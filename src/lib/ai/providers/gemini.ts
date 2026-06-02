@@ -8,9 +8,12 @@ import type { AIProvider, AIChatResult, ChatMessage, VisionInput } from "@/lib/a
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 
-const MODEL = "gemini-1.5-flash";
+const MODEL = "gemini-2.5-flash";
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const TIMEOUT_MS = 20000;
+// Desactiva el "thinking" de 2.5 (consume tokens de salida y encarece/retrasa);
+// para asesoría conversacional y extracción de recibos no aporta y sí estabiliza.
+const THINKING_OFF = { thinkingBudget: 0 };
 
 type GeminiResponse = {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
@@ -67,7 +70,11 @@ export class GeminiProvider implements AIProvider {
     const body = {
       system_instruction: { parts: [{ text: system }] },
       contents,
-      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.4 },
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.4,
+        thinkingConfig: THINKING_OFF,
+      },
     };
     return extract(await call(this.key, body));
   }
@@ -80,7 +87,11 @@ export class GeminiProvider implements AIProvider {
           parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: imageBase64 } }],
         },
       ],
-      generationConfig: { maxOutputTokens: 512, temperature: 0.1 },
+      generationConfig: {
+        maxOutputTokens: 512,
+        temperature: 0.1,
+        thinkingConfig: THINKING_OFF,
+      },
     };
     return extract(await call(this.key, body));
   }
