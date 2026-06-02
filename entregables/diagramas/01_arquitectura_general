@@ -1,0 +1,56 @@
+digraph "01_arquitectura" {
+	bgcolor="#F8FAFC" fontname="DejaVu Sans" fontsize=12 nodesep=0.35 pad=0.4 rankdir=TB ranksep=0.55 splines=spline
+	node [color="#0B1F3A" fillcolor="#FFFFFF" fontcolor="#0F172A" fontname="DejaVu Sans" fontsize=12 margin="0.16,0.10" shape=box style="filled,rounded"]
+	edge [arrowsize=0.8 color="#475569" fontname="DejaVu Sans" fontsize=9 penwidth=1.3]
+	fontcolor="#0B1F3A" fontsize=18 label="Compound Ascend - Arquitectura general (monolito modular)" labelloc=t
+	graph [dpi=160]
+	subgraph cluster_client {
+		color="#4F46E5" fillcolor="#EEF2FF" fontcolor="#4F46E5" fontsize=13 label="Cliente (navegador / movil)" style="filled,rounded"
+		ui [label="UI React 19 + Tailwind v4
+Dashboard - 5 modulos - Coach IA" color="#4F46E5" fillcolor="#FFFFFF"]
+	}
+	subgraph cluster_edge {
+		color="#059669" fillcolor="#ECFDF5" fontcolor="#059669" fontsize=13 label="Next.js 15 (App Router - Vercel)" style="filled,rounded"
+		mw [label="Middleware
+(refresca sesion Supabase)" color="#059669" fillcolor="#FFFFFF"]
+		rsc [label="Server Components / Pages
+(auth - onboarding - dashboard)" color="#059669" fillcolor="#FFFFFF"]
+		api [label="Rutas API
+assistant - market-price - webhooks - health" color="#059669" fillcolor="#FFFFFF"]
+		sec [label="Capa transversal de seguridad
+CORS - CSP/headers - rate-limit - Zod" color="#D97706" fillcolor="#FEF3C7"]
+	}
+	subgraph cluster_domain {
+		color="#475569" fillcolor="#F1F5F9" fontcolor="#475569" fontsize=13 label="Dominio (src/modules - logica por capas)" style="filled,rounded"
+		svc [label="Services
+(acceso a datos + RLS)" fillcolor="#FFFFFF"]
+		eng [label="Engines
+(logica pura - determinista - testeable)" color="#059669" fillcolor="#D1FAE5"]
+		aiorq [label="Orquestador IA
+(AIProvider - limites de tokens)" color="#4F46E5" fillcolor="#EDE9FE"]
+	}
+	subgraph cluster_data {
+		color="#D97706" fillcolor="#FFF7ED" fontcolor="#D97706" fontsize=13 label="Datos y servicios externos" style="filled,rounded"
+		db [label="Supabase
+Postgres (45 tablas + RLS) - Auth - Storage" color="#0B1F3A" fillcolor="#FFFFFF"]
+		gem [label="Proveedor IA
+(Gemini, tras AIProvider)" color="#4F46E5" fillcolor="#FFFFFF"]
+		mkt [label="Market data
+Finnhub - AlphaVantage - Yahoo - Binance - CoinGecko" fillcolor="#FFFFFF"]
+		pay [label="Pasarela de pagos
+(webhook firmado HMAC)" fillcolor="#FFFFFF"]
+	}
+	ui -> mw
+	mw -> rsc
+	rsc -> api [style=dashed]
+	rsc -> svc
+	api -> sec
+	sec -> svc
+	api -> aiorq
+	svc -> eng
+	svc -> db
+	aiorq -> gem
+	aiorq -> db [label=tokens style=dashed]
+	api -> mkt [label=precios]
+	pay -> api [label="plan.updated" color="#D97706"]
+}
