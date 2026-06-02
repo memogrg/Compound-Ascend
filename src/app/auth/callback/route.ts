@@ -14,6 +14,8 @@ function safeNext(next: string | null): string {
   return next;
 }
 
+const pendingCallbackExchange = new Map<string, Promise<NextResponse>>();
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -23,10 +25,38 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=auth", url.origin));
   }
 
+  if (pendingCallbackExchange.has(code)) {
+    return pendingCallbackExchange.get(code)!;
+  }
+
+  const exchangePromise = handleCallbackExchange(url, code, next);
+  pendingCallbackExchange.set(code, exchangePromise);
+
+  try {
+    return await exchangePromise;
+  } finally {
+    pendingCallbackExchange.delete(code);
+  }
+}
+
+async function handleCallbackExchange(url: URL, code: string, next: string) {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
+
   if (error) {
-    logger.warn("exchangeCodeForSession fallido", { code: error.code });
+    logger.warn("exchangeCodeForSession fallido", {
+      code: error.code,
+      message: error.message,
+    });
+
+    if (
+      error.status === 400 ||
+      error.message?.toLowerCase().includes("already been used") ||
+      error.message?.toLowerCase().includes("invalid grant")
+    ) {
+      return NextResponse.redirect(new URL(next, url.origin));
+    }
+
     return NextResponse.redirect(new URL("/login?error=auth", url.origin));
   }
 
