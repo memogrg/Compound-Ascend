@@ -4,12 +4,15 @@ import type { Database } from "@/lib/supabase/database.types";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-/** Rutas públicas (no requieren sesión). */
+/** Rutas públicas de PÁGINA (no requieren sesión). */
 const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth"];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
 
 function isPublic(pathname: string): boolean {
+  // Las rutas /api gestionan su propia autenticación y responden JSON; el
+  // middleware nunca debe redirigirlas a /login (rompería los fetch).
+  if (pathname.startsWith("/api/")) return true;
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
