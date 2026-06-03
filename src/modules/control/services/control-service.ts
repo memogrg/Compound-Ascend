@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { GoalInput, DebtInputForm } from "@/modules/control/schemas";
 import type {
   SavingsGoal,
@@ -178,12 +179,13 @@ export type ControlSummary = {
 /** Carga todo y calcula el diagnóstico de control. */
 export async function getControlSummary(): Promise<ControlSummary> {
   const user = await requireUser();
-  const [goals, debts, base, currency, discipline] = await Promise.all([
+  const [goals, debts, base, currency, discipline, rates] = await Promise.all([
     listGoals(),
     listDebts(),
     getBaseSummary(),
     getPrimaryCurrency(),
     getDiscipline(user.id),
+    getFxRates(),
   ]);
 
   const hasEmergencyFund = goals.some(
@@ -198,15 +200,15 @@ export async function getControlSummary(): Promise<ControlSummary> {
   // moneda original en el dashboard).
   const goalsForEngine = goals.map((g) => ({
     ...g,
-    targetAmount: convertCurrency(g.targetAmount, g.currency, currency),
-    currentAmount: convertCurrency(g.currentAmount, g.currency, currency),
-    monthlyContribution: convertCurrency(g.monthlyContribution, g.currency, currency),
+    targetAmount: convertCurrency(g.targetAmount, g.currency, currency, rates),
+    currentAmount: convertCurrency(g.currentAmount, g.currency, currency, rates),
+    monthlyContribution: convertCurrency(g.monthlyContribution, g.currency, currency, rates),
   }));
   const debtsForEngine = debts.map((d) => ({
     ...d,
-    balance: convertCurrency(d.balance, d.currency, currency),
-    minPayment: convertCurrency(d.minPayment, d.currency, currency),
-    currentPayment: convertCurrency(d.currentPayment, d.currency, currency),
+    balance: convertCurrency(d.balance, d.currency, currency, rates),
+    minPayment: convertCurrency(d.minPayment, d.currency, currency, rates),
+    currentPayment: convertCurrency(d.currentPayment, d.currency, currency, rates),
   }));
 
   const diagnosis = buildControlDiagnosis(

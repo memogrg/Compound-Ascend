@@ -12,6 +12,7 @@ import {
 } from "@/modules/wealth/engine/wealth-engine";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { convertCurrency } from "@/lib/fx";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { InvestmentInput, PolicyInput } from "@/modules/wealth/schemas";
 import type {
   Investment,
@@ -191,11 +192,12 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  const [investments, policies, base, currency] = await Promise.all([
+  const [investments, policies, base, currency, rates] = await Promise.all([
     listInvestments(),
     listPolicies(),
     getBaseSummary(),
     getPrimaryCurrency(),
+    getFxRates(),
   ]);
 
   const [{ data: profile }, { data: risk }, { data: goals }, { data: debts }] = await Promise.all([
@@ -226,8 +228,8 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   // moneda por ítem, se asumen en la moneda principal).
   const policiesForEngine = policies.map((p) => ({
     ...p,
-    coverage: p.coverage == null ? p.coverage : convertCurrency(p.coverage, p.currency, currency),
-    premium: p.premium == null ? p.premium : convertCurrency(p.premium, p.currency, currency),
+    coverage: p.coverage == null ? p.coverage : convertCurrency(p.coverage, p.currency, currency, rates),
+    premium: p.premium == null ? p.premium : convertCurrency(p.premium, p.currency, currency, rates),
   }));
 
   const readiness = computeReadiness(ctx, investments);

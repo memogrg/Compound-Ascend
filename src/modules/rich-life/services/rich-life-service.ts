@@ -10,6 +10,7 @@ import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/ser
 import { computeProtection, computePortfolio } from "@/modules/wealth/engine/wealth-engine";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { convertCurrency } from "@/lib/fx";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { AssetInput, LiabilityInput } from "@/modules/rich-life/schemas";
 import type {
   Asset,
@@ -107,7 +108,11 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  const [base, currency] = await Promise.all([getBaseSummary(), getPrimaryCurrency()]);
+  const [base, currency, rates] = await Promise.all([
+    getBaseSummary(),
+    getPrimaryCurrency(),
+    getFxRates(),
+  ]);
 
   const [assetRows, liabRows, debtRows, invRows, policyRows, profileRow, prevSnap] =
     await Promise.all([
@@ -176,7 +181,7 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
   // Ingreso pasivo mensual (normalizado a la moneda principal).
   const passiveIncomeMonthly = base.incomes
     .filter((i) => i.incomeType === "pasivo" && i.includeInBudget)
-    .reduce((s, i) => s + convertCurrency(i.amountMonthly, i.currency, currency), 0);
+    .reduce((s, i) => s + convertCurrency(i.amountMonthly, i.currency, currency, rates), 0);
 
   // Protección y diversificación (reutiliza motores de Patrimonio).
   const policies: InsurancePolicy[] = (policyRows.data ?? []).map((p, i) => ({
@@ -214,11 +219,11 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
   // El motor agrega patrimonio: normalizamos valores a la moneda principal.
   const assetsForEngine = assets.map((a) => ({
     ...a,
-    value: convertCurrency(a.value, a.currency, currency),
+    value: convertCurrency(a.value, a.currency, currency, rates),
   }));
   const liabsForEngine = liabilities.map((l) => ({
     ...l,
-    balance: convertCurrency(l.balance, l.currency, currency),
+    balance: convertCurrency(l.balance, l.currency, currency, rates),
   }));
 
   const input: RichLifeInput = {

@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth/session";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { convertCurrency } from "@/lib/fx";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import type {
   IncomeSource,
   ExpenseItem,
@@ -176,21 +177,22 @@ export type BaseSummary = {
 
 /** Carga ítems y calcula los indicadores de la base financiera. */
 export async function getBaseSummary(): Promise<BaseSummary> {
-  const [incomes, expenses, primary] = await Promise.all([
+  const [incomes, expenses, primary, rates] = await Promise.all([
     listIncomes(),
     listExpenses(),
     getPrimaryCurrency(),
+    getFxRates(),
   ]);
   // Los indicadores agregan dinero, así que normalizamos cada ítem a la moneda
   // principal antes de sumar. Los montos por ítem se conservan en su moneda
   // original (los componentes los muestran tal cual el usuario los registró).
   const incForEngine = incomes.map((i) => ({
     ...i,
-    amountMonthly: convertCurrency(i.amountMonthly, i.currency, primary),
+    amountMonthly: convertCurrency(i.amountMonthly, i.currency, primary, rates),
   }));
   const expForEngine = expenses.map((e) => ({
     ...e,
-    amountMonthly: convertCurrency(e.amountMonthly, e.currency, primary),
+    amountMonthly: convertCurrency(e.amountMonthly, e.currency, primary, rates),
   }));
   return { indicators: computeBaseIndicators(incForEngine, expForEngine), incomes, expenses };
 }
