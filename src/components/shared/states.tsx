@@ -71,13 +71,77 @@ export function ErrorState({
   );
 }
 
+/** Bloque base con shimmer. `aria-hidden` porque el contenedor ya anuncia "Cargando". */
+export function Skel({
+  h = 16,
+  w = "100%",
+  r = 8,
+  style,
+}: {
+  h?: number | string;
+  w?: number | string;
+  r?: number;
+  style?: React.CSSProperties;
+}) {
+  return <div className="skel" aria-hidden style={{ height: h, width: w, borderRadius: r, ...style }} />;
+}
+
 export function LoadingSkeleton({ height = 120 }: { height?: number }) {
+  return <Skel h={height} r={16} />;
+}
+
+function SkelCard({ children, minHeight }: { children: React.ReactNode; minHeight?: number }) {
   return (
-    <div
-      className="card"
-      style={{ height, position: "relative", overflow: "hidden" }}
-      aria-busy="true"
-      aria-label="Cargando"
-    />
+    <div className="card card-pad" style={{ minHeight, display: "grid", gap: 14, alignContent: "start" }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Skeleton de página de módulo: cabecera + fila de KPIs + dos tarjetas de
+ * contenido. Refleja el layout real para evitar un salto brusco al cargar.
+ * Se usa como fallback de Suspense (loading.tsx) mientras el servidor agrega
+ * los datos (incluida la consulta de tasas de cambio).
+ */
+export function ModuleSkeleton({ kpis = 4 }: { kpis?: number }) {
+  return (
+    <div className="grid" aria-busy="true">
+      <span className="sr-only" role="status">
+        Cargando…
+      </span>
+
+      <div
+        className="card card-pad"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}
+      >
+        <div style={{ display: "grid", gap: 9 }}>
+          <Skel h={16} w={190} />
+          <Skel h={12} w={280} />
+        </div>
+        <Skel h={38} w={150} r={11} />
+      </div>
+
+      <section className="cols-4">
+        {Array.from({ length: kpis }).map((_, i) => (
+          <div key={i} className="card kpi" style={{ padding: "16px 18px", display: "grid", gap: 12 }}>
+            <Skel h={11} w={90} />
+            <Skel h={26} w={130} />
+            <Skel h={10} w={70} />
+          </div>
+        ))}
+      </section>
+
+      <section className="cols-2">
+        <SkelCard minHeight={260}>
+          <Skel h={14} w={170} />
+          <Skel h={170} r={14} />
+        </SkelCard>
+        <SkelCard minHeight={260}>
+          <Skel h={14} w={170} />
+          <Skel h={170} r={14} />
+        </SkelCard>
+      </section>
+    </div>
   );
 }

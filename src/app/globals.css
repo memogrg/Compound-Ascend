@@ -538,3 +538,17 @@ a { color: inherit; text-decoration: none; }
 .toast.show { opacity: 1; transform: none; }
 .toast .ic { width: 18px; height: 18px; border-radius: 50%; background: var(--pos); color: white; display: grid; place-items: center; flex: none; }
 .toast .ic svg { width: 11px; height: 11px; }
+
+/* ── Skeletons de carga (shimmer) ───────────────────────────────────── */
+.skel { position: relative; overflow: hidden; background: var(--chip); border-radius: 10px; }
+.skel::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 7%, transparent), transparent);
+  animation: skelShimmer 1.4s ease-in-out infinite;
+}
+@keyframes skelShimmer { 100% { transform: translateX(100%); } }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+@media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }
