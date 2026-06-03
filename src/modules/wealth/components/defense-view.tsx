@@ -1,6 +1,6 @@
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
-import { EditWealthButton } from "./wealth-actions";
+import { EditWealthButton, WealthActions } from "./wealth-actions";
 import { formatMoney } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type { PolicyType } from "@/modules/wealth/types";
@@ -107,8 +107,9 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
             </div>
           </div>
           {policies.length === 0 ? (
-            <div className="muted" style={{ padding: "20px 24px", fontSize: 13 }}>
-              Aún no registras pólizas.
+            <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+              <span>Aún no registras pólizas.</span>
+              <WealthActions mode="policy" currency={currency} />
             </div>
           ) : (
             policies.map((pol) => (

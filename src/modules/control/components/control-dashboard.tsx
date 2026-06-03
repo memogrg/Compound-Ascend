@@ -1,6 +1,6 @@
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
-import { EditControlButton } from "./control-actions";
+import { EditControlButton, AddControlButton } from "./control-actions";
 import { formatMoney } from "@/lib/format";
 import type { ControlSummary } from "@/modules/control/services/control-service";
 import type { GoalAction, Semaforo } from "@/modules/control/types";
@@ -159,7 +159,10 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
             </div>
           </div>
           {goals.length === 0 ? (
-            <Empty text="Aún no agregas objetivos de ahorro." />
+            <Empty
+              text="Aún no agregas objetivos de ahorro."
+              action={<AddControlButton kind="goal" currency={currency} label="Agregar objetivo" />}
+            />
           ) : (
             goals.map((g) => {
               const rec = d.goalRecs.find((r) => r.goalId === g.id);
@@ -254,10 +257,11 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
   );
 }
 
-function Empty({ text }: { text: string }) {
+function Empty({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div className="muted" style={{ padding: "20px 24px", fontSize: 13 }}>
-      {text}
+    <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+      <span>{text}</span>
+      {action}
     </div>
   );
 }

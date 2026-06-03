@@ -30,23 +30,38 @@ function currencySymbol(code: string): string {
   return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[code] ?? "";
 }
 
-/** Toolbar de alta (ingreso / gasto). */
-export function BaseActions({ currency = "CRC" }: { currency?: string }) {
-  const [open, setOpen] = useState<Kind | null>(null);
+/** Botón de alta (ingreso / gasto) que abre su propio diálogo. Reutilizable
+ * en la toolbar y en los estados vacíos accionables. */
+export function AddItemButton({
+  kind,
+  currency,
+  label,
+  variant = "btn-primary",
+}: {
+  kind: Kind;
+  currency: string;
+  label?: string;
+  variant?: "btn-primary" | "btn-secondary";
+}) {
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn btn-primary" onClick={() => setOpen("income")}>
-          <Icon name="income" width={2} /> Agregar ingreso
-        </button>
-        <button className="btn btn-secondary" onClick={() => setOpen("expense")}>
-          <Icon name="expense" width={2} /> Agregar gasto
-        </button>
-      </div>
-      {open ? (
-        <ItemDialog kind={open} currency={currency} onClose={() => setOpen(null)} />
-      ) : null}
+      <button className={`btn ${variant}`} onClick={() => setOpen(true)}>
+        <Icon name={kind === "income" ? "income" : "expense"} width={2} />{" "}
+        {label ?? (kind === "income" ? "Agregar ingreso" : "Agregar gasto")}
+      </button>
+      {open ? <ItemDialog kind={kind} currency={currency} onClose={() => setOpen(false)} /> : null}
     </>
+  );
+}
+
+/** Toolbar de alta (ingreso / gasto). */
+export function BaseActions({ currency = "CRC" }: { currency?: string }) {
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <AddItemButton kind="income" currency={currency} variant="btn-primary" />
+      <AddItemButton kind="expense" currency={currency} variant="btn-secondary" />
+    </div>
   );
 }
 

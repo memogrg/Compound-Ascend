@@ -17,20 +17,37 @@ import type { SavingsGoal, Debt } from "@/modules/control/types";
 
 type Kind = "goal" | "debt";
 
-export function ControlActions({ currency = "CRC" }: { currency?: string }) {
-  const [open, setOpen] = useState<Kind | null>(null);
+/** Botón de alta (objetivo / deuda) que abre su propio diálogo. Reutilizable
+ * en la toolbar y en los estados vacíos accionables. */
+export function AddControlButton({
+  kind,
+  currency,
+  label,
+  variant = "btn-primary",
+}: {
+  kind: Kind;
+  currency: string;
+  label?: string;
+  variant?: "btn-primary" | "btn-secondary";
+}) {
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn btn-primary" onClick={() => setOpen("goal")}>
-          <Icon name="savings" width={2} /> Agregar objetivo
-        </button>
-        <button className="btn btn-secondary" onClick={() => setOpen("debt")}>
-          <Icon name="debt" width={2} /> Agregar deuda
-        </button>
-      </div>
-      {open ? <ControlDialog kind={open} currency={currency} onClose={() => setOpen(null)} /> : null}
+      <button className={`btn ${variant}`} onClick={() => setOpen(true)}>
+        <Icon name={kind === "goal" ? "savings" : "debt"} width={2} />{" "}
+        {label ?? (kind === "goal" ? "Agregar objetivo" : "Agregar deuda")}
+      </button>
+      {open ? <ControlDialog kind={kind} currency={currency} onClose={() => setOpen(false)} /> : null}
     </>
+  );
+}
+
+export function ControlActions({ currency = "CRC" }: { currency?: string }) {
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <AddControlButton kind="goal" currency={currency} variant="btn-primary" />
+      <AddControlButton kind="debt" currency={currency} variant="btn-secondary" />
+    </div>
   );
 }
 

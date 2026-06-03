@@ -1,7 +1,7 @@
 import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
-import { EditWealthButton } from "./wealth-actions";
+import { EditWealthButton, WealthActions } from "./wealth-actions";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 
@@ -126,8 +126,9 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
             </div>
           </div>
           {investments.length === 0 ? (
-            <div className="muted" style={{ padding: "20px 24px", fontSize: 13 }}>
-              Aún no registras inversiones.
+            <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+              <span>Aún no registras inversiones.</span>
+              <WealthActions mode="investment" currency={currency} />
             </div>
           ) : (
             investments.map((inv) => {

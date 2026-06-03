@@ -1,6 +1,6 @@
 import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { DeleteButton } from "./delete-button";
-import { EditItemButton } from "./base-actions";
+import { EditItemButton, AddItemButton } from "./base-actions";
 import { EXPENSE_NATURES, NATURE_COLOR } from "@/modules/financial-base/constants";
 import { formatMoney, formatPercent, formatCompact } from "@/lib/format";
 import type { BaseSummary } from "@/modules/financial-base/services/base-service";
@@ -96,7 +96,10 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
       <section className="split-3-2">
         <ItemCard title="Mis ingresos" sub={`${incomes.length} fuente(s)`}>
           {incomes.length === 0 ? (
-            <Empty text="Aún no agregas ingresos." />
+            <Empty
+              text="Aún no agregas ingresos."
+              action={<AddItemButton kind="income" currency={currency} label="Agregar ingreso" />}
+            />
           ) : (
             incomes.map((i) => (
               <Row
@@ -114,7 +117,10 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
 
         <ItemCard title="Mis gastos" sub={`${expenses.length} gasto(s)`}>
           {expenses.length === 0 ? (
-            <Empty text="Aún no agregas gastos." />
+            <Empty
+              text="Aún no agregas gastos."
+              action={<AddItemButton kind="expense" currency={currency} variant="btn-secondary" label="Agregar gasto" />}
+            />
           ) : (
             expenses.map((e) => (
               <Row
@@ -221,10 +227,11 @@ function Row({
   );
 }
 
-function Empty({ text }: { text: string }) {
+function Empty({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div className="muted" style={{ padding: "20px 24px", fontSize: 13 }}>
-      {text}
+    <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+      <span>{text}</span>
+      {action}
     </div>
   );
 }

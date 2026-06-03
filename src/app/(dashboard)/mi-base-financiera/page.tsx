@@ -2,7 +2,7 @@ import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { BaseDashboard } from "@/modules/financial-base/components/base-dashboard";
-import { BaseActions } from "@/modules/financial-base/components/base-actions";
+import { BaseActions, AddItemButton } from "@/modules/financial-base/components/base-actions";
 import { EmptyState } from "@/components/shared/states";
 import type { BaseSummary } from "@/modules/financial-base/services/base-service";
 
@@ -48,6 +48,7 @@ export default async function Page() {
           icon="income"
           title="Empieza por tu ingreso principal"
           description="Agrega tu salario u otra fuente de ingreso y luego tus gastos esenciales. Con eso ya podemos darte un primer diagnóstico de tu flujo libre, tus tasas y tu presión financiera."
+          action={<AddItemButton kind="income" currency={currency} label="Agregar mi ingreso" />}
         />
       ) : (
         <BaseDashboard summary={summary} currency={currency} />

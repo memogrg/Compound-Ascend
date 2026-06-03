@@ -33,20 +33,37 @@ const LIAB_CLASSES = [
   ["critico", "Crítico"],
 ] as const;
 
-export function RichActions({ currency = "CRC" }: { currency?: string }) {
-  const [open, setOpen] = useState<Kind | null>(null);
+/** Botón de alta (activo / pasivo) que abre su propio diálogo. Reutilizable
+ * en la toolbar y en los estados vacíos accionables. */
+export function AddRichButton({
+  kind,
+  currency,
+  label,
+  variant = "btn-primary",
+}: {
+  kind: Kind;
+  currency: string;
+  label?: string;
+  variant?: "btn-primary" | "btn-secondary";
+}) {
+  const [open, setOpen] = useState(false);
   return (
     <>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <button className="btn btn-primary" onClick={() => setOpen("asset")}>
-          <Icon name="networth" width={2} /> Agregar activo
-        </button>
-        <button className="btn btn-secondary" onClick={() => setOpen("liability")}>
-          <Icon name="debt" width={2} /> Agregar pasivo
-        </button>
-      </div>
-      {open ? <RichDialog kind={open} currency={currency} onClose={() => setOpen(null)} /> : null}
+      <button className={`btn ${variant}`} onClick={() => setOpen(true)}>
+        <Icon name={kind === "asset" ? "networth" : "debt"} width={2} />{" "}
+        {label ?? (kind === "asset" ? "Agregar activo" : "Agregar pasivo")}
+      </button>
+      {open ? <RichDialog kind={kind} currency={currency} onClose={() => setOpen(false)} /> : null}
     </>
+  );
+}
+
+export function RichActions({ currency = "CRC" }: { currency?: string }) {
+  return (
+    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <AddRichButton kind="asset" currency={currency} variant="btn-primary" />
+      <AddRichButton kind="liability" currency={currency} variant="btn-secondary" />
+    </div>
   );
 }
 

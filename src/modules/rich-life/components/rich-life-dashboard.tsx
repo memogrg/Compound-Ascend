@@ -1,6 +1,6 @@
 import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { DeleteButton } from "./delete-button";
-import { EditRichButton } from "./rich-actions";
+import { EditRichButton, AddRichButton } from "./rich-actions";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
 import type { RichTrend, Asset, Liability } from "@/modules/rich-life/types";
@@ -124,6 +124,7 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           title="Mis activos"
           sub={`${assets.length} registrado(s)`}
           currency={currency}
+          addKind="asset"
           items={assets.map((a) => ({ id: a.id, name: a.name, sub: a.assetClass.replace("_", " "), amount: formatMoney(a.value, a.currency), color: "var(--pos)", kind: "asset" as const, entity: a }))}
           emptyText="Agrega tu casa, carro, inversiones…"
         />
@@ -131,6 +132,7 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           title="Mis pasivos"
           sub={`${liabilities.length} registrado(s)`}
           currency={currency}
+          addKind="liability"
           items={liabilities.map((l) => ({ id: l.id, name: l.name, sub: l.liabilityClass, amount: formatMoney(l.balance, l.currency), color: "var(--neg)", kind: "liability" as const, entity: l }))}
           emptyText="Agrega hipotecas u otras deudas grandes."
         />
@@ -197,6 +199,7 @@ function ListCard({
   items,
   emptyText,
   currency,
+  addKind,
 }: {
   title: string;
   sub: string;
@@ -211,6 +214,7 @@ function ListCard({
   }[];
   emptyText: string;
   currency: string;
+  addKind: "asset" | "liability";
 }) {
   return (
     <div className="card">
@@ -221,8 +225,13 @@ function ListCard({
         </div>
       </div>
       {items.length === 0 ? (
-        <div className="muted" style={{ padding: "20px 24px", fontSize: 13 }}>
-          {emptyText}
+        <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+          <span>{emptyText}</span>
+          <AddRichButton
+            kind={addKind}
+            currency={currency}
+            variant={addKind === "asset" ? "btn-primary" : "btn-secondary"}
+          />
         </div>
       ) : (
         items.map((it) => (
