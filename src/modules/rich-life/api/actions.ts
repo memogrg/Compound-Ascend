@@ -5,6 +5,8 @@ import { assetInputSchema, liabilityInputSchema } from "@/modules/rich-life/sche
 import {
   createAsset,
   createLiability,
+  updateAsset,
+  updateLiability,
   deleteAsset,
   deleteLiability,
 } from "@/modules/rich-life/services/rich-life-service";
@@ -47,6 +49,34 @@ export async function addLiabilityAction(raw: unknown): Promise<ActionResult> {
   } catch (err) {
     logger.error("addLiability fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos guardar el pasivo." };
+  }
+}
+
+export async function editAssetAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = assetInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateAsset(id, parsed.data);
+    revalidatePath("/mi-rich-life");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editAsset fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar el activo." };
+  }
+}
+
+export async function editLiabilityAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = liabilityInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateLiability(id, parsed.data);
+    revalidatePath("/mi-rich-life");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editLiability fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar el pasivo." };
   }
 }
 

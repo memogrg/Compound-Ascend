@@ -10,6 +10,8 @@ import { incomeInputSchema, expenseInputSchema } from "@/modules/financial-base/
 import {
   createIncome,
   createExpense,
+  updateIncome,
+  updateExpense,
   deleteIncome,
   deleteExpense,
 } from "@/modules/financial-base/services/base-service";
@@ -52,6 +54,36 @@ export async function addExpenseAction(raw: unknown): Promise<ActionResult> {
   } catch (err) {
     logger.error("addExpense fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos guardar el gasto." };
+  }
+}
+
+export async function editIncomeAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = incomeInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateIncome(id, parsed.data);
+    revalidatePath("/mi-base-financiera");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editIncome fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar el ingreso." };
+  }
+}
+
+export async function editExpenseAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = expenseInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateExpense(id, parsed.data);
+    revalidatePath("/mi-base-financiera");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editExpense fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar el gasto." };
   }
 }
 

@@ -1,5 +1,6 @@
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
+import { EditWealthButton } from "./wealth-actions";
 import { formatMoney } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type { PolicyType } from "@/modules/wealth/types";
@@ -122,7 +123,10 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
                 <span className="tnum" style={{ fontSize: 12.5, color: "var(--muted)" }}>
                   {pol.premium ? `${formatMoney(pol.premium, currency)}/${(pol.premiumFrequency ?? "año").slice(0, 3)}` : "—"}
                 </span>
-                <DeleteButton id={pol.id} kind="policy" />
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <EditWealthButton mode="policy" item={pol} currency={currency} />
+                  <DeleteButton id={pol.id} kind="policy" />
+                </div>
               </div>
             ))
           )}

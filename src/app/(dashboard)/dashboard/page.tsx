@@ -5,6 +5,8 @@ import { DashboardView } from "@/modules/dashboard";
 import { EmptyState } from "@/components/shared/states";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isDemoData } from "@/modules/account/services/account-service";
+import { DemoBanner } from "@/components/shared/demo-banner";
 
 /**
  * Panel principal — consume datos reales del Perfil y la Base Financiera.
@@ -51,14 +53,23 @@ export default async function DashboardPage() {
     );
   }
 
+  const showDemoBanner = data.configured && (await isDemoData());
+
   return (
-    <DashboardView
-      name={data.name}
-      summary={data.summary}
-      currency={data.currency}
-      health={data.health}
-      insights={data.insights}
-      demo={!data.configured}
-    />
+    <>
+      {showDemoBanner ? (
+        <div style={{ marginBottom: 18 }}>
+          <DemoBanner />
+        </div>
+      ) : null}
+      <DashboardView
+        name={data.name}
+        summary={data.summary}
+        currency={data.currency}
+        health={data.health}
+        insights={data.insights}
+        demo={!data.configured}
+      />
+    </>
   );
 }

@@ -1,9 +1,10 @@
 import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { DeleteButton } from "./delete-button";
+import { EditItemButton } from "./base-actions";
 import { EXPENSE_NATURES, NATURE_COLOR } from "@/modules/financial-base/constants";
 import { formatMoney, formatPercent, formatCompact } from "@/lib/format";
 import type { BaseSummary } from "@/modules/financial-base/services/base-service";
-import type { ExpenseNature } from "@/modules/financial-base/types";
+import type { ExpenseNature, IncomeSource, ExpenseItem } from "@/modules/financial-base/types";
 
 const PRESSURE_LABEL: Record<string, { label: string; cls: string }> = {
   baja: { label: "Baja", cls: "var(--pos)" },
@@ -100,9 +101,9 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
             incomes.map((i) => (
               <Row
                 key={i.id}
-                id={i.id}
                 kind="income"
-                name={i.name}
+                item={i}
+                currency={currency}
                 sub={`${i.frequency} · ${i.incomeType}`}
                 amount={`+${formatMoney(i.amountMonthly, currency)}/mes`}
                 amountColor="var(--pos)"
@@ -118,9 +119,9 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
             expenses.map((e) => (
               <Row
                 key={e.id}
-                id={e.id}
                 kind="expense"
-                name={e.name}
+                item={e}
+                currency={currency}
                 sub={`${e.frequency} · ${NATURE_LABEL[e.nature] ?? e.nature}`}
                 amount={`${formatMoney(e.amountMonthly, currency)}/mes`}
               />
@@ -184,16 +185,16 @@ function ItemCard({
 }
 
 function Row({
-  id,
   kind,
-  name,
+  item,
+  currency,
   sub,
   amount,
   amountColor,
 }: {
-  id: string;
   kind: "income" | "expense";
-  name: string;
+  item: IncomeSource | ExpenseItem;
+  currency: string;
   sub: string;
   amount: string;
   amountColor?: string;
@@ -201,19 +202,20 @@ function Row({
   return (
     <div className="list-row">
       <div className="li-icon" style={{ width: 34, height: 34, borderRadius: 9, background: "var(--chip)", display: "grid", placeItems: "center", color: "var(--ink-2)" }}>
-        <span style={{ fontSize: 12, fontWeight: 600 }}>{name.charAt(0).toUpperCase()}</span>
+        <span style={{ fontSize: 12, fontWeight: 600 }}>{item.name.charAt(0).toUpperCase()}</span>
       </div>
       <div>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{name}</div>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</div>
         <div className="muted" style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}>
           {sub}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500, color: amountColor }}>
           {amount}
         </span>
-        <DeleteButton id={id} kind={kind} />
+        <EditItemButton kind={kind} item={item} currency={currency} />
+        <DeleteButton id={item.id} kind={kind} />
       </div>
     </div>
   );

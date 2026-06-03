@@ -5,6 +5,8 @@ import { investmentInputSchema, policyInputSchema } from "@/modules/wealth/schem
 import {
   createInvestment,
   createPolicy,
+  updateInvestment,
+  updatePolicy,
   deleteInvestment,
   deletePolicy,
 } from "@/modules/wealth/services/wealth-service";
@@ -47,6 +49,34 @@ export async function addPolicyAction(raw: unknown): Promise<ActionResult> {
   } catch (err) {
     logger.error("addPolicy fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos guardar la póliza." };
+  }
+}
+
+export async function editInvestmentAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = investmentInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateInvestment(id, parsed.data);
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editInvestment fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar la inversión." };
+  }
+}
+
+export async function editPolicyAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = policyInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updatePolicy(id, parsed.data);
+    revalidatePath("/patrimonio/proteccion");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editPolicy fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar la póliza." };
   }
 }
 

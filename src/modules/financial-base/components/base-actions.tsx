@@ -11,18 +11,25 @@ import {
   EXPENSE_CATEGORIES,
   CATEGORY_DEFAULT_NATURE,
 } from "@/modules/financial-base/constants";
-import { addIncomeAction, addExpenseAction } from "@/modules/financial-base/api/actions";
+import {
+  addIncomeAction,
+  addExpenseAction,
+  editIncomeAction,
+  editExpenseAction,
+} from "@/modules/financial-base/api/actions";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
+import type { IncomeSource, ExpenseItem } from "@/modules/financial-base/types";
 
-type Kind = "income" | "expense" | null;
+type Kind = "income" | "expense";
+type EditItem = IncomeSource | ExpenseItem;
 
-const FREQ_OPTS = FREQUENCIES;
+function currencySymbol(code: string): string {
+  return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[code] ?? "";
+}
 
+/** Toolbar de alta (ingreso / gasto). */
 export function BaseActions({ currency = "CRC" }: { currency?: string }) {
-  const [open, setOpen] = useState<Kind>(null);
-  const router = useRouter();
-  const close = () => setOpen(null);
-
+  const [open, setOpen] = useState<Kind | null>(null);
   return (
     <>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -33,63 +40,111 @@ export function BaseActions({ currency = "CRC" }: { currency?: string }) {
           <Icon name="expense" width={2} /> Agregar gasto
         </button>
       </div>
-
-      {open && (
-        <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && close()}>
-          <div className="modal" role="dialog">
-            <div className="modal-head">
-              <div>
-                <div className="modal-title">
-                  {open === "income" ? "Agregar ingreso" : "Agregar gasto"}
-                </div>
-                <div className="modal-sub">
-                  No tiene que ser exacto. Empieza con un aproximado y lo afinamos.
-                </div>
-              </div>
-              <button className="modal-x" aria-label="Cerrar" onClick={close}>
-                <Icon name="x" width={2} />
-              </button>
-            </div>
-            {open === "income" ? (
-              <CaptureForm
-                kind="income"
-                currency={currency}
-                onDone={() => {
-                  close();
-                  router.refresh();
-                }}
-              />
-            ) : (
-              <CaptureForm
-                kind="expense"
-                currency={currency}
-                onDone={() => {
-                  close();
-                  router.refresh();
-                }}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      {open ? (
+        <ItemDialog kind={open} currency={currency} onClose={() => setOpen(null)} />
+      ) : null}
     </>
+  );
+}
+
+/** Botón de editar para una fila. */
+export function EditItemButton({
+  kind,
+  item,
+  currency,
+}: {
+  kind: Kind;
+  item: EditItem;
+  currency: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="icon-btn"
+        style={{ width: 30, height: 30 }}
+        aria-label="Editar"
+        title="Editar"
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="edit" />
+      </button>
+      {open ? (
+        <ItemDialog kind={kind} currency={currency} item={item} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+function ItemDialog({
+  kind,
+  currency,
+  item,
+  onClose,
+}: {
+  kind: Kind;
+  currency: string;
+  item?: EditItem;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const editing = Boolean(item);
+  const title = editing
+    ? kind === "income"
+      ? "Editar ingreso"
+      : "Editar gasto"
+    : kind === "income"
+      ? "Agregar ingreso"
+      : "Agregar gasto";
+
+  return (
+    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog">
+        <div className="modal-head">
+          <div>
+            <div className="modal-title">{title}</div>
+            <div className="modal-sub">
+              {editing ? "Ajusta los datos y guarda." : "No tiene que ser exacto; lo afinamos luego."}
+            </div>
+          </div>
+          <button className="modal-x" aria-label="Cerrar" onClick={onClose}>
+            <Icon name="x" width={2} />
+          </button>
+        </div>
+        <CaptureForm
+          kind={kind}
+          currency={currency}
+          item={item}
+          onDone={() => {
+            onClose();
+            router.refresh();
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
 function CaptureForm({
   kind,
   currency,
+  item,
   onDone,
 }: {
-  kind: "income" | "expense";
+  kind: Kind;
   currency: string;
+  item?: EditItem;
   onDone: () => void;
 }) {
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const [cat, setCat] = useState<string>("");
-  const [nature, setNature] = useState<string>(kind === "income" ? "" : "esencial");
+
+  const incomeItem = kind === "income" ? (item as IncomeSource | undefined) : undefined;
+  const expenseItem = kind === "expense" ? (item as ExpenseItem | undefined) : undefined;
+
+  const [cat, setCat] = useState<string>(incomeItem?.category ?? "");
+  const [nature, setNature] = useState<string>(expenseItem?.nature ?? (kind === "income" ? "" : "esencial"));
 
   const onCategoryChange = (v: string) => {
     setCat(v);
@@ -112,28 +167,26 @@ function CaptureForm({
       ownerScope: "usuario" as const,
     };
 
-    const res =
-      kind === "income"
-        ? await addIncomeAction({
-            ...common,
-            incomeType: String(fd.get("incomeType") ?? "activo"),
-            category: cat || undefined,
-            includeInBudget: true,
-          })
-        : await addExpenseAction({
-            ...common,
-            nature: nature || "esencial",
-            categoryKey: cat || undefined,
-          });
+    let res;
+    if (kind === "income") {
+      const payload = { ...common, incomeType: String(fd.get("incomeType") ?? "activo"), category: cat || undefined, includeInBudget: true };
+      res = incomeItem ? await editIncomeAction(incomeItem.id, payload) : await addIncomeAction(payload);
+    } else {
+      const payload = { ...common, nature: nature || "esencial", categoryKey: cat || undefined };
+      res = expenseItem ? await editExpenseAction(expenseItem.id, payload) : await addExpenseAction(payload);
+    }
 
     setPending(false);
-    if (res.ok) {
-      onDone();
-    } else {
+    if (res.ok) onDone();
+    else {
       if (res.fieldErrors) setErrors(res.fieldErrors);
       if (res.message) setMessage(res.message);
     }
   }
+
+  const defAmount = item ? item.amount : undefined;
+  const defFreq = item ? item.frequency : "mensual";
+  const defCurrency = item ? item.currency : currency;
 
   return (
     <form onSubmit={onSubmit}>
@@ -145,6 +198,7 @@ function CaptureForm({
           <input
             className="inp"
             name="name"
+            defaultValue={item?.name ?? ""}
             placeholder={kind === "income" ? "Salario, alquiler…" : "Alquiler, Netflix…"}
             required
           />
@@ -155,14 +209,14 @@ function CaptureForm({
           <div className="fld">
             <label className="fld-label">Monto</label>
             <div className="inp-money">
-              <span className="pre">{currencySymbol(currency)}</span>
-              <input name="amount" type="number" step="0.01" min="0" placeholder="0" required />
+              <span className="pre">{currencySymbol(defCurrency)}</span>
+              <input name="amount" type="number" step="0.01" min="0" defaultValue={defAmount} placeholder="0" required />
             </div>
             {errors.amount ? <span className="auth-err">{errors.amount}</span> : null}
           </div>
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={currency}>
+            <select className="sel" name="currency" defaultValue={defCurrency}>
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -175,8 +229,8 @@ function CaptureForm({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Frecuencia</label>
-            <select className="sel" name="frequency" defaultValue="mensual">
-              {FREQ_OPTS.map((f) => (
+            <select className="sel" name="frequency" defaultValue={defFreq}>
+              {FREQUENCIES.map((f) => (
                 <option key={f.value} value={f.value}>
                   {f.label}
                 </option>
@@ -199,7 +253,7 @@ function CaptureForm({
         {kind === "income" ? (
           <div className="fld">
             <label className="fld-label">Tipo de ingreso</label>
-            <select className="sel" name="incomeType" defaultValue="activo">
+            <select className="sel" name="incomeType" defaultValue={incomeItem?.incomeType ?? "activo"}>
               {INCOME_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -221,7 +275,7 @@ function CaptureForm({
         )}
 
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <input type="checkbox" name="isFixed" defaultChecked /> Es un monto fijo
+          <input type="checkbox" name="isFixed" defaultChecked={item ? item.isFixed : true} /> Es un monto fijo
         </label>
       </div>
 
@@ -235,8 +289,4 @@ function CaptureForm({
       </div>
     </form>
   );
-}
-
-function currencySymbol(code: string): string {
-  return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[code] ?? "";
 }

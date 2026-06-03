@@ -112,6 +112,49 @@ export async function createExpense(input: ExpenseInput): Promise<void> {
   });
 }
 
+export async function updateIncome(id: string, input: IncomeInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("income_sources")
+    .update({
+      name: input.name,
+      income_type: input.incomeType,
+      category: input.category ?? null,
+      amount: input.amount,
+      currency: input.currency,
+      frequency: input.frequency,
+      is_fixed: input.isFixed,
+      certainty: input.certainty ?? null,
+      owner_scope: input.ownerScope,
+      include_in_budget: input.includeInBudget,
+      amount_monthly_base: monthlyize(input.amount, input.frequency),
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
+export async function updateExpense(id: string, input: ExpenseInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("expense_items")
+    .update({
+      name: input.name,
+      nature: input.nature,
+      amount: input.amount,
+      currency: input.currency,
+      frequency: input.frequency,
+      is_fixed: input.isFixed,
+      obligation: input.obligation ?? null,
+      reducible: input.reducible ?? null,
+      owner_scope: input.ownerScope,
+      amount_monthly_base: monthlyize(input.amount, input.frequency),
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
 export async function deleteIncome(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

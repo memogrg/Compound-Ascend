@@ -1,6 +1,7 @@
 import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
+import { EditWealthButton } from "./wealth-actions";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 
@@ -143,7 +144,10 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
                   <span className="chip" style={{ textTransform: "uppercase", fontSize: 10.5 }}>
                     {inv.symbol ?? inv.assetType}
                   </span>
-                  <DeleteButton id={inv.id} kind="investment" />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <EditWealthButton mode="investment" item={inv} currency={currency} />
+                    <DeleteButton id={inv.id} kind="investment" />
+                  </div>
                 </div>
               );
             })

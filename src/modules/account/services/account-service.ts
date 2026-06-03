@@ -1,9 +1,26 @@
 import "server-only";
 
-/** Datos de cuenta: plan y consumo de IA del mes (lectura). */
+/** Datos de cuenta: plan, consumo de IA, moneda y limpieza de datos. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
+import { getUser, isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { aiTokenLimit, type Plan } from "@/lib/plan";
+
+/**
+ * Tablas de datos financieros de nivel superior (para "empezar de cero").
+ * Las tablas hijas (goal_contributions, debt_payments, holdings…) se eliminan
+ * en cascada al borrar sus padres.
+ */
+const FINANCIAL_TABLES = [
+  "income_sources",
+  "expense_items",
+  "transactions",
+  "savings_goals",
+  "debts",
+  "investments",
+  "insurance_policies",
+  "assets",
+  "liabilities",
+] as const;
 
 export type AccountInfo = {
   email: string | null;
@@ -11,6 +28,7 @@ export type AccountInfo = {
   plan: Plan;
   tokensUsed: number;
   tokenLimit: number;
+  currency: string;
   configured: boolean;
 };
 
@@ -25,11 +43,19 @@ export async function getAccountInfo(): Promise<AccountInfo> {
   const email = user?.email ?? null;
 
   if (!isSupabaseConfigured() || !user) {
-    return { email, name, plan: "free", tokensUsed: 0, tokenLimit: aiTokenLimit("free"), configured: false };
+    return {
+      email,
+      name,
+      plan: "free",
+      tokensUsed: 0,
+      tokenLimit: aiTokenLimit("free"),
+      currency: "CRC",
+      configured: false,
+    };
   }
 
   const supabase = await createSupabaseServerClient();
-  const [{ data: profile }, { data: usage }] = await Promise.all([
+  const [{ data: profile }, { data: usage }, { data: settings }] = await Promise.all([
     supabase.from("profiles").select("plan,display_name").eq("id", user.id).maybeSingle(),
     supabase
       .from("ai_usage_ledger")
@@ -37,14 +63,54 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       .eq("user_id", user.id)
       .eq("period", currentPeriod())
       .maybeSingle(),
+    supabase.from("user_settings").select("primary_currency").eq("user_id", user.id).maybeSingle(),
   ]);
   const plan = (profile?.plan ?? "free") as Plan;
   return {
     email,
     name: profile?.display_name ?? name,
     plan,
+    currency: settings?.primary_currency ?? "CRC",
     tokensUsed: Number(usage?.tokens_used ?? 0),
     tokenLimit: aiTokenLimit(plan),
     configured: true,
   };
+}
+
+/** True si los datos actuales provienen de la plantilla de ejemplo. */
+export async function isDemoData(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const user = await getUser();
+  if (!user) return false;
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("personal_profiles")
+    .select("extra")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const extra = (data?.extra ?? {}) as { demo?: boolean };
+  return extra.demo === true;
+}
+
+/** Cambia la moneda principal del usuario (afecta formato y nuevos ítems). */
+export async function updatePrimaryCurrency(code: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("user_settings")
+    .upsert({ user_id: user.id, primary_currency: code }, { onConflict: "user_id" });
+}
+
+/** Borra todos los datos financieros del usuario y la marca de ejemplo. */
+export async function clearAllFinancialData(): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await Promise.all(
+    FINANCIAL_TABLES.map((t) => supabase.from(t).delete().eq("user_id", user.id)),
+  );
+  // Quita la marca de demo del perfil.
+  await supabase
+    .from("personal_profiles")
+    .update({ extra: {} })
+    .eq("user_id", user.id);
 }

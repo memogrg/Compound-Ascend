@@ -46,6 +46,38 @@ export async function createLiability(input: LiabilityInput): Promise<void> {
   });
 }
 
+export async function updateAsset(id: string, input: AssetInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("assets")
+    .update({
+      name: input.name,
+      asset_class: input.assetClass,
+      value: input.value,
+      currency: input.currency,
+      generates_income: input.generatesIncome,
+      liquidity: input.liquidity ?? null,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
+export async function updateLiability(id: string, input: LiabilityInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("liabilities")
+    .update({
+      name: input.name,
+      liability_class: input.liabilityClass,
+      balance: input.balance,
+      currency: input.currency,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
 export async function deleteAsset(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

@@ -4,7 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
-import { addInvestmentAction, addPolicyAction, type ActionResult } from "@/modules/wealth/api/actions";
+import {
+  addInvestmentAction,
+  addPolicyAction,
+  editInvestmentAction,
+  editPolicyAction,
+  type ActionResult,
+} from "@/modules/wealth/api/actions";
+import type { Investment, InsurancePolicy } from "@/modules/wealth/types";
+
+type Mode = "investment" | "policy";
 
 const ASSET_TYPES = [
   ["etf", "ETF"],
@@ -30,54 +39,95 @@ const POLICY_TYPES = [
   ["otro", "Otro"],
 ] as const;
 
-export function WealthActions({
-  mode,
-  currency = "CRC",
-}: {
-  mode: "investment" | "policy";
-  currency?: string;
-}) {
+export function WealthActions({ mode, currency = "CRC" }: { mode: Mode; currency?: string }) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
-  const done = () => {
-    setOpen(false);
-    router.refresh();
-  };
-
   return (
     <>
       <button className="btn btn-primary" onClick={() => setOpen(true)}>
         <Icon name={mode === "investment" ? "invest" : "defense"} width={2} />
         {mode === "investment" ? "Agregar inversión" : "Añadir póliza"}
       </button>
-
-      {open && (
-        <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
-          <div className="modal" role="dialog">
-            <div className="modal-head">
-              <div>
-                <div className="modal-title">
-                  {mode === "investment" ? "Agregar inversión" : "Añadir póliza"}
-                </div>
-                <div className="modal-sub">
-                  {mode === "investment"
-                    ? "Cuéntanos dónde está creciendo tu dinero."
-                    : "Registremos tus coberturas para detectar brechas."}
-                </div>
-              </div>
-              <button className="modal-x" aria-label="Cerrar" onClick={() => setOpen(false)}>
-                <Icon name="x" width={2} />
-              </button>
-            </div>
-            {mode === "investment" ? (
-              <InvestmentForm currency={currency} onDone={done} />
-            ) : (
-              <PolicyForm currency={currency} onDone={done} />
-            )}
-          </div>
-        </div>
-      )}
+      {open ? <WealthDialog mode={mode} currency={currency} onClose={() => setOpen(false)} /> : null}
     </>
+  );
+}
+
+/** Botón de editar (inversión / póliza). */
+export function EditWealthButton({
+  mode,
+  item,
+  currency,
+}: {
+  mode: Mode;
+  item: Investment | InsurancePolicy;
+  currency: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="icon-btn"
+        style={{ width: 30, height: 30 }}
+        aria-label="Editar"
+        title="Editar"
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="edit" />
+      </button>
+      {open ? (
+        <WealthDialog mode={mode} currency={currency} item={item} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+function WealthDialog({
+  mode,
+  currency,
+  item,
+  onClose,
+}: {
+  mode: Mode;
+  currency: string;
+  item?: Investment | InsurancePolicy;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const done = () => {
+    onClose();
+    router.refresh();
+  };
+  const editing = Boolean(item);
+  const title = editing
+    ? mode === "investment"
+      ? "Editar inversión"
+      : "Editar póliza"
+    : mode === "investment"
+      ? "Agregar inversión"
+      : "Añadir póliza";
+  return (
+    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog">
+        <div className="modal-head">
+          <div>
+            <div className="modal-title">{title}</div>
+            <div className="modal-sub">
+              {mode === "investment"
+                ? "Cuéntanos dónde está creciendo tu dinero."
+                : "Registremos tus coberturas para detectar brechas."}
+            </div>
+          </div>
+          <button className="modal-x" aria-label="Cerrar" onClick={onClose}>
+            <Icon name="x" width={2} />
+          </button>
+        </div>
+        {mode === "investment" ? (
+          <InvestmentForm currency={currency} onDone={done} item={item as Investment | undefined} />
+        ) : (
+          <PolicyForm currency={currency} onDone={done} item={item as InsurancePolicy | undefined} />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -104,8 +154,9 @@ function sym(currency: string): string {
   return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
 }
 
-function InvestmentForm({ currency, onDone }: { currency: string; onDone: () => void }) {
-  const { pending, errors, message, run } = useSubmit(addInvestmentAction);
+function InvestmentForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: Investment }) {
+  const action = item ? (raw: unknown) => editInvestmentAction(item.id, raw) : addInvestmentAction;
+  const { pending, errors, message, run } = useSubmit(action);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -128,13 +179,13 @@ function InvestmentForm({ currency, onDone }: { currency: string; onDone: () => 
         {message ? <div className="auth-msg warn">{message}</div> : null}
         <div className="fld">
           <label className="fld-label">Nombre o descripción</label>
-          <input className="inp" name="name" placeholder="ETF S&P 500, apartamento…" required />
+          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="ETF S&P 500, apartamento…" required />
           {errors.name ? <span className="auth-err">{errors.name}</span> : null}
         </div>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Tipo</label>
-            <select className="sel" name="assetType" defaultValue="etf">
+            <select className="sel" name="assetType" defaultValue={item?.assetType ?? "etf"}>
               {ASSET_TYPES.map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
@@ -144,26 +195,27 @@ function InvestmentForm({ currency, onDone }: { currency: string; onDone: () => 
           </div>
           <div className="fld">
             <label className="fld-label">Símbolo (opcional)</label>
-            <input className="inp" name="symbol" placeholder="VOO, BTC…" />
+            <input className="inp" name="symbol" defaultValue={item?.symbol ?? ""} placeholder="VOO, BTC…" />
           </div>
         </div>
         <div className="fld-2">
-          <Money label="Monto invertido" name="investedAmount" currency={currency} error={errors.investedAmount} />
-          <Money label="Aporte mensual" name="contribution" currency={currency} />
+          <Money label="Monto invertido" name="investedAmount" currency={currency} error={errors.investedAmount} defaultValue={item?.investedAmount} />
+          <Money label="Aporte mensual" name="contribution" currency={currency} defaultValue={item?.contribution} />
         </div>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Horizonte</label>
-            <select className="sel" name="horizon" defaultValue="mas_5">
+            <select className="sel" name="horizon" defaultValue={item?.horizon ?? "5_10"}>
               <option value="menos_1">Menos de 1 año</option>
               <option value="1_3">1 a 3 años</option>
               <option value="3_5">3 a 5 años</option>
-              <option value="mas_5">Más de 5 años</option>
+              <option value="5_10">5 a 10 años</option>
+              <option value="mas_10">Más de 10 años</option>
             </select>
           </div>
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={currency}>
+            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -178,8 +230,9 @@ function InvestmentForm({ currency, onDone }: { currency: string; onDone: () => 
   );
 }
 
-function PolicyForm({ currency, onDone }: { currency: string; onDone: () => void }) {
-  const { pending, message, run } = useSubmit(addPolicyAction);
+function PolicyForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: InsurancePolicy }) {
+  const action = item ? (raw: unknown) => editPolicyAction(item.id, raw) : addPolicyAction;
+  const { pending, message, run } = useSubmit(action);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -202,7 +255,7 @@ function PolicyForm({ currency, onDone }: { currency: string; onDone: () => void
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Tipo de cobertura</label>
-            <select className="sel" name="policyType" defaultValue="medico">
+            <select className="sel" name="policyType" defaultValue={item?.policyType ?? "medico"}>
               {POLICY_TYPES.map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
@@ -212,17 +265,17 @@ function PolicyForm({ currency, onDone }: { currency: string; onDone: () => void
           </div>
           <div className="fld">
             <label className="fld-label">Aseguradora (opcional)</label>
-            <input className="inp" name="provider" placeholder="Nombre" />
+            <input className="inp" name="provider" defaultValue={item?.provider ?? ""} placeholder="Nombre" />
           </div>
         </div>
         <div className="fld-2">
-          <Money label="Suma asegurada" name="coverage" currency={currency} />
-          <Money label="Prima" name="premium" currency={currency} />
+          <Money label="Suma asegurada" name="coverage" currency={currency} defaultValue={item?.coverage ?? undefined} />
+          <Money label="Prima" name="premium" currency={currency} defaultValue={item?.premium ?? undefined} />
         </div>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Frecuencia de la prima</label>
-            <select className="sel" name="premiumFrequency" defaultValue="mensual">
+            <select className="sel" name="premiumFrequency" defaultValue={item?.premiumFrequency ?? "mensual"}>
               <option value="mensual">Mensual</option>
               <option value="trimestral">Trimestral</option>
               <option value="semestral">Semestral</option>
@@ -231,7 +284,7 @@ function PolicyForm({ currency, onDone }: { currency: string; onDone: () => void
           </div>
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={currency}>
+            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -251,18 +304,20 @@ function Money({
   name,
   currency,
   error,
+  defaultValue,
 }: {
   label: string;
   name: string;
   currency: string;
   error?: string;
+  defaultValue?: number;
 }) {
   return (
     <div className="fld">
       <label className="fld-label">{label}</label>
       <div className="inp-money">
         <span className="pre">{sym(currency)}</span>
-        <input name={name} type="number" step="0.01" min="0" placeholder="0" />
+        <input name={name} type="number" step="0.01" min="0" defaultValue={defaultValue} placeholder="0" />
       </div>
       {error ? <span className="auth-err">{error}</span> : null}
     </div>

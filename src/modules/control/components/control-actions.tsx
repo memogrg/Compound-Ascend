@@ -4,19 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
-import { addGoalAction, addDebtAction } from "@/modules/control/api/actions";
+import {
+  addGoalAction,
+  addDebtAction,
+  editGoalAction,
+  editDebtAction,
+} from "@/modules/control/api/actions";
+import type { SavingsGoal, Debt } from "@/modules/control/types";
 
-type Kind = "goal" | "debt" | null;
+type Kind = "goal" | "debt";
 
 export function ControlActions({ currency = "CRC" }: { currency?: string }) {
-  const [open, setOpen] = useState<Kind>(null);
-  const router = useRouter();
-  const close = () => setOpen(null);
-  const done = () => {
-    close();
-    router.refresh();
-  };
-
+  const [open, setOpen] = useState<Kind | null>(null);
   return (
     <>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -27,34 +26,88 @@ export function ControlActions({ currency = "CRC" }: { currency?: string }) {
           <Icon name="debt" width={2} /> Agregar deuda
         </button>
       </div>
-
-      {open && (
-        <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && close()}>
-          <div className="modal" role="dialog">
-            <div className="modal-head">
-              <div>
-                <div className="modal-title">
-                  {open === "goal" ? "Agregar objetivo" : "Agregar deuda"}
-                </div>
-                <div className="modal-sub">
-                  {open === "goal"
-                    ? "¿Para qué estás apartando dinero?"
-                    : "No es para juzgarte; es para liberarte de presión financiera."}
-                </div>
-              </div>
-              <button className="modal-x" aria-label="Cerrar" onClick={close}>
-                <Icon name="x" width={2} />
-              </button>
-            </div>
-            {open === "goal" ? (
-              <GoalForm currency={currency} onDone={done} />
-            ) : (
-              <DebtForm currency={currency} onDone={done} />
-            )}
-          </div>
-        </div>
-      )}
+      {open ? <ControlDialog kind={open} currency={currency} onClose={() => setOpen(null)} /> : null}
     </>
+  );
+}
+
+/** Botón de editar (objetivo / deuda). */
+export function EditControlButton({
+  kind,
+  item,
+  currency,
+}: {
+  kind: Kind;
+  item: SavingsGoal | Debt;
+  currency: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="icon-btn"
+        style={{ width: 30, height: 30 }}
+        aria-label="Editar"
+        title="Editar"
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="edit" />
+      </button>
+      {open ? (
+        <ControlDialog kind={kind} currency={currency} item={item} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+function ControlDialog({
+  kind,
+  currency,
+  item,
+  onClose,
+}: {
+  kind: Kind;
+  currency: string;
+  item?: SavingsGoal | Debt;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const done = () => {
+    onClose();
+    router.refresh();
+  };
+  const editing = Boolean(item);
+  return (
+    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal" role="dialog">
+        <div className="modal-head">
+          <div>
+            <div className="modal-title">
+              {editing
+                ? kind === "goal"
+                  ? "Editar objetivo"
+                  : "Editar deuda"
+                : kind === "goal"
+                  ? "Agregar objetivo"
+                  : "Agregar deuda"}
+            </div>
+            <div className="modal-sub">
+              {kind === "goal"
+                ? "¿Para qué estás apartando dinero?"
+                : "No es para juzgarte; es para liberarte de presión financiera."}
+            </div>
+          </div>
+          <button className="modal-x" aria-label="Cerrar" onClick={onClose}>
+            <Icon name="x" width={2} />
+          </button>
+        </div>
+        {kind === "goal" ? (
+          <GoalForm currency={currency} onDone={done} item={item as SavingsGoal | undefined} />
+        ) : (
+          <DebtForm currency={currency} onDone={done} item={item as Debt | undefined} />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -77,8 +130,9 @@ function useFormSubmit(action: (raw: unknown) => Promise<{ ok: boolean; fieldErr
   return { pending, errors, message, run };
 }
 
-function GoalForm({ currency, onDone }: { currency: string; onDone: () => void }) {
-  const { pending, errors, message, run } = useFormSubmit(addGoalAction);
+function GoalForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: SavingsGoal }) {
+  const action = item ? (raw: unknown) => editGoalAction(item.id, raw) : addGoalAction;
+  const { pending, errors, message, run } = useFormSubmit(action);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -103,24 +157,24 @@ function GoalForm({ currency, onDone }: { currency: string; onDone: () => void }
         {message ? <div className="auth-msg warn">{message}</div> : null}
         <div className="fld">
           <label className="fld-label">Nombre del objetivo</label>
-          <input className="inp" name="name" placeholder="Fondo de emergencia, viaje…" required />
+          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Fondo de emergencia, viaje…" required />
           {errors.name ? <span className="auth-err">{errors.name}</span> : null}
         </div>
         <div className="fld-2">
-          <Money label="Monto meta" name="targetAmount" currency={currency} error={errors.targetAmount} />
-          <Money label="Acumulado" name="currentAmount" currency={currency} />
+          <Money label="Monto meta" name="targetAmount" currency={currency} error={errors.targetAmount} defaultValue={item?.targetAmount} />
+          <Money label="Acumulado" name="currentAmount" currency={currency} defaultValue={item?.currentAmount} />
         </div>
         <div className="fld-2">
-          <Money label="Aporte mensual" name="monthlyContribution" currency={currency} />
+          <Money label="Aporte mensual" name="monthlyContribution" currency={currency} defaultValue={item?.monthlyContribution} />
           <div className="fld">
             <label className="fld-label">Fecha objetivo</label>
-            <input className="inp" name="targetDate" type="date" />
+            <input className="inp" name="targetDate" type="date" defaultValue={item?.targetDate ?? ""} />
           </div>
         </div>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={currency}>
+            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -130,7 +184,7 @@ function GoalForm({ currency, onDone }: { currency: string; onDone: () => void }
           </div>
           <div className="fld">
             <label className="fld-label">Prioridad</label>
-            <select className="sel" name="priority" defaultValue="media">
+            <select className="sel" name="priority" defaultValue={item?.priority ?? "media"}>
               <option value="alta">Alta</option>
               <option value="media">Media</option>
               <option value="baja">Baja</option>
@@ -143,8 +197,9 @@ function GoalForm({ currency, onDone }: { currency: string; onDone: () => void }
   );
 }
 
-function DebtForm({ currency, onDone }: { currency: string; onDone: () => void }) {
-  const { pending, errors, message, run } = useFormSubmit(addDebtAction);
+function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: Debt }) {
+  const action = item ? (raw: unknown) => editDebtAction(item.id, raw) : addDebtAction;
+  const { pending, errors, message, run } = useFormSubmit(action);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -171,24 +226,24 @@ function DebtForm({ currency, onDone }: { currency: string; onDone: () => void }
         {message ? <div className="auth-msg warn">{message}</div> : null}
         <div className="fld">
           <label className="fld-label">Nombre de la deuda</label>
-          <input className="inp" name="name" placeholder="Tarjeta, préstamo…" required />
+          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Tarjeta, préstamo…" required />
           {errors.name ? <span className="auth-err">{errors.name}</span> : null}
         </div>
         <div className="fld-2">
-          <Money label="Saldo actual" name="balance" currency={currency} error={errors.balance} />
+          <Money label="Saldo actual" name="balance" currency={currency} error={errors.balance} defaultValue={item?.balance} />
           <div className="fld">
             <label className="fld-label">Tasa anual (%)</label>
-            <input className="inp" name="apr" type="number" step="0.1" min="0" placeholder="Ej. 38" />
+            <input className="inp" name="apr" type="number" step="0.1" min="0" defaultValue={item?.apr ?? undefined} placeholder="Ej. 38" />
           </div>
         </div>
         <div className="fld-2">
-          <Money label="Pago mínimo" name="minPayment" currency={currency} />
-          <Money label="Pago actual" name="currentPayment" currency={currency} />
+          <Money label="Pago mínimo" name="minPayment" currency={currency} defaultValue={item?.minPayment} />
+          <Money label="Pago actual" name="currentPayment" currency={currency} defaultValue={item?.currentPayment} />
         </div>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">¿Atraso?</label>
-            <select className="sel" name="delinquency" defaultValue="no">
+            <select className="sel" name="delinquency" defaultValue={item?.delinquency ?? "no"}>
               <option value="no">Al día</option>
               <option value="1_30">1 a 30 días</option>
               <option value="31_60">31 a 60 días</option>
@@ -197,7 +252,7 @@ function DebtForm({ currency, onDone }: { currency: string; onDone: () => void }
           </div>
           <div className="fld">
             <label className="fld-label">Nivel de estrés (1-10)</label>
-            <input className="inp" name="stress" type="number" min="1" max="10" defaultValue={5} />
+            <input className="inp" name="stress" type="number" min="1" max="10" defaultValue={item?.stress ?? 5} />
           </div>
         </div>
       </div>
@@ -211,11 +266,13 @@ function Money({
   name,
   currency,
   error,
+  defaultValue,
 }: {
   label: string;
   name: string;
   currency: string;
   error?: string;
+  defaultValue?: number;
 }) {
   const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
   return (
@@ -223,7 +280,7 @@ function Money({
       <label className="fld-label">{label}</label>
       <div className="inp-money">
         <span className="pre">{sym}</span>
-        <input name={name} type="number" step="0.01" min="0" placeholder="0" />
+        <input name={name} type="number" step="0.01" min="0" defaultValue={defaultValue} placeholder="0" />
       </div>
       {error ? <span className="auth-err">{error}</span> : null}
     </div>

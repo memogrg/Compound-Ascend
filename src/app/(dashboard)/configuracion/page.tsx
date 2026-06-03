@@ -1,4 +1,5 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
+import { CurrencySelector } from "@/modules/account/components/currency-selector";
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PLAN_LABEL, isPremium } from "@/lib/plan";
@@ -66,18 +67,18 @@ export default async function Page() {
         </div>
       </section>
 
-      {!isPremium(acc.plan) ? (
-        <section className="cols-2">
-          <UpgradePrompt />
-          <div className="card card-pad">
-            <div className="card-title">Preferencias</div>
-            <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
-              Moneda principal, idioma, tono y frecuencia de acompañamiento se configuran desde tu
-              Perfil Financiero. El tema (claro/oscuro) se cambia en la barra superior.
-            </p>
-          </div>
-        </section>
-      ) : null}
+      <section className="cols-2">
+        <CurrencySelector current={acc.currency} />
+        <div className="card card-pad">
+          <div className="card-title">Preferencias</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
+            El idioma, el tono y la frecuencia de acompañamiento se configuran desde tu Perfil
+            Financiero. El tema (claro/oscuro) se cambia en la barra superior.
+          </p>
+        </div>
+      </section>
+
+      {!isPremium(acc.plan) ? <UpgradePrompt /> : null}
     </div>
   );
 }

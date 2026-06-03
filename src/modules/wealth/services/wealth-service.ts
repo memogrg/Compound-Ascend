@@ -105,6 +105,42 @@ export async function createPolicy(input: PolicyInput): Promise<void> {
   });
 }
 
+export async function updateInvestment(id: string, input: InvestmentInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("investments")
+    .update({
+      asset_type: input.assetType,
+      name: input.name,
+      symbol: input.symbol ?? null,
+      invested_amount: input.investedAmount,
+      contribution: input.contribution,
+      horizon: input.horizon ?? null,
+      perceived_risk: input.perceivedRisk ?? null,
+      liquidity: input.liquidity ?? null,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
+export async function updatePolicy(id: string, input: PolicyInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("insurance_policies")
+    .update({
+      policy_type: input.policyType,
+      provider: input.provider ?? null,
+      coverage: input.coverage ?? null,
+      premium: input.premium ?? null,
+      premium_frequency: input.premiumFrequency ?? null,
+      currency: input.currency,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
 export async function deleteInvestment(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

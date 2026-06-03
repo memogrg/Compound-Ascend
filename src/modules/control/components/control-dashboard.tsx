@@ -1,5 +1,6 @@
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
+import { EditControlButton } from "./control-actions";
 import { formatMoney } from "@/lib/format";
 import type { ControlSummary } from "@/modules/control/services/control-service";
 import type { GoalAction, Semaforo } from "@/modules/control/types";
@@ -180,7 +181,10 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                       {formatMoney(g.currentAmount, currency)} / {formatMoney(g.targetAmount, currency)} · {rec?.reason}
                     </div>
                   </div>
-                  <DeleteButton id={g.id} kind="goal" />
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <EditControlButton kind="goal" item={g} currency={currency} />
+                    <DeleteButton id={g.id} kind="goal" />
+                  </div>
                 </div>
               );
             })
@@ -217,7 +221,10 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                 ) : (
                   <span className="chip">Controlada</span>
                 )}
-                <DeleteButton id={dt.id} kind="debt" />
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <EditControlButton kind="debt" item={dt} currency={currency} />
+                  <DeleteButton id={dt.id} kind="debt" />
+                </div>
               </div>
             ))
           )}

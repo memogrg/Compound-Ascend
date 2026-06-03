@@ -5,6 +5,8 @@ import { goalInputSchema, debtInputSchema } from "@/modules/control/schemas";
 import {
   createGoal,
   createDebt,
+  updateGoal,
+  updateDebt,
   deleteGoal,
   deleteDebt,
 } from "@/modules/control/services/control-service";
@@ -47,6 +49,34 @@ export async function addDebtAction(raw: unknown): Promise<ActionResult> {
   } catch (err) {
     logger.error("addDebt fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos guardar la deuda." };
+  }
+}
+
+export async function editGoalAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = goalInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateGoal(id, parsed.data);
+    revalidatePath("/control-financiero");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editGoal fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar el objetivo." };
+  }
+}
+
+export async function editDebtAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = debtInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateDebt(id, parsed.data);
+    revalidatePath("/control-financiero");
+    return { ok: true };
+  } catch (err) {
+    logger.error("editDebt fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar la deuda." };
   }
 }
 

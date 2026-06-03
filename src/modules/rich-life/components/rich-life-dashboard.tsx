@@ -1,8 +1,9 @@
 import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { DeleteButton } from "./delete-button";
+import { EditRichButton } from "./rich-actions";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
-import type { RichTrend } from "@/modules/rich-life/types";
+import type { RichTrend, Asset, Liability } from "@/modules/rich-life/types";
 
 const TREND: Record<RichTrend, { label: string; cls: string; delta: string }> = {
   mas_rico: { label: "Te estás haciendo más rico", cls: "var(--pos)", delta: "up" },
@@ -119,8 +120,20 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
 
       {/* Listas */}
       <section className="dash-split">
-        <ListCard title="Mis activos" sub={`${assets.length} registrado(s)`} items={assets.map((a) => ({ id: a.id, name: a.name, sub: a.assetClass.replace("_", " "), amount: formatMoney(a.value, currency), color: "var(--pos)", kind: "asset" as const }))} emptyText="Agrega tu casa, carro, inversiones…" />
-        <ListCard title="Mis pasivos" sub={`${liabilities.length} registrado(s)`} items={liabilities.map((l) => ({ id: l.id, name: l.name, sub: l.liabilityClass, amount: formatMoney(l.balance, currency), color: "var(--neg)", kind: "liability" as const }))} emptyText="Agrega hipotecas u otras deudas grandes." />
+        <ListCard
+          title="Mis activos"
+          sub={`${assets.length} registrado(s)`}
+          currency={currency}
+          items={assets.map((a) => ({ id: a.id, name: a.name, sub: a.assetClass.replace("_", " "), amount: formatMoney(a.value, currency), color: "var(--pos)", kind: "asset" as const, entity: a }))}
+          emptyText="Agrega tu casa, carro, inversiones…"
+        />
+        <ListCard
+          title="Mis pasivos"
+          sub={`${liabilities.length} registrado(s)`}
+          currency={currency}
+          items={liabilities.map((l) => ({ id: l.id, name: l.name, sub: l.liabilityClass, amount: formatMoney(l.balance, currency), color: "var(--neg)", kind: "liability" as const, entity: l }))}
+          emptyText="Agrega hipotecas u otras deudas grandes."
+        />
       </section>
     </div>
   );
@@ -183,11 +196,21 @@ function ListCard({
   sub,
   items,
   emptyText,
+  currency,
 }: {
   title: string;
   sub: string;
-  items: { id: string; name: string; sub: string; amount: string; color: string; kind: "asset" | "liability" }[];
+  items: {
+    id: string;
+    name: string;
+    sub: string;
+    amount: string;
+    color: string;
+    kind: "asset" | "liability";
+    entity: Asset | Liability;
+  }[];
   emptyText: string;
+  currency: string;
 }) {
   return (
     <div className="card">
@@ -213,7 +236,10 @@ function ListCard({
             <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500, color: it.color }}>
               {it.amount}
             </span>
-            <DeleteButton id={it.id} kind={it.kind} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <EditRichButton kind={it.kind} item={it.entity} currency={currency} />
+              <DeleteButton id={it.id} kind={it.kind} />
+            </div>
           </div>
         ))
       )}
