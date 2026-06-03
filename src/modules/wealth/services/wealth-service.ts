@@ -3,7 +3,7 @@ import "server-only";
 /** Servicio del Módulo 4 (respeta RLS). Cruza Base, Control y Perfil. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import {
   computeReadiness,
   computeProtection,
@@ -196,7 +196,7 @@ export async function getWealthSummary(): Promise<WealthSummary> {
     listInvestments(),
     listPolicies(),
     getBaseSummary(),
-    getPrimaryCurrency(),
+    getDisplayCurrency(),
     getFxRates(),
   ]);
 

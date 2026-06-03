@@ -6,7 +6,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { computeProtection, computePortfolio } from "@/modules/wealth/engine/wealth-engine";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { convertCurrency } from "@/lib/fx";
@@ -110,7 +110,7 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
 
   const [base, currency, rates] = await Promise.all([
     getBaseSummary(),
-    getPrimaryCurrency(),
+    getDisplayCurrency(),
     getFxRates(),
   ]);
 

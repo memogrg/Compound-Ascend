@@ -4,11 +4,12 @@ import "server-only";
  * Servicio de datos del Módulo 2 (respeta RLS). El monto mensualizado se calcula
  * en el servidor con el motor `monthlyize` y se persiste en `amount_monthly_base`.
  */
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
-import { convertCurrency } from "@/lib/fx";
+import { convertCurrency, SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type {
   IncomeSource,
@@ -180,11 +181,11 @@ export async function getBaseSummary(): Promise<BaseSummary> {
   const [incomes, expenses, primary, rates] = await Promise.all([
     listIncomes(),
     listExpenses(),
-    getPrimaryCurrency(),
+    getDisplayCurrency(),
     getFxRates(),
   ]);
   // Los indicadores agregan dinero, así que normalizamos cada ítem a la moneda
-  // principal antes de sumar. Los montos por ítem se conservan en su moneda
+  // de visualización antes de sumar. Los montos por ítem se conservan en su moneda
   // original (los componentes los muestran tal cual el usuario los registró).
   const incForEngine = incomes.map((i) => ({
     ...i,
@@ -197,7 +198,8 @@ export async function getBaseSummary(): Promise<BaseSummary> {
   return { indicators: computeBaseIndicators(incForEngine, expForEngine), incomes, expenses };
 }
 
-/** Moneda principal del usuario (de user_settings); CRC por defecto. */
+/** Moneda principal del usuario (de user_settings); CRC por defecto.
+ *  Es la moneda por defecto al registrar ítems nuevos. */
 export async function getPrimaryCurrency(): Promise<string> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -207,4 +209,22 @@ export async function getPrimaryCurrency(): Promise<string> {
     .eq("user_id", user.id)
     .maybeSingle();
   return data?.primary_currency ?? "CRC";
+}
+
+/** Cookie que guarda la moneda de visualización (switch rápido en dashboards). */
+export const DISPLAY_CURRENCY_COOKIE = "ca_display_currency";
+
+/**
+ * Moneda de visualización de los dashboards: si hay override por cookie (el
+ * switch rápido), se usa esa; si no, la moneda principal. Solo afecta cómo se
+ * MUESTRAN los totales — los datos se registran en la moneda que el usuario
+ * elija y la app los convierte a esta para mostrarlos.
+ */
+export async function getDisplayCurrency(): Promise<string> {
+  const store = await cookies();
+  const override = store.get(DISPLAY_CURRENCY_COOKIE)?.value;
+  if (override && (SUPPORTED_CURRENCIES as readonly string[]).includes(override)) {
+    return override;
+  }
+  return getPrimaryCurrency();
 }

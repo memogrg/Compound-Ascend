@@ -3,7 +3,7 @@ import "server-only";
 /** Servicio del Módulo 3 (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -183,7 +183,7 @@ export async function getControlSummary(): Promise<ControlSummary> {
     listGoals(),
     listDebts(),
     getBaseSummary(),
-    getPrimaryCurrency(),
+    getDisplayCurrency(),
     getDiscipline(user.id),
     getFxRates(),
   ]);

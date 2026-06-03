@@ -33,6 +33,9 @@ const serverSchema = z.object({
   GEMINI_API_KEY: optionalStr,
   FINNHUB_TOKEN: optionalStr,
   ALPHA_VANTAGE_KEY: optionalStr,
+  // Email (invitaciones de familia). Si faltan, el envío se omite con gracia.
+  RESEND_API_KEY: optionalStr,
+  EMAIL_FROM: optionalStr,
   REDIS_URL: optionalStr,
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,

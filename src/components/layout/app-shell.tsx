@@ -11,10 +11,11 @@ import { cn } from "@/lib/utils";
 type AppShellProps = {
   children: React.ReactNode;
   user?: { name: string; sub: string; initials: string };
+  currency?: { display: string; primary: string };
 };
 
 /** Cascarón principal de la app: sidebar + topbar + contenido + coach + nav móvil. */
-export function AppShell({ children, user }: AppShellProps) {
+export function AppShell({ children, user, currency }: AppShellProps) {
   const [drawer, setDrawer] = useState(false);
   const close = () => setDrawer(false);
 
@@ -23,7 +24,7 @@ export function AppShell({ children, user }: AppShellProps) {
       <div className="app">
         <Sidebar open={drawer} onNavigate={close} user={user} />
         <main className="main">
-          <Topbar onMenu={() => setDrawer(true)} />
+          <Topbar onMenu={() => setDrawer(true)} currency={currency} />
           {children}
         </main>
       </div>
