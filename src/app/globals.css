@@ -552,3 +552,8 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 @media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }
+
+/* Botón destructivo (confirmación de borrado) */
+.btn-danger { background: var(--neg); color: #fff; }
+.btn-danger:hover { filter: brightness(0.94); }
+.btn-danger:disabled { opacity: 0.6; cursor: default; }

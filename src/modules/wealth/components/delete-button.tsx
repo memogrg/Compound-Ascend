@@ -1,26 +1,14 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Icon } from "@/components/ui/icon";
-import { useToast } from "@/components/ui/toast";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { removeInvestmentAction, removePolicyAction } from "@/modules/wealth/api/actions";
 
+/** Botón de borrado (inversión/póliza), con confirmación. */
 export function DeleteButton({ id, kind }: { id: string; kind: "investment" | "policy" }) {
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
-  const toast = useToast();
-  const onClick = () =>
-    startTransition(async () => {
-      const res = kind === "investment" ? await removeInvestmentAction(id) : await removePolicyAction(id);
-      if (res.ok) {
-        toast("Eliminado");
-        router.refresh();
-      }
-    });
   return (
-    <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Eliminar" onClick={onClick} disabled={pending}>
-      <Icon name="x" width={2} />
-    </button>
+    <ConfirmDeleteButton
+      noun={kind === "investment" ? "esta inversión" : "esta póliza"}
+      onConfirm={() => (kind === "investment" ? removeInvestmentAction(id) : removePolicyAction(id))}
+    />
   );
 }

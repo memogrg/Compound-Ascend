@@ -1,32 +1,14 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Icon } from "@/components/ui/icon";
-import { useToast } from "@/components/ui/toast";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { removeGoalAction, removeDebtAction } from "@/modules/control/api/actions";
 
+/** Botón de borrado (objetivo/deuda), con confirmación. */
 export function DeleteButton({ id, kind }: { id: string; kind: "goal" | "debt" }) {
-  const [pending, startTransition] = useTransition();
-  const router = useRouter();
-  const toast = useToast();
-  const onClick = () =>
-    startTransition(async () => {
-      const res = kind === "goal" ? await removeGoalAction(id) : await removeDebtAction(id);
-      if (res.ok) {
-        toast("Eliminado");
-        router.refresh();
-      }
-    });
   return (
-    <button
-      className="icon-btn"
-      style={{ width: 30, height: 30 }}
-      aria-label="Eliminar"
-      onClick={onClick}
-      disabled={pending}
-    >
-      <Icon name="x" width={2} />
-    </button>
+    <ConfirmDeleteButton
+      noun={kind === "goal" ? "este objetivo" : "esta deuda"}
+      onConfirm={() => (kind === "goal" ? removeGoalAction(id) : removeDebtAction(id))}
+    />
   );
 }
