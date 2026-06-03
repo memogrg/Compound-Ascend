@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
+import { convertCurrency } from "@/lib/fx";
 import type { GoalInput, DebtInputForm } from "@/modules/control/schemas";
 import type {
   SavingsGoal,
@@ -192,9 +193,25 @@ export async function getControlSummary(): Promise<ControlSummary> {
     ? Math.round(debts.reduce((s, d) => s + (d.stress ?? 5), 0) / debts.length)
     : undefined;
 
+  // El diagnóstico agrega objetivos y deudas: normalizamos sus montos a la
+  // moneda principal antes de calcular (los montos por ítem se muestran en su
+  // moneda original en el dashboard).
+  const goalsForEngine = goals.map((g) => ({
+    ...g,
+    targetAmount: convertCurrency(g.targetAmount, g.currency, currency),
+    currentAmount: convertCurrency(g.currentAmount, g.currency, currency),
+    monthlyContribution: convertCurrency(g.monthlyContribution, g.currency, currency),
+  }));
+  const debtsForEngine = debts.map((d) => ({
+    ...d,
+    balance: convertCurrency(d.balance, d.currency, currency),
+    minPayment: convertCurrency(d.minPayment, d.currency, currency),
+    currentPayment: convertCurrency(d.currentPayment, d.currency, currency),
+  }));
+
   const diagnosis = buildControlDiagnosis(
-    goals,
-    debts,
+    goalsForEngine,
+    debtsForEngine,
     { freeCashflow: base.indicators.freeCashflow, hasEmergencyFund, discipline, stress },
     currency,
   );

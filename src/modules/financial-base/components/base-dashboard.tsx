@@ -105,7 +105,7 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
                 item={i}
                 currency={currency}
                 sub={`${i.frequency} · ${i.incomeType}`}
-                amount={`+${formatMoney(i.amountMonthly, currency)}/mes`}
+                amount={`+${formatMoney(i.amountMonthly, i.currency)}/mes`}
                 amountColor="var(--pos)"
               />
             ))
@@ -123,7 +123,7 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
                 item={e}
                 currency={currency}
                 sub={`${e.frequency} · ${NATURE_LABEL[e.nature] ?? e.nature}`}
-                amount={`${formatMoney(e.amountMonthly, currency)}/mes`}
+                amount={`${formatMoney(e.amountMonthly, e.currency)}/mes`}
               />
             ))
           )}

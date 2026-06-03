@@ -124,14 +124,14 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           title="Mis activos"
           sub={`${assets.length} registrado(s)`}
           currency={currency}
-          items={assets.map((a) => ({ id: a.id, name: a.name, sub: a.assetClass.replace("_", " "), amount: formatMoney(a.value, currency), color: "var(--pos)", kind: "asset" as const, entity: a }))}
+          items={assets.map((a) => ({ id: a.id, name: a.name, sub: a.assetClass.replace("_", " "), amount: formatMoney(a.value, a.currency), color: "var(--pos)", kind: "asset" as const, entity: a }))}
           emptyText="Agrega tu casa, carro, inversiones…"
         />
         <ListCard
           title="Mis pasivos"
           sub={`${liabilities.length} registrado(s)`}
           currency={currency}
-          items={liabilities.map((l) => ({ id: l.id, name: l.name, sub: l.liabilityClass, amount: formatMoney(l.balance, currency), color: "var(--neg)", kind: "liability" as const, entity: l }))}
+          items={liabilities.map((l) => ({ id: l.id, name: l.name, sub: l.liabilityClass, amount: formatMoney(l.balance, l.currency), color: "var(--neg)", kind: "liability" as const, entity: l }))}
           emptyText="Agrega hipotecas u otras deudas grandes."
         />
       </section>

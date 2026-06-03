@@ -117,11 +117,11 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>{POLICY_LABEL[pol.policyType]}</div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
                     {pol.provider ?? "—"}
-                    {pol.coverage ? ` · ${formatMoney(pol.coverage, currency)}` : ""}
+                    {pol.coverage ? ` · ${formatMoney(pol.coverage, pol.currency)}` : ""}
                   </div>
                 </div>
                 <span className="tnum" style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                  {pol.premium ? `${formatMoney(pol.premium, currency)}/${(pol.premiumFrequency ?? "año").slice(0, 3)}` : "—"}
+                  {pol.premium ? `${formatMoney(pol.premium, pol.currency)}/${(pol.premiumFrequency ?? "año").slice(0, 3)}` : "—"}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <EditWealthButton mode="policy" item={pol} currency={currency} />

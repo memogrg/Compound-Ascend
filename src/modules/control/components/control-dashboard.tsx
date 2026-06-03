@@ -178,7 +178,7 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                       <div className="bar-fill" style={{ width: `${progress}%`, background: "var(--c-savings)" }} />
                     </div>
                     <div className="muted" style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.45 }}>
-                      {formatMoney(g.currentAmount, currency)} / {formatMoney(g.targetAmount, currency)} · {rec?.reason}
+                      {formatMoney(g.currentAmount, g.currency)} / {formatMoney(g.targetAmount, g.currency)} · {rec?.reason}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -209,7 +209,7 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>{dt.name}</div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                    {formatMoney(dt.balance, currency)}
+                    {formatMoney(dt.balance, dt.currency)}
                     {dt.apr ? ` · ${dt.apr}% TAE` : ""}
                     {dt.delinquency && dt.delinquency !== "no" ? " · con atraso" : ""}
                   </div>

@@ -11,6 +11,7 @@ import {
   computePortfolio,
 } from "@/modules/wealth/engine/wealth-engine";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
+import { convertCurrency } from "@/lib/fx";
 import type { InvestmentInput, PolicyInput } from "@/modules/wealth/schemas";
 import type {
   Investment,
@@ -220,8 +221,17 @@ export async function getWealthSummary(): Promise<WealthSummary> {
     currency,
   };
 
+  // El diagnóstico de protección suma cobertura y primas: normalizamos cada
+  // póliza a la moneda principal antes de agregar (las inversiones no guardan
+  // moneda por ítem, se asumen en la moneda principal).
+  const policiesForEngine = policies.map((p) => ({
+    ...p,
+    coverage: p.coverage == null ? p.coverage : convertCurrency(p.coverage, p.currency, currency),
+    premium: p.premium == null ? p.premium : convertCurrency(p.premium, p.currency, currency),
+  }));
+
   const readiness = computeReadiness(ctx, investments);
-  const protection = computeProtection(ctx, policies);
+  const protection = computeProtection(ctx, policiesForEngine);
   const portfolio = computePortfolio(investments);
   const balance = computeBalance(readiness, protection, investments.length > 0);
   const prices = await getLivePrices(investments);

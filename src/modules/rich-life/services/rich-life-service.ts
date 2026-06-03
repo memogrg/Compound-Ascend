@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 import { computeProtection, computePortfolio } from "@/modules/wealth/engine/wealth-engine";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
+import { convertCurrency } from "@/lib/fx";
 import type { AssetInput, LiabilityInput } from "@/modules/rich-life/schemas";
 import type {
   Asset,
@@ -172,10 +173,10 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
     }));
   const liabilities = [...explicitLiabs, ...debtLiabs];
 
-  // Ingreso pasivo mensual.
+  // Ingreso pasivo mensual (normalizado a la moneda principal).
   const passiveIncomeMonthly = base.incomes
     .filter((i) => i.incomeType === "pasivo" && i.includeInBudget)
-    .reduce((s, i) => s + i.amountMonthly, 0);
+    .reduce((s, i) => s + convertCurrency(i.amountMonthly, i.currency, currency), 0);
 
   // Protección y diversificación (reutiliza motores de Patrimonio).
   const policies: InsurancePolicy[] = (policyRows.data ?? []).map((p, i) => ({
@@ -210,9 +211,19 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
   );
   const portfolio = computePortfolio(investments);
 
+  // El motor agrega patrimonio: normalizamos valores a la moneda principal.
+  const assetsForEngine = assets.map((a) => ({
+    ...a,
+    value: convertCurrency(a.value, a.currency, currency),
+  }));
+  const liabsForEngine = liabilities.map((l) => ({
+    ...l,
+    balance: convertCurrency(l.balance, l.currency, currency),
+  }));
+
   const input: RichLifeInput = {
-    assets,
-    liabilities,
+    assets: assetsForEngine,
+    liabilities: liabsForEngine,
     passiveIncomeMonthly,
     monthlyExpenses: base.indicators.expenseMonthly,
     freeCashflow: base.indicators.freeCashflow,
