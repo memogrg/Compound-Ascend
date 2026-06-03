@@ -17,6 +17,9 @@ export const profileDraftSchema = z.object({
   primaryCurrency: z.string().length(3).optional(),
   maritalStatus: z.string().max(40).optional(),
   financialNucleus: z.enum(["solo", "pareja", "familia", "socios", "otro"]).optional(),
+  // Strings libres aquí (no bloquear el guardado progresivo con emails a medio
+  // escribir); el formato de email se valida en la UI y al invitar.
+  householdMemberEmails: z.array(z.string().trim().max(120)).max(4).optional(),
   dependentsCount: z.number().int().min(0).max(30).optional(),
 
   lifeStage: z.string().max(40).optional(),
@@ -24,6 +27,7 @@ export const profileDraftSchema = z.object({
   satisfaction: scale.optional(),
   urgency: z.enum(["baja", "media", "alta", "critica"]).optional(),
   mainConcern: z.string().max(60).optional(),
+  mainConcerns: z.array(z.string().max(60)).max(5).optional(),
 
   goals: z.array(z.string().max(60)).max(20).optional(),
   goalDetails: z.array(goalDraftSchema).max(20).optional(),

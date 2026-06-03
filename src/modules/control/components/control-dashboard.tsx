@@ -45,7 +45,8 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                 fill="none"
                 stroke={sem.color}
                 strokeWidth="4"
-                strokeLinecap="round"
+                strokeLinecap={d.scoreControl >= 100 ? "butt" : "round"}
+                pathLength={100}
                 strokeDasharray={`${d.scoreControl} 100`}
                 strokeDashoffset="25"
                 transform="rotate(-90 21 21)"

@@ -35,6 +35,8 @@ export type ProfileDraft = {
   primaryCurrency?: string;
   maritalStatus?: string;
   financialNucleus?: FinancialNucleus;
+  /** Emails de miembros invitados cuando el núcleo es "familia" (hasta 4). */
+  householdMemberEmails?: string[];
   dependentsCount?: number;
 
   // Etapa financiera
@@ -42,7 +44,10 @@ export type ProfileDraft = {
   perceivedControl?: number; // 1-10
   satisfaction?: number; // 1-10
   urgency?: Urgency;
+  /** Preocupación principal (primera de mainConcerns; se conserva por compat). */
   mainConcern?: string;
+  /** Preocupaciones seleccionadas (hasta 5) — más contexto para la IA. */
+  mainConcerns?: string[];
 
   // Objetivos y prioridades
   goals?: string[]; // claves de objetivos seleccionados

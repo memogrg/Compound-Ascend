@@ -50,7 +50,8 @@ export function ProfileSummary({
                   fill="none"
                   stroke="var(--pos)"
                   strokeWidth="4"
-                  strokeLinecap="round"
+                  strokeLinecap={diagnosis.completion >= 100 ? "butt" : "round"}
+                  pathLength={100}
                   strokeDasharray={`${diagnosis.completion} 100`}
                   strokeDashoffset="25"
                   transform="rotate(-90 21 21)"

@@ -95,7 +95,8 @@ export function DashboardView({
                   fill="none"
                   stroke="var(--pos)"
                   strokeWidth="4"
-                  strokeLinecap="round"
+                  strokeLinecap={health.score >= 100 ? "butt" : "round"}
+                  pathLength={100}
                   strokeDasharray={`${health.score} 100`}
                   strokeDashoffset="25"
                   transform="rotate(-90 21 21)"

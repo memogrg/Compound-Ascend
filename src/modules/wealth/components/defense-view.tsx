@@ -39,7 +39,7 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
           <div className="ring-wrap" style={{ margin: "14px 0 6px" }}>
             <svg width="150" height="150" viewBox="0 0 42 42">
               <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
-              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--c-protect)" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${score} 100`} strokeDashoffset="25" transform="rotate(-90 21 21)" />
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--c-protect)" strokeWidth="4" strokeLinecap={score >= 100 ? "butt" : "round"} pathLength={100} strokeDasharray={`${score} 100`} strokeDashoffset="25" transform="rotate(-90 21 21)" />
             </svg>
             <div className="ring-center">
               <div>

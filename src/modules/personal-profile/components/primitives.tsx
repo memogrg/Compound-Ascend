@@ -1,8 +1,60 @@
 "use client";
 
+import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { Option } from "@/modules/personal-profile/constants";
 import { cn } from "@/lib/utils";
+
+/** Burbuja de ayuda accesible (?) que explica para qué sirve un paso/campo. */
+export function HelpTip({ text, label = "Más información" }: { text: string; label?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="help-tip" onMouseLeave={() => setOpen(false)}>
+      <button
+        type="button"
+        className="help-btn"
+        aria-label={label}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onMouseEnter={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+      >
+        ?
+      </button>
+      {open ? (
+        <span className="help-pop" role="tooltip">
+          {text}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/** Dropdown simple basado en <select>. */
+export function Dropdown({
+  options,
+  value,
+  onChange,
+  placeholder = "Selecciona…",
+}: {
+  options: Option[];
+  value?: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <select className="sel" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 /** Tarjetas de elección única (estilo Setup Wizard). */
 export function OptionCards({

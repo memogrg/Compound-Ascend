@@ -29,7 +29,7 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
           <div className="ring-wrap">
             <svg width="120" height="120" viewBox="0 0 42 42">
               <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
-              <circle cx="21" cy="21" r="15.915" fill="none" stroke={ring} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${readiness.score} 100`} strokeDashoffset="25" transform="rotate(-90 21 21)" />
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke={ring} strokeWidth="4" strokeLinecap={readiness.score >= 100 ? "butt" : "round"} pathLength={100} strokeDasharray={`${readiness.score} 100`} strokeDashoffset="25" transform="rotate(-90 21 21)" />
             </svg>
             <div className="ring-center">
               <div>

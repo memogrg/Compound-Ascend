@@ -460,8 +460,8 @@ a { color: inherit; text-decoration: none; }
 .opt.selected { border-color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 10%, transparent); }
 .opt-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--chip); color: var(--ink-2); display: grid; place-items: center; margin-bottom: 4px; }
 .opt-icon svg { width: 18px; height: 18px; }
-.opt-name { font-size: 14px; font-weight: 500; }
-.opt-desc { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.opt-name { font-size: 14px; font-weight: 500; padding-right: 24px; }
+.opt-desc { font-size: 12px; color: var(--muted); line-height: 1.45; padding-right: 24px; }
 .opt-check { position: absolute; top: 14px; right: 14px; width: 18px; height: 18px; border-radius: 50%; border: 1.4px solid var(--line-strong); display: grid; place-items: center; transition: all 160ms; }
 .opt.selected .opt-check { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .opt-check svg { width: 10px; height: 10px; opacity: 0; }
@@ -557,3 +557,18 @@ a { color: inherit; text-decoration: none; }
 .btn-danger { background: var(--neg); color: #fff; }
 .btn-danger:hover { filter: brightness(0.94); }
 .btn-danger:disabled { opacity: 0.6; cursor: default; }
+
+/* Burbuja de ayuda (?) en pasos del wizard */
+.help-tip { position: relative; display: inline-flex; vertical-align: middle; }
+.help-btn {
+  width: 22px; height: 22px; border-radius: 50%; border: 1.4px solid var(--line-strong);
+  background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 700;
+  line-height: 1; cursor: pointer; display: grid; place-items: center; transition: all 140ms;
+}
+.help-btn:hover, .help-btn[aria-expanded="true"] { border-color: var(--ink); color: var(--ink); }
+.help-pop {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 30; width: max-content; max-width: 320px;
+  background: var(--ink); color: var(--bg); font-size: 12.5px; line-height: 1.5; font-weight: 400;
+  padding: 10px 13px; border-radius: 10px; box-shadow: var(--shadow-float);
+}
+@media (max-width: 640px) { .help-pop { max-width: 240px; } }

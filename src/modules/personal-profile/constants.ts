@@ -4,18 +4,45 @@ import type { IconName } from "@/components/ui/icon";
 export type Option = { value: string; label: string; desc?: string; icon?: IconName };
 
 export const CURRENCIES: Option[] = [
-  { value: "CRC", label: "Colón (₡)" },
-  { value: "USD", label: "Dólar ($)" },
+  { value: "CRC", label: "Colón costarricense (₡)" },
+  { value: "USD", label: "Dólar estadounidense ($)" },
   { value: "EUR", label: "Euro (€)" },
-  { value: "MXN", label: "Peso MXN ($)" },
-  { value: "COP", label: "Peso COP ($)" },
+  { value: "MXN", label: "Peso mexicano (MX$)" },
+  { value: "COP", label: "Peso colombiano (COL$)" },
+  { value: "GBP", label: "Libra esterlina (£)" },
 ];
 
+/** Países de residencia (lista enfocada en LatAm + comunes). El valor es el
+ *  nombre, que se guarda tal cual en personal_profiles.country. */
+export const COUNTRIES: Option[] = [
+  { value: "Costa Rica", label: "Costa Rica" },
+  { value: "México", label: "México" },
+  { value: "Colombia", label: "Colombia" },
+  { value: "Panamá", label: "Panamá" },
+  { value: "Guatemala", label: "Guatemala" },
+  { value: "El Salvador", label: "El Salvador" },
+  { value: "Honduras", label: "Honduras" },
+  { value: "Nicaragua", label: "Nicaragua" },
+  { value: "República Dominicana", label: "República Dominicana" },
+  { value: "Argentina", label: "Argentina" },
+  { value: "Chile", label: "Chile" },
+  { value: "Perú", label: "Perú" },
+  { value: "Ecuador", label: "Ecuador" },
+  { value: "Uruguay", label: "Uruguay" },
+  { value: "Paraguay", label: "Paraguay" },
+  { value: "Bolivia", label: "Bolivia" },
+  { value: "Venezuela", label: "Venezuela" },
+  { value: "España", label: "España" },
+  { value: "Estados Unidos", label: "Estados Unidos" },
+  { value: "Canadá", label: "Canadá" },
+  { value: "Otro", label: "Otro" },
+];
+
+/** Núcleo financiero: solo Personal o Familia (las demás opciones se eliminaron
+ *  por revisión de producto). Con "familia" se invita hasta a 4 miembros. */
 export const NUCLEUS: Option[] = [
-  { value: "solo", label: "Solo", desc: "Gestiono mis finanzas por mi cuenta", icon: "profile" },
-  { value: "pareja", label: "En pareja", desc: "Con mi pareja o cónyuge", icon: "profile" },
-  { value: "familia", label: "Con familia", desc: "Decisiones familiares compartidas", icon: "profile" },
-  { value: "socios", label: "Con socios", desc: "Un grupo o negocio", icon: "portfolio" },
+  { value: "solo", label: "Personal", desc: "Gestiono mis finanzas por mi cuenta", icon: "profile" },
+  { value: "familia", label: "Con familia", desc: "Decisiones familiares compartidas (hasta 4 miembros)", icon: "profile" },
 ];
 
 export const LIFE_STAGES: Option[] = [

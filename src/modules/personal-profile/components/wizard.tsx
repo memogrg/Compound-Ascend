@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { OptionCards, Chips, Scale, YesNo, NumStepper } from "./primitives";
+import { OptionCards, Chips, Scale, YesNo, NumStepper, HelpTip, Dropdown } from "./primitives";
+import { HouseholdInvites } from "./household-invites";
 import { ProfileSummary } from "./summary";
 import { StartChoice } from "./start-choice";
 import * as O from "@/modules/personal-profile/constants";
@@ -22,6 +23,8 @@ type Step = {
   eyebrow: string;
   titleHTML: string;
   sub: string;
+  /** Explicación del paso (para el tooltip de ayuda "?"). */
+  help: string;
   render: (d: ProfileDraft, set: Update) => React.ReactNode;
 };
 
@@ -37,6 +40,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 1 · Tú",
     titleHTML: 'Cuéntanos un poco de <span class="it">ti</span>',
     sub: "Esto nos ayuda a adaptar cada recomendación a tu realidad. Puedes dejar en blanco lo que no sepas todavía.",
+    help: "Estos datos básicos personalizan todo. Tu país y moneda definen el contexto; la moneda principal es la que verás en tus dashboards (puedes registrar datos en cualquier moneda y la app los convierte). Saber con quién gestionas tus finanzas y cuántas personas dependen de ti ajusta tus metas y tu protección.",
     render: (d, set) => (
       <div className="field-row">
         <div className="field-row two">
@@ -60,23 +64,28 @@ const STEPS: Step[] = [
             />
           </div>
         </div>
-        <div className="fld">
-          <label className="fld-label">País de residencia</label>
-          <input
-            className="inp"
-            value={d.country ?? ""}
-            onChange={(e) => set({ country: e.target.value })}
-            placeholder="Costa Rica…"
-          />
-        </div>
-        <div className="fld">
-          <label className="fld-label">Moneda principal</label>
-          <OptionCards
-            options={O.CURRENCIES}
-            value={d.primaryCurrency}
-            onChange={(v) => set({ primaryCurrency: v })}
-            cols={3}
-          />
+        <div className="field-row two">
+          <div className="fld">
+            <label className="fld-label">País de residencia</label>
+            <Dropdown
+              options={O.COUNTRIES}
+              value={d.country}
+              onChange={(v) => set({ country: v })}
+              placeholder="Elige tu país…"
+            />
+          </div>
+          <div className="fld">
+            <label className="fld-label">
+              Moneda principal{" "}
+              <HelpTip text="Es la moneda en la que verás tus dashboards. Puedes registrar ingresos, gastos o inversiones en cualquier moneda: la app revisa el tipo de cambio y los convierte para mostrarte los totales en esta moneda." />
+            </label>
+            <Dropdown
+              options={O.CURRENCIES}
+              value={d.primaryCurrency}
+              onChange={(v) => set({ primaryCurrency: v })}
+              placeholder="Elige tu moneda…"
+            />
+          </div>
         </div>
         <div className="fld">
           <label className="fld-label">¿Gestionas tus finanzas…?</label>
@@ -86,6 +95,12 @@ const STEPS: Step[] = [
             onChange={(v) => set({ financialNucleus: v as ProfileDraft["financialNucleus"] })}
           />
         </div>
+        {d.financialNucleus === "familia" ? (
+          <HouseholdInvites
+            emails={d.householdMemberEmails ?? []}
+            onChange={(emails) => set({ householdMemberEmails: emails })}
+          />
+        ) : null}
         <div className="yn">
           <div>
             <div className="yn-q">¿Cuántas personas dependen económicamente de ti?</div>
@@ -105,6 +120,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 2 · Etapa financiera",
     titleHTML: '¿Cuál describe mejor tu <span class="it">situación</span>?',
     sub: "No hay respuesta correcta. Esto define tu punto de partida para no recomendarte el cohete antes que el oxígeno.",
+    help: "Tu etapa financiera define el punto de partida. No te diremos que inviertas si primero necesitas estabilidad: priorizamos las recomendaciones según dónde estás hoy.",
     render: (d, set) => (
       <div className="field-row">
         <OptionCards
@@ -143,12 +159,17 @@ const STEPS: Step[] = [
     label: "Tu preocupación",
     eyebrow: "Paso 3 · Lo que más pesa",
     titleHTML: '¿Qué te <span class="it">preocupa</span> más hoy?',
-    sub: "Elige lo que más te quita tranquilidad. Lo tendremos presente en cada recomendación.",
+    sub: "Elige lo que más te quita tranquilidad (hasta 5). Lo tendremos presente en cada recomendación.",
+    help: "Tus preocupaciones enfocan el plan. Puedes elegir varias (hasta 5): mientras más contexto, mejor entiende la IA qué te quita tranquilidad y qué atacar primero.",
     render: (d, set) => (
-      <OptionCards
+      <Chips
         options={O.CONCERNS}
-        value={d.mainConcern}
-        onChange={(v) => set({ mainConcern: v })}
+        values={d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : [])}
+        onToggle={(v) => {
+          const next = toggle(d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : []), v);
+          set({ mainConcerns: next, mainConcern: next[0] });
+        }}
+        max={5}
       />
     ),
   },
@@ -158,6 +179,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 4 · Hacia dónde vas",
     titleHTML: '¿Qué quieres <span class="it">lograr</span> con tu dinero?',
     sub: "Selecciona los que apliquen. El dinero no se gestiona en abstracto: se gestiona para lograr algo.",
+    help: "Tus objetivos guían las metas de ahorro e inversión y la ruta que te sugerimos. Puedes elegir varios; luego les pondremos montos y fechas.",
     render: (d, set) => (
       <Chips options={O.GOALS} values={d.goals ?? []} onToggle={(v) => set({ goals: toggle(d.goals, v) })} />
     ),
@@ -168,6 +190,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 5 · Lo que más valoras",
     titleHTML: 'Tus <span class="it">prioridades</span> en esta etapa',
     sub: "Elige hasta 5. Dos personas con el mismo ingreso pueden querer vidas muy distintas.",
+    help: "Tus prioridades equilibran los consejos entre disfrutar hoy y asegurar el futuro. Es lo que hace que el plan se sienta tuyo y no genérico.",
     render: (d, set) => (
       <Chips
         options={O.PRIORITIES}
@@ -183,6 +206,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 6 · Tu relación con el dinero",
     titleHTML: 'Cómo te <span class="it">comportas</span> con el dinero',
     sub: "Esto ajusta el tono: hay quien necesita estructura, quien necesita motivación y quien necesita alertas.",
+    help: "Tu relación con el dinero ajusta cómo te acompañamos: quién necesita estructura, quién motivación y quién alertas. Así el asesor te habla de la forma que mejor te funciona.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -215,6 +239,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 7 · Tu nivel",
     titleHTML: '¿Cuánto sabes de <span class="it">finanzas</span>?',
     sub: "Para no hablarte ni como profesor universitario ni como TikTok financiero con corbata.",
+    help: "Tu nivel de conocimiento ajusta cómo te explicamos las cosas: ni demasiado técnico ni demasiado básico. Y nos dice qué temas reforzar contigo.",
     render: (d, set) => (
       <div className="field-row">
         <OptionCards
@@ -239,6 +264,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 8 · Tolerancia al riesgo",
     titleHTML: 'Tu perfil de <span class="it">riesgo</span>',
     sub: "Clave para futuras recomendaciones de inversión, ahorro y protección.",
+    help: "Tu tolerancia al riesgo define qué inversiones y estrategias te recomendamos, acordes a lo que puedes sostener emocional y financieramente. De aquí sale tu perfil de riesgo.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -275,6 +301,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 9 · Tu blindaje",
     titleHTML: 'Tu <span class="it">protección</span> actual',
     sub: "Una persona puede ganar bien y aun así estar financieramente expuesta. Veamos cómo estás.",
+    help: "Aquí medimos qué tan blindado estás ante imprevistos (fondo de emergencia y seguros). Ganar bien no es lo mismo que estar protegido: esto detecta tus brechas.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -307,6 +334,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 10 · Cómo te acompañamos",
     titleHTML: '¿Cómo quieres que te <span class="it">acompañemos</span>?',
     sub: "Esto le da personalidad a tu asesor: desde coach amable hasta directo y exigente.",
+    help: "Define la personalidad de tu asesor y cómo te avisa: desde coach amable hasta directo y exigente, con qué frecuencia te da recomendaciones y qué tan intensas quieres las alertas.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -330,6 +358,7 @@ const STEPS: Step[] = [
     eyebrow: "Paso 11 · Tu Rich Life",
     titleHTML: 'Tu <span class="it">Rich Life</span>',
     sub: "Conectemos el dinero con la vida que quieres. Cada recomendación se conectará con tu porqué.",
+    help: "Conectamos el dinero con la vida que quieres. Cada recomendación se ligará a tu 'porqué' para que el plan tenga sentido para ti, no solo números.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -448,7 +477,10 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
         <div className="wiz-canvas">
           <section className="step-frame" key={step.id}>
             <div className="step-eyebrow">{step.eyebrow}</div>
-            <h1 className="step-title" dangerouslySetInnerHTML={{ __html: step.titleHTML }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <h1 className="step-title" style={{ margin: 0 }} dangerouslySetInnerHTML={{ __html: step.titleHTML }} />
+              <HelpTip text={step.help} label={`Para qué sirve: ${step.label}`} />
+            </div>
             <p className="step-sub">{step.sub}</p>
             {step.render(draft, set)}
           </section>

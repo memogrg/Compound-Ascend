@@ -62,7 +62,7 @@ export async function completeProfile(
       perceived_control: draft.perceivedControl ?? null,
       satisfaction: draft.satisfaction ?? null,
       urgency: draft.urgency ?? null,
-      main_concern: draft.mainConcern ?? null,
+      main_concern: draft.mainConcerns?.[0] ?? draft.mainConcern ?? null,
       marital_status: draft.maritalStatus ?? null,
       extra: { draft, richLifeVision: draft.richLifeVision ?? null },
     },
