@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
+import { focusFirstError } from "@/lib/forms";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addInvestmentAction,
@@ -106,28 +108,21 @@ function WealthDialog({
       ? "Agregar inversión"
       : "Añadir póliza";
   return (
-    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog">
-        <div className="modal-head">
-          <div>
-            <div className="modal-title">{title}</div>
-            <div className="modal-sub">
-              {mode === "investment"
-                ? "Cuéntanos dónde está creciendo tu dinero."
-                : "Registremos tus coberturas para detectar brechas."}
-            </div>
-          </div>
-          <button className="modal-x" aria-label="Cerrar" onClick={onClose}>
-            <Icon name="x" width={2} />
-          </button>
-        </div>
-        {mode === "investment" ? (
-          <InvestmentForm currency={currency} onDone={done} item={item as Investment | undefined} />
-        ) : (
-          <PolicyForm currency={currency} onDone={done} item={item as InsurancePolicy | undefined} />
-        )}
-      </div>
-    </div>
+    <Modal
+      title={title}
+      sub={
+        mode === "investment"
+          ? "Cuéntanos dónde está creciendo tu dinero."
+          : "Registremos tus coberturas para detectar brechas."
+      }
+      onClose={onClose}
+    >
+      {mode === "investment" ? (
+        <InvestmentForm currency={currency} onDone={done} item={item as Investment | undefined} />
+      ) : (
+        <PolicyForm currency={currency} onDone={done} item={item as InsurancePolicy | undefined} />
+      )}
+    </Modal>
   );
 }
 
@@ -135,7 +130,7 @@ function useSubmit(action: (raw: unknown) => Promise<ActionResult>) {
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const run = async (payload: unknown, onOk: () => void) => {
+  const run = async (payload: unknown, onOk: () => void, form?: HTMLFormElement) => {
     setPending(true);
     setErrors({});
     setMessage(null);
@@ -143,7 +138,10 @@ function useSubmit(action: (raw: unknown) => Promise<ActionResult>) {
     setPending(false);
     if (res.ok) onOk();
     else {
-      if (res.fieldErrors) setErrors(res.fieldErrors);
+      if (res.fieldErrors) {
+        setErrors(res.fieldErrors);
+        focusFirstError(form, res.fieldErrors);
+      }
       if (res.message) setMessage(res.message);
     }
   };
@@ -159,7 +157,8 @@ function InvestmentForm({ currency, onDone, item }: { currency: string; onDone: 
   const { pending, errors, message, run } = useSubmit(action);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     run(
       {
         name: String(fd.get("name") ?? ""),
@@ -171,16 +170,25 @@ function InvestmentForm({ currency, onDone, item }: { currency: string; onDone: 
         horizon: String(fd.get("horizon") ?? "") || undefined,
       },
       onDone,
+      form,
     );
   };
   return (
     <form onSubmit={onSubmit}>
       <div className="modal-body">
-        {message ? <div className="auth-msg warn">{message}</div> : null}
+        {message ? (
+          <div className="auth-msg warn" role="alert">
+            {message}
+          </div>
+        ) : null}
         <div className="fld">
           <label className="fld-label">Nombre o descripción</label>
-          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="ETF S&P 500, apartamento…" required />
-          {errors.name ? <span className="auth-err">{errors.name}</span> : null}
+          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="ETF S&P 500, apartamento…" required aria-invalid={errors.name ? true : undefined} />
+          {errors.name ? (
+            <span className="auth-err" role="alert">
+              {errors.name}
+            </span>
+          ) : null}
         </div>
         <div className="fld-2">
           <div className="fld">
@@ -235,7 +243,8 @@ function PolicyForm({ currency, onDone, item }: { currency: string; onDone: () =
   const { pending, message, run } = useSubmit(action);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     run(
       {
         policyType: String(fd.get("policyType") ?? "medico"),
@@ -246,12 +255,17 @@ function PolicyForm({ currency, onDone, item }: { currency: string; onDone: () =
         currency: String(fd.get("currency") ?? currency),
       },
       onDone,
+      form,
     );
   };
   return (
     <form onSubmit={onSubmit}>
       <div className="modal-body">
-        {message ? <div className="auth-msg warn">{message}</div> : null}
+        {message ? (
+          <div className="auth-msg warn" role="alert">
+            {message}
+          </div>
+        ) : null}
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Tipo de cobertura</label>
@@ -317,9 +331,21 @@ function Money({
       <label className="fld-label">{label}</label>
       <div className="inp-money">
         <span className="pre">{sym(currency)}</span>
-        <input name={name} type="number" step="0.01" min="0" defaultValue={defaultValue} placeholder="0" />
+        <input
+          name={name}
+          type="number"
+          step="0.01"
+          min="0"
+          defaultValue={defaultValue}
+          placeholder="0"
+          aria-invalid={error ? true : undefined}
+        />
       </div>
-      {error ? <span className="auth-err">{error}</span> : null}
+      {error ? (
+        <span className="auth-err" role="alert">
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }

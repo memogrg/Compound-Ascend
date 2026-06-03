@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
+import { focusFirstError } from "@/lib/forms";
 import {
   FREQUENCIES,
   INCOME_TYPES,
@@ -98,30 +100,21 @@ function ItemDialog({
       : "Agregar gasto";
 
   return (
-    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog">
-        <div className="modal-head">
-          <div>
-            <div className="modal-title">{title}</div>
-            <div className="modal-sub">
-              {editing ? "Ajusta los datos y guarda." : "No tiene que ser exacto; lo afinamos luego."}
-            </div>
-          </div>
-          <button className="modal-x" aria-label="Cerrar" onClick={onClose}>
-            <Icon name="x" width={2} />
-          </button>
-        </div>
-        <CaptureForm
-          kind={kind}
-          currency={currency}
-          item={item}
-          onDone={() => {
-            onClose();
-            router.refresh();
-          }}
-        />
-      </div>
-    </div>
+    <Modal
+      title={title}
+      sub={editing ? "Ajusta los datos y guarda." : "No tiene que ser exacto; lo afinamos luego."}
+      onClose={onClose}
+    >
+      <CaptureForm
+        kind={kind}
+        currency={currency}
+        item={item}
+        onDone={() => {
+          onClose();
+          router.refresh();
+        }}
+      />
+    </Modal>
   );
 }
 
@@ -153,10 +146,11 @@ function CaptureForm({
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
     setPending(true);
     setErrors({});
     setMessage(null);
-    const fd = new FormData(e.currentTarget);
+    const fd = new FormData(form);
     const amount = Number(fd.get("amount"));
     const common = {
       name: String(fd.get("name") ?? ""),
@@ -179,7 +173,10 @@ function CaptureForm({
     setPending(false);
     if (res.ok) onDone();
     else {
-      if (res.fieldErrors) setErrors(res.fieldErrors);
+      if (res.fieldErrors) {
+        setErrors(res.fieldErrors);
+        focusFirstError(form, res.fieldErrors);
+      }
       if (res.message) setMessage(res.message);
     }
   }
@@ -191,7 +188,11 @@ function CaptureForm({
   return (
     <form onSubmit={onSubmit}>
       <div className="modal-body">
-        {message ? <div className="auth-msg warn">{message}</div> : null}
+        {message ? (
+          <div className="auth-msg warn" role="alert">
+            {message}
+          </div>
+        ) : null}
 
         <div className="fld">
           <label className="fld-label">Nombre</label>
@@ -201,8 +202,13 @@ function CaptureForm({
             defaultValue={item?.name ?? ""}
             placeholder={kind === "income" ? "Salario, alquiler…" : "Alquiler, Netflix…"}
             required
+            aria-invalid={errors.name ? true : undefined}
           />
-          {errors.name ? <span className="auth-err">{errors.name}</span> : null}
+          {errors.name ? (
+            <span className="auth-err" role="alert">
+              {errors.name}
+            </span>
+          ) : null}
         </div>
 
         <div className="fld-2">
@@ -210,9 +216,22 @@ function CaptureForm({
             <label className="fld-label">Monto</label>
             <div className="inp-money">
               <span className="pre">{currencySymbol(defCurrency)}</span>
-              <input name="amount" type="number" step="0.01" min="0" defaultValue={defAmount} placeholder="0" required />
+              <input
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                defaultValue={defAmount}
+                placeholder="0"
+                required
+                aria-invalid={errors.amount ? true : undefined}
+              />
             </div>
-            {errors.amount ? <span className="auth-err">{errors.amount}</span> : null}
+            {errors.amount ? (
+              <span className="auth-err" role="alert">
+                {errors.amount}
+              </span>
+            ) : null}
           </div>
           <div className="fld">
             <label className="fld-label">Moneda</label>

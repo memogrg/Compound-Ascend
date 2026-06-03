@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
+import { focusFirstError } from "@/lib/forms";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addGoalAction,
@@ -77,37 +79,29 @@ function ControlDialog({
     router.refresh();
   };
   const editing = Boolean(item);
+  const title = editing
+    ? kind === "goal"
+      ? "Editar objetivo"
+      : "Editar deuda"
+    : kind === "goal"
+      ? "Agregar objetivo"
+      : "Agregar deuda";
   return (
-    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog">
-        <div className="modal-head">
-          <div>
-            <div className="modal-title">
-              {editing
-                ? kind === "goal"
-                  ? "Editar objetivo"
-                  : "Editar deuda"
-                : kind === "goal"
-                  ? "Agregar objetivo"
-                  : "Agregar deuda"}
-            </div>
-            <div className="modal-sub">
-              {kind === "goal"
-                ? "¿Para qué estás apartando dinero?"
-                : "No es para juzgarte; es para liberarte de presión financiera."}
-            </div>
-          </div>
-          <button className="modal-x" aria-label="Cerrar" onClick={onClose}>
-            <Icon name="x" width={2} />
-          </button>
-        </div>
-        {kind === "goal" ? (
-          <GoalForm currency={currency} onDone={done} item={item as SavingsGoal | undefined} />
-        ) : (
-          <DebtForm currency={currency} onDone={done} item={item as Debt | undefined} />
-        )}
-      </div>
-    </div>
+    <Modal
+      title={title}
+      sub={
+        kind === "goal"
+          ? "¿Para qué estás apartando dinero?"
+          : "No es para juzgarte; es para liberarte de presión financiera."
+      }
+      onClose={onClose}
+    >
+      {kind === "goal" ? (
+        <GoalForm currency={currency} onDone={done} item={item as SavingsGoal | undefined} />
+      ) : (
+        <DebtForm currency={currency} onDone={done} item={item as Debt | undefined} />
+      )}
+    </Modal>
   );
 }
 
@@ -115,7 +109,7 @@ function useFormSubmit(action: (raw: unknown) => Promise<{ ok: boolean; fieldErr
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const run = async (payload: unknown, onOk: () => void) => {
+  const run = async (payload: unknown, onOk: () => void, form?: HTMLFormElement) => {
     setPending(true);
     setErrors({});
     setMessage(null);
@@ -123,7 +117,10 @@ function useFormSubmit(action: (raw: unknown) => Promise<{ ok: boolean; fieldErr
     setPending(false);
     if (res.ok) onOk();
     else {
-      if (res.fieldErrors) setErrors(res.fieldErrors);
+      if (res.fieldErrors) {
+        setErrors(res.fieldErrors);
+        focusFirstError(form, res.fieldErrors);
+      }
       if (res.message) setMessage(res.message);
     }
   };
@@ -136,7 +133,8 @@ function GoalForm({ currency, onDone, item }: { currency: string; onDone: () => 
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     run(
       {
         name: String(fd.get("name") ?? ""),
@@ -148,17 +146,26 @@ function GoalForm({ currency, onDone, item }: { currency: string; onDone: () => 
         priority: String(fd.get("priority") ?? "media"),
       },
       onDone,
+      form,
     );
   };
 
   return (
     <form onSubmit={onSubmit}>
       <div className="modal-body">
-        {message ? <div className="auth-msg warn">{message}</div> : null}
+        {message ? (
+          <div className="auth-msg warn" role="alert">
+            {message}
+          </div>
+        ) : null}
         <div className="fld">
           <label className="fld-label">Nombre del objetivo</label>
-          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Fondo de emergencia, viaje…" required />
-          {errors.name ? <span className="auth-err">{errors.name}</span> : null}
+          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Fondo de emergencia, viaje…" required aria-invalid={errors.name ? true : undefined} />
+          {errors.name ? (
+            <span className="auth-err" role="alert">
+              {errors.name}
+            </span>
+          ) : null}
         </div>
         <div className="fld-2">
           <Money label="Monto meta" name="targetAmount" currency={currency} error={errors.targetAmount} defaultValue={item?.targetAmount} />
@@ -203,7 +210,8 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const aprRaw = fd.get("apr");
     run(
       {
@@ -217,17 +225,26 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
         stress: Number(fd.get("stress") ?? 5),
       },
       onDone,
+      form,
     );
   };
 
   return (
     <form onSubmit={onSubmit}>
       <div className="modal-body">
-        {message ? <div className="auth-msg warn">{message}</div> : null}
+        {message ? (
+          <div className="auth-msg warn" role="alert">
+            {message}
+          </div>
+        ) : null}
         <div className="fld">
           <label className="fld-label">Nombre de la deuda</label>
-          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Tarjeta, préstamo…" required />
-          {errors.name ? <span className="auth-err">{errors.name}</span> : null}
+          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Tarjeta, préstamo…" required aria-invalid={errors.name ? true : undefined} />
+          {errors.name ? (
+            <span className="auth-err" role="alert">
+              {errors.name}
+            </span>
+          ) : null}
         </div>
         <div className="fld-2">
           <Money label="Saldo actual" name="balance" currency={currency} error={errors.balance} defaultValue={item?.balance} />
@@ -280,9 +297,21 @@ function Money({
       <label className="fld-label">{label}</label>
       <div className="inp-money">
         <span className="pre">{sym}</span>
-        <input name={name} type="number" step="0.01" min="0" defaultValue={defaultValue} placeholder="0" />
+        <input
+          name={name}
+          type="number"
+          step="0.01"
+          min="0"
+          defaultValue={defaultValue}
+          placeholder="0"
+          aria-invalid={error ? true : undefined}
+        />
       </div>
-      {error ? <span className="auth-err">{error}</span> : null}
+      {error ? (
+        <span className="auth-err" role="alert">
+          {error}
+        </span>
+      ) : null}
     </div>
   );
 }

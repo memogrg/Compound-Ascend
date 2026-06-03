@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
+import { focusFirstError } from "@/lib/forms";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addAssetAction,
@@ -93,29 +95,17 @@ function RichDialog({
     router.refresh();
   };
   const editing = Boolean(item);
+  const title = editing
+    ? kind === "asset"
+      ? "Editar activo"
+      : "Editar pasivo"
+    : kind === "asset"
+      ? "Agregar activo"
+      : "Agregar pasivo";
   return (
-    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog">
-        <div className="modal-head">
-          <div>
-            <div className="modal-title">
-              {editing
-                ? kind === "asset"
-                  ? "Editar activo"
-                  : "Editar pasivo"
-                : kind === "asset"
-                  ? "Agregar activo"
-                  : "Agregar pasivo"}
-            </div>
-            <div className="modal-sub">No buscamos exactitud contable, buscamos dirección.</div>
-          </div>
-          <button className="modal-x" aria-label="Cerrar" onClick={onClose}>
-            <Icon name="x" width={2} />
-          </button>
-        </div>
-        <Form kind={kind} currency={currency} onDone={done} item={item} />
-      </div>
-    </div>
+    <Modal title={title} sub="No buscamos exactitud contable, buscamos dirección." onClose={onClose}>
+      <Form kind={kind} currency={currency} onDone={done} item={item} />
+    </Modal>
   );
 }
 
@@ -140,10 +130,11 @@ function Form({
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
     setPending(true);
     setErrors({});
     setMessage(null);
-    const fd = new FormData(e.currentTarget);
+    const fd = new FormData(form);
     let res: ActionResult;
     if (kind === "asset") {
       const payload = {
@@ -166,7 +157,10 @@ function Form({
     setPending(false);
     if (res.ok) onDone();
     else {
-      if (res.fieldErrors) setErrors(res.fieldErrors);
+      if (res.fieldErrors) {
+        setErrors(res.fieldErrors);
+        focusFirstError(form, res.fieldErrors);
+      }
       if (res.message) setMessage(res.message);
     }
   };
@@ -177,7 +171,11 @@ function Form({
   return (
     <form onSubmit={onSubmit}>
       <div className="modal-body">
-        {message ? <div className="auth-msg warn">{message}</div> : null}
+        {message ? (
+          <div className="auth-msg warn" role="alert">
+            {message}
+          </div>
+        ) : null}
         <div className="fld">
           <label className="fld-label">Nombre</label>
           <input
@@ -186,8 +184,13 @@ function Form({
             defaultValue={item?.name ?? ""}
             placeholder={kind === "asset" ? "Casa, carro, inversión…" : "Hipoteca, préstamo…"}
             required
+            aria-invalid={errors.name ? true : undefined}
           />
-          {errors.name ? <span className="auth-err">{errors.name}</span> : null}
+          {errors.name ? (
+            <span className="auth-err" role="alert">
+              {errors.name}
+            </span>
+          ) : null}
         </div>
         <div className="fld-2">
           <div className="fld">
@@ -201,10 +204,13 @@ function Form({
                 min="0"
                 defaultValue={defValue}
                 placeholder="0"
+                aria-invalid={errors.value || errors.balance ? true : undefined}
               />
             </div>
             {errors.value || errors.balance ? (
-              <span className="auth-err">{errors.value ?? errors.balance}</span>
+              <span className="auth-err" role="alert">
+                {errors.value ?? errors.balance}
+              </span>
             ) : null}
           </div>
           <div className="fld">
