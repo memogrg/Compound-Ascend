@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
 import { focusFirstError } from "@/lib/forms";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
@@ -95,11 +96,13 @@ function WealthDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const toast = useToast();
+  const editing = Boolean(item);
   const done = () => {
+    toast(editing ? "Cambios guardados" : "Agregado");
     onClose();
     router.refresh();
   };
-  const editing = Boolean(item);
   const title = editing
     ? mode === "investment"
       ? "Editar inversión"

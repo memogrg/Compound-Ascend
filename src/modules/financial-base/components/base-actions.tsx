@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
 import { focusFirstError } from "@/lib/forms";
 import {
   FREQUENCIES,
@@ -90,6 +91,7 @@ function ItemDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const editing = Boolean(item);
   const title = editing
     ? kind === "income"
@@ -110,6 +112,7 @@ function ItemDialog({
         currency={currency}
         item={item}
         onDone={() => {
+          toast(editing ? "Cambios guardados" : "Agregado");
           onClose();
           router.refresh();
         }}

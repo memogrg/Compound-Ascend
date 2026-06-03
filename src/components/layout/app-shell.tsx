@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { CoachPanel } from "@/components/ai/coach-panel";
+import { ToastProvider } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 type AppShellProps = {
@@ -18,7 +19,7 @@ export function AppShell({ children, user }: AppShellProps) {
   const close = () => setDrawer(false);
 
   return (
-    <>
+    <ToastProvider>
       <div className="app">
         <Sidebar open={drawer} onNavigate={close} user={user} />
         <main className="main">
@@ -34,6 +35,6 @@ export function AppShell({ children, user }: AppShellProps) {
       />
       <BottomNav />
       <CoachPanel />
-    </>
+    </ToastProvider>
   );
 }

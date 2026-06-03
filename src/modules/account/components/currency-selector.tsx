@@ -4,25 +4,25 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import { updateCurrencyAction } from "@/modules/account/api/actions";
+import { useToast } from "@/components/ui/toast";
 
 export function CurrencySelector({ current }: { current: string }) {
   const router = useRouter();
+  const toast = useToast();
   const [value, setValue] = useState(current);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
 
   const onChange = async (code: string) => {
     setValue(code);
     setBusy(true);
-    setMsg(null);
     const res = await updateCurrencyAction(code);
     setBusy(false);
     if (res.ok) {
-      setMsg("Moneda actualizada.");
+      toast("Moneda actualizada");
       router.refresh();
     } else {
       setValue(current);
-      setMsg(res.message ?? "No se pudo cambiar.");
+      toast(res.message ?? "No se pudo cambiar la moneda", "error");
     }
   };
 
@@ -45,11 +45,6 @@ export function CurrencySelector({ current }: { current: string }) {
           </option>
         ))}
       </select>
-      {msg ? (
-        <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-          {msg}
-        </div>
-      ) : null}
     </div>
   );
 }
