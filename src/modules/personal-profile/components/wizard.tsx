@@ -7,6 +7,7 @@ import { BrandMark } from "@/components/layout/brand-mark";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { OptionCards, Chips, Scale, YesNo, NumStepper } from "./primitives";
 import { ProfileSummary } from "./summary";
+import { StartChoice } from "./start-choice";
 import * as O from "@/modules/personal-profile/constants";
 import { saveDraftAction, completeOnboardingAction } from "@/modules/personal-profile/api/actions";
 import { computeCompletion } from "@/modules/personal-profile/engine/diagnosis";
@@ -357,6 +358,9 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
   const [index, setIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [diagnosis, setDiagnosis] = useState<ProfileDiagnosis | null>(null);
+  // Pantalla inicial de 3 opciones; si ya hay borrador, va directo al wizard.
+  const resuming = Boolean(initialDraft && Object.keys(initialDraft).length > 0);
+  const [started, setStarted] = useState(resuming);
 
   const set: Update = useCallback((patch) => setDraft((d) => ({ ...d, ...patch })), []);
 
@@ -388,6 +392,10 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
 
   if (diagnosis) {
     return <ProfileSummary diagnosis={diagnosis} onContinue={() => router.push("/dashboard")} />;
+  }
+
+  if (!started) {
+    return <StartChoice onGuided={() => setStarted(true)} />;
   }
 
   return (

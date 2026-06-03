@@ -6,14 +6,51 @@
  * configurado (dev), no persisten pero devuelven el diagnóstico calculado para
  * no bloquear la experiencia.
  */
+import { revalidatePath } from "next/cache";
 import { profileDraftSchema } from "@/modules/personal-profile/schemas";
 import { saveDraft, completeProfile } from "@/modules/personal-profile/services/profile-service";
+import {
+  seedDemoTemplate,
+  markOnboardingStarted,
+} from "@/modules/personal-profile/services/demo-template";
 import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { logger } from "@/lib/logger";
 
 export type SaveResult = { ok: boolean };
+export type StartResult = { ok: boolean; message?: string };
+
+/** Opción "Crear ejemplo y editarlo": siembra la plantilla demo del usuario. */
+export async function startWithDemoAction(): Promise<StartResult> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, message: "Conecta Supabase para usar la plantilla de ejemplo." };
+  }
+  try {
+    await seedDemoTemplate();
+    revalidatePath("/dashboard");
+    revalidatePath("/mi-base-financiera");
+    revalidatePath("/control-financiero");
+    revalidatePath("/patrimonio");
+    revalidatePath("/mi-rich-life");
+    return { ok: true };
+  } catch (err) {
+    logger.error("startWithDemo fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos crear el ejemplo. Inténtalo de nuevo." };
+  }
+}
+
+/** Opción "Quiero cargarlo manualmente": marca el onboarding y va al panel. */
+export async function startManualAction(): Promise<StartResult> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    await markOnboardingStarted();
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch {
+    return { ok: true }; // no bloqueamos la navegación
+  }
+}
 export type CompleteResult = { ok: boolean; diagnosis: ProfileDiagnosis; persisted: boolean };
 
 /** Guardado progresivo (best-effort). */

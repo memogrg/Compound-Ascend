@@ -1,14 +1,30 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getDashboardData } from "@/modules/dashboard";
 import { DashboardView } from "@/modules/dashboard";
 import { EmptyState } from "@/components/shared/states";
+import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * Panel principal — consume datos reales del Perfil y la Base Financiera.
- * Mientras no exista base, muestra un estado de bienvenida que guía a empezar.
- * Los KPIs de Patrimonio/Rich Life enlazan a sus módulos (F6/F7).
+ * Los usuarios nuevos (onboarding incompleto) se envían a /bienvenida para que
+ * elijan cómo empezar (guiado / manual / ejemplo).
  */
 export default async function DashboardPage() {
+  if (isSupabaseConfigured()) {
+    const user = await getUser();
+    if (user) {
+      const supabase = await createSupabaseServerClient();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile && !profile.onboarding_completed) redirect("/bienvenida");
+    }
+  }
+
   const data = await getDashboardData();
 
   if (!data.health.hasData) {
