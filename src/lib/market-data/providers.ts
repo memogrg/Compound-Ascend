@@ -81,8 +81,37 @@ export async function binance(ticker: string): Promise<Quote | null> {
   return null;
 }
 
+// Ticker → id de CoinGecko para la lista curada (rápido, sin red).
+const COINGECKO_IDS: Record<string, string> = {
+  BTC: "bitcoin",      ETH: "ethereum",      SOL: "solana",       XRP: "ripple",
+  ADA: "cardano",      AVAX: "avalanche-2",  DOGE: "dogecoin",    LINK: "chainlink",
+  MATIC: "matic-network", DOT: "polkadot",   LTC: "litecoin",     BNB: "binancecoin",
+  TRX: "tron",         SUI: "sui",           APT: "aptos",
+};
+
+// Cache en memoria de resoluciones dinámicas (ticker → id) para el resto.
+const resolvedIds = new Map<string, string>();
+
+/** Resuelve el id de CoinGecko para un ticker no listado, vía /search. */
+async function resolveCoingeckoId(ticker: string): Promise<string | null> {
+  const key = ticker.toUpperCase();
+  if (COINGECKO_IDS[key]) return COINGECKO_IDS[key]!;
+  if (resolvedIds.has(key)) return resolvedIds.get(key)!;
+  const data = (await fetchJson(
+    `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(ticker)}`,
+  )) as { coins?: { id: string; symbol: string; market_cap_rank: number | null }[] } | null;
+  const coins = data?.coins ?? [];
+  const match = coins
+    .filter((c) => c.symbol?.toUpperCase() === key)
+    .sort((a, b) => (a.market_cap_rank ?? 1e9) - (b.market_cap_rank ?? 1e9))[0];
+  if (!match) return null;
+  resolvedIds.set(key, match.id);
+  return match.id;
+}
+
 export async function coingecko(ticker: string): Promise<Quote | null> {
-  const id = ticker.toLowerCase();
+  const id = await resolveCoingeckoId(ticker);
+  if (!id) return null;
   const data = (await fetchJson(
     `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=usd`,
   )) as Record<string, { usd?: number }> | null;

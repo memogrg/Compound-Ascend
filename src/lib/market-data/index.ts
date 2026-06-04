@@ -1,6 +1,6 @@
 /**
  * Orquestador de precios: cadena de proveedores con cache y fallback.
- * Stocks/ETF: Finnhub → AlphaVantage → Yahoo.  Cripto: Binance → CoinGecko.
+ * Stocks/ETF: Finnhub → AlphaVantage → Yahoo.  Cripto: CoinGecko → Binance.
  */
 import "server-only";
 import { priceCache, TTL } from "@/lib/market-data/cache";
@@ -21,7 +21,7 @@ export type MarketPrice = Quote & { symbol: string; assetType: AssetType; cached
 import { persistMarketPrice } from "@/lib/market-data/persist";
 
 const STOCK_CHAIN = [finnhub, alphaVantage, yahoo];
-const CRYPTO_CHAIN = [binance, coingecko];
+const CRYPTO_CHAIN = [coingecko, binance];
 
 export async function getMarketPrice(
   rawSymbol: string,
