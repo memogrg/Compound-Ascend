@@ -45,10 +45,43 @@ export async function listHoldings(): Promise<Holding[]> {
 export async function createHolding(input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const symbol = input.symbol.toUpperCase();
+
+  // If the user already holds this symbol+assetType+currency, merge via weighted average.
+  const { data: existing } = await supabase
+    .from("investment_holdings")
+    .select("id, quantity, average_cost, broker")
+    .eq("user_id", user.id)
+    .eq("symbol", symbol)
+    .eq("asset_type", input.assetType)
+    .eq("currency", input.currency)
+    .maybeSingle();
+
+  if (existing) {
+    const prevQty = Number(existing.quantity ?? 0);
+    const prevAvg = Number(existing.average_cost ?? 0);
+    const newQty = prevQty + input.quantity;
+    const newAvg = newQty > 0
+      ? (prevQty * prevAvg + input.quantity * input.averageCost) / newQty
+      : input.averageCost;
+    await supabase
+      .from("investment_holdings")
+      .update({
+        quantity: newQty,
+        average_cost: newAvg,
+        cost_basis: newQty * newAvg,
+        purchase_date: input.purchaseDate ?? null,
+        broker: input.broker ?? existing.broker ?? null,
+      })
+      .eq("id", existing.id)
+      .eq("user_id", user.id);
+    return;
+  }
+
   await supabase.from("investment_holdings").insert({
     user_id: user.id,
     investment_id: input.investmentId ?? null,
-    symbol: input.symbol.toUpperCase(),
+    symbol,
     asset_type: input.assetType,
     quantity: input.quantity,
     average_cost: input.averageCost,
