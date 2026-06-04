@@ -48,25 +48,28 @@ export async function createHolding(input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const symbol = input.symbol.toUpperCase();
+  const label = input.label?.trim() || null;
 
-  // If the user already holds this symbol+assetType+currency, merge via weighted average.
-  const { data: existing } = await supabase
+  // Merge key: symbol + assetType + currency + label.
+  // Same name → weighted-average merge; different name → separate position.
+  let q = supabase
     .from("investment_holdings")
-    .select("id, quantity, average_cost, broker, label")
+    .select("id, quantity, average_cost, broker")
     .eq("user_id", user.id)
     .eq("symbol", symbol)
     .eq("asset_type", input.assetType)
-    .eq("currency", input.currency)
-    .maybeSingle();
+    .eq("currency", input.currency);
+  q = label === null ? q.is("label", null) : q.eq("label", label);
+  const { data: existing, error: selErr } = await q.maybeSingle();
+  if (selErr) throw new Error(selErr.message);
 
   if (existing) {
     const prevQty = Number(existing.quantity ?? 0);
     const prevAvg = Number(existing.average_cost ?? 0);
     const newQty = prevQty + input.quantity;
-    const newAvg =
-      newQty > 0
-        ? (prevQty * prevAvg + input.quantity * input.averageCost) / newQty
-        : input.averageCost;
+    const newAvg = newQty > 0
+      ? (prevQty * prevAvg + input.quantity * input.averageCost) / newQty
+      : input.averageCost;
     const { error } = await supabase
       .from("investment_holdings")
       .update({
@@ -75,7 +78,6 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         cost_basis: newQty * newAvg,
         purchase_date: input.purchaseDate ?? null,
         broker: input.broker ?? existing.broker ?? null,
-        label: input.label ?? existing.label ?? null,
       })
       .eq("id", existing.id)
       .eq("user_id", user.id);
@@ -86,6 +88,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
   const { error } = await supabase.from("investment_holdings").insert({
     user_id: user.id,
     investment_id: input.investmentId ?? null,
+    label,
     symbol,
     asset_type: input.assetType,
     quantity: input.quantity,
@@ -94,7 +97,6 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     purchase_date: input.purchaseDate ?? null,
     broker: input.broker ?? null,
     currency: input.currency,
-    label: input.label ?? null,
   });
   if (error) throw new Error(error.message);
 }

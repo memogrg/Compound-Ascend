@@ -25,6 +25,7 @@ export const investmentInputSchema = z.object({
   horizon: z.string().max(20).optional(),
   perceivedRisk: z.enum(["bajo", "medio", "alto", "no_se"]).optional(),
   liquidity: z.enum(["rapida", "penalidad", "largo_plazo", "no_se"]).optional(),
+  dcaBroker: z.string().trim().max(80).optional(),
 });
 
 export const policyInputSchema = z.object({

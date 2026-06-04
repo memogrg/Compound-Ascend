@@ -91,6 +91,7 @@ export async function createInvestment(input: InvestmentInput): Promise<void> {
     horizon: input.horizon ?? null,
     perceived_risk: input.perceivedRisk ?? null,
     liquidity: input.liquidity ?? null,
+    dca_broker: input.dcaBroker ?? null,
   });
   if (error) throw new Error(error.message);
 }
@@ -125,6 +126,7 @@ export async function updateInvestment(id: string, input: InvestmentInput): Prom
       horizon: input.horizon ?? null,
       perceived_risk: input.perceivedRisk ?? null,
       liquidity: input.liquidity ?? null,
+      dca_broker: input.dcaBroker ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);

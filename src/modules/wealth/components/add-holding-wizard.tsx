@@ -10,6 +10,7 @@ import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addHoldingAction,
   addInvestmentAction,
+  getUserCountryAction,
 } from "@/modules/wealth/api/actions";
 import type { AssetType, Holding } from "@/modules/wealth/types";
 
@@ -112,6 +113,43 @@ const STEP_TITLES = [
   "Plan DCA",
 ] as const;
 
+const DCA_BROKERS = [
+  "Interactive Brokers",
+  "Dominion",
+  "ITA",
+  "Local",
+  "Otro",
+] as const;
+
+type DcaBroker = (typeof DCA_BROKERS)[number] | "";
+
+// US-listed ETF → UCITS equivalent (informativo; solo para no residentes en EE.UU.)
+const UCITS_EQUIVALENTS: Partial<Record<string, { symbol: string; name: string }>> = {
+  VOO:  { symbol: "VUAA",  name: "Vanguard S&P 500 UCITS ETF (Acc)" },
+  SPY:  { symbol: "CSPX",  name: "iShares Core S&P 500 UCITS ETF" },
+  IVV:  { symbol: "CSPX",  name: "iShares Core S&P 500 UCITS ETF" },
+  VTI:  { symbol: "VWRL",  name: "Vanguard FTSE All-World UCITS ETF" },
+  QQQ:  { symbol: "EQQQ",  name: "Invesco EQQQ Nasdaq-100 UCITS ETF" },
+  SCHB: { symbol: "VWRL",  name: "Vanguard FTSE All-World UCITS ETF" },
+  VWO:  { symbol: "VFEM",  name: "Vanguard FTSE Emerging Markets UCITS ETF" },
+  AGG:  { symbol: "VAGP",  name: "Vanguard USD Corporate Bond UCITS ETF" },
+};
+
+// Guía por broker (texto informativo de cómo configurar el DCA en cada uno)
+const BROKER_GUIDANCE: Partial<Record<string, string>> = {
+  "Interactive Brokers": "Activa 'Recurring Investments' en IBKR (Cuenta → Inversiones recurrentes). Disponible para acciones/ETFs en mercados US, CA y EU. La app no ejecuta órdenes.",
+  Dominion: "Configura la orden recurrente directamente en el portal de Dominion Securities.",
+  ITA: "Contacta a tu asesor de ITA para programar aportes periódicos.",
+  Local: "Consulta con tu broker la opción de órdenes automáticas periódicas.",
+  Otro: "Configura la automatización directamente con tu broker. La app no ejecuta compras.",
+};
+
+function isUSResident(country: string | null): boolean {
+  if (!country) return false;
+  const lc = country.toLowerCase();
+  return lc.includes("united states") || lc === "usa" || lc === "ee.uu." || lc.includes("estados unidos");
+}
+
 function sym(currency: string): string {
   return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
 }
@@ -208,6 +246,9 @@ function AddHoldingWizard({
   // Step 4
   const [dcaFrequency, setDcaFrequency] = useState<DcaFreq>("mensual");
   const [dcaAmount, setDcaAmount] = useState("");
+  const [dcaBroker, setDcaBroker] = useState<DcaBroker>("");
+  const [userCountry, setUserCountry] = useState<string | null>(null);
+  const countryFetchedRef = useRef(false);
 
   // Submit
   const [pending, setPending] = useState(false);
@@ -290,6 +331,14 @@ function AddHoldingWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch user country lazily when DCA step is first shown
+  useEffect(() => {
+    if (step === 4 && !countryFetchedRef.current) {
+      countryFetchedRef.current = true;
+      getUserCountryAction().then(setUserCountry).catch(() => {});
+    }
+  }, [step]);
+
   const selectSymbol = useCallback(
     (symbol: string, description: string, cat: AssetType) => {
       const upper = symbol.toUpperCase();
@@ -369,6 +418,7 @@ function AddHoldingWizard({
             contribution: dcaNum,
             currency: holdingCurrency,
             horizon: dcaFrequency,
+            dcaBroker: dcaBroker || undefined,
           });
         }
       }
@@ -465,7 +515,12 @@ function AddHoldingWizard({
             onFrequencyChange={setDcaFrequency}
             dcaAmount={dcaAmount}
             onAmountChange={setDcaAmount}
+            dcaBroker={dcaBroker}
+            onDcaBrokerChange={setDcaBroker}
             holdingCurrency={holdingCurrency}
+            userCountry={userCountry}
+            selectedSymbol={selectedSymbol}
+            assetCategory={assetCategory}
           />
         )}
 
@@ -967,20 +1022,35 @@ function Step4DCA({
   onFrequencyChange,
   dcaAmount,
   onAmountChange,
+  dcaBroker,
+  onDcaBrokerChange,
   holdingCurrency,
+  userCountry,
+  selectedSymbol,
+  assetCategory,
 }: {
   dcaFrequency: DcaFreq;
   onFrequencyChange: (f: DcaFreq) => void;
   dcaAmount: string;
   onAmountChange: (v: string) => void;
+  dcaBroker: DcaBroker;
+  onDcaBrokerChange: (b: DcaBroker) => void;
   holdingCurrency: string;
+  userCountry: string | null;
+  selectedSymbol: string;
+  assetCategory: AssetType;
 }) {
+  const isUS = isUSResident(userCountry);
+  const ucits = assetCategory === "etf" ? UCITS_EQUIVALENTS[selectedSymbol] : undefined;
+  const brokerNote = dcaBroker ? BROKER_GUIDANCE[dcaBroker] : undefined;
+
   return (
     <div>
       <div className="auth-msg">
-        Este plan es solo informativo. Registra cada compra real por separado para mantener
-        tu costo promedio ponderado actualizado.
+        Este plan es informativo — la app <strong>no ejecuta ni automatiza compras reales</strong>.
+        Registra cada compra real por separado para mantener tu costo promedio actualizado.
       </div>
+
       <div className="fld-2">
         <div className="fld">
           <label className="fld-label">Frecuencia de aporte</label>
@@ -988,6 +1058,7 @@ function Step4DCA({
             className="sel"
             value={dcaFrequency}
             onChange={(e) => onFrequencyChange(e.target.value as DcaFreq)}
+            autoFocus
           >
             <option value="semanal">Semanal</option>
             <option value="mensual">Mensual</option>
@@ -1005,11 +1076,58 @@ function Step4DCA({
               value={dcaAmount}
               onChange={(e) => onAmountChange(e.target.value)}
               placeholder="0"
-              autoFocus
             />
           </div>
         </div>
       </div>
+
+      <div className="fld">
+        <label className="fld-label">Broker del plan (opcional)</label>
+        <select
+          className="sel"
+          value={dcaBroker}
+          onChange={(e) => onDcaBrokerChange(e.target.value as DcaBroker)}
+        >
+          <option value="">— Sin especificar —</option>
+          {DCA_BROKERS.map((b) => (
+            <option key={b} value={b}>{b}</option>
+          ))}
+        </select>
+        {brokerNote && (
+          <div className="auth-msg" style={{ marginBottom: 0 }}>
+            {brokerNote}
+          </div>
+        )}
+      </div>
+
+      {/* Guía para no residentes en EE.UU. */}
+      {userCountry !== null && !isUS && dcaBroker === "Interactive Brokers" && (
+        <div className="auth-msg warn" style={{ lineHeight: 1.55 }}>
+          Residentes fuera de EE.UU.: activa &ldquo;Recurring Investments&rdquo; desde la
+          interfaz web de IBKR. Esta función <strong>no está disponible vía API</strong> — debes
+          configurarla manualmente en tu cuenta.
+        </div>
+      )}
+
+      {/* Sugerencia UCITS (informativa) */}
+      {!isUS && ucits && (
+        <div
+          style={{
+            padding: "10px 14px",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--r-md)",
+            fontSize: 12.5,
+            lineHeight: 1.55,
+            color: "var(--muted)",
+          }}
+        >
+          <strong style={{ color: "var(--ink-2)" }}>Sugerencia informativa — </strong>
+          Como residente fuera de EE.UU., suele aplicar la versión UCITS/acumulativa.
+          Un equivalente común de <strong>{selectedSymbol}</strong> es{" "}
+          <strong style={{ color: "var(--ink)" }}>{ucits.symbol}</strong> ({ucits.name}).
+          Consulta con un asesor financiero antes de decidir.
+        </div>
+      )}
     </div>
   );
 }

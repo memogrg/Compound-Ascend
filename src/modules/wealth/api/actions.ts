@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { investmentInputSchema, policyInputSchema, holdingInputSchema, dividendInputSchema } from "@/modules/wealth/schemas";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createInvestment,
   createPolicy,
@@ -19,7 +20,7 @@ import {
   createDividend,
   deleteDividend,
 } from "@/modules/wealth/services/dividend-service";
-import { isSupabaseConfigured } from "@/lib/auth/session";
+import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
@@ -176,5 +177,23 @@ export async function removeDividendAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/** País de residencia del usuario (para guía de DCA). */
+export async function getUserCountryAction(): Promise<string | null> {
+  const user = await getUser();
+  if (!user) return null;
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase
+      .from("personal_profiles")
+      .select("country")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    return data?.country ?? null;
+  } catch {
+    return null;
   }
 }

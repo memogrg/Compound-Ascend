@@ -297,6 +297,7 @@ export type InvestmentRow = Timestamps & {
   liquidity: string | null;
   fees: number | null;
   understanding: number | null;
+  dca_broker: string | null;
 };
 
 export type InvestmentHoldingRow = Timestamps & {
