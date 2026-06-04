@@ -347,6 +347,9 @@ export type DividendRow = {
   amount: number;
   currency: string;
   created_at: string;
+  yield_pct: number | null;
+  frequency: string | null;
+  income_id: string | null;
 };
 
 export type PortfolioSnapshotRow = {

@@ -84,6 +84,10 @@ export const dividendInputSchema = z.object({
   paymentDate: z.string().date(),
   amount: z.number().positive("El monto debe ser mayor a 0"),
   currency: z.string().length(3),
+  yieldPct: z.number().positive().max(100).optional(),
+  frequency: z.enum(["mensual", "trimestral", "semestral", "anual"]).optional(),
+  holdingLabel: z.string().max(120).optional(),
+  holdingSymbol: z.string().max(12).optional(),
 });
 
 export type HoldingInput = z.infer<typeof holdingInputSchema>;

@@ -2,15 +2,35 @@ import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
 import { EditWealthButton } from "./wealth-actions";
-import { AddHoldingButton, AddPurchaseButton } from "./add-holding-wizard";
+import { AddHoldingButton, AddPurchaseButton, EditHoldingButton } from "./add-holding-wizard";
+import { HoldingDetailButton } from "./holding-detail-modal";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
+import type { AssetType, Holding } from "@/modules/wealth/types";
 
 const SEMAFORO: Record<string, string> = {
   rojo: "var(--neg)",
   amarillo: "var(--warn)",
   verde: "var(--pos)",
 };
+
+// Part C: bucket mapping for category view
+type Bucket = "ETF" | "Acción" | "Cripto" | "Renta fija" | "Inmueble" | "Negocio" | "Otros";
+
+function getBucket(assetType: AssetType): Bucket {
+  switch (assetType) {
+    case "etf": return "ETF";
+    case "accion": return "Acción";
+    case "cripto": return "Cripto";
+    case "bono":
+    case "fondo":
+    case "certificado":
+    case "pension": return "Renta fija";
+    case "inmueble": return "Inmueble";
+    case "negocio": return "Negocio";
+    default: return "Otros";
+  }
+}
 
 export function GrowthView({ summary }: { summary: WealthSummary }) {
   const { readiness, balance, portfolio, investments, holdings, prices, currency } = summary;
@@ -22,6 +42,17 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
     color: d.color,
   }));
 
+  // Part C: category breakdown
+  const buckets = new Map<Bucket, { value: number; cost: number; count: number }>();
+  for (const h of holdings) {
+    const liveH = prices[h.symbol];
+    const val = liveH ? h.quantity * liveH.price : h.quantity * h.averageCost;
+    const cost = h.quantity * h.averageCost;
+    const bucket = getBucket(h.assetType);
+    const prev = buckets.get(bucket) ?? { value: 0, cost: 0, count: 0 };
+    buckets.set(bucket, { value: prev.value + val, cost: prev.cost + cost, count: prev.count + 1 });
+  }
+
   return (
     <div className="grid">
       {/* Estado patrimonial */}
@@ -30,13 +61,14 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
           <div className="ring-wrap">
             <svg width="120" height="120" viewBox="0 0 42 42">
               <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
-              <circle cx="21" cy="21" r="15.915" fill="none" stroke={ring} strokeWidth="4" strokeLinecap={readiness.score >= 100 ? "butt" : "round"} pathLength={100} strokeDasharray={`${readiness.score} 100`} strokeDashoffset="25" transform="rotate(-90 21 21)" />
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke={ring} strokeWidth="4"
+                strokeLinecap={readiness.score >= 100 ? "butt" : "round"}
+                pathLength={100} strokeDasharray={`${readiness.score} 100`}
+                strokeDashoffset="25" transform="rotate(-90 21 21)" />
             </svg>
             <div className="ring-center">
               <div>
-                <div className="num-xl" style={{ fontSize: 36 }}>
-                  {readiness.score}
-                </div>
+                <div className="num-xl" style={{ fontSize: 36 }}>{readiness.score}</div>
                 <div style={{ fontSize: 10, color: "var(--muted)" }}>preparación</div>
               </div>
             </div>
@@ -52,7 +84,6 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
           </div>
         </div>
 
-        {/* Balance ofensiva / defensiva */}
         <div className="card card-pad">
           <div className="card-title">Balance patrimonial</div>
           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -65,7 +96,7 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
         </div>
       </section>
 
-      {/* Próxima acción patrimonial */}
+      {/* Próxima acción */}
       <div className="card card-pad">
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
           <div className="card-title">Tu próxima mejor acción patrimonial</div>
@@ -92,9 +123,7 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
             <DonutChart data={donut} centerLabel={formatCompact(portfolio.totalInvested, currency)} centerSub="invertido" />
             <div style={{ flex: 1, minWidth: 150, display: "flex", flexDirection: "column", gap: 8 }}>
               {donut.length === 0 ? (
-                <span className="muted" style={{ fontSize: 12.5 }}>
-                  Agrega inversiones para ver su distribución.
-                </span>
+                <span className="muted" style={{ fontSize: 12.5 }}>Agrega inversiones para ver su distribución.</span>
               ) : (
                 donut.map((d) => (
                   <div key={d.name} style={{ display: "grid", gridTemplateColumns: "10px 1fr auto", gap: 9, alignItems: "center", fontSize: 12.5 }}>
@@ -107,16 +136,35 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
             </div>
           </div>
           <div style={{ display: "flex", gap: 18, marginTop: 16, fontSize: 12, color: "var(--muted)", flexWrap: "wrap" }}>
-            <div>
-              Aporte mensual <strong style={{ color: "var(--ink-2)" }}>{formatMoney(portfolio.monthlyContribution, currency)}</strong>
-            </div>
-            <div>
-              Diversificación <strong style={{ color: "var(--ink-2)", textTransform: "capitalize" }}>{portfolio.diversification}</strong>
-            </div>
-            <div>
-              Concentración máx. <strong style={{ color: "var(--ink-2)" }}>{formatPercent(portfolio.topConcentration)}</strong>
-            </div>
+            <div>Aporte mensual <strong style={{ color: "var(--ink-2)" }}>{formatMoney(portfolio.monthlyContribution, currency)}</strong></div>
+            <div>Diversificación <strong style={{ color: "var(--ink-2)", textTransform: "capitalize" }}>{portfolio.diversification}</strong></div>
+            <div>Concentración máx. <strong style={{ color: "var(--ink-2)" }}>{formatPercent(portfolio.topConcentration)}</strong></div>
           </div>
+
+          {/* Part C: category summary */}
+          {buckets.size > 0 && (
+            <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+              <div className="fld-label" style={{ marginBottom: 8 }}>Por categoría</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[...buckets.entries()].map(([bucket, data]) => {
+                  const roi = data.cost > 0 ? (data.value - data.cost) / data.cost : 0;
+                  const pos = roi >= 0;
+                  return (
+                    <div key={bucket} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12 }}>
+                      <span style={{ color: "var(--ink-2)", fontWeight: 500 }}>{bucket}</span>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <span className="muted">{data.count} posición(es)</span>
+                        <span className="tnum" style={{ color: "var(--ink-2)" }}>{formatMoney(data.value, currency)}</span>
+                        <span style={{ color: pos ? "var(--pos)" : "var(--neg)", fontWeight: 500, minWidth: 44, textAlign: "right" }}>
+                          {pos ? "+" : ""}{formatPercent(roi)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="card">
@@ -129,6 +177,7 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
               <AddHoldingButton currency={currency} />
             )}
           </div>
+
           {holdings.length === 0 && investments.length === 0 ? (
             <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
               <span>Aún no registras inversiones.</span>
@@ -136,31 +185,9 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
             </div>
           ) : (
             <>
-              {holdings.map((h) => {
-                const liveH = prices[h.symbol];
-                const currentValue = liveH ? h.quantity * liveH.price : null;
-                return (
-                  <div key={h.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>
-                        {h.label ?? h.symbol}
-                      </div>
-                      <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                        {h.symbol}
-                        {" · "}
-                        {h.quantity.toFixed(h.quantity < 1 ? 6 : 4)} uds.
-                        {currentValue !== null
-                          ? ` · ${formatMoney(currentValue, liveH?.currency ?? h.currency)}`
-                          : ` · costo ${formatMoney(h.quantity * h.averageCost, h.currency)}`}
-                      </div>
-                    </div>
-                    <span className="chip" style={{ textTransform: "uppercase", fontSize: 10.5 }}>
-                      {h.assetType}
-                    </span>
-                    <AddPurchaseButton holding={h} currency={currency} />
-                  </div>
-                );
-              })}
+              {holdings.map((h) => (
+                <HoldingRow key={h.id} holding={h} prices={prices} currency={currency} />
+              ))}
               {investments.map((inv) => {
                 const live = inv.symbol ? prices[inv.symbol] : undefined;
                 return (
@@ -187,7 +214,7 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
         </div>
       </section>
 
-      {/* Checklist de preparación */}
+      {/* Checklist */}
       <div className="card card-pad">
         <div className="card-title">Tu preparación paso a paso</div>
         <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10 }}>
@@ -205,6 +232,69 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
   );
 }
 
+// ── Holding row (B1 ROI + A2 edit/delete + B2 detail) ────────────
+
+function HoldingRow({
+  holding,
+  prices,
+  currency,
+}: {
+  holding: Holding;
+  prices: Record<string, { price: number; currency: string }>;
+  currency: string;
+}) {
+  const liveH = prices[holding.symbol];
+  const currentPrice = liveH?.price ?? null;
+  const currentValue = currentPrice !== null ? holding.quantity * currentPrice : null;
+  const costBasis = holding.quantity * holding.averageCost;
+  const profitLoss = currentValue !== null ? currentValue - costBasis : null;
+  const returnPct = profitLoss !== null && costBasis > 0 ? profitLoss / costBasis : null;
+  const positive = (returnPct ?? 0) >= 0;
+
+  return (
+    <div className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 500 }}>
+          {holding.label ?? holding.symbol}
+        </div>
+        <div className="muted" style={{ fontSize: 11.5, marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span>{holding.symbol}</span>
+          <span>·</span>
+          <span>{holding.quantity.toFixed(holding.quantity < 1 ? 6 : 4)} uds.</span>
+          {currentValue !== null ? (
+            <span>{formatMoney(currentValue, liveH?.currency ?? holding.currency)}</span>
+          ) : (
+            <span>costo {formatMoney(costBasis, holding.currency)}</span>
+          )}
+          {/* B1: ROI% */}
+          {returnPct !== null && (
+            <span
+              style={{
+                color: positive ? "var(--pos)" : "var(--neg)",
+                fontWeight: 500,
+                fontSize: 11.5,
+              }}
+            >
+              {positive ? "+" : ""}{formatPercent(returnPct)}
+            </span>
+          )}
+          {/* B1: avg cost */}
+          <span>@ {formatMoney(holding.averageCost, holding.currency)}</span>
+        </div>
+      </div>
+      <span className="chip" style={{ textTransform: "uppercase", fontSize: 10.5 }}>
+        {holding.assetType}
+      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <HoldingDetailButton holding={holding} currentPrice={currentPrice} currency={currency} />
+        <AddPurchaseButton holding={holding} currency={currency} />
+        <EditHoldingButton holding={holding} currency={currency} />
+        <DeleteButton id={holding.id} kind="holding" />
+      </div>
+    </div>
+  );
+}
+
 function BalanceBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "150px 1fr 40px", gap: 10, alignItems: "center" }}>
@@ -212,9 +302,7 @@ function BalanceBar({ label, value, color }: { label: string; value: number; col
       <div className="bar-track">
         <div className="bar-fill" style={{ width: `${value}%`, background: color }} />
       </div>
-      <span className="muted tnum" style={{ fontSize: 12, textAlign: "right" }}>
-        {value}
-      </span>
+      <span className="muted tnum" style={{ fontSize: 12, textAlign: "right" }}>{value}</span>
     </div>
   );
 }

@@ -19,7 +19,14 @@ import {
 import {
   createDividend,
   deleteDividend,
+  listDividends,
 } from "@/modules/wealth/services/dividend-service";
+import {
+  getHoldingHistory,
+  type HistoryPoint,
+  type Period,
+} from "@/modules/wealth/services/holding-history-service";
+import type { Holding } from "@/modules/wealth/types";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -195,5 +202,31 @@ export async function getUserCountryAction(): Promise<string | null> {
     return data?.country ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Historial de valor de una posición para la gráfica de detalle. */
+export async function getHoldingHistoryAction(
+  holding: Holding,
+  currentPrice: number | null,
+  period: Period,
+): Promise<HistoryPoint[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    return await getHoldingHistory(holding, currentPrice, period);
+  } catch {
+    return [];
+  }
+}
+
+/** Dividendos de una posición. */
+export async function listDividendsAction(holdingId: string): Promise<
+  import("@/modules/wealth/types").Dividend[]
+> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    return await listDividends(holdingId);
+  } catch {
+    return [];
   }
 }

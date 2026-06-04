@@ -134,6 +134,9 @@ export type Dividend = {
   paymentDate: string;
   amount: number;
   currency: string;
+  yieldPct?: number | null;
+  frequency?: string | null;
+  incomeId?: string | null;
 };
 
 export type AllocationSlice = {
