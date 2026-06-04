@@ -29,6 +29,9 @@ export default async function Page() {
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <WealthActions mode="investment" currency={summary.currency} />
+          <Link className="btn btn-secondary" href="/patrimonio/indicadores">
+            <Icon name="networth" width={2} /> Indicadores
+          </Link>
           <Link className="btn btn-secondary" href="/patrimonio/proteccion">
             <Icon name="defense" width={2} /> Protección
           </Link>

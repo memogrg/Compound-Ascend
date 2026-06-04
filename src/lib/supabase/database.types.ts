@@ -339,6 +339,18 @@ export type MarketPriceCacheRow = {
   ttl_seconds: number;
 };
 
+// Indicadores económicos globales (BCCR + FRED). Tabla compartida, sin user_id;
+// escritura solo service-role (migración 0015).
+export type EconomicIndicatorRow = {
+  id: string;
+  indicator_code: string;
+  source: string;
+  value: number;
+  unit: string;
+  observed_date: string;
+  fetched_at: string;
+};
+
 export type DividendRow = {
   id: string;
   holding_id: string;
@@ -464,6 +476,11 @@ export interface Database {
         MarketPriceCacheRow,
         Partial<MarketPriceCacheRow> & { symbol: string; asset_type: string; price: number; currency: string; fetched_at: string; ttl_seconds: number },
         Partial<MarketPriceCacheRow>
+      >;
+      economic_indicators: TableShape<
+        EconomicIndicatorRow,
+        Partial<EconomicIndicatorRow> & { indicator_code: string; source: string; value: number; unit: string; observed_date: string },
+        Partial<EconomicIndicatorRow>
       >;
       dividends: UserTable<DividendRow>;
       portfolio_snapshots: UserTable<PortfolioSnapshotRow>;

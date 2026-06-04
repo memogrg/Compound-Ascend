@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   AreaChart,
   Area,
@@ -16,9 +17,13 @@ interface PerformanceChartProps {
   data: AreaPoint[];
   currency: string;
   costBasis?: number;
+  /** Formateador del valor en el tooltip. Por defecto: moneda. Útil para % o índices. */
+  formatValue?: (value: number) => string;
 }
 
-export function PerformanceChart({ data, currency, costBasis }: PerformanceChartProps) {
+export function PerformanceChart({ data, currency, costBasis, formatValue }: PerformanceChartProps) {
+  const fmt = formatValue ?? ((v: number) => formatMoney(v, currency));
+  const reactId = useId();
   if (data.length < 2) {
     return (
       <div
@@ -40,7 +45,7 @@ export function PerformanceChart({ data, currency, costBasis }: PerformanceChart
   const first = data[0]?.value ?? 0;
   const positive = last >= first;
   const color = positive ? "var(--pos)" : "var(--neg)";
-  const gradId = `pg-${currency}`;
+  const gradId = `pg-${currency}-${reactId.replace(/:/g, "")}`;
 
   return (
     <ResponsiveContainer width="100%" height={120}>
@@ -78,7 +83,7 @@ export function PerformanceChart({ data, currency, costBasis }: PerformanceChart
             fontSize: 12,
             padding: "6px 10px",
           }}
-          formatter={(v: number) => [formatMoney(v, currency), ""]}
+          formatter={(v: number) => [fmt(v), ""]}
           labelFormatter={(l: string) => l}
           labelStyle={{ color: "var(--muted-2)", fontSize: 11, marginBottom: 2 }}
           cursor={{ stroke: "var(--muted-2)", strokeWidth: 1 }}

@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/indicators/refresh", "schedule": "0 8 * * *" }
+  ]
+}
