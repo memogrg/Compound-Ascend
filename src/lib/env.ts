@@ -36,6 +36,7 @@ const serverSchema = z.object({
   REDIS_URL: optionalStr,
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,
+  CRON_SECRET: optionalStr,
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;

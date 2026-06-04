@@ -299,6 +299,65 @@ export type InvestmentRow = Timestamps & {
   understanding: number | null;
 };
 
+export type InvestmentHoldingRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  investment_id: string | null;
+  symbol: string;
+  asset_type: string;
+  quantity: number;
+  cost_basis: number | null;
+  average_cost: number;
+  purchase_date: string | null;
+  broker: string | null;
+  currency: string;
+};
+
+export type InvestmentTransactionRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  investment_id: string | null;
+  tx_type: string | null;
+  amount: number;
+  quantity: number | null;
+  currency: string;
+  occurred_on: string;
+};
+
+export type MarketPriceCacheRow = {
+  id: string;
+  symbol: string;
+  asset_type: string;
+  price: number;
+  currency: string;
+  provider: string | null;
+  fetched_at: string;
+  ttl_seconds: number;
+};
+
+export type DividendRow = {
+  id: string;
+  holding_id: string;
+  user_id: string;
+  payment_date: string;
+  amount: number;
+  currency: string;
+  created_at: string;
+};
+
+export type PortfolioSnapshotRow = {
+  id: string;
+  user_id: string;
+  date: string;
+  portfolio_value: number;
+  investment_value: number;
+  net_worth: number;
+  currency: string;
+  created_at: string;
+};
+
 export type InsurancePolicyRow = Timestamps & {
   id: string;
   user_id: string;
@@ -393,7 +452,16 @@ export interface Database {
       savings_goals: UserTable<SavingsGoalRow>;
       debts: UserTable<DebtRow>;
       investments: UserTable<InvestmentRow>;
+      investment_holdings: UserTable<InvestmentHoldingRow>;
+      investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
+      market_price_cache: TableShape<
+        MarketPriceCacheRow,
+        Partial<MarketPriceCacheRow> & { symbol: string; asset_type: string; price: number; currency: string; fetched_at: string; ttl_seconds: number },
+        Partial<MarketPriceCacheRow>
+      >;
+      dividends: UserTable<DividendRow>;
+      portfolio_snapshots: UserTable<PortfolioSnapshotRow>;
       assets: UserTable<AssetRow>;
       liabilities: UserTable<LiabilityRow>;
       net_worth_snapshots: UserTable<NetWorthSnapshotRow>;

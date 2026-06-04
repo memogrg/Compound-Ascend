@@ -18,6 +18,7 @@ import { isValidSymbol } from "@/lib/market-data/symbol";
 export { isValidSymbol };
 export type AssetType = "stock" | "etf" | "crypto";
 export type MarketPrice = Quote & { symbol: string; assetType: AssetType; cached: boolean };
+import { persistMarketPrice } from "@/lib/market-data/persist";
 
 const STOCK_CHAIN = [finnhub, alphaVantage, yahoo];
 const CRYPTO_CHAIN = [binance, coingecko];
@@ -39,6 +40,8 @@ export async function getMarketPrice(
     const quote = await provider(symbol);
     if (quote) {
       priceCache.set(cacheKey, quote, ttl);
+      // Persiste en BD para historial y acceso offline (fire-and-forget).
+      persistMarketPrice(symbol, assetType, quote.price, quote.currency, quote.provider);
       return { ...quote, symbol, assetType, cached: false };
     }
   }

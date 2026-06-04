@@ -40,7 +40,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     summary = buildDemoSummary();
   }
 
-  const health = computeHealthScore(summary.indicators);
+  // Pasa la tasa de inversión activa para que contribuya al health score.
+  const health = computeHealthScore(summary.indicators, summary.indicators.investmentRate);
   const insights = buildInsights(summary.indicators, health, currency);
 
   return { name, currency, summary, health, insights, configured };

@@ -104,3 +104,87 @@ export type PortfolioStats = {
   diversification: "baja" | "media" | "alta";
   topConcentration: number; // 0-1
 };
+
+// ── Motor de inversiones ──────────────────────────────────────────
+
+export type Holding = {
+  id: string;
+  investmentId?: string | null;
+  symbol: string;
+  assetType: AssetType;
+  quantity: number;
+  averageCost: number;
+  purchaseDate?: string | null;
+  broker?: string | null;
+  currency: string;
+};
+
+export type HoldingPerformance = Holding & {
+  currentPrice?: number;
+  currentValue: number;
+  costBasis: number;
+  profitLoss: number;
+  returnPct: number;
+};
+
+export type Dividend = {
+  id: string;
+  holdingId: string;
+  paymentDate: string;
+  amount: number;
+  currency: string;
+};
+
+export type AllocationSlice = {
+  label: string;
+  value: number;
+  pct: number;
+  color: string;
+};
+
+export type PortfolioAnalytics = {
+  totalPortfolioValue: number;
+  totalCostBasis: number;
+  totalProfitLoss: number;
+  totalReturnPct: number;
+  allocation: {
+    etf: AllocationSlice;
+    stock: AllocationSlice;
+    crypto: AllocationSlice;
+    cash: AllocationSlice;
+    other: AllocationSlice;
+  };
+  holdingsWithPerformance: HoldingPerformance[];
+  growthScore: number;
+};
+
+export type DividendAnalytics = {
+  monthlyDividends: number;
+  annualDividends: number;
+  dividendYield: number;
+  yieldOnCost: number;
+};
+
+export type CryptoAnalytics = {
+  currentValue: number;
+  costBasis: number;
+  profitLoss: number;
+  allocationPct: number;
+};
+
+export type PortfolioSnapshot = {
+  id: string;
+  date: string;
+  portfolioValue: number;
+  investmentValue: number;
+  netWorth: number;
+  currency: string;
+};
+
+export type InvestmentInsights = {
+  concentrationAnalysis: string;
+  diversificationAnalysis: string;
+  dividendInsights: string;
+  passiveIncomeInsights: string;
+  allocationInsights: string;
+};

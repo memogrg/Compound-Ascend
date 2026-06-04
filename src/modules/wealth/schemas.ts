@@ -49,3 +49,40 @@ export const policyInputSchema = z.object({
 
 export type InvestmentInput = z.infer<typeof investmentInputSchema>;
 export type PolicyInput = z.infer<typeof policyInputSchema>;
+
+const ASSET_TYPE_ENUM = [
+  "etf",
+  "accion",
+  "bono",
+  "fondo",
+  "certificado",
+  "inmueble",
+  "cripto",
+  "negocio",
+  "pension",
+  "commodity",
+  "arte",
+  "nft",
+  "otro",
+] as const;
+
+export const holdingInputSchema = z.object({
+  investmentId: z.string().uuid().optional(),
+  symbol: z.string().trim().min(1, "El símbolo es obligatorio").max(12).toUpperCase(),
+  assetType: z.enum(ASSET_TYPE_ENUM),
+  quantity: z.number().positive("La cantidad debe ser mayor a 0"),
+  averageCost: z.number().nonnegative("El costo promedio no puede ser negativo"),
+  purchaseDate: z.string().date().optional(),
+  broker: z.string().trim().max(80).optional(),
+  currency: z.string().length(3),
+});
+
+export const dividendInputSchema = z.object({
+  holdingId: z.string().uuid(),
+  paymentDate: z.string().date(),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  currency: z.string().length(3),
+});
+
+export type HoldingInput = z.infer<typeof holdingInputSchema>;
+export type DividendInput = z.infer<typeof dividendInputSchema>;

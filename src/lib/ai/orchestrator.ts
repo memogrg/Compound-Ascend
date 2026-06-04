@@ -18,6 +18,9 @@ export type FinancialContext = {
   freeCashflow?: number;
   netWorth?: number;
   topConcern?: string;
+  portfolioValue?: number;
+  portfolioReturnPct?: number;
+  topAssetClass?: string;
 };
 
 function getProvider(): AIProvider {
@@ -36,6 +39,9 @@ function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.freeCashflow !== undefined) facts.push(`Flujo libre: ${ctx.freeCashflow} ${ctx.currency}.`);
   if (ctx.netWorth !== undefined) facts.push(`Patrimonio neto: ${ctx.netWorth} ${ctx.currency}.`);
   if (ctx.topConcern) facts.push(`Principal preocupación: ${ctx.topConcern}.`);
+  if (ctx.portfolioValue !== undefined) facts.push(`Valor de mercado del portafolio: ${ctx.portfolioValue} ${ctx.currency}.`);
+  if (ctx.portfolioReturnPct !== undefined) facts.push(`Rendimiento del portafolio: ${(ctx.portfolioReturnPct * 100).toFixed(1)}%.`);
+  if (ctx.topAssetClass) facts.push(`Clase de activo principal: ${ctx.topAssetClass}.`);
 
   return [
     "Eres Ascend AI, el asesor financiero personal de la app Compound Ascend.",

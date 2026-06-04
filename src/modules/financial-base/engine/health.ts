@@ -21,7 +21,14 @@ function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
-export function computeHealthScore(ind: BaseIndicators): HealthScore {
+/**
+ * @param ind              Indicadores de la base financiera.
+ * @param investmentRate   Tasa de inversión activa (0-1). Cuando está presente,
+ *                         aporta hasta +5 pts bonus al score (capeado en 100).
+ *                         Implementa la dimensión patrimonial descrita en el
+ *                         comentario original de este motor.
+ */
+export function computeHealthScore(ind: BaseIndicators, investmentRate?: number): HealthScore {
   const hasData = ind.incomeMonthly > 0 || ind.expenseMonthly > 0;
 
   // Tasa de ahorro: meta 20% → 30 pts.
@@ -33,8 +40,13 @@ export function computeHealthScore(ind: BaseIndicators): HealthScore {
   const cashPts = clamp01((free + 0.2) / 0.4) * 25;
   // Gastos esenciales: meta ≤60% → 20 pts; ≥100% → 0.
   const essPts = (1 - clamp01((ind.essentialsWeight - 0.6) / 0.4)) * 20;
+  // Bonus de inversión activa: invertir ≥10% del ingreso = +5 pts.
+  const invBonus =
+    investmentRate !== undefined ? clamp01(investmentRate / 0.1) * 5 : 0;
 
-  const score = hasData ? Math.round(savingsPts + debtPts + cashPts + essPts) : 0;
+  const score = hasData
+    ? Math.min(100, Math.round(savingsPts + debtPts + cashPts + essPts + invBonus))
+    : 0;
 
   const grade: HealthGrade =
     score >= 80 ? "SÓLIDA" : score >= 60 ? "BUENA" : score >= 40 ? "EN PROGRESO" : "FRÁGIL";

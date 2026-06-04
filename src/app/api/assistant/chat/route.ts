@@ -61,13 +61,33 @@ async function buildContext(): Promise<FinancialContext> {
       "@/modules/financial-base/services/base-service"
     );
     const [base, currency] = await Promise.all([getBaseSummary(), getPrimaryCurrency()]);
-    return {
+    const ctx: FinancialContext = {
       name,
       currency,
       incomeMonthly: base.indicators.incomeMonthly,
       expenseMonthly: base.indicators.expenseMonthly,
       freeCashflow: base.indicators.freeCashflow,
     };
+
+    // Enriquece con datos de portafolio (best-effort, no bloquea si falla).
+    try {
+      const { getPortfolioReport } = await import(
+        "@/modules/wealth/services/portfolio-service"
+      );
+      const report = await getPortfolioReport();
+      if (report.analytics.totalPortfolioValue > 0) {
+        const topSlice = Object.values(report.analytics.allocation).reduce((a, b) =>
+          a.value > b.value ? a : b,
+        );
+        ctx.portfolioValue = Math.round(report.analytics.totalPortfolioValue);
+        ctx.portfolioReturnPct = report.analytics.totalReturnPct;
+        ctx.topAssetClass = topSlice.label;
+      }
+    } catch {
+      // Portfolio no disponible — el contexto base sigue siendo suficiente.
+    }
+
+    return ctx;
   } catch {
     return { name, currency: "CRC" };
   }

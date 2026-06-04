@@ -22,6 +22,18 @@ import type {
 } from "@/modules/rich-life/types";
 import type { Investment, InsurancePolicy, PolicyType } from "@/modules/wealth/types";
 
+async function tryGetPortfolioMarketValues(): Promise<Record<string, number>> {
+  try {
+    const { getPortfolioMarketValues } = await import(
+      "@/modules/wealth/services/portfolio-service"
+    );
+    const result = await getPortfolioMarketValues();
+    return result.byInvestmentId;
+  } catch {
+    return {};
+  }
+}
+
 export async function createAsset(input: AssetInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -114,7 +126,7 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
     getFxRates(),
   ]);
 
-  const [assetRows, liabRows, debtRows, invRows, policyRows, profileRow, prevSnap] =
+  const [assetRows, liabRows, debtRows, invRows, policyRows, profileRow, prevSnap, marketValues] =
     await Promise.all([
       supabase.from("assets").select("*").eq("user_id", user.id),
       supabase.from("liabilities").select("*").eq("user_id", user.id),
@@ -129,6 +141,7 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
         .order("period", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      tryGetPortfolioMarketValues(),
     ]);
 
   // Activos: explícitos + inversiones.
@@ -143,11 +156,15 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
   }));
   const investmentAssets: Asset[] = (invRows.data ?? []).map((r) => {
     const cls = INVESTMENT_CLASS[r.asset_type] ?? "inversion";
+    // Preferir valor de mercado actual cuando hay holdings con precios vivos;
+    // si no, recaer en el monto invertido registrado.
+    const marketValue = marketValues[r.id] ?? marketValues["_standalone"];
+    const value = marketValue !== undefined ? marketValue : Number(r.invested_amount);
     return {
       id: "inv-" + r.id,
       name: r.name,
       assetClass: cls,
-      value: Number(r.invested_amount),
+      value,
       currency: currency,
       generatesIncome: cls === "productivo",
       liquidity: null,
