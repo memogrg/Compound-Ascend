@@ -33,6 +33,15 @@ const serverSchema = z.object({
   GEMINI_API_KEY: optionalStr,
   FINNHUB_TOKEN: optionalStr,
   ALPHA_VANTAGE_KEY: optionalStr,
+  // Email (invitaciones de familia). Si faltan, el envío se omite con gracia.
+  // Vía 1 (recomendada): SMTP de Google Workspace / Gmail con App Password.
+  SMTP_HOST: optionalStr, // p. ej. smtp.gmail.com
+  SMTP_PORT: optionalStr, // 465 (SSL) o 587 (STARTTLS)
+  SMTP_USER: optionalStr, // correo del Workspace, p. ej. invitaciones@tudominio.com
+  SMTP_PASS: optionalStr, // App Password de Google (no la contraseña normal)
+  // Vía 2 (alternativa): Resend.
+  RESEND_API_KEY: optionalStr,
+  EMAIL_FROM: optionalStr, // remitente, p. ej. "Compound Ascend <invitaciones@tudominio.com>"
   REDIS_URL: optionalStr,
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,

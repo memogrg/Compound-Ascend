@@ -4,7 +4,7 @@ import "server-only";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import {
   getBaseSummary,
-  getPrimaryCurrency,
+  getDisplayCurrency,
 } from "@/modules/financial-base/services/base-service";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { computeHealthScore, type HealthScore } from "@/modules/financial-base/engine/health";
@@ -32,7 +32,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   let summary: BaseSummary;
   let currency = "CRC";
   if (configured) {
-    [summary, currency] = await Promise.all([getBaseSummary(), getPrimaryCurrency()]);
+    [summary, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
   } else {
     // Modo demostración (sin Supabase): datos de ejemplo claramente etiquetados
     // en la UI, para previsualizar el panel premium. Se reemplazan por datos

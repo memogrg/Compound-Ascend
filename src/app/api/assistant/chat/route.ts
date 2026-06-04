@@ -57,10 +57,10 @@ async function buildContext(): Promise<FinancialContext> {
   const name = (user?.user_metadata?.display_name as string | undefined) ?? undefined;
   if (!isSupabaseConfigured()) return { name, currency: "CRC" };
   try {
-    const { getBaseSummary, getPrimaryCurrency } = await import(
+    const { getBaseSummary, getDisplayCurrency } = await import(
       "@/modules/financial-base/services/base-service"
     );
-    const [base, currency] = await Promise.all([getBaseSummary(), getPrimaryCurrency()]);
+    const [base, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
     const ctx: FinancialContext = {
       name,
       currency,

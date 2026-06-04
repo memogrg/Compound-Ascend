@@ -3,9 +3,16 @@
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { CurrencySwitch } from "@/components/layout/currency-switch";
 import { resolvePageMeta } from "@/lib/constants/page-meta";
 
-export function Topbar({ onMenu }: { onMenu: () => void }) {
+export function Topbar({
+  onMenu,
+  currency,
+}: {
+  onMenu: () => void;
+  currency?: { display: string; primary: string };
+}) {
   const pathname = usePathname();
   const meta = resolvePageMeta(pathname);
 
@@ -34,6 +41,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
           <input placeholder="Buscar cuentas, inversiones…" aria-label="Buscar" />
           <span className="kbd">⌘K</span>
         </div>
+        {currency ? <CurrencySwitch current={currency.display} primary={currency.primary} /> : null}
         <button className="icon-btn" aria-label="Notificaciones">
           <Icon name="bell" />
         </button>

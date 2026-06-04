@@ -1,5 +1,9 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { getUser } from "@/lib/auth/session";
+import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
+import {
+  getDisplayCurrency,
+  getPrimaryCurrency,
+} from "@/modules/financial-base/services/base-service";
 
 /**
  * Layout del área autenticada. Obtiene el usuario (si Supabase está configurado)
@@ -20,5 +24,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .join("")
     .toUpperCase();
 
-  return <AppShell user={{ name, sub, initials }}>{children}</AppShell>;
+  // Monedas para el switch de visualización del topbar (best-effort).
+  let currency = { display: "CRC", primary: "CRC" };
+  if (isSupabaseConfigured() && user) {
+    try {
+      const [display, primary] = await Promise.all([getDisplayCurrency(), getPrimaryCurrency()]);
+      currency = { display, primary };
+    } catch {
+      // sin perfil aún: se mantiene el valor por defecto
+    }
+  }
+
+  return (
+    <AppShell user={{ name, sub, initials }} currency={currency}>
+      {children}
+    </AppShell>
+  );
 }

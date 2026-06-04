@@ -1,5 +1,5 @@
 import { isSupabaseConfigured } from "@/lib/auth/session";
-import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { BaseDashboard } from "@/modules/financial-base/components/base-dashboard";
 import { BaseActions, AddItemButton } from "@/modules/financial-base/components/base-actions";
@@ -15,7 +15,7 @@ export default async function Page() {
   let summary: BaseSummary;
   let currency = "CRC";
   if (configured) {
-    [summary, currency] = await Promise.all([getBaseSummary(), getPrimaryCurrency()]);
+    [summary, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
   } else {
     summary = { indicators: computeBaseIndicators([], []), incomes: [], expenses: [] };
   }
