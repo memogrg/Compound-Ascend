@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, useId, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -11,17 +11,23 @@ import {
   addHoldingAction,
   addInvestmentAction,
 } from "@/modules/wealth/api/actions";
+import type { AssetType, Holding } from "@/modules/wealth/types";
 
 // ── Types & constants ─────────────────────────────────────────────
 
-type WizardMode = "unica" | "dca";
-type AssetCategory = "etf" | "accion" | "cripto";
+type WizardMode = "puntual" | "dca";
 type PriceMode = "live" | "custom";
 type DcaFreq = "semanal" | "mensual" | "trimestral";
 
 interface SymbolResult {
   symbol: string;
   description: string;
+}
+
+interface InitialHolding {
+  symbol: string;
+  assetCategory: AssetType;
+  description?: string;
 }
 
 const CRYPTO_LIST: SymbolResult[] = [
@@ -42,16 +48,61 @@ const CRYPTO_LIST: SymbolResult[] = [
   { symbol: "APT", description: "Aptos" },
 ];
 
-const CATEGORY_LABELS: Record<AssetCategory, string> = {
-  etf: "ETF",
-  accion: "Acción",
-  cripto: "Cripto",
-};
+const LIVE_PRICE_TYPES = new Set<AssetType>(["etf", "accion", "cripto"]);
 
-const API_TYPE_MAP: Record<AssetCategory, string> = {
+function hasLivePrice(cat: AssetType): boolean {
+  return LIVE_PRICE_TYPES.has(cat);
+}
+
+const API_TYPE_MAP: Partial<Record<AssetType, string>> = {
   etf: "etf",
   accion: "stock",
   cripto: "crypto",
+};
+
+const LIVE_CATEGORY_LABELS: Array<[AssetType, string]> = [
+  ["etf", "ETF"],
+  ["accion", "Acción"],
+  ["cripto", "Cripto"],
+];
+
+const OTHER_ASSET_TYPES: Array<[AssetType, string]> = [
+  ["bono", "Bono"],
+  ["fondo", "Fondo"],
+  ["certificado", "Certificado"],
+  ["inmueble", "Bienes raíces"],
+  ["negocio", "Negocio"],
+  ["pension", "Pensión"],
+  ["commodity", "Commodity"],
+  ["arte", "Arte / Coleccionables"],
+  ["nft", "NFT"],
+  ["otro", "Otro"],
+];
+
+const DEFAULT_SYMBOL: Partial<Record<AssetType, string>> = {
+  bono: "BONO",
+  fondo: "FONDO",
+  certificado: "CERT",
+  inmueble: "INMU",
+  negocio: "NEG",
+  pension: "PENS",
+  commodity: "COMM",
+  arte: "ARTE",
+  nft: "NFT",
+  otro: "OTRO",
+};
+
+const OTHER_TYPE_LABEL: Partial<Record<AssetType, string>> = {
+  bono: "Bono",
+  fondo: "Fondo de inversión",
+  certificado: "Certificado",
+  inmueble: "Bienes raíces",
+  negocio: "Negocio",
+  pension: "Pensión",
+  commodity: "Commodity",
+  arte: "Arte / Coleccionables",
+  nft: "NFT",
+  otro: "Otro activo",
 };
 
 const STEP_TITLES = [
@@ -65,7 +116,7 @@ function sym(currency: string): string {
   return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
 }
 
-// ── Exported trigger ──────────────────────────────────────────────
+// ── Exported triggers ─────────────────────────────────────────────
 
 export function AddHoldingButton({ currency = "CRC" }: { currency?: string }) {
   const [open, setOpen] = useState(false);
@@ -80,28 +131,69 @@ export function AddHoldingButton({ currency = "CRC" }: { currency?: string }) {
   );
 }
 
+export function AddPurchaseButton({ holding, currency }: { holding: Holding; currency: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="btn btn-ghost"
+        style={{ fontSize: 12, padding: "5px 10px" }}
+        onClick={() => setOpen(true)}
+      >
+        + Compra
+      </button>
+      {open && (
+        <AddHoldingWizard
+          currency={currency}
+          initialHolding={{
+            symbol: holding.symbol,
+            assetCategory: holding.assetType,
+            description: holding.label ?? holding.symbol,
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
 // ── Wizard modal ──────────────────────────────────────────────────
 
-function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: () => void }) {
+function AddHoldingWizard({
+  currency,
+  onClose,
+  initialHolding,
+}: {
+  currency: string;
+  onClose: () => void;
+  initialHolding?: InitialHolding;
+}) {
   const router = useRouter();
   const toast = useToast();
 
-  const [step, setStep] = useState(1);
-  const [mode, setMode] = useState<WizardMode | null>(null);
+  const [step, setStep] = useState(initialHolding ? 3 : 1);
+  const [mode, setMode] = useState<WizardMode | null>(initialHolding ? "puntual" : null);
 
   // Step 2
-  const [assetCategory, setAssetCategory] = useState<AssetCategory>("etf");
+  const [assetCategory, setAssetCategory] = useState<AssetType>(
+    initialHolding?.assetCategory ?? "etf",
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SymbolResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [selectedSymbol, setSelectedSymbol] = useState("");
-  const [selectedDescription, setSelectedDescription] = useState("");
+  const [selectedSymbol, setSelectedSymbol] = useState(initialHolding?.symbol ?? "");
+  const [selectedDescription, setSelectedDescription] = useState(
+    initialHolding?.description ?? "",
+  );
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [livePriceCurrency, setLivePriceCurrency] = useState("USD");
   const [livePriceLoading, setLivePriceLoading] = useState(false);
   const [livePriceError, setLivePriceError] = useState(false);
 
   // Step 3
+  const [label, setLabel] = useState(
+    initialHolding?.description ?? initialHolding?.symbol ?? "",
+  );
   const [priceMode, setPriceMode] = useState<PriceMode>("live");
   const [averageCost, setAverageCost] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(
@@ -160,13 +252,16 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
     }, 300);
   }, []);
 
-  const fetchLivePrice = useCallback(async (symbol: string, cat: AssetCategory) => {
+  const fetchLivePrice = useCallback(async (symbol: string, cat: AssetType) => {
+    if (!hasLivePrice(cat)) return;
+    const apiType = API_TYPE_MAP[cat];
+    if (!apiType) return;
     setLivePriceLoading(true);
     setLivePriceError(false);
     setLivePrice(null);
     try {
       const res = await fetch(
-        `/api/market-price?symbol=${encodeURIComponent(symbol)}&type=${API_TYPE_MAP[cat]}`,
+        `/api/market-price?symbol=${encodeURIComponent(symbol)}&type=${apiType}`,
       );
       if (!res.ok) { setLivePriceError(true); setPriceMode("custom"); return; }
       const data = (await res.json()) as { price?: number; currency?: string };
@@ -187,11 +282,20 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
     }
   }, []);
 
+  // Fetch live price when jumping to step 3 via initialHolding
+  useEffect(() => {
+    if (initialHolding) {
+      fetchLivePrice(initialHolding.symbol, initialHolding.assetCategory);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const selectSymbol = useCallback(
-    (symbol: string, description: string, cat: AssetCategory) => {
+    (symbol: string, description: string, cat: AssetType) => {
       const upper = symbol.toUpperCase();
       setSelectedSymbol(upper);
       setSelectedDescription(description);
+      setLabel(description || upper);
       setSearchResults([]);
       setSearchQuery("");
       fetchLivePrice(upper, cat);
@@ -199,16 +303,23 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
     [fetchLivePrice],
   );
 
-  const handleCategoryChange = (cat: AssetCategory) => {
+  const handleCategoryChange = (cat: AssetType) => {
     setAssetCategory(cat);
-    setSelectedSymbol("");
-    setSelectedDescription("");
     setSearchQuery("");
     setSearchResults([]);
     setLivePrice(null);
     setLivePriceError(false);
     setLivePriceLoading(false);
     setAverageCost("");
+    if (!hasLivePrice(cat)) {
+      const defSym = DEFAULT_SYMBOL[cat] ?? cat.toUpperCase().slice(0, 6);
+      setSelectedSymbol(defSym);
+      setSelectedDescription("");
+      setLabel(OTHER_TYPE_LABEL[cat] ?? defSym);
+    } else {
+      setSelectedSymbol("");
+      setSelectedDescription("");
+    }
   };
 
   const handlePriceModeChange = (pm: PriceMode) => {
@@ -233,6 +344,8 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
   const canAdvanceStep2 = selectedSymbol.length > 0;
   const canSave = quantityNum > 0 && !!purchaseDate;
 
+  const isFirstVisibleStep = step === 1 || (!!initialHolding && step === 3);
+
   const handleSave = async () => {
     setErrorMsg(null);
     if (!selectedSymbol) { setErrorMsg("Selecciona un activo."); return; }
@@ -249,7 +362,7 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
             : dcaFrequency === "trimestral" ? "Trimestral"
             : "Mensual";
           await addInvestmentAction({
-            name: `${selectedSymbol} — DCA ${freqLabel}`,
+            name: label.trim() || `${selectedSymbol} — DCA ${freqLabel}`,
             assetType: assetCategory,
             symbol: selectedSymbol,
             investedAmount: quantityNum * effectiveAvgCost,
@@ -268,6 +381,7 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
         purchaseDate: purchaseDate || undefined,
         broker: broker.trim() || undefined,
         currency: holdingCurrency,
+        label: label.trim() || undefined,
       });
 
       if (!result.ok) {
@@ -288,15 +402,13 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
 
   return (
     <Modal
-      title="Agregar inversión"
-      sub={`Paso ${step} de ${totalSteps} — ${stepTitle}`}
+      title={initialHolding ? `Agregar compra — ${initialHolding.symbol}` : "Agregar inversión"}
+      sub={initialHolding ? "Nueva compra del mismo activo" : `Paso ${step} de ${totalSteps} — ${stepTitle}`}
       onClose={onClose}
     >
       <div className="modal-body">
         {step === 1 && (
-          <Step1Mode
-            onSelect={(m) => { setMode(m); setStep(2); }}
-          />
+          <Step1Mode onSelect={(m) => { setMode(m); setStep(2); }} />
         )}
 
         {step === 2 && (
@@ -310,6 +422,7 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
             selectedSymbol={selectedSymbol}
             selectedDescription={selectedDescription}
             onSelectSymbol={selectSymbol}
+            onSymbolManualChange={(s) => setSelectedSymbol(s.toUpperCase().slice(0, 12))}
             livePrice={livePrice}
             livePriceCurrency={livePriceCurrency}
             livePriceLoading={livePriceLoading}
@@ -319,6 +432,8 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
 
         {step === 3 && (
           <Step3Details
+            label={label}
+            onLabelChange={setLabel}
             livePrice={livePrice}
             livePriceCurrency={livePriceCurrency}
             livePriceError={livePriceError}
@@ -362,17 +477,15 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
       </div>
 
       <div className="modal-foot">
-        {step === 1 ? (
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Cancelar
-          </button>
-        ) : (
-          <button type="button" className="btn btn-ghost" onClick={() => setStep((s) => s - 1)}>
-            ← Atrás
-          </button>
-        )}
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => (isFirstVisibleStep ? onClose() : setStep((s) => s - 1))}
+        >
+          {isFirstVisibleStep ? "Cancelar" : "← Atrás"}
+        </button>
 
-        {step >= 2 && step < totalSteps && (
+        {step >= 2 && step < totalSteps && !initialHolding && (
           <button
             type="button"
             className="btn btn-primary"
@@ -383,7 +496,7 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
           </button>
         )}
 
-        {step === totalSteps && step >= 3 && (
+        {(step === totalSteps && step >= 3) || (!!initialHolding && step === 3) ? (
           <button
             type="button"
             className="btn btn-primary"
@@ -392,25 +505,25 @@ function AddHoldingWizard({ currency, onClose }: { currency: string; onClose: ()
           >
             {pending ? "Guardando…" : "Guardar posición"}
           </button>
-        )}
+        ) : null}
       </div>
     </Modal>
   );
 }
 
-// ── Step 1: Única vs DCA ──────────────────────────────────────────
+// ── Step 1: Puntual vs DCA ────────────────────────────────────────
 
 function Step1Mode({ onSelect }: { onSelect: (m: WizardMode) => void }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
       <ModeCard
-        title="Compra única"
-        description="Registras una inversión puntual: una fecha, una cantidad y un precio. Ideal para algo que ya compraste o una entrada única."
-        onClick={() => onSelect("unica")}
+        title="Inversión puntual"
+        description="Compras esporádicas, sin plan fijo. Puedes seguir agregando compras de este activo cuando quieras."
+        onClick={() => onSelect("puntual")}
       />
       <ModeCard
-        title="DCA — Promedio de costo"
-        description="Inviertes un monto fijo de forma recurrente (p. ej. $500 cada mes). Suaviza el efecto de la volatilidad. Guardamos tu plan y te recordamos registrar cada compra real; las proyecciones son solo informativas."
+        title="DCA — aportes recurrentes"
+        description="Plan de aportes fijos (p. ej. $500/mes) que suaviza la volatilidad. Guardamos el plan; registra cada compra real. Las proyecciones son informativas."
         onClick={() => onSelect("dca")}
       />
     </div>
@@ -428,8 +541,10 @@ function ModeCard({
 }) {
   return (
     <button type="button" className="mode-card" onClick={onClick}>
-      <div className="mode-card-title">{title}</div>
-      <div className="mode-card-desc">{description}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="mode-card-title">{title}</div>
+        <HelpTip text={description} />
+      </div>
     </button>
   );
 }
@@ -446,45 +561,61 @@ function Step2Asset({
   selectedSymbol,
   selectedDescription,
   onSelectSymbol,
+  onSymbolManualChange,
   livePrice,
   livePriceCurrency,
   livePriceLoading,
   livePriceError,
 }: {
-  assetCategory: AssetCategory;
-  onCategoryChange: (cat: AssetCategory) => void;
+  assetCategory: AssetType;
+  onCategoryChange: (cat: AssetType) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   searchResults: SymbolResult[];
   searchLoading: boolean;
   selectedSymbol: string;
   selectedDescription: string;
-  onSelectSymbol: (symbol: string, description: string, cat: AssetCategory) => void;
+  onSelectSymbol: (symbol: string, description: string, cat: AssetType) => void;
+  onSymbolManualChange: (s: string) => void;
   livePrice: number | null;
   livePriceCurrency: string;
   livePriceLoading: boolean;
   livePriceError: boolean;
 }) {
+  const isLive = hasLivePrice(assetCategory);
+  const isOtherType = !isLive;
+
   return (
     <div>
-      {/* Category chips */}
+      {/* Live-price chips */}
       <div className="fld">
         <label className="fld-label">Tipo de activo</label>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {(["etf", "accion", "cripto"] as AssetCategory[]).map((cat) => (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {LIVE_CATEGORY_LABELS.map(([cat, lbl]) => (
             <PillButton
               key={cat}
               active={assetCategory === cat}
               onClick={() => onCategoryChange(cat)}
             >
-              {CATEGORY_LABELS[cat]}
+              {lbl}
             </PillButton>
           ))}
+          <select
+            className="sel"
+            style={{ flex: "none", width: "auto", minWidth: 130, fontSize: 12.5, padding: "5px 10px" }}
+            value={isOtherType ? assetCategory : ""}
+            onChange={(e) => { if (e.target.value) onCategoryChange(e.target.value as AssetType); }}
+          >
+            <option value="">Otros activos…</option>
+            {OTHER_ASSET_TYPES.map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
         </div>
       </div>
 
       {/* ETF / Acción: live search */}
-      {assetCategory !== "cripto" && (
+      {isLive && assetCategory !== "cripto" && (
         <div className="fld">
           <label className="fld-label">
             Buscar {assetCategory === "etf" ? "ETF" : "acción"}
@@ -499,9 +630,7 @@ function Step2Asset({
             autoFocus
           />
           {searchLoading && (
-            <span className="muted" style={{ fontSize: 12 }}>
-              Buscando…
-            </span>
+            <span className="muted" style={{ fontSize: 12 }}>Buscando…</span>
           )}
           {!searchLoading && searchResults.length > 0 && (
             <div className="symbol-results">
@@ -511,8 +640,7 @@ function Step2Asset({
                   type="button"
                   className="symbol-row"
                   style={{
-                    borderBottom:
-                      i < searchResults.length - 1 ? "1px solid var(--line)" : "none",
+                    borderBottom: i < searchResults.length - 1 ? "1px solid var(--line)" : "none",
                   }}
                   onClick={() => onSelectSymbol(r.symbol, r.description, assetCategory)}
                 >
@@ -559,8 +687,24 @@ function Step2Asset({
         </div>
       )}
 
+      {/* Non-live: optional manual symbol */}
+      {isOtherType && (
+        <div className="fld">
+          <label className="fld-label">Identificador (opcional)</label>
+          <input
+            className="inp"
+            type="text"
+            value={selectedSymbol}
+            onChange={(e) => onSymbolManualChange(e.target.value)}
+            placeholder={`Ej. ${DEFAULT_SYMBOL[assetCategory] ?? "SYMBOL"}`}
+            maxLength={12}
+            autoFocus
+          />
+        </div>
+      )}
+
       {/* Selected asset + live price badge */}
-      {selectedSymbol && (
+      {selectedSymbol && isLive && (
         <div className="asset-badge">
           <div>
             <span className="asset-badge-sym">{selectedSymbol}</span>
@@ -572,21 +716,14 @@ function Step2Asset({
           </div>
           <div style={{ textAlign: "right" }}>
             {livePriceLoading && (
-              <span className="muted" style={{ fontSize: 12 }}>
-                Cargando precio…
-              </span>
+              <span className="muted" style={{ fontSize: 12 }}>Cargando precio…</span>
             )}
             {!livePriceLoading && livePrice !== null && !livePriceError && (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{ fontFamily: "var(--serif)", fontSize: 17, fontWeight: 700, color: "var(--ink)" }}
-                >
+                <span style={{ fontFamily: "var(--serif)", fontSize: 17, fontWeight: 700, color: "var(--ink)" }}>
                   {formatMoney(livePrice, livePriceCurrency)}
                 </span>
-                <span
-                  className="chip"
-                  style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}
-                >
+                <span className="chip" style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}>
                   en vivo
                 </span>
               </div>
@@ -604,6 +741,8 @@ function Step2Asset({
 // ── Step 3: Details ───────────────────────────────────────────────
 
 function Step3Details({
+  label,
+  onLabelChange,
   livePrice,
   livePriceCurrency,
   livePriceError,
@@ -627,6 +766,8 @@ function Step3Details({
   effectiveAvgCost,
   quantityNum,
 }: {
+  label: string;
+  onLabelChange: (v: string) => void;
   livePrice: number | null;
   livePriceCurrency: string;
   livePriceError: boolean;
@@ -658,7 +799,20 @@ function Step3Details({
 
   return (
     <div>
-      {/* Price mode selector — only when live price is available */}
+      {/* Label */}
+      <div className="fld">
+        <label className="fld-label">Nombre de la inversión</label>
+        <input
+          className="inp"
+          value={label}
+          onChange={(e) => onLabelChange(e.target.value)}
+          placeholder="Ej. Mi S&P 500, BTC largo plazo…"
+          maxLength={120}
+          autoFocus
+        />
+      </div>
+
+      {/* Price mode — only when live price is available */}
       {livePrice !== null && !livePriceError && (
         <div className="fld">
           <label className="fld-label">Precio de compra</label>
@@ -692,7 +846,6 @@ function Step3Details({
               value={averageCost}
               onChange={(e) => onAverageCostChange(e.target.value)}
               placeholder="0.00"
-              autoFocus={livePrice === null}
             />
           </div>
         </div>
@@ -715,25 +868,17 @@ function Step3Details({
       <div className="fld">
         <label className="fld-label">¿Cómo ingresas la compra?</label>
         <div style={{ display: "flex", gap: 8, marginBottom: 2 }}>
-          <PillButton
-            active={inputMode === "units"}
-            onClick={() => onInputModeChange("units")}
-          >
+          <PillButton active={inputMode === "units"} onClick={() => onInputModeChange("units")}>
             Cantidad de unidades
           </PillButton>
-          <PillButton
-            active={inputMode === "amount"}
-            onClick={() => onInputModeChange("amount")}
-          >
+          <PillButton active={inputMode === "amount"} onClick={() => onInputModeChange("amount")}>
             Monto total invertido
           </PillButton>
         </div>
 
         {inputMode === "units" ? (
           <div className="inp-money">
-            <span className="pre" style={{ fontSize: 11, minWidth: 40 }}>
-              {selectedSymbol}
-            </span>
+            <span className="pre" style={{ fontSize: 11, minWidth: 40 }}>{selectedSymbol}</span>
             <input
               type="number"
               step="any"
@@ -741,7 +886,6 @@ function Step3Details({
               value={quantity}
               onChange={(e) => onQuantityChange(e.target.value)}
               placeholder="0"
-              autoFocus
             />
           </div>
         ) : (
@@ -755,7 +899,6 @@ function Step3Details({
                 value={totalAmount}
                 onChange={(e) => onTotalAmountChange(e.target.value)}
                 placeholder="0"
-                autoFocus
               />
             </div>
             {derivedQty !== null && derivedQty > 0 && (
@@ -786,9 +929,7 @@ function Step3Details({
             onChange={(e) => onCurrencyChange(e.target.value)}
           >
             {CURRENCIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
+              <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
         </div>
@@ -837,8 +978,8 @@ function Step4DCA({
   return (
     <div>
       <div className="auth-msg">
-        Este plan es solo informativo. Registra cada compra real por separado para mantener tu
-        costo promedio ponderado actualizado.
+        Este plan es solo informativo. Registra cada compra real por separado para mantener
+        tu costo promedio ponderado actualizado.
       </div>
       <div className="fld-2">
         <div className="fld">
@@ -874,6 +1015,35 @@ function Step4DCA({
 }
 
 // ── Shared UI atoms ───────────────────────────────────────────────
+
+function HelpTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <span
+      className="help-tip"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        className="help-btn"
+        aria-label="Más información"
+        aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+      >
+        ?
+      </button>
+      {open && (
+        <span role="tooltip" id={id} className="help-pop">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 function PillButton({
   active,

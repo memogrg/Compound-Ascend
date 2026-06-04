@@ -75,6 +75,7 @@ export const holdingInputSchema = z.object({
   purchaseDate: z.string().date().optional(),
   broker: z.string().trim().max(80).optional(),
   currency: z.string().length(3),
+  label: z.string().trim().max(120).optional(),
 });
 
 export const dividendInputSchema = z.object({

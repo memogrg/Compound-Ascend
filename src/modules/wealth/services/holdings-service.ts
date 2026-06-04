@@ -17,6 +17,7 @@ function rowToHolding(r: {
   purchase_date: string | null;
   broker: string | null;
   currency: string;
+  label: string | null;
 }): Holding {
   return {
     id: r.id,
@@ -28,6 +29,7 @@ function rowToHolding(r: {
     purchaseDate: r.purchase_date,
     broker: r.broker,
     currency: r.currency,
+    label: r.label,
   };
 }
 
@@ -36,7 +38,7 @@ export async function listHoldings(): Promise<Holding[]> {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("investment_holdings")
-    .select("id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency")
+    .select("id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToHolding);
@@ -50,7 +52,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
   // If the user already holds this symbol+assetType+currency, merge via weighted average.
   const { data: existing } = await supabase
     .from("investment_holdings")
-    .select("id, quantity, average_cost, broker")
+    .select("id, quantity, average_cost, broker, label")
     .eq("user_id", user.id)
     .eq("symbol", symbol)
     .eq("asset_type", input.assetType)
@@ -61,10 +63,11 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     const prevQty = Number(existing.quantity ?? 0);
     const prevAvg = Number(existing.average_cost ?? 0);
     const newQty = prevQty + input.quantity;
-    const newAvg = newQty > 0
-      ? (prevQty * prevAvg + input.quantity * input.averageCost) / newQty
-      : input.averageCost;
-    await supabase
+    const newAvg =
+      newQty > 0
+        ? (prevQty * prevAvg + input.quantity * input.averageCost) / newQty
+        : input.averageCost;
+    const { error } = await supabase
       .from("investment_holdings")
       .update({
         quantity: newQty,
@@ -72,13 +75,15 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         cost_basis: newQty * newAvg,
         purchase_date: input.purchaseDate ?? null,
         broker: input.broker ?? existing.broker ?? null,
+        label: input.label ?? existing.label ?? null,
       })
       .eq("id", existing.id)
       .eq("user_id", user.id);
+    if (error) throw new Error(error.message);
     return;
   }
 
-  await supabase.from("investment_holdings").insert({
+  const { error } = await supabase.from("investment_holdings").insert({
     user_id: user.id,
     investment_id: input.investmentId ?? null,
     symbol,
@@ -89,13 +94,15 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     purchase_date: input.purchaseDate ?? null,
     broker: input.broker ?? null,
     currency: input.currency,
+    label: input.label ?? null,
   });
+  if (error) throw new Error(error.message);
 }
 
 export async function updateHolding(id: string, input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase
+  const { error } = await supabase
     .from("investment_holdings")
     .update({
       investment_id: input.investmentId ?? null,
@@ -107,13 +114,20 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       purchase_date: input.purchaseDate ?? null,
       broker: input.broker ?? null,
       currency: input.currency,
+      label: input.label ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteHolding(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("investment_holdings").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase
+    .from("investment_holdings")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
 }

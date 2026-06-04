@@ -2,7 +2,7 @@ import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
 import { EditWealthButton } from "./wealth-actions";
-import { AddHoldingButton } from "./add-holding-wizard";
+import { AddHoldingButton, AddPurchaseButton } from "./add-holding-wizard";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 
@@ -13,7 +13,7 @@ const SEMAFORO: Record<string, string> = {
 };
 
 export function GrowthView({ summary }: { summary: WealthSummary }) {
-  const { readiness, balance, portfolio, investments, prices, currency } = summary;
+  const { readiness, balance, portfolio, investments, holdings, prices, currency } = summary;
   const ring = SEMAFORO[readiness.semaforo] ?? "var(--warn)";
 
   const donut: DonutDatum[] = portfolio.distribution.map((d) => ({
@@ -123,37 +123,66 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
           <div className="card-head">
             <div>
               <div className="card-title">Mis inversiones</div>
-              <div className="card-sub">{investments.length} activo(s)</div>
+              <div className="card-sub">{holdings.length + investments.length} activo(s)</div>
             </div>
-            {investments.length > 0 && <AddHoldingButton currency={currency} />}
+            {(holdings.length > 0 || investments.length > 0) && (
+              <AddHoldingButton currency={currency} />
+            )}
           </div>
-          {investments.length === 0 ? (
+          {holdings.length === 0 && investments.length === 0 ? (
             <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
               <span>Aún no registras inversiones.</span>
               <AddHoldingButton currency={currency} />
             </div>
           ) : (
-            investments.map((inv) => {
-              const live = inv.symbol ? prices[inv.symbol] : undefined;
-              return (
-                <div key={inv.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 500 }}>{inv.name}</div>
-                    <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                      {formatMoney(inv.investedAmount, currency)}
-                      {live ? ` · precio: ${formatMoney(live.price, live.currency)}` : ""}
+            <>
+              {holdings.map((h) => {
+                const liveH = prices[h.symbol];
+                const currentValue = liveH ? h.quantity * liveH.price : null;
+                return (
+                  <div key={h.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>
+                        {h.label ?? h.symbol}
+                      </div>
+                      <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                        {h.symbol}
+                        {" · "}
+                        {h.quantity.toFixed(h.quantity < 1 ? 6 : 4)} uds.
+                        {currentValue !== null
+                          ? ` · ${formatMoney(currentValue, liveH?.currency ?? h.currency)}`
+                          : ` · costo ${formatMoney(h.quantity * h.averageCost, h.currency)}`}
+                      </div>
+                    </div>
+                    <span className="chip" style={{ textTransform: "uppercase", fontSize: 10.5 }}>
+                      {h.assetType}
+                    </span>
+                    <AddPurchaseButton holding={h} currency={currency} />
+                  </div>
+                );
+              })}
+              {investments.map((inv) => {
+                const live = inv.symbol ? prices[inv.symbol] : undefined;
+                return (
+                  <div key={inv.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>{inv.name}</div>
+                      <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                        {formatMoney(inv.investedAmount, currency)}
+                        {live ? ` · precio: ${formatMoney(live.price, live.currency)}` : ""}
+                      </div>
+                    </div>
+                    <span className="chip" style={{ textTransform: "uppercase", fontSize: 10.5 }}>
+                      {inv.symbol ?? inv.assetType}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <EditWealthButton mode="investment" item={inv} currency={currency} />
+                      <DeleteButton id={inv.id} kind="investment" />
                     </div>
                   </div>
-                  <span className="chip" style={{ textTransform: "uppercase", fontSize: 10.5 }}>
-                    {inv.symbol ?? inv.assetType}
-                  </span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <EditWealthButton mode="investment" item={inv} currency={currency} />
-                    <DeleteButton id={inv.id} kind="investment" />
-                  </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </>
           )}
         </div>
       </section>

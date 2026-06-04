@@ -14,9 +14,11 @@ import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { InvestmentInput, PolicyInput } from "@/modules/wealth/schemas";
+import { listHoldings } from "@/modules/wealth/services/holdings-service";
 import type {
   Investment,
   InsurancePolicy,
+  Holding,
   InvestmentReadiness,
   ProtectionDiagnosis,
   Balance,
@@ -79,7 +81,7 @@ export async function listPolicies(): Promise<InsurancePolicy[]> {
 export async function createInvestment(input: InvestmentInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("investments").insert({
+  const { error } = await supabase.from("investments").insert({
     user_id: user.id,
     asset_type: input.assetType,
     name: input.name,
@@ -90,12 +92,13 @@ export async function createInvestment(input: InvestmentInput): Promise<void> {
     perceived_risk: input.perceivedRisk ?? null,
     liquidity: input.liquidity ?? null,
   });
+  if (error) throw new Error(error.message);
 }
 
 export async function createPolicy(input: PolicyInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("insurance_policies").insert({
+  const { error } = await supabase.from("insurance_policies").insert({
     user_id: user.id,
     policy_type: input.policyType,
     provider: input.provider ?? null,
@@ -105,12 +108,13 @@ export async function createPolicy(input: PolicyInput): Promise<void> {
     renewal_date: input.renewalDate ?? null,
     currency: input.currency,
   });
+  if (error) throw new Error(error.message);
 }
 
 export async function updateInvestment(id: string, input: InvestmentInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase
+  const { error } = await supabase
     .from("investments")
     .update({
       asset_type: input.assetType,
@@ -124,12 +128,13 @@ export async function updateInvestment(id: string, input: InvestmentInput): Prom
     })
     .eq("id", id)
     .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
 }
 
 export async function updatePolicy(id: string, input: PolicyInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase
+  const { error } = await supabase
     .from("insurance_policies")
     .update({
       policy_type: input.policyType,
@@ -141,18 +146,21 @@ export async function updatePolicy(id: string, input: PolicyInput): Promise<void
     })
     .eq("id", id)
     .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteInvestment(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("investments").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("investments").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deletePolicy(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("insurance_policies").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("insurance_policies").delete().eq("id", id).eq("user_id", user.id);
+  if (error) throw new Error(error.message);
 }
 
 const MARKET_TYPE: Partial<Record<AssetType, MarketAssetType>> = {
@@ -183,6 +191,7 @@ export type WealthSummary = {
   balance: Balance;
   portfolio: PortfolioStats;
   investments: Investment[];
+  holdings: Holding[];
   policies: InsurancePolicy[];
   prices: Record<string, { price: number; currency: string }>;
   currency: string;
@@ -192,9 +201,10 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  const [investments, policies, base, currency, rates] = await Promise.all([
+  const [investments, policies, holdings, base, currency, rates] = await Promise.all([
     listInvestments(),
     listPolicies(),
+    listHoldings(),
     getBaseSummary(),
     getDisplayCurrency(),
     getFxRates(),
@@ -238,7 +248,7 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   const balance = computeBalance(readiness, protection, investments.length > 0);
   const prices = await getLivePrices(investments);
 
-  return { readiness, protection, balance, portfolio, investments, policies, prices, currency };
+  return { readiness, protection, balance, portfolio, investments, holdings, policies, prices, currency };
 }
 
 /** Resumen patrimonial de demostración (no toca la BD ni proveedores). */
@@ -266,5 +276,5 @@ export function buildDemoWealthSummary(): WealthSummary {
   const protection = computeProtection(ctx, policies);
   const portfolio = computePortfolio(investments);
   const balance = computeBalance(readiness, protection, true);
-  return { readiness, protection, balance, portfolio, investments, policies, prices: {}, currency };
+  return { readiness, protection, balance, portfolio, investments, holdings: [], policies, prices: {}, currency };
 }

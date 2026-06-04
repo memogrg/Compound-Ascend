@@ -312,6 +312,7 @@ export type InvestmentHoldingRow = Timestamps & {
   purchase_date: string | null;
   broker: string | null;
   currency: string;
+  label: string | null;
 };
 
 export type InvestmentTransactionRow = Timestamps & {

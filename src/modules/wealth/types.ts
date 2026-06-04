@@ -117,6 +117,7 @@ export type Holding = {
   purchaseDate?: string | null;
   broker?: string | null;
   currency: string;
+  label?: string | null;
 };
 
 export type HoldingPerformance = Holding & {

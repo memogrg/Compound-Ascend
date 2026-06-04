@@ -588,13 +588,12 @@ a { color: inherit; text-decoration: none; }
 
 /* ── Holding wizard ──────────────────────────────────────────────── */
 .mode-card {
-  text-align: left; padding: 16px; width: 100%; cursor: pointer;
+  text-align: left; padding: 16px; width: 100%; cursor: pointer; overflow: visible;
   border: 1.5px solid var(--line); border-radius: var(--r-lg);
   background: var(--surface); transition: border-color 0.15s, background 0.15s;
 }
 .mode-card:hover { border-color: var(--ink-2); background: var(--surface-2); }
-.mode-card-title { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
-.mode-card-desc  { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+.mode-card-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
 
 .symbol-results {
   border: 1px solid var(--line); border-radius: var(--r-md); margin-top: 4px;
