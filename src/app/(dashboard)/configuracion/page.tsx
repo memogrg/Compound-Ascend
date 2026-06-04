@@ -1,5 +1,6 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { CurrencySelector } from "@/modules/account/components/currency-selector";
+import { EmailTester } from "@/modules/account/components/email-tester";
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { PLAN_LABEL, isPremium } from "@/lib/plan";
@@ -69,6 +70,10 @@ export default async function Page() {
 
       <section className="cols-2">
         <CurrencySelector current={acc.currency} />
+        <EmailTester />
+      </section>
+
+      <section className="cols-2">
         <div className="card card-pad">
           <div className="card-title">Preferencias</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>

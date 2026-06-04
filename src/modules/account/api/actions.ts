@@ -8,7 +8,13 @@ import {
   clearAllFinancialData,
 } from "@/modules/account/services/account-service";
 import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base/services/base-service";
-import { isSupabaseConfigured } from "@/lib/auth/session";
+import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
+import {
+  isEmailConfigured,
+  emailProviderName,
+  verifyEmailConnection,
+  sendEmail,
+} from "@/lib/email/send";
 import { logger } from "@/lib/logger";
 
 export type AccountActionResult = { ok: boolean; message?: string };
@@ -59,6 +65,61 @@ export async function setDisplayCurrencyAction(code: string): Promise<AccountAct
   }
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: true };
+}
+
+export type EmailTestResult = {
+  ok: boolean;
+  provider: "smtp" | "resend" | null;
+  message: string;
+};
+
+/**
+ * Diagnóstico de correo: detecta el proveedor, verifica la conexión/credenciales
+ * (sin enviar) y manda un correo de prueba al propio usuario. Devuelve el error
+ * exacto si algo falla, para saber qué falta. No expone secretos.
+ */
+export async function testEmailAction(): Promise<EmailTestResult> {
+  const provider = emailProviderName();
+  if (!isEmailConfigured()) {
+    return {
+      ok: false,
+      provider,
+      message:
+        "No detecto credenciales de correo en este deploy. Verifica que agregaste SMTP_HOST, SMTP_USER y SMTP_PASS en Vercel y, sobre todo, que hiciste un redeploy después (las variables solo aplican a deploys nuevos).",
+    };
+  }
+
+  const user = await getUser();
+  const to = user?.email;
+  if (!to) return { ok: false, provider, message: "No hay correo de sesión para la prueba." };
+
+  const verified = await verifyEmailConnection();
+  if (!verified.ok) {
+    return {
+      ok: false,
+      provider,
+      message: `Conexión SMTP rechazada: ${verified.error ?? "error desconocido"}. Suele ser App Password incorrecta, verificación en 2 pasos no activada, o el puerto/host equivocado.`,
+    };
+  }
+
+  const sent = await sendEmail({
+    to,
+    subject: "Prueba de correo · Compound Ascend",
+    html: "<p>Si recibes este correo, el envío de Compound Ascend quedó funcional. ✅</p>",
+  });
+  if (!sent.ok) {
+    return {
+      ok: false,
+      provider,
+      message: `La conexión funcionó pero el envío falló: ${sent.error ?? "error desconocido"}. Revisa que EMAIL_FROM coincida con el buzón autenticado (o sea un alias 'Enviar como' verificado).`,
+    };
+  }
+
+  return {
+    ok: true,
+    provider,
+    message: `¡Listo! Enviamos un correo de prueba a ${to} vía ${provider?.toUpperCase()}. Revisa tu bandeja (y spam).`,
+  };
 }
 
 export async function clearAllDataAction(): Promise<AccountActionResult> {

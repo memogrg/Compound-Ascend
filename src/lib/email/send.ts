@@ -34,6 +34,41 @@ export function isEmailConfigured(): boolean {
   return smtpConfigured(env) || resendConfigured(env);
 }
 
+/** Proveedor de email activo según el entorno (sin exponer secretos). */
+export function emailProviderName(): "smtp" | "resend" | null {
+  const env = getServerEnv();
+  if (smtpConfigured(env)) return "smtp";
+  if (resendConfigured(env)) return "resend";
+  return null;
+}
+
+/**
+ * Verifica la conexión/credenciales SMTP (handshake + auth) SIN enviar correo.
+ * Útil para diagnosticar la configuración. Resend no expone verify → se asume OK.
+ */
+export async function verifyEmailConnection(): Promise<SendResult> {
+  const env = getServerEnv();
+  if (smtpConfigured(env)) {
+    const port = Number(env.SMTP_PORT ?? "465") || 465;
+    try {
+      const transporter = nodemailer.createTransport({
+        host: env.SMTP_HOST,
+        port,
+        secure: port === 465,
+        auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+        connectionTimeout: TIMEOUT_MS,
+        greetingTimeout: TIMEOUT_MS,
+      });
+      await transporter.verify();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "error desconocido" };
+    }
+  }
+  if (resendConfigured(env)) return { ok: true };
+  return { ok: false, skipped: true };
+}
+
 export async function sendEmail(params: SendParams): Promise<SendResult> {
   const env = getServerEnv();
   if (smtpConfigured(env)) return sendViaSmtp(env, params);
@@ -63,10 +98,9 @@ async function sendViaSmtp(env: Env, params: SendParams): Promise<SendResult> {
     });
     return { ok: true };
   } catch (err) {
-    logger.error("email(smtp): fallo al enviar", {
-      message: err instanceof Error ? err.message : "?",
-    });
-    return { ok: false, error: "smtp" };
+    const message = err instanceof Error ? err.message : "?";
+    logger.error("email(smtp): fallo al enviar", { message });
+    return { ok: false, error: message };
   }
 }
 
