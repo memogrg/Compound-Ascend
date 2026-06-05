@@ -15,6 +15,8 @@ import type {
   GoalStatus,
   GoalPriority,
   DebtClassification,
+  DebtRateType,
+  DebtRateIndex,
 } from "@/modules/control/types";
 import type { SavingsGoalRow, DebtRow } from "@/lib/supabase/database.types";
 
@@ -47,6 +49,15 @@ function rowToDebt(r: DebtRow): Debt {
     delinquency: (r.delinquency ?? undefined) as Debt["delinquency"],
     stress: r.stress,
     classification: (r.classification ?? undefined) as DebtClassification | undefined ?? null,
+    originalAmount: r.original_amount === null ? null : Number(r.original_amount),
+    rateType: (r.rate_type ?? null) as DebtRateType | null,
+    rateIndex: (r.rate_index ?? null) as DebtRateIndex | null,
+    rateSpread: r.rate_spread === null ? null : Number(r.rate_spread),
+    termMonths: r.term_months,
+    startDate: r.start_date,
+    extraMonthly: r.extra_monthly === null ? null : Number(r.extra_monthly),
+    insurance: r.insurance === null ? null : Number(r.insurance),
+    notes: r.notes,
   };
 }
 
@@ -89,11 +100,9 @@ export async function createGoal(input: GoalInput): Promise<void> {
   });
 }
 
-export async function createDebt(input: DebtInputForm): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  await supabase.from("debts").insert({
-    user_id: user.id,
+/** Campos de deuda compartidos por insert/update (incluye amortización). */
+function debtColumns(input: DebtInputForm) {
+  return {
     name: input.name,
     debt_type: input.debtType ?? null,
     balance: input.balance,
@@ -103,8 +112,25 @@ export async function createDebt(input: DebtInputForm): Promise<void> {
     currency: input.currency,
     delinquency: input.delinquency ?? "no",
     stress: input.stress ?? null,
-    is_current: true,
-  });
+    original_amount: input.originalAmount ?? null,
+    rate_type: input.rateType ?? null,
+    rate_index: input.rateIndex ?? null,
+    rate_spread: input.rateSpread ?? null,
+    term_months: input.termMonths ?? null,
+    start_date: input.startDate ?? null,
+    extra_monthly: input.extraMonthly ?? null,
+    insurance: input.insurance ?? null,
+    notes: input.notes ?? null,
+  };
+}
+
+export async function createDebt(input: DebtInputForm): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("debts")
+    .insert({ user_id: user.id, is_current: true, ...debtColumns(input) });
+  if (error) throw new Error(error.message);
 }
 
 export async function updateGoal(id: string, input: GoalInput): Promise<void> {
@@ -129,21 +155,12 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
 export async function updateDebt(id: string, input: DebtInputForm): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase
+  const { error } = await supabase
     .from("debts")
-    .update({
-      name: input.name,
-      debt_type: input.debtType ?? null,
-      balance: input.balance,
-      min_payment: input.minPayment,
-      current_payment: input.currentPayment,
-      apr: input.apr ?? null,
-      currency: input.currency,
-      delinquency: input.delinquency ?? "no",
-      stress: input.stress ?? null,
-    })
+    .update(debtColumns(input))
     .eq("id", id)
     .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteGoal(id: string): Promise<void> {

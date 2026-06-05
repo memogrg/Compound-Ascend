@@ -277,6 +277,29 @@ export type DebtRow = Timestamps & {
   stress: number | null;
   allows_extra_payment: string | null;
   classification: string | null;
+  // Calculadora de deudas (migración 0016).
+  original_amount: number | null;
+  rate_type: string | null;
+  rate_index: string | null;
+  rate_spread: number | null;
+  term_months: number | null;
+  start_date: string | null;
+  extra_monthly: number | null;
+  insurance: number | null;
+  notes: string | null;
+};
+
+export type DebtPaymentRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  debt_id: string;
+  amount: number;
+  principal: number | null;
+  interest: number | null;
+  occurred_on: string;
+  extra_amount: number;
+  extra_mode: string | null;
 };
 
 // ---------- Módulo 4 — Patrimonio ----------
@@ -468,6 +491,7 @@ export interface Database {
       monthly_snapshots: UserTable<MonthlySnapshotRow>;
       savings_goals: UserTable<SavingsGoalRow>;
       debts: UserTable<DebtRow>;
+      debt_payments: UserTable<DebtPaymentRow>;
       investments: UserTable<InvestmentRow>;
       investment_holdings: UserTable<InvestmentHoldingRow>;
       investment_transactions: UserTable<InvestmentTransactionRow>;

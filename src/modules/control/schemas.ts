@@ -22,7 +22,27 @@ export const debtInputSchema = z.object({
   currency: z.string().length(3),
   delinquency: z.enum(["no", "1_30", "31_60", "60_mas"]).optional(),
   stress: z.number().int().min(1).max(10).optional(),
+  // ── Calculadora / amortización ──
+  originalAmount: z.number().nonnegative().optional(),
+  rateType: z.enum(["fija", "variable"]).optional(),
+  rateIndex: z.enum(["prime", "tbp", "tri"]).optional(),
+  rateSpread: z.number().min(0).max(100).optional(),
+  termMonths: z.number().int().min(0).max(1200).optional(),
+  startDate: z.string().optional(),
+  extraMonthly: z.number().nonnegative().optional(),
+  insurance: z.number().nonnegative().optional(),
+  notes: z.string().max(500).optional(),
+});
+
+/** Pago reportado sobre una deuda. */
+export const debtPaymentInputSchema = z.object({
+  debtId: z.string().uuid(),
+  paymentDate: z.string().min(1),
+  amount: z.number().nonnegative(),
+  extraAmount: z.number().nonnegative().default(0),
+  extraMode: z.enum(["tiempo", "cuota"]).optional(),
 });
 
 export type GoalInput = z.infer<typeof goalInputSchema>;
 export type DebtInputForm = z.infer<typeof debtInputSchema>;
+export type DebtPaymentInput = z.infer<typeof debtPaymentInputSchema>;

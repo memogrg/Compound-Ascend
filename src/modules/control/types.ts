@@ -17,6 +17,9 @@ export type SavingsGoal = {
 };
 
 export type DebtClassification = "critica" | "controlada" | "estrategica" | "emocional";
+export type DebtRateType = "fija" | "variable";
+export type DebtRateIndex = "prime" | "tbp" | "tri";
+export type ExtraMode = "tiempo" | "cuota";
 
 export type Debt = {
   id: string;
@@ -24,6 +27,7 @@ export type Debt = {
   debtType?: string | null;
   balance: number;
   minPayment: number;
+  /** Cuota mensual (columna current_payment). */
   currentPayment: number;
   apr: number | null;
   currency: string;
@@ -31,6 +35,29 @@ export type Debt = {
   delinquency?: "no" | "1_30" | "31_60" | "60_mas" | null;
   stress?: number | null;
   classification?: DebtClassification | null;
+  // ── Calculadora / amortización (migración 0016) ──
+  originalAmount?: number | null;
+  rateType?: DebtRateType | null;
+  rateIndex?: DebtRateIndex | null;
+  /** Margen (en puntos) sumado al índice en deudas variables. */
+  rateSpread?: number | null;
+  /** Plazo total en meses. */
+  termMonths?: number | null;
+  startDate?: string | null;
+  extraMonthly?: number | null;
+  insurance?: number | null;
+  notes?: string | null;
+};
+
+/** Pago reportado de una deuda (fuente de la verdad: tabla debt_payments). */
+export type DebtPayment = {
+  id: string;
+  debtId: string;
+  /** Fecha del pago (columna occurred_on). */
+  paymentDate: string;
+  amount: number;
+  extraAmount: number;
+  extraMode?: ExtraMode | null;
 };
 
 export type GoalAction =
