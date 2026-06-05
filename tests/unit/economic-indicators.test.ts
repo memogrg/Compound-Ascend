@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseBccrXml } from "@/lib/economic-indicators/providers";
+import { parseBccrXml, parseFredObservations } from "@/lib/economic-indicators/providers";
 
 describe("parseBccrXml", () => {
   it("parsea el XML escapado dentro del envoltorio <string>", () => {
@@ -40,5 +40,27 @@ describe("parseBccrXml", () => {
 
   it("devuelve [] cuando no hay observaciones", () => {
     expect(parseBccrXml("<string></string>")).toEqual([]);
+  });
+});
+
+describe("parseFredObservations", () => {
+  it("parsea observaciones y descarta faltantes (.)", () => {
+    const data = {
+      observations: [
+        { date: "2026-05-01", value: "5.33" },
+        { date: "2026-04-01", value: "." }, // faltante en FRED
+        { date: "2026-03-01", value: "5.31" },
+      ],
+    };
+    expect(parseFredObservations(data)).toEqual([
+      { observedDate: "2026-05-01", value: 5.33 },
+      { observedDate: "2026-03-01", value: 5.31 },
+    ]);
+  });
+
+  it("tolera payloads vacíos o malformados", () => {
+    expect(parseFredObservations(null)).toEqual([]);
+    expect(parseFredObservations({})).toEqual([]);
+    expect(parseFredObservations({ observations: [{ date: "mala", value: "1" }] })).toEqual([]);
   });
 });

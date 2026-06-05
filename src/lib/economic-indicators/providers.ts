@@ -169,13 +169,19 @@ export async function fetchFred(seriesId: string, limit = 400): Promise<Observat
     `?series_id=${encodeURIComponent(seriesId)}&api_key=${key}` +
     `&file_type=json&sort_order=desc&limit=${limit}`;
 
-  const data = (await fetchJson(url)) as
-    | { observations?: { date: string; value: string }[] }
-    | null;
-  const obs = data?.observations ?? [];
+  return parseFredObservations(await fetchJson(url));
+}
+
+/**
+ * Parsea la respuesta JSON de FRED a observaciones normalizadas. Función pura
+ * (sin red) para test. FRED marca valores faltantes con ".".
+ */
+export function parseFredObservations(data: unknown): Observation[] {
+  const obs =
+    (data as { observations?: { date: string; value: string }[] } | null)?.observations ?? [];
   const out: Observation[] = [];
   for (const o of obs) {
-    const value = num(o.value); // FRED marca faltantes con "."
+    const value = num(o.value);
     if (value === null || !/^\d{4}-\d{2}-\d{2}$/.test(o.date)) continue;
     out.push({ observedDate: o.date, value });
   }

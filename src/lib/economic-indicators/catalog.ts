@@ -77,7 +77,7 @@ export const INDICATORS: readonly IndicatorDef[] = [
   //   - TRI (Tasa de Referencia Interbancaria) → externalId pendiente
   //   - IPC / inflación interanual            → externalId pendiente
 
-  // ── Estados Unidos (FRED) — Fase 2 (scaffolding, sin ingerir aún) ──
+  // ── Estados Unidos (FRED) — Fase 2 (activado; requiere FRED_API_KEY) ──
   {
     code: "FED_PRIME",
     source: "FRED",
@@ -86,7 +86,7 @@ export const INDICATORS: readonly IndicatorDef[] = [
     label: "Prime Rate",
     description: "Tasa preferencial bancaria en EE. UU.",
     group: "Estados Unidos",
-    enabled: false,
+    enabled: true,
   },
   {
     code: "FED_FUNDS",
@@ -96,7 +96,7 @@ export const INDICATORS: readonly IndicatorDef[] = [
     label: "Federal Funds",
     description: "Tasa efectiva de fondos federales.",
     group: "Estados Unidos",
-    enabled: false,
+    enabled: true,
   },
   {
     code: "SOFR",
@@ -106,7 +106,7 @@ export const INDICATORS: readonly IndicatorDef[] = [
     label: "SOFR",
     description: "Secured Overnight Financing Rate.",
     group: "Estados Unidos",
-    enabled: false,
+    enabled: true,
   },
   {
     code: "US_TREASURY_10Y",
@@ -116,7 +116,7 @@ export const INDICATORS: readonly IndicatorDef[] = [
     label: "Tesoro 10 años",
     description: "Rendimiento del bono del Tesoro de EE. UU. a 10 años.",
     group: "Estados Unidos",
-    enabled: false,
+    enabled: true,
   },
   {
     code: "US_CPI",
@@ -126,7 +126,7 @@ export const INDICATORS: readonly IndicatorDef[] = [
     label: "CPI (índice)",
     description: "Índice de precios al consumidor de EE. UU.",
     group: "Estados Unidos",
-    enabled: false,
+    enabled: true,
   },
 ] as const;
 
