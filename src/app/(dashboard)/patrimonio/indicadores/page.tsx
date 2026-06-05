@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getIndicatorsViewModel } from "@/modules/wealth/services/indicators-service";
+import { getMacroInsights, type MacroInsight } from "@/modules/wealth";
 import { IndicatorsView } from "@/modules/wealth/components/indicators-view";
 import { Icon } from "@/components/ui/icon";
 import type { IndicatorsViewModel } from "@/modules/wealth/services/indicators-service";
@@ -11,9 +12,9 @@ import type { IndicatorsViewModel } from "@/modules/wealth/services/indicators-s
  */
 export default async function Page() {
   const configured = isSupabaseConfigured();
-  const model: IndicatorsViewModel = configured
-    ? await getIndicatorsViewModel()
-    : { groups: [], hasData: false };
+  const [model, insights]: [IndicatorsViewModel, MacroInsight[]] = configured
+    ? await Promise.all([getIndicatorsViewModel(), getMacroInsights().catch(() => [])])
+    : [{ groups: [], hasData: false }, []];
 
   return (
     <div className="grid">
@@ -35,7 +36,7 @@ export default async function Page() {
           Modo demostración. Conecta Supabase para ver los indicadores económicos en vivo.
         </div>
       ) : (
-        <IndicatorsView model={model} />
+        <IndicatorsView model={model} insights={insights} />
       )}
     </div>
   );

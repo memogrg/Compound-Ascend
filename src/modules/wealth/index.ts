@@ -20,6 +20,7 @@ export {
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getSnapshotHistory, generateAndSaveSnapshot } from "./services/snapshot-service";
 export { getInvestmentInsights } from "./services/investment-insights";
+export { getMacroInsights, type MacroInsight } from "./services/macro-insights";
 export { GrowthView } from "./components/growth-view";
 export { DefenseView } from "./components/defense-view";
 export { WealthActions } from "./components/wealth-actions";

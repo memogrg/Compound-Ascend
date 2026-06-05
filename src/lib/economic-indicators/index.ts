@@ -217,3 +217,4 @@ export async function refreshAllIndicators(): Promise<RefreshResult[]> {
 }
 
 export { findIndicator };
+export { getYoYInflation, getTbpContext, type TbpContext } from "@/lib/economic-indicators/insights";

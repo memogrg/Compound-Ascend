@@ -5,7 +5,15 @@ import type {
   IndicatorCard,
   IndicatorsViewModel,
 } from "@/modules/wealth/services/indicators-service";
+import type { MacroInsight, InsightTone } from "@/modules/wealth/services/macro-insights";
 import type { IndicatorUnit } from "@/lib/economic-indicators";
+
+const TONE_COLOR: Record<InsightTone, string> = {
+  pos: "var(--pos)",
+  neg: "var(--neg)",
+  warn: "var(--warn)",
+  info: "var(--info, var(--muted-2))",
+};
 
 /** Número con 2 decimales en formato es-CR. */
 function num2(value: number): string {
@@ -86,8 +94,46 @@ function Card({ card }: { card: IndicatorCard }) {
   );
 }
 
-export function IndicatorsView({ model }: { model: IndicatorsViewModel }) {
-  if (model.groups.length === 0) {
+function MacroInsightsPanel({ insights }: { insights: MacroInsight[] }) {
+  if (insights.length === 0) return null;
+  return (
+    <div className="card card-pad">
+      <div className="card-title">Qué significa para ti</div>
+      <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+        {insights.map((i) => {
+          const color = TONE_COLOR[i.tone];
+          return (
+            <div
+              key={i.id}
+              style={{
+                borderLeft: `3px solid ${color}`,
+                paddingLeft: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 3,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>{i.title}</div>
+              <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>{i.body}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="muted" style={{ fontSize: 11, marginTop: 12 }}>
+        Información de contexto. No constituye recomendación financiera.
+      </div>
+    </div>
+  );
+}
+
+export function IndicatorsView({
+  model,
+  insights = [],
+}: {
+  model: IndicatorsViewModel;
+  insights?: MacroInsight[];
+}) {
+  if (model.groups.length === 0 && insights.length === 0) {
     return (
       <div className="muted" style={{ fontSize: 13, padding: "8px 0" }}>
         No hay indicadores configurados todavía.
@@ -97,6 +143,7 @@ export function IndicatorsView({ model }: { model: IndicatorsViewModel }) {
 
   return (
     <div className="grid">
+      <MacroInsightsPanel insights={insights} />
       {model.groups.map((g) => (
         <section key={g.group} className="grid" style={{ gap: 12 }}>
           <div className="card-title" style={{ fontSize: 13, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
