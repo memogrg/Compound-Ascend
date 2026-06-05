@@ -1,14 +1,12 @@
-import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getDebtsOverview } from "@/modules/control/services/debts-service";
 import { getIndexRates } from "@/modules/control/services/index-rates";
 import { DebtsView } from "@/modules/control/components/debts-view";
-import { Icon } from "@/components/ui/icon";
 import type { DebtsOverview } from "@/modules/control/services/debts-service";
 
 /**
- * Sub-página de Control — Préstamos y deudas. Calculadora completa con
- * amortización, comparación de estrategias y proyección de pago.
+ * Préstamos y deudas — calculadora completa con amortización, comparación de
+ * estrategias y proyección de pago. Tab propio en la navegación.
  */
 export default async function Page() {
   const configured = isSupabaseConfigured();
@@ -28,9 +26,6 @@ export default async function Page() {
             Tu plan para salir de deudas: estrategia, amortización y cuánto te ahorras pagando de más.
           </div>
         </div>
-        <Link className="btn btn-secondary" href="/control-financiero">
-          <Icon name="dashboard" width={2} /> Control
-        </Link>
       </div>
 
       {!configured ? (

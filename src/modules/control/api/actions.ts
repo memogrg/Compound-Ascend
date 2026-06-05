@@ -87,8 +87,8 @@ export async function reportPaymentAction(raw: unknown): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await addDebtPayment(parsed.data);
-    revalidatePath("/control-financiero/deudas");
-    revalidatePath(`/control-financiero/deudas/${parsed.data.debtId}`);
+    revalidatePath("/deudas");
+    revalidatePath(`/deudas/${parsed.data.debtId}`);
     return { ok: true };
   } catch (err) {
     logger.error("reportPayment fallido", { message: err instanceof Error ? err.message : "?" });

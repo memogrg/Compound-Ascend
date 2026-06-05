@@ -29,7 +29,7 @@ export default async function Page({ params }: { params: Promise<{ debtId: strin
           <div className="card-title">Detalle de deuda</div>
           <div className="card-sub">Calculadora de amortización y pago.</div>
         </div>
-        <Link className="btn btn-secondary" href="/control-financiero/deudas">
+        <Link className="btn btn-secondary" href="/deudas">
           <Icon name="chev" width={2} /> Volver a deudas
         </Link>
       </div>

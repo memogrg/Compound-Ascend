@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney, formatPercent } from "@/lib/format";
+import { PerformanceChart } from "@/components/charts/area-chart";
 import { AddControlButton } from "./control-actions";
 import {
   simulateStrategy,
@@ -74,6 +75,68 @@ function fmtDate(iso: string | null): string {
   return `${months[Number(m) - 1] ?? ""} ${y}`;
 }
 
+/** Salud del ratio deuda/ingresos (DTI). */
+function dtiHealth(dti: number): { label: string; color: string } {
+  if (dti < 0.36) return { label: "Saludable", color: "var(--pos)" };
+  if (dti < 0.43) return { label: "Ajustado", color: "var(--warn)" };
+  return { label: "Alto", color: "var(--neg)" };
+}
+
+/** Color sólido de la categoría (barra de progreso). */
+function debtColor(debtType: string | null): string {
+  const t = (debtType ?? "").toLowerCase();
+  if (/tarjeta/.test(t)) return "var(--neg)";
+  if (/auto|veh/.test(t)) return "var(--warn)";
+  if (/estud/.test(t)) return "var(--info)";
+  if (/hipoteca/.test(t)) return "var(--c-networth, var(--info))";
+  return "var(--muted-2)";
+}
+
+/** Gradiente del icono por categoría (estética Debts.html). */
+function debtGradient(debtType: string | null): string {
+  const t = (debtType ?? "").toLowerCase();
+  if (/tarjeta/.test(t)) return "linear-gradient(135deg,var(--neg),var(--warn))";
+  if (/auto|veh/.test(t)) return "linear-gradient(135deg,var(--warn),var(--gold,#d9a441))";
+  if (/estud/.test(t)) return "linear-gradient(135deg,var(--info),var(--teal,#3aa))";
+  if (/hipoteca/.test(t)) return "linear-gradient(135deg,var(--c-networth,var(--info)),var(--ink-2))";
+  return "linear-gradient(135deg,var(--muted-2),var(--ink-2))";
+}
+
+/**
+ * Curva de saldo total proyectado bajo la estrategia avalancha con `extra`.
+ * Replica la simulación de debt-strategy registrando el saldo total por mes
+ * (responde al control ± de pago extra).
+ */
+function strategyCurve(items: DebtInput[], extra: number): { date: string; value: number }[] {
+  const order = orderDebts(items, "avalancha");
+  const state = order.map((d) => ({ ...d, bal: d.balance }));
+  const totalMin = state.reduce((s, d) => s + d.minPayment, 0);
+  const sum = () => Math.round(state.reduce((s, d) => s + Math.max(0, d.bal), 0));
+  const curve = [{ date: "Hoy", value: sum() }];
+  let months = 0;
+  while (state.some((d) => d.bal > 0.01) && months < 600) {
+    months += 1;
+    for (const d of state) if (d.bal > 0) d.bal += d.bal * (d.apr / 100 / 12);
+    let budget = totalMin + extra;
+    for (const d of state) {
+      if (d.bal <= 0) continue;
+      const pay = Math.min(d.minPayment, d.bal, budget);
+      d.bal -= pay;
+      budget -= pay;
+    }
+    for (const d of state) {
+      if (budget <= 0) break;
+      if (d.bal <= 0) continue;
+      const pay = Math.min(budget, d.bal);
+      d.bal -= pay;
+      budget -= pay;
+    }
+    for (const d of state) if (d.bal <= 0.01) d.bal = 0;
+    curve.push({ date: payoffDateFromMonths(months), value: sum() });
+  }
+  return curve;
+}
+
 export function DebtsView({ overview }: { overview: DebtsOverview }) {
   const { currency, incomeMonthly, debts } = overview;
   const noDecimals = ["CRC", "COP", "MXN"].includes(currency);
@@ -100,6 +163,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
     );
     const dti = incomeMonthly > 0 ? monthlyPayments / incomeMonthly : null;
     const highestApr = debts.reduce((m, d) => Math.max(m, d.apr), 0);
+    const avgApr = totalDebt > 0 ? debts.reduce((s, d) => s + d.balance * d.apr, 0) / totalDebt : 0;
     const interestThisYear = debts.reduce(
       (s, d) => s + (summaries.get(d.id)?.interestNext12 ?? 0),
       0,
@@ -109,7 +173,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
     const cardLimit = cards.reduce((s, d) => s + (d.originalAmount ?? 0), 0);
     const cardBalance = cards.reduce((s, d) => s + d.balance, 0);
     const utilization = cardLimit > 0 ? cardBalance / cardLimit : null;
-    return { totalDebt, monthlyPayments, dti, highestApr, interestThisYear, utilization };
+    return { totalDebt, monthlyPayments, dti, highestApr, avgApr, interestThisYear, utilization };
   }, [debts, incomeMonthly, summaries]);
 
   const strategy = useMemo(() => {
@@ -119,6 +183,8 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
     const recommended = recommendMethod(inputs);
     return { avalancha, bolaNieve, recommended };
   }, [debts, extra]);
+
+  const curve = useMemo(() => strategyCurve(debts.map(toDebtInput), extra), [debts, extra]);
 
   if (debts.length === 0) {
     return (
@@ -141,24 +207,37 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
       <section className="top-grid">
         {/* Deuda total */}
         <div className="card card-pad">
-          <div className="card-title">Deuda total</div>
-          <div className="num-xl" style={{ fontSize: 40, color: "var(--neg)", marginTop: 10 }}>
-            {formatMoney(totals.totalDebt, currency)}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14 }}>
+            <div>
+              <div className="label">Deuda total</div>
+              <div className="num-xl" style={{ fontSize: 44, color: "var(--neg)", marginTop: 8 }}>
+                {formatMoney(totals.totalDebt, currency)}
+              </div>
+              <div className="row" style={{ gap: 18, marginTop: 14, fontSize: 12.5, color: "var(--muted)", flexWrap: "wrap" }}>
+                <div>Pagos mensuales <strong style={{ color: "var(--ink-2)" }}>{formatMoney(totals.monthlyPayments, currency)}</strong></div>
+                <div>Tasa media <strong style={{ color: "var(--ink-2)" }}>{totals.avgApr.toFixed(1)}%</strong></div>
+                <div>Libre de deudas <strong style={{ color: "var(--pos)" }}>{recSim.feasible ? fmtDate(payoffDateFromMonths(recSim.months)) : "—"}</strong></div>
+              </div>
+            </div>
             {totals.dti != null ? (
-              <span className="chip" style={{ background: "var(--neg-soft)", color: "var(--neg)" }}>
-                {formatPercent(totals.dti)} de tus ingresos
+              <span
+                className="chip"
+                style={{
+                  background: `color-mix(in srgb, ${dtiHealth(totals.dti).color} 16%, transparent)`,
+                  color: dtiHealth(totals.dti).color,
+                }}
+              >
+                Ratio de deuda {formatPercent(totals.dti)} · {dtiHealth(totals.dti).label}
               </span>
             ) : null}
-            <span className="chip">
-              Libre en {monthsToText(recSim.months)}
-            </span>
           </div>
-          <div className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>
-            Pagando {formatMoney(totals.monthlyPayments + extra, currency)}/mes ({METHOD_LABEL[rec.method].toLowerCase()}),
-            terminarías hacia <strong style={{ color: "var(--ink-2)" }}>{fmtDate(payoffDateFromMonths(recSim.months))}</strong>{" "}
-            con {formatMoney(recSim.totalInterest, currency)} en intereses.
+
+          <div style={{ marginTop: 14 }}>
+            <PerformanceChart data={curve} currency={currency} />
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>
+            Saldo proyectado con la estrategia{" "}
+            <strong style={{ color: "var(--ink-2)" }}>{METHOD_LABEL[rec.method].toLowerCase()}</strong>
           </div>
         </div>
 
@@ -226,32 +305,52 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           const s = summaries.get(d.id)!;
           const isHighest = d.apr === totals.highestApr && totals.highestApr > 0;
           return (
-            <Link key={d.id} href={`/control-financiero/deudas/${d.id}`} className="debt-row">
-              <span className="debt-rank">{i + 1}</span>
+            <Link key={d.id} href={`/deudas/${d.id}`} className="debt-row">
+              <span className="debt-ic" style={{ background: debtGradient(d.debtType) }}>{i + 1}</span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{d.name}</div>
-                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                <div className="debt-name">{d.name}</div>
+                <div className="debt-sub">
                   {d.debtType ?? "Deuda"}
                   {d.rateType === "variable" ? " · variable" : ""}
+                  {i === 0 ? " · pagar primero" : ""}
                 </div>
                 {d.rateNote ? (
                   <div style={{ fontSize: 11, color: "var(--warn)", marginTop: 3 }}>{d.rateNote}</div>
                 ) : null}
-                {d.originalAmount ? (
-                  <div className="dbar">
-                    <span style={{ width: `${s.progress * 100}%` }} />
-                  </div>
-                ) : null}
               </div>
-              <span className={`drate${isHighest ? " high" : ""}`}>
-                {d.apr.toFixed(1)}%
-              </span>
-              <div className="dbal" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div>
-                  <div className="dbal-amount">{formatMoney(d.balance, currency)}</div>
-                  <div className="dbal-sub">≈ {monthsToText(s.monthsRemaining)} restantes</div>
+              <div className="dbar">
+                <div className="bar-track">
+                  <div
+                    className="bar-fill"
+                    style={{
+                      width: `${d.originalAmount ? Math.min(100, (d.balance / d.originalAmount) * 100) : 100}%`,
+                      background: debtColor(d.debtType),
+                    }}
+                  />
                 </div>
-                <Icon name="chev" width={2} />
+                <div className="dbar-meta">
+                  <span>
+                    {d.originalAmount
+                      ? `${formatMoney(d.balance, currency)} de ${formatMoney(d.originalAmount, currency)}`
+                      : formatMoney(d.balance, currency)}
+                  </span>
+                  <span>
+                    {d.monthlyPayment > 0
+                      ? `${formatMoney(d.monthlyPayment, currency)}/mes`
+                      : `mín. ${formatMoney(d.minPayment, currency)}`}
+                  </span>
+                </div>
+              </div>
+              <div className={`drate${isHighest ? " high" : ""}`}>
+                <div className="r">{d.apr.toFixed(1)}%</div>
+                <div className="l">TAE</div>
+              </div>
+              <div className="dbal">
+                <div>
+                  <div className="b">{formatMoney(d.balance, currency)}</div>
+                  <div className="m">≈ {monthsToText(s.monthsRemaining)}</div>
+                </div>
+                <span className="chev"><Icon name="chev" width={1.8} /></span>
               </div>
             </Link>
           );

@@ -625,19 +625,29 @@ a { color: inherit; text-decoration: none; }
 .health-cell .hc-val { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 @media (max-width: 720px) { .health-strip { grid-template-columns: 1fr 1fr; } }
 
-.debt-row { display: grid; grid-template-columns: 30px 1fr 64px auto; gap: 13px; align-items: center; padding: 13px 24px; border-top: 1px solid var(--line); cursor: pointer; transition: background 120ms; text-align: left; width: 100%; background: transparent; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; }
+.debt-row { display: grid; grid-template-columns: 40px 1.4fr 1fr 92px 120px; gap: 16px; align-items: center; padding: 15px 24px; border-top: 1px solid var(--line); cursor: pointer; transition: background 120ms; text-align: left; color: inherit; text-decoration: none; }
 .debt-row:first-of-type { border-top: 0; }
 .debt-row:hover { background: var(--surface-2); }
-.debt-rank { width: 26px; height: 26px; border-radius: 999px; background: var(--chip); color: var(--ink-2); display: grid; place-items: center; font-size: 11px; font-weight: 600; flex: none; }
+@media (max-width: 860px) {
+  .debt-row { grid-template-columns: 40px 1fr auto; row-gap: 12px; }
+  .debt-row .dbar, .debt-row .drate { grid-column: 1 / -1; }
+}
+.debt-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; color: white; font-weight: 600; font-size: 13px; flex: none; }
+.debt-name { font-size: 13.5px; font-weight: 500; }
+.debt-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
 
-.dbar { height: 5px; border-radius: 999px; background: var(--chip); overflow: hidden; margin-top: 7px; max-width: 320px; }
-.dbar > span { display: block; height: 100%; border-radius: 999px; background: var(--c-protect, var(--info)); }
+.dbar .bar-track { height: 7px; }
+.dbar-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
-.drate { font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; color: var(--ink-2); text-align: right; }
-.drate.high { color: var(--neg); }
-.dbal { text-align: right; font-variant-numeric: tabular-nums; }
-.dbal .dbal-amount { font-size: 14px; font-weight: 600; color: var(--ink); }
-.dbal .dbal-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.drate { text-align: center; }
+.drate .r { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.drate.high .r { color: var(--neg); }
+.drate .l { font-size: 10.5px; color: var(--muted); }
+
+.dbal { text-align: right; display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+.dbal .b { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.dbal .m { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.dbal .chev { color: var(--muted-2); display: inline-flex; }
 
 .amort-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .amort-table th { text-align: right; padding: 8px 14px; color: var(--muted); font-weight: 500; font-size: 11px; position: sticky; top: 0; background: var(--surface); border-bottom: 1px solid var(--line); white-space: nowrap; }

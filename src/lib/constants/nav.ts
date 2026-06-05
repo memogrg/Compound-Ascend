@@ -42,7 +42,7 @@ export const NAV: NavGroup[] = [
     label: "Control",
     items: [
       { id: "control", name: "Control Financiero", icon: "savings", href: "/control-financiero" },
-      { id: "debts", name: "Deudas y Préstamos", icon: "debt", href: "/control-financiero#deudas" },
+      { id: "debts", name: "Deudas y Préstamos", icon: "debt", href: "/deudas" },
     ],
   },
   {
