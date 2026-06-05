@@ -638,3 +638,10 @@ a { color: inherit; text-decoration: none; }
 .dbal { text-align: right; font-variant-numeric: tabular-nums; }
 .dbal .dbal-amount { font-size: 14px; font-weight: 600; color: var(--ink); }
 .dbal .dbal-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.amort-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.amort-table th { text-align: right; padding: 8px 14px; color: var(--muted); font-weight: 500; font-size: 11px; position: sticky; top: 0; background: var(--surface); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.amort-table th:nth-child(2), .amort-table td:nth-child(2) { text-align: left; }
+.amort-table td { text-align: right; padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.amort-table tbody tr:hover { background: var(--surface-2); }
+@media (max-width: 640px) { .scenario-grid { grid-template-columns: 1fr !important; } }

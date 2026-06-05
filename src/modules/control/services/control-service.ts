@@ -7,18 +7,20 @@ import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/ser
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import type { GoalInput, DebtInputForm } from "@/modules/control/schemas";
+import type { GoalInput, DebtInputForm, DebtPaymentInput } from "@/modules/control/schemas";
 import type {
   SavingsGoal,
   Debt,
+  DebtPayment,
   ControlDiagnosis,
   GoalStatus,
   GoalPriority,
   DebtClassification,
   DebtRateType,
   DebtRateIndex,
+  ExtraMode,
 } from "@/modules/control/types";
-import type { SavingsGoalRow, DebtRow } from "@/lib/supabase/database.types";
+import type { SavingsGoalRow, DebtRow, DebtPaymentRow } from "@/lib/supabase/database.types";
 
 function rowToGoal(r: SavingsGoalRow): SavingsGoal {
   return {
@@ -173,6 +175,85 @@ export async function deleteDebt(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   await supabase.from("debts").delete().eq("id", id).eq("user_id", user.id);
+}
+
+// ── Deuda individual y pagos (fuente de la verdad: debt_payments) ──
+
+function rowToDebtPayment(r: DebtPaymentRow): DebtPayment {
+  return {
+    id: r.id,
+    debtId: r.debt_id,
+    paymentDate: r.occurred_on,
+    amount: Number(r.amount),
+    extraAmount: Number(r.extra_amount ?? 0),
+    extraMode: (r.extra_mode ?? null) as ExtraMode | null,
+  };
+}
+
+export async function getDebt(id: string): Promise<Debt | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("debts")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? rowToDebt(data) : null;
+}
+
+export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("debt_payments")
+    .select("*")
+    .eq("debt_id", debtId)
+    .eq("user_id", user.id)
+    .order("occurred_on", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(rowToDebtPayment);
+}
+
+/** Registra un pago reportado. Si el extra es modo 'cuota', baja la cuota. */
+export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("debt_payments").insert({
+    user_id: user.id,
+    debt_id: input.debtId,
+    occurred_on: input.paymentDate,
+    amount: input.amount,
+    extra_amount: input.extraAmount,
+    extra_mode: input.extraMode ?? null,
+  });
+  if (error) throw new Error(error.message);
+
+  // Modo 'cuota': el extra baja la cuota futura → actualiza current_payment.
+  if (input.extraAmount > 0 && input.extraMode === "cuota") {
+    const debt = await getDebt(input.debtId);
+    if (debt) {
+      const { applyExtraDecision } = await import("@/modules/control/engine/amortization");
+      const decision = applyExtraDecision(
+        {
+          balance: debt.balance,
+          apr: debt.apr ?? 0,
+          termMonths: debt.termMonths,
+          monthlyPayment: debt.currentPayment > 0 ? debt.currentPayment : null,
+          insurance: debt.insurance,
+        },
+        input.extraAmount,
+        "cuota",
+      );
+      const { error: upErr } = await supabase
+        .from("debts")
+        .update({ current_payment: decision.monthlyPayment, balance: Math.max(0, debt.balance - input.extraAmount) })
+        .eq("id", input.debtId)
+        .eq("user_id", user.id);
+      if (upErr) throw new Error(upErr.message);
+    }
+  }
 }
 
 async function getDiscipline(userId: string): Promise<number | undefined> {

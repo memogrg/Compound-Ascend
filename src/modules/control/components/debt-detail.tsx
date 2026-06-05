@@ -1,0 +1,338 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
+import { PerformanceChart } from "@/components/charts/area-chart";
+import { formatMoney } from "@/lib/format";
+import { reportPaymentAction } from "@/modules/control/api/actions";
+import {
+  compareExtra,
+  solveExtraForTarget,
+  applyExtraDecision,
+  type AmortizationInput,
+} from "@/modules/control/engine/amortization";
+import type { DebtDetailVM } from "@/modules/control/services/debt-detail-service";
+
+function monthsToText(months: number): string {
+  if (months <= 0) return "—";
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0) return `${m} mes${m === 1 ? "" : "es"}`;
+  if (m === 0) return `${y} año${y === 1 ? "" : "s"}`;
+  return `${y} a ${m} m`;
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const [y, m] = iso.split("-");
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${months[Number(m) - 1] ?? ""} ${y}`;
+}
+
+export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
+  const { currency } = vm;
+  const input: AmortizationInput = useMemo(
+    () => ({
+      balance: vm.balance,
+      apr: vm.apr,
+      termMonths: vm.termMonths,
+      monthlyPayment: vm.monthlyPayment > 0 ? vm.monthlyPayment : null,
+      insurance: vm.insurance,
+      extraMonthly: 0,
+      startDate: vm.startDate,
+      originalAmount: vm.originalAmount,
+    }),
+    [vm],
+  );
+
+  const chartData = useMemo(() => {
+    const head = { date: vm.startDate ?? "Hoy", value: vm.balance };
+    const rest = vm.schedule.map((r) => ({ date: r.date ?? `Mes ${r.month}`, value: r.balance }));
+    return [head, ...rest];
+  }, [vm]);
+
+  const [showPay, setShowPay] = useState(false);
+
+  return (
+    <div className="grid">
+      {/* Encabezado */}
+      <div className="card card-pad">
+        <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <div className="card-title" style={{ fontSize: 18 }}>{vm.name}</div>
+            <div className="card-sub" style={{ marginTop: 2 }}>
+              {vm.debtType ?? "Deuda"}
+              {vm.rateType === "variable"
+                ? ` · variable (${(vm.rateIndex ?? "").toUpperCase()} + ${vm.rateSpread ?? 0}%)`
+                : " · tasa fija"}
+            </div>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowPay(true)}>
+            Reportar pago
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))",
+            gap: 14,
+            marginTop: 18,
+          }}
+        >
+          <Stat label="Saldo actual" value={formatMoney(vm.balance, currency)} big />
+          <Stat label="TAE" value={`${vm.apr.toFixed(2)}%`} />
+          <Stat label="Cuota mensual" value={formatMoney(vm.monthlyPayment + vm.insurance, currency)} />
+          <Stat label="Libre de deuda" value={fmtDate(vm.payoffDate)} sub={monthsToText(vm.monthsRemaining)} />
+          <Stat label="Interés restante" value={formatMoney(vm.interestRemaining, currency)} />
+        </div>
+
+        {vm.originalAmount ? (
+          <div style={{ marginTop: 16 }}>
+            <div className="row" style={{ justifyContent: "space-between", fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
+              <span>Pagado {Math.round(vm.progress * 100)}%</span>
+              <span>{formatMoney(vm.originalAmount, currency)} original</span>
+            </div>
+            <div className="bar-track">
+              <div className="bar-fill" style={{ width: `${vm.progress * 100}%`, background: "var(--pos)" }} />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Gráfica de saldo */}
+      <div className="card card-pad">
+        <div className="card-title">Saldo a lo largo del tiempo</div>
+        <div style={{ marginTop: 8 }}>
+          <PerformanceChart data={chartData} currency={currency} />
+        </div>
+      </div>
+
+      {/* Calculadora de escenarios */}
+      <ScenarioCalculator input={input} currency={currency} />
+
+      {/* Tabla de amortización */}
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title">Tabla de amortización</div>
+            <div className="card-sub">{vm.schedule.length} cuota(s) proyectada(s)</div>
+          </div>
+        </div>
+        <div style={{ overflow: "auto", maxHeight: 420 }}>
+          <table className="amort-table">
+            <thead>
+              <tr>
+                <th>Mes</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th>
+                {vm.insurance > 0 ? <th>Seguro</th> : null}<th>Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vm.schedule.map((r) => (
+                <tr key={r.month}>
+                  <td className="tnum">{r.month}</td>
+                  <td>{fmtDate(r.date)}</td>
+                  <td className="tnum">{formatMoney(r.payment, currency)}</td>
+                  <td className="tnum">{formatMoney(r.principal, currency)}</td>
+                  <td className="tnum" style={{ color: "var(--neg)" }}>{formatMoney(r.interest, currency)}</td>
+                  {vm.insurance > 0 ? <td className="tnum">{formatMoney(r.insurance, currency)}</td> : null}
+                  <td className="tnum">{formatMoney(r.balance, currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showPay ? (
+        <ReportPaymentModal vm={vm} input={input} currency={currency} onClose={() => setShowPay(false)} />
+      ) : null}
+    </div>
+  );
+}
+
+function Stat({ label, value, sub, big }: { label: string; value: string; sub?: string; big?: boolean }) {
+  return (
+    <div>
+      <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{label}</div>
+      <div className={big ? "num-xl" : ""} style={{ fontSize: big ? 24 : 15, fontWeight: big ? 400 : 600, marginTop: 4 }}>
+        {value}
+      </div>
+      {sub ? <div className="muted" style={{ fontSize: 11 }}>{sub}</div> : null}
+    </div>
+  );
+}
+
+// ── Calculadora de escenarios (bidireccional) ──────────────────────
+
+function ScenarioCalculator({ input, currency }: { input: AmortizationInput; currency: string }) {
+  const noDecimals = ["CRC", "COP", "MXN"].includes(currency);
+  const [extra, setExtra] = useState(noDecimals ? 50000 : 100);
+  const [years, setYears] = useState(5);
+  const [targetYears, setTargetYears] = useState(10);
+
+  const cmp = useMemo(() => compareExtra(input, extra, years), [input, extra, years]);
+  const needed = useMemo(
+    () => solveExtraForTarget(input, Math.round(targetYears * 12)),
+    [input, targetYears],
+  );
+
+  return (
+    <div className="card card-pad">
+      <div className="card-title">Calculadora de escenarios</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 14 }} className="scenario-grid">
+        {/* Modo A */}
+        <div style={{ border: "1px solid var(--line)", borderRadius: "var(--r-md)", padding: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 10 }}>
+            Si pago de más cada mes
+          </div>
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">Extra mensual</label>
+              <div className="inp-money">
+                <input type="number" min="0" value={extra} onChange={(e) => setExtra(Number(e.target.value))} />
+              </div>
+            </div>
+            <div className="fld">
+              <label className="fld-label">Durante (años)</label>
+              <input className="inp" type="number" min="1" max="40" value={years} onChange={(e) => setYears(Number(e.target.value))} />
+            </div>
+          </div>
+          <div className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.55 }}>
+            Saldrías <strong style={{ color: "var(--pos)" }}>{monthsToText(cmp.monthsSaved)} antes</strong> y ahorrarías{" "}
+            <strong style={{ color: "var(--pos)" }}>{formatMoney(cmp.interestSaved, currency)}</strong> en intereses.
+            {cmp.newPayoffDate ? <> Nueva fecha: {fmtDate(cmp.newPayoffDate)}.</> : null}
+          </div>
+        </div>
+
+        {/* Modo B */}
+        <div style={{ border: "1px solid var(--line)", borderRadius: "var(--r-md)", padding: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 10 }}>
+            Si quiero salir en…
+          </div>
+          <div className="fld">
+            <label className="fld-label">Plazo objetivo (años)</label>
+            <input className="inp" type="number" min="1" max="40" value={targetYears} onChange={(e) => setTargetYears(Number(e.target.value))} />
+          </div>
+          <div className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.55 }}>
+            {needed > 0 ? (
+              <>Necesitas pagar <strong style={{ color: "var(--ink-2)" }}>{formatMoney(needed, currency)} extra al mes</strong> para terminar en {targetYears} año(s).</>
+            ) : (
+              <>Ya terminarías en ese plazo (o antes) sin pagos extra.</>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reportar pago (tiempo vs cuota) ────────────────────────────────
+
+function ReportPaymentModal({
+  vm,
+  input,
+  currency,
+  onClose,
+}: {
+  vm: DebtDetailVM;
+  input: AmortizationInput;
+  currency: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const today = new Date().toISOString().slice(0, 10);
+  const [amount, setAmount] = useState(vm.monthlyPayment || 0);
+  const [date, setDate] = useState(today);
+  const [extra, setExtra] = useState(0);
+  const [mode, setMode] = useState<"tiempo" | "cuota">("tiempo");
+  const [pending, setPending] = useState(false);
+
+  const comparison = useMemo(() => {
+    if (extra <= 0) return null;
+    return {
+      tiempo: applyExtraDecision(input, extra, "tiempo"),
+      cuota: applyExtraDecision(input, extra, "cuota"),
+    };
+  }, [input, extra]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPending(true);
+    const res = await reportPaymentAction({
+      debtId: vm.id,
+      paymentDate: date,
+      amount,
+      extraAmount: extra,
+      extraMode: extra > 0 ? mode : undefined,
+    });
+    setPending(false);
+    if (res.ok) {
+      toast("Pago registrado");
+      onClose();
+      router.refresh();
+    } else {
+      toast(res.message ?? "No se pudo registrar");
+    }
+  };
+
+  return (
+    <Modal title="Reportar pago" sub="Tus pagos reales recalculan el saldo y la proyección." onClose={onClose}>
+      <form onSubmit={submit}>
+        <div className="modal-body">
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">Monto de la cuota</label>
+              <div className="inp-money">
+                <input type="number" min="0" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required />
+              </div>
+            </div>
+            <div className="fld">
+              <label className="fld-label">Fecha</label>
+              <input className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="fld">
+            <label className="fld-label">Pago extra (opcional)</label>
+            <div className="inp-money">
+              <input type="number" min="0" value={extra} onChange={(e) => setExtra(Number(e.target.value))} />
+            </div>
+          </div>
+
+          {comparison ? (
+            <div className="fld">
+              <label className="fld-label">¿Qué reduce el pago extra?</label>
+              <div className="seg" role="group" style={{ marginBottom: 10 }}>
+                <button type="button" className={`seg-btn${mode === "tiempo" ? " on" : ""}`} onClick={() => setMode("tiempo")}>
+                  Reducir tiempo
+                </button>
+                <button type="button" className={`seg-btn${mode === "cuota" ? " on" : ""}`} onClick={() => setMode("cuota")}>
+                  Reducir cuota
+                </button>
+              </div>
+              <div className="auth-msg" style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55 }}>
+                <strong>Recomendado: reducir tiempo.</strong> Manteniendo la cuota ahorras{" "}
+                <strong style={{ color: "var(--pos)" }}>
+                  {formatMoney(comparison.tiempo.interestSaved - comparison.cuota.interestSaved, currency)}
+                </strong>{" "}
+                más en intereses y sales{" "}
+                <strong>{monthsToText(Math.max(0, comparison.cuota.months - comparison.tiempo.months))} antes</strong>{" "}
+                que si bajas la cuota (que pasaría a {formatMoney(comparison.cuota.monthlyPayment + vm.insurance, currency)}).
+              </div>
+            </div>
+          ) : null}
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={pending}>
+            {pending ? "Guardando…" : "Registrar pago"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}

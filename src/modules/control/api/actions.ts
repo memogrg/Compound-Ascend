@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { goalInputSchema, debtInputSchema } from "@/modules/control/schemas";
+import { goalInputSchema, debtInputSchema, debtPaymentInputSchema } from "@/modules/control/schemas";
 import {
   createGoal,
   createDebt,
@@ -9,6 +9,7 @@ import {
   updateDebt,
   deleteGoal,
   deleteDebt,
+  addDebtPayment,
 } from "@/modules/control/services/control-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -77,6 +78,21 @@ export async function editDebtAction(id: string, raw: unknown): Promise<ActionRe
   } catch (err) {
     logger.error("editDebt fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos actualizar la deuda." };
+  }
+}
+
+export async function reportPaymentAction(raw: unknown): Promise<ActionResult> {
+  const parsed = debtPaymentInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await addDebtPayment(parsed.data);
+    revalidatePath("/control-financiero/deudas");
+    revalidatePath(`/control-financiero/deudas/${parsed.data.debtId}`);
+    return { ok: true };
+  } catch (err) {
+    logger.error("reportPayment fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos registrar el pago." };
   }
 }
 
