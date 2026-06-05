@@ -1,3 +1,5 @@
+"use client";
+
 import { PerformanceChart } from "@/components/charts/area-chart";
 import type {
   IndicatorCard,
