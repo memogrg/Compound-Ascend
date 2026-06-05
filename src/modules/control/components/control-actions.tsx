@@ -224,25 +224,52 @@ function GoalForm({ currency, onDone, item }: { currency: string; onDone: () => 
   );
 }
 
+const DEBT_TYPES = [
+  { value: "tarjeta", label: "Tarjeta de crédito" },
+  { value: "personal", label: "Préstamo personal" },
+  { value: "estudiantil", label: "Estudiantil" },
+  { value: "auto", label: "Automóvil" },
+  { value: "hipoteca", label: "Hipoteca" },
+  { value: "otro", label: "Otro" },
+];
+
 function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: Debt }) {
   const action = item ? (raw: unknown) => editDebtAction(item.id, raw) : addDebtAction;
   const { pending, errors, message, run } = useFormSubmit(action);
+  const [rateType, setRateType] = useState<"fija" | "variable">(item?.rateType ?? "fija");
+
+  const totalTerm = item?.termMonths ?? 0;
+  const defYears = Math.floor(totalTerm / 12) || "";
+  const defMonths = totalTerm % 12 || "";
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const fd = new FormData(form);
     const aprRaw = fd.get("apr");
+    const years = Number(fd.get("termYears") ?? 0);
+    const months = Number(fd.get("termMonths") ?? 0);
+    const term = years * 12 + months;
     run(
       {
         name: String(fd.get("name") ?? ""),
+        debtType: String(fd.get("debtType") ?? "otro"),
+        originalAmount: fd.get("originalAmount") ? Number(fd.get("originalAmount")) : undefined,
         balance: Number(fd.get("balance") ?? 0),
+        currency: String(fd.get("currency") ?? currency),
+        rateType,
+        rateIndex: rateType === "variable" ? String(fd.get("rateIndex") ?? "prime") : undefined,
+        rateSpread: rateType === "variable" && fd.get("rateSpread") ? Number(fd.get("rateSpread")) : undefined,
+        apr: aprRaw ? Number(aprRaw) : undefined,
+        termMonths: term > 0 ? term : undefined,
+        startDate: String(fd.get("startDate") ?? "") || undefined,
         minPayment: Number(fd.get("minPayment") ?? 0),
         currentPayment: Number(fd.get("currentPayment") ?? 0),
-        apr: aprRaw ? Number(aprRaw) : undefined,
-        currency: String(fd.get("currency") ?? currency),
+        extraMonthly: fd.get("extraMonthly") ? Number(fd.get("extraMonthly")) : undefined,
+        insurance: fd.get("insurance") ? Number(fd.get("insurance")) : undefined,
         delinquency: String(fd.get("delinquency") ?? "no"),
         stress: Number(fd.get("stress") ?? 5),
+        notes: String(fd.get("notes") ?? "") || undefined,
       },
       onDone,
       form,
@@ -260,23 +287,95 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
         <div className="fld">
           <label className="fld-label">Nombre de la deuda</label>
           <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Tarjeta, préstamo…" required aria-invalid={errors.name ? true : undefined} />
-          {errors.name ? (
-            <span className="auth-err" role="alert">
-              {errors.name}
-            </span>
-          ) : null}
+          {errors.name ? <span className="auth-err" role="alert">{errors.name}</span> : null}
         </div>
+
         <div className="fld-2">
-          <Money label="Saldo actual" name="balance" currency={currency} error={errors.balance} defaultValue={item?.balance} />
           <div className="fld">
-            <label className="fld-label">Tasa anual (%)</label>
-            <input className="inp" name="apr" type="number" step="0.1" min="0" defaultValue={item?.apr ?? undefined} placeholder="Ej. 38" />
+            <label className="fld-label">Categoría</label>
+            <select className="sel" name="debtType" defaultValue={item?.debtType ?? "tarjeta"}>
+              {DEBT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="fld">
+            <label className="fld-label">Moneda</label>
+            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
+              {CURRENCIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
           </div>
         </div>
+
         <div className="fld-2">
-          <Money label="Pago mínimo" name="minPayment" currency={currency} defaultValue={item?.minPayment} />
-          <Money label="Pago actual" name="currentPayment" currency={currency} defaultValue={item?.currentPayment} />
+          <Money label="Monto original" name="originalAmount" currency={currency} defaultValue={item?.originalAmount ?? undefined} />
+          <Money label="Saldo actual" name="balance" currency={currency} error={errors.balance} defaultValue={item?.balance} />
         </div>
+
+        {/* Tasa: fija o variable */}
+        <div className="fld">
+          <label className="fld-label">Tipo de tasa</label>
+          <div className="seg" role="group" aria-label="Tipo de tasa">
+            <button type="button" className={`seg-btn${rateType === "fija" ? " on" : ""}`} onClick={() => setRateType("fija")}>Manual (fija)</button>
+            <button type="button" className={`seg-btn${rateType === "variable" ? " on" : ""}`} onClick={() => setRateType("variable")}>Variable (índice)</button>
+          </div>
+        </div>
+
+        {rateType === "variable" ? (
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">Índice de referencia</label>
+              <select className="sel" name="rateIndex" defaultValue={item?.rateIndex ?? "prime"}>
+                <option value="prime">Prime (EE. UU.)</option>
+                <option value="tbp">TBP (Costa Rica)</option>
+                <option value="tri">TRI (Costa Rica)</option>
+              </select>
+            </div>
+            <div className="fld">
+              <label className="fld-label">Margen / piso (%)</label>
+              <input className="inp" name="rateSpread" type="number" step="0.1" min="0" defaultValue={item?.rateSpread ?? undefined} placeholder="Ej. 3" />
+            </div>
+          </div>
+        ) : null}
+
+        <div className="fld-2">
+          <div className="fld">
+            <label className="fld-label">{rateType === "variable" ? "TAE efectiva actual (%)" : "Tasa anual (%)"}</label>
+            <input className="inp" name="apr" type="number" step="0.1" min="0" defaultValue={item?.apr ?? undefined} placeholder="Ej. 38" />
+          </div>
+          <div className="fld">
+            <label className="fld-label">Fecha de inicio</label>
+            <input className="inp" name="startDate" type="date" defaultValue={item?.startDate ?? ""} />
+          </div>
+        </div>
+
+        {/* Plazo en años + meses */}
+        <div className="fld">
+          <label className="fld-label">Plazo total</label>
+          <div className="fld-2">
+            <div className="inp-money">
+              <input name="termYears" type="number" min="0" defaultValue={defYears} placeholder="0" />
+              <span className="pre" style={{ left: "auto", right: 12 }}>años</span>
+            </div>
+            <div className="inp-money">
+              <input name="termMonths" type="number" min="0" max="11" defaultValue={defMonths} placeholder="0" />
+              <span className="pre" style={{ left: "auto", right: 12 }}>meses</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="fld-2">
+          <Money label="Cuota mensual" name="currentPayment" currency={currency} defaultValue={item?.currentPayment} />
+          <Money label="Pago mínimo" name="minPayment" currency={currency} defaultValue={item?.minPayment} />
+        </div>
+
+        <div className="fld-2">
+          <Money label="Pago extra mensual (opcional)" name="extraMonthly" currency={currency} defaultValue={item?.extraMonthly ?? undefined} />
+          <Money label="Seguro mensual (opcional)" name="insurance" currency={currency} defaultValue={item?.insurance ?? undefined} />
+        </div>
+
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">¿Atraso?</label>
@@ -291,6 +390,11 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
             <label className="fld-label">Nivel de estrés (1-10)</label>
             <input className="inp" name="stress" type="number" min="1" max="10" defaultValue={item?.stress ?? 5} />
           </div>
+        </div>
+
+        <div className="fld">
+          <label className="fld-label">Notas (opcional)</label>
+          <textarea className="inp" name="notes" rows={2} defaultValue={item?.notes ?? ""} placeholder="Banco, condiciones, recordatorios…" />
         </div>
       </div>
       <Foot pending={pending} onCancel={onDone} />

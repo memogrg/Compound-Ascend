@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import {
   getControlSummary,
@@ -5,6 +6,7 @@ import {
 } from "@/modules/control/services/control-service";
 import { ControlDashboard } from "@/modules/control/components/control-dashboard";
 import { ControlActions } from "@/modules/control/components/control-actions";
+import { Icon } from "@/components/ui/icon";
 import type { ControlSummary } from "@/modules/control/services/control-service";
 
 /**
@@ -29,7 +31,12 @@ export default async function Page() {
             Vamos a revisar si tus ahorros y obligaciones trabajan a tu favor.
           </div>
         </div>
-        <ControlActions currency={summary.currency} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <Link className="btn btn-secondary" href="/control-financiero/deudas">
+            <Icon name="debt" width={2} /> Préstamos y deudas
+          </Link>
+          <ControlActions currency={summary.currency} />
+        </div>
       </div>
 
       {!configured ? (
