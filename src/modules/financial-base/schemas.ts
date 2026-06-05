@@ -55,3 +55,44 @@ export const expenseInputSchema = z.object({
 
 export type IncomeInput = z.infer<typeof incomeInputSchema>;
 export type ExpenseInput = z.infer<typeof expenseInputSchema>;
+
+// ---------- Base Financiera V2 ----------
+const uuidOrNull = z.preprocess(
+  (v) => (v === "" || v === undefined ? null : v),
+  z.string().uuid().nullable(),
+);
+
+export const budgetItemInputSchema = z.object({
+  type: z.enum(["income", "expense"]),
+  categoryId: uuidOrNull.optional(),
+  name: z.string().trim().min(1, "Ponle un nombre").max(120),
+  amount: z.number({ invalid_type_error: "Monto inválido" }).nonnegative("No puede ser negativo"),
+  currency: z.string().length(3),
+  frequency: frequency.default("mensual"),
+  periodMonth: z.number().int().min(1).max(12),
+  periodYear: z.number().int().min(2000).max(3000),
+});
+
+export const txnInputSchema = z.object({
+  kind: z.enum(["ingreso", "gasto"]),
+  amount: z.number({ invalid_type_error: "Monto inválido" }).positive("Debe ser mayor a 0"),
+  currency: z.string().length(3).default("CRC"),
+  occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
+  categoryId: uuidOrNull.optional(),
+  accountId: uuidOrNull.optional(),
+  merchantOrSource: z.string().max(160).optional(),
+  description: z.string().max(280).optional(),
+  status: z.enum(["confirmed", "pending_review"]).default("confirmed"),
+  origin: z.enum(["manual", "scanned", "imported", "recurring", "ai_assisted"]).default("manual"),
+});
+
+export const accountInputSchema = z.object({
+  name: z.string().trim().min(1, "Ponle un nombre").max(80),
+  kind: z.enum(["banco", "efectivo", "tarjeta", "otro"]).default("banco"),
+  currency: z.string().length(3).default("CRC"),
+  isDefault: z.boolean().default(false),
+});
+
+export type BudgetItemInput = z.infer<typeof budgetItemInputSchema>;
+export type TxnInput = z.infer<typeof txnInputSchema>;
+export type AccountInput = z.infer<typeof accountInputSchema>;

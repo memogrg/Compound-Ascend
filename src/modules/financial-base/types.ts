@@ -66,3 +66,57 @@ export type BaseIndicators = {
   incomeByType: Record<IncomeType, number>;
   expenseByNature: Record<ExpenseNature, number>;
 };
+
+// ---------- Base Financiera V2 ----------
+export type TxnKind = "ingreso" | "gasto";
+export type TxnStatus = "confirmed" | "pending_review";
+export type TxnOrigin = "manual" | "scanned" | "imported" | "recurring" | "ai_assisted";
+export type BudgetType = "income" | "expense";
+export type AccountKind = "banco" | "efectivo" | "tarjeta" | "otro";
+
+/** Transacción real (fuente de verdad de lo ocurrido). */
+export type Transaction = {
+  id: string;
+  kind: TxnKind;
+  description: string | null;
+  merchantOrSource: string | null;
+  amount: number;
+  currency: string;
+  occurredOn: string; // YYYY-MM-DD
+  categoryId: string | null;
+  accountId: string | null;
+  accountLabel: string | null;
+  status: TxnStatus;
+  origin: TxnOrigin;
+  confirmedByUser: boolean;
+};
+
+/** Ítem de presupuesto, scopeado por mes. */
+export type BudgetItem = {
+  id: string;
+  type: BudgetType;
+  categoryId: string | null;
+  name: string;
+  amount: number;
+  currency: string;
+  frequency: Frequency;
+  periodMonth: number;
+  periodYear: number;
+};
+
+export type Account = {
+  id: string;
+  name: string;
+  kind: AccountKind;
+  currency: string;
+  isDefault: boolean;
+};
+
+/** Periodo de consulta (un mes natural por defecto). */
+export type Period = {
+  month: number; // 1-12
+  year: number;
+  from: string; // YYYY-MM-DD (inclusive)
+  to: string; // YYYY-MM-DD (inclusive)
+  label: string; // "jun 2026"
+};

@@ -30,3 +30,6 @@ yarn-debug.log*
 # supabase (local CLI)
 supabase/.temp
 supabase/.branches
+
+# Material de revisión (wireframes/docx) — no se versiona
+/Revision_V2_BaseFinanciera/

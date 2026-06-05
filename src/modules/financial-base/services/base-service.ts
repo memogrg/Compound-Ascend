@@ -9,6 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
+import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { convertCurrency, SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type {
@@ -174,6 +175,13 @@ export type BaseSummary = {
   indicators: BaseIndicators;
   incomes: IncomeSource[];
   expenses: ExpenseItem[];
+  // Base Financiera V2 — campos AÑADIDOS (opcionales; no rompen consumidores).
+  // Presupuesto y real del MES ACTUAL, normalizados a la moneda de visualización.
+  budgetIncome?: number;
+  realIncome?: number;
+  budgetExpense?: number;
+  realExpense?: number;
+  variances?: { income: number; expense: number };
 };
 
 /** Carga ítems y calcula los indicadores de la base financiera. */
@@ -195,7 +203,74 @@ export async function getBaseSummary(): Promise<BaseSummary> {
     ...e,
     amountMonthly: convertCurrency(e.amountMonthly, e.currency, primary, rates),
   }));
-  return { indicators: computeBaseIndicators(incForEngine, expForEngine), incomes, expenses };
+
+  const summary: BaseSummary = {
+    indicators: computeBaseIndicators(incForEngine, expForEngine),
+    incomes,
+    expenses,
+  };
+
+  // V2 (best-effort, no bloquea ni rompe a los 5 consumidores si falla).
+  try {
+    const v2 = await computeV2Totals(primary, rates);
+    Object.assign(summary, v2);
+  } catch {
+    // Sin presupuesto/transacciones aún: los campos V2 quedan undefined.
+  }
+
+  return summary;
+}
+
+/** Presupuesto-vs-real del mes actual (campos V2 de getBaseSummary). */
+async function computeV2Totals(
+  displayCurrency: string,
+  rates: Record<string, number>,
+): Promise<Pick<BaseSummary, "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances">> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const now = new Date();
+  const p = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+
+  const [bi, tx] = await Promise.all([
+    supabase
+      .from("budget_items")
+      .select("type,amount,currency")
+      .eq("user_id", user.id)
+      .eq("period_month", p.month)
+      .eq("period_year", p.year),
+    supabase
+      .from("transactions")
+      .select("kind,amount,currency")
+      .eq("user_id", user.id)
+      .gte("occurred_on", p.from)
+      .lte("occurred_on", p.to),
+  ]);
+
+  let budgetIncome = 0;
+  let budgetExpense = 0;
+  let realIncome = 0;
+  let realExpense = 0;
+  for (const r of bi.data ?? []) {
+    const v = convertCurrency(Number(r.amount), r.currency, displayCurrency, rates);
+    if (r.type === "income") budgetIncome += v;
+    else budgetExpense += v;
+  }
+  for (const r of tx.data ?? []) {
+    const v = convertCurrency(Number(r.amount), r.currency, displayCurrency, rates);
+    if (r.kind === "ingreso") realIncome += v;
+    else realExpense += v;
+  }
+
+  return {
+    budgetIncome,
+    realIncome,
+    budgetExpense,
+    realExpense,
+    variances: {
+      income: budgetIncome > 0 ? (realIncome - budgetIncome) / budgetIncome : 0,
+      expense: budgetExpense > 0 ? (realExpense - budgetExpense) / budgetExpense : 0,
+    },
+  };
 }
 
 /** Moneda principal del usuario (de user_settings); CRC por defecto.

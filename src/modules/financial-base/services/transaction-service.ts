@@ -1,0 +1,316 @@
+import "server-only";
+
+/**
+ * Servicio completo de transacciones (fuente de verdad de lo real). Respeta RLS.
+ * Los tabs Ingresos/Gastos/Transacciones leen/escriben aquí; cualquier cambio se
+ * refleja en indicadores y en Mi Base. Mantiene compatible la creación del asistente.
+ */
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth/session";
+import { convertCurrency } from "@/lib/fx";
+import { getFxRates } from "@/lib/market-data/fx-rates";
+import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import { getCategoryNameMap } from "@/modules/financial-base/services/categories-service";
+import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
+import type {
+  Transaction,
+  TxnKind,
+  TxnStatus,
+  TxnOrigin,
+  Period,
+} from "@/modules/financial-base/types";
+import type { TxnInput } from "@/modules/financial-base/schemas";
+import type { TransactionRow } from "@/lib/supabase/database.types";
+
+export type TxnFilters = { kind?: TxnKind; status?: TxnStatus; origin?: TxnOrigin };
+
+function rowToTransaction(r: TransactionRow): Transaction {
+  return {
+    id: r.id,
+    kind: r.kind as TxnKind,
+    description: r.description,
+    merchantOrSource: r.merchant_or_source ?? null,
+    amount: Number(r.amount),
+    currency: r.currency,
+    occurredOn: r.occurred_on,
+    categoryId: r.category_id,
+    accountId: r.account_id ?? null,
+    accountLabel: r.account_label,
+    status: (r.status ?? "confirmed") as TxnStatus,
+    origin: (r.origin ?? "manual") as TxnOrigin,
+    confirmedByUser: r.confirmed_by_user,
+  };
+}
+
+/** Resuelve el nombre de la cuenta para denormalizar account_label. */
+async function accountLabelFor(accountId: string | null | undefined): Promise<string | null> {
+  if (!accountId) return null;
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("accounts")
+    .select("name")
+    .eq("id", accountId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return data?.name ?? null;
+}
+
+export async function listTransactions(period: Period, filters: TxnFilters = {}): Promise<Transaction[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  let q = supabase
+    .from("transactions")
+    .select("*")
+    .eq("user_id", user.id)
+    .gte("occurred_on", period.from)
+    .lte("occurred_on", period.to)
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (filters.kind) q = q.eq("kind", filters.kind);
+  if (filters.status) q = q.eq("status", filters.status);
+  if (filters.origin) q = q.eq("origin", filters.origin);
+  const { data } = await q;
+  return (data ?? []).map(rowToTransaction);
+}
+
+export async function createTransaction(input: TxnInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const accountLabel = await accountLabelFor(input.accountId);
+  await supabase.from("transactions").insert({
+    user_id: user.id,
+    kind: input.kind,
+    description: input.description ?? null,
+    merchant_or_source: input.merchantOrSource ?? null,
+    amount: input.amount,
+    currency: input.currency,
+    occurred_on: input.occurredOn,
+    category_id: input.categoryId ?? null,
+    account_id: input.accountId ?? null,
+    account_label: accountLabel,
+    status: input.status,
+    origin: input.origin,
+    source: "manual",
+    confirmed_by_user: input.status === "confirmed",
+  });
+}
+
+export async function updateTransaction(id: string, input: TxnInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const accountLabel = await accountLabelFor(input.accountId);
+  await supabase
+    .from("transactions")
+    .update({
+      kind: input.kind,
+      description: input.description ?? null,
+      merchant_or_source: input.merchantOrSource ?? null,
+      amount: input.amount,
+      currency: input.currency,
+      occurred_on: input.occurredOn,
+      category_id: input.categoryId ?? null,
+      account_id: input.accountId ?? null,
+      account_label: accountLabel,
+      status: input.status,
+      origin: input.origin,
+      confirmed_by_user: input.status === "confirmed",
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
+export async function deleteTransaction(id: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id);
+}
+
+export async function duplicateTransaction(id: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!data) return;
+  await supabase.from("transactions").insert({
+    user_id: user.id,
+    kind: data.kind,
+    description: data.description,
+    merchant_or_source: data.merchant_or_source ?? null,
+    amount: data.amount,
+    currency: data.currency,
+    occurred_on: data.occurred_on,
+    category_id: data.category_id,
+    account_id: data.account_id ?? null,
+    account_label: data.account_label,
+    status: data.status ?? "confirmed",
+    origin: data.origin ?? "manual",
+    source: data.source,
+    confirmed_by_user: data.confirmed_by_user,
+  });
+}
+
+export async function markReviewed(id: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("transactions")
+    .update({ status: "confirmed", confirmed_by_user: true })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
+/** Divide una transacción en partes (reemplaza el original por las partes). */
+export async function splitTransaction(
+  id: string,
+  parts: { amount: number; categoryId?: string | null; description?: string | null }[],
+): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("transactions")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!data || parts.length === 0) return;
+  const base = data;
+  const rows = parts.map((p) => ({
+    user_id: user.id,
+    kind: base.kind,
+    description: p.description ?? base.description,
+    merchant_or_source: base.merchant_or_source,
+    amount: p.amount,
+    currency: base.currency,
+    occurred_on: base.occurred_on,
+    category_id: p.categoryId ?? base.category_id,
+    account_id: base.account_id,
+    account_label: base.account_label,
+    status: base.status,
+    origin: base.origin,
+    source: base.source,
+    confirmed_by_user: base.confirmed_by_user,
+  }));
+  await supabase.from("transactions").insert(rows);
+  await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id);
+}
+
+export type KeyedTotals = Record<string, { label: string; value: number }>;
+export type RealTotals = {
+  realIncome: number;
+  realExpense: number;
+  freeCashflowReal: number;
+  count: number;
+  avgDaily: number;
+  incomeByKey: KeyedTotals;
+  expenseByKey: KeyedTotals;
+  topExpenseCategory: string | null;
+  pendingCount: number;
+  currency: string;
+};
+
+/** Totales reales del periodo (desde transactions), normalizados a la moneda de visualización. */
+export async function getRealTotals(period: Period): Promise<RealTotals> {
+  const [txns, currency, rates, catMap] = await Promise.all([
+    listTransactions(period),
+    getDisplayCurrency(),
+    getFxRates(),
+    getCategoryNameMap(),
+  ]);
+
+  let realIncome = 0;
+  let realExpense = 0;
+  let pendingCount = 0;
+  const incomeByKey: KeyedTotals = {};
+  const expenseByKey: KeyedTotals = {};
+
+  for (const t of txns) {
+    if (t.status === "pending_review") pendingCount += 1;
+    const value = convertCurrency(t.amount, t.currency, currency, rates);
+    if (t.kind === "ingreso") {
+      realIncome += value;
+      const label = t.merchantOrSource || t.description || "Otros ingresos";
+      const key = label.trim().toLowerCase();
+      incomeByKey[key] = { label, value: (incomeByKey[key]?.value ?? 0) + value };
+    } else {
+      realExpense += value;
+      const label = t.categoryId ? (catMap[t.categoryId] ?? "Sin categoría") : "Sin categoría";
+      const key = t.categoryId ?? "sin_categoria";
+      expenseByKey[key] = { label, value: (expenseByKey[key]?.value ?? 0) + value };
+    }
+  }
+
+  const daysInPeriod = new Date(period.to).getDate();
+  const topExpenseCategory =
+    Object.values(expenseByKey).sort((a, b) => b.value - a.value)[0]?.label ?? null;
+
+  return {
+    realIncome,
+    realExpense,
+    freeCashflowReal: realIncome - realExpense,
+    count: txns.length,
+    avgDaily: daysInPeriod > 0 ? realExpense / daysInPeriod : 0,
+    incomeByKey,
+    expenseByKey,
+    topExpenseCategory,
+    pendingCount,
+    currency,
+  };
+}
+
+export type HistoryPoint = {
+  label: string;
+  realIncome: number;
+  realExpense: number;
+  freeCashflow: number;
+};
+
+/** Serie histórica real (últimos N meses hasta `period`) para gráficas de línea. */
+export async function getRealHistory(period: Period, monthsBack = 6): Promise<HistoryPoint[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
+
+  // Rango: desde (monthsBack-1) meses atrás hasta el fin del periodo.
+  let start = period;
+  for (let i = 0; i < monthsBack - 1; i++) start = previousMonthPeriod(start);
+
+  const { data } = await supabase
+    .from("transactions")
+    .select("kind,amount,currency,occurred_on")
+    .eq("user_id", user.id)
+    .gte("occurred_on", start.from)
+    .lte("occurred_on", period.to);
+
+  // Acumula por mes.
+  const buckets = new Map<string, { label: string; income: number; expense: number }>();
+  let cursor = start;
+  for (let i = 0; i < monthsBack; i++) {
+    buckets.set(`${cursor.year}-${cursor.month}`, { label: cursor.label, income: 0, expense: 0 });
+    cursor = monthPeriod(
+      cursor.month === 12 ? cursor.year + 1 : cursor.year,
+      cursor.month === 12 ? 1 : cursor.month + 1,
+    );
+  }
+
+  for (const r of data ?? []) {
+    const d = new Date(r.occurred_on);
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+    const b = buckets.get(key);
+    if (!b) continue;
+    const value = convertCurrency(Number(r.amount), r.currency, currency, rates);
+    if (r.kind === "ingreso") b.income += value;
+    else b.expense += value;
+  }
+
+  return [...buckets.values()].map((b) => ({
+    label: b.label,
+    realIncome: Math.round(b.income),
+    realExpense: Math.round(b.expense),
+    freeCashflow: Math.round(b.income - b.expense),
+  }));
+}

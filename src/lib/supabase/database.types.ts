@@ -226,6 +226,49 @@ export type TransactionRow = Timestamps & {
   account_label: string | null;
   source: string;
   confirmed_by_user: boolean;
+  // Base Financiera V2 (migración 0015 · columnas aditivas, opcionales)
+  account_id: string | null;
+  merchant_or_source: string | null;
+  status: string;
+  origin: string;
+  receipt_url: string | null;
+  confidence_score_internal: number | null;
+};
+
+// ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
+export type BudgetItemRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  type: string; // 'income' | 'expense'
+  category_id: string | null;
+  name: string;
+  amount: number;
+  currency: string;
+  frequency: string;
+  period_month: number;
+  period_year: number;
+};
+
+export type AccountRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  name: string;
+  kind: string; // 'banco' | 'efectivo' | 'tarjeta' | 'otro'
+  currency: string;
+  is_default: boolean;
+};
+
+export type TransactionRuleRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  merchant_pattern: string;
+  suggested_category_id: string | null;
+  suggested_account_id: string | null;
+  type: string; // 'income' | 'expense'
+  active: boolean;
 };
 
 // ---------- IA / tokens ----------
@@ -512,6 +555,9 @@ export interface Database {
       liabilities: UserTable<LiabilityRow>;
       net_worth_snapshots: UserTable<NetWorthSnapshotRow>;
       transactions: UserTable<TransactionRow>;
+      budget_items: UserTable<BudgetItemRow>;
+      accounts: UserTable<AccountRow>;
+      transaction_rules: UserTable<TransactionRuleRow>;
       ai_usage_ledger: UserTable<AiUsageLedgerRow>;
       expense_categories: TableShape<
         ExpenseCategoryRow,

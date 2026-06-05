@@ -347,11 +347,12 @@ a { color: inherit; text-decoration: none; }
 .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .cols-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px; }
 .cols-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 18px; }
+.cols-5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 18px; }
 .split-3-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 26px; }
 .split-2-3 { display: grid; grid-template-columns: 1fr 1.5fr; gap: 26px; }
-@media (max-width: 1180px) { .cols-4 { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 1180px) { .cols-4 { grid-template-columns: repeat(2,1fr); } .cols-5 { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 900px) { .cols-3 { grid-template-columns: 1fr 1fr; } .split-3-2, .split-2-3 { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .cols-2, .cols-3, .cols-4, .cols-5 { grid-template-columns: 1fr 1fr; } }
 
 .fs11 { font-size: 11px; } .fs12 { font-size: 12px; } .fs13 { font-size: 13px; } .fs14 { font-size: 14px; }
 .fw500 { font-weight: 500; } .fw600 { font-weight: 600; }
@@ -557,6 +558,32 @@ a { color: inherit; text-decoration: none; }
 .btn-danger { background: var(--neg); color: #fff; }
 .btn-danger:hover { filter: brightness(0.94); }
 .btn-danger:disabled { opacity: 0.6; cursor: default; }
+
+/* Base Financiera V2 — tabs reales */
+.base-tabs {
+  display: flex; gap: 5px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 13px; padding: 5px; flex-wrap: wrap;
+}
+.base-tab {
+  padding: 8px 16px; border-radius: 9px; font-size: 13.5px; font-weight: 500;
+  color: var(--muted); background: none; border: 0; cursor: pointer; text-decoration: none;
+  transition: all 140ms; white-space: nowrap;
+}
+.base-tab:hover { color: var(--ink); background: var(--surface-2); }
+.base-tab.active { background: var(--pos); color: #fff; }
+
+/* Menú por fila de transacción */
+.txn-menu {
+  position: absolute; top: calc(100% + 2px); right: 0; z-index: 25; min-width: 158px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 11px;
+  box-shadow: var(--shadow-float); padding: 5px; display: flex; flex-direction: column;
+}
+.txn-menu button {
+  text-align: left; background: none; border: 0; padding: 9px 12px; border-radius: 8px;
+  font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.txn-menu button:hover { background: var(--surface-2); }
+.txn-menu button.danger { color: var(--neg); }
 
 /* Switch de moneda de visualización (topbar) */
 .cur-switch {

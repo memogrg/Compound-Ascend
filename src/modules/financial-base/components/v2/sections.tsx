@@ -1,0 +1,249 @@
+/**
+ * Secciones (tabs) de Base Financiera V2 — componentes de presentación (servidor).
+ * Reciben los datos ya calculados desde la página. Sincronización: lo real sale
+ * de transactions; el presupuesto de budget_items.
+ */
+import { formatMoney, formatPercent } from "@/lib/format";
+import { MetricCard, type MetricTone } from "@/components/shared/metric-card";
+import { FinancialInsightCard, type FinancialReading } from "@/components/shared/financial-insight-card";
+import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
+import { PremiumLineChart } from "@/components/charts/line-chart";
+import { EditableBudgetTable } from "@/modules/financial-base/components/v2/editable-budget-table";
+import { TransactionList } from "@/modules/financial-base/components/v2/transaction-list";
+import { QuickAddButtons } from "@/modules/financial-base/components/v2/quick-add-buttons";
+import { composition, computeV2Totals, topRows, type TopRow } from "@/modules/financial-base/engine/base-v2";
+import type { BudgetTotals } from "@/modules/financial-base/services/budget-service";
+import type { RealTotals, HistoryPoint } from "@/modules/financial-base/services/transaction-service";
+import type { Category } from "@/modules/financial-base/services/categories-service";
+import type { Account, FinancialPressure, Period, Transaction } from "@/modules/financial-base/types";
+
+const PALETTE = [
+  "var(--pos)", "var(--info)", "var(--gold)", "var(--teal)",
+  "var(--c-networth)", "var(--warn)", "var(--c-protect)", "var(--muted-2)",
+];
+
+const PRESSURE: Record<FinancialPressure, { label: string; tone: MetricTone }> = {
+  baja: { label: "Baja", tone: "pos" },
+  media: { label: "Media", tone: "warn" },
+  alta: { label: "Alta", tone: "neg" },
+  critica: { label: "Crítica", tone: "neg" },
+};
+
+export type V2View = {
+  period: Period;
+  currency: string;
+  budget: BudgetTotals;
+  real: RealTotals;
+  history: HistoryPoint[];
+  financialPressure: FinancialPressure;
+  transactions: Transaction[];
+  categories: Category[];
+  accounts: Account[];
+  categoryNames: Record<string, string>;
+  baseReading: FinancialReading;
+  incomeCapsule: FinancialReading;
+  expenseCapsule: FinancialReading;
+};
+
+function donutData(map: Record<string, { label: string; value: number }>): DonutDatum[] {
+  return composition(map).map((s, i) => ({ name: s.label, value: Math.round(s.value), color: PALETTE[i % PALETTE.length]! }));
+}
+
+function ChartCard({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="card card-pad">
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+        <div className="card-title">{title}</div>
+        {hint ? <span className="muted" style={{ fontSize: 11.5 }}>{hint}</span> : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TopTable({ title, rows, currency, dimLabel }: { title: string; rows: TopRow[]; currency: string; dimLabel: string }) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <div className="card-title">{title}</div>
+      </div>
+      <div className="list-row" style={{ gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr", fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.3 }}>
+        <span>{dimLabel}</span><span style={{ textAlign: "right" }}>Presup.</span><span style={{ textAlign: "right" }}>Real</span><span style={{ textAlign: "right" }}>%</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="muted" style={{ padding: "16px 24px", fontSize: 13 }}>Sin datos aún.</div>
+      ) : (
+        rows.map((r) => (
+          <div key={r.key} className="list-row" style={{ gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr" }}>
+            <span style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+            <span className="tnum muted" style={{ textAlign: "right", fontSize: 12.5 }}>{formatMoney(r.budget, currency)}</span>
+            <span className="tnum" style={{ textAlign: "right", fontSize: 12.5, fontWeight: 500 }}>{formatMoney(r.real, currency)}</span>
+            <span className="tnum" style={{ textAlign: "right", fontSize: 12.5, color: r.status === "over" ? "var(--neg)" : r.status === "warn" ? "var(--warn)" : "var(--pos)" }}>
+              {formatPercent(r.sharePct)}
+            </span>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+function tone(v: number, goodWhenPositive = true): MetricTone {
+  if (Math.abs(v) < 0.001) return "neutral";
+  return (v > 0) === goodWhenPositive ? "pos" : "warn";
+}
+
+// ============================== MI BASE ==============================
+export function MiBaseSection({ view }: { view: V2View }) {
+  const { budget, real, currency, history } = view;
+  const t = computeV2Totals({ budgetIncome: budget.budgetIncome, realIncome: real.realIncome, budgetExpense: budget.budgetExpense, realExpense: real.realExpense });
+  const incomeLine = history.map((h) => ({ label: h.label, Real: h.realIncome, Presupuesto: Math.round(budget.budgetIncome) }));
+  const expenseLine = history.map((h) => ({ label: h.label, Real: h.realExpense, Presupuesto: Math.round(budget.budgetExpense) }));
+  const flujoLine = history.map((h) => ({ label: h.label, Ingresos: h.realIncome, Gastos: h.realExpense, "Flujo libre": h.freeCashflow }));
+  const press = PRESSURE[view.financialPressure];
+
+  return (
+    <div className="grid">
+      <section className="cols-4">
+        <MetricCard label="Ingresos presup." value={formatMoney(budget.budgetIncome, currency)} sub="presupuesto del mes" />
+        <MetricCard label="Ingresos reales" value={formatMoney(real.realIncome, currency)} delta={`${t.incomeVariancePct >= 0 ? "+" : ""}${formatPercent(t.incomeVariancePct)} vs presup.`} deltaTone={tone(t.incomeVariancePct)} valueTone="pos" />
+        <MetricCard label="Gastos presup." value={formatMoney(budget.budgetExpense, currency)} sub="presupuesto del mes" />
+        <MetricCard label="Gastos reales" value={formatMoney(real.realExpense, currency)} delta={`${t.expenseVariancePct >= 0 ? "+" : ""}${formatPercent(t.expenseVariancePct)} vs presup.`} deltaTone={tone(t.expenseVariancePct, false)} valueTone="neg" />
+      </section>
+      <section className="cols-4">
+        <MetricCard label="Flujo libre real" value={formatMoney(t.freeCashflowReal, currency)} sub="ingresos − gastos" valueTone={t.freeCashflowReal >= 0 ? "pos" : "neg"} />
+        <MetricCard label="% flujo libre" value={formatPercent(t.freeCashflowPct)} valueTone={t.freeCashflowPct >= 0 ? "pos" : "neg"} />
+        <MetricCard label="Ratio gasto/ingreso" value={t.expenseRatio.toFixed(2)} sub="objetivo < 0.80" valueTone={t.expenseRatio < 0.8 ? "pos" : "warn"} />
+        <MetricCard label="Presión financiera" value={press.label} valueTone={press.tone} />
+      </section>
+
+      <section className="cols-2">
+        <ChartCard title="A · Ingresos reales vs presupuestados" hint="por mes">
+          <PremiumLineChart data={incomeLine} xKey="label" currency={currency} series={[{ key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true }, { key: "Real", label: "Real", color: "var(--pos)" }]} />
+        </ChartCard>
+        <ChartCard title="B · Gastos reales vs presupuestados" hint="por mes">
+          <PremiumLineChart data={expenseLine} xKey="label" currency={currency} series={[{ key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true }, { key: "Real", label: "Real", color: "var(--c-expense)" }]} />
+        </ChartCard>
+      </section>
+
+      <ChartCard title="C · Flujo de caja libre mensual" hint="ingresos · gastos · flujo">
+        <PremiumLineChart data={flujoLine} xKey="label" currency={currency} series={[{ key: "Ingresos", label: "Ingresos", color: "var(--pos)" }, { key: "Gastos", label: "Gastos", color: "var(--c-expense)" }, { key: "Flujo libre", label: "Flujo libre", color: "var(--info)" }]} />
+      </ChartCard>
+
+      <section className="cols-2">
+        <DonutCard title="D · Composición de ingresos" data={donutData(real.incomeByKey)} total={real.realIncome} currency={currency} />
+        <DonutCard title="E · Composición de gastos" data={donutData(real.expenseByKey)} total={real.realExpense} currency={currency} />
+      </section>
+
+      <section className="cols-2">
+        <TopTable title="Top 10 ingresos" rows={topRows(budget.incomeByKey, real.incomeByKey, { kind: "income", limit: 10 })} currency={currency} dimLabel="Fuente" />
+        <TopTable title="Top 10 gastos" rows={topRows(budget.expenseByKey, real.expenseByKey, { kind: "expense", limit: 10 })} currency={currency} dimLabel="Categoría" />
+      </section>
+
+      <FinancialInsightCard reading={view.baseReading} />
+    </div>
+  );
+}
+
+function DonutCard({ title, data, total, currency }: { title: string; data: DonutDatum[]; total: number; currency: string }) {
+  return (
+    <div className="card card-pad">
+      <div className="card-title">{title}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}>
+        <DonutChart data={data} centerLabel={formatMoney(total, currency)} centerSub="al mes" />
+        <div style={{ flex: 1, minWidth: 150, display: "flex", flexDirection: "column", gap: 7 }}>
+          {data.length === 0 ? (
+            <span className="muted" style={{ fontSize: 12.5 }}>Sin datos este mes.</span>
+          ) : (
+            data.map((d) => (
+              <div key={d.name} style={{ display: "grid", gridTemplateColumns: "10px 1fr auto", gap: 8, alignItems: "center", fontSize: 12.5 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
+                <span style={{ color: "var(--ink-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+                <span className="muted tnum">{formatMoney(d.value, currency)}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================== INGRESOS / GASTOS ==============================
+export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "income" | "expense" }) {
+  const { budget, real, currency, history } = view;
+  const isIncome = kind === "income";
+  const budgetTotal = isIncome ? budget.budgetIncome : budget.budgetExpense;
+  const realTotal = isIncome ? real.realIncome : real.realExpense;
+  const diff = realTotal - budgetTotal;
+  const complPct = budgetTotal > 0 ? realTotal / budgetTotal : 0;
+  const byKey = isIncome ? real.incomeByKey : real.expenseByKey;
+  const comp = composition(byKey);
+  const main = comp[0];
+  const items = budget.items.filter((b) => b.type === kind);
+  const txns = view.transactions.filter((t) => t.kind === (isIncome ? "ingreso" : "gasto"));
+  const lineData = history.map((h) => ({ label: h.label, Real: isIncome ? h.realIncome : h.realExpense, Presupuesto: Math.round(budgetTotal) }));
+
+  return (
+    <div className="grid">
+      <section className="cols-4">
+        <MetricCard label={isIncome ? "Ingresos presup." : "Gastos presup."} value={formatMoney(budgetTotal, currency)} sub="del mes" />
+        <MetricCard label={isIncome ? "Ingresos reales" : "Gastos reales"} value={formatMoney(realTotal, currency)} valueTone={isIncome ? "pos" : "neg"} />
+        <MetricCard label="Diferencia" value={formatMoney(diff, currency)} valueTone={(isIncome ? diff >= 0 : diff <= 0) ? "pos" : "warn"} />
+        <MetricCard label={isIncome ? "% cumplimiento" : "% ejecución"} value={formatPercent(complPct)} valueTone={complPct <= 1.05 ? "pos" : "warn"} />
+      </section>
+
+      <section className="cols-2">
+        <ChartCard title={isIncome ? "Histórico de ingresos" : "Histórico de gastos"} hint="real vs presupuesto">
+          <PremiumLineChart data={lineData} xKey="label" currency={currency} series={[{ key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true }, { key: "Real", label: "Real", color: isIncome ? "var(--pos)" : "var(--c-expense)" }]} />
+        </ChartCard>
+        <DonutCard title={isIncome ? "Composición por fuente" : "Composición por categoría"} data={donutData(byKey)} total={realTotal} currency={currency} />
+      </section>
+
+      <section className="dash-split">
+        <EditableBudgetTable type={kind} title={isIncome ? "Presupuesto de ingresos" : "Presupuesto de gastos"} items={items} categoryNames={view.categoryNames} categories={view.categories} period={view.period} currency={currency} />
+        <div>
+          <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+            <div className="card-title">{isIncome ? "Ingresos reales del mes" : "Gastos reales del mes"}</div>
+            <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} only={isIncome ? "ingreso" : "gasto"} />
+          </div>
+          <TransactionList transactions={txns} categoryNames={view.categoryNames} categories={view.categories} accounts={view.accounts} currency={currency} />
+        </div>
+      </section>
+
+      <FinancialInsightCard reading={isIncome ? view.incomeCapsule : view.expenseCapsule} />
+      {main ? null : null}
+    </div>
+  );
+}
+
+// ============================== TRANSACCIONES ==============================
+export function TransaccionesSection({ view }: { view: V2View }) {
+  const { real, currency } = view;
+  return (
+    <div className="grid">
+      <section className="cols-5">
+        <MetricCard label="Saldo neto" value={formatMoney(real.freeCashflowReal, currency)} sub="del periodo" valueTone={real.freeCashflowReal >= 0 ? "pos" : "neg"} />
+        <MetricCard label="Ingresos" value={formatMoney(real.realIncome, currency)} valueTone="pos" />
+        <MetricCard label="Gastos" value={formatMoney(real.realExpense, currency)} valueTone="neg" />
+        <MetricCard label="Movimientos" value={String(real.count)} sub="este mes" />
+        <MetricCard label="Gasto prom/día" value={formatMoney(real.avgDaily, currency)} />
+      </section>
+
+      <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} />
+
+      <TransactionList transactions={view.transactions} categoryNames={view.categoryNames} categories={view.categories} accounts={view.accounts} currency={currency} />
+
+      {view.transactions.length > 0 ? (
+        <div className="card card-pad" style={{ borderColor: "color-mix(in srgb, var(--info) 35%, var(--line))" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13.5, color: "var(--ink-2)" }}>
+            <span style={{ color: "var(--info)" }}>●</span>
+            {real.topExpenseCategory
+              ? `Tu mayor gasto del periodo es "${real.topExpenseCategory}". Registrar todo te ayuda a detectar fugas hormiga.`
+              : "Asigna categorías a tus movimientos para ver patrones útiles."}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
