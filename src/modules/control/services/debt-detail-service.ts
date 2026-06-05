@@ -11,16 +11,9 @@ import { getDisplayCurrency } from "@/modules/financial-base/services/base-servi
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { buildSchedule, recomputeFromPayments } from "@/modules/control/engine/amortization";
+import { effectiveApr, buildRateNote } from "@/modules/control/services/index-rates";
 import type { ScheduleRow } from "@/modules/control/engine/amortization";
-import type { Debt, DebtPayment, DebtRateType, DebtRateIndex } from "@/modules/control/types";
-
-function effectiveApr(d: Debt, indexRates?: Record<string, number>): number {
-  if (d.rateType === "variable" && d.rateIndex && d.rateSpread != null) {
-    const idx = indexRates?.[d.rateIndex];
-    if (idx != null) return idx + d.rateSpread;
-  }
-  return d.apr ?? 0;
-}
+import type { DebtPayment, DebtRateType, DebtRateIndex } from "@/modules/control/types";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -40,6 +33,7 @@ export interface DebtDetailVM {
   extraMonthly: number;
   termMonths: number | null;
   startDate: string | null;
+  rateNote: string | null;
   progress: number;
   monthsRemaining: number;
   payoffDate: string | null;
@@ -116,6 +110,7 @@ export async function getDebtDetail(
     extraMonthly: round2(input.extraMonthly),
     termMonths: debt.termMonths ?? null,
     startDate: debt.startDate ?? null,
+    rateNote: buildRateNote(debt, indexRates),
     progress,
     monthsRemaining: schedule.length,
     payoffDate: schedule[schedule.length - 1]?.date ?? null,

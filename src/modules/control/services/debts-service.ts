@@ -11,7 +11,8 @@ import { getBaseSummary } from "@/modules/financial-base";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import type { Debt, DebtRateType, DebtRateIndex } from "@/modules/control/types";
+import { effectiveApr, buildRateNote } from "@/modules/control/services/index-rates";
+import type { DebtRateType, DebtRateIndex } from "@/modules/control/types";
 
 export interface DebtVM {
   id: string;
@@ -32,21 +33,14 @@ export interface DebtVM {
   extraMonthly: number;
   termMonths: number | null;
   startDate: string | null;
+  /** Nota cuando el índice movió la TAE (deudas variables). */
+  rateNote: string | null;
 }
 
 export interface DebtsOverview {
   currency: string;
   incomeMonthly: number;
   debts: DebtVM[];
-}
-
-/** TAE efectiva. Para variables, índice + spread (F5 inyecta el índice). */
-function effectiveApr(d: Debt, indexRates?: Record<string, number>): number {
-  if (d.rateType === "variable" && d.rateIndex && d.rateSpread != null) {
-    const idx = indexRates?.[d.rateIndex];
-    if (idx != null) return idx + d.rateSpread;
-  }
-  return d.apr ?? 0;
 }
 
 export async function getDebtsOverview(
@@ -80,6 +74,7 @@ export async function getDebtsOverview(
       extraMonthly: d.extraMonthly != null ? conv(d.extraMonthly, d.currency) : 0,
       termMonths: d.termMonths ?? null,
       startDate: d.startDate ?? null,
+      rateNote: buildRateNote(d, indexRates),
     }));
 
   return {

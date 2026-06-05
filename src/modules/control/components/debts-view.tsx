@@ -234,6 +234,9 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                   {d.debtType ?? "Deuda"}
                   {d.rateType === "variable" ? " · variable" : ""}
                 </div>
+                {d.rateNote ? (
+                  <div style={{ fontSize: 11, color: "var(--warn)", marginTop: 3 }}>{d.rateNote}</div>
+                ) : null}
                 {d.originalAmount ? (
                   <div className="dbar">
                     <span style={{ width: `${s.progress * 100}%` }} />

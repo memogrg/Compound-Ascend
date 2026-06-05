@@ -26,6 +26,7 @@ export type {
 export { getControlSummary, listDebts } from "./services/control-service";
 export { getDebtsOverview } from "./services/debts-service";
 export { getDebtDetail } from "./services/debt-detail-service";
+export { getIndexRates, effectiveApr, buildRateNote } from "./services/index-rates";
 export { ControlDashboard } from "./components/control-dashboard";
 export { ControlActions } from "./components/control-actions";
 export { DebtsView } from "./components/debts-view";

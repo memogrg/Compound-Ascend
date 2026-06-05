@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getDebtDetail } from "@/modules/control/services/debt-detail-service";
+import { getIndexRates } from "@/modules/control/services/index-rates";
 import { DebtDetail } from "@/modules/control/components/debt-detail";
 import { Icon } from "@/components/ui/icon";
 
@@ -18,7 +19,7 @@ export default async function Page({ params }: { params: Promise<{ debtId: strin
       </div>
     );
   }
-  const vm = await getDebtDetail(debtId);
+  const vm = await getDebtDetail(debtId, await getIndexRates());
   if (!vm) notFound();
 
   return (

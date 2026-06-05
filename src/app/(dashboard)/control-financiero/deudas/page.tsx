@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getDebtsOverview } from "@/modules/control/services/debts-service";
+import { getIndexRates } from "@/modules/control/services/index-rates";
 import { DebtsView } from "@/modules/control/components/debts-view";
 import { Icon } from "@/components/ui/icon";
 import type { DebtsOverview } from "@/modules/control/services/debts-service";
@@ -12,7 +13,7 @@ import type { DebtsOverview } from "@/modules/control/services/debts-service";
 export default async function Page() {
   const configured = isSupabaseConfigured();
   const overview: DebtsOverview = configured
-    ? await getDebtsOverview()
+    ? await getDebtsOverview(await getIndexRates())
     : { currency: "CRC", incomeMonthly: 0, debts: [] };
 
   return (

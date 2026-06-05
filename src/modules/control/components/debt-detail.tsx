@@ -89,6 +89,12 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
           <Stat label="Interés restante" value={formatMoney(vm.interestRemaining, currency)} />
         </div>
 
+        {vm.rateNote ? (
+          <div className="auth-msg warn" style={{ margin: "14px 0 0", fontSize: 12.5 }}>
+            {vm.rateNote}
+          </div>
+        ) : null}
+
         {vm.originalAmount ? (
           <div style={{ marginTop: 16 }}>
             <div className="row" style={{ justifyContent: "space-between", fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
