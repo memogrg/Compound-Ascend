@@ -131,6 +131,27 @@ export function parseBccrXml(raw: string): Observation[] {
   return out;
 }
 
+// ---------- Hacienda (fallback USD/CRC sin token) ----------
+
+/**
+ * Fallback SIN token para USD/CRC: API pública del Ministerio de Hacienda de
+ * Costa Rica, que republica el tipo de cambio de referencia del BCCR. Solo
+ * devuelve el valor del día (sin histórico). Temporal: una vez configurado
+ * BCCR_WS_TOKEN, el web service del BCCR provee el histórico completo.
+ */
+export async function fetchHaciendaTc(
+  code: "USDCRC_COMPRA" | "USDCRC_VENTA",
+): Promise<Observation[]> {
+  const data = (await fetchJson("https://api.hacienda.go.cr/indicadores/tc")) as
+    | { dolar?: { compra?: { fecha: string; valor: number }; venta?: { fecha: string; valor: number } } }
+    | null;
+  const node = code === "USDCRC_COMPRA" ? data?.dolar?.compra : data?.dolar?.venta;
+  if (!node || !Number.isFinite(node.valor) || node.valor <= 0) return [];
+  const observedDate = (node.fecha ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(observedDate)) return [];
+  return [{ observedDate, value: node.valor }];
+}
+
 // ---------- FRED ----------
 
 /**

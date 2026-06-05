@@ -9,7 +9,7 @@
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { indicatorCache, TTL } from "@/lib/economic-indicators/cache";
-import { fetchBccr, fetchFred } from "@/lib/economic-indicators/providers";
+import { fetchBccr, fetchFred, fetchHaciendaTc } from "@/lib/economic-indicators/providers";
 import { upsertIndicators } from "@/lib/economic-indicators/persist";
 import {
   enabledIndicators,
@@ -157,7 +157,14 @@ async function fetchObservations(def: IndicatorDef) {
     const to = new Date();
     const from = new Date();
     from.setUTCDate(from.getUTCDate() - INGEST_WINDOW_DAYS);
-    return fetchBccr(def.externalId, from, to);
+    const obs = await fetchBccr(def.externalId, from, to);
+    if (obs.length > 0) return obs;
+    // Fallback temporal SIN token: USD/CRC vía API pública de Hacienda (republica
+    // el TC de referencia del BCCR). Solo valor del día. TBP/TPM no tienen fallback.
+    if (def.code === "USDCRC_COMPRA" || def.code === "USDCRC_VENTA") {
+      return fetchHaciendaTc(def.code);
+    }
+    return obs;
   }
   return fetchFred(def.externalId, INGEST_WINDOW_DAYS);
 }
