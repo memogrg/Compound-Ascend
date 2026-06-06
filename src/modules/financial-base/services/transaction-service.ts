@@ -77,7 +77,24 @@ export async function listTransactions(period: Period, filters: TxnFilters = {})
 export async function createTransaction(input: TxnInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const accountLabel = await accountLabelFor(input.accountId);
+
+  // Auto-categorización por reglas: si falta categoría/cuenta y hay comercio,
+  // aplica la primera regla que haga match (determinista, sin IA).
+  let categoryId = input.categoryId ?? null;
+  let accountId = input.accountId ?? null;
+  if ((!categoryId || !accountId) && input.merchantOrSource) {
+    const { findMatchingRule } = await import("@/modules/financial-base/services/rules-service");
+    const rule = await findMatchingRule(
+      input.merchantOrSource,
+      input.kind === "gasto" ? "expense" : "income",
+    );
+    if (rule) {
+      categoryId = categoryId ?? rule.suggestedCategoryId;
+      accountId = accountId ?? rule.suggestedAccountId;
+    }
+  }
+
+  const accountLabel = await accountLabelFor(accountId);
   await supabase.from("transactions").insert({
     user_id: user.id,
     kind: input.kind,
@@ -86,12 +103,14 @@ export async function createTransaction(input: TxnInput): Promise<void> {
     amount: input.amount,
     currency: input.currency,
     occurred_on: input.occurredOn,
-    category_id: input.categoryId ?? null,
-    account_id: input.accountId ?? null,
+    category_id: categoryId,
+    account_id: accountId,
     account_label: accountLabel,
     status: input.status,
     origin: input.origin,
-    source: "manual",
+    receipt_url: input.receiptUrl ?? null,
+    confidence_score_internal: input.confidence ?? null,
+    source: input.origin === "scanned" ? "receipt" : "manual",
     confirmed_by_user: input.status === "confirmed",
   });
 }
@@ -266,10 +285,16 @@ export type HistoryPoint = {
   label: string;
   realIncome: number;
   realExpense: number;
+  budgetIncome: number;
+  budgetExpense: number;
   freeCashflow: number;
 };
 
-/** Serie histórica real (últimos N meses hasta `period`) para gráficas de línea. */
+/**
+ * Serie histórica (últimos N meses hasta `period`) para gráficas de línea:
+ * real (transactions) + presupuesto por mes (budget_items). Todo en la moneda
+ * de visualización. El presupuesto por mes hace fieles las líneas real-vs-presup.
+ */
 export async function getRealHistory(period: Period, monthsBack = 6): Promise<HistoryPoint[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -279,38 +304,52 @@ export async function getRealHistory(period: Period, monthsBack = 6): Promise<Hi
   let start = period;
   for (let i = 0; i < monthsBack - 1; i++) start = previousMonthPeriod(start);
 
-  const { data } = await supabase
-    .from("transactions")
-    .select("kind,amount,currency,occurred_on")
-    .eq("user_id", user.id)
-    .gte("occurred_on", start.from)
-    .lte("occurred_on", period.to);
-
-  // Acumula por mes.
-  const buckets = new Map<string, { label: string; income: number; expense: number }>();
+  const years = new Set<number>();
+  const buckets = new Map<string, { label: string; income: number; expense: number; bIncome: number; bExpense: number }>();
   let cursor = start;
   for (let i = 0; i < monthsBack; i++) {
-    buckets.set(`${cursor.year}-${cursor.month}`, { label: cursor.label, income: 0, expense: 0 });
-    cursor = monthPeriod(
-      cursor.month === 12 ? cursor.year + 1 : cursor.year,
-      cursor.month === 12 ? 1 : cursor.month + 1,
-    );
+    buckets.set(`${cursor.year}-${cursor.month}`, { label: cursor.label, income: 0, expense: 0, bIncome: 0, bExpense: 0 });
+    years.add(cursor.year);
+    cursor = monthPeriod(cursor.month === 12 ? cursor.year + 1 : cursor.year, cursor.month === 12 ? 1 : cursor.month + 1);
   }
 
-  for (const r of data ?? []) {
+  const [txnRes, budgetRes] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select("kind,amount,currency,occurred_on")
+      .eq("user_id", user.id)
+      .gte("occurred_on", start.from)
+      .lte("occurred_on", period.to),
+    supabase
+      .from("budget_items")
+      .select("type,amount,currency,period_month,period_year")
+      .eq("user_id", user.id)
+      .in("period_year", [...years]),
+  ]);
+
+  for (const r of txnRes.data ?? []) {
     const d = new Date(r.occurred_on);
-    const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
-    const b = buckets.get(key);
+    const b = buckets.get(`${d.getFullYear()}-${d.getMonth() + 1}`);
     if (!b) continue;
     const value = convertCurrency(Number(r.amount), r.currency, currency, rates);
     if (r.kind === "ingreso") b.income += value;
     else b.expense += value;
   }
 
+  for (const r of budgetRes.data ?? []) {
+    const b = buckets.get(`${r.period_year}-${r.period_month}`);
+    if (!b) continue;
+    const value = convertCurrency(Number(r.amount), r.currency, currency, rates);
+    if (r.type === "income") b.bIncome += value;
+    else b.bExpense += value;
+  }
+
   return [...buckets.values()].map((b) => ({
     label: b.label,
     realIncome: Math.round(b.income),
     realExpense: Math.round(b.expense),
+    budgetIncome: Math.round(b.bIncome),
+    budgetExpense: Math.round(b.bExpense),
     freeCashflow: Math.round(b.income - b.expense),
   }));
 }

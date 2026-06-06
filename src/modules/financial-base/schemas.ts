@@ -84,6 +84,8 @@ export const txnInputSchema = z.object({
   description: z.string().max(280).optional(),
   status: z.enum(["confirmed", "pending_review"]).default("confirmed"),
   origin: z.enum(["manual", "scanned", "imported", "recurring", "ai_assisted"]).default("manual"),
+  receiptUrl: z.string().max(500).optional(),
+  confidence: z.number().min(0).max(1).optional(),
 });
 
 export const accountInputSchema = z.object({
@@ -93,6 +95,15 @@ export const accountInputSchema = z.object({
   isDefault: z.boolean().default(false),
 });
 
+export const ruleInputSchema = z.object({
+  merchantPattern: z.string().trim().min(1, "Escribe un texto a detectar").max(120),
+  type: z.enum(["income", "expense"]),
+  suggestedCategoryId: uuidOrNull.optional(),
+  suggestedAccountId: uuidOrNull.optional(),
+  active: z.boolean().default(true),
+});
+
 export type BudgetItemInput = z.infer<typeof budgetItemInputSchema>;
 export type TxnInput = z.infer<typeof txnInputSchema>;
 export type AccountInput = z.infer<typeof accountInputSchema>;
+export type RuleInput = z.infer<typeof ruleInputSchema>;

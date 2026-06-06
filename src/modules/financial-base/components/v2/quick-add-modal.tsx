@@ -29,12 +29,22 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+export type ScanPrefill = {
+  amount?: number | null;
+  merchant?: string | null;
+  date?: string | null;
+  currency?: string | null;
+  receiptUrl?: string;
+  confidence?: number;
+};
+
 export function QuickAddModal({
   kind,
   categories,
   accounts,
   currency,
   item,
+  prefill,
   onClose,
 }: {
   kind: TxnKind;
@@ -42,20 +52,23 @@ export function QuickAddModal({
   accounts: Account[];
   currency: string;
   item?: Transaction;
+  prefill?: ScanPrefill;
   onClose: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
   const editing = Boolean(item);
   const isGasto = kind === "gasto";
+  const scanned = Boolean(prefill);
+  const effectiveCurrency = prefill?.currency || currency;
 
-  const [amount, setAmount] = useState(item ? String(item.amount) : "");
+  const [amount, setAmount] = useState(item ? String(item.amount) : prefill?.amount ? String(prefill.amount) : "");
   const [categoryId, setCategoryId] = useState(item?.categoryId ?? categories[0]?.id ?? "");
   const [source, setSource] = useState(item?.merchantOrSource ?? INCOME_SOURCES[0]);
   const [accountId, setAccountId] = useState(item?.accountId ?? accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "");
-  const [more, setMore] = useState(false);
-  const [date, setDate] = useState(item?.occurredOn ?? todayISO());
-  const [merchant, setMerchant] = useState(isGasto ? (item?.merchantOrSource ?? "") : "");
+  const [more, setMore] = useState(Boolean(prefill?.date || prefill?.merchant));
+  const [date, setDate] = useState(item?.occurredOn ?? prefill?.date ?? todayISO());
+  const [merchant, setMerchant] = useState(isGasto ? (item?.merchantOrSource ?? prefill?.merchant ?? "") : "");
   const [note, setNote] = useState(item?.description ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,14 +82,16 @@ export function QuickAddModal({
     const payload = {
       kind,
       amount: amt,
-      currency,
+      currency: effectiveCurrency,
       occurredOn: date,
       categoryId: isGasto ? categoryId || null : null,
       accountId: accountId || null,
       merchantOrSource: isGasto ? merchant || null : source,
       description: note || undefined,
       status: "confirmed" as const,
-      origin: "manual" as const,
+      origin: scanned ? ("scanned" as const) : ("manual" as const),
+      receiptUrl: prefill?.receiptUrl,
+      confidence: prefill?.confidence,
     };
     const res = editing
       ? await editTransactionAction(item!.id, payload)
@@ -91,10 +106,15 @@ export function QuickAddModal({
     }
   };
 
-  const title = `${editing ? "Editar" : "Registrar"} ${isGasto ? "gasto" : "ingreso"}`;
+  const title = scanned
+    ? "Revisar recibo"
+    : `${editing ? "Editar" : "Registrar"} ${isGasto ? "gasto" : "ingreso"}`;
+  const sub = scanned
+    ? "Encontramos estos datos en tu recibo. Revísalos y guarda."
+    : "Captura rápida; lo avanzado está en Más detalles.";
 
   return (
-    <Modal title={title} sub="Captura rápida; lo avanzado está en Más detalles." onClose={onClose}>
+    <Modal title={title} sub={sub} onClose={onClose}>
       <form onSubmit={onSubmit}>
         <div className="modal-body">
           {error ? (
@@ -107,7 +127,7 @@ export function QuickAddModal({
             <label className="fld-label">Monto</label>
             <div className="inp-money" style={{ fontSize: 22 }}>
               <span className="pre" style={{ fontSize: 20 }}>
-                {SYM[currency] ?? ""}
+                {SYM[effectiveCurrency] ?? ""}
               </span>
               <input
                 autoFocus

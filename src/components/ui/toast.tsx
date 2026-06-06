@@ -11,8 +11,9 @@ import { Icon } from "@/components/ui/icon";
 import type { IconName } from "@/components/ui/icon";
 
 type Variant = "success" | "error" | "info";
-type ToastFn = (message: string, variant?: Variant) => void;
-type Item = { id: number; message: string; variant: Variant };
+export type ToastAction = { label: string; onClick: () => void };
+type ToastFn = (message: string, variant?: Variant, action?: ToastAction) => void;
+type Item = { id: number; message: string; variant: Variant; action?: ToastAction };
 
 const ToastContext = createContext<ToastFn>(() => {});
 
@@ -28,10 +29,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     setItems((list) => list.filter((t) => t.id !== id));
   }, []);
 
-  const push = useCallback<ToastFn>((message, variant = "success") => {
+  const push = useCallback<ToastFn>((message, variant = "success", action) => {
     idRef.current += 1;
     const id = idRef.current;
-    setItems((list) => [...list, { id, message, variant }]);
+    setItems((list) => [...list, { id, message, variant, action }]);
   }, []);
 
   return (
@@ -55,17 +56,18 @@ const DOT_BG: Record<Variant, string> = {
 
 function ToastView({ item, onDone }: { item: Item; onDone: () => void }) {
   const [show, setShow] = useState(false);
+  const lifeMs = item.action ? 5000 : 3000; // más tiempo si hay "Deshacer"
 
   useEffect(() => {
     const enter = requestAnimationFrame(() => setShow(true));
-    const hide = setTimeout(() => setShow(false), 3000);
-    const done = setTimeout(onDone, 3260);
+    const hide = setTimeout(() => setShow(false), lifeMs);
+    const done = setTimeout(onDone, lifeMs + 260);
     return () => {
       cancelAnimationFrame(enter);
       clearTimeout(hide);
       clearTimeout(done);
     };
-  }, [onDone]);
+  }, [onDone, lifeMs]);
 
   return (
     <div className={show ? "toast show" : "toast"} role="status" aria-live="polite">
@@ -73,6 +75,18 @@ function ToastView({ item, onDone }: { item: Item; onDone: () => void }) {
         <Icon name={ICON[item.variant]} width={2} />
       </span>
       {item.message}
+      {item.action ? (
+        <button
+          type="button"
+          className="toast-action"
+          onClick={() => {
+            item.action!.onClick();
+            onDone();
+          }}
+        >
+          {item.action.label}
+        </button>
+      ) : null}
     </div>
   );
 }

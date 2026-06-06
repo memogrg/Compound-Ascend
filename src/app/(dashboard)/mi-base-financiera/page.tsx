@@ -9,7 +9,9 @@ import {
 } from "@/modules/financial-base/services/transaction-service";
 import { listCategories } from "@/modules/financial-base/services/categories-service";
 import { listAccounts } from "@/modules/financial-base/services/accounts-service";
-import { parseMonthParam, monthParam } from "@/modules/financial-base/engine/period";
+import { listRules } from "@/modules/financial-base/services/rules-service";
+import { parseMonthParam, monthParam, previousMonthPeriod } from "@/modules/financial-base/engine/period";
+import { tryGenerateMonthlySnapshot } from "@/modules/financial-base/services/snapshot-service";
 import { computeV2Totals, composition } from "@/modules/financial-base/engine/base-v2";
 import { buildBaseReading, buildCapsule } from "@/modules/financial-base/engine/reading";
 import { PeriodSelector } from "@/modules/financial-base/components/v2/period-selector";
@@ -43,19 +45,23 @@ export default async function Page({
     );
   }
 
-  const [budget, real, history, transactions, categories, accounts, base] = await Promise.all([
+  const [budget, real, history, transactions, categories, accounts, rules, base] = await Promise.all([
     getBudgetTotals(period),
     getRealTotals(period),
     getRealHistory(period, 6),
     listTransactions(period),
     listCategories(),
     listAccounts(),
+    listRules(),
     getBaseSummary(),
   ]);
 
   const currency = real.currency;
   const categoryNames: Record<string, string> = {};
   for (const c of categories) categoryNames[c.id] = c.name;
+
+  // Acumula histórico: persiste el snapshot del mes recién cerrado (best-effort).
+  void tryGenerateMonthlySnapshot(previousMonthPeriod(period));
 
   // Lectura determinista (siempre disponible, barata).
   const totals = computeV2Totals({
@@ -84,6 +90,7 @@ export default async function Page({
     transactions,
     categories,
     accounts,
+    rules,
     categoryNames,
     baseReading: buildBaseReading(readingInput),
     incomeCapsule: buildCapsule("income", readingInput),

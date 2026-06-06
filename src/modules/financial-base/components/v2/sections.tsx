@@ -11,6 +11,9 @@ import { PremiumLineChart } from "@/components/charts/line-chart";
 import { EditableBudgetTable } from "@/modules/financial-base/components/v2/editable-budget-table";
 import { TransactionList } from "@/modules/financial-base/components/v2/transaction-list";
 import { QuickAddButtons } from "@/modules/financial-base/components/v2/quick-add-buttons";
+import { RulesButton } from "@/modules/financial-base/components/v2/rules-panel";
+import { ScanReceiptButton } from "@/modules/financial-base/components/v2/scan-receipt-button";
+import type { TransactionRule } from "@/modules/financial-base/services/rules-service";
 import { composition, computeV2Totals, topRows, type TopRow } from "@/modules/financial-base/engine/base-v2";
 import type { BudgetTotals } from "@/modules/financial-base/services/budget-service";
 import type { RealTotals, HistoryPoint } from "@/modules/financial-base/services/transaction-service";
@@ -40,6 +43,7 @@ export type V2View = {
   categories: Category[];
   accounts: Account[];
   categoryNames: Record<string, string>;
+  rules: TransactionRule[];
   baseReading: FinancialReading;
   incomeCapsule: FinancialReading;
   expenseCapsule: FinancialReading;
@@ -97,8 +101,8 @@ function tone(v: number, goodWhenPositive = true): MetricTone {
 export function MiBaseSection({ view }: { view: V2View }) {
   const { budget, real, currency, history } = view;
   const t = computeV2Totals({ budgetIncome: budget.budgetIncome, realIncome: real.realIncome, budgetExpense: budget.budgetExpense, realExpense: real.realExpense });
-  const incomeLine = history.map((h) => ({ label: h.label, Real: h.realIncome, Presupuesto: Math.round(budget.budgetIncome) }));
-  const expenseLine = history.map((h) => ({ label: h.label, Real: h.realExpense, Presupuesto: Math.round(budget.budgetExpense) }));
+  const incomeLine = history.map((h) => ({ label: h.label, Real: h.realIncome, Presupuesto: h.budgetIncome || Math.round(budget.budgetIncome) }));
+  const expenseLine = history.map((h) => ({ label: h.label, Real: h.realExpense, Presupuesto: h.budgetExpense || Math.round(budget.budgetExpense) }));
   const flujoLine = history.map((h) => ({ label: h.label, Ingresos: h.realIncome, Gastos: h.realExpense, "Flujo libre": h.freeCashflow }));
   const press = PRESSURE[view.financialPressure];
 
@@ -182,7 +186,11 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
   const main = comp[0];
   const items = budget.items.filter((b) => b.type === kind);
   const txns = view.transactions.filter((t) => t.kind === (isIncome ? "ingreso" : "gasto"));
-  const lineData = history.map((h) => ({ label: h.label, Real: isIncome ? h.realIncome : h.realExpense, Presupuesto: Math.round(budgetTotal) }));
+  const lineData = history.map((h) => ({
+    label: h.label,
+    Real: isIncome ? h.realIncome : h.realExpense,
+    Presupuesto: (isIncome ? h.budgetIncome : h.budgetExpense) || Math.round(budgetTotal),
+  }));
 
   return (
     <div className="grid">
@@ -230,7 +238,11 @@ export function TransaccionesSection({ view }: { view: V2View }) {
         <MetricCard label="Gasto prom/día" value={formatMoney(real.avgDaily, currency)} />
       </section>
 
-      <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} />
+        <ScanReceiptButton categories={view.categories} accounts={view.accounts} currency={currency} />
+        <RulesButton rules={view.rules} categories={view.categories} accounts={view.accounts} />
+      </div>
 
       <TransactionList transactions={view.transactions} categoryNames={view.categoryNames} categories={view.categories} accounts={view.accounts} currency={currency} />
 

@@ -10,7 +10,10 @@ import {
   budgetItemInputSchema,
   txnInputSchema,
   accountInputSchema,
+  ruleInputSchema,
 } from "@/modules/financial-base/schemas";
+import { createRule, updateRule, deleteRule } from "@/modules/financial-base/services/rules-service";
+import { extractReceipt, type ReceiptExtraction } from "@/modules/financial-base/services/receipt-service";
 import {
   createBudgetItem,
   updateBudgetItem,
@@ -199,5 +202,66 @@ export async function removeAccountAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+// ---------- Reglas de auto-categorización ----------
+export async function addRuleAction(raw: unknown): Promise<ActionResult> {
+  const parsed = ruleInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await createRule(parsed.data);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos guardar la regla." };
+  }
+}
+
+export async function editRuleAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = ruleInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateRule(id, parsed.data);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos actualizar la regla." };
+  }
+}
+
+export async function removeRuleAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    await deleteRule(id);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// ---------- OCR de recibos ----------
+export type ScanResult =
+  | { ok: true; data: ReceiptExtraction }
+  | { ok: false; message: string };
+
+export async function scanReceiptAction(imageBase64: string, mimeType: string): Promise<ScanResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  if (!imageBase64 || imageBase64.length > 8_000_000) {
+    return { ok: false, message: "Imagen inválida o demasiado grande (máx ~6 MB)." };
+  }
+  try {
+    const data = await extractReceipt(imageBase64, mimeType || "image/jpeg");
+    if (!data.configured) {
+      return { ok: false, message: "El escaneo con IA no está disponible (proveedor no configurado)." };
+    }
+    return { ok: true, data };
+  } catch (err) {
+    const msg = err instanceof Error && err.message.includes("límite") ? err.message : "No pudimos leer el recibo. Inténtalo de nuevo o regístralo manual.";
+    logger.warn("scanReceipt fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: msg };
   }
 }
