@@ -1,45 +1,53 @@
 import { describe, it, expect } from "vitest";
-import { parseBccrXml, parseFredObservations } from "@/lib/economic-indicators/providers";
+import { parseSddeSeries, parseFredObservations } from "@/lib/economic-indicators/providers";
 
-describe("parseBccrXml", () => {
-  it("parsea el XML escapado dentro del envoltorio <string>", () => {
-    const raw =
-      '<?xml version="1.0" encoding="utf-8"?>' +
-      '<string xmlns="https://gee.bccr.fi.cr/...">' +
-      "&lt;Datos&gt;&lt;INGC011_CAT_INDICADORECONOMIC&gt;" +
-      "&lt;COD_INDICADORINTERNO&gt;317&lt;/COD_INDICADORINTERNO&gt;" +
-      "&lt;DES_FECHA&gt;2024-01-15T00:00:00-06:00&lt;/DES_FECHA&gt;" +
-      "&lt;NUM_VALOR&gt;512.34&lt;/NUM_VALOR&gt;" +
-      "&lt;/INGC011_CAT_INDICADORECONOMIC&gt;&lt;/Datos&gt;</string>";
-    expect(parseBccrXml(raw)).toEqual([{ observedDate: "2024-01-15", value: 512.34 }]);
+describe("parseSddeSeries", () => {
+  it("parsea la respuesta JSON del SDDE e ignora valores nulos", () => {
+    const sdde = {
+      estado: true,
+      datos: [
+        {
+          series: [
+            { fecha: "2026-06-05", valorDatoPorPeriodo: 5.15 },
+            { fecha: "2026-06-06", valorDatoPorPeriodo: null }, // se ignora
+          ],
+        },
+      ],
+    };
+    expect(parseSddeSeries(sdde)).toEqual([{ observedDate: "2026-06-05", value: 5.15 }]);
   });
 
-  it("parsea XML sin escapar y empareja múltiples observaciones por posición", () => {
-    const raw =
-      "<Datos>" +
-      "<INGC011_CAT_INDICADORECONOMIC><DES_FECHA>2024-01-15T00:00:00-06:00</DES_FECHA><NUM_VALOR>500.00</NUM_VALOR></INGC011_CAT_INDICADORECONOMIC>" +
-      "<INGC011_CAT_INDICADORECONOMIC><DES_FECHA>2024-01-16T00:00:00-06:00</DES_FECHA><NUM_VALOR>501.50</NUM_VALOR></INGC011_CAT_INDICADORECONOMIC>" +
-      "</Datos>";
-    expect(parseBccrXml(raw)).toEqual([
-      { observedDate: "2024-01-15", value: 500 },
-      { observedDate: "2024-01-16", value: 501.5 },
+  it("aplana múltiples indicadores y recorta la fecha ISO a yyyy-mm-dd", () => {
+    const sdde = {
+      datos: [
+        { series: [{ fecha: "2026-01-15T00:00:00-06:00", valorDatoPorPeriodo: 500 }] },
+        { series: [{ fecha: "2026-01-16", valorDatoPorPeriodo: 501.5 }] },
+      ],
+    };
+    expect(parseSddeSeries(sdde)).toEqual([
+      { observedDate: "2026-01-15", value: 500 },
+      { observedDate: "2026-01-16", value: 501.5 },
     ]);
   });
 
-  it("acepta coma decimal", () => {
-    const raw = "<DES_FECHA>2024-03-01T00:00:00-06:00</DES_FECHA><NUM_VALOR>4,75</NUM_VALOR>";
-    expect(parseBccrXml(raw)).toEqual([{ observedDate: "2024-03-01", value: 4.75 }]);
+  it("ignora fechas inválidas y valores no finitos", () => {
+    const sdde = {
+      datos: [
+        {
+          series: [
+            { fecha: "fecha-mala", valorDatoPorPeriodo: 10 },
+            { fecha: "2026-05-05", valorDatoPorPeriodo: Number.NaN },
+          ],
+        },
+      ],
+    };
+    expect(parseSddeSeries(sdde)).toEqual([]);
   });
 
-  it("ignora valores no numéricos y fechas inválidas", () => {
-    const raw =
-      "<DES_FECHA>fecha-mala</DES_FECHA><NUM_VALOR>10</NUM_VALOR>" +
-      "<DES_FECHA>2024-05-05T00:00:00-06:00</DES_FECHA><NUM_VALOR>nan</NUM_VALOR>";
-    expect(parseBccrXml(raw)).toEqual([]);
-  });
-
-  it("devuelve [] cuando no hay observaciones", () => {
-    expect(parseBccrXml("<string></string>")).toEqual([]);
+  it("tolera payloads vacíos o malformados", () => {
+    expect(parseSddeSeries(null)).toEqual([]);
+    expect(parseSddeSeries({})).toEqual([]);
+    expect(parseSddeSeries({ datos: [{}] })).toEqual([]);
   });
 });
 

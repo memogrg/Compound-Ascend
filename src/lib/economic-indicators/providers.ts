@@ -4,7 +4,7 @@
  * Con timeout, sin filtrar secretos en logs. La `unit` no la decide el
  * proveedor: viene del catálogo.
  *
- *  - BCCR: web service SOAP/ASMX → XML (solo servidor; el BCCR bloquea CORS).
+ *  - BCCR: API SDDE (REST/JSON con Bearer; solo servidor, token secreto).
  *  - FRED: REST JSON (St. Louis Fed).
  */
 import { getServerEnv } from "@/lib/env";
@@ -28,8 +28,8 @@ async function fetchText(url: string, init?: RequestInit): Promise<string | null
   }
 }
 
-async function fetchJson(url: string): Promise<unknown | null> {
-  const text = await fetchText(url);
+async function fetchJson(url: string, init?: RequestInit): Promise<unknown | null> {
+  const text = await fetchText(url, init);
   if (!text) return null;
   try {
     return JSON.parse(text);
@@ -45,88 +45,63 @@ function num(v: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** dd/mm/yyyy a partir de un Date (formato exigido por el BCCR). */
-function toBccrDate(d: Date): string {
-  const dd = String(d.getUTCDate()).padStart(2, "0");
+// ---------- BCCR (SDDE — API REST/JSON oficial, Bearer) ----------
+
+const BCCR_SDDE_BASE =
+  "https://apim.bccr.fi.cr/SDDE/api/Bccr.Ge.SDDE.Publico.Indicadores.API";
+
+/** yyyy/mm/dd (formato exigido por el SDDE). */
+function toSddeDate(d: Date): string {
+  const yyyy = d.getUTCFullYear();
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${dd}/${mm}/${d.getUTCFullYear()}`;
-}
-
-// ---------- BCCR ----------
-
-/** Decodifica entidades HTML básicas (el ASMX envuelve el XML escapado). */
-function unescapeXml(s: string): string {
-  return s
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x?\d+;/g, "")
-    .replace(/&amp;/g, "&");
-}
-
-function matchAll(xml: string, tag: string): string[] {
-  const re = new RegExp(`<${tag}>([^<]*)</${tag}>`, "g");
-  const out: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(xml)) !== null) {
-    if (m[1] !== undefined) out.push(m[1]);
-  }
-  return out;
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}/${mm}/${dd}`;
 }
 
 /**
- * Consulta un indicador del BCCR entre dos fechas y devuelve sus observaciones.
- * Si faltan credenciales o el servicio responde "Nothing", devuelve [].
+ * Consulta un indicador del SDDE entre dos fechas (REST/JSON, Bearer).
+ * Solo servidor (token secreto). Sin token o sin datos → [].
  */
 export async function fetchBccr(externalId: string, from: Date, to: Date): Promise<Observation[]> {
-  const env = getServerEnv();
-  const { BCCR_WS_EMAIL, BCCR_WS_TOKEN, BCCR_WS_NAME } = env;
-  if (!BCCR_WS_EMAIL || !BCCR_WS_TOKEN || !BCCR_WS_NAME) {
-    logger.warn("economic-indicators: credenciales BCCR ausentes; omitiendo");
+  const token = getServerEnv().BCCR_SDDE_TOKEN;
+  if (!token) {
+    logger.warn("economic-indicators: BCCR_SDDE_TOKEN ausente; omitiendo");
     return [];
   }
-
-  const params = new URLSearchParams({
-    Indicador: externalId,
-    FechaInicio: toBccrDate(from),
-    FechaFinal: toBccrDate(to),
-    Nombre: BCCR_WS_NAME,
-    SubNiveles: "N",
-    CorreoElectronico: BCCR_WS_EMAIL,
-    Token: BCCR_WS_TOKEN,
+  const qs = new URLSearchParams({
+    fechaInicio: toSddeDate(from),
+    fechaFin: toSddeDate(to),
+    idioma: "ES",
   });
-  const url =
-    "https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/" +
-    `ObtenerIndicadoresEconomicosXML?${params.toString()}`;
-
-  const raw = await fetchText(url);
-  if (!raw) return [];
-  // Falta de algún parámetro → el servicio devuelve "Nothing" (tratar como error).
-  if (/\bNothing\b/.test(raw)) {
-    logger.warn("economic-indicators: BCCR devolvió Nothing", { len: externalId.length });
-    return [];
-  }
-  return parseBccrXml(raw);
+  const url = `${BCCR_SDDE_BASE}/indicadoresEconomicos/${encodeURIComponent(externalId)}/series?${qs}`;
+  const data = await fetchJson(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "User-Agent": "Mozilla/5.0", // el ejemplo del doc SDDE lo usa; evita 403
+    },
+  });
+  return parseSddeSeries(data);
 }
 
 /**
- * Parsea la respuesta del web service del BCCR (XML, posiblemente escapado
- * dentro de un envoltorio <string>). Cada observación trae DES_FECHA y
- * NUM_VALOR; se emparejan por posición. Función pura (sin red) para test.
+ * Parsea la respuesta JSON del SDDE a observaciones. Pura (sin red) para test.
+ * Estructura: { estado, datos: [{ series: [{ fecha, valorDatoPorPeriodo }] }] }.
  */
-export function parseBccrXml(raw: string): Observation[] {
-  const xml = unescapeXml(raw);
-  const fechas = matchAll(xml, "DES_FECHA");
-  const valores = matchAll(xml, "NUM_VALOR");
-  const n = Math.min(fechas.length, valores.length);
+export function parseSddeSeries(data: unknown): Observation[] {
+  const datos =
+    (data as { datos?: { series?: { fecha: string; valorDatoPorPeriodo: number | null }[] }[] } | null)?.datos ?? [];
   const out: Observation[] = [];
-  for (let i = 0; i < n; i++) {
-    const value = num(valores[i]);
-    const fecha = fechas[i];
-    if (value === null || !fecha) continue;
-    const observedDate = fecha.slice(0, 10); // "yyyy-mm-dd" del ISO devuelto
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(observedDate)) continue;
-    out.push({ observedDate, value });
+  for (const ind of datos) {
+    for (const s of ind.series ?? []) {
+      const value =
+        typeof s.valorDatoPorPeriodo === "number" && Number.isFinite(s.valorDatoPorPeriodo)
+          ? s.valorDatoPorPeriodo
+          : null;
+      const observedDate = (s.fecha ?? "").slice(0, 10);
+      if (value === null || !/^\d{4}-\d{2}-\d{2}$/.test(observedDate)) continue;
+      out.push({ observedDate, value });
+    }
   }
   return out;
 }

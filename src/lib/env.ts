@@ -33,11 +33,10 @@ const serverSchema = z.object({
   GEMINI_API_KEY: optionalStr,
   FINNHUB_TOKEN: optionalStr,
   ALPHA_VANTAGE_KEY: optionalStr,
-  // Indicadores económicos — Costa Rica (servicio web del BCCR). Registro en
-  // https://www.bccr.fi.cr/indicadores-economicos/servicio-web (token por correo).
-  BCCR_WS_EMAIL: optionalStr,
-  BCCR_WS_TOKEN: optionalStr,
-  BCCR_WS_NAME: optionalStr, // nombre representativo del consumidor (param "Nombre")
+  // Indicadores económicos — Costa Rica (API SDDE del BCCR, REST/JSON con Bearer).
+  // Registro/suscripción en https://www.bccr.fi.cr/indicadores-economicos (token JWT).
+  BCCR_SDDE_TOKEN: optionalStr, // token Bearer (JWT) de la suscripción SDDE
+  BCCR_SDDE_EMAIL: optionalStr, // correo de la suscripción (informativo / ValideSuscripcion)
   // Indicadores económicos — EE. UU. (FRED, St. Louis Fed). Key gratis.
   FRED_API_KEY: optionalStr,
   // Email (invitaciones de familia). Si faltan, el envío se omite con gracia.

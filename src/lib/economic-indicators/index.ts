@@ -210,7 +210,7 @@ export async function refreshIndicator(def: IndicatorDef): Promise<RefreshResult
 export async function refreshAllIndicators(): Promise<RefreshResult[]> {
   const results: RefreshResult[] = [];
   for (const def of enabledIndicators()) {
-    // Secuencial a propósito: evita ráfagas contra el web service del BCCR.
+    // Secuencial a propósito: evita ráfagas contra el SDDE del BCCR.
     results.push(await refreshIndicator(def));
   }
   return results;
