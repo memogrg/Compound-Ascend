@@ -9,7 +9,10 @@ import { FinancialInsightCard, type FinancialReading } from "@/components/shared
 import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { PremiumLineChart } from "@/components/charts/line-chart";
 import { EditableBudgetTable } from "@/modules/financial-base/components/v2/editable-budget-table";
-import { TransactionList } from "@/modules/financial-base/components/v2/transaction-list";
+import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
+import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
+import { ExpenseEnvelopes } from "@/modules/financial-base/components/v2/expense-envelopes";
+import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
 import { QuickAddButtons } from "@/modules/financial-base/components/v2/quick-add-buttons";
 import { RulesButton } from "@/modules/financial-base/components/v2/rules-panel";
 import { ScanReceiptButton } from "@/modules/financial-base/components/v2/scan-receipt-button";
@@ -184,24 +187,41 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
   const diff = realTotal - budgetTotal;
   const complPct = budgetTotal > 0 ? realTotal / budgetTotal : 0;
   const byKey = isIncome ? real.incomeByKey : real.expenseByKey;
-  const comp = composition(byKey);
-  const main = comp[0];
   const items = budget.items.filter((b) => b.type === kind);
-  const txns = view.transactions.filter((t) => t.kind === (isIncome ? "ingreso" : "gasto"));
+  const incomeTxns = view.transactions.filter((t) => t.kind === "ingreso");
+  const envelopes = topRows(budget.expenseByKey, real.expenseByKey, { kind: "expense", limit: 12 });
   const lineData = history.map((h) => ({
     label: h.label,
     Real: isIncome ? h.realIncome : h.realExpense,
     Presupuesto: (isIncome ? h.budgetIncome : h.budgetExpense) || Math.round(budgetTotal),
   }));
 
+  const summary: SumCard[] = isIncome
+    ? [
+        { ttl: "Ingresos planificados", val: formatMoney(budgetTotal, currency), sub: `${items.length} fuente(s)`, tone: "pos" },
+        { ttl: "Ingresos reales", val: formatMoney(realTotal, currency), sub: "recibido este mes", tone: "pos" },
+        { ttl: "Diferencia", val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`, sub: "real − planificado", tone: diff >= 0 ? "pos" : "neg" },
+        { ttl: "% cumplimiento", val: formatPercent(complPct), sub: "de lo planificado" },
+      ]
+    : [
+        { ttl: "Gasto planificado", val: formatMoney(budgetTotal, currency), sub: `${items.length} categoría(s)` },
+        { ttl: "Gasto real", val: formatMoney(realTotal, currency), sub: "hasta hoy" },
+        { ttl: "Diferencia", val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`, sub: "real − planificado", tone: diff <= 0 ? "pos" : "neg" },
+        { ttl: "% ejecución", val: formatPercent(complPct), sub: "del presupuesto" },
+      ];
+
   return (
     <div className="grid">
-      <section className="cols-4">
-        <MetricCard label={isIncome ? "Ingresos presup." : "Gastos presup."} value={formatMoney(budgetTotal, currency)} sub="del mes" />
-        <MetricCard label={isIncome ? "Ingresos reales" : "Gastos reales"} value={formatMoney(realTotal, currency)} valueTone={isIncome ? "pos" : "neg"} />
-        <MetricCard label="Diferencia" value={formatMoney(diff, currency)} valueTone={(isIncome ? diff >= 0 : diff <= 0) ? "pos" : "warn"} />
-        <MetricCard label={isIncome ? "% cumplimiento" : "% ejecución"} value={formatPercent(complPct)} valueTone={complPct <= 1.05 ? "pos" : "warn"} />
-      </section>
+      <div className="tab-toolbar">
+        <div className="hint">
+          {isIncome
+            ? "Tus ingresos se registran aquí; confirma cada uno cuando lo recibas."
+            : "Tus gastos por categoría, comparados con tu presupuesto del mes."}
+        </div>
+        <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} only={isIncome ? "ingreso" : "gasto"} />
+      </div>
+
+      <SummaryStrip cards={summary} />
 
       <section className="cols-2">
         <ChartCard title={isIncome ? "Histórico de ingresos" : "Histórico de gastos"} hint="real vs presupuesto">
@@ -210,19 +230,40 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
         <DonutCard title={isIncome ? "Composición por fuente" : "Composición por categoría"} data={donutData(byKey)} total={realTotal} currency={currency} />
       </section>
 
-      <section className="dash-split">
-        <EditableBudgetTable type={kind} title={isIncome ? "Presupuesto de ingresos" : "Presupuesto de gastos"} items={items} categoryNames={view.categoryNames} categories={view.categories} period={view.period} currency={currency} />
-        <div>
-          <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-            <div className="card-title">{isIncome ? "Ingresos reales del mes" : "Gastos reales del mes"}</div>
-            <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} only={isIncome ? "ingreso" : "gasto"} />
+      {isIncome ? (
+        // TODO(data): el diseño agrupa ingresos por persona (Elena/Jordan) con
+        // person-head/person-total. V2 no tiene dimensión de miembro del hogar,
+        // así que mostramos una lista plana de ingresos reales del mes.
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Ingresos reales del mes</div>
+              <div className="card-sub">Confirma cada ingreso cuando lo recibas</div>
+            </div>
           </div>
-          <TransactionList transactions={txns} categoryNames={view.categoryNames} categories={view.categories} accounts={view.accounts} currency={currency} />
+          <IncomeRows
+            transactions={incomeTxns}
+            categoryNames={view.categoryNames}
+            categories={view.categories}
+            accounts={view.accounts}
+            currency={currency}
+          />
         </div>
-      </section>
+      ) : (
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Categorías de gasto</div>
+              <div className="card-sub">Recurrente + variable · este mes</div>
+            </div>
+          </div>
+          <ExpenseEnvelopes rows={envelopes} currency={currency} />
+        </div>
+      )}
+
+      <EditableBudgetTable type={kind} title={isIncome ? "Presupuesto de ingresos" : "Presupuesto de gastos"} items={items} categoryNames={view.categoryNames} categories={view.categories} period={view.period} currency={currency} />
 
       <FinancialInsightCard reading={isIncome ? view.incomeCapsule : view.expenseCapsule} />
-      {main ? null : null}
     </div>
   );
 }
@@ -230,25 +271,36 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
 // ============================== TRANSACCIONES ==============================
 export function TransaccionesSection({ view }: { view: V2View }) {
   const { real, currency } = view;
+  const summary: SumCard[] = [
+    { ttl: "Saldo neto", val: formatMoney(real.freeCashflowReal, currency), sub: "del periodo", tone: real.freeCashflowReal >= 0 ? "pos" : "neg" },
+    { ttl: "Ingresos", val: formatMoney(real.realIncome, currency), sub: "este mes", tone: "pos" },
+    { ttl: "Gastos", val: formatMoney(real.realExpense, currency), sub: "este mes", tone: "neg" },
+    { ttl: "Movimientos", val: String(real.count), sub: `${formatMoney(real.avgDaily, currency)}/día prom.` },
+  ];
+
   return (
     <div className="grid">
-      <section className="cols-5">
-        <MetricCard label="Saldo neto" value={formatMoney(real.freeCashflowReal, currency)} sub="del periodo" valueTone={real.freeCashflowReal >= 0 ? "pos" : "neg"} />
-        <MetricCard label="Ingresos" value={formatMoney(real.realIncome, currency)} valueTone="pos" />
-        <MetricCard label="Gastos" value={formatMoney(real.realExpense, currency)} valueTone="neg" />
-        <MetricCard label="Movimientos" value={String(real.count)} sub="este mes" />
-        <MetricCard label="Gasto prom/día" value={formatMoney(real.avgDaily, currency)} />
-      </section>
+      <SummaryStrip cards={summary} />
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} />
-        <ScanReceiptButton categories={view.categories} accounts={view.accounts} currency={currency} />
-        <CsvImportButton currency={currency} />
-        <TransferButton accounts={view.accounts} currency={currency} />
-        <RulesButton rules={view.rules} categories={view.categories} accounts={view.accounts} />
+      <div className="tab-toolbar">
+        <div className="hint">Busca, filtra y gestiona todos tus movimientos del mes.</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} />
+          <ScanReceiptButton categories={view.categories} accounts={view.accounts} currency={currency} />
+          <CsvImportButton currency={currency} />
+          <TransferButton accounts={view.accounts} currency={currency} />
+          <RulesButton rules={view.rules} categories={view.categories} accounts={view.accounts} />
+        </div>
       </div>
 
-      <TransactionList transactions={view.transactions} categoryNames={view.categoryNames} categories={view.categories} accounts={view.accounts} currency={currency} />
+      <TransactionsBrowser
+        transactions={view.transactions}
+        categoryNames={view.categoryNames}
+        categories={view.categories}
+        accounts={view.accounts}
+        currency={currency}
+        period={view.period.label}
+      />
 
       {view.transactions.length > 0 ? (
         <div className="card card-pad" style={{ borderColor: "color-mix(in srgb, var(--info) 35%, var(--line))" }}>

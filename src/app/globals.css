@@ -568,18 +568,17 @@ a { color: inherit; text-decoration: none; }
 .btn-danger:hover { filter: brightness(0.94); }
 .btn-danger:disabled { opacity: 0.6; cursor: default; }
 
-/* Base Financiera V2 — tabs reales */
+/* Base Financiera V2 — tabs reales (estilo underline del diseño) */
 .base-tabs {
-  display: flex; gap: 5px; background: var(--surface); border: 1px solid var(--line);
-  border-radius: 13px; padding: 5px; flex-wrap: wrap;
+  display: flex; gap: 2px; border-bottom: 1px solid var(--line); flex-wrap: wrap;
 }
 .base-tab {
-  padding: 8px 16px; border-radius: 9px; font-size: 13.5px; font-weight: 500;
-  color: var(--muted); background: none; border: 0; cursor: pointer; text-decoration: none;
-  transition: all 140ms; white-space: nowrap;
+  padding: 10px 14px; font-size: 13.5px; font-weight: 500; color: var(--muted);
+  background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  cursor: pointer; text-decoration: none; transition: color 120ms, border-color 120ms; white-space: nowrap;
 }
-.base-tab:hover { color: var(--ink); background: var(--surface-2); }
-.base-tab.active { background: var(--pos); color: #fff; }
+.base-tab:hover { color: var(--ink-2); }
+.base-tab.active { color: var(--ink); border-bottom-color: var(--ink); }
 
 /* Menú por fila de transacción */
 .txn-menu {
@@ -691,3 +690,55 @@ a { color: inherit; text-decoration: none; }
 .amort-table td { text-align: right; padding: 7px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .amort-table tbody tr:hover { background: var(--surface-2); }
 @media (max-width: 640px) { .scenario-grid { grid-template-columns: 1fr !important; } }
+
+/* ============================================================
+   DISEÑO CLAUDE — Presupuesto (Ingresos / Gastos / Transacciones)
+   Clases porteadas de testing/project/Budget.html + assets/app.css.
+   Solo presentación; ningún cálculo depende de estas reglas.
+   ============================================================ */
+
+/* Tira de resumen (KPIs estilo "sobre") */
+.summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+@media (max-width: 1180px) { .summary-strip { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .summary-strip { grid-template-columns: 1fr; } }
+.card.sum { padding: 16px 18px; }
+.sum .ttl { font-size: 12px; color: var(--muted); font-weight: 500; }
+.sum .val { font-family: var(--serif); font-size: 28px; line-height: 1; margin-top: 10px; letter-spacing: -0.02em; }
+.sum .sub { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
+
+/* Filas de ingreso (fuente + tag + confirmación + monto) */
+.inc-row { display: grid; grid-template-columns: 32px 1fr auto auto auto; gap: 14px; align-items: center; padding: 14px 24px; border-top: 1px solid var(--line); }
+.inc-row:first-of-type { border-top: 0; }
+@media (max-width: 680px) {
+  .inc-row { grid-template-columns: 32px 1fr auto; row-gap: 10px; }
+  .inc-row .inc-tag, .inc-row .confirm-pill { grid-column: 2 / -1; justify-self: start; }
+}
+.inc-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--chip); color: var(--ink-2); }
+.inc-ic svg { width: 15px; height: 15px; }
+.inc-name { font-size: 13.5px; font-weight: 500; }
+.inc-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.inc-tag { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--chip); color: var(--muted); font-weight: 500; white-space: nowrap; }
+.inc-amt { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--pos); text-align: right; min-width: 92px; }
+
+/* Sobres / categorías de gasto (barra presupuesto vs real) */
+.env { display: grid; grid-template-columns: 38px 1fr 220px 120px; gap: 16px; align-items: center; padding: 15px 24px; border-top: 1px solid var(--line); }
+.env:first-of-type { border-top: 0; }
+@media (max-width: 780px) {
+  .env { grid-template-columns: 38px 1fr; row-gap: 12px; }
+  .env .env-bar-cell, .env .env-num { grid-column: 1 / -1; }
+  .env .env-num { text-align: left; }
+}
+.env-ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; }
+.env-ic svg { width: 17px; height: 17px; }
+.env-name { font-size: 13.5px; font-weight: 500; }
+.env-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.env-bar-cell .bar-track { height: 7px; }
+.env-bar-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.env-num { text-align: right; }
+.env-num .big { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.env-num .small { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.env.over .env-num .big { color: var(--neg); }
+
+/* Toolbar de pestaña (hint + acciones) */
+.tab-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+.tab-toolbar .hint { font-size: 12.5px; color: var(--muted); max-width: 60ch; }
