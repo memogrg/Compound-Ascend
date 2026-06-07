@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/indicators/refresh", "schedule": "0 8 * * *" }
+    { "path": "/api/indicators/refresh", "schedule": "0 8 * * *" },
+    { "path": "/api/base/snapshot", "schedule": "0 6 1 * *" }
   ]
 }

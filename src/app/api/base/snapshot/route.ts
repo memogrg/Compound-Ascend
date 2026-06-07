@@ -1,20 +1,23 @@
 /**
- * POST /api/base/snapshot — genera snapshots mensuales de la Base Financiera
+ * GET/POST /api/base/snapshot — genera snapshots mensuales de la Base Financiera
  * para el mes recién cerrado.
- *  - Con header X-Cron-Secret: recorre TODOS los usuarios (service role).
- *  - Sin header: requiere sesión; genera el del usuario activo.
+ *  - Cron: header X-Cron-Secret = CRON_SECRET, o Authorization: Bearer <CRON_SECRET>
+ *    (el que añade Vercel Cron Jobs en su GET). Recorre TODOS los usuarios (service role).
+ *  - Sin cron: requiere sesión; genera el del usuario activo.
  */
 import { NextResponse } from "next/server";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
-function isCron(req: Request): boolean {
+function isCronRequest(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  return Boolean(secret) && req.headers.get("x-cron-secret") === secret;
+  if (!secret) return false;
+  if (req.headers.get("x-cron-secret") === secret) return true;
+  return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-export async function POST(req: Request) {
+async function handle(req: Request) {
   if (!isSupabaseConfigured()) {
     return NextResponse.json({ error: "Supabase no configurado" }, { status: 500 });
   }
@@ -24,7 +27,7 @@ export async function POST(req: Request) {
   const closed = previousMonthPeriod(monthPeriod(now.getFullYear(), now.getMonth() + 1));
 
   try {
-    if (isCron(req)) {
+    if (isCronRequest(req)) {
       const { generateSnapshotsForAllUsers } = await import(
         "@/modules/financial-base/services/snapshot-service"
       );
@@ -42,4 +45,12 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "snapshot failed" }, { status: 500 });
   }
+}
+
+export function GET(req: Request) {
+  return handle(req);
+}
+
+export function POST(req: Request) {
+  return handle(req);
 }
