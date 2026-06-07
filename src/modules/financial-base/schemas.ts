@@ -95,6 +95,28 @@ export const accountInputSchema = z.object({
   isDefault: z.boolean().default(false),
 });
 
+export const transferInputSchema = z
+  .object({
+    fromAccountId: z.string().uuid("Elige la cuenta de origen"),
+    toAccountId: z.string().uuid("Elige la cuenta de destino"),
+    amount: z.number({ invalid_type_error: "Monto inválido" }).positive("Debe ser mayor a 0"),
+    currency: z.string().length(3).default("CRC"),
+    occurredOn: z.string().min(8).max(10),
+    note: z.string().max(280).optional(),
+  })
+  .refine((d) => d.fromAccountId !== d.toAccountId, {
+    message: "Elige cuentas distintas",
+    path: ["toAccountId"],
+  });
+
+export const csvTxnSchema = z.object({
+  kind: z.enum(["ingreso", "gasto"]),
+  amount: z.number().positive(),
+  occurredOn: z.string().min(8).max(10),
+  description: z.string().max(200).optional(),
+  currency: z.string().length(3).default("CRC"),
+});
+
 export const ruleInputSchema = z.object({
   merchantPattern: z.string().trim().min(1, "Escribe un texto a detectar").max(120),
   type: z.enum(["income", "expense"]),
@@ -107,3 +129,5 @@ export type BudgetItemInput = z.infer<typeof budgetItemInputSchema>;
 export type TxnInput = z.infer<typeof txnInputSchema>;
 export type AccountInput = z.infer<typeof accountInputSchema>;
 export type RuleInput = z.infer<typeof ruleInputSchema>;
+export type TransferInput = z.infer<typeof transferInputSchema>;
+export type CsvTxnInput = z.infer<typeof csvTxnSchema>;

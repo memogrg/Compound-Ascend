@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { addTransactionAction, editTransactionAction } from "@/modules/financial-base/api/v2-actions";
+import { addTransactionAction, editTransactionAction, addRuleAction } from "@/modules/financial-base/api/v2-actions";
 import type { Account, Transaction, TxnKind } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 
@@ -99,6 +99,23 @@ export function QuickAddModal({
     setPending(false);
     if (res.ok) {
       toast(editing ? "Transacción actualizada" : isGasto ? "Gasto registrado" : "Ingreso registrado");
+      // Aprender regla: si recategorizaste un gasto con comercio, ofrece crearla.
+      const merchantText = merchant.trim();
+      if (isGasto && editing && merchantText && categoryId && categoryId !== item?.categoryId) {
+        const catName = categories.find((c) => c.id === categoryId)?.name ?? "esa categoría";
+        toast(`Categorizado como ${catName}`, "info", {
+          label: "Crear regla",
+          onClick: () => {
+            void addRuleAction({
+              merchantPattern: merchantText,
+              type: "expense",
+              suggestedCategoryId: categoryId,
+              suggestedAccountId: accountId || null,
+              active: true,
+            });
+          },
+        });
+      }
       onClose();
       router.refresh();
     } else {

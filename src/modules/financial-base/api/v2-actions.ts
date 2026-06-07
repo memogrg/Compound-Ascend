@@ -11,7 +11,10 @@ import {
   txnInputSchema,
   accountInputSchema,
   ruleInputSchema,
+  transferInputSchema,
+  csvTxnSchema,
 } from "@/modules/financial-base/schemas";
+import type { CsvTxnInput } from "@/modules/financial-base/schemas";
 import { createRule, updateRule, deleteRule } from "@/modules/financial-base/services/rules-service";
 import { extractReceipt, type ReceiptExtraction } from "@/modules/financial-base/services/receipt-service";
 import {
@@ -26,6 +29,9 @@ import {
   duplicateTransaction,
   markReviewed,
   splitTransaction,
+  createTransfer,
+  importTransactions,
+  getReceiptSignedUrl,
 } from "@/modules/financial-base/services/transaction-service";
 import {
   createAccount,
@@ -238,6 +244,53 @@ export async function removeRuleAction(id: string): Promise<ActionResult> {
     await deleteRule(id);
     revalidate();
     return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// ---------- Transferencias entre cuentas ----------
+export async function addTransferAction(raw: unknown): Promise<ActionResult> {
+  const parsed = transferInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await createTransfer(parsed.data);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos registrar la transferencia." };
+  }
+}
+
+// ---------- Importación CSV ----------
+export type ImportResult = { ok: boolean; count: number; skipped: number; message?: string };
+
+export async function importTransactionsAction(rows: unknown[]): Promise<ImportResult> {
+  if (!isSupabaseConfigured()) return { ok: false, count: 0, skipped: 0, message: "Conecta Supabase." };
+  const valid: CsvTxnInput[] = [];
+  let skipped = 0;
+  for (const r of rows ?? []) {
+    const parsed = csvTxnSchema.safeParse(r);
+    if (parsed.success) valid.push(parsed.data);
+    else skipped += 1;
+  }
+  if (valid.length === 0) return { ok: false, count: 0, skipped, message: "No se encontraron filas válidas." };
+  try {
+    const count = await importTransactions(valid);
+    revalidate();
+    return { ok: count > 0, count, skipped };
+  } catch {
+    return { ok: false, count: 0, skipped, message: "No pudimos importar." };
+  }
+}
+
+// ---------- Recibo (signed URL) ----------
+export async function getReceiptUrlAction(path: string): Promise<{ ok: boolean; url?: string }> {
+  if (!isSupabaseConfigured() || !path) return { ok: false };
+  try {
+    const url = await getReceiptSignedUrl(path);
+    return url ? { ok: true, url } : { ok: false };
   } catch {
     return { ok: false };
   }

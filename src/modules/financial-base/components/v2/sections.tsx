@@ -13,6 +13,8 @@ import { TransactionList } from "@/modules/financial-base/components/v2/transact
 import { QuickAddButtons } from "@/modules/financial-base/components/v2/quick-add-buttons";
 import { RulesButton } from "@/modules/financial-base/components/v2/rules-panel";
 import { ScanReceiptButton } from "@/modules/financial-base/components/v2/scan-receipt-button";
+import { CsvImportButton } from "@/modules/financial-base/components/v2/csv-import-modal";
+import { TransferButton } from "@/modules/financial-base/components/v2/transfer-modal";
 import type { TransactionRule } from "@/modules/financial-base/services/rules-service";
 import { composition, computeV2Totals, topRows, type TopRow } from "@/modules/financial-base/engine/base-v2";
 import type { BudgetTotals } from "@/modules/financial-base/services/budget-service";
@@ -241,6 +243,8 @@ export function TransaccionesSection({ view }: { view: V2View }) {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} />
         <ScanReceiptButton categories={view.categories} accounts={view.accounts} currency={currency} />
+        <CsvImportButton currency={currency} />
+        <TransferButton accounts={view.accounts} currency={currency} />
         <RulesButton rules={view.rules} categories={view.categories} accounts={view.accounts} />
       </div>
 

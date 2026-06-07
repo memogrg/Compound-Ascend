@@ -19,7 +19,7 @@ import type {
   TxnOrigin,
   Period,
 } from "@/modules/financial-base/types";
-import type { TxnInput } from "@/modules/financial-base/schemas";
+import type { TxnInput, TransferInput, CsvTxnInput } from "@/modules/financial-base/schemas";
 import type { TransactionRow } from "@/lib/supabase/database.types";
 
 export type TxnFilters = { kind?: TxnKind; status?: TxnStatus; origin?: TxnOrigin };
@@ -38,6 +38,7 @@ function rowToTransaction(r: TransactionRow): Transaction {
     accountLabel: r.account_label,
     status: (r.status ?? "confirmed") as TxnStatus,
     origin: (r.origin ?? "manual") as TxnOrigin,
+    receiptUrl: r.receipt_url ?? null,
     confirmedByUser: r.confirmed_by_user,
   };
 }
@@ -216,6 +217,67 @@ export async function splitTransaction(
   }));
   await supabase.from("transactions").insert(rows);
   await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id);
+}
+
+/** Transferencia entre cuentas: una fila kind='transferencia' (neutra en agregados). */
+export async function createTransfer(input: TransferInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data: accs } = await supabase
+    .from("accounts")
+    .select("id,name")
+    .eq("user_id", user.id)
+    .in("id", [input.fromAccountId, input.toAccountId]);
+  const nameOf = (id: string) => accs?.find((a) => a.id === id)?.name ?? "Cuenta";
+  await supabase.from("transactions").insert({
+    user_id: user.id,
+    kind: "transferencia",
+    description: input.note ?? null,
+    merchant_or_source: `${nameOf(input.fromAccountId)} → ${nameOf(input.toAccountId)}`,
+    amount: input.amount,
+    currency: input.currency,
+    occurred_on: input.occurredOn,
+    category_id: null,
+    account_id: input.fromAccountId,
+    account_label: nameOf(input.fromAccountId),
+    status: "confirmed",
+    origin: "manual",
+    source: "manual",
+    confirmed_by_user: true,
+  });
+}
+
+/** Importación masiva (CSV): entran como pendientes de revisar. */
+export async function importTransactions(rows: CsvTxnInput[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const payload = rows.map((r) => ({
+    user_id: user.id,
+    kind: r.kind,
+    description: r.description ?? null,
+    merchant_or_source: r.description ?? null,
+    amount: r.amount,
+    currency: r.currency,
+    occurred_on: r.occurredOn,
+    category_id: null,
+    account_id: null,
+    account_label: null,
+    status: "pending_review" as const,
+    origin: "imported" as const,
+    source: "manual",
+    confirmed_by_user: false,
+  }));
+  const { error } = await supabase.from("transactions").insert(payload);
+  return error ? 0 : payload.length;
+}
+
+/** Genera una URL firmada temporal para ver el recibo (bucket privado). */
+export async function getReceiptSignedUrl(path: string): Promise<string | null> {
+  await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.storage.from("receipts").createSignedUrl(path, 120);
+  return data?.signedUrl ?? null;
 }
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;

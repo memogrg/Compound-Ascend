@@ -16,6 +16,7 @@ import {
   removeTransactionAction,
   duplicateTransactionAction,
   markReviewedAction,
+  getReceiptUrlAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { Account, Transaction } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
@@ -159,7 +160,15 @@ function Row({
   const [dx, setDx] = useState(0);
   const startX = useRef<number | null>(null);
   const isIncome = t.kind === "ingreso";
-  const amountStr = `${isIncome ? "+" : "−"}${formatMoney(t.amount, t.currency)}`;
+  const isTransfer = t.kind === "transferencia";
+  const amountColor = isTransfer ? "var(--ink-2)" : isIncome ? "var(--pos)" : "var(--neg)";
+  const amountStr = `${isTransfer ? "" : isIncome ? "+" : "−"}${formatMoney(t.amount, t.currency)}`;
+
+  const viewReceipt = async () => {
+    setOpen(false);
+    const res = await getReceiptUrlAction(t.receiptUrl ?? "");
+    if (res.ok && res.url) window.open(res.url, "_blank", "noopener,noreferrer");
+  };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType !== "touch") return; // swipe solo táctil; desktop usa el menú
@@ -200,7 +209,7 @@ function Row({
             {categoryName}{t.accountLabel ? ` · ${t.accountLabel}` : ""}
           </div>
         </div>
-        <span className="tnum" style={{ fontSize: 13.5, fontWeight: 600, color: isIncome ? "var(--pos)" : "var(--neg)" }}>{amountStr}</span>
+        <span className="tnum" style={{ fontSize: 13.5, fontWeight: 600, color: amountColor }}>{amountStr}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}>
           <span className="chip" style={t.status === "pending_review" ? { background: "var(--warn-soft)", color: "var(--warn)", fontSize: 11 } : { fontSize: 11 }}>
             {STATUS_LABEL[t.status] ?? t.status}
@@ -212,6 +221,7 @@ function Row({
             <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
               <button onClick={() => { setOpen(false); onEdit(); }}>Editar</button>
               <button onClick={() => { setOpen(false); onDuplicate(); }}>Duplicar</button>
+              {t.receiptUrl ? <button onClick={viewReceipt}>Ver recibo</button> : null}
               {t.status === "pending_review" ? (
                 <button onClick={() => { setOpen(false); onMarkReviewed(); }}>Marcar revisada</button>
               ) : null}
