@@ -29,12 +29,11 @@ export interface IndicatorDef {
 }
 
 export const INDICATORS: readonly IndicatorDef[] = [
-  // ── Costa Rica (BCCR) — códigos verificados ──────────────────────
-  // 17, 317 y 318 confirmados; 3541 verificado contra el catálogo público.
+  // ── Costa Rica (BCCR/SDDE) — códigos verificados contra el SDDE (jun-2026) ──
   {
     code: "TBP",
     source: "BCCR",
-    externalId: "17", // alternativa documentada en algunas fuentes: 423
+    externalId: "423",
     unit: "percent",
     label: "Tasa Básica Pasiva",
     description: "Referencia del costo del dinero en colones (revisión semanal).",
@@ -71,11 +70,26 @@ export const INDICATORS: readonly IndicatorDef[] = [
     group: "Costa Rica",
     enabled: true,
   },
-  // TODO(catálogo BCCR): verificar los códigos internos antes de activar.
-  // No se hardcodean porque no se confirmaron contra el archivo oficial
-  // (https://gee.bccr.fi.cr/Indicadores/Suscripciones/UI/ConsultaIndicadores/ObtenerArchivo):
-  //   - TRI (Tasa de Referencia Interbancaria) → externalId pendiente
-  //   - IPC / inflación interanual            → externalId pendiente
+  {
+    code: "TRI",
+    source: "BCCR",
+    externalId: "90765",
+    unit: "percent",
+    label: "Tasa Interbancaria (1 día, ₡)",
+    description: "Tasa interbancaria garantizada a 1 día plazo en colones (TRI).",
+    group: "Costa Rica",
+    enabled: true,
+  },
+  {
+    code: "IPC",
+    source: "BCCR",
+    externalId: "89638",
+    unit: "percent",
+    label: "Inflación (IPC interanual)",
+    description: "Variación interanual del índice de precios al consumidor (base dic-2020).",
+    group: "Costa Rica",
+    enabled: true,
+  },
 
   // ── Estados Unidos (FRED) — Fase 2 (activado; requiere FRED_API_KEY) ──
   {
