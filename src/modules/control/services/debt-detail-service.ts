@@ -12,6 +12,7 @@ import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { buildSchedule, recomputeFromPayments } from "@/modules/control/engine/amortization";
 import { effectiveApr, buildRateNote } from "@/modules/control/services/index-rates";
+import { computeDueStatus } from "@/modules/control/engine/due-dates";
 import type { ScheduleRow } from "@/modules/control/engine/amortization";
 import type { DebtPayment, DebtRateType, DebtRateIndex } from "@/modules/control/types";
 
@@ -21,10 +22,13 @@ export interface DebtDetailVM {
   id: string;
   name: string;
   debtType: string | null;
+  bank: string | null;
   currency: string;
   rateType: DebtRateType | null;
   rateIndex: DebtRateIndex | null;
   rateSpread: number | null;
+  introApr: number | null;
+  introFixedMonths: number | null;
   apr: number;
   originalAmount: number | null;
   balance: number;
@@ -40,6 +44,9 @@ export interface DebtDetailVM {
   interestRemaining: number;
   paidPrincipal: number;
   paidInterest: number;
+  nextDue: string | null;
+  dueSoon: boolean;
+  paidThisMonth: boolean;
   schedule: ScheduleRow[];
   payments: DebtPayment[];
 }
@@ -69,7 +76,14 @@ export async function getDebtDetail(
     extraMonthly: debt.extraMonthly != null ? conv(debt.extraMonthly) : 0,
     startDate: debt.startDate,
     originalAmount: debt.originalAmount != null ? conv(debt.originalAmount) : null,
+    introApr: debt.introApr ?? null,
+    introFixedMonths: debt.introFixedMonths ?? null,
   };
+
+  const due = computeDueStatus(
+    { payDay: debt.payDay, startDate: debt.startDate, paymentDates: payments.map((p) => p.paymentDate) },
+    new Date(),
+  );
 
   const pmts: DebtPayment[] = payments.map((p) => ({
     ...p,
@@ -98,10 +112,13 @@ export async function getDebtDetail(
     id: debt.id,
     name: debt.name,
     debtType: debt.debtType ?? null,
+    bank: debt.bank ?? null,
     currency,
     rateType: debt.rateType ?? null,
     rateIndex: debt.rateIndex ?? null,
     rateSpread: debt.rateSpread ?? null,
+    introApr: debt.introApr ?? null,
+    introFixedMonths: debt.introFixedMonths ?? null,
     apr,
     originalAmount: input.originalAmount,
     balance: round2(currentBalance),
@@ -117,6 +134,9 @@ export async function getDebtDetail(
     interestRemaining: round2(interestRemaining),
     paidPrincipal: recompute ? recompute.paidPrincipal : 0,
     paidInterest: recompute ? recompute.paidInterest : 0,
+    nextDue: due.nextDue,
+    dueSoon: due.dueSoon,
+    paidThisMonth: due.paidThisMonth,
     schedule,
     payments: pmts,
   };

@@ -15,6 +15,7 @@ export const goalInputSchema = z.object({
 export const debtInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
   debtType: z.string().max(40).optional(),
+  bank: z.string().trim().max(80).optional(),
   balance: z.number().nonnegative("No puede ser negativo"),
   minPayment: z.number().nonnegative().default(0),
   currentPayment: z.number().nonnegative().default(0),
@@ -27,6 +28,8 @@ export const debtInputSchema = z.object({
   rateType: z.enum(["fija", "variable"]).optional(),
   rateIndex: z.enum(["prime", "tbp", "tri"]).optional(),
   rateSpread: z.number().min(0).max(100).optional(),
+  introFixedMonths: z.number().int().min(0).max(600).optional(),
+  introApr: z.number().min(0).max(200).optional(),
   termMonths: z.number().int().min(0).max(1200).optional(),
   startDate: z.string().optional(),
   extraMonthly: z.number().nonnegative().optional(),

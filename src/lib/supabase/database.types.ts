@@ -330,6 +330,11 @@ export type DebtRow = Timestamps & {
   extra_monthly: number | null;
   insurance: number | null;
   notes: string | null;
+  // Banco, tasa introductoria y recordatorios (migración 0017).
+  bank: string | null;
+  intro_fixed_months: number | null;
+  intro_apr: number | null;
+  last_reminded_on: string | null;
 };
 
 export type DebtPaymentRow = Timestamps & {

@@ -29,7 +29,7 @@ export default async function Page() {
             Vamos a revisar si tus ahorros y obligaciones trabajan a tu favor.
           </div>
         </div>
-        <ControlActions currency={summary.currency} />
+        <ControlActions currency={summary.currency} indexRates={summary.indexRates} />
       </div>
 
       {!configured ? (

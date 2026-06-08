@@ -13,6 +13,7 @@ import {
   editGoalAction,
   editDebtAction,
 } from "@/modules/control/api/actions";
+import { pmt } from "@/modules/control/engine/amortization";
 import type { SavingsGoal, Debt } from "@/modules/control/types";
 
 type Kind = "goal" | "debt";
@@ -24,11 +25,13 @@ export function AddControlButton({
   currency,
   label,
   variant = "btn-primary",
+  indexRates,
 }: {
   kind: Kind;
   currency: string;
   label?: string;
   variant?: "btn-primary" | "btn-secondary";
+  indexRates?: Record<string, number>;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -37,16 +40,24 @@ export function AddControlButton({
         <Icon name={kind === "goal" ? "savings" : "debt"} width={2} />{" "}
         {label ?? (kind === "goal" ? "Agregar objetivo" : "Agregar deuda")}
       </button>
-      {open ? <ControlDialog kind={kind} currency={currency} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <ControlDialog kind={kind} currency={currency} indexRates={indexRates} onClose={() => setOpen(false)} />
+      ) : null}
     </>
   );
 }
 
-export function ControlActions({ currency = "CRC" }: { currency?: string }) {
+export function ControlActions({
+  currency = "CRC",
+  indexRates,
+}: {
+  currency?: string;
+  indexRates?: Record<string, number>;
+}) {
   return (
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       <AddControlButton kind="goal" currency={currency} variant="btn-primary" />
-      <AddControlButton kind="debt" currency={currency} variant="btn-secondary" />
+      <AddControlButton kind="debt" currency={currency} variant="btn-secondary" indexRates={indexRates} />
     </div>
   );
 }
@@ -56,10 +67,12 @@ export function EditControlButton({
   kind,
   item,
   currency,
+  indexRates,
 }: {
   kind: Kind;
   item: SavingsGoal | Debt;
   currency: string;
+  indexRates?: Record<string, number>;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -74,7 +87,7 @@ export function EditControlButton({
         <Icon name="edit" />
       </button>
       {open ? (
-        <ControlDialog kind={kind} currency={currency} item={item} onClose={() => setOpen(false)} />
+        <ControlDialog kind={kind} currency={currency} item={item} indexRates={indexRates} onClose={() => setOpen(false)} />
       ) : null}
     </>
   );
@@ -84,11 +97,13 @@ function ControlDialog({
   kind,
   currency,
   item,
+  indexRates,
   onClose,
 }: {
   kind: Kind;
   currency: string;
   item?: SavingsGoal | Debt;
+  indexRates?: Record<string, number>;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -119,7 +134,7 @@ function ControlDialog({
       {kind === "goal" ? (
         <GoalForm currency={currency} onDone={done} item={item as SavingsGoal | undefined} />
       ) : (
-        <DebtForm currency={currency} onDone={done} item={item as Debt | undefined} />
+        <DebtForm currency={currency} onDone={done} item={item as Debt | undefined} indexRates={indexRates} />
       )}
     </Modal>
   );
@@ -233,38 +248,68 @@ const DEBT_TYPES = [
   { value: "otro", label: "Otro" },
 ];
 
-function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: Debt }) {
+function DebtForm({
+  currency,
+  onDone,
+  item,
+  indexRates,
+}: {
+  currency: string;
+  onDone: () => void;
+  item?: Debt;
+  indexRates?: Record<string, number>;
+}) {
   const action = item ? (raw: unknown) => editDebtAction(item.id, raw) : addDebtAction;
   const { pending, errors, message, run } = useFormSubmit(action);
   const [rateType, setRateType] = useState<"fija" | "variable">(item?.rateType ?? "fija");
 
   const totalTerm = item?.termMonths ?? 0;
-  const defYears = Math.floor(totalTerm / 12) || "";
-  const defMonths = totalTerm % 12 || "";
+  // Estado controlado de los campos que alimentan la cuota sugerida / TAE en vivo.
+  const [balance, setBalance] = useState<string>(item?.balance != null ? String(item.balance) : "");
+  const [apr, setApr] = useState<string>(item?.apr != null ? String(item.apr) : "");
+  const [rateIndex, setRateIndex] = useState<string>(item?.rateIndex ?? "prime");
+  const [rateSpread, setRateSpread] = useState<string>(item?.rateSpread != null ? String(item.rateSpread) : "");
+  const [introMonths, setIntroMonths] = useState<string>(item?.introFixedMonths != null ? String(item.introFixedMonths) : "");
+  const [introApr, setIntroApr] = useState<string>(item?.introApr != null ? String(item.introApr) : "");
+  const [termYears, setTermYears] = useState<string>(totalTerm ? String(Math.floor(totalTerm / 12)) : "");
+  const [termMonths, setTermMonths] = useState<string>(totalTerm % 12 ? String(totalTerm % 12) : "");
+  const [currentPayment, setCurrentPayment] = useState<string>(item?.currentPayment != null ? String(item.currentPayment) : "");
+
+  // Valor actual del índice y TAE efectiva en vivo (Punto 1.4).
+  const idxVal = rateType === "variable" ? indexRates?.[rateIndex] : undefined;
+  const effectiveTae = idxVal != null ? idxVal + (Number(rateSpread) || 0) : null;
+
+  // Cuota sugerida con la fórmula de amortización (Punto 1.2).
+  const termTotal = (Number(termYears) || 0) * 12 + (Number(termMonths) || 0);
+  const rateForCalc = rateType === "variable" ? (effectiveTae ?? (Number(apr) || 0)) : (Number(apr) || 0);
+  const bal = Number(balance) || 0;
+  const suggested =
+    bal > 0 && termTotal > 0 && rateForCalc >= 0 ? pmt(bal, rateForCalc / 100 / 12, termTotal) : 0;
+  const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const fd = new FormData(form);
-    const aprRaw = fd.get("apr");
-    const years = Number(fd.get("termYears") ?? 0);
-    const months = Number(fd.get("termMonths") ?? 0);
-    const term = years * 12 + months;
+    const term = (Number(termYears) || 0) * 12 + (Number(termMonths) || 0);
     run(
       {
         name: String(fd.get("name") ?? ""),
         debtType: String(fd.get("debtType") ?? "otro"),
+        bank: String(fd.get("bank") ?? "") || undefined,
         originalAmount: fd.get("originalAmount") ? Number(fd.get("originalAmount")) : undefined,
-        balance: Number(fd.get("balance") ?? 0),
+        balance: Number(balance) || 0,
         currency: String(fd.get("currency") ?? currency),
         rateType,
-        rateIndex: rateType === "variable" ? String(fd.get("rateIndex") ?? "prime") : undefined,
-        rateSpread: rateType === "variable" && fd.get("rateSpread") ? Number(fd.get("rateSpread")) : undefined,
-        apr: aprRaw ? Number(aprRaw) : undefined,
+        rateIndex: rateType === "variable" ? rateIndex : undefined,
+        rateSpread: rateType === "variable" && rateSpread ? Number(rateSpread) : undefined,
+        introFixedMonths: rateType === "variable" && introMonths ? Number(introMonths) : undefined,
+        introApr: rateType === "variable" && introApr ? Number(introApr) : undefined,
+        apr: apr ? Number(apr) : undefined,
         termMonths: term > 0 ? term : undefined,
         startDate: String(fd.get("startDate") ?? "") || undefined,
         minPayment: Number(fd.get("minPayment") ?? 0),
-        currentPayment: Number(fd.get("currentPayment") ?? 0),
+        currentPayment: Number(currentPayment) || 0,
         extraMonthly: fd.get("extraMonthly") ? Number(fd.get("extraMonthly")) : undefined,
         insurance: fd.get("insurance") ? Number(fd.get("insurance")) : undefined,
         delinquency: String(fd.get("delinquency") ?? "no"),
@@ -284,10 +329,16 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
             {message}
           </div>
         ) : null}
-        <div className="fld">
-          <label className="fld-label">Nombre de la deuda</label>
-          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Tarjeta, préstamo…" required aria-invalid={errors.name ? true : undefined} />
-          {errors.name ? <span className="auth-err" role="alert">{errors.name}</span> : null}
+        <div className="fld-2">
+          <div className="fld">
+            <label className="fld-label">Nombre de la deuda</label>
+            <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="Tarjeta, préstamo…" required aria-invalid={errors.name ? true : undefined} />
+            {errors.name ? <span className="auth-err" role="alert">{errors.name}</span> : null}
+          </div>
+          <div className="fld">
+            <label className="fld-label">Banco (opcional)</label>
+            <input className="inp" name="bank" defaultValue={item?.bank ?? ""} maxLength={80} placeholder="BAC, BCR, Scotiabank…" />
+          </div>
         </div>
 
         <div className="fld-2">
@@ -311,7 +362,7 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
 
         <div className="fld-2">
           <Money label="Monto original" name="originalAmount" currency={currency} defaultValue={item?.originalAmount ?? undefined} />
-          <Money label="Saldo actual" name="balance" currency={currency} error={errors.balance} defaultValue={item?.balance} />
+          <Money label="Saldo actual" name="balance" currency={currency} error={errors.balance} value={balance} onChange={setBalance} />
         </div>
 
         {/* Tasa: fija o variable */}
@@ -324,26 +375,49 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
         </div>
 
         {rateType === "variable" ? (
-          <div className="fld-2">
-            <div className="fld">
-              <label className="fld-label">Índice de referencia</label>
-              <select className="sel" name="rateIndex" defaultValue={item?.rateIndex ?? "prime"}>
-                <option value="prime">Prime (EE. UU.)</option>
-                <option value="tbp">TBP (Costa Rica)</option>
-                <option value="tri">TRI (Costa Rica)</option>
-              </select>
+          <>
+            <div className="fld-2">
+              <div className="fld">
+                <label className="fld-label">Índice de referencia</label>
+                <select className="sel" name="rateIndex" value={rateIndex} onChange={(e) => setRateIndex(e.target.value)}>
+                  <option value="prime">Prime (EE. UU.)</option>
+                  <option value="tbp">TBP (Costa Rica)</option>
+                  <option value="tri">TRI (Costa Rica)</option>
+                </select>
+              </div>
+              <div className="fld">
+                <label className="fld-label">Margen / piso (%)</label>
+                <input className="inp" name="rateSpread" type="number" step="0.1" min="0" value={rateSpread} onChange={(e) => setRateSpread(e.target.value)} placeholder="Ej. 3" />
+              </div>
             </div>
-            <div className="fld">
-              <label className="fld-label">Margen / piso (%)</label>
-              <input className="inp" name="rateSpread" type="number" step="0.1" min="0" defaultValue={item?.rateSpread ?? undefined} placeholder="Ej. 3" />
+            {effectiveTae != null ? (
+              <div className="auth-msg" style={{ margin: "0 0 14px", fontSize: 12.5 }}>
+                {rateIndex.toUpperCase()} {idxVal!.toFixed(2)}% + {Number(rateSpread) || 0}% ={" "}
+                <strong>TAE efectiva {effectiveTae.toFixed(2)}%</strong>
+              </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 11.5, margin: "0 0 14px" }}>
+                Sin valor del índice todavía; ingresa la TAE efectiva manualmente abajo.
+              </div>
+            )}
+            {/* Tasa introductoria fija → luego variable (Punto 1.3) */}
+            <div className="fld-2">
+              <div className="fld">
+                <label className="fld-label">Meses a tasa fija inicial (opcional)</label>
+                <input className="inp" type="number" min="0" value={introMonths} onChange={(e) => setIntroMonths(e.target.value)} placeholder="Ej. 36" />
+              </div>
+              <div className="fld">
+                <label className="fld-label">TAE fija inicial (%) (opcional)</label>
+                <input className="inp" type="number" step="0.1" min="0" value={introApr} onChange={(e) => setIntroApr(e.target.value)} placeholder="Ej. 6.5" />
+              </div>
             </div>
-          </div>
+          </>
         ) : null}
 
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">{rateType === "variable" ? "TAE efectiva actual (%)" : "Tasa anual (%)"}</label>
-            <input className="inp" name="apr" type="number" step="0.1" min="0" defaultValue={item?.apr ?? undefined} placeholder="Ej. 38" />
+            <input className="inp" name="apr" type="number" step="0.1" min="0" value={apr} onChange={(e) => setApr(e.target.value)} placeholder="Ej. 38" />
           </div>
           <div className="fld">
             <label className="fld-label">Fecha de inicio</label>
@@ -356,20 +430,31 @@ function DebtForm({ currency, onDone, item }: { currency: string; onDone: () => 
           <label className="fld-label">Plazo total</label>
           <div className="fld-2">
             <div className="inp-money">
-              <input name="termYears" type="number" min="0" defaultValue={defYears} placeholder="0" />
+              <input name="termYears" type="number" min="0" value={termYears} onChange={(e) => setTermYears(e.target.value)} placeholder="0" />
               <span className="pre" style={{ left: "auto", right: 12 }}>años</span>
             </div>
             <div className="inp-money">
-              <input name="termMonths" type="number" min="0" max="11" defaultValue={defMonths} placeholder="0" />
+              <input name="termMonths" type="number" min="0" max="11" value={termMonths} onChange={(e) => setTermMonths(e.target.value)} placeholder="0" />
               <span className="pre" style={{ left: "auto", right: 12 }}>meses</span>
             </div>
           </div>
         </div>
 
         <div className="fld-2">
-          <Money label="Cuota mensual" name="currentPayment" currency={currency} defaultValue={item?.currentPayment} />
+          <Money label="Cuota mensual" name="currentPayment" currency={currency} value={currentPayment} onChange={setCurrentPayment} />
           <Money label="Pago mínimo" name="minPayment" currency={currency} defaultValue={item?.minPayment} />
         </div>
+
+        {suggested > 0 ? (
+          <div className="row" style={{ gap: 10, flexWrap: "wrap", margin: "-4px 0 14px", fontSize: 12.5 }}>
+            <span className="muted">
+              Cuota sugerida: <strong style={{ color: "var(--ink-2)" }}>{sym}{Math.round(suggested).toLocaleString("es-CR")}</strong>
+            </span>
+            <button type="button" className="btn btn-secondary" style={{ padding: "5px 11px", fontSize: 12 }} onClick={() => setCurrentPayment(String(Math.round(suggested)))}>
+              Usar
+            </button>
+          </div>
+        ) : null}
 
         <div className="fld-2">
           <Money label="Pago extra mensual (opcional)" name="extraMonthly" currency={currency} defaultValue={item?.extraMonthly ?? undefined} />
@@ -408,14 +493,20 @@ function Money({
   currency,
   error,
   defaultValue,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
   currency: string;
   error?: string;
   defaultValue?: number;
+  /** Modo controlado (para cálculo en vivo); si se omite, usa defaultValue. */
+  value?: string;
+  onChange?: (v: string) => void;
 }) {
   const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
+  const controlled = value !== undefined && onChange !== undefined;
   return (
     <div className="fld">
       <label className="fld-label">{label}</label>
@@ -426,9 +517,11 @@ function Money({
           type="number"
           step="0.01"
           min="0"
-          defaultValue={defaultValue}
           placeholder="0"
           aria-invalid={error ? true : undefined}
+          {...(controlled
+            ? { value, onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(e.target.value) }
+            : { defaultValue })}
         />
       </div>
       {error ? (

@@ -31,6 +31,13 @@ function fmtDate(iso: string | null): string {
   return `${months[Number(m) - 1] ?? ""} ${y}`;
 }
 
+/** Fecha con día: "12 jun 2026". */
+function fmtDay(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${Number(d)} ${months[Number(m) - 1] ?? ""} ${y}`;
+}
+
 export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
   const { currency } = vm;
   const input: AmortizationInput = useMemo(
@@ -53,7 +60,8 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
     return [head, ...rest];
   }, [vm]);
 
-  const [showPay, setShowPay] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const [pay, setPay] = useState<{ amount: number; date: string } | null>(null);
 
   return (
     <div className="grid">
@@ -64,15 +72,25 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
             <div className="card-title" style={{ fontSize: 18 }}>{vm.name}</div>
             <div className="card-sub" style={{ marginTop: 2 }}>
               {vm.debtType ?? "Deuda"}
+              {vm.bank ? ` · ${vm.bank}` : ""}
               {vm.rateType === "variable"
-                ? ` · variable (${(vm.rateIndex ?? "").toUpperCase()} + ${vm.rateSpread ?? 0}%)`
+                ? vm.introFixedMonths && vm.introApr != null
+                  ? ` · ${vm.introApr}% fija ${vm.introFixedMonths}m → ${(vm.rateIndex ?? "").toUpperCase()} + ${vm.rateSpread ?? 0}%`
+                  : ` · variable (${(vm.rateIndex ?? "").toUpperCase()} + ${vm.rateSpread ?? 0}%)`
                 : " · tasa fija"}
             </div>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowPay(true)}>
+          <button className="btn btn-primary" onClick={() => setPay({ amount: vm.monthlyPayment || 0, date: today })}>
             Reportar pago
           </button>
         </div>
+
+        {vm.dueSoon && vm.nextDue ? (
+          <div className="auth-msg warn" style={{ margin: "14px 0 0", fontSize: 12.5 }}>
+            Tu pago de <strong>{vm.name}</strong> vence el <strong>{fmtDay(vm.nextDue)}</strong> —{" "}
+            {formatMoney(vm.monthlyPayment + vm.insurance, currency)}.
+          </div>
+        ) : null}
 
         <div
           style={{
@@ -132,7 +150,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
             <thead>
               <tr>
                 <th>Mes</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th>
-                {vm.insurance > 0 ? <th>Seguro</th> : null}<th>Saldo</th>
+                {vm.insurance > 0 ? <th>Seguro</th> : null}<th>Saldo</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -145,6 +163,16 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
                   <td className="tnum" style={{ color: "var(--neg)" }}>{formatMoney(r.interest, currency)}</td>
                   {vm.insurance > 0 ? <td className="tnum">{formatMoney(r.insurance, currency)}</td> : null}
                   <td className="tnum">{formatMoney(r.balance, currency)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ padding: "3px 9px", fontSize: 11 }}
+                      onClick={() => setPay({ amount: r.payment, date: r.date ?? today })}
+                    >
+                      Pagar
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -152,8 +180,8 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
         </div>
       </div>
 
-      {showPay ? (
-        <ReportPaymentModal vm={vm} input={input} currency={currency} onClose={() => setShowPay(false)} />
+      {pay ? (
+        <ReportPaymentModal vm={vm} input={input} currency={currency} preset={pay} onClose={() => setPay(null)} />
       ) : null}
     </div>
   );
@@ -241,18 +269,20 @@ function ReportPaymentModal({
   vm,
   input,
   currency,
+  preset,
   onClose,
 }: {
   vm: DebtDetailVM;
   input: AmortizationInput;
   currency: string;
+  preset?: { amount: number; date: string };
   onClose: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
-  const [amount, setAmount] = useState(vm.monthlyPayment || 0);
-  const [date, setDate] = useState(today);
+  const [amount, setAmount] = useState(preset?.amount ?? vm.monthlyPayment ?? 0);
+  const [date, setDate] = useState(preset?.date ?? today);
   const [extra, setExtra] = useState(0);
   const [mode, setMode] = useState<"tiempo" | "cuota">("tiempo");
   const [pending, setPending] = useState(false);

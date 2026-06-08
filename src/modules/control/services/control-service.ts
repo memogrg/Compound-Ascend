@@ -60,6 +60,11 @@ function rowToDebt(r: DebtRow): Debt {
     extraMonthly: r.extra_monthly === null ? null : Number(r.extra_monthly),
     insurance: r.insurance === null ? null : Number(r.insurance),
     notes: r.notes,
+    bank: r.bank,
+    payDay: r.pay_day,
+    introFixedMonths: r.intro_fixed_months,
+    introApr: r.intro_apr === null ? null : Number(r.intro_apr),
+    lastRemindedOn: r.last_reminded_on,
   };
 }
 
@@ -107,6 +112,7 @@ function debtColumns(input: DebtInputForm) {
   return {
     name: input.name,
     debt_type: input.debtType ?? null,
+    bank: input.bank ?? null,
     balance: input.balance,
     min_payment: input.minPayment,
     current_payment: input.currentPayment,
@@ -118,6 +124,8 @@ function debtColumns(input: DebtInputForm) {
     rate_type: input.rateType ?? null,
     rate_index: input.rateIndex ?? null,
     rate_spread: input.rateSpread ?? null,
+    intro_fixed_months: input.introFixedMonths ?? null,
+    intro_apr: input.introApr ?? null,
     term_months: input.termMonths ?? null,
     start_date: input.startDate ?? null,
     extra_monthly: input.extraMonthly ?? null,
@@ -216,6 +224,21 @@ export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
   return (data ?? []).map(rowToDebtPayment);
 }
 
+/** Fechas de pago reportadas en el mes calendario actual, agrupadas por deuda. */
+export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, string[]>> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const monthStart = `${new Date().toISOString().slice(0, 8)}01`; // yyyy-mm-01
+  const { data } = await supabase
+    .from("debt_payments")
+    .select("debt_id,occurred_on")
+    .eq("user_id", user.id)
+    .gte("occurred_on", monthStart);
+  const out: Record<string, string[]> = {};
+  for (const p of data ?? []) (out[p.debt_id] ??= []).push(p.occurred_on);
+  return out;
+}
+
 /** Registra un pago reportado. Si el extra es modo 'cuota', baja la cuota. */
 export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   const user = await requireUser();
@@ -272,18 +295,22 @@ export type ControlSummary = {
   debts: Debt[];
   freeCashflow: number;
   currency: string;
+  /** Valores actuales de los índices (prime/tbp/tri) para el form de deuda. */
+  indexRates: Record<string, number>;
 };
 
 /** Carga todo y calcula el diagnóstico de control. */
 export async function getControlSummary(): Promise<ControlSummary> {
   const user = await requireUser();
-  const [goals, debts, base, currency, discipline, rates] = await Promise.all([
+  const { getIndexRates } = await import("@/modules/control/services/index-rates");
+  const [goals, debts, base, currency, discipline, rates, indexRates] = await Promise.all([
     listGoals(),
     listDebts(),
     getBaseSummary(),
     getDisplayCurrency(),
     getDiscipline(user.id),
     getFxRates(),
+    getIndexRates(),
   ]);
 
   const hasEmergencyFund = goals.some(
@@ -316,7 +343,7 @@ export async function getControlSummary(): Promise<ControlSummary> {
     currency,
   );
 
-  return { diagnosis, goals, debts, freeCashflow: base.indicators.freeCashflow, currency };
+  return { diagnosis, goals, debts, freeCashflow: base.indicators.freeCashflow, currency, indexRates };
 }
 
 /** Resumen de control de demostración (no toca la BD). */
@@ -381,7 +408,7 @@ export function buildDemoControlSummary(): ControlSummary {
     { freeCashflow: 175_000, hasEmergencyFund: true, discipline: 6, stress: 6 },
     currency,
   );
-  return { diagnosis, goals, debts, freeCashflow: 175_000, currency };
+  return { diagnosis, goals, debts, freeCashflow: 175_000, currency, indexRates: {} };
 }
 
 function futureISO(monthsAhead: number): string {

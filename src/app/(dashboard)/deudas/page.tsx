@@ -12,7 +12,7 @@ export default async function Page() {
   const configured = isSupabaseConfigured();
   const overview: DebtsOverview = configured
     ? await getDebtsOverview(await getIndexRates())
-    : { currency: "CRC", incomeMonthly: 0, debts: [] };
+    : { currency: "CRC", incomeMonthly: 0, freeCashflow: 0, indexRates: {}, debts: [] };
 
   return (
     <div className="grid">

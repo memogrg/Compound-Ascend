@@ -25,6 +25,18 @@ export interface AmortizationInput {
   startDate?: string | null;
   /** Monto original (para progreso vs saldo). */
   originalAmount?: number | null;
+  /** TAE fija (%) durante el periodo introductorio (caso CR: 3 años fija). */
+  introApr?: number | null;
+  /** Meses iniciales a `introApr` antes de pasar a `apr` (índice+spread). */
+  introFixedMonths?: number | null;
+}
+
+/** TAE vigente en el mes `m` (1-based): intro durante los primeros meses. */
+function aprForMonth(input: AmortizationInput, m: number): number {
+  if (input.introApr != null && input.introFixedMonths && m <= input.introFixedMonths) {
+    return input.introApr;
+  }
+  return input.apr ?? 0;
 }
 
 export interface ScheduleRow {
@@ -68,7 +80,8 @@ export function pmt(balance: number, r: number, n: number): number {
 
 /** Tabla de amortización mes a mes hasta liquidar (o tope MAX_MONTHS). */
 export function buildSchedule(input: AmortizationInput, opts: ScheduleOpts = {}): ScheduleRow[] {
-  const r = (input.apr ?? 0) / 100 / 12;
+  // Tasa principal (post-intro) para derivar la cuota nivelada por plazo.
+  const rMain = (input.apr ?? 0) / 100 / 12;
   const insurance = input.insurance ?? 0;
   const extra = opts.extraMonthly ?? input.extraMonthly ?? 0;
   const extraMonths = opts.extraMonths ?? Infinity;
@@ -81,7 +94,7 @@ export function buildSchedule(input: AmortizationInput, opts: ScheduleOpts = {})
     (input.monthlyPayment && input.monthlyPayment > 0
       ? input.monthlyPayment
       : input.termMonths && input.termMonths > 0
-        ? pmt(balance, r, input.termMonths)
+        ? pmt(balance, rMain, input.termMonths)
         : 0);
   if (payment <= 0) return [];
 
@@ -89,6 +102,7 @@ export function buildSchedule(input: AmortizationInput, opts: ScheduleOpts = {})
   const rows: ScheduleRow[] = [];
 
   for (let m = 1; m <= MAX_MONTHS && balance > 0.005; m++) {
+    const r = aprForMonth(input, m) / 100 / 12; // intro durante los primeros meses
     const interest = balance * r;
     const principalFromPayment = payment - interest;
     const extraThis = (m <= extraMonths ? extra : 0) + (opts.oneOffExtras?.[m] ?? 0);

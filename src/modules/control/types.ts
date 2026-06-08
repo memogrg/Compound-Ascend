@@ -47,6 +47,16 @@ export type Debt = {
   extraMonthly?: number | null;
   insurance?: number | null;
   notes?: string | null;
+  // ── Banco, tasa introductoria y recordatorios (migración 0017) ──
+  bank?: string | null;
+  /** Día del mes de pago (1-31) si se conoce. */
+  payDay?: number | null;
+  /** Meses iniciales a TAE fija (intro) antes de pasar a variable. */
+  introFixedMonths?: number | null;
+  /** TAE fija (%) durante el periodo introductorio. */
+  introApr?: number | null;
+  /** Último día (ISO) en que se envió recordatorio de pago. */
+  lastRemindedOn?: string | null;
 };
 
 /** Pago reportado de una deuda (fuente de la verdad: tabla debt_payments). */

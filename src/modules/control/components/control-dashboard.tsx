@@ -27,7 +27,7 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 export function ControlDashboard({ summary }: { summary: ControlSummary }) {
-  const { diagnosis: d, goals, debts, currency } = summary;
+  const { diagnosis: d, goals, debts, currency, indexRates } = summary;
   const sem = SEMAFORO[d.semaforo];
 
   return (
@@ -226,7 +226,7 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                   <span className="chip">Controlada</span>
                 )}
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <EditControlButton kind="debt" item={dt} currency={currency} />
+                  <EditControlButton kind="debt" item={dt} currency={currency} indexRates={indexRates} />
                   <DeleteButton id={dt.id} kind="debt" />
                 </div>
               </div>

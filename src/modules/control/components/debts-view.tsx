@@ -75,6 +75,13 @@ function fmtDate(iso: string | null): string {
   return `${months[Number(m) - 1] ?? ""} ${y}`;
 }
 
+/** Fecha de vencimiento corta: "12 jun". */
+function dueLabel(iso: string): string {
+  const [, m, d] = iso.split("-");
+  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${Number(d)} ${months[Number(m) - 1] ?? ""}`;
+}
+
 /** Salud del ratio deuda/ingresos (DTI). */
 function dtiHealth(dti: number): { label: string; color: string } {
   if (dti < 0.36) return { label: "Saludable", color: "var(--pos)" };
@@ -107,8 +114,8 @@ function debtGradient(debtType: string | null): string {
  * Replica la simulación de debt-strategy registrando el saldo total por mes
  * (responde al control ± de pago extra).
  */
-function strategyCurve(items: DebtInput[], extra: number): { date: string; value: number }[] {
-  const order = orderDebts(items, "avalancha");
+function strategyCurve(items: DebtInput[], extra: number, method: DebtMethod): { date: string; value: number }[] {
+  const order = orderDebts(items, method);
   const state = order.map((d) => ({ ...d, bal: d.balance }));
   const totalMin = state.reduce((s, d) => s + d.minPayment, 0);
   const sum = () => Math.round(state.reduce((s, d) => s + Math.max(0, d.bal), 0));
@@ -138,20 +145,28 @@ function strategyCurve(items: DebtInput[], extra: number): { date: string; value
 }
 
 export function DebtsView({ overview }: { overview: DebtsOverview }) {
-  const { currency, incomeMonthly, debts } = overview;
+  const { currency, incomeMonthly, debts, freeCashflow, indexRates } = overview;
   const noDecimals = ["CRC", "COP", "MXN"].includes(currency);
   const step = noDecimals ? 25000 : 50;
-  const [extra, setExtra] = useState(0);
+  // Extra por defecto = sobrante mensual del usuario (ajustable con ±).
+  const [extra, setExtra] = useState(Math.max(0, Math.round(freeCashflow)));
+  // Método elegido por el usuario (null = usar el recomendado).
+  const [method, setMethod] = useState<DebtMethod | null>(null);
 
-  // Orden por prioridad avalancha.
+  // Orden por el método activo.
+  const recommended = useMemo(() => recommendMethod(debts.map(toDebtInput)), [debts]);
+  // El selector ofrece avalancha/bola; por defecto sigue al recomendado.
+  const defaultSel: DebtMethod = recommended.method === "bola_nieve" ? "bola_nieve" : "avalancha";
+  const activeMethod: DebtMethod = method ?? defaultSel;
+
   const ordered = useMemo(() => {
     const inputs = debts.map(toDebtInput);
-    const order = orderDebts(inputs, "avalancha");
+    const order = orderDebts(inputs, activeMethod);
     const rankById = new Map(order.map((d, i) => [d.id, i + 1]));
     return [...debts].sort(
       (a, b) => (rankById.get(a.id) ?? 99) - (rankById.get(b.id) ?? 99),
     );
-  }, [debts]);
+  }, [debts, activeMethod]);
 
   const summaries = useMemo(() => new Map(debts.map((d) => [d.id, debtSummary(d)])), [debts]);
 
@@ -180,11 +195,16 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
     const inputs = debts.map(toDebtInput);
     const avalancha = simulateStrategy(inputs, "avalancha", extra);
     const bolaNieve = simulateStrategy(inputs, "bola_nieve", extra);
-    const recommended = recommendMethod(inputs);
-    return { avalancha, bolaNieve, recommended };
+    return { avalancha, bolaNieve };
   }, [debts, extra]);
 
-  const curve = useMemo(() => strategyCurve(debts.map(toDebtInput), extra), [debts, extra]);
+  // Orden de ataque concreto del método activo (con tiempos por deuda).
+  const attackPlan = useMemo(
+    () => simulateStrategy(debts.map(toDebtInput), activeMethod, extra).payoffOrder,
+    [debts, activeMethod, extra],
+  );
+
+  const curve = useMemo(() => strategyCurve(debts.map(toDebtInput), extra, activeMethod), [debts, extra, activeMethod]);
 
   if (debts.length === 0) {
     return (
@@ -193,13 +213,14 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           <div className="card-title">Sin deudas registradas</div>
           <div className="card-sub">Cuando agregues una, verás aquí su amortización y estrategia de pago.</div>
         </div>
-        <AddControlButton kind="debt" currency={currency} label="Agregar deuda" />
+        <AddControlButton kind="debt" currency={currency} label="Agregar deuda" indexRates={indexRates} />
       </div>
     );
   }
 
-  const rec = strategy.recommended;
-  const recSim = rec.method === "bola_nieve" ? strategy.bolaNieve : strategy.avalancha;
+  const rec = recommended;
+  const activeSim = activeMethod === "bola_nieve" ? strategy.bolaNieve : strategy.avalancha;
+  const debtById = new Map(debts.map((d) => [d.id, d]));
 
   return (
     <div className="grid">
@@ -216,7 +237,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               <div className="row" style={{ gap: 18, marginTop: 14, fontSize: 12.5, color: "var(--muted)", flexWrap: "wrap" }}>
                 <div>Pagos mensuales <strong style={{ color: "var(--ink-2)" }}>{formatMoney(totals.monthlyPayments, currency)}</strong></div>
                 <div>Tasa media <strong style={{ color: "var(--ink-2)" }}>{totals.avgApr.toFixed(1)}%</strong></div>
-                <div>Libre de deudas <strong style={{ color: "var(--pos)" }}>{recSim.feasible ? fmtDate(payoffDateFromMonths(recSim.months)) : "—"}</strong></div>
+                <div>Libre de deudas <strong style={{ color: "var(--pos)" }}>{activeSim.feasible ? fmtDate(payoffDateFromMonths(activeSim.months)) : "—"}</strong></div>
               </div>
             </div>
             {totals.dti != null ? (
@@ -237,7 +258,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           </div>
           <div style={{ fontSize: 11.5, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>
             Saldo proyectado con la estrategia{" "}
-            <strong style={{ color: "var(--ink-2)" }}>{METHOD_LABEL[rec.method].toLowerCase()}</strong>
+            <strong style={{ color: "var(--ink-2)" }}>{METHOD_LABEL[activeMethod].toLowerCase()}</strong>
           </div>
         </div>
 
@@ -250,7 +271,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
             <span className="muted" style={{ fontSize: 12.5 }}>Pago extra mensual</span>
             <div className="seg" role="group" aria-label="Ajustar pago extra">
               <button className="seg-btn" onClick={() => setExtra((e) => Math.max(0, e - step))} aria-label="Reducir">−</button>
@@ -259,6 +280,9 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               </span>
               <button className="seg-btn" onClick={() => setExtra((e) => e + step)} aria-label="Aumentar">+</button>
             </div>
+            {freeCashflow > 0 ? (
+              <span className="muted" style={{ fontSize: 11 }}>de tu sobrante {formatMoney(freeCashflow, currency)}</span>
+            ) : null}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -266,20 +290,45 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               label="Avalancha"
               sim={strategy.avalancha}
               currency={currency}
-              highlight={rec.method === "avalancha"}
+              selected={activeMethod === "avalancha"}
+              recommended={rec.method === "avalancha"}
+              onSelect={() => setMethod("avalancha")}
               note="Ataca la TAE más alta → menos intereses"
             />
             <MethodCard
               label="Bola de nieve"
               sim={strategy.bolaNieve}
               currency={currency}
-              highlight={rec.method === "bola_nieve"}
+              selected={activeMethod === "bola_nieve"}
+              recommended={rec.method === "bola_nieve"}
+              onSelect={() => setMethod("bola_nieve")}
               note="Liquida primero las pequeñas → más motivación"
             />
           </div>
 
+          {/* Orden de ataque concreto del método elegido */}
+          {attackPlan.length > 0 ? (
+            <div style={{ marginTop: 14 }}>
+              <div className="label" style={{ fontSize: 11, marginBottom: 8 }}>
+                Orden de ataque · {METHOD_LABEL[activeMethod].toLowerCase()}
+              </div>
+              <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+                {attackPlan.map((p, i) => {
+                  const d = debtById.get(p.id);
+                  return (
+                    <li key={p.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12.5 }}>
+                      <span className="tnum" style={{ color: "var(--muted)", minWidth: 16 }}>{i + 1}º</span>
+                      <span style={{ fontWeight: 500 }}>{d?.name ?? p.name}</span>
+                      <span className="muted">— liquida en ~{monthsToText(p.monthPaid)}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ) : null}
+
           <div className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>
-            {rec.reason}
+            <strong style={{ color: "var(--ink-2)" }}>Recomendado: {METHOD_LABEL[rec.method].toLowerCase()}.</strong> {rec.reason}
           </div>
         </div>
       </section>
@@ -297,9 +346,9 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
         <div className="card-head">
           <div>
             <div className="card-title">Tus deudas</div>
-            <div className="card-sub">{debts.length} deuda(s) · orden de ataque (avalancha)</div>
+            <div className="card-sub">{debts.length} deuda(s) · orden de ataque ({METHOD_LABEL[activeMethod].toLowerCase()})</div>
           </div>
-          <AddControlButton kind="debt" currency={currency} label="Agregar deuda" variant="btn-secondary" />
+          <AddControlButton kind="debt" currency={currency} label="Agregar deuda" variant="btn-secondary" indexRates={indexRates} />
         </div>
         {ordered.map((d, i) => {
           const s = summaries.get(d.id)!;
@@ -311,9 +360,15 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                 <div className="debt-name">{d.name}</div>
                 <div className="debt-sub">
                   {d.debtType ?? "Deuda"}
+                  {d.bank ? ` · ${d.bank}` : ""}
                   {d.rateType === "variable" ? " · variable" : ""}
                   {i === 0 ? " · pagar primero" : ""}
                 </div>
+                {d.dueSoon && d.nextDue ? (
+                  <div style={{ fontSize: 11, color: "var(--neg)", marginTop: 3, fontWeight: 500 }}>
+                    Vence el {dueLabel(d.nextDue)} — {formatMoney(d.monthlyPayment > 0 ? d.monthlyPayment : d.minPayment, currency)}
+                  </div>
+                ) : null}
                 {d.rateNote ? (
                   <div style={{ fontSize: 11, color: "var(--warn)", marginTop: 3 }}>{d.rateNote}</div>
                 ) : null}
@@ -370,25 +425,40 @@ function MethodCard({
   label,
   sim,
   currency,
-  highlight,
+  selected,
+  recommended,
+  onSelect,
   note,
 }: {
   label: string;
   sim: { months: number; totalInterest: number; feasible: boolean };
   currency: string;
-  highlight: boolean;
+  selected: boolean;
+  recommended: boolean;
+  onSelect: () => void;
   note: string;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
       className="card-pad"
       style={{
-        border: `1px solid ${highlight ? "var(--ink)" : "var(--line)"}`,
+        textAlign: "left",
+        cursor: "pointer",
+        font: "inherit",
+        border: `1px solid ${selected ? "var(--ink)" : "var(--line)"}`,
         borderRadius: "var(--r-md)",
-        background: highlight ? "var(--surface-2)" : "transparent",
+        background: selected ? "var(--surface-2)" : "transparent",
       }}
     >
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}>{label}</div>
+      <div className="row" style={{ justifyContent: "space-between", gap: 6 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}>{label}</span>
+        {recommended ? (
+          <span className="chip" style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}>Recomendado</span>
+        ) : null}
+      </div>
       <div className="num-xl" style={{ fontSize: 22, marginTop: 6 }}>
         {sim.feasible ? monthsToText(sim.months) : "—"}
       </div>
@@ -396,7 +466,7 @@ function MethodCard({
         {formatMoney(sim.totalInterest, currency)} en intereses
       </div>
       <div className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{note}</div>
-    </div>
+    </button>
   );
 }
 
