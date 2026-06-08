@@ -14,34 +14,43 @@ insert into public.currencies (code, symbol, name) values
 on conflict (code) do update set symbol = excluded.symbol, name = excluded.name;
 
 -- ---------- Categorías de gasto (sistema) ----------
-delete from public.expense_categories where is_system;
-
-insert into public.expense_categories (key, name, default_nature, is_system, sort_order) values
-  ('vivienda','Vivienda','esencial',true,10),
-  ('alimentacion','Alimentación','esencial',true,20),
-  ('servicios_hogar','Servicios y hogar','esencial',true,30),
-  ('transporte','Transporte','esencial',true,40),
-  ('automovil','Automóvil','esencial',true,50),
-  ('salud','Salud','proteccion',true,60),
-  ('cuidado_personal','Cuidado personal','estilo_vida',true,70),
-  ('familia','Familia y dependientes','esencial',true,80),
-  ('mascotas','Mascotas','estilo_vida',true,90),
-  ('educacion','Educación','crecimiento',true,100),
-  ('disfrute','Disfrute','estilo_vida',true,110),
-  ('viajes','Viajes','ahorro',true,120),
-  ('tecnologia','Tecnología','ahorro',true,130),
-  ('suscripciones','Suscripciones','estilo_vida',true,140),
-  ('seguros','Seguros','proteccion',true,150),
-  ('impuestos','Impuestos y trámites','financiero',true,160),
-  ('deudas','Deudas','financiero',true,170),
-  ('fondo_emergencia','Fondo de emergencia','ahorro',true,180),
-  ('fondo_paz','Fondo de paz','proteccion',true,190),
-  ('inversiones','Inversiones','inversion',true,200),
-  ('retiro','Retiro','inversion',true,210),
-  ('donaciones','Donaciones','donacion',true,220),
-  ('miscelaneos','Misceláneos','miscelaneo',true,230);
+-- NO DESTRUCTIVO: insertar solo si la key de sistema aún no existe. Antes este
+-- bloque hacía `delete ... where is_system`, lo que (tras la migración 0018)
+-- podía borrar los 8 grupos nuevos y anular la categorización histórica de las
+-- transacciones (FK ON DELETE SET NULL). Ahora es idempotente y aditivo.
+insert into public.expense_categories (key, name, default_nature, is_system, sort_order)
+select v.key, v.name, v.nature, true, v.ord
+from (values
+  ('vivienda','Vivienda','esencial',10),
+  ('alimentacion','Alimentación','esencial',20),
+  ('servicios_hogar','Servicios y hogar','esencial',30),
+  ('transporte','Transporte','esencial',40),
+  ('automovil','Automóvil','esencial',50),
+  ('salud','Salud','proteccion',60),
+  ('cuidado_personal','Cuidado personal','estilo_vida',70),
+  ('familia','Familia y dependientes','esencial',80),
+  ('mascotas','Mascotas','estilo_vida',90),
+  ('educacion','Educación','crecimiento',100),
+  ('disfrute','Disfrute','estilo_vida',110),
+  ('viajes','Viajes','ahorro',120),
+  ('tecnologia','Tecnología','ahorro',130),
+  ('suscripciones','Suscripciones','estilo_vida',140),
+  ('seguros','Seguros','proteccion',150),
+  ('impuestos','Impuestos y trámites','financiero',160),
+  ('deudas','Deudas','financiero',170),
+  ('fondo_emergencia','Fondo de emergencia','ahorro',180),
+  ('fondo_paz','Fondo de paz','proteccion',190),
+  ('inversiones','Inversiones','inversion',200),
+  ('retiro','Retiro','inversion',210),
+  ('donaciones','Donaciones','donacion',220),
+  ('miscelaneos','Misceláneos','miscelaneo',230)
+) as v(key, name, nature, ord)
+where not exists (
+  select 1 from public.expense_categories e where e.key = v.key and e.is_system
+);
 
 -- ---------- Subcategorías (ejemplos representativos de la Biblia) ----------
+-- Idempotente: solo crea la subcategoría si su key aún no existe.
 insert into public.expense_categories (parent_id, key, name, default_nature, is_system, sort_order)
 select c.id, sub.key, sub.name, c.default_nature, true, sub.ord
 from public.expense_categories c
@@ -72,4 +81,7 @@ join (values
   ('servicios_hogar','serv_limpieza','Limpieza',5)
 ) as sub(parent_key, key, name, ord)
   on sub.parent_key = c.key
-where c.is_system and c.parent_id is null;
+where c.is_system and c.parent_id is null
+  and not exists (
+    select 1 from public.expense_categories e where e.key = sub.key and e.is_system
+  );

@@ -13,9 +13,26 @@ import {
   ruleInputSchema,
   transferInputSchema,
   csvTxnSchema,
+  categoryInputSchema,
+  categoryMergeSchema,
+  categoryDeleteSchema,
+  templateInputSchema,
 } from "@/modules/financial-base/schemas";
 import type { CsvTxnInput } from "@/modules/financial-base/schemas";
 import { createRule, updateRule, deleteRule } from "@/modules/financial-base/services/rules-service";
+import {
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  mergeCategory,
+} from "@/modules/financial-base/services/categories-service";
+import {
+  listTemplates,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  touchTemplate,
+} from "@/modules/financial-base/services/templates-service";
 import { extractReceipt, type ReceiptExtraction } from "@/modules/financial-base/services/receipt-service";
 import {
   createBudgetItem,
@@ -293,6 +310,134 @@ export async function getReceiptUrlAction(path: string): Promise<{ ok: boolean; 
     return url ? { ok: true, url } : { ok: false };
   } catch {
     return { ok: false };
+  }
+}
+
+// ---------- Categorías personalizadas ----------
+export async function addCategoryAction(raw: unknown): Promise<ActionResult & { id?: string }> {
+  const parsed = categoryInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const id = await createCategory(parsed.data);
+    revalidate();
+    return { ok: true, id: id ?? undefined };
+  } catch (err) {
+    logger.error("addCategory fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos crear la categoría." };
+  }
+}
+
+export async function editCategoryAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = categoryInputSchema.partial().safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateCategory(id, parsed.data);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos actualizar la categoría." };
+  }
+}
+
+export async function removeCategoryAction(raw: unknown): Promise<ActionResult> {
+  const parsed = categoryDeleteSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    await deleteCategory(parsed.data.id, parsed.data.reassignToId ?? null);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos eliminar la categoría." };
+  }
+}
+
+export async function mergeCategoryAction(raw: unknown): Promise<ActionResult> {
+  const parsed = categoryMergeSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    await mergeCategory(parsed.data.fromId, parsed.data.intoId);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos fusionar las categorías." };
+  }
+}
+
+// ---------- Plantillas / favoritos ----------
+export async function addTemplateAction(raw: unknown): Promise<ActionResult> {
+  const parsed = templateInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await createTemplate(parsed.data);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos guardar la plantilla." };
+  }
+}
+
+export async function editTemplateAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = templateInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateTemplate(id, parsed.data);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false, message: "No pudimos actualizar la plantilla." };
+  }
+}
+
+export async function removeTemplateAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    await deleteTemplate(id);
+    revalidate();
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Registra una transacción a partir de una plantilla (1 clic). */
+export async function runTemplateAction(
+  id: string,
+  overrides?: { amount?: number; occurredOn?: string },
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const tpl = (await listTemplates()).find((t) => t.id === id);
+    if (!tpl) return { ok: false, message: "Plantilla no encontrada." };
+    const kind = tpl.kind;
+    if (kind === "transferencia") return { ok: false, message: "Las transferencias no se registran por plantilla." };
+    const amount = overrides?.amount ?? tpl.amount ?? 0;
+    if (!(amount > 0)) return { ok: false, message: "La plantilla necesita un monto." };
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    await createTransaction({
+      kind,
+      amount,
+      currency: tpl.currency,
+      occurredOn: overrides?.occurredOn ?? iso,
+      categoryId: tpl.categoryId ?? null,
+      accountId: tpl.accountId ?? null,
+      merchantOrSource: tpl.merchantOrSource ?? undefined,
+      description: tpl.note ?? undefined,
+      status: "confirmed",
+      origin: "manual",
+    });
+    await touchTemplate(id);
+    revalidate();
+    return { ok: true };
+  } catch (err) {
+    logger.error("runTemplate fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos registrar desde la plantilla." };
   }
 }
 

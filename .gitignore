@@ -33,3 +33,6 @@ supabase/.branches
 
 # Material de revisión (wireframes/docx) — no se versiona
 /Revision_V2_BaseFinanciera/
+
+# Material de revisión (spec Fase 1 Transacciones) — no se versiona
+/Reestructuracion_Transacciones/

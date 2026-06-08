@@ -125,9 +125,49 @@ export const ruleInputSchema = z.object({
   active: z.boolean().default(true),
 });
 
+// ---------- Categorías personalizadas (módulo Transacciones) ----------
+export const categoryInputSchema = z.object({
+  name: z.string().trim().min(1, "Ponle un nombre").max(60),
+  parentId: uuidOrNull.optional(),
+  categoryType: z.enum(["expense", "income", "transfer", "both"]).default("expense"),
+  icon: z.string().max(40).optional().nullable(),
+  color: z.string().max(40).optional().nullable(),
+  isFavorite: z.boolean().optional(),
+});
+
+export const categoryMergeSchema = z
+  .object({
+    fromId: z.string().uuid(),
+    intoId: z.string().uuid(),
+  })
+  .refine((d) => d.fromId !== d.intoId, { message: "Elige categorías distintas", path: ["intoId"] });
+
+export const categoryDeleteSchema = z.object({
+  id: z.string().uuid(),
+  reassignToId: uuidOrNull.optional(),
+});
+
+// ---------- Plantillas / favoritos de transacción ----------
+export const templateInputSchema = z.object({
+  name: z.string().trim().min(1, "Ponle un nombre").max(80),
+  kind: z.enum(["ingreso", "gasto", "transferencia"]).default("gasto"),
+  amount: z.number({ invalid_type_error: "Monto inválido" }).positive().optional().nullable(),
+  currency: z.string().length(3).default("CRC"),
+  categoryId: uuidOrNull.optional(),
+  accountId: uuidOrNull.optional(),
+  merchantOrSource: z.string().max(160).optional().nullable(),
+  note: z.string().max(280).optional().nullable(),
+  isFavorite: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
 export type BudgetItemInput = z.infer<typeof budgetItemInputSchema>;
 export type TxnInput = z.infer<typeof txnInputSchema>;
 export type AccountInput = z.infer<typeof accountInputSchema>;
 export type RuleInput = z.infer<typeof ruleInputSchema>;
 export type TransferInput = z.infer<typeof transferInputSchema>;
 export type CsvTxnInput = z.infer<typeof csvTxnSchema>;
+export type CategoryInput = z.infer<typeof categoryInputSchema>;
+export type CategoryMergeInput = z.infer<typeof categoryMergeSchema>;
+export type CategoryDeleteInput = z.infer<typeof categoryDeleteSchema>;
+export type TemplateInput = z.infer<typeof templateInputSchema>;

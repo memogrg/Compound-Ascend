@@ -194,6 +194,13 @@ export type ExpenseCategoryRow = Timestamps & {
   default_nature: string | null;
   is_system: boolean;
   sort_order: number;
+  // Reestructuración de Transacciones (migración 0018 · columnas aditivas)
+  category_type: string; // 'expense' | 'income' | 'transfer' | 'both'
+  icon: string | null;
+  color: string | null;
+  is_active: boolean;
+  is_favorite: boolean;
+  merged_into_id: string | null;
 };
 
 export type MonthlySnapshotRow = Timestamps & {
@@ -233,6 +240,8 @@ export type TransactionRow = Timestamps & {
   origin: string;
   receipt_url: string | null;
   confidence_score_internal: number | null;
+  // Reestructuración de Transacciones (migración 0018 · hook de IA)
+  ai_meta: Json | null;
 };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
@@ -269,6 +278,25 @@ export type TransactionRuleRow = Timestamps & {
   suggested_account_id: string | null;
   type: string; // 'income' | 'expense'
   active: boolean;
+};
+
+// Plantillas / favoritos de transacción (migración 0018 · registro en 1 clic)
+export type TransactionTemplateRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  name: string;
+  kind: string; // 'ingreso' | 'gasto' | 'transferencia'
+  amount: number | null;
+  currency: string;
+  category_id: string | null;
+  account_id: string | null;
+  merchant_or_source: string | null;
+  note: string | null;
+  is_favorite: boolean;
+  sort_order: number;
+  last_used_at: string | null;
+  use_count: number;
 };
 
 // ---------- IA / tokens ----------
@@ -581,6 +609,7 @@ export interface Database {
       budget_items: UserTable<BudgetItemRow>;
       accounts: UserTable<AccountRow>;
       transaction_rules: UserTable<TransactionRuleRow>;
+      transaction_templates: UserTable<TransactionTemplateRow>;
       ai_usage_ledger: UserTable<AiUsageLedgerRow>;
       expense_categories: TableShape<
         ExpenseCategoryRow,
