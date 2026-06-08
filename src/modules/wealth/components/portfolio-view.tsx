@@ -18,6 +18,7 @@ import { Icon } from "@/components/ui/icon";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { HoldingIcon, iconGradient } from "./holding-icon";
 import { AddHoldingButton } from "./add-holding-wizard";
+import { HoldingDetailModal } from "./holding-detail-modal";
 import type { PortfolioReport } from "@/modules/wealth/services/portfolio-service";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type { AssetType, Dividend, HoldingPerformance, PortfolioSnapshot } from "@/modules/wealth/types";
@@ -516,11 +517,17 @@ function HoldRow({
 }: {
   h: HoldingPerformance; total: number; currency: string; dca?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const pct = total > 0 ? h.currentValue / total : 0;
   const pos = h.returnPct >= 0;
   const swColor = iconGradient(h.assetType, h.symbol).background.match(/var\([^)]+\)/)?.[0] ?? "var(--info)";
   return (
-    <div className="hold-row">
+    <div className="hold-row" style={{ cursor: "pointer" }} role="button" tabIndex={0}
+      onClick={() => setOpen(true)}
+      onKeyDown={(e) => { if (e.key === "Enter") setOpen(true); }}>
+      {open ? (
+        <HoldingDetailModal holding={h} currentPrice={h.currentPrice ?? null} currency={currency} onClose={() => setOpen(false)} />
+      ) : null}
       <HoldingIcon assetType={h.assetType} symbol={h.symbol} label={h.label} />
       <div style={{ minWidth: 0 }}>
         <div className="hold-name" style={{ display: "flex", alignItems: "center", gap: 6 }}>

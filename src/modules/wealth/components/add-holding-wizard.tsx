@@ -155,6 +155,8 @@ export function AddHoldingButton({ currency = "CRC" }: { currency?: string }) {
 
 export function AddPurchaseButton({ holding, currency }: { holding: Holding; currency: string }) {
   const [open, setOpen] = useState(false);
+  // Activos no cotizados (inmueble/negocio): la "compra" es un aporte de capital.
+  const aporteLabel = hasLivePrice(holding.assetType) ? "+ Compra" : "+ Aporte";
   return (
     <>
       <button
@@ -162,7 +164,7 @@ export function AddPurchaseButton({ holding, currency }: { holding: Holding; cur
         style={{ fontSize: 12, padding: "5px 10px" }}
         onClick={() => setOpen(true)}
       >
-        + Compra
+        {aporteLabel}
       </button>
       {open && (
         <AddHoldingWizard
@@ -269,6 +271,20 @@ function AddHoldingWizard({
   const [broker, setBroker] = useState(holdingToEdit?.broker ?? "");
   const [holdingCurrency, setHoldingCurrency] = useState(
     holdingToEdit?.currency ?? currency,
+  );
+
+  // ── Renta / valor manual (activos no cotizados: inmueble, negocio, otro) ──
+  const [currentValueManual, setCurrentValueManual] = useState(
+    holdingToEdit?.currentValueManual != null ? String(holdingToEdit.currentValueManual) : "",
+  );
+  const [rentalIncome, setRentalIncome] = useState(
+    holdingToEdit?.rentalIncome != null ? String(holdingToEdit.rentalIncome) : "",
+  );
+  const [rentalFrequency, setRentalFrequency] = useState<"mensual" | "trimestral" | "anual">(
+    holdingToEdit?.rentalFrequency ?? "mensual",
+  );
+  const [rentalSubtype, setRentalSubtype] = useState<"alquiler" | "airbnb" | "auto" | "negocio" | "otro">(
+    holdingToEdit?.rentalSubtype ?? "alquiler",
   );
 
   // ── Step 4 ────────────────────────────────────────────────────────
@@ -419,6 +435,7 @@ function AddHoldingWizard({
 
     setPending(true);
     try {
+      const isRental = !hasLivePrice(assetCategory);
       const payload = {
         symbol: selectedSymbol,
         assetType: assetCategory,
@@ -428,6 +445,15 @@ function AddHoldingWizard({
         broker: broker.trim() || undefined,
         currency: holdingCurrency,
         label: label.trim() || undefined,
+        // Activos no cotizados: valor manual + renta opcional.
+        ...(isRental
+          ? {
+              currentValueManual: parseFloat(currentValueManual) || undefined,
+              rentalIncome: parseFloat(rentalIncome) || undefined,
+              rentalFrequency: parseFloat(rentalIncome) ? rentalFrequency : undefined,
+              rentalSubtype,
+            }
+          : {}),
       };
 
       if (isEdit && holdingToEdit) {
@@ -542,6 +568,20 @@ function AddHoldingWizard({
             quantityNum={quantityNum}
             unitsSanityWarn={unitsSanityWarn}
             priceRequiredForAmount={priceRequiredForAmount}
+          />
+        )}
+
+        {step === 3 && !hasLivePrice(assetCategory) && (
+          <RentalFields
+            currency={holdingCurrency}
+            currentValueManual={currentValueManual}
+            onCurrentValueManualChange={setCurrentValueManual}
+            rentalIncome={rentalIncome}
+            onRentalIncomeChange={setRentalIncome}
+            rentalFrequency={rentalFrequency}
+            onRentalFrequencyChange={setRentalFrequency}
+            rentalSubtype={rentalSubtype}
+            onRentalSubtypeChange={setRentalSubtype}
           />
         )}
 
@@ -957,6 +997,72 @@ function Step3Details({
           {formatMoney(effectiveAvgCost, holdingCurrency)} / ud.
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Campos de renta (activos no cotizados) ────────────────────────
+
+function RentalFields({
+  currency,
+  currentValueManual, onCurrentValueManualChange,
+  rentalIncome, onRentalIncomeChange,
+  rentalFrequency, onRentalFrequencyChange,
+  rentalSubtype, onRentalSubtypeChange,
+}: {
+  currency: string;
+  currentValueManual: string; onCurrentValueManualChange: (v: string) => void;
+  rentalIncome: string; onRentalIncomeChange: (v: string) => void;
+  rentalFrequency: "mensual" | "trimestral" | "anual"; onRentalFrequencyChange: (v: "mensual" | "trimestral" | "anual") => void;
+  rentalSubtype: "alquiler" | "airbnb" | "auto" | "negocio" | "otro"; onRentalSubtypeChange: (v: "alquiler" | "airbnb" | "auto" | "negocio" | "otro") => void;
+}) {
+  return (
+    <div style={{ marginTop: 8, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+      <div className="fld-label" style={{ marginBottom: 8, fontWeight: 600, color: "var(--ink-2)" }}>
+        Valor y renta (activo no cotizado)
+      </div>
+      <div className="fld">
+        <label className="fld-label">Valor actual del activo</label>
+        <div className="inp-money">
+          <span className="pre">{sym(currency)}</span>
+          <input type="number" step="any" min="0" value={currentValueManual}
+            onChange={(e) => onCurrentValueManualChange(e.target.value)} placeholder="Ej. valor de mercado hoy" />
+        </div>
+        <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+          Para inmuebles/negocios el valor no se calcula por precio × cantidad. Si lo dejas vacío, se usa el costo.
+        </div>
+      </div>
+      <div className="fld">
+        <label className="fld-label">Tipo de renta</label>
+        <select className="sel" value={rentalSubtype} onChange={(e) => onRentalSubtypeChange(e.target.value as typeof rentalSubtype)}>
+          <option value="alquiler">Alquiler</option>
+          <option value="airbnb">Airbnb</option>
+          <option value="auto">Alquiler de auto</option>
+          <option value="negocio">Negocio</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div className="fld-2">
+        <div className="fld">
+          <label className="fld-label">Renta recurrente (opcional)</label>
+          <div className="inp-money">
+            <span className="pre">{sym(currency)}</span>
+            <input type="number" step="any" min="0" value={rentalIncome}
+              onChange={(e) => onRentalIncomeChange(e.target.value)} placeholder="0" />
+          </div>
+        </div>
+        <div className="fld">
+          <label className="fld-label">Frecuencia</label>
+          <select className="sel" value={rentalFrequency} onChange={(e) => onRentalFrequencyChange(e.target.value as typeof rentalFrequency)}>
+            <option value="mensual">Mensual</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+      </div>
+      <div className="muted" style={{ fontSize: 11 }}>
+        La renta configurada es proyección. Solo la renta que <strong>registres</strong> suma a tu ingreso pasivo.
+      </div>
     </div>
   );
 }

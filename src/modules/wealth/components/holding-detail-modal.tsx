@@ -12,9 +12,16 @@ import {
   listDividendsAction,
   addDividendAction,
   removeDividendAction,
+  listRentalPaymentsAction,
+  addRentalIncomeAction,
+  removeRentalPaymentAction,
 } from "@/modules/wealth/api/actions";
-import type { Holding, Dividend } from "@/modules/wealth/types";
+import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
+import type { Holding, Dividend, RentalPayment } from "@/modules/wealth/types";
 import type { Period } from "@/modules/wealth/services/holding-history-service";
+
+const RENTAL_FREQ_PER_YEAR: Record<string, number> = { mensual: 12, trimestral: 4, anual: 1 };
+const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
 const PERIODS: { label: string; value: Period }[] = [
   { label: "1M", value: "1M" },
@@ -67,7 +74,7 @@ export function HoldingDetailButton({
 
 // ── Modal ─────────────────────────────────────────────────────────
 
-function HoldingDetailModal({
+export function HoldingDetailModal({
   holding,
   currentPrice,
   currency,
@@ -85,9 +92,13 @@ function HoldingDetailModal({
   const [histLoading, setHistLoading] = useState(true);
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [divLoading, setDivLoading] = useState(true);
+  const [rentals, setRentals] = useState<RentalPayment[]>([]);
 
   const costBasis = holding.quantity * holding.averageCost;
-  const currentValue = currentPrice !== null ? holding.quantity * currentPrice : costBasis;
+  // No cotizados: valor manual del usuario (no precio×cantidad).
+  const isRental = !QUOTED_TYPES.has(holding.assetType);
+  const currentValue =
+    currentPrice !== null ? holding.quantity * currentPrice : (holding.currentValueManual ?? costBasis);
   const profitLoss = currentValue - costBasis;
   const returnPct = costBasis > 0 ? profitLoss / costBasis : 0;
   const positive = profitLoss >= 0;
@@ -110,6 +121,11 @@ function HoldingDetailModal({
     void listDividendsAction(holding.id).then((d) => { setDividends(d); setDivLoading(false); });
   }, [holding.id]);
 
+  // Load rental payments (solo activos no cotizados)
+  useEffect(() => {
+    if (isRental) void listRentalPaymentsAction(holding.id).then(setRentals);
+  }, [holding.id, isRental]);
+
   const totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
 
   return (
@@ -119,6 +135,9 @@ function HoldingDetailModal({
       onClose={onClose}
     >
       <div className="modal-body" style={{ padding: 0 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 22px 0" }}>
+          <EditHoldingButton holding={holding} currency={currency} />
+        </div>
         {/* Header metrics */}
         <div
           style={{
@@ -209,7 +228,8 @@ function HoldingDetailModal({
           )}
         </div>
 
-        {/* Dividends section */}
+        {/* Dividendos: solo activos cotizados (no se mezcla con renta) */}
+        {!isRental && (
         <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
           <div
             style={{
@@ -279,6 +299,20 @@ function HoldingDetailModal({
             </div>
           )}
         </div>
+        )}
+
+        {isRental && (
+          <RentalSection
+            holding={holding}
+            currency={currency}
+            currentValue={currentValue}
+            rentals={rentals}
+            onChange={() => {
+              void listRentalPaymentsAction(holding.id).then(setRentals);
+              router.refresh();
+            }}
+          />
+        )}
       </div>
     </Modal>
   );
@@ -500,6 +534,134 @@ function DividendForm({
       >
         {pending ? "Guardando…" : "Registrar dividendo"}
       </button>
+    </div>
+  );
+}
+
+// ── Renta (activos no cotizados) ──────────────────────────────────
+
+function RentalSection({
+  holding,
+  currency,
+  currentValue,
+  rentals,
+  onChange,
+}: {
+  holding: Holding;
+  currency: string;
+  currentValue: number;
+  rentals: RentalPayment[];
+  onChange: () => void;
+}) {
+  const toast = useToast();
+  const today = new Date().toISOString().slice(0, 10);
+  const cfgFreq = holding.rentalFrequency ?? "mensual";
+  const annualRent = (holding.rentalIncome ?? 0) * (RENTAL_FREQ_PER_YEAR[cfgFreq] ?? 12);
+  const rentYield = currentValue > 0 ? annualRent / currentValue : 0;
+  const totalReceived = rentals.reduce((s, r) => s + r.amount, 0);
+
+  const [amount, setAmount] = useState(holding.rentalIncome != null ? String(holding.rentalIncome) : "");
+  const [date, setDate] = useState(today);
+  const [freq, setFreq] = useState<"mensual" | "trimestral" | "anual">(cfgFreq);
+  const [rentCurrency, setRentCurrency] = useState(holding.currency);
+  const [pending, setPending] = useState(false);
+
+  const submit = async () => {
+    const value = parseFloat(amount) || 0;
+    if (value <= 0) return;
+    setPending(true);
+    try {
+      const res = await addRentalIncomeAction({
+        holdingId: holding.id,
+        receivedOn: date,
+        amount: value,
+        currency: rentCurrency,
+        frequency: freq,
+        holdingLabel: holding.label ?? undefined,
+        holdingSymbol: holding.symbol,
+      });
+      if (res.ok) {
+        toast("Renta registrada");
+        setAmount("");
+        onChange();
+      } else {
+        toast(res.message ?? "No se pudo registrar", "error");
+      }
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>Renta</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))", gap: 10, marginBottom: 12 }}>
+        <Metric label="Total recibido" value={formatMoney(totalReceived, currency)} accent="var(--pos)" />
+        {holding.rentalIncome ? (
+          <Metric label={`Renta ${cfgFreq}`} value={formatMoney(holding.rentalIncome, holding.currency)} />
+        ) : null}
+        {rentYield > 0 ? <Metric label="Yield de renta" value={formatPercent(rentYield)} accent="var(--pos)" /> : null}
+      </div>
+
+      <div style={{ background: "var(--surface-2)", borderRadius: "var(--r-md)", padding: "12px 14px", marginBottom: 8 }}>
+        <div className="fld-2" style={{ marginBottom: 8 }}>
+          <div className="fld" style={{ marginBottom: 0 }}>
+            <label className="fld-label">Monto recibido</label>
+            <div className="inp-money">
+              <span className="pre">{sym(rentCurrency)}</span>
+              <input type="number" step="any" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+          <div className="fld" style={{ marginBottom: 0 }}>
+            <label className="fld-label">Moneda</label>
+            <select className="sel" value={rentCurrency} onChange={(e) => setRentCurrency(e.target.value)}>
+              {CURRENCIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="fld-2" style={{ marginBottom: 8 }}>
+          <div className="fld" style={{ marginBottom: 0 }}>
+            <label className="fld-label">Fecha</label>
+            <input className="inp" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="fld" style={{ marginBottom: 0 }}>
+            <label className="fld-label">Frecuencia</label>
+            <select className="sel" value={freq} onChange={(e) => setFreq(e.target.value as typeof freq)}>
+              <option value="mensual">Mensual</option>
+              <option value="trimestral">Trimestral</option>
+              <option value="anual">Anual</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" className="btn btn-primary" style={{ fontSize: 12.5 }} disabled={pending || (parseFloat(amount) || 0) <= 0} onClick={submit}>
+          {pending ? "Guardando…" : "Registrar renta"}
+        </button>
+      </div>
+
+      {rentals.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingBottom: 8 }}>
+          {rentals.map((r) => (
+            <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "var(--surface-2)", borderRadius: "var(--r-md)", fontSize: 12.5 }}>
+              <span style={{ color: "var(--muted)" }}>{r.receivedOn}</span>
+              <span style={{ fontWeight: 500, color: "var(--pos)" }}>+{formatMoney(r.amount, r.currency)}</span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ fontSize: 11, padding: "2px 8px", color: "var(--neg)" }}
+                onClick={async () => { await removeRentalPaymentAction(r.id); onChange(); }}
+              >
+                Borrar
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 12.5, marginTop: 2, paddingBottom: 8 }}>
+          Sin renta registrada aún. La renta que registres suma a tu ingreso pasivo.
+        </div>
+      )}
     </div>
   );
 }

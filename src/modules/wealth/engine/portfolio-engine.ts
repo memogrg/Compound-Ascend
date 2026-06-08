@@ -63,7 +63,12 @@ export function computeHoldingPerformance(
   currentPrice?: number,
 ): HoldingPerformance {
   const costBasis = holding.quantity * holding.averageCost;
-  const currentValue = currentPrice !== undefined ? holding.quantity * currentPrice : costBasis;
+  // Cotizados: precio×cantidad. No cotizados: valor manual del usuario (si lo
+  // puso) o, en su defecto, el costo base. Nunca precio×cantidad sin precio.
+  const currentValue =
+    currentPrice !== undefined
+      ? holding.quantity * currentPrice
+      : (holding.currentValueManual ?? costBasis);
   const profitLoss = currentValue - costBasis;
   const returnPct = costBasis > 0 ? profitLoss / costBasis : 0;
   return { ...holding, currentPrice, currentValue, costBasis, profitLoss, returnPct };

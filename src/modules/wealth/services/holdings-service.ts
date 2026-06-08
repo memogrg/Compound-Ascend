@@ -18,6 +18,10 @@ function rowToHolding(r: {
   broker: string | null;
   currency: string;
   label: string | null;
+  current_value_manual?: number | null;
+  rental_income?: number | null;
+  rental_frequency?: string | null;
+  rental_subtype?: string | null;
 }): Holding {
   return {
     id: r.id,
@@ -30,6 +34,23 @@ function rowToHolding(r: {
     broker: r.broker,
     currency: r.currency,
     label: r.label,
+    currentValueManual: r.current_value_manual == null ? null : Number(r.current_value_manual),
+    rentalIncome: r.rental_income == null ? null : Number(r.rental_income),
+    rentalFrequency: (r.rental_frequency ?? null) as Holding["rentalFrequency"],
+    rentalSubtype: (r.rental_subtype ?? null) as Holding["rentalSubtype"],
+  };
+}
+
+const HOLDING_COLS =
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype";
+
+/** Columnas de renta / valor manual compartidas por insert y update. */
+function rentalColumns(input: HoldingInput) {
+  return {
+    current_value_manual: input.currentValueManual ?? null,
+    rental_income: input.rentalIncome ?? null,
+    rental_frequency: input.rentalFrequency ?? null,
+    rental_subtype: input.rentalSubtype ?? null,
   };
 }
 
@@ -38,7 +59,7 @@ export async function listHoldings(): Promise<Holding[]> {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from("investment_holdings")
-    .select("id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label")
+    .select(HOLDING_COLS)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToHolding);
@@ -97,6 +118,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     purchase_date: input.purchaseDate ?? null,
     broker: input.broker ?? null,
     currency: input.currency,
+    ...rentalColumns(input),
   });
   if (error) throw new Error(error.message);
 }
@@ -117,6 +139,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       broker: input.broker ?? null,
       currency: input.currency,
       label: input.label ?? null,
+      ...rentalColumns(input),
     })
     .eq("id", id)
     .eq("user_id", user.id);

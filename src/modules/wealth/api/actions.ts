@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { investmentInputSchema, policyInputSchema, holdingInputSchema, dividendInputSchema } from "@/modules/wealth/schemas";
+import { investmentInputSchema, policyInputSchema, holdingInputSchema, dividendInputSchema, rentalPaymentInputSchema } from "@/modules/wealth/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createInvestment,
@@ -21,6 +21,11 @@ import {
   deleteDividend,
   listDividends,
 } from "@/modules/wealth/services/dividend-service";
+import {
+  createRentalPayment,
+  deleteRentalPayment,
+  listRentalPayments,
+} from "@/modules/wealth/services/rental-service";
 import {
   getHoldingHistory,
   type HistoryPoint,
@@ -184,6 +189,45 @@ export async function removeDividendAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+// ── Renta (activos de renta: alquiler / Airbnb / auto / negocio) ──
+
+export async function addRentalIncomeAction(raw: unknown): Promise<ActionResult> {
+  const parsed = rentalPaymentInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await createRentalPayment(parsed.data);
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch (err) {
+    logger.error("addRentalIncome fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos registrar la renta." };
+  }
+}
+
+export async function removeRentalPaymentAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    await deleteRentalPayment(id);
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Rentas registradas de una posición. */
+export async function listRentalPaymentsAction(holdingId: string): Promise<
+  import("@/modules/wealth/types").RentalPayment[]
+> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    return await listRentalPayments(holdingId);
+  } catch {
+    return [];
   }
 }
 

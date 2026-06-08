@@ -48,8 +48,10 @@ export async function getHoldingHistory(
   }
 
   // Fallback sintético: interpolación lineal desde costo a valor actual.
+  // No cotizados: valor manual del usuario (no precio×cantidad).
   const costBasis = holding.quantity * holding.averageCost;
-  const currentValue = currentPrice !== null ? holding.quantity * currentPrice : costBasis;
+  const currentValue =
+    currentPrice !== null ? holding.quantity * currentPrice : (holding.currentValueManual ?? costBasis);
 
   const purchaseDate = holding.purchaseDate
     ? new Date(holding.purchaseDate)

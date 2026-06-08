@@ -77,6 +77,21 @@ export const holdingInputSchema = z.object({
   broker: z.string().trim().max(80).optional(),
   currency: z.string().length(3),
   label: z.string().trim().max(120).optional(),
+  // Activos de renta / no cotizados.
+  currentValueManual: z.number().nonnegative().optional(),
+  rentalIncome: z.number().nonnegative().optional(),
+  rentalFrequency: z.enum(["mensual", "trimestral", "anual"]).optional(),
+  rentalSubtype: z.enum(["alquiler", "airbnb", "auto", "negocio", "otro"]).optional(),
+});
+
+export const rentalPaymentInputSchema = z.object({
+  holdingId: z.string().uuid(),
+  receivedOn: z.string().date(),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  currency: z.string().length(3),
+  frequency: z.enum(["mensual", "trimestral", "anual"]).optional(),
+  holdingLabel: z.string().max(120).optional(),
+  holdingSymbol: z.string().max(12).optional(),
 });
 
 export const dividendInputSchema = z.object({
@@ -92,3 +107,4 @@ export const dividendInputSchema = z.object({
 
 export type HoldingInput = z.infer<typeof holdingInputSchema>;
 export type DividendInput = z.infer<typeof dividendInputSchema>;
+export type RentalPaymentInput = z.infer<typeof rentalPaymentInputSchema>;

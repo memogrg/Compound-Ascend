@@ -107,6 +107,9 @@ export type PortfolioStats = {
 
 // ── Motor de inversiones ──────────────────────────────────────────
 
+export type RentalFrequency = "mensual" | "trimestral" | "anual";
+export type RentalSubtype = "alquiler" | "airbnb" | "auto" | "negocio" | "otro";
+
 export type Holding = {
   id: string;
   investmentId?: string | null;
@@ -118,6 +121,24 @@ export type Holding = {
   broker?: string | null;
   currency: string;
   label?: string | null;
+  // ── Activos de renta / no cotizados (migración 0018) ──
+  /** Valor actual puesto a mano (no cotizados: inmueble, negocio, otro). */
+  currentValueManual?: number | null;
+  /** Renta recurrente que genera el activo (proyección informativa). */
+  rentalIncome?: number | null;
+  rentalFrequency?: RentalFrequency | null;
+  rentalSubtype?: RentalSubtype | null;
+};
+
+/** Evento de renta recibida (fuente: tabla rental_payments). */
+export type RentalPayment = {
+  id: string;
+  holdingId: string;
+  receivedOn: string;
+  amount: number;
+  currency: string;
+  frequency?: string | null;
+  incomeId?: string | null;
 };
 
 export type HoldingPerformance = Holding & {

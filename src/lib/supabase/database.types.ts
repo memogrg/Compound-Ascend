@@ -385,6 +385,23 @@ export type InvestmentHoldingRow = Timestamps & {
   broker: string | null;
   currency: string;
   label: string | null;
+  // Activos de renta (migración 0018).
+  current_value_manual: number | null;
+  rental_income: number | null;
+  rental_frequency: string | null;
+  rental_subtype: string | null;
+};
+
+export type RentalPaymentRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  holding_id: string;
+  received_on: string;
+  amount: number;
+  currency: string;
+  frequency: string | null;
+  income_id: string | null;
 };
 
 export type InvestmentTransactionRow = Timestamps & {
@@ -555,6 +572,7 @@ export interface Database {
         Partial<EconomicIndicatorRow>
       >;
       dividends: UserTable<DividendRow>;
+      rental_payments: UserTable<RentalPaymentRow>;
       portfolio_snapshots: UserTable<PortfolioSnapshotRow>;
       assets: UserTable<AssetRow>;
       liabilities: UserTable<LiabilityRow>;
