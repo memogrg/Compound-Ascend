@@ -30,7 +30,7 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
   if (!isSupabaseConfigured()) return null;
   const period = parseMonthParam(periodRaw, new Date());
 
-  const [budget, real, history, transactions, categories, tree, suggestions, templates, accounts, rules, base] =
+  const [budget, real, history, transactions, categories, tree, incomeTree, suggestions, templates, accounts, rules, base] =
     await Promise.all([
       getBudgetTotals(period),
       getRealTotals(period),
@@ -38,6 +38,7 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
       listTransactions(period),
       listCategories(),
       listCategoryTree("expense"),
+      listCategoryTree("income"),
       buildSuggestionIndex(),
       listTemplates(),
       listAccounts(),
@@ -79,6 +80,7 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
     transactions,
     categories,
     tree,
+    incomeTree,
     suggestions,
     templates,
     accounts,

@@ -278,6 +278,7 @@ export type TransactionRuleRow = Timestamps & {
   suggested_account_id: string | null;
   type: string; // 'income' | 'expense'
   active: boolean;
+  priority: number; // Fase 2 (0019): mayor = se evalúa primero
 };
 
 // Plantillas / favoritos de transacción (migración 0018 · registro en 1 clic)

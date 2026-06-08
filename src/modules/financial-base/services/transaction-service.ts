@@ -83,7 +83,8 @@ export async function createTransaction(input: TxnInput): Promise<void> {
   // aplica la primera regla que haga match (determinista, sin IA).
   let categoryId = input.categoryId ?? null;
   let accountId = input.accountId ?? null;
-  if ((!categoryId || !accountId) && input.merchantOrSource) {
+  // Auto-categorización por reglas solo para gasto/ingreso (no para 'ajuste').
+  if ((!categoryId || !accountId) && input.merchantOrSource && (input.kind === "gasto" || input.kind === "ingreso")) {
     const { findMatchingRule } = await import("@/modules/financial-base/services/rules-service");
     const rule = await findMatchingRule(
       input.merchantOrSource,

@@ -6,7 +6,9 @@ import { requireUser } from "@/lib/auth/session";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
-import { getCategoryNameMap } from "@/modules/financial-base/services/categories-service";
+import { getCategoryNameMap, listCategoryTree } from "@/modules/financial-base/services/categories-service";
+import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
+import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
 import type { BudgetItem, BudgetType, Period } from "@/modules/financial-base/types";
 import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
 import type { BudgetItemInput } from "@/modules/financial-base/schemas";
@@ -119,4 +121,17 @@ export async function getBudgetTotals(period: Period): Promise<BudgetTotals> {
   }
 
   return { budgetIncome, budgetExpense, incomeByKey, expenseByKey, items, currency };
+}
+
+/**
+ * Presupuesto-vs-real agregado por GRUPO de Nivel 1 (rollup). Para vistas de
+ * presupuesto jerárquico. No toca los agregados existentes.
+ */
+export async function getBudgetByGroup(period: Period): Promise<GroupRollup[]> {
+  const [budget, real, tree] = await Promise.all([
+    getBudgetTotals(period),
+    getRealTotals(period),
+    listCategoryTree("expense"),
+  ]);
+  return rollupByGroup(budget.expenseByKey, real.expenseByKey, tree);
 }

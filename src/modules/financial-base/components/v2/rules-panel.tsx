@@ -49,13 +49,14 @@ function RulesPanel({
   const [type, setType] = useState<"income" | "expense">("expense");
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [priority, setPriority] = useState(0);
   const catName = (id: string | null) => (id ? categories.find((c) => c.id === id)?.name ?? "—" : "—");
   const accName = (id: string | null) => (id ? accounts.find((a) => a.id === id)?.name ?? "—" : "—");
 
   const add = () =>
     startTransition(async () => {
       if (!pattern.trim()) return toast("Escribe un texto a detectar", "error");
-      const res = await addRuleAction({ merchantPattern: pattern.trim(), type, suggestedCategoryId: categoryId || null, suggestedAccountId: accountId || null, active: true });
+      const res = await addRuleAction({ merchantPattern: pattern.trim(), type, suggestedCategoryId: categoryId || null, suggestedAccountId: accountId || null, active: true, priority });
       if (res.ok) {
         toast("Regla creada");
         setPattern("");
@@ -107,12 +108,14 @@ function RulesPanel({
               ))}
             </select>
           </div>
-          <div className="fld" style={{ justifyContent: "flex-end" }}>
-            <button type="button" className="btn btn-primary" onClick={add} disabled={pending} style={{ marginTop: "auto" }}>
-              <Icon name="plus" width={2} /> Agregar regla
-            </button>
+          <div className="fld">
+            <label className="fld-label">Prioridad (mayor gana)</label>
+            <input className="inp" type="number" min="0" max="1000" value={priority} onChange={(e) => setPriority(Number(e.target.value) || 0)} />
           </div>
         </div>
+        <button type="button" className="btn btn-primary" onClick={add} disabled={pending} style={{ alignSelf: "flex-start" }}>
+          <Icon name="plus" width={2} /> Agregar regla
+        </button>
 
         <div style={{ marginTop: 8 }}>
           <div className="label" style={{ marginBottom: 8 }}>Tus reglas ({rules.length})</div>
@@ -125,6 +128,7 @@ function RulesPanel({
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>“{r.merchantPattern}”</div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
                     {r.type === "expense" ? "Gasto" : "Ingreso"} → {catName(r.suggestedCategoryId)} · {accName(r.suggestedAccountId)}
+                    {r.priority > 0 ? ` · prio ${r.priority}` : ""}
                   </div>
                 </div>
                 <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Eliminar" onClick={() => remove(r.id)} disabled={pending}>

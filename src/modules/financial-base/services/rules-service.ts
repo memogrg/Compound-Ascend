@@ -13,6 +13,7 @@ export type TransactionRule = {
   suggestedAccountId: string | null;
   type: "income" | "expense";
   active: boolean;
+  priority: number;
 };
 
 function rowToRule(r: TransactionRuleRow): TransactionRule {
@@ -23,16 +24,19 @@ function rowToRule(r: TransactionRuleRow): TransactionRule {
     suggestedAccountId: r.suggested_account_id,
     type: r.type as "income" | "expense",
     active: r.active,
+    priority: r.priority ?? 0,
   };
 }
 
 export async function listRules(): Promise<TransactionRule[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // Mayor prioridad primero; a igual prioridad, la más reciente.
   const { data } = await supabase
     .from("transaction_rules")
     .select("*")
     .eq("user_id", user.id)
+    .order("priority", { ascending: false })
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToRule);
 }
@@ -47,6 +51,7 @@ export async function createRule(input: RuleInput): Promise<void> {
     suggested_account_id: input.suggestedAccountId ?? null,
     type: input.type,
     active: input.active,
+    priority: input.priority ?? 0,
   });
 }
 
@@ -61,6 +66,7 @@ export async function updateRule(id: string, input: RuleInput): Promise<void> {
       suggested_account_id: input.suggestedAccountId ?? null,
       type: input.type,
       active: input.active,
+      priority: input.priority ?? 0,
     })
     .eq("id", id)
     .eq("user_id", user.id);

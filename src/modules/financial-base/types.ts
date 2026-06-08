@@ -68,7 +68,7 @@ export type BaseIndicators = {
 };
 
 // ---------- Base Financiera V2 ----------
-export type TxnKind = "ingreso" | "gasto" | "transferencia";
+export type TxnKind = "ingreso" | "gasto" | "transferencia" | "ajuste";
 export type TxnStatus = "confirmed" | "pending_review";
 export type TxnOrigin = "manual" | "scanned" | "imported" | "recurring" | "ai_assisted";
 export type BudgetType = "income" | "expense";

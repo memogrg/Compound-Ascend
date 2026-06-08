@@ -51,6 +51,7 @@ export type V2View = {
   transactions: Transaction[];
   categories: Category[];
   tree: CategoryNode[];
+  incomeTree: CategoryNode[];
   suggestions: SuggestionEntry[];
   templates: TransactionTemplate[];
   accounts: Account[];
@@ -227,6 +228,7 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
         </div>
         <ComposerButton
           tree={view.tree}
+          incomeTree={view.incomeTree}
           accounts={view.accounts}
           currency={currency}
           suggestions={view.suggestions}
@@ -302,6 +304,7 @@ export function TransaccionesSection({ view }: { view: V2View }) {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <ComposerButton
             tree={view.tree}
+            incomeTree={view.incomeTree}
             accounts={view.accounts}
             currency={currency}
             suggestions={view.suggestions}

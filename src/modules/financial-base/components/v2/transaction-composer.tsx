@@ -52,6 +52,7 @@ function matchSuggestion(text: string, index: SuggestionEntry[]): SuggestionEntr
 export function TransactionComposer({
   initialKind = "gasto",
   tree,
+  incomeTree = [],
   accounts,
   currency,
   suggestions,
@@ -61,6 +62,7 @@ export function TransactionComposer({
 }: {
   initialKind?: TxnKind;
   tree: CategoryNode[];
+  incomeTree?: CategoryNode[];
   accounts: Account[];
   currency: string;
   suggestions: SuggestionEntry[];
@@ -78,6 +80,7 @@ export function TransactionComposer({
   const [touchedCat, setTouchedCat] = useState(false);
   const [merchant, setMerchant] = useState("");
   const [source, setSource] = useState<string>(INCOME_SOURCES[0]);
+  const [incomeCatId, setIncomeCatId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState(accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "");
   const [toAccountId, setToAccountId] = useState(accounts[1]?.id ?? "");
   const [more, setMore] = useState(false);
@@ -89,6 +92,7 @@ export function TransactionComposer({
   const isGasto = kind === "gasto";
   const isIngreso = kind === "ingreso";
   const isTransfer = kind === "transferencia";
+  const isAdjust = kind === "ajuste";
   const sym = SYM[currency] ?? "";
 
   // Mapa id → categoría para resolver etiquetas/ruta.
@@ -103,6 +107,9 @@ export function TransactionComposer({
 
   const activeGroup = tree.find((g) => g.id === groupId) ?? tree[0];
   const selectedCat = categoryId ? flatById.get(categoryId) ?? null : null;
+
+  // Categorías de ingreso (opcionales): hojas del árbol de ingresos.
+  const incomeCats = useMemo(() => incomeTree.flatMap((g) => g.children), [incomeTree]);
 
   // Sugerencia viva por comercio.
   const suggestion = useMemo(
@@ -190,9 +197,9 @@ export function TransactionComposer({
         amount: amt,
         currency,
         occurredOn: date,
-        categoryId: isGasto ? catId || null : null,
+        categoryId: isGasto ? catId || null : isIngreso ? incomeCatId : null,
         accountId: accountId || null,
-        merchantOrSource: isGasto ? merchant || undefined : source,
+        merchantOrSource: isGasto ? merchant || undefined : isIngreso ? source : note || "Ajuste de saldo",
         description: note || undefined,
         status: "confirmed",
         origin: "manual",
@@ -201,7 +208,15 @@ export function TransactionComposer({
 
     setPending(false);
     if (res.ok) {
-      toast(isTransfer ? "Transferencia registrada" : isGasto ? "Gasto registrado" : "Ingreso registrado");
+      toast(
+        isTransfer
+          ? "Transferencia registrada"
+          : isAdjust
+            ? "Ajuste registrado"
+            : isGasto
+              ? "Gasto registrado"
+              : "Ingreso registrado",
+      );
       // Aprendizaje: si categorizaste un comercio y no había sugerencia exacta, ofrece regla.
       const m = merchant.trim();
       if (isGasto && m && categoryId && (!suggestion || suggestion.categoryId !== categoryId)) {
@@ -239,7 +254,15 @@ export function TransactionComposer({
             <button type="button" className={`seg-btn ${isTransfer ? "on" : ""}`} onClick={() => setKind("transferencia")} disabled={lockKind}>
               <Icon name="repeat" width={2} /> Transferencia
             </button>
+            <button type="button" className={`seg-btn ${isAdjust ? "on" : ""}`} onClick={() => setKind("ajuste")} disabled={lockKind}>
+              <Icon name="edit" width={2} /> Ajuste
+            </button>
           </div>
+          {isAdjust ? (
+            <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
+              Conciliación de saldo (neutro): no cuenta como ingreso ni gasto.
+            </p>
+          ) : null}
 
           {/* Favoritos · 1 clic */}
           {favorites.length > 0 ? (
@@ -339,16 +362,38 @@ export function TransactionComposer({
             </>
           ) : null}
 
-          {/* Ingreso: fuente */}
+          {/* Ingreso: fuente (usa categorías de ingreso si existen) */}
           {isIngreso ? (
             <div className="fld">
               <label className="fld-label">Fuente</label>
               <div className="chip-grid">
-                {INCOME_SOURCES.map((s) => (
-                  <button key={s} type="button" className={`chip-sel ${source === s ? "on" : ""}`} onClick={() => setSource(s)}>
-                    {s}
-                  </button>
-                ))}
+                {incomeCats.length > 0
+                  ? incomeCats.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`chip-sel ${source === c.name ? "on" : ""}`}
+                        onClick={() => {
+                          setSource(c.name);
+                          setIncomeCatId(c.id);
+                        }}
+                      >
+                        {c.name}
+                      </button>
+                    ))
+                  : INCOME_SOURCES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        className={`chip-sel ${source === s ? "on" : ""}`}
+                        onClick={() => {
+                          setSource(s);
+                          setIncomeCatId(null);
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
               </div>
             </div>
           ) : null}

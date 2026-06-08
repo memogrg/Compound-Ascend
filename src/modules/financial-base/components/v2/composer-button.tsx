@@ -11,6 +11,7 @@ import type { TransactionTemplate } from "@/modules/financial-base/services/temp
 
 export function ComposerButton({
   tree,
+  incomeTree = [],
   accounts,
   currency,
   suggestions,
@@ -19,6 +20,7 @@ export function ComposerButton({
   label,
 }: {
   tree: CategoryNode[];
+  incomeTree?: CategoryNode[];
   accounts: Account[];
   currency: string;
   suggestions: SuggestionEntry[];
@@ -42,6 +44,7 @@ export function ComposerButton({
           initialKind={initialKind}
           lockKind={Boolean(only)}
           tree={tree}
+          incomeTree={incomeTree}
           accounts={accounts}
           currency={currency}
           suggestions={suggestions}

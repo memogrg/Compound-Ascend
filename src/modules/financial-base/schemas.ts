@@ -74,7 +74,7 @@ export const budgetItemInputSchema = z.object({
 });
 
 export const txnInputSchema = z.object({
-  kind: z.enum(["ingreso", "gasto"]),
+  kind: z.enum(["ingreso", "gasto", "ajuste"]),
   amount: z.number({ invalid_type_error: "Monto inválido" }).positive("Debe ser mayor a 0"),
   currency: z.string().length(3).default("CRC"),
   occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
@@ -123,6 +123,7 @@ export const ruleInputSchema = z.object({
   suggestedCategoryId: uuidOrNull.optional(),
   suggestedAccountId: uuidOrNull.optional(),
   active: z.boolean().default(true),
+  priority: z.number().int().min(0).max(1000).default(0),
 });
 
 // ---------- Categorías personalizadas (módulo Transacciones) ----------
