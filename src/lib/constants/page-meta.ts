@@ -12,22 +12,33 @@ export const PAGE_META: Record<string, PageMeta> = {
     titleHTML: 'Mi perfil <span class="it">financiero</span>',
   },
   "/mi-base-financiera": {
-    crumb: "Base",
+    crumb: "Presupuesto",
     title: "Mi Base Financiera",
     titleHTML: 'Mi base <span class="it">financiera</span>',
   },
+  "/ingresos": { crumb: "Presupuesto", title: "Ingresos", titleHTML: 'Tus <span class="it">ingresos</span>' },
+  "/gastos": { crumb: "Presupuesto", title: "Gastos", titleHTML: 'Tus <span class="it">gastos</span>' },
+  "/transacciones": {
+    crumb: "Presupuesto",
+    title: "Transacciones",
+    titleHTML: 'Tus <span class="it">transacciones</span>',
+  },
   "/control-financiero": {
     crumb: "Control",
-    title: "Control Financiero",
-    titleHTML: 'Control <span class="it">financiero</span>',
+    title: "Ahorro",
+    titleHTML: 'Tu <span class="it">ahorro</span>',
   },
-  "/patrimonio": { crumb: "Crecimiento", title: "Patrimonio", titleHTML: 'Mi <span class="it">patrimonio</span>' },
+  "/patrimonio": {
+    crumb: "Crecimiento",
+    title: "Portafolio de inversiones",
+    titleHTML: 'Portafolio de <span class="it">inversiones</span>',
+  },
   "/patrimonio/proteccion": {
-    crumb: "Patrimonio",
+    crumb: "Crecimiento",
     title: "Defensa Patrimonial",
     titleHTML: 'Defensa <span class="it">patrimonial</span>',
   },
-  "/mi-rich-life": { crumb: "Patrimonio", title: "Mi Rich Life", titleHTML: 'Mi <span class="it">Rich Life</span>' },
+  "/mi-rich-life": { crumb: "Crecimiento", title: "Patrimonio", titleHTML: 'Mi <span class="it">patrimonio</span>' },
   "/configuracion": { crumb: "Cuenta", title: "Configuración" },
 };
 

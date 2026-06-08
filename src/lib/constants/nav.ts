@@ -33,9 +33,9 @@ export const NAV: NavGroup[] = [
     label: "Presupuesto",
     items: [
       { id: "base", name: "Mi Base Financiera", icon: "budget", href: "/mi-base-financiera" },
-      { id: "income", name: "Ingresos", icon: "income", href: "/mi-base-financiera#ingresos" },
-      { id: "expenses", name: "Gastos", icon: "expense", href: "/mi-base-financiera#gastos" },
-      { id: "transactions", name: "Transacciones", icon: "txn", href: "/mi-base-financiera#transacciones" },
+      { id: "income", name: "Ingresos", icon: "income", href: "/ingresos" },
+      { id: "expenses", name: "Gastos", icon: "expense", href: "/gastos" },
+      { id: "transactions", name: "Transacciones", icon: "txn", href: "/transacciones" },
     ],
   },
   {
@@ -50,11 +50,6 @@ export const NAV: NavGroup[] = [
     items: [
       { id: "wealth", name: "Portafolio de inversiones", icon: "invest", href: "/patrimonio" },
       { id: "defense", name: "Defensa Patrimonial", icon: "defense", href: "/patrimonio/proteccion" },
-    ],
-  },
-  {
-    label: "Patrimonio",
-    items: [
       { id: "rich-life", name: "Patrimonio", icon: "networth", href: "/mi-rich-life" },
     ],
   },
