@@ -13,12 +13,16 @@ import { TransactionsBrowser } from "@/modules/financial-base/components/v2/tran
 import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
 import { ExpenseEnvelopes } from "@/modules/financial-base/components/v2/expense-envelopes";
 import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
-import { QuickAddButtons } from "@/modules/financial-base/components/v2/quick-add-buttons";
+import { ComposerButton } from "@/modules/financial-base/components/v2/composer-button";
+import { CategoryManagerButton } from "@/modules/financial-base/components/v2/category-manager";
 import { RulesButton } from "@/modules/financial-base/components/v2/rules-panel";
 import { ScanReceiptButton } from "@/modules/financial-base/components/v2/scan-receipt-button";
 import { CsvImportButton } from "@/modules/financial-base/components/v2/csv-import-modal";
 import { TransferButton } from "@/modules/financial-base/components/v2/transfer-modal";
 import type { TransactionRule } from "@/modules/financial-base/services/rules-service";
+import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
+import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
+import type { TransactionTemplate } from "@/modules/financial-base/services/templates-service";
 import { composition, computeV2Totals, topRows, type TopRow } from "@/modules/financial-base/engine/base-v2";
 import type { BudgetTotals } from "@/modules/financial-base/services/budget-service";
 import type { RealTotals, HistoryPoint } from "@/modules/financial-base/services/transaction-service";
@@ -46,6 +50,9 @@ export type V2View = {
   financialPressure: FinancialPressure;
   transactions: Transaction[];
   categories: Category[];
+  tree: CategoryNode[];
+  suggestions: SuggestionEntry[];
+  templates: TransactionTemplate[];
   accounts: Account[];
   categoryNames: Record<string, string>;
   rules: TransactionRule[];
@@ -218,7 +225,15 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
             ? "Tus ingresos se registran aquí; confirma cada uno cuando lo recibas."
             : "Tus gastos por categoría, comparados con tu presupuesto del mes."}
         </div>
-        <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} only={isIncome ? "ingreso" : "gasto"} />
+        <ComposerButton
+          tree={view.tree}
+          accounts={view.accounts}
+          currency={currency}
+          suggestions={view.suggestions}
+          templates={view.templates}
+          only={isIncome ? "ingreso" : "gasto"}
+          label={isIncome ? "Registrar ingreso" : "Registrar gasto"}
+        />
       </div>
 
       <SummaryStrip cards={summary} />
@@ -285,10 +300,17 @@ export function TransaccionesSection({ view }: { view: V2View }) {
       <div className="tab-toolbar">
         <div className="hint">Busca, filtra y gestiona todos tus movimientos del mes.</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <QuickAddButtons categories={view.categories} accounts={view.accounts} currency={currency} />
+          <ComposerButton
+            tree={view.tree}
+            accounts={view.accounts}
+            currency={currency}
+            suggestions={view.suggestions}
+            templates={view.templates}
+          />
           <ScanReceiptButton categories={view.categories} accounts={view.accounts} currency={currency} />
           <CsvImportButton currency={currency} />
           <TransferButton accounts={view.accounts} currency={currency} />
+          <CategoryManagerButton tree={view.tree} />
           <RulesButton rules={view.rules} categories={view.categories} accounts={view.accounts} />
         </div>
       </div>

@@ -15,9 +15,11 @@ import {
   getRealHistory,
   listTransactions,
 } from "@/modules/financial-base/services/transaction-service";
-import { listCategories } from "@/modules/financial-base/services/categories-service";
+import { listCategories, listCategoryTree } from "@/modules/financial-base/services/categories-service";
 import { listAccounts } from "@/modules/financial-base/services/accounts-service";
 import { listRules } from "@/modules/financial-base/services/rules-service";
+import { buildSuggestionIndex } from "@/modules/financial-base/services/suggestion-service";
+import { listTemplates } from "@/modules/financial-base/services/templates-service";
 import { parseMonthParam, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { tryGenerateMonthlySnapshot } from "@/modules/financial-base/services/snapshot-service";
 import { computeV2Totals, composition } from "@/modules/financial-base/engine/base-v2";
@@ -28,16 +30,20 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
   if (!isSupabaseConfigured()) return null;
   const period = parseMonthParam(periodRaw, new Date());
 
-  const [budget, real, history, transactions, categories, accounts, rules, base] = await Promise.all([
-    getBudgetTotals(period),
-    getRealTotals(period),
-    getRealHistory(period, 6),
-    listTransactions(period),
-    listCategories(),
-    listAccounts(),
-    listRules(),
-    getBaseSummary(),
-  ]);
+  const [budget, real, history, transactions, categories, tree, suggestions, templates, accounts, rules, base] =
+    await Promise.all([
+      getBudgetTotals(period),
+      getRealTotals(period),
+      getRealHistory(period, 6),
+      listTransactions(period),
+      listCategories(),
+      listCategoryTree("expense"),
+      buildSuggestionIndex(),
+      listTemplates(),
+      listAccounts(),
+      listRules(),
+      getBaseSummary(),
+    ]);
 
   const currency = real.currency;
   const categoryNames: Record<string, string> = {};
@@ -72,6 +78,9 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
     financialPressure: base.indicators.financialPressure,
     transactions,
     categories,
+    tree,
+    suggestions,
+    templates,
     accounts,
     rules,
     categoryNames,
