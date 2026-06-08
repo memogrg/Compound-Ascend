@@ -4,18 +4,25 @@ import {
   getWealthSummary,
   buildDemoWealthSummary,
 } from "@/modules/wealth/services/wealth-service";
+import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
+import { getSnapshotHistory } from "@/modules/wealth/services/snapshot-service";
+import { listDividends } from "@/modules/wealth/services/dividend-service";
 import { GrowthView } from "@/modules/wealth/components/growth-view";
+import { PortfolioView } from "@/modules/wealth/components/portfolio-view";
 import { WealthActions } from "@/modules/wealth/components/wealth-actions";
 import { Icon } from "@/components/ui/icon";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 
 /**
- * Módulo 4 — Patrimonio (Crecimiento). Diseña la ofensiva: invertir con
- * inteligencia. La defensa (protección) vive en /patrimonio/proteccion.
+ * Módulo 4 — Patrimonio (Crecimiento). Cartera con 4 paneles
+ * (Resumen/Cartera/Dividendos/Rendimiento). La defensa vive en /patrimonio/proteccion.
  */
 export default async function Page() {
   const configured = isSupabaseConfigured();
   const summary: WealthSummary = configured ? await getWealthSummary() : buildDemoWealthSummary();
+  const portfolio = configured
+    ? await Promise.all([getPortfolioReport(), getSnapshotHistory("all"), listDividends()])
+    : null;
 
   return (
     <div className="grid">
@@ -45,7 +52,11 @@ export default async function Page() {
         </div>
       ) : null}
 
-      <GrowthView summary={summary} />
+      {portfolio ? (
+        <PortfolioView report={portfolio[0]} snapshots={portfolio[1]} dividends={portfolio[2]} summary={summary} />
+      ) : (
+        <GrowthView summary={summary} />
+      )}
     </div>
   );
 }
