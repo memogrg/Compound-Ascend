@@ -8,10 +8,11 @@ import { SubmitButton } from "@/components/auth/submit-button";
 
 const initial: ActionState = { ok: false };
 
-export function LoginForm() {
+export function LoginForm({ next }: { next?: string } = {}) {
   const [state, action] = useActionState(signInAction, initial);
   return (
     <form action={action}>
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       {state.message ? <div className="auth-msg warn">{state.message}</div> : null}
       <Field
         label="Correo"

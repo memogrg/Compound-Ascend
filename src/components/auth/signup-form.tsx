@@ -7,7 +7,13 @@ import { SubmitButton } from "@/components/auth/submit-button";
 
 const initial: ActionState = { ok: false };
 
-export function SignupForm() {
+export function SignupForm({
+  defaultEmail,
+  next,
+}: {
+  defaultEmail?: string;
+  next?: string;
+} = {}) {
   const [state, action] = useActionState(signUpAction, initial);
 
   if (state.ok && state.message) {
@@ -16,6 +22,7 @@ export function SignupForm() {
 
   return (
     <form action={action}>
+      {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field
         label="¿Cómo quieres que te llamemos?"
         name="displayName"
@@ -30,6 +37,7 @@ export function SignupForm() {
         type="email"
         autoComplete="email"
         placeholder="tu@correo.com"
+        defaultValue={defaultEmail}
         error={state.fieldErrors?.email}
         required
       />
