@@ -11,6 +11,15 @@ import { removeBudgetItemAction } from "@/modules/financial-base/api/v2-actions"
 import type { BudgetItem, BudgetType, Period } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 
+/** Etiqueta corta del origen de una línea derivada (Fase 3 · plan derivado). */
+const DERIVED_LABEL: Record<string, string> = {
+  debt: "de tu deuda",
+  goal: "de tu meta",
+  policy: "de tu seguro",
+  recurring: "recurrente",
+  dividend: "de tus dividendos",
+};
+
 export function EditableBudgetTable({
   type,
   title,
@@ -60,28 +69,43 @@ export function EditableBudgetTable({
           Sin presupuesto este mes. Agrega tu primer ítem.
         </div>
       ) : (
-        items.map((it) => (
-          <div key={it.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 500 }}>{it.name}</div>
-              <div className="muted" style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}>
-                {it.frequency}
-                {it.categoryId && categoryNames[it.categoryId] ? ` · ${categoryNames[it.categoryId]}` : ""}
+        items.map((it) => {
+          const derived = (it.sourceKind ?? "manual") !== "manual";
+          return (
+            <div key={it.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 500 }}>{it.name}</div>
+                <div className="muted" style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}>
+                  {it.frequency}
+                  {it.categoryId && categoryNames[it.categoryId] ? ` · ${categoryNames[it.categoryId]}` : ""}
+                  {derived ? ` · ${DERIVED_LABEL[it.sourceKind ?? ""] ?? "derivado"}` : ""}
+                </div>
               </div>
+              <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500 }}>
+                {formatMoney(it.amount, it.currency)}
+              </span>
+              {derived ? (
+                <div
+                  className="muted tip"
+                  data-tip="Se deriva de tu deuda/meta/seguro: edítala desde su módulo"
+                  style={{ display: "flex", alignItems: "center", gap: 6, width: 66, justifyContent: "center" }}
+                  aria-label="Línea derivada (solo lectura)"
+                >
+                  <Icon name="lock" />
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Editar" onClick={() => setEditing(it)}>
+                    <Icon name="edit" />
+                  </button>
+                  <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Eliminar" onClick={() => remove(it.id)} disabled={pending}>
+                    <Icon name="x" width={2} />
+                  </button>
+                </div>
+              )}
             </div>
-            <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500 }}>
-              {formatMoney(it.amount, it.currency)}
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Editar" onClick={() => setEditing(it)}>
-                <Icon name="edit" />
-              </button>
-              <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Eliminar" onClick={() => remove(it.id)} disabled={pending}>
-                <Icon name="x" width={2} />
-              </button>
-            </div>
-          </div>
-        ))
+          );
+        })
       )}
 
       {adding ? (

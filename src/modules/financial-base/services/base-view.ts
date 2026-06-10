@@ -21,6 +21,7 @@ import { listRules } from "@/modules/financial-base/services/rules-service";
 import { buildSuggestionIndex } from "@/modules/financial-base/services/suggestion-service";
 import { listTemplates } from "@/modules/financial-base/services/templates-service";
 import { listLinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
+import { syncDerivedBudget } from "@/modules/financial-base/services/derived-budget-service";
 import { parseMonthParam, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { tryGenerateMonthlySnapshot } from "@/modules/financial-base/services/snapshot-service";
 import { computeV2Totals, composition } from "@/modules/financial-base/engine/base-v2";
@@ -30,6 +31,16 @@ import type { V2View } from "@/modules/financial-base/components/v2/sections";
 export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
   if (!isSupabaseConfigured()) return null;
   const period = parseMonthParam(periodRaw, new Date());
+
+  // Plan derivado (Fase 3): sincroniza las líneas que nacen de entidades
+  // ANTES de leer el presupuesto, para que el periodo refleje deudas/metas/
+  // pólizas/recurrentes/dividendos al día. Best-effort: si falla, la vista
+  // carga igual con lo que haya.
+  try {
+    await syncDerivedBudget(period);
+  } catch {
+    // noop — el sync se reintenta en la próxima carga.
+  }
 
   const [budget, real, history, transactions, categories, tree, incomeTree, suggestions, templates, accounts, rules, linkables, base] =
     await Promise.all([

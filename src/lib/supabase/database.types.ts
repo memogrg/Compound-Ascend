@@ -164,6 +164,19 @@ export type IncomeSourceRow = Timestamps & {
   amount_monthly_base: number;
 };
 
+export type RecurringItemRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  kind: string; // 'ingreso' | 'gasto'
+  name: string;
+  amount: number;
+  currency: string;
+  frequency: string;
+  next_date: string | null;
+  active: boolean;
+};
+
 export type ExpenseItemRow = Timestamps & {
   id: string;
   user_id: string;
@@ -599,6 +612,7 @@ export interface Database {
       financial_goals_profile: UserTable<FinancialGoalProfileRow>;
       dependents: UserTable<DependentRow>;
       income_sources: UserTable<IncomeSourceRow>;
+      recurring_items: UserTable<RecurringItemRow>;
       expense_items: UserTable<ExpenseItemRow>;
       monthly_snapshots: UserTable<MonthlySnapshotRow>;
       savings_goals: UserTable<SavingsGoalRow>;
