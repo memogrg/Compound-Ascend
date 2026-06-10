@@ -58,7 +58,9 @@ import {
 import {
   propagateLinkedTransaction,
   deleteLinkedTransaction,
+  linkExistingTransaction,
 } from "@/modules/financial-base/services/linked-transaction-service";
+import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -150,6 +152,30 @@ export async function addTransactionAction(raw: unknown): Promise<ActionResult> 
   } catch (err) {
     logger.error("addTransaction fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos guardar la transacción." };
+  }
+}
+
+const linkTxnSchema = z.object({
+  transactionId: z.string().uuid(),
+  linkedKind: z.enum(["debt", "goal", "holding", "policy", "rental"]),
+  linkedId: z.string().uuid(),
+});
+
+/** Conciliación (Fase 6): vincula una transacción existente y propaga. */
+export async function linkTransactionAction(raw: unknown): Promise<ActionResult> {
+  const parsed = linkTxnSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await linkExistingTransaction(parsed.data);
+    revalidate();
+    revalidatePath("/transacciones");
+    revalidatePath("/deudas");
+    revalidatePath("/ahorro");
+    return { ok: true };
+  } catch (err) {
+    logger.error("linkTransaction fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos vincular la transacción." };
   }
 }
 

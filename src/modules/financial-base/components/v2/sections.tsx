@@ -16,6 +16,8 @@ import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/
 import { ComposerButton } from "@/modules/financial-base/components/v2/composer-button";
 import { CategoryManagerButton } from "@/modules/financial-base/components/v2/category-manager";
 import { RulesButton } from "@/modules/financial-base/components/v2/rules-panel";
+import { ReconciliationCard } from "@/modules/financial-base/components/v2/reconciliation-card";
+import { findUnlinkedCandidates, buildEntityAlerts } from "@/modules/financial-base/engine/reconciliation";
 import { ScanReceiptButton } from "@/modules/financial-base/components/v2/scan-receipt-button";
 import { CsvImportButton } from "@/modules/financial-base/components/v2/csv-import-modal";
 import { TransferButton } from "@/modules/financial-base/components/v2/transfer-modal";
@@ -329,6 +331,13 @@ export function TransaccionesSection({ view }: { view: V2View }) {
         accounts={view.accounts}
         currency={currency}
         period={view.period.label}
+      />
+
+      {/* Conciliación (Fase 6): sin-vincular + plan-vs-real por entidad. */}
+      <ReconciliationCard
+        candidates={findUnlinkedCandidates(view.transactions, view.categories, view.linkables)}
+        alerts={buildEntityAlerts(view.budget.items, view.transactions)}
+        linkables={view.linkables}
       />
 
       {view.transactions.length > 0 ? (

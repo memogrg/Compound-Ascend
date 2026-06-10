@@ -87,6 +87,57 @@ export async function propagateLinkedTransaction(args: {
   // holding / policy / rental: sin propagación desde el composer (por ahora).
 }
 
+/**
+ * Conciliación (Fase 6): vincula una transacción EXISTENTE a una entidad y
+ * propaga el registro especializado (debt_payments / avance de meta). Si la
+ * propagación falla, el vínculo se revierte — la transacción queda como
+ * estaba. Solo aplica a transacciones aún sin vínculo.
+ */
+export async function linkExistingTransaction(args: {
+  transactionId: string;
+  linkedKind: "debt" | "goal" | "holding" | "policy" | "rental";
+  linkedId: string;
+}): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: txn, error: tErr } = await supabase
+    .from("transactions")
+    .select("id,kind,amount,occurred_on,linked_kind")
+    .eq("id", args.transactionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (tErr) throw new Error(tErr.message);
+  if (!txn) throw new Error("Transacción no encontrada");
+  if ((txn.linked_kind ?? "none") !== "none") throw new Error("La transacción ya está vinculada.");
+
+  const { error: upErr } = await supabase
+    .from("transactions")
+    .update({ linked_kind: args.linkedKind, linked_id: args.linkedId })
+    .eq("id", args.transactionId)
+    .eq("user_id", user.id);
+  if (upErr) throw new Error(upErr.message);
+
+  try {
+    await propagateLinkedTransaction({
+      transactionId: args.transactionId,
+      kind: txn.kind,
+      linkedKind: args.linkedKind,
+      linkedId: args.linkedId,
+      amount: Number(txn.amount),
+      occurredOn: txn.occurred_on,
+    });
+  } catch (err) {
+    // Compensación: revierte el vínculo; la transacción no se toca más.
+    await supabase
+      .from("transactions")
+      .update({ linked_kind: "none", linked_id: null })
+      .eq("id", args.transactionId)
+      .eq("user_id", user.id);
+    throw err;
+  }
+}
+
 /** Rollback compensatorio: borra la transacción creada por el orquestador. */
 export async function deleteLinkedTransaction(transactionId: string): Promise<void> {
   const user = await requireUser();
