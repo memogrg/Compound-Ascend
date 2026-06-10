@@ -59,6 +59,19 @@ export type HouseholdMemberRow = Timestamps & {
   status: MemberStatus;
 };
 
+export type InvitationStatus = "pending" | "accepted" | "revoked";
+
+export type HouseholdInvitationRow = Timestamps & {
+  id: string;
+  household_id: string;
+  email: string;
+  token: string;
+  invited_by: string;
+  role: HouseholdRole;
+  status: InvitationStatus;
+  expires_at: string;
+};
+
 // ---------- Módulo 1 — Mi Perfil Financiero ----------
 export type PersonalProfileRow = Timestamps & {
   id: string;
@@ -573,6 +586,11 @@ export interface Database {
         Partial<HouseholdMemberRow> & { household_id: string; user_id: string },
         Partial<HouseholdMemberRow>
       >;
+      household_invitations: TableShape<
+        HouseholdInvitationRow,
+        Partial<HouseholdInvitationRow> & { household_id: string; email: string; invited_by: string },
+        Partial<HouseholdInvitationRow>
+      >;
       personal_profiles: UserTable<PersonalProfileRow>;
       risk_profiles: UserTable<RiskProfileRow>;
       behavior_profiles: UserTable<BehaviorProfileRow>;
@@ -622,7 +640,12 @@ export interface Database {
     // never>` tiene índice `[k]: never` y, vía `Tables & Views`, intersecta cada
     // tabla con `never`, colapsándolas. Así lo generan los tipos oficiales.
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      ensure_household: {
+        Args: { p_name?: string | null };
+        Returns: string;
+      };
+    };
     Enums: {
       plan: Plan;
       household_type: HouseholdType;
