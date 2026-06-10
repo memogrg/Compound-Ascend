@@ -201,6 +201,8 @@ export type ExpenseCategoryRow = Timestamps & {
   is_active: boolean;
   is_favorite: boolean;
   merged_into_id: string | null;
+  // Vínculo transacción↔entidad (migración 0020 · Fase 0)
+  linked_kind: string | null; // 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
 };
 
 export type MonthlySnapshotRow = Timestamps & {
@@ -242,6 +244,10 @@ export type TransactionRow = Timestamps & {
   confidence_score_internal: number | null;
   // Reestructuración de Transacciones (migración 0018 · hook de IA)
   ai_meta: Json | null;
+  // Vínculo transacción↔entidad (migración 0020 · Fase 0)
+  linked_kind: string; // 'none' | 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
+  linked_id: string | null;
+  recurring_item_id: string | null;
 };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
@@ -257,6 +263,9 @@ export type BudgetItemRow = Timestamps & {
   frequency: string;
   period_month: number;
   period_year: number;
+  // Plan derivado (migración 0020 · Fase 0)
+  source_kind: string; // 'manual' | 'debt' | 'goal' | 'policy' | 'recurring' | 'dividend'
+  source_id: string | null;
 };
 
 export type AccountRow = Timestamps & {
