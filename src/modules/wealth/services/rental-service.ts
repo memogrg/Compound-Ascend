@@ -8,6 +8,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";
 
@@ -60,10 +61,12 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
       : "Renta / alquiler";
 
   // Ingreso vinculado en income_sources (pasivo), mismo patrón que dividendos.
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   const { data: incomeRow, error: incomeErr } = await supabase
     .from("income_sources")
     .insert({
       user_id: user.id,
+      household_id,
       name: incomeName,
       income_type: "pasivo",
       category: "Renta / alquiler",
@@ -82,6 +85,7 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
 
   const { error: rentErr } = await supabase.from("rental_payments").insert({
     user_id: user.id,
+    household_id,
     holding_id: input.holdingId,
     received_on: input.receivedOn,
     amount: input.amount,

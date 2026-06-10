@@ -3,6 +3,7 @@ import "server-only";
 /** Servicio del Módulo 3 (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
@@ -93,8 +94,10 @@ export async function listDebts(): Promise<Debt[]> {
 export async function createGoal(input: GoalInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   await supabase.from("savings_goals").insert({
     user_id: user.id,
+    household_id,
     name: input.name,
     goal_type: input.goalType ?? null,
     target_amount: input.targetAmount,
@@ -137,9 +140,10 @@ function debtColumns(input: DebtInputForm) {
 export async function createDebt(input: DebtInputForm): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   const { error } = await supabase
     .from("debts")
-    .insert({ user_id: user.id, is_current: true, ...debtColumns(input) });
+    .insert({ user_id: user.id, household_id, is_current: true, ...debtColumns(input) });
   if (error) throw new Error(error.message);
 }
 

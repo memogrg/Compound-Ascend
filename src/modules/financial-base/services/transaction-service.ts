@@ -7,6 +7,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -97,8 +98,10 @@ export async function createTransaction(input: TxnInput): Promise<void> {
   }
 
   const accountLabel = await accountLabelFor(accountId);
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   await supabase.from("transactions").insert({
     user_id: user.id,
+    household_id,
     kind: input.kind,
     description: input.description ?? null,
     merchant_or_source: input.merchantOrSource ?? null,
@@ -159,6 +162,7 @@ export async function duplicateTransaction(id: string): Promise<void> {
   if (!data) return;
   await supabase.from("transactions").insert({
     user_id: user.id,
+    household_id: data.household_id ?? null,
     kind: data.kind,
     description: data.description,
     merchant_or_source: data.merchant_or_source ?? null,
@@ -202,6 +206,7 @@ export async function splitTransaction(
   const base = data;
   const rows = parts.map((p) => ({
     user_id: user.id,
+    household_id: base.household_id ?? null,
     kind: base.kind,
     description: p.description ?? base.description,
     merchant_or_source: base.merchant_or_source,
@@ -230,8 +235,10 @@ export async function createTransfer(input: TransferInput): Promise<void> {
     .eq("user_id", user.id)
     .in("id", [input.fromAccountId, input.toAccountId]);
   const nameOf = (id: string) => accs?.find((a) => a.id === id)?.name ?? "Cuenta";
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   await supabase.from("transactions").insert({
     user_id: user.id,
+    household_id,
     kind: "transferencia",
     description: input.note ?? null,
     merchant_or_source: `${nameOf(input.fromAccountId)} → ${nameOf(input.toAccountId)}`,
@@ -253,8 +260,10 @@ export async function importTransactions(rows: CsvTxnInput[]): Promise<number> {
   if (rows.length === 0) return 0;
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   const payload = rows.map((r) => ({
     user_id: user.id,
+    household_id,
     kind: r.kind,
     description: r.description ?? null,
     merchant_or_source: r.description ?? null,

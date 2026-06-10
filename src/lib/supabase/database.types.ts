@@ -485,6 +485,7 @@ export type DividendRow = {
   id: string;
   holding_id: string;
   user_id: string;
+  household_id: string | null;
   payment_date: string;
   amount: number;
   currency: string;
