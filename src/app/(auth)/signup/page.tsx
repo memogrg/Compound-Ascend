@@ -5,20 +5,26 @@ import { SignupForm } from "@/components/auth/signup-form";
 
 export const metadata = { title: "Crear cuenta — Compound Ascend" };
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string; next?: string }>;
+}) {
+  const { email, next } = await searchParams;
+  const loginHref = next ? `/login?next=${encodeURIComponent(next)}` : "/login";
   return (
     <AuthShell
       titleHTML='Construye tu <span class="it">Rich Life</span>'
       subtitle="Crea tu cuenta y empieza a ordenar, hacer crecer y proteger tu dinero con un asesor con IA."
       footer={
         <>
-          ¿Ya tienes cuenta? <Link href="/login">Inicia sesión</Link>
+          ¿Ya tienes cuenta? <Link href={loginHref}>Inicia sesión</Link>
         </>
       }
     >
       <GoogleButton />
       <div className="auth-divider">o con tu correo</div>
-      <SignupForm />
+      <SignupForm defaultEmail={email} next={next} />
     </AuthShell>
   );
 }

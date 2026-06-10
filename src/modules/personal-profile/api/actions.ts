@@ -168,6 +168,44 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
   };
 }
 
+export type AcceptResult = { ok: boolean; message?: string };
+
+/**
+ * Acepta una invitación de hogar para el usuario autenticado: lo suma al mismo
+ * hogar del invitador (vía RPC SECURITY DEFINER) y marca su onboarding completo.
+ * No corre el wizard. El paso de nombre se resuelve aparte (pantalla mínima).
+ */
+export async function acceptInvitationAction(token: string): Promise<AcceptResult> {
+  const parsed = z.string().uuid().safeParse(token);
+  if (!parsed.success) return { ok: false, message: "Invitación no válida." };
+  if (!isSupabaseConfigured()) {
+    return { ok: false, message: "Conecta Supabase para aceptar la invitación." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("accept_household_invitation", { p_token: parsed.data });
+  if (error) {
+    logger.warn("aceptar invitación fallido", { message: error.message });
+    return { ok: false, message: friendlyAcceptError(error.message) };
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/mi-perfil-financiero");
+  return { ok: true };
+}
+
+/** Traduce el mensaje de la excepción de Postgres a una copia segura en español. */
+function friendlyAcceptError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("otro correo")) {
+    return "Esta invitación es para otro correo. Inicia sesión con el correo invitado.";
+  }
+  if (m.includes("expir")) return "La invitación expiró. Pide una nueva al administrador del hogar.";
+  if (m.includes("disponible") || m.includes("encontrada")) {
+    return "La invitación ya no está disponible.";
+  }
+  return "No pudimos aceptar la invitación. Inténtalo de nuevo.";
+}
+
 function inviteHtml(inviter: string, acceptUrl: string): string {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
