@@ -16,6 +16,8 @@ next-env.d.ts
 .env.development.local
 .env.staging.local
 .env.production.local
+.env.sandbox.local
+.env.prod.local
 
 # logs
 npm-debug.log*
