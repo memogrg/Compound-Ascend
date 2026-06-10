@@ -10,18 +10,11 @@ import { StubProvider, type AIProvider, type ChatMessage } from "@/lib/ai/provid
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import { parseAction, type AIChatResponse } from "@/lib/ai/types";
 
-export type FinancialContext = {
-  name?: string;
-  currency: string;
-  incomeMonthly?: number;
-  expenseMonthly?: number;
-  freeCashflow?: number;
-  netWorth?: number;
-  topConcern?: string;
-  portfolioValue?: number;
-  portfolioReturnPct?: number;
-  topAssetClass?: string;
-};
+// El system prompt y su contexto viven en system-prompt.ts (puro, testeable);
+// el context-engine (Fase 5) arma el FinancialContext con datos autorizados.
+import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt";
+
+export type { FinancialContext };
 
 function getProvider(): AIProvider {
   if (getServerEnv().AI_PROVIDER === "gemini") {
@@ -29,38 +22,6 @@ function getProvider(): AIProvider {
     if (g) return g;
   }
   return new StubProvider();
-}
-
-function buildSystemPrompt(ctx: FinancialContext): string {
-  const facts: string[] = [`Moneda principal: ${ctx.currency}.`];
-  if (ctx.name) facts.push(`El usuario se llama ${ctx.name}.`);
-  if (ctx.incomeMonthly !== undefined) facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}.`);
-  if (ctx.expenseMonthly !== undefined) facts.push(`Gasto mensual: ${ctx.expenseMonthly} ${ctx.currency}.`);
-  if (ctx.freeCashflow !== undefined) facts.push(`Flujo libre: ${ctx.freeCashflow} ${ctx.currency}.`);
-  if (ctx.netWorth !== undefined) facts.push(`Patrimonio neto: ${ctx.netWorth} ${ctx.currency}.`);
-  if (ctx.topConcern) facts.push(`Principal preocupación: ${ctx.topConcern}.`);
-  if (ctx.portfolioValue !== undefined) facts.push(`Valor de mercado del portafolio: ${ctx.portfolioValue} ${ctx.currency}.`);
-  if (ctx.portfolioReturnPct !== undefined) facts.push(`Rendimiento del portafolio: ${(ctx.portfolioReturnPct * 100).toFixed(1)}%.`);
-  if (ctx.topAssetClass) facts.push(`Clase de activo principal: ${ctx.topAssetClass}.`);
-
-  return [
-    "Eres Ascend AI, el asesor financiero personal de la app Compound Ascend.",
-    "Responde SIEMPRE en español, con tono humano, claro y sin culpa. Explica el porqué de cada recomendación.",
-    "No prometas rendimientos garantizados. No des consejos de inversión específicos como certezas; habla de escenarios, riesgos y horizonte.",
-    "Usa solo el contexto financiero proporcionado; no inventes datos del usuario.",
-    "",
-    "Contexto financiero autorizado del usuario:",
-    ...facts.map((f) => `- ${f}`),
-    "",
-    "Si el usuario claramente quiere registrar una transacción, crear una meta, o aplicar una estrategia, PROPÓN una acción añadiendo al final un bloque:",
-    "```action",
-    '{"type":"create_transaction","payload":{"kind":"gasto","description":"...","amount":0,"currency":"' +
-      ctx.currency +
-      '","category":null},"summary":"texto corto"}',
-    "```",
-    "Tipos válidos: create_transaction, create_goal, suggest_debt_strategy, suggest_budget_adjustment.",
-    "NUNCA afirmes que ya ejecutaste la acción: solo la propones; el usuario debe confirmar.",
-  ].join("\n");
 }
 
 export async function financeChat(

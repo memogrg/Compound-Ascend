@@ -25,6 +25,10 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
     await createTransaction(parsed.data);
     revalidatePath("/mi-base-financiera");
     revalidatePath("/dashboard");
+    // El pipeline central puede vincular/propagar (Fase 5).
+    revalidatePath("/transacciones");
+    revalidatePath("/deudas");
+    revalidatePath("/ahorro");
     return { ok: true };
   } catch (err) {
     logger.error("confirmTransaction fallido", { message: err instanceof Error ? err.message : "?" });

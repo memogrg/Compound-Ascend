@@ -1,21 +1,55 @@
 import "server-only";
 
-/** Crea transacciones (respeta RLS). Siempre marcadas como confirmadas por el usuario. */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
+/**
+ * Crea transacciones confirmadas por el usuario (wizard, chat IA, recibo).
+ *
+ * Fase 5 (interconexión): delega en el pipeline central de financial-base —
+ * la misma ruta que el composer — para que apliquen las reglas de
+ * auto-categorización/auto-vínculo (Fase 2) y la propagación al ledger
+ * especializado (pago de deuda / aporte a meta) con compensación.
+ * El insert directo anterior se saltaba todo eso.
+ */
+import {
+  createTransaction as createBaseTransaction,
+} from "@/modules/financial-base/services/transaction-service";
+import {
+  propagateLinkedTransaction,
+  deleteLinkedTransaction,
+} from "@/modules/financial-base/services/linked-transaction-service";
 import type { TransactionInput } from "@/modules/assistant/schemas";
 
 export async function createTransaction(input: TransactionInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  await supabase.from("transactions").insert({
-    user_id: user.id,
+  const created = await createBaseTransaction({
     kind: input.kind,
-    description: input.description,
     amount: input.amount,
     currency: input.currency,
-    occurred_on: input.occurredOn,
-    source: input.source,
-    confirmed_by_user: true,
+    occurredOn: input.occurredOn,
+    categoryId: null,
+    accountId: null,
+    // La descripción funciona como comercio/fuente: las reglas hacen match
+    // sobre ella (igual que el texto del recibo escaneado).
+    merchantOrSource: input.description,
+    description: input.description,
+    status: "confirmed",
+    origin: input.source === "receipt" ? "scanned" : "ai_assisted",
+    linkedKind: input.linkedKind ?? "none",
+    linkedId: input.linkedId ?? null,
   });
+
+  // Propagación (vínculo propuesto por la IA o aplicado por regla).
+  if (created.linkedKind !== "none" && created.linkedId) {
+    try {
+      await propagateLinkedTransaction({
+        transactionId: created.id,
+        kind: input.kind,
+        linkedKind: created.linkedKind,
+        linkedId: created.linkedId,
+        amount: input.amount,
+        occurredOn: input.occurredOn,
+      });
+    } catch (err) {
+      await deleteLinkedTransaction(created.id);
+      throw err;
+    }
+  }
 }

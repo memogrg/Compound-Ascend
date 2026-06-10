@@ -6,7 +6,8 @@
  */
 import { NextResponse } from "next/server";
 import { chatRequestSchema } from "@/modules/assistant/schemas";
-import { financeChat, type FinancialContext } from "@/lib/ai/orchestrator";
+import { financeChat } from "@/lib/ai/orchestrator";
+import { buildFinancialContext } from "@/lib/ai/context-engine";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
 
     if (user) await assertTokenBudget(user.id);
 
-    const ctx = await buildContext();
+    const ctx = await buildFinancialContext();
     const messages: ChatMessage[] = [
       ...parsed.data.history.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
       { role: "user", content: parsed.data.message },
@@ -52,43 +53,5 @@ export async function POST(req: Request) {
   }
 }
 
-async function buildContext(): Promise<FinancialContext> {
-  const user = await getUser();
-  const name = (user?.user_metadata?.display_name as string | undefined) ?? undefined;
-  if (!isSupabaseConfigured()) return { name, currency: "CRC" };
-  try {
-    const { getBaseSummary, getDisplayCurrency } = await import(
-      "@/modules/financial-base/services/base-service"
-    );
-    const [base, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
-    const ctx: FinancialContext = {
-      name,
-      currency,
-      incomeMonthly: base.indicators.incomeMonthly,
-      expenseMonthly: base.indicators.expenseMonthly,
-      freeCashflow: base.indicators.freeCashflow,
-    };
-
-    // Enriquece con datos de portafolio (best-effort, no bloquea si falla).
-    try {
-      const { getPortfolioReport } = await import(
-        "@/modules/wealth/services/portfolio-service"
-      );
-      const report = await getPortfolioReport();
-      if (report.analytics.totalPortfolioValue > 0) {
-        const topSlice = Object.values(report.analytics.allocation).reduce((a, b) =>
-          a.value > b.value ? a : b,
-        );
-        ctx.portfolioValue = Math.round(report.analytics.totalPortfolioValue);
-        ctx.portfolioReturnPct = report.analytics.totalReturnPct;
-        ctx.topAssetClass = topSlice.label;
-      }
-    } catch {
-      // Portfolio no disponible — el contexto base sigue siendo suficiente.
-    }
-
-    return ctx;
-  } catch {
-    return { name, currency: "CRC" };
-  }
-}
+// buildContext() vive ahora en src/lib/ai/context-engine.ts (Fase 5):
+// perfil + deudas + metas + patrimonio + portafolio + entidades vinculables.

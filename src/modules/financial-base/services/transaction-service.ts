@@ -136,7 +136,7 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
       origin: input.origin,
       receipt_url: input.receiptUrl ?? null,
       confidence_score_internal: input.confidence ?? null,
-      source: input.origin === "scanned" ? "receipt" : "manual",
+      source: input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual",
       confirmed_by_user: input.status === "confirmed",
       linked_kind: linkedKind,
       linked_id: linkedId,

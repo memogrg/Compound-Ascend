@@ -242,6 +242,11 @@ function ActionCard({ action }: { action: AIActionProposal }) {
   const [done, setDone] = useState(false);
   if (action.type === "create_transaction") {
     const p = action.payload as Record<string, unknown>;
+    const VALID_LINKS = new Set(["debt", "goal", "holding", "policy", "rental"]);
+    const linkedKind =
+      typeof p.linkedKind === "string" && VALID_LINKS.has(p.linkedKind)
+        ? (p.linkedKind as DraftTxn["linkedKind"])
+        : null;
     const draft: DraftTxn = {
       kind: (p.kind as "ingreso" | "gasto") ?? "gasto",
       description: String(p.description ?? action.summary ?? "Transacción"),
@@ -249,6 +254,9 @@ function ActionCard({ action }: { action: AIActionProposal }) {
       currency: String(p.currency ?? "CRC"),
       occurredOn: String(p.date ?? p.occurredOn ?? todayISO()),
       source: "chat",
+      linkedKind,
+      linkedId: linkedKind && typeof p.linkedId === "string" ? p.linkedId : null,
+      linkedName: linkedKind && typeof p.linkedName === "string" ? p.linkedName : null,
     };
     return (
       <div style={{ padding: "4px 0 0 36px" }}>
@@ -278,6 +286,10 @@ type DraftTxn = {
   currency: string;
   occurredOn: string;
   source: "chat" | "receipt" | "manual";
+  // Fase 5: vínculo propuesto por la IA (el usuario lo ve antes de confirmar).
+  linkedKind?: "debt" | "goal" | "holding" | "policy" | "rental" | null;
+  linkedId?: string | null;
+  linkedName?: string | null;
 };
 
 function TransactionWizard() {
@@ -419,6 +431,14 @@ function TxnConfirmCard({
       <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
         {draft.description} · {draft.occurredOn}
       </div>
+      {draft.linkedKind && draft.linkedId ? (
+        <div style={{ marginTop: 6 }}>
+          <span className="chip" style={{ fontSize: 10.5 }}>
+            Vinculada a {draft.linkedKind === "debt" ? "deuda" : draft.linkedKind === "goal" ? "meta" : "entidad"}
+            {draft.linkedName ? `: ${draft.linkedName}` : ""}
+          </span>
+        </div>
+      ) : null}
       {error ? <div className="auth-err" style={{ marginTop: 6 }}>{error}</div> : null}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <button className="btn btn-secondary" style={{ flex: 1, justifyContent: "center" }} onClick={onCancel} disabled={pending}>
