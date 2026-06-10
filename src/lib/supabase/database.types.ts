@@ -645,6 +645,22 @@ export interface Database {
         Args: { p_name?: string | null };
         Returns: string;
       };
+      get_invitation_by_token: {
+        Args: { p_token: string };
+        Returns: {
+          household_id: string;
+          email: string;
+          role: HouseholdRole;
+          status: InvitationStatus;
+          expired: boolean;
+          inviter_name: string;
+          household_name: string;
+        }[];
+      };
+      accept_household_invitation: {
+        Args: { p_token: string };
+        Returns: string;
+      };
     };
     Enums: {
       plan: Plan;
