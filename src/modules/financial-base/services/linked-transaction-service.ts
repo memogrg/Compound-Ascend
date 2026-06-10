@@ -55,13 +55,37 @@ export async function propagateLinkedTransaction(args: {
   const supabase = await createSupabaseServerClient();
 
   if (args.linkedKind === "debt") {
+    // Desglose cuota vs abono extra (Fase 7): si el pago supera la cuota
+    // vigente, el excedente amortiza capital directo. El split capital/interés
+    // se estima con el engine de amortización (null si no hay tasa).
+    const { data: debt, error: dErr } = await supabase
+      .from("debts")
+      .select("balance,apr,current_payment,min_payment")
+      .eq("id", args.linkedId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (dErr) throw new Error(dErr.message);
+    if (!debt) throw new Error("La deuda vinculada ya no existe o no te pertenece.");
+
+    const { estimatePaymentSplit } = await import("@/modules/control/engine/amortization");
+    const cuota =
+      Number(debt.current_payment) > 0 ? Number(debt.current_payment) : Number(debt.min_payment ?? 0);
+    const split = estimatePaymentSplit({
+      totalPaid: args.amount,
+      cuota,
+      balance: Number(debt.balance),
+      apr: debt.apr == null ? null : Number(debt.apr),
+    });
+
     const { error } = await supabase.from("debt_payments").insert({
       user_id: user.id,
       debt_id: args.linkedId,
       occurred_on: args.occurredOn,
-      amount: args.amount,
-      extra_amount: 0,
+      amount: split.amount,
+      extra_amount: split.extraAmount,
       extra_mode: null,
+      principal: split.principal,
+      interest: split.interest,
       transaction_id: args.transactionId,
     });
     if (error) throw new Error(error.message);

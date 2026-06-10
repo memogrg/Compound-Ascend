@@ -134,6 +134,9 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
         </div>
       </div>
 
+      {/* Pagos reportados (todos los orígenes: Control, Gastos, chat, conciliación) */}
+      <PaymentsCard vm={vm} currency={currency} />
+
       {/* Calculadora de escenarios */}
       <ScenarioCalculator input={input} currency={currency} />
 
@@ -183,6 +186,81 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
       {pay ? (
         <ReportPaymentModal vm={vm} input={input} currency={currency} preset={pay} onClose={() => setPay(null)} />
       ) : null}
+    </div>
+  );
+}
+
+/** Etiqueta discreta del origen del pago según el source de su transacción. */
+const VIA_LABEL: Record<string, string> = {
+  manual: "vía Gastos",
+  chat: "vía Chat",
+  receipt: "vía Recibo",
+};
+
+/**
+ * Pagos reportados de la deuda, de cualquier origen (modal de Control,
+ * composer de Gastos, chat IA, conciliación 1-tap). Con desglose cuota/extra
+ * y la amortización estimada cuando hay tasa.
+ */
+function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) {
+  if (vm.payments.length === 0) return null;
+  const sorted = [...vm.payments].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
+  return (
+    <div className="card">
+      <div className="card-head">
+        <div>
+          <div className="card-title">Pagos reportados</div>
+          <div className="card-sub">{sorted.length} pago(s) · recalculan el saldo y la proyección</div>
+        </div>
+      </div>
+      {sorted.map((p) => {
+        const total = p.amount + p.extraAmount;
+        const hasExtra = p.extraAmount > 0;
+        const hasEstimate = p.principal != null && p.interest != null;
+        return (
+          <div key={p.id} className="list-row" style={{ gridTemplateColumns: "1fr auto" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {fmtDay(p.paymentDate)}
+                {p.viaSource && VIA_LABEL[p.viaSource] ? (
+                  <span className="chip" style={{ fontSize: 10, background: "var(--chip)", color: "var(--muted)" }}>
+                    {VIA_LABEL[p.viaSource]}
+                  </span>
+                ) : null}
+              </div>
+              <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                {hasExtra ? (
+                  hasEstimate ? (
+                    <>
+                      Cuota {formatMoney(p.amount, currency)} + Extra {formatMoney(p.extraAmount, currency)} → amortizaste{" "}
+                      <span style={{ color: "var(--pos)", fontWeight: 600 }}>{formatMoney(p.extraAmount, currency)}</span> adicionales
+                      {" "}(capital total {formatMoney(p.principal!, currency)}, interés {formatMoney(p.interest!, currency)})
+                    </>
+                  ) : (
+                    <span
+                      className="tip"
+                      data-tip={
+                        vm.apr > 0
+                          ? "Pago registrado antes del desglose automático; los nuevos estiman capital e interés"
+                          : "Agrega la tasa de interés para ver cuánto amortizas"
+                      }
+                    >
+                      Cuota {formatMoney(p.amount, currency)} + Extra {formatMoney(p.extraAmount, currency)} · sin estimación
+                    </span>
+                  )
+                ) : hasEstimate ? (
+                  <>Capital {formatMoney(p.principal!, currency)} · interés {formatMoney(p.interest!, currency)}</>
+                ) : (
+                  <>Cuota del mes</>
+                )}
+              </div>
+            </div>
+            <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500 }}>
+              {formatMoney(total, currency)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

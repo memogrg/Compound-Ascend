@@ -89,6 +89,8 @@ export async function getDebtDetail(
     ...p,
     amount: conv(p.amount),
     extraAmount: conv(p.extraAmount),
+    principal: p.principal == null ? null : conv(p.principal),
+    interest: p.interest == null ? null : conv(p.interest),
   }));
 
   const recompute =

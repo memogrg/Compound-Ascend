@@ -197,7 +197,9 @@ export async function deleteDebt(id: string): Promise<void> {
 
 // ── Deuda individual y pagos (fuente de la verdad: debt_payments) ──
 
-function rowToDebtPayment(r: DebtPaymentRow): DebtPayment {
+function rowToDebtPayment(
+  r: DebtPaymentRow & { txn?: { source: string | null } | null },
+): DebtPayment {
   return {
     id: r.id,
     debtId: r.debt_id,
@@ -205,6 +207,9 @@ function rowToDebtPayment(r: DebtPaymentRow): DebtPayment {
     amount: Number(r.amount),
     extraAmount: Number(r.extra_amount ?? 0),
     extraMode: (r.extra_mode ?? null) as ExtraMode | null,
+    principal: r.principal == null ? null : Number(r.principal),
+    interest: r.interest == null ? null : Number(r.interest),
+    viaSource: r.txn?.source ?? null,
   };
 }
 
@@ -224,14 +229,21 @@ export async function getDebt(id: string): Promise<Debt | null> {
 export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // Incluye TODOS los pagos sin importar su origen (Control, composer, chat,
+  // conciliación). El embed por transaction_id trae el source de la
+  // transacción vinculada para mostrar el origen ("vía Gastos"/"vía Chat").
   const { data, error } = await supabase
     .from("debt_payments")
-    .select("*")
+    .select("*, txn:transactions!debt_payments_transaction_id_fkey(source)")
     .eq("debt_id", debtId)
     .eq("user_id", user.id)
     .order("occurred_on", { ascending: true });
   if (error) throw new Error(error.message);
-  return (data ?? []).map(rowToDebtPayment);
+  // Cast: los tipos de DB hechos a mano no describen relaciones; el FK
+  // debt_payments_transaction_id_fkey existe (migración 0021).
+  return ((data ?? []) as unknown as (DebtPaymentRow & { txn?: { source: string | null } | null })[]).map(
+    rowToDebtPayment,
+  );
 }
 
 /** Fechas de pago reportadas en el mes calendario actual, agrupadas por deuda. */

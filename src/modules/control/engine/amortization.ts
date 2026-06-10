@@ -296,3 +296,40 @@ export function recomputeFromPayments(
     projectedPayoffDate: last?.date ?? null,
   };
 }
+
+/** Desglose de un pago total contra la cuota vigente (Fase 7 · pagos vía Gastos). */
+export type PaymentSplit = {
+  /** Parte que cuenta como cuota (≤ total pagado). */
+  amount: number;
+  /** Excedente sobre la cuota: amortiza capital directo. */
+  extraAmount: number;
+  /** Capital estimado del pago completo (null sin tasa registrada). */
+  principal: number | null;
+  /** Interés estimado del mes (null sin tasa registrada). */
+  interest: number | null;
+};
+
+/**
+ * Divide un pago total en cuota + extra y estima capital/interés con la
+ * misma regla que recomputeFromPayments (interés del mes = saldo × r).
+ * Si la cuota vigente no se conoce (≤ 0), todo el pago cuenta como cuota.
+ * Sin tasa (apr ≤ 0) no se estima el split capital/interés.
+ */
+export function estimatePaymentSplit(args: {
+  totalPaid: number;
+  cuota: number;
+  balance: number;
+  apr: number | null;
+}): PaymentSplit {
+  const cuota = args.cuota > 0 ? args.cuota : args.totalPaid;
+  const amount = round2(Math.min(args.totalPaid, cuota));
+  const extraAmount = round2(Math.max(0, args.totalPaid - cuota));
+
+  if (!args.apr || args.apr <= 0) {
+    return { amount, extraAmount, principal: null, interest: null };
+  }
+  const r = args.apr / 100 / 12;
+  const interest = round2(Math.min(args.balance * r, amount));
+  const principal = round2(Math.min(Math.max(0, args.totalPaid - interest), args.balance));
+  return { amount, extraAmount, principal, interest };
+}
