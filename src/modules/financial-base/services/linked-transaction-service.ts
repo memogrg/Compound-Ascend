@@ -28,7 +28,63 @@ import type { LinkedTxnInput } from "@/modules/financial-base/engine/linked";
  */
 export async function registerLinkedTransaction(input: LinkedTxnInput): Promise<string> {
   const parsed = txnInputSchema.parse(input);
-  return createTransaction(parsed);
+  const { id } = await createTransaction(parsed);
+  return id;
+}
+
+/**
+ * Propagación para transacciones vinculadas creadas DESDE el composer
+ * (Fase 2): escribe el registro especializado mínimo para que el módulo
+ * dueño vea el evento. Solo debt/goal — los flujos de wealth (dividendo,
+ * renta) tienen su propio formulario y pasan por sus servicios.
+ *
+ * NO se usa en los flujos de control/wealth (Fase 1): ellos escriben su
+ * ledger completo (extra, modos, income_sources) y llaman a
+ * registerLinkedTransaction; propagar aquí también lo duplicaría.
+ */
+export async function propagateLinkedTransaction(args: {
+  transactionId: string;
+  kind: string;
+  linkedKind: string;
+  linkedId: string | null;
+  amount: number;
+  occurredOn: string;
+}): Promise<void> {
+  if (!args.linkedId || args.kind !== "gasto") return;
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  if (args.linkedKind === "debt") {
+    const { error } = await supabase.from("debt_payments").insert({
+      user_id: user.id,
+      debt_id: args.linkedId,
+      occurred_on: args.occurredOn,
+      amount: args.amount,
+      extra_amount: 0,
+      extra_mode: null,
+      transaction_id: args.transactionId,
+    });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (args.linkedKind === "goal") {
+    const { data: goal, error: gErr } = await supabase
+      .from("savings_goals")
+      .select("current_amount")
+      .eq("id", args.linkedId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (gErr) throw new Error(gErr.message);
+    if (!goal) throw new Error("Meta no encontrada");
+    const { error } = await supabase
+      .from("savings_goals")
+      .update({ current_amount: Number(goal.current_amount) + args.amount })
+      .eq("id", args.linkedId)
+      .eq("user_id", user.id);
+    if (error) throw new Error(error.message);
+  }
+  // holding / policy / rental: sin propagación desde el composer (por ahora).
 }
 
 /** Rollback compensatorio: borra la transacción creada por el orquestador. */

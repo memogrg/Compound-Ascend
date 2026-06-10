@@ -28,6 +28,8 @@ export type Category = {
   isSystem: boolean;
   categoryType: string; // 'expense' | 'income' | 'transfer' | 'both'
   sortOrder: number;
+  /** La categoría sugiere vincular a una entidad ('debt'|'goal'|…) o null. */
+  linkedKind: string | null;
 };
 
 /** Nodo de Nivel 1 con sus descendientes seleccionables aplanados. */
@@ -47,10 +49,11 @@ type CategoryRowLite = Pick<
   | "is_system"
   | "category_type"
   | "sort_order"
+  | "linked_kind"
 >;
 
 const SELECT_COLS =
-  "id,key,name,default_nature,parent_id,icon,color,is_favorite,is_active,is_system,category_type,sort_order";
+  "id,key,name,default_nature,parent_id,icon,color,is_favorite,is_active,is_system,category_type,sort_order,linked_kind";
 
 function rowToCategory(r: CategoryRowLite): Category {
   return {
@@ -66,6 +69,7 @@ function rowToCategory(r: CategoryRowLite): Category {
     isSystem: Boolean(r.is_system),
     categoryType: r.category_type ?? "expense",
     sortOrder: r.sort_order ?? 0,
+    linkedKind: r.linked_kind ?? null,
   };
 }
 

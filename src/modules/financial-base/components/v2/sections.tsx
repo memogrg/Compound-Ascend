@@ -20,6 +20,7 @@ import { ScanReceiptButton } from "@/modules/financial-base/components/v2/scan-r
 import { CsvImportButton } from "@/modules/financial-base/components/v2/csv-import-modal";
 import { TransferButton } from "@/modules/financial-base/components/v2/transfer-modal";
 import type { TransactionRule } from "@/modules/financial-base/services/rules-service";
+import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
 import type { TransactionTemplate } from "@/modules/financial-base/services/templates-service";
@@ -57,6 +58,7 @@ export type V2View = {
   accounts: Account[];
   categoryNames: Record<string, string>;
   rules: TransactionRule[];
+  linkables: LinkableEntities;
   baseReading: FinancialReading;
   incomeCapsule: FinancialReading;
   expenseCapsule: FinancialReading;
@@ -233,6 +235,7 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
           currency={currency}
           suggestions={view.suggestions}
           templates={view.templates}
+          linkables={view.linkables}
           only={isIncome ? "ingreso" : "gasto"}
           label={isIncome ? "Registrar ingreso" : "Registrar gasto"}
         />
@@ -309,6 +312,7 @@ export function TransaccionesSection({ view }: { view: V2View }) {
             currency={currency}
             suggestions={view.suggestions}
             templates={view.templates}
+            linkables={view.linkables}
           />
           <ScanReceiptButton categories={view.categories} accounts={view.accounts} currency={currency} />
           <CsvImportButton currency={currency} />

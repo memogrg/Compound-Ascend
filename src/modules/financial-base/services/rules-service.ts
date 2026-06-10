@@ -14,6 +14,9 @@ export type TransactionRule = {
   type: "income" | "expense";
   active: boolean;
   priority: number;
+  /** Auto-vínculo (Fase 2): la regla puede fijar entidad además de categoría. */
+  linkedKind: string | null;
+  linkedId: string | null;
 };
 
 function rowToRule(r: TransactionRuleRow): TransactionRule {
@@ -25,6 +28,8 @@ function rowToRule(r: TransactionRuleRow): TransactionRule {
     type: r.type as "income" | "expense",
     active: r.active,
     priority: r.priority ?? 0,
+    linkedKind: r.linked_kind ?? null,
+    linkedId: r.linked_id ?? null,
   };
 }
 
@@ -52,6 +57,8 @@ export async function createRule(input: RuleInput): Promise<void> {
     type: input.type,
     active: input.active,
     priority: input.priority ?? 0,
+    linked_kind: input.linkedKind ?? null,
+    linked_id: input.linkedId ?? null,
   });
 }
 
@@ -67,6 +74,8 @@ export async function updateRule(id: string, input: RuleInput): Promise<void> {
       type: input.type,
       active: input.active,
       priority: input.priority ?? 0,
+      linked_kind: input.linkedKind ?? null,
+      linked_id: input.linkedId ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);

@@ -288,6 +288,9 @@ export type TransactionRuleRow = Timestamps & {
   type: string; // 'income' | 'expense'
   active: boolean;
   priority: number; // Fase 2 (0019): mayor = se evalúa primero
+  // Auto-vínculo (migración 0022 · Fase 2 interconexión)
+  linked_kind: string | null; // 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
+  linked_id: string | null;
 };
 
 // Plantillas / favoritos de transacción (migración 0018 · registro en 1 clic)

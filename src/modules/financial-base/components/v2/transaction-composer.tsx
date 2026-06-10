@@ -23,10 +23,19 @@ import {
   addRuleAction,
   runTemplateAction,
 } from "@/modules/financial-base/api/v2-actions";
-import type { Account, TxnKind } from "@/modules/financial-base/types";
+import type { Account, TxnKind, LinkedKind } from "@/modules/financial-base/types";
 import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
 import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
 import type { TransactionTemplate } from "@/modules/financial-base/services/templates-service";
+import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
+
+const LINK_LABEL: Record<string, string> = {
+  debt: "deuda",
+  goal: "meta",
+  holding: "inversión",
+  policy: "póliza",
+  rental: "activo de renta",
+};
 
 const INCOME_SOURCES = ["Salario", "Comisión", "Venta", "Reembolso", "Ingreso pasivo", "Extraordinario"] as const;
 const SYM: Record<string, string> = { CRC: "₡", USD: "$", EUR: "€", MXN: "MX$", COP: "COL$", GBP: "£" };
@@ -57,6 +66,7 @@ export function TransactionComposer({
   currency,
   suggestions,
   templates,
+  linkables,
   lockKind,
   onClose,
 }: {
@@ -67,6 +77,7 @@ export function TransactionComposer({
   currency: string;
   suggestions: SuggestionEntry[];
   templates: TransactionTemplate[];
+  linkables?: LinkableEntities;
   lockKind?: boolean;
   onClose: () => void;
 }) {
@@ -110,6 +121,22 @@ export function TransactionComposer({
 
   // Categorías de ingreso (opcionales): hojas del árbol de ingresos.
   const incomeCats = useMemo(() => incomeTree.flatMap((g) => g.children), [incomeTree]);
+
+  // Vínculo entidad (Fase 2): la categoría sugiere el tipo; 1 tap elige cuál.
+  const [linkedId, setLinkedId] = useState<string | null>(null);
+  const [touchedLink, setTouchedLink] = useState(false);
+  const linkKind = (isGasto ? (selectedCat?.linkedKind ?? null) : null) as Exclude<LinkedKind, "none"> | null;
+  const linkOptions = useMemo(
+    () => (linkKind && linkables ? linkables[linkKind] : []),
+    [linkKind, linkables],
+  );
+  // Solo cuenta si la entidad elegida es del tipo que sugiere la categoría
+  // actual (cambiar de categoría invalida el vínculo viejo). Si hay una sola
+  // entidad de ese tipo y el usuario no ha tocado el selector, se preselecciona.
+  const validLinkedId =
+    linkedId && linkOptions.some((o) => o.id === linkedId) ? linkedId : null;
+  const effectiveLinkedId =
+    validLinkedId ?? (!touchedLink && linkOptions.length === 1 ? linkOptions[0]!.id : null);
 
   // Sugerencia viva por comercio.
   const suggestion = useMemo(
@@ -203,6 +230,8 @@ export function TransactionComposer({
         description: note || undefined,
         status: "confirmed",
         origin: "manual",
+        linkedKind: linkKind && effectiveLinkedId ? linkKind : "none",
+        linkedId: linkKind && effectiveLinkedId ? effectiveLinkedId : null,
       });
     }
 
@@ -217,14 +246,25 @@ export function TransactionComposer({
               ? "Gasto registrado"
               : "Ingreso registrado",
       );
-      // Aprendizaje: si categorizaste un comercio y no había sugerencia exacta, ofrece regla.
+      // Aprendizaje: si categorizaste un comercio y no había sugerencia exacta,
+      // ofrece regla (con vínculo incluido: la próxima vez se auto-vincula).
       const m = merchant.trim();
       if (isGasto && m && categoryId && (!suggestion || suggestion.categoryId !== categoryId)) {
         const catName = flatById.get(categoryId)?.name ?? "esa categoría";
+        const ruleLinkKind = linkKind && effectiveLinkedId ? linkKind : null;
+        const ruleLinkId = linkKind && effectiveLinkedId ? effectiveLinkedId : null;
         toast(`Aprender "${m}" → ${catName}`, "info", {
           label: "Crear regla",
           onClick: () => {
-            void addRuleAction({ merchantPattern: m, type: "expense", suggestedCategoryId: categoryId, suggestedAccountId: accountId || null, active: true });
+            void addRuleAction({
+              merchantPattern: m,
+              type: "expense",
+              suggestedCategoryId: categoryId,
+              suggestedAccountId: accountId || null,
+              active: true,
+              linkedKind: ruleLinkKind,
+              linkedId: ruleLinkId,
+            });
           },
         });
       }
@@ -359,6 +399,42 @@ export function TransactionComposer({
                   </div>
                 ) : null}
               </div>
+
+              {/* Vínculo entidad (Fase 2): 1 tap. Aparece si la categoría lo sugiere. */}
+              {linkKind && linkOptions.length > 0 ? (
+                <div className="fld">
+                  <label className="fld-label">
+                    Vincular a {LINK_LABEL[linkKind] ?? "entidad"}
+                    {effectiveLinkedId ? (
+                      <span className="cmp-picked">
+                        {" "}· {linkOptions.find((o) => o.id === effectiveLinkedId)?.name}
+                      </span>
+                    ) : null}
+                  </label>
+                  <div className="chip-grid">
+                    {linkOptions.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className={`chip-sel ${effectiveLinkedId === o.id ? "on" : ""}`}
+                        onClick={() => {
+                          setLinkedId(effectiveLinkedId === o.id ? null : o.id);
+                          setTouchedLink(true);
+                        }}
+                      >
+                        {o.name}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    {linkKind === "debt"
+                      ? "El pago también quedará en el historial de la deuda."
+                      : linkKind === "goal"
+                        ? "El aporte también sumará al avance de la meta."
+                        : "La transacción quedará conectada a la entidad."}
+                  </p>
+                </div>
+              ) : null}
             </>
           ) : null}
 

@@ -55,6 +55,10 @@ import {
   updateAccount,
   deleteAccount,
 } from "@/modules/financial-base/services/accounts-service";
+import {
+  propagateLinkedTransaction,
+  deleteLinkedTransaction,
+} from "@/modules/financial-base/services/linked-transaction-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -120,8 +124,28 @@ export async function addTransactionAction(raw: unknown): Promise<ActionResult> 
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    await createTransaction(parsed.data);
+    const created = await createTransaction(parsed.data);
+    // Fase 2: si quedó vinculada (a mano o por regla), escribe también el
+    // registro especializado (pago de deuda / aporte a meta). Compensa si falla.
+    if (created.linkedKind !== "none" && created.linkedId) {
+      try {
+        await propagateLinkedTransaction({
+          transactionId: created.id,
+          kind: parsed.data.kind,
+          linkedKind: created.linkedKind,
+          linkedId: created.linkedId,
+          amount: parsed.data.amount,
+          occurredOn: parsed.data.occurredOn,
+        });
+      } catch (propErr) {
+        await deleteLinkedTransaction(created.id);
+        throw propErr;
+      }
+    }
     revalidate();
+    revalidatePath("/transacciones");
+    revalidatePath("/deudas");
+    revalidatePath("/ahorro");
     return { ok: true };
   } catch (err) {
     logger.error("addTransaction fallido", { message: err instanceof Error ? err.message : "?" });

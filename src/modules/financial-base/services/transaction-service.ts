@@ -78,17 +78,30 @@ export async function listTransactions(period: Period, filters: TxnFilters = {})
   return (data ?? []).map(rowToTransaction);
 }
 
-/** Crea la transacción y devuelve su id (lo usa el orquestador de vínculos). */
-export async function createTransaction(input: TxnInput): Promise<string> {
+export type CreatedTransaction = {
+  id: string;
+  /** Vínculo final tras aplicar reglas (puede diferir del input). */
+  linkedKind: NonNullable<TxnInput["linkedKind"]>;
+  linkedId: string | null;
+};
+
+/** Crea la transacción y devuelve id + vínculo final (post-reglas). */
+export async function createTransaction(input: TxnInput): Promise<CreatedTransaction> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  // Auto-categorización por reglas: si falta categoría/cuenta y hay comercio,
-  // aplica la primera regla que haga match (determinista, sin IA).
+  // Auto-categorización por reglas: si falta categoría/cuenta/vínculo y hay
+  // comercio, aplica la primera regla que haga match (determinista, sin IA).
   let categoryId = input.categoryId ?? null;
   let accountId = input.accountId ?? null;
+  let linkedKind = input.linkedKind ?? "none";
+  let linkedId = input.linkedId ?? null;
   // Auto-categorización por reglas solo para gasto/ingreso (no para 'ajuste').
-  if ((!categoryId || !accountId) && input.merchantOrSource && (input.kind === "gasto" || input.kind === "ingreso")) {
+  if (
+    (!categoryId || !accountId || linkedKind === "none") &&
+    input.merchantOrSource &&
+    (input.kind === "gasto" || input.kind === "ingreso")
+  ) {
     const { findMatchingRule } = await import("@/modules/financial-base/services/rules-service");
     const rule = await findMatchingRule(
       input.merchantOrSource,
@@ -97,6 +110,11 @@ export async function createTransaction(input: TxnInput): Promise<string> {
     if (rule) {
       categoryId = categoryId ?? rule.suggestedCategoryId;
       accountId = accountId ?? rule.suggestedAccountId;
+      // Auto-vínculo (Fase 2): solo si el usuario no eligió vínculo a mano.
+      if (linkedKind === "none" && rule.linkedKind && rule.linkedId) {
+        linkedKind = rule.linkedKind as NonNullable<TxnInput["linkedKind"]>;
+        linkedId = rule.linkedId;
+      }
     }
   }
 
@@ -120,14 +138,14 @@ export async function createTransaction(input: TxnInput): Promise<string> {
       confidence_score_internal: input.confidence ?? null,
       source: input.origin === "scanned" ? "receipt" : "manual",
       confirmed_by_user: input.status === "confirmed",
-      linked_kind: input.linkedKind ?? "none",
-      linked_id: input.linkedId ?? null,
+      linked_kind: linkedKind,
+      linked_id: linkedId,
       recurring_item_id: input.recurringItemId ?? null,
     })
     .select("id")
     .single();
   if (error) throw new Error(error.message);
-  return data.id;
+  return { id: data.id, linkedKind, linkedId };
 }
 
 export async function updateTransaction(id: string, input: TxnInput): Promise<void> {

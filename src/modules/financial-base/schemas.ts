@@ -129,6 +129,9 @@ export const ruleInputSchema = z.object({
   suggestedAccountId: uuidOrNull.optional(),
   active: z.boolean().default(true),
   priority: z.number().int().min(0).max(1000).default(0),
+  // Auto-vínculo (Fase 2): la regla puede fijar la entidad vinculada.
+  linkedKind: z.enum(["debt", "goal", "holding", "policy", "rental"]).nullable().optional(),
+  linkedId: uuidOrNull.optional(),
 });
 
 // ---------- Categorías personalizadas (módulo Transacciones) ----------

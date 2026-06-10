@@ -16,6 +16,7 @@ function cat(id: string, name: string, color: string | null, parentId: string | 
     isSystem: true,
     categoryType: "expense",
     sortOrder: 0,
+    linkedKind: null,
   };
 }
 
