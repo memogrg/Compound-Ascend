@@ -157,5 +157,11 @@ export async function completeProfile(
     })
     .eq("id", user.id);
 
+  // 9) user_metadata.display_name (coherencia: lo leen account/dashboard como
+  // respaldo y otros clientes de auth). Best-effort: no bloquea el onboarding.
+  if (draft.displayName) {
+    await supabase.auth.updateUser({ data: { display_name: draft.displayName } });
+  }
+
   return { completion, riskClass };
 }
