@@ -23,6 +23,46 @@ export type LinkableEntities = {
   rental: LinkableEntity[];
 };
 
+/** Tabla que respalda cada linked_kind (rental vive en investment_holdings). */
+export const LINKED_KIND_TABLE = {
+  debt: "debts",
+  goal: "savings_goals",
+  holding: "investment_holdings",
+  policy: "insurance_policies",
+  rental: "investment_holdings",
+} as const;
+
+/** Mensaje en español por tipo cuando la entidad no existe o no es del usuario. */
+export const LINKED_KIND_MISSING_MSG: Record<keyof typeof LINKED_KIND_TABLE, string> = {
+  debt: "La deuda vinculada ya no existe o no te pertenece.",
+  goal: "La meta vinculada ya no existe o no te pertenece.",
+  holding: "La inversión vinculada ya no existe o no te pertenece.",
+  policy: "La póliza vinculada ya no existe o no te pertenece.",
+  rental: "El activo de renta vinculado ya no existe o no te pertenece.",
+};
+
+/**
+ * Garantiza que la entidad vinculada existe Y pertenece al usuario (Fase 6.1).
+ * linked_id es polimórfico sin FK: esta es LA validación. RLS ya filtra por
+ * usuario, y además se exige user_id explícito — un id ajeno se comporta
+ * igual que uno inexistente. Lanza con mensaje en español si no se encuentra.
+ */
+export async function assertLinkableEntity(
+  kind: keyof typeof LINKED_KIND_TABLE,
+  id: string,
+): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from(LINKED_KIND_TABLE[kind])
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(LINKED_KIND_MISSING_MSG[kind]);
+}
+
 export async function listLinkableEntities(): Promise<LinkableEntities> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

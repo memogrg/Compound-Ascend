@@ -60,6 +60,19 @@ describe("validación de transacción (confirmación)", () => {
     expect(r.success).toBe(true);
   });
 
+  it("rechaza linkedKind sin linkedId (Fase 6.1: un kind colgante no es vínculo)", () => {
+    const r = transactionInputSchema.safeParse({
+      kind: "gasto",
+      description: "Pago",
+      amount: 45000,
+      currency: "CRC",
+      occurredOn: "2026-06-10",
+      linkedKind: "debt",
+      linkedId: null,
+    });
+    expect(r.success).toBe(false);
+  });
+
   it("acepta el vínculo propuesto por la IA (Fase 5) y rechaza ids inválidos", () => {
     const ok = transactionInputSchema.safeParse({
       kind: "gasto",

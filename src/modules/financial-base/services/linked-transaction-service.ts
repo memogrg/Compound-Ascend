@@ -111,6 +111,12 @@ export async function linkExistingTransaction(args: {
   if (!txn) throw new Error("Transacción no encontrada");
   if ((txn.linked_kind ?? "none") !== "none") throw new Error("La transacción ya está vinculada.");
 
+  // Fase 6.1: la entidad debe existir y ser del usuario antes de vincular.
+  const { assertLinkableEntity } = await import(
+    "@/modules/financial-base/services/linkable-entities-service"
+  );
+  await assertLinkableEntity(args.linkedKind, args.linkedId);
+
   const { error: upErr } = await supabase
     .from("transactions")
     .update({ linked_kind: args.linkedKind, linked_id: args.linkedId })

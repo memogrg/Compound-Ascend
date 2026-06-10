@@ -13,6 +13,9 @@ export const transactionInputSchema = z.object({
   // El usuario la ve y confirma; nunca se ejecuta sola.
   linkedKind: z.enum(["debt", "goal", "holding", "policy", "rental"]).nullable().optional(),
   linkedId: z.string().uuid().nullable().optional(),
+}).refine((d) => !d.linkedKind || !!d.linkedId, {
+  message: "Un vínculo necesita la entidad (linkedId).",
+  path: ["linkedId"],
 });
 
 export type TransactionInput = z.infer<typeof transactionInputSchema>;

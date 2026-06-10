@@ -32,6 +32,12 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
     return { ok: true };
   } catch (err) {
     logger.error("confirmTransaction fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: "No pudimos guardar la transacción." };
+    // La validación de entidad vinculada (Fase 6.1) es un mensaje para el
+    // usuario ("...ya no existe o no te pertenece"), no un error técnico.
+    const msg =
+      err instanceof Error && err.message.includes("ya no existe o no te pertenece")
+        ? err.message
+        : "No pudimos guardar la transacción.";
+    return { ok: false, message: msg };
   }
 }

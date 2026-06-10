@@ -202,4 +202,20 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
     expect(parsed.linkedKind ?? "none").toBe("none");
     expect(parsed.linkedId ?? null).toBeNull();
   });
+
+  it("Fase 6.1: Zod rechaza uuid malformado y kind sin id antes de tocar la base", () => {
+    const base = { kind: "gasto", amount: 1000, currency: "CRC", occurredOn: "2026-06-10" };
+    // uuid malformado
+    expect(
+      txnInputSchema.safeParse({ ...base, linkedKind: "debt", linkedId: "no-es-uuid" }).success,
+    ).toBe(false);
+    // kind sin id (un kind colgante no es vínculo)
+    expect(
+      txnInputSchema.safeParse({ ...base, linkedKind: "debt", linkedId: null }).success,
+    ).toBe(false);
+    // 'none' con id null sigue siendo válido (caso del composer)
+    expect(
+      txnInputSchema.safeParse({ ...base, linkedKind: "none", linkedId: null }).success,
+    ).toBe(true);
+  });
 });

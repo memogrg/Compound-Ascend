@@ -151,7 +151,11 @@ export async function addTransactionAction(raw: unknown): Promise<ActionResult> 
     return { ok: true };
   } catch (err) {
     logger.error("addTransaction fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: "No pudimos guardar la transacción." };
+    const msg =
+      err instanceof Error && err.message.includes("ya no existe o no te pertenece")
+        ? err.message
+        : "No pudimos guardar la transacción.";
+    return { ok: false, message: msg };
   }
 }
 
@@ -175,7 +179,11 @@ export async function linkTransactionAction(raw: unknown): Promise<ActionResult>
     return { ok: true };
   } catch (err) {
     logger.error("linkTransaction fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: "No pudimos vincular la transacción." };
+    const msg =
+      err instanceof Error && err.message.includes("ya no existe o no te pertenece")
+        ? err.message
+        : "No pudimos vincular la transacción.";
+    return { ok: false, message: msg };
   }
 }
 

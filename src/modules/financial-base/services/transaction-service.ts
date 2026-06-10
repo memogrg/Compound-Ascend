@@ -111,12 +111,38 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
       categoryId = categoryId ?? rule.suggestedCategoryId;
       accountId = accountId ?? rule.suggestedAccountId;
       // Auto-vínculo (Fase 2): solo si el usuario no eligió vínculo a mano.
+      // La entidad de la regla se valida; si murió, el vínculo se descarta
+      // en silencio (una regla vieja no debe bloquear el registro del gasto).
       if (linkedKind === "none" && rule.linkedKind && rule.linkedId) {
-        linkedKind = rule.linkedKind as NonNullable<TxnInput["linkedKind"]>;
-        linkedId = rule.linkedId;
+        const { assertLinkableEntity } = await import(
+          "@/modules/financial-base/services/linkable-entities-service"
+        );
+        try {
+          await assertLinkableEntity(
+            rule.linkedKind as Exclude<NonNullable<TxnInput["linkedKind"]>, "none">,
+            rule.linkedId,
+          );
+          linkedKind = rule.linkedKind as NonNullable<TxnInput["linkedKind"]>;
+          linkedId = rule.linkedId;
+        } catch {
+          // Entidad de la regla inexistente: la transacción nace sin vínculo.
+        }
       }
     }
   }
+
+  // Fase 6.1: un vínculo pedido explícitamente (composer, chat/scanner,
+  // orquestador) debe apuntar a una entidad EXISTENTE y DEL USUARIO. linked_id
+  // es polimórfico sin FK — sin este guard, un uuid alucinado o ajeno se
+  // persistiría. Falla limpia ANTES de crear la transacción.
+  if (input.linkedKind && input.linkedKind !== "none" && input.linkedId) {
+    const { assertLinkableEntity } = await import(
+      "@/modules/financial-base/services/linkable-entities-service"
+    );
+    await assertLinkableEntity(input.linkedKind, input.linkedId);
+  }
+  // Un kind sin id no es un vínculo: se normaliza a 'none'.
+  if (linkedKind !== "none" && !linkedId) linkedKind = "none";
 
   const accountLabel = await accountLabelFor(accountId);
   const { data, error } = await supabase

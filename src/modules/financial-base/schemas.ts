@@ -91,6 +91,9 @@ export const txnInputSchema = z.object({
   linkedKind: z.enum(["none", "debt", "goal", "holding", "policy", "rental"]).optional(),
   linkedId: uuidOrNull.optional(),
   recurringItemId: uuidOrNull.optional(),
+}).refine((d) => !d.linkedKind || d.linkedKind === "none" || !!d.linkedId, {
+  message: "Un vínculo necesita la entidad (linkedId).",
+  path: ["linkedId"],
 });
 
 export const accountInputSchema = z.object({
