@@ -1,7 +1,8 @@
 /**
  * Modelo de navegación de Compound Ascend (en español).
  * Agrupado por las 5 capas de la "escalera financiera" de la Biblia:
- * Resumen · Base · Control · Crecimiento · Patrimonio.
+ * Resumen · Presupuesto · Control · Crecimiento · Perfil.
+ * "Mi Perfil Financiero" va al final (debajo de Patrimonio).
  *
  * Las rutas reflejan la estructura App Router /(dashboard)/...
  */
@@ -22,12 +23,6 @@ export const NAV: NavGroup[] = [
   {
     label: "Resumen",
     items: [{ id: "dashboard", name: "Centro de mando", icon: "dashboard", href: "/dashboard" }],
-  },
-  {
-    label: "Perfil",
-    items: [
-      { id: "profile", name: "Mi Perfil Financiero", icon: "profile", href: "/mi-perfil-financiero" },
-    ],
   },
   {
     label: "Presupuesto",
@@ -51,6 +46,12 @@ export const NAV: NavGroup[] = [
       { id: "wealth", name: "Portafolio de inversiones", icon: "invest", href: "/patrimonio" },
       { id: "defense", name: "Defensa Patrimonial", icon: "defense", href: "/patrimonio/proteccion" },
       { id: "rich-life", name: "Patrimonio", icon: "networth", href: "/mi-rich-life" },
+    ],
+  },
+  {
+    label: "Perfil",
+    items: [
+      { id: "profile", name: "Mi Perfil Financiero", icon: "profile", href: "/mi-perfil-financiero" },
     ],
   },
 ];
