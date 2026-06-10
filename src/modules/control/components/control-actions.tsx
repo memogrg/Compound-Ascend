@@ -131,9 +131,9 @@ function ControlDialog({
       onClose={onClose}
     >
       {kind === "goal" ? (
-        <GoalForm currency={currency} onDone={done} item={item as SavingsGoal | undefined} />
+        <GoalForm currency={currency} onDone={done} onCancel={onClose} item={item as SavingsGoal | undefined} />
       ) : (
-        <DebtForm currency={currency} onDone={done} item={item as Debt | undefined} indexRates={indexRates} />
+        <DebtForm currency={currency} onDone={done} onCancel={onClose} item={item as Debt | undefined} indexRates={indexRates} />
       )}
     </Modal>
   );
@@ -161,7 +161,7 @@ function useFormSubmit(action: (raw: unknown) => Promise<{ ok: boolean; fieldErr
   return { pending, errors, message, run };
 }
 
-function GoalForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: SavingsGoal }) {
+function GoalForm({ currency, onDone, onCancel, item }: { currency: string; onDone: () => void; onCancel: () => void; item?: SavingsGoal }) {
   const action = item ? (raw: unknown) => editGoalAction(item.id, raw) : addGoalAction;
   const { pending, errors, message, run } = useFormSubmit(action);
 
@@ -233,7 +233,7 @@ function GoalForm({ currency, onDone, item }: { currency: string; onDone: () => 
           </div>
         </div>
       </div>
-      <Foot pending={pending} onCancel={onDone} />
+      <Foot pending={pending} onCancel={onCancel} />
     </form>
   );
 }
@@ -250,11 +250,13 @@ const DEBT_TYPES = [
 function DebtForm({
   currency,
   onDone,
+  onCancel,
   item,
   indexRates,
 }: {
   currency: string;
   onDone: () => void;
+  onCancel: () => void;
   item?: Debt;
   indexRates?: Record<string, number>;
 }) {
@@ -481,7 +483,7 @@ function DebtForm({
           <textarea className="inp" name="notes" rows={2} defaultValue={item?.notes ?? ""} placeholder="Banco, condiciones, recordatorios…" />
         </div>
       </div>
-      <Foot pending={pending} onCancel={onDone} />
+      <Foot pending={pending} onCancel={onCancel} />
     </form>
   );
 }
