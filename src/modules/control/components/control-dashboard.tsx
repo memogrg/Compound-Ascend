@@ -20,14 +20,8 @@ const ACTION: Record<GoalAction, { label: string; color: string; bg: string }> =
   replantear: { label: "Replantear", color: "var(--warn)", bg: "var(--warn-soft)" },
 };
 
-const METHOD_LABEL: Record<string, string> = {
-  avalancha: "Avalancha",
-  bola_nieve: "Bola de nieve",
-  hibrido: "Híbrido",
-};
-
 export function ControlDashboard({ summary }: { summary: ControlSummary }) {
-  const { diagnosis: d, goals, debts, currency, indexRates } = summary;
+  const { diagnosis: d, goals, currency } = summary;
   const sem = SEMAFORO[d.semaforo];
 
   return (
@@ -150,8 +144,8 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
         </div>
       ) : null}
 
-      {/* Objetivos y deudas */}
-      <section className="dash-split">
+      {/* Objetivos */}
+      <section>
         <div className="card">
           <div className="card-head">
             <div>
@@ -193,50 +187,6 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
               );
             })
           )}
-        </div>
-
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <div className="card-title">Obligaciones y deudas</div>
-              <div className="card-sub">
-                {debts.length} deuda(s)
-                {d.debtMethod ? ` · método sugerido: ${METHOD_LABEL[d.debtMethod.method]}` : ""}
-              </div>
-            </div>
-          </div>
-          {debts.length === 0 ? (
-            <Empty text="No registras deudas. ¡Bien!" />
-          ) : (
-            debts.map((dt) => (
-              <div key={dt.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>{dt.name}</div>
-                  <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                    {formatMoney(dt.balance, dt.currency)}
-                    {dt.apr ? ` · ${dt.apr}% TAE` : ""}
-                    {dt.delinquency && dt.delinquency !== "no" ? " · con atraso" : ""}
-                  </div>
-                </div>
-                {(dt.apr ?? 0) >= 30 ? (
-                  <span className="chip" style={{ background: "var(--neg-soft)", color: "var(--neg)" }}>
-                    Crítica
-                  </span>
-                ) : (
-                  <span className="chip">Controlada</span>
-                )}
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <EditControlButton kind="debt" item={dt} currency={currency} indexRates={indexRates} />
-                  <DeleteButton id={dt.id} kind="debt" />
-                </div>
-              </div>
-            ))
-          )}
-          {d.debtMethod ? (
-            <div className="muted" style={{ padding: "12px 24px", fontSize: 12, lineHeight: 1.5, borderTop: "1px solid var(--line)" }}>
-              {d.debtMethod.reason}
-            </div>
-          ) : null}
         </div>
       </section>
 

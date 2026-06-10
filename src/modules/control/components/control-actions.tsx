@@ -49,15 +49,14 @@ export function AddControlButton({
 
 export function ControlActions({
   currency = "CRC",
-  indexRates,
 }: {
   currency?: string;
+  /** Aceptado por compatibilidad con la página; las deudas viven en /deudas. */
   indexRates?: Record<string, number>;
 }) {
   return (
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       <AddControlButton kind="goal" currency={currency} variant="btn-primary" />
-      <AddControlButton kind="debt" currency={currency} variant="btn-secondary" indexRates={indexRates} />
     </div>
   );
 }
