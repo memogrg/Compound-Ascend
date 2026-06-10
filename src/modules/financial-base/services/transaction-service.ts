@@ -144,6 +144,18 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
   // Un kind sin id no es un vínculo: se normaliza a 'none'.
   if (linkedKind !== "none" && !linkedId) linkedKind = "none";
 
+  // Sin cuenta explícita ni de regla: cuenta predeterminada en silencio
+  // (el composer ya no muestra selector de cuenta).
+  if (!accountId) {
+    const { data: def } = await supabase
+      .from("accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_default", true)
+      .maybeSingle();
+    accountId = def?.id ?? null;
+  }
+
   const accountLabel = await accountLabelFor(accountId);
   const { data, error } = await supabase
     .from("transactions")

@@ -22,7 +22,9 @@ import {
   addTransferAction,
   addRuleAction,
   runTemplateAction,
+  addCategoryAction,
 } from "@/modules/financial-base/api/v2-actions";
+import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { Account, TxnKind, LinkedKind } from "@/modules/financial-base/types";
 import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
 import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
@@ -86,25 +88,39 @@ export function TransactionComposer({
 
   const [kind, setKind] = useState<TxnKind>(initialKind);
   const [amount, setAmount] = useState("");
+  // Moneda de la transacción: default = moneda de visualización; recuerda la
+  // última usada en la sesión (solo UI: el schema ya guarda currency).
+  const [txnCurrency, setTxnCurrency] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const last = window.sessionStorage.getItem("cmp-last-currency");
+      if (last && CURRENCIES.some((c) => c.value === last)) return last;
+    }
+    return currency;
+  });
   const [groupId, setGroupId] = useState<string>(tree[0]?.id ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [touchedCat, setTouchedCat] = useState(false);
   const [merchant, setMerchant] = useState("");
   const [source, setSource] = useState<string>(INCOME_SOURCES[0]);
   const [incomeCatId, setIncomeCatId] = useState<string | null>(null);
+  // Cuentas: solo las transferencias eligen cuenta en la UI; en el resto el
+  // servidor asigna la predeterminada en silencio (Fase 7 · composer simple).
   const [accountId, setAccountId] = useState(accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "");
   const [toAccountId, setToAccountId] = useState(accounts[1]?.id ?? "");
-  const [more, setMore] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Crear subcategoría inline ("+ Nueva") sin salir del modal.
+  const [newCatOpen, setNewCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatPending, setNewCatPending] = useState(false);
 
   const isGasto = kind === "gasto";
   const isIngreso = kind === "ingreso";
   const isTransfer = kind === "transferencia";
   const isAdjust = kind === "ajuste";
-  const sym = SYM[currency] ?? "";
+  const sym = SYM[txnCurrency] ?? "";
 
   // Mapa id → categoría para resolver etiquetas/ruta.
   const flatById = useMemo(() => {
@@ -162,6 +178,28 @@ export function TransactionComposer({
     setTouchedCat(true);
   }
 
+  // Chips optimistas de subcategorías recién creadas (hasta que llegue el
+  // árbol fresco vía router.refresh).
+  const [extraCats, setExtraCats] = useState<{ id: string; name: string; groupId: string }[]>([]);
+
+  async function createInlineCategory() {
+    const name = newCatName.trim();
+    if (!name || !activeGroup) return;
+    setNewCatPending(true);
+    const res = await addCategoryAction({ name, parentId: activeGroup.id, categoryType: "expense" });
+    setNewCatPending(false);
+    if (res.ok && res.id) {
+      setExtraCats((prev) => [...prev, { id: res.id!, name, groupId: activeGroup.id }]);
+      selectCategory(res.id);
+      setNewCatOpen(false);
+      setNewCatName("");
+      toast(`Subcategoría "${name}" creada`);
+      router.refresh();
+    } else {
+      toast(res.message ?? "No pudimos crear la subcategoría", "error");
+    }
+  }
+
   function fillFromTemplate(t: TransactionTemplate) {
     setKind(t.kind);
     if (t.amount) setAmount(String(t.amount));
@@ -213,7 +251,7 @@ export function TransactionComposer({
         fromAccountId: accountId,
         toAccountId,
         amount: amt,
-        currency,
+        currency: txnCurrency,
         occurredOn: date,
         note: note || undefined,
       });
@@ -222,10 +260,11 @@ export function TransactionComposer({
       res = await addTransactionAction({
         kind,
         amount: amt,
-        currency,
+        currency: txnCurrency,
         occurredOn: date,
         categoryId: isGasto ? catId || null : isIngreso ? incomeCatId : null,
-        accountId: accountId || null,
+        // Sin selector de cuenta: el servidor asigna la predeterminada.
+        accountId: null,
         merchantOrSource: isGasto ? merchant || undefined : isIngreso ? source : note || "Ajuste de saldo",
         description: note || undefined,
         status: "confirmed",
@@ -233,6 +272,9 @@ export function TransactionComposer({
         linkedKind: linkKind && effectiveLinkedId ? linkKind : "none",
         linkedId: linkKind && effectiveLinkedId ? effectiveLinkedId : null,
       });
+    }
+    if (res.ok && typeof window !== "undefined") {
+      window.sessionStorage.setItem("cmp-last-currency", txnCurrency);
     }
 
     setPending(false);
@@ -278,26 +320,38 @@ export function TransactionComposer({
   const favorites = templates.filter((t) => t.isFavorite).slice(0, 6);
 
   return (
-    <Modal title="Registrar transacción" sub="Tipo · categoría · monto. En segundos." onClose={onClose}>
+    <Modal
+      title={
+        lockKind
+          ? isIngreso
+            ? "Registrar ingreso"
+            : "Registrar gasto"
+          : "Registrar transacción"
+      }
+      sub={lockKind ? "Categoría · monto. En segundos." : "Tipo · categoría · monto. En segundos."}
+      onClose={onClose}
+    >
       <form onSubmit={onSubmit}>
         <div className="modal-body">
           {error ? <div className="auth-msg warn" role="alert">{error}</div> : null}
 
-          {/* Paso 1 · Tipo */}
+          {/* Paso 1 · Tipo — oculto cuando el contexto ya lo fija (tab Gastos/Ingresos). */}
+          {!lockKind ? (
           <div className="seg cmp-seg" role="tablist" aria-label="Tipo de transacción">
-            <button type="button" className={`seg-btn ${isGasto ? "on" : ""}`} onClick={() => setKind("gasto")} disabled={lockKind}>
+            <button type="button" className={`seg-btn ${isGasto ? "on" : ""}`} onClick={() => setKind("gasto")}>
               <Icon name="expense" width={2} /> Gasto
             </button>
-            <button type="button" className={`seg-btn ${isIngreso ? "on" : ""}`} onClick={() => setKind("ingreso")} disabled={lockKind}>
+            <button type="button" className={`seg-btn ${isIngreso ? "on" : ""}`} onClick={() => setKind("ingreso")}>
               <Icon name="income" width={2} /> Ingreso
             </button>
-            <button type="button" className={`seg-btn ${isTransfer ? "on" : ""}`} onClick={() => setKind("transferencia")} disabled={lockKind}>
+            <button type="button" className={`seg-btn ${isTransfer ? "on" : ""}`} onClick={() => setKind("transferencia")}>
               <Icon name="repeat" width={2} /> Transferencia
             </button>
-            <button type="button" className={`seg-btn ${isAdjust ? "on" : ""}`} onClick={() => setKind("ajuste")} disabled={lockKind}>
+            <button type="button" className={`seg-btn ${isAdjust ? "on" : ""}`} onClick={() => setKind("ajuste")}>
               <Icon name="edit" width={2} /> Ajuste
             </button>
           </div>
+          ) : null}
           {isAdjust ? (
             <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
               Conciliación de saldo (neutro): no cuenta como ingreso ni gasto.
@@ -325,23 +379,37 @@ export function TransactionComposer({
             </div>
           ) : null}
 
-          {/* Monto */}
+          {/* Monto + moneda */}
           <div className="fld">
             <label className="fld-label">Monto</label>
-            <div className="inp-money" style={{ fontSize: 24 }}>
-              <span className="pre" style={{ fontSize: 21 }}>{sym}</span>
-              <input
-                autoFocus
-                inputMode="decimal"
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                style={{ fontSize: 24, fontWeight: 650 }}
-                required
-              />
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              <div className="inp-money" style={{ fontSize: 24, flex: 1 }}>
+                <span className="pre" style={{ fontSize: 21 }}>{sym}</span>
+                <input
+                  autoFocus
+                  inputMode="decimal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  style={{ fontSize: 24, fontWeight: 650 }}
+                  required
+                />
+              </div>
+              <select
+                className="sel tip"
+                data-tip="Moneda de esta transacción"
+                aria-label="Moneda de la transacción"
+                value={txnCurrency}
+                onChange={(e) => setTxnCurrency(e.target.value)}
+                style={{ flex: "none", width: "auto", minWidth: 86, fontSize: 13 }}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.value} value={c.value}>{c.value}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -396,6 +464,57 @@ export function TransactionComposer({
                         {c.name}
                       </button>
                     ))}
+                    {extraCats
+                      .filter((e) => e.groupId === activeGroup.id && !activeGroup.children.some((c) => c.id === e.id))
+                      .map((e) => (
+                        <button
+                          key={e.id}
+                          type="button"
+                          className={`chip-sel ${categoryId === e.id ? "on" : ""}`}
+                          onClick={() => selectCategory(e.id)}
+                        >
+                          {e.name}
+                        </button>
+                      ))}
+                    {/* Crear subcategoría inline (hereda el grupo activo). */}
+                    {!newCatOpen ? (
+                      <button
+                        type="button"
+                        className="chip-sel tip"
+                        data-tip="Crea una subcategoría en este grupo sin salir"
+                        style={{ borderStyle: "dashed", color: "var(--muted)" }}
+                        onClick={() => setNewCatOpen(true)}
+                      >
+                        <Icon name="plus" width={2} /> Nueva
+                      </button>
+                    ) : (
+                      <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                        <input
+                          className="inp"
+                          autoFocus
+                          value={newCatName}
+                          onChange={(e) => setNewCatName(e.target.value)}
+                          placeholder="Nombre…"
+                          maxLength={60}
+                          style={{ padding: "5px 10px", fontSize: 12.5, width: 150 }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void createInlineCategory();
+                            }
+                            if (e.key === "Escape") setNewCatOpen(false);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="chip-sel"
+                          disabled={newCatPending || !newCatName.trim()}
+                          onClick={() => void createInlineCategory()}
+                        >
+                          {newCatPending ? "…" : "Crear"}
+                        </button>
+                      </span>
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -474,7 +593,7 @@ export function TransactionComposer({
             </div>
           ) : null}
 
-          {/* Cuenta(s) */}
+          {/* Cuentas: solo transferencias (el resto usa la predeterminada). */}
           {isTransfer ? (
             <div className="fld-2">
               <div className="fld">
@@ -490,38 +609,19 @@ export function TransactionComposer({
                 </select>
               </div>
             </div>
-          ) : (
-            <div className="fld">
-              <label className="fld-label">{isGasto ? "Cuenta / método" : "Cuenta destino"}</label>
-              {accounts.length > 0 ? (
-                <select className="sel" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}{a.isDefault ? " (predeterminada)" : ""}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className="muted" style={{ fontSize: 12.5 }}>Aún no tienes cuentas; puedes guardar sin cuenta.</div>
-              )}
-            </div>
-          )}
+          ) : null}
 
-          {/* Más detalles */}
-          {!more ? (
-            <button type="button" className="btn btn-ghost" style={{ alignSelf: "flex-start", padding: "4px 0", color: "var(--info)" }} onClick={() => setMore(true)}>
-              + Más detalles (fecha, nota…)
-            </button>
-          ) : (
-            <div className="fld-2">
-              <div className="fld">
-                <label className="fld-label">Fecha</label>
-                <input className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              </div>
-              <div className="fld">
-                <label className="fld-label">Nota</label>
-                <input className="inp" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opcional" />
-              </div>
+          {/* Fecha y nota, siempre visibles (sin colapso). */}
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">Fecha</label>
+              <input className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
-          )}
+            <div className="fld">
+              <label className="fld-label">Nota</label>
+              <input className="inp" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opcional" />
+            </div>
+          </div>
         </div>
 
         <div className="modal-foot">
