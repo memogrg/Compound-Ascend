@@ -9,7 +9,11 @@ import {
   deleteLinkedTransaction,
   getSystemCategoryId,
 } from "@/modules/financial-base/services/linked-transaction-service";
-import { debtPaymentToTxn, goalContributionToTxn } from "@/modules/financial-base/engine/linked";
+import {
+  debtPaymentToTxn,
+  goalContributionToTxn,
+  goalWithdrawalToTxn,
+} from "@/modules/financial-base/engine/linked";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -347,6 +351,48 @@ export async function addGoalContribution(input: {
   const { error } = await supabase
     .from("savings_goals")
     .update({ current_amount: Number(goalRow.current_amount) + input.amount })
+    .eq("id", input.goalId)
+    .eq("user_id", user.id);
+  if (error) {
+    await deleteLinkedTransaction(txnId);
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Retiro de una meta (Fase 4 · flujos inversos): crea el ingreso vinculado
+ * (linked_kind='goal') y baja current_amount (sin pasar de 0).
+ */
+export async function withdrawFromGoal(input: {
+  goalId: string;
+  amount: number;
+  withdrawalDate: string;
+}): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: goalRow, error: gErr } = await supabase
+    .from("savings_goals")
+    .select("id,name,currency,current_amount")
+    .eq("id", input.goalId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (gErr) throw new Error(gErr.message);
+  if (!goalRow) throw new Error("Meta no encontrada");
+
+  const txnId = await registerLinkedTransaction(
+    goalWithdrawalToTxn({
+      goalId: goalRow.id,
+      goalName: goalRow.name,
+      currency: goalRow.currency,
+      withdrawalDate: input.withdrawalDate,
+      amount: input.amount,
+    }),
+  );
+
+  const { error } = await supabase
+    .from("savings_goals")
+    .update({ current_amount: Math.max(0, Number(goalRow.current_amount) - input.amount) })
     .eq("id", input.goalId)
     .eq("user_id", user.id);
   if (error) {

@@ -80,6 +80,53 @@ export function dividendToTxn(args: {
   };
 }
 
+/** Venta/retiro parcial de una posición → ingreso vinculado al holding. */
+export function holdingSaleToTxn(args: {
+  holdingId: string;
+  label: string;
+  currency: string;
+  saleDate: string;
+  amount: number;
+  categoryId?: string | null;
+}): LinkedTxnInput {
+  return {
+    kind: "ingreso",
+    amount: args.amount,
+    currency: args.currency,
+    occurredOn: args.saleDate,
+    categoryId: args.categoryId ?? null,
+    merchantOrSource: args.label,
+    description: `Venta — ${args.label}`,
+    status: "confirmed",
+    origin: "manual",
+    linkedKind: "holding",
+    linkedId: args.holdingId,
+  };
+}
+
+/** Retiro de una meta de ahorro → ingreso vinculado a la meta. */
+export function goalWithdrawalToTxn(args: {
+  goalId: string;
+  goalName: string;
+  currency: string;
+  withdrawalDate: string;
+  amount: number;
+}): LinkedTxnInput {
+  return {
+    kind: "ingreso",
+    amount: args.amount,
+    currency: args.currency,
+    occurredOn: args.withdrawalDate,
+    categoryId: null,
+    merchantOrSource: args.goalName,
+    description: `Retiro — ${args.goalName}`,
+    status: "confirmed",
+    origin: "manual",
+    linkedKind: "goal",
+    linkedId: args.goalId,
+  };
+}
+
 /** Renta cobrada (inmueble/Airbnb/etc.) → ingreso vinculado al activo. */
 export function rentalPaymentToTxn(args: {
   holdingId: string;

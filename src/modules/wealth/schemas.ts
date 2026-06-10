@@ -105,6 +105,16 @@ export const dividendInputSchema = z.object({
   holdingSymbol: z.string().max(12).optional(),
 });
 
+// Venta/retiro parcial de una posición (Fase 4 · flujos inversos).
+export const holdingSaleInputSchema = z.object({
+  holdingId: z.string().uuid(),
+  saleDate: z.string().date(),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  currency: z.string().length(3),
+  quantitySold: z.number().positive().optional(),
+});
+
 export type HoldingInput = z.infer<typeof holdingInputSchema>;
+export type HoldingSaleInput = z.infer<typeof holdingSaleInputSchema>;
 export type DividendInput = z.infer<typeof dividendInputSchema>;
 export type RentalPaymentInput = z.infer<typeof rentalPaymentInputSchema>;

@@ -3,7 +3,13 @@ import "server-only";
 /** CRUD de posiciones (investment_holdings). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import type { HoldingInput } from "@/modules/wealth/schemas";
+import {
+  registerLinkedTransaction,
+  deleteLinkedTransaction,
+  getSystemCategoryId,
+} from "@/modules/financial-base/services/linked-transaction-service";
+import { holdingSaleToTxn } from "@/modules/financial-base/engine/linked";
+import type { HoldingInput, HoldingSaleInput } from "@/modules/wealth/schemas";
 import type { Holding } from "@/modules/wealth/types";
 import type { AssetType } from "@/modules/wealth/types";
 
@@ -155,4 +161,58 @@ export async function deleteHolding(id: string): Promise<void> {
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Venta/retiro parcial (Fase 4 · flujos inversos): el dinero recibido nace
+ * como ingreso vinculado (linked_kind='holding') y la posición disminuye —
+ * cantidad en activos cotizados; valor manual en activos de renta. La
+ * transacción ES el registro de la venta (no hay ledger aparte para
+ * holdings). Compensación: si la actualización falla, se borra el ingreso.
+ */
+export async function recordHoldingSale(input: HoldingSaleInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: row, error: hErr } = await supabase
+    .from("investment_holdings")
+    .select(HOLDING_COLS)
+    .eq("id", input.holdingId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (hErr) throw new Error(hErr.message);
+  if (!row) throw new Error("Posición no encontrada");
+  const holding = rowToHolding(row);
+
+  const txnId = await registerLinkedTransaction(
+    holdingSaleToTxn({
+      holdingId: holding.id,
+      label: holding.label ?? holding.symbol,
+      currency: input.currency,
+      saleDate: input.saleDate,
+      amount: input.amount,
+      categoryId: await getSystemCategoryId("inc_venta"),
+    }),
+  );
+
+  // Disminución en la entidad: cantidad (cotizados) o valor manual (renta).
+  let patch: { quantity?: number; cost_basis?: number; current_value_manual?: number } = {};
+  if (input.quantitySold && input.quantitySold > 0) {
+    const newQty = Math.max(0, holding.quantity - input.quantitySold);
+    patch = { quantity: newQty, cost_basis: newQty * holding.averageCost };
+  } else if (holding.currentValueManual != null) {
+    patch = { current_value_manual: Math.max(0, holding.currentValueManual - input.amount) };
+  }
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase
+      .from("investment_holdings")
+      .update(patch)
+      .eq("id", input.holdingId)
+      .eq("user_id", user.id);
+    if (error) {
+      await deleteLinkedTransaction(txnId);
+      throw new Error(error.message);
+    }
+  }
 }

@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   debtPaymentToTxn,
   goalContributionToTxn,
+  goalWithdrawalToTxn,
   dividendToTxn,
   rentalPaymentToTxn,
+  holdingSaleToTxn,
 } from "@/modules/financial-base/engine/linked";
 import { txnInputSchema } from "@/modules/financial-base/schemas";
 
@@ -80,6 +82,35 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
     expect(txn.kind).toBe("ingreso");
     expect(txn.linkedKind).toBe("rental");
     expect(txn.description).toBe("Renta — Apartamento Escazú");
+    expect(() => txnInputSchema.parse(txn)).not.toThrow();
+  });
+
+  it("venta de posición → ingreso vinculado al holding (Fase 4)", () => {
+    const txn = holdingSaleToTxn({
+      holdingId: "66666666-6666-6666-6666-666666666666",
+      label: "VOO",
+      currency: "USD",
+      saleDate: "2026-06-15",
+      amount: 2500,
+      categoryId: null,
+    });
+    expect(txn.kind).toBe("ingreso");
+    expect(txn.linkedKind).toBe("holding");
+    expect(txn.description).toBe("Venta — VOO");
+    expect(() => txnInputSchema.parse(txn)).not.toThrow();
+  });
+
+  it("retiro de meta → ingreso vinculado a la meta (Fase 4)", () => {
+    const txn = goalWithdrawalToTxn({
+      goalId: "77777777-7777-7777-7777-777777777777",
+      goalName: "Fondo de emergencia",
+      currency: "CRC",
+      withdrawalDate: "2026-06-15",
+      amount: 50000,
+    });
+    expect(txn.kind).toBe("ingreso");
+    expect(txn.linkedKind).toBe("goal");
+    expect(txn.description).toBe("Retiro — Fondo de emergencia");
     expect(() => txnInputSchema.parse(txn)).not.toThrow();
   });
 

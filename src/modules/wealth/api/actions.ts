@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { investmentInputSchema, policyInputSchema, holdingInputSchema, dividendInputSchema, rentalPaymentInputSchema } from "@/modules/wealth/schemas";
+import { investmentInputSchema, policyInputSchema, holdingInputSchema, holdingSaleInputSchema, dividendInputSchema, rentalPaymentInputSchema } from "@/modules/wealth/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createInvestment,
@@ -15,6 +15,7 @@ import {
   createHolding,
   updateHolding,
   deleteHolding,
+  recordHoldingSale,
 } from "@/modules/wealth/services/holdings-service";
 import {
   createDividend,
@@ -166,6 +167,23 @@ export async function removeHoldingAction(id: string): Promise<ActionResult> {
 }
 
 // ── Dividendos ────────────────────────────────────────────────────
+
+/** Venta/retiro parcial: ingreso vinculado + disminución de la posición (Fase 4). */
+export async function sellHoldingAction(raw: unknown): Promise<ActionResult> {
+  const parsed = holdingSaleInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await recordHoldingSale(parsed.data);
+    revalidatePath("/patrimonio");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("sellHolding fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos registrar la venta." };
+  }
+}
 
 export async function addDividendAction(raw: unknown): Promise<ActionResult> {
   const parsed = dividendInputSchema.safeParse(raw);
