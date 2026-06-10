@@ -27,7 +27,8 @@ export function AcceptInvitation({
       setError(null);
       const res = await acceptInvitationAction(token);
       if (res.ok) {
-        router.replace("/dashboard");
+        // Único paso del invitado: confirmar cómo quiere que le llamemos.
+        router.replace("/invitacion/nombre");
         router.refresh();
       } else {
         setError(res.message ?? "No pudimos aceptar la invitación.");

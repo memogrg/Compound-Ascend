@@ -661,6 +661,10 @@ export interface Database {
         Args: { p_token: string };
         Returns: string;
       };
+      get_household_profile: {
+        Args: Record<string, never>;
+        Returns: Record<string, unknown> | null;
+      };
     };
     Enums: {
       plan: Plan;
