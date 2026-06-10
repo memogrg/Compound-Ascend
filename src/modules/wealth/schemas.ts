@@ -82,6 +82,10 @@ export const holdingInputSchema = z.object({
   rentalIncome: z.number().nonnegative().optional(),
   rentalFrequency: z.enum(["mensual", "trimestral", "anual"]).optional(),
   rentalSubtype: z.enum(["alquiler", "airbnb", "auto", "negocio", "otro"]).optional(),
+  // Fase 4.1: registrar la compra/aporte como gasto vinculado en Base
+  // Financiera (default ON al crear; OFF al editar — un edit puede ser
+  // corrección de datos, no un aporte real).
+  registerExpense: z.boolean().optional(),
 });
 
 export const rentalPaymentInputSchema = z.object({

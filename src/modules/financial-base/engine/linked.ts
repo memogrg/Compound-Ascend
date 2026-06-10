@@ -80,6 +80,70 @@ export function dividendToTxn(args: {
   };
 }
 
+/**
+ * Monto del gasto de una compra/aporte de inversión (Fase 4.1): lo PAGADO,
+ * es decir cantidad × costo unitario. El valor manual del activo es
+ * valuación (puede venir apreciado), no flujo de caja — solo se usa como
+ * fallback si no se ingresó costo.
+ */
+export function purchaseExpenseAmount(args: {
+  isRental: boolean;
+  quantity: number;
+  averageCost: number;
+  currentValueManual?: number | null;
+}): number {
+  const paid = args.quantity * args.averageCost;
+  const amount =
+    paid > 0 ? paid : args.isRental ? (args.currentValueManual ?? 0) : paid;
+  return Math.round(amount * 100) / 100;
+}
+
+/**
+ * Monto del gasto cuando un edit aumenta la posición (Fase 4.1): solo el
+ * delta positivo cuenta como aporte; un delta ≤ 0 (corrección o venta por
+ * edit) no genera gasto. Devuelve 0 si no hay aporte.
+ */
+export function positionIncreaseAmount(args: {
+  isRental: boolean;
+  oldQuantity: number;
+  newQuantity: number;
+  averageCost: number;
+  oldManualValue?: number | null;
+  newManualValue?: number | null;
+}): number {
+  if (args.isRental) {
+    const delta = (args.newManualValue ?? 0) - (args.oldManualValue ?? 0);
+    return delta > 0 ? Math.round(delta * 100) / 100 : 0;
+  }
+  const delta = args.newQuantity - args.oldQuantity;
+  return delta > 0 ? Math.round(delta * args.averageCost * 100) / 100 : 0;
+}
+
+/** Compra/aporte de inversión → gasto vinculado al holding (Fase 4.1). */
+export function holdingPurchaseToTxn(args: {
+  holdingId: string;
+  label: string;
+  currency: string;
+  purchaseDate: string;
+  amount: number;
+  verb: "Compra" | "Aporte";
+  categoryId?: string | null;
+}): LinkedTxnInput {
+  return {
+    kind: "gasto",
+    amount: args.amount,
+    currency: args.currency,
+    occurredOn: args.purchaseDate,
+    categoryId: args.categoryId ?? null,
+    merchantOrSource: args.label,
+    description: `${args.verb} — ${args.label}`,
+    status: "confirmed",
+    origin: "manual",
+    linkedKind: "holding",
+    linkedId: args.holdingId,
+  };
+}
+
 /** Venta/retiro parcial de una posición → ingreso vinculado al holding. */
 export function holdingSaleToTxn(args: {
   holdingId: string;
@@ -111,7 +175,9 @@ export function goalWithdrawalToTxn(args: {
   currency: string;
   withdrawalDate: string;
   amount: number;
+  note?: string;
 }): LinkedTxnInput {
+  const note = args.note?.trim();
   return {
     kind: "ingreso",
     amount: args.amount,
@@ -119,7 +185,7 @@ export function goalWithdrawalToTxn(args: {
     occurredOn: args.withdrawalDate,
     categoryId: null,
     merchantOrSource: args.goalName,
-    description: `Retiro — ${args.goalName}`,
+    description: note ? `Retiro — ${args.goalName} · ${note}` : `Retiro — ${args.goalName}`,
     status: "confirmed",
     origin: "manual",
     linkedKind: "goal",

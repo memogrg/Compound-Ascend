@@ -130,6 +130,7 @@ const goalWithdrawalSchema = z.object({
   goalId: z.string().uuid(),
   amount: z.number().positive("Debe ser mayor a 0"),
   withdrawalDate: z.string().min(8).max(10),
+  note: z.string().max(280).optional(),
 });
 
 /** Retiro de meta: baja current_amount y crea el ingreso vinculado (Fase 4). */
@@ -146,7 +147,11 @@ export async function withdrawGoalAction(raw: unknown): Promise<ActionResult> {
     return { ok: true };
   } catch (err) {
     logger.error("withdrawGoal fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: "No pudimos registrar el retiro." };
+    // La validación de saldo es un mensaje para el usuario, no un error técnico.
+    const msg = err instanceof Error && err.message.startsWith("No puedes retirar")
+      ? err.message
+      : "No pudimos registrar el retiro.";
+    return { ok: false, message: msg };
   }
 }
 

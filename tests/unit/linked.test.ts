@@ -6,6 +6,9 @@ import {
   dividendToTxn,
   rentalPaymentToTxn,
   holdingSaleToTxn,
+  holdingPurchaseToTxn,
+  purchaseExpenseAmount,
+  positionIncreaseAmount,
 } from "@/modules/financial-base/engine/linked";
 import { txnInputSchema } from "@/modules/financial-base/schemas";
 
@@ -112,6 +115,81 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
     expect(txn.linkedKind).toBe("goal");
     expect(txn.description).toBe("Retiro — Fondo de emergencia");
     expect(() => txnInputSchema.parse(txn)).not.toThrow();
+  });
+
+  it("compra de inversión → gasto vinculado (Fase 4.1)", () => {
+    const txn = holdingPurchaseToTxn({
+      holdingId: "88888888-8888-8888-8888-888888888888",
+      label: "VOO",
+      currency: "USD",
+      purchaseDate: "2026-06-10",
+      amount: 4000,
+      verb: "Compra",
+      categoryId: "99999999-9999-9999-9999-999999999999",
+    });
+    expect(txn.kind).toBe("gasto");
+    expect(txn.linkedKind).toBe("holding");
+    expect(txn.description).toBe("Compra — VOO");
+    expect(() => txnInputSchema.parse(txn)).not.toThrow();
+  });
+
+  it("monto de compra = lo pagado (cantidad × costo); valor manual solo como fallback", () => {
+    expect(purchaseExpenseAmount({ isRental: false, quantity: 10, averageCost: 400 })).toBe(4000);
+    // Renta con costo: el gasto es lo pagado, NO el valor actual (apreciado).
+    expect(
+      purchaseExpenseAmount({
+        isRental: true,
+        quantity: 1,
+        averageCost: 50000000,
+        currentValueManual: 85000000,
+      }),
+    ).toBe(50000000);
+    // Renta sin costo ingresado: cae al valor manual.
+    expect(
+      purchaseExpenseAmount({
+        isRental: true,
+        quantity: 1,
+        averageCost: 0,
+        currentValueManual: 85000000,
+      }),
+    ).toBe(85000000);
+  });
+
+  it("edit de posición: solo el aumento explícito genera gasto (Fase 4.1)", () => {
+    // Aporte: 8 → 10 uds a $400 = $800 de gasto.
+    expect(
+      positionIncreaseAmount({ isRental: false, oldQuantity: 8, newQuantity: 10, averageCost: 400 }),
+    ).toBe(800);
+    // Corrección a la baja o sin cambio: cero gasto.
+    expect(
+      positionIncreaseAmount({ isRental: false, oldQuantity: 10, newQuantity: 8, averageCost: 400 }),
+    ).toBe(0);
+    expect(
+      positionIncreaseAmount({ isRental: false, oldQuantity: 10, newQuantity: 10, averageCost: 400 }),
+    ).toBe(0);
+    // Activo de renta: delta del valor manual.
+    expect(
+      positionIncreaseAmount({
+        isRental: true,
+        oldQuantity: 1,
+        newQuantity: 1,
+        averageCost: 0,
+        oldManualValue: 80000000,
+        newManualValue: 85000000,
+      }),
+    ).toBe(5000000);
+  });
+
+  it("retiro de meta con nota la incluye en la descripción", () => {
+    const txn = goalWithdrawalToTxn({
+      goalId: "77777777-7777-7777-7777-777777777777",
+      goalName: "Fondo de emergencia",
+      currency: "CRC",
+      withdrawalDate: "2026-06-15",
+      amount: 30000,
+      note: "imprevisto médico",
+    });
+    expect(txn.description).toBe("Retiro — Fondo de emergencia · imprevisto médico");
   });
 
   it("el vínculo es opt-in: una transacción normal pasa el schema sin él", () => {

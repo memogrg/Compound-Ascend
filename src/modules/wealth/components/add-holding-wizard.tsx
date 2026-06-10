@@ -269,6 +269,9 @@ function AddHoldingWizard({
   );
   const [totalAmount, setTotalAmount] = useState("");
   const [broker, setBroker] = useState(holdingToEdit?.broker ?? "");
+  // Fase 4.1: compra/aporte → gasto vinculado. ON al crear; OFF al editar
+  // (un edit puede ser corrección de datos, no un aporte real).
+  const [registerExpense, setRegisterExpense] = useState(!holdingToEdit);
   const [holdingCurrency, setHoldingCurrency] = useState(
     holdingToEdit?.currency ?? currency,
   );
@@ -445,6 +448,7 @@ function AddHoldingWizard({
         broker: broker.trim() || undefined,
         currency: holdingCurrency,
         label: label.trim() || undefined,
+        registerExpense,
         // Activos no cotizados: valor manual + renta opcional.
         ...(isRental
           ? {
@@ -599,6 +603,51 @@ function AddHoldingWizard({
             assetCategory={assetCategory}
           />
         )}
+
+        {/* Fase 4.1: la compra/aporte puede nacer como gasto vinculado. */}
+        {(step === totalSteps && step >= 3) ||
+        (!!initialHolding && step === 3) ||
+        (!!holdingToEdit && step === 3) ? (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 10,
+              fontSize: 12.5,
+              color: "var(--ink-2)",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={registerExpense}
+              onChange={(e) => setRegisterExpense(e.target.checked)}
+            />
+            Registrar como gasto en Base Financiera
+            <span
+              className="tip"
+              data-tip={
+                isEdit
+                  ? "Solo si este edit es un aporte real: crea el gasto vinculado por el aumento de posición (las correcciones de datos no deben marcarse)"
+                  : "Crea la transacción de gasto vinculada a esta posición (Compra/Aporte). Desmárcalo si estás cargando histórico"
+              }
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                border: "1px solid var(--line)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 10.5,
+                color: "var(--muted)",
+              }}
+            >
+              ?
+            </span>
+          </label>
+        ) : null}
 
         {errorMsg ? (
           <div className="auth-msg warn" role="alert" style={{ marginTop: 4 }}>

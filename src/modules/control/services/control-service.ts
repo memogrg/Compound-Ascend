@@ -367,6 +367,7 @@ export async function withdrawFromGoal(input: {
   goalId: string;
   amount: number;
   withdrawalDate: string;
+  note?: string;
 }): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -379,6 +380,9 @@ export async function withdrawFromGoal(input: {
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
   if (!goalRow) throw new Error("Meta no encontrada");
+  if (input.amount > Number(goalRow.current_amount)) {
+    throw new Error("No puedes retirar más de lo acumulado en la meta.");
+  }
 
   const txnId = await registerLinkedTransaction(
     goalWithdrawalToTxn({
@@ -387,6 +391,7 @@ export async function withdrawFromGoal(input: {
       currency: goalRow.currency,
       withdrawalDate: input.withdrawalDate,
       amount: input.amount,
+      note: input.note,
     }),
   );
 
