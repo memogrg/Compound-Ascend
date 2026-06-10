@@ -86,6 +86,11 @@ export const txnInputSchema = z.object({
   origin: z.enum(["manual", "scanned", "imported", "recurring", "ai_assisted"]).default("manual"),
   receiptUrl: z.string().max(500).optional(),
   confidence: z.number().min(0).max(1).optional(),
+  // Vínculo transacción↔entidad (Fase 1 · orquestador). Opt-in: si se omite,
+  // createTransaction persiste 'none'.
+  linkedKind: z.enum(["none", "debt", "goal", "holding", "policy", "rental"]).optional(),
+  linkedId: uuidOrNull.optional(),
+  recurringItemId: uuidOrNull.optional(),
 });
 
 export const accountInputSchema = z.object({

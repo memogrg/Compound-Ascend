@@ -3,6 +3,12 @@ import "server-only";
 /** CRUD de dividendos + creación de ingreso vinculado en income_sources. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import {
+  registerLinkedTransaction,
+  deleteLinkedTransaction,
+  getSystemCategoryId,
+} from "@/modules/financial-base/services/linked-transaction-service";
+import { dividendToTxn } from "@/modules/financial-base/engine/linked";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";
 
@@ -80,6 +86,19 @@ export async function createDividend(input: DividendInput): Promise<void> {
     .single();
   if (incomeErr) throw new Error(incomeErr.message);
 
+  // Fase 1 · orquestador: el dividendo nace también como transacción
+  // vinculada (ingreso, linked_kind='holding').
+  const txnId = await registerLinkedTransaction(
+    dividendToTxn({
+      holdingId: input.holdingId,
+      label: input.holdingLabel ?? input.holdingSymbol ?? "Dividendo",
+      currency: input.currency,
+      paymentDate: input.paymentDate,
+      amount: input.amount,
+      categoryId: await getSystemCategoryId("inc_pasivo"),
+    }),
+  );
+
   const { error: divErr } = await supabase.from("dividends").insert({
     user_id: user.id,
     holding_id: input.holdingId,
@@ -89,18 +108,26 @@ export async function createDividend(input: DividendInput): Promise<void> {
     yield_pct: input.yieldPct ?? null,
     frequency: freq,
     income_id: incomeRow?.id ?? null,
+    transaction_id: txnId,
   });
-  if (divErr) throw new Error(divErr.message);
+  if (divErr) {
+    // Compensación: limpia la transacción (y el ingreso) si el ledger falla.
+    await deleteLinkedTransaction(txnId);
+    if (incomeRow?.id) {
+      await supabase.from("income_sources").delete().eq("id", incomeRow.id).eq("user_id", user.id);
+    }
+    throw new Error(divErr.message);
+  }
 }
 
 export async function deleteDividend(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  // Lee income_id antes de borrar para poder limpiar el ingreso vinculado.
+  // Lee income_id/transaction_id antes de borrar para limpiar lo vinculado.
   const { data: row } = await supabase
     .from("dividends")
-    .select("income_id")
+    .select("income_id,transaction_id")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -118,5 +145,8 @@ export async function deleteDividend(id: string): Promise<void> {
       .delete()
       .eq("id", row.income_id)
       .eq("user_id", user.id);
+  }
+  if (row?.transaction_id) {
+    await deleteLinkedTransaction(row.transaction_id);
   }
 }

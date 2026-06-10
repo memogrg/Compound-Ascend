@@ -40,6 +40,9 @@ function rowToTransaction(r: TransactionRow): Transaction {
     origin: (r.origin ?? "manual") as TxnOrigin,
     receiptUrl: r.receipt_url ?? null,
     confirmedByUser: r.confirmed_by_user,
+    linkedKind: (r.linked_kind ?? "none") as Transaction["linkedKind"],
+    linkedId: r.linked_id ?? null,
+    recurringItemId: r.recurring_item_id ?? null,
   };
 }
 
@@ -75,7 +78,8 @@ export async function listTransactions(period: Period, filters: TxnFilters = {})
   return (data ?? []).map(rowToTransaction);
 }
 
-export async function createTransaction(input: TxnInput): Promise<void> {
+/** Crea la transacción y devuelve su id (lo usa el orquestador de vínculos). */
+export async function createTransaction(input: TxnInput): Promise<string> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
@@ -97,24 +101,33 @@ export async function createTransaction(input: TxnInput): Promise<void> {
   }
 
   const accountLabel = await accountLabelFor(accountId);
-  await supabase.from("transactions").insert({
-    user_id: user.id,
-    kind: input.kind,
-    description: input.description ?? null,
-    merchant_or_source: input.merchantOrSource ?? null,
-    amount: input.amount,
-    currency: input.currency,
-    occurred_on: input.occurredOn,
-    category_id: categoryId,
-    account_id: accountId,
-    account_label: accountLabel,
-    status: input.status,
-    origin: input.origin,
-    receipt_url: input.receiptUrl ?? null,
-    confidence_score_internal: input.confidence ?? null,
-    source: input.origin === "scanned" ? "receipt" : "manual",
-    confirmed_by_user: input.status === "confirmed",
-  });
+  const { data, error } = await supabase
+    .from("transactions")
+    .insert({
+      user_id: user.id,
+      kind: input.kind,
+      description: input.description ?? null,
+      merchant_or_source: input.merchantOrSource ?? null,
+      amount: input.amount,
+      currency: input.currency,
+      occurred_on: input.occurredOn,
+      category_id: categoryId,
+      account_id: accountId,
+      account_label: accountLabel,
+      status: input.status,
+      origin: input.origin,
+      receipt_url: input.receiptUrl ?? null,
+      confidence_score_internal: input.confidence ?? null,
+      source: input.origin === "scanned" ? "receipt" : "manual",
+      confirmed_by_user: input.status === "confirmed",
+      linked_kind: input.linkedKind ?? "none",
+      linked_id: input.linkedId ?? null,
+      recurring_item_id: input.recurringItemId ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data.id;
 }
 
 export async function updateTransaction(id: string, input: TxnInput): Promise<void> {

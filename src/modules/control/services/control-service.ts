@@ -4,6 +4,12 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import {
+  registerLinkedTransaction,
+  deleteLinkedTransaction,
+  getSystemCategoryId,
+} from "@/modules/financial-base/services/linked-transaction-service";
+import { debtPaymentToTxn, goalContributionToTxn } from "@/modules/financial-base/engine/linked";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -239,10 +245,33 @@ export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, st
   return out;
 }
 
-/** Registra un pago reportado. Si el extra es modo 'cuota', baja la cuota. */
+/**
+ * Registra un pago reportado. Si el extra es modo 'cuota', baja la cuota.
+ * Fase 1: el pago pasa por el orquestador — nace también como transacción
+ * vinculada (gasto, linked_kind='debt') y debt_payments guarda su id.
+ */
 export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+
+  const debt = await getDebt(input.debtId);
+  if (!debt) throw new Error("Deuda no encontrada");
+  const total = input.amount + input.extraAmount;
+  let txnId: string | null = null;
+  if (total > 0) {
+    txnId = await registerLinkedTransaction(
+      debtPaymentToTxn({
+        debtId: debt.id,
+        debtName: debt.name,
+        currency: debt.currency,
+        paymentDate: input.paymentDate,
+        amount: input.amount,
+        extraAmount: input.extraAmount,
+        categoryId: await getSystemCategoryId("deudas"),
+      }),
+    );
+  }
+
   const { error } = await supabase.from("debt_payments").insert({
     user_id: user.id,
     debt_id: input.debtId,
@@ -250,32 +279,79 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     amount: input.amount,
     extra_amount: input.extraAmount,
     extra_mode: input.extraMode ?? null,
+    transaction_id: txnId,
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Compensación: sin registro especializado no debe quedar la transacción.
+    if (txnId) await deleteLinkedTransaction(txnId);
+    throw new Error(error.message);
+  }
 
   // Modo 'cuota': el extra baja la cuota futura → actualiza current_payment.
   if (input.extraAmount > 0 && input.extraMode === "cuota") {
-    const debt = await getDebt(input.debtId);
-    if (debt) {
-      const { applyExtraDecision } = await import("@/modules/control/engine/amortization");
-      const decision = applyExtraDecision(
-        {
-          balance: debt.balance,
-          apr: debt.apr ?? 0,
-          termMonths: debt.termMonths,
-          monthlyPayment: debt.currentPayment > 0 ? debt.currentPayment : null,
-          insurance: debt.insurance,
-        },
-        input.extraAmount,
-        "cuota",
-      );
-      const { error: upErr } = await supabase
-        .from("debts")
-        .update({ current_payment: decision.monthlyPayment, balance: Math.max(0, debt.balance - input.extraAmount) })
-        .eq("id", input.debtId)
-        .eq("user_id", user.id);
-      if (upErr) throw new Error(upErr.message);
-    }
+    const { applyExtraDecision } = await import("@/modules/control/engine/amortization");
+    const decision = applyExtraDecision(
+      {
+        balance: debt.balance,
+        apr: debt.apr ?? 0,
+        termMonths: debt.termMonths,
+        monthlyPayment: debt.currentPayment > 0 ? debt.currentPayment : null,
+        insurance: debt.insurance,
+      },
+      input.extraAmount,
+      "cuota",
+    );
+    const { error: upErr } = await supabase
+      .from("debts")
+      .update({ current_payment: decision.monthlyPayment, balance: Math.max(0, debt.balance - input.extraAmount) })
+      .eq("id", input.debtId)
+      .eq("user_id", user.id);
+    if (upErr) throw new Error(upErr.message);
+  }
+}
+
+/**
+ * Aporte a una meta de ahorro (Fase 1 · orquestador): crea la transacción
+ * vinculada (gasto, linked_kind='goal') y sube current_amount de la meta.
+ * No existe ledger propio de aportes — la transacción ES el histórico.
+ */
+export async function addGoalContribution(input: {
+  goalId: string;
+  amount: number;
+  contributionDate: string;
+}): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: goalRow, error: gErr } = await supabase
+    .from("savings_goals")
+    .select("id,name,currency,current_amount")
+    .eq("id", input.goalId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (gErr) throw new Error(gErr.message);
+  if (!goalRow) throw new Error("Meta no encontrada");
+
+  const txnId = await registerLinkedTransaction(
+    goalContributionToTxn({
+      goalId: goalRow.id,
+      goalName: goalRow.name,
+      currency: goalRow.currency,
+      contributionDate: input.contributionDate,
+      amount: input.amount,
+      // Sin categoría fija: el tipo de meta varía; linked_kind='goal' basta.
+      categoryId: null,
+    }),
+  );
+
+  const { error } = await supabase
+    .from("savings_goals")
+    .update({ current_amount: Number(goalRow.current_amount) + input.amount })
+    .eq("id", input.goalId)
+    .eq("user_id", user.id);
+  if (error) {
+    await deleteLinkedTransaction(txnId);
+    throw new Error(error.message);
   }
 }
 

@@ -8,6 +8,12 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import {
+  registerLinkedTransaction,
+  deleteLinkedTransaction,
+  getSystemCategoryId,
+} from "@/modules/financial-base/services/linked-transaction-service";
+import { rentalPaymentToTxn } from "@/modules/financial-base/engine/linked";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";
 
@@ -80,6 +86,19 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
     .single();
   if (incomeErr) throw new Error(incomeErr.message);
 
+  // Fase 1 · orquestador: la renta nace también como transacción vinculada
+  // (ingreso, linked_kind='rental').
+  const txnId = await registerLinkedTransaction(
+    rentalPaymentToTxn({
+      holdingId: input.holdingId,
+      label: input.holdingLabel ?? input.holdingSymbol ?? "Renta / alquiler",
+      currency: input.currency,
+      receivedOn: input.receivedOn,
+      amount: input.amount,
+      categoryId: await getSystemCategoryId("inc_pasivo"),
+    }),
+  );
+
   const { error: rentErr } = await supabase.from("rental_payments").insert({
     user_id: user.id,
     holding_id: input.holdingId,
@@ -88,8 +107,16 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
     currency: input.currency,
     frequency: freq,
     income_id: incomeRow?.id ?? null,
+    transaction_id: txnId,
   });
-  if (rentErr) throw new Error(rentErr.message);
+  if (rentErr) {
+    // Compensación: limpia transacción e ingreso si el ledger falla.
+    await deleteLinkedTransaction(txnId);
+    if (incomeRow?.id) {
+      await supabase.from("income_sources").delete().eq("id", incomeRow.id).eq("user_id", user.id);
+    }
+    throw new Error(rentErr.message);
+  }
 }
 
 export async function deleteRentalPayment(id: string): Promise<void> {
@@ -98,7 +125,7 @@ export async function deleteRentalPayment(id: string): Promise<void> {
 
   const { data: row } = await supabase
     .from("rental_payments")
-    .select("income_id")
+    .select("income_id,transaction_id")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -116,5 +143,8 @@ export async function deleteRentalPayment(id: string): Promise<void> {
       .delete()
       .eq("id", row.income_id)
       .eq("user_id", user.id);
+  }
+  if (row?.transaction_id) {
+    await deleteLinkedTransaction(row.transaction_id);
   }
 }

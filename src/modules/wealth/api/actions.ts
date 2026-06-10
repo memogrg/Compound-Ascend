@@ -174,6 +174,9 @@ export async function addDividendAction(raw: unknown): Promise<ActionResult> {
   try {
     await createDividend(parsed.data);
     revalidatePath("/patrimonio");
+    // El dividendo también nace como transacción vinculada (Fase 1).
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("addDividend fallido", { message: err instanceof Error ? err.message : "?" });
@@ -186,6 +189,8 @@ export async function removeDividendAction(id: string): Promise<ActionResult> {
   try {
     await deleteDividend(id);
     revalidatePath("/patrimonio");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -201,6 +206,9 @@ export async function addRentalIncomeAction(raw: unknown): Promise<ActionResult>
   try {
     await createRentalPayment(parsed.data);
     revalidatePath("/patrimonio");
+    // La renta también nace como transacción vinculada (Fase 1).
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("addRentalIncome fallido", { message: err instanceof Error ? err.message : "?" });
@@ -213,6 +221,8 @@ export async function removeRentalPaymentAction(id: string): Promise<ActionResul
   try {
     await deleteRentalPayment(id);
     revalidatePath("/patrimonio");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch {
     return { ok: false };

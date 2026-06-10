@@ -386,6 +386,8 @@ export type DebtPaymentRow = Timestamps & {
   occurred_on: string;
   extra_amount: number;
   extra_mode: string | null;
+  // Puente ledger↔transacción (migración 0021 · Fase 1)
+  transaction_id: string | null;
 };
 
 // ---------- Módulo 4 — Patrimonio ----------
@@ -440,6 +442,8 @@ export type RentalPaymentRow = Timestamps & {
   currency: string;
   frequency: string | null;
   income_id: string | null;
+  // Puente ledger↔transacción (migración 0021 · Fase 1)
+  transaction_id: string | null;
 };
 
 export type InvestmentTransactionRow = Timestamps & {
@@ -488,6 +492,8 @@ export type DividendRow = {
   yield_pct: number | null;
   frequency: string | null;
   income_id: string | null;
+  // Puente ledger↔transacción (migración 0021 · Fase 1)
+  transaction_id: string | null;
 };
 
 export type PortfolioSnapshotRow = {
