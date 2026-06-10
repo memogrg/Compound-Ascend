@@ -193,6 +193,35 @@ export async function acceptInvitationAction(token: string): Promise<AcceptResul
   return { ok: true };
 }
 
+const displayNameSchema = z.string().trim().min(1, "Dinos cómo llamarte.").max(60);
+
+/**
+ * Guarda "¿cómo querés que te llamemos?" en profiles.display_name y en
+ * user_metadata. Es el único paso del invitado tras aceptar la invitación.
+ */
+export async function updateDisplayNameAction(name: string): Promise<AcceptResult> {
+  const parsed = displayNameSchema.safeParse(name);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Nombre no válido." };
+  }
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  const user = await getUser();
+  if (!user) return { ok: false, message: "Inicia sesión para continuar." };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ display_name: parsed.data })
+    .eq("id", user.id);
+  if (error) {
+    logger.error("updateDisplayName fallido", { message: error.message });
+    return { ok: false, message: "No pudimos guardar tu nombre. Inténtalo de nuevo." };
+  }
+  await supabase.auth.updateUser({ data: { display_name: parsed.data } });
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 /** Traduce el mensaje de la excepción de Postgres a una copia segura en español. */
 function friendlyAcceptError(message: string): string {
   const m = message.toLowerCase();
