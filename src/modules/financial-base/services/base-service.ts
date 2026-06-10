@@ -7,6 +7,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
@@ -82,8 +83,10 @@ export async function listExpenses(): Promise<ExpenseItem[]> {
 export async function createIncome(input: IncomeInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   await supabase.from("income_sources").insert({
     user_id: user.id,
+    household_id,
     name: input.name,
     income_type: input.incomeType,
     category: input.category ?? null,
@@ -101,8 +104,10 @@ export async function createIncome(input: IncomeInput): Promise<void> {
 export async function createExpense(input: ExpenseInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   await supabase.from("expense_items").insert({
     user_id: user.id,
+    household_id,
     name: input.name,
     nature: input.nature,
     amount: input.amount,
