@@ -3,6 +3,7 @@ import "server-only";
 /** CRUD + agregados de presupuesto por mes (budget_items). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -62,8 +63,11 @@ export async function listBudgetItems(period: Period): Promise<BudgetItem[]> {
 export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // household: las líneas manuales comparten hogar igual que las derivadas.
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   await supabase.from("budget_items").insert({
     user_id: user.id,
+    household_id,
     type: input.type,
     category_id: input.categoryId ?? null,
     name: input.name,
