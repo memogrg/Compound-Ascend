@@ -12,9 +12,11 @@ import "server-only";
  *
  * Nada se escribe sin confirmación explícita del usuario.
  */
-import { scanReceipt } from "@/lib/ai/orchestrator";
+import { financeChat, scanReceipt } from "@/lib/ai/orchestrator";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { AppError } from "@/lib/errors";
+import type { ChatMessage } from "@/lib/ai/provider";
+import { buildContextForUser } from "@/lib/whatsapp/context-service";
 import {
   activateLinkByOtp,
   getActiveLinkByPhone,
@@ -119,11 +121,89 @@ async function handleActiveMessage(
     return;
   }
 
-  // Texto libre: llega en el siguiente sub-PR.
+  if (!msg.body) {
+    await provider.sendText(
+      msg.phone,
+      'Mandame una foto del recibo o escribí un gasto/ingreso, p. ej. "gasté 12000 en super".',
+    );
+    return;
+  }
+
+  // Texto libre: gasto/ingreso (con confirmación) o consulta de solo lectura.
+  await handleText(provider, link, msg);
+}
+
+/** Texto libre: arma el contexto del hogar, consulta a la IA y, si propone una
+ * transacción, la deja PENDIENTE de confirmación. Las consultas se responden sin
+ * escribir nada. */
+async function handleText(
+  provider: WhatsAppProvider,
+  link: ActiveLink,
+  msg: InboundMessage,
+): Promise<void> {
+  try {
+    await assertTokenBudget(link.userId);
+  } catch (err) {
+    await provider.sendText(
+      msg.phone,
+      err instanceof AppError ? err.message : "No pude procesar tu mensaje ahora.",
+    );
+    return;
+  }
+
+  const ctx = await buildContextForUser(link.userId, link.householdId);
+  const messages: ChatMessage[] = [{ role: "user", content: msg.body }];
+  const result = await financeChat(messages, ctx);
+  await recordUsage(link.userId, result.tokensIn, result.tokensOut);
+
+  const action =
+    result.action?.type === "create_transaction"
+      ? toTxnAction(result.action.payload, ctx.currency)
+      : null;
+
+  if (action) {
+    await setPendingAction(link.id, action);
+    const lead =
+      result.action?.summary?.trim() ||
+      `${action.kind === "ingreso" ? "Ingreso" : "Gasto"} de ${formatMoney(action.amount, action.currency)}${action.description ? ` · ${action.description}` : ""}`;
+    await provider.sendButtons(msg.phone, `${lead}. ¿Lo agrego?`, [
+      { id: "yes", title: "Sí" },
+      { id: "edit", title: "Editar" },
+    ]);
+    return;
+  }
+
+  // Consulta o respuesta general (solo lectura): NO escribe nada.
   await provider.sendText(
     msg.phone,
-    "📸 Mandame una foto del recibo y te propongo el gasto para confirmar. (Registrar por texto llega muy pronto.)",
+    result.reply ||
+      'No entendí. Probá: "gasté 12000 en super", "¿cuánto gasté este mes?" o enviá una foto del recibo.',
   );
+}
+
+/** Mapea el payload de la acción `create_transaction` a una PendingAction. */
+function toTxnAction(payload: Record<string, unknown>, fallbackCurrency: string): PendingAction | null {
+  const amount = Number(payload.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const kind = String(payload.kind ?? "gasto") === "ingreso" ? "ingreso" : "gasto";
+  const description =
+    typeof payload.description === "string" && payload.description.trim()
+      ? payload.description.trim()
+      : kind === "ingreso"
+        ? "Ingreso"
+        : "Gasto";
+  const currency =
+    typeof payload.currency === "string" && payload.currency ? payload.currency : fallbackCurrency;
+  return {
+    kind,
+    description,
+    amount,
+    currency,
+    occurredOn: todayIso(),
+    merchant: null,
+    origin: "ai_assisted",
+    source: "chat",
+  };
 }
 
 async function handleReceiptPhoto(
