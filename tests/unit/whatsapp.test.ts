@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { formatButtonsAsText } from "@/lib/whatsapp/provider";
 import { verifyTwilioSignature } from "@/lib/whatsapp/twilio-signature";
+import { formatMoney } from "@/lib/whatsapp/format";
 
 // Vector de ejemplo de Twilio (URL + params ordenados). La firma esperada es la
 // que produce el algoritmo oficial de twilio-node (HMAC-SHA1 base64), idéntico
@@ -28,6 +29,16 @@ describe("verifyTwilioSignature", () => {
     expect(
       verifyTwilioSignature(TW_TOKEN, TW_SIG, TW_URL, { ...TW_PARAMS, Digits: "9999" }),
     ).toBe(false);
+  });
+});
+
+describe("formatMoney", () => {
+  it("antepone el símbolo y redondea (separador es-CR)", () => {
+    const n12000 = (12000).toLocaleString("es-CR");
+    const n1235 = (1235).toLocaleString("es-CR");
+    expect(formatMoney(12000, "CRC")).toBe(`₡${n12000}`);
+    expect(formatMoney(1234.6, "USD")).toBe(`$${n1235}`);
+    expect(formatMoney(500, "XYZ")).toBe("500");
   });
 });
 
