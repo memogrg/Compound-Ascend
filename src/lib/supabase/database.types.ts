@@ -59,6 +59,34 @@ export type HouseholdMemberRow = Timestamps & {
   status: MemberStatus;
 };
 
+export type WhatsAppLinkStatus = "pending" | "active" | "revoked";
+
+export type WhatsAppLinkRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  phone_e164: string | null;
+  status: WhatsAppLinkStatus;
+  otp_code: string | null;
+  otp_expires_at: string | null;
+  pending_action: Json | null;
+  verified_at: string | null;
+  last_seen_at: string | null;
+};
+
+export type InvitationStatus = "pending" | "accepted" | "revoked";
+
+export type HouseholdInvitationRow = Timestamps & {
+  id: string;
+  household_id: string;
+  email: string;
+  token: string;
+  invited_by: string;
+  role: HouseholdRole;
+  status: InvitationStatus;
+  expires_at: string;
+};
+
 // ---------- Módulo 1 — Mi Perfil Financiero ----------
 export type PersonalProfileRow = Timestamps & {
   id: string;
@@ -501,6 +529,7 @@ export type DividendRow = {
   id: string;
   holding_id: string;
   user_id: string;
+  household_id: string | null;
   payment_date: string;
   amount: number;
   currency: string;
@@ -604,6 +633,12 @@ export interface Database {
         Partial<HouseholdMemberRow> & { household_id: string; user_id: string },
         Partial<HouseholdMemberRow>
       >;
+      household_invitations: TableShape<
+        HouseholdInvitationRow,
+        Partial<HouseholdInvitationRow> & { household_id: string; email: string; invited_by: string },
+        Partial<HouseholdInvitationRow>
+      >;
+      whatsapp_links: UserTable<WhatsAppLinkRow>;
       personal_profiles: UserTable<PersonalProfileRow>;
       risk_profiles: UserTable<RiskProfileRow>;
       behavior_profiles: UserTable<BehaviorProfileRow>;
@@ -654,7 +689,32 @@ export interface Database {
     // never>` tiene índice `[k]: never` y, vía `Tables & Views`, intersecta cada
     // tabla con `never`, colapsándolas. Así lo generan los tipos oficiales.
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      ensure_household: {
+        Args: { p_name?: string | null };
+        Returns: string;
+      };
+      get_invitation_by_token: {
+        Args: { p_token: string };
+        Returns: {
+          household_id: string;
+          email: string;
+          role: HouseholdRole;
+          status: InvitationStatus;
+          expired: boolean;
+          inviter_name: string;
+          household_name: string;
+        }[];
+      };
+      accept_household_invitation: {
+        Args: { p_token: string };
+        Returns: string;
+      };
+      get_household_profile: {
+        Args: Record<string, never>;
+        Returns: Record<string, unknown> | null;
+      };
+    };
     Enums: {
       plan: Plan;
       household_type: HouseholdType;

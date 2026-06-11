@@ -35,9 +35,12 @@ function pickMany(options: Option[], values?: string[]): string[] {
 export function ProfileDashboard({
   draft,
   diagnosis,
+  readOnly = false,
 }: {
   draft: ProfileDraft;
   diagnosis: ProfileDiagnosis;
+  /** Vista del invitado: hereda el perfil del hogar, sin acciones de edición. */
+  readOnly?: boolean;
 }) {
   const completion = diagnosis.completion;
   const concerns = pickMany(O.CONCERNS, draft.mainConcerns ?? (draft.mainConcern ? [draft.mainConcern] : []));
@@ -58,11 +61,15 @@ export function ProfileDashboard({
               {RISK_LABEL[diagnosis.riskClass] ?? diagnosis.riskClass}
             </div>
             <div className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
-              Perfil completado al {completion}%. Cuanto más completo, mejores tus recomendaciones.
+              {readOnly
+                ? "Perfil del hogar (solo lectura). Lo configuró quien creó el hogar."
+                : `Perfil completado al ${completion}%. Cuanto más completo, mejores tus recomendaciones.`}
             </div>
-            <Link className="btn btn-primary" href="/bienvenida" style={{ marginTop: 14 }}>
-              <Icon name="edit" width={2} /> Editar mi perfil
-            </Link>
+            {readOnly ? null : (
+              <Link className="btn btn-primary" href="/bienvenida" style={{ marginTop: 14 }}>
+                <Icon name="edit" width={2} /> Editar mi perfil
+              </Link>
+            )}
           </div>
         </div>
 
@@ -75,7 +82,7 @@ export function ProfileDashboard({
       </section>
 
       {/* Identidad */}
-      <Card title="Identidad" editHint>
+      <Card title="Identidad" editHint={!readOnly}>
         <div className="cols-2" style={{ gap: "14px 28px" }}>
           <Info label="Nombre" value={draft.displayName} />
           <Info label="Edad" value={draft.age ? `${draft.age} años` : undefined} />

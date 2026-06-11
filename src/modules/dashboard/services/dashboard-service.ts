@@ -1,6 +1,7 @@
 import "server-only";
 
 /** Reúne los datos del panel desde los módulos disponibles. */
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import {
   getBaseSummary,
@@ -24,21 +25,36 @@ export type DashboardData = {
 export async function getDashboardData(): Promise<DashboardData> {
   const configured = isSupabaseConfigured();
   const user = await getUser();
-  const name =
-    (user?.user_metadata?.display_name as string | undefined) ??
-    user?.email?.split("@")[0] ??
-    "bienvenido";
 
   let summary: BaseSummary;
   let currency = "CRC";
+  // Nombre del perfil (el del wizard "¿Cómo querés que te llamemos?"). Prioriza
+  // la tabla profiles porque user_metadata puede venir vacío aunque el usuario
+  // sí lo haya configurado.
+  let profileName: string | null = null;
   if (configured) {
     [summary, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
+    if (user) {
+      const supabase = await createSupabaseServerClient();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      profileName = profile?.display_name ?? null;
+    }
   } else {
     // Modo demostración (sin Supabase): datos de ejemplo claramente etiquetados
     // en la UI, para previsualizar el panel premium. Se reemplazan por datos
     // reales al conectar Supabase y capturar tu base.
     summary = buildDemoSummary();
   }
+
+  const name =
+    profileName ??
+    (user?.user_metadata?.display_name as string | undefined) ??
+    user?.email?.split("@")[0] ??
+    "tu perfil";
 
   // Pasa la tasa de inversión activa para que contribuya al health score.
   const health = computeHealthScore(summary.indicators, summary.indicators.investmentRate);

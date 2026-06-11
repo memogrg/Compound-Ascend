@@ -9,8 +9,39 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import type { HouseholdRole } from "@/lib/supabase/database.types";
 import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { computeCompletion, computeRiskClass } from "@/modules/personal-profile/engine/diagnosis";
+
+export type HouseholdContext = { role: HouseholdRole | null; isInvitedMember: boolean };
+
+/**
+ * Rol del usuario en su hogar. `isInvitedMember` es true cuando pertenece a un
+ * hogar pero NO es owner de ninguno: es un invitado que hereda el perfil del
+ * hogar y no debe correr el wizard.
+ */
+export async function getHouseholdContext(): Promise<HouseholdContext> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("household_members")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+  const roles = (data ?? []).map((r) => r.role);
+  if (roles.length === 0) return { role: null, isInvitedMember: false };
+  const isOwner = roles.includes("owner");
+  return { role: isOwner ? "owner" : (roles[0] ?? null), isInvitedMember: !isOwner };
+}
+
+/** Perfil (solo lectura) del owner del hogar al que pertenece el invitado. */
+export async function getHouseholdProfileDraft(): Promise<ProfileDraft> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.rpc("get_household_profile", {});
+  const extra = (data ?? {}) as { draft?: ProfileDraft };
+  return extra.draft ?? {};
+}
 
 /** Lee el borrador guardado (si existe). */
 export async function getDraft(): Promise<ProfileDraft> {
@@ -156,6 +187,12 @@ export async function completeProfile(
       profile_completion: completion,
     })
     .eq("id", user.id);
+
+  // 9) user_metadata.display_name (coherencia: lo leen account/dashboard como
+  // respaldo y otros clientes de auth). Best-effort: no bloquea el onboarding.
+  if (draft.displayName) {
+    await supabase.auth.updateUser({ data: { display_name: draft.displayName } });
+  }
 
   return { completion, riskClass };
 }

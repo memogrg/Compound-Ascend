@@ -7,7 +7,8 @@ import "server-only";
  * la misma ruta que el composer — para que apliquen las reglas de
  * auto-categorización/auto-vínculo (Fase 2) y la propagación al ledger
  * especializado (pago de deuda / aporte a meta) con compensación.
- * El insert directo anterior se saltaba todo eso.
+ * El insert directo anterior se saltaba todo eso. El household_id lo pone el
+ * pipeline central (integración household de main), no este servicio.
  */
 import {
   createTransaction as createBaseTransaction,
