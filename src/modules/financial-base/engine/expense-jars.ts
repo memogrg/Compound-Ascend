@@ -24,6 +24,7 @@ export type Jar =
       name: string;
       color: string;
       icon: string;
+      isSystem: boolean;
       envelopes: JarEnvelope[];
       suggestions: string[];
     }
@@ -150,6 +151,7 @@ export function buildExpenseJars(args: {
       name: group.name,
       color: group.color ?? "var(--muted-2)",
       icon: group.icon ?? "spark",
+      isSystem: group.isSystem,
       envelopes,
       suggestions: mergeSuggestions({
         groupKey: group.key,
