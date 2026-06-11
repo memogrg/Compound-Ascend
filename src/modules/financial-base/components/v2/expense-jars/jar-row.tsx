@@ -1,0 +1,101 @@
+"use client";
+
+/**
+ * Fila de un frasco. Normal → abre el modal de sobres + crear subcategoría.
+ * Vinculado → de momento (este commit) muestra un resumen de solo lectura; su
+ * modal con entidades reales + CTA llega en el commit de frascos vinculados.
+ */
+import { useState } from "react";
+import { Icon, type IconName } from "@/components/ui/icon";
+import { formatMoney } from "@/lib/format";
+import { JarNormalModal } from "@/modules/financial-base/components/v2/expense-jars/jar-normal-modal";
+import type { Jar } from "@/modules/financial-base/engine/expense-jars";
+import type { Period } from "@/modules/financial-base/types";
+
+// Los iconos sembrados en BD (home/car/food/heart/book/bank…) no existen en el
+// set del design system: mapéalos a uno válido; fallback genérico.
+const ICON_MAP: Record<string, IconName> = {
+  home: "budget", car: "repeat", food: "expense", heart: "defense", sparkles: "spark",
+  book: "profile", bank: "networth", dots: "dots", invest: "invest", debt: "debt",
+  defense: "defense", savings: "savings",
+};
+function iconFor(name: string): IconName {
+  return ICON_MAP[name] ?? "expense";
+}
+
+function pct(spent: number, budget: number): number {
+  if (budget <= 0) return spent > 0 ? 100 : 0;
+  return Math.min(100, Math.round((spent / budget) * 100));
+}
+
+export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; period: Period }) {
+  const [open, setOpen] = useState(false);
+  const icon = iconFor(jar.icon);
+
+  if (jar.kind === "linked") {
+    const n = jar.items.length;
+    const sub = n > 0 ? `${n} ${n === 1 ? "elemento vinculado" : "elementos vinculados"}` : jar.emptyText;
+    return (
+      <div className="env" aria-label={jar.name}>
+        <div className="env-ic" style={{ background: `color-mix(in srgb, ${jar.color} 14%, transparent)`, color: jar.color }}>
+          <Icon name={icon} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div className="env-name">{jar.name}</div>
+          <div className="env-sub">{sub}</div>
+        </div>
+        <div className="env-bar-cell" />
+        <div className="env-num">
+          <div className="small">vinculado</div>
+        </div>
+      </div>
+    );
+  }
+
+  const totalSpent = jar.envelopes.reduce((s, e) => s + e.spent, 0);
+  const totalBudget = jar.envelopes.reduce((s, e) => s + e.budget, 0);
+  const over = totalBudget > 0 && totalSpent > totalBudget;
+  const color = over ? "var(--neg)" : jar.color;
+  const width = pct(totalSpent, totalBudget);
+  const remaining = totalBudget - totalSpent;
+  const n = jar.envelopes.length;
+
+  return (
+    <>
+      <button
+        type="button"
+        className={over ? "env exp-clickable over" : "env exp-clickable"}
+        style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", font: "inherit" }}
+        onClick={() => setOpen(true)}
+      >
+        <div className="env-ic" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>
+          <Icon name={icon} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div className="env-name">{jar.name}</div>
+          <div className="env-sub">{n} {n === 1 ? "sobre" : "sobres"}</div>
+        </div>
+        <div className="env-bar-cell">
+          <div className="bar-track">
+            <div className="bar-fill" style={{ width: `${width}%`, background: color }} />
+          </div>
+          <div className="env-bar-meta">
+            <span style={over ? { color: "var(--neg)" } : undefined}>{formatMoney(totalSpent, currency)} gastado</span>
+            <span>
+              {over
+                ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
+                : `${formatMoney(remaining, currency)} restante`}
+            </span>
+          </div>
+        </div>
+        <div className="env-num">
+          <div className="big">{formatMoney(totalBudget, currency)}</div>
+          <div className="small">presupuestado</div>
+        </div>
+      </button>
+      {open ? (
+        <JarNormalModal jar={jar} currency={currency} period={period} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}

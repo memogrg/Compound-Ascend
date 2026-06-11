@@ -11,7 +11,7 @@ import { PremiumLineChart } from "@/components/charts/line-chart";
 import { EditableBudgetTable } from "@/modules/financial-base/components/v2/editable-budget-table";
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
 import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
-import { ExpenseEnvelopes } from "@/modules/financial-base/components/v2/expense-envelopes";
+import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
 import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
 import { ComposerButton } from "@/modules/financial-base/components/v2/composer-button";
 import { CategoryManagerButton } from "@/modules/financial-base/components/v2/category-manager";
@@ -203,7 +203,6 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
   const byKey = isIncome ? real.incomeByKey : real.expenseByKey;
   const items = budget.items.filter((b) => b.type === kind);
   const incomeTxns = view.transactions.filter((t) => t.kind === "ingreso");
-  const envelopes = topRows(budget.expenseByKey, real.expenseByKey, { kind: "expense", limit: 12 });
   const lineData = history.map((h) => ({
     label: h.label,
     Real: isIncome ? h.realIncome : h.realExpense,
@@ -278,10 +277,10 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
           <div className="card-head">
             <div>
               <div className="card-title">Categorías de gasto</div>
-              <div className="card-sub">Recurrente + variable · este mes</div>
+              <div className="card-sub">Frascos por bloque · este mes</div>
             </div>
           </div>
-          <ExpenseEnvelopes rows={envelopes} currency={currency} />
+          <ExpenseJars jars={view.jars} currency={currency} period={view.period} />
         </div>
       )}
 
