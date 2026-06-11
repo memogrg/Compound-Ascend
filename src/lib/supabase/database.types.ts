@@ -192,6 +192,19 @@ export type IncomeSourceRow = Timestamps & {
   amount_monthly_base: number;
 };
 
+export type RecurringItemRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  kind: string; // 'ingreso' | 'gasto'
+  name: string;
+  amount: number;
+  currency: string;
+  frequency: string;
+  next_date: string | null;
+  active: boolean;
+};
+
 export type ExpenseItemRow = Timestamps & {
   id: string;
   user_id: string;
@@ -229,6 +242,8 @@ export type ExpenseCategoryRow = Timestamps & {
   is_active: boolean;
   is_favorite: boolean;
   merged_into_id: string | null;
+  // Vínculo transacción↔entidad (migración 0020 · Fase 0)
+  linked_kind: string | null; // 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
 };
 
 export type MonthlySnapshotRow = Timestamps & {
@@ -270,6 +285,10 @@ export type TransactionRow = Timestamps & {
   confidence_score_internal: number | null;
   // Reestructuración de Transacciones (migración 0018 · hook de IA)
   ai_meta: Json | null;
+  // Vínculo transacción↔entidad (migración 0020 · Fase 0)
+  linked_kind: string; // 'none' | 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
+  linked_id: string | null;
+  recurring_item_id: string | null;
 };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
@@ -285,6 +304,9 @@ export type BudgetItemRow = Timestamps & {
   frequency: string;
   period_month: number;
   period_year: number;
+  // Plan derivado (migración 0020 · Fase 0)
+  source_kind: string; // 'manual' | 'debt' | 'goal' | 'policy' | 'recurring' | 'dividend'
+  source_id: string | null;
 };
 
 export type AccountRow = Timestamps & {
@@ -307,6 +329,9 @@ export type TransactionRuleRow = Timestamps & {
   type: string; // 'income' | 'expense'
   active: boolean;
   priority: number; // Fase 2 (0019): mayor = se evalúa primero
+  // Auto-vínculo (migración 0022 · Fase 2 interconexión)
+  linked_kind: string | null; // 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
+  linked_id: string | null;
 };
 
 // Plantillas / favoritos de transacción (migración 0018 · registro en 1 clic)
@@ -405,6 +430,8 @@ export type DebtPaymentRow = Timestamps & {
   occurred_on: string;
   extra_amount: number;
   extra_mode: string | null;
+  // Puente ledger↔transacción (migración 0021 · Fase 1)
+  transaction_id: string | null;
 };
 
 // ---------- Módulo 4 — Patrimonio ----------
@@ -459,6 +486,8 @@ export type RentalPaymentRow = Timestamps & {
   currency: string;
   frequency: string | null;
   income_id: string | null;
+  // Puente ledger↔transacción (migración 0021 · Fase 1)
+  transaction_id: string | null;
 };
 
 export type InvestmentTransactionRow = Timestamps & {
@@ -508,6 +537,8 @@ export type DividendRow = {
   yield_pct: number | null;
   frequency: string | null;
   income_id: string | null;
+  // Puente ledger↔transacción (migración 0021 · Fase 1)
+  transaction_id: string | null;
 };
 
 export type PortfolioSnapshotRow = {
@@ -616,6 +647,7 @@ export interface Database {
       financial_goals_profile: UserTable<FinancialGoalProfileRow>;
       dependents: UserTable<DependentRow>;
       income_sources: UserTable<IncomeSourceRow>;
+      recurring_items: UserTable<RecurringItemRow>;
       expense_items: UserTable<ExpenseItemRow>;
       monthly_snapshots: UserTable<MonthlySnapshotRow>;
       savings_goals: UserTable<SavingsGoalRow>;

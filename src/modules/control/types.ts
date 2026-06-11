@@ -68,6 +68,11 @@ export type DebtPayment = {
   amount: number;
   extraAmount: number;
   extraMode?: ExtraMode | null;
+  /** Capital/interés estimados del pago (Fase 7); null si no hay tasa. */
+  principal?: number | null;
+  interest?: number | null;
+  /** source de la transacción vinculada ('manual'|'chat'|'receipt') o null. */
+  viaSource?: string | null;
 };
 
 export type GoalAction =

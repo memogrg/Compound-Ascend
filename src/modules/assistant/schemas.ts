@@ -9,6 +9,13 @@ export const transactionInputSchema = z.object({
   occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
   category: z.string().max(60).optional(),
   source: z.enum(["manual", "chat", "receipt"]).default("chat"),
+  // Fase 5: la IA puede proponer la transacción ya vinculada a una entidad.
+  // El usuario la ve y confirma; nunca se ejecuta sola.
+  linkedKind: z.enum(["debt", "goal", "holding", "policy", "rental"]).nullable().optional(),
+  linkedId: z.string().uuid().nullable().optional(),
+}).refine((d) => !d.linkedKind || !!d.linkedId, {
+  message: "Un vínculo necesita la entidad (linkedId).",
+  path: ["linkedId"],
 });
 
 export type TransactionInput = z.infer<typeof transactionInputSchema>;

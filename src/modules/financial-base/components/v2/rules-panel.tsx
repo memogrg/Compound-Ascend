@@ -129,6 +129,7 @@ function RulesPanel({
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
                     {r.type === "expense" ? "Gasto" : "Ingreso"} → {catName(r.suggestedCategoryId)} · {accName(r.suggestedAccountId)}
                     {r.priority > 0 ? ` · prio ${r.priority}` : ""}
+                    {r.linkedKind ? ` · auto-vincula (${r.linkedKind === "debt" ? "deuda" : r.linkedKind === "goal" ? "meta" : r.linkedKind})` : ""}
                   </div>
                 </div>
                 <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Eliminar" onClick={() => remove(r.id)} disabled={pending}>

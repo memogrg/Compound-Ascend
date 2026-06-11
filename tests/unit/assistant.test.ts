@@ -59,4 +59,68 @@ describe("validación de transacción (confirmación)", () => {
     });
     expect(r.success).toBe(true);
   });
+
+  it("rechaza linkedKind sin linkedId (Fase 6.1: un kind colgante no es vínculo)", () => {
+    const r = transactionInputSchema.safeParse({
+      kind: "gasto",
+      description: "Pago",
+      amount: 45000,
+      currency: "CRC",
+      occurredOn: "2026-06-10",
+      linkedKind: "debt",
+      linkedId: null,
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("acepta el vínculo propuesto por la IA (Fase 5) y rechaza ids inválidos", () => {
+    const ok = transactionInputSchema.safeParse({
+      kind: "gasto",
+      description: "Pago tarjeta BAC",
+      amount: 45000,
+      currency: "CRC",
+      occurredOn: "2026-06-10",
+      linkedKind: "debt",
+      linkedId: "8126a25b-0873-44a4-8321-53de492cfe4a",
+    });
+    expect(ok.success).toBe(true);
+    const bad = transactionInputSchema.safeParse({
+      kind: "gasto",
+      description: "Pago",
+      amount: 45000,
+      currency: "CRC",
+      occurredOn: "2026-06-10",
+      linkedKind: "debt",
+      linkedId: "no-es-uuid",
+    });
+    expect(bad.success).toBe(false);
+  });
+});
+
+describe("system prompt con vinculables (Fase 5 · context engine)", () => {
+  it("incluye deudas/metas con sus ids y la instrucción de vincular", async () => {
+    const { buildSystemPrompt } = await import("@/lib/ai/system-prompt");
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      debtCount: 1,
+      debtTotal: 850000,
+      topDebtName: "Tarjeta BAC",
+      topDebtApr: 38.5,
+      goalCount: 1,
+      goalsProgressPct: 0.27,
+      netWorth: 12000000,
+      topConcern: "deudas",
+      lifeStage: "pareja joven",
+      linkables: {
+        debt: [{ id: "8126a25b-0873-44a4-8321-53de492cfe4a", name: "Tarjeta BAC" }],
+        goal: [{ id: "c1924069-e29e-4e81-b463-c39cfaf42d56", name: "Fondo de emergencia" }],
+      },
+    });
+    expect(prompt).toContain("Deudas activas: 1 por un total de 850000 CRC");
+    expect(prompt).toContain("Tarjeta BAC [8126a25b-0873-44a4-8321-53de492cfe4a]");
+    expect(prompt).toContain("Fondo de emergencia [c1924069-e29e-4e81-b463-c39cfaf42d56]");
+    expect(prompt).toContain("Patrimonio neto: 12000000 CRC");
+    expect(prompt).toContain('linkedKind');
+    expect(prompt).toContain("NUNCA afirmes que ya ejecutaste la acción");
+  });
 });

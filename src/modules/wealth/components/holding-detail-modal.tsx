@@ -15,6 +15,7 @@ import {
   listRentalPaymentsAction,
   addRentalIncomeAction,
   removeRentalPaymentAction,
+  sellHoldingAction,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
 import type { Holding, Dividend, RentalPayment } from "@/modules/wealth/types";
@@ -313,8 +314,139 @@ export function HoldingDetailModal({
             }}
           />
         )}
+
+        {/* Venta / retiro parcial (Fase 4 · flujos inversos) */}
+        <SaleSection
+          holding={holding}
+          isRental={isRental}
+          onSold={() => {
+            toast("Venta registrada como ingreso vinculado");
+            router.refresh();
+            onClose();
+          }}
+        />
       </div>
     </Modal>
+  );
+}
+
+// Venta/retiro parcial: el dinero recibido entra como ingreso vinculado a la
+// posición y la posición disminuye (cantidad o valor manual).
+function SaleSection({
+  holding,
+  isRental,
+  onSold,
+}: {
+  holding: Holding;
+  isRental: boolean;
+  onSold: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [qty, setQty] = useState("");
+  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    const amt = parseFloat(amount) || 0;
+    if (amt <= 0) return setError("Ingresa el monto recibido.");
+    const quantitySold = !isRental ? parseFloat(qty) || 0 : 0;
+    if (!isRental && (quantitySold <= 0 || quantitySold > holding.quantity)) {
+      return setError(`Cantidad inválida (tienes ${holding.quantity}).`);
+    }
+    setPending(true);
+    setError(null);
+    const res = await sellHoldingAction({
+      holdingId: holding.id,
+      saleDate,
+      amount: amt,
+      currency: holding.currency,
+      quantitySold: quantitySold > 0 ? quantitySold : undefined,
+    });
+    setPending(false);
+    if (res.ok) onSold();
+    else setError(res.message ?? "No pudimos registrar la venta.");
+  };
+
+  return (
+    <div style={{ padding: "14px 22px 18px", borderTop: "1px solid var(--line)", marginTop: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>Venta / retiro</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            El dinero recibido entra como ingreso vinculado y la posición disminuye.
+          </div>
+        </div>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ fontSize: 12, padding: "5px 10px" }}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? "Cerrar" : "Registrar venta"}
+        </button>
+      </div>
+
+      {open && (
+        <div
+          style={{
+            background: "var(--surface-2)",
+            borderRadius: "var(--r-md)",
+            padding: "12px 14px",
+            marginTop: 10,
+          }}
+        >
+          {error ? (
+            <div className="auth-msg warn" role="alert" style={{ marginBottom: 8 }}>{error}</div>
+          ) : null}
+          <div style={{ display: "grid", gridTemplateColumns: isRental ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
+            {!isRental && (
+              <div className="fld" style={{ marginBottom: 0 }}>
+                <label className="fld-label">Cantidad vendida</label>
+                <input
+                  className="inp"
+                  type="number"
+                  step="any"
+                  min="0"
+                  max={holding.quantity}
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  placeholder={`máx. ${holding.quantity}`}
+                />
+              </div>
+            )}
+            <div className="fld" style={{ marginBottom: 0 }}>
+              <label className="fld-label">Monto recibido</label>
+              <div className="inp-money">
+                <span className="pre">{sym(holding.currency)}</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="fld" style={{ marginBottom: 0 }}>
+              <label className="fld-label">Fecha</label>
+              <input className="inp" type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: 10, fontSize: 12.5, padding: "8px 14px" }}
+            onClick={() => void submit()}
+            disabled={pending}
+          >
+            {pending ? "Guardando…" : "Registrar venta"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -41,6 +41,9 @@ function rowToTransaction(r: TransactionRow): Transaction {
     origin: (r.origin ?? "manual") as TxnOrigin,
     receiptUrl: r.receipt_url ?? null,
     confirmedByUser: r.confirmed_by_user,
+    linkedKind: (r.linked_kind ?? "none") as Transaction["linkedKind"],
+    linkedId: r.linked_id ?? null,
+    recurringItemId: r.recurring_item_id ?? null,
   };
 }
 
@@ -76,16 +79,30 @@ export async function listTransactions(period: Period, filters: TxnFilters = {})
   return (data ?? []).map(rowToTransaction);
 }
 
-export async function createTransaction(input: TxnInput): Promise<void> {
+export type CreatedTransaction = {
+  id: string;
+  /** Vínculo final tras aplicar reglas (puede diferir del input). */
+  linkedKind: NonNullable<TxnInput["linkedKind"]>;
+  linkedId: string | null;
+};
+
+/** Crea la transacción y devuelve id + vínculo final (post-reglas). */
+export async function createTransaction(input: TxnInput): Promise<CreatedTransaction> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  // Auto-categorización por reglas: si falta categoría/cuenta y hay comercio,
-  // aplica la primera regla que haga match (determinista, sin IA).
+  // Auto-categorización por reglas: si falta categoría/cuenta/vínculo y hay
+  // comercio, aplica la primera regla que haga match (determinista, sin IA).
   let categoryId = input.categoryId ?? null;
   let accountId = input.accountId ?? null;
+  let linkedKind = input.linkedKind ?? "none";
+  let linkedId = input.linkedId ?? null;
   // Auto-categorización por reglas solo para gasto/ingreso (no para 'ajuste').
-  if ((!categoryId || !accountId) && input.merchantOrSource && (input.kind === "gasto" || input.kind === "ingreso")) {
+  if (
+    (!categoryId || !accountId || linkedKind === "none") &&
+    input.merchantOrSource &&
+    (input.kind === "gasto" || input.kind === "ingreso")
+  ) {
     const { findMatchingRule } = await import("@/modules/financial-base/services/rules-service");
     const rule = await findMatchingRule(
       input.merchantOrSource,
@@ -94,30 +111,82 @@ export async function createTransaction(input: TxnInput): Promise<void> {
     if (rule) {
       categoryId = categoryId ?? rule.suggestedCategoryId;
       accountId = accountId ?? rule.suggestedAccountId;
+      // Auto-vínculo (Fase 2): solo si el usuario no eligió vínculo a mano.
+      // La entidad de la regla se valida; si murió, el vínculo se descarta
+      // en silencio (una regla vieja no debe bloquear el registro del gasto).
+      if (linkedKind === "none" && rule.linkedKind && rule.linkedId) {
+        const { assertLinkableEntity } = await import(
+          "@/modules/financial-base/services/linkable-entities-service"
+        );
+        try {
+          await assertLinkableEntity(
+            rule.linkedKind as Exclude<NonNullable<TxnInput["linkedKind"]>, "none">,
+            rule.linkedId,
+          );
+          linkedKind = rule.linkedKind as NonNullable<TxnInput["linkedKind"]>;
+          linkedId = rule.linkedId;
+        } catch {
+          // Entidad de la regla inexistente: la transacción nace sin vínculo.
+        }
+      }
     }
+  }
+
+  // Fase 6.1: un vínculo pedido explícitamente (composer, chat/scanner,
+  // orquestador) debe apuntar a una entidad EXISTENTE y DEL USUARIO. linked_id
+  // es polimórfico sin FK — sin este guard, un uuid alucinado o ajeno se
+  // persistiría. Falla limpia ANTES de crear la transacción.
+  if (input.linkedKind && input.linkedKind !== "none" && input.linkedId) {
+    const { assertLinkableEntity } = await import(
+      "@/modules/financial-base/services/linkable-entities-service"
+    );
+    await assertLinkableEntity(input.linkedKind, input.linkedId);
+  }
+  // Un kind sin id no es un vínculo: se normaliza a 'none'.
+  if (linkedKind !== "none" && !linkedId) linkedKind = "none";
+
+  // Sin cuenta explícita ni de regla: cuenta predeterminada en silencio
+  // (el composer ya no muestra selector de cuenta).
+  if (!accountId) {
+    const { data: def } = await supabase
+      .from("accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_default", true)
+      .maybeSingle();
+    accountId = def?.id ?? null;
   }
 
   const accountLabel = await accountLabelFor(accountId);
   const household_id = await getActiveHouseholdId(supabase, user.id);
-  await supabase.from("transactions").insert({
-    user_id: user.id,
-    household_id,
-    kind: input.kind,
-    description: input.description ?? null,
-    merchant_or_source: input.merchantOrSource ?? null,
-    amount: input.amount,
-    currency: input.currency,
-    occurred_on: input.occurredOn,
-    category_id: categoryId,
-    account_id: accountId,
-    account_label: accountLabel,
-    status: input.status,
-    origin: input.origin,
-    receipt_url: input.receiptUrl ?? null,
-    confidence_score_internal: input.confidence ?? null,
-    source: input.origin === "scanned" ? "receipt" : "manual",
-    confirmed_by_user: input.status === "confirmed",
-  });
+  const { data, error } = await supabase
+    .from("transactions")
+    .insert({
+      user_id: user.id,
+      household_id,
+      kind: input.kind,
+      description: input.description ?? null,
+      merchant_or_source: input.merchantOrSource ?? null,
+      amount: input.amount,
+      currency: input.currency,
+      occurred_on: input.occurredOn,
+      category_id: categoryId,
+      account_id: accountId,
+      account_label: accountLabel,
+      status: input.status,
+      origin: input.origin,
+      receipt_url: input.receiptUrl ?? null,
+      confidence_score_internal: input.confidence ?? null,
+      source: input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual",
+      confirmed_by_user: input.status === "confirmed",
+      linked_kind: linkedKind,
+      linked_id: linkedId,
+      recurring_item_id: input.recurringItemId ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return { id: data.id, linkedKind, linkedId };
 }
 
 export async function updateTransaction(id: string, input: TxnInput): Promise<void> {

@@ -25,7 +25,24 @@ function rowToBudgetItem(r: BudgetItemRow): BudgetItem {
     frequency: r.frequency as Frequency,
     periodMonth: r.period_month,
     periodYear: r.period_year,
+    sourceKind: (r.source_kind ?? "manual") as BudgetItem["sourceKind"],
+    sourceId: r.source_id ?? null,
   };
+}
+
+/** Una línea derivada se edita en su entidad, nunca directo (candado). */
+async function assertManualItem(id: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("budget_items")
+    .select("source_kind")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (data && data.source_kind !== "manual") {
+    throw new Error("Esta línea se deriva de una entidad; edítala desde su módulo.");
+  }
 }
 
 export async function listBudgetItems(period: Period): Promise<BudgetItem[]> {
@@ -58,6 +75,7 @@ export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
 }
 
 export async function updateBudgetItem(id: string, input: BudgetItemInput): Promise<void> {
+  await assertManualItem(id);
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   await supabase
@@ -77,6 +95,7 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
 }
 
 export async function deleteBudgetItem(id: string): Promise<void> {
+  await assertManualItem(id);
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   await supabase.from("budget_items").delete().eq("id", id).eq("user_id", user.id);

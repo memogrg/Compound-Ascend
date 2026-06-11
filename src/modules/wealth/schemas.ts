@@ -82,6 +82,10 @@ export const holdingInputSchema = z.object({
   rentalIncome: z.number().nonnegative().optional(),
   rentalFrequency: z.enum(["mensual", "trimestral", "anual"]).optional(),
   rentalSubtype: z.enum(["alquiler", "airbnb", "auto", "negocio", "otro"]).optional(),
+  // Fase 4.1: registrar la compra/aporte como gasto vinculado en Base
+  // Financiera (default ON al crear; OFF al editar — un edit puede ser
+  // corrección de datos, no un aporte real).
+  registerExpense: z.boolean().optional(),
 });
 
 export const rentalPaymentInputSchema = z.object({
@@ -105,6 +109,16 @@ export const dividendInputSchema = z.object({
   holdingSymbol: z.string().max(12).optional(),
 });
 
+// Venta/retiro parcial de una posición (Fase 4 · flujos inversos).
+export const holdingSaleInputSchema = z.object({
+  holdingId: z.string().uuid(),
+  saleDate: z.string().date(),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  currency: z.string().length(3),
+  quantitySold: z.number().positive().optional(),
+});
+
 export type HoldingInput = z.infer<typeof holdingInputSchema>;
+export type HoldingSaleInput = z.infer<typeof holdingSaleInputSchema>;
 export type DividendInput = z.infer<typeof dividendInputSchema>;
 export type RentalPaymentInput = z.infer<typeof rentalPaymentInputSchema>;

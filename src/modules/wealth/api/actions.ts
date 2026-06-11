@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { investmentInputSchema, policyInputSchema, holdingInputSchema, dividendInputSchema, rentalPaymentInputSchema } from "@/modules/wealth/schemas";
+import { investmentInputSchema, policyInputSchema, holdingInputSchema, holdingSaleInputSchema, dividendInputSchema, rentalPaymentInputSchema } from "@/modules/wealth/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createInvestment,
@@ -15,6 +15,7 @@ import {
   createHolding,
   updateHolding,
   deleteHolding,
+  recordHoldingSale,
 } from "@/modules/wealth/services/holdings-service";
 import {
   createDividend,
@@ -167,6 +168,23 @@ export async function removeHoldingAction(id: string): Promise<ActionResult> {
 
 // ── Dividendos ────────────────────────────────────────────────────
 
+/** Venta/retiro parcial: ingreso vinculado + disminución de la posición (Fase 4). */
+export async function sellHoldingAction(raw: unknown): Promise<ActionResult> {
+  const parsed = holdingSaleInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await recordHoldingSale(parsed.data);
+    revalidatePath("/patrimonio");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("sellHolding fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos registrar la venta." };
+  }
+}
+
 export async function addDividendAction(raw: unknown): Promise<ActionResult> {
   const parsed = dividendInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
@@ -174,6 +192,9 @@ export async function addDividendAction(raw: unknown): Promise<ActionResult> {
   try {
     await createDividend(parsed.data);
     revalidatePath("/patrimonio");
+    // El dividendo también nace como transacción vinculada (Fase 1).
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("addDividend fallido", { message: err instanceof Error ? err.message : "?" });
@@ -186,6 +207,8 @@ export async function removeDividendAction(id: string): Promise<ActionResult> {
   try {
     await deleteDividend(id);
     revalidatePath("/patrimonio");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch {
     return { ok: false };
@@ -201,6 +224,9 @@ export async function addRentalIncomeAction(raw: unknown): Promise<ActionResult>
   try {
     await createRentalPayment(parsed.data);
     revalidatePath("/patrimonio");
+    // La renta también nace como transacción vinculada (Fase 1).
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("addRentalIncome fallido", { message: err instanceof Error ? err.message : "?" });
@@ -213,6 +239,8 @@ export async function removeRentalPaymentAction(id: string): Promise<ActionResul
   try {
     await deleteRentalPayment(id);
     revalidatePath("/patrimonio");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch {
     return { ok: false };

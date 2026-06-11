@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { goalInputSchema, debtInputSchema, debtPaymentInputSchema } from "@/modules/control/schemas";
 import {
   createGoal,
@@ -10,6 +11,8 @@ import {
   deleteGoal,
   deleteDebt,
   addDebtPayment,
+  addGoalContribution,
+  withdrawFromGoal,
 } from "@/modules/control/services/control-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -89,10 +92,66 @@ export async function reportPaymentAction(raw: unknown): Promise<ActionResult> {
     await addDebtPayment(parsed.data);
     revalidatePath("/deudas");
     revalidatePath(`/deudas/${parsed.data.debtId}`);
+    // El pago también nace como transacción vinculada (Fase 1 · orquestador).
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
     logger.error("reportPayment fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos registrar el pago." };
+  }
+}
+
+const goalContributionSchema = z.object({
+  goalId: z.string().uuid(),
+  amount: z.number().positive("Debe ser mayor a 0"),
+  contributionDate: z.string().min(8).max(10),
+});
+
+/** Aporte a meta: sube current_amount y crea la transacción vinculada. */
+export async function addGoalContributionAction(raw: unknown): Promise<ActionResult> {
+  const parsed = goalContributionSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await addGoalContribution(parsed.data);
+    revalidatePath("/control-financiero");
+    revalidatePath("/ahorro");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("addGoalContribution fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos registrar el aporte." };
+  }
+}
+
+const goalWithdrawalSchema = z.object({
+  goalId: z.string().uuid(),
+  amount: z.number().positive("Debe ser mayor a 0"),
+  withdrawalDate: z.string().min(8).max(10),
+  note: z.string().max(280).optional(),
+});
+
+/** Retiro de meta: baja current_amount y crea el ingreso vinculado (Fase 4). */
+export async function withdrawGoalAction(raw: unknown): Promise<ActionResult> {
+  const parsed = goalWithdrawalSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await withdrawFromGoal(parsed.data);
+    revalidatePath("/control-financiero");
+    revalidatePath("/ahorro");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("withdrawGoal fallido", { message: err instanceof Error ? err.message : "?" });
+    // La validación de saldo es un mensaje para el usuario, no un error técnico.
+    const msg = err instanceof Error && err.message.startsWith("No puedes retirar")
+      ? err.message
+      : "No pudimos registrar el retiro.";
+    return { ok: false, message: msg };
   }
 }
 

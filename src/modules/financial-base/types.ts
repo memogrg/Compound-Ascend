@@ -73,6 +73,10 @@ export type TxnStatus = "confirmed" | "pending_review";
 export type TxnOrigin = "manual" | "scanned" | "imported" | "recurring" | "ai_assisted";
 export type BudgetType = "income" | "expense";
 export type AccountKind = "banco" | "efectivo" | "tarjeta" | "otro";
+/** Entidad a la que puede vincularse una transacción (Fase 0 · solo schema). */
+export type LinkedKind = "none" | "debt" | "goal" | "holding" | "policy" | "rental";
+/** Fuente de la que se deriva un ítem de presupuesto (Fase 0 · solo schema). */
+export type BudgetSourceKind = "manual" | "debt" | "goal" | "policy" | "recurring" | "dividend";
 
 /** Transacción real (fuente de verdad de lo ocurrido). */
 export type Transaction = {
@@ -90,6 +94,10 @@ export type Transaction = {
   origin: TxnOrigin;
   receiptUrl: string | null;
   confirmedByUser: boolean;
+  // Vínculo transacción↔entidad (Fase 0 · passthrough, sin lógica todavía)
+  linkedKind?: LinkedKind;
+  linkedId?: string | null;
+  recurringItemId?: string | null;
 };
 
 /** Ítem de presupuesto, scopeado por mes. */
@@ -103,6 +111,9 @@ export type BudgetItem = {
   frequency: Frequency;
   periodMonth: number;
   periodYear: number;
+  // Plan derivado (Fase 0 · passthrough, sin lógica todavía)
+  sourceKind?: BudgetSourceKind;
+  sourceId?: string | null;
 };
 
 export type Account = {
