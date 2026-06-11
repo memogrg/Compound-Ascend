@@ -15,6 +15,7 @@ import {
 } from "@/modules/personal-profile/services/demo-template";
 import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendEmail, isEmailConfigured } from "@/lib/email/send";
 import { getClientEnv } from "@/lib/env";
 import { z } from "zod";
@@ -61,14 +62,24 @@ const inviteSchema = z.array(z.string().trim().email().max(120)).min(1).max(4);
 export type InviteResult = { ok: boolean; sent: number; configured: boolean; message: string };
 
 /**
- * Envía invitaciones por correo a los miembros de la familia. Los correos ya se
- * guardan en el perfil al avanzar; esto dispara el email. Si el proveedor de
- * email no está configurado, no falla: informa que se enviará al activarlo.
+ * Invita a miembros al MISMO hogar del invitador. Asegura que el invitador tenga
+ * un hogar (lo crea como `owner` si no existe), inserta una fila por correo en
+ * `household_invitations` con un token y envía el correo con un enlace a
+ * `/invitacion/aceptar?token=...`. Si el email no está configurado, no falla:
+ * informa que se enviará al activarlo.
  */
 export async function inviteHouseholdMembersAction(emails: string[]): Promise<InviteResult> {
   const parsed = inviteSchema.safeParse(emails);
   if (!parsed.success) {
     return { ok: false, sent: 0, configured: false, message: "Agrega al menos un correo válido." };
+  }
+  if (!isSupabaseConfigured()) {
+    return {
+      ok: false,
+      sent: 0,
+      configured: false,
+      message: "Conecta Supabase para enviar invitaciones al hogar.",
+    };
   }
   if (!isEmailConfigured()) {
     return {
@@ -81,18 +92,66 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
   }
 
   const user = await getUser();
+  if (!user) {
+    return { ok: false, sent: 0, configured: false, message: "Inicia sesión para invitar." };
+  }
   const inviter =
-    (user?.user_metadata?.display_name as string | undefined) ?? user?.email ?? "Un familiar";
+    (user.user_metadata?.display_name as string | undefined) ?? user.email ?? "Un familiar";
   const appUrl = getClientEnv().NEXT_PUBLIC_APP_URL;
+  const supabase = await createSupabaseServerClient();
+
+  // Asegura el hogar del invitador (lo crea como owner si aún no existe).
+  const { data: householdId, error: hhErr } = await supabase.rpc("ensure_household", {});
+  if (hhErr || !householdId) {
+    logger.error("ensure_household fallido", { message: hhErr?.message });
+    return {
+      ok: false,
+      sent: 0,
+      configured: true,
+      message: "No pudimos preparar tu hogar. Inténtalo de nuevo.",
+    };
+  }
+
+  const targets = parsed.data;
+  // Reutiliza el token de invitaciones pendientes ya existentes (correos repetidos).
+  const tokenByEmail = new Map<string, string>();
+  const { data: existing } = await supabase
+    .from("household_invitations")
+    .select("email, token")
+    .eq("household_id", householdId)
+    .eq("status", "pending")
+    .in("email", targets);
+  for (const row of existing ?? []) tokenByEmail.set(row.email.toLowerCase(), row.token);
+
+  const toInsert = targets.filter((e) => !tokenByEmail.has(e.toLowerCase()));
+  if (toInsert.length) {
+    const { data: inserted, error: insErr } = await supabase
+      .from("household_invitations")
+      .insert(toInsert.map((email) => ({ household_id: householdId, email, invited_by: user.id })))
+      .select("email, token");
+    if (insErr) {
+      logger.error("invitaciones: insert fallido", { message: insErr.message });
+      return {
+        ok: false,
+        sent: 0,
+        configured: true,
+        message: "No pudimos registrar las invitaciones. Inténtalo de nuevo.",
+      };
+    }
+    for (const row of inserted ?? []) tokenByEmail.set(row.email.toLowerCase(), row.token);
+  }
 
   let sent = 0;
   await Promise.all(
-    parsed.data.map(async (to) => {
+    targets.map(async (to) => {
+      const token = tokenByEmail.get(to.toLowerCase());
+      if (!token) return;
+      const acceptUrl = `${appUrl}/invitacion/aceptar?token=${token}`;
       const r = await sendEmail({
         to,
-        subject: `${inviter} te invitó a gestionar las finanzas en familia`,
-        html: inviteHtml(inviter, appUrl),
-        replyTo: user?.email ?? undefined,
+        subject: `${inviter} te invitó a su hogar en Compound Ascend`,
+        html: inviteHtml(inviter, acceptUrl),
+        replyTo: user.email ?? undefined,
       });
       if (r.ok) sent += 1;
     }),
@@ -109,21 +168,93 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
   };
 }
 
-function inviteHtml(inviter: string, appUrl: string): string {
+export type AcceptResult = { ok: boolean; message?: string };
+
+/**
+ * Acepta una invitación de hogar para el usuario autenticado: lo suma al mismo
+ * hogar del invitador (vía RPC SECURITY DEFINER) y marca su onboarding completo.
+ * No corre el wizard. El paso de nombre se resuelve aparte (pantalla mínima).
+ */
+export async function acceptInvitationAction(token: string): Promise<AcceptResult> {
+  const parsed = z.string().uuid().safeParse(token);
+  if (!parsed.success) return { ok: false, message: "Invitación no válida." };
+  if (!isSupabaseConfigured()) {
+    return { ok: false, message: "Conecta Supabase para aceptar la invitación." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("accept_household_invitation", { p_token: parsed.data });
+  if (error) {
+    logger.warn("aceptar invitación fallido", { message: error.message });
+    return { ok: false, message: friendlyAcceptError(error.message) };
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/mi-perfil-financiero");
+  return { ok: true };
+}
+
+const displayNameSchema = z.string().trim().min(1, "Dinos cómo llamarte.").max(60);
+
+/**
+ * Guarda "¿cómo querés que te llamemos?" en profiles.display_name y en
+ * user_metadata. Es el único paso del invitado tras aceptar la invitación.
+ */
+export async function updateDisplayNameAction(name: string): Promise<AcceptResult> {
+  const parsed = displayNameSchema.safeParse(name);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Nombre no válido." };
+  }
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  const user = await getUser();
+  if (!user) return { ok: false, message: "Inicia sesión para continuar." };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ display_name: parsed.data })
+    .eq("id", user.id);
+  if (error) {
+    logger.error("updateDisplayName fallido", { message: error.message });
+    return { ok: false, message: "No pudimos guardar tu nombre. Inténtalo de nuevo." };
+  }
+  await supabase.auth.updateUser({ data: { display_name: parsed.data } });
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+/** Traduce el mensaje de la excepción de Postgres a una copia segura en español. */
+function friendlyAcceptError(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("otro correo")) {
+    return "Esta invitación es para otro correo. Inicia sesión con el correo invitado.";
+  }
+  if (m.includes("expir")) return "La invitación expiró. Pide una nueva al administrador del hogar.";
+  if (m.includes("disponible") || m.includes("encontrada")) {
+    return "La invitación ya no está disponible.";
+  }
+  return "No pudimos aceptar la invitación. Inténtalo de nuevo.";
+}
+
+function inviteHtml(inviter: string, acceptUrl: string): string {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
     <h1 style="font-size:20px;margin:0 0 12px">Compound Ascend</h1>
     <p style="font-size:15px;line-height:1.6">
-      <strong>${escapeHtml(inviter)}</strong> te invitó a unirte para gestionar las finanzas de la
-      familia en <strong>Compound Ascend</strong>, tu asesor financiero con IA.
+      <strong>${escapeHtml(inviter)}</strong> te invitó a unirte a su hogar para gestionar las
+      finanzas en <strong>Compound Ascend</strong>, su asesor financiero con IA.
     </p>
     <p style="font-size:15px;line-height:1.6">
-      Crea tu cuenta con este mismo correo para sumarte a la gestión compartida.
+      Acepta la invitación con este mismo correo. Te sumarás al hogar compartido sin volver a
+      configurar el perfil: solo elegirás cómo quieres que te llamemos.
     </p>
     <p style="margin:24px 0">
-      <a href="${appUrl}/signup" style="background:#111;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-size:15px;display:inline-block">
-        Unirme a la familia
+      <a href="${acceptUrl}" style="background:#111;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-size:15px;display:inline-block">
+        Aceptar invitación
       </a>
+    </p>
+    <p style="font-size:12.5px;color:#777;line-height:1.5">
+      Si el botón no funciona, copia este enlace en tu navegador:<br />
+      <span style="color:#555">${escapeHtml(acceptUrl)}</span>
     </p>
     <p style="font-size:12.5px;color:#777;line-height:1.5">
       Si no esperabas esta invitación, puedes ignorar este correo.

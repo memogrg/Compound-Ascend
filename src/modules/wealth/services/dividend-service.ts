@@ -9,6 +9,7 @@ import {
   getSystemCategoryId,
 } from "@/modules/financial-base/services/linked-transaction-service";
 import { dividendToTxn } from "@/modules/financial-base/engine/linked";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";
 
@@ -66,10 +67,12 @@ export async function createDividend(input: DividendInput): Promise<void> {
       : "Dividendo";
 
   // Crea el ingreso vinculado en income_sources.
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   const { data: incomeRow, error: incomeErr } = await supabase
     .from("income_sources")
     .insert({
       user_id: user.id,
+      household_id,
       name: incomeName,
       income_type: "dividendo",
       category: "Dividendos",
@@ -101,6 +104,7 @@ export async function createDividend(input: DividendInput): Promise<void> {
 
   const { error: divErr } = await supabase.from("dividends").insert({
     user_id: user.id,
+    household_id,
     holding_id: input.holdingId,
     payment_date: input.paymentDate,
     amount: input.amount,

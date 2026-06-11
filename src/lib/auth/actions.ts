@@ -37,6 +37,13 @@ function appUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 }
 
+/** Solo permite redirecciones internas (mismo sitio); evita open-redirects. */
+function safeRelative(next: FormDataEntryValue | null, fallback: string): string {
+  const value = typeof next === "string" ? next : "";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return fallback;
+  return value;
+}
+
 export async function signInAction(
   _prev: ActionState,
   formData: FormData,
@@ -56,7 +63,7 @@ export async function signInAction(
     return { ok: false, message: "Correo o contraseña incorrectos." };
   }
 
-  redirect("/dashboard");
+  redirect(safeRelative(formData.get("next"), "/dashboard"));
 }
 
 export async function signUpAction(
@@ -73,12 +80,15 @@ export async function signUpAction(
     return { ok: false, fieldErrors: zodToFieldErrors(parsed.error.issues) };
   }
 
+  // Tras confirmar el correo, vuelve a `next` (p. ej. aceptar invitación) o al
+  // onboarding. El valor va anidado, así que se codifica para el callback.
+  const next = safeRelative(formData.get("next"), "/bienvenida");
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${appUrl()}/auth/callback?next=/bienvenida`,
+      emailRedirectTo: `${appUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
       data: { display_name: parsed.data.displayName },
     },
   });

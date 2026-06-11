@@ -5,7 +5,9 @@ import type { Database } from "@/lib/supabase/database.types";
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 /** Rutas públicas de PÁGINA (no requieren sesión). */
-const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth"];
+// `/invitacion` debe ser pública: el invitado sin sesión llega por el enlace del
+// correo y la propia página decide si pedir registro/login o aceptar.
+const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth", "/invitacion"];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
 

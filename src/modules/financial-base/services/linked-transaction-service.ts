@@ -18,6 +18,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import { createTransaction } from "@/modules/financial-base/services/transaction-service";
 import { txnInputSchema } from "@/modules/financial-base/schemas";
 import type { LinkedTxnInput } from "@/modules/financial-base/engine/linked";
@@ -77,8 +78,11 @@ export async function propagateLinkedTransaction(args: {
       apr: debt.apr == null ? null : Number(debt.apr),
     });
 
+    // household: el ledger especializado comparte hogar igual que la transacción.
+    const household_id = await getActiveHouseholdId(supabase, user.id);
     const { error } = await supabase.from("debt_payments").insert({
       user_id: user.id,
+      household_id,
       debt_id: args.linkedId,
       occurred_on: args.occurredOn,
       amount: split.amount,

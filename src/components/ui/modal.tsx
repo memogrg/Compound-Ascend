@@ -1,14 +1,12 @@
 "use client";
 
 /**
- * Modal accesible compartido por todos los diálogos de la app.
- * - Cierra con Escape y con clic en el fondo (scrim).
- * - Atrapa el foco dentro del diálogo (Tab / Shift+Tab cíclico).
- * - Enfoca el primer campo al abrir y devuelve el foco al disparador al cerrar.
- * - Bloquea el scroll del fondo mientras está abierto.
- * - ARIA: role="dialog", aria-modal, aria-labelledby / aria-describedby.
+ * Modal accesible compartido. Se monta en un portal a document.body para que
+ * el position:fixed del scrim no quede atrapado por ancestros con transform/
+ * backdrop-filter (que rompían el centrado y el fondo).
  */
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/icon";
 
 const FOCUSABLE =
@@ -28,6 +26,9 @@ export function Modal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const subId = useId();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -36,7 +37,6 @@ export function Modal({
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    // Enfoca el primer campo real (no el botón de cerrar) al abrir.
     const focusables = dialog ? Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)) : [];
     const firstField = focusables.find((el) => !el.classList.contains("modal-x"));
     (firstField ?? dialog)?.focus();
@@ -71,7 +71,9 @@ export function Modal({
     };
   }, [onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={dialogRef}
@@ -99,6 +101,7 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

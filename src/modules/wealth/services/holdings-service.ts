@@ -3,6 +3,7 @@ import "server-only";
 /** CRUD de posiciones (investment_holdings). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
@@ -170,10 +171,13 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     return;
   }
 
+  // household: cubre el hueco del sub-PR household de main (no tocó este insert).
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   const { data: created, error } = await supabase
     .from("investment_holdings")
     .insert({
       user_id: user.id,
+      household_id,
       investment_id: input.investmentId ?? null,
       label,
       symbol,
