@@ -23,6 +23,7 @@ import { CsvImportButton } from "@/modules/financial-base/components/v2/csv-impo
 import { TransferButton } from "@/modules/financial-base/components/v2/transfer-modal";
 import type { TransactionRule } from "@/modules/financial-base/services/rules-service";
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
+import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
 import type { TransactionTemplate } from "@/modules/financial-base/services/templates-service";
@@ -61,6 +62,7 @@ export type V2View = {
   categoryNames: Record<string, string>;
   rules: TransactionRule[];
   linkables: LinkableEntities;
+  jars: Jar[];
   baseReading: FinancialReading;
   incomeCapsule: FinancialReading;
   expenseCapsule: FinancialReading;

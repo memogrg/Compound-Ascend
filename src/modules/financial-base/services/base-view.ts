@@ -22,6 +22,7 @@ import { buildSuggestionIndex } from "@/modules/financial-base/services/suggesti
 import { listTemplates } from "@/modules/financial-base/services/templates-service";
 import { listLinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 import { syncDerivedBudget } from "@/modules/financial-base/services/derived-budget-service";
+import { getExpenseJars } from "@/modules/financial-base/services/expense-jars-service";
 import { parseMonthParam, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { tryGenerateMonthlySnapshot } from "@/modules/financial-base/services/snapshot-service";
 import { computeV2Totals, composition } from "@/modules/financial-base/engine/base-v2";
@@ -63,6 +64,14 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
   const categoryNames: Record<string, string> = {};
   for (const c of categories) categoryNames[c.id] = c.name;
 
+  // Frascos del tab de Gastos (reusa tree + budget/real ya cargados).
+  const jars = await getExpenseJars({
+    tree,
+    budgetByKey: budget.expenseByKey,
+    realByKey: real.expenseByKey,
+    currency,
+  });
+
   // Acumula histórico: persiste el snapshot del mes recién cerrado (best-effort).
   void tryGenerateMonthlySnapshot(previousMonthPeriod(period));
 
@@ -99,6 +108,7 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
     accounts,
     rules,
     linkables,
+    jars,
     categoryNames,
     baseReading: buildBaseReading(readingInput),
     incomeCapsule: buildCapsule("income", readingInput),
