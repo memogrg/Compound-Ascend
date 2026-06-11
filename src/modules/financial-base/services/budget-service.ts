@@ -8,6 +8,7 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { getCategoryNameMap, listCategoryTree } from "@/modules/financial-base/services/categories-service";
 import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
+import { previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
 import type { BudgetItem, BudgetType, Period } from "@/modules/financial-base/types";
 import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
@@ -72,6 +73,35 @@ export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
     period_month: input.periodMonth,
     period_year: input.periodYear,
   });
+}
+
+/**
+ * Copia las líneas de gasto MANUALES del mes anterior al periodo dado, sin
+ * duplicar las categorías que ya tienen presupuesto este mes. Devuelve cuántas
+ * copió. Las líneas derivadas (deuda/meta/etc.) no se copian: se regeneran solas.
+ */
+export async function copyPreviousMonthExpenseBudget(period: Period): Promise<number> {
+  const prev = previousMonthPeriod(period);
+  const [prevItems, curItems] = await Promise.all([listBudgetItems(prev), listBudgetItems(period)]);
+  const present = new Set(
+    curItems.filter((i) => i.type === "expense").map((i) => i.categoryId ?? "∅"),
+  );
+  const toCopy = prevItems.filter(
+    (i) => i.type === "expense" && i.sourceKind === "manual" && !present.has(i.categoryId ?? "∅"),
+  );
+  for (const it of toCopy) {
+    await createBudgetItem({
+      type: "expense",
+      categoryId: it.categoryId,
+      name: it.name,
+      amount: it.amount,
+      currency: it.currency,
+      frequency: it.frequency,
+      periodMonth: period.month,
+      periodYear: period.year,
+    });
+  }
+  return toCopy.length;
 }
 
 export async function updateBudgetItem(id: string, input: BudgetItemInput): Promise<void> {

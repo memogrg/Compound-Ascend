@@ -30,7 +30,7 @@ export function CategoryManagerButton({ tree }: { tree: CategoryNode[] }) {
   );
 }
 
-function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; onClose: () => void }) {
+export function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);

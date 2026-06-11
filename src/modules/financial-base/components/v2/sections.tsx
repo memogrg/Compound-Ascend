@@ -12,6 +12,7 @@ import { EditableBudgetTable } from "@/modules/financial-base/components/v2/edit
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
 import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
+import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
 import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
 import { ComposerButton } from "@/modules/financial-base/components/v2/composer-button";
 import { CategoryManagerButton } from "@/modules/financial-base/components/v2/category-manager";
@@ -231,17 +232,19 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
             ? "Tus ingresos se registran aquí; confirma cada uno cuando lo recibas."
             : "Tus gastos por categoría, comparados con tu presupuesto del mes."}
         </div>
-        <ComposerButton
-          tree={view.tree}
-          incomeTree={view.incomeTree}
-          accounts={view.accounts}
-          currency={currency}
-          suggestions={view.suggestions}
-          templates={view.templates}
-          linkables={view.linkables}
-          only={isIncome ? "ingreso" : "gasto"}
-          label={isIncome ? "Registrar ingreso" : "Registrar gasto"}
-        />
+        {isIncome ? (
+          <ComposerButton
+            tree={view.tree}
+            incomeTree={view.incomeTree}
+            accounts={view.accounts}
+            currency={currency}
+            suggestions={view.suggestions}
+            templates={view.templates}
+            linkables={view.linkables}
+            only="ingreso"
+            label="Registrar ingreso"
+          />
+        ) : null}
       </div>
 
       <SummaryStrip cards={summary} />
@@ -279,6 +282,7 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
               <div className="card-title">Categorías de gasto</div>
               <div className="card-sub">Frascos por bloque · este mes</div>
             </div>
+            <ExpenseToolbar jars={view.jars} accounts={view.accounts} currency={currency} period={view.period} tree={view.tree} />
           </div>
           <ExpenseJars jars={view.jars} currency={currency} period={view.period} />
         </div>
