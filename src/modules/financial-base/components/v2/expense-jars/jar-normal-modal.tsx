@@ -23,6 +23,16 @@ function pct(spent: number, budget: number): number {
   return Math.min(100, Math.round((spent / budget) * 100));
 }
 
+// Mismo set/símbolos que el switch de moneda del topbar (currency-switch.tsx).
+const SUB_CURRENCIES: { code: string; sym: string }[] = [
+  { code: "CRC", sym: "₡" },
+  { code: "USD", sym: "$" },
+  { code: "EUR", sym: "€" },
+  { code: "MXN", sym: "MX$" },
+  { code: "COP", sym: "COL$" },
+  { code: "GBP", sym: "£" },
+];
+
 export function JarNormalModal({
   jar,
   currency,
@@ -39,6 +49,8 @@ export function JarNormalModal({
   const [extra, setExtra] = useState<JarEnvelope[]>([]);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  // Moneda del presupuesto del nuevo sobre (default = moneda de visualización).
+  const [subCur, setSubCur] = useState(currency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editEnv, setEditEnv] = useState<JarEnvelope | null>(null);
@@ -52,6 +64,12 @@ export function JarNormalModal({
   // Marca de agua con ejemplos del grupo (se borra al escribir).
   const watermark =
     jar.suggestions.length > 0 ? `Ej.: ${jar.suggestions.slice(0, 3).join(", ")}` : "Nombre de la subcategoría";
+
+  // La moneda de visualización va primero aunque no esté en el set base.
+  const subCurOptions = SUB_CURRENCIES.some((c) => c.code === currency)
+    ? SUB_CURRENCIES
+    : [{ code: currency, sym: currency }, ...SUB_CURRENCIES];
+  const subSym = subCurOptions.find((c) => c.code === subCur)?.sym ?? subCur;
 
   async function addSubcategory() {
     const n = name.trim();
@@ -72,7 +90,7 @@ export function JarNormalModal({
         categoryId: cat.id,
         name: n,
         amount: amt,
-        currency,
+        currency: subCur,
         frequency: "mensual",
         periodMonth: period.month,
         periodYear: period.year,
@@ -205,18 +223,38 @@ export function JarNormalModal({
               maxLength={60}
               style={{ flex: "1 1 160px", minWidth: 0, maxWidth: "100%", boxSizing: "border-box" }}
             />
-            <div className="inp-money" style={{ flex: "1 1 110px", minWidth: 0, boxSizing: "border-box" }}>
-              <span className="pre">{currency}</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                style={{ minWidth: 0 }}
-              />
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flex: "1 1 170px", minWidth: 0 }}>
+              <select
+                className="sel"
+                value={subCur}
+                onChange={(e) => setSubCur(e.target.value)}
+                aria-label="Moneda del presupuesto del sobre"
+                style={{ width: "auto", flex: "none", minWidth: 0, padding: "10px 8px" }}
+              >
+                {subCurOptions.map((c) => (
+                  <option key={c.code} value={c.code}>{c.code}</option>
+                ))}
+              </select>
+              <div className="inp-money" style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}>
+                <span className="pre">{subSym}</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  style={{ minWidth: 0 }}
+                />
+              </div>
+              <span
+                className="tip"
+                data-tip="Moneda en que defines el presupuesto de este sobre. Por defecto, tu moneda de visualización."
+                style={{ width: 16, height: 16, flex: "none", borderRadius: "50%", border: "1px solid var(--line)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--muted)" }}
+              >
+                ?
+              </span>
             </div>
             <button type="button" className="btn btn-primary" style={{ flex: "0 1 auto" }} onClick={() => void addSubcategory()} disabled={pending || !name.trim()}>
               {pending ? "…" : <><Icon name="plus" width={2} /> Añadir</>}
