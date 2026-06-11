@@ -88,7 +88,7 @@ export function JarNormalModal({
 
   return (
     <Modal title={jar.name} sub={`${envelopes.length} ${envelopes.length === 1 ? "sobre" : "sobres"}`} onClose={onClose}>
-      <div className="modal-body">
+      <div className="modal-body" style={{ maxWidth: "100%", overflowX: "hidden" }}>
         {/* Cabecera: gastado este mes + chip % usado */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
           <div>
@@ -196,16 +196,16 @@ export function JarNormalModal({
             </div>
           ) : null}
           {error ? <div className="auth-msg warn" role="alert" style={{ marginBottom: 8 }}>{error}</div> : null}
-          <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "stretch" }}>
             <input
               className="inp"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={watermark}
               maxLength={60}
-              style={{ flex: 1 }}
+              style={{ flex: "1 1 160px", minWidth: 0, maxWidth: "100%", boxSizing: "border-box" }}
             />
-            <div className="inp-money" style={{ width: 130, flex: "none" }}>
+            <div className="inp-money" style={{ flex: "1 1 110px", minWidth: 0, boxSizing: "border-box" }}>
               <span className="pre">{currency}</span>
               <input
                 type="number"
@@ -215,9 +215,10 @@ export function JarNormalModal({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0"
+                style={{ minWidth: 0 }}
               />
             </div>
-            <button type="button" className="btn btn-primary" style={{ flex: "none" }} onClick={() => void addSubcategory()} disabled={pending || !name.trim()}>
+            <button type="button" className="btn btn-primary" style={{ flex: "0 1 auto" }} onClick={() => void addSubcategory()} disabled={pending || !name.trim()}>
               {pending ? "…" : <><Icon name="plus" width={2} /> Añadir</>}
             </button>
           </div>
