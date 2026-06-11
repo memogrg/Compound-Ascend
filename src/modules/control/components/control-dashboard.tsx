@@ -155,12 +155,12 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
               <div className="card-title">Objetivos activos</div>
               <div className="card-sub">{goals.length} objetivo(s)</div>
             </div>
+            {/* Botón permanente: siempre montado, también recibe el deep-link
+                ?new=goal aunque ya existan objetivos. */}
+            <AddControlButton kind="goal" currency={currency} label="Agregar objetivo" deepLinkKey="goal" />
           </div>
           {goals.length === 0 ? (
-            <Empty
-              text="Aún no agregas objetivos de ahorro."
-              action={<AddControlButton kind="goal" currency={currency} label="Agregar objetivo" />}
-            />
+            <Empty text="Aún no agregas objetivos de ahorro." />
           ) : (
             goals.map((g) => {
               const rec = d.goalRecs.find((r) => r.goalId === g.id);

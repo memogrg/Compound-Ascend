@@ -213,7 +213,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           <div className="card-title">Sin deudas registradas</div>
           <div className="card-sub">Cuando agregues una, verás aquí su amortización y estrategia de pago.</div>
         </div>
-        <AddControlButton kind="debt" currency={currency} label="Agregar deuda" indexRates={indexRates} />
+        <AddControlButton kind="debt" currency={currency} label="Agregar deuda" indexRates={indexRates} deepLinkKey="debt" />
       </div>
     );
   }
@@ -348,7 +348,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
             <div className="card-title">Tus deudas</div>
             <div className="card-sub">{debts.length} deuda(s) · orden de ataque ({METHOD_LABEL[activeMethod].toLowerCase()})</div>
           </div>
-          <AddControlButton kind="debt" currency={currency} label="Agregar deuda" variant="btn-secondary" indexRates={indexRates} />
+          <AddControlButton kind="debt" currency={currency} label="Agregar deuda" variant="btn-secondary" indexRates={indexRates} deepLinkKey="debt" />
         </div>
         {ordered.map((d, i) => {
           const s = summaries.get(d.id)!;

@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { focusFirstError } from "@/lib/forms";
+import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addInvestmentAction,
@@ -42,8 +43,9 @@ const POLICY_TYPES = [
   ["otro", "Otro"],
 ] as const;
 
-export function WealthActions({ mode, currency = "CRC" }: { mode: Mode; currency?: string }) {
+export function WealthActions({ mode, currency = "CRC", deepLinkKey }: { mode: Mode; currency?: string; deepLinkKey?: string }) {
   const [open, setOpen] = useState(false);
+  useDeepLinkModal(deepLinkKey, () => setOpen(true));
   return (
     <>
       <button className="btn btn-primary" onClick={() => setOpen(true)}>

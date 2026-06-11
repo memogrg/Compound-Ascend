@@ -27,7 +27,7 @@ export default async function Page() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <WealthActions mode="policy" currency={summary.currency} />
+          <WealthActions mode="policy" currency={summary.currency} deepLinkKey="policy" />
           <Link className="btn btn-secondary" href="/patrimonio">
             <Icon name="invest" width={2} /> Crecimiento
           </Link>

@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { focusFirstError } from "@/lib/forms";
+import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addGoalAction,
@@ -26,14 +27,17 @@ export function AddControlButton({
   label,
   variant = "btn-primary",
   indexRates,
+  deepLinkKey,
 }: {
   kind: Kind;
   currency: string;
   label?: string;
   variant?: "btn-primary" | "btn-secondary";
   indexRates?: Record<string, number>;
+  deepLinkKey?: string;
 }) {
   const [open, setOpen] = useState(false);
+  useDeepLinkModal(deepLinkKey, () => setOpen(true));
   return (
     <>
       <button className={`btn ${variant}`} onClick={() => setOpen(true)}>

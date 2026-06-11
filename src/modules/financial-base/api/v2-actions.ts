@@ -38,7 +38,10 @@ import {
   createBudgetItem,
   updateBudgetItem,
   deleteBudgetItem,
+  setCategoryBudget,
+  copyPreviousMonthExpenseBudget,
 } from "@/modules/financial-base/services/budget-service";
+import { monthPeriod } from "@/modules/financial-base/engine/period";
 import {
   createTransaction,
   updateTransaction,
@@ -117,6 +120,57 @@ export async function removeBudgetItemAction(id: string): Promise<ActionResult> 
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+const envelopeBudgetSchema = z.object({
+  categoryId: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  amount: z.number().nonnegative(),
+  currency: z.string().length(3),
+  periodMonth: z.number().int().min(1).max(12),
+  periodYear: z.number().int().min(2000).max(3000),
+});
+
+/** Fija el presupuesto de un sobre del periodo (candado del tab de Gastos). */
+export async function setEnvelopeBudgetAction(raw: unknown): Promise<ActionResult> {
+  const parsed = envelopeBudgetSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await setCategoryBudget({
+      categoryId: parsed.data.categoryId,
+      name: parsed.data.name,
+      amount: parsed.data.amount,
+      currency: parsed.data.currency,
+      period: monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
+    });
+    revalidate();
+    return { ok: true };
+  } catch (err) {
+    logger.error("setEnvelopeBudget fallido", { message: err instanceof Error ? err.message : "?" });
+    const msg = err instanceof Error && err.message.includes("se deriva de una entidad") ? err.message : "No pudimos actualizar el presupuesto.";
+    return { ok: false, message: msg };
+  }
+}
+
+const copyMonthSchema = z.object({
+  periodMonth: z.number().int().min(1).max(12),
+  periodYear: z.number().int().min(2000).max(3000),
+});
+
+/** Copia el presupuesto de gasto del mes anterior (toolbar "Copiar mes anterior"). */
+export async function copyPreviousMonthBudgetAction(raw: unknown): Promise<ActionResult & { copied?: number }> {
+  const parsed = copyMonthSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const copied = await copyPreviousMonthExpenseBudget(monthPeriod(parsed.data.periodYear, parsed.data.periodMonth));
+    revalidate();
+    return { ok: true, copied };
+  } catch (err) {
+    logger.error("copyPreviousMonthBudget fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos copiar el presupuesto del mes anterior." };
   }
 }
 

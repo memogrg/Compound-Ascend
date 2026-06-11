@@ -3,11 +3,13 @@ import "server-only";
 /** CRUD + agregados de presupuesto por mes (budget_items). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { getCategoryNameMap, listCategoryTree } from "@/modules/financial-base/services/categories-service";
 import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
+import { previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
 import type { BudgetItem, BudgetType, Period } from "@/modules/financial-base/types";
 import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
@@ -61,8 +63,11 @@ export async function listBudgetItems(period: Period): Promise<BudgetItem[]> {
 export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // household: las líneas manuales comparten hogar igual que las derivadas.
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   await supabase.from("budget_items").insert({
     user_id: user.id,
+    household_id,
     type: input.type,
     category_id: input.categoryId ?? null,
     name: input.name,
@@ -72,6 +77,35 @@ export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
     period_month: input.periodMonth,
     period_year: input.periodYear,
   });
+}
+
+/**
+ * Copia las líneas de gasto MANUALES del mes anterior al periodo dado, sin
+ * duplicar las categorías que ya tienen presupuesto este mes. Devuelve cuántas
+ * copió. Las líneas derivadas (deuda/meta/etc.) no se copian: se regeneran solas.
+ */
+export async function copyPreviousMonthExpenseBudget(period: Period): Promise<number> {
+  const prev = previousMonthPeriod(period);
+  const [prevItems, curItems] = await Promise.all([listBudgetItems(prev), listBudgetItems(period)]);
+  const present = new Set(
+    curItems.filter((i) => i.type === "expense").map((i) => i.categoryId ?? "∅"),
+  );
+  const toCopy = prevItems.filter(
+    (i) => i.type === "expense" && i.sourceKind === "manual" && !present.has(i.categoryId ?? "∅"),
+  );
+  for (const it of toCopy) {
+    await createBudgetItem({
+      type: "expense",
+      categoryId: it.categoryId,
+      name: it.name,
+      amount: it.amount,
+      currency: it.currency,
+      frequency: it.frequency,
+      periodMonth: period.month,
+      periodYear: period.year,
+    });
+  }
+  return toCopy.length;
 }
 
 export async function updateBudgetItem(id: string, input: BudgetItemInput): Promise<void> {
@@ -99,6 +133,46 @@ export async function deleteBudgetItem(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   await supabase.from("budget_items").delete().eq("id", id).eq("user_id", user.id);
+}
+
+/**
+ * Fija el presupuesto de gasto de una categoría (sobre) para el periodo:
+ * actualiza el budget_item manual existente o crea uno. Las líneas derivadas
+ * (deuda/meta/póliza) quedan bloqueadas por assertManualItem en updateBudgetItem.
+ * Lo usa el candado de "editar presupuesto del sobre" en el tab de Gastos.
+ */
+export async function setCategoryBudget(args: {
+  categoryId: string;
+  name: string;
+  period: Period;
+  amount: number;
+  currency: string;
+}): Promise<void> {
+  const items = await listBudgetItems(args.period);
+  const existing = items.find((b) => b.type === "expense" && b.categoryId === args.categoryId);
+  if (existing) {
+    await updateBudgetItem(existing.id, {
+      type: "expense",
+      categoryId: args.categoryId,
+      name: existing.name,
+      amount: args.amount,
+      currency: existing.currency,
+      frequency: existing.frequency,
+      periodMonth: args.period.month,
+      periodYear: args.period.year,
+    });
+    return;
+  }
+  await createBudgetItem({
+    type: "expense",
+    categoryId: args.categoryId,
+    name: args.name,
+    amount: args.amount,
+    currency: args.currency,
+    frequency: "mensual",
+    periodMonth: args.period.month,
+    periodYear: args.period.year,
+  });
 }
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;
