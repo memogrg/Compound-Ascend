@@ -7,6 +7,7 @@
  * una subcategoría la añade como sobre del grupo con su presupuesto del mes.
  */
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
@@ -45,6 +46,8 @@ export function JarNormalModal({
   const envelopes = [...jar.envelopes, ...extra];
   const totalSpent = envelopes.reduce((s, e) => s + e.spent, 0);
   const totalBudget = envelopes.reduce((s, e) => s + e.budget, 0);
+  const usedPct = pct(totalSpent, totalBudget);
+  const usedOver = totalBudget > 0 && totalSpent > totalBudget;
 
   // Marca de agua con ejemplos del grupo (se borra al escribir).
   const watermark =
@@ -84,14 +87,34 @@ export function JarNormalModal({
   }
 
   return (
-    <Modal
-      title={jar.name}
-      sub={`${envelopes.length} sobre(s) · ${formatMoney(totalSpent, currency)} de ${formatMoney(totalBudget, currency)}`}
-      onClose={onClose}
-    >
+    <Modal title={jar.name} sub={`${envelopes.length} ${envelopes.length === 1 ? "sobre" : "sobres"}`} onClose={onClose}>
       <div className="modal-body">
+        {/* Cabecera: gastado este mes + chip % usado */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+          <div>
+            <div className="muted" style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em" }}>Gastado este mes</div>
+            <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
+              {formatMoney(totalSpent, currency)}
+              <span className="muted" style={{ fontSize: 14, fontWeight: 500 }}> /{formatMoney(totalBudget, currency)}</span>
+            </div>
+          </div>
+          <span
+            className="chip"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "4px 10px",
+              borderRadius: 999,
+              background: usedOver ? "color-mix(in srgb, var(--neg) 14%, transparent)" : "color-mix(in srgb, var(--pos) 14%, transparent)",
+              color: usedOver ? "var(--neg)" : "var(--pos)",
+            }}
+          >
+            {usedPct}% usado
+          </span>
+        </div>
+
         {/* Sobres */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {envelopes.length === 0 ? (
             <div className="muted" style={{ fontSize: 12.5 }}>Este frasco aún no tiene sobres. Crea el primero abajo.</div>
           ) : (
@@ -99,36 +122,43 @@ export function JarNormalModal({
               const over = e.budget > 0 && e.spent > e.budget;
               const color = over ? "var(--neg)" : jar.color;
               const remaining = e.budget - e.spent;
+              const ePct = e.budget > 0 ? Math.round((e.spent / e.budget) * 100) : e.spent > 0 ? 100 : 0;
               return (
-                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{e.name}</div>
-                    <div className="bar-track" style={{ marginTop: 6 }}>
-                      <div className="bar-fill" style={{ width: `${pct(e.spent, e.budget)}%`, background: color }} />
-                    </div>
-                    <div className="env-bar-meta" style={{ marginTop: 4 }}>
-                      <span style={over ? { color: "var(--neg)" } : undefined}>{formatMoney(e.spent, currency)} gastado</span>
-                      <span>
-                        {over
-                          ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
-                          : `${formatMoney(remaining, currency)} restante`}
-                      </span>
-                    </div>
+                <div key={e.id} className="subenv" style={{ padding: "11px 0", borderTop: "1px solid var(--line)" }}>
+                  {/* Nombre · presupuesto del sobre · candado */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.name}</span>
+                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{formatMoney(e.budget, currency)}</span>
+                    <button
+                      type="button"
+                      className="se-lock icon-btn tip"
+                      data-tip="Editar el presupuesto de este sobre (requiere confirmación)"
+                      aria-label={`Editar presupuesto de ${e.name}`}
+                      style={{ width: 28, height: 28, flex: "none", color: "var(--muted)" }}
+                      onClick={() => setEditEnv(e)}
+                    >
+                      <Icon name="lock" />
+                    </button>
                   </div>
-                  <div className="env-num">
-                    <div className="big">{formatMoney(e.budget, currency)}</div>
-                    <div className="small">presupuesto</div>
+                  {/* gastado de presupuesto · ver movimientos */}
+                  <div style={{ fontSize: 12, marginTop: 3 }}>
+                    <span className="muted">{formatMoney(e.spent, currency)} de {formatMoney(e.budget, currency)}</span>
+                    {" · "}
+                    <Link href={`/transacciones?cat=${e.id}`} className="se-link" style={{ color: "var(--info)", fontWeight: 600, textDecoration: "none" }}>
+                      ver movimientos ›
+                    </Link>
                   </div>
-                  <button
-                    type="button"
-                    className="icon-btn tip"
-                    data-tip="Editar el presupuesto de este sobre (requiere confirmación)"
-                    aria-label={`Editar presupuesto de ${e.name}`}
-                    style={{ width: 30, height: 30, color: "var(--muted)" }}
-                    onClick={() => setEditEnv(e)}
-                  >
-                    <Icon name="lock" />
-                  </button>
+                  <div className="bar-track" style={{ marginTop: 6 }}>
+                    <div className="bar-fill" style={{ width: `${pct(e.spent, e.budget)}%`, background: color }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 11.5 }}>
+                    <span className={over ? undefined : "muted"} style={over ? { color: "var(--neg)" } : undefined}>{ePct}% gastado</span>
+                    <span style={over ? { color: "var(--neg)", fontWeight: 600 } : undefined}>
+                      {over
+                        ? `−${formatMoney(Math.abs(remaining), currency)} excedido`
+                        : `${formatMoney(remaining, currency)} restante`}
+                    </span>
+                  </div>
                 </div>
               );
             })

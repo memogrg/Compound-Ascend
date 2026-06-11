@@ -69,6 +69,9 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
   const width = pct(totalSpent, totalBudget);
   const remaining = totalBudget - totalSpent;
   const n = jar.envelopes.length;
+  // Lista descriptiva de subcategorías (no "Presupuestado $X").
+  const subList =
+    n > 0 ? jar.envelopes.map((e) => e.name).join(", ") : "Sin sobres · crea el primero";
 
   return (
     <>
@@ -83,7 +86,7 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
         </div>
         <div style={{ minWidth: 0 }}>
           <div className="env-name">{jar.name}</div>
-          <div className="env-sub">{n} {n === 1 ? "sobre" : "sobres"}</div>
+          <div className="env-sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subList}</div>
         </div>
         <div className="env-bar-cell">
           <div className="bar-track">
@@ -100,7 +103,7 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
         </div>
         <div className="env-num">
           <div className="big">{formatMoney(totalBudget, currency)}</div>
-          <div className="small">presupuestado</div>
+          <div className="small">{n} {n === 1 ? "sobre" : "sobres"}</div>
         </div>
       </button>
       {open ? (

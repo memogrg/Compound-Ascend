@@ -9,7 +9,7 @@
  * MISMAS server actions de V2 (editar/duplicar/eliminar/marcar revisada).
  */
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
@@ -54,10 +54,13 @@ export function TransactionsBrowser({
   period: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
+  // Deep-link "ver movimientos ›" desde un sobre → filtra por esa categoría.
+  const catParam = searchParams.get("cat");
   const [items, setItems] = useState<Transaction[]>(transactions);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(catParam ? `cat:${catParam}` : "all");
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [, startTransition] = useTransition();
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -94,8 +97,14 @@ export function TransactionsBrowser({
       counts.set(t.categoryId, cur);
     }
     const top = [...counts.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 4);
-    return [...base, ...top.map(([id, v]) => ({ id: `cat:${id}`, label: v.label }))];
-  }, [items, categoryNames]);
+    const chips = top.map(([id, v]) => ({ id: `cat:${id}`, label: v.label }));
+    // Si llegamos por deep-link a una categoría sin movimientos (no está en el
+    // top), añade su chip para que el filtro activo sea visible.
+    if (catParam && !chips.some((c) => c.id === `cat:${catParam}`)) {
+      chips.push({ id: `cat:${catParam}`, label: categoryNames[catParam] ?? "Categoría" });
+    }
+    return [...base, ...chips];
+  }, [items, categoryNames, catParam]);
 
   const commitDelete = (id: string) => {
     timers.current.delete(id);
