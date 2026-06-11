@@ -1,8 +1,12 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { CurrencySelector } from "@/modules/account/components/currency-selector";
 import { EmailTester } from "@/modules/account/components/email-tester";
+import { WhatsAppLink } from "@/modules/account/components/whatsapp-link";
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { isSupabaseConfigured } from "@/lib/auth/session";
+import { getMyLink } from "@/lib/whatsapp/links-service";
+import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { PLAN_LABEL, isPremium } from "@/lib/plan";
 
 /**
@@ -12,6 +16,8 @@ import { PLAN_LABEL, isPremium } from "@/lib/plan";
 export default async function Page() {
   const acc = await getAccountInfo();
   const usagePct = acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
+  const whatsappLink = isSupabaseConfigured() ? await getMyLink() : null;
+  const whatsappConfigured = isWhatsAppConfigured();
 
   return (
     <div className="grid">
@@ -71,6 +77,10 @@ export default async function Page() {
       <section className="cols-2">
         <CurrencySelector current={acc.currency} />
         <EmailTester />
+      </section>
+
+      <section className="cols-2">
+        <WhatsAppLink initial={whatsappLink} configured={whatsappConfigured} />
       </section>
 
       <section className="cols-2">
