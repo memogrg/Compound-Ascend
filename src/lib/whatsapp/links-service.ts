@@ -86,6 +86,17 @@ export async function getActiveLinkByPhone(phone: string): Promise<ActiveLink | 
   return { id: data.id, userId: data.user_id, householdId: data.household_id, phone: data.phone_e164 };
 }
 
+/** Nombre del usuario (para saludarlo al confirmar el vínculo). */
+export async function getUserDisplayName(userId: string): Promise<string> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.display_name ?? "";
+}
+
 /** Marca actividad reciente (no registra contenido). */
 export async function touchLastSeen(linkId: string): Promise<void> {
   const supabase = createServiceRoleClient();
