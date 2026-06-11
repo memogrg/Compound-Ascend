@@ -45,6 +45,13 @@ const NOT_LINKED =
 const OTP_RE = /^\d{6}$/;
 const CONFIRM_RE = /^(s[ií]|yes|ok|dale|confirmar|confirmo|listo)$/;
 const EDIT_RE = /^edit/;
+const HELP_RE = /^(ayuda|men[uú]|hola|help|empezar|start|\?)$/;
+const HELP_TEXT =
+  "👋 Soy tu asistente de Compound Ascend. Puedo:\n\n" +
+  "📸 Registrar un gasto: enviá una *foto* del recibo.\n" +
+  '✍️ Registrar por texto: "gasté 12000 en super" o "me entraron 50000 de freelance".\n' +
+  '📊 Responder consultas: "¿cuánto gasté este mes?", "¿cómo va mi presupuesto?".\n\n' +
+  "Siempre te pido confirmar antes de guardar.";
 
 export async function routeInbound(provider: WhatsAppProvider, msg: InboundMessage): Promise<void> {
   const link = await getActiveLinkByPhone(msg.phone);
@@ -113,6 +120,12 @@ async function handleActiveMessage(
     }
     // No es confirmación: descartamos la propuesta vieja y seguimos con el input nuevo.
     await setPendingAction(link.id, null);
+  }
+
+  // Ayuda / saludo: respuesta rápida sin consumir IA.
+  if (HELP_RE.test(lower)) {
+    await provider.sendText(msg.phone, HELP_TEXT);
+    return;
   }
 
   // Foto de recibo.
