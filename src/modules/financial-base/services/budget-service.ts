@@ -101,6 +101,46 @@ export async function deleteBudgetItem(id: string): Promise<void> {
   await supabase.from("budget_items").delete().eq("id", id).eq("user_id", user.id);
 }
 
+/**
+ * Fija el presupuesto de gasto de una categoría (sobre) para el periodo:
+ * actualiza el budget_item manual existente o crea uno. Las líneas derivadas
+ * (deuda/meta/póliza) quedan bloqueadas por assertManualItem en updateBudgetItem.
+ * Lo usa el candado de "editar presupuesto del sobre" en el tab de Gastos.
+ */
+export async function setCategoryBudget(args: {
+  categoryId: string;
+  name: string;
+  period: Period;
+  amount: number;
+  currency: string;
+}): Promise<void> {
+  const items = await listBudgetItems(args.period);
+  const existing = items.find((b) => b.type === "expense" && b.categoryId === args.categoryId);
+  if (existing) {
+    await updateBudgetItem(existing.id, {
+      type: "expense",
+      categoryId: args.categoryId,
+      name: existing.name,
+      amount: args.amount,
+      currency: existing.currency,
+      frequency: existing.frequency,
+      periodMonth: args.period.month,
+      periodYear: args.period.year,
+    });
+    return;
+  }
+  await createBudgetItem({
+    type: "expense",
+    categoryId: args.categoryId,
+    name: args.name,
+    amount: args.amount,
+    currency: args.currency,
+    frequency: "mensual",
+    periodMonth: args.period.month,
+    periodYear: args.period.year,
+  });
+}
+
 export type KeyedTotals = Record<string, { label: string; value: number }>;
 export type BudgetTotals = {
   budgetIncome: number;

@@ -13,6 +13,7 @@ import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { addCategoryAction, addBudgetItemAction } from "@/modules/financial-base/api/v2-actions";
+import { BudgetWarningModal } from "@/modules/financial-base/components/v2/expense-jars/budget-warning-modal";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 
@@ -39,6 +40,7 @@ export function JarNormalModal({
   const [amount, setAmount] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editEnv, setEditEnv] = useState<JarEnvelope | null>(null);
 
   const envelopes = [...jar.envelopes, ...extra];
   const totalSpent = envelopes.reduce((s, e) => s + e.spent, 0);
@@ -98,7 +100,7 @@ export function JarNormalModal({
               const color = over ? "var(--neg)" : jar.color;
               const remaining = e.budget - e.spent;
               return (
-                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center" }}>
+                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "center" }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{e.name}</div>
                     <div className="bar-track" style={{ marginTop: 6 }}>
@@ -117,11 +119,24 @@ export function JarNormalModal({
                     <div className="big">{formatMoney(e.budget, currency)}</div>
                     <div className="small">presupuesto</div>
                   </div>
+                  <button
+                    type="button"
+                    className="icon-btn tip"
+                    data-tip="Editar el presupuesto de este sobre (requiere confirmación)"
+                    aria-label={`Editar presupuesto de ${e.name}`}
+                    style={{ width: 30, height: 30, color: "var(--muted)" }}
+                    onClick={() => setEditEnv(e)}
+                  >
+                    <Icon name="lock" />
+                  </button>
                 </div>
               );
             })
           )}
         </div>
+        {editEnv ? (
+          <BudgetWarningModal envelope={editEnv} period={period} currency={currency} onClose={() => setEditEnv(null)} />
+        ) : null}
 
         {/* Crear nueva subcategoría */}
         <div className="fld" style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
