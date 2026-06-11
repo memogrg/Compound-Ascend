@@ -15,6 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
+import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import {
   addHoldingAction,
   editHoldingAction,
@@ -140,8 +141,9 @@ function sym(currency: string): string {
 
 // ── Exported triggers ─────────────────────────────────────────────
 
-export function AddHoldingButton({ currency = "CRC" }: { currency?: string }) {
+export function AddHoldingButton({ currency = "CRC", deepLinkKey }: { currency?: string; deepLinkKey?: string }) {
   const [open, setOpen] = useState(false);
+  useDeepLinkModal(deepLinkKey, () => setOpen(true));
   return (
     <>
       <button className="btn btn-primary" onClick={() => setOpen(true)}>

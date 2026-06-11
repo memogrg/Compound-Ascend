@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { formatMoney } from "@/lib/format";
 import { JarNormalModal } from "@/modules/financial-base/components/v2/expense-jars/jar-normal-modal";
+import { JarLinkedModal } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 
@@ -36,19 +37,28 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
     const n = jar.items.length;
     const sub = n > 0 ? `${n} ${n === 1 ? "elemento vinculado" : "elementos vinculados"}` : jar.emptyText;
     return (
-      <div className="env" aria-label={jar.name}>
-        <div className="env-ic" style={{ background: `color-mix(in srgb, ${jar.color} 14%, transparent)`, color: jar.color }}>
-          <Icon name={icon} />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <div className="env-name">{jar.name}</div>
-          <div className="env-sub">{sub}</div>
-        </div>
-        <div className="env-bar-cell" />
-        <div className="env-num">
-          <div className="small">vinculado</div>
-        </div>
-      </div>
+      <>
+        <button
+          type="button"
+          className="env exp-clickable"
+          style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", font: "inherit" }}
+          onClick={() => setOpen(true)}
+          aria-label={jar.name}
+        >
+          <div className="env-ic" style={{ background: `color-mix(in srgb, ${jar.color} 14%, transparent)`, color: jar.color }}>
+            <Icon name={icon} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div className="env-name">{jar.name}</div>
+            <div className="env-sub">{sub}</div>
+          </div>
+          <div className="env-bar-cell" />
+          <div className="env-num">
+            <div className="small">vinculado</div>
+          </div>
+        </button>
+        {open ? <JarLinkedModal jar={jar} onClose={() => setOpen(false)} /> : null}
+      </>
     );
   }
 

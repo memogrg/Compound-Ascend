@@ -174,14 +174,14 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
               <div className="card-sub">{holdings.length + investments.length} activo(s)</div>
             </div>
             {(holdings.length > 0 || investments.length > 0) && (
-              <AddHoldingButton currency={currency} />
+              <AddHoldingButton currency={currency} deepLinkKey="holding" />
             )}
           </div>
 
           {holdings.length === 0 && investments.length === 0 ? (
             <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
               <span>Aún no registras inversiones.</span>
-              <AddHoldingButton currency={currency} />
+              <AddHoldingButton currency={currency} deepLinkKey="holding" />
             </div>
           ) : (
             <>

@@ -159,7 +159,7 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
           {goals.length === 0 ? (
             <Empty
               text="Aún no agregas objetivos de ahorro."
-              action={<AddControlButton kind="goal" currency={currency} label="Agregar objetivo" />}
+              action={<AddControlButton kind="goal" currency={currency} label="Agregar objetivo" deepLinkKey="goal" />}
             />
           ) : (
             goals.map((g) => {
