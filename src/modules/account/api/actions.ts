@@ -15,9 +15,44 @@ import {
   verifyEmailConnection,
   sendEmail,
 } from "@/lib/email/send";
+import { generateLinkOtp, revokeLink } from "@/lib/whatsapp/links-service";
 import { logger } from "@/lib/logger";
 
 export type AccountActionResult = { ok: boolean; message?: string };
+
+export type WhatsAppLinkResult = {
+  ok: boolean;
+  otp?: string;
+  botNumber?: string | null;
+  expiresInMin?: number;
+  message?: string;
+};
+
+/** Genera el OTP para vincular WhatsApp; devuelve el código y el número del bot. */
+export async function linkWhatsAppAction(): Promise<WhatsAppLinkResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para vincular." };
+  try {
+    const r = await generateLinkOtp();
+    revalidatePath("/configuracion");
+    return { ok: true, otp: r.otp, botNumber: r.botNumber, expiresInMin: r.expiresInMin };
+  } catch (err) {
+    logger.error("linkWhatsApp fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos generar el código. Inténtalo de nuevo." };
+  }
+}
+
+/** Desvincula el WhatsApp del usuario. */
+export async function revokeWhatsAppAction(): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  try {
+    await revokeLink();
+    revalidatePath("/configuracion");
+    return { ok: true };
+  } catch (err) {
+    logger.error("revokeWhatsApp fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos desvincular." };
+  }
+}
 
 const currencySchema = z.enum(["CRC", "USD", "EUR", "MXN", "COP", "GBP"]);
 

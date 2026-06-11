@@ -59,6 +59,21 @@ export type HouseholdMemberRow = Timestamps & {
   status: MemberStatus;
 };
 
+export type WhatsAppLinkStatus = "pending" | "active" | "revoked";
+
+export type WhatsAppLinkRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  phone_e164: string | null;
+  status: WhatsAppLinkStatus;
+  otp_code: string | null;
+  otp_expires_at: string | null;
+  pending_action: Json | null;
+  verified_at: string | null;
+  last_seen_at: string | null;
+};
+
 export type InvitationStatus = "pending" | "accepted" | "revoked";
 
 export type HouseholdInvitationRow = Timestamps & {
@@ -592,6 +607,7 @@ export interface Database {
         Partial<HouseholdInvitationRow> & { household_id: string; email: string; invited_by: string },
         Partial<HouseholdInvitationRow>
       >;
+      whatsapp_links: UserTable<WhatsAppLinkRow>;
       personal_profiles: UserTable<PersonalProfileRow>;
       risk_profiles: UserTable<RiskProfileRow>;
       behavior_profiles: UserTable<BehaviorProfileRow>;
