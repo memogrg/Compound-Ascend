@@ -288,7 +288,11 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
         </div>
       )}
 
-      <EditableBudgetTable type={kind} title={isIncome ? "Presupuesto de ingresos" : "Presupuesto de gastos"} items={items} categoryNames={view.categoryNames} categories={view.categories} period={view.period} currency={currency} />
+      {/* En Gastos el presupuesto se gestiona en los frascos/sobres (crear
+          subcategoría + candado); la tabla editable queda solo en Ingresos. */}
+      {isIncome ? (
+        <EditableBudgetTable type={kind} title="Presupuesto de ingresos" items={items} categoryNames={view.categoryNames} categories={view.categories} period={view.period} currency={currency} />
+      ) : null}
 
       <FinancialInsightCard reading={isIncome ? view.incomeCapsule : view.expenseCapsule} />
     </div>
