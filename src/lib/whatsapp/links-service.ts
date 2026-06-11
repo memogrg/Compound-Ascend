@@ -73,6 +73,45 @@ export type ActiveLink = {
   phone: string;
 };
 
+/** Propuesta de transacción pendiente de confirmación (foto o texto). */
+export type PendingAction = {
+  kind: "gasto" | "ingreso";
+  description: string;
+  amount: number;
+  currency: string;
+  occurredOn: string; // YYYY-MM-DD
+  merchant?: string | null;
+  origin: "scanned" | "ai_assisted" | "manual";
+  source: "receipt" | "chat";
+};
+
+/** Moneda principal del usuario (default CRC). */
+export async function getUserCurrency(userId: string): Promise<string> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("user_settings")
+    .select("primary_currency")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data?.primary_currency ?? "CRC";
+}
+
+/** Guarda/limpia la confirmación pendiente del vínculo. */
+export async function setPendingAction(linkId: string, action: PendingAction | null): Promise<void> {
+  const supabase = createServiceRoleClient();
+  await supabase.from("whatsapp_links").update({ pending_action: action }).eq("id", linkId);
+}
+
+export async function getPendingAction(linkId: string): Promise<PendingAction | null> {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("whatsapp_links")
+    .select("pending_action")
+    .eq("id", linkId)
+    .maybeSingle();
+  return (data?.pending_action as PendingAction | null) ?? null;
+}
+
 /** Vínculo activo por número (E.164). Devuelve null si no está vinculado. */
 export async function getActiveLinkByPhone(phone: string): Promise<ActiveLink | null> {
   const supabase = createServiceRoleClient();
