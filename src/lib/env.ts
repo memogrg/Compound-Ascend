@@ -52,6 +52,10 @@ const serverSchema = z.object({
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,
   CRON_SECRET: optionalStr,
+  // WhatsApp (Twilio). Si faltan, la integración se omite con gracia.
+  TWILIO_ACCOUNT_SID: optionalStr,
+  TWILIO_AUTH_TOKEN: optionalStr, // también firma los webhooks (X-Twilio-Signature)
+  TWILIO_WHATSAPP_NUMBER: optionalStr, // E.164, p. ej. +14155238886 (sandbox)
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;
