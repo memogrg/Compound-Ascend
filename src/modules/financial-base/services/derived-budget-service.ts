@@ -16,6 +16,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import {
   diffDerived,
   toMonthly,
@@ -186,11 +187,14 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   const { toInsert, toUpdate, toDeleteIds } = diffDerived(existing, desired);
 
   if (toInsert.length > 0) {
+    // household: las líneas derivadas comparten hogar igual que las manuales.
+    const household_id = await getActiveHouseholdId(supabase, user.id);
     // El índice único 0023 evita duplicados si dos syncs corren a la vez;
     // la carrera perdedora recibe 23505 y se ignora (la línea ya existe).
     const { error } = await supabase.from("budget_items").insert(
       toInsert.map((l) => ({
         user_id: user.id,
+        household_id,
         type: l.type,
         category_id: l.categoryId,
         name: l.name,

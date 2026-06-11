@@ -292,8 +292,11 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     );
   }
 
+  // household: cubre el hueco del sub-PR household de main (no tocó este insert).
+  const household_id = await getActiveHouseholdId(supabase, user.id);
   const { error } = await supabase.from("debt_payments").insert({
     user_id: user.id,
+    household_id,
     debt_id: input.debtId,
     occurred_on: input.paymentDate,
     amount: input.amount,
