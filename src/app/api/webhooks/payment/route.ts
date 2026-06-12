@@ -6,6 +6,7 @@
  * con service-role. Scaffold genérico (adáptalo al proveedor real: Stripe, etc.).
  */
 import { NextResponse } from "next/server";
+import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { z } from "zod";
 import { verifySignature } from "@/lib/security/webhook";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -23,6 +24,9 @@ const eventSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const rl = await rateLimit(`webhook:pay:${clientIp(req)}`, RATE_LIMITS.webhook);
+    if (!rl.ok) throw new AppError("RATE_LIMITED");
+
     const secret = getServerEnv().PAYMENT_WEBHOOK_SECRET;
     if (!secret) throw new AppError("INTERNAL", undefined, "PAYMENT_WEBHOOK_SECRET ausente");
 

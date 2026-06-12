@@ -11,7 +11,7 @@ import { buildFinancialContext } from "@/lib/ai/context-engine";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
-import { assertTrustedOrigin } from "@/lib/security/cors";
+import { assertTrustedOrigin, corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
 import { alert } from "@/server/observability/alerts";
 import type { ChatMessage } from "@/lib/ai/provider";
@@ -46,10 +46,10 @@ export async function POST(req: Request) {
     const result = await financeChat(messages, ctx);
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
 
-    return NextResponse.json({ reply: result.reply, action: result.action });
+    return NextResponse.json({ reply: result.reply, action: result.action }, { headers: corsHeaders(req.headers.get("origin")) });
   } catch (err) {
     const { status, body } = toSafeResponse(err);
-    return NextResponse.json(body, { status });
+    return NextResponse.json(body, { status, headers: corsHeaders(req.headers.get("origin")) });
   }
 }
 
