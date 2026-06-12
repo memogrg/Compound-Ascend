@@ -9,6 +9,7 @@
  * Uso: `const rates = await getFxRates(); convertCurrency(x, from, to, rates)`.
  */
 import "server-only";
+import { cache } from "react";
 import { priceCache } from "@/lib/market-data/cache";
 import { FX_PER_USD, completeRateTable } from "@/lib/fx";
 import { logger } from "@/lib/logger";
@@ -55,7 +56,7 @@ async function currencyApi(): Promise<Record<string, number> | null> {
  * Tabla de tasas (por USD) lista para `convertCurrency`. Cacheada 6 h.
  * Nunca lanza: ante fallo total devuelve el respaldo estático.
  */
-export async function getFxRates(): Promise<Record<string, number>> {
+async function _getFxRates(): Promise<Record<string, number>> {
   const cached = priceCache.get<Record<string, number>>(CACHE_KEY);
   if (cached) return cached;
 
@@ -71,3 +72,6 @@ export async function getFxRates(): Promise<Record<string, number>> {
   logger.warn("fx-rates: proveedores sin respuesta; usando tasas estáticas");
   return FX_PER_USD;
 }
+
+/** Dedup por request (React cache): se llamaba getFxRates varias veces por render. */
+export const getFxRates = cache(_getFxRates);

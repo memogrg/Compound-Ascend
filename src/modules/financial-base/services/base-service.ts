@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 
 /**
  * Servicio de datos del Módulo 2 (respeta RLS). El monto mensualizado se calcula
@@ -190,7 +191,7 @@ export type BaseSummary = {
 };
 
 /** Carga ítems y calcula los indicadores de la base financiera. */
-export async function getBaseSummary(): Promise<BaseSummary> {
+async function _getBaseSummary(): Promise<BaseSummary> {
   const [incomes, expenses, primary, rates] = await Promise.all([
     listIncomes(),
     listExpenses(),
@@ -282,7 +283,7 @@ async function computeV2Totals(
 
 /** Moneda principal del usuario (de user_settings); CRC por defecto.
  *  Es la moneda por defecto al registrar ítems nuevos. */
-export async function getPrimaryCurrency(): Promise<string> {
+async function _getPrimaryCurrency(): Promise<string> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
@@ -302,7 +303,7 @@ export const DISPLAY_CURRENCY_COOKIE = "ca_display_currency";
  * MUESTRAN los totales — los datos se registran en la moneda que el usuario
  * elija y la app los convierte a esta para mostrarlos.
  */
-export async function getDisplayCurrency(): Promise<string> {
+async function _getDisplayCurrency(): Promise<string> {
   const store = await cookies();
   const override = store.get(DISPLAY_CURRENCY_COOKIE)?.value;
   if (override && (SUPPORTED_CURRENCIES as readonly string[]).includes(override)) {
@@ -310,3 +311,12 @@ export async function getDisplayCurrency(): Promise<string> {
   }
   return getPrimaryCurrency();
 }
+
+/** Dedup por request (React cache): se llamaba getBaseSummary varias veces por render. */
+export const getBaseSummary = cache(_getBaseSummary);
+
+/** Dedup por request (React cache): se llamaba getPrimaryCurrency varias veces por render. */
+export const getPrimaryCurrency = cache(_getPrimaryCurrency);
+
+/** Dedup por request (React cache): se llamaba getDisplayCurrency varias veces por render. */
+export const getDisplayCurrency = cache(_getDisplayCurrency);
