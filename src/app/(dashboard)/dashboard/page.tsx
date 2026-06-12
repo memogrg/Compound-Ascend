@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getDashboardData } from "@/modules/dashboard";
 import { DashboardView } from "@/modules/dashboard";
@@ -8,25 +9,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isDemoData } from "@/modules/account/services/account-service";
 import { DemoBanner } from "@/components/shared/demo-banner";
 
-/**
- * Panel principal — consume datos reales del Perfil y la Base Financiera.
- * Los usuarios nuevos (onboarding incompleto) se envían a /bienvenida para que
- * elijan cómo empezar (guiado / manual / ejemplo).
- */
-export default async function DashboardPage() {
-  if (isSupabaseConfigured()) {
-    const user = await getUser();
-    if (user) {
-      const supabase = await createSupabaseServerClient();
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (profile && !profile.onboarding_completed) redirect("/bienvenida");
-    }
-  }
-
+/** Datos del panel en streaming: el shell pinta de inmediato con skeletons. */
+async function DashboardContent() {
   const data = await getDashboardData();
 
   if (!data.health.hasData) {
@@ -71,5 +55,45 @@ export default async function DashboardPage() {
         demo={!data.configured}
       />
     </>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="grid" aria-hidden="true">
+      <div className="skel" style={{ height: 34, width: 280 }} />
+      <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(2, 1fr)" }}>
+        <div className="skel" style={{ height: 190 }} />
+        <div className="skel" style={{ height: 190 }} />
+      </div>
+      <div className="skel" style={{ height: 150 }} />
+      <div className="skel" style={{ height: 260 }} />
+    </div>
+  );
+}
+
+/**
+ * Panel principal — consume datos reales del Perfil y la Base Financiera.
+ * Los usuarios nuevos (onboarding incompleto) se envían a /bienvenida para que
+ * elijan cómo empezar (guiado / manual / ejemplo).
+ */
+export default async function DashboardPage() {
+  if (isSupabaseConfigured()) {
+    const user = await getUser();
+    if (user) {
+      const supabase = await createSupabaseServerClient();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profile && !profile.onboarding_completed) redirect("/bienvenida");
+    }
+  }
+
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
+    </Suspense>
   );
 }

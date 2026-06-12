@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { EXPENSE_NATURES, NATURE_COLOR } from "@/modules/financial-base/constants";

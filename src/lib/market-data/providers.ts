@@ -10,7 +10,9 @@ import { logger } from "@/lib/logger";
 
 export type Quote = { price: number; currency: string; provider: string };
 
-const TIMEOUT_MS = 6000;
+// 3 s por proveedor: con 3 proveedores en cadena el peor caso por simbolo baja
+// de 18 s a 9 s; los hits reales responden muy por debajo de 3 s.
+const TIMEOUT_MS = 3000;
 
 async function fetchJson(url: string, init?: RequestInit): Promise<unknown | null> {
   const controller = new AbortController();
