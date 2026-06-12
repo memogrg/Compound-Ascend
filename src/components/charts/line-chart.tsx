@@ -34,7 +34,9 @@ export function PremiumLineChart({
   height?: number;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div role="img" aria-label="Gráfico de líneas: evolución en el tiempo">
+      <div aria-hidden="true">
+        <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke="var(--line)" strokeDasharray="3 6" vertical={false} />
         <XAxis
@@ -78,6 +80,8 @@ export function PremiumLineChart({
           />
         ))}
       </LineChart>
-    </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }

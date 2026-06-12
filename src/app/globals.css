@@ -3469,3 +3469,15 @@ tooltips ============================================================ */ .cmp-se
     display: none;
   }
 }
+
+/* ── Foco visible para teclado (a11y · revisión F5) ─────────────────────
+   Solo :focus-visible (teclado), nunca al click. Los inputs conservan su
+   tratamiento propio de :focus (borde), por eso no se incluyen aquí. */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+  border-radius: 8px;
+}

@@ -22,9 +22,9 @@ const CURRENCIES: { code: string; sym: string }[] = [
   { code: "CRC", sym: "₡" },
   { code: "USD", sym: "$" },
   { code: "EUR", sym: "€" },
-  { code: "GBP", sym: "£" },
   { code: "MXN", sym: "MX$" },
   { code: "COP", sym: "COL$" },
+  { code: "GBP", sym: "£" },
 ];
 
 function todayISO(): string {
