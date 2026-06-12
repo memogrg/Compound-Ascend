@@ -38,3 +38,5 @@ supabase/.branches
 
 # Material de revisión (spec Fase 1 Transacciones) — no se versiona
 /Reestructuracion_Transacciones/
+/test-results
+/playwright-report
