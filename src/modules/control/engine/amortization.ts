@@ -67,7 +67,9 @@ function round2(n: number): number {
 }
 
 function addMonths(start: Date, months: number): string {
-  const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, start.getUTCDate()));
+  const d = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, start.getUTCDate()),
+  );
   return d.toISOString().slice(0, 10);
 }
 
@@ -133,7 +135,9 @@ function sumInterest(rows: ScheduleRow[]): number {
 
 /** ¿La deuda se liquida dentro del tope? */
 export function paysOff(rows: ScheduleRow[]): boolean {
-  return rows.length > 0 && rows.length < MAX_MONTHS && (rows[rows.length - 1]!.balance ?? 0) <= 0.01;
+  return (
+    rows.length > 0 && rows.length < MAX_MONTHS && (rows[rows.length - 1]!.balance ?? 0) <= 0.01
+  );
 }
 
 export interface ExtraComparison {

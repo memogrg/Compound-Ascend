@@ -23,10 +23,21 @@ export function RulesButton({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="btn btn-ghost" onClick={() => setOpen(true)} style={{ border: "1px solid var(--line)" }}>
+      <button
+        className="btn btn-ghost"
+        onClick={() => setOpen(true)}
+        style={{ border: "1px solid var(--line)" }}
+      >
         <Icon name="filter" width={2} /> Ver reglas
       </button>
-      {open ? <RulesPanel rules={rules} categories={categories} accounts={accounts} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <RulesPanel
+          rules={rules}
+          categories={categories}
+          accounts={accounts}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
@@ -50,13 +61,22 @@ function RulesPanel({
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [priority, setPriority] = useState(0);
-  const catName = (id: string | null) => (id ? categories.find((c) => c.id === id)?.name ?? "—" : "—");
-  const accName = (id: string | null) => (id ? accounts.find((a) => a.id === id)?.name ?? "—" : "—");
+  const catName = (id: string | null) =>
+    id ? (categories.find((c) => c.id === id)?.name ?? "—") : "—";
+  const accName = (id: string | null) =>
+    id ? (accounts.find((a) => a.id === id)?.name ?? "—") : "—";
 
   const add = () =>
     startTransition(async () => {
       if (!pattern.trim()) return toast("Escribe un texto a detectar", "error");
-      const res = await addRuleAction({ merchantPattern: pattern.trim(), type, suggestedCategoryId: categoryId || null, suggestedAccountId: accountId || null, active: true, priority });
+      const res = await addRuleAction({
+        merchantPattern: pattern.trim(),
+        type,
+        suggestedCategoryId: categoryId || null,
+        suggestedAccountId: accountId || null,
+        active: true,
+        priority,
+      });
       if (res.ok) {
         toast("Regla creada");
         setPattern("");
@@ -74,26 +94,46 @@ function RulesPanel({
     });
 
   return (
-    <Modal title="Reglas de categorización" sub="Cuando un comercio coincide, se sugiere categoría y cuenta al registrar." onClose={onClose}>
+    <Modal
+      title="Reglas de categorización"
+      sub="Cuando un comercio coincide, se sugiere categoría y cuenta al registrar."
+      onClose={onClose}
+    >
       <div className="modal-body">
         <div className="fld">
           <label className="fld-label">Si el comercio contiene…</label>
-          <input className="inp" value={pattern} onChange={(e) => setPattern(e.target.value)} placeholder="Uber, Automercado, Netflix…" />
+          <input
+            className="inp"
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value)}
+            placeholder="Uber, Automercado, Netflix…"
+          />
         </div>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Aplica a</label>
-            <select className="sel" value={type} onChange={(e) => setType(e.target.value as "income" | "expense")}>
+            <select
+              className="sel"
+              value={type}
+              onChange={(e) => setType(e.target.value as "income" | "expense")}
+            >
               <option value="expense">Gastos</option>
               <option value="income">Ingresos</option>
             </select>
           </div>
           <div className="fld">
             <label className="fld-label">Categoría</label>
-            <select className="sel" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} disabled={type === "income"}>
+            <select
+              className="sel"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              disabled={type === "income"}
+            >
               <option value="">Sin categoría</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
@@ -101,38 +141,70 @@ function RulesPanel({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Cuenta</label>
-            <select className="sel" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            <select
+              className="sel"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
               <option value="">Sin cuenta</option>
               {accounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
             </select>
           </div>
           <div className="fld">
             <label className="fld-label">Prioridad (mayor gana)</label>
-            <input className="inp" type="number" min="0" max="1000" value={priority} onChange={(e) => setPriority(Number(e.target.value) || 0)} />
+            <input
+              className="inp"
+              type="number"
+              min="0"
+              max="1000"
+              value={priority}
+              onChange={(e) => setPriority(Number(e.target.value) || 0)}
+            />
           </div>
         </div>
-        <button type="button" className="btn btn-primary" onClick={add} disabled={pending} style={{ alignSelf: "flex-start" }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={add}
+          disabled={pending}
+          style={{ alignSelf: "flex-start" }}
+        >
           <Icon name="plus" width={2} /> Agregar regla
         </button>
 
         <div style={{ marginTop: 8 }}>
-          <div className="label" style={{ marginBottom: 8 }}>Tus reglas ({rules.length})</div>
+          <div className="label" style={{ marginBottom: 8 }}>
+            Tus reglas ({rules.length})
+          </div>
           {rules.length === 0 ? (
-            <p className="muted" style={{ fontSize: 12.5 }}>Aún no tienes reglas. Crea una arriba.</p>
+            <p className="muted" style={{ fontSize: 12.5 }}>
+              Aún no tienes reglas. Crea una arriba.
+            </p>
           ) : (
             rules.map((r) => (
               <div key={r.id} className="list-row" style={{ gridTemplateColumns: "1fr auto" }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 500 }}>“{r.merchantPattern}”</div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                    {r.type === "expense" ? "Gasto" : "Ingreso"} → {catName(r.suggestedCategoryId)} · {accName(r.suggestedAccountId)}
+                    {r.type === "expense" ? "Gasto" : "Ingreso"} → {catName(r.suggestedCategoryId)}{" "}
+                    · {accName(r.suggestedAccountId)}
                     {r.priority > 0 ? ` · prio ${r.priority}` : ""}
-                    {r.linkedKind ? ` · auto-vincula (${r.linkedKind === "debt" ? "deuda" : r.linkedKind === "goal" ? "meta" : r.linkedKind})` : ""}
+                    {r.linkedKind
+                      ? ` · auto-vincula (${r.linkedKind === "debt" ? "deuda" : r.linkedKind === "goal" ? "meta" : r.linkedKind})`
+                      : ""}
                   </div>
                 </div>
-                <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Eliminar" onClick={() => remove(r.id)} disabled={pending}>
+                <button
+                  className="icon-btn"
+                  style={{ width: 30, height: 30 }}
+                  aria-label="Eliminar"
+                  onClick={() => remove(r.id)}
+                  disabled={pending}
+                >
                   <Icon name="x" width={2} />
                 </button>
               </div>
@@ -141,7 +213,9 @@ function RulesPanel({
         </div>
       </div>
       <div className="modal-foot">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cerrar
+        </button>
       </div>
     </Modal>
   );

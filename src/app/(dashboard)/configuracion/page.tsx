@@ -15,7 +15,8 @@ import { PLAN_LABEL, isPremium } from "@/lib/plan";
  */
 export default async function Page() {
   const acc = await getAccountInfo();
-  const usagePct = acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
+  const usagePct =
+    acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
   const whatsappLink = isSupabaseConfigured() ? await getMyLink() : null;
   const whatsappConfigured = isWhatsAppConfigured();
 
@@ -47,7 +48,10 @@ export default async function Page() {
               className="chip"
               style={
                 isPremium(acc.plan)
-                  ? { background: "color-mix(in srgb,var(--gold) 18%, transparent)", color: "var(--gold)" }
+                  ? {
+                      background: "color-mix(in srgb,var(--gold) 18%, transparent)",
+                      color: "var(--gold)",
+                    }
                   : undefined
               }
             >
@@ -58,13 +62,17 @@ export default async function Page() {
             <div className="row" style={{ justifyContent: "space-between", fontSize: 12.5 }}>
               <span className="muted">Uso de IA este mes</span>
               <span className="tnum">
-                {acc.tokensUsed.toLocaleString("es-CR")} / {acc.tokenLimit.toLocaleString("es-CR")} tokens
+                {acc.tokensUsed.toLocaleString("es-CR")} / {acc.tokenLimit.toLocaleString("es-CR")}{" "}
+                tokens
               </span>
             </div>
             <div className="bar-track" style={{ marginTop: 8 }}>
               <div
                 className="bar-fill"
-                style={{ width: `${usagePct}%`, background: usagePct > 85 ? "var(--neg)" : "var(--pos)" }}
+                style={{
+                  width: `${usagePct}%`,
+                  background: usagePct > 85 ? "var(--neg)" : "var(--pos)",
+                }}
               />
             </div>
             <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>

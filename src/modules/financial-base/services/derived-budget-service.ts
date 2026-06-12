@@ -42,9 +42,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  const twelveMonthsAgo = new Date(period.year, period.month - 13, 1)
-    .toISOString()
-    .slice(0, 10);
+  const twelveMonthsAgo = new Date(period.year, period.month - 13, 1).toISOString().slice(0, 10);
 
   const [debts, goals, policies, recurring, divs, catDeudas, catSeguros] = await Promise.all([
     supabase

@@ -228,7 +228,8 @@ function friendlyAcceptError(message: string): string {
   if (m.includes("otro correo")) {
     return "Esta invitación es para otro correo. Inicia sesión con el correo invitado.";
   }
-  if (m.includes("expir")) return "La invitación expiró. Pide una nueva al administrador del hogar.";
+  if (m.includes("expir"))
+    return "La invitación expiró. Pide una nueva al administrador del hogar.";
   if (m.includes("disponible") || m.includes("encontrada")) {
     return "La invitación ya no está disponible.";
   }
@@ -263,8 +264,9 @@ function inviteHtml(inviter: string, acceptUrl: string): string {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
   );
 }
 

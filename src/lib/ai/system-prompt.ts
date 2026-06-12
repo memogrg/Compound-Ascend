@@ -34,17 +34,24 @@ export type FinancialContext = {
 export function buildSystemPrompt(ctx: FinancialContext): string {
   const facts: string[] = [`Moneda principal: ${ctx.currency}.`];
   if (ctx.name) facts.push(`El usuario se llama ${ctx.name}.`);
-  if (ctx.incomeMonthly !== undefined) facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}.`);
-  if (ctx.expenseMonthly !== undefined) facts.push(`Gasto mensual: ${ctx.expenseMonthly} ${ctx.currency}.`);
-  if (ctx.freeCashflow !== undefined) facts.push(`Flujo libre: ${ctx.freeCashflow} ${ctx.currency}.`);
+  if (ctx.incomeMonthly !== undefined)
+    facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}.`);
+  if (ctx.expenseMonthly !== undefined)
+    facts.push(`Gasto mensual: ${ctx.expenseMonthly} ${ctx.currency}.`);
+  if (ctx.freeCashflow !== undefined)
+    facts.push(`Flujo libre: ${ctx.freeCashflow} ${ctx.currency}.`);
   if (ctx.netWorth !== undefined) facts.push(`Patrimonio neto: ${ctx.netWorth} ${ctx.currency}.`);
   if (ctx.topConcern) facts.push(`Principal preocupación: ${ctx.topConcern}.`);
-  if (ctx.portfolioValue !== undefined) facts.push(`Valor de mercado del portafolio: ${ctx.portfolioValue} ${ctx.currency}.`);
-  if (ctx.portfolioReturnPct !== undefined) facts.push(`Rendimiento del portafolio: ${(ctx.portfolioReturnPct * 100).toFixed(1)}%.`);
+  if (ctx.portfolioValue !== undefined)
+    facts.push(`Valor de mercado del portafolio: ${ctx.portfolioValue} ${ctx.currency}.`);
+  if (ctx.portfolioReturnPct !== undefined)
+    facts.push(`Rendimiento del portafolio: ${(ctx.portfolioReturnPct * 100).toFixed(1)}%.`);
   if (ctx.topAssetClass) facts.push(`Clase de activo principal: ${ctx.topAssetClass}.`);
   if (ctx.lifeStage) facts.push(`Etapa de vida: ${ctx.lifeStage}.`);
   if (ctx.debtCount !== undefined && ctx.debtTotal !== undefined) {
-    facts.push(`Deudas activas: ${ctx.debtCount} por un total de ${ctx.debtTotal} ${ctx.currency}.`);
+    facts.push(
+      `Deudas activas: ${ctx.debtCount} por un total de ${ctx.debtTotal} ${ctx.currency}.`,
+    );
   }
   if (ctx.topDebtName) {
     facts.push(
@@ -78,7 +85,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "",
     "Contexto financiero autorizado del usuario:",
     ...facts.map((f) => `- ${f}`),
-    ...(linkFacts.length ? ["", "Entidades del usuario (para vincular transacciones):", ...linkFacts.map((f) => `- ${f}`)] : []),
+    ...(linkFacts.length
+      ? [
+          "",
+          "Entidades del usuario (para vincular transacciones):",
+          ...linkFacts.map((f) => `- ${f}`),
+        ]
+      : []),
     "",
     "Si el usuario claramente quiere registrar una transacción, crear una meta, o aplicar una estrategia, PROPÓN una acción añadiendo al final un bloque:",
     "```action",

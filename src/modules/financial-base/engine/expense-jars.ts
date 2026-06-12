@@ -54,7 +54,12 @@ export type JarEntities = {
 /** Config de los grupos vinculados (texto vacío + CTA deep-link al módulo). */
 const LINKED_GROUPS: Record<
   string,
-  { linkedKind: "holding" | "debt" | "policy" | "goal"; emptyText: string; cta: { label: string; href: string }; fixedFunds?: { name: string; sub: string }[] }
+  {
+    linkedKind: "holding" | "debt" | "policy" | "goal";
+    emptyText: string;
+    cta: { label: string; href: string };
+    fixedFunds?: { name: string; sub: string }[];
+  }
 > = {
   g_libertad: {
     linkedKind: "holding",
@@ -129,7 +134,12 @@ export function buildExpenseJars(args: {
     const groupSpent = realByKey[group.id]?.value ?? 0;
     const groupBudget = budgetByKey[group.id]?.value ?? 0;
     if (groupSpent > 0 || groupBudget > 0) {
-      envelopes.push({ id: group.id, name: `${group.name} (general)`, spent: groupSpent, budget: groupBudget });
+      envelopes.push({
+        id: group.id,
+        name: `${group.name} (general)`,
+        spent: groupSpent,
+        budget: groupBudget,
+      });
     }
     for (const c of group.children) {
       if (!(c.isFavorite || !c.isSystem)) continue;

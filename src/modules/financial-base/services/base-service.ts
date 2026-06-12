@@ -230,7 +230,9 @@ export async function getBaseSummary(): Promise<BaseSummary> {
 async function computeV2Totals(
   displayCurrency: string,
   rates: Record<string, number>,
-): Promise<Pick<BaseSummary, "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances">> {
+): Promise<
+  Pick<BaseSummary, "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances">
+> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const now = new Date();

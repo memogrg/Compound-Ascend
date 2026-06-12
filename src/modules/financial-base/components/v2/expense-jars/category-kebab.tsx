@@ -84,7 +84,15 @@ export function CategoryKebab({
             boxShadow: "0 12px 32px rgba(0,0,0,.18)",
           }}
         >
-          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "var(--muted)", marginBottom: 8 }}>
+          <div
+            style={{
+              fontSize: 10.5,
+              fontWeight: 700,
+              letterSpacing: ".06em",
+              color: "var(--muted)",
+              marginBottom: 8,
+            }}
+          >
             CAMBIAR COLOR
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
@@ -118,7 +126,13 @@ export function CategoryKebab({
               type="button"
               role="menuitem"
               className="btn btn-ghost"
-              style={{ justifyContent: "flex-start", width: "100%", padding: "7px 8px", fontSize: 12.5, marginBottom: 4 }}
+              style={{
+                justifyContent: "flex-start",
+                width: "100%",
+                padding: "7px 8px",
+                fontSize: 12.5,
+                marginBottom: 4,
+              }}
               onClick={() => {
                 onReset();
                 setOpen(false);
@@ -157,11 +171,14 @@ export function CategoryKebab({
         <Modal title="Eliminar categoría" sub={name} onClose={() => setConfirm(false)}>
           <div className="modal-body">
             <p style={{ fontSize: 14 }}>
-              ¿Seguro que quieres eliminar <strong>{name}</strong>? Sus sobres y movimientos quedarán sin categoría.
+              ¿Seguro que quieres eliminar <strong>{name}</strong>? Sus sobres y movimientos
+              quedarán sin categoría.
             </p>
           </div>
           <div className="modal-foot">
-            <button type="button" className="btn btn-ghost" onClick={() => setConfirm(false)}>Cancelar</button>
+            <button type="button" className="btn btn-ghost" onClick={() => setConfirm(false)}>
+              Cancelar
+            </button>
             <button
               type="button"
               className="btn btn-primary"

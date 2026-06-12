@@ -29,13 +29,7 @@ const NATURES: ExpenseNature[] = [
   "miscelaneo",
 ];
 
-const NON_MONTHLY = new Set([
-  "anual",
-  "semestral",
-  "trimestral",
-  "cuatrimestral",
-  "bimensual",
-]);
+const NON_MONTHLY = new Set(["anual", "semestral", "trimestral", "cuatrimestral", "bimensual"]);
 
 function ratio(part: number, whole: number): number {
   if (whole <= 0) return 0;

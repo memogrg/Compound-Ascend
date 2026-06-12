@@ -54,7 +54,12 @@ export function NameStep({ defaultName }: { defaultName: string }) {
           </span>
         ) : null}
       </div>
-      <button type="submit" className="btn btn-primary" disabled={pending} style={{ width: "100%" }}>
+      <button
+        type="submit"
+        className="btn btn-primary"
+        disabled={pending}
+        style={{ width: "100%" }}
+      >
         {pending ? "Guardando…" : "Entrar al panel"}
       </button>
     </form>

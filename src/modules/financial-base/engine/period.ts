@@ -6,7 +6,18 @@
 import type { Period } from "@/modules/financial-base/types";
 
 const MONTHS_SHORT = [
-  "ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic",
+  "ene",
+  "feb",
+  "mar",
+  "abr",
+  "may",
+  "jun",
+  "jul",
+  "ago",
+  "sep",
+  "oct",
+  "nov",
+  "dic",
 ];
 
 function pad(n: number): string {

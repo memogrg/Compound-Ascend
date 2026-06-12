@@ -31,8 +31,16 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
     <div className="grid">
       {/* KPIs */}
       <section className="cols-4">
-        <Kpi label="Ingresos mensualizados" value={formatMoney(ind.incomeMonthly, currency)} accent="var(--pos)" />
-        <Kpi label="Gastos mensualizados" value={formatMoney(ind.expenseMonthly, currency)} accent="var(--c-expense)" />
+        <Kpi
+          label="Ingresos mensualizados"
+          value={formatMoney(ind.incomeMonthly, currency)}
+          accent="var(--pos)"
+        />
+        <Kpi
+          label="Gastos mensualizados"
+          value={formatMoney(ind.expenseMonthly, currency)}
+          accent="var(--c-expense)"
+        />
         <Kpi
           label="Flujo libre mensual"
           value={formatMoney(ind.freeCashflow, currency)}
@@ -42,23 +50,53 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
       </section>
 
       <section className="cols-4">
-        <Kpi label="Tasa de ahorro" value={formatPercent(ind.savingsRate)} accent="var(--c-savings)" small />
-        <Kpi label="Tasa de inversión" value={formatPercent(ind.investmentRate)} accent="var(--c-invest)" small />
-        <Kpi label="Peso de deuda" value={formatPercent(ind.debtWeight)} accent="var(--c-debt)" small />
-        <Kpi label="Gastos esenciales" value={formatPercent(ind.essentialsWeight)} accent="var(--c-expense)" small />
+        <Kpi
+          label="Tasa de ahorro"
+          value={formatPercent(ind.savingsRate)}
+          accent="var(--c-savings)"
+          small
+        />
+        <Kpi
+          label="Tasa de inversión"
+          value={formatPercent(ind.investmentRate)}
+          accent="var(--c-invest)"
+          small
+        />
+        <Kpi
+          label="Peso de deuda"
+          value={formatPercent(ind.debtWeight)}
+          accent="var(--c-debt)"
+          small
+        />
+        <Kpi
+          label="Gastos esenciales"
+          value={formatPercent(ind.essentialsWeight)}
+          accent="var(--c-expense)"
+          small
+        />
       </section>
 
       {/* Donut + insight */}
       <section className="split-2-3">
         <div className="card card-pad">
           <div className="card-title">Composición de gastos</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
+              marginTop: 14,
+              flexWrap: "wrap",
+            }}
+          >
             <DonutChart
               data={donutData}
               centerLabel={formatCompact(ind.expenseMonthly, currency)}
               centerSub="al mes"
             />
-            <div style={{ flex: 1, minWidth: 160, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              style={{ flex: 1, minWidth: 160, display: "flex", flexDirection: "column", gap: 8 }}
+            >
               {donutData.length === 0 ? (
                 <span className="muted" style={{ fontSize: 13 }}>
                   Agrega gastos para ver su composición.
@@ -67,7 +105,13 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
                 donutData.map((d) => (
                   <div
                     key={d.name}
-                    style={{ display: "grid", gridTemplateColumns: "10px 1fr auto", gap: 9, alignItems: "center", fontSize: 12.5 }}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "10px 1fr auto",
+                      gap: 9,
+                      alignItems: "center",
+                      fontSize: 12.5,
+                    }}
                   >
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
                     <span style={{ color: "var(--ink-2)" }}>{d.name}</span>
@@ -79,10 +123,14 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
           </div>
         </div>
 
-        <div className="card card-pad" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div
+          className="card card-pad"
+          style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}
+        >
           <div className="eyebrow">Lectura</div>
           <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 8 }}>
-            Tus ingresos mensualizados son <strong>{formatMoney(ind.incomeMonthly, currency)}</strong> y tus gastos{" "}
+            Tus ingresos mensualizados son{" "}
+            <strong>{formatMoney(ind.incomeMonthly, currency)}</strong> y tus gastos{" "}
             <strong>{formatMoney(ind.expenseMonthly, currency)}</strong>, dejando un flujo libre de{" "}
             <strong style={{ color: ind.freeCashflow >= 0 ? "var(--pos)" : "var(--neg)" }}>
               {formatMoney(ind.freeCashflow, currency)}
@@ -119,7 +167,14 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
           {expenses.length === 0 ? (
             <Empty
               text="Aún no agregas gastos."
-              action={<AddItemButton kind="expense" currency={currency} variant="btn-secondary" label="Agregar gasto" />}
+              action={
+                <AddItemButton
+                  kind="expense"
+                  currency={currency}
+                  variant="btn-secondary"
+                  label="Agregar gasto"
+                />
+              }
             />
           ) : (
             expenses.map((e) => (
@@ -207,12 +262,26 @@ function Row({
 }) {
   return (
     <div className="list-row">
-      <div className="li-icon" style={{ width: 34, height: 34, borderRadius: 9, background: "var(--chip)", display: "grid", placeItems: "center", color: "var(--ink-2)" }}>
+      <div
+        className="li-icon"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 9,
+          background: "var(--chip)",
+          display: "grid",
+          placeItems: "center",
+          color: "var(--ink-2)",
+        }}
+      >
         <span style={{ fontSize: 12, fontWeight: 600 }}>{item.name.charAt(0).toUpperCase()}</span>
       </div>
       <div>
         <div style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</div>
-        <div className="muted" style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}>
+        <div
+          className="muted"
+          style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}
+        >
           {sub}
         </div>
       </div>
@@ -229,7 +298,16 @@ function Row({
 
 function Empty({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+    <div
+      className="muted"
+      style={{
+        padding: "20px 24px",
+        fontSize: 13,
+        display: "grid",
+        gap: 12,
+        justifyItems: "start",
+      }}
+    >
       <span>{text}</span>
       {action}
     </div>

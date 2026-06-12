@@ -7,7 +7,10 @@ import { getActiveHouseholdId } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
-import { getCategoryNameMap, listCategoryTree } from "@/modules/financial-base/services/categories-service";
+import {
+  getCategoryNameMap,
+  listCategoryTree,
+} from "@/modules/financial-base/services/categories-service";
 import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
 import { previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";

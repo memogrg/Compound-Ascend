@@ -155,7 +155,9 @@ function CaptureForm({
   const expenseItem = kind === "expense" ? (item as ExpenseItem | undefined) : undefined;
 
   const [cat, setCat] = useState<string>(incomeItem?.category ?? "");
-  const [nature, setNature] = useState<string>(expenseItem?.nature ?? (kind === "income" ? "" : "esencial"));
+  const [nature, setNature] = useState<string>(
+    expenseItem?.nature ?? (kind === "income" ? "" : "esencial"),
+  );
 
   const onCategoryChange = (v: string) => {
     setCat(v);
@@ -181,11 +183,20 @@ function CaptureForm({
 
     let res;
     if (kind === "income") {
-      const payload = { ...common, incomeType: String(fd.get("incomeType") ?? "activo"), category: cat || undefined, includeInBudget: true };
-      res = incomeItem ? await editIncomeAction(incomeItem.id, payload) : await addIncomeAction(payload);
+      const payload = {
+        ...common,
+        incomeType: String(fd.get("incomeType") ?? "activo"),
+        category: cat || undefined,
+        includeInBudget: true,
+      };
+      res = incomeItem
+        ? await editIncomeAction(incomeItem.id, payload)
+        : await addIncomeAction(payload);
     } else {
       const payload = { ...common, nature: nature || "esencial", categoryKey: cat || undefined };
-      res = expenseItem ? await editExpenseAction(expenseItem.id, payload) : await addExpenseAction(payload);
+      res = expenseItem
+        ? await editExpenseAction(expenseItem.id, payload)
+        : await addExpenseAction(payload);
     }
 
     setPending(false);
@@ -290,7 +301,11 @@ function CaptureForm({
         {kind === "income" ? (
           <div className="fld">
             <label className="fld-label">Tipo de ingreso</label>
-            <select className="sel" name="incomeType" defaultValue={incomeItem?.incomeType ?? "activo"}>
+            <select
+              className="sel"
+              name="incomeType"
+              defaultValue={incomeItem?.incomeType ?? "activo"}
+            >
               {INCOME_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -312,7 +327,8 @@ function CaptureForm({
         )}
 
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-          <input type="checkbox" name="isFixed" defaultChecked={item ? item.isFixed : true} /> Es un monto fijo
+          <input type="checkbox" name="isFixed" defaultChecked={item ? item.isFixed : true} /> Es un
+          monto fijo
         </label>
       </div>
 

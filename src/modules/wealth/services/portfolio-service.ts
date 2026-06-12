@@ -19,7 +19,12 @@ import {
   computeCryptoAnalytics,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { getWealthSummary } from "@/modules/wealth/services/wealth-service";
-import type { Holding, PortfolioAnalytics, DividendAnalytics, CryptoAnalytics } from "@/modules/wealth/types";
+import type {
+  Holding,
+  PortfolioAnalytics,
+  DividendAnalytics,
+  CryptoAnalytics,
+} from "@/modules/wealth/types";
 
 const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
   etf: "etf",

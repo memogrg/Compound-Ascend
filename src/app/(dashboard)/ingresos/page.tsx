@@ -21,7 +21,11 @@ export default async function Page({
 
   return (
     <div className="grid">
-      <BaseHeader title="Ingresos" sub="Planificado vs real y registro del mes." period={view.period} />
+      <BaseHeader
+        title="Ingresos"
+        sub="Planificado vs real y registro del mes."
+        period={view.period}
+      />
       <IncomeExpenseSection view={view} kind="income" />
     </div>
   );

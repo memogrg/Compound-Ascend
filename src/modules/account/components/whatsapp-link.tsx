@@ -14,7 +14,11 @@ type LinkState = { status: "pending" | "active" | "revoked"; phone: string | nul
 export function WhatsAppLink({ initial, configured }: { initial: LinkState; configured: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [otp, setOtp] = useState<{ code: string; botNumber: string | null; expiresInMin: number } | null>(null);
+  const [otp, setOtp] = useState<{
+    code: string;
+    botNumber: string | null;
+    expiresInMin: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isActive = initial?.status === "active";
@@ -67,9 +71,11 @@ export function WhatsAppLink({ initial, configured }: { initial: LinkState; conf
         </div>
       ) : otp ? (
         <div className="auth-msg" style={{ marginTop: 14, lineHeight: 1.6 }}>
-          Envía este código por WhatsApp al número{" "}
-          <strong>{otp.botNumber ?? "del bot"}</strong>:
-          <div className="tnum" style={{ fontSize: 30, fontWeight: 700, letterSpacing: 4, margin: "10px 0" }}>
+          Envía este código por WhatsApp al número <strong>{otp.botNumber ?? "del bot"}</strong>:
+          <div
+            className="tnum"
+            style={{ fontSize: 30, fontWeight: 700, letterSpacing: 4, margin: "10px 0" }}
+          >
             {otp.code}
           </div>
           <span className="muted" style={{ fontSize: 12.5 }}>

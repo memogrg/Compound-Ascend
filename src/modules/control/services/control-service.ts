@@ -43,7 +43,7 @@ function rowToGoal(r: SavingsGoalRow): SavingsGoal {
     monthlyContribution: Number(r.monthly_contribution),
     currency: r.currency,
     targetDate: r.target_date,
-    priority: (r.priority ?? undefined) as GoalPriority | undefined ?? null,
+    priority: ((r.priority ?? undefined) as GoalPriority | undefined) ?? null,
     status: (r.status ?? "revisar") as GoalStatus,
   };
 }
@@ -61,7 +61,7 @@ function rowToDebt(r: DebtRow): Debt {
     isCurrent: r.is_current ?? true,
     delinquency: (r.delinquency ?? undefined) as Debt["delinquency"],
     stress: r.stress,
-    classification: (r.classification ?? undefined) as DebtClassification | undefined ?? null,
+    classification: ((r.classification ?? undefined) as DebtClassification | undefined) ?? null,
     originalAmount: r.original_amount === null ? null : Number(r.original_amount),
     rateType: (r.rate_type ?? null) as DebtRateType | null,
     rateIndex: (r.rate_index ?? null) as DebtRateIndex | null,
@@ -245,9 +245,9 @@ export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
   if (error) throw new Error(error.message);
   // Cast: los tipos de DB hechos a mano no describen relaciones; el FK
   // debt_payments_transaction_id_fkey existe (migración 0021).
-  return ((data ?? []) as unknown as (DebtPaymentRow & { txn?: { source: string | null } | null })[]).map(
-    rowToDebtPayment,
-  );
+  return (
+    (data ?? []) as unknown as (DebtPaymentRow & { txn?: { source: string | null } | null })[]
+  ).map(rowToDebtPayment);
 }
 
 /** Fechas de pago reportadas en el mes calendario actual, agrupadas por deuda. */
@@ -326,7 +326,10 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     );
     const { error: upErr } = await supabase
       .from("debts")
-      .update({ current_payment: decision.monthlyPayment, balance: Math.max(0, debt.balance - input.extraAmount) })
+      .update({
+        current_payment: decision.monthlyPayment,
+        balance: Math.max(0, debt.balance - input.extraAmount),
+      })
       .eq("id", input.debtId)
       .eq("user_id", user.id);
     if (upErr) throw new Error(upErr.message);
@@ -459,9 +462,7 @@ export async function getControlSummary(): Promise<ControlSummary> {
     getIndexRates(),
   ]);
 
-  const hasEmergencyFund = goals.some(
-    (g) => /emergencia|paz/i.test(g.name) && g.currentAmount > 0,
-  );
+  const hasEmergencyFund = goals.some((g) => /emergencia|paz/i.test(g.name) && g.currentAmount > 0);
   const stress = debts.length
     ? Math.round(debts.reduce((s, d) => s + (d.stress ?? 5), 0) / debts.length)
     : undefined;
@@ -489,7 +490,14 @@ export async function getControlSummary(): Promise<ControlSummary> {
     currency,
   );
 
-  return { diagnosis, goals, debts, freeCashflow: base.indicators.freeCashflow, currency, indexRates };
+  return {
+    diagnosis,
+    goals,
+    debts,
+    freeCashflow: base.indicators.freeCashflow,
+    currency,
+    indexRates,
+  };
 }
 
 /** Resumen de control de demostración (no toca la BD). */

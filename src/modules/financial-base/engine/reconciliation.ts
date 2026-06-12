@@ -94,7 +94,13 @@ export function buildEntityAlerts(
     const planned = item.amount;
     const ratio = planned > 0 ? real / planned : 0;
     const status: EntityAlertStatus =
-      real <= 0 ? "sin_movimiento" : ratio < 0.95 ? "parcial" : ratio <= 1.05 ? "cumplido" : "excedido";
+      real <= 0
+        ? "sin_movimiento"
+        : ratio < 0.95
+          ? "parcial"
+          : ratio <= 1.05
+            ? "cumplido"
+            : "excedido";
     alerts.push({
       sourceKind: sk,
       sourceId: item.sourceId,

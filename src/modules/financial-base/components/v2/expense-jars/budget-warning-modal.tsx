@@ -14,8 +14,18 @@ import { setEnvelopeBudgetAction } from "@/modules/financial-base/api/v2-actions
 import type { Period } from "@/modules/financial-base/types";
 
 const MONTHS = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ];
 
 const CHECKS = [
@@ -23,7 +33,6 @@ const CHECKS = [
   "Entiendo que modificar el presupuesto afectará la precisión de mis métricas y análisis financieros.",
   "Entiendo que debería utilizar esta acción únicamente cuando exista un cambio real en mis circunstancias financieras.",
 ];
-
 
 export function BudgetWarningModal({
   envelope,
@@ -73,16 +82,22 @@ export function BudgetWarningModal({
   }
 
   return (
-    <Modal title="Modificar presupuesto del período actual" sub={`${periodLabel} · período en curso`} onClose={onClose}>
+    <Modal
+      title="Modificar presupuesto del período actual"
+      sub={`${periodLabel} · período en curso`}
+      onClose={onClose}
+    >
       <div className="modal-body">
         {phase === "warning" ? (
           <>
             <p style={{ fontSize: 14, marginBottom: 8 }}>
-              Tu presupuesto idealmente debería estar definido <strong>antes de iniciar el período</strong>.
+              Tu presupuesto idealmente debería estar definido{" "}
+              <strong>antes de iniciar el período</strong>.
             </p>
             <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              Cuando modificas un presupuesto después de iniciado el mes, los reportes y análisis financieros
-              pueden perder precisión, ya que los resultados dejarán de reflejar la planificación original.
+              Cuando modificas un presupuesto después de iniciado el mes, los reportes y análisis
+              financieros pueden perder precisión, ya que los resultados dejarán de reflejar la
+              planificación original.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {CHECKS.map((text, i) => {
@@ -108,7 +123,11 @@ export function BudgetWarningModal({
                       type="checkbox"
                       checked={on}
                       disabled={!enabled}
-                      onChange={(e) => setChecked((prev) => prev.map((v, j) => (j === i ? e.target.checked : j > i ? false : v)))}
+                      onChange={(e) =>
+                        setChecked((prev) =>
+                          prev.map((v, j) => (j === i ? e.target.checked : j > i ? false : v)),
+                        )
+                      }
                       style={{ marginTop: 1, flex: "none" }}
                     />
                     <span>{text}</span>
@@ -120,9 +139,15 @@ export function BudgetWarningModal({
         ) : phase === "edit" ? (
           <div className="fld">
             <label className="fld-label">Nuevo presupuesto del sobre · {envelope.name}</label>
-            {error ? <div className="auth-msg warn" role="alert" style={{ marginBottom: 8 }}>{error}</div> : null}
+            {error ? (
+              <div className="auth-msg warn" role="alert" style={{ marginBottom: 8 }}>
+                {error}
+              </div>
+            ) : null}
             <div className="inp-money" style={{ fontSize: 22 }}>
-              <span className="pre" style={{ fontSize: 19 }}>{sym}</span>
+              <span className="pre" style={{ fontSize: 19 }}>
+                {sym}
+              </span>
               <input
                 autoFocus
                 type="number"
@@ -138,7 +163,8 @@ export function BudgetWarningModal({
           </div>
         ) : (
           <p style={{ fontSize: 14, padding: "8px 0", lineHeight: 1.5 }}>
-            Excelente. Lo importante no es ser perfecto, sino mantener un presupuesto que refleje tu realidad financiera.
+            Excelente. Lo importante no es ser perfecto, sino mantener un presupuesto que refleje tu
+            realidad financiera.
           </p>
         )}
       </div>
@@ -146,20 +172,39 @@ export function BudgetWarningModal({
       <div className="modal-foot">
         {phase === "warning" ? (
           <>
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="button" className="btn btn-primary" disabled={!allChecked} onClick={() => setPhase("edit")}>
+            <button type="button" className="btn btn-ghost" onClick={onClose}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!allChecked}
+              onClick={() => setPhase("edit")}
+            >
               Continuar y modificar
             </button>
           </>
         ) : phase === "edit" ? (
           <>
-            <button type="button" className="btn btn-ghost" onClick={() => setPhase("warning")}>Atrás</button>
-            <button type="button" className="btn btn-primary" disabled={pending} onClick={() => void save()}>
+            <button type="button" className="btn btn-ghost" onClick={() => setPhase("warning")}>
+              Atrás
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={pending}
+              onClick={() => void save()}
+            >
               {pending ? "Guardando…" : "Guardar presupuesto"}
             </button>
           </>
         ) : (
-          <button type="button" className="btn btn-primary" onClick={onClose} style={{ marginLeft: "auto" }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onClose}
+            style={{ marginLeft: "auto" }}
+          >
             Listo
           </button>
         )}

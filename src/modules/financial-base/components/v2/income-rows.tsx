@@ -114,7 +114,10 @@ function Row({
         <Icon name="income" />
       </div>
       <div style={{ minWidth: 0 }}>
-        <div className="inc-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div
+          className="inc-name"
+          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
           {t.merchantOrSource || t.description || "Ingreso"}
         </div>
         <div className="inc-sub">
@@ -136,16 +139,51 @@ function Row({
         <Icon name="check" width={received ? 3 : 2.4} />
         {received ? "Recibido" : "Confirmar recibido"}
       </button>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end", position: "relative" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          justifyContent: "flex-end",
+          position: "relative",
+        }}
+      >
         <span className="inc-amt">+{formatMoney(t.amount, t.currency || currency)}</span>
-        <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Acciones" onClick={() => setOpen((o) => !o)}>
+        <button
+          className="icon-btn"
+          style={{ width: 30, height: 30 }}
+          aria-label="Acciones"
+          onClick={() => setOpen((o) => !o)}
+        >
           <Icon name="dots" />
         </button>
         {open ? (
           <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
-            <button onClick={() => { setOpen(false); onEdit(); }}>Editar</button>
-            <button onClick={() => { setOpen(false); onDuplicate(); }}>Duplicar</button>
-            <button className="danger" onClick={() => { setOpen(false); onDelete(); }}>Eliminar</button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onDuplicate();
+              }}
+            >
+              Duplicar
+            </button>
+            <button
+              className="danger"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+            >
+              Eliminar
+            </button>
           </div>
         ) : null}
       </div>

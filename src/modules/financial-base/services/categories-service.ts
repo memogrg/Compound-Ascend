@@ -109,9 +109,7 @@ export async function listCategoryTree(
     (c) => c.isActive && (c.categoryType === type || c.categoryType === "both"),
   );
   const byId = new Map(all.map((c) => [c.id, c]));
-  const roots = all
-    .filter((c) => !c.parentId || !byId.has(c.parentId))
-    .sort(sortCats);
+  const roots = all.filter((c) => !c.parentId || !byId.has(c.parentId)).sort(sortCats);
 
   // Descendientes (todos los niveles) de un nodo, aplanados y ordenados.
   // `seen` evita bucles infinitos si existiera un ciclo de parent_id (la BD no
@@ -205,11 +203,7 @@ export async function updateCategory(
   if (input.isFavorite !== undefined) patch.is_favorite = input.isFavorite;
   if (Object.keys(patch).length === 0) return;
   // RLS impide editar las de sistema (user_id distinto); el filtro lo refuerza.
-  await supabase
-    .from("expense_categories")
-    .update(patch)
-    .eq("id", id)
-    .eq("user_id", user.id);
+  await supabase.from("expense_categories").update(patch).eq("id", id).eq("user_id", user.id);
 }
 
 /**
@@ -218,10 +212,7 @@ export async function updateCategory(
  * destino, las transacciones quedan sin categoría (category_id null por la FK
  * ON DELETE SET NULL) pero NUNCA se borran.
  */
-export async function deleteCategory(
-  id: string,
-  reassignToId?: string | null,
-): Promise<void> {
+export async function deleteCategory(id: string, reassignToId?: string | null): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   if (reassignToId) {
@@ -249,11 +240,7 @@ export async function mergeCategory(fromId: string, intoId: string): Promise<voi
 }
 
 /** Re-apunta transactions, expense_items, budget_items y categorías hijas. */
-async function reassignReferences(
-  fromId: string,
-  intoId: string,
-  userId: string,
-): Promise<void> {
+async function reassignReferences(fromId: string, intoId: string, userId: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   await Promise.all([
     supabase

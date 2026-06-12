@@ -16,7 +16,10 @@ export function FinancialInsightCard({ reading }: { reading: FinancialReading })
         <div className="card-title">{reading.title}</div>
         <span
           className="chip"
-          style={{ background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))", color: "var(--ink-2)" }}
+          style={{
+            background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
+            color: "var(--ink-2)",
+          }}
         >
           <Icon name="spark" filled width={2} /> IA
         </span>
@@ -78,7 +81,16 @@ function Block({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {items.map((t, i) => (
-          <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 13, lineHeight: 1.5 }}>
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              gap: 9,
+              alignItems: "flex-start",
+              fontSize: 13,
+              lineHeight: 1.5,
+            }}
+          >
             <span style={{ color: tone, flex: "none", marginTop: 1 }}>
               <Icon name={icon} width={2} />
             </span>

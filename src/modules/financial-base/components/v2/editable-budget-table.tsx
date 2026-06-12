@@ -57,9 +57,15 @@ export function EditableBudgetTable({
       <div className="card-head">
         <div>
           <div className="card-title">{title}</div>
-          <div className="card-sub">{items.length} ítem(s) · {period.label}</div>
+          <div className="card-sub">
+            {items.length} ítem(s) · {period.label}
+          </div>
         </div>
-        <button className="btn btn-secondary" onClick={() => setAdding(true)} style={{ padding: "7px 12px" }}>
+        <button
+          className="btn btn-secondary"
+          onClick={() => setAdding(true)}
+          style={{ padding: "7px 12px" }}
+        >
           <Icon name="plus" width={2} /> Agregar
         </button>
       </div>
@@ -75,9 +81,14 @@ export function EditableBudgetTable({
             <div key={it.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 500 }}>{it.name}</div>
-                <div className="muted" style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}>
+                <div
+                  className="muted"
+                  style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}
+                >
                   {it.frequency}
-                  {it.categoryId && categoryNames[it.categoryId] ? ` · ${categoryNames[it.categoryId]}` : ""}
+                  {it.categoryId && categoryNames[it.categoryId]
+                    ? ` · ${categoryNames[it.categoryId]}`
+                    : ""}
                   {derived ? ` · ${DERIVED_LABEL[it.sourceKind ?? ""] ?? "derivado"}` : ""}
                 </div>
               </div>
@@ -88,17 +99,34 @@ export function EditableBudgetTable({
                 <div
                   className="muted tip"
                   data-tip="Se deriva de tu deuda/meta/seguro: edítala desde su módulo"
-                  style={{ display: "flex", alignItems: "center", gap: 6, width: 66, justifyContent: "center" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    width: 66,
+                    justifyContent: "center",
+                  }}
                   aria-label="Línea derivada (solo lectura)"
                 >
                   <Icon name="lock" />
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Editar" onClick={() => setEditing(it)}>
+                  <button
+                    className="icon-btn"
+                    style={{ width: 30, height: 30 }}
+                    aria-label="Editar"
+                    onClick={() => setEditing(it)}
+                  >
                     <Icon name="edit" />
                   </button>
-                  <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Eliminar" onClick={() => remove(it.id)} disabled={pending}>
+                  <button
+                    className="icon-btn"
+                    style={{ width: 30, height: 30 }}
+                    aria-label="Eliminar"
+                    onClick={() => remove(it.id)}
+                    disabled={pending}
+                  >
                     <Icon name="x" width={2} />
                   </button>
                 </div>
@@ -109,10 +137,23 @@ export function EditableBudgetTable({
       )}
 
       {adding ? (
-        <BudgetItemModal type={type} period={period} categories={categories} currency={currency} onClose={() => setAdding(false)} />
+        <BudgetItemModal
+          type={type}
+          period={period}
+          categories={categories}
+          currency={currency}
+          onClose={() => setAdding(false)}
+        />
       ) : null}
       {editing ? (
-        <BudgetItemModal type={type} period={period} categories={categories} currency={currency} item={editing} onClose={() => setEditing(null)} />
+        <BudgetItemModal
+          type={type}
+          period={period}
+          categories={categories}
+          currency={currency}
+          item={editing}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
     </div>
   );

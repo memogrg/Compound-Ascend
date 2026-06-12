@@ -12,7 +12,6 @@ import type { Category } from "@/modules/financial-base/services/categories-serv
 import { FREQUENCIES } from "@/modules/financial-base/constants";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 
-
 export function BudgetItemModal({
   type,
   period,
@@ -71,27 +70,51 @@ export function BudgetItemModal({
 
   const noun = type === "income" ? "ingreso" : "gasto";
   return (
-    <Modal title={`${editing ? "Editar" : "Agregar"} presupuesto de ${noun}`} sub={`Solo afecta el presupuesto de ${period.label}.`} onClose={onClose}>
+    <Modal
+      title={`${editing ? "Editar" : "Agregar"} presupuesto de ${noun}`}
+      sub={`Solo afecta el presupuesto de ${period.label}.`}
+      onClose={onClose}
+    >
       <form onSubmit={onSubmit}>
         <div className="modal-body">
-          {error ? <div className="auth-msg warn" role="alert">{error}</div> : null}
+          {error ? (
+            <div className="auth-msg warn" role="alert">
+              {error}
+            </div>
+          ) : null}
           <div className="fld">
             <label className="fld-label">{type === "income" ? "Fuente" : "Nombre"}</label>
-            <input className="inp" value={name} onChange={(e) => setName(e.target.value)} placeholder={type === "income" ? "Salario…" : "Alquiler…"} required />
+            <input
+              className="inp"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={type === "income" ? "Salario…" : "Alquiler…"}
+              required
+            />
           </div>
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Monto mensual presupuestado</label>
               <div className="inp-money">
                 <span className="pre">{CURRENCY_SYMBOL[cur] ?? ""}</span>
-                <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  required
+                />
               </div>
             </div>
             <div className="fld">
               <label className="fld-label">Moneda</label>
               <select className="sel" value={cur} onChange={(e) => setCur(e.target.value)}>
                 {CURRENCIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -99,19 +122,31 @@ export function BudgetItemModal({
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Frecuencia</label>
-              <select className="sel" value={frequency} onChange={(e) => setFrequency(e.target.value)}>
+              <select
+                className="sel"
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+              >
                 {FREQUENCIES.map((f) => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
                 ))}
               </select>
             </div>
             {type === "expense" ? (
               <div className="fld">
                 <label className="fld-label">Categoría</label>
-                <select className="sel" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+                <select
+                  className="sel"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                >
                   <option value="">Sin categoría</option>
                   {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -121,7 +156,9 @@ export function BudgetItemModal({
           </div>
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
           <button type="submit" className="btn btn-primary" disabled={pending}>
             {pending ? "Guardando…" : "Guardar"}
           </button>

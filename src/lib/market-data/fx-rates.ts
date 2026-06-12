@@ -33,9 +33,10 @@ async function fetchJson(url: string): Promise<unknown | null> {
 
 /** open.er-api.com → { result: "success", rates: { USD:1, CRC:..., ... } } */
 async function erApi(): Promise<Record<string, number> | null> {
-  const data = (await fetchJson("https://open.er-api.com/v6/latest/USD")) as
-    | { result?: string; rates?: Record<string, number> }
-    | null;
+  const data = (await fetchJson("https://open.er-api.com/v6/latest/USD")) as {
+    result?: string;
+    rates?: Record<string, number>;
+  } | null;
   return data?.result === "success" && data.rates ? data.rates : null;
 }
 

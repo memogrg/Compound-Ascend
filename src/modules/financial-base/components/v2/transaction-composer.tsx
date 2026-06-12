@@ -40,7 +40,14 @@ const LINK_LABEL: Record<string, string> = {
   rental: "activo de renta",
 };
 
-const INCOME_SOURCES = ["Salario", "Comisión", "Venta", "Reembolso", "Ingreso pasivo", "Extraordinario"] as const;
+const INCOME_SOURCES = [
+  "Salario",
+  "Comisión",
+  "Venta",
+  "Reembolso",
+  "Ingreso pasivo",
+  "Extraordinario",
+] as const;
 
 function todayISO(): string {
   const d = new Date();
@@ -105,7 +112,9 @@ export function TransactionComposer({
   const [incomeCatId, setIncomeCatId] = useState<string | null>(null);
   // Cuentas: solo las transferencias eligen cuenta en la UI; en el resto el
   // servidor asigna la predeterminada en silencio (Fase 7 · composer simple).
-  const [accountId, setAccountId] = useState(accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "");
+  const [accountId, setAccountId] = useState(
+    accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "",
+  );
   const [toAccountId, setToAccountId] = useState(accounts[1]?.id ?? "");
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
@@ -133,7 +142,7 @@ export function TransactionComposer({
   }, [tree]);
 
   const activeGroup = tree.find((g) => g.id === groupId) ?? tree[0];
-  const selectedCat = categoryId ? flatById.get(categoryId) ?? null : null;
+  const selectedCat = categoryId ? (flatById.get(categoryId) ?? null) : null;
 
   // Categorías de ingreso (opcionales): hojas del árbol de ingresos.
   const incomeCats = useMemo(() => incomeTree.flatMap((g) => g.children), [incomeTree]);
@@ -141,7 +150,10 @@ export function TransactionComposer({
   // Vínculo entidad (Fase 2): la categoría sugiere el tipo; 1 tap elige cuál.
   const [linkedId, setLinkedId] = useState<string | null>(null);
   const [touchedLink, setTouchedLink] = useState(false);
-  const linkKind = (isGasto ? (selectedCat?.linkedKind ?? null) : null) as Exclude<LinkedKind, "none"> | null;
+  const linkKind = (isGasto ? (selectedCat?.linkedKind ?? null) : null) as Exclude<
+    LinkedKind,
+    "none"
+  > | null;
   const linkOptions = useMemo(
     () => (linkKind && linkables ? linkables[linkKind] : []),
     [linkKind, linkables],
@@ -149,8 +161,7 @@ export function TransactionComposer({
   // Solo cuenta si la entidad elegida es del tipo que sugiere la categoría
   // actual (cambiar de categoría invalida el vínculo viejo). Si hay una sola
   // entidad de ese tipo y el usuario no ha tocado el selector, se preselecciona.
-  const validLinkedId =
-    linkedId && linkOptions.some((o) => o.id === linkedId) ? linkedId : null;
+  const validLinkedId = linkedId && linkOptions.some((o) => o.id === linkedId) ? linkedId : null;
   const effectiveLinkedId =
     validLinkedId ?? (!touchedLink && linkOptions.length === 1 ? linkOptions[0]!.id : null);
 
@@ -161,14 +172,17 @@ export function TransactionComposer({
   );
 
   // Auto-aplica la sugerencia si el usuario aún no eligió categoría a mano.
-  const effectiveSuggestionApplies = suggestion && !touchedCat && suggestion.categoryId !== categoryId;
+  const effectiveSuggestionApplies =
+    suggestion && !touchedCat && suggestion.categoryId !== categoryId;
 
   function applySuggestion(s: SuggestionEntry) {
     const cat = flatById.get(s.categoryId);
     setCategoryId(s.categoryId);
     setTouchedCat(true);
     // Lleva el grupo correcto al frente.
-    const parentGroup = tree.find((g) => g.id === s.categoryId || g.children.some((c) => c.id === s.categoryId));
+    const parentGroup = tree.find(
+      (g) => g.id === s.categoryId || g.children.some((c) => c.id === s.categoryId),
+    );
     if (parentGroup) setGroupId(parentGroup.id);
     if (cat) toast(`Sugerido: ${cat.name}`, "info");
   }
@@ -186,7 +200,11 @@ export function TransactionComposer({
     const name = newCatName.trim();
     if (!name || !activeGroup) return;
     setNewCatPending(true);
-    const res = await addCategoryAction({ name, parentId: activeGroup.id, categoryType: "expense" });
+    const res = await addCategoryAction({
+      name,
+      parentId: activeGroup.id,
+      categoryType: "expense",
+    });
     setNewCatPending(false);
     if (res.ok && res.id) {
       setExtraCats((prev) => [...prev, { id: res.id!, name, groupId: activeGroup.id }]);
@@ -206,7 +224,9 @@ export function TransactionComposer({
     if (t.categoryId) {
       setCategoryId(t.categoryId);
       setTouchedCat(true);
-      const g = tree.find((x) => x.id === t.categoryId || x.children.some((c) => c.id === t.categoryId));
+      const g = tree.find(
+        (x) => x.id === t.categoryId || x.children.some((c) => c.id === t.categoryId),
+      );
       if (g) setGroupId(g.id);
     }
     if (t.merchantOrSource) {
@@ -265,7 +285,11 @@ export function TransactionComposer({
         categoryId: isGasto ? catId || null : isIngreso ? incomeCatId : null,
         // Sin selector de cuenta: el servidor asigna la predeterminada.
         accountId: null,
-        merchantOrSource: isGasto ? merchant || undefined : isIngreso ? source : note || "Ajuste de saldo",
+        merchantOrSource: isGasto
+          ? merchant || undefined
+          : isIngreso
+            ? source
+            : note || "Ajuste de saldo",
         description: note || undefined,
         status: "confirmed",
         origin: "manual",
@@ -322,35 +346,51 @@ export function TransactionComposer({
   return (
     <Modal
       title={
-        lockKind
-          ? isIngreso
-            ? "Registrar ingreso"
-            : "Registrar gasto"
-          : "Registrar transacción"
+        lockKind ? (isIngreso ? "Registrar ingreso" : "Registrar gasto") : "Registrar transacción"
       }
       sub={lockKind ? "Categoría · monto. En segundos." : "Tipo · categoría · monto. En segundos."}
       onClose={onClose}
     >
       <form onSubmit={onSubmit}>
         <div className="modal-body">
-          {error ? <div className="auth-msg warn" role="alert">{error}</div> : null}
+          {error ? (
+            <div className="auth-msg warn" role="alert">
+              {error}
+            </div>
+          ) : null}
 
           {/* Paso 1 · Tipo — oculto cuando el contexto ya lo fija (tab Gastos/Ingresos). */}
           {!lockKind ? (
-          <div className="seg cmp-seg" role="tablist" aria-label="Tipo de transacción">
-            <button type="button" className={`seg-btn ${isGasto ? "on" : ""}`} onClick={() => setKind("gasto")}>
-              <Icon name="expense" width={2} /> Gasto
-            </button>
-            <button type="button" className={`seg-btn ${isIngreso ? "on" : ""}`} onClick={() => setKind("ingreso")}>
-              <Icon name="income" width={2} /> Ingreso
-            </button>
-            <button type="button" className={`seg-btn ${isTransfer ? "on" : ""}`} onClick={() => setKind("transferencia")}>
-              <Icon name="repeat" width={2} /> Transferencia
-            </button>
-            <button type="button" className={`seg-btn ${isAdjust ? "on" : ""}`} onClick={() => setKind("ajuste")}>
-              <Icon name="edit" width={2} /> Ajuste
-            </button>
-          </div>
+            <div className="seg cmp-seg" role="tablist" aria-label="Tipo de transacción">
+              <button
+                type="button"
+                className={`seg-btn ${isGasto ? "on" : ""}`}
+                onClick={() => setKind("gasto")}
+              >
+                <Icon name="expense" width={2} /> Gasto
+              </button>
+              <button
+                type="button"
+                className={`seg-btn ${isIngreso ? "on" : ""}`}
+                onClick={() => setKind("ingreso")}
+              >
+                <Icon name="income" width={2} /> Ingreso
+              </button>
+              <button
+                type="button"
+                className={`seg-btn ${isTransfer ? "on" : ""}`}
+                onClick={() => setKind("transferencia")}
+              >
+                <Icon name="repeat" width={2} /> Transferencia
+              </button>
+              <button
+                type="button"
+                className={`seg-btn ${isAdjust ? "on" : ""}`}
+                onClick={() => setKind("ajuste")}
+              >
+                <Icon name="edit" width={2} /> Ajuste
+              </button>
+            </div>
           ) : null}
           {isAdjust ? (
             <p className="muted" style={{ fontSize: 12, marginTop: -4 }}>
@@ -368,7 +408,11 @@ export function TransactionComposer({
                     key={t.id}
                     type="button"
                     className="cmp-fav-chip tip"
-                    data-tip={t.amount ? `${CURRENCY_SYMBOL[t.currency] ?? ""}${t.amount.toLocaleString("es-CR")} · 1 clic` : "Rellenar formulario"}
+                    data-tip={
+                      t.amount
+                        ? `${CURRENCY_SYMBOL[t.currency] ?? ""}${t.amount.toLocaleString("es-CR")} · 1 clic`
+                        : "Rellenar formulario"
+                    }
                     onClick={() => void oneClickTemplate(t)}
                     disabled={pending}
                   >
@@ -384,7 +428,9 @@ export function TransactionComposer({
             <label className="fld-label">Monto</label>
             <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
               <div className="inp-money" style={{ fontSize: 24, flex: 1 }}>
-                <span className="pre" style={{ fontSize: 21 }}>{sym}</span>
+                <span className="pre" style={{ fontSize: 21 }}>
+                  {sym}
+                </span>
                 <input
                   autoFocus
                   inputMode="decimal"
@@ -407,7 +453,9 @@ export function TransactionComposer({
                 style={{ flex: "none", width: "auto", minWidth: 86, fontSize: 13 }}
               >
                 {CURRENCIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.value}</option>
+                  <option key={c.value} value={c.value}>
+                    {c.value}
+                  </option>
                 ))}
               </select>
             </div>
@@ -418,17 +466,28 @@ export function TransactionComposer({
             <>
               <div className="fld">
                 <label className="fld-label">Comercio</label>
-                <input className="inp" value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="Automercado, Uber, Netflix…" />
+                <input
+                  className="inp"
+                  value={merchant}
+                  onChange={(e) => setMerchant(e.target.value)}
+                  placeholder="Automercado, Uber, Netflix…"
+                />
                 {suggestion ? (
-                  <button type="button" className="cmp-sugg" onClick={() => applySuggestion(suggestion)}>
-                    <Icon name="spark" width={2} /> Sugerencia: <strong>{suggestion.categoryName}</strong> · tocar para aplicar
+                  <button
+                    type="button"
+                    className="cmp-sugg"
+                    onClick={() => applySuggestion(suggestion)}
+                  >
+                    <Icon name="spark" width={2} /> Sugerencia:{" "}
+                    <strong>{suggestion.categoryName}</strong> · tocar para aplicar
                   </button>
                 ) : null}
               </div>
 
               <div className="fld">
                 <label className="fld-label">
-                  Categoría {selectedCat ? <span className="cmp-picked">· {selectedCat.name}</span> : null}
+                  Categoría{" "}
+                  {selectedCat ? <span className="cmp-picked">· {selectedCat.name}</span> : null}
                 </label>
                 <div className="cmp-groups">
                   {tree.map((g) => (
@@ -439,7 +498,10 @@ export function TransactionComposer({
                       data-tip={`${g.children.length} subcategorías`}
                       onClick={() => setGroupId(g.id)}
                     >
-                      <span className="cmp-dot" style={{ background: g.color ?? "var(--muted-2)" }} />
+                      <span
+                        className="cmp-dot"
+                        style={{ background: g.color ?? "var(--muted-2)" }}
+                      />
                       {g.name}
                     </button>
                   ))}
@@ -465,7 +527,11 @@ export function TransactionComposer({
                       </button>
                     ))}
                     {extraCats
-                      .filter((e) => e.groupId === activeGroup.id && !activeGroup.children.some((c) => c.id === e.id))
+                      .filter(
+                        (e) =>
+                          e.groupId === activeGroup.id &&
+                          !activeGroup.children.some((c) => c.id === e.id),
+                      )
                       .map((e) => (
                         <button
                           key={e.id}
@@ -526,7 +592,8 @@ export function TransactionComposer({
                     Vincular a {LINK_LABEL[linkKind] ?? "entidad"}
                     {effectiveLinkedId ? (
                       <span className="cmp-picked">
-                        {" "}· {linkOptions.find((o) => o.id === effectiveLinkedId)?.name}
+                        {" "}
+                        · {linkOptions.find((o) => o.id === effectiveLinkedId)?.name}
                       </span>
                     ) : null}
                   </label>
@@ -598,14 +665,30 @@ export function TransactionComposer({
             <div className="fld-2">
               <div className="fld">
                 <label className="fld-label">Desde</label>
-                <select className="sel" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                <select
+                  className="sel"
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="fld">
                 <label className="fld-label">Hacia</label>
-                <select className="sel" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
-                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                <select
+                  className="sel"
+                  value={toAccountId}
+                  onChange={(e) => setToAccountId(e.target.value)}
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -615,19 +698,41 @@ export function TransactionComposer({
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Fecha</label>
-              <input className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input
+                className="inp"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
             <div className="fld">
               <label className="fld-label">Nota</label>
-              <input className="inp" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opcional" />
+              <input
+                className="inp"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Opcional"
+              />
             </div>
           </div>
         </div>
 
         <div className="modal-foot">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-          <button type="submit" className={`btn ${isIngreso ? "btn-secondary" : "btn-primary"}`} disabled={pending}>
-            {pending ? "Guardando…" : <><Icon name="check" width={2} /> Guardar</>}
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            className={`btn ${isIngreso ? "btn-secondary" : "btn-primary"}`}
+            disabled={pending}
+          >
+            {pending ? (
+              "Guardando…"
+            ) : (
+              <>
+                <Icon name="check" width={2} /> Guardar
+              </>
+            )}
           </button>
         </div>
       </form>

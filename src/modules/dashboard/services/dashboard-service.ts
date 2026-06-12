@@ -3,10 +3,7 @@ import "server-only";
 /** Reúne los datos del panel desde los módulos disponibles. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
-import {
-  getBaseSummary,
-  getDisplayCurrency,
-} from "@/modules/financial-base";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { computeBaseIndicators } from "@/modules/financial-base";
 import { computeHealthScore, type HealthScore } from "@/modules/financial-base";
 import { buildInsights, type DashboardInsights } from "@/modules/dashboard/engine/insights";

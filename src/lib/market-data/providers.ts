@@ -58,9 +58,9 @@ export async function yahoo(symbol: string): Promise<Quote | null> {
     const data = (await fetchJson(
       `https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`,
       { headers },
-    )) as
-      | { chart?: { result?: { meta?: { regularMarketPrice?: number; currency?: string } }[] } }
-      | null;
+    )) as {
+      chart?: { result?: { meta?: { regularMarketPrice?: number; currency?: string } }[] };
+    } | null;
     const meta = data?.chart?.result?.[0]?.meta;
     const price = meta ? num(meta.regularMarketPrice) : null;
     if (price) return { price, currency: meta?.currency ?? "USD", provider: "yahoo" };
@@ -83,10 +83,21 @@ export async function binance(ticker: string): Promise<Quote | null> {
 
 // Ticker → id de CoinGecko para la lista curada (rápido, sin red).
 const COINGECKO_IDS: Record<string, string> = {
-  BTC: "bitcoin",      ETH: "ethereum",      SOL: "solana",       XRP: "ripple",
-  ADA: "cardano",      AVAX: "avalanche-2",  DOGE: "dogecoin",    LINK: "chainlink",
-  MATIC: "matic-network", DOT: "polkadot",   LTC: "litecoin",     BNB: "binancecoin",
-  TRX: "tron",         SUI: "sui",           APT: "aptos",
+  BTC: "bitcoin",
+  ETH: "ethereum",
+  SOL: "solana",
+  XRP: "ripple",
+  ADA: "cardano",
+  AVAX: "avalanche-2",
+  DOGE: "dogecoin",
+  LINK: "chainlink",
+  MATIC: "matic-network",
+  DOT: "polkadot",
+  LTC: "litecoin",
+  BNB: "binancecoin",
+  TRX: "tron",
+  SUI: "sui",
+  APT: "aptos",
 };
 
 // Cache en memoria de resoluciones dinámicas (ticker → id) para el resto.

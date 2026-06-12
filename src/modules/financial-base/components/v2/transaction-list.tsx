@@ -33,16 +33,25 @@ const CHIPS: { id: Chip; label: string }[] = [
 
 function matches(t: Transaction, chip: Chip): boolean {
   switch (chip) {
-    case "ingresos": return t.kind === "ingreso";
-    case "gastos": return t.kind === "gasto";
-    case "pendiente": return t.status === "pending_review";
-    case "escaneado": return t.origin === "scanned";
-    case "recurrente": return t.origin === "recurring";
-    default: return true;
+    case "ingresos":
+      return t.kind === "ingreso";
+    case "gastos":
+      return t.kind === "gasto";
+    case "pendiente":
+      return t.status === "pending_review";
+    case "escaneado":
+      return t.origin === "scanned";
+    case "recurrente":
+      return t.origin === "recurring";
+    default:
+      return true;
   }
 }
 
-const STATUS_LABEL: Record<string, string> = { confirmed: "Confirmado", pending_review: "Pendiente" };
+const STATUS_LABEL: Record<string, string> = {
+  confirmed: "Confirmado",
+  pending_review: "Pendiente",
+};
 
 export function TransactionList({
   transactions,
@@ -106,7 +115,13 @@ export function TransactionList({
     <>
       <div className="chip-grid" style={{ marginBottom: 14 }}>
         {CHIPS.map((c) => (
-          <button key={c.id} type="button" className={chip === c.id ? "chip-sel on" : "chip-sel"} onClick={() => setChip(c.id)} aria-pressed={chip === c.id}>
+          <button
+            key={c.id}
+            type="button"
+            className={chip === c.id ? "chip-sel on" : "chip-sel"}
+            onClick={() => setChip(c.id)}
+            aria-pressed={chip === c.id}
+          >
             {c.label}
           </button>
         ))}
@@ -118,13 +133,21 @@ export function TransactionList({
           <div className="card-sub">{visible.length} en el periodo</div>
         </div>
         {visible.length === 0 ? (
-          <div className="muted" style={{ padding: "24px", fontSize: 13 }}>No hay movimientos con este filtro.</div>
+          <div className="muted" style={{ padding: "24px", fontSize: 13 }}>
+            No hay movimientos con este filtro.
+          </div>
         ) : (
           visible.map((t) => (
             <Row
               key={t.id}
               t={t}
-              categoryName={t.categoryId ? (categoryNames[t.categoryId] ?? "Sin categoría") : t.kind === "gasto" ? "Sin categoría" : "—"}
+              categoryName={
+                t.categoryId
+                  ? (categoryNames[t.categoryId] ?? "Sin categoría")
+                  : t.kind === "gasto"
+                    ? "Sin categoría"
+                    : "—"
+              }
               onEdit={() => setEditing(t)}
               onDelete={() => requestDelete(t)}
               onDuplicate={() => runAction(() => duplicateTransactionAction(t.id), "Duplicada")}
@@ -135,7 +158,14 @@ export function TransactionList({
       </div>
 
       {editing ? (
-        <QuickAddModal kind={editing.kind} categories={categories} accounts={accounts} currency={currency} item={editing} onClose={() => setEditing(null)} />
+        <QuickAddModal
+          kind={editing.kind}
+          categories={categories}
+          accounts={accounts}
+          currency={currency}
+          item={editing}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
     </>
   );
@@ -194,38 +224,99 @@ function Row({
       </div>
       <div
         className="swipe-content list-row"
-        style={{ gridTemplateColumns: "auto 1fr auto auto", gap: 12, transform: `translateX(${dx}px)` }}
+        style={{
+          gridTemplateColumns: "auto 1fr auto auto",
+          gap: 12,
+          transform: `translateX(${dx}px)`,
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={() => { startX.current = null; setDx(0); }}
+        onPointerCancel={() => {
+          startX.current = null;
+          setDx(0);
+        }}
       >
-        <div style={{ fontSize: 12, color: "var(--muted)", minWidth: 44 }}>{t.occurredOn.slice(5).replace("-", "/")}</div>
+        <div style={{ fontSize: 12, color: "var(--muted)", minWidth: 44 }}>
+          {t.occurredOn.slice(5).replace("-", "/")}
+        </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div
+            style={{
+              fontSize: 13.5,
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {t.merchantOrSource || t.description || (isIncome ? "Ingreso" : "Gasto")}
           </div>
           <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-            {categoryName}{t.accountLabel ? ` · ${t.accountLabel}` : ""}
+            {categoryName}
+            {t.accountLabel ? ` · ${t.accountLabel}` : ""}
           </div>
         </div>
-        <span className="tnum" style={{ fontSize: 13.5, fontWeight: 600, color: amountColor }}>{amountStr}</span>
+        <span className="tnum" style={{ fontSize: 13.5, fontWeight: 600, color: amountColor }}>
+          {amountStr}
+        </span>
         <div style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}>
-          <span className="chip" style={t.status === "pending_review" ? { background: "var(--warn-soft)", color: "var(--warn)", fontSize: 11 } : { fontSize: 11 }}>
+          <span
+            className="chip"
+            style={
+              t.status === "pending_review"
+                ? { background: "var(--warn-soft)", color: "var(--warn)", fontSize: 11 }
+                : { fontSize: 11 }
+            }
+          >
             {STATUS_LABEL[t.status] ?? t.status}
           </span>
-          <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Acciones" onClick={() => setOpen((o) => !o)}>
+          <button
+            className="icon-btn"
+            style={{ width: 30, height: 30 }}
+            aria-label="Acciones"
+            onClick={() => setOpen((o) => !o)}
+          >
             <Icon name="dots" />
           </button>
           {open ? (
             <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
-              <button onClick={() => { setOpen(false); onEdit(); }}>Editar</button>
-              <button onClick={() => { setOpen(false); onDuplicate(); }}>Duplicar</button>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onEdit();
+                }}
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onDuplicate();
+                }}
+              >
+                Duplicar
+              </button>
               {t.receiptUrl ? <button onClick={viewReceipt}>Ver recibo</button> : null}
               {t.status === "pending_review" ? (
-                <button onClick={() => { setOpen(false); onMarkReviewed(); }}>Marcar revisada</button>
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onMarkReviewed();
+                  }}
+                >
+                  Marcar revisada
+                </button>
               ) : null}
-              <button className="danger" onClick={() => { setOpen(false); onDelete(); }}>Eliminar</button>
+              <button
+                className="danger"
+                onClick={() => {
+                  setOpen(false);
+                  onDelete();
+                }}
+              >
+                Eliminar
+              </button>
             </div>
           ) : null}
         </div>

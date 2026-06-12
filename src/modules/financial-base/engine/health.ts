@@ -41,8 +41,7 @@ export function computeHealthScore(ind: BaseIndicators, investmentRate?: number)
   // Gastos esenciales: meta ≤60% → 20 pts; ≥100% → 0.
   const essPts = (1 - clamp01((ind.essentialsWeight - 0.6) / 0.4)) * 20;
   // Bonus de inversión activa: invertir ≥10% del ingreso = +5 pts.
-  const invBonus =
-    investmentRate !== undefined ? clamp01(investmentRate / 0.1) * 5 : 0;
+  const invBonus = investmentRate !== undefined ? clamp01(investmentRate / 0.1) * 5 : 0;
 
   const score = hasData
     ? Math.min(100, Math.round(savingsPts + debtPts + cashPts + essPts + invBonus))

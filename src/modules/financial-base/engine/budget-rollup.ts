@@ -16,7 +16,9 @@ export type GroupRollup = {
 };
 
 /** Mapa categoryId → groupId (un grupo se mapea a sí mismo). */
-function buildCatToGroup(tree: CategoryNode[]): Map<string, { id: string; name: string; color: string }> {
+function buildCatToGroup(
+  tree: CategoryNode[],
+): Map<string, { id: string; name: string; color: string }> {
   const map = new Map<string, { id: string; name: string; color: string }>();
   for (const g of tree) {
     const info = { id: g.id, name: g.name, color: g.color ?? "var(--muted-2)" };
@@ -62,8 +64,8 @@ export function rollupByGroup(
       pct: v.budget > 0 ? v.real / v.budget : 0,
     }))
     .sort((a, b) => {
-      const oa = a.groupId === "__none__" ? 999 : order.get(a.groupId) ?? 998;
-      const ob = b.groupId === "__none__" ? 999 : order.get(b.groupId) ?? 998;
+      const oa = a.groupId === "__none__" ? 999 : (order.get(a.groupId) ?? 998);
+      const ob = b.groupId === "__none__" ? 999 : (order.get(b.groupId) ?? 998);
       return oa - ob;
     });
 }

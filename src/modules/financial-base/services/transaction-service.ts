@@ -61,7 +61,10 @@ async function accountLabelFor(accountId: string | null | undefined): Promise<st
   return data?.name ?? null;
 }
 
-export async function listTransactions(period: Period, filters: TxnFilters = {}): Promise<Transaction[]> {
+export async function listTransactions(
+  period: Period,
+  filters: TxnFilters = {},
+): Promise<Transaction[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   let q = supabase
@@ -115,9 +118,8 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
       // La entidad de la regla se valida; si murió, el vínculo se descarta
       // en silencio (una regla vieja no debe bloquear el registro del gasto).
       if (linkedKind === "none" && rule.linkedKind && rule.linkedId) {
-        const { assertLinkableEntity } = await import(
-          "@/modules/financial-base/services/linkable-entities-service"
-        );
+        const { assertLinkableEntity } =
+          await import("@/modules/financial-base/services/linkable-entities-service");
         try {
           await assertLinkableEntity(
             rule.linkedKind as Exclude<NonNullable<TxnInput["linkedKind"]>, "none">,
@@ -137,9 +139,8 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
   // es polimórfico sin FK — sin este guard, un uuid alucinado o ajeno se
   // persistiría. Falla limpia ANTES de crear la transacción.
   if (input.linkedKind && input.linkedKind !== "none" && input.linkedId) {
-    const { assertLinkableEntity } = await import(
-      "@/modules/financial-base/services/linkable-entities-service"
-    );
+    const { assertLinkableEntity } =
+      await import("@/modules/financial-base/services/linkable-entities-service");
     await assertLinkableEntity(input.linkedKind, input.linkedId);
   }
   // Un kind sin id no es un vínculo: se normaliza a 'none'.
@@ -177,7 +178,8 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
       origin: input.origin,
       receipt_url: input.receiptUrl ?? null,
       confidence_score_internal: input.confidence ?? null,
-      source: input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual",
+      source:
+        input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual",
       confirmed_by_user: input.status === "confirmed",
       linked_kind: linkedKind,
       linked_id: linkedId,
@@ -446,12 +448,24 @@ export async function getRealHistory(period: Period, monthsBack = 6): Promise<Hi
   for (let i = 0; i < monthsBack - 1; i++) start = previousMonthPeriod(start);
 
   const years = new Set<number>();
-  const buckets = new Map<string, { label: string; income: number; expense: number; bIncome: number; bExpense: number }>();
+  const buckets = new Map<
+    string,
+    { label: string; income: number; expense: number; bIncome: number; bExpense: number }
+  >();
   let cursor = start;
   for (let i = 0; i < monthsBack; i++) {
-    buckets.set(`${cursor.year}-${cursor.month}`, { label: cursor.label, income: 0, expense: 0, bIncome: 0, bExpense: 0 });
+    buckets.set(`${cursor.year}-${cursor.month}`, {
+      label: cursor.label,
+      income: 0,
+      expense: 0,
+      bIncome: 0,
+      bExpense: 0,
+    });
     years.add(cursor.year);
-    cursor = monthPeriod(cursor.month === 12 ? cursor.year + 1 : cursor.year, cursor.month === 12 ? 1 : cursor.month + 1);
+    cursor = monthPeriod(
+      cursor.month === 12 ? cursor.year + 1 : cursor.year,
+      cursor.month === 12 ? 1 : cursor.month + 1,
+    );
   }
 
   const [txnRes, budgetRes] = await Promise.all([

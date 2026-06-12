@@ -24,7 +24,9 @@ export function verifyTwilioSignature(
   for (const key of Object.keys(params).sort()) {
     data += key + (params[key] ?? "");
   }
-  const expected = createHmac("sha1", authToken).update(Buffer.from(data, "utf-8")).digest("base64");
+  const expected = createHmac("sha1", authToken)
+    .update(Buffer.from(data, "utf-8"))
+    .digest("base64");
 
   const a = Buffer.from(expected);
   const b = Buffer.from(signature);

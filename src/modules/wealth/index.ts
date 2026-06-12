@@ -13,10 +13,7 @@ export {
   computeCryptoAnalytics,
   buildInvestmentInsights,
 } from "./engine/portfolio-engine";
-export {
-  getWealthSummary,
-  buildDemoWealthSummary,
-} from "./services/wealth-service";
+export { getWealthSummary, buildDemoWealthSummary } from "./services/wealth-service";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getSnapshotHistory, generateAndSaveSnapshot } from "./services/snapshot-service";
 export { getInvestmentInsights } from "./services/investment-insights";

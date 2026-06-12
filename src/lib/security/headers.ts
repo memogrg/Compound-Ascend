@@ -14,9 +14,7 @@ const isProd = process.env.APP_ENV === "production";
 function contentSecurityPolicy(): string {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   // En dev permitimos 'unsafe-eval' para el HMR de Next; en prod no.
-  const scriptSrc = isProd
-    ? "'self' 'unsafe-inline'"
-    : "'self' 'unsafe-inline' 'unsafe-eval'";
+  const scriptSrc = isProd ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'";
 
   const connectSrc = [
     "'self'",

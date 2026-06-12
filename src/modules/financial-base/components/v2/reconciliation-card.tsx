@@ -15,7 +15,11 @@ import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { linkTransactionAction } from "@/modules/financial-base/api/v2-actions";
-import type { UnlinkedCandidate, EntityAlert, EntityAlertStatus } from "@/modules/financial-base/engine/reconciliation";
+import type {
+  UnlinkedCandidate,
+  EntityAlert,
+  EntityAlertStatus,
+} from "@/modules/financial-base/engine/reconciliation";
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 
 const KIND_LABEL: Record<string, string> = {
@@ -62,7 +66,11 @@ export function ReconciliationCard({
   const link = (txnId: string, kind: UnlinkedCandidate["suggestedKind"], entityId: string) => {
     setLinking(txnId);
     startTransition(async () => {
-      const res = await linkTransactionAction({ transactionId: txnId, linkedKind: kind, linkedId: entityId });
+      const res = await linkTransactionAction({
+        transactionId: txnId,
+        linkedKind: kind,
+        linkedId: entityId,
+      });
       setLinking(null);
       if (res.ok) {
         toast("Transacción vinculada y conciliada");
@@ -107,7 +115,12 @@ export function ReconciliationCard({
         </span>
         <span
           className="muted"
-          style={{ marginLeft: "auto", display: "inline-flex", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}
+          style={{
+            marginLeft: "auto",
+            display: "inline-flex",
+            transform: open ? "rotate(90deg)" : "none",
+            transition: "transform .15s",
+          }}
         >
           <Icon name="chev" width={2} style={{ width: 14, height: 14 }} />
         </span>
@@ -117,7 +130,9 @@ export function ReconciliationCard({
         <div style={{ padding: "0 18px 12px", borderTop: "1px solid var(--line)" }}>
           {visibleCandidates.length > 0 ? (
             <>
-              <div className="eyebrow" style={{ margin: "10px 0 2px" }}>Sin vincular</div>
+              <div className="eyebrow" style={{ margin: "10px 0 2px" }}>
+                Sin vincular
+              </div>
               {visibleCandidates.slice(0, 6).map(({ transaction: t, suggestedKind }) => (
                 <div
                   key={t.id}
@@ -131,11 +146,23 @@ export function ReconciliationCard({
                     fontSize: 12.5,
                   }}
                 >
-                  <span style={{ fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span
+                    style={{
+                      fontWeight: 500,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {t.merchantOrSource ?? t.description ?? "Transacción"}
                   </span>
-                  <span className="muted tnum" style={{ flex: "none" }}>{formatMoney(t.amount, t.currency)}</span>
-                  <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", marginLeft: "auto" }}>
+                  <span className="muted tnum" style={{ flex: "none" }}>
+                    {formatMoney(t.amount, t.currency)}
+                  </span>
+                  <span
+                    style={{ display: "inline-flex", gap: 4, flexWrap: "wrap", marginLeft: "auto" }}
+                  >
                     {(linkables[suggestedKind] ?? []).slice(0, 3).map((e) => (
                       <button
                         key={e.id}
@@ -157,7 +184,9 @@ export function ReconciliationCard({
 
           {alerts.length > 0 ? (
             <>
-              <div className="eyebrow" style={{ margin: "10px 0 2px" }}>Plan vs real por entidad</div>
+              <div className="eyebrow" style={{ margin: "10px 0 2px" }}>
+                Plan vs real por entidad
+              </div>
               {alerts.map((a) => (
                 <div
                   key={`${a.sourceKind}:${a.sourceId}`}
@@ -170,7 +199,15 @@ export function ReconciliationCard({
                     fontSize: 12.5,
                   }}
                 >
-                  <span style={{ fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span
+                    style={{
+                      fontWeight: 500,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {a.name}
                   </span>
                   <span className="muted tnum" style={{ flex: "none" }}>

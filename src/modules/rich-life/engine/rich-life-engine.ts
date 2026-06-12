@@ -56,9 +56,7 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
 
   const passiveIncomeCoverage = ratio(input.passiveIncomeMonthly, input.monthlyExpenses);
   const monthsOfIndependence =
-    input.monthlyExpenses > 0
-      ? Math.round((sum(liquid) / input.monthlyExpenses) * 10) / 10
-      : 0;
+    input.monthlyExpenses > 0 ? Math.round((sum(liquid) / input.monthlyExpenses) * 10) / 10 : 0;
 
   let trend: RichTrend = "sin_historico";
   let wealthVelocity: number | null = null;
@@ -71,7 +69,12 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
     netWorth,
     totalAssets,
     totalLiabilities,
-    assetLiabilityRatio: totalLiabilities > 0 ? Math.round((totalAssets / totalLiabilities) * 10) / 10 : totalAssets > 0 ? Infinity : 0,
+    assetLiabilityRatio:
+      totalLiabilities > 0
+        ? Math.round((totalAssets / totalLiabilities) * 10) / 10
+        : totalAssets > 0
+          ? Infinity
+          : 0,
     debtToAssets: ratio(totalLiabilities, totalAssets),
     productiveAssetsPct: ratio(sum(productive), totalAssets),
     liquidAssetsPct: ratio(sum(liquid), totalAssets),
@@ -89,17 +92,15 @@ function sum(list: { value: number }[]): number {
 }
 
 /** Rich Life Score con las 8 dimensiones ponderadas de la Biblia. */
-export function computeRichLifeScore(
-  ind: RichLifeIndicators,
-  input: RichLifeInput,
-): RichLifeScore {
+export function computeRichLifeScore(ind: RichLifeIndicators, input: RichLifeInput): RichLifeScore {
   const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
   const dims = [
     {
       label: "Patrimonio neto positivo y creciente",
       weight: 20,
       score:
-        (ind.netWorth > 0 ? 0.7 : 0) + (ind.trend === "mas_rico" ? 0.3 : ind.trend === "sin_historico" ? 0.15 : 0),
+        (ind.netWorth > 0 ? 0.7 : 0) +
+        (ind.trend === "mas_rico" ? 0.3 : ind.trend === "sin_historico" ? 0.15 : 0),
     },
     { label: "Flujo libre mensual positivo", weight: 15, score: input.freeCashflow > 0 ? 1 : 0 },
     {

@@ -41,8 +41,18 @@ export const COUNTRIES: Option[] = [
 /** Núcleo financiero: solo Personal o Familia (las demás opciones se eliminaron
  *  por revisión de producto). Con "familia" se invita hasta a 4 miembros. */
 export const NUCLEUS: Option[] = [
-  { value: "solo", label: "Personal", desc: "Gestiono mis finanzas por mi cuenta", icon: "profile" },
-  { value: "familia", label: "Con familia", desc: "Decisiones familiares compartidas (hasta 4 miembros)", icon: "profile" },
+  {
+    value: "solo",
+    label: "Personal",
+    desc: "Gestiono mis finanzas por mi cuenta",
+    icon: "profile",
+  },
+  {
+    value: "familia",
+    label: "Con familia",
+    desc: "Decisiones familiares compartidas (hasta 4 miembros)",
+    icon: "profile",
+  },
 ];
 
 export const LIFE_STAGES: Option[] = [

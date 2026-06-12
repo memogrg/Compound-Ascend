@@ -74,7 +74,14 @@ export async function generateAndSaveSnapshot(
     const { data, error } = await supabase
       .from("portfolio_snapshots")
       .upsert(
-        { user_id: userId, date: today, portfolio_value: portfolioValue, investment_value: investmentValue, net_worth: netWorth, currency },
+        {
+          user_id: userId,
+          date: today,
+          portfolio_value: portfolioValue,
+          investment_value: investmentValue,
+          net_worth: netWorth,
+          currency,
+        },
         { onConflict: "user_id,date", ignoreDuplicates: false },
       )
       .select("id,date,portfolio_value,investment_value,net_worth,currency")
@@ -130,10 +137,18 @@ function periodCutoff(period: SnapshotPeriod): string | null {
   if (period === "all") return null;
   const d = new Date();
   switch (period) {
-    case "1M": d.setMonth(d.getMonth() - 1); break;
-    case "3M": d.setMonth(d.getMonth() - 3); break;
-    case "6M": d.setMonth(d.getMonth() - 6); break;
-    case "1Y": d.setFullYear(d.getFullYear() - 1); break;
+    case "1M":
+      d.setMonth(d.getMonth() - 1);
+      break;
+    case "3M":
+      d.setMonth(d.getMonth() - 3);
+      break;
+    case "6M":
+      d.setMonth(d.getMonth() - 6);
+      break;
+    case "1Y":
+      d.setFullYear(d.getFullYear() - 1);
+      break;
   }
   return d.toISOString().slice(0, 10);
 }

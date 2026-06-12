@@ -52,12 +52,18 @@ export async function assertTokenBudget(userId: string): Promise<void> {
   } catch (err) {
     if (err instanceof AppError) throw err;
     // Si falla la verificación (config), no bloqueamos al usuario.
-    logger.warn("assertTokenBudget no disponible", { message: err instanceof Error ? err.message : "?" });
+    logger.warn("assertTokenBudget no disponible", {
+      message: err instanceof Error ? err.message : "?",
+    });
   }
 }
 
 /** Registra el consumo DESPUÉS de la llamada (incremento server-side). */
-export async function recordUsage(userId: string, tokensIn: number, tokensOut: number): Promise<void> {
+export async function recordUsage(
+  userId: string,
+  tokensIn: number,
+  tokensOut: number,
+): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const total = Math.max(0, Math.round(tokensIn + tokensOut));
   if (total === 0) return;

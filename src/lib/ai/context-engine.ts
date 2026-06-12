@@ -24,9 +24,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Base Financiera: indicadores del mes.
   try {
-    const { getBaseSummary, getDisplayCurrency } = await import(
-      "@/modules/financial-base/services/base-service"
-    );
+    const { getBaseSummary, getDisplayCurrency } =
+      await import("@/modules/financial-base/services/base-service");
     const [base, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
     ctx = {
       ...ctx,
@@ -114,9 +113,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Entidades vinculables: la IA puede proponer transacciones ya vinculadas.
   try {
-    const { listLinkableEntities } = await import(
-      "@/modules/financial-base/services/linkable-entities-service"
-    );
+    const { listLinkableEntities } =
+      await import("@/modules/financial-base/services/linkable-entities-service");
     const linkables = await listLinkableEntities();
     ctx.linkables = {
       debt: linkables.debt.map((e) => ({ id: e.id, name: e.name })),

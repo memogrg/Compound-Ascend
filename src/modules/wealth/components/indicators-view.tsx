@@ -47,12 +47,25 @@ function Card({ card }: { card: IndicatorCard }) {
 
   return (
     <div className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 10,
+        }}
+      >
         <div>
-          <div className="card-title" style={{ fontSize: 14.5 }}>{card.label}</div>
-          <div className="card-sub" style={{ marginTop: 2 }}>{card.description}</div>
+          <div className="card-title" style={{ fontSize: 14.5 }}>
+            {card.label}
+          </div>
+          <div className="card-sub" style={{ marginTop: 2 }}>
+            {card.description}
+          </div>
         </div>
-        <span className="chip" style={{ fontSize: 10.5 }}>{card.source}</span>
+        <span className="chip" style={{ fontSize: 10.5 }}>
+          {card.source}
+        </span>
       </div>
 
       {hasValue ? (
@@ -114,7 +127,9 @@ function MacroInsightsPanel({ insights }: { insights: MacroInsight[] }) {
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>{i.title}</div>
-              <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>{i.body}</div>
+              <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+                {i.body}
+              </div>
             </div>
           );
         })}
@@ -146,10 +161,24 @@ export function IndicatorsView({
       <MacroInsightsPanel insights={insights} />
       {model.groups.map((g) => (
         <section key={g.group} className="grid" style={{ gap: 12 }}>
-          <div className="card-title" style={{ fontSize: 13, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          <div
+            className="card-title"
+            style={{
+              fontSize: 13,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
             {g.group}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+              gap: 12,
+            }}
+          >
             {g.cards.map((c) => (
               <Card key={c.code} card={c} />
             ))}

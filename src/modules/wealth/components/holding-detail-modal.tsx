@@ -32,7 +32,10 @@ const PERIODS: { label: string; value: Period }[] = [
 ];
 
 const PAYMENTS_PER_YEAR: Record<string, number> = {
-  mensual: 12, trimestral: 4, semestral: 2, anual: 1,
+  mensual: 12,
+  trimestral: 4,
+  semestral: 2,
+  anual: 1,
 };
 
 function sym(currency: string): string {
@@ -99,7 +102,9 @@ export function HoldingDetailModal({
   // No cotizados: valor manual del usuario (no precio×cantidad).
   const isRental = !QUOTED_TYPES.has(holding.assetType);
   const currentValue =
-    currentPrice !== null ? holding.quantity * currentPrice : (holding.currentValueManual ?? costBasis);
+    currentPrice !== null
+      ? holding.quantity * currentPrice
+      : (holding.currentValueManual ?? costBasis);
   const profitLoss = currentValue - costBasis;
   const returnPct = costBasis > 0 ? profitLoss / costBasis : 0;
   const positive = profitLoss >= 0;
@@ -115,11 +120,16 @@ export function HoldingDetailModal({
     }
   }, [holding, currentPrice, period]);
 
-  useEffect(() => { void loadHistory(); }, [loadHistory]);
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
 
   // Load dividends
   useEffect(() => {
-    void listDividendsAction(holding.id).then((d) => { setDividends(d); setDivLoading(false); });
+    void listDividendsAction(holding.id).then((d) => {
+      setDividends(d);
+      setDivLoading(false);
+    });
   }, [holding.id]);
 
   // Load rental payments (solo activos no cotizados)
@@ -136,7 +146,9 @@ export function HoldingDetailModal({
       onClose={onClose}
     >
       <div className="modal-body" style={{ padding: 0 }}>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 22px 0" }}>
+        <div
+          style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 22px 0" }}
+        >
           <EditHoldingButton holding={holding} currency={currency} />
         </div>
         {/* Header metrics */}
@@ -164,7 +176,10 @@ export function HoldingDetailModal({
             value={`${positive ? "+" : ""}${formatMoney(profitLoss, currency)}`}
             accent={positive ? "var(--pos)" : "var(--neg)"}
           />
-          <Metric label="Costo promedio" value={formatMoney(holding.averageCost, holding.currency)} />
+          <Metric
+            label="Costo promedio"
+            value={formatMoney(holding.averageCost, holding.currency)}
+          />
           {currentPrice !== null && (
             <Metric
               label="Precio actual"
@@ -202,10 +217,8 @@ export function HoldingDetailModal({
                     borderRadius: 6,
                     fontSize: 11.5,
                     fontWeight: period === p.value ? 600 : 400,
-                    background:
-                      period === p.value ? "var(--ink)" : "var(--chip)",
-                    color:
-                      period === p.value ? "var(--bg)" : "var(--muted)",
+                    background: period === p.value ? "var(--ink)" : "var(--chip)",
+                    color: period === p.value ? "var(--bg)" : "var(--muted)",
                     border: "none",
                     cursor: "pointer",
                   }}
@@ -216,8 +229,17 @@ export function HoldingDetailModal({
             </div>
           </div>
           {histLoading ? (
-            <div style={{ height: 120, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span className="muted" style={{ fontSize: 12 }}>Cargando…</span>
+            <div
+              style={{
+                height: 120,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span className="muted" style={{ fontSize: 12 }}>
+                Cargando…
+              </span>
             </div>
           ) : (
             <PerformanceChart data={history} currency={currency} costBasis={costBasis} />
@@ -231,75 +253,77 @@ export function HoldingDetailModal({
 
         {/* Dividendos: solo activos cotizados (no se mezcla con renta) */}
         {!isRental && (
-        <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
           <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 10,
-            }}
+            style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}
           >
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>
-                Dividendos
-              </div>
-              {totalDividends > 0 && (
-                <div className="muted" style={{ fontSize: 12 }}>
-                  Total recibido: {formatMoney(totalDividends, currency)}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 10,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>
+                  Dividendos
                 </div>
-              )}
+                {totalDividends > 0 && (
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    Total recibido: {formatMoney(totalDividends, currency)}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          <DividendForm
-            holding={holding}
-            currentValue={currentValue}
-            onAdded={() => {
-              void listDividendsAction(holding.id).then(setDividends);
-              toast("Dividendo registrado");
-              router.refresh();
-            }}
-          />
-          {divLoading ? null : dividends.length > 0 ? (
-            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-              {dividends.map((d) => (
-                <div
-                  key={d.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "7px 10px",
-                    background: "var(--surface-2)",
-                    borderRadius: "var(--r-md)",
-                    fontSize: 12.5,
-                  }}
-                >
-                  <span style={{ color: "var(--muted)" }}>{d.paymentDate}</span>
-                  <span style={{ fontWeight: 500, color: "var(--pos)" }}>
-                    +{formatMoney(d.amount, d.currency)}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    style={{ fontSize: 11, padding: "2px 8px", color: "var(--neg)" }}
-                    onClick={async () => {
-                      await removeDividendAction(d.id);
-                      setDividends((prev) => prev.filter((x) => x.id !== d.id));
-                      router.refresh();
+            <DividendForm
+              holding={holding}
+              currentValue={currentValue}
+              onAdded={() => {
+                void listDividendsAction(holding.id).then(setDividends);
+                toast("Dividendo registrado");
+                router.refresh();
+              }}
+            />
+            {divLoading ? null : dividends.length > 0 ? (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                {dividends.map((d) => (
+                  <div
+                    key={d.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "7px 10px",
+                      background: "var(--surface-2)",
+                      borderRadius: "var(--r-md)",
+                      fontSize: 12.5,
                     }}
                   >
-                    Borrar
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="muted" style={{ fontSize: 12.5, marginTop: 6, paddingBottom: 8 }}>
-              Sin dividendos registrados aún.
-            </div>
-          )}
-        </div>
+                    <span style={{ color: "var(--muted)" }}>{d.paymentDate}</span>
+                    <span style={{ fontWeight: 500, color: "var(--pos)" }}>
+                      +{formatMoney(d.amount, d.currency)}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ fontSize: 11, padding: "2px 8px", color: "var(--neg)" }}
+                      onClick={async () => {
+                        await removeDividendAction(d.id);
+                        setDividends((prev) => prev.filter((x) => x.id !== d.id));
+                        router.refresh();
+                      }}
+                    >
+                      Borrar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 12.5, marginTop: 6, paddingBottom: 8 }}>
+                Sin dividendos registrados aún.
+              </div>
+            )}
+          </div>
         )}
 
         {isRental && (
@@ -398,9 +422,17 @@ function SaleSection({
           }}
         >
           {error ? (
-            <div className="auth-msg warn" role="alert" style={{ marginBottom: 8 }}>{error}</div>
+            <div className="auth-msg warn" role="alert" style={{ marginBottom: 8 }}>
+              {error}
+            </div>
           ) : null}
-          <div style={{ display: "grid", gridTemplateColumns: isRental ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isRental ? "1fr 1fr" : "1fr 1fr 1fr",
+              gap: 8,
+            }}
+          >
             {!isRental && (
               <div className="fld" style={{ marginBottom: 0 }}>
                 <label className="fld-label">Cantidad vendida</label>
@@ -432,7 +464,12 @@ function SaleSection({
             </div>
             <div className="fld" style={{ marginBottom: 0 }}>
               <label className="fld-label">Fecha</label>
-              <input className="inp" type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
+              <input
+                className="inp"
+                type="date"
+                value={saleDate}
+                onChange={(e) => setSaleDate(e.target.value)}
+              />
             </div>
           </div>
           <button
@@ -592,9 +629,7 @@ function DividendForm({
             <select
               className="sel"
               value={frequency}
-              onChange={(e) =>
-                setFrequency(e.target.value as typeof frequency)
-              }
+              onChange={(e) => setFrequency(e.target.value as typeof frequency)}
             >
               <option value="mensual">Mensual</option>
               <option value="trimestral">Trimestral</option>
@@ -603,10 +638,7 @@ function DividendForm({
             </select>
           </div>
           {derivedAmount !== null && derivedAmount > 0 && (
-            <div
-              className="auth-msg"
-              style={{ gridColumn: "1/-1", marginBottom: 0, fontSize: 12 }}
-            >
+            <div className="auth-msg" style={{ gridColumn: "1/-1", marginBottom: 0, fontSize: 12 }}>
               Monto por pago: {formatMoney(derivedAmount, divCurrency)}
             </div>
           )}
@@ -692,7 +724,9 @@ function RentalSection({
   const rentYield = currentValue > 0 ? annualRent / currentValue : 0;
   const totalReceived = rentals.reduce((s, r) => s + r.amount, 0);
 
-  const [amount, setAmount] = useState(holding.rentalIncome != null ? String(holding.rentalIncome) : "");
+  const [amount, setAmount] = useState(
+    holding.rentalIncome != null ? String(holding.rentalIncome) : "",
+  );
   const [date, setDate] = useState(today);
   const [freq, setFreq] = useState<"mensual" | "trimestral" | "anual">(cfgFreq);
   const [rentCurrency, setRentCurrency] = useState(holding.currency);
@@ -726,29 +760,67 @@ function RentalSection({
 
   return (
     <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
-      <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>Renta</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))", gap: 10, marginBottom: 12 }}>
-        <Metric label="Total recibido" value={formatMoney(totalReceived, currency)} accent="var(--pos)" />
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>
+        Renta
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))",
+          gap: 10,
+          marginBottom: 12,
+        }}
+      >
+        <Metric
+          label="Total recibido"
+          value={formatMoney(totalReceived, currency)}
+          accent="var(--pos)"
+        />
         {holding.rentalIncome ? (
-          <Metric label={`Renta ${cfgFreq}`} value={formatMoney(holding.rentalIncome, holding.currency)} />
+          <Metric
+            label={`Renta ${cfgFreq}`}
+            value={formatMoney(holding.rentalIncome, holding.currency)}
+          />
         ) : null}
-        {rentYield > 0 ? <Metric label="Yield de renta" value={formatPercent(rentYield)} accent="var(--pos)" /> : null}
+        {rentYield > 0 ? (
+          <Metric label="Yield de renta" value={formatPercent(rentYield)} accent="var(--pos)" />
+        ) : null}
       </div>
 
-      <div style={{ background: "var(--surface-2)", borderRadius: "var(--r-md)", padding: "12px 14px", marginBottom: 8 }}>
+      <div
+        style={{
+          background: "var(--surface-2)",
+          borderRadius: "var(--r-md)",
+          padding: "12px 14px",
+          marginBottom: 8,
+        }}
+      >
         <div className="fld-2" style={{ marginBottom: 8 }}>
           <div className="fld" style={{ marginBottom: 0 }}>
             <label className="fld-label">Monto recibido</label>
             <div className="inp-money">
               <span className="pre">{sym(rentCurrency)}</span>
-              <input type="number" step="any" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+              />
             </div>
           </div>
           <div className="fld" style={{ marginBottom: 0 }}>
             <label className="fld-label">Moneda</label>
-            <select className="sel" value={rentCurrency} onChange={(e) => setRentCurrency(e.target.value)}>
+            <select
+              className="sel"
+              value={rentCurrency}
+              onChange={(e) => setRentCurrency(e.target.value)}
+            >
               {CURRENCIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
               ))}
             </select>
           </div>
@@ -756,18 +828,34 @@ function RentalSection({
         <div className="fld-2" style={{ marginBottom: 8 }}>
           <div className="fld" style={{ marginBottom: 0 }}>
             <label className="fld-label">Fecha</label>
-            <input className="inp" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} />
+            <input
+              className="inp"
+              type="date"
+              value={date}
+              max={today}
+              onChange={(e) => setDate(e.target.value)}
+            />
           </div>
           <div className="fld" style={{ marginBottom: 0 }}>
             <label className="fld-label">Frecuencia</label>
-            <select className="sel" value={freq} onChange={(e) => setFreq(e.target.value as typeof freq)}>
+            <select
+              className="sel"
+              value={freq}
+              onChange={(e) => setFreq(e.target.value as typeof freq)}
+            >
               <option value="mensual">Mensual</option>
               <option value="trimestral">Trimestral</option>
               <option value="anual">Anual</option>
             </select>
           </div>
         </div>
-        <button type="button" className="btn btn-primary" style={{ fontSize: 12.5 }} disabled={pending || (parseFloat(amount) || 0) <= 0} onClick={submit}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ fontSize: 12.5 }}
+          disabled={pending || (parseFloat(amount) || 0) <= 0}
+          onClick={submit}
+        >
           {pending ? "Guardando…" : "Registrar renta"}
         </button>
       </div>
@@ -775,14 +863,30 @@ function RentalSection({
       {rentals.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingBottom: 8 }}>
           {rentals.map((r) => (
-            <div key={r.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 10px", background: "var(--surface-2)", borderRadius: "var(--r-md)", fontSize: 12.5 }}>
+            <div
+              key={r.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "7px 10px",
+                background: "var(--surface-2)",
+                borderRadius: "var(--r-md)",
+                fontSize: 12.5,
+              }}
+            >
               <span style={{ color: "var(--muted)" }}>{r.receivedOn}</span>
-              <span style={{ fontWeight: 500, color: "var(--pos)" }}>+{formatMoney(r.amount, r.currency)}</span>
+              <span style={{ fontWeight: 500, color: "var(--pos)" }}>
+                +{formatMoney(r.amount, r.currency)}
+              </span>
               <button
                 type="button"
                 className="btn btn-ghost"
                 style={{ fontSize: 11, padding: "2px 8px", color: "var(--neg)" }}
-                onClick={async () => { await removeRentalPaymentAction(r.id); onChange(); }}
+                onClick={async () => {
+                  await removeRentalPaymentAction(r.id);
+                  onChange();
+                }}
               >
                 Borrar
               </button>

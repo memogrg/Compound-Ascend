@@ -19,7 +19,11 @@ import {
   templateInputSchema,
 } from "@/modules/financial-base/schemas";
 import type { CsvTxnInput } from "@/modules/financial-base/schemas";
-import { createRule, updateRule, deleteRule } from "@/modules/financial-base/services/rules-service";
+import {
+  createRule,
+  updateRule,
+  deleteRule,
+} from "@/modules/financial-base/services/rules-service";
 import {
   createCategory,
   updateCategory,
@@ -33,7 +37,10 @@ import {
   deleteTemplate,
   touchTemplate,
 } from "@/modules/financial-base/services/templates-service";
-import { extractReceipt, type ReceiptExtraction } from "@/modules/financial-base/services/receipt-service";
+import {
+  extractReceipt,
+  type ReceiptExtraction,
+} from "@/modules/financial-base/services/receipt-service";
 import {
   createBudgetItem,
   updateBudgetItem,
@@ -148,8 +155,13 @@ export async function setEnvelopeBudgetAction(raw: unknown): Promise<ActionResul
     revalidate();
     return { ok: true };
   } catch (err) {
-    logger.error("setEnvelopeBudget fallido", { message: err instanceof Error ? err.message : "?" });
-    const msg = err instanceof Error && err.message.includes("se deriva de una entidad") ? err.message : "No pudimos actualizar el presupuesto.";
+    logger.error("setEnvelopeBudget fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    const msg =
+      err instanceof Error && err.message.includes("se deriva de una entidad")
+        ? err.message
+        : "No pudimos actualizar el presupuesto.";
     return { ok: false, message: msg };
   }
 }
@@ -160,16 +172,22 @@ const copyMonthSchema = z.object({
 });
 
 /** Copia el presupuesto de gasto del mes anterior (toolbar "Copiar mes anterior"). */
-export async function copyPreviousMonthBudgetAction(raw: unknown): Promise<ActionResult & { copied?: number }> {
+export async function copyPreviousMonthBudgetAction(
+  raw: unknown,
+): Promise<ActionResult & { copied?: number }> {
   const parsed = copyMonthSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    const copied = await copyPreviousMonthExpenseBudget(monthPeriod(parsed.data.periodYear, parsed.data.periodMonth));
+    const copied = await copyPreviousMonthExpenseBudget(
+      monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
+    );
     revalidate();
     return { ok: true, copied };
   } catch (err) {
-    logger.error("copyPreviousMonthBudget fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("copyPreviousMonthBudget fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos copiar el presupuesto del mes anterior." };
   }
 }
@@ -396,7 +414,8 @@ export async function addTransferAction(raw: unknown): Promise<ActionResult> {
 export type ImportResult = { ok: boolean; count: number; skipped: number; message?: string };
 
 export async function importTransactionsAction(rows: unknown[]): Promise<ImportResult> {
-  if (!isSupabaseConfigured()) return { ok: false, count: 0, skipped: 0, message: "Conecta Supabase." };
+  if (!isSupabaseConfigured())
+    return { ok: false, count: 0, skipped: 0, message: "Conecta Supabase." };
   const valid: CsvTxnInput[] = [];
   let skipped = 0;
   for (const r of rows ?? []) {
@@ -404,7 +423,8 @@ export async function importTransactionsAction(rows: unknown[]): Promise<ImportR
     if (parsed.success) valid.push(parsed.data);
     else skipped += 1;
   }
-  if (valid.length === 0) return { ok: false, count: 0, skipped, message: "No se encontraron filas válidas." };
+  if (valid.length === 0)
+    return { ok: false, count: 0, skipped, message: "No se encontraron filas válidas." };
   try {
     const count = await importTransactions(valid);
     revalidate();
@@ -527,7 +547,8 @@ export async function runTemplateAction(
     const tpl = (await listTemplates()).find((t) => t.id === id);
     if (!tpl) return { ok: false, message: "Plantilla no encontrada." };
     const kind = tpl.kind;
-    if (kind === "transferencia") return { ok: false, message: "Las transferencias no se registran por plantilla." };
+    if (kind === "transferencia")
+      return { ok: false, message: "Las transferencias no se registran por plantilla." };
     const amount = overrides?.amount ?? tpl.amount ?? 0;
     if (!(amount > 0)) return { ok: false, message: "La plantilla necesita un monto." };
     const today = new Date();
@@ -554,11 +575,12 @@ export async function runTemplateAction(
 }
 
 // ---------- OCR de recibos ----------
-export type ScanResult =
-  | { ok: true; data: ReceiptExtraction }
-  | { ok: false; message: string };
+export type ScanResult = { ok: true; data: ReceiptExtraction } | { ok: false; message: string };
 
-export async function scanReceiptAction(imageBase64: string, mimeType: string): Promise<ScanResult> {
+export async function scanReceiptAction(
+  imageBase64: string,
+  mimeType: string,
+): Promise<ScanResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
   if (!imageBase64 || imageBase64.length > 8_000_000) {
     return { ok: false, message: "Imagen inválida o demasiado grande (máx ~6 MB)." };
@@ -566,11 +588,17 @@ export async function scanReceiptAction(imageBase64: string, mimeType: string): 
   try {
     const data = await extractReceipt(imageBase64, mimeType || "image/jpeg");
     if (!data.configured) {
-      return { ok: false, message: "El escaneo con IA no está disponible (proveedor no configurado)." };
+      return {
+        ok: false,
+        message: "El escaneo con IA no está disponible (proveedor no configurado).",
+      };
     }
     return { ok: true, data };
   } catch (err) {
-    const msg = err instanceof Error && err.message.includes("límite") ? err.message : "No pudimos leer el recibo. Inténtalo de nuevo o regístralo manual.";
+    const msg =
+      err instanceof Error && err.message.includes("límite")
+        ? err.message
+        : "No pudimos leer el recibo. Inténtalo de nuevo o regístralo manual.";
     logger.warn("scanReceipt fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: msg };
   }

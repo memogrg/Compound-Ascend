@@ -41,8 +41,9 @@ export function formatPercent(ratio: number, decimals = 0): string {
 /** Versión compacta para cifras grandes (₡1,2M). */
 export function formatCompact(amount: number, currency = "CRC"): string {
   const sym = SYMBOL[currency] ?? "";
-  const n = new Intl.NumberFormat("es-CR", { notation: "compact", maximumFractionDigits: 1 }).format(
-    amount,
-  );
+  const n = new Intl.NumberFormat("es-CR", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
   return `${sym}${n}`;
 }

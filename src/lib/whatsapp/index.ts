@@ -8,11 +8,7 @@ import "server-only";
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { TwilioWhatsAppProvider } from "@/lib/whatsapp/twilio";
-import type {
-  DownloadedMedia,
-  SendResult,
-  WhatsAppProvider,
-} from "@/lib/whatsapp/provider";
+import type { DownloadedMedia, SendResult, WhatsAppProvider } from "@/lib/whatsapp/provider";
 
 export type {
   WhatsAppProvider,
@@ -23,9 +19,7 @@ export type {
 
 export function isWhatsAppConfigured(): boolean {
   const env = getServerEnv();
-  return Boolean(
-    env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_NUMBER,
-  );
+  return Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_NUMBER);
 }
 
 /** Proveedor inactivo: registra y omite (no rompe el flujo si falta config). */

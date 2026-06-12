@@ -73,28 +73,30 @@ export const budgetItemInputSchema = z.object({
   periodYear: z.number().int().min(2000).max(3000),
 });
 
-export const txnInputSchema = z.object({
-  kind: z.enum(["ingreso", "gasto", "ajuste"]),
-  amount: z.number({ invalid_type_error: "Monto inválido" }).positive("Debe ser mayor a 0"),
-  currency: z.string().length(3).default("CRC"),
-  occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
-  categoryId: uuidOrNull.optional(),
-  accountId: uuidOrNull.optional(),
-  merchantOrSource: z.string().max(160).optional(),
-  description: z.string().max(280).optional(),
-  status: z.enum(["confirmed", "pending_review"]).default("confirmed"),
-  origin: z.enum(["manual", "scanned", "imported", "recurring", "ai_assisted"]).default("manual"),
-  receiptUrl: z.string().max(500).optional(),
-  confidence: z.number().min(0).max(1).optional(),
-  // Vínculo transacción↔entidad (Fase 1 · orquestador). Opt-in: si se omite,
-  // createTransaction persiste 'none'.
-  linkedKind: z.enum(["none", "debt", "goal", "holding", "policy", "rental"]).optional(),
-  linkedId: uuidOrNull.optional(),
-  recurringItemId: uuidOrNull.optional(),
-}).refine((d) => !d.linkedKind || d.linkedKind === "none" || !!d.linkedId, {
-  message: "Un vínculo necesita la entidad (linkedId).",
-  path: ["linkedId"],
-});
+export const txnInputSchema = z
+  .object({
+    kind: z.enum(["ingreso", "gasto", "ajuste"]),
+    amount: z.number({ invalid_type_error: "Monto inválido" }).positive("Debe ser mayor a 0"),
+    currency: z.string().length(3).default("CRC"),
+    occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
+    categoryId: uuidOrNull.optional(),
+    accountId: uuidOrNull.optional(),
+    merchantOrSource: z.string().max(160).optional(),
+    description: z.string().max(280).optional(),
+    status: z.enum(["confirmed", "pending_review"]).default("confirmed"),
+    origin: z.enum(["manual", "scanned", "imported", "recurring", "ai_assisted"]).default("manual"),
+    receiptUrl: z.string().max(500).optional(),
+    confidence: z.number().min(0).max(1).optional(),
+    // Vínculo transacción↔entidad (Fase 1 · orquestador). Opt-in: si se omite,
+    // createTransaction persiste 'none'.
+    linkedKind: z.enum(["none", "debt", "goal", "holding", "policy", "rental"]).optional(),
+    linkedId: uuidOrNull.optional(),
+    recurringItemId: uuidOrNull.optional(),
+  })
+  .refine((d) => !d.linkedKind || d.linkedKind === "none" || !!d.linkedId, {
+    message: "Un vínculo necesita la entidad (linkedId).",
+    path: ["linkedId"],
+  });
 
 export const accountInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(80),
@@ -152,7 +154,10 @@ export const categoryMergeSchema = z
     fromId: z.string().uuid(),
     intoId: z.string().uuid(),
   })
-  .refine((d) => d.fromId !== d.intoId, { message: "Elige categorías distintas", path: ["intoId"] });
+  .refine((d) => d.fromId !== d.intoId, {
+    message: "Elige categorías distintas",
+    path: ["intoId"],
+  });
 
 export const categoryDeleteSchema = z.object({
   id: z.string().uuid(),

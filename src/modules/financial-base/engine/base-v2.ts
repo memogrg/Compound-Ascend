@@ -54,11 +54,18 @@ export function computeV2Totals(input: {
 }
 
 /** Composición (dona) ordenada desc. con % de participación. */
-export function composition(map: Record<string, { label: string; value: number }>): CompositionSlice[] {
+export function composition(
+  map: Record<string, { label: string; value: number }>,
+): CompositionSlice[] {
   const entries = Object.entries(map).filter(([, v]) => v.value > 0);
   const total = entries.reduce((s, [, v]) => s + v.value, 0);
   return entries
-    .map(([key, v]) => ({ key, label: v.label, value: v.value, pct: total > 0 ? v.value / total : 0 }))
+    .map(([key, v]) => ({
+      key,
+      label: v.label,
+      value: v.value,
+      pct: total > 0 ? v.value / total : 0,
+    }))
     .sort((a, b) => b.value - a.value);
 }
 

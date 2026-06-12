@@ -20,7 +20,12 @@ export function EmailTester() {
         Comprueba que el envío de invitaciones de familia funcione. Verificamos la conexión y te
         enviamos un correo de prueba a tu propia dirección.
       </p>
-      <button className="btn btn-secondary" style={{ marginTop: 12 }} onClick={run} disabled={pending}>
+      <button
+        className="btn btn-secondary"
+        style={{ marginTop: 12 }}
+        onClick={run}
+        disabled={pending}
+      >
         {pending ? "Probando…" : "Probar envío de correo"}
       </button>
       {result ? (

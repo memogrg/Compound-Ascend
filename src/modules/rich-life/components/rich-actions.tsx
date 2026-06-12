@@ -123,7 +123,11 @@ function RichDialog({
       ? "Agregar activo"
       : "Agregar pasivo";
   return (
-    <Modal title={title} sub="No buscamos exactitud contable, buscamos dirección." onClose={onClose}>
+    <Modal
+      title={title}
+      sub="No buscamos exactitud contable, buscamos dirección."
+      onClose={onClose}
+    >
       <Form kind={kind} currency={currency} onDone={done} item={item} />
     </Modal>
   );
@@ -164,7 +168,9 @@ function Form({
         currency: String(fd.get("currency") ?? currency),
         generatesIncome: fd.get("generatesIncome") === "on",
       };
-      res = assetItem ? await editAssetAction(assetItem.id, payload) : await addAssetAction(payload);
+      res = assetItem
+        ? await editAssetAction(assetItem.id, payload)
+        : await addAssetAction(payload);
     } else {
       const payload = {
         name: String(fd.get("name") ?? ""),
@@ -172,7 +178,9 @@ function Form({
         balance: Number(fd.get("balance") ?? 0),
         currency: String(fd.get("currency") ?? currency),
       };
-      res = liabItem ? await editLiabilityAction(liabItem.id, payload) : await addLiabilityAction(payload);
+      res = liabItem
+        ? await editLiabilityAction(liabItem.id, payload)
+        : await addLiabilityAction(payload);
     }
     setPending(false);
     if (res.ok) onDone();
@@ -260,8 +268,22 @@ function Form({
             </select>
           </div>
           {kind === "asset" ? (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, alignSelf: "end", paddingBottom: 12 }}>
-              <input type="checkbox" name="generatesIncome" defaultChecked={assetItem?.generatesIncome ?? false} /> Genera ingreso
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                alignSelf: "end",
+                paddingBottom: 12,
+              }}
+            >
+              <input
+                type="checkbox"
+                name="generatesIncome"
+                defaultChecked={assetItem?.generatesIncome ?? false}
+              />{" "}
+              Genera ingreso
             </label>
           ) : (
             <div />

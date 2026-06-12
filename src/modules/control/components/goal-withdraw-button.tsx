@@ -83,7 +83,9 @@ export function GoalWithdrawButton({ goal }: { goal: SavingsGoal }) {
           <form onSubmit={submit}>
             <div className="modal-body">
               {error ? (
-                <div className="auth-msg warn" role="alert">{error}</div>
+                <div className="auth-msg warn" role="alert">
+                  {error}
+                </div>
               ) : null}
               <div className="fld">
                 <label className="fld-label">Monto a retirar</label>
@@ -112,16 +114,28 @@ export function GoalWithdrawButton({ goal }: { goal: SavingsGoal }) {
               <div className="fld-2">
                 <div className="fld">
                   <label className="fld-label">Fecha</label>
-                  <input className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                  <input
+                    className="inp"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
                 </div>
                 <div className="fld">
                   <label className="fld-label">Nota</label>
-                  <input className="inp" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opcional" />
+                  <input
+                    className="inp"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="Opcional"
+                  />
                 </div>
               </div>
             </div>
             <div className="modal-foot">
-              <button type="button" className="btn btn-ghost" onClick={close}>Cancelar</button>
+              <button type="button" className="btn btn-ghost" onClick={close}>
+                Cancelar
+              </button>
               <button type="submit" className="btn btn-primary" disabled={pending || exceeds}>
                 {pending ? "Guardando…" : "Registrar retiro"}
               </button>

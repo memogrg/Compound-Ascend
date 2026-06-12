@@ -89,12 +89,21 @@ export function StartChoice({ onGuided }: { onGuided: () => void }) {
               {o.badge ? (
                 <span
                   className="chip"
-                  style={{ position: "absolute", top: 14, right: 14, background: "var(--pos-soft)", color: "var(--pos)" }}
+                  style={{
+                    position: "absolute",
+                    top: 14,
+                    right: 14,
+                    background: "var(--pos-soft)",
+                    color: "var(--pos)",
+                  }}
                 >
                   {o.badge}
                 </span>
               ) : null}
-              <span className="opt-icon" style={{ background: "var(--green-soft)", color: "var(--green)" }}>
+              <span
+                className="opt-icon"
+                style={{ background: "var(--green-soft)", color: "var(--green)" }}
+              >
                 <Icon name={o.icon} filled={o.icon === "spark"} />
               </span>
               <span className="opt-name">{o.title}</span>

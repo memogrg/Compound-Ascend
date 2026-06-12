@@ -1,7 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { investmentInputSchema, policyInputSchema, holdingInputSchema, holdingSaleInputSchema, dividendInputSchema, rentalPaymentInputSchema } from "@/modules/wealth/schemas";
+import {
+  investmentInputSchema,
+  policyInputSchema,
+  holdingInputSchema,
+  holdingSaleInputSchema,
+  dividendInputSchema,
+  rentalPaymentInputSchema,
+} from "@/modules/wealth/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createInvestment,
@@ -248,9 +255,9 @@ export async function removeRentalPaymentAction(id: string): Promise<ActionResul
 }
 
 /** Rentas registradas de una posición. */
-export async function listRentalPaymentsAction(holdingId: string): Promise<
-  import("@/modules/wealth/types").RentalPayment[]
-> {
+export async function listRentalPaymentsAction(
+  holdingId: string,
+): Promise<import("@/modules/wealth/types").RentalPayment[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     return await listRentalPayments(holdingId);
@@ -292,9 +299,9 @@ export async function getHoldingHistoryAction(
 }
 
 /** Dividendos de una posición. */
-export async function listDividendsAction(holdingId: string): Promise<
-  import("@/modules/wealth/types").Dividend[]
-> {
+export async function listDividendsAction(
+  holdingId: string,
+): Promise<import("@/modules/wealth/types").Dividend[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     return await listDividends(holdingId);

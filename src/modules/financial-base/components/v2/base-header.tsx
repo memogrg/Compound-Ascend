@@ -11,7 +11,13 @@ export function BaseHeader({ title, sub, period }: { title: string; sub: string;
   return (
     <div
       className="card card-pad"
-      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 16,
+        flexWrap: "wrap",
+      }}
     >
       <div>
         <div className="card-title">{title}</div>

@@ -20,7 +20,8 @@ export function DonutChart({
   centerSub?: string;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0);
-  const safe = total > 0 ? data.filter((d) => d.value > 0) : [{ name: "—", value: 1, color: "var(--chip)" }];
+  const safe =
+    total > 0 ? data.filter((d) => d.value > 0) : [{ name: "—", value: 1, color: "var(--chip)" }];
 
   return (
     <div style={{ position: "relative", width: size, height: size, flex: "none" }}>

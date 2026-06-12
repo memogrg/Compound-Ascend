@@ -38,11 +38,17 @@ export function AcceptInvitation({
   return (
     <div>
       <p style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 18 }}>
-        <strong>{inviterName}</strong> te invitó a su hogar{" "}
-        <strong>{householdName}</strong>. Al aceptar te sumas a la gestión compartida y heredas la
-        configuración del perfil; no tendrás que llenar el cuestionario.
+        <strong>{inviterName}</strong> te invitó a su hogar <strong>{householdName}</strong>. Al
+        aceptar te sumas a la gestión compartida y heredas la configuración del perfil; no tendrás
+        que llenar el cuestionario.
       </p>
-      <button type="button" className="btn btn-primary" onClick={accept} disabled={pending} style={{ width: "100%" }}>
+      <button
+        type="button"
+        className="btn btn-primary"
+        onClick={accept}
+        disabled={pending}
+        style={{ width: "100%" }}
+      >
         {pending ? "Uniéndote…" : "Aceptar y unirme al hogar"}
       </button>
       {error ? (

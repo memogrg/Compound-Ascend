@@ -18,10 +18,7 @@ export async function buildContextForUser(
   householdId: string | null,
 ): Promise<FinancialContext> {
   const supabase = createServiceRoleClient();
-  const [name, currency] = await Promise.all([
-    getUserDisplayName(userId),
-    getUserCurrency(userId),
-  ]);
+  const [name, currency] = await Promise.all([getUserDisplayName(userId), getUserCurrency(userId)]);
 
   // Incluye filas propias y, si pertenece a un hogar, las del hogar.
   const orFilter = householdId

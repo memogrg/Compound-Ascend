@@ -1,10 +1,6 @@
 /** Barrel público del Módulo 3 — Control Financiero. */
 export { buildControlDiagnosis } from "./engine/priority-engine";
-export {
-  simulateStrategy,
-  recommendMethod,
-  orderDebts,
-} from "./engine/debt-strategy";
+export { simulateStrategy, recommendMethod, orderDebts } from "./engine/debt-strategy";
 export {
   buildSchedule,
   compareExtra,

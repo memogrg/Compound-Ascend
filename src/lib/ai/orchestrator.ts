@@ -31,7 +31,12 @@ export async function financeChat(
   const provider = getProvider();
   const result = await provider.chat({ system: buildSystemPrompt(ctx), messages });
   const parsed = parseAction(result.text);
-  return { ...parsed, tokensIn: result.tokensIn, tokensOut: result.tokensOut, provider: provider.name };
+  return {
+    ...parsed,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
+    provider: provider.name,
+  };
 }
 
 export type ReceiptExtract = {
@@ -53,7 +58,12 @@ export async function scanReceipt(
   const provider = getProvider();
   const result = await provider.vision({ imageBase64, mimeType, prompt: RECEIPT_PROMPT });
   const extract = parseReceipt(result.text);
-  return { extract, tokensIn: result.tokensIn, tokensOut: result.tokensOut, provider: provider.name };
+  return {
+    extract,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
+    provider: provider.name,
+  };
 }
 
 function parseReceipt(text: string): ReceiptExtract {

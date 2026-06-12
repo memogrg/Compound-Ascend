@@ -22,12 +22,20 @@ export function QuickAddButtons({
   return (
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
       {only !== "ingreso" ? (
-        <button className="btn btn-primary" style={{ padding: "12px 18px", fontSize: 14.5 }} onClick={() => setOpen("gasto")}>
+        <button
+          className="btn btn-primary"
+          style={{ padding: "12px 18px", fontSize: 14.5 }}
+          onClick={() => setOpen("gasto")}
+        >
           <Icon name="expense" width={2} /> Registrar gasto
         </button>
       ) : null}
       {only !== "gasto" ? (
-        <button className="btn btn-secondary" style={{ padding: "12px 18px", fontSize: 14.5 }} onClick={() => setOpen("ingreso")}>
+        <button
+          className="btn btn-secondary"
+          style={{ padding: "12px 18px", fontSize: 14.5 }}
+          onClick={() => setOpen("ingreso")}
+        >
           <Icon name="income" width={2} /> Registrar ingreso
         </button>
       ) : null}

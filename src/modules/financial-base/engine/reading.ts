@@ -34,55 +34,76 @@ export function buildBaseReading(input: ReadingInput): FinancialReading {
 
   // Flujo libre
   if (free > 0) {
-    insights.push(`Tu flujo libre real del mes es ${fmt(free)} (${pct(totals.freeCashflowPct)} de tus ingresos).`);
+    insights.push(
+      `Tu flujo libre real del mes es ${fmt(free)} (${pct(totals.freeCashflowPct)} de tus ingresos).`,
+    );
   } else {
-    insights.push(`Tus gastos reales superan tus ingresos: tu flujo libre es ${fmt(free)}. Es la prioridad a corregir.`);
+    insights.push(
+      `Tus gastos reales superan tus ingresos: tu flujo libre es ${fmt(free)}. Es la prioridad a corregir.`,
+    );
     actions.push("Recorta primero las categorías flexibles que más se salieron del presupuesto.");
   }
 
   // Gasto vs presupuesto
   if (totals.expenseVariancePct > 0.05) {
-    insights.push(`Gastaste ${pct(totals.expenseVariancePct)} por encima de tu presupuesto este mes.`);
+    insights.push(
+      `Gastaste ${pct(totals.expenseVariancePct)} por encima de tu presupuesto este mes.`,
+    );
     actions.push(
       input.topExpenseCategory
         ? `Revisa la categoría "${input.topExpenseCategory}": es donde más se concentra tu gasto.`
         : "Asigna categorías a tus gastos para ver dónde se va el dinero.",
     );
   } else if (totals.budgetExpense > 0) {
-    insights.push(`Mantuviste tus gastos dentro del presupuesto (${pct(totals.expenseVariancePct)} de variación).`);
+    insights.push(
+      `Mantuviste tus gastos dentro del presupuesto (${pct(totals.expenseVariancePct)} de variación).`,
+    );
   }
 
   // Ingresos vs presupuesto / dependencia
   if (totals.incomeVariancePct < -0.05) {
-    insights.push(`Tus ingresos reales quedaron ${pct(Math.abs(totals.incomeVariancePct))} por debajo de lo presupuestado.`);
+    insights.push(
+      `Tus ingresos reales quedaron ${pct(Math.abs(totals.incomeVariancePct))} por debajo de lo presupuestado.`,
+    );
   }
   if (topIncomeShare > 0.8 && incomeComposition.length > 0) {
-    insights.push(`Dependes demasiado de una sola fuente (${pct(topIncomeShare)} de tus ingresos).`);
+    insights.push(
+      `Dependes demasiado de una sola fuente (${pct(topIncomeShare)} de tus ingresos).`,
+    );
     actions.push("Explora una fuente de ingreso secundaria antes de subir tus gastos fijos.");
   }
 
   // Ratio gasto/ingreso
   if (totals.expenseRatio > 0.9 && totals.realIncome > 0) {
-    actions.push("Tu ratio gasto/ingreso está alto; apunta a gastar menos del 80% de lo que ingresas.");
+    actions.push(
+      "Tu ratio gasto/ingreso está alto; apunta a gastar menos del 80% de lo que ingresas.",
+    );
   } else if (free > 0 && totals.expenseRatio < 0.7) {
-    actions.push("Con tu flujo libre actual, automatiza un ahorro mensual fijo apenas entra tu ingreso.");
+    actions.push(
+      "Con tu flujo libre actual, automatiza un ahorro mensual fijo apenas entra tu ingreso.",
+    );
   }
 
   // Próximo paso
   let nextStep: string;
   if (free <= 0) {
-    nextStep = "Equilibra tu mes: el objetivo inmediato es que tus ingresos cubran tus gastos y liberar presión.";
+    nextStep =
+      "Equilibra tu mes: el objetivo inmediato es que tus ingresos cubran tus gastos y liberar presión.";
   } else if (financialPressure === "alta" || financialPressure === "critica") {
-    nextStep = "Antes de crecer, refuerza tu base: prioriza fondo de emergencia y reducir gasto fijo.";
+    nextStep =
+      "Antes de crecer, refuerza tu base: prioriza fondo de emergencia y reducir gasto fijo.";
   } else if (totals.expenseRatio < 0.7) {
     nextStep = `Tienes margen sano (${fmt(free)} libres): dirígelo a tus metas de ahorro o inversión.`;
   } else {
-    nextStep = "Ajusta una o dos categorías para ampliar tu flujo libre y darte margen de maniobra.";
+    nextStep =
+      "Ajusta una o dos categorías para ampliar tu flujo libre y darte margen de maniobra.";
   }
 
   // Rellenos por si faltan (siempre 3).
-  while (insights.length < 3) insights.push("Tu base luce estable; sigue registrando para afinar las lecturas.");
-  while (actions.length < 3) actions.push("Mantén el hábito de registrar cada gasto: lo que se mide, mejora.");
+  while (insights.length < 3)
+    insights.push("Tu base luce estable; sigue registrando para afinar las lecturas.");
+  while (actions.length < 3)
+    actions.push("Mantén el hábito de registrar cada gasto: lo que se mide, mejora.");
 
   const diagnosis =
     free > 0
@@ -99,27 +120,38 @@ export function buildBaseReading(input: ReadingInput): FinancialReading {
 }
 
 /** Cápsula corta para los tabs de Ingresos / Gastos. */
-export function buildCapsule(
-  kind: "income" | "expense",
-  input: ReadingInput,
-): FinancialReading {
+export function buildCapsule(kind: "income" | "expense", input: ReadingInput): FinancialReading {
   const { totals, currencyFormat: fmt } = input;
   const insights: string[] = [];
   const actions: string[] = [];
 
   if (kind === "income") {
     const dep = input.incomeComposition[0];
-    insights.push(`Ingresos reales: ${fmt(totals.realIncome)} (${pct(totals.incomeVariancePct)} vs presupuesto).`);
-    if (dep && dep.pct > 0.7) insights.push(`Tu fuente principal (${dep.label}) pesa ${pct(dep.pct)} del total.`);
+    insights.push(
+      `Ingresos reales: ${fmt(totals.realIncome)} (${pct(totals.incomeVariancePct)} vs presupuesto).`,
+    );
+    if (dep && dep.pct > 0.7)
+      insights.push(`Tu fuente principal (${dep.label}) pesa ${pct(dep.pct)} del total.`);
     else insights.push("Tienes una mezcla de fuentes razonablemente diversificada.");
     insights.push(`${input.incomeComposition.length} fuente(s) activa(s) este mes.`);
-    actions.push(dep && dep.pct > 0.7 ? "Diversifica: una segunda fuente reduce tu riesgo." : "Mantén el ritmo y formaliza tus ingresos variables.");
+    actions.push(
+      dep && dep.pct > 0.7
+        ? "Diversifica: una segunda fuente reduce tu riesgo."
+        : "Mantén el ritmo y formaliza tus ingresos variables.",
+    );
     actions.push("Registra cada ingreso real para medir tu cumplimiento vs presupuesto.");
   } else {
-    insights.push(`Gastos reales: ${fmt(totals.realExpense)} (${pct(totals.expenseVariancePct)} vs presupuesto).`);
-    if (input.topExpenseCategory) insights.push(`Tu mayor categoría es "${input.topExpenseCategory}".`);
+    insights.push(
+      `Gastos reales: ${fmt(totals.realExpense)} (${pct(totals.expenseVariancePct)} vs presupuesto).`,
+    );
+    if (input.topExpenseCategory)
+      insights.push(`Tu mayor categoría es "${input.topExpenseCategory}".`);
     insights.push(`Ratio gasto/ingreso: ${pct(totals.expenseRatio)}.`);
-    actions.push(totals.expenseVariancePct > 0.05 ? "Recorta donde más te saliste del presupuesto." : "Vas dentro del presupuesto; mantén el control.");
+    actions.push(
+      totals.expenseVariancePct > 0.05
+        ? "Recorta donde más te saliste del presupuesto."
+        : "Vas dentro del presupuesto; mantén el control.",
+    );
     actions.push("Marca tus gastos recurrentes para anticipar el mes siguiente.");
   }
   while (insights.length < 3) insights.push("Sigue registrando para afinar la lectura.");

@@ -66,7 +66,10 @@ export class GeminiProvider implements AIProvider {
   }): Promise<AIChatResult> {
     const contents = messages
       .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+      .map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
     const body = {
       system_instruction: { parts: [{ text: system }] },
       contents,

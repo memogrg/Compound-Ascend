@@ -22,7 +22,11 @@ export function CategoryManagerButton({ tree }: { tree: CategoryNode[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className="btn btn-ghost" style={{ padding: "12px 16px", fontSize: 14 }} onClick={() => setOpen(true)}>
+      <button
+        className="btn btn-ghost"
+        style={{ padding: "12px 16px", fontSize: 14 }}
+        onClick={() => setOpen(true)}
+      >
         <Icon name="gear" width={2} /> Categorías
       </button>
       {open ? <CategoryManagerModal tree={tree} onClose={() => setOpen(false)} /> : null}
@@ -30,7 +34,13 @@ export function CategoryManagerButton({ tree }: { tree: CategoryNode[] }) {
   );
 }
 
-export function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; onClose: () => void }) {
+export function CategoryManagerModal({
+  tree,
+  onClose,
+}: {
+  tree: CategoryNode[];
+  onClose: () => void;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
@@ -59,7 +69,11 @@ export function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; 
   async function onCreate() {
     if (!newName.trim()) return;
     setPending(true);
-    const res = await addCategoryAction({ name: newName.trim(), parentId: newGroup || null, categoryType: "expense" });
+    const res = await addCategoryAction({
+      name: newName.trim(),
+      parentId: newGroup || null,
+      categoryType: "expense",
+    });
     setPending(false);
     if (res.ok) {
       toast("Categoría creada");
@@ -106,19 +120,38 @@ export function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; 
   }
 
   return (
-    <Modal title="Gestionar categorías" sub="Crea, fusiona y organiza. Tu histórico nunca se pierde." onClose={onClose}>
+    <Modal
+      title="Gestionar categorías"
+      sub="Crea, fusiona y organiza. Tu histórico nunca se pierde."
+      onClose={onClose}
+    >
       <div className="modal-body">
         {/* Crear */}
         <div className="fld">
           <label className="fld-label">Nueva categoría</label>
           <div className="fld-2">
-            <input className="inp" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ej. Cuotas del gym" />
+            <input
+              className="inp"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Ej. Cuotas del gym"
+            />
             <select className="sel" value={newGroup} onChange={(e) => setNewGroup(e.target.value)}>
               <option value="">Sin grupo (Nivel 1)</option>
-              {tree.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              {tree.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
             </select>
           </div>
-          <button type="button" className="btn btn-primary" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={() => void onCreate()} disabled={pending}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: 8, alignSelf: "flex-start" }}
+            onClick={() => void onCreate()}
+            disabled={pending}
+          >
             <Icon name="plus" width={2} /> Crear
           </button>
         </div>
@@ -127,16 +160,38 @@ export function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; 
         <div className="fld" style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
           <label className="fld-label">Fusionar duplicadas</label>
           <div className="fld-2">
-            <select className="sel" value={mergeFrom} onChange={(e) => setMergeFrom(e.target.value)}>
+            <select
+              className="sel"
+              value={mergeFrom}
+              onChange={(e) => setMergeFrom(e.target.value)}
+            >
               <option value="">Fusionar… (tuya)</option>
-              {userCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {userCats.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
             </select>
-            <select className="sel" value={mergeInto} onChange={(e) => setMergeInto(e.target.value)}>
+            <select
+              className="sel"
+              value={mergeInto}
+              onChange={(e) => setMergeInto(e.target.value)}
+            >
               <option value="">…dentro de</option>
-              {flat.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              {flat.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
             </select>
           </div>
-          <button type="button" className="btn btn-secondary" style={{ marginTop: 8, alignSelf: "flex-start" }} onClick={() => void onMerge()} disabled={pending}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ marginTop: 8, alignSelf: "flex-start" }}
+            onClick={() => void onMerge()}
+            disabled={pending}
+          >
             <Icon name="repeat" width={2} /> Fusionar
           </button>
           <span className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
@@ -152,10 +207,21 @@ export function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; 
               <div key={c.id} className="cmp-cat-row">
                 <span className="cmp-dot" style={{ background: c.color ?? "var(--muted-2)" }} />
                 <span style={{ flex: 1, fontSize: 13 }}>{c.name}</span>
-                <button type="button" className="btn btn-ghost" style={{ padding: "4px 8px" }} onClick={() => void onToggleFavorite(c.id, c.isFavorite)}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ padding: "4px 8px" }}
+                  onClick={() => void onToggleFavorite(c.id, c.isFavorite)}
+                >
                   <Icon name={c.isFavorite ? "check" : "spark"} width={2} />
                 </button>
-                <button type="button" className="btn btn-ghost" style={{ padding: "4px 8px", color: "var(--neg)" }} onClick={() => void onDelete(c.id)} disabled={pending}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ padding: "4px 8px", color: "var(--neg)" }}
+                  onClick={() => void onDelete(c.id)}
+                  disabled={pending}
+                >
                   <Icon name="x" width={2} />
                 </button>
               </div>
@@ -163,12 +229,15 @@ export function CategoryManagerModal({ tree, onClose }: { tree: CategoryNode[]; 
           </div>
         ) : (
           <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
-            Aún no has creado categorías propias. Las de sistema no se pueden borrar, pero puedes marcarlas como favoritas desde aquí en el futuro.
+            Aún no has creado categorías propias. Las de sistema no se pueden borrar, pero puedes
+            marcarlas como favoritas desde aquí en el futuro.
           </div>
         )}
       </div>
       <div className="modal-foot">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>Cerrar</button>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cerrar
+        </button>
       </div>
     </Modal>
   );

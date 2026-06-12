@@ -10,10 +10,18 @@ export type Period = "1M" | "3M" | "1Y" | "all";
 function periodStart(period: Period): string {
   const d = new Date();
   switch (period) {
-    case "1M": d.setMonth(d.getMonth() - 1); break;
-    case "3M": d.setMonth(d.getMonth() - 3); break;
-    case "1Y": d.setFullYear(d.getFullYear() - 1); break;
-    case "all": d.setFullYear(2015); break;
+    case "1M":
+      d.setMonth(d.getMonth() - 1);
+      break;
+    case "3M":
+      d.setMonth(d.getMonth() - 3);
+      break;
+    case "1Y":
+      d.setFullYear(d.getFullYear() - 1);
+      break;
+    case "all":
+      d.setFullYear(2015);
+      break;
   }
   return d.toISOString().slice(0, 10);
 }
@@ -51,7 +59,9 @@ export async function getHoldingHistory(
   // No cotizados: valor manual del usuario (no precio×cantidad).
   const costBasis = holding.quantity * holding.averageCost;
   const currentValue =
-    currentPrice !== null ? holding.quantity * currentPrice : (holding.currentValueManual ?? costBasis);
+    currentPrice !== null
+      ? holding.quantity * currentPrice
+      : (holding.currentValueManual ?? costBasis);
 
   const purchaseDate = holding.purchaseDate
     ? new Date(holding.purchaseDate)

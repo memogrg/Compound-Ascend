@@ -10,20 +10,49 @@ export function UpgradePrompt({ compact = false }: { compact?: boolean }) {
     <div
       className="card card-pad"
       style={{
-        background: "linear-gradient(140deg, color-mix(in srgb,var(--gold) 12%, var(--surface)), var(--surface))",
+        background:
+          "linear-gradient(140deg, color-mix(in srgb,var(--gold) 12%, var(--surface)), var(--surface))",
         border: "1px solid color-mix(in srgb,var(--gold) 30%, var(--line))",
       }}
     >
       <div className="row" style={{ gap: 10 }}>
-        <span style={{ width: 28, height: 28, borderRadius: 8, display: "grid", placeItems: "center", background: "var(--gold)", color: "white" }}>
+        <span
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            display: "grid",
+            placeItems: "center",
+            background: "var(--gold)",
+            color: "white",
+          }}
+        >
           <Icon name="spark" filled width={0} />
         </span>
         <div className="card-title">Compound Ascend Premium</div>
       </div>
       {!compact ? (
-        <ul style={{ margin: "14px 0 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
+        <ul
+          style={{
+            margin: "14px 0 0",
+            padding: 0,
+            listStyle: "none",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
           {PREMIUM_BENEFITS.map((b) => (
-            <li key={b} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--ink-2)" }}>
+            <li
+              key={b}
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                fontSize: 13,
+                color: "var(--ink-2)",
+              }}
+            >
               <span style={{ color: "var(--pos)", flex: "none", marginTop: 1 }}>
                 <Icon name="check" width={2.4} />
               </span>
@@ -36,7 +65,12 @@ export function UpgradePrompt({ compact = false }: { compact?: boolean }) {
         Tu diagnóstico y tus módulos siempre son gratuitos. Premium suma acompañamiento avanzado
         cuando lo necesites.
       </p>
-      <button className="btn btn-primary" style={{ marginTop: 8 }} disabled title="Pagos próximamente">
+      <button
+        className="btn btn-primary"
+        style={{ marginTop: 8 }}
+        disabled
+        title="Pagos próximamente"
+      >
         Mejorar a Premium
       </button>
     </div>

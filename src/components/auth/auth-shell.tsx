@@ -44,9 +44,7 @@ export function AuthShell({
         {showTrust ? (
           <div className="auth-trust">
             <Icon name="defense" />
-            <span>
-              Tus datos financieros están protegidos y solo tú puedes acceder a ellos.
-            </span>
+            <span>Tus datos financieros están protegidos y solo tú puedes acceder a ellos.</span>
           </div>
         ) : null}
       </div>

@@ -18,12 +18,19 @@ export default async function Page() {
     <div className="grid">
       <div
         className="card card-pad"
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
       >
         <div>
           <div className="card-title">Préstamos y deudas</div>
           <div className="card-sub">
-            Tu plan para salir de deudas: estrategia, amortización y cuánto te ahorras pagando de más.
+            Tu plan para salir de deudas: estrategia, amortización y cuánto te ahorras pagando de
+            más.
           </div>
         </div>
       </div>

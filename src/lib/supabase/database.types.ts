@@ -635,7 +635,11 @@ export interface Database {
       >;
       household_invitations: TableShape<
         HouseholdInvitationRow,
-        Partial<HouseholdInvitationRow> & { household_id: string; email: string; invited_by: string },
+        Partial<HouseholdInvitationRow> & {
+          household_id: string;
+          email: string;
+          invited_by: string;
+        },
         Partial<HouseholdInvitationRow>
       >;
       whatsapp_links: UserTable<WhatsAppLinkRow>;
@@ -659,12 +663,25 @@ export interface Database {
       insurance_policies: UserTable<InsurancePolicyRow>;
       market_price_cache: TableShape<
         MarketPriceCacheRow,
-        Partial<MarketPriceCacheRow> & { symbol: string; asset_type: string; price: number; currency: string; fetched_at: string; ttl_seconds: number },
+        Partial<MarketPriceCacheRow> & {
+          symbol: string;
+          asset_type: string;
+          price: number;
+          currency: string;
+          fetched_at: string;
+          ttl_seconds: number;
+        },
         Partial<MarketPriceCacheRow>
       >;
       economic_indicators: TableShape<
         EconomicIndicatorRow,
-        Partial<EconomicIndicatorRow> & { indicator_code: string; source: string; value: number; unit: string; observed_date: string },
+        Partial<EconomicIndicatorRow> & {
+          indicator_code: string;
+          source: string;
+          value: number;
+          unit: string;
+          observed_date: string;
+        },
         Partial<EconomicIndicatorRow>
       >;
       dividends: UserTable<DividendRow>;

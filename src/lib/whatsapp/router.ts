@@ -195,7 +195,10 @@ async function handleText(
 }
 
 /** Mapea el payload de la acción `create_transaction` a una PendingAction. */
-function toTxnAction(payload: Record<string, unknown>, fallbackCurrency: string): PendingAction | null {
+function toTxnAction(
+  payload: Record<string, unknown>,
+  fallbackCurrency: string,
+): PendingAction | null {
   const amount = Number(payload.amount);
   if (!Number.isFinite(amount) || amount <= 0) return null;
   const kind = String(payload.kind ?? "gasto") === "ingreso" ? "ingreso" : "gasto";
@@ -266,7 +269,11 @@ async function handleReceiptPhoto(
   };
   await setPendingAction(link.id, action);
 
-  const parts = [`🧾 ${extract.merchant ?? "Comercio"}`, formatMoney(extract.amount, currency), date];
+  const parts = [
+    `🧾 ${extract.merchant ?? "Comercio"}`,
+    formatMoney(extract.amount, currency),
+    date,
+  ];
   if (extract.category) parts.push(`categoría ${extract.category}`);
   await provider.sendButtons(msg.phone, `${parts.join(" · ")}. ¿Lo agrego?`, [
     { id: "yes", title: "Sí" },

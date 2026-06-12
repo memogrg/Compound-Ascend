@@ -81,7 +81,11 @@ export async function getDebtDetail(
   };
 
   const due = computeDueStatus(
-    { payDay: debt.payDay, startDate: debt.startDate, paymentDates: payments.map((p) => p.paymentDate) },
+    {
+      payDay: debt.payDay,
+      startDate: debt.startDate,
+      paymentDates: payments.map((p) => p.paymentDate),
+    },
     new Date(),
   );
 
@@ -97,7 +101,11 @@ export async function getDebtDetail(
     pmts.length > 0
       ? recomputeFromPayments(
           input,
-          pmts.map((p) => ({ paymentDate: p.paymentDate, amount: p.amount, extraAmount: p.extraAmount })),
+          pmts.map((p) => ({
+            paymentDate: p.paymentDate,
+            amount: p.amount,
+            extraAmount: p.extraAmount,
+          })),
         )
       : null;
 

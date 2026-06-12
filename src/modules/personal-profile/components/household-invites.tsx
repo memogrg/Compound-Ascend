@@ -86,43 +86,56 @@ export function HouseholdInvites({
       ) : null}
       {emails.length > 0 ? (
         <>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-          {emails.map((e) => (
-            <span
-              key={e}
-              className="chip-sel on"
-              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              {e}
-              <button
-                type="button"
-                aria-label={`Quitar ${e}`}
-                onClick={() => remove(e)}
-                style={{
-                  background: "none",
-                  border: 0,
-                  color: "inherit",
-                  cursor: "pointer",
-                  display: "grid",
-                  placeItems: "center",
-                  padding: 0,
-                }}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            {emails.map((e) => (
+              <span
+                key={e}
+                className="chip-sel on"
+                style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
               >
-                <Icon name="x" width={2} />
-              </button>
-            </span>
-          ))}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-          <button type="button" className="btn btn-secondary" onClick={sendInvites} disabled={sending}>
-            {sending ? "Enviando…" : "Enviar invitaciones"}
-          </button>
-          {status ? (
-            <span className="muted" style={{ fontSize: 12.5 }} role="status">
-              {status}
-            </span>
-          ) : null}
-        </div>
+                {e}
+                <button
+                  type="button"
+                  aria-label={`Quitar ${e}`}
+                  onClick={() => remove(e)}
+                  style={{
+                    background: "none",
+                    border: 0,
+                    color: "inherit",
+                    cursor: "pointer",
+                    display: "grid",
+                    placeItems: "center",
+                    padding: 0,
+                  }}
+                >
+                  <Icon name="x" width={2} />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginTop: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={sendInvites}
+              disabled={sending}
+            >
+              {sending ? "Enviando…" : "Enviar invitaciones"}
+            </button>
+            {status ? (
+              <span className="muted" style={{ fontSize: 12.5 }} role="status">
+                {status}
+              </span>
+            ) : null}
+          </div>
         </>
       ) : null}
     </div>

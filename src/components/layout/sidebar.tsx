@@ -48,9 +48,7 @@ export function Sidebar({ open, onNavigate, user }: SidebarProps) {
                 </span>
                 <span>{it.name}</span>
                 {it.badge ? <span className="nav-badge">{it.badge}</span> : null}
-                {it.dot ? (
-                  <span className="nav-dot" style={{ background: it.dot }} />
-                ) : null}
+                {it.dot ? <span className="nav-dot" style={{ background: it.dot }} /> : null}
               </Link>
             ))}
           </nav>

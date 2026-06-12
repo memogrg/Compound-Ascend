@@ -70,7 +70,9 @@ export async function propagateLinkedTransaction(args: {
 
     const { estimatePaymentSplit } = await import("@/modules/control/engine/amortization");
     const cuota =
-      Number(debt.current_payment) > 0 ? Number(debt.current_payment) : Number(debt.min_payment ?? 0);
+      Number(debt.current_payment) > 0
+        ? Number(debt.current_payment)
+        : Number(debt.min_payment ?? 0);
     const split = estimatePaymentSplit({
       totalPaid: args.amount,
       cuota,
@@ -140,9 +142,8 @@ export async function linkExistingTransaction(args: {
   if ((txn.linked_kind ?? "none") !== "none") throw new Error("La transacción ya está vinculada.");
 
   // Fase 6.1: la entidad debe existir y ser del usuario antes de vincular.
-  const { assertLinkableEntity } = await import(
-    "@/modules/financial-base/services/linkable-entities-service"
-  );
+  const { assertLinkableEntity } =
+    await import("@/modules/financial-base/services/linkable-entities-service");
   await assertLinkableEntity(args.linkedKind, args.linkedId);
 
   const { error: upErr } = await supabase

@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useRef,
-  useCallback,
-  useEffect,
-  useId,
-  type ReactNode,
-} from "react";
+import { useState, useRef, useCallback, useEffect, useId, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
@@ -91,14 +84,29 @@ const OTHER_ASSET_TYPES: Array<[AssetType, string]> = [
 ];
 
 const DEFAULT_SYMBOL: Partial<Record<AssetType, string>> = {
-  bono: "BONO", fondo: "FONDO", certificado: "CERT", inmueble: "INMU",
-  negocio: "NEG", pension: "PENS", commodity: "COMM", arte: "ARTE", nft: "NFT", otro: "OTRO",
+  bono: "BONO",
+  fondo: "FONDO",
+  certificado: "CERT",
+  inmueble: "INMU",
+  negocio: "NEG",
+  pension: "PENS",
+  commodity: "COMM",
+  arte: "ARTE",
+  nft: "NFT",
+  otro: "OTRO",
 };
 
 const OTHER_TYPE_LABEL: Partial<Record<AssetType, string>> = {
-  bono: "Bono", fondo: "Fondo de inversión", certificado: "Certificado",
-  inmueble: "Bienes raíces", negocio: "Negocio", pension: "Pensión",
-  commodity: "Commodity", arte: "Arte / Coleccionables", nft: "NFT", otro: "Otro activo",
+  bono: "Bono",
+  fondo: "Fondo de inversión",
+  certificado: "Certificado",
+  inmueble: "Bienes raíces",
+  negocio: "Negocio",
+  pension: "Pensión",
+  commodity: "Commodity",
+  arte: "Arte / Coleccionables",
+  nft: "NFT",
+  otro: "Otro activo",
 };
 
 const STEP_TITLES = [
@@ -122,7 +130,8 @@ const UCITS_EQUIVALENTS: Partial<Record<string, { symbol: string; name: string }
 };
 
 const BROKER_GUIDANCE: Partial<Record<string, string>> = {
-  "Interactive Brokers": "Activa 'Recurring Investments' en IBKR (Cuenta → Inversiones recurrentes). Disponible para acciones/ETFs en mercados US, CA y EU. La app no ejecuta órdenes.",
+  "Interactive Brokers":
+    "Activa 'Recurring Investments' en IBKR (Cuenta → Inversiones recurrentes). Disponible para acciones/ETFs en mercados US, CA y EU. La app no ejecuta órdenes.",
   Dominion: "Configura la orden recurrente directamente en el portal de Dominion Securities.",
   ITA: "Contacta a tu asesor de ITA para programar aportes periódicos.",
   Local: "Consulta con tu broker la opción de órdenes automáticas periódicas.",
@@ -132,7 +141,9 @@ const BROKER_GUIDANCE: Partial<Record<string, string>> = {
 function isUSResident(country: string | null): boolean {
   if (!country) return false;
   const lc = country.toLowerCase();
-  return lc.includes("united states") || lc === "usa" || lc === "ee.uu." || lc.includes("estados unidos");
+  return (
+    lc.includes("united states") || lc === "usa" || lc === "ee.uu." || lc.includes("estados unidos")
+  );
 }
 
 function sym(currency: string): string {
@@ -141,7 +152,13 @@ function sym(currency: string): string {
 
 // ── Exported triggers ─────────────────────────────────────────────
 
-export function AddHoldingButton({ currency = "CRC", deepLinkKey }: { currency?: string; deepLinkKey?: string }) {
+export function AddHoldingButton({
+  currency = "CRC",
+  deepLinkKey,
+}: {
+  currency?: string;
+  deepLinkKey?: string;
+}) {
   const [open, setOpen] = useState(false);
   useDeepLinkModal(deepLinkKey, () => setOpen(true));
   return (
@@ -254,9 +271,7 @@ function AddHoldingWizard({
     holdingToEdit?.label ?? initialHolding?.description ?? initialHolding?.symbol ?? "",
   );
   // A1: default to "amount" — monto total es más intuitivo
-  const [priceMode, setPriceMode] = useState<PriceMode>(
-    holdingToEdit ? "custom" : "live",
-  );
+  const [priceMode, setPriceMode] = useState<PriceMode>(holdingToEdit ? "custom" : "live");
   const [averageCost, setAverageCost] = useState(
     holdingToEdit ? String(holdingToEdit.averageCost) : "",
   );
@@ -266,17 +281,13 @@ function AddHoldingWizard({
   const [inputMode, setInputMode] = useState<"units" | "amount">(
     holdingToEdit ? "units" : "amount",
   );
-  const [quantity, setQuantity] = useState(
-    holdingToEdit ? String(holdingToEdit.quantity) : "",
-  );
+  const [quantity, setQuantity] = useState(holdingToEdit ? String(holdingToEdit.quantity) : "");
   const [totalAmount, setTotalAmount] = useState("");
   const [broker, setBroker] = useState(holdingToEdit?.broker ?? "");
   // Fase 4.1: compra/aporte → gasto vinculado. ON al crear; OFF al editar
   // (un edit puede ser corrección de datos, no un aporte real).
   const [registerExpense, setRegisterExpense] = useState(!holdingToEdit);
-  const [holdingCurrency, setHoldingCurrency] = useState(
-    holdingToEdit?.currency ?? currency,
-  );
+  const [holdingCurrency, setHoldingCurrency] = useState(holdingToEdit?.currency ?? currency);
 
   // ── Renta / valor manual (activos no cotizados: inmueble, negocio, otro) ──
   const [currentValueManual, setCurrentValueManual] = useState(
@@ -288,9 +299,9 @@ function AddHoldingWizard({
   const [rentalFrequency, setRentalFrequency] = useState<"mensual" | "trimestral" | "anual">(
     holdingToEdit?.rentalFrequency ?? "mensual",
   );
-  const [rentalSubtype, setRentalSubtype] = useState<"alquiler" | "airbnb" | "auto" | "negocio" | "otro">(
-    holdingToEdit?.rentalSubtype ?? "alquiler",
-  );
+  const [rentalSubtype, setRentalSubtype] = useState<
+    "alquiler" | "airbnb" | "auto" | "negocio" | "otro"
+  >(holdingToEdit?.rentalSubtype ?? "alquiler");
 
   // ── Step 4 ────────────────────────────────────────────────────────
   const [dcaFrequency, setDcaFrequency] = useState<DcaFreq>("mensual");
@@ -316,41 +327,70 @@ function AddHoldingWizard({
 
   const runSearch = useCallback((q: string) => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (q.length < 2) { setSearchResults([]); setSearchLoading(false); return; }
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
     setSearchLoading(true);
     timerRef.current = setTimeout(async () => {
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       try {
-        const res = await fetch(`/api/market-price/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
-        if (!res.ok) { setSearchResults([]); return; }
+        const res = await fetch(`/api/market-price/search?q=${encodeURIComponent(q)}`, {
+          signal: ctrl.signal,
+        });
+        if (!res.ok) {
+          setSearchResults([]);
+          return;
+        }
         const data = (await res.json()) as { results?: SymbolResult[] };
         setSearchResults(data.results ?? []);
-      } catch { /* AbortError */ } finally { setSearchLoading(false); }
+      } catch {
+        /* AbortError */
+      } finally {
+        setSearchLoading(false);
+      }
     }, 300);
   }, []);
 
-  const fetchLivePrice = useCallback(async (symbol: string, cat: AssetType) => {
-    if (!hasLivePrice(cat)) return;
-    const apiType = API_TYPE_MAP[cat];
-    if (!apiType) return;
-    setLivePriceLoading(true);
-    setLivePriceError(false);
-    setLivePrice(null);
-    try {
-      const res = await fetch(`/api/market-price?symbol=${encodeURIComponent(symbol)}&type=${apiType}`);
-      if (!res.ok) { setLivePriceError(true); setPriceMode("custom"); return; }
-      const data = (await res.json()) as { price?: number; currency?: string };
-      if (typeof data.price === "number" && data.price > 0) {
-        setLivePrice(data.price);
-        setLivePriceCurrency(data.currency ?? "USD");
-        setAverageCost(String(data.price));
-        if (!isEdit) setPriceMode("live");
-      } else { setLivePriceError(true); setPriceMode("custom"); }
-    } catch { setLivePriceError(true); setPriceMode("custom"); }
-    finally { setLivePriceLoading(false); }
-  }, [isEdit]);
+  const fetchLivePrice = useCallback(
+    async (symbol: string, cat: AssetType) => {
+      if (!hasLivePrice(cat)) return;
+      const apiType = API_TYPE_MAP[cat];
+      if (!apiType) return;
+      setLivePriceLoading(true);
+      setLivePriceError(false);
+      setLivePrice(null);
+      try {
+        const res = await fetch(
+          `/api/market-price?symbol=${encodeURIComponent(symbol)}&type=${apiType}`,
+        );
+        if (!res.ok) {
+          setLivePriceError(true);
+          setPriceMode("custom");
+          return;
+        }
+        const data = (await res.json()) as { price?: number; currency?: string };
+        if (typeof data.price === "number" && data.price > 0) {
+          setLivePrice(data.price);
+          setLivePriceCurrency(data.currency ?? "USD");
+          setAverageCost(String(data.price));
+          if (!isEdit) setPriceMode("live");
+        } else {
+          setLivePriceError(true);
+          setPriceMode("custom");
+        }
+      } catch {
+        setLivePriceError(true);
+        setPriceMode("custom");
+      } finally {
+        setLivePriceLoading(false);
+      }
+    },
+    [isEdit],
+  );
 
   // Fetch live price on mount for initialHolding / holdingToEdit
   useEffect(() => {
@@ -365,7 +405,9 @@ function AddHoldingWizard({
       countryFetchedRef.current = true;
       // El país solo precarga una sugerencia del paso DCA: si falla, el wizard
       // sigue con el default — silenciarlo es intencional, no un descuido.
-      getUserCountryAction().then(setUserCountry).catch(() => {});
+      getUserCountryAction()
+        .then(setUserCountry)
+        .catch(() => {});
     }
   }, [step]);
 
@@ -426,19 +468,30 @@ function AddHoldingWizard({
 
   // A1: sanity check — large quantity in units mode looks like a money amount
   const unitsSanityWarn =
-    inputMode === "units" &&
-    parseFloat(quantity) >= 500 &&
-    effectiveAvgCost >= 50;
+    inputMode === "units" && parseFloat(quantity) >= 500 && effectiveAvgCost >= 50;
 
-  const isFirstVisibleStep = step === 1 || (!!initialHolding && step === 3) || (!!holdingToEdit && step === 3);
+  const isFirstVisibleStep =
+    step === 1 || (!!initialHolding && step === 3) || (!!holdingToEdit && step === 3);
 
   // ── Save ──────────────────────────────────────────────────────────
   const handleSave = async () => {
     setErrorMsg(null);
-    if (!selectedSymbol) { setErrorMsg("Selecciona un activo."); return; }
-    if (quantityNum <= 0) { setErrorMsg("La cantidad debe ser mayor a 0."); return; }
-    if (!purchaseDate) { setErrorMsg("Selecciona la fecha de compra."); return; }
-    if (priceRequiredForAmount) { setErrorMsg("Ingresa el precio por unidad para calcular la cantidad."); return; }
+    if (!selectedSymbol) {
+      setErrorMsg("Selecciona un activo.");
+      return;
+    }
+    if (quantityNum <= 0) {
+      setErrorMsg("La cantidad debe ser mayor a 0.");
+      return;
+    }
+    if (!purchaseDate) {
+      setErrorMsg("Selecciona la fecha de compra.");
+      return;
+    }
+    if (priceRequiredForAmount) {
+      setErrorMsg("Ingresa el precio por unidad para calcular la cantidad.");
+      return;
+    }
 
     setPending(true);
     try {
@@ -476,7 +529,12 @@ function AddHoldingWizard({
         if (mode === "dca") {
           const dcaNum = parseFloat(dcaAmount) || 0;
           if (dcaNum > 0) {
-            const freqLabel = dcaFrequency === "semanal" ? "Semanal" : dcaFrequency === "trimestral" ? "Trimestral" : "Mensual";
+            const freqLabel =
+              dcaFrequency === "semanal"
+                ? "Semanal"
+                : dcaFrequency === "trimestral"
+                  ? "Trimestral"
+                  : "Mensual";
             await addInvestmentAction({
               name: label.trim() || `${selectedSymbol} — DCA ${freqLabel}`,
               assetType: assetCategory,
@@ -526,7 +584,12 @@ function AddHoldingWizard({
     >
       <div className="modal-body">
         {step === 1 && (
-          <Step1Mode onSelect={(m) => { setMode(m); setStep(2); }} />
+          <Step1Mode
+            onSelect={(m) => {
+              setMode(m);
+              setStep(2);
+            }}
+          />
         )}
 
         {step === 2 && (
@@ -534,7 +597,10 @@ function AddHoldingWizard({
             assetCategory={assetCategory}
             onCategoryChange={handleCategoryChange}
             searchQuery={searchQuery}
-            onSearchChange={(q) => { setSearchQuery(q); runSearch(q); }}
+            onSearchChange={(q) => {
+              setSearchQuery(q);
+              runSearch(q);
+            }}
             searchResults={searchResults}
             searchLoading={searchLoading}
             selectedSymbol={selectedSymbol}
@@ -689,11 +755,7 @@ function AddHoldingWizard({
             disabled={pending || !canSave}
             onClick={handleSave}
           >
-            {pending
-              ? "Guardando…"
-              : isEdit
-                ? "Guardar cambios"
-                : "Guardar posición"}
+            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Guardar posición"}
           </button>
         ) : null}
       </div>
@@ -720,7 +782,15 @@ function Step1Mode({ onSelect }: { onSelect: (m: WizardMode) => void }) {
   );
 }
 
-function ModeCard({ title, description, onClick }: { title: string; description: string; onClick: () => void }) {
+function ModeCard({
+  title,
+  description,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
   return (
     <button type="button" className="mode-card" onClick={onClick}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -734,12 +804,20 @@ function ModeCard({ title, description, onClick }: { title: string; description:
 // ── Step 2 ────────────────────────────────────────────────────────
 
 function Step2Asset({
-  assetCategory, onCategoryChange,
-  searchQuery, onSearchChange,
-  searchResults, searchLoading,
-  selectedSymbol, selectedDescription,
-  onSelectSymbol, onSymbolManualChange,
-  livePrice, livePriceCurrency, livePriceLoading, livePriceError,
+  assetCategory,
+  onCategoryChange,
+  searchQuery,
+  onSearchChange,
+  searchResults,
+  searchLoading,
+  selectedSymbol,
+  selectedDescription,
+  onSelectSymbol,
+  onSymbolManualChange,
+  livePrice,
+  livePriceCurrency,
+  livePriceLoading,
+  livePriceError,
 }: {
   assetCategory: AssetType;
   onCategoryChange: (cat: AssetType) => void;
@@ -765,19 +843,33 @@ function Step2Asset({
         <label className="fld-label">Tipo de activo</label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {LIVE_CATEGORY_LABELS.map(([cat, lbl]) => (
-            <PillButton key={cat} active={assetCategory === cat} onClick={() => onCategoryChange(cat)}>
+            <PillButton
+              key={cat}
+              active={assetCategory === cat}
+              onClick={() => onCategoryChange(cat)}
+            >
               {lbl}
             </PillButton>
           ))}
           <select
             className="sel"
-            style={{ flex: "none", width: "auto", minWidth: 130, fontSize: 12.5, padding: "5px 10px" }}
+            style={{
+              flex: "none",
+              width: "auto",
+              minWidth: 130,
+              fontSize: 12.5,
+              padding: "5px 10px",
+            }}
             value={isOtherType ? assetCategory : ""}
-            onChange={(e) => { if (e.target.value) onCategoryChange(e.target.value as AssetType); }}
+            onChange={(e) => {
+              if (e.target.value) onCategoryChange(e.target.value as AssetType);
+            }}
           >
             <option value="">Otros activos…</option>
             {OTHER_ASSET_TYPES.map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
+              <option key={v} value={v}>
+                {l}
+              </option>
             ))}
           </select>
         </div>
@@ -787,18 +879,29 @@ function Step2Asset({
         <div className="fld">
           <label className="fld-label">Buscar {assetCategory === "etf" ? "ETF" : "acción"}</label>
           <input
-            className="inp" type="text" value={searchQuery}
+            className="inp"
+            type="text"
+            value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Símbolo o nombre (ej. VOO, Apple, S&P 500…)"
-            autoComplete="off" autoFocus
+            autoComplete="off"
+            autoFocus
           />
-          {searchLoading && <span className="muted" style={{ fontSize: 12 }}>Buscando…</span>}
+          {searchLoading && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              Buscando…
+            </span>
+          )}
           {!searchLoading && searchResults.length > 0 && (
             <div className="symbol-results">
               {searchResults.map((r, i) => (
                 <button
-                  key={r.symbol} type="button" className="symbol-row"
-                  style={{ borderBottom: i < searchResults.length - 1 ? "1px solid var(--line)" : "none" }}
+                  key={r.symbol}
+                  type="button"
+                  className="symbol-row"
+                  style={{
+                    borderBottom: i < searchResults.length - 1 ? "1px solid var(--line)" : "none",
+                  }}
                   onClick={() => onSelectSymbol(r.symbol, r.description, assetCategory)}
                 >
                   <span className="symbol-row-sym">{r.symbol}</span>
@@ -809,9 +912,12 @@ function Step2Asset({
           )}
           {!searchLoading && searchResults.length === 0 && searchQuery.length >= 2 && (
             <button
-              type="button" className="btn btn-ghost"
+              type="button"
+              className="btn btn-ghost"
               style={{ marginTop: 6, fontSize: 12, alignSelf: "flex-start" }}
-              onClick={() => onSelectSymbol(searchQuery.toUpperCase(), searchQuery.toUpperCase(), assetCategory)}
+              onClick={() =>
+                onSelectSymbol(searchQuery.toUpperCase(), searchQuery.toUpperCase(), assetCategory)
+              }
             >
               Usar &ldquo;{searchQuery.toUpperCase()}&rdquo; como símbolo
             </button>
@@ -822,7 +928,9 @@ function Step2Asset({
       {assetCategory === "cripto" && (
         <div className="fld">
           <label className="fld-label">Criptomoneda</label>
-          <select className="sel" value={selectedSymbol}
+          <select
+            className="sel"
+            value={selectedSymbol}
             onChange={(e) => {
               const found = CRYPTO_LIST.find((c) => c.symbol === e.target.value);
               if (found) onSelectSymbol(found.symbol, found.description, "cripto");
@@ -830,7 +938,9 @@ function Step2Asset({
           >
             <option value="">— Elige una criptomoneda —</option>
             {CRYPTO_LIST.map((c) => (
-              <option key={c.symbol} value={c.symbol}>{c.symbol} — {c.description}</option>
+              <option key={c.symbol} value={c.symbol}>
+                {c.symbol} — {c.description}
+              </option>
             ))}
           </select>
         </div>
@@ -840,10 +950,13 @@ function Step2Asset({
         <div className="fld">
           <label className="fld-label">Identificador (opcional)</label>
           <input
-            className="inp" type="text" value={selectedSymbol}
+            className="inp"
+            type="text"
+            value={selectedSymbol}
             onChange={(e) => onSymbolManualChange(e.target.value)}
             placeholder={`Ej. ${DEFAULT_SYMBOL[assetCategory] ?? "SYMBOL"}`}
-            maxLength={12} autoFocus
+            maxLength={12}
+            autoFocus
           />
         </div>
       )}
@@ -853,17 +966,35 @@ function Step2Asset({
           <div>
             <span className="asset-badge-sym">{selectedSymbol}</span>
             {selectedDescription && selectedDescription !== selectedSymbol && (
-              <span className="muted" style={{ fontSize: 12, marginLeft: 10 }}>{selectedDescription}</span>
+              <span className="muted" style={{ fontSize: 12, marginLeft: 10 }}>
+                {selectedDescription}
+              </span>
             )}
           </div>
           <div style={{ textAlign: "right" }}>
-            {livePriceLoading && <span className="muted" style={{ fontSize: 12 }}>Cargando precio…</span>}
+            {livePriceLoading && (
+              <span className="muted" style={{ fontSize: 12 }}>
+                Cargando precio…
+              </span>
+            )}
             {!livePriceLoading && livePrice !== null && !livePriceError && (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontFamily: "var(--serif)", fontSize: 17, fontWeight: 700, color: "var(--ink)" }}>
+                <span
+                  style={{
+                    fontFamily: "var(--serif)",
+                    fontSize: 17,
+                    fontWeight: 700,
+                    color: "var(--ink)",
+                  }}
+                >
                   {formatMoney(livePrice, livePriceCurrency)}
                 </span>
-                <span className="chip" style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}>en vivo</span>
+                <span
+                  className="chip"
+                  style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}
+                >
+                  en vivo
+                </span>
               </div>
             )}
             {!livePriceLoading && livePriceError && (
@@ -879,31 +1010,59 @@ function Step2Asset({
 // ── Step 3 ────────────────────────────────────────────────────────
 
 function Step3Details({
-  label, onLabelChange,
-  livePrice, livePriceCurrency, livePriceError,
-  priceMode, onPriceModeChange,
-  averageCost, onAverageCostChange,
-  purchaseDate, onPurchaseDateChange,
-  inputMode, onInputModeChange,
-  quantity, onQuantityChange,
-  totalAmount, onTotalAmountChange,
-  broker, onBrokerChange,
-  holdingCurrency, onCurrencyChange,
-  selectedSymbol, effectiveAvgCost, quantityNum,
-  unitsSanityWarn, priceRequiredForAmount,
+  label,
+  onLabelChange,
+  livePrice,
+  livePriceCurrency,
+  livePriceError,
+  priceMode,
+  onPriceModeChange,
+  averageCost,
+  onAverageCostChange,
+  purchaseDate,
+  onPurchaseDateChange,
+  inputMode,
+  onInputModeChange,
+  quantity,
+  onQuantityChange,
+  totalAmount,
+  onTotalAmountChange,
+  broker,
+  onBrokerChange,
+  holdingCurrency,
+  onCurrencyChange,
+  selectedSymbol,
+  effectiveAvgCost,
+  quantityNum,
+  unitsSanityWarn,
+  priceRequiredForAmount,
 }: {
-  label: string; onLabelChange: (v: string) => void;
-  livePrice: number | null; livePriceCurrency: string; livePriceError: boolean;
-  priceMode: PriceMode; onPriceModeChange: (pm: PriceMode) => void;
-  averageCost: string; onAverageCostChange: (v: string) => void;
-  purchaseDate: string; onPurchaseDateChange: (v: string) => void;
-  inputMode: "units" | "amount"; onInputModeChange: (m: "units" | "amount") => void;
-  quantity: string; onQuantityChange: (v: string) => void;
-  totalAmount: string; onTotalAmountChange: (v: string) => void;
-  broker: string; onBrokerChange: (v: string) => void;
-  holdingCurrency: string; onCurrencyChange: (v: string) => void;
-  selectedSymbol: string; effectiveAvgCost: number; quantityNum: number;
-  unitsSanityWarn: boolean; priceRequiredForAmount: boolean;
+  label: string;
+  onLabelChange: (v: string) => void;
+  livePrice: number | null;
+  livePriceCurrency: string;
+  livePriceError: boolean;
+  priceMode: PriceMode;
+  onPriceModeChange: (pm: PriceMode) => void;
+  averageCost: string;
+  onAverageCostChange: (v: string) => void;
+  purchaseDate: string;
+  onPurchaseDateChange: (v: string) => void;
+  inputMode: "units" | "amount";
+  onInputModeChange: (m: "units" | "amount") => void;
+  quantity: string;
+  onQuantityChange: (v: string) => void;
+  totalAmount: string;
+  onTotalAmountChange: (v: string) => void;
+  broker: string;
+  onBrokerChange: (v: string) => void;
+  holdingCurrency: string;
+  onCurrencyChange: (v: string) => void;
+  selectedSymbol: string;
+  effectiveAvgCost: number;
+  quantityNum: number;
+  unitsSanityWarn: boolean;
+  priceRequiredForAmount: boolean;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const derivedQty =
@@ -916,10 +1075,12 @@ function Step3Details({
       <div className="fld">
         <label className="fld-label">Nombre de la inversión</label>
         <input
-          className="inp" value={label}
+          className="inp"
+          value={label}
           onChange={(e) => onLabelChange(e.target.value)}
           placeholder="Ej. Mi S&P 500, BTC largo plazo…"
-          maxLength={120} autoFocus
+          maxLength={120}
+          autoFocus
         />
       </div>
 
@@ -948,16 +1109,28 @@ function Step3Details({
           <label className="fld-label">Precio por unidad</label>
           <div className="inp-money">
             <span className="pre">{sym(holdingCurrency)}</span>
-            <input type="number" step="any" min="0" value={averageCost}
-              onChange={(e) => onAverageCostChange(e.target.value)} placeholder="0.00" />
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={averageCost}
+              onChange={(e) => onAverageCostChange(e.target.value)}
+              placeholder="0.00"
+            />
           </div>
         </div>
       )}
 
       <div className="fld">
         <label className="fld-label">Fecha de compra</label>
-        <input className="inp" type="date" value={purchaseDate} max={today}
-          onChange={(e) => onPurchaseDateChange(e.target.value)} required />
+        <input
+          className="inp"
+          type="date"
+          value={purchaseDate}
+          max={today}
+          onChange={(e) => onPurchaseDateChange(e.target.value)}
+          required
+        />
       </div>
 
       {/* A1: amount mode is default; units mode gets a clear warning label */}
@@ -976,8 +1149,14 @@ function Step3Details({
           <>
             <div className="inp-money">
               <span className="pre">{sym(holdingCurrency)}</span>
-              <input type="number" step="any" min="0" value={totalAmount}
-                onChange={(e) => onTotalAmountChange(e.target.value)} placeholder="0" />
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={totalAmount}
+                onChange={(e) => onTotalAmountChange(e.target.value)}
+                placeholder="0"
+              />
             </div>
             {priceRequiredForAmount && (
               <div className="auth-msg warn" style={{ marginBottom: 0, fontSize: 12 }}>
@@ -992,17 +1171,31 @@ function Step3Details({
           </>
         ) : (
           <>
-            <div className="fld-label" style={{ fontSize: 11, color: "var(--warn)", marginBottom: 4 }}>
+            <div
+              className="fld-label"
+              style={{ fontSize: 11, color: "var(--warn)", marginBottom: 4 }}
+            >
               ⚠ Ingresa la cantidad de acciones/monedas, NO el monto en dinero.
             </div>
             <div className="inp-money">
-              <span className="pre" style={{ fontSize: 11, minWidth: 40 }}>{selectedSymbol}</span>
-              <input type="number" step="any" min="0" value={quantity}
-                onChange={(e) => onQuantityChange(e.target.value)} placeholder="0" />
+              <span className="pre" style={{ fontSize: 11, minWidth: 40 }}>
+                {selectedSymbol}
+              </span>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={quantity}
+                onChange={(e) => onQuantityChange(e.target.value)}
+                placeholder="0"
+              />
             </div>
             {unitsSanityWarn && (
               <div className="auth-msg warn" style={{ marginBottom: 0, fontSize: 12 }}>
-                ¿Ingresaste el monto en dinero como unidades? Si invertiste {sym(holdingCurrency)}{quantity}, el número de {selectedSymbol} sería ≈ {effectiveAvgCost > 0 ? (parseFloat(quantity) / effectiveAvgCost).toFixed(4) : "?"} unidades.
+                ¿Ingresaste el monto en dinero como unidades? Si invertiste {sym(holdingCurrency)}
+                {quantity}, el número de {selectedSymbol} sería ≈{" "}
+                {effectiveAvgCost > 0 ? (parseFloat(quantity) / effectiveAvgCost).toFixed(4) : "?"}{" "}
+                unidades.
               </div>
             )}
           </>
@@ -1012,14 +1205,24 @@ function Step3Details({
       <div className="fld-2">
         <div className="fld">
           <label className="fld-label">Broker (opcional)</label>
-          <input className="inp" value={broker} onChange={(e) => onBrokerChange(e.target.value)}
-            placeholder="Ej. Interactive Brokers" />
+          <input
+            className="inp"
+            value={broker}
+            onChange={(e) => onBrokerChange(e.target.value)}
+            placeholder="Ej. Interactive Brokers"
+          />
         </div>
         <div className="fld">
           <label className="fld-label">Moneda</label>
-          <select className="sel" value={holdingCurrency} onChange={(e) => onCurrencyChange(e.target.value)}>
+          <select
+            className="sel"
+            value={holdingCurrency}
+            onChange={(e) => onCurrencyChange(e.target.value)}
+          >
             {CURRENCIES.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
             ))}
           </select>
         </div>
@@ -1058,36 +1261,58 @@ function Step3Details({
 
 function RentalFields({
   currency,
-  currentValueManual, onCurrentValueManualChange,
-  rentalIncome, onRentalIncomeChange,
-  rentalFrequency, onRentalFrequencyChange,
-  rentalSubtype, onRentalSubtypeChange,
+  currentValueManual,
+  onCurrentValueManualChange,
+  rentalIncome,
+  onRentalIncomeChange,
+  rentalFrequency,
+  onRentalFrequencyChange,
+  rentalSubtype,
+  onRentalSubtypeChange,
 }: {
   currency: string;
-  currentValueManual: string; onCurrentValueManualChange: (v: string) => void;
-  rentalIncome: string; onRentalIncomeChange: (v: string) => void;
-  rentalFrequency: "mensual" | "trimestral" | "anual"; onRentalFrequencyChange: (v: "mensual" | "trimestral" | "anual") => void;
-  rentalSubtype: "alquiler" | "airbnb" | "auto" | "negocio" | "otro"; onRentalSubtypeChange: (v: "alquiler" | "airbnb" | "auto" | "negocio" | "otro") => void;
+  currentValueManual: string;
+  onCurrentValueManualChange: (v: string) => void;
+  rentalIncome: string;
+  onRentalIncomeChange: (v: string) => void;
+  rentalFrequency: "mensual" | "trimestral" | "anual";
+  onRentalFrequencyChange: (v: "mensual" | "trimestral" | "anual") => void;
+  rentalSubtype: "alquiler" | "airbnb" | "auto" | "negocio" | "otro";
+  onRentalSubtypeChange: (v: "alquiler" | "airbnb" | "auto" | "negocio" | "otro") => void;
 }) {
   return (
     <div style={{ marginTop: 8, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
-      <div className="fld-label" style={{ marginBottom: 8, fontWeight: 600, color: "var(--ink-2)" }}>
+      <div
+        className="fld-label"
+        style={{ marginBottom: 8, fontWeight: 600, color: "var(--ink-2)" }}
+      >
         Valor y renta (activo no cotizado)
       </div>
       <div className="fld">
         <label className="fld-label">Valor actual del activo</label>
         <div className="inp-money">
           <span className="pre">{sym(currency)}</span>
-          <input type="number" step="any" min="0" value={currentValueManual}
-            onChange={(e) => onCurrentValueManualChange(e.target.value)} placeholder="Ej. valor de mercado hoy" />
+          <input
+            type="number"
+            step="any"
+            min="0"
+            value={currentValueManual}
+            onChange={(e) => onCurrentValueManualChange(e.target.value)}
+            placeholder="Ej. valor de mercado hoy"
+          />
         </div>
         <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-          Para inmuebles/negocios el valor no se calcula por precio × cantidad. Si lo dejas vacío, se usa el costo.
+          Para inmuebles/negocios el valor no se calcula por precio × cantidad. Si lo dejas vacío,
+          se usa el costo.
         </div>
       </div>
       <div className="fld">
         <label className="fld-label">Tipo de renta</label>
-        <select className="sel" value={rentalSubtype} onChange={(e) => onRentalSubtypeChange(e.target.value as typeof rentalSubtype)}>
+        <select
+          className="sel"
+          value={rentalSubtype}
+          onChange={(e) => onRentalSubtypeChange(e.target.value as typeof rentalSubtype)}
+        >
           <option value="alquiler">Alquiler</option>
           <option value="airbnb">Airbnb</option>
           <option value="auto">Alquiler de auto</option>
@@ -1100,13 +1325,23 @@ function RentalFields({
           <label className="fld-label">Renta recurrente (opcional)</label>
           <div className="inp-money">
             <span className="pre">{sym(currency)}</span>
-            <input type="number" step="any" min="0" value={rentalIncome}
-              onChange={(e) => onRentalIncomeChange(e.target.value)} placeholder="0" />
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={rentalIncome}
+              onChange={(e) => onRentalIncomeChange(e.target.value)}
+              placeholder="0"
+            />
           </div>
         </div>
         <div className="fld">
           <label className="fld-label">Frecuencia</label>
-          <select className="sel" value={rentalFrequency} onChange={(e) => onRentalFrequencyChange(e.target.value as typeof rentalFrequency)}>
+          <select
+            className="sel"
+            value={rentalFrequency}
+            onChange={(e) => onRentalFrequencyChange(e.target.value as typeof rentalFrequency)}
+          >
             <option value="mensual">Mensual</option>
             <option value="trimestral">Trimestral</option>
             <option value="anual">Anual</option>
@@ -1114,7 +1349,8 @@ function RentalFields({
         </div>
       </div>
       <div className="muted" style={{ fontSize: 11 }}>
-        La renta configurada es proyección. Solo la renta que <strong>registres</strong> suma a tu ingreso pasivo.
+        La renta configurada es proyección. Solo la renta que <strong>registres</strong> suma a tu
+        ingreso pasivo.
       </div>
     </div>
   );
@@ -1123,17 +1359,27 @@ function RentalFields({
 // ── Step 4 ────────────────────────────────────────────────────────
 
 function Step4DCA({
-  dcaFrequency, onFrequencyChange,
-  dcaAmount, onAmountChange,
-  dcaBroker, onDcaBrokerChange,
+  dcaFrequency,
+  onFrequencyChange,
+  dcaAmount,
+  onAmountChange,
+  dcaBroker,
+  onDcaBrokerChange,
   holdingCurrency,
-  userCountry, selectedSymbol, assetCategory,
+  userCountry,
+  selectedSymbol,
+  assetCategory,
 }: {
-  dcaFrequency: DcaFreq; onFrequencyChange: (f: DcaFreq) => void;
-  dcaAmount: string; onAmountChange: (v: string) => void;
-  dcaBroker: DcaBroker; onDcaBrokerChange: (b: DcaBroker) => void;
+  dcaFrequency: DcaFreq;
+  onFrequencyChange: (f: DcaFreq) => void;
+  dcaAmount: string;
+  onAmountChange: (v: string) => void;
+  dcaBroker: DcaBroker;
+  onDcaBrokerChange: (b: DcaBroker) => void;
   holdingCurrency: string;
-  userCountry: string | null; selectedSymbol: string; assetCategory: AssetType;
+  userCountry: string | null;
+  selectedSymbol: string;
+  assetCategory: AssetType;
 }) {
   const isUS = isUSResident(userCountry);
   const ucits = assetCategory === "etf" ? UCITS_EQUIVALENTS[selectedSymbol] : undefined;
@@ -1148,7 +1394,12 @@ function Step4DCA({
       <div className="fld-2">
         <div className="fld">
           <label className="fld-label">Frecuencia de aporte</label>
-          <select className="sel" value={dcaFrequency} onChange={(e) => onFrequencyChange(e.target.value as DcaFreq)} autoFocus>
+          <select
+            className="sel"
+            value={dcaFrequency}
+            onChange={(e) => onFrequencyChange(e.target.value as DcaFreq)}
+            autoFocus
+          >
             <option value="semanal">Semanal</option>
             <option value="mensual">Mensual</option>
             <option value="trimestral">Trimestral</option>
@@ -1158,33 +1409,59 @@ function Step4DCA({
           <label className="fld-label">Monto por aporte</label>
           <div className="inp-money">
             <span className="pre">{sym(holdingCurrency)}</span>
-            <input type="number" step="any" min="0" value={dcaAmount}
-              onChange={(e) => onAmountChange(e.target.value)} placeholder="0" />
+            <input
+              type="number"
+              step="any"
+              min="0"
+              value={dcaAmount}
+              onChange={(e) => onAmountChange(e.target.value)}
+              placeholder="0"
+            />
           </div>
         </div>
       </div>
       <div className="fld">
         <label className="fld-label">Broker del plan (opcional)</label>
-        <select className="sel" value={dcaBroker}
-          onChange={(e) => onDcaBrokerChange(e.target.value as DcaBroker)}>
+        <select
+          className="sel"
+          value={dcaBroker}
+          onChange={(e) => onDcaBrokerChange(e.target.value as DcaBroker)}
+        >
           <option value="">— Sin especificar —</option>
-          {DCA_BROKERS.map((b) => <option key={b} value={b}>{b}</option>)}
+          {DCA_BROKERS.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
         </select>
-        {brokerNote && <div className="auth-msg" style={{ marginBottom: 0 }}>{brokerNote}</div>}
+        {brokerNote && (
+          <div className="auth-msg" style={{ marginBottom: 0 }}>
+            {brokerNote}
+          </div>
+        )}
       </div>
       {userCountry !== null && !isUS && dcaBroker === "Interactive Brokers" && (
         <div className="auth-msg warn" style={{ lineHeight: 1.55 }}>
-          Residentes fuera de EE.UU.: activa &ldquo;Recurring Investments&rdquo; desde la
-          interfaz web de IBKR. Esta función <strong>no está disponible vía API</strong>.
+          Residentes fuera de EE.UU.: activa &ldquo;Recurring Investments&rdquo; desde la interfaz
+          web de IBKR. Esta función <strong>no está disponible vía API</strong>.
         </div>
       )}
       {!isUS && ucits && (
-        <div style={{ padding: "10px 14px", border: "1px solid var(--line)", borderRadius: "var(--r-md)", fontSize: 12.5, lineHeight: 1.55, color: "var(--muted)" }}>
+        <div
+          style={{
+            padding: "10px 14px",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--r-md)",
+            fontSize: 12.5,
+            lineHeight: 1.55,
+            color: "var(--muted)",
+          }}
+        >
           <strong style={{ color: "var(--ink-2)" }}>Sugerencia informativa — </strong>
           Como residente fuera de EE.UU., un equivalente UCITS común de{" "}
           <strong>{selectedSymbol}</strong> es{" "}
-          <strong style={{ color: "var(--ink)" }}>{ucits.symbol}</strong> ({ucits.name}).
-          Consulta con un asesor financiero antes de decidir.
+          <strong style={{ color: "var(--ink)" }}>{ucits.symbol}</strong> ({ucits.name}). Consulta
+          con un asesor financiero antes de decidir.
         </div>
       )}
     </div>
@@ -1221,8 +1498,12 @@ function HelpTip({ text }: { text: string }) {
   }, [open]);
 
   return (
-    <span className="help-tip"
-      onMouseEnter={() => { calcPos(); setOpen(true); }}
+    <span
+      className="help-tip"
+      onMouseEnter={() => {
+        calcPos();
+        setOpen(true);
+      }}
       onMouseLeave={() => setOpen(false)}
     >
       <button
@@ -1232,14 +1513,21 @@ function HelpTip({ text }: { text: string }) {
         aria-label="Más información"
         aria-expanded={open}
         aria-describedby={open ? id : undefined}
-        onClick={(e) => { e.stopPropagation(); calcPos(); setOpen((o) => !o); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          calcPos();
+          setOpen((o) => !o);
+        }}
         onBlur={() => setOpen(false)}
-        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         ?
       </button>
-      {open && typeof document !== "undefined" &&
+      {open &&
+        typeof document !== "undefined" &&
         createPortal(
           <span
             role="tooltip"
@@ -1269,7 +1557,15 @@ function HelpTip({ text }: { text: string }) {
   );
 }
 
-function PillButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function PillButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"

@@ -9,7 +9,5 @@ export const config = {
   /**
    * Aplica a todo excepto estáticos y assets. Incluye rutas de página y API.
    */
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

@@ -51,7 +51,11 @@ export function ConfirmDeleteButton({
         <Icon name="x" width={2} />
       </button>
       {open ? (
-        <Modal title={`¿Eliminar ${noun}?`} sub="Esta acción no se puede deshacer." onClose={() => setOpen(false)}>
+        <Modal
+          title={`¿Eliminar ${noun}?`}
+          sub="Esta acción no se puede deshacer."
+          onClose={() => setOpen(false)}
+        >
           <div className="modal-body">
             <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-2)", margin: 0 }}>
               Se eliminará {noun} de forma permanente. Si solo quieres ajustarlo, usa el botón de

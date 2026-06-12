@@ -34,9 +34,14 @@ export function MetricCard({
       <div className="num-xl" style={{ fontSize: 25, marginTop: 9, color: TONE_COLOR[valueTone] }}>
         {value}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7, flexWrap: "wrap" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7, flexWrap: "wrap" }}
+      >
         {delta ? (
-          <span className="tnum" style={{ fontSize: 11.5, fontWeight: 600, color: TONE_COLOR[deltaTone] }}>
+          <span
+            className="tnum"
+            style={{ fontSize: 11.5, fontWeight: 600, color: TONE_COLOR[deltaTone] }}
+          >
             {delta}
           </span>
         ) : null}
