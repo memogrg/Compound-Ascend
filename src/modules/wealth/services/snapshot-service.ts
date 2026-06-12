@@ -7,6 +7,12 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { logger } from "@/lib/logger";
+import { getFxRates } from "@/lib/market-data/fx-rates";
+import { convertCurrency } from "@/lib/fx";
+import { computePortfolioAnalytics } from "@/modules/wealth/engine/portfolio-engine";
+import { fetchNormalizedPrices } from "@/modules/wealth/services/portfolio-service";
+import { rowToHolding, HOLDING_COLS } from "@/modules/wealth/services/holdings-service";
 import type { PortfolioSnapshot } from "@/modules/wealth/types";
 
 export type SnapshotPeriod = "1M" | "3M" | "6M" | "1Y" | "all";
@@ -131,6 +137,72 @@ export async function maybeGenerateSnapshot(
   } catch {
     // Silencioso: no bloquear la carga del portafolio por un fallo de snapshot.
   }
+}
+
+/**
+ * Genera el snapshot del día para un usuario SIN sesión (modo cron).
+ *
+ * A diferencia de getPortfolioReport/getRichLifeSummary (atados a requireUser
+ * por cookies), aquí todo se lee con service-role: holdings y moneda principal
+ * del usuario indicado, precios/FX con lib/market-data (no requieren sesión) y
+ * la misma normalización del portfolio (fetchNormalizedPrices).
+ *
+ * net_worth: se arrastra el último valor conocido (carry-forward del snapshot
+ * más reciente). Calcularlo fresco exigiría replicar rich-life con service-role
+ * — pendiente documentado en docs/revision/02-pendientes-fase3.md.
+ *
+ * Devuelve null si el usuario no tiene holdings (no hay nada que snapshotear).
+ */
+export async function generateSnapshotForUserCron(
+  userId: string,
+): Promise<PortfolioSnapshot | null> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const supabase = createServiceRoleClient();
+
+  const [{ data: settings }, { data: holdingRows }] = await Promise.all([
+    supabase.from("user_settings").select("primary_currency").eq("user_id", userId).maybeSingle(),
+    supabase.from("investment_holdings").select(HOLDING_COLS).eq("user_id", userId),
+  ]);
+  if (!holdingRows || holdingRows.length === 0) return null;
+
+  const currency = settings?.primary_currency ?? "CRC";
+  const holdings = holdingRows.map(rowToHolding);
+  const rates = await getFxRates();
+
+  const normalized = holdings.map((h) => ({
+    ...h,
+    averageCost: convertCurrency(h.averageCost, h.currency, currency, rates),
+  }));
+  // fetchNormalizedPrices solo usa symbol y assetType — no depende del
+  // averageCost normalizado (mismo orden que el camino con sesión).
+  const prices = await fetchNormalizedPrices(holdings, currency, rates);
+  const analytics = computePortfolioAnalytics(normalized, prices);
+
+  const { data: last } = await supabase
+    .from("portfolio_snapshots")
+    .select("net_worth")
+    .eq("user_id", userId)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!last) {
+    logger.warn("cron-snapshot: sin snapshot previo; net_worth cae a portfolioValue", { userId });
+  }
+  const netWorth = last ? Number(last.net_worth) : analytics.totalPortfolioValue;
+
+  const snap = await generateAndSaveSnapshot(
+    userId,
+    analytics.totalPortfolioValue,
+    analytics.totalCostBasis,
+    netWorth,
+    currency,
+  );
+  if (!snap) {
+    // generateAndSaveSnapshot devuelve null tanto por duplicado como por fallo
+    // de escritura; en cron eso seria invisible sin este log.
+    logger.warn("cron-snapshot: generateAndSaveSnapshot devolvio null", { userId });
+  }
+  return snap;
 }
 
 function periodCutoff(period: SnapshotPeriod): string | null {

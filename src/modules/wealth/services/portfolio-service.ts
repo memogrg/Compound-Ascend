@@ -41,8 +41,12 @@ export type PortfolioReport = {
   lastUpdated: string;
 };
 
-/** Obtiene precios en vivo para los holdings cotizables y los normaliza a la moneda principal. */
-async function fetchNormalizedPrices(
+/**
+ * Obtiene precios en vivo para los holdings cotizables y los normaliza a la
+ * moneda principal. Exportada porque el snapshot de cron (sin sesión) reusa
+ * exactamente la misma normalización — no depende de requireUser.
+ */
+export async function fetchNormalizedPrices(
   holdings: Holding[],
   primaryCurrency: string,
   rates: Record<string, number>,

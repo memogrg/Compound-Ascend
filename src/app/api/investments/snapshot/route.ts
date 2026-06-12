@@ -8,6 +8,7 @@
  *  - Sin header de cron: requiere sesión autenticada; genera para el usuario activo.
  */
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
@@ -17,7 +18,9 @@ export const runtime = "nodejs";
 function isCronRequest(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return req.headers.get("x-cron-secret") === secret;
+  if (req.headers.get("x-cron-secret") === secret) return true;
+  // Vercel Cron manda el secret como Bearer (mismo patrón que /api/base/snapshot).
+  return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
 export async function POST(req: Request) {
@@ -26,18 +29,24 @@ export async function POST(req: Request) {
     if (!isSupabaseConfigured())
       throw new AppError("INTERNAL", undefined, "Supabase no configurado");
 
-    let userId: string;
-
     if (isCronRequest(req)) {
-      // Llamada de cron: usuario en el body o devuelve error.
+      // Modo cron (sin sesión): el camino con getPortfolioReport/getRichLifeSummary
+      // hacía requireUser() y fallaba siempre; el snapshot se calcula con la
+      // variante service-role del servicio.
       const body = (await req.json().catch(() => ({}))) as { userId?: string };
-      if (!body.userId) throw new AppError("VALIDATION", "Falta userId en el body del cron.");
-      userId = body.userId;
-    } else {
-      const user = await getUser();
-      if (!user) throw new AppError("UNAUTHORIZED");
-      userId = user.id;
+      const parsed = z.string().uuid().safeParse(body.userId);
+      if (!parsed.success)
+        throw new AppError("VALIDATION", "userId inválido o ausente en el body del cron.");
+
+      const { generateSnapshotForUserCron } = await import(
+        "@/modules/wealth/services/snapshot-service"
+      );
+      const snapshot = await generateSnapshotForUserCron(parsed.data);
+      return NextResponse.json({ ok: true, mode: "cron", snapshot }, { headers: cors });
     }
+
+    const user = await getUser();
+    if (!user) throw new AppError("UNAUTHORIZED");
 
     // Importaciones dinámicas para no cargar toda la cadena en cold start.
     const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
@@ -47,7 +56,7 @@ export async function POST(req: Request) {
     const [report, richLife] = await Promise.all([getPortfolioReport(), getRichLifeSummary()]);
 
     const snapshot = await generateAndSaveSnapshot(
-      userId,
+      user.id,
       report.analytics.totalPortfolioValue,
       report.analytics.totalCostBasis,
       richLife.snapshot.indicators.netWorth,
