@@ -38,7 +38,17 @@ gastos/ingresos/transacciones/mi-base 328 kB; mi-rich-life 260 kB;
 dashboard 219 kB. La reducción de bundles llega con los items de la lista de
 aprobación (recharts dynamic + Server Components).
 
-## Pendientes de aprobación (alteran comportamiento visible o config) — [GRANDE]
+## [GRANDE] aprobados y aplicados (2026-06-12)
+
+| Optimización | Métrica (build de producción) |
+|---|---|
+| recharts vía `next/dynamic` ssr:false + skeleton | gastos/ingresos/transacciones/mi-base **328→215 kB** (−34%) · dashboard **219→117 kB** (−47%) · patrimonio **246→152 kB** · deudas **239→127 kB** · mi-rich-life **260→149 kB** · indicadores **261→146 kB** |
+| Suspense + streaming (dashboard, patrimonio) | El shell pinta de inmediato; el portafolio (precios en vivo) ya no bloquea el primer byte. Verificado en sandbox sin errores de consola |
+| Timeout proveedores 6s→3s | Peor caso por símbolo frío 18s→9s |
+| `indicators-view` → Server Component | /patrimonio/indicadores: route JS 1.54 kB→251 B |
+| Índices `idx_transactions_user_occurred` + `idx_budget_items_user_period` | Migración `20260613000001_perf_indexes.sql` aplicada a **sandbox y prod** (verificada en pg_indexes) |
+
+## Pendientes de aprobación originales — resueltos arriba; sin pendientes [GRANDE]
 
 1. **recharts vía `next/dynamic` (ssr:false) con skeleton** en las 5 vistas
    pesadas — los charts pasan a montarse tras hidratar (parpadeo breve de
