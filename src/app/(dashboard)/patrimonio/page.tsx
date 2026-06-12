@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/services/wealth-service";
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
@@ -14,12 +15,39 @@ import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
  * Módulo 4 — Patrimonio (Crecimiento). Cartera con 4 paneles
  * (Resumen/Cartera/Dividendos/Rendimiento). La defensa vive en /patrimonio/proteccion.
  */
+
+/**
+ * El portafolio consulta precios en vivo (proveedores externos): es la parte
+ * lenta de la página. Componente async dentro de Suspense para que el header
+ * pinte de inmediato y la cartera llegue en streaming.
+ */
+async function PortfolioSection({ summary }: { summary: WealthSummary }) {
+  const [report, snapshots, dividends] = await Promise.all([
+    getPortfolioReport(),
+    getSnapshotHistory("all"),
+    listDividends(),
+  ]);
+  return (
+    <PortfolioView report={report} snapshots={snapshots} dividends={dividends} summary={summary} />
+  );
+}
+
+function PortfolioSkeleton() {
+  return (
+    <div className="grid" aria-hidden="true">
+      <div className="skel" style={{ height: 120 }} />
+      <div style={{ display: "grid", gap: 18, gridTemplateColumns: "1.5fr 1fr" }}>
+        <div className="skel" style={{ height: 280 }} />
+        <div className="skel" style={{ height: 280 }} />
+      </div>
+      <div className="skel" style={{ height: 220 }} />
+    </div>
+  );
+}
+
 export default async function Page() {
   const configured = isSupabaseConfigured();
   const summary: WealthSummary = configured ? await getWealthSummary() : buildDemoWealthSummary();
-  const portfolio = configured
-    ? await Promise.all([getPortfolioReport(), getSnapshotHistory("all"), listDividends()])
-    : null;
 
   return (
     <div className="grid">
@@ -58,13 +86,10 @@ export default async function Page() {
         </div>
       ) : null}
 
-      {portfolio ? (
-        <PortfolioView
-          report={portfolio[0]}
-          snapshots={portfolio[1]}
-          dividends={portfolio[2]}
-          summary={summary}
-        />
+      {configured ? (
+        <Suspense fallback={<PortfolioSkeleton />}>
+          <PortfolioSection summary={summary} />
+        </Suspense>
       ) : (
         <GrowthView summary={summary} />
       )}
