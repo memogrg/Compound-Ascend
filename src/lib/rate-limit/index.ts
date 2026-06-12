@@ -61,6 +61,9 @@ export const RATE_LIMITS = {
   aiChat: { limit: 20, windowMs: 60_000 },
   receiptScan: { limit: 10, windowMs: 60_000 },
   marketData: { limit: 60, windowMs: 60_000 },
+  // Webhooks firmados: la firma es la defensa real; esto solo corta el costo
+  // de CPU de intentos masivos de firma invalida.
+  webhook: { limit: 30, windowMs: 60_000 },
 } satisfies Record<string, RateLimitConfig>;
 
 /**

@@ -9,7 +9,7 @@ import { scanReceipt } from "@/lib/ai/orchestrator";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
-import { assertTrustedOrigin } from "@/lib/security/cors";
+import { assertTrustedOrigin, corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -43,9 +43,9 @@ export async function POST(req: Request) {
     );
     if (user) await recordUsage(user.id, tokensIn, tokensOut);
 
-    return NextResponse.json({ extract });
+    return NextResponse.json({ extract }, { headers: corsHeaders(req.headers.get("origin")) });
   } catch (err) {
     const { status, body } = toSafeResponse(err);
-    return NextResponse.json(body, { status });
+    return NextResponse.json(body, { status, headers: corsHeaders(req.headers.get("origin")) });
   }
 }

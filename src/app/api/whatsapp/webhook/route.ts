@@ -5,6 +5,7 @@
  * del mensaje (puede contener montos).
  */
 import { NextResponse } from "next/server";
+import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { verifyTwilioSignature } from "@/lib/whatsapp/twilio-signature";
@@ -24,6 +25,9 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const rl = await rateLimit(`webhook:wa:${clientIp(request)}`, RATE_LIMITS.webhook);
+  if (!rl.ok) return new NextResponse("rate limited", { status: 429 });
+
   const token = getServerEnv().TWILIO_AUTH_TOKEN;
   if (!token) {
     logger.warn("whatsapp webhook: TWILIO_AUTH_TOKEN ausente");
