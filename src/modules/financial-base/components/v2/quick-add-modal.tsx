@@ -5,6 +5,7 @@
  * transactions. Sirve para alta y edición. Teclado numérico nativo en móvil
  * (inputmode="decimal").
  */
+import { CURRENCY_SYMBOL } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -22,7 +23,6 @@ export const INCOME_SOURCES = [
   "Extraordinario",
 ] as const;
 
-const SYM: Record<string, string> = { CRC: "₡", USD: "$", EUR: "€", MXN: "MX$", COP: "COL$", GBP: "£" };
 
 function todayISO(): string {
   const d = new Date();
@@ -144,7 +144,7 @@ export function QuickAddModal({
             <label className="fld-label">Monto</label>
             <div className="inp-money" style={{ fontSize: 22 }}>
               <span className="pre" style={{ fontSize: 20 }}>
-                {SYM[effectiveCurrency] ?? ""}
+                {CURRENCY_SYMBOL[effectiveCurrency] ?? ""}
               </span>
               <input
                 autoFocus

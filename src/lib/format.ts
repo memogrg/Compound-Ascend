@@ -1,5 +1,19 @@
 /** Formateo de moneda y porcentajes en español (es-CR por defecto). */
 
+/**
+ * Símbolos para selectores/prefijos de moneda en la UI (MX$/COL$ desambiguados).
+ * OJO: formatMoney usa su propio mapa interno con "$" plano para MXN/COP —
+ * unificarlos cambia output visible; decisión pendiente (ver 02-pendientes-fase3).
+ */
+export const CURRENCY_SYMBOL: Record<string, string> = {
+  CRC: "₡",
+  USD: "$",
+  EUR: "€",
+  MXN: "MX$",
+  COP: "COL$",
+  GBP: "£",
+};
+
 const SYMBOL: Record<string, string> = {
   CRC: "₡",
   USD: "$",

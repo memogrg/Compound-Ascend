@@ -12,6 +12,7 @@
  *
  * No reemplaza la edición existente (QuickAddModal sigue para editar filas).
  */
+import { CURRENCY_SYMBOL } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -40,7 +41,6 @@ const LINK_LABEL: Record<string, string> = {
 };
 
 const INCOME_SOURCES = ["Salario", "Comisión", "Venta", "Reembolso", "Ingreso pasivo", "Extraordinario"] as const;
-const SYM: Record<string, string> = { CRC: "₡", USD: "$", EUR: "€", MXN: "MX$", COP: "COL$", GBP: "£" };
 
 function todayISO(): string {
   const d = new Date();
@@ -120,7 +120,7 @@ export function TransactionComposer({
   const isIngreso = kind === "ingreso";
   const isTransfer = kind === "transferencia";
   const isAdjust = kind === "ajuste";
-  const sym = SYM[txnCurrency] ?? "";
+  const sym = CURRENCY_SYMBOL[txnCurrency] ?? "";
 
   // Mapa id → categoría para resolver etiquetas/ruta.
   const flatById = useMemo(() => {
@@ -368,7 +368,7 @@ export function TransactionComposer({
                     key={t.id}
                     type="button"
                     className="cmp-fav-chip tip"
-                    data-tip={t.amount ? `${SYM[t.currency] ?? ""}${t.amount.toLocaleString("es-CR")} · 1 clic` : "Rellenar formulario"}
+                    data-tip={t.amount ? `${CURRENCY_SYMBOL[t.currency] ?? ""}${t.amount.toLocaleString("es-CR")} · 1 clic` : "Rellenar formulario"}
                     onClick={() => void oneClickTemplate(t)}
                     disabled={pending}
                   >
