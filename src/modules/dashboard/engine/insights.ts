@@ -3,8 +3,8 @@
  * indicadores de la Base y la salud financiera. Determinista (la IA puede
  * reescribir el tono después). Tono humano, sin culpa, siempre con el porqué.
  */
-import type { BaseIndicators } from "@/modules/financial-base/types";
-import type { HealthScore } from "@/modules/financial-base/engine/health";
+import type { BaseIndicators } from "@/modules/financial-base";
+import type { HealthScore } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
 
 export type Insight = { h: string; d: string };

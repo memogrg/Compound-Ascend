@@ -3,10 +3,10 @@ import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { EXPENSE_NATURES, NATURE_COLOR } from "@/modules/financial-base/constants";
-import type { BaseSummary } from "@/modules/financial-base/services/base-service";
-import type { HealthScore } from "@/modules/financial-base/engine/health";
+import type { BaseSummary } from "@/modules/financial-base";
+import type { HealthScore } from "@/modules/financial-base";
 import type { DashboardInsights } from "@/modules/dashboard/engine/insights";
-import type { ExpenseNature } from "@/modules/financial-base/types";
+import type { ExpenseNature } from "@/modules/financial-base";
 
 const NATURE_LABEL = Object.fromEntries(EXPENSE_NATURES.map((n) => [n.value, n.label]));
 

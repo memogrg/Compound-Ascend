@@ -12,11 +12,11 @@ import "server-only";
  */
 import {
   createTransaction as createBaseTransaction,
-} from "@/modules/financial-base/services/transaction-service";
+} from "@/modules/financial-base";
 import {
   propagateLinkedTransaction,
   deleteLinkedTransaction,
-} from "@/modules/financial-base/services/linked-transaction-service";
+} from "@/modules/financial-base";
 import type { TransactionInput } from "@/modules/assistant/schemas";
 
 export async function createTransaction(input: TransactionInput): Promise<void> {

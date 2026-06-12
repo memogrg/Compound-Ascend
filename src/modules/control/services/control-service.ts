@@ -4,17 +4,17 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
-import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
   getSystemCategoryId,
-} from "@/modules/financial-base/services/linked-transaction-service";
+} from "@/modules/financial-base";
 import {
   debtPaymentToTxn,
   goalContributionToTxn,
   goalWithdrawalToTxn,
-} from "@/modules/financial-base/engine/linked";
+} from "@/modules/financial-base";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";

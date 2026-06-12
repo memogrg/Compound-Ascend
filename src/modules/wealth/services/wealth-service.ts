@@ -3,13 +3,13 @@ import "server-only";
 /** Servicio del Módulo 4 (respeta RLS). Cruza Base, Control y Perfil. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import {
   computeReadiness,
   computeProtection,
   computeBalance,
   computePortfolio,
-} from "@/modules/wealth/engine/wealth-engine";
+} from "@/modules/wealth";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";

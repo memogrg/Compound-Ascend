@@ -6,12 +6,12 @@ import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import {
   getBaseSummary,
   getDisplayCurrency,
-} from "@/modules/financial-base/services/base-service";
-import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
-import { computeHealthScore, type HealthScore } from "@/modules/financial-base/engine/health";
+} from "@/modules/financial-base";
+import { computeBaseIndicators } from "@/modules/financial-base";
+import { computeHealthScore, type HealthScore } from "@/modules/financial-base";
 import { buildInsights, type DashboardInsights } from "@/modules/dashboard/engine/insights";
-import type { BaseSummary } from "@/modules/financial-base/services/base-service";
-import type { IncomeSource, ExpenseItem } from "@/modules/financial-base/types";
+import type { BaseSummary } from "@/modules/financial-base";
+import type { IncomeSource, ExpenseItem } from "@/modules/financial-base";
 
 export type DashboardData = {
   name: string;

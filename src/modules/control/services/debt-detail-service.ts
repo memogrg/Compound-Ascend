@@ -7,7 +7,7 @@ import "server-only";
  * como en el cliente para la calculadora de escenarios.
  */
 import { getDebt, listDebtPayments } from "@/modules/control/services/control-service";
-import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import { getDisplayCurrency } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { buildSchedule, recomputeFromPayments } from "@/modules/control/engine/amortization";

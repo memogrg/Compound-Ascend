@@ -7,7 +7,7 @@ import {
   updatePrimaryCurrency,
   clearAllFinancialData,
 } from "@/modules/account/services/account-service";
-import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base/services/base-service";
+import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import {
   isEmailConfigured,
