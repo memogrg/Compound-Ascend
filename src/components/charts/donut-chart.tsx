@@ -24,8 +24,13 @@ export function DonutChart({
     total > 0 ? data.filter((d) => d.value > 0) : [{ name: "—", value: 1, color: "var(--chip)" }];
 
   return (
-    <div style={{ position: "relative", width: size, height: size, flex: "none" }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div
+      role="img"
+      aria-label="Gráfico de dona: composición por categoría"
+      style={{ position: "relative", width: size, height: size, flex: "none" }}
+    >
+      <div aria-hidden="true" style={{ width: "100%", height: "100%" }}>
+        <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={safe}
@@ -43,7 +48,8 @@ export function DonutChart({
             ))}
           </Pie>
         </PieChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
       {(centerLabel || centerSub) && (
         <div
           style={{

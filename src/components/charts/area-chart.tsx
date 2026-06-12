@@ -55,7 +55,9 @@ export function PerformanceChart({
   const gradId = `pg-${currency}-${reactId.replace(/:/g, "")}`;
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    <div role="img" aria-label="Gráfico de área: rendimiento">
+      <div aria-hidden="true">
+        <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -104,6 +106,8 @@ export function PerformanceChart({
           cursor={{ stroke: "var(--muted-2)", strokeWidth: 1 }}
         />
       </AreaChart>
-    </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
