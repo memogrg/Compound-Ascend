@@ -92,6 +92,7 @@ export function ScanReceiptButton({
   return (
     <>
       <input
+        aria-label="Subir imagen del recibo"
         ref={fileRef}
         type="file"
         accept="image/*"
