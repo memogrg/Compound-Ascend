@@ -1,4 +1,3 @@
-"use client";
 
 import { PerformanceChart } from "@/components/charts/lazy";
 import type {
