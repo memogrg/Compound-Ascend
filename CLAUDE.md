@@ -27,17 +27,20 @@ The RLS isolation test (`tests/rls/isolation.test.ts`) requires real Supabase cr
 
 ### Module structure
 
-Business logic lives in `src/modules/`, divided into 6 self-contained modules:
+Business logic lives in `src/modules/`, divided into 8 self-contained modules:
 
-| Module | Route | Purpose |
+| Module | Routes | Purpose |
 |---|---|---|
 | `personal-profile` | `/mi-perfil-financiero` | Financial DNA onboarding wizard |
-| `financial-base` | `/mi-base-financiera` | Income/expense tracking |
+| `financial-base` | `/mi-base-financiera`, `/gastos`, `/ingresos`, `/transacciones` | Budget + income/expense tracking (each tab is its own route) |
 | `dashboard` | `/dashboard` | Financial health overview |
-| `control` | `/control-financiero` | Priority Engine (debt strategy) |
-| `wealth` | `/patrimonio` | Investments & insurance |
+| `control` | `/control-financiero` (Ahorro), `/deudas` | Priority Engine, goals, debt strategy |
+| `wealth` | `/patrimonio`, `/patrimonio/proteccion`, `/patrimonio/indicadores` | Investments & insurance |
 | `rich-life` | `/mi-rich-life` | Net worth & Rich Life Score |
+| `account` | `/configuracion` | Account, plan, household invitations, WhatsApp link |
 | `assistant` | API only | AI chat + receipt scanner |
+
+WhatsApp lives outside modules (`src/lib/whatsapp/` + `/api/whatsapp/webhook`); household helpers in `src/lib/household/`.
 
 Each module follows this internal layout:
 ```
@@ -59,6 +62,14 @@ module/
 2. Action validates with Zod, calls `requireUser()` for auth
 3. Supabase RLS enforces row-level ownership — no manual user-ID filtering needed
 4. `revalidatePath()` triggers re-render; no client-side cache invalidation
+
+### Linked transactions (orchestrator)
+
+A money event is a single fact: when control/wealth record a payment, dividend, rent, goal contribution/withdrawal or holding purchase/sale, the transaction (`linked_kind`/`linked_id` on `transactions`) and the specialized ledger row are created together via `financial-base/services/linked-transaction-service.ts`, with compensating rollback if the second write fails. Dependency direction: control/wealth → financial-base, never the reverse. Budget lines derived from entities (`budget_items.source_kind` ≠ `'manual'`) are locked in the UI and regenerate through `syncDerivedBudget`; edit them in their owning module. Reconciliation (`engine/reconciliation.ts`) surfaces unlinked transactions whose category has a `linked_kind` and lets the user link them 1-tap.
+
+### Household
+
+Every INSERT into user-data tables must include `household_id` via `getActiveHouseholdId()` (`src/lib/household/active.ts`) — otherwise the row is invisible to the rest of the household (RLS filters by it). There's a guard test in `tests/unit/household-propagation.test.ts`. WhatsApp writes use the service-role client directly (the webhook has no user session) and bypass the central pipeline; its transactions are born `linked_kind='none'` and surface in reconciliation once the user categorizes them.
 
 ### Supabase clients
 
@@ -126,6 +137,17 @@ API routes:
 **AI context**: `FinancialContext` now includes `portfolioValue`, `portfolioReturnPct`, `topAssetClass`; the chat route enriches these from `getPortfolioReport()`.
 
 **Currency discipline**: all amounts in portfolio engines are assumed to be in the user's primary currency. Conversion from holding/price currencies happens in `portfolio-service.ts` before calling the engines.
+
+### Gastos tab (frascos/sobres)
+
+The expense panel renders jars (`financial-base/components/v2/expense-jars/` + pure engine `engine/expense-jars.ts`): 6 normal groups with envelopes (favorite leaf categories) and 4 linked groups fed by real entities (holdings/debts/policies/goals) with deep-link CTAs (`?new=holding|debt|policy|goal`). Budget edits for the current period go through a 3-check warning modal. Suggestion chips merge `engine/expense-suggestions.ts` benchmarks with non-favorite system leaves.
+
+### Gotchas
+
+- `next lint` is deprecated (removal in Next.js 16) — migration to ESLint CLI pending.
+- Some `revalidatePath("/ahorro")` calls reference a non-existent route; the savings screen is `/control-financiero`.
+- Migrations: 34 files. `20260610000001-3` (household, from main) and `20260610100001-3` (interconexión, renamed to avoid version collision) coexist on purpose — don't "fix" the numbering.
+- `npm run build` and `npm run dev` can't run simultaneously (shared `.next`).
 
 ### Localisation
 
