@@ -8,13 +8,13 @@ import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
   getSystemCategoryId,
-} from "@/modules/financial-base/services/linked-transaction-service";
+} from "@/modules/financial-base";
 import {
   holdingSaleToTxn,
   holdingPurchaseToTxn,
   purchaseExpenseAmount,
   positionIncreaseAmount,
-} from "@/modules/financial-base/engine/linked";
+} from "@/modules/financial-base";
 import type { HoldingInput, HoldingSaleInput } from "@/modules/wealth/schemas";
 import type { Holding } from "@/modules/wealth/types";
 import type { AssetType } from "@/modules/wealth/types";

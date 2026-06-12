@@ -9,7 +9,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
-import { getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
+import { getPrimaryCurrency } from "@/modules/financial-base";
 import { listHoldings } from "@/modules/wealth/services/holdings-service";
 import { listDividends } from "@/modules/wealth/services/dividend-service";
 import {

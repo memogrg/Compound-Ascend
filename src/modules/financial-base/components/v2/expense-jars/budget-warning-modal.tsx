@@ -6,6 +6,7 @@
  * Tras continuar: editar el monto del sobre → mensaje de éxito. Texto literal
  * del diseño.
  */
+import { CURRENCY_SYMBOL } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -23,7 +24,6 @@ const CHECKS = [
   "Entiendo que debería utilizar esta acción únicamente cuando exista un cambio real en mis circunstancias financieras.",
 ];
 
-const SYM: Record<string, string> = { CRC: "₡", USD: "$", EUR: "€", MXN: "MX$", COP: "COL$", GBP: "£" };
 
 export function BudgetWarningModal({
   envelope,
@@ -48,7 +48,7 @@ export function BudgetWarningModal({
   const isEnabled = (i: number) => i === 0 || checked.slice(0, i).every(Boolean);
 
   const periodLabel = `${MONTHS[period.month - 1] ?? ""} ${period.year}`;
-  const sym = SYM[currency] ?? "";
+  const sym = CURRENCY_SYMBOL[currency] ?? "";
 
   async function save() {
     const amt = Number(amount);

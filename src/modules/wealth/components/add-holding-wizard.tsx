@@ -363,6 +363,8 @@ function AddHoldingWizard({
   useEffect(() => {
     if (step === 4 && !countryFetchedRef.current) {
       countryFetchedRef.current = true;
+      // El país solo precarga una sugerencia del paso DCA: si falla, el wizard
+      // sigue con el default — silenciarlo es intencional, no un descuido.
       getUserCountryAction().then(setUserCountry).catch(() => {});
     }
   }, [step]);

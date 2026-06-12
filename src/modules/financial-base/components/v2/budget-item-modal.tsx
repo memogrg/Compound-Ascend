@@ -1,6 +1,7 @@
 "use client";
 
 /** Alta/edición de un ítem de presupuesto (budget_items). No toca lo real. */
+import { CURRENCY_SYMBOL } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -11,7 +12,6 @@ import type { Category } from "@/modules/financial-base/services/categories-serv
 import { FREQUENCIES } from "@/modules/financial-base/constants";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 
-const SYM: Record<string, string> = { CRC: "₡", USD: "$", EUR: "€", MXN: "MX$", COP: "COL$", GBP: "£" };
 
 export function BudgetItemModal({
   type,
@@ -83,7 +83,7 @@ export function BudgetItemModal({
             <div className="fld">
               <label className="fld-label">Monto mensual presupuestado</label>
               <div className="inp-money">
-                <span className="pre">{SYM[cur] ?? ""}</span>
+                <span className="pre">{CURRENCY_SYMBOL[cur] ?? ""}</span>
                 <input type="number" step="0.01" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" required />
               </div>
             </div>

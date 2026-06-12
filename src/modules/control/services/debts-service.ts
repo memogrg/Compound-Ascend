@@ -8,7 +8,7 @@ import "server-only";
  */
 import { listDebts, listDebtPaymentDatesThisMonth } from "@/modules/control/services/control-service";
 import { getBaseSummary } from "@/modules/financial-base";
-import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import { getDisplayCurrency } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { effectiveApr, buildRateNote } from "@/modules/control/services/index-rates";

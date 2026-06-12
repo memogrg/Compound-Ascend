@@ -8,16 +8,9 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDisplayCurrencyAction } from "@/modules/account/api/actions";
+import { CURRENCY_SYMBOL } from "@/lib/format";
 
 const CODES = ["CRC", "USD", "EUR", "MXN", "COP", "GBP"] as const;
-const SYMBOL: Record<string, string> = {
-  CRC: "₡",
-  USD: "$",
-  EUR: "€",
-  MXN: "MX$",
-  COP: "COL$",
-  GBP: "£",
-};
 
 export function CurrencySwitch({ current, primary }: { current: string; primary: string }) {
   const router = useRouter();
@@ -32,7 +25,7 @@ export function CurrencySwitch({ current, primary }: { current: string; primary:
   return (
     <label className="cur-switch" title="Moneda en que ves tus dashboards">
       <span className="cur-switch-ic" aria-hidden>
-        {SYMBOL[current] ?? "¤"}
+        {CURRENCY_SYMBOL[current] ?? "¤"}
       </span>
       <select
         value={CODES.includes(current as (typeof CODES)[number]) ? current : "CRC"}

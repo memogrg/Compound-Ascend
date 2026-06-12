@@ -7,7 +7,7 @@ import "server-only";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
-import { getBaseSummary } from "@/modules/financial-base/services/base-service";
+import { getBaseSummary } from "@/modules/financial-base";
 import { buildInvestmentInsights } from "@/modules/wealth/engine/portfolio-engine";
 import type { InvestmentInsights } from "@/modules/wealth/types";
 

@@ -7,8 +7,8 @@ import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
   getSystemCategoryId,
-} from "@/modules/financial-base/services/linked-transaction-service";
-import { dividendToTxn } from "@/modules/financial-base/engine/linked";
+} from "@/modules/financial-base";
+import { dividendToTxn } from "@/modules/financial-base";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";

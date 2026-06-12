@@ -12,8 +12,8 @@ import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
   getSystemCategoryId,
-} from "@/modules/financial-base/services/linked-transaction-service";
-import { rentalPaymentToTxn } from "@/modules/financial-base/engine/linked";
+} from "@/modules/financial-base";
+import { rentalPaymentToTxn } from "@/modules/financial-base";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";

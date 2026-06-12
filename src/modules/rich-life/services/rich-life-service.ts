@@ -6,8 +6,8 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base/services/base-service";
-import { computeProtection, computePortfolio } from "@/modules/wealth/engine/wealth-engine";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
+import { computeProtection, computePortfolio } from "@/modules/wealth";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -20,7 +20,7 @@ import type {
   RichLifeSnapshot,
   RichLifeInput,
 } from "@/modules/rich-life/types";
-import type { Investment, InsurancePolicy, PolicyType } from "@/modules/wealth/types";
+import type { Investment, InsurancePolicy, PolicyType } from "@/modules/wealth";
 
 async function tryGetPortfolioMarketValues(): Promise<Record<string, number>> {
   try {

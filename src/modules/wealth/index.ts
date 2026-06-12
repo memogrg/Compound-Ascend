@@ -26,6 +26,9 @@ export { DefenseView } from "./components/defense-view";
 export { WealthActions } from "./components/wealth-actions";
 export type { WealthSummary } from "./services/wealth-service";
 export type {
+  Investment,
+  InsurancePolicy,
+  PolicyType,
   Holding,
   HoldingPerformance,
   Dividend,

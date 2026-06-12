@@ -1,7 +1,513 @@
 {
-  "extends": ["next/core-web-vitals", "next/typescript"],
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
   "rules": {
     "@typescript-eslint/no-explicit-any": "error",
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
-  }
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/modules/account/**/*.ts",
+        "src/modules/account/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/assistant/services/*",
+                  "@/modules/assistant/engine/*",
+                  "@/modules/assistant/api/*",
+                  "@/modules/assistant/components/**",
+                  "@/modules/assistant/schemas",
+                  "@/modules/assistant/types",
+                  "@/modules/control/services/*",
+                  "@/modules/control/engine/*",
+                  "@/modules/control/api/*",
+                  "@/modules/control/components/**",
+                  "@/modules/control/schemas",
+                  "@/modules/control/types",
+                  "@/modules/dashboard/services/*",
+                  "@/modules/dashboard/engine/*",
+                  "@/modules/dashboard/api/*",
+                  "@/modules/dashboard/components/**",
+                  "@/modules/dashboard/schemas",
+                  "@/modules/dashboard/types",
+                  "@/modules/financial-base/services/*",
+                  "@/modules/financial-base/engine/*",
+                  "@/modules/financial-base/api/*",
+                  "@/modules/financial-base/components/**",
+                  "@/modules/financial-base/schemas",
+                  "@/modules/financial-base/types",
+                  "@/modules/personal-profile/services/*",
+                  "@/modules/personal-profile/engine/*",
+                  "@/modules/personal-profile/api/*",
+                  "@/modules/personal-profile/components/**",
+                  "@/modules/personal-profile/schemas",
+                  "@/modules/personal-profile/types",
+                  "@/modules/rich-life/services/*",
+                  "@/modules/rich-life/engine/*",
+                  "@/modules/rich-life/api/*",
+                  "@/modules/rich-life/components/**",
+                  "@/modules/rich-life/schemas",
+                  "@/modules/rich-life/types",
+                  "@/modules/wealth/services/*",
+                  "@/modules/wealth/engine/*",
+                  "@/modules/wealth/api/*",
+                  "@/modules/wealth/components/**",
+                  "@/modules/wealth/schemas",
+                  "@/modules/wealth/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/modules/assistant/**/*.ts",
+        "src/modules/assistant/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/account/services/*",
+                  "@/modules/account/engine/*",
+                  "@/modules/account/api/*",
+                  "@/modules/account/components/**",
+                  "@/modules/account/schemas",
+                  "@/modules/account/types",
+                  "@/modules/control/services/*",
+                  "@/modules/control/engine/*",
+                  "@/modules/control/api/*",
+                  "@/modules/control/components/**",
+                  "@/modules/control/schemas",
+                  "@/modules/control/types",
+                  "@/modules/dashboard/services/*",
+                  "@/modules/dashboard/engine/*",
+                  "@/modules/dashboard/api/*",
+                  "@/modules/dashboard/components/**",
+                  "@/modules/dashboard/schemas",
+                  "@/modules/dashboard/types",
+                  "@/modules/financial-base/services/*",
+                  "@/modules/financial-base/engine/*",
+                  "@/modules/financial-base/api/*",
+                  "@/modules/financial-base/components/**",
+                  "@/modules/financial-base/schemas",
+                  "@/modules/financial-base/types",
+                  "@/modules/personal-profile/services/*",
+                  "@/modules/personal-profile/engine/*",
+                  "@/modules/personal-profile/api/*",
+                  "@/modules/personal-profile/components/**",
+                  "@/modules/personal-profile/schemas",
+                  "@/modules/personal-profile/types",
+                  "@/modules/rich-life/services/*",
+                  "@/modules/rich-life/engine/*",
+                  "@/modules/rich-life/api/*",
+                  "@/modules/rich-life/components/**",
+                  "@/modules/rich-life/schemas",
+                  "@/modules/rich-life/types",
+                  "@/modules/wealth/services/*",
+                  "@/modules/wealth/engine/*",
+                  "@/modules/wealth/api/*",
+                  "@/modules/wealth/components/**",
+                  "@/modules/wealth/schemas",
+                  "@/modules/wealth/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/modules/control/**/*.ts",
+        "src/modules/control/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/account/services/*",
+                  "@/modules/account/engine/*",
+                  "@/modules/account/api/*",
+                  "@/modules/account/components/**",
+                  "@/modules/account/schemas",
+                  "@/modules/account/types",
+                  "@/modules/assistant/services/*",
+                  "@/modules/assistant/engine/*",
+                  "@/modules/assistant/api/*",
+                  "@/modules/assistant/components/**",
+                  "@/modules/assistant/schemas",
+                  "@/modules/assistant/types",
+                  "@/modules/dashboard/services/*",
+                  "@/modules/dashboard/engine/*",
+                  "@/modules/dashboard/api/*",
+                  "@/modules/dashboard/components/**",
+                  "@/modules/dashboard/schemas",
+                  "@/modules/dashboard/types",
+                  "@/modules/financial-base/services/*",
+                  "@/modules/financial-base/engine/*",
+                  "@/modules/financial-base/api/*",
+                  "@/modules/financial-base/components/**",
+                  "@/modules/financial-base/schemas",
+                  "@/modules/financial-base/types",
+                  "@/modules/personal-profile/services/*",
+                  "@/modules/personal-profile/engine/*",
+                  "@/modules/personal-profile/api/*",
+                  "@/modules/personal-profile/components/**",
+                  "@/modules/personal-profile/schemas",
+                  "@/modules/personal-profile/types",
+                  "@/modules/rich-life/services/*",
+                  "@/modules/rich-life/engine/*",
+                  "@/modules/rich-life/api/*",
+                  "@/modules/rich-life/components/**",
+                  "@/modules/rich-life/schemas",
+                  "@/modules/rich-life/types",
+                  "@/modules/wealth/services/*",
+                  "@/modules/wealth/engine/*",
+                  "@/modules/wealth/api/*",
+                  "@/modules/wealth/components/**",
+                  "@/modules/wealth/schemas",
+                  "@/modules/wealth/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/modules/dashboard/**/*.ts",
+        "src/modules/dashboard/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/account/services/*",
+                  "@/modules/account/engine/*",
+                  "@/modules/account/api/*",
+                  "@/modules/account/components/**",
+                  "@/modules/account/schemas",
+                  "@/modules/account/types",
+                  "@/modules/assistant/services/*",
+                  "@/modules/assistant/engine/*",
+                  "@/modules/assistant/api/*",
+                  "@/modules/assistant/components/**",
+                  "@/modules/assistant/schemas",
+                  "@/modules/assistant/types",
+                  "@/modules/control/services/*",
+                  "@/modules/control/engine/*",
+                  "@/modules/control/api/*",
+                  "@/modules/control/components/**",
+                  "@/modules/control/schemas",
+                  "@/modules/control/types",
+                  "@/modules/financial-base/services/*",
+                  "@/modules/financial-base/engine/*",
+                  "@/modules/financial-base/api/*",
+                  "@/modules/financial-base/components/**",
+                  "@/modules/financial-base/schemas",
+                  "@/modules/financial-base/types",
+                  "@/modules/personal-profile/services/*",
+                  "@/modules/personal-profile/engine/*",
+                  "@/modules/personal-profile/api/*",
+                  "@/modules/personal-profile/components/**",
+                  "@/modules/personal-profile/schemas",
+                  "@/modules/personal-profile/types",
+                  "@/modules/rich-life/services/*",
+                  "@/modules/rich-life/engine/*",
+                  "@/modules/rich-life/api/*",
+                  "@/modules/rich-life/components/**",
+                  "@/modules/rich-life/schemas",
+                  "@/modules/rich-life/types",
+                  "@/modules/wealth/services/*",
+                  "@/modules/wealth/engine/*",
+                  "@/modules/wealth/api/*",
+                  "@/modules/wealth/components/**",
+                  "@/modules/wealth/schemas",
+                  "@/modules/wealth/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/modules/financial-base/**/*.ts",
+        "src/modules/financial-base/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/account/services/*",
+                  "@/modules/account/engine/*",
+                  "@/modules/account/api/*",
+                  "@/modules/account/components/**",
+                  "@/modules/account/schemas",
+                  "@/modules/account/types",
+                  "@/modules/assistant/services/*",
+                  "@/modules/assistant/engine/*",
+                  "@/modules/assistant/api/*",
+                  "@/modules/assistant/components/**",
+                  "@/modules/assistant/schemas",
+                  "@/modules/assistant/types",
+                  "@/modules/control/services/*",
+                  "@/modules/control/engine/*",
+                  "@/modules/control/api/*",
+                  "@/modules/control/components/**",
+                  "@/modules/control/schemas",
+                  "@/modules/control/types",
+                  "@/modules/dashboard/services/*",
+                  "@/modules/dashboard/engine/*",
+                  "@/modules/dashboard/api/*",
+                  "@/modules/dashboard/components/**",
+                  "@/modules/dashboard/schemas",
+                  "@/modules/dashboard/types",
+                  "@/modules/personal-profile/services/*",
+                  "@/modules/personal-profile/engine/*",
+                  "@/modules/personal-profile/api/*",
+                  "@/modules/personal-profile/components/**",
+                  "@/modules/personal-profile/schemas",
+                  "@/modules/personal-profile/types",
+                  "@/modules/rich-life/services/*",
+                  "@/modules/rich-life/engine/*",
+                  "@/modules/rich-life/api/*",
+                  "@/modules/rich-life/components/**",
+                  "@/modules/rich-life/schemas",
+                  "@/modules/rich-life/types",
+                  "@/modules/wealth/services/*",
+                  "@/modules/wealth/engine/*",
+                  "@/modules/wealth/api/*",
+                  "@/modules/wealth/components/**",
+                  "@/modules/wealth/schemas",
+                  "@/modules/wealth/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/modules/personal-profile/**/*.ts",
+        "src/modules/personal-profile/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/account/services/*",
+                  "@/modules/account/engine/*",
+                  "@/modules/account/api/*",
+                  "@/modules/account/components/**",
+                  "@/modules/account/schemas",
+                  "@/modules/account/types",
+                  "@/modules/assistant/services/*",
+                  "@/modules/assistant/engine/*",
+                  "@/modules/assistant/api/*",
+                  "@/modules/assistant/components/**",
+                  "@/modules/assistant/schemas",
+                  "@/modules/assistant/types",
+                  "@/modules/control/services/*",
+                  "@/modules/control/engine/*",
+                  "@/modules/control/api/*",
+                  "@/modules/control/components/**",
+                  "@/modules/control/schemas",
+                  "@/modules/control/types",
+                  "@/modules/dashboard/services/*",
+                  "@/modules/dashboard/engine/*",
+                  "@/modules/dashboard/api/*",
+                  "@/modules/dashboard/components/**",
+                  "@/modules/dashboard/schemas",
+                  "@/modules/dashboard/types",
+                  "@/modules/financial-base/services/*",
+                  "@/modules/financial-base/engine/*",
+                  "@/modules/financial-base/api/*",
+                  "@/modules/financial-base/components/**",
+                  "@/modules/financial-base/schemas",
+                  "@/modules/financial-base/types",
+                  "@/modules/rich-life/services/*",
+                  "@/modules/rich-life/engine/*",
+                  "@/modules/rich-life/api/*",
+                  "@/modules/rich-life/components/**",
+                  "@/modules/rich-life/schemas",
+                  "@/modules/rich-life/types",
+                  "@/modules/wealth/services/*",
+                  "@/modules/wealth/engine/*",
+                  "@/modules/wealth/api/*",
+                  "@/modules/wealth/components/**",
+                  "@/modules/wealth/schemas",
+                  "@/modules/wealth/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/modules/rich-life/**/*.ts",
+        "src/modules/rich-life/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/account/services/*",
+                  "@/modules/account/engine/*",
+                  "@/modules/account/api/*",
+                  "@/modules/account/components/**",
+                  "@/modules/account/schemas",
+                  "@/modules/account/types",
+                  "@/modules/assistant/services/*",
+                  "@/modules/assistant/engine/*",
+                  "@/modules/assistant/api/*",
+                  "@/modules/assistant/components/**",
+                  "@/modules/assistant/schemas",
+                  "@/modules/assistant/types",
+                  "@/modules/control/services/*",
+                  "@/modules/control/engine/*",
+                  "@/modules/control/api/*",
+                  "@/modules/control/components/**",
+                  "@/modules/control/schemas",
+                  "@/modules/control/types",
+                  "@/modules/dashboard/services/*",
+                  "@/modules/dashboard/engine/*",
+                  "@/modules/dashboard/api/*",
+                  "@/modules/dashboard/components/**",
+                  "@/modules/dashboard/schemas",
+                  "@/modules/dashboard/types",
+                  "@/modules/financial-base/services/*",
+                  "@/modules/financial-base/engine/*",
+                  "@/modules/financial-base/api/*",
+                  "@/modules/financial-base/components/**",
+                  "@/modules/financial-base/schemas",
+                  "@/modules/financial-base/types",
+                  "@/modules/personal-profile/services/*",
+                  "@/modules/personal-profile/engine/*",
+                  "@/modules/personal-profile/api/*",
+                  "@/modules/personal-profile/components/**",
+                  "@/modules/personal-profile/schemas",
+                  "@/modules/personal-profile/types",
+                  "@/modules/wealth/services/*",
+                  "@/modules/wealth/engine/*",
+                  "@/modules/wealth/api/*",
+                  "@/modules/wealth/components/**",
+                  "@/modules/wealth/schemas",
+                  "@/modules/wealth/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/modules/wealth/**/*.ts",
+        "src/modules/wealth/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@/modules/account/services/*",
+                  "@/modules/account/engine/*",
+                  "@/modules/account/api/*",
+                  "@/modules/account/components/**",
+                  "@/modules/account/schemas",
+                  "@/modules/account/types",
+                  "@/modules/assistant/services/*",
+                  "@/modules/assistant/engine/*",
+                  "@/modules/assistant/api/*",
+                  "@/modules/assistant/components/**",
+                  "@/modules/assistant/schemas",
+                  "@/modules/assistant/types",
+                  "@/modules/control/services/*",
+                  "@/modules/control/engine/*",
+                  "@/modules/control/api/*",
+                  "@/modules/control/components/**",
+                  "@/modules/control/schemas",
+                  "@/modules/control/types",
+                  "@/modules/dashboard/services/*",
+                  "@/modules/dashboard/engine/*",
+                  "@/modules/dashboard/api/*",
+                  "@/modules/dashboard/components/**",
+                  "@/modules/dashboard/schemas",
+                  "@/modules/dashboard/types",
+                  "@/modules/financial-base/services/*",
+                  "@/modules/financial-base/engine/*",
+                  "@/modules/financial-base/api/*",
+                  "@/modules/financial-base/components/**",
+                  "@/modules/financial-base/schemas",
+                  "@/modules/financial-base/types",
+                  "@/modules/personal-profile/services/*",
+                  "@/modules/personal-profile/engine/*",
+                  "@/modules/personal-profile/api/*",
+                  "@/modules/personal-profile/components/**",
+                  "@/modules/personal-profile/schemas",
+                  "@/modules/personal-profile/types",
+                  "@/modules/rich-life/services/*",
+                  "@/modules/rich-life/engine/*",
+                  "@/modules/rich-life/api/*",
+                  "@/modules/rich-life/components/**",
+                  "@/modules/rich-life/schemas",
+                  "@/modules/rich-life/types"
+                ],
+                "message": "Cross-módulo: importa desde el barrel (@/modules/<modulo>). Los internos son privados (CLAUDE.md). Excepción permitida: @/modules/*/constants."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

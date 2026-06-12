@@ -99,6 +99,9 @@ export function Icon({ name, width = 1.8, filled = false, className, style }: Ic
       className={className}
       style={style}
       aria-hidden="true"
+      // PATHS es un mapa constante interno tipado por IconName: nunca recibe
+      // entrada de usuario, por eso el innerHTML es seguro aquí.
+      // nosemgrep
       dangerouslySetInnerHTML={{ __html: PATHS[name] }}
     />
   );

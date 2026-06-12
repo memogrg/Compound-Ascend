@@ -7,8 +7,8 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
-import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
+import { getPrimaryCurrency } from "@/modules/financial-base";
+import { monthlyize, type Frequency } from "@/modules/financial-base";
 
 function futureISO(monthsAhead: number): string {
   const d = new Date();
