@@ -19,7 +19,9 @@ import type { HoldingInput, HoldingSaleInput } from "@/modules/wealth/schemas";
 import type { Holding } from "@/modules/wealth/types";
 import type { AssetType } from "@/modules/wealth/types";
 
-function rowToHolding(r: {
+// Exportados para el snapshot de cron (sin sesión): mismo mapeo y columnas
+// que el resto del módulo, sin duplicar la forma del row.
+export function rowToHolding(r: {
   id: string;
   investment_id: string | null;
   symbol: string;
@@ -53,7 +55,7 @@ function rowToHolding(r: {
   };
 }
 
-const HOLDING_COLS =
+export const HOLDING_COLS =
   "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
