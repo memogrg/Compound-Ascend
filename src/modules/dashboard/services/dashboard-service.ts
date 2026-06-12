@@ -30,16 +30,23 @@ export async function getDashboardData(): Promise<DashboardData> {
   // sí lo haya configurado.
   let profileName: string | null = null;
   if (configured) {
-    [summary, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
-    if (user) {
-      const supabase = await createSupabaseServerClient();
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", user.id)
-        .maybeSingle();
-      profileName = profile?.display_name ?? null;
-    }
+    // El nombre del perfil no depende del summary: va en el mismo lote.
+    const profilePromise = user
+      ? (async () => {
+          const supabase = await createSupabaseServerClient();
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("id", user.id)
+            .maybeSingle();
+          return profile?.display_name ?? null;
+        })()
+      : Promise.resolve(null);
+    [summary, currency, profileName] = await Promise.all([
+      getBaseSummary(),
+      getDisplayCurrency(),
+      profilePromise,
+    ]);
   } else {
     // Modo demostración (sin Supabase): datos de ejemplo claramente etiquetados
     // en la UI, para previsualizar el panel premium. Se reemplazan por datos
