@@ -107,6 +107,7 @@ export function CoachPanel() {
           <input
             ref={fileRef}
             type="file"
+            aria-label="Subir foto del recibo"
             accept="image/*"
             capture="environment"
             hidden
@@ -378,6 +379,7 @@ function TransactionWizard() {
       <Field label="Descripción">
         <input
           className="inp"
+          aria-label="Descripción"
           value={draft.description}
           onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
           placeholder="Supermercado, salario…"
@@ -387,6 +389,7 @@ function TransactionWizard() {
       <Field label="Categoría">
         <select
           className="sel"
+          aria-label="Categoría"
           onChange={(e) =>
             setDraft((d) => ({ ...d, description: d.description || e.target.value }))
           }
@@ -408,7 +411,8 @@ function TransactionWizard() {
             type="number"
             min="0"
             step="0.01"
-            value={draft.amount || ""}
+            aria-label="Monto"
+          value={draft.amount || ""}
             onChange={(e) => setDraft((d) => ({ ...d, amount: Number(e.target.value) }))}
             placeholder="0"
           />
@@ -416,7 +420,8 @@ function TransactionWizard() {
         <Field label="Moneda">
           <select
             className="sel"
-            value={draft.currency}
+            aria-label="Moneda"
+          value={draft.currency}
             onChange={(e) => setDraft((d) => ({ ...d, currency: e.target.value }))}
           >
             {CURRENCIES.map((c) => (
@@ -432,6 +437,7 @@ function TransactionWizard() {
         <input
           className="inp"
           type="date"
+          aria-label="Fecha"
           value={draft.occurredOn}
           onChange={(e) => setDraft((d) => ({ ...d, occurredOn: e.target.value }))}
         />
