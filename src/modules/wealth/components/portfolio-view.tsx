@@ -12,8 +12,8 @@
  *  - Rendimiento: benchmark (índice) y métricas de riesgo (volatilidad, etc.).
  */
 import { useEffect, useMemo, useState } from "react";
-import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
-import { PerformanceChart, type AreaPoint } from "@/components/charts/area-chart";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { HoldingIcon, iconGradient } from "./holding-icon";

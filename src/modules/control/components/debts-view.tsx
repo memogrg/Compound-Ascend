@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney, formatPercent } from "@/lib/format";
-import { PerformanceChart } from "@/components/charts/area-chart";
+import { PerformanceChart } from "@/components/charts/lazy";
 import { AddControlButton } from "./control-actions";
 import {
   simulateStrategy,

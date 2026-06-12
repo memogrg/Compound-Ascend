@@ -1,4 +1,4 @@
-import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { DeleteButton } from "./delete-button";
 import { EditItemButton, AddItemButton } from "./base-actions";
 import { EXPENSE_NATURES, NATURE_COLOR } from "@/modules/financial-base/constants";

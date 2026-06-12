@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
-import { PerformanceChart, type AreaPoint } from "@/components/charts/area-chart";
+import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {

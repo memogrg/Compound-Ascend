@@ -1,4 +1,4 @@
-import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { DeleteButton } from "./delete-button";
 import { EditRichButton, AddRichButton } from "./rich-actions";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";

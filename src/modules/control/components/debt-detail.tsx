@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { PerformanceChart } from "@/components/charts/area-chart";
+import { PerformanceChart } from "@/components/charts/lazy";
 import { formatMoney } from "@/lib/format";
 import { reportPaymentAction } from "@/modules/control/api/actions";
 import {

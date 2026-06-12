@@ -9,8 +9,8 @@ import {
   FinancialInsightCard,
   type FinancialReading,
 } from "@/components/shared/financial-insight-card";
-import { DonutChart, type DonutDatum } from "@/components/charts/donut-chart";
-import { PremiumLineChart } from "@/components/charts/line-chart";
+import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
+import { PremiumLineChart } from "@/components/charts/lazy";
 import { EditableBudgetTable } from "@/modules/financial-base/components/v2/editable-budget-table";
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
 import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";

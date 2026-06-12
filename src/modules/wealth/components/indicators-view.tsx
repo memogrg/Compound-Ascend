@@ -1,6 +1,6 @@
 "use client";
 
-import { PerformanceChart } from "@/components/charts/area-chart";
+import { PerformanceChart } from "@/components/charts/lazy";
 import type {
   IndicatorCard,
   IndicatorsViewModel,
