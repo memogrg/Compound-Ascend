@@ -1,10 +1,13 @@
 /**
  * GET /api/market-price?symbol=AAPL&type=stock
- * Precio con cadena de proveedores + cache. Rate-limited por IP.
+ * Precio con cadena de proveedores + cache. Requiere sesión: el endpoint
+ * proxyea APIs externas con NUESTROS tokens (Finnhub/AlphaVantage) — sin auth,
+ * cualquier anónimo podía quemar la cuota. Rate-limit por usuario.
  */
 import { NextResponse } from "next/server";
+import { getUser } from "@/lib/auth/session";
 import { getMarketPrice, isValidSymbol, type AssetType } from "@/lib/market-data";
-import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
+import { rateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
 
@@ -14,7 +17,10 @@ const ASSET_TYPES: AssetType[] = ["stock", "etf", "crypto"];
 export async function GET(req: Request) {
   const cors = corsHeaders(req.headers.get("origin"));
   try {
-    const rl = await rateLimit(`market:${clientIp(req)}`, RATE_LIMITS.marketData);
+    const user = await getUser();
+    if (!user) throw new AppError("UNAUTHORIZED");
+
+    const rl = await rateLimit(`market:user:${user.id}`, RATE_LIMITS.marketData);
     if (!rl.ok) throw new AppError("RATE_LIMITED");
 
     const url = new URL(req.url);
