@@ -143,7 +143,8 @@ export function TransactionsBrowser({
     if (filter.startsWith("cat:") && t.categoryId !== filter.slice(4)) return false;
     if (!q) return true;
     const cat = t.categoryId ? (categoryNames[t.categoryId] ?? "") : "";
-    const hay = `${t.merchantOrSource ?? ""} ${t.description ?? ""} ${cat} ${t.amount}`.toLowerCase();
+    const hay =
+      `${t.merchantOrSource ?? ""} ${t.description ?? ""} ${cat} ${t.amount}`.toLowerCase();
     return hay.includes(q);
   });
 
@@ -186,7 +187,14 @@ export function TransactionsBrowser({
           </div>
         </div>
         {visible.length === 0 ? (
-          <div style={{ padding: "40px 24px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+          <div
+            style={{
+              padding: "40px 24px",
+              textAlign: "center",
+              color: "var(--muted)",
+              fontSize: 13,
+            }}
+          >
             Sin resultados para tu búsqueda.
           </div>
         ) : (
@@ -194,7 +202,13 @@ export function TransactionsBrowser({
             <Row
               key={t.id}
               t={t}
-              categoryName={t.categoryId ? (categoryNames[t.categoryId] ?? "Sin categoría") : t.kind === "ingreso" ? "Ingreso" : "Sin categoría"}
+              categoryName={
+                t.categoryId
+                  ? (categoryNames[t.categoryId] ?? "Sin categoría")
+                  : t.kind === "ingreso"
+                    ? "Ingreso"
+                    : "Sin categoría"
+              }
               currency={currency}
               onEdit={() => setEditing(t)}
               onDelete={() => requestDelete(t)}
@@ -249,7 +263,10 @@ function Row({
         <Icon name={isIncome ? "income" : "expense"} width={2} />
       </div>
       <div style={{ minWidth: 0 }}>
-        <div className="env-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div
+          className="env-name"
+          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+        >
           {t.merchantOrSource || t.description || (isIncome ? "Ingreso" : "Gasto")}
         </div>
         <div className="env-sub">
@@ -261,24 +278,65 @@ function Row({
         {isIncome ? "Ingreso" : categoryName}
       </span>
       <div className="env-num">
-        <div className="big" style={{ color: isIncome ? "var(--pos)" : undefined }}>{amountStr}</div>
+        <div className="big" style={{ color: isIncome ? "var(--pos)" : undefined }}>
+          {amountStr}
+        </div>
         <div className="small">{relativeDate(t.occurredOn)}</div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}>
         {t.status === "pending_review" ? (
-          <span className="chip" style={{ background: "var(--warn-soft)", color: "var(--warn)", fontSize: 11 }}>Pendiente</span>
+          <span
+            className="chip"
+            style={{ background: "var(--warn-soft)", color: "var(--warn)", fontSize: 11 }}
+          >
+            Pendiente
+          </span>
         ) : null}
-        <button className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Acciones" onClick={() => setOpen((o) => !o)}>
+        <button
+          className="icon-btn"
+          style={{ width: 30, height: 30 }}
+          aria-label="Acciones"
+          onClick={() => setOpen((o) => !o)}
+        >
           <Icon name="dots" />
         </button>
         {open ? (
           <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
-            <button onClick={() => { setOpen(false); onEdit(); }}>Editar</button>
-            <button onClick={() => { setOpen(false); onDuplicate(); }}>Duplicar</button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                onDuplicate();
+              }}
+            >
+              Duplicar
+            </button>
             {t.status === "pending_review" ? (
-              <button onClick={() => { setOpen(false); onMarkReviewed(); }}>Marcar revisada</button>
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onMarkReviewed();
+                }}
+              >
+                Marcar revisada
+              </button>
             ) : null}
-            <button className="danger" onClick={() => { setOpen(false); onDelete(); }}>Eliminar</button>
+            <button
+              className="danger"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+            >
+              Eliminar
+            </button>
           </div>
         ) : null}
       </div>

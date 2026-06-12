@@ -53,9 +53,16 @@ export function ExpenseToolbar({
   function copyMonth() {
     setMenu(false);
     startCopy(async () => {
-      const res = await copyPreviousMonthBudgetAction({ periodMonth: period.month, periodYear: period.year });
+      const res = await copyPreviousMonthBudgetAction({
+        periodMonth: period.month,
+        periodYear: period.year,
+      });
       if (res.ok) {
-        toast(res.copied && res.copied > 0 ? `Copiados ${res.copied} sobres del mes anterior` : "El mes ya tenía todo el presupuesto copiado");
+        toast(
+          res.copied && res.copied > 0
+            ? `Copiados ${res.copied} sobres del mes anterior`
+            : "El mes ya tenía todo el presupuesto copiado",
+        );
         router.refresh();
       } else {
         toast(res.message ?? "No pudimos copiar el mes anterior");
@@ -64,8 +71,16 @@ export function ExpenseToolbar({
   }
 
   return (
-    <div ref={wrapRef} style={{ display: "flex", gap: 8, alignItems: "center", flex: "none", position: "relative" }}>
-      <button type="button" className="btn btn-primary" style={{ padding: "10px 14px", fontSize: 13.5 }} onClick={() => setSheet("spend")}>
+    <div
+      ref={wrapRef}
+      style={{ display: "flex", gap: 8, alignItems: "center", flex: "none", position: "relative" }}
+    >
+      <button
+        type="button"
+        className="btn btn-primary"
+        style={{ padding: "10px 14px", fontSize: 13.5 }}
+        onClick={() => setSheet("spend")}
+      >
         <Icon name="expense" width={2} /> Registrar gasto
       </button>
 
@@ -100,25 +115,69 @@ export function ExpenseToolbar({
           }}
         >
           <MenuItem icon="repeat" label="Copiar mes anterior" onClick={copyMonth} />
-          <MenuItem icon="budget" label="Nueva categoría" onClick={() => { setMenu(false); setSheet("category"); }} />
-          <MenuItem icon="plus" label="Nuevo sobre" onClick={() => { setMenu(false); setSheet("sobre"); }} />
+          <MenuItem
+            icon="budget"
+            label="Nueva categoría"
+            onClick={() => {
+              setMenu(false);
+              setSheet("category");
+            }}
+          />
+          <MenuItem
+            icon="plus"
+            label="Nuevo sobre"
+            onClick={() => {
+              setMenu(false);
+              setSheet("sobre");
+            }}
+          />
         </div>
       ) : null}
 
-      {sheet === "spend" ? <AddSpendModal jars={jars} accounts={accounts} currency={currency} onClose={() => setSheet(null)} /> : null}
-      {sheet === "sobre" ? <NewSobreModal jars={jars} currency={currency} period={period} onClose={() => setSheet(null)} /> : null}
-      {sheet === "category" ? <CategoryManagerModal tree={tree} onClose={() => setSheet(null)} /> : null}
+      {sheet === "spend" ? (
+        <AddSpendModal
+          jars={jars}
+          accounts={accounts}
+          currency={currency}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "sobre" ? (
+        <NewSobreModal
+          jars={jars}
+          currency={currency}
+          period={period}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
+      {sheet === "category" ? (
+        <CategoryManagerModal tree={tree} onClose={() => setSheet(null)} />
+      ) : null}
     </div>
   );
 }
 
-function MenuItem({ icon, label, onClick }: { icon: Parameters<typeof Icon>[0]["name"]; label: string; onClick: () => void }) {
+function MenuItem({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: Parameters<typeof Icon>[0]["name"];
+  label: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       role="menuitem"
       className="btn btn-ghost"
-      style={{ justifyContent: "flex-start", gap: 10, padding: "9px 10px", fontSize: 13.5, width: "100%" }}
+      style={{
+        justifyContent: "flex-start",
+        gap: 10,
+        padding: "9px 10px",
+        fontSize: 13.5,
+        width: "100%",
+      }}
       onClick={onClick}
     >
       <Icon name={icon} width={2} /> {label}

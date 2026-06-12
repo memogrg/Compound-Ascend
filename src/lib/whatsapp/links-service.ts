@@ -46,12 +46,18 @@ export async function generateLinkOtp(): Promise<GeneratedOtp> {
   const otp_expires_at = new Date(Date.now() + OTP_TTL_MIN * 60_000).toISOString();
 
   // Upsert por user_id: no tocamos phone_e164 (se fija al verificar).
-  await supabase.from("whatsapp_links").upsert(
-    { user_id: user.id, household_id, status: "pending", otp_code: otp, otp_expires_at },
-    { onConflict: "user_id" },
-  );
+  await supabase
+    .from("whatsapp_links")
+    .upsert(
+      { user_id: user.id, household_id, status: "pending", otp_code: otp, otp_expires_at },
+      { onConflict: "user_id" },
+    );
 
-  return { otp, botNumber: getServerEnv().TWILIO_WHATSAPP_NUMBER ?? null, expiresInMin: OTP_TTL_MIN };
+  return {
+    otp,
+    botNumber: getServerEnv().TWILIO_WHATSAPP_NUMBER ?? null,
+    expiresInMin: OTP_TTL_MIN,
+  };
 }
 
 /** Desvincula el WhatsApp del usuario actual. */
@@ -97,7 +103,10 @@ export async function getUserCurrency(userId: string): Promise<string> {
 }
 
 /** Guarda/limpia la confirmación pendiente del vínculo. */
-export async function setPendingAction(linkId: string, action: PendingAction | null): Promise<void> {
+export async function setPendingAction(
+  linkId: string,
+  action: PendingAction | null,
+): Promise<void> {
   const supabase = createServiceRoleClient();
   await supabase.from("whatsapp_links").update({ pending_action: action }).eq("id", linkId);
 }
@@ -122,7 +131,12 @@ export async function getActiveLinkByPhone(phone: string): Promise<ActiveLink | 
     .eq("status", "active")
     .maybeSingle();
   if (!data || !data.phone_e164) return null;
-  return { id: data.id, userId: data.user_id, householdId: data.household_id, phone: data.phone_e164 };
+  return {
+    id: data.id,
+    userId: data.user_id,
+    householdId: data.household_id,
+    phone: data.phone_e164,
+  };
 }
 
 /** Nombre del usuario (para saludarlo al confirmar el vínculo). */

@@ -7,9 +7,7 @@ import type { User } from "@supabase/supabase-js";
 
 /** True si Supabase está configurado (evita fallos en dev sin credenciales). */
 export function isSupabaseConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
 /** Devuelve el usuario autenticado o null. Revalida con Auth (getUser). */

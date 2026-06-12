@@ -21,7 +21,11 @@ export default async function Page({
 
   return (
     <div className="grid">
-      <BaseHeader title="Transacciones" sub="Todos tus movimientos del periodo." period={view.period} />
+      <BaseHeader
+        title="Transacciones"
+        sub="Todos tus movimientos del periodo."
+        period={view.period}
+      />
       <TransaccionesSection view={view} />
     </div>
   );

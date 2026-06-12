@@ -73,7 +73,8 @@ export async function getDueReminders(today: Date = new Date()): Promise<DueRemi
       { payDay: d.pay_day, startDate: d.start_date, paymentDates: paidDates.get(d.id) ?? [] },
       today,
     );
-    const payment = Number(d.current_payment ?? 0) > 0 ? Number(d.current_payment) : Number(d.min_payment ?? 0);
+    const payment =
+      Number(d.current_payment ?? 0) > 0 ? Number(d.current_payment) : Number(d.min_payment ?? 0);
     return {
       debtId: d.id,
       userId: d.user_id,

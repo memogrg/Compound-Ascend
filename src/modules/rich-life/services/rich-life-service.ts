@@ -24,9 +24,8 @@ import type { Investment, InsurancePolicy, PolicyType } from "@/modules/wealth";
 
 async function tryGetPortfolioMarketValues(): Promise<Record<string, number>> {
   try {
-    const { getPortfolioMarketValues } = await import(
-      "@/modules/wealth/services/portfolio-service"
-    );
+    const { getPortfolioMarketValues } =
+      await import("@/modules/wealth/services/portfolio-service");
     const result = await getPortfolioMarketValues();
     return result.byInvestmentId;
   } catch {
@@ -130,10 +129,20 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
     await Promise.all([
       supabase.from("assets").select("*").eq("user_id", user.id),
       supabase.from("liabilities").select("*").eq("user_id", user.id),
-      supabase.from("debts").select("id,name,balance,classification,apr,delinquency").eq("user_id", user.id),
+      supabase
+        .from("debts")
+        .select("id,name,balance,classification,apr,delinquency")
+        .eq("user_id", user.id),
       supabase.from("investments").select("*").eq("user_id", user.id),
-      supabase.from("insurance_policies").select("policy_type,coverage,premium,premium_frequency").eq("user_id", user.id),
-      supabase.from("personal_profiles").select("dependents_count").eq("user_id", user.id).maybeSingle(),
+      supabase
+        .from("insurance_policies")
+        .select("policy_type,coverage,premium,premium_frequency")
+        .eq("user_id", user.id),
+      supabase
+        .from("personal_profiles")
+        .select("dependents_count")
+        .eq("user_id", user.id)
+        .maybeSingle(),
       supabase
         .from("net_worth_snapshots")
         .select("net_worth,period")
@@ -210,7 +219,9 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
     currency,
   }));
   const hasCriticalDebt = (debtRows.data ?? []).some(
-    (d) => Number(d.balance) > 0 && (Number(d.apr ?? 0) >= 30 || (d.delinquency && d.delinquency !== "no")),
+    (d) =>
+      Number(d.balance) > 0 &&
+      (Number(d.apr ?? 0) >= 30 || (d.delinquency && d.delinquency !== "no")),
   );
   const investments: Investment[] = (invRows.data ?? []).map((r) => ({
     id: r.id,
@@ -263,13 +274,51 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
 export function buildDemoRichLifeSummary(): RichLifeSummary {
   const currency = "CRC";
   const assets: Asset[] = [
-    { id: "a1", name: "Fondo de emergencia", assetClass: "liquido", value: 3_000_000, currency, generatesIncome: false, liquidity: "alta" },
-    { id: "a2", name: "ETF S&P 500", assetClass: "inversion", value: 4_200_000, currency, generatesIncome: false, liquidity: "media" },
-    { id: "a3", name: "Apartamento alquiler", assetClass: "productivo", value: 38_000_000, currency, generatesIncome: true, liquidity: "baja" },
-    { id: "a4", name: "Vehículo", assetClass: "uso_personal", value: 9_000_000, currency, generatesIncome: false, liquidity: "media" },
+    {
+      id: "a1",
+      name: "Fondo de emergencia",
+      assetClass: "liquido",
+      value: 3_000_000,
+      currency,
+      generatesIncome: false,
+      liquidity: "alta",
+    },
+    {
+      id: "a2",
+      name: "ETF S&P 500",
+      assetClass: "inversion",
+      value: 4_200_000,
+      currency,
+      generatesIncome: false,
+      liquidity: "media",
+    },
+    {
+      id: "a3",
+      name: "Apartamento alquiler",
+      assetClass: "productivo",
+      value: 38_000_000,
+      currency,
+      generatesIncome: true,
+      liquidity: "baja",
+    },
+    {
+      id: "a4",
+      name: "Vehículo",
+      assetClass: "uso_personal",
+      value: 9_000_000,
+      currency,
+      generatesIncome: false,
+      liquidity: "media",
+    },
   ];
   const liabilities: Liability[] = [
-    { id: "l1", name: "Tarjeta de crédito", liabilityClass: "critico", balance: 1_400_000, currency },
+    {
+      id: "l1",
+      name: "Tarjeta de crédito",
+      liabilityClass: "critico",
+      balance: 1_400_000,
+      currency,
+    },
     { id: "l2", name: "Hipoteca", liabilityClass: "patrimonial", balance: 22_000_000, currency },
   ];
   const input: RichLifeInput = {

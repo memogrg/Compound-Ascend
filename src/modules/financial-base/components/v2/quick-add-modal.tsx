@@ -10,7 +10,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { addTransactionAction, editTransactionAction, addRuleAction } from "@/modules/financial-base/api/v2-actions";
+import {
+  addTransactionAction,
+  editTransactionAction,
+  addRuleAction,
+} from "@/modules/financial-base/api/v2-actions";
 import type { Account, Transaction, TxnKind } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 
@@ -22,7 +26,6 @@ export const INCOME_SOURCES = [
   "Ingreso pasivo",
   "Extraordinario",
 ] as const;
-
 
 function todayISO(): string {
   const d = new Date();
@@ -62,13 +65,19 @@ export function QuickAddModal({
   const scanned = Boolean(prefill);
   const effectiveCurrency = prefill?.currency || currency;
 
-  const [amount, setAmount] = useState(item ? String(item.amount) : prefill?.amount ? String(prefill.amount) : "");
+  const [amount, setAmount] = useState(
+    item ? String(item.amount) : prefill?.amount ? String(prefill.amount) : "",
+  );
   const [categoryId, setCategoryId] = useState(item?.categoryId ?? categories[0]?.id ?? "");
   const [source, setSource] = useState(item?.merchantOrSource ?? INCOME_SOURCES[0]);
-  const [accountId, setAccountId] = useState(item?.accountId ?? accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "");
+  const [accountId, setAccountId] = useState(
+    item?.accountId ?? accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "",
+  );
   const [more, setMore] = useState(Boolean(prefill?.date || prefill?.merchant));
   const [date, setDate] = useState(item?.occurredOn ?? prefill?.date ?? todayISO());
-  const [merchant, setMerchant] = useState(isGasto ? (item?.merchantOrSource ?? prefill?.merchant ?? "") : "");
+  const [merchant, setMerchant] = useState(
+    isGasto ? (item?.merchantOrSource ?? prefill?.merchant ?? "") : "",
+  );
   const [note, setNote] = useState(item?.description ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +107,9 @@ export function QuickAddModal({
       : await addTransactionAction(payload);
     setPending(false);
     if (res.ok) {
-      toast(editing ? "Transacción actualizada" : isGasto ? "Gasto registrado" : "Ingreso registrado");
+      toast(
+        editing ? "Transacción actualizada" : isGasto ? "Gasto registrado" : "Ingreso registrado",
+      );
       // Aprender regla: si recategorizaste un gasto con comercio, ofrece crearla.
       const merchantText = merchant.trim();
       if (isGasto && editing && merchantText && categoryId && categoryId !== item?.categoryId) {
@@ -164,7 +175,11 @@ export function QuickAddModal({
           {isGasto ? (
             <div className="fld">
               <label className="fld-label">Categoría</label>
-              <select className="sel" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <select
+                className="sel"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+              >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -188,7 +203,11 @@ export function QuickAddModal({
           <div className="fld">
             <label className="fld-label">{isGasto ? "Cuenta / método" : "Cuenta destino"}</label>
             {accounts.length > 0 ? (
-              <select className="sel" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              <select
+                className="sel"
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+              >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name}
@@ -217,7 +236,12 @@ export function QuickAddModal({
               <div className="fld-2">
                 <div className="fld">
                   <label className="fld-label">Fecha</label>
-                  <input className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                  <input
+                    className="inp"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
                 </div>
                 {isGasto ? (
                   <div className="fld">
@@ -235,7 +259,12 @@ export function QuickAddModal({
               </div>
               <div className="fld">
                 <label className="fld-label">Nota</label>
-                <input className="inp" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Opcional" />
+                <input
+                  className="inp"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Opcional"
+                />
               </div>
             </>
           )}
@@ -245,7 +274,11 @@ export function QuickAddModal({
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button type="submit" className={`btn ${isGasto ? "btn-primary" : "btn-secondary"}`} disabled={pending}>
+          <button
+            type="submit"
+            className={`btn ${isGasto ? "btn-primary" : "btn-secondary"}`}
+            disabled={pending}
+          >
             {pending ? "Guardando…" : `Guardar ${isGasto ? "gasto" : "ingreso"}`}
           </button>
         </div>

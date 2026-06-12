@@ -20,15 +20,9 @@ export async function GET(req: Request) {
     const rl = await rateLimit(`portfolio:${user.id}`, RATE_LIMITS.default);
     if (!rl.ok) throw new AppError("RATE_LIMITED");
 
-    const { getPortfolioReport } = await import(
-      "@/modules/wealth/services/portfolio-service"
-    );
-    const { getSnapshotHistory } = await import(
-      "@/modules/wealth/services/snapshot-service"
-    );
-    const { getInvestmentInsights } = await import(
-      "@/modules/wealth/services/investment-insights"
-    );
+    const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
+    const { getSnapshotHistory } = await import("@/modules/wealth/services/snapshot-service");
+    const { getInvestmentInsights } = await import("@/modules/wealth/services/investment-insights");
 
     const [report, snapshots, insights] = await Promise.all([
       getPortfolioReport(),

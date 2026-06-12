@@ -142,11 +142,7 @@ export async function deleteRentalPayment(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 
   if (row?.income_id) {
-    await supabase
-      .from("income_sources")
-      .delete()
-      .eq("id", row.income_id)
-      .eq("user_id", user.id);
+    await supabase.from("income_sources").delete().eq("id", row.income_id).eq("user_id", user.id);
   }
   if (row?.transaction_id) {
     await deleteLinkedTransaction(row.transaction_id);

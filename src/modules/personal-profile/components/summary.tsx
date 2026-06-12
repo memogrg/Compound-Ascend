@@ -42,7 +42,14 @@ export function ProfileSummary({
           <div className="row" style={{ gap: 18, flexWrap: "wrap" }}>
             <div className="ring-wrap">
               <svg width="92" height="92" viewBox="0 0 42 42">
-                <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
+                <circle
+                  cx="21"
+                  cy="21"
+                  r="15.915"
+                  fill="none"
+                  stroke="var(--chip)"
+                  strokeWidth="4"
+                />
                 <circle
                   cx="21"
                   cy="21"

@@ -62,7 +62,11 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
             <div className="label">Score de Control</div>
             <div
               className="chip"
-              style={{ marginTop: 8, background: "color-mix(in srgb," + sem.color + " 16%, transparent)", color: sem.color }}
+              style={{
+                marginTop: 8,
+                background: "color-mix(in srgb," + sem.color + " 16%, transparent)",
+                color: sem.color,
+              }}
             >
               ● {sem.label}
             </div>
@@ -77,7 +81,10 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
             <div className="card-title">Tu próxima mejor acción</div>
             <span
               className="chip"
-              style={{ background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))", color: "var(--ink-2)" }}
+              style={{
+                background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
+                color: "var(--ink-2)",
+              }}
             >
               Motor de Prioridad
             </span>
@@ -118,7 +125,12 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
               </span>
               <span style={{ fontSize: 13.5, color: "var(--ink-2)", flex: 1 }}>
                 {a.label}
-                {a.note ? <span className="muted" style={{ fontSize: 12 }}> · {a.note}</span> : null}
+                {a.note ? (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    {" "}
+                    · {a.note}
+                  </span>
+                ) : null}
               </span>
               {a.amount > 0 ? (
                 <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500 }}>
@@ -136,7 +148,16 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
           <div className="card-title">Alertas</div>
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
             {d.alerts.map((a, i) => (
-              <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--ink-2)" }}>
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "flex-start",
+                  fontSize: 13,
+                  color: "var(--ink-2)",
+                }}
+              >
                 <span style={{ color: "var(--warn)", flex: "none" }}>
                   <Icon name="bell" width={2} />
                 </span>
@@ -157,7 +178,12 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
             </div>
             {/* Botón permanente: siempre montado, también recibe el deep-link
                 ?new=goal aunque ya existan objetivos. */}
-            <AddControlButton kind="goal" currency={currency} label="Agregar objetivo" deepLinkKey="goal" />
+            <AddControlButton
+              kind="goal"
+              currency={currency}
+              label="Agregar objetivo"
+              deepLinkKey="goal"
+            />
           </div>
           {goals.length === 0 ? (
             <Empty text="Aún no agregas objetivos de ahorro." />
@@ -165,21 +191,31 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
             goals.map((g) => {
               const rec = d.goalRecs.find((r) => r.goalId === g.id);
               const a = rec ? ACTION[rec.action] : ACTION.mantener;
-              const progress = g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
+              const progress =
+                g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
               return (
                 <div key={g.id} className="list-row" style={{ gridTemplateColumns: "1fr auto" }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                    >
                       <span style={{ fontSize: 13.5, fontWeight: 500 }}>{g.name}</span>
                       <span className="chip" style={{ background: a.bg, color: a.color }}>
                         {a.label}
                       </span>
                     </div>
                     <div className="bar-track" style={{ marginTop: 8, maxWidth: 260 }}>
-                      <div className="bar-fill" style={{ width: `${progress}%`, background: "var(--c-savings)" }} />
+                      <div
+                        className="bar-fill"
+                        style={{ width: `${progress}%`, background: "var(--c-savings)" }}
+                      />
                     </div>
-                    <div className="muted" style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.45 }}>
-                      {formatMoney(g.currentAmount, g.currency)} / {formatMoney(g.targetAmount, g.currency)} · {rec?.reason}
+                    <div
+                      className="muted"
+                      style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.45 }}
+                    >
+                      {formatMoney(g.currentAmount, g.currency)} /{" "}
+                      {formatMoney(g.targetAmount, g.currency)} · {rec?.reason}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -214,7 +250,16 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
 
 function Empty({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
-    <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+    <div
+      className="muted"
+      style={{
+        padding: "20px 24px",
+        fontSize: 13,
+        display: "grid",
+        gap: 12,
+        justifyItems: "start",
+      }}
+    >
       <span>{text}</span>
       {action}
     </div>

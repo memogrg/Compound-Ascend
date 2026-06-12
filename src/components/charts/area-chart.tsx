@@ -1,14 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from "recharts";
+import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { formatMoney } from "@/lib/format";
 
 export type AreaPoint = { date: string; value: number };

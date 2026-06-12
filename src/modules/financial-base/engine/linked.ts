@@ -93,8 +93,7 @@ export function purchaseExpenseAmount(args: {
   currentValueManual?: number | null;
 }): number {
   const paid = args.quantity * args.averageCost;
-  const amount =
-    paid > 0 ? paid : args.isRental ? (args.currentValueManual ?? 0) : paid;
+  const amount = paid > 0 ? paid : args.isRental ? (args.currentValueManual ?? 0) : paid;
   return Math.round(amount * 100) / 100;
 }
 

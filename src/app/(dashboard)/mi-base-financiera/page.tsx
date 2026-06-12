@@ -18,7 +18,8 @@ export default async function Page({
   if (!view) {
     return (
       <div className="auth-msg warn" style={{ margin: 0 }}>
-        Conecta Supabase para usar tu Base Financiera (presupuesto, ingresos, gastos y transacciones).
+        Conecta Supabase para usar tu Base Financiera (presupuesto, ingresos, gastos y
+        transacciones).
       </div>
     );
   }

@@ -181,7 +181,11 @@ const STEPS: Step[] = [
     sub: "Selecciona los que apliquen. El dinero no se gestiona en abstracto: se gestiona para lograr algo.",
     help: "Tus objetivos guían las metas de ahorro e inversión y la ruta que te sugerimos. Puedes elegir varios; luego les pondremos montos y fechas.",
     render: (d, set) => (
-      <Chips options={O.GOALS} values={d.goals ?? []} onToggle={(v) => set({ goals: toggle(d.goals, v) })} />
+      <Chips
+        options={O.GOALS}
+        values={d.goals ?? []}
+        onToggle={(v) => set({ goals: toggle(d.goals, v) })}
+      />
     ),
   },
   {
@@ -211,11 +215,21 @@ const STEPS: Step[] = [
       <div className="field-row">
         <div className="fld">
           <label className="fld-label">¿Qué tan disciplinado eres siguiendo un plan?</label>
-          <Scale value={d.discipline} onChange={(v) => set({ discipline: v })} lowLabel="Poco" highLabel="Mucho" />
+          <Scale
+            value={d.discipline}
+            onChange={(v) => set({ discipline: v })}
+            lowLabel="Poco"
+            highLabel="Mucho"
+          />
         </div>
         <div className="fld">
           <label className="fld-label">¿Qué tan impulsivo eres al comprar?</label>
-          <Scale value={d.impulsivity} onChange={(v) => set({ impulsivity: v })} lowLabel="Nada" highLabel="Mucho" />
+          <Scale
+            value={d.impulsivity}
+            onChange={(v) => set({ impulsivity: v })}
+            lowLabel="Nada"
+            highLabel="Mucho"
+          />
         </div>
         <div className="fld">
           <label className="fld-label">¿Con qué frecuencia revisas tus finanzas?</label>
@@ -228,7 +242,11 @@ const STEPS: Step[] = [
         </div>
         <div className="fld">
           <label className="fld-label">¿Qué te cuesta más?</label>
-          <Chips options={O.HARDEST} values={d.hardest ?? []} onToggle={(v) => set({ hardest: toggle(d.hardest, v) })} />
+          <Chips
+            options={O.HARDEST}
+            values={d.hardest ?? []}
+            onToggle={(v) => set({ hardest: toggle(d.hardest, v) })}
+          />
         </div>
       </div>
     ),
@@ -269,7 +287,11 @@ const STEPS: Step[] = [
       <div className="field-row">
         <div className="fld">
           <label className="fld-label">Si una inversión baja un 15% temporalmente…</label>
-          <OptionCards options={O.LOSS_REACTIONS} value={d.lossReaction} onChange={(v) => set({ lossReaction: v })} />
+          <OptionCards
+            options={O.LOSS_REACTIONS}
+            value={d.lossReaction}
+            onChange={(v) => set({ lossReaction: v })}
+          />
         </div>
         <div className="fld">
           <label className="fld-label">¿Qué prefieres?</label>
@@ -281,7 +303,12 @@ const STEPS: Step[] = [
         </div>
         <div className="fld">
           <label className="fld-label">¿En cuánto tiempo necesitarías ese dinero?</label>
-          <OptionCards options={O.INVEST_HORIZONS} value={d.investHorizon} onChange={(v) => set({ investHorizon: v })} cols={3} />
+          <OptionCards
+            options={O.INVEST_HORIZONS}
+            value={d.investHorizon}
+            onChange={(v) => set({ investHorizon: v })}
+            cols={3}
+          />
         </div>
         <YesNo
           question="¿Has invertido antes?"
@@ -290,7 +317,12 @@ const STEPS: Step[] = [
         />
         <div className="fld">
           <label className="fld-label">¿Qué tan cómodo te sientes con la volatilidad?</label>
-          <Scale value={d.volatilityComfort} onChange={(v) => set({ volatilityComfort: v })} lowLabel="Nada" highLabel="Mucho" />
+          <Scale
+            value={d.volatilityComfort}
+            onChange={(v) => set({ volatilityComfort: v })}
+            lowLabel="Nada"
+            highLabel="Mucho"
+          />
         </div>
       </div>
     ),
@@ -339,15 +371,29 @@ const STEPS: Step[] = [
       <div className="field-row">
         <div className="fld">
           <label className="fld-label">Tono del acompañamiento</label>
-          <OptionCards options={O.COACHING_TONES} value={d.coachingTone} onChange={(v) => set({ coachingTone: v })} />
+          <OptionCards
+            options={O.COACHING_TONES}
+            value={d.coachingTone}
+            onChange={(v) => set({ coachingTone: v })}
+          />
         </div>
         <div className="fld">
           <label className="fld-label">¿Con qué frecuencia quieres recomendaciones?</label>
-          <OptionCards options={O.COACHING_FREQUENCIES} value={d.coachingFrequency} onChange={(v) => set({ coachingFrequency: v })} cols={3} />
+          <OptionCards
+            options={O.COACHING_FREQUENCIES}
+            value={d.coachingFrequency}
+            onChange={(v) => set({ coachingFrequency: v })}
+            cols={3}
+          />
         </div>
         <div className="fld">
           <label className="fld-label">¿Qué tan intensas quieres las alertas?</label>
-          <OptionCards options={O.ALERT_INTENSITIES} value={d.alertIntensity} onChange={(v) => set({ alertIntensity: v })} cols={2} />
+          <OptionCards
+            options={O.ALERT_INTENSITIES}
+            value={d.alertIntensity}
+            onChange={(v) => set({ alertIntensity: v })}
+            cols={2}
+          />
         </div>
       </div>
     ),
@@ -363,10 +409,16 @@ const STEPS: Step[] = [
       <div className="field-row">
         <div className="fld">
           <label className="fld-label">¿Qué frase describe mejor tu Rich Life?</label>
-          <OptionCards options={O.RICH_LIFE_PHRASES} value={d.richLifePhrase} onChange={(v) => set({ richLifePhrase: v })} />
+          <OptionCards
+            options={O.RICH_LIFE_PHRASES}
+            value={d.richLifePhrase}
+            onChange={(v) => set({ richLifePhrase: v })}
+          />
         </div>
         <div className="fld">
-          <label className="fld-label">Describe tu vida financiera ideal en 5–10 años (opcional)</label>
+          <label className="fld-label">
+            Describe tu vida financiera ideal en 5–10 años (opcional)
+          </label>
           <textarea
             className="inp"
             rows={4}
@@ -465,7 +517,10 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
               Paso <strong>{index + 1}</strong> de <strong>{total}</strong>
             </span>
             <div className="progress-bar">
-              <div className="progress-bar-fill" style={{ width: `${((index + 1) / total) * 100}%` }} />
+              <div
+                className="progress-bar-fill"
+                style={{ width: `${((index + 1) / total) * 100}%` }}
+              />
             </div>
             <span>{completion}% de perfil</span>
           </div>
@@ -478,7 +533,11 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
           <section className="step-frame" key={step.id}>
             <div className="step-eyebrow">{step.eyebrow}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <h1 className="step-title" style={{ margin: 0 }} dangerouslySetInnerHTML={{ __html: step.titleHTML }} />
+              <h1
+                className="step-title"
+                style={{ margin: 0 }}
+                dangerouslySetInnerHTML={{ __html: step.titleHTML }}
+              />
               <HelpTip text={step.help} label={`Para qué sirve: ${step.label}`} />
             </div>
             <p className="step-sub">{step.sub}</p>
@@ -497,7 +556,10 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
           </button>
           <div className="dots">
             {STEPS.map((s, i) => (
-              <span key={s.id} className={cn("dot", i === index && "active", i < index && "done")} />
+              <span
+                key={s.id}
+                className={cn("dot", i === index && "active", i < index && "done")}
+              />
             ))}
           </div>
           <button className="btn btn-primary" onClick={goNext} disabled={finishing}>

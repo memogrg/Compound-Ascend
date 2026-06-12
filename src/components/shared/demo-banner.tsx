@@ -65,7 +65,11 @@ export function DemoBanner() {
           <span className="muted" style={{ fontSize: 12.5 }}>
             ¿Borrar todo?
           </span>
-          <button className="btn btn-secondary" onClick={() => setConfirming(false)} disabled={busy}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setConfirming(false)}
+            disabled={busy}
+          >
             No
           </button>
           <button className="btn btn-primary" onClick={clear} disabled={busy}>

@@ -22,24 +22,23 @@ async function handle(req: Request) {
     return NextResponse.json({ error: "Supabase no configurado" }, { status: 500 });
   }
 
-  const { monthPeriod, previousMonthPeriod } = await import("@/modules/financial-base/engine/period");
+  const { monthPeriod, previousMonthPeriod } =
+    await import("@/modules/financial-base/engine/period");
   const now = new Date();
   const closed = previousMonthPeriod(monthPeriod(now.getFullYear(), now.getMonth() + 1));
 
   try {
     if (isCronRequest(req)) {
-      const { generateSnapshotsForAllUsers } = await import(
-        "@/modules/financial-base/services/snapshot-service"
-      );
+      const { generateSnapshotsForAllUsers } =
+        await import("@/modules/financial-base/services/snapshot-service");
       const res = await generateSnapshotsForAllUsers(closed);
       return NextResponse.json({ ok: true, mode: "cron", period: closed.label, ...res });
     }
 
     const user = await getUser();
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    const { generateMonthlySnapshot } = await import(
-      "@/modules/financial-base/services/snapshot-service"
-    );
+    const { generateMonthlySnapshot } =
+      await import("@/modules/financial-base/services/snapshot-service");
     await generateMonthlySnapshot(closed);
     return NextResponse.json({ ok: true, mode: "user", period: closed.label });
   } catch {

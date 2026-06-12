@@ -18,7 +18,11 @@ export type VisionInput = {
 export interface AIProvider {
   readonly name: string;
   readonly model: string;
-  chat(opts: { system: string; messages: ChatMessage[]; maxTokens?: number }): Promise<AIChatResult>;
+  chat(opts: {
+    system: string;
+    messages: ChatMessage[];
+    maxTokens?: number;
+  }): Promise<AIChatResult>;
   vision(opts: VisionInput): Promise<AIChatResult>;
 }
 

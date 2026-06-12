@@ -35,7 +35,9 @@ export default async function AcceptInvitationPage({
     return <Shell subtitle="Este enlace de invitación no es válido o está incompleto." />;
   }
   if (!isSupabaseConfigured()) {
-    return <Shell subtitle="El servicio no está disponible en este momento. Inténtalo más tarde." />;
+    return (
+      <Shell subtitle="El servicio no está disponible en este momento. Inténtalo más tarde." />
+    );
   }
 
   const supabase = await createSupabaseServerClient();
@@ -62,11 +64,19 @@ export default async function AcceptInvitationPage({
       <Shell
         subtitle={`${invitation.inviter_name} te invitó al hogar ${invitation.household_name}. Crea tu cuenta con ${invitation.email} para unirte.`}
       >
-        <Link href={signupHref} className="btn btn-primary" style={{ width: "100%", textAlign: "center" }}>
+        <Link
+          href={signupHref}
+          className="btn btn-primary"
+          style={{ width: "100%", textAlign: "center" }}
+        >
           Crear cuenta y unirme
         </Link>
         <div className="auth-divider">¿ya tienes cuenta?</div>
-        <Link href={loginHref} className="btn btn-secondary" style={{ width: "100%", textAlign: "center" }}>
+        <Link
+          href={loginHref}
+          className="btn btn-secondary"
+          style={{ width: "100%", textAlign: "center" }}
+        >
           Iniciar sesión
         </Link>
       </Shell>

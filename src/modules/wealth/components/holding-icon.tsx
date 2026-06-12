@@ -28,9 +28,15 @@ export function iconGradient(assetType: AssetType, symbol?: string): IconStyle {
     case "cripto":
       return { background: "linear-gradient(135deg,var(--gold),var(--warn))", color: "white" };
     case "commodity":
-      return { background: "linear-gradient(135deg,var(--gold),var(--c-networth))", color: "white" };
+      return {
+        background: "linear-gradient(135deg,var(--gold),var(--c-networth))",
+        color: "white",
+      };
     default:
-      return { background: "linear-gradient(135deg,var(--c-networth),var(--ink-2))", color: "white" };
+      return {
+        background: "linear-gradient(135deg,var(--c-networth),var(--ink-2))",
+        color: "white",
+      };
   }
 }
 

@@ -1,22 +1,26 @@
 /** Validación del asistente IA: transacciones y solicitudes de chat. */
 import { z } from "zod";
 
-export const transactionInputSchema = z.object({
-  kind: z.enum(["ingreso", "gasto"]),
-  description: z.string().trim().min(1, "Describe la transacción").max(160),
-  amount: z.number({ invalid_type_error: "Monto inválido" }).positive("El monto debe ser mayor a 0"),
-  currency: z.string().length(3),
-  occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
-  category: z.string().max(60).optional(),
-  source: z.enum(["manual", "chat", "receipt"]).default("chat"),
-  // Fase 5: la IA puede proponer la transacción ya vinculada a una entidad.
-  // El usuario la ve y confirma; nunca se ejecuta sola.
-  linkedKind: z.enum(["debt", "goal", "holding", "policy", "rental"]).nullable().optional(),
-  linkedId: z.string().uuid().nullable().optional(),
-}).refine((d) => !d.linkedKind || !!d.linkedId, {
-  message: "Un vínculo necesita la entidad (linkedId).",
-  path: ["linkedId"],
-});
+export const transactionInputSchema = z
+  .object({
+    kind: z.enum(["ingreso", "gasto"]),
+    description: z.string().trim().min(1, "Describe la transacción").max(160),
+    amount: z
+      .number({ invalid_type_error: "Monto inválido" })
+      .positive("El monto debe ser mayor a 0"),
+    currency: z.string().length(3),
+    occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
+    category: z.string().max(60).optional(),
+    source: z.enum(["manual", "chat", "receipt"]).default("chat"),
+    // Fase 5: la IA puede proponer la transacción ya vinculada a una entidad.
+    // El usuario la ve y confirma; nunca se ejecuta sola.
+    linkedKind: z.enum(["debt", "goal", "holding", "policy", "rental"]).nullable().optional(),
+    linkedId: z.string().uuid().nullable().optional(),
+  })
+  .refine((d) => !d.linkedKind || !!d.linkedId, {
+    message: "Un vínculo necesita la entidad (linkedId).",
+    path: ["linkedId"],
+  });
 
 export type TransactionInput = z.infer<typeof transactionInputSchema>;
 

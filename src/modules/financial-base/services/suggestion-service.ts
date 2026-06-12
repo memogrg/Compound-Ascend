@@ -28,18 +28,38 @@ const SEED: { patterns: string[]; categoryKey: string }[] = [
   // Transporte
   { patterns: ["uber", "didi", "indriver"], categoryKey: "trans_uber" },
   { patterns: ["taxi"], categoryKey: "trans_taxi" },
-  { patterns: ["gasolina", "combustible", "delta", "gas station", "servicentro"], categoryKey: "trans_combustible" },
+  {
+    patterns: ["gasolina", "combustible", "delta", "gas station", "servicentro"],
+    categoryKey: "trans_combustible",
+  },
   { patterns: ["peaje", "ruta 27"], categoryKey: "trans_peajes" },
   { patterns: ["parqueo", "parking"], categoryKey: "trans_parqueos" },
   { patterns: ["bus", "tren", "incofer"], categoryKey: "trans_bus" },
   { patterns: ["marchamo"], categoryKey: "auto_marchamo" },
   { patterns: ["riteve", "dekra", "revision tecnica"], categoryKey: "auto_revision" },
   // Alimentación
-  { patterns: ["automercado", "walmart", "mas x menos", "masxmenos", "pricesmart", "perimercados", "super"], categoryKey: "alim_supermercado" },
+  {
+    patterns: [
+      "automercado",
+      "walmart",
+      "mas x menos",
+      "masxmenos",
+      "pricesmart",
+      "perimercados",
+      "super",
+    ],
+    categoryKey: "alim_supermercado",
+  },
   { patterns: ["feria"], categoryKey: "alim_feria" },
-  { patterns: ["mcdonald", "kfc", "burger", "pizza", "rostipollo", "taco"], categoryKey: "alim_comida_rapida" },
+  {
+    patterns: ["mcdonald", "kfc", "burger", "pizza", "rostipollo", "taco"],
+    categoryKey: "alim_comida_rapida",
+  },
   { patterns: ["starbucks", "cafe", "coffee", "britt"], categoryKey: "alim_cafe" },
-  { patterns: ["uber eats", "rappi", "pedidosya", "glovo", "didi food"], categoryKey: "alim_delivery" },
+  {
+    patterns: ["uber eats", "rappi", "pedidosya", "glovo", "didi food"],
+    categoryKey: "alim_delivery",
+  },
   { patterns: ["restaurante", "rest "], categoryKey: "alim_restaurantes" },
   // Vivienda / servicios
   { patterns: ["alquiler", "renta"], categoryKey: "vivienda_alquiler" },
@@ -49,7 +69,10 @@ const SEED: { patterns: string[]; categoryKey: string }[] = [
   { patterns: ["internet", "cabletica", "tigo", "telecable"], categoryKey: "serv_internet" },
   { patterns: ["kolbi", "movistar", "claro", "celular", "recarga"], categoryKey: "serv_celular" },
   // Estilo de vida
-  { patterns: ["netflix", "spotify", "hbo", "disney", "max", "youtube", "apple tv", "prime video"], categoryKey: "estilo_streaming" },
+  {
+    patterns: ["netflix", "spotify", "hbo", "disney", "max", "youtube", "apple tv", "prime video"],
+    categoryKey: "estilo_streaming",
+  },
   { patterns: ["smartfit", "gimnasio", "gym", "crossfit"], categoryKey: "estilo_gimnasio" },
   { patterns: ["zara", "h&m", "ropa", "aeropostale"], categoryKey: "estilo_ropa" },
   // Salud

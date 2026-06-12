@@ -88,7 +88,13 @@ export function computePortfolioAnalytics(
   prices: Record<string, number>,
   cashAmount = 0,
 ): Omit<PortfolioAnalytics, "growthScore"> {
-  const buckets: Record<Bucket, number> = { etf: 0, stock: 0, crypto: 0, cash: cashAmount, other: 0 };
+  const buckets: Record<Bucket, number> = {
+    etf: 0,
+    stock: 0,
+    crypto: 0,
+    cash: cashAmount,
+    other: 0,
+  };
   let totalCostBasis = 0;
 
   const holdingsWithPerformance: HoldingPerformance[] = holdings.map((h) => {
@@ -218,7 +224,9 @@ export function computeCryptoAnalytics(
 
 // ── Insights deterministas (sin IA, en español) ───────────────────
 
-export function buildConcentrationInsight(analytics: Omit<PortfolioAnalytics, "growthScore">): string {
+export function buildConcentrationInsight(
+  analytics: Omit<PortfolioAnalytics, "growthScore">,
+): string {
   const slices = Object.values(analytics.allocation) as AllocationSlice[];
   const top = slices.reduce((a, b) => (a.pct > b.pct ? a : b), slices[0]!);
   if (!top || analytics.totalPortfolioValue === 0) {
@@ -234,7 +242,9 @@ export function buildConcentrationInsight(analytics: Omit<PortfolioAnalytics, "g
   return `Buena distribución: ninguna clase de activo supera el 50%. ${top.label} es tu mayor exposición con el ${pct}%.`;
 }
 
-export function buildDiversificationInsight(analytics: Omit<PortfolioAnalytics, "growthScore">): string {
+export function buildDiversificationInsight(
+  analytics: Omit<PortfolioAnalytics, "growthScore">,
+): string {
   const activeBuckets = (Object.values(analytics.allocation) as AllocationSlice[]).filter(
     (s) => s.value > 0,
   );
@@ -293,11 +303,14 @@ export function buildAllocationInsight(
 
   const { etf, stock, crypto } = analytics.allocation;
   const riskLabel: Record<string, string> = {
-    conservador: "una mayor exposición a instrumentos de renta fija (bonos, certificados) y menor a renta variable y cripto",
+    conservador:
+      "una mayor exposición a instrumentos de renta fija (bonos, certificados) y menor a renta variable y cripto",
     moderado: "una mezcla balanceada de ETFs y acciones con baja exposición a cripto (≤5%)",
     balanceado: "ETFs de amplio mercado como base, con acciones individuales complementarias",
-    crecimiento: "alta exposición a renta variable (ETFs + acciones), con un 5-15% en cripto si tu horizonte es largo",
-    agresivo: "máxima exposición a renta variable y cripto, aceptando alta volatilidad por mayor rendimiento esperado",
+    crecimiento:
+      "alta exposición a renta variable (ETFs + acciones), con un 5-15% en cripto si tu horizonte es largo",
+    agresivo:
+      "máxima exposición a renta variable y cripto, aceptando alta volatilidad por mayor rendimiento esperado",
   };
 
   const suggestion = riskLabel[riskClass] ?? "un portafolio acorde a tu tolerancia al riesgo";

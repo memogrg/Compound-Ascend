@@ -47,8 +47,7 @@ function num(v: string | undefined): number | null {
 
 // ---------- BCCR (SDDE — API REST/JSON oficial, Bearer) ----------
 
-const BCCR_SDDE_BASE =
-  "https://apim.bccr.fi.cr/SDDE/api/Bccr.Ge.SDDE.Publico.Indicadores.API";
+const BCCR_SDDE_BASE = "https://apim.bccr.fi.cr/SDDE/api/Bccr.Ge.SDDE.Publico.Indicadores.API";
 
 /** yyyy/mm/dd (formato exigido por el SDDE). */
 function toSddeDate(d: Date): string {
@@ -90,7 +89,11 @@ export async function fetchBccr(externalId: string, from: Date, to: Date): Promi
  */
 export function parseSddeSeries(data: unknown): Observation[] {
   const datos =
-    (data as { datos?: { series?: { fecha: string; valorDatoPorPeriodo: number | null }[] }[] } | null)?.datos ?? [];
+    (
+      data as {
+        datos?: { series?: { fecha: string; valorDatoPorPeriodo: number | null }[] }[];
+      } | null
+    )?.datos ?? [];
   const out: Observation[] = [];
   for (const ind of datos) {
     for (const s of ind.series ?? []) {
@@ -117,9 +120,9 @@ export function parseSddeSeries(data: unknown): Observation[] {
 export async function fetchHaciendaTc(
   code: "USDCRC_COMPRA" | "USDCRC_VENTA",
 ): Promise<Observation[]> {
-  const data = (await fetchJson("https://api.hacienda.go.cr/indicadores/tc")) as
-    | { dolar?: { compra?: { fecha: string; valor: number }; venta?: { fecha: string; valor: number } } }
-    | null;
+  const data = (await fetchJson("https://api.hacienda.go.cr/indicadores/tc")) as {
+    dolar?: { compra?: { fecha: string; valor: number }; venta?: { fecha: string; valor: number } };
+  } | null;
   const node = code === "USDCRC_COMPRA" ? data?.dolar?.compra : data?.dolar?.venta;
   if (!node || !Number.isFinite(node.valor) || node.valor <= 0) return [];
   const observedDate = (node.fecha ?? "").slice(0, 10);

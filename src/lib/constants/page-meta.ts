@@ -16,8 +16,16 @@ export const PAGE_META: Record<string, PageMeta> = {
     title: "Mi Base Financiera",
     titleHTML: 'Mi base <span class="it">financiera</span>',
   },
-  "/ingresos": { crumb: "Presupuesto", title: "Ingresos", titleHTML: 'Tus <span class="it">ingresos</span>' },
-  "/gastos": { crumb: "Presupuesto", title: "Gastos", titleHTML: 'Tus <span class="it">gastos</span>' },
+  "/ingresos": {
+    crumb: "Presupuesto",
+    title: "Ingresos",
+    titleHTML: 'Tus <span class="it">ingresos</span>',
+  },
+  "/gastos": {
+    crumb: "Presupuesto",
+    title: "Gastos",
+    titleHTML: 'Tus <span class="it">gastos</span>',
+  },
   "/transacciones": {
     crumb: "Presupuesto",
     title: "Transacciones",
@@ -38,7 +46,11 @@ export const PAGE_META: Record<string, PageMeta> = {
     title: "Defensa Patrimonial",
     titleHTML: 'Defensa <span class="it">patrimonial</span>',
   },
-  "/mi-rich-life": { crumb: "Crecimiento", title: "Patrimonio", titleHTML: 'Mi <span class="it">patrimonio</span>' },
+  "/mi-rich-life": {
+    crumb: "Crecimiento",
+    title: "Patrimonio",
+    titleHTML: 'Mi <span class="it">patrimonio</span>',
+  },
   "/configuracion": { crumb: "Cuenta", title: "Configuración" },
 };
 

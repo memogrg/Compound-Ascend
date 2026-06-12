@@ -29,7 +29,14 @@ export async function getExpenseJars(args: {
 
   const conv = (amount: number, from: string): number =>
     convertCurrency(amount, from, args.currency, rates);
-  const toJarEntity = (e: { id: string; name: string; sub: string; amount: number; currency: string; delta?: string }): JarEntity => ({
+  const toJarEntity = (e: {
+    id: string;
+    name: string;
+    sub: string;
+    amount: number;
+    currency: string;
+    delta?: string;
+  }): JarEntity => ({
     id: e.id,
     name: e.name,
     sub: e.sub,

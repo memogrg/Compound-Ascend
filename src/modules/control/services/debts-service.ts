@@ -6,7 +6,10 @@ import "server-only";
  * y entrega datos serializables; el motor de amortización/estrategia (puro)
  * se ejecuta en el cliente para el control reactivo del pago extra.
  */
-import { listDebts, listDebtPaymentDatesThisMonth } from "@/modules/control/services/control-service";
+import {
+  listDebts,
+  listDebtPaymentDatesThisMonth,
+} from "@/modules/control/services/control-service";
 import { getBaseSummary } from "@/modules/financial-base";
 import { getDisplayCurrency } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";

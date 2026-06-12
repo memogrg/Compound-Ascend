@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/auth/session";
-import {
-  getWealthSummary,
-  buildDemoWealthSummary,
-} from "@/modules/wealth/services/wealth-service";
+import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/services/wealth-service";
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
 import { getSnapshotHistory } from "@/modules/wealth/services/snapshot-service";
 import { listDividends } from "@/modules/wealth/services/dividend-service";
@@ -26,7 +23,16 @@ export default async function Page() {
 
   return (
     <div className="grid">
-      <div className="card card-pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <div
+        className="card card-pad"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <div className="card-title">Mi patrimonio</div>
           <div className="card-sub">
@@ -53,7 +59,12 @@ export default async function Page() {
       ) : null}
 
       {portfolio ? (
-        <PortfolioView report={portfolio[0]} snapshots={portfolio[1]} dividends={portfolio[2]} summary={summary} />
+        <PortfolioView
+          report={portfolio[0]}
+          snapshots={portfolio[1]}
+          dividends={portfolio[2]}
+          summary={summary}
+        />
       ) : (
         <GrowthView summary={summary} />
       )}

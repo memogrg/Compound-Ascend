@@ -161,7 +161,11 @@ export async function deleteInvestment(id: string): Promise<void> {
 export async function deletePolicy(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("insurance_policies").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase
+    .from("insurance_policies")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (error) throw new Error(error.message);
 }
 
@@ -213,7 +217,11 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   ]);
 
   const [{ data: profile }, { data: risk }, { data: goals }, { data: debts }] = await Promise.all([
-    supabase.from("personal_profiles").select("dependents_count").eq("user_id", user.id).maybeSingle(),
+    supabase
+      .from("personal_profiles")
+      .select("dependents_count")
+      .eq("user_id", user.id)
+      .maybeSingle(),
     supabase.from("risk_profiles").select("risk_class").eq("user_id", user.id).maybeSingle(),
     supabase.from("savings_goals").select("name,current_amount").eq("user_id", user.id),
     supabase.from("debts").select("apr,delinquency,balance").eq("user_id", user.id),
@@ -223,7 +231,9 @@ export async function getWealthSummary(): Promise<WealthSummary> {
     (g) => /emergencia|paz/i.test(g.name ?? "") && Number(g.current_amount) > 0,
   );
   const hasCriticalDebt = (debts ?? []).some(
-    (d) => Number(d.balance) > 0 && (Number(d.apr ?? 0) >= 30 || (d.delinquency && d.delinquency !== "no")),
+    (d) =>
+      Number(d.balance) > 0 &&
+      (Number(d.apr ?? 0) >= 30 || (d.delinquency && d.delinquency !== "no")),
   );
 
   const ctx = {
@@ -240,8 +250,10 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   // moneda por ítem, se asumen en la moneda principal).
   const policiesForEngine = policies.map((p) => ({
     ...p,
-    coverage: p.coverage == null ? p.coverage : convertCurrency(p.coverage, p.currency, currency, rates),
-    premium: p.premium == null ? p.premium : convertCurrency(p.premium, p.currency, currency, rates),
+    coverage:
+      p.coverage == null ? p.coverage : convertCurrency(p.coverage, p.currency, currency, rates),
+    premium:
+      p.premium == null ? p.premium : convertCurrency(p.premium, p.currency, currency, rates),
   }));
 
   const readiness = computeReadiness(ctx, investments);
@@ -250,21 +262,81 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   const balance = computeBalance(readiness, protection, investments.length > 0);
   const prices = await getLivePrices(investments);
 
-  return { readiness, protection, balance, portfolio, investments, holdings, policies, prices, currency };
+  return {
+    readiness,
+    protection,
+    balance,
+    portfolio,
+    investments,
+    holdings,
+    policies,
+    prices,
+    currency,
+  };
 }
 
 /** Resumen patrimonial de demostración (no toca la BD ni proveedores). */
 export function buildDemoWealthSummary(): WealthSummary {
   const currency = "CRC";
   const investments: Investment[] = [
-    { id: "i1", assetType: "etf", name: "ETF S&P 500", symbol: "VOO", investedAmount: 4_200_000, contribution: 120_000, currency, horizon: "mas_5" },
-    { id: "i2", assetType: "cripto", name: "Bitcoin", symbol: "BTC", investedAmount: 1_100_000, contribution: 30_000, currency, horizon: "mas_5" },
-    { id: "i3", assetType: "inmueble", name: "Apartamento alquiler", investedAmount: 38_000_000, contribution: 0, currency, horizon: "mas_10" },
+    {
+      id: "i1",
+      assetType: "etf",
+      name: "ETF S&P 500",
+      symbol: "VOO",
+      investedAmount: 4_200_000,
+      contribution: 120_000,
+      currency,
+      horizon: "mas_5",
+    },
+    {
+      id: "i2",
+      assetType: "cripto",
+      name: "Bitcoin",
+      symbol: "BTC",
+      investedAmount: 1_100_000,
+      contribution: 30_000,
+      currency,
+      horizon: "mas_5",
+    },
+    {
+      id: "i3",
+      assetType: "inmueble",
+      name: "Apartamento alquiler",
+      investedAmount: 38_000_000,
+      contribution: 0,
+      currency,
+      horizon: "mas_10",
+    },
   ];
   const policies: InsurancePolicy[] = [
-    { id: "p1", policyType: "vida", provider: "Aseguradora", coverage: 90_000_000, premium: 18_000, premiumFrequency: "mensual", currency },
-    { id: "p2", policyType: "medico", provider: "Aseguradora", coverage: 50_000_000, premium: 35_000, premiumFrequency: "mensual", currency },
-    { id: "p3", policyType: "vehiculo", provider: "Aseguradora", coverage: 12_000_000, premium: 22_000, premiumFrequency: "mensual", currency },
+    {
+      id: "p1",
+      policyType: "vida",
+      provider: "Aseguradora",
+      coverage: 90_000_000,
+      premium: 18_000,
+      premiumFrequency: "mensual",
+      currency,
+    },
+    {
+      id: "p2",
+      policyType: "medico",
+      provider: "Aseguradora",
+      coverage: 50_000_000,
+      premium: 35_000,
+      premiumFrequency: "mensual",
+      currency,
+    },
+    {
+      id: "p3",
+      policyType: "vehiculo",
+      provider: "Aseguradora",
+      coverage: 12_000_000,
+      premium: 22_000,
+      premiumFrequency: "mensual",
+      currency,
+    },
   ];
   const ctx = {
     freeCashflow: 175_000,
@@ -278,5 +350,15 @@ export function buildDemoWealthSummary(): WealthSummary {
   const protection = computeProtection(ctx, policies);
   const portfolio = computePortfolio(investments);
   const balance = computeBalance(readiness, protection, true);
-  return { readiness, protection, balance, portfolio, investments, holdings: [], policies, prices: {}, currency };
+  return {
+    readiness,
+    protection,
+    balance,
+    portfolio,
+    investments,
+    holdings: [],
+    policies,
+    prices: {},
+    currency,
+  };
 }

@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/auth/session";
-import {
-  getWealthSummary,
-  buildDemoWealthSummary,
-} from "@/modules/wealth/services/wealth-service";
+import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/services/wealth-service";
 import { DefenseView } from "@/modules/wealth/components/defense-view";
 import { WealthActions } from "@/modules/wealth/components/wealth-actions";
 import { Icon } from "@/components/ui/icon";
@@ -19,7 +16,16 @@ export default async function Page() {
 
   return (
     <div className="grid">
-      <div className="card card-pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <div
+        className="card card-pad"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <div className="card-title">Defensa patrimonial</div>
           <div className="card-sub">
@@ -36,7 +42,8 @@ export default async function Page() {
 
       {!configured ? (
         <div className="auth-msg warn" style={{ margin: 0 }}>
-          Modo demostración con datos de ejemplo. Conecta Supabase para gestionar tus pólizas reales.
+          Modo demostración con datos de ejemplo. Conecta Supabase para gestionar tus pólizas
+          reales.
         </div>
       ) : null}
 

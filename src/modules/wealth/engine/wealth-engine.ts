@@ -119,7 +119,8 @@ export function computeProtection(
             : req.type === "incapacidad"
               ? "Si no pudieras trabajar, no hay reemplazo de ingresos."
               : "Una emergencia médica puede afectar tu estabilidad financiera.",
-        recommendation: "Detectamos una brecha; si quieres, revisamos opciones acordes a tu presupuesto.",
+        recommendation:
+          "Detectamos una brecha; si quieres, revisamos opciones acordes a tu presupuesto.",
       });
     }
   }
@@ -173,14 +174,17 @@ export function computeBalance(
   protection: ProtectionDiagnosis,
   hasInvestments: boolean,
 ): Balance {
-  const offense = hasInvestments ? Math.max(40, readiness.score) : Math.round(readiness.score * 0.4);
+  const offense = hasInvestments
+    ? Math.max(40, readiness.score)
+    : Math.round(readiness.score * 0.4);
   const defense = protection.score;
   let message: string;
   if (offense - defense >= 25) {
     message =
       "Estás muy enfocado en crecer, pero tu protección está rezagada. Fortalece coberturas antes de aumentar exposición.";
   } else if (defense - offense >= 25) {
-    message = "Tienes buena protección, pero tu patrimonio podría crecer por debajo de su potencial.";
+    message =
+      "Tienes buena protección, pero tu patrimonio podría crecer por debajo de su potencial.";
   } else {
     message = "Tu ofensiva y tu defensiva están razonablemente balanceadas.";
   }

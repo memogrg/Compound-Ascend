@@ -31,7 +31,9 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
     revalidatePath("/ahorro");
     return { ok: true };
   } catch (err) {
-    logger.error("confirmTransaction fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("confirmTransaction fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     // La validación de entidad vinculada (Fase 6.1) es un mensaje para el
     // usuario ("...ya no existe o no te pertenece"), no un error técnico.
     const msg =

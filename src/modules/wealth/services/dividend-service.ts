@@ -15,7 +15,10 @@ import type { Dividend } from "@/modules/wealth/types";
 
 // Meses que hay en un año según frecuencia (para calcular amount_monthly_base).
 const FREQ_MONTHS: Record<string, number> = {
-  mensual: 1, trimestral: 3, semestral: 6, anual: 12,
+  mensual: 1,
+  trimestral: 3,
+  semestral: 6,
+  anual: 12,
 };
 
 function rowToDividend(r: {
@@ -136,19 +139,11 @@ export async function deleteDividend(id: string): Promise<void> {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const { error } = await supabase
-    .from("dividends")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
+  const { error } = await supabase.from("dividends").delete().eq("id", id).eq("user_id", user.id);
   if (error) throw new Error(error.message);
 
   if (row?.income_id) {
-    await supabase
-      .from("income_sources")
-      .delete()
-      .eq("id", row.income_id)
-      .eq("user_id", user.id);
+    await supabase.from("income_sources").delete().eq("id", row.income_id).eq("user_id", user.id);
   }
   if (row?.transaction_id) {
     await deleteLinkedTransaction(row.transaction_id);

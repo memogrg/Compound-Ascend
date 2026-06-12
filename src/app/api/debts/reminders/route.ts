@@ -27,7 +27,20 @@ function isCronRequest(req: Request): boolean {
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split("-");
-  const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const months = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+  ];
   return `${Number(d)} de ${months[Number(m) - 1] ?? ""} de ${y}`;
 }
 
@@ -36,9 +49,8 @@ async function handle(req: Request) {
   try {
     if (!isCronRequest(req)) throw new AppError("UNAUTHORIZED");
 
-    const { getDueReminders, markReminded } = await import(
-      "@/modules/control/services/debt-reminders-service"
-    );
+    const { getDueReminders, markReminded } =
+      await import("@/modules/control/services/debt-reminders-service");
     const { sendEmail, isEmailConfigured } = await import("@/lib/email/send");
 
     const reminders = await getDueReminders();

@@ -20,9 +20,18 @@ import type { Period } from "@/modules/financial-base/types";
 // Los iconos sembrados en BD (home/car/food/heart/book/bank…) no existen en el
 // set del design system: mapéalos a uno válido; fallback genérico.
 const ICON_MAP: Record<string, IconName> = {
-  home: "budget", car: "repeat", food: "expense", heart: "defense", sparkles: "spark",
-  book: "profile", bank: "networth", dots: "dots", invest: "invest", debt: "debt",
-  defense: "defense", savings: "savings",
+  home: "budget",
+  car: "repeat",
+  food: "expense",
+  heart: "defense",
+  sparkles: "spark",
+  book: "profile",
+  bank: "networth",
+  dots: "dots",
+  invest: "invest",
+  debt: "debt",
+  defense: "defense",
+  savings: "savings",
 };
 function iconFor(name: string): IconName {
   return ICON_MAP[name] ?? "expense";
@@ -53,21 +62,37 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
   if (jar.kind === "linked") {
     // (linked branch — sin kebab)
     const n = jar.items.length;
-    const sub = n > 0 ? `${n} ${n === 1 ? "elemento vinculado" : "elementos vinculados"}` : jar.emptyText;
+    const sub =
+      n > 0 ? `${n} ${n === 1 ? "elemento vinculado" : "elementos vinculados"}` : jar.emptyText;
     return (
       <>
         <button
           type="button"
           className="env exp-clickable"
-          style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", font: "inherit" }}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            font: "inherit",
+          }}
           onClick={() => setOpen(true)}
           aria-label={jar.name}
         >
-          <div className="env-ic" style={{ background: `color-mix(in srgb, ${jar.color} 14%, transparent)`, color: jar.color }}>
+          <div
+            className="env-ic"
+            style={{
+              background: `color-mix(in srgb, ${jar.color} 14%, transparent)`,
+              color: jar.color,
+            }}
+          >
             <Icon name={icon} />
           </div>
           <div style={{ minWidth: 0 }}>
-            <div className="env-name">{jar.name} <span style={{ color: "var(--muted)" }}>›</span></div>
+            <div className="env-name">
+              {jar.name} <span style={{ color: "var(--muted)" }}>›</span>
+            </div>
             <div className="env-sub">{sub}</div>
           </div>
           <div className="env-bar-cell" />
@@ -120,27 +145,49 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
 
   return (
     <>
-      <div className={over ? "env exp-clickable over" : "env exp-clickable"} style={{ position: "relative" }}>
+      <div
+        className={over ? "env exp-clickable over" : "env exp-clickable"}
+        style={{ position: "relative" }}
+      >
         {/* Área de click (abre el modal del frasco) por debajo del kebab */}
         <button
           type="button"
           aria-label={jar.name}
           onClick={() => setOpen(true)}
-          style={{ position: "absolute", inset: 0, background: "transparent", border: "none", cursor: "pointer", zIndex: 0 }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            zIndex: 0,
+          }}
         />
-        <div className="env-ic" style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>
+        <div
+          className="env-ic"
+          style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
+        >
           <Icon name={icon} />
         </div>
         <div style={{ minWidth: 0 }}>
-          <div className="env-name">{jar.name} <span style={{ color: "var(--muted)" }}>›</span></div>
-          <div className="env-sub" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subList}</div>
+          <div className="env-name">
+            {jar.name} <span style={{ color: "var(--muted)" }}>›</span>
+          </div>
+          <div
+            className="env-sub"
+            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {subList}
+          </div>
         </div>
         <div className="env-bar-cell">
           <div className="bar-track">
             <div className="bar-fill" style={{ width: `${width}%`, background: color }} />
           </div>
           <div className="env-bar-meta">
-            <span style={over ? { color: "var(--neg)" } : undefined}>{formatMoney(totalSpent, currency)} gastado</span>
+            <span style={over ? { color: "var(--neg)" } : undefined}>
+              {formatMoney(totalSpent, currency)} gastado
+            </span>
             <span>
               {over
                 ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
@@ -148,10 +195,15 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
             </span>
           </div>
         </div>
-        <div className="env-num" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+        <div
+          className="env-num"
+          style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}
+        >
           <div style={{ textAlign: "right" }}>
             <div className="big">{formatMoney(totalBudget, currency)}</div>
-            <div className="small">{n} {n === 1 ? "sobre" : "sobres"}</div>
+            <div className="small">
+              {n} {n === 1 ? "sobre" : "sobres"}
+            </div>
           </div>
           <CategoryKebab
             name={jar.name}
@@ -165,7 +217,12 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
         </div>
       </div>
       {open ? (
-        <JarNormalModal jar={jar} currency={currency} period={period} onClose={() => setOpen(false)} />
+        <JarNormalModal
+          jar={jar}
+          currency={currency}
+          period={period}
+          onClose={() => setOpen(false)}
+        />
       ) : null}
     </>
   );

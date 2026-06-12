@@ -8,7 +8,15 @@ import { JarRow } from "@/modules/financial-base/components/v2/expense-jars/jar-
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 
-export function ExpenseJars({ jars, currency, period }: { jars: Jar[]; currency: string; period: Period }) {
+export function ExpenseJars({
+  jars,
+  currency,
+  period,
+}: {
+  jars: Jar[];
+  currency: string;
+  period: Period;
+}) {
   if (jars.length === 0) {
     return (
       <div className="muted" style={{ padding: "20px 24px", fontSize: 13 }}>

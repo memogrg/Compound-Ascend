@@ -96,9 +96,17 @@ export function AddSpendModal({
   }
 
   return (
-    <Modal title="Registrar gasto" sub="Reduce el presupuesto del sobre que elijas" onClose={onClose}>
+    <Modal
+      title="Registrar gasto"
+      sub="Reduce el presupuesto del sobre que elijas"
+      onClose={onClose}
+    >
       <div className="modal-body" style={{ maxWidth: "100%", overflowX: "hidden" }}>
-        {error ? <div className="auth-msg warn" role="alert" style={{ marginBottom: 10 }}>{error}</div> : null}
+        {error ? (
+          <div className="auth-msg warn" role="alert" style={{ marginBottom: 10 }}>
+            {error}
+          </div>
+        ) : null}
 
         {/* Nombre */}
         <div className="fld">
@@ -136,7 +144,9 @@ export function AddSpendModal({
                 style={{ width: 76, flex: "none", boxSizing: "border-box", paddingInline: 8 }}
               >
                 {currencyOptions.map((c) => (
-                  <option key={c.code} value={c.code}>{c.code}</option>
+                  <option key={c.code} value={c.code}>
+                    {c.code}
+                  </option>
                 ))}
               </select>
               <div className="inp-money" style={{ flex: 1, minWidth: 0 }}>
@@ -160,7 +170,9 @@ export function AddSpendModal({
         <div className="fld" style={{ marginTop: 12 }}>
           <label className="fld-label">Sobre</label>
           {normalJars.length === 0 ? (
-            <div className="muted" style={{ fontSize: 12.5 }}>Crea primero un sobre dentro de un frasco para registrar gastos.</div>
+            <div className="muted" style={{ fontSize: 12.5 }}>
+              Crea primero un sobre dentro de un frasco para registrar gastos.
+            </div>
           ) : (
             <select
               className="inp"
@@ -171,7 +183,9 @@ export function AddSpendModal({
               {normalJars.map((j) => (
                 <optgroup key={j.group} label={j.name}>
                   {j.envelopes.map((e) => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
                   ))}
                 </optgroup>
               ))}
@@ -184,9 +198,22 @@ export function AddSpendModal({
       </div>
 
       <div className="modal-foot">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-        <button type="button" className="btn btn-primary" disabled={pending || normalJars.length === 0} onClick={() => void save()}>
-          {pending ? "Guardando…" : <><Icon name="expense" width={2} /> Registrar gasto</>}
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={pending || normalJars.length === 0}
+          onClick={() => void save()}
+        >
+          {pending ? (
+            "Guardando…"
+          ) : (
+            <>
+              <Icon name="expense" width={2} /> Registrar gasto
+            </>
+          )}
         </button>
       </div>
     </Modal>

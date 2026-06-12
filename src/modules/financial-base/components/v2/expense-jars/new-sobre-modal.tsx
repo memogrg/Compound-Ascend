@@ -45,7 +45,12 @@ export function NewSobreModal({
     const amt = Number(amount) || 0;
     setPending(true);
     setError(null);
-    const cat = await addCategoryAction({ name: n, parentId: group, categoryType: "expense", isFavorite: true });
+    const cat = await addCategoryAction({
+      name: n,
+      parentId: group,
+      categoryType: "expense",
+      isFavorite: true,
+    });
     if (!cat.ok || !cat.id) {
       setPending(false);
       return setError(cat.message ?? "No pudimos crear el sobre.");
@@ -71,33 +76,73 @@ export function NewSobreModal({
   return (
     <Modal title="Nuevo sobre" sub="Una subcategoría con su propio presupuesto" onClose={onClose}>
       <div className="modal-body">
-        {error ? <div className="auth-msg warn" role="alert" style={{ marginBottom: 10 }}>{error}</div> : null}
+        {error ? (
+          <div className="auth-msg warn" role="alert" style={{ marginBottom: 10 }}>
+            {error}
+          </div>
+        ) : null}
         <div className="fld">
           <label className="fld-label">Frasco</label>
-          <select className="inp" value={group} onChange={(e) => setGroup(e.target.value)} style={{ width: "100%", boxSizing: "border-box" }}>
+          <select
+            className="inp"
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box" }}
+          >
             {normalJars.map((j) => (
-              <option key={j.group} value={j.group}>{j.name}</option>
+              <option key={j.group} value={j.group}>
+                {j.name}
+              </option>
             ))}
           </select>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
           <div className="fld" style={{ flex: "1 1 160px", minWidth: 0, margin: 0 }}>
             <label className="fld-label">Nombre del sobre</label>
-            <input className="inp" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej.: Internet, Gimnasio…" maxLength={60} style={{ width: "100%", boxSizing: "border-box" }} />
+            <input
+              className="inp"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej.: Internet, Gimnasio…"
+              maxLength={60}
+              style={{ width: "100%", boxSizing: "border-box" }}
+            />
           </div>
           <div className="fld" style={{ flex: "1 1 120px", minWidth: 0, margin: 0 }}>
             <label className="fld-label">Presupuesto del mes</label>
             <div className="inp-money">
               <span className="pre">{currency}</span>
-              <input type="number" inputMode="decimal" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" style={{ minWidth: 0 }} />
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+                style={{ minWidth: 0 }}
+              />
             </div>
           </div>
         </div>
       </div>
       <div className="modal-foot">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-        <button type="button" className="btn btn-primary" disabled={pending || !name.trim()} onClick={() => void save()}>
-          {pending ? "Guardando…" : <><Icon name="plus" width={2} /> Crear sobre</>}
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={pending || !name.trim()}
+          onClick={() => void save()}
+        >
+          {pending ? (
+            "Guardando…"
+          ) : (
+            <>
+              <Icon name="plus" width={2} /> Crear sobre
+            </>
+          )}
         </button>
       </div>
     </Modal>

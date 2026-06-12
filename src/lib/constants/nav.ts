@@ -44,14 +44,24 @@ export const NAV: NavGroup[] = [
     label: "Crecimiento",
     items: [
       { id: "wealth", name: "Portafolio de inversiones", icon: "invest", href: "/patrimonio" },
-      { id: "defense", name: "Defensa Patrimonial", icon: "defense", href: "/patrimonio/proteccion" },
+      {
+        id: "defense",
+        name: "Defensa Patrimonial",
+        icon: "defense",
+        href: "/patrimonio/proteccion",
+      },
       { id: "rich-life", name: "Patrimonio", icon: "networth", href: "/mi-rich-life" },
     ],
   },
   {
     label: "Perfil",
     items: [
-      { id: "profile", name: "Mi Perfil Financiero", icon: "profile", href: "/mi-perfil-financiero" },
+      {
+        id: "profile",
+        name: "Mi Perfil Financiero",
+        icon: "profile",
+        href: "/mi-perfil-financiero",
+      },
     ],
   },
 ];

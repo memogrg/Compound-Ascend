@@ -19,7 +19,16 @@ export default async function Page() {
 
   return (
     <div className="grid">
-      <div className="card card-pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <div
+        className="card card-pad"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <div className="card-title">Mi Rich Life</div>
           <div className="card-sub">

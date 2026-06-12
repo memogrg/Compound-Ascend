@@ -126,34 +126,89 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
   const supabase = await createSupabaseServerClient();
 
   const [debts, goals, holdings, policies] = await Promise.all([
-    supabase.from("debts").select("id,name,current_payment,min_payment,currency").eq("user_id", user.id).order("created_at"),
-    supabase.from("savings_goals").select("id,name,monthly_contribution,current_amount,target_amount,currency").eq("user_id", user.id).order("created_at"),
-    supabase.from("investment_holdings").select("id,label,symbol,quantity,average_cost,current_value_manual,rental_subtype,currency").eq("user_id", user.id).order("created_at"),
-    supabase.from("insurance_policies").select("id,policy_type,provider,premium,premium_frequency,currency").eq("user_id", user.id).order("created_at"),
+    supabase
+      .from("debts")
+      .select("id,name,current_payment,min_payment,currency")
+      .eq("user_id", user.id)
+      .order("created_at"),
+    supabase
+      .from("savings_goals")
+      .select("id,name,monthly_contribution,current_amount,target_amount,currency")
+      .eq("user_id", user.id)
+      .order("created_at"),
+    supabase
+      .from("investment_holdings")
+      .select("id,label,symbol,quantity,average_cost,current_value_manual,rental_subtype,currency")
+      .eq("user_id", user.id)
+      .order("created_at"),
+    supabase
+      .from("insurance_policies")
+      .select("id,policy_type,provider,premium,premium_frequency,currency")
+      .eq("user_id", user.id)
+      .order("created_at"),
   ]);
 
   const out: DetailedEntities = { debt: [], goal: [], holding: [], policy: [], rental: [] };
 
   for (const d of debts.data ?? []) {
-    const cuota = Number(d.current_payment) > 0 ? Number(d.current_payment) : Number(d.min_payment ?? 0);
-    out.debt.push({ id: d.id, name: d.name, sub: "Cuota mensual", amount: cuota, currency: d.currency, kind: "debt" });
+    const cuota =
+      Number(d.current_payment) > 0 ? Number(d.current_payment) : Number(d.min_payment ?? 0);
+    out.debt.push({
+      id: d.id,
+      name: d.name,
+      sub: "Cuota mensual",
+      amount: cuota,
+      currency: d.currency,
+      kind: "debt",
+    });
   }
   for (const g of goals.data ?? []) {
     const sub = `${Math.round((Number(g.target_amount) > 0 ? Number(g.current_amount) / Number(g.target_amount) : 0) * 100)}% · aporte mensual`;
-    out.goal.push({ id: g.id, name: g.name, sub, amount: Number(g.monthly_contribution ?? 0), currency: g.currency, kind: "goal" });
+    out.goal.push({
+      id: g.id,
+      name: g.name,
+      sub,
+      amount: Number(g.monthly_contribution ?? 0),
+      currency: g.currency,
+      kind: "goal",
+    });
   }
   for (const h of holdings.data ?? []) {
     const name = h.label ?? h.symbol;
-    const value = h.current_value_manual != null ? Number(h.current_value_manual) : Number(h.quantity) * Number(h.average_cost);
+    const value =
+      h.current_value_manual != null
+        ? Number(h.current_value_manual)
+        : Number(h.quantity) * Number(h.average_cost);
     if (h.rental_subtype) {
-      out.rental.push({ id: h.id, name, sub: String(h.rental_subtype), amount: value, currency: h.currency, kind: "rental" });
+      out.rental.push({
+        id: h.id,
+        name,
+        sub: String(h.rental_subtype),
+        amount: value,
+        currency: h.currency,
+        kind: "rental",
+      });
     } else {
-      out.holding.push({ id: h.id, name, sub: h.symbol ?? "Inversión", amount: value, currency: h.currency, kind: "holding" });
+      out.holding.push({
+        id: h.id,
+        name,
+        sub: h.symbol ?? "Inversión",
+        amount: value,
+        currency: h.currency,
+        kind: "holding",
+      });
     }
   }
   for (const p of policies.data ?? []) {
     const name = [p.policy_type, p.provider].filter(Boolean).join(" — ") || "Póliza";
-    out.policy.push({ id: p.id, name, sub: p.premium_frequency ? `Prima ${p.premium_frequency}` : "Prima", amount: Number(p.premium ?? 0), currency: p.currency, kind: "policy" });
+    out.policy.push({
+      id: p.id,
+      name,
+      sub: p.premium_frequency ? `Prima ${p.premium_frequency}` : "Prima",
+      amount: Number(p.premium ?? 0),
+      currency: p.currency,
+      kind: "policy",
+    });
   }
   return out;
 }

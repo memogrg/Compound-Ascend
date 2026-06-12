@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { goalInputSchema, debtInputSchema, debtPaymentInputSchema } from "@/modules/control/schemas";
+import {
+  goalInputSchema,
+  debtInputSchema,
+  debtPaymentInputSchema,
+} from "@/modules/control/schemas";
 import {
   createGoal,
   createDebt,
@@ -121,7 +125,9 @@ export async function addGoalContributionAction(raw: unknown): Promise<ActionRes
     revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
-    logger.error("addGoalContribution fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("addGoalContribution fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos registrar el aporte." };
   }
 }
@@ -148,9 +154,10 @@ export async function withdrawGoalAction(raw: unknown): Promise<ActionResult> {
   } catch (err) {
     logger.error("withdrawGoal fallido", { message: err instanceof Error ? err.message : "?" });
     // La validación de saldo es un mensaje para el usuario, no un error técnico.
-    const msg = err instanceof Error && err.message.startsWith("No puedes retirar")
-      ? err.message
-      : "No pudimos registrar el retiro.";
+    const msg =
+      err instanceof Error && err.message.startsWith("No puedes retirar")
+        ? err.message
+        : "No pudimos registrar el retiro.";
     return { ok: false, message: msg };
   }
 }

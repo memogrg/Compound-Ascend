@@ -43,7 +43,15 @@ const POLICY_TYPES = [
   ["otro", "Otro"],
 ] as const;
 
-export function WealthActions({ mode, currency = "CRC", deepLinkKey }: { mode: Mode; currency?: string; deepLinkKey?: string }) {
+export function WealthActions({
+  mode,
+  currency = "CRC",
+  deepLinkKey,
+}: {
+  mode: Mode;
+  currency?: string;
+  deepLinkKey?: string;
+}) {
   const [open, setOpen] = useState(false);
   useDeepLinkModal(deepLinkKey, () => setOpen(true));
   return (
@@ -52,7 +60,9 @@ export function WealthActions({ mode, currency = "CRC", deepLinkKey }: { mode: M
         <Icon name={mode === "investment" ? "invest" : "defense"} width={2} />
         {mode === "investment" ? "Agregar inversión" : "Añadir póliza"}
       </button>
-      {open ? <WealthDialog mode={mode} currency={currency} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <WealthDialog mode={mode} currency={currency} onClose={() => setOpen(false)} />
+      ) : null}
     </>
   );
 }
@@ -157,7 +167,15 @@ function sym(currency: string): string {
   return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
 }
 
-function InvestmentForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: Investment }) {
+function InvestmentForm({
+  currency,
+  onDone,
+  item,
+}: {
+  currency: string;
+  onDone: () => void;
+  item?: Investment;
+}) {
   const action = item ? (raw: unknown) => editInvestmentAction(item.id, raw) : addInvestmentAction;
   const { pending, errors, message, run } = useSubmit(action);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -188,7 +206,14 @@ function InvestmentForm({ currency, onDone, item }: { currency: string; onDone: 
         ) : null}
         <div className="fld">
           <label className="fld-label">Nombre o descripción</label>
-          <input className="inp" name="name" defaultValue={item?.name ?? ""} placeholder="ETF S&P 500, apartamento…" required aria-invalid={errors.name ? true : undefined} />
+          <input
+            className="inp"
+            name="name"
+            defaultValue={item?.name ?? ""}
+            placeholder="ETF S&P 500, apartamento…"
+            required
+            aria-invalid={errors.name ? true : undefined}
+          />
           {errors.name ? (
             <span className="auth-err" role="alert">
               {errors.name}
@@ -208,12 +233,28 @@ function InvestmentForm({ currency, onDone, item }: { currency: string; onDone: 
           </div>
           <div className="fld">
             <label className="fld-label">Símbolo (opcional)</label>
-            <input className="inp" name="symbol" defaultValue={item?.symbol ?? ""} placeholder="VOO, BTC…" />
+            <input
+              className="inp"
+              name="symbol"
+              defaultValue={item?.symbol ?? ""}
+              placeholder="VOO, BTC…"
+            />
           </div>
         </div>
         <div className="fld-2">
-          <Money label="Monto invertido" name="investedAmount" currency={currency} error={errors.investedAmount} defaultValue={item?.investedAmount} />
-          <Money label="Aporte mensual" name="contribution" currency={currency} defaultValue={item?.contribution} />
+          <Money
+            label="Monto invertido"
+            name="investedAmount"
+            currency={currency}
+            error={errors.investedAmount}
+            defaultValue={item?.investedAmount}
+          />
+          <Money
+            label="Aporte mensual"
+            name="contribution"
+            currency={currency}
+            defaultValue={item?.contribution}
+          />
         </div>
         <div className="fld-2">
           <div className="fld">
@@ -243,7 +284,15 @@ function InvestmentForm({ currency, onDone, item }: { currency: string; onDone: 
   );
 }
 
-function PolicyForm({ currency, onDone, item }: { currency: string; onDone: () => void; item?: InsurancePolicy }) {
+function PolicyForm({
+  currency,
+  onDone,
+  item,
+}: {
+  currency: string;
+  onDone: () => void;
+  item?: InsurancePolicy;
+}) {
   const action = item ? (raw: unknown) => editPolicyAction(item.id, raw) : addPolicyAction;
   const { pending, message, run } = useSubmit(action);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -284,17 +333,36 @@ function PolicyForm({ currency, onDone, item }: { currency: string; onDone: () =
           </div>
           <div className="fld">
             <label className="fld-label">Aseguradora (opcional)</label>
-            <input className="inp" name="provider" defaultValue={item?.provider ?? ""} placeholder="Nombre" />
+            <input
+              className="inp"
+              name="provider"
+              defaultValue={item?.provider ?? ""}
+              placeholder="Nombre"
+            />
           </div>
         </div>
         <div className="fld-2">
-          <Money label="Suma asegurada" name="coverage" currency={currency} defaultValue={item?.coverage ?? undefined} />
-          <Money label="Prima" name="premium" currency={currency} defaultValue={item?.premium ?? undefined} />
+          <Money
+            label="Suma asegurada"
+            name="coverage"
+            currency={currency}
+            defaultValue={item?.coverage ?? undefined}
+          />
+          <Money
+            label="Prima"
+            name="premium"
+            currency={currency}
+            defaultValue={item?.premium ?? undefined}
+          />
         </div>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Frecuencia de la prima</label>
-            <select className="sel" name="premiumFrequency" defaultValue={item?.premiumFrequency ?? "mensual"}>
+            <select
+              className="sel"
+              name="premiumFrequency"
+              defaultValue={item?.premiumFrequency ?? "mensual"}
+            >
               <option value="mensual">Mensual</option>
               <option value="trimestral">Trimestral</option>
               <option value="semestral">Semestral</option>

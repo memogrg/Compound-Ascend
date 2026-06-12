@@ -29,11 +29,7 @@ export function AppShell({ children, user, currency }: AppShellProps) {
         </main>
       </div>
 
-      <div
-        className={cn("sidebar-scrim", drawer && "open")}
-        onClick={close}
-        aria-hidden="true"
-      />
+      <div className={cn("sidebar-scrim", drawer && "open")} onClick={close} aria-hidden="true" />
       <BottomNav />
       <CoachPanel />
     </ToastProvider>

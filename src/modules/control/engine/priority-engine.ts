@@ -165,14 +165,20 @@ function buildAllocation(
   hasCriticalDebt: boolean,
 ): AllocationItem[] {
   if (free <= 0) {
-    return [{ label: "Estabilizar flujo", amount: 0, note: "Recupera flujo positivo antes de asignar." }];
+    return [
+      { label: "Estabilizar flujo", amount: 0, note: "Recupera flujo positivo antes de asignar." },
+    ];
   }
   const items: AllocationItem[] = [];
   let rest = free;
 
   if (!ctx.hasEmergencyFund) {
     const toEmergency = Math.round(rest * 0.4);
-    items.push({ label: "Mini fondo de emergencia", amount: toEmergency, note: "Base de seguridad" });
+    items.push({
+      label: "Mini fondo de emergencia",
+      amount: toEmergency,
+      note: "Base de seguridad",
+    });
     rest -= toEmergency;
   }
   if (hasCriticalDebt) {
@@ -181,7 +187,11 @@ function buildAllocation(
     rest -= toDebt;
   }
   if (rest > 0) {
-    items.push({ label: "Objetivos prioritarios", amount: Math.round(rest), note: "Avanza tus metas" });
+    items.push({
+      label: "Objetivos prioritarios",
+      amount: Math.round(rest),
+      note: "Avanza tus metas",
+    });
   }
   return items;
 }
@@ -297,7 +307,10 @@ function narrative(
   }
   const accelerate = recs.find((r) => r.action === "acelerar");
   return {
-    diagnosis: semaforo === "verde" ? "Tu estrategia es saludable." : "Tu estrategia es sólida con ajustes menores.",
+    diagnosis:
+      semaforo === "verde"
+        ? "Tu estrategia es saludable."
+        : "Tu estrategia es sólida con ajustes menores.",
     decision: accelerate
       ? `Puedes acelerar "${accelerate.goalName}" con tu margen disponible.`
       : "Mantén tus aportes y evalúa convertir metas largas en inversión.",

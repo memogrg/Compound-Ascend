@@ -150,9 +150,10 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     const prevQty = Number(existing.quantity ?? 0);
     const prevAvg = Number(existing.average_cost ?? 0);
     const newQty = prevQty + input.quantity;
-    const newAvg = newQty > 0
-      ? (prevQty * prevAvg + input.quantity * input.averageCost) / newQty
-      : input.averageCost;
+    const newAvg =
+      newQty > 0
+        ? (prevQty * prevAvg + input.quantity * input.averageCost) / newQty
+        : input.averageCost;
     const { error } = await supabase
       .from("investment_holdings")
       .update({
@@ -212,7 +213,11 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         verb: "Compra",
       });
     } catch (err) {
-      await supabase.from("investment_holdings").delete().eq("id", created.id).eq("user_id", user.id);
+      await supabase
+        .from("investment_holdings")
+        .delete()
+        .eq("id", created.id)
+        .eq("user_id", user.id);
       throw err;
     }
   }

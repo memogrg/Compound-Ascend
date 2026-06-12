@@ -24,7 +24,16 @@ export default async function Page({ params }: { params: Promise<{ debtId: strin
 
   return (
     <div className="grid">
-      <div className="card card-pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <div
+        className="card card-pad"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <div className="card-title">Detalle de deuda</div>
           <div className="card-sub">Calculadora de amortización y pago.</div>

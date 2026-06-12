@@ -15,7 +15,13 @@ import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { importTransactionsAction } from "@/modules/financial-base/api/v2-actions";
 
-type Parsed = { kind: "ingreso" | "gasto"; amount: number; occurredOn: string; description?: string; currency: string };
+type Parsed = {
+  kind: "ingreso" | "gasto";
+  amount: number;
+  occurredOn: string;
+  description?: string;
+  currency: string;
+};
 
 function splitLine(line: string): string[] {
   const out: string[] = [];
@@ -25,10 +31,15 @@ function splitLine(line: string): string[] {
     const c = line[i]!;
     if (q) {
       if (c === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; } else q = false;
+        if (line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else q = false;
       } else cur += c;
-    } else if (c === ",") { out.push(cur); cur = ""; }
-    else if (c === '"') q = true;
+    } else if (c === ",") {
+      out.push(cur);
+      cur = "";
+    } else if (c === '"') q = true;
     else cur += c;
   }
   out.push(cur);
@@ -36,7 +47,10 @@ function splitLine(line: string): string[] {
 }
 
 function norm(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function normalizeDate(s: string): string | null {
@@ -48,7 +62,10 @@ function normalizeDate(s: string): string | null {
 }
 
 function parseCsv(text: string, defaultCurrency: string): { rows: Parsed[]; skipped: number } {
-  const lines = text.trim().split(/\r?\n/).filter((l) => l.trim());
+  const lines = text
+    .trim()
+    .split(/\r?\n/)
+    .filter((l) => l.trim());
   if (lines.length < 2) return { rows: [], skipped: 0 };
   const header = splitLine(lines[0]!).map(norm);
   const idx = (names: string[]) => header.findIndex((h) => names.some((n) => h.includes(n)));
@@ -65,7 +82,10 @@ function parseCsv(text: string, defaultCurrency: string): { rows: Parsed[]; skip
     const rawAmt = (iAmt >= 0 ? cells[iAmt] : "") ?? "";
     const num = Number(rawAmt.replace(/[^0-9.\-]/g, ""));
     const date = iDate >= 0 ? normalizeDate(cells[iDate] ?? "") : null;
-    if (!Number.isFinite(num) || num === 0 || !date) { skipped++; continue; }
+    if (!Number.isFinite(num) || num === 0 || !date) {
+      skipped++;
+      continue;
+    }
     let kind: "ingreso" | "gasto";
     const kindCell = iKind >= 0 ? norm(cells[iKind] ?? "") : "";
     if (kindCell.includes("ingres") || kindCell.includes("income")) kind = "ingreso";
@@ -75,7 +95,7 @@ function parseCsv(text: string, defaultCurrency: string): { rows: Parsed[]; skip
       kind,
       amount: Math.abs(num),
       occurredOn: date,
-      description: iDesc >= 0 ? (cells[iDesc] || undefined) : undefined,
+      description: iDesc >= 0 ? cells[iDesc] || undefined : undefined,
       currency: (iCur >= 0 ? cells[iCur]?.toUpperCase().slice(0, 3) : "") || defaultCurrency,
     });
   }
@@ -86,7 +106,12 @@ export function CsvImportButton({ currency }: { currency: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="btn btn-ghost" style={{ border: "1px solid var(--line)" }} onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        style={{ border: "1px solid var(--line)" }}
+        onClick={() => setOpen(true)}
+      >
         <Icon name="upload" width={2} /> Importar CSV
       </button>
       {open ? <CsvImportModal currency={currency} onClose={() => setOpen(false)} /> : null}
@@ -126,36 +151,82 @@ function CsvImportModal({ currency, onClose }: { currency: string; onClose: () =
     });
 
   return (
-    <Modal title="Importar CSV" sub="Columnas: fecha, descripción, monto, tipo (ingreso/gasto), moneda." onClose={onClose}>
+    <Modal
+      title="Importar CSV"
+      sub="Columnas: fecha, descripción, monto, tipo (ingreso/gasto), moneda."
+      onClose={onClose}
+    >
       <div className="modal-body">
         <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onFile} />
-        <button type="button" className="btn btn-secondary" onClick={() => fileRef.current?.click()}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => fileRef.current?.click()}
+        >
           <Icon name="upload" width={2} /> {fileName || "Elegir archivo CSV"}
         </button>
 
         {rows.length > 0 ? (
           <>
             <div className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-              {rows.length} fila(s) válida(s){skipped > 0 ? ` · ${skipped} omitida(s)` : ""}. Vista previa:
+              {rows.length} fila(s) válida(s){skipped > 0 ? ` · ${skipped} omitida(s)` : ""}. Vista
+              previa:
             </div>
-            <div style={{ marginTop: 8, maxHeight: 240, overflow: "auto", border: "1px solid var(--line)", borderRadius: 10 }}>
+            <div
+              style={{
+                marginTop: 8,
+                maxHeight: 240,
+                overflow: "auto",
+                border: "1px solid var(--line)",
+                borderRadius: 10,
+              }}
+            >
               {rows.slice(0, 12).map((r, i) => (
                 <div key={i} className="list-row" style={{ gridTemplateColumns: "auto 1fr auto" }}>
-                  <span style={{ fontSize: 12, color: "var(--muted)" }}>{r.occurredOn.slice(5)}</span>
-                  <span style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.description || (r.kind === "ingreso" ? "Ingreso" : "Gasto")}</span>
-                  <span className="tnum" style={{ fontSize: 13, color: r.kind === "ingreso" ? "var(--pos)" : "var(--neg)" }}>
-                    {r.kind === "ingreso" ? "+" : "−"}{formatMoney(r.amount, r.currency)}
+                  <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                    {r.occurredOn.slice(5)}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 13,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {r.description || (r.kind === "ingreso" ? "Ingreso" : "Gasto")}
+                  </span>
+                  <span
+                    className="tnum"
+                    style={{
+                      fontSize: 13,
+                      color: r.kind === "ingreso" ? "var(--pos)" : "var(--neg)",
+                    }}
+                  >
+                    {r.kind === "ingreso" ? "+" : "−"}
+                    {formatMoney(r.amount, r.currency)}
                   </span>
                 </div>
               ))}
-              {rows.length > 12 ? <div className="muted" style={{ padding: "8px 14px", fontSize: 12 }}>… y {rows.length - 12} más</div> : null}
+              {rows.length > 12 ? (
+                <div className="muted" style={{ padding: "8px 14px", fontSize: 12 }}>
+                  … y {rows.length - 12} más
+                </div>
+              ) : null}
             </div>
           </>
         ) : null}
       </div>
       <div className="modal-foot">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-        <button type="button" className="btn btn-primary" onClick={doImport} disabled={pending || rows.length === 0}>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={doImport}
+          disabled={pending || rows.length === 0}
+        >
           {pending ? "Importando…" : `Importar ${rows.length || ""}`}
         </button>
       </div>

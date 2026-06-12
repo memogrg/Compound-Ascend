@@ -44,10 +44,7 @@ function safeRelative(next: FormDataEntryValue | null, fallback: string): string
   return value;
 }
 
-export async function signInAction(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+export async function signInAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signInSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -66,10 +63,7 @@ export async function signInAction(
   redirect(safeRelative(formData.get("next"), "/dashboard"));
 }
 
-export async function signUpAction(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+export async function signUpAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = signUpSchema.safeParse({
     displayName: formData.get("displayName"),
     email: formData.get("email"),
@@ -97,8 +91,7 @@ export async function signUpAction(
     // Mensaje genérico para no revelar si el correo ya existe.
     return {
       ok: true,
-      message:
-        "Si el correo es válido, te enviamos un enlace de confirmación. Revisa tu bandeja.",
+      message: "Si el correo es válido, te enviamos un enlace de confirmación. Revisa tu bandeja.",
     };
   }
 

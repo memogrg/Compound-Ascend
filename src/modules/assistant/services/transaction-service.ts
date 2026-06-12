@@ -10,13 +10,8 @@ import "server-only";
  * El insert directo anterior se saltaba todo eso. El household_id lo pone el
  * pipeline central (integración household de main), no este servicio.
  */
-import {
-  createTransaction as createBaseTransaction,
-} from "@/modules/financial-base";
-import {
-  propagateLinkedTransaction,
-  deleteLinkedTransaction,
-} from "@/modules/financial-base";
+import { createTransaction as createBaseTransaction } from "@/modules/financial-base";
+import { propagateLinkedTransaction, deleteLinkedTransaction } from "@/modules/financial-base";
 import type { TransactionInput } from "@/modules/assistant/schemas";
 
 export async function createTransaction(input: TransactionInput): Promise<void> {

@@ -23,7 +23,8 @@ function isCronRequest(req: Request): boolean {
 export async function POST(req: Request) {
   const cors = corsHeaders(req.headers.get("origin"));
   try {
-    if (!isSupabaseConfigured()) throw new AppError("INTERNAL", undefined, "Supabase no configurado");
+    if (!isSupabaseConfigured())
+      throw new AppError("INTERNAL", undefined, "Supabase no configurado");
 
     let userId: string;
 
@@ -39,20 +40,11 @@ export async function POST(req: Request) {
     }
 
     // Importaciones dinámicas para no cargar toda la cadena en cold start.
-    const { getPortfolioReport } = await import(
-      "@/modules/wealth/services/portfolio-service"
-    );
-    const { getRichLifeSummary } = await import(
-      "@/modules/rich-life/services/rich-life-service"
-    );
-    const { generateAndSaveSnapshot } = await import(
-      "@/modules/wealth/services/snapshot-service"
-    );
+    const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
+    const { getRichLifeSummary } = await import("@/modules/rich-life/services/rich-life-service");
+    const { generateAndSaveSnapshot } = await import("@/modules/wealth/services/snapshot-service");
 
-    const [report, richLife] = await Promise.all([
-      getPortfolioReport(),
-      getRichLifeSummary(),
-    ]);
+    const [report, richLife] = await Promise.all([getPortfolioReport(), getRichLifeSummary()]);
 
     const snapshot = await generateAndSaveSnapshot(
       userId,
@@ -62,10 +54,7 @@ export async function POST(req: Request) {
       report.currency,
     );
 
-    return NextResponse.json(
-      { ok: true, snapshot },
-      { headers: cors },
-    );
+    return NextResponse.json({ ok: true, snapshot }, { headers: cors });
   } catch (err) {
     const { status, body } = toSafeResponse(err);
     return NextResponse.json(body, { status, headers: cors });

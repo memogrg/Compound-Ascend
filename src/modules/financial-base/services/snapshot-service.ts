@@ -102,10 +102,14 @@ async function snapshotUserAdmin(
 
   if ((bi.data?.length ?? 0) === 0 && (tx.data?.length ?? 0) === 0) return false;
 
-  let bIncome = 0, bExpense = 0, rIncome = 0, rExpense = 0;
+  let bIncome = 0,
+    bExpense = 0,
+    rIncome = 0,
+    rExpense = 0;
   for (const r of bi.data ?? []) {
     const v = convertCurrency(Number(r.amount), r.currency, currency, rates);
-    if (r.type === "income") bIncome += v; else bExpense += v;
+    if (r.type === "income") bIncome += v;
+    else bExpense += v;
   }
   for (const r of tx.data ?? []) {
     const v = convertCurrency(Number(r.amount), r.currency, currency, rates);

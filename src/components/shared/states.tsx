@@ -19,7 +19,13 @@ export function EmptyState({
   return (
     <div
       className="card card-pad"
-      style={{ textAlign: "center", display: "grid", placeItems: "center", gap: 12, padding: "48px 24px" }}
+      style={{
+        textAlign: "center",
+        display: "grid",
+        placeItems: "center",
+        gap: 12,
+        padding: "48px 24px",
+      }}
     >
       <div
         style={{
@@ -83,7 +89,9 @@ export function Skel({
   r?: number;
   style?: React.CSSProperties;
 }) {
-  return <div className="skel" aria-hidden style={{ height: h, width: w, borderRadius: r, ...style }} />;
+  return (
+    <div className="skel" aria-hidden style={{ height: h, width: w, borderRadius: r, ...style }} />
+  );
 }
 
 export function LoadingSkeleton({ height = 120 }: { height?: number }) {
@@ -92,7 +100,10 @@ export function LoadingSkeleton({ height = 120 }: { height?: number }) {
 
 function SkelCard({ children, minHeight }: { children: React.ReactNode; minHeight?: number }) {
   return (
-    <div className="card card-pad" style={{ minHeight, display: "grid", gap: 14, alignContent: "start" }}>
+    <div
+      className="card card-pad"
+      style={{ minHeight, display: "grid", gap: 14, alignContent: "start" }}
+    >
       {children}
     </div>
   );
@@ -113,7 +124,13 @@ export function ModuleSkeleton({ kpis = 4 }: { kpis?: number }) {
 
       <div
         className="card card-pad"
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
       >
         <div style={{ display: "grid", gap: 9 }}>
           <Skel h={16} w={190} />
@@ -124,7 +141,11 @@ export function ModuleSkeleton({ kpis = 4 }: { kpis?: number }) {
 
       <section className="cols-4">
         {Array.from({ length: kpis }).map((_, i) => (
-          <div key={i} className="card kpi" style={{ padding: "16px 18px", display: "grid", gap: 12 }}>
+          <div
+            key={i}
+            className="card kpi"
+            style={{ padding: "16px 18px", display: "grid", gap: 12 }}
+          >
             <Skel h={11} w={90} />
             <Skel h={26} w={130} />
             <Skel h={10} w={70} />

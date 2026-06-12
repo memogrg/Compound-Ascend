@@ -128,24 +128,93 @@ export async function seedDemoTemplate(): Promise<{ seeded: boolean }> {
     ];
 
     const investments = [
-      { user_id: uid, asset_type: "etf", name: "ETF S&P 500", symbol: "VOO", invested_amount: 4_200_000, contribution: 120_000, horizon: "5_10" },
-      { user_id: uid, asset_type: "cripto", name: "Bitcoin", symbol: "BTC", invested_amount: 1_100_000, contribution: 30_000, horizon: "5_10" },
-      { user_id: uid, asset_type: "inmueble", name: "Apartamento alquiler", invested_amount: 38_000_000, contribution: 0, horizon: "mas_10" },
+      {
+        user_id: uid,
+        asset_type: "etf",
+        name: "ETF S&P 500",
+        symbol: "VOO",
+        invested_amount: 4_200_000,
+        contribution: 120_000,
+        horizon: "5_10",
+      },
+      {
+        user_id: uid,
+        asset_type: "cripto",
+        name: "Bitcoin",
+        symbol: "BTC",
+        invested_amount: 1_100_000,
+        contribution: 30_000,
+        horizon: "5_10",
+      },
+      {
+        user_id: uid,
+        asset_type: "inmueble",
+        name: "Apartamento alquiler",
+        invested_amount: 38_000_000,
+        contribution: 0,
+        horizon: "mas_10",
+      },
     ];
 
     const policies = [
-      { user_id: uid, policy_type: "vida", provider: "Aseguradora", coverage: 90_000_000, premium: 18_000, premium_frequency: "mensual", currency },
-      { user_id: uid, policy_type: "medico", provider: "Aseguradora", coverage: 50_000_000, premium: 35_000, premium_frequency: "mensual", currency },
-      { user_id: uid, policy_type: "vehiculo", provider: "Aseguradora", coverage: 12_000_000, premium: 22_000, premium_frequency: "mensual", currency },
+      {
+        user_id: uid,
+        policy_type: "vida",
+        provider: "Aseguradora",
+        coverage: 90_000_000,
+        premium: 18_000,
+        premium_frequency: "mensual",
+        currency,
+      },
+      {
+        user_id: uid,
+        policy_type: "medico",
+        provider: "Aseguradora",
+        coverage: 50_000_000,
+        premium: 35_000,
+        premium_frequency: "mensual",
+        currency,
+      },
+      {
+        user_id: uid,
+        policy_type: "vehiculo",
+        provider: "Aseguradora",
+        coverage: 12_000_000,
+        premium: 22_000,
+        premium_frequency: "mensual",
+        currency,
+      },
     ];
 
     const assets = [
-      { user_id: uid, name: "Fondo de emergencia", asset_class: "liquido", value: 900_000, currency, generates_income: false, liquidity: "alta" },
-      { user_id: uid, name: "Vehículo", asset_class: "uso_personal", value: 9_000_000, currency, generates_income: false, liquidity: "media" },
+      {
+        user_id: uid,
+        name: "Fondo de emergencia",
+        asset_class: "liquido",
+        value: 900_000,
+        currency,
+        generates_income: false,
+        liquidity: "alta",
+      },
+      {
+        user_id: uid,
+        name: "Vehículo",
+        asset_class: "uso_personal",
+        value: 9_000_000,
+        currency,
+        generates_income: false,
+        liquidity: "media",
+      },
     ];
 
     const liabilities = [
-      { user_id: uid, name: "Hipoteca", liability_class: "patrimonial", balance: 22_000_000, currency },
+      {
+        user_id: uid,
+        name: "Hipoteca",
+        liability_class: "patrimonial",
+        balance: 22_000_000,
+        currency,
+      },
     ];
 
     await Promise.all([
@@ -203,8 +272,5 @@ export async function seedDemoTemplate(): Promise<{ seeded: boolean }> {
 export async function markOnboardingStarted(): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase
-    .from("profiles")
-    .update({ onboarding_completed: true })
-    .eq("id", user.id);
+  await supabase.from("profiles").update({ onboarding_completed: true }).eq("id", user.id);
 }

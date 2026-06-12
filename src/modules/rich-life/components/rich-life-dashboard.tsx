@@ -17,8 +17,16 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
   const ind = s.indicators;
   const trend = TREND[ind.trend];
 
-  const assetDonut: DonutDatum[] = s.assetsByClass.map((a) => ({ name: a.label, value: a.value, color: a.color }));
-  const liabDonut: DonutDatum[] = s.liabilitiesByClass.map((a) => ({ name: a.label, value: a.value, color: a.color }));
+  const assetDonut: DonutDatum[] = s.assetsByClass.map((a) => ({
+    name: a.label,
+    value: a.value,
+    color: a.color,
+  }));
+  const liabDonut: DonutDatum[] = s.liabilitiesByClass.map((a) => ({
+    name: a.label,
+    value: a.value,
+    color: a.color,
+  }));
   const freedomPct = Math.min(100, Math.round(ind.financialFreedomIndex * 100));
 
   return (
@@ -32,14 +40,31 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           </div>
           <span className={`delta ${trend.delta}`} style={{ marginTop: 12, color: trend.cls }}>
             {trend.label}
-            {ind.wealthVelocity !== null ? ` · ${formatMoney(ind.wealthVelocity, currency)}/mes` : ""}
+            {ind.wealthVelocity !== null
+              ? ` · ${formatMoney(ind.wealthVelocity, currency)}/mes`
+              : ""}
           </span>
-          <div style={{ display: "flex", gap: 22, marginTop: 16, fontSize: 12.5, color: "var(--muted)", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 22,
+              marginTop: 16,
+              fontSize: 12.5,
+              color: "var(--muted)",
+              flexWrap: "wrap",
+            }}
+          >
             <div>
-              Activos <strong style={{ color: "var(--pos)" }}>{formatMoney(ind.totalAssets, currency)}</strong>
+              Activos{" "}
+              <strong style={{ color: "var(--pos)" }}>
+                {formatMoney(ind.totalAssets, currency)}
+              </strong>
             </div>
             <div>
-              Pasivos <strong style={{ color: "var(--ink-2)" }}>{formatMoney(ind.totalLiabilities, currency)}</strong>
+              Pasivos{" "}
+              <strong style={{ color: "var(--ink-2)" }}>
+                {formatMoney(ind.totalLiabilities, currency)}
+              </strong>
             </div>
             <div>
               Activos/Pasivos{" "}
@@ -54,7 +79,19 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           <div className="ring-wrap">
             <svg width="120" height="120" viewBox="0 0 42 42">
               <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
-              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--gold)" strokeWidth="4" strokeLinecap={s.score.score >= 100 ? "butt" : "round"} pathLength={100} strokeDasharray={`${s.score.score} 100`} strokeDashoffset="25" transform="rotate(-90 21 21)" />
+              <circle
+                cx="21"
+                cy="21"
+                r="15.915"
+                fill="none"
+                stroke="var(--gold)"
+                strokeWidth="4"
+                strokeLinecap={s.score.score >= 100 ? "butt" : "round"}
+                pathLength={100}
+                strokeDasharray={`${s.score.score} 100`}
+                strokeDashoffset="25"
+                transform="rotate(-90 21 21)"
+              />
             </svg>
             <div className="ring-center">
               <div>
@@ -67,7 +104,14 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           </div>
           <div>
             <div className="label">Rich Life Score</div>
-            <div className="chip" style={{ marginTop: 8, background: "color-mix(in srgb,var(--gold) 18%, transparent)", color: "var(--gold)" }}>
+            <div
+              className="chip"
+              style={{
+                marginTop: 8,
+                background: "color-mix(in srgb,var(--gold) 18%, transparent)",
+                color: "var(--gold)",
+              }}
+            >
               {s.score.state}
             </div>
             <p className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.5 }}>
@@ -79,16 +123,44 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
 
       {/* Indicadores */}
       <section className="cols-4">
-        <Ind label="Activos productivos" value={formatPercent(ind.productiveAssetsPct)} note="trabajan para ti" />
-        <Ind label="Activos líquidos" value={formatPercent(ind.liquidAssetsPct)} note="disponibles" />
-        <Ind label="Meses de independencia" value={String(ind.monthsOfIndependence)} note="sin nuevos ingresos" />
-        <Ind label="Endeudamiento patrimonial" value={formatPercent(ind.debtToAssets)} note="pasivos / activos" />
+        <Ind
+          label="Activos productivos"
+          value={formatPercent(ind.productiveAssetsPct)}
+          note="trabajan para ti"
+        />
+        <Ind
+          label="Activos líquidos"
+          value={formatPercent(ind.liquidAssetsPct)}
+          note="disponibles"
+        />
+        <Ind
+          label="Meses de independencia"
+          value={String(ind.monthsOfIndependence)}
+          note="sin nuevos ingresos"
+        />
+        <Ind
+          label="Endeudamiento patrimonial"
+          value={formatPercent(ind.debtToAssets)}
+          note="pasivos / activos"
+        />
       </section>
 
       {/* Donuts activos / pasivos */}
       <section className="cols-2">
-        <DonutCard title="Composición de activos" data={assetDonut} total={ind.totalAssets} currency={currency} empty="Agrega tus activos." />
-        <DonutCard title="Composición de pasivos" data={liabDonut} total={ind.totalLiabilities} currency={currency} empty="Sin pasivos registrados." />
+        <DonutCard
+          title="Composición de activos"
+          data={assetDonut}
+          total={ind.totalAssets}
+          currency={currency}
+          empty="Agrega tus activos."
+        />
+        <DonutCard
+          title="Composición de pasivos"
+          data={liabDonut}
+          total={ind.totalLiabilities}
+          currency={currency}
+          empty="Sin pasivos registrados."
+        />
       </section>
 
       {/* Termómetro de libertad financiera */}
@@ -100,7 +172,13 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           </span>
         </div>
         <div className="bar-track" style={{ marginTop: 14, height: 12 }}>
-          <div className="bar-fill" style={{ width: `${freedomPct}%`, background: "linear-gradient(90deg, var(--pos), var(--teal))" }} />
+          <div
+            className="bar-fill"
+            style={{
+              width: `${freedomPct}%`,
+              background: "linear-gradient(90deg, var(--pos), var(--teal))",
+            }}
+          />
         </div>
         <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
           Meta: 100% = tus ingresos pasivos cubren todos tus gastos (independencia financiera).
@@ -111,11 +189,19 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
       <div className="card card-pad">
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
           <div className="card-title">Tu próxima mejor acción</div>
-          <span className="chip" style={{ background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))", color: "var(--ink-2)" }}>
+          <span
+            className="chip"
+            style={{
+              background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
+              color: "var(--ink-2)",
+            }}
+          >
             Rich Life Snapshot
           </span>
         </div>
-        <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: 0 }}>{s.nextBestAction}</p>
+        <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: 0 }}>
+          {s.nextBestAction}
+        </p>
       </div>
 
       {/* Listas */}
@@ -125,7 +211,15 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           sub={`${assets.length} registrado(s)`}
           currency={currency}
           addKind="asset"
-          items={assets.map((a) => ({ id: a.id, name: a.name, sub: a.assetClass.replace("_", " "), amount: formatMoney(a.value, a.currency), color: "var(--pos)", kind: "asset" as const, entity: a }))}
+          items={assets.map((a) => ({
+            id: a.id,
+            name: a.name,
+            sub: a.assetClass.replace("_", " "),
+            amount: formatMoney(a.value, a.currency),
+            color: "var(--pos)",
+            kind: "asset" as const,
+            entity: a,
+          }))}
           emptyText="Agrega tu casa, carro, inversiones…"
         />
         <ListCard
@@ -133,7 +227,15 @@ export function RichLifeDashboard({ summary }: { summary: RichLifeSummary }) {
           sub={`${liabilities.length} registrado(s)`}
           currency={currency}
           addKind="liability"
-          items={liabilities.map((l) => ({ id: l.id, name: l.name, sub: l.liabilityClass, amount: formatMoney(l.balance, l.currency), color: "var(--neg)", kind: "liability" as const, entity: l }))}
+          items={liabilities.map((l) => ({
+            id: l.id,
+            name: l.name,
+            sub: l.liabilityClass,
+            amount: formatMoney(l.balance, l.currency),
+            color: "var(--neg)",
+            kind: "liability" as const,
+            entity: l,
+          }))}
           emptyText="Agrega hipotecas u otras deudas grandes."
         />
       </section>
@@ -171,7 +273,9 @@ function DonutCard({
   return (
     <div className="card card-pad">
       <div className="card-title">{title}</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
+      >
         <DonutChart data={data} centerLabel={formatCompact(total, currency)} />
         <div style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 8 }}>
           {data.length === 0 ? (
@@ -180,7 +284,16 @@ function DonutCard({
             </span>
           ) : (
             data.map((d) => (
-              <div key={d.name} style={{ display: "grid", gridTemplateColumns: "10px 1fr auto", gap: 9, alignItems: "center", fontSize: 12.5 }}>
+              <div
+                key={d.name}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "10px 1fr auto",
+                  gap: 9,
+                  alignItems: "center",
+                  fontSize: 12.5,
+                }}
+              >
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
                 <span style={{ color: "var(--ink-2)" }}>{d.name}</span>
                 <span className="muted tnum">{formatMoney(d.value, currency)}</span>
@@ -225,7 +338,16 @@ function ListCard({
         </div>
       </div>
       {items.length === 0 ? (
-        <div className="muted" style={{ padding: "20px 24px", fontSize: 13, display: "grid", gap: 12, justifyItems: "start" }}>
+        <div
+          className="muted"
+          style={{
+            padding: "20px 24px",
+            fontSize: 13,
+            display: "grid",
+            gap: 12,
+            justifyItems: "start",
+          }}
+        >
           <span>{emptyText}</span>
           <AddRichButton
             kind={addKind}
@@ -238,7 +360,10 @@ function ListCard({
           <div key={it.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 500 }}>{it.name}</div>
-              <div className="muted" style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}>
+              <div
+                className="muted"
+                style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}
+              >
                 {it.sub}
               </div>
             </div>

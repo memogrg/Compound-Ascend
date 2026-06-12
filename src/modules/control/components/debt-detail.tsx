@@ -27,14 +27,40 @@ function monthsToText(months: number): string {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   const [y, m] = iso.split("-");
-  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const months = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${months[Number(m) - 1] ?? ""} ${y}`;
 }
 
 /** Fecha con día: "12 jun 2026". */
 function fmtDay(iso: string): string {
   const [y, m, d] = iso.split("-");
-  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const months = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${Number(d)} ${months[Number(m) - 1] ?? ""} ${y}`;
 }
 
@@ -69,7 +95,9 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
       <div className="card card-pad">
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
           <div>
-            <div className="card-title" style={{ fontSize: 18 }}>{vm.name}</div>
+            <div className="card-title" style={{ fontSize: 18 }}>
+              {vm.name}
+            </div>
             <div className="card-sub" style={{ marginTop: 2 }}>
               {vm.debtType ?? "Deuda"}
               {vm.bank ? ` · ${vm.bank}` : ""}
@@ -80,7 +108,10 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
                 : " · tasa fija"}
             </div>
           </div>
-          <button className="btn btn-primary" onClick={() => setPay({ amount: vm.monthlyPayment || 0, date: today })}>
+          <button
+            className="btn btn-primary"
+            onClick={() => setPay({ amount: vm.monthlyPayment || 0, date: today })}
+          >
             Reportar pago
           </button>
         </div>
@@ -102,8 +133,15 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
         >
           <Stat label="Saldo actual" value={formatMoney(vm.balance, currency)} big />
           <Stat label="TAE" value={`${vm.apr.toFixed(2)}%`} />
-          <Stat label="Cuota mensual" value={formatMoney(vm.monthlyPayment + vm.insurance, currency)} />
-          <Stat label="Libre de deuda" value={fmtDate(vm.payoffDate)} sub={monthsToText(vm.monthsRemaining)} />
+          <Stat
+            label="Cuota mensual"
+            value={formatMoney(vm.monthlyPayment + vm.insurance, currency)}
+          />
+          <Stat
+            label="Libre de deuda"
+            value={fmtDate(vm.payoffDate)}
+            sub={monthsToText(vm.monthsRemaining)}
+          />
           <Stat label="Interés restante" value={formatMoney(vm.interestRemaining, currency)} />
         </div>
 
@@ -115,12 +153,23 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
 
         {vm.originalAmount ? (
           <div style={{ marginTop: 16 }}>
-            <div className="row" style={{ justifyContent: "space-between", fontSize: 11.5, color: "var(--muted)", marginBottom: 6 }}>
+            <div
+              className="row"
+              style={{
+                justifyContent: "space-between",
+                fontSize: 11.5,
+                color: "var(--muted)",
+                marginBottom: 6,
+              }}
+            >
               <span>Pagado {Math.round(vm.progress * 100)}%</span>
               <span>{formatMoney(vm.originalAmount, currency)} original</span>
             </div>
             <div className="bar-track">
-              <div className="bar-fill" style={{ width: `${vm.progress * 100}%`, background: "var(--pos)" }} />
+              <div
+                className="bar-fill"
+                style={{ width: `${vm.progress * 100}%`, background: "var(--pos)" }}
+              />
             </div>
           </div>
         ) : null}
@@ -152,8 +201,14 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
           <table className="amort-table">
             <thead>
               <tr>
-                <th>Mes</th><th>Fecha</th><th>Cuota</th><th>Capital</th><th>Interés</th>
-                {vm.insurance > 0 ? <th>Seguro</th> : null}<th>Saldo</th><th></th>
+                <th>Mes</th>
+                <th>Fecha</th>
+                <th>Cuota</th>
+                <th>Capital</th>
+                <th>Interés</th>
+                {vm.insurance > 0 ? <th>Seguro</th> : null}
+                <th>Saldo</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -163,8 +218,12 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
                   <td>{fmtDate(r.date)}</td>
                   <td className="tnum">{formatMoney(r.payment, currency)}</td>
                   <td className="tnum">{formatMoney(r.principal, currency)}</td>
-                  <td className="tnum" style={{ color: "var(--neg)" }}>{formatMoney(r.interest, currency)}</td>
-                  {vm.insurance > 0 ? <td className="tnum">{formatMoney(r.insurance, currency)}</td> : null}
+                  <td className="tnum" style={{ color: "var(--neg)" }}>
+                    {formatMoney(r.interest, currency)}
+                  </td>
+                  {vm.insurance > 0 ? (
+                    <td className="tnum">{formatMoney(r.insurance, currency)}</td>
+                  ) : null}
                   <td className="tnum">{formatMoney(r.balance, currency)}</td>
                   <td style={{ textAlign: "right" }}>
                     <button
@@ -184,7 +243,13 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
       </div>
 
       {pay ? (
-        <ReportPaymentModal vm={vm} input={input} currency={currency} preset={pay} onClose={() => setPay(null)} />
+        <ReportPaymentModal
+          vm={vm}
+          input={input}
+          currency={currency}
+          preset={pay}
+          onClose={() => setPay(null)}
+        />
       ) : null}
     </div>
   );
@@ -210,7 +275,9 @@ function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) 
       <div className="card-head">
         <div>
           <div className="card-title">Pagos reportados</div>
-          <div className="card-sub">{sorted.length} pago(s) · recalculan el saldo y la proyección</div>
+          <div className="card-sub">
+            {sorted.length} pago(s) · recalculan el saldo y la proyección
+          </div>
         </div>
       </div>
       {sorted.map((p) => {
@@ -220,10 +287,22 @@ function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) 
         return (
           <div key={p.id} className="list-row" style={{ gridTemplateColumns: "1fr auto" }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
                 {fmtDay(p.paymentDate)}
                 {p.viaSource && VIA_LABEL[p.viaSource] ? (
-                  <span className="chip" style={{ fontSize: 10, background: "var(--chip)", color: "var(--muted)" }}>
+                  <span
+                    className="chip"
+                    style={{ fontSize: 10, background: "var(--chip)", color: "var(--muted)" }}
+                  >
                     {VIA_LABEL[p.viaSource]}
                   </span>
                 ) : null}
@@ -232,9 +311,13 @@ function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) 
                 {hasExtra ? (
                   hasEstimate ? (
                     <>
-                      Cuota {formatMoney(p.amount, currency)} + Extra {formatMoney(p.extraAmount, currency)} → amortizaste{" "}
-                      <span style={{ color: "var(--pos)", fontWeight: 600 }}>{formatMoney(p.extraAmount, currency)}</span> adicionales
-                      {" "}(capital total {formatMoney(p.principal!, currency)}, interés {formatMoney(p.interest!, currency)})
+                      Cuota {formatMoney(p.amount, currency)} + Extra{" "}
+                      {formatMoney(p.extraAmount, currency)} → amortizaste{" "}
+                      <span style={{ color: "var(--pos)", fontWeight: 600 }}>
+                        {formatMoney(p.extraAmount, currency)}
+                      </span>{" "}
+                      adicionales (capital total {formatMoney(p.principal!, currency)}, interés{" "}
+                      {formatMoney(p.interest!, currency)})
                     </>
                   ) : (
                     <span
@@ -245,11 +328,15 @@ function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) 
                           : "Agrega la tasa de interés para ver cuánto amortizas"
                       }
                     >
-                      Cuota {formatMoney(p.amount, currency)} + Extra {formatMoney(p.extraAmount, currency)} · sin estimación
+                      Cuota {formatMoney(p.amount, currency)} + Extra{" "}
+                      {formatMoney(p.extraAmount, currency)} · sin estimación
                     </span>
                   )
                 ) : hasEstimate ? (
-                  <>Capital {formatMoney(p.principal!, currency)} · interés {formatMoney(p.interest!, currency)}</>
+                  <>
+                    Capital {formatMoney(p.principal!, currency)} · interés{" "}
+                    {formatMoney(p.interest!, currency)}
+                  </>
                 ) : (
                   <>Cuota del mes</>
                 )}
@@ -265,14 +352,31 @@ function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) 
   );
 }
 
-function Stat({ label, value, sub, big }: { label: string; value: string; sub?: string; big?: boolean }) {
+function Stat({
+  label,
+  value,
+  sub,
+  big,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  big?: boolean;
+}) {
   return (
     <div>
       <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{label}</div>
-      <div className={big ? "num-xl" : ""} style={{ fontSize: big ? 24 : 15, fontWeight: big ? 400 : 600, marginTop: 4 }}>
+      <div
+        className={big ? "num-xl" : ""}
+        style={{ fontSize: big ? 24 : 15, fontWeight: big ? 400 : 600, marginTop: 4 }}
+      >
         {value}
       </div>
-      {sub ? <div className="muted" style={{ fontSize: 11 }}>{sub}</div> : null}
+      {sub ? (
+        <div className="muted" style={{ fontSize: 11 }}>
+          {sub}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -294,7 +398,10 @@ function ScenarioCalculator({ input, currency }: { input: AmortizationInput; cur
   return (
     <div className="card card-pad">
       <div className="card-title">Calculadora de escenarios</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 14 }} className="scenario-grid">
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 14 }}
+        className="scenario-grid"
+      >
         {/* Modo A */}
         <div style={{ border: "1px solid var(--line)", borderRadius: "var(--r-md)", padding: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)", marginBottom: 10 }}>
@@ -304,17 +411,34 @@ function ScenarioCalculator({ input, currency }: { input: AmortizationInput; cur
             <div className="fld">
               <label className="fld-label">Extra mensual</label>
               <div className="inp-money">
-                <input type="number" min="0" value={extra} onChange={(e) => setExtra(Number(e.target.value))} />
+                <input
+                  type="number"
+                  min="0"
+                  value={extra}
+                  onChange={(e) => setExtra(Number(e.target.value))}
+                />
               </div>
             </div>
             <div className="fld">
               <label className="fld-label">Durante (años)</label>
-              <input className="inp" type="number" min="1" max="40" value={years} onChange={(e) => setYears(Number(e.target.value))} />
+              <input
+                className="inp"
+                type="number"
+                min="1"
+                max="40"
+                value={years}
+                onChange={(e) => setYears(Number(e.target.value))}
+              />
             </div>
           </div>
           <div className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.55 }}>
-            Saldrías <strong style={{ color: "var(--pos)" }}>{monthsToText(cmp.monthsSaved)} antes</strong> y ahorrarías{" "}
-            <strong style={{ color: "var(--pos)" }}>{formatMoney(cmp.interestSaved, currency)}</strong> en intereses.
+            Saldrías{" "}
+            <strong style={{ color: "var(--pos)" }}>{monthsToText(cmp.monthsSaved)} antes</strong> y
+            ahorrarías{" "}
+            <strong style={{ color: "var(--pos)" }}>
+              {formatMoney(cmp.interestSaved, currency)}
+            </strong>{" "}
+            en intereses.
             {cmp.newPayoffDate ? <> Nueva fecha: {fmtDate(cmp.newPayoffDate)}.</> : null}
           </div>
         </div>
@@ -326,11 +450,24 @@ function ScenarioCalculator({ input, currency }: { input: AmortizationInput; cur
           </div>
           <div className="fld">
             <label className="fld-label">Plazo objetivo (años)</label>
-            <input className="inp" type="number" min="1" max="40" value={targetYears} onChange={(e) => setTargetYears(Number(e.target.value))} />
+            <input
+              className="inp"
+              type="number"
+              min="1"
+              max="40"
+              value={targetYears}
+              onChange={(e) => setTargetYears(Number(e.target.value))}
+            />
           </div>
           <div className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.55 }}>
             {needed > 0 ? (
-              <>Necesitas pagar <strong style={{ color: "var(--ink-2)" }}>{formatMoney(needed, currency)} extra al mes</strong> para terminar en {targetYears} año(s).</>
+              <>
+                Necesitas pagar{" "}
+                <strong style={{ color: "var(--ink-2)" }}>
+                  {formatMoney(needed, currency)} extra al mes
+                </strong>{" "}
+                para terminar en {targetYears} año(s).
+              </>
             ) : (
               <>Ya terminarías en ese plazo (o antes) sin pagos extra.</>
             )}
@@ -394,26 +531,46 @@ function ReportPaymentModal({
   };
 
   return (
-    <Modal title="Reportar pago" sub="Tus pagos reales recalculan el saldo y la proyección." onClose={onClose}>
+    <Modal
+      title="Reportar pago"
+      sub="Tus pagos reales recalculan el saldo y la proyección."
+      onClose={onClose}
+    >
       <form onSubmit={submit}>
         <div className="modal-body">
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Monto de la cuota</label>
               <div className="inp-money">
-                <input type="number" min="0" value={amount} onChange={(e) => setAmount(Number(e.target.value))} required />
+                <input
+                  type="number"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(Number(e.target.value))}
+                  required
+                />
               </div>
             </div>
             <div className="fld">
               <label className="fld-label">Fecha</label>
-              <input className="inp" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input
+                className="inp"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
           </div>
 
           <div className="fld">
             <label className="fld-label">Pago extra (opcional)</label>
             <div className="inp-money">
-              <input type="number" min="0" value={extra} onChange={(e) => setExtra(Number(e.target.value))} />
+              <input
+                type="number"
+                min="0"
+                value={extra}
+                onChange={(e) => setExtra(Number(e.target.value))}
+              />
             </div>
           </div>
 
@@ -421,27 +578,44 @@ function ReportPaymentModal({
             <div className="fld">
               <label className="fld-label">¿Qué reduce el pago extra?</label>
               <div className="seg" role="group" style={{ marginBottom: 10 }}>
-                <button type="button" className={`seg-btn${mode === "tiempo" ? " on" : ""}`} onClick={() => setMode("tiempo")}>
+                <button
+                  type="button"
+                  className={`seg-btn${mode === "tiempo" ? " on" : ""}`}
+                  onClick={() => setMode("tiempo")}
+                >
                   Reducir tiempo
                 </button>
-                <button type="button" className={`seg-btn${mode === "cuota" ? " on" : ""}`} onClick={() => setMode("cuota")}>
+                <button
+                  type="button"
+                  className={`seg-btn${mode === "cuota" ? " on" : ""}`}
+                  onClick={() => setMode("cuota")}
+                >
                   Reducir cuota
                 </button>
               </div>
               <div className="auth-msg" style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55 }}>
                 <strong>Recomendado: reducir tiempo.</strong> Manteniendo la cuota ahorras{" "}
                 <strong style={{ color: "var(--pos)" }}>
-                  {formatMoney(comparison.tiempo.interestSaved - comparison.cuota.interestSaved, currency)}
+                  {formatMoney(
+                    comparison.tiempo.interestSaved - comparison.cuota.interestSaved,
+                    currency,
+                  )}
                 </strong>{" "}
                 más en intereses y sales{" "}
-                <strong>{monthsToText(Math.max(0, comparison.cuota.months - comparison.tiempo.months))} antes</strong>{" "}
-                que si bajas la cuota (que pasaría a {formatMoney(comparison.cuota.monthlyPayment + vm.insurance, currency)}).
+                <strong>
+                  {monthsToText(Math.max(0, comparison.cuota.months - comparison.tiempo.months))}{" "}
+                  antes
+                </strong>{" "}
+                que si bajas la cuota (que pasaría a{" "}
+                {formatMoney(comparison.cuota.monthlyPayment + vm.insurance, currency)}).
               </div>
             </div>
           ) : null}
         </div>
         <div className="modal-foot">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
           <button type="submit" className="btn btn-primary" disabled={pending}>
             {pending ? "Guardando…" : "Registrar pago"}
           </button>

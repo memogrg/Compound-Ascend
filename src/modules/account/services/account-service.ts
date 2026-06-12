@@ -105,12 +105,7 @@ export async function updatePrimaryCurrency(code: string): Promise<void> {
 export async function clearAllFinancialData(): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await Promise.all(
-    FINANCIAL_TABLES.map((t) => supabase.from(t).delete().eq("user_id", user.id)),
-  );
+  await Promise.all(FINANCIAL_TABLES.map((t) => supabase.from(t).delete().eq("user_id", user.id)));
   // Quita la marca de demo del perfil.
-  await supabase
-    .from("personal_profiles")
-    .update({ extra: {} })
-    .eq("user_id", user.id);
+  await supabase.from("personal_profiles").update({ extra: {} }).eq("user_id", user.id);
 }

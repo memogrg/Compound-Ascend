@@ -64,8 +64,7 @@ async function buildCard(def: IndicatorDef): Promise<IndicatorCard> {
   const base = valueSixMonthsBack(history);
 
   const change6mAbs = latest && base !== null ? latest.value - base : null;
-  const change6mPct =
-    latest && base !== null && base !== 0 ? (latest.value - base) / base : null;
+  const change6mPct = latest && base !== null && base !== 0 ? (latest.value - base) / base : null;
 
   return {
     code: def.code,

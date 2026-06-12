@@ -15,7 +15,10 @@ import {
   getRealHistory,
   listTransactions,
 } from "@/modules/financial-base/services/transaction-service";
-import { listCategories, listCategoryTree } from "@/modules/financial-base/services/categories-service";
+import {
+  listCategories,
+  listCategoryTree,
+} from "@/modules/financial-base/services/categories-service";
 import { listAccounts } from "@/modules/financial-base/services/accounts-service";
 import { listRules } from "@/modules/financial-base/services/rules-service";
 import { buildSuggestionIndex } from "@/modules/financial-base/services/suggestion-service";
@@ -43,22 +46,35 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
     // noop — el sync se reintenta en la próxima carga.
   }
 
-  const [budget, real, history, transactions, categories, tree, incomeTree, suggestions, templates, accounts, rules, linkables, base] =
-    await Promise.all([
-      getBudgetTotals(period),
-      getRealTotals(period),
-      getRealHistory(period, 6),
-      listTransactions(period),
-      listCategories(),
-      listCategoryTree("expense"),
-      listCategoryTree("income"),
-      buildSuggestionIndex(),
-      listTemplates(),
-      listAccounts(),
-      listRules(),
-      listLinkableEntities(),
-      getBaseSummary(),
-    ]);
+  const [
+    budget,
+    real,
+    history,
+    transactions,
+    categories,
+    tree,
+    incomeTree,
+    suggestions,
+    templates,
+    accounts,
+    rules,
+    linkables,
+    base,
+  ] = await Promise.all([
+    getBudgetTotals(period),
+    getRealTotals(period),
+    getRealHistory(period, 6),
+    listTransactions(period),
+    listCategories(),
+    listCategoryTree("expense"),
+    listCategoryTree("income"),
+    buildSuggestionIndex(),
+    listTemplates(),
+    listAccounts(),
+    listRules(),
+    listLinkableEntities(),
+    getBaseSummary(),
+  ]);
 
   const currency = real.currency;
   const categoryNames: Record<string, string> = {};

@@ -62,7 +62,10 @@ function sinceDate(range: IndicatorRange): string | null {
 // ── Lectura ─────────────────────────────────────────────────────
 
 /** Histórico de un indicador (ascendente por fecha), cacheado en memoria. */
-export async function getHistory(code: string, range: IndicatorRange = "1Y"): Promise<IndicatorPoint[]> {
+export async function getHistory(
+  code: string,
+  range: IndicatorRange = "1Y",
+): Promise<IndicatorPoint[]> {
   const cacheKey = `hist:${code}:${range}`;
   const cached = indicatorCache.get<IndicatorPoint[]>(cacheKey);
   if (cached) return cached;
@@ -217,4 +220,8 @@ export async function refreshAllIndicators(): Promise<RefreshResult[]> {
 }
 
 export { findIndicator };
-export { getYoYInflation, getTbpContext, type TbpContext } from "@/lib/economic-indicators/insights";
+export {
+  getYoYInflation,
+  getTbpContext,
+  type TbpContext,
+} from "@/lib/economic-indicators/insights";

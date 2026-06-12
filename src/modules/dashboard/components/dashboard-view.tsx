@@ -64,17 +64,44 @@ export function DashboardView({
           >
             {ind.freeCashflow >= 0 ? "Disponible para tus metas" : "Estás gastando de más"}
           </span>
-          <div style={{ display: "flex", gap: 22, marginTop: 16, fontSize: 12.5, color: "var(--muted)", flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 22,
+              marginTop: 16,
+              fontSize: 12.5,
+              color: "var(--muted)",
+              flexWrap: "wrap",
+            }}
+          >
             <div>
-              Ingresos <strong style={{ color: "var(--pos)" }}>{formatMoney(ind.incomeMonthly, currency)}</strong>
+              Ingresos{" "}
+              <strong style={{ color: "var(--pos)" }}>
+                {formatMoney(ind.incomeMonthly, currency)}
+              </strong>
             </div>
             <div>
-              Gastos <strong style={{ color: "var(--ink-2)" }}>{formatMoney(ind.expenseMonthly, currency)}</strong>
+              Gastos{" "}
+              <strong style={{ color: "var(--ink-2)" }}>
+                {formatMoney(ind.expenseMonthly, currency)}
+              </strong>
             </div>
           </div>
-          <div style={{ display: "flex", height: 12, borderRadius: 999, overflow: "hidden", gap: 2, marginTop: 14 }}>
+          <div
+            style={{
+              display: "flex",
+              height: 12,
+              borderRadius: 999,
+              overflow: "hidden",
+              gap: 2,
+              marginTop: 14,
+            }}
+          >
             <span style={{ background: "var(--pos)", width: `${incomePct}%` }} title="Ingresos" />
-            <span style={{ background: "var(--c-expense)", width: `${100 - incomePct}%` }} title="Gastos" />
+            <span
+              style={{ background: "var(--c-expense)", width: `${100 - incomePct}%` }}
+              title="Gastos"
+            />
           </div>
         </div>
 
@@ -87,7 +114,14 @@ export function DashboardView({
           <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 14 }}>
             <div className="ring-wrap">
               <svg width="120" height="120" viewBox="0 0 42 42">
-                <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
+                <circle
+                  cx="21"
+                  cy="21"
+                  r="15.915"
+                  fill="none"
+                  stroke="var(--chip)"
+                  strokeWidth="4"
+                />
                 <circle
                   cx="21"
                   cy="21"
@@ -107,7 +141,14 @@ export function DashboardView({
                   <div className="num-xl" style={{ fontSize: 40 }}>
                     {health.score}
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--pos)", fontWeight: 600, letterSpacing: "0.02em" }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--pos)",
+                      fontWeight: 600,
+                      letterSpacing: "0.02em",
+                    }}
+                  >
                     {health.grade}
                   </div>
                 </div>
@@ -117,11 +158,19 @@ export function DashboardView({
               {health.bars.map((b) => (
                 <div
                   key={b.label}
-                  style={{ display: "grid", gridTemplateColumns: "92px 1fr 42px", gap: 10, alignItems: "center" }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "92px 1fr 42px",
+                    gap: 10,
+                    alignItems: "center",
+                  }}
                 >
                   <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{b.label}</span>
                   <div className="bar-track">
-                    <div className="bar-fill" style={{ width: `${b.ratio * 100}%`, background: b.color }} />
+                    <div
+                      className="bar-fill"
+                      style={{ width: `${b.ratio * 100}%`, background: b.color }}
+                    />
                   </div>
                   <span className="muted tnum" style={{ fontSize: 11.5, textAlign: "right" }}>
                     {b.display}
@@ -135,8 +184,18 @@ export function DashboardView({
 
       {/* KPI strip */}
       <section className="cols-4">
-        <Kpi label="Ingresos mensuales" value={formatMoney(ind.incomeMonthly, currency)} icon="income" accent="var(--pos)" />
-        <Kpi label="Gasto mensual" value={formatMoney(ind.expenseMonthly, currency)} icon="expense" accent="var(--c-expense)" />
+        <Kpi
+          label="Ingresos mensuales"
+          value={formatMoney(ind.incomeMonthly, currency)}
+          icon="income"
+          accent="var(--pos)"
+        />
+        <Kpi
+          label="Gasto mensual"
+          value={formatMoney(ind.expenseMonthly, currency)}
+          icon="expense"
+          accent="var(--c-expense)"
+        />
         <KpiLink
           label="Activos invertidos"
           icon="invest"
@@ -160,7 +219,10 @@ export function DashboardView({
             <div className="card-title">Tu próxima mejor acción</div>
             <span
               className="chip"
-              style={{ background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))", color: "var(--ink-2)" }}
+              style={{
+                background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
+                color: "var(--ink-2)",
+              }}
             >
               Ascend AI
             </span>
@@ -237,16 +299,39 @@ export function DashboardView({
               Detalle <Icon name="chev" width={2.2} />
             </Link>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}>
-            <DonutChart data={donutData} centerLabel={formatCompact(ind.expenseMonthly, currency)} centerSub="al mes" />
-            <div style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 18,
+              marginTop: 14,
+              flexWrap: "wrap",
+            }}
+          >
+            <DonutChart
+              data={donutData}
+              centerLabel={formatCompact(ind.expenseMonthly, currency)}
+              centerSub="al mes"
+            />
+            <div
+              style={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: 8 }}
+            >
               {donutData.length === 0 ? (
                 <span className="muted" style={{ fontSize: 12.5 }}>
                   Agrega gastos en tu Base Financiera.
                 </span>
               ) : (
                 donutData.slice(0, 5).map((d) => (
-                  <div key={d.name} style={{ display: "grid", gridTemplateColumns: "10px 1fr auto", gap: 9, alignItems: "center", fontSize: 12.5 }}>
+                  <div
+                    key={d.name}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "10px 1fr auto",
+                      gap: 9,
+                      alignItems: "center",
+                      fontSize: 12.5,
+                    }}
+                  >
                     <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
                     <span style={{ color: "var(--ink-2)" }}>{d.name}</span>
                     <span className="muted tnum">{formatMoney(d.value, currency)}</span>
@@ -275,7 +360,17 @@ function Kpi({
   return (
     <div className="card kpi" style={{ padding: "16px 18px" }}>
       <div className="row" style={{ gap: 8 }}>
-        <span style={{ width: 24, height: 24, borderRadius: 7, display: "grid", placeItems: "center", background: "color-mix(in srgb, " + accent + " 16%, transparent)", color: accent }}>
+        <span
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 7,
+            display: "grid",
+            placeItems: "center",
+            background: "color-mix(in srgb, " + accent + " 16%, transparent)",
+            color: accent,
+          }}
+        >
           <Icon name={icon} width={2} />
         </span>
         <span className="label">{label}</span>
@@ -303,7 +398,17 @@ function KpiLink({
   return (
     <Link className="card kpi" href={href} style={{ padding: "16px 18px", display: "block" }}>
       <div className="row" style={{ gap: 8 }}>
-        <span style={{ width: 24, height: 24, borderRadius: 7, display: "grid", placeItems: "center", background: "color-mix(in srgb, " + accent + " 16%, transparent)", color: accent }}>
+        <span
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 7,
+            display: "grid",
+            placeItems: "center",
+            background: "color-mix(in srgb, " + accent + " 16%, transparent)",
+            color: accent,
+          }}
+        >
           <Icon name={icon} width={2} />
         </span>
         <span className="label">{label}</span>

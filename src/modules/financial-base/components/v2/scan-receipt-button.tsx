@@ -10,7 +10,10 @@ import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 import { scanReceiptAction } from "@/modules/financial-base/api/v2-actions";
-import { QuickAddModal, type ScanPrefill } from "@/modules/financial-base/components/v2/quick-add-modal";
+import {
+  QuickAddModal,
+  type ScanPrefill,
+} from "@/modules/financial-base/components/v2/quick-add-modal";
 import type { Account } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 

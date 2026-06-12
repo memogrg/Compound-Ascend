@@ -29,7 +29,10 @@ const PROMPT = `Eres un extractor de recibos. Analiza la imagen y devuelve SOLO 
 Si un dato no aparece, usa null.`;
 
 function parseJson(text: string): Record<string, unknown> | null {
-  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const cleaned = text
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start === -1 || end === -1) return null;
@@ -42,11 +45,21 @@ function parseJson(text: string): Record<string, unknown> | null {
 
 const SUPPORTED = ["CRC", "USD", "EUR", "MXN", "COP", "GBP"];
 
-export async function extractReceipt(imageBase64: string, mimeType: string): Promise<ReceiptExtraction> {
+export async function extractReceipt(
+  imageBase64: string,
+  mimeType: string,
+): Promise<ReceiptExtraction> {
   const user = await requireUser();
   const provider = createGeminiProvider();
   if (!provider) {
-    return { amount: null, date: null, merchant: null, currency: null, confidence: 0, configured: false };
+    return {
+      amount: null,
+      date: null,
+      merchant: null,
+      currency: null,
+      confidence: 0,
+      configured: false,
+    };
   }
 
   await assertTokenBudget(user.id); // respeta PLAN_TOKEN_LIMITS (lanza si excede)
@@ -57,15 +70,27 @@ export async function extractReceipt(imageBase64: string, mimeType: string): Pro
     const data = parseJson(res.text) ?? {};
 
     const amount = typeof data.amount === "number" && data.amount > 0 ? data.amount : null;
-    const dateRaw = typeof data.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : null;
-    const merchant = typeof data.merchant === "string" && data.merchant.trim() ? data.merchant.trim().slice(0, 120) : null;
+    const dateRaw =
+      typeof data.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : null;
+    const merchant =
+      typeof data.merchant === "string" && data.merchant.trim()
+        ? data.merchant.trim().slice(0, 120)
+        : null;
     const curRaw = typeof data.currency === "string" ? data.currency.toUpperCase() : null;
     const currency = curRaw && SUPPORTED.includes(curRaw) ? curRaw : null;
-    const confidence = typeof data.confidence === "number" ? Math.max(0, Math.min(1, data.confidence)) : 0.5;
+    const confidence =
+      typeof data.confidence === "number" ? Math.max(0, Math.min(1, data.confidence)) : 0.5;
 
     return { amount, date: dateRaw, merchant, currency, confidence, configured: true };
   } catch (err) {
     logger.error("extractReceipt fallido", { message: err instanceof Error ? err.message : "?" });
-    return { amount: null, date: null, merchant: null, currency: null, confidence: 0, configured: true };
+    return {
+      amount: null,
+      date: null,
+      merchant: null,
+      currency: null,
+      confidence: 0,
+      configured: true,
+    };
   }
 }

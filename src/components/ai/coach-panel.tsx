@@ -72,7 +72,11 @@ export function CoachPanel() {
 
   return (
     <>
-      <button className={`coach-fab${open ? " hide" : ""}`} onClick={() => setOpen(true)} aria-label="Abrir Ascend AI">
+      <button
+        className={`coach-fab${open ? " hide" : ""}`}
+        onClick={() => setOpen(true)}
+        aria-label="Abrir Ascend AI"
+      >
         <span className="spark">
           <Icon name="spark" filled />
         </span>
@@ -88,17 +92,37 @@ export function CoachPanel() {
             <div className="coach-title">Ascend AI</div>
             <div className="coach-status">Tu asesor financiero</div>
           </div>
-          <button className="coach-x" aria-label="Escanear recibo" onClick={onPickFile} title="Escanear recibo" style={{ marginLeft: "auto" }}>
+          <button
+            className="coach-x"
+            aria-label="Escanear recibo"
+            onClick={onPickFile}
+            title="Escanear recibo"
+            style={{ marginLeft: "auto" }}
+          >
             <Icon name="budget" width={2} />
           </button>
           <button className="coach-x" aria-label="Cerrar" onClick={() => setOpen(false)}>
             <Icon name="x" width={2} />
           </button>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={onFile}
+          />
         </div>
 
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 2, padding: "0 12px", borderBottom: "1px solid var(--line)" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 2,
+            padding: "0 12px",
+            borderBottom: "1px solid var(--line)",
+          }}
+        >
           <Tab active={mode === "assistant"} onClick={() => setMode("assistant")}>
             Asistente
           </Tab>
@@ -115,7 +139,12 @@ export function CoachPanel() {
 
         {receipt ? (
           <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
-            <TxnConfirmCard draft={receipt} title="Recibo escaneado" onCancel={() => setReceipt(null)} onConfirmed={() => setReceipt(null)} />
+            <TxnConfirmCard
+              draft={receipt}
+              title="Recibo escaneado"
+              onCancel={() => setReceipt(null)}
+              onConfirmed={() => setReceipt(null)}
+            />
           </div>
         ) : null}
 
@@ -125,7 +154,15 @@ export function CoachPanel() {
   );
 }
 
-function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Tab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
@@ -181,9 +218,15 @@ function FinanceChat() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessages((m) => [...m, { role: "ai", html: escapeHtml(data.reply), action: data.action ?? null }]);
+        setMessages((m) => [
+          ...m,
+          { role: "ai", html: escapeHtml(data.reply), action: data.action ?? null },
+        ]);
       } else {
-        setMessages((m) => [...m, { role: "ai", html: escapeHtml(data.error?.message ?? "No pude responder ahora.") }]);
+        setMessages((m) => [
+          ...m,
+          { role: "ai", html: escapeHtml(data.error?.message ?? "No pude responder ahora.") },
+        ]);
       }
     } catch {
       setMessages((m) => [...m, { role: "ai", html: "Hubo un problema de conexión." }]);
@@ -261,7 +304,12 @@ function ActionCard({ action }: { action: AIActionProposal }) {
     return (
       <div style={{ padding: "4px 0 0 36px" }}>
         {done ? null : (
-          <TxnConfirmCard draft={draft} title="Acción propuesta" onCancel={() => setDone(true)} onConfirmed={() => setDone(true)} />
+          <TxnConfirmCard
+            draft={draft}
+            title="Acción propuesta"
+            onCancel={() => setDone(true)}
+            onConfirmed={() => setDone(true)}
+          />
         )}
       </div>
     );
@@ -316,7 +364,9 @@ function TransactionWizard() {
             <button
               key={k}
               className="coach-chip"
-              style={draft.kind === k ? { background: "var(--ink)", color: "var(--bg)" } : undefined}
+              style={
+                draft.kind === k ? { background: "var(--ink)", color: "var(--bg)" } : undefined
+              }
               onClick={() => setDraft((d) => ({ ...d, kind: k }))}
             >
               {k === "gasto" ? "Gasto" : "Ingreso"}
@@ -326,11 +376,22 @@ function TransactionWizard() {
       </Field>
 
       <Field label="Descripción">
-        <input className="inp" value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} placeholder="Supermercado, salario…" />
+        <input
+          className="inp"
+          value={draft.description}
+          onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+          placeholder="Supermercado, salario…"
+        />
       </Field>
 
       <Field label="Categoría">
-        <select className="sel" onChange={(e) => setDraft((d) => ({ ...d, description: d.description || e.target.value }))} defaultValue="">
+        <select
+          className="sel"
+          onChange={(e) =>
+            setDraft((d) => ({ ...d, description: d.description || e.target.value }))
+          }
+          defaultValue=""
+        >
           <option value="">Selecciona…</option>
           {cats.map((c) => (
             <option key={c.value} value={c.label}>
@@ -342,10 +403,22 @@ function TransactionWizard() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <Field label="Monto">
-          <input className="inp" type="number" min="0" step="0.01" value={draft.amount || ""} onChange={(e) => setDraft((d) => ({ ...d, amount: Number(e.target.value) }))} placeholder="0" />
+          <input
+            className="inp"
+            type="number"
+            min="0"
+            step="0.01"
+            value={draft.amount || ""}
+            onChange={(e) => setDraft((d) => ({ ...d, amount: Number(e.target.value) }))}
+            placeholder="0"
+          />
         </Field>
         <Field label="Moneda">
-          <select className="sel" value={draft.currency} onChange={(e) => setDraft((d) => ({ ...d, currency: e.target.value }))}>
+          <select
+            className="sel"
+            value={draft.currency}
+            onChange={(e) => setDraft((d) => ({ ...d, currency: e.target.value }))}
+          >
             {CURRENCIES.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.value}
@@ -356,11 +429,21 @@ function TransactionWizard() {
       </div>
 
       <Field label="Fecha">
-        <input className="inp" type="date" value={draft.occurredOn} onChange={(e) => setDraft((d) => ({ ...d, occurredOn: e.target.value }))} />
+        <input
+          className="inp"
+          type="date"
+          value={draft.occurredOn}
+          onChange={(e) => setDraft((d) => ({ ...d, occurredOn: e.target.value }))}
+        />
       </Field>
 
       {confirming ? (
-        <TxnConfirmCard draft={draft} title="Confirma la transacción" onCancel={() => setConfirming(false)} onConfirmed={() => setConfirming(false)} />
+        <TxnConfirmCard
+          draft={draft}
+          title="Confirma la transacción"
+          onCancel={() => setConfirming(false)}
+          onConfirmed={() => setConfirming(false)}
+        />
       ) : (
         <button
           className="btn btn-primary"
@@ -434,17 +517,36 @@ function TxnConfirmCard({
       {draft.linkedKind && draft.linkedId ? (
         <div style={{ marginTop: 6 }}>
           <span className="chip" style={{ fontSize: 10.5 }}>
-            Vinculada a {draft.linkedKind === "debt" ? "deuda" : draft.linkedKind === "goal" ? "meta" : "entidad"}
+            Vinculada a{" "}
+            {draft.linkedKind === "debt"
+              ? "deuda"
+              : draft.linkedKind === "goal"
+                ? "meta"
+                : "entidad"}
             {draft.linkedName ? `: ${draft.linkedName}` : ""}
           </span>
         </div>
       ) : null}
-      {error ? <div className="auth-err" style={{ marginTop: 6 }}>{error}</div> : null}
+      {error ? (
+        <div className="auth-err" style={{ marginTop: 6 }}>
+          {error}
+        </div>
+      ) : null}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button className="btn btn-secondary" style={{ flex: 1, justifyContent: "center" }} onClick={onCancel} disabled={pending}>
+        <button
+          className="btn btn-secondary"
+          style={{ flex: 1, justifyContent: "center" }}
+          onClick={onCancel}
+          disabled={pending}
+        >
           Cancelar
         </button>
-        <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={confirm} disabled={pending}>
+        <button
+          className="btn btn-primary"
+          style={{ flex: 1, justifyContent: "center" }}
+          onClick={confirm}
+          disabled={pending}
+        >
           {pending ? "Guardando…" : "Confirmar"}
         </button>
       </div>
@@ -467,7 +569,11 @@ function readImage(file: File): Promise<{ base64: string; mimeType: string }> {
 }
 
 function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 function stripHtml(s: string): string {
   return s.replace(/<[^>]*>/g, "");

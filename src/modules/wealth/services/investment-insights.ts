@@ -23,11 +23,7 @@ export async function getInvestmentInsights(): Promise<FullInvestmentInsights> {
   const [report, base, riskRow] = await Promise.all([
     getPortfolioReport(),
     getBaseSummary(),
-    supabase
-      .from("risk_profiles")
-      .select("risk_class")
-      .eq("user_id", user.id)
-      .maybeSingle(),
+    supabase.from("risk_profiles").select("risk_class").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const riskClass = riskRow.data?.risk_class ?? null;

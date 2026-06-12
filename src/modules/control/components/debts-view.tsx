@@ -71,14 +71,40 @@ function monthsToText(months: number): string {
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   const [y, m] = iso.split("-");
-  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const months = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${months[Number(m) - 1] ?? ""} ${y}`;
 }
 
 /** Fecha de vencimiento corta: "12 jun". */
 function dueLabel(iso: string): string {
   const [, m, d] = iso.split("-");
-  const months = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const months = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
   return `${Number(d)} ${months[Number(m) - 1] ?? ""}`;
 }
 
@@ -105,7 +131,8 @@ function debtGradient(debtType: string | null): string {
   if (/tarjeta/.test(t)) return "linear-gradient(135deg,var(--neg),var(--warn))";
   if (/auto|veh/.test(t)) return "linear-gradient(135deg,var(--warn),var(--gold,#d9a441))";
   if (/estud/.test(t)) return "linear-gradient(135deg,var(--info),var(--teal,#3aa))";
-  if (/hipoteca/.test(t)) return "linear-gradient(135deg,var(--c-networth,var(--info)),var(--ink-2))";
+  if (/hipoteca/.test(t))
+    return "linear-gradient(135deg,var(--c-networth,var(--info)),var(--ink-2))";
   return "linear-gradient(135deg,var(--muted-2),var(--ink-2))";
 }
 
@@ -114,7 +141,11 @@ function debtGradient(debtType: string | null): string {
  * Replica la simulación de debt-strategy registrando el saldo total por mes
  * (responde al control ± de pago extra).
  */
-function strategyCurve(items: DebtInput[], extra: number, method: DebtMethod): { date: string; value: number }[] {
+function strategyCurve(
+  items: DebtInput[],
+  extra: number,
+  method: DebtMethod,
+): { date: string; value: number }[] {
   const order = orderDebts(items, method);
   const state = order.map((d) => ({ ...d, bal: d.balance }));
   const totalMin = state.reduce((s, d) => s + d.minPayment, 0);
@@ -163,9 +194,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
     const inputs = debts.map(toDebtInput);
     const order = orderDebts(inputs, activeMethod);
     const rankById = new Map(order.map((d, i) => [d.id, i + 1]));
-    return [...debts].sort(
-      (a, b) => (rankById.get(a.id) ?? 99) - (rankById.get(b.id) ?? 99),
-    );
+    return [...debts].sort((a, b) => (rankById.get(a.id) ?? 99) - (rankById.get(b.id) ?? 99));
   }, [debts, activeMethod]);
 
   const summaries = useMemo(() => new Map(debts.map((d) => [d.id, debtSummary(d)])), [debts]);
@@ -204,16 +233,27 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
     [debts, activeMethod, extra],
   );
 
-  const curve = useMemo(() => strategyCurve(debts.map(toDebtInput), extra, activeMethod), [debts, extra, activeMethod]);
+  const curve = useMemo(
+    () => strategyCurve(debts.map(toDebtInput), extra, activeMethod),
+    [debts, extra, activeMethod],
+  );
 
   if (debts.length === 0) {
     return (
       <div className="card card-pad" style={{ display: "grid", gap: 14, justifyItems: "start" }}>
         <div>
           <div className="card-title">Sin deudas registradas</div>
-          <div className="card-sub">Cuando agregues una, verás aquí su amortización y estrategia de pago.</div>
+          <div className="card-sub">
+            Cuando agregues una, verás aquí su amortización y estrategia de pago.
+          </div>
         </div>
-        <AddControlButton kind="debt" currency={currency} label="Agregar deuda" indexRates={indexRates} deepLinkKey="debt" />
+        <AddControlButton
+          kind="debt"
+          currency={currency}
+          label="Agregar deuda"
+          indexRates={indexRates}
+          deepLinkKey="debt"
+        />
       </div>
     );
   }
@@ -228,16 +268,46 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
       <section className="top-grid">
         {/* Deuda total */}
         <div className="card card-pad">
-          <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14 }}>
+          <div
+            className="row"
+            style={{
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+              gap: 14,
+            }}
+          >
             <div>
               <div className="label">Deuda total</div>
               <div className="num-xl" style={{ fontSize: 44, color: "var(--neg)", marginTop: 8 }}>
                 {formatMoney(totals.totalDebt, currency)}
               </div>
-              <div className="row" style={{ gap: 18, marginTop: 14, fontSize: 12.5, color: "var(--muted)", flexWrap: "wrap" }}>
-                <div>Pagos mensuales <strong style={{ color: "var(--ink-2)" }}>{formatMoney(totals.monthlyPayments, currency)}</strong></div>
-                <div>Tasa media <strong style={{ color: "var(--ink-2)" }}>{totals.avgApr.toFixed(1)}%</strong></div>
-                <div>Libre de deudas <strong style={{ color: "var(--pos)" }}>{activeSim.feasible ? fmtDate(payoffDateFromMonths(activeSim.months)) : "—"}</strong></div>
+              <div
+                className="row"
+                style={{
+                  gap: 18,
+                  marginTop: 14,
+                  fontSize: 12.5,
+                  color: "var(--muted)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  Pagos mensuales{" "}
+                  <strong style={{ color: "var(--ink-2)" }}>
+                    {formatMoney(totals.monthlyPayments, currency)}
+                  </strong>
+                </div>
+                <div>
+                  Tasa media{" "}
+                  <strong style={{ color: "var(--ink-2)" }}>{totals.avgApr.toFixed(1)}%</strong>
+                </div>
+                <div>
+                  Libre de deudas{" "}
+                  <strong style={{ color: "var(--pos)" }}>
+                    {activeSim.feasible ? fmtDate(payoffDateFromMonths(activeSim.months)) : "—"}
+                  </strong>
+                </div>
               </div>
             </div>
             {totals.dti != null ? (
@@ -258,7 +328,9 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           </div>
           <div style={{ fontSize: 11.5, color: "var(--muted)", textAlign: "center", marginTop: 4 }}>
             Saldo proyectado con la estrategia{" "}
-            <strong style={{ color: "var(--ink-2)" }}>{METHOD_LABEL[activeMethod].toLowerCase()}</strong>
+            <strong style={{ color: "var(--ink-2)" }}>
+              {METHOD_LABEL[activeMethod].toLowerCase()}
+            </strong>
           </div>
         </div>
 
@@ -266,22 +338,52 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
         <div className="card card-pad">
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
             <div className="card-title">Estrategia de pago</div>
-            <span className="chip" style={{ background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))", color: "var(--ink-2)" }}>
+            <span
+              className="chip"
+              style={{
+                background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
+                color: "var(--ink-2)",
+              }}
+            >
               {METHOD_LABEL[rec.method]} recomendado
             </span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-            <span className="muted" style={{ fontSize: 12.5 }}>Pago extra mensual</span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 14,
+              flexWrap: "wrap",
+            }}
+          >
+            <span className="muted" style={{ fontSize: 12.5 }}>
+              Pago extra mensual
+            </span>
             <div className="seg" role="group" aria-label="Ajustar pago extra">
-              <button className="seg-btn" onClick={() => setExtra((e) => Math.max(0, e - step))} aria-label="Reducir">−</button>
+              <button
+                className="seg-btn"
+                onClick={() => setExtra((e) => Math.max(0, e - step))}
+                aria-label="Reducir"
+              >
+                −
+              </button>
               <span className="seg-btn on tnum" style={{ minWidth: 96, textAlign: "center" }}>
                 {formatMoney(extra, currency)}
               </span>
-              <button className="seg-btn" onClick={() => setExtra((e) => e + step)} aria-label="Aumentar">+</button>
+              <button
+                className="seg-btn"
+                onClick={() => setExtra((e) => e + step)}
+                aria-label="Aumentar"
+              >
+                +
+              </button>
             </div>
             {freeCashflow > 0 ? (
-              <span className="muted" style={{ fontSize: 11 }}>de tu sobrante {formatMoney(freeCashflow, currency)}</span>
+              <span className="muted" style={{ fontSize: 11 }}>
+                de tu sobrante {formatMoney(freeCashflow, currency)}
+              </span>
             ) : null}
           </div>
 
@@ -316,8 +418,13 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                 {attackPlan.map((p, i) => {
                   const d = debtById.get(p.id);
                   return (
-                    <li key={p.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12.5 }}>
-                      <span className="tnum" style={{ color: "var(--muted)", minWidth: 16 }}>{i + 1}º</span>
+                    <li
+                      key={p.id}
+                      style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12.5 }}
+                    >
+                      <span className="tnum" style={{ color: "var(--muted)", minWidth: 16 }}>
+                        {i + 1}º
+                      </span>
                       <span style={{ fontWeight: 500 }}>{d?.name ?? p.name}</span>
                       <span className="muted">— liquida en ~{monthsToText(p.monthPaid)}</span>
                     </li>
@@ -328,16 +435,34 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           ) : null}
 
           <div className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>
-            <strong style={{ color: "var(--ink-2)" }}>Recomendado: {METHOD_LABEL[rec.method].toLowerCase()}.</strong> {rec.reason}
+            <strong style={{ color: "var(--ink-2)" }}>
+              Recomendado: {METHOD_LABEL[rec.method].toLowerCase()}.
+            </strong>{" "}
+            {rec.reason}
           </div>
         </div>
       </section>
 
       {/* Health strip */}
       <div className="health-strip">
-        <Kpi label="Deuda / ingresos" value={totals.dti != null ? formatPercent(totals.dti) : "—"} ratio={totals.dti} danger={0.4} />
-        <Kpi label="Uso de crédito" value={totals.utilization != null ? formatPercent(totals.utilization) : "—"} ratio={totals.utilization} danger={0.3} />
-        <Kpi label="TAE más alta" value={`${totals.highestApr.toFixed(1)}%`} ratio={totals.highestApr / 60} danger={0.5} />
+        <Kpi
+          label="Deuda / ingresos"
+          value={totals.dti != null ? formatPercent(totals.dti) : "—"}
+          ratio={totals.dti}
+          danger={0.4}
+        />
+        <Kpi
+          label="Uso de crédito"
+          value={totals.utilization != null ? formatPercent(totals.utilization) : "—"}
+          ratio={totals.utilization}
+          danger={0.3}
+        />
+        <Kpi
+          label="TAE más alta"
+          value={`${totals.highestApr.toFixed(1)}%`}
+          ratio={totals.highestApr / 60}
+          danger={0.5}
+        />
         <Kpi label="Intereses (próx. 12m)" value={formatMoney(totals.interestThisYear, currency)} />
       </div>
 
@@ -346,16 +471,27 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
         <div className="card-head">
           <div>
             <div className="card-title">Tus deudas</div>
-            <div className="card-sub">{debts.length} deuda(s) · orden de ataque ({METHOD_LABEL[activeMethod].toLowerCase()})</div>
+            <div className="card-sub">
+              {debts.length} deuda(s) · orden de ataque ({METHOD_LABEL[activeMethod].toLowerCase()})
+            </div>
           </div>
-          <AddControlButton kind="debt" currency={currency} label="Agregar deuda" variant="btn-secondary" indexRates={indexRates} deepLinkKey="debt" />
+          <AddControlButton
+            kind="debt"
+            currency={currency}
+            label="Agregar deuda"
+            variant="btn-secondary"
+            indexRates={indexRates}
+            deepLinkKey="debt"
+          />
         </div>
         {ordered.map((d, i) => {
           const s = summaries.get(d.id)!;
           const isHighest = d.apr === totals.highestApr && totals.highestApr > 0;
           return (
             <Link key={d.id} href={`/deudas/${d.id}`} className="debt-row">
-              <span className="debt-ic" style={{ background: debtGradient(d.debtType) }}>{i + 1}</span>
+              <span className="debt-ic" style={{ background: debtGradient(d.debtType) }}>
+                {i + 1}
+              </span>
               <div style={{ minWidth: 0 }}>
                 <div className="debt-name">{d.name}</div>
                 <div className="debt-sub">
@@ -366,11 +502,14 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                 </div>
                 {d.dueSoon && d.nextDue ? (
                   <div style={{ fontSize: 11, color: "var(--neg)", marginTop: 3, fontWeight: 500 }}>
-                    Vence el {dueLabel(d.nextDue)} — {formatMoney(d.monthlyPayment > 0 ? d.monthlyPayment : d.minPayment, currency)}
+                    Vence el {dueLabel(d.nextDue)} —{" "}
+                    {formatMoney(d.monthlyPayment > 0 ? d.monthlyPayment : d.minPayment, currency)}
                   </div>
                 ) : null}
                 {d.rateNote ? (
-                  <div style={{ fontSize: 11, color: "var(--warn)", marginTop: 3 }}>{d.rateNote}</div>
+                  <div style={{ fontSize: 11, color: "var(--warn)", marginTop: 3 }}>
+                    {d.rateNote}
+                  </div>
                 ) : null}
               </div>
               <div className="dbar">
@@ -405,7 +544,9 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                   <div className="b">{formatMoney(d.balance, currency)}</div>
                   <div className="m">≈ {monthsToText(s.monthsRemaining)}</div>
                 </div>
-                <span className="chev"><Icon name="chev" width={1.8} /></span>
+                <span className="chev">
+                  <Icon name="chev" width={1.8} />
+                </span>
               </div>
             </Link>
           );
@@ -456,7 +597,12 @@ function MethodCard({
       <div className="row" style={{ justifyContent: "space-between", gap: 6 }}>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}>{label}</span>
         {recommended ? (
-          <span className="chip" style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}>Recomendado</span>
+          <span
+            className="chip"
+            style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}
+          >
+            Recomendado
+          </span>
         ) : null}
       </div>
       <div className="num-xl" style={{ fontSize: 22, marginTop: 6 }}>
@@ -465,7 +611,9 @@ function MethodCard({
       <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
         {formatMoney(sim.totalInterest, currency)} en intereses
       </div>
-      <div className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>{note}</div>
+      <div className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>
+        {note}
+      </div>
     </button>
   );
 }
