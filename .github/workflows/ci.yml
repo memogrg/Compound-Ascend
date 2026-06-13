@@ -12,9 +12,37 @@ concurrency:
 
 jobs:
   ci:
-    name: Lint, Typecheck & Test
+    name: Lint, Typecheck, Test & Build
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache de build Next
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  e2e:
+    name: E2E smoke (no bloqueante por ahora)
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.event_name == 'pull_request'
+    # Promover a requerido (quitar esta línea) cuando se confirme estable.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -25,11 +53,29 @@ jobs:
 
       - run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Levantar Supabase local + migraciones
+        run: |
+          supabase start
+          supabase migration up --local
+          # Exporta URL + service-role del stack efímero al entorno del job.
+          supabase status -o env | sed -E 's/^API_URL=/SUPABASE_URL=/; s/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/' >> "$GITHUB_ENV"
 
-      - name: Test
-        run: npm run test
+      - name: Seed usuario E2E
+        run: node scripts/seed-e2e-user.mjs
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      - name: Navegador Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E
+        run: npx playwright test
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
