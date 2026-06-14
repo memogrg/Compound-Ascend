@@ -15,6 +15,8 @@ import {
   deleteGoal,
   deleteDebt,
   addDebtPayment,
+  updateDebtPayment,
+  deleteDebtPayment,
   addGoalContribution,
   withdrawFromGoal,
 } from "@/modules/control/services/control-service";
@@ -103,6 +105,50 @@ export async function reportPaymentAction(raw: unknown): Promise<ActionResult> {
   } catch (err) {
     logger.error("reportPayment fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos registrar el pago." };
+  }
+}
+
+/** Edita un pago reportado (actualiza pago + transacción vinculada). */
+export async function updateDebtPaymentAction(
+  paymentId: string,
+  raw: unknown,
+): Promise<ActionResult> {
+  const parsed = debtPaymentInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateDebtPayment(paymentId, parsed.data);
+    revalidatePath("/deudas");
+    revalidatePath(`/deudas/${parsed.data.debtId}`);
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("updateDebtPayment fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos actualizar el pago." };
+  }
+}
+
+/** Elimina un pago reportado y revierte su transacción vinculada. */
+export async function deleteDebtPaymentAction(
+  paymentId: string,
+  debtId: string,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await deleteDebtPayment(paymentId);
+    revalidatePath("/deudas");
+    revalidatePath(`/deudas/${debtId}`);
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("deleteDebtPayment fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos eliminar el pago." };
   }
 }
 

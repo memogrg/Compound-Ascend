@@ -3,10 +3,16 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
+import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { PerformanceChart } from "@/components/charts/lazy";
 import { formatMoney } from "@/lib/format";
-import { reportPaymentAction } from "@/modules/control/api/actions";
+import {
+  reportPaymentAction,
+  updateDebtPaymentAction,
+  deleteDebtPaymentAction,
+} from "@/modules/control/api/actions";
+import type { DebtPayment } from "@/modules/control/types";
 import {
   compareExtra,
   solveExtraForTarget,
@@ -81,13 +87,24 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
   );
 
   const chartData = useMemo(() => {
-    const head = { date: vm.startDate ?? "Hoy", value: vm.balance };
+    // Con cuotas pagadas, el saldo arranca en el monto original (la curva baja
+    // hasta hoy y sigue con la proyección); sin pagos, arranca en el saldo actual.
+    const hasPaid = vm.schedule[0]?.paid ?? false;
+    const headValue = hasPaid ? (vm.originalAmount ?? vm.balance) : vm.balance;
+    const head = { date: vm.startDate ?? "Hoy", value: headValue };
     const rest = vm.schedule.map((r) => ({ date: r.date ?? `Mes ${r.month}`, value: r.balance }));
     return [head, ...rest];
   }, [vm]);
 
   const today = new Date().toISOString().slice(0, 10);
   const [pay, setPay] = useState<{ amount: number; date: string } | null>(null);
+  const [editPayment, setEditPayment] = useState<string | null>(null);
+  const [deletePayment, setDeletePayment] = useState<string | null>(null);
+
+  const editing = editPayment ? (vm.payments.find((p) => p.id === editPayment) ?? null) : null;
+  const deleting = deletePayment
+    ? (vm.payments.find((p) => p.id === deletePayment) ?? null)
+    : null;
 
   return (
     <div className="grid">
@@ -184,7 +201,12 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
       </div>
 
       {/* Pagos reportados (todos los orígenes: Control, Gastos, chat, conciliación) */}
-      <PaymentsCard vm={vm} currency={currency} />
+      <PaymentsCard
+        vm={vm}
+        currency={currency}
+        onEdit={(id) => setEditPayment(id)}
+        onDelete={(id) => setDeletePayment(id)}
+      />
 
       {/* Calculadora de escenarios */}
       <ScenarioCalculator input={input} currency={currency} />
@@ -213,12 +235,33 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
             </thead>
             <tbody>
               {vm.schedule.map((r) => (
-                <tr key={r.month}>
-                  <td className="tnum">{r.month}</td>
+                <tr
+                  key={r.month}
+                  style={
+                    r.paid
+                      ? {
+                          background: "color-mix(in srgb, var(--pos) 7%, transparent)",
+                          color: "var(--muted)",
+                        }
+                      : undefined
+                  }
+                >
+                  <td className="tnum">
+                    {r.paid ? (
+                      <span
+                        style={{ color: "var(--pos)", display: "inline-flex", alignItems: "center" }}
+                        title="Cuota pagada"
+                      >
+                        <Icon name="check" width={3} style={{ width: 13, height: 13 }} />
+                      </span>
+                    ) : (
+                      r.month
+                    )}
+                  </td>
                   <td>{fmtDate(r.date)}</td>
                   <td className="tnum">{formatMoney(r.payment, currency)}</td>
                   <td className="tnum">{formatMoney(r.principal, currency)}</td>
-                  <td className="tnum" style={{ color: "var(--neg)" }}>
+                  <td className="tnum" style={{ color: r.paid ? "var(--muted)" : "var(--neg)" }}>
                     {formatMoney(r.interest, currency)}
                   </td>
                   {vm.insurance > 0 ? (
@@ -226,14 +269,22 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
                   ) : null}
                   <td className="tnum">{formatMoney(r.balance, currency)}</td>
                   <td style={{ textAlign: "right" }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ padding: "3px 9px", fontSize: 11 }}
-                      onClick={() => setPay({ amount: r.payment, date: r.date ?? today })}
-                    >
-                      Pagar
-                    </button>
+                    {r.paid ? (
+                      <PaidRowAction
+                        row={r}
+                        onEdit={() => setEditPayment(r.paymentId)}
+                        onDelete={() => setDeletePayment(r.paymentId)}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ padding: "3px 9px", fontSize: 11 }}
+                        onClick={() => setPay({ amount: r.payment, date: r.date ?? today })}
+                      >
+                        Pagar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -251,8 +302,88 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
           onClose={() => setPay(null)}
         />
       ) : null}
+
+      {editing ? (
+        <ReportPaymentModal
+          vm={vm}
+          input={input}
+          currency={currency}
+          editing={editing}
+          onClose={() => setEditPayment(null)}
+        />
+      ) : null}
+
+      {deleting ? (
+        <DeletePaymentModal
+          vm={vm}
+          payment={deleting}
+          currency={currency}
+          onClose={() => setDeletePayment(null)}
+        />
+      ) : null}
     </div>
   );
+}
+
+/** Kebab (⋯) con Editar/Eliminar para un pago ya registrado. */
+function PaymentMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: "relative", display: "inline-flex" }}>
+      <button
+        type="button"
+        className="icon-btn"
+        style={{ width: 30, height: 30 }}
+        aria-label="Acciones del pago"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Icon name="dots" />
+      </button>
+      {open ? (
+        <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+          >
+            Editar
+          </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+          >
+            Eliminar
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Acción de una fila pagada en la tabla: kebab si tiene pago asociado. */
+function PaidRowAction({
+  row,
+  onEdit,
+  onDelete,
+}: {
+  row: { paymentId: string | null };
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  if (!row.paymentId) {
+    return (
+      <span className="muted" style={{ fontSize: 11 }}>
+        Pagado
+      </span>
+    );
+  }
+  return <PaymentMenu onEdit={onEdit} onDelete={onDelete} />;
 }
 
 /** Etiqueta discreta del origen del pago según el source de su transacción. */
@@ -267,7 +398,17 @@ const VIA_LABEL: Record<string, string> = {
  * composer de Gastos, chat IA, conciliación 1-tap). Con desglose cuota/extra
  * y la amortización estimada cuando hay tasa.
  */
-function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) {
+function PaymentsCard({
+  vm,
+  currency,
+  onEdit,
+  onDelete,
+}: {
+  vm: DebtDetailVM;
+  currency: string;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
   if (vm.payments.length === 0) return null;
   const sorted = [...vm.payments].sort((a, b) => b.paymentDate.localeCompare(a.paymentDate));
   return (
@@ -285,7 +426,7 @@ function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) 
         const hasExtra = p.extraAmount > 0;
         const hasEstimate = p.principal != null && p.interest != null;
         return (
-          <div key={p.id} className="list-row" style={{ gridTemplateColumns: "1fr auto" }}>
+          <div key={p.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
             <div style={{ minWidth: 0 }}>
               <div
                 style={{
@@ -345,6 +486,7 @@ function PaymentsCard({ vm, currency }: { vm: DebtDetailVM; currency: string }) 
             <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500 }}>
               {formatMoney(total, currency)}
             </span>
+            <PaymentMenu onEdit={() => onEdit(p.id)} onDelete={() => onDelete(p.id)} />
           </div>
         );
       })}
@@ -413,6 +555,7 @@ function ScenarioCalculator({ input, currency }: { input: AmortizationInput; cur
               <div className="inp-money">
                 <input
                   type="number"
+                  step="any"
                   min="0"
                   value={extra}
                   onChange={(e) => setExtra(Number(e.target.value))}
@@ -485,21 +628,24 @@ function ReportPaymentModal({
   input,
   currency,
   preset,
+  editing,
   onClose,
 }: {
   vm: DebtDetailVM;
   input: AmortizationInput;
   currency: string;
   preset?: { amount: number; date: string };
+  /** Si se pasa, el modal edita ese pago en vez de crear uno nuevo. */
+  editing?: DebtPayment;
   onClose: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
-  const [amount, setAmount] = useState(preset?.amount ?? vm.monthlyPayment ?? 0);
-  const [date, setDate] = useState(preset?.date ?? today);
-  const [extra, setExtra] = useState(0);
-  const [mode, setMode] = useState<"tiempo" | "cuota">("tiempo");
+  const [amount, setAmount] = useState(editing?.amount ?? preset?.amount ?? vm.monthlyPayment ?? 0);
+  const [date, setDate] = useState(editing?.paymentDate ?? preset?.date ?? today);
+  const [extra, setExtra] = useState(editing?.extraAmount ?? 0);
+  const [mode, setMode] = useState<"tiempo" | "cuota">(editing?.extraMode ?? "tiempo");
   const [pending, setPending] = useState(false);
 
   const comparison = useMemo(() => {
@@ -513,16 +659,19 @@ function ReportPaymentModal({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPending(true);
-    const res = await reportPaymentAction({
+    const payload = {
       debtId: vm.id,
       paymentDate: date,
       amount,
       extraAmount: extra,
       extraMode: extra > 0 ? mode : undefined,
-    });
+    };
+    const res = editing
+      ? await updateDebtPaymentAction(editing.id, payload)
+      : await reportPaymentAction(payload);
     setPending(false);
     if (res.ok) {
-      toast("Pago registrado");
+      toast(editing ? "Pago actualizado" : "Pago registrado");
       onClose();
       router.refresh();
     } else {
@@ -532,7 +681,7 @@ function ReportPaymentModal({
 
   return (
     <Modal
-      title="Reportar pago"
+      title={editing ? "Editar pago" : "Reportar pago"}
       sub="Tus pagos reales recalculan el saldo y la proyección."
       onClose={onClose}
     >
@@ -544,6 +693,7 @@ function ReportPaymentModal({
               <div className="inp-money">
                 <input
                   type="number"
+                  step="any"
                   min="0"
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
@@ -617,10 +767,64 @@ function ReportPaymentModal({
             Cancelar
           </button>
           <button type="submit" className="btn btn-primary" disabled={pending}>
-            {pending ? "Guardando…" : "Registrar pago"}
+            {pending ? "Guardando…" : editing ? "Guardar cambios" : "Registrar pago"}
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/** Confirmación de borrado de un pago (revierte la transacción vinculada). */
+function DeletePaymentModal({
+  vm,
+  payment,
+  currency,
+  onClose,
+}: {
+  vm: DebtDetailVM;
+  payment: DebtPayment;
+  currency: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [pending, setPending] = useState(false);
+  const total = payment.amount + payment.extraAmount;
+
+  const confirm = async () => {
+    setPending(true);
+    const res = await deleteDebtPaymentAction(payment.id, vm.id);
+    setPending(false);
+    if (res.ok) {
+      toast("Pago eliminado");
+      onClose();
+      router.refresh();
+    } else {
+      toast(res.message ?? "No se pudo eliminar");
+    }
+  };
+
+  return (
+    <Modal
+      title="Eliminar pago"
+      sub="Se revierte también el gasto vinculado del mes."
+      onClose={onClose}
+    >
+      <div className="modal-body">
+        <p style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+          ¿Eliminar el pago de <strong>{formatMoney(total, currency)}</strong> del{" "}
+          <strong>{fmtDay(payment.paymentDate)}</strong>? El saldo y la proyección se recalcularán.
+        </p>
+      </div>
+      <div className="modal-foot">
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button type="button" className="btn btn-danger" disabled={pending} onClick={confirm}>
+          {pending ? "Eliminando…" : "Eliminar"}
+        </button>
+      </div>
     </Modal>
   );
 }
