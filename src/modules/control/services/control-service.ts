@@ -337,6 +337,78 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
 }
 
 /**
+ * Edita un pago reportado: actualiza el `debt_payment` y mantiene la
+ * transacción vinculada (gasto del mes) en sincronía (monto y fecha). El saldo
+ * y la proyección se recalculan en `getDebtDetail` desde los pagos, así que no
+ * hace falta tocar la deuda aquí.
+ */
+export async function updateDebtPayment(
+  paymentId: string,
+  input: DebtPaymentInput,
+): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: row, error } = await supabase
+    .from("debt_payments")
+    .select("id,transaction_id")
+    .eq("id", paymentId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("Pago no encontrado");
+
+  const { error: upErr } = await supabase
+    .from("debt_payments")
+    .update({
+      occurred_on: input.paymentDate,
+      amount: input.amount,
+      extra_amount: input.extraAmount,
+      extra_mode: input.extraMode ?? null,
+    })
+    .eq("id", paymentId)
+    .eq("user_id", user.id);
+  if (upErr) throw new Error(upErr.message);
+
+  // El gasto vinculado refleja el total (cuota + extra) y la fecha del pago.
+  if (row.transaction_id) {
+    const { error: txErr } = await supabase
+      .from("transactions")
+      .update({ amount: input.amount + input.extraAmount, occurred_on: input.paymentDate })
+      .eq("id", row.transaction_id)
+      .eq("user_id", user.id);
+    if (txErr) throw new Error(txErr.message);
+  }
+}
+
+/**
+ * Elimina un pago reportado y revierte su transacción vinculada (el gasto del
+ * mes desaparece). El saldo/proyección se recalculan desde los pagos restantes.
+ */
+export async function deleteDebtPayment(paymentId: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: row, error } = await supabase
+    .from("debt_payments")
+    .select("id,transaction_id")
+    .eq("id", paymentId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("Pago no encontrado");
+
+  const { error: delErr } = await supabase
+    .from("debt_payments")
+    .delete()
+    .eq("id", paymentId)
+    .eq("user_id", user.id);
+  if (delErr) throw new Error(delErr.message);
+
+  if (row.transaction_id) await deleteLinkedTransaction(row.transaction_id);
+}
+
+/**
  * Aporte a una meta de ahorro (Fase 1 · orquestador): crea la transacción
  * vinculada (gasto, linked_kind='goal') y sube current_amount de la meta.
  * No existe ledger propio de aportes — la transacción ES el histórico.

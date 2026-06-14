@@ -2503,9 +2503,15 @@ a {
   border-color: var(--line-strong);
 }
 .cur-switch-ic {
+  display: inline-flex;
+  align-items: center;
   font-size: 13px;
   font-weight: 700;
   color: var(--ink-2);
+}
+.cur-switch-ic svg {
+  width: 15px;
+  height: 15px;
 }
 .cur-switch select {
   border: 0;

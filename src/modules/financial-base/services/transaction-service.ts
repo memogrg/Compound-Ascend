@@ -369,6 +369,9 @@ export type RealTotals = {
   count: number;
   avgDaily: number;
   incomeByKey: KeyedTotals;
+  /** Solo ingresos CONFIRMADOS (status='confirmed'), por fuente. Para las barras
+   *  "recibido vs presupuestado" que se llenan al confirmar "Recibido". */
+  incomeConfirmedByKey: KeyedTotals;
   expenseByKey: KeyedTotals;
   topExpenseCategory: string | null;
   pendingCount: number;
@@ -388,6 +391,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
   let realExpense = 0;
   let pendingCount = 0;
   const incomeByKey: KeyedTotals = {};
+  const incomeConfirmedByKey: KeyedTotals = {};
   const expenseByKey: KeyedTotals = {};
 
   for (const t of txns) {
@@ -398,6 +402,12 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
       const label = t.merchantOrSource || t.description || "Otros ingresos";
       const key = label.trim().toLowerCase();
       incomeByKey[key] = { label, value: (incomeByKey[key]?.value ?? 0) + value };
+      if (t.status === "confirmed") {
+        incomeConfirmedByKey[key] = {
+          label,
+          value: (incomeConfirmedByKey[key]?.value ?? 0) + value,
+        };
+      }
     } else {
       realExpense += value;
       const label = t.categoryId ? (catMap[t.categoryId] ?? "Sin categoría") : "Sin categoría";
@@ -417,6 +427,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
     count: txns.length,
     avgDaily: daysInPeriod > 0 ? realExpense / daysInPeriod : 0,
     incomeByKey,
+    incomeConfirmedByKey,
     expenseByKey,
     topExpenseCategory,
     pendingCount,

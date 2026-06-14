@@ -18,6 +18,27 @@ import type { DebtPayment, DebtRateType, DebtRateIndex } from "@/modules/control
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Suma meses a una fecha ISO (yyyy-mm-dd), en UTC. */
+function addMonthsISO(iso: string, months: number): string {
+  const d = new Date(iso);
+  const nd = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate()));
+  return nd.toISOString().slice(0, 10);
+}
+
+/**
+ * Fila de la tabla de amortización en el VM: una `ScheduleRow` del motor más
+ * el estado de pago. Las filas `paid` son cuotas ya cubiertas por un
+ * `debt_payment`; las demás son la proyección futura (recalculada).
+ */
+export interface ScheduleVMRow extends ScheduleRow {
+  /** La cuota ya fue cubierta por un pago reportado. */
+  paid: boolean;
+  /** El pago incluyó un abono extra a capital. */
+  paidExtra: boolean;
+  /** Id del `debt_payment` que cubrió la cuota (para editar/eliminar); null si pendiente. */
+  paymentId: string | null;
+}
+
 export interface DebtDetailVM {
   id: string;
   name: string;
@@ -47,8 +68,43 @@ export interface DebtDetailVM {
   nextDue: string | null;
   dueSoon: boolean;
   paidThisMonth: boolean;
-  schedule: ScheduleRow[];
+  schedule: ScheduleVMRow[];
   payments: DebtPayment[];
+}
+
+/**
+ * Reconstruye las cuotas YA pagadas a partir de los pagos reportados, usando la
+ * misma aritmética que `recomputeFromPayments` (interés = saldo·r; capital =
+ * cuota − interés + extra) para que el saldo de la última fila pagada empalme
+ * con el saldo actual y la proyección continúe sin saltos.
+ */
+function buildPaidRows(
+  input: { apr: number; insurance: number; originalAmount: number | null; balance: number },
+  pmts: DebtPayment[],
+): ScheduleVMRow[] {
+  const r = (input.apr ?? 0) / 100 / 12;
+  const insurance = input.insurance ?? 0;
+  let balance = input.originalAmount ?? input.balance;
+  const sorted = [...pmts].sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
+  return sorted.map((p, i) => {
+    const interest = balance * r;
+    let principal = p.amount - interest + p.extraAmount;
+    if (principal < 0) principal = 0;
+    if (principal > balance) principal = balance;
+    balance -= principal;
+    return {
+      month: i + 1,
+      date: p.paymentDate,
+      payment: round2(p.amount + p.extraAmount + insurance),
+      principal: round2(principal),
+      interest: round2(interest),
+      insurance: round2(insurance),
+      balance: round2(Math.max(0, balance)),
+      paid: true,
+      paidExtra: p.extraAmount > 0,
+      paymentId: p.id,
+    };
+  });
 }
 
 export async function getDebtDetail(
@@ -110,8 +166,28 @@ export async function getDebtDetail(
       : null;
 
   const currentBalance = recompute ? recompute.currentBalance : input.balance;
-  const schedule = buildSchedule({ ...input, balance: currentBalance });
-  const interestRemaining = schedule.reduce((s, r) => s + r.interest, 0);
+
+  // Cuotas ya pagadas (historial) + proyección futura. La proyección se fecha a
+  // partir del mes siguiente al último pago para que la tabla sea continua.
+  const paidRows = buildPaidRows(input, pmts);
+  const lastPaymentDate = paidRows[paidRows.length - 1]?.date ?? null;
+  const projectionStart = lastPaymentDate
+    ? addMonthsISO(lastPaymentDate, 1)
+    : (input.startDate ?? null);
+  const projected = buildSchedule({
+    ...input,
+    balance: currentBalance,
+    startDate: projectionStart,
+  });
+  const interestRemaining = projected.reduce((s, r) => s + r.interest, 0);
+  const projectedRows: ScheduleVMRow[] = projected.map((r) => ({
+    ...r,
+    month: paidRows.length + r.month,
+    paid: false,
+    paidExtra: false,
+    paymentId: null,
+  }));
+  const schedule: ScheduleVMRow[] = [...paidRows, ...projectedRows];
   const progress = recompute
     ? recompute.progressPct
     : input.originalAmount && input.originalAmount > 0
@@ -139,8 +215,8 @@ export async function getDebtDetail(
     startDate: debt.startDate ?? null,
     rateNote: buildRateNote(debt, indexRates),
     progress,
-    monthsRemaining: schedule.length,
-    payoffDate: schedule[schedule.length - 1]?.date ?? null,
+    monthsRemaining: projected.length,
+    payoffDate: projected[projected.length - 1]?.date ?? null,
     interestRemaining: round2(interestRemaining),
     paidPrincipal: recompute ? recompute.paidPrincipal : 0,
     paidInterest: recompute ? recompute.paidInterest : 0,
