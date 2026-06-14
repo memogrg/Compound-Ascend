@@ -10,7 +10,7 @@ import {
   type FinancialReading,
 } from "@/components/shared/financial-insight-card";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
-import { PremiumLineChart } from "@/components/charts/lazy";
+import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
 import { EditableBudgetTable } from "@/modules/financial-base/components/v2/editable-budget-table";
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
 import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
@@ -417,6 +417,101 @@ function DonutCard({
   );
 }
 
+// ── Barras "recibido vs presupuestado" por fuente de ingreso ──────────
+type IncomeBar = {
+  key: string;
+  label: string;
+  budget: number;
+  confirmed: number;
+  recorded: number;
+  pct: number;
+};
+
+/**
+ * Una barra por fuente de ingreso: la del presupuesto se llena con lo CONFIRMADO
+ * ("Recibido") del mes; las no presupuestadas (registradas pero sin línea de
+ * presupuesto) aparecen con su propia barra y se llenan al confirmarse.
+ */
+function buildIncomeBars(
+  budgetMap: Record<string, { label: string; value: number }>,
+  recordedMap: Record<string, { label: string; value: number }>,
+  confirmedMap: Record<string, { label: string; value: number }>,
+): IncomeBar[] {
+  const keys = new Set([...Object.keys(budgetMap), ...Object.keys(recordedMap)]);
+  return [...keys]
+    .map((key) => {
+      const label = recordedMap[key]?.label ?? budgetMap[key]?.label ?? key;
+      const budget = budgetMap[key]?.value ?? 0;
+      const confirmed = confirmedMap[key]?.value ?? 0;
+      const recorded = recordedMap[key]?.value ?? 0;
+      const pct = budget > 0 ? Math.min(1, confirmed / budget) : confirmed > 0 ? 1 : 0;
+      return { key, label, budget, confirmed, recorded, pct };
+    })
+    .sort((a, b) => (b.budget || b.recorded) - (a.budget || a.recorded));
+}
+
+function IncomeProgressCard({ bars, currency }: { bars: IncomeBar[]; currency: string }) {
+  return (
+    <div className="card">
+      <div className="card-head">
+        <div>
+          <div className="card-title">Ingresos</div>
+          <div className="card-sub">
+            Recibido vs presupuestado · la barra se llena al confirmar “Recibido”
+          </div>
+        </div>
+      </div>
+      {bars.length === 0 ? (
+        <div className="muted" style={{ padding: "16px 24px", fontSize: 13 }}>
+          Aún no tienes ingresos planificados ni registrados este mes.
+        </div>
+      ) : (
+        <div style={{ padding: "4px 0 10px" }}>
+          {bars.map((b) => {
+            const budgeted = b.budget > 0;
+            return (
+              <div key={b.key} style={{ padding: "11px 24px" }}>
+                <div
+                  className="row"
+                  style={{ justifyContent: "space-between", gap: 10, marginBottom: 6 }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 500,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {b.label}
+                    {budgeted ? null : (
+                      <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>
+                        · no presupuestado
+                      </span>
+                    )}
+                  </span>
+                  <span className="tnum muted" style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>
+                    {budgeted
+                      ? `${formatPercent(b.pct)} · ${formatMoney(b.confirmed, currency)} / ${formatMoney(b.budget, currency)}`
+                      : `${formatMoney(b.confirmed, currency)} recibido`}
+                  </span>
+                </div>
+                <div className="bar-track">
+                  <div
+                    className="bar-fill"
+                    style={{ width: `${Math.round(b.pct * 100)}%`, background: "var(--pos)" }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================== INGRESOS / GASTOS ==============================
 export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "income" | "expense" }) {
   const { budget, real, currency, history } = view;
@@ -428,6 +523,12 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
   const byKey = isIncome ? real.incomeByKey : real.expenseByKey;
   const items = budget.items.filter((b) => b.type === kind);
   const incomeTxns = view.transactions.filter((t) => t.kind === "ingreso");
+  const incomeBars = isIncome
+    ? buildIncomeBars(budget.incomeByKey, real.incomeByKey, real.incomeConfirmedByKey)
+    : [];
+  // Serie para el gráfico de área (real); el presupuesto se dibuja como línea
+  // punteada de referencia (goalValue).
+  const incomeArea = history.map((h) => ({ date: h.label, value: h.realIncome }));
   const lineData = history.map((h) => ({
     label: h.label,
     Real: isIncome ? h.realIncome : h.realExpense,
@@ -497,20 +598,34 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
 
       <SummaryStrip cards={summary} />
 
+      {isIncome ? <IncomeProgressCard bars={incomeBars} currency={currency} /> : null}
+
       <section className="cols-2">
         <ChartCard
           title={isIncome ? "Histórico de ingresos" : "Histórico de gastos"}
           hint="real vs presupuesto"
         >
-          <PremiumLineChart
-            data={lineData}
-            xKey="label"
-            currency={currency}
-            series={[
-              { key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true },
-              { key: "Real", label: "Real", color: isIncome ? "var(--pos)" : "var(--c-expense)" },
-            ]}
-          />
+          {isIncome ? (
+            // Área con degradado (--pos) + línea punteada de presupuesto, como el
+            // detalle de deudas. Más legible que la línea plana.
+            <PerformanceChart
+              data={incomeArea}
+              currency={currency}
+              tone="pos"
+              goalValue={Math.round(budgetTotal)}
+              height={160}
+            />
+          ) : (
+            <PremiumLineChart
+              data={lineData}
+              xKey="label"
+              currency={currency}
+              series={[
+                { key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true },
+                { key: "Real", label: "Real", color: "var(--c-expense)" },
+              ]}
+            />
+          )}
         </ChartCard>
         <DonutCard
           title={isIncome ? "Composición por fuente" : "Composición por categoría"}
@@ -527,7 +642,7 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
         <div className="card">
           <div className="card-head">
             <div>
-              <div className="card-title">Ingresos reales del mes</div>
+              <div className="card-title">Movimientos de ingreso</div>
               <div className="card-sub">Confirma cada ingreso cuando lo recibas</div>
             </div>
           </div>
