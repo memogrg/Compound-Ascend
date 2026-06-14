@@ -2,9 +2,16 @@
 
 /**
  * Error global (último recurso, reemplaza el root layout). Debe incluir
- * <html>/<body> propios. Mensaje amable, sin detalles internos.
+ * <html>/<body> propios. Mensaje amable, sin detalles internos. Reporta a
+ * Sentry (inerte sin DSN).
  */
-export default function GlobalError({ reset }: { error: Error; reset: () => void }) {
+import { useEffect } from "react";
+import * as Sentry from "@sentry/nextjs";
+
+export default function GlobalError({ error, reset }: { error: Error; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
   return (
     <html lang="es">
       <body

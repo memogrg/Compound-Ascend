@@ -41,3 +41,25 @@
 2. Yo instalo el paquete + configs + scrubbing en una rama `feat/sentry`,
    gate completo, PR.
 3. Verificamos en el preview que un error de prueba llega a Sentry sin PII.
+
+
+---
+
+## Estado: IMPLEMENTADO (dormante) — rama feat/sentry-observability
+
+Integración instalada y commiteada, **inerte mientras no exista
+`NEXT_PUBLIC_SENTRY_DSN`** (el SDK no envía nada y el build no se afecta —
+verificado: build exit 0 sin DSN).
+
+Archivos: `sentry.server.config.ts`, `sentry.edge.config.ts`,
+`src/instrumentation-client.ts`, `src/instrumentation.ts`,
+`src/lib/observability/sentry-options.ts` (opciones + scrubbing PII),
+`global-error.tsx` (captureException), `next.config.ts` (withSentryConfig).
+
+### Para activarlo (solo tú)
+1. Crear proyecto en sentry.io (Next.js).
+2. En Vercel añadir variables: `NEXT_PUBLIC_SENTRY_DSN` (obligatoria),
+   y para subir source maps en el build: `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`,
+   `SENTRY_PROJECT` (opcionales — sin ellas igual reporta, solo sin
+   stack traces des-minificados).
+3. Re-deploy. Verás los errores en Sentry; el scrubbing quita correos/montos.

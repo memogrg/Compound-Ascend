@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import { buildSecurityHeaders } from "./src/lib/security/headers";
 
 /**
@@ -20,4 +21,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// withSentryConfig sube source maps solo si hay SENTRY_AUTH_TOKEN (CI/Vercel);
+// sin él, no falla el build — solo omite la subida. silent en CI.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+});
