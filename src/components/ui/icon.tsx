@@ -36,7 +36,8 @@ export type IconName =
   | "dots"
   | "filter"
   | "repeat"
-  | "lock";
+  | "lock"
+  | "calendar";
 
 const PATHS: Record<IconName, string> = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/>',
@@ -47,6 +48,8 @@ const PATHS: Record<IconName, string> = {
   filter: '<path d="M3 5h18l-7 8v6l-4-2v-4L3 5Z"/>',
   repeat: '<path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  calendar:
+    '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2.5v3M16 2.5v3"/>',
   dashboard:
     '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   budget: '<path d="M3 7h18M6 7v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7M9 7V5a3 3 0 0 1 6 0v2"/>',
