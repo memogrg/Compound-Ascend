@@ -127,7 +127,7 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
               </div>
             </div>
           </button>
-          {open ? <JarLinkedModal jar={jar} onClose={() => setOpen(false)} /> : null}
+          {open ? <JarLinkedModal jar={jar} currency={currency} onClose={() => setOpen(false)} /> : null}
         </>
       );
     }
@@ -170,7 +170,7 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
             <div className="small">vinculado</div>
           </div>
         </button>
-        {open ? <JarLinkedModal jar={jar} onClose={() => setOpen(false)} /> : null}
+        {open ? <JarLinkedModal jar={jar} currency={currency} onClose={() => setOpen(false)} /> : null}
       </>
     );
   }
