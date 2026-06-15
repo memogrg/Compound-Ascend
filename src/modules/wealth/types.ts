@@ -128,6 +128,8 @@ export type Holding = {
   rentalIncome?: number | null;
   rentalFrequency?: RentalFrequency | null;
   rentalSubtype?: RentalSubtype | null;
+  /** Stub por completar (creado desde un ingreso pasivo · Fase 3). */
+  needsDetail?: boolean;
 };
 
 /** Evento de renta recibida (fuente: tabla rental_payments). */

@@ -44,6 +44,7 @@ function rowToTransaction(r: TransactionRow): Transaction {
     linkedKind: (r.linked_kind ?? "none") as Transaction["linkedKind"],
     linkedId: r.linked_id ?? null,
     recurringItemId: r.recurring_item_id ?? null,
+    incomeSourceId: r.income_source_id ?? null,
   };
 }
 
@@ -184,6 +185,7 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
       linked_kind: linkedKind,
       linked_id: linkedId,
       recurring_item_id: input.recurringItemId ?? null,
+      income_source_id: input.incomeSourceId ?? null,
     })
     .select("id")
     .single();
@@ -372,6 +374,9 @@ export type RealTotals = {
   /** Solo ingresos CONFIRMADOS (status='confirmed'), por fuente. Para las barras
    *  "recibido vs presupuestado" que se llenan al confirmar "Recibido". */
   incomeConfirmedByKey: KeyedTotals;
+  /** Recibido confirmado por FUENTE (income_source_id → monto). Llena la barra
+   *  buffer del tab de Ingresos (Fase 2 · recibido parcial acumulado). */
+  incomeReceivedBySource: Record<string, number>;
   expenseByKey: KeyedTotals;
   topExpenseCategory: string | null;
   pendingCount: number;
@@ -392,6 +397,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
   let pendingCount = 0;
   const incomeByKey: KeyedTotals = {};
   const incomeConfirmedByKey: KeyedTotals = {};
+  const incomeReceivedBySource: Record<string, number> = {};
   const expenseByKey: KeyedTotals = {};
 
   for (const t of txns) {
@@ -407,6 +413,10 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
           label,
           value: (incomeConfirmedByKey[key]?.value ?? 0) + value,
         };
+        if (t.incomeSourceId) {
+          incomeReceivedBySource[t.incomeSourceId] =
+            (incomeReceivedBySource[t.incomeSourceId] ?? 0) + value;
+        }
       }
     } else {
       realExpense += value;
@@ -428,6 +438,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
     avgDaily: daysInPeriod > 0 ? realExpense / daysInPeriod : 0,
     incomeByKey,
     incomeConfirmedByKey,
+    incomeReceivedBySource,
     expenseByKey,
     topExpenseCategory,
     pendingCount,
@@ -462,6 +473,21 @@ export async function getLinkedSpentByEntity(
       (out[r.linked_id] ?? 0) + convertCurrency(Number(r.amount), r.currency, currency, rates);
   }
   return out;
+}
+
+/** Fecha (YYYY-MM-DD) de la transacción más antigua del usuario, o null. Sirve
+ *  para acotar el rango "Todo el tiempo" del histórico de ingresos. */
+export async function getEarliestTransactionDate(): Promise<string | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("transactions")
+    .select("occurred_on")
+    .eq("user_id", user.id)
+    .order("occurred_on", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.occurred_on ?? null;
 }
 
 export type HistoryPoint = {

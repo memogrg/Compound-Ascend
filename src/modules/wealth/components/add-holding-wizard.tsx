@@ -224,6 +224,36 @@ export function EditHoldingButton({ holding, currency }: { holding: Holding; cur
   );
 }
 
+/** "Completar detalle" de un stub creado desde un ingreso pasivo (Fase 3). */
+export function CompleteHoldingButton({
+  holding,
+  currency,
+}: {
+  holding: Holding;
+  currency: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        style={{ fontSize: 12.5, padding: "6px 12px" }}
+        onClick={() => setOpen(true)}
+      >
+        Completar detalle
+      </button>
+      {open && (
+        <AddHoldingWizard
+          currency={currency}
+          holdingToEdit={holding}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
 // ── Wizard modal ──────────────────────────────────────────────────
 
 function AddHoldingWizard({

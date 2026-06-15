@@ -8,6 +8,7 @@ import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
   getSystemCategoryId,
+  deleteIncomeSourcesByHolding,
 } from "@/modules/financial-base";
 import {
   holdingSaleToTxn,
@@ -36,6 +37,7 @@ export function rowToHolding(r: {
   rental_income?: number | null;
   rental_frequency?: string | null;
   rental_subtype?: string | null;
+  needs_detail?: boolean | null;
 }): Holding {
   return {
     id: r.id,
@@ -52,11 +54,12 @@ export function rowToHolding(r: {
     rentalIncome: r.rental_income == null ? null : Number(r.rental_income),
     rentalFrequency: (r.rental_frequency ?? null) as Holding["rentalFrequency"],
     rentalSubtype: (r.rental_subtype ?? null) as Holding["rentalSubtype"],
+    needsDetail: r.needs_detail ?? false,
   };
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -277,6 +280,8 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       broker: input.broker ?? null,
       currency: input.currency,
       label: input.label ?? null,
+      // Completar el detalle de un stub (Fase 3) lo marca como completo.
+      needs_detail: false,
       ...rentalColumns(input),
     })
     .eq("id", id)
@@ -290,12 +295,40 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
 export async function deleteHolding(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // Fase 3: borrar un stub revierte las fuentes de ingreso vinculadas (la
+  // FK ON DELETE SET NULL solo desvincularía; aquí sí queremos eliminarlas).
+  await deleteIncomeSourcesByHolding(id);
   const { error } = await supabase
     .from("investment_holdings")
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
+}
+
+/** Posiciones stub pendientes de completar (needs_detail=true). */
+export async function listPendingHoldings(): Promise<Holding[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("investment_holdings")
+    .select(HOLDING_COLS)
+    .eq("user_id", user.id)
+    .eq("needs_detail", true)
+    .order("created_at", { ascending: false });
+  return (data ?? []).map(rowToHolding);
+}
+
+/** Conteo de stubs pendientes (badge en nav). */
+export async function countPendingHoldings(): Promise<number> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { count } = await supabase
+    .from("investment_holdings")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("needs_detail", true);
+  return count ?? 0;
 }
 
 /**

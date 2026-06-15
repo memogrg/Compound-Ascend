@@ -8,6 +8,8 @@
 import { revalidatePath } from "next/cache";
 import {
   budgetItemInputSchema,
+  incomeSourceInputSchema,
+  passiveIncomeStubInputSchema,
   txnInputSchema,
   accountInputSchema,
   ruleInputSchema,
@@ -47,6 +49,12 @@ import {
   deleteBudgetItem,
   setCategoryBudget,
   copyPreviousMonthExpenseBudget,
+  registerIncomeSource,
+  updateIncomeSource,
+  deleteIncomeSource,
+  receivePartialIncome,
+  copyPreviousMonthIncome,
+  registerPassiveIncomeWithStub,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import {
@@ -189,6 +197,125 @@ export async function copyPreviousMonthBudgetAction(
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos copiar el presupuesto del mes anterior." };
+  }
+}
+
+// ---------- Fuentes de ingreso (tab Ingresos · Fase 1) ----------
+export async function registerIncomeSourceAction(raw: unknown): Promise<ActionResult> {
+  const parsed = incomeSourceInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await registerIncomeSource(parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("registerIncomeSource fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos registrar el ingreso." };
+  }
+}
+
+export async function updateIncomeSourceAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = incomeSourceInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateIncomeSource(id, parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("updateIncomeSource fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos actualizar el ingreso." };
+  }
+}
+
+export async function deleteIncomeSourceAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    await deleteIncomeSource(id);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+const receivePartialIncomeSchema = z.object({
+  budgetItemId: z.string().uuid(),
+  amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
+  date: z.string().min(8).max(10),
+});
+
+/** Recibido parcial (Fase 2): suma un ingreso confirmado a la barra de la fuente. */
+export async function receivePartialIncomeAction(raw: unknown): Promise<ActionResult> {
+  const parsed = receivePartialIncomeSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await receivePartialIncome(parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("receivePartialIncome fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    const msg =
+      err instanceof Error && err.message.includes("ya no existe")
+        ? err.message
+        : "No pudimos registrar lo recibido.";
+    return { ok: false, message: msg };
+  }
+}
+
+/** Copia al mes actual SOLO las fuentes de ingreso recurrentes del mes anterior. */
+export async function copyPreviousMonthIncomeAction(
+  raw: unknown,
+): Promise<ActionResult & { copied?: number }> {
+  const parsed = copyMonthSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const copied = await copyPreviousMonthIncome(
+      monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
+    );
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true, copied };
+  } catch (err) {
+    logger.error("copyPreviousMonthIncome fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos copiar los ingresos del mes anterior." };
+  }
+}
+
+/**
+ * Registra un ingreso pasivo (renta/dividendos) creando un stub de inversión
+ * vinculado a la fuente (Fase 3). Revalida Ingresos + Inversiones.
+ */
+export async function registerPassiveIncomeWithStubAction(raw: unknown): Promise<ActionResult> {
+  const parsed = passiveIncomeStubInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await registerPassiveIncomeWithStub(parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch (err) {
+    logger.error("registerPassiveIncomeWithStub fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos registrar el ingreso pasivo." };
   }
 }
 

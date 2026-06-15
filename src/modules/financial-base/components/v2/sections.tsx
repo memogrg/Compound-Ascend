@@ -11,9 +11,11 @@ import {
 } from "@/components/shared/financial-insight-card";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
-import { EditableBudgetTable } from "@/modules/financial-base/components/v2/editable-budget-table";
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
-import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
+import { IncomeSources } from "@/modules/financial-base/components/v2/income-sources";
+import { IncomeRangeFilter } from "@/modules/financial-base/components/v2/income-range-filter";
+import { RegisterIncomeButton } from "@/modules/financial-base/components/v2/register-income-button";
+import { CopyPreviousIncomeButton } from "@/modules/financial-base/components/v2/copy-previous-income-button";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
 import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
 import { JarDatePicker } from "@/modules/financial-base/components/v2/expense-jars/jar-date-picker";
@@ -54,6 +56,7 @@ import type {
   Period,
   Transaction,
 } from "@/modules/financial-base/types";
+import { monthParam, type RangeKey } from "@/modules/financial-base/engine/period";
 
 const PALETTE = [
   "var(--pos)",
@@ -75,6 +78,7 @@ const PRESSURE: Record<FinancialPressure, { label: string; tone: MetricTone }> =
 
 export type V2View = {
   period: Period;
+  range?: RangeKey;
   currency: string;
   budget: BudgetTotals;
   real: RealTotals;
@@ -419,101 +423,6 @@ function DonutCard({
   );
 }
 
-// ── Barras "recibido vs presupuestado" por fuente de ingreso ──────────
-type IncomeBar = {
-  key: string;
-  label: string;
-  budget: number;
-  confirmed: number;
-  recorded: number;
-  pct: number;
-};
-
-/**
- * Una barra por fuente de ingreso: la del presupuesto se llena con lo CONFIRMADO
- * ("Recibido") del mes; las no presupuestadas (registradas pero sin línea de
- * presupuesto) aparecen con su propia barra y se llenan al confirmarse.
- */
-function buildIncomeBars(
-  budgetMap: Record<string, { label: string; value: number }>,
-  recordedMap: Record<string, { label: string; value: number }>,
-  confirmedMap: Record<string, { label: string; value: number }>,
-): IncomeBar[] {
-  const keys = new Set([...Object.keys(budgetMap), ...Object.keys(recordedMap)]);
-  return [...keys]
-    .map((key) => {
-      const label = recordedMap[key]?.label ?? budgetMap[key]?.label ?? key;
-      const budget = budgetMap[key]?.value ?? 0;
-      const confirmed = confirmedMap[key]?.value ?? 0;
-      const recorded = recordedMap[key]?.value ?? 0;
-      const pct = budget > 0 ? Math.min(1, confirmed / budget) : confirmed > 0 ? 1 : 0;
-      return { key, label, budget, confirmed, recorded, pct };
-    })
-    .sort((a, b) => (b.budget || b.recorded) - (a.budget || a.recorded));
-}
-
-function IncomeProgressCard({ bars, currency }: { bars: IncomeBar[]; currency: string }) {
-  return (
-    <div className="card">
-      <div className="card-head">
-        <div>
-          <div className="card-title">Ingresos</div>
-          <div className="card-sub">
-            Recibido vs presupuestado · la barra se llena al confirmar “Recibido”
-          </div>
-        </div>
-      </div>
-      {bars.length === 0 ? (
-        <div className="muted" style={{ padding: "16px 24px", fontSize: 13 }}>
-          Aún no tienes ingresos planificados ni registrados este mes.
-        </div>
-      ) : (
-        <div style={{ padding: "4px 0 10px" }}>
-          {bars.map((b) => {
-            const budgeted = b.budget > 0;
-            return (
-              <div key={b.key} style={{ padding: "11px 24px" }}>
-                <div
-                  className="row"
-                  style={{ justifyContent: "space-between", gap: 10, marginBottom: 6 }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {b.label}
-                    {budgeted ? null : (
-                      <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>
-                        · no presupuestado
-                      </span>
-                    )}
-                  </span>
-                  <span className="tnum muted" style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>
-                    {budgeted
-                      ? `${formatPercent(b.pct)} · ${formatMoney(b.confirmed, currency)} / ${formatMoney(b.budget, currency)}`
-                      : `${formatMoney(b.confirmed, currency)} recibido`}
-                  </span>
-                </div>
-                <div className="bar-track">
-                  <div
-                    className="bar-fill"
-                    style={{ width: `${Math.round(b.pct * 100)}%`, background: "var(--pos)" }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ============================== INGRESOS / GASTOS ==============================
 export function IncomeExpenseSection({
   view,
@@ -530,188 +439,179 @@ export function IncomeExpenseSection({
   /** Solo Gastos: rango activo (1m/3m/6m/ytd/all) de las cards y gráficas. */
   range?: string;
 }) {
+  if (kind === "income") return <IncomeSection view={view} />;
+
+  // ----- Gastos -----
   const { budget, real, currency, history } = view;
-  // Los frascos se scopean por su propio filtro de fecha; el resto de la página
-  // (cards y gráficas) conserva su scope. Fallback al periodo de la vista.
+  // Los frascos se scopean por su propio filtro de fecha; el resto (cards y
+  // gráficas) conserva su scope. Fallback al periodo de la vista.
   const jarPeriod = jarsPeriod ?? view.period;
-  const isIncome = kind === "income";
-  const budgetTotal = isIncome ? budget.budgetIncome : budget.budgetExpense;
-  const realTotal = isIncome ? real.realIncome : real.realExpense;
+  const budgetTotal = budget.budgetExpense;
+  const realTotal = real.realExpense;
   const diff = realTotal - budgetTotal;
   const complPct = budgetTotal > 0 ? realTotal / budgetTotal : 0;
-  const byKey = isIncome ? real.incomeByKey : real.expenseByKey;
-  const items = budget.items.filter((b) => b.type === kind);
-  const incomeTxns = view.transactions.filter((t) => t.kind === "ingreso");
-  const incomeBars = isIncome
-    ? buildIncomeBars(budget.incomeByKey, real.incomeByKey, real.incomeConfirmedByKey)
-    : [];
-  // Serie para el gráfico de área (real); el presupuesto se dibuja como línea
-  // punteada de referencia (goalValue).
-  const incomeArea = history.map((h) => ({ date: h.label, value: h.realIncome }));
+  const items = budget.items.filter((b) => b.type === "expense");
   const lineData = history.map((h) => ({
     label: h.label,
-    Real: isIncome ? h.realIncome : h.realExpense,
-    Presupuesto: (isIncome ? h.budgetIncome : h.budgetExpense) || Math.round(budgetTotal),
+    Real: h.realExpense,
+    Presupuesto: h.budgetExpense || Math.round(budgetTotal),
   }));
 
-  const summary: SumCard[] = isIncome
-    ? [
-        {
-          ttl: "Ingresos planificados",
-          val: formatMoney(budgetTotal, currency),
-          sub: `${items.length} fuente(s)`,
-          tone: "pos",
-        },
-        {
-          ttl: "Ingresos reales",
-          val: formatMoney(realTotal, currency),
-          sub: "recibido este mes",
-          tone: "pos",
-        },
-        {
-          ttl: "Diferencia",
-          val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`,
-          sub: "real − planificado",
-          tone: diff >= 0 ? "pos" : "neg",
-        },
-        { ttl: "% cumplimiento", val: formatPercent(complPct), sub: "de lo planificado" },
-      ]
-    : [
-        {
-          ttl: "Gasto planificado",
-          val: formatMoney(budgetTotal, currency),
-          sub: `${items.length} categoría(s)`,
-        },
-        { ttl: "Gasto real", val: formatMoney(realTotal, currency), sub: "hasta hoy" },
-        {
-          ttl: "Diferencia",
-          val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`,
-          sub: "real − planificado",
-          tone: diff <= 0 ? "pos" : "neg",
-        },
-        { ttl: "% ejecución", val: formatPercent(complPct), sub: "del presupuesto" },
-      ];
+  const summary: SumCard[] = [
+    {
+      ttl: "Gasto planificado",
+      val: formatMoney(budgetTotal, currency),
+      sub: `${items.length} categoría(s)`,
+    },
+    { ttl: "Gasto real", val: formatMoney(realTotal, currency), sub: "hasta hoy" },
+    {
+      ttl: "Diferencia",
+      val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`,
+      sub: "real − planificado",
+      tone: diff <= 0 ? "pos" : "neg",
+    },
+    { ttl: "% ejecución", val: formatPercent(complPct), sub: "del presupuesto" },
+  ];
 
   return (
     <div className="grid">
       <div className="tab-toolbar">
-        <div className="hint">
-          {isIncome
-            ? "Tus ingresos se registran aquí; confirma cada uno cuando lo recibas."
-            : "Tus gastos por categoría, comparados con tu presupuesto del mes."}
-        </div>
-        {isIncome ? (
-          <ComposerButton
-            tree={view.tree}
-            incomeTree={view.incomeTree}
-            accounts={view.accounts}
-            currency={currency}
-            suggestions={view.suggestions}
-            templates={view.templates}
-            linkables={view.linkables}
-            only="ingreso"
-            label="Registrar ingreso"
-          />
-        ) : (
-          <ExpenseRangeControl current={range ?? "1m"} />
-        )}
+        <div className="hint">Tus gastos por categoría, comparados con tu presupuesto del mes.</div>
+        <ExpenseRangeControl current={range ?? "1m"} />
       </div>
 
       <SummaryStrip cards={summary} />
 
-      {isIncome ? <IncomeProgressCard bars={incomeBars} currency={currency} /> : null}
-
       <section className="cols-2">
-        <ChartCard
-          title={isIncome ? "Histórico de ingresos" : "Histórico de gastos"}
-          hint="real vs presupuesto"
-        >
-          {isIncome ? (
-            // Área con degradado (--pos) + línea punteada de presupuesto, como el
-            // detalle de deudas. Más legible que la línea plana.
-            <PerformanceChart
-              data={incomeArea}
-              currency={currency}
-              tone="pos"
-              goalValue={Math.round(budgetTotal)}
-              height={160}
-            />
-          ) : (
-            <PremiumLineChart
-              data={lineData}
-              xKey="label"
-              currency={currency}
-              series={[
-                { key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true },
-                { key: "Real", label: "Real", color: "var(--c-expense)" },
-              ]}
-            />
-          )}
+        <ChartCard title="Histórico de gastos" hint="real vs presupuesto">
+          <PremiumLineChart
+            data={lineData}
+            xKey="label"
+            currency={currency}
+            series={[
+              { key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true },
+              { key: "Real", label: "Real", color: "var(--c-expense)" },
+            ]}
+          />
         </ChartCard>
         <DonutCard
-          title={isIncome ? "Composición por fuente" : "Composición por categoría"}
-          data={donutData(byKey)}
+          title="Composición por categoría"
+          data={donutData(real.expenseByKey)}
           total={realTotal}
           currency={currency}
         />
       </section>
 
-      {isIncome ? (
-        // TODO(data): el diseño agrupa ingresos por persona (Elena/Jordan) con
-        // person-head/person-total. V2 no tiene dimensión de miembro del hogar,
-        // así que mostramos una lista plana de ingresos reales del mes.
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <div className="card-title">Movimientos de ingreso</div>
-              <div className="card-sub">Confirma cada ingreso cuando lo recibas</div>
-            </div>
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title">Categorías de gasto</div>
+            <div className="card-sub">Frascos por bloque · gasto real al día elegido</div>
           </div>
-          <IncomeRows
-            transactions={incomeTxns}
-            categoryNames={view.categoryNames}
-            categories={view.categories}
-            accounts={view.accounts}
-            currency={currency}
-          />
-        </div>
-      ) : (
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <div className="card-title">Categorías de gasto</div>
-              <div className="card-sub">Frascos por bloque · gasto real al día elegido</div>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {jarsAsOf ? <JarDatePicker current={jarsAsOf} /> : null}
-              <ExpenseToolbar
-                jars={view.jars}
-                accounts={view.accounts}
-                currency={currency}
-                period={jarPeriod}
-                tree={view.tree}
-              />
-            </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {jarsAsOf ? <JarDatePicker current={jarsAsOf} /> : null}
+            <ExpenseToolbar
+              jars={view.jars}
+              accounts={view.accounts}
+              currency={currency}
+              period={jarPeriod}
+              tree={view.tree}
+            />
           </div>
-          <ExpenseJars jars={view.jars} currency={currency} period={jarPeriod} />
         </div>
-      )}
+        <ExpenseJars jars={view.jars} currency={currency} period={jarPeriod} />
+      </div>
 
-      {/* En Gastos el presupuesto se gestiona en los frascos/sobres (crear
-          subcategoría + candado); la tabla editable queda solo en Ingresos. */}
-      {isIncome ? (
-        <EditableBudgetTable
-          type={kind}
-          title="Presupuesto de ingresos"
-          items={items}
-          categoryNames={view.categoryNames}
-          categories={view.categories}
-          period={view.period}
+      <FinancialInsightCard reading={view.expenseCapsule} />
+    </div>
+  );
+}
+
+// ── Tab de Ingresos (Fase 1): orden toolbar · rango · cuadros · histórico/
+//    composición · Área "Ingreso" (fuentes con barra buffer) · insight. ──
+function IncomeSection({ view }: { view: V2View }) {
+  const { budget, real, currency, history, period } = view;
+  const range = view.range ?? "1m";
+  const rangeActive = range !== "1m";
+  const incomeItems = budget.items.filter((b) => b.type === "income");
+
+  // Cuadros: agregan sobre el rango elegido (suma del histórico); en "1 mes"
+  // se usan los totales del periodo actual (comportamiento de siempre).
+  const realIncome = rangeActive
+    ? history.reduce((s, h) => s + h.realIncome, 0)
+    : real.realIncome;
+  const budgetIncome = rangeActive
+    ? history.reduce((s, h) => s + h.budgetIncome, 0)
+    : budget.budgetIncome;
+  const diff = realIncome - budgetIncome;
+  const complPct = budgetIncome > 0 ? realIncome / budgetIncome : 0;
+
+  const incomeArea = history.map((h) => ({ date: h.label, value: h.realIncome }));
+
+  const summary: SumCard[] = [
+    {
+      ttl: "Ingresos planificados",
+      val: formatMoney(budgetIncome, currency),
+      sub: rangeActive ? "en el rango" : `${incomeItems.length} fuente(s)`,
+      tone: "pos",
+    },
+    {
+      ttl: "Ingresos totales",
+      val: formatMoney(realIncome, currency),
+      sub: rangeActive ? "recibido en el rango" : "recibido este mes",
+      tone: "pos",
+    },
+    {
+      ttl: "Diferencia",
+      val: `${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`,
+      sub: "real − planificado",
+      tone: diff >= 0 ? "pos" : "neg",
+    },
+    { ttl: "% cumplimiento", val: formatPercent(complPct), sub: "de lo planificado" },
+  ];
+
+  return (
+    <div className="grid">
+      <div className="tab-toolbar">
+        <div className="hint">Tus ingresos se registran aquí; confírmalos cuando los recibas.</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <CopyPreviousIncomeButton periodMonth={period.month} periodYear={period.year} />
+          <RegisterIncomeButton currency={currency} />
+        </div>
+      </div>
+
+      <div className="tab-toolbar">
+        <div className="hint">Rango de los cuadros y el histórico</div>
+        <IncomeRangeFilter range={range} periodParam={monthParam(period)} />
+      </div>
+
+      <SummaryStrip cards={summary} />
+
+      <section className="cols-2">
+        <ChartCard title="Histórico de ingresos" hint="real vs presupuesto">
+          <PerformanceChart
+            data={incomeArea}
+            currency={currency}
+            tone="pos"
+            goalValue={Math.round(budget.budgetIncome)}
+            height={160}
+          />
+        </ChartCard>
+        <DonutCard
+          title="Composición por fuente"
+          data={donutData(real.incomeByKey)}
+          total={real.realIncome}
           currency={currency}
         />
-      ) : null}
+      </section>
 
-      <FinancialInsightCard reading={isIncome ? view.incomeCapsule : view.expenseCapsule} />
+      <IncomeSources
+        items={incomeItems}
+        received={real.incomeReceivedBySource}
+        currency={currency}
+      />
+
+      <FinancialInsightCard reading={view.incomeCapsule} />
     </div>
   );
 }

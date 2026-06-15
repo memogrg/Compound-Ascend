@@ -98,6 +98,8 @@ export type Transaction = {
   linkedKind?: LinkedKind;
   linkedId?: string | null;
   recurringItemId?: string | null;
+  // Ingresos (Fase 2): fuente de ingreso (budget_items) a la que se atribuye.
+  incomeSourceId?: string | null;
 };
 
 /** Ítem de presupuesto, scopeado por mes. */
@@ -114,6 +116,11 @@ export type BudgetItem = {
   // Plan derivado (Fase 0 · passthrough, sin lógica todavía)
   sourceKind?: BudgetSourceKind;
   sourceId?: string | null;
+  // Ingresos (Fase 1): tipo de fuente + plantilla recurrente copy-on-demand.
+  incomeType?: IncomeType;
+  recurringItemId?: string | null;
+  // Ingresos (Fase 3): inversión vinculada (stub de renta/dividendos).
+  holdingId?: string | null;
 };
 
 export type Account = {

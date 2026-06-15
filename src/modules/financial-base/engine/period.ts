@@ -57,3 +57,36 @@ export function parseMonthParam(param: string | undefined | null, now: Date): Pe
 export function monthParam(p: Period): string {
   return `${p.year}-${pad(p.month)}`;
 }
+
+// ── Rango de agregación (tab Ingresos · Fase 1) ───────────────────────────
+// Controla la ventana del histórico y la agregación de los cuadros. "all" se
+// resuelve a meses concretos en el loader (desde la transacción más antigua).
+export type RangeKey = "1m" | "3m" | "6m" | "1y" | "3y" | "all";
+
+export const RANGE_OPTIONS: { value: RangeKey; label: string }[] = [
+  { value: "1m", label: "1 mes" },
+  { value: "3m", label: "3 meses" },
+  { value: "6m", label: "6 meses" },
+  { value: "1y", label: "1 año" },
+  { value: "3y", label: "3 años" },
+  { value: "all", label: "Todo el tiempo" },
+];
+
+const RANGE_MONTHS: Record<RangeKey, number> = {
+  "1m": 1,
+  "3m": 3,
+  "6m": 6,
+  "1y": 12,
+  "3y": 36,
+  all: 120, // tope; el loader lo ajusta a la transacción más antigua.
+};
+
+/** Parsea "?range=" a un RangeKey válido; cae a "1m". */
+export function parseRangeParam(param: string | undefined | null): RangeKey {
+  return RANGE_OPTIONS.some((o) => o.value === param) ? (param as RangeKey) : "1m";
+}
+
+/** Meses hacia atrás (incluyendo el periodo actual) que cubre un rango. */
+export function rangeToMonths(range: RangeKey): number {
+  return RANGE_MONTHS[range];
+}

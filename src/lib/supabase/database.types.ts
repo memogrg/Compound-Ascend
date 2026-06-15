@@ -289,6 +289,8 @@ export type TransactionRow = Timestamps & {
   linked_kind: string; // 'none' | 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
   linked_id: string | null;
   recurring_item_id: string | null;
+  // Ingresos (migración 20260615000002 · Fase 2): vínculo a la fuente de ingreso.
+  income_source_id: string | null;
 };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
@@ -307,6 +309,11 @@ export type BudgetItemRow = Timestamps & {
   // Plan derivado (migración 0020 · Fase 0)
   source_kind: string; // 'manual' | 'debt' | 'goal' | 'policy' | 'recurring' | 'dividend'
   source_id: string | null;
+  // Ingresos (migración 20260615 · Fase 1)
+  income_type: string | null; // 'activo' | 'pasivo' | 'extraordinario' (solo ingresos)
+  recurring_item_id: string | null; // plantilla recurrente copy-on-demand
+  // Ingresos (migración 20260615000003 · Fase 3): inversión vinculada (stub).
+  holding_id: string | null;
 };
 
 export type AccountRow = Timestamps & {
@@ -474,6 +481,8 @@ export type InvestmentHoldingRow = Timestamps & {
   rental_income: number | null;
   rental_frequency: string | null;
   rental_subtype: string | null;
+  // Ingresos (migración 20260615000003 · Fase 3): stub por completar.
+  needs_detail: boolean;
 };
 
 export type RentalPaymentRow = Timestamps & {
