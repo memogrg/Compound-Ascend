@@ -1,5 +1,6 @@
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
+import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sections";
 
@@ -14,7 +15,7 @@ function resolveAsOf(raw: string | undefined): string {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ asOf?: string }>;
+  searchParams: Promise<{ asOf?: string; range?: string }>;
 }) {
   const sp = await searchParams;
   const view = await loadBaseView();
@@ -32,20 +33,34 @@ export default async function Page({
   const asOf = resolveAsOf(sp.asOf);
   const [ay, am] = asOf.split("-").map(Number) as [number, number];
   const jarsPeriod = monthPeriod(ay, am);
-  const jars = await getExpenseJarsAsOf({
-    tree: view.tree,
-    period: jarsPeriod,
-    asOf,
-    currency: view.currency,
-  });
+
+  // Filtro propio de las 4 cards + 2 gráficas: rango (1m/3m/6m/YTD/All). No
+  // re-scopea los frascos. Se computa en paralelo con los frascos del asOf.
+  const [jars, rangeView] = await Promise.all([
+    getExpenseJarsAsOf({ tree: view.tree, period: jarsPeriod, asOf, currency: view.currency }),
+    getExpenseRangeView(sp.range, view.period),
+  ]);
+
+  const expenseView = {
+    ...view,
+    jars,
+    history: rangeView.history,
+    budget: { ...view.budget, budgetExpense: rangeView.budgetExpense },
+    real: {
+      ...view.real,
+      realExpense: rangeView.realExpense,
+      expenseByKey: rangeView.expenseByKey,
+    },
+  };
 
   return (
     <div className="grid">
       <IncomeExpenseSection
-        view={{ ...view, jars }}
+        view={expenseView}
         kind="expense"
         jarsAsOf={asOf}
         jarsPeriod={jarsPeriod}
+        range={rangeView.range}
       />
     </div>
   );

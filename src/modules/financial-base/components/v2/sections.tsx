@@ -17,6 +17,7 @@ import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
 import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
 import { JarDatePicker } from "@/modules/financial-base/components/v2/expense-jars/jar-date-picker";
+import { ExpenseRangeControl } from "@/modules/financial-base/components/v2/expense-range-control";
 import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
 import { ComposerButton } from "@/modules/financial-base/components/v2/composer-button";
 import { CategoryManagerButton } from "@/modules/financial-base/components/v2/category-manager";
@@ -519,12 +520,15 @@ export function IncomeExpenseSection({
   kind,
   jarsAsOf,
   jarsPeriod,
+  range,
 }: {
   view: V2View;
   kind: "income" | "expense";
   /** Solo Gastos: fecha de corte (YYYY-MM-DD) y periodo que scopean los frascos. */
   jarsAsOf?: string;
   jarsPeriod?: Period;
+  /** Solo Gastos: rango activo (1m/3m/6m/ytd/all) de las cards y gráficas. */
+  range?: string;
 }) {
   const { budget, real, currency, history } = view;
   // Los frascos se scopean por su propio filtro de fecha; el resto de la página
@@ -608,7 +612,9 @@ export function IncomeExpenseSection({
             only="ingreso"
             label="Registrar ingreso"
           />
-        ) : null}
+        ) : (
+          <ExpenseRangeControl current={range ?? "1m"} />
+        )}
       </div>
 
       <SummaryStrip cards={summary} />
