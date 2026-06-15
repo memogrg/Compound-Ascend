@@ -168,6 +168,48 @@ describe("buildExpenseJars (Fase frascos)", () => {
     expect(jar.fixedFunds?.map((f) => f.name)).toEqual(["Fondo de emergencia", "Fondo de paz"]);
     expect(jar.emptyText).toBe("No existen Objetivos activos mapeados");
   });
+
+  it("Ahorro budget-aware (goal): aporte/aportado/restante por meta + totales, conservando fondos fijos", () => {
+    const entities: JarEntities = {
+      ...NO_ENTITIES,
+      goal: [
+        { id: "m1", name: "Casa propia", sub: "Aporte mensual", amount: 100000 },
+        { id: "m2", name: "Viaje", sub: "Aporte mensual", amount: 30000 },
+      ],
+    };
+    const jar = buildExpenseJars({
+      tree: [AHORRO],
+      budgetByKey: {},
+      realByKey: {},
+      entities,
+      fmt,
+      linkedBudget: {
+        goal: {
+          // m1 toma la línea derivada (120000, ≠ monto de entidad); m2 cae al monto.
+          bySource: { m1: 120000 },
+          spentById: { m1: 50000 },
+          paymentCategoryId: "cat-ahorro",
+        },
+      },
+    })[0]!;
+    if (jar.kind !== "linked") throw new Error("linked");
+    expect(jar.linkedKind).toBe("goal");
+    expect(jar.budgetAware).toBe(true);
+    expect(jar.paymentCategoryId).toBe("cat-ahorro");
+
+    const m1 = jar.items.find((i) => i.id === "m1")!;
+    expect(m1.budget).toBe(120000); // línea derivada, no el monto de la entidad
+    expect(m1.spent).toBe(50000);
+    expect(m1.remaining).toBe(70000);
+
+    const m2 = jar.items.find((i) => i.id === "m2")!;
+    expect(m2.budget).toBe(30000); // fallback al monto de la entidad
+    expect(m2.spent).toBe(0);
+
+    expect(jar.totals).toEqual({ budget: 150000, spent: 50000, remaining: 100000 });
+    // Los fondos fijos siguen presentes (informativos, el modal los pinta sin barra).
+    expect(jar.fixedFunds?.map((f) => f.name)).toEqual(["Fondo de emergencia", "Fondo de paz"]);
+  });
 });
 
 describe("mergeSuggestions", () => {
