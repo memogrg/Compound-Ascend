@@ -70,6 +70,8 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
       const over = tBudget > 0 && tSpent > tBudget;
       const color = over ? "var(--neg)" : jar.color;
       const width = pct(tSpent, tBudget);
+      // Verbo según el tipo: deudas "pagado", metas "aportado".
+      const doneVerb = jar.linkedKind === "goal" ? "aportado" : "pagado";
       const subList =
         n > 0 ? jar.items.map((it) => it.name).join(", ") : jar.emptyText;
       return (
@@ -111,7 +113,7 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
               </div>
               <div className="env-bar-meta">
                 <span style={over ? { color: "var(--neg)" } : undefined}>
-                  {formatMoney(tSpent, currency)} pagado
+                  {formatMoney(tSpent, currency)} {doneVerb}
                 </span>
                 <span>
                   {over
