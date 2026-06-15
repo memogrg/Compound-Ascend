@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
@@ -45,9 +46,9 @@ export function Topbar({
         <button className="icon-btn" aria-label="Notificaciones">
           <Icon name="bell" />
         </button>
-        <button className="icon-btn" aria-label="Ajustes">
+        <Link href="/configuracion" className="icon-btn" aria-label="Ajustes">
           <Icon name="gear" />
-        </button>
+        </Link>
         <ThemeToggle />
       </div>
     </div>
