@@ -24,7 +24,7 @@ export type ActionState = {
   fieldErrors?: Record<string, string>;
 };
 
-function zodToFieldErrors(issues: { path: (string | number)[]; message: string }[]) {
+function zodToFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
   const out: Record<string, string> = {};
   for (const i of issues) {
     const key = String(i.path[0] ?? "form");
