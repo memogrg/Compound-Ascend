@@ -15,18 +15,18 @@ import { txnInputSchema } from "@/modules/financial-base/schemas";
 describe("builders del orquestador de vínculos (Fase 1)", () => {
   it("pago de deuda → gasto vinculado con monto total (cuota + extra)", () => {
     const txn = debtPaymentToTxn({
-      debtId: "11111111-1111-1111-1111-111111111111",
+      debtId: "11111111-1111-4111-8111-111111111111",
       debtName: "Tarjeta BAC",
       currency: "CRC",
       paymentDate: "2026-06-15",
       amount: 45000,
       extraAmount: 10000,
-      categoryId: "22222222-2222-2222-2222-222222222222",
+      categoryId: "22222222-2222-4222-8222-222222222222",
     });
     expect(txn.kind).toBe("gasto");
     expect(txn.amount).toBe(55000);
     expect(txn.linkedKind).toBe("debt");
-    expect(txn.linkedId).toBe("11111111-1111-1111-1111-111111111111");
+    expect(txn.linkedId).toBe("11111111-1111-4111-8111-111111111111");
     expect(txn.description).toBe("Pago — Tarjeta BAC");
     // Debe pasar el mismo schema que usa createTransaction.
     expect(() => txnInputSchema.parse(txn)).not.toThrow();
@@ -34,7 +34,7 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
 
   it("pago sin extra usa solo la cuota", () => {
     const txn = debtPaymentToTxn({
-      debtId: "11111111-1111-1111-1111-111111111111",
+      debtId: "11111111-1111-4111-8111-111111111111",
       debtName: "Préstamo",
       currency: "USD",
       paymentDate: "2026-06-01",
@@ -46,7 +46,7 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
 
   it("aporte a meta → gasto vinculado a la meta, sin categoría fija", () => {
     const txn = goalContributionToTxn({
-      goalId: "33333333-3333-3333-3333-333333333333",
+      goalId: "33333333-3333-4333-8333-333333333333",
       goalName: "Fondo de emergencia",
       currency: "CRC",
       contributionDate: "2026-06-10",
@@ -60,7 +60,7 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
 
   it("dividendo → ingreso vinculado al holding", () => {
     const txn = dividendToTxn({
-      holdingId: "44444444-4444-4444-4444-444444444444",
+      holdingId: "44444444-4444-4444-8444-444444444444",
       label: "VOO",
       currency: "USD",
       paymentDate: "2026-06-20",
@@ -69,14 +69,14 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
     });
     expect(txn.kind).toBe("ingreso");
     expect(txn.linkedKind).toBe("holding");
-    expect(txn.linkedId).toBe("44444444-4444-4444-4444-444444444444");
+    expect(txn.linkedId).toBe("44444444-4444-4444-8444-444444444444");
     expect(txn.description).toBe("Dividendo — VOO");
     expect(() => txnInputSchema.parse(txn)).not.toThrow();
   });
 
   it("renta cobrada → ingreso vinculado al activo", () => {
     const txn = rentalPaymentToTxn({
-      holdingId: "55555555-5555-5555-5555-555555555555",
+      holdingId: "55555555-5555-4555-8555-555555555555",
       label: "Apartamento Escazú",
       currency: "CRC",
       receivedOn: "2026-06-05",
@@ -90,7 +90,7 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
 
   it("venta de posición → ingreso vinculado al holding (Fase 4)", () => {
     const txn = holdingSaleToTxn({
-      holdingId: "66666666-6666-6666-6666-666666666666",
+      holdingId: "66666666-6666-4666-8666-666666666666",
       label: "VOO",
       currency: "USD",
       saleDate: "2026-06-15",
@@ -105,7 +105,7 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
 
   it("retiro de meta → ingreso vinculado a la meta (Fase 4)", () => {
     const txn = goalWithdrawalToTxn({
-      goalId: "77777777-7777-7777-7777-777777777777",
+      goalId: "77777777-7777-4777-8777-777777777777",
       goalName: "Fondo de emergencia",
       currency: "CRC",
       withdrawalDate: "2026-06-15",
@@ -119,13 +119,13 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
 
   it("compra de inversión → gasto vinculado (Fase 4.1)", () => {
     const txn = holdingPurchaseToTxn({
-      holdingId: "88888888-8888-8888-8888-888888888888",
+      holdingId: "88888888-8888-4888-8888-888888888888",
       label: "VOO",
       currency: "USD",
       purchaseDate: "2026-06-10",
       amount: 4000,
       verb: "Compra",
-      categoryId: "99999999-9999-9999-9999-999999999999",
+      categoryId: "99999999-9999-4999-8999-999999999999",
     });
     expect(txn.kind).toBe("gasto");
     expect(txn.linkedKind).toBe("holding");
@@ -182,7 +182,7 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
 
   it("retiro de meta con nota la incluye en la descripción", () => {
     const txn = goalWithdrawalToTxn({
-      goalId: "77777777-7777-7777-7777-777777777777",
+      goalId: "77777777-7777-4777-8777-777777777777",
       goalName: "Fondo de emergencia",
       currency: "CRC",
       withdrawalDate: "2026-06-15",

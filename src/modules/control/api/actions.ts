@@ -25,7 +25,7 @@ import { logger } from "@/lib/logger";
 
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
 
-function fieldErrors(issues: { path: (string | number)[]; message: string }[]) {
+function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
   const out: Record<string, string> = {};
   for (const i of issues) {
     const k = String(i.path[0] ?? "form");

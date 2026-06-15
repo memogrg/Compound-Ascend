@@ -6,7 +6,7 @@ export const transactionInputSchema = z
     kind: z.enum(["ingreso", "gasto"]),
     description: z.string().trim().min(1, "Describe la transacción").max(160),
     amount: z
-      .number({ invalid_type_error: "Monto inválido" })
+      .number({ error: "Monto inválido" })
       .positive("El monto debe ser mayor a 0"),
     currency: z.string().length(3),
     occurredOn: z.string().min(8).max(10), // YYYY-MM-DD

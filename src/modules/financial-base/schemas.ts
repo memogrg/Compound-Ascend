@@ -21,7 +21,7 @@ export const incomeInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
   incomeType: z.enum(["activo", "pasivo", "extraordinario"]),
   category: z.string().max(60).optional(),
-  amount: z.number({ invalid_type_error: "Monto inválido" }).nonnegative("No puede ser negativo"),
+  amount: z.number({ error: "Monto inválido" }).nonnegative("No puede ser negativo"),
   currency: z.string().length(3),
   frequency,
   isFixed: z.boolean().default(true),
@@ -44,7 +44,7 @@ export const expenseInputSchema = z.object({
     "donacion",
     "miscelaneo",
   ]),
-  amount: z.number({ invalid_type_error: "Monto inválido" }).nonnegative("No puede ser negativo"),
+  amount: z.number({ error: "Monto inválido" }).nonnegative("No puede ser negativo"),
   currency: z.string().length(3),
   frequency,
   isFixed: z.boolean().default(true),
@@ -66,7 +66,7 @@ export const budgetItemInputSchema = z.object({
   type: z.enum(["income", "expense"]),
   categoryId: uuidOrNull.optional(),
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
-  amount: z.number({ invalid_type_error: "Monto inválido" }).nonnegative("No puede ser negativo"),
+  amount: z.number({ error: "Monto inválido" }).nonnegative("No puede ser negativo"),
   currency: z.string().length(3),
   frequency: frequency.default("mensual"),
   periodMonth: z.number().int().min(1).max(12),
@@ -76,7 +76,7 @@ export const budgetItemInputSchema = z.object({
 export const txnInputSchema = z
   .object({
     kind: z.enum(["ingreso", "gasto", "ajuste"]),
-    amount: z.number({ invalid_type_error: "Monto inválido" }).positive("Debe ser mayor a 0"),
+    amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
     currency: z.string().length(3).default("CRC"),
     occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
     categoryId: uuidOrNull.optional(),
@@ -109,7 +109,7 @@ export const transferInputSchema = z
   .object({
     fromAccountId: z.string().uuid("Elige la cuenta de origen"),
     toAccountId: z.string().uuid("Elige la cuenta de destino"),
-    amount: z.number({ invalid_type_error: "Monto inválido" }).positive("Debe ser mayor a 0"),
+    amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
     currency: z.string().length(3).default("CRC"),
     occurredOn: z.string().min(8).max(10),
     note: z.string().max(280).optional(),
@@ -168,7 +168,7 @@ export const categoryDeleteSchema = z.object({
 export const templateInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(80),
   kind: z.enum(["ingreso", "gasto", "transferencia"]).default("gasto"),
-  amount: z.number({ invalid_type_error: "Monto inválido" }).positive().optional().nullable(),
+  amount: z.number({ error: "Monto inválido" }).positive().optional().nullable(),
   currency: z.string().length(3).default("CRC"),
   categoryId: uuidOrNull.optional(),
   accountId: uuidOrNull.optional(),
