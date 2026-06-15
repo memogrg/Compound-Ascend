@@ -83,16 +83,26 @@ export async function getExpenseJarsAsOf(args: {
   currency: string;
 }): Promise<Jar[]> {
   const cutoff: Period = { ...args.period, to: args.asOf };
-  const [budget, real, debtBudget, debtSpent, deudasCatId] = await Promise.all([
-    getBudgetTotals(args.period),
-    getRealTotals(cutoff),
-    // Deudas budget-aware: cuota derivada por deuda (mes) + pagado al corte +
-    // categoría de sistema del pago (para Registrar gasto). Solo `debt` en esta
-    // entrega; el engine queda listo para Libertad/Defensa/Ahorro.
-    getLinkedBudgetBySource(args.period, "debt"),
-    getLinkedSpentByEntity(cutoff, "debt"),
-    getSystemCategoryId("deudas"),
-  ]);
+  const [budget, real, debtBudget, debtSpent, deudasCatId, goalBudget, goalSpent] =
+    await Promise.all([
+      getBudgetTotals(args.period),
+      getRealTotals(cutoff),
+      // Deudas budget-aware: cuota derivada por deuda (mes) + pagado al corte +
+      // categoría de sistema del pago (para Registrar gasto).
+      getLinkedBudgetBySource(args.period, "debt"),
+      getLinkedSpentByEntity(cutoff, "debt"),
+      getSystemCategoryId("deudas"),
+      // Ahorro budget-aware: aporte derivado por meta (mes) + aportado al corte.
+      getLinkedBudgetBySource(args.period, "goal"),
+      getLinkedSpentByEntity(cutoff, "goal"),
+    ]);
+
+  // La línea derivada de metas nace con categoryId NULL, pero Registrar gasto
+  // exige un uuid. Imputamos el aporte a la categoría del GRUPO Ahorro
+  // (key='g_ahorro_lp', del tree) — uuid válido y existente; el vínculo real lo
+  // lleva linked_kind='goal'/linked_id. Holding/policy quedan fuera de esta entrega.
+  const ahorroCatId = args.tree.find((g) => g.key === "g_ahorro_lp")?.id ?? null;
+
   return getExpenseJars({
     tree: args.tree,
     budgetByKey: budget.expenseByKey,
@@ -100,6 +110,7 @@ export async function getExpenseJarsAsOf(args: {
     currency: args.currency,
     linkedBudget: {
       debt: { bySource: debtBudget, spentById: debtSpent, paymentCategoryId: deudasCatId },
+      goal: { bySource: goalBudget, spentById: goalSpent, paymentCategoryId: ahorroCatId },
     },
   });
 }
