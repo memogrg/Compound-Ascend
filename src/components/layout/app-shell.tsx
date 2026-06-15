@@ -12,17 +12,19 @@ type AppShellProps = {
   children: React.ReactNode;
   user?: { name: string; sub: string; initials: string };
   currency?: { display: string; primary: string };
+  /** Conteos dinámicos por id de nav (ej. stubs de inversión por completar). */
+  navBadges?: Record<string, number>;
 };
 
 /** Cascarón principal de la app: sidebar + topbar + contenido + coach + nav móvil. */
-export function AppShell({ children, user, currency }: AppShellProps) {
+export function AppShell({ children, user, currency, navBadges }: AppShellProps) {
   const [drawer, setDrawer] = useState(false);
   const close = () => setDrawer(false);
 
   return (
     <ToastProvider>
       <div className="app">
-        <Sidebar open={drawer} onNavigate={close} user={user} />
+        <Sidebar open={drawer} onNavigate={close} user={user} navBadges={navBadges} />
         <main className="main">
           <Topbar onMenu={() => setDrawer(true)} currency={currency} />
           {children}

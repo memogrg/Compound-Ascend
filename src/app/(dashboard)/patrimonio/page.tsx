@@ -5,6 +5,8 @@ import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/servi
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
 import { getSnapshotHistory } from "@/modules/wealth/services/snapshot-service";
 import { listDividends } from "@/modules/wealth/services/dividend-service";
+import { listPendingHoldings } from "@/modules/wealth/services/holdings-service";
+import { PendingHoldingsCard } from "@/modules/wealth/components/pending-holdings-card";
 import { GrowthView } from "@/modules/wealth/components/growth-view";
 import { PortfolioView } from "@/modules/wealth/components/portfolio-view";
 import { WealthActions } from "@/modules/wealth/components/wealth-actions";
@@ -48,6 +50,7 @@ function PortfolioSkeleton() {
 export default async function Page() {
   const configured = isSupabaseConfigured();
   const summary: WealthSummary = configured ? await getWealthSummary() : buildDemoWealthSummary();
+  const pendingHoldings = configured ? await listPendingHoldings() : [];
 
   return (
     <div className="grid">
@@ -84,6 +87,10 @@ export default async function Page() {
           Modo demostración con datos de ejemplo. Conecta Supabase para gestionar tus inversiones
           reales y ver precios en vivo.
         </div>
+      ) : null}
+
+      {configured ? (
+        <PendingHoldingsCard holdings={pendingHoldings} currency={summary.currency} />
       ) : null}
 
       {configured ? (

@@ -26,6 +26,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Monedas para el switch de visualización del topbar (best-effort).
   let currency = { display: "CRC", primary: "CRC" };
+  // Badge dinámico: stubs de inversión por completar (Fase 3). Best-effort.
+  let navBadges: Record<string, number> | undefined;
   if (isSupabaseConfigured() && user) {
     try {
       const [display, primary] = await Promise.all([getDisplayCurrency(), getPrimaryCurrency()]);
@@ -33,10 +35,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
     } catch {
       // sin perfil aún: se mantiene el valor por defecto
     }
+    try {
+      const { countPendingHoldings } = await import(
+        "@/modules/wealth/services/holdings-service"
+      );
+      const pending = await countPendingHoldings();
+      if (pending > 0) navBadges = { wealth: pending };
+    } catch {
+      // sin inversiones / sin sesión: sin badge
+    }
   }
 
   return (
-    <AppShell user={{ name, sub, initials }} currency={currency}>
+    <AppShell user={{ name, sub, initials }} currency={currency} navBadges={navBadges}>
       {children}
     </AppShell>
   );
