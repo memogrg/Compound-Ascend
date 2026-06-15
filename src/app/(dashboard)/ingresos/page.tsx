@@ -6,10 +6,12 @@ import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sec
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; range?: string }>;
 }) {
   const sp = await searchParams;
-  const view = await loadBaseView(sp.period);
+  // El tab de Ingresos siempre pasa un rango (default "1m"); las demás rutas
+  // omiten el rango y conservan la ventana mensual/6-meses por defecto.
+  const view = await loadBaseView(sp.period, sp.range ?? "1m");
 
   if (!view) {
     return (

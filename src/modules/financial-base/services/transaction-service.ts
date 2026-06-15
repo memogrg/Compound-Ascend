@@ -435,6 +435,21 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
   };
 }
 
+/** Fecha (YYYY-MM-DD) de la transacción más antigua del usuario, o null. Sirve
+ *  para acotar el rango "Todo el tiempo" del histórico de ingresos. */
+export async function getEarliestTransactionDate(): Promise<string | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("transactions")
+    .select("occurred_on")
+    .eq("user_id", user.id)
+    .order("occurred_on", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data?.occurred_on ?? null;
+}
+
 export type HistoryPoint = {
   label: string;
   realIncome: number;
