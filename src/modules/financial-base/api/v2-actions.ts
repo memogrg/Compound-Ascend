@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import {
   budgetItemInputSchema,
   incomeSourceInputSchema,
+  passiveIncomeStubInputSchema,
   txnInputSchema,
   accountInputSchema,
   ruleInputSchema,
@@ -53,6 +54,7 @@ import {
   deleteIncomeSource,
   receivePartialIncome,
   copyPreviousMonthIncome,
+  registerPassiveIncomeWithStub,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import {
@@ -292,6 +294,28 @@ export async function copyPreviousMonthIncomeAction(
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos copiar los ingresos del mes anterior." };
+  }
+}
+
+/**
+ * Registra un ingreso pasivo (renta/dividendos) creando un stub de inversión
+ * vinculado a la fuente (Fase 3). Revalida Ingresos + Inversiones.
+ */
+export async function registerPassiveIncomeWithStubAction(raw: unknown): Promise<ActionResult> {
+  const parsed = passiveIncomeStubInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await registerPassiveIncomeWithStub(parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch (err) {
+    logger.error("registerPassiveIncomeWithStub fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos registrar el ingreso pasivo." };
   }
 }
 

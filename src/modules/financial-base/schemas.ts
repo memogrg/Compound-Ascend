@@ -74,6 +74,8 @@ export const budgetItemInputSchema = z.object({
   // Ingresos (Fase 1): clasificación + plantilla recurrente copy-on-demand.
   incomeType: z.enum(["activo", "pasivo", "extraordinario"]).optional(),
   recurringItemId: uuidOrNull.optional(),
+  // Ingresos (Fase 3): inversión vinculada (stub de renta/dividendos).
+  holdingId: uuidOrNull.optional(),
 });
 
 /**
@@ -89,6 +91,17 @@ export const incomeSourceInputSchema = z.object({
   incomeType: z.enum(["activo", "pasivo", "extraordinario"]),
   recurrent: z.boolean().default(false),
   frequency: frequency.default("mensual"),
+});
+
+/**
+ * Ingreso pasivo (renta/dividendos) que crea un stub de inversión vinculado
+ * (Fase 3 · flujo inverso). Combina la fuente con los datos mínimos del activo.
+ */
+export const passiveIncomeStubInputSchema = z.object({
+  income: incomeSourceInputSchema,
+  subtype: z.enum(["renta", "dividendos"]),
+  assetName: z.string().trim().min(1, "Ponle un nombre al activo").max(120),
+  baseValue: z.number({ error: "Valor inválido" }).nonnegative("No puede ser negativo"),
 });
 
 export const txnInputSchema = z
@@ -200,6 +213,7 @@ export const templateInputSchema = z.object({
 
 export type BudgetItemInput = z.infer<typeof budgetItemInputSchema>;
 export type IncomeSourceInput = z.infer<typeof incomeSourceInputSchema>;
+export type PassiveIncomeStubInput = z.infer<typeof passiveIncomeStubInputSchema>;
 export type TxnInput = z.infer<typeof txnInputSchema>;
 export type AccountInput = z.infer<typeof accountInputSchema>;
 export type RuleInput = z.infer<typeof ruleInputSchema>;

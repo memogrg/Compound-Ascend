@@ -16,8 +16,11 @@ import { useToast } from "@/components/ui/toast";
 import {
   registerIncomeSourceAction,
   updateIncomeSourceAction,
+  registerPassiveIncomeWithStubAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
+
+type PassiveSubtype = "" | "renta" | "dividendos";
 
 const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
   activo: "Activo",
@@ -66,39 +69,130 @@ export function RegisterIncomeModal({
   const [incomeType, setIncomeType] = useState<IncomeType>(item?.incomeType ?? "activo");
   const [recurrent, setRecurrent] = useState(Boolean(item?.recurringItemId));
   const [frequency, setFrequency] = useState<string>(item?.frequency ?? "mensual");
+  // Subtipo pasivo (Fase 3): renta de bienes raíces / dividendos → stub de inversión.
+  const [subtype, setSubtype] = useState<PassiveSubtype>("");
+  const [stubStep, setStubStep] = useState(false);
+  const [assetName, setAssetName] = useState("");
+  const [baseValue, setBaseValue] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const currencyOptions = Array.from(new Set([curr, ...Object.keys(CURRENCY_SYMBOL)]));
+
+  const incomePayload = () => ({
+    name: name.trim(),
+    amount: Number(amount),
+    currency: curr,
+    occurredOn: date,
+    incomeType,
+    recurrent,
+    frequency: recurrent ? frequency : "mensual",
+  });
+
+  // Un ingreso pasivo de renta/dividendos abre el sub-popup del stub (solo al
+  // crear; en edición se actualiza la fuente sin tocar la inversión vinculada).
+  const needsStub = !editing && incomeType === "pasivo" && subtype !== "";
+
+  const finish = (res: { ok: boolean; message?: string }, okMsg: string) => {
+    setPending(false);
+    if (res.ok) {
+      toast(okMsg);
+      onClose();
+      router.refresh();
+    } else setError(res.message ?? "No pudimos guardar.");
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const amt = Number(amount);
     if (!name.trim()) return setError("Ponle un nombre a la fuente.");
     if (!Number.isFinite(amt) || amt < 0) return setError("Ingresa un monto válido.");
-    setPending(true);
     setError(null);
-    const payload = {
-      name: name.trim(),
-      amount: amt,
-      currency: curr,
-      occurredOn: date,
-      incomeType,
-      recurrent,
-      frequency: recurrent ? frequency : "mensual",
-    };
-    const res = editing
-      ? await updateIncomeSourceAction(item!.id, payload)
-      : await registerIncomeSourceAction(payload);
-    setPending(false);
-    if (res.ok) {
-      toast(editing ? "Fuente actualizada" : "Ingreso registrado");
-      onClose();
-      router.refresh();
-    } else {
-      setError(res.message ?? "No pudimos guardar.");
+    if (needsStub) {
+      setAssetName((v) => v || name.trim());
+      setStubStep(true);
+      return;
     }
+    setPending(true);
+    const res = editing
+      ? await updateIncomeSourceAction(item!.id, incomePayload())
+      : await registerIncomeSourceAction(incomePayload());
+    finish(res, editing ? "Fuente actualizada" : "Ingreso registrado");
   };
+
+  const onSubmitStub = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = Number(baseValue);
+    if (!assetName.trim()) return setError("Completa el nombre del activo.");
+    if (!Number.isFinite(value) || value < 0) return setError("Ingresa un valor válido.");
+    setError(null);
+    setPending(true);
+    const res = await registerPassiveIncomeWithStubAction({
+      income: incomePayload(),
+      subtype,
+      assetName: assetName.trim(),
+      baseValue: value,
+    });
+    finish(res, "Ingreso pasivo registrado · inversión por completar");
+  };
+
+  if (stubStep) {
+    const isRental = subtype === "renta";
+    return (
+      <Modal
+        title={isRental ? "Renta de bienes raíces" : "Dividendos"}
+        sub="Vinculamos este ingreso a una inversión que podrás completar luego."
+        onClose={onClose}
+      >
+        <form onSubmit={onSubmitStub}>
+          <div className="modal-body">
+            {error ? (
+              <div className="auth-msg warn" role="alert">
+                {error}
+              </div>
+            ) : null}
+            <div className="fld">
+              <label className="fld-label">{isRental ? "Nombre del bien" : "Ticker o nombre"}</label>
+              <input
+                autoFocus
+                className="inp"
+                value={assetName}
+                onChange={(e) => setAssetName(e.target.value)}
+                placeholder={isRental ? "Apartamento centro…" : "AAPL, VOO…"}
+                required
+              />
+            </div>
+            <div className="fld">
+              <label className="fld-label">
+                {isRental ? "Valor de la casa / inmueble" : "Monto invertido"}
+              </label>
+              <div className="inp-money">
+                <span className="pre">{CURRENCY_SYMBOL[curr] ?? ""}</span>
+                <input
+                  inputMode="decimal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={baseValue}
+                  onChange={(e) => setBaseValue(e.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-ghost" onClick={() => setStubStep(false)}>
+              ← Atrás
+            </button>
+            <button type="submit" className="btn btn-secondary" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar ingreso"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -183,6 +277,30 @@ export function RegisterIncomeModal({
             </div>
           </div>
 
+          {incomeType === "pasivo" && !editing ? (
+            <div className="fld">
+              <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                Origen del ingreso pasivo
+                <span
+                  className="tip tip-wrap"
+                  data-tip="Renta de bienes raíces y dividendos crean una inversión vinculada que podrás completar luego en Patrimonio."
+                  style={{ display: "inline-flex", color: "var(--muted)", cursor: "help" }}
+                >
+                  <Icon name="info" />
+                </span>
+              </label>
+              <select
+                className="sel"
+                value={subtype}
+                onChange={(e) => setSubtype(e.target.value as PassiveSubtype)}
+              >
+                <option value="">Otro ingreso pasivo</option>
+                <option value="renta">Renta de bienes raíces</option>
+                <option value="dividendos">Dividendos</option>
+              </select>
+            </div>
+          ) : null}
+
           <div className="fld">
             <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
               Recurrencia
@@ -240,7 +358,13 @@ export function RegisterIncomeModal({
             Cancelar
           </button>
           <button type="submit" className="btn btn-secondary" disabled={pending}>
-            {pending ? "Guardando…" : editing ? "Guardar cambios" : "Guardar ingreso"}
+            {pending
+              ? "Guardando…"
+              : needsStub
+                ? "Siguiente →"
+                : editing
+                  ? "Guardar cambios"
+                  : "Guardar ingreso"}
           </button>
         </div>
       </form>

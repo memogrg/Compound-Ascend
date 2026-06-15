@@ -19,7 +19,11 @@ import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engin
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
 import type { BudgetItem, BudgetType, IncomeType, Period } from "@/modules/financial-base/types";
 import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
-import type { BudgetItemInput, IncomeSourceInput } from "@/modules/financial-base/schemas";
+import type {
+  BudgetItemInput,
+  IncomeSourceInput,
+  PassiveIncomeStubInput,
+} from "@/modules/financial-base/schemas";
 import type { BudgetItemRow } from "@/lib/supabase/database.types";
 
 function rowToBudgetItem(r: BudgetItemRow): BudgetItem {
@@ -37,6 +41,7 @@ function rowToBudgetItem(r: BudgetItemRow): BudgetItem {
     sourceId: r.source_id ?? null,
     incomeType: (r.income_type ?? "activo") as IncomeType,
     recurringItemId: r.recurring_item_id ?? null,
+    holdingId: r.holding_id ?? null,
   };
 }
 
@@ -87,6 +92,7 @@ export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
     // income_type solo aplica a ingresos; los gastos lo dejan null.
     income_type: input.type === "income" ? (input.incomeType ?? "activo") : null,
     recurring_item_id: input.recurringItemId ?? null,
+    holding_id: input.holdingId ?? null,
   });
 }
 
@@ -136,6 +142,7 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
       period_year: input.periodYear,
       income_type: input.type === "income" ? (input.incomeType ?? "activo") : null,
       recurring_item_id: input.recurringItemId ?? null,
+      holding_id: input.holdingId ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);
@@ -225,25 +232,38 @@ async function createRecurringTemplate(
   return data!.id;
 }
 
-export async function registerIncomeSource(input: IncomeSourceInput): Promise<void> {
+export async function registerIncomeSource(
+  input: IncomeSourceInput,
+  holdingId?: string | null,
+): Promise<string> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const period = periodFromDate(input.occurredOn);
   const recurringItemId = input.recurrent
     ? await createRecurringTemplate(supabase, user.id, input)
     : null;
-  await createBudgetItem({
-    type: "income",
-    categoryId: null,
-    name: input.name,
-    amount: input.amount,
-    currency: input.currency,
-    frequency: input.recurrent ? input.frequency : "mensual",
-    periodMonth: period.month,
-    periodYear: period.year,
-    incomeType: input.incomeType,
-    recurringItemId,
-  });
+  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const { data, error } = await supabase
+    .from("budget_items")
+    .insert({
+      user_id: user.id,
+      household_id,
+      type: "income",
+      category_id: null,
+      name: input.name,
+      amount: input.amount,
+      currency: input.currency,
+      frequency: input.recurrent ? input.frequency : "mensual",
+      period_month: period.month,
+      period_year: period.year,
+      income_type: input.incomeType,
+      recurring_item_id: recurringItemId,
+      holding_id: holdingId ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data!.id;
 }
 
 export async function updateIncomeSource(id: string, input: IncomeSourceInput): Promise<void> {
@@ -253,11 +273,12 @@ export async function updateIncomeSource(id: string, input: IncomeSourceInput): 
 
   const { data: row } = await supabase
     .from("budget_items")
-    .select("recurring_item_id")
+    .select("recurring_item_id,holding_id")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
   let recurringItemId = row?.recurring_item_id ?? null;
+  const holdingId = row?.holding_id ?? null;
 
   if (input.recurrent && recurringItemId) {
     // Mantiene sincronizada la plantilla recurrente con la fuente editada.
@@ -291,6 +312,7 @@ export async function updateIncomeSource(id: string, input: IncomeSourceInput): 
     periodYear: period.year,
     incomeType: input.incomeType,
     recurringItemId,
+    holdingId,
   });
 }
 
@@ -311,6 +333,74 @@ export async function deleteIncomeSource(id: string): Promise<void> {
       .delete()
       .eq("id", row.recurring_item_id)
       .eq("user_id", user.id);
+  }
+}
+
+/**
+ * Flujo inverso (Fase 3): un ingreso pasivo de renta/dividendos crea un STUB de
+ * inversión (needs_detail=true) y lo vincula a la fuente (budget_items.holding_id).
+ * El stub vive en investment_holdings (tabla de Patrimonio); se inserta directo
+ * para NO invertir la dirección de dependencia (financial-base no importa wealth).
+ * El detalle real se completa luego desde el wizard de Inversiones. Compensa
+ * borrando el stub si la creación de la fuente falla.
+ */
+export async function registerPassiveIncomeWithStub(args: PassiveIncomeStubInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const isRental = args.subtype === "renta";
+  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const { data: holding, error: hErr } = await supabase
+    .from("investment_holdings")
+    .insert({
+      user_id: user.id,
+      household_id,
+      symbol: isRental ? "INMU" : args.assetName.toUpperCase().slice(0, 12),
+      asset_type: isRental ? "inmueble" : "accion",
+      label: args.assetName,
+      currency: args.income.currency,
+      quantity: 0,
+      average_cost: 0,
+      cost_basis: isRental ? null : args.baseValue,
+      current_value_manual: isRental ? args.baseValue : null,
+      needs_detail: true,
+    })
+    .select("id")
+    .single();
+  if (hErr) throw new Error(hErr.message);
+  try {
+    await registerIncomeSource({ ...args.income, incomeType: "pasivo" }, holding!.id);
+  } catch (err) {
+    await supabase
+      .from("investment_holdings")
+      .delete()
+      .eq("id", holding!.id)
+      .eq("user_id", user.id);
+    throw err;
+  }
+}
+
+/**
+ * Revierte las fuentes de ingreso vinculadas a una inversión (Fase 3): al borrar
+ * un stub se eliminan sus líneas de ingreso y sus plantillas recurrentes. Lo
+ * llama wealth/deleteHolding (dirección wealth → financial-base).
+ */
+export async function deleteIncomeSourcesByHolding(holdingId: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data: rows } = await supabase
+    .from("budget_items")
+    .select("id,recurring_item_id")
+    .eq("user_id", user.id)
+    .eq("holding_id", holdingId);
+  for (const r of rows ?? []) {
+    await supabase.from("budget_items").delete().eq("id", r.id).eq("user_id", user.id);
+    if (r.recurring_item_id) {
+      await supabase
+        .from("recurring_items")
+        .delete()
+        .eq("id", r.recurring_item_id)
+        .eq("user_id", user.id);
+    }
   }
 }
 
