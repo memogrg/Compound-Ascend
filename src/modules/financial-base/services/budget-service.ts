@@ -12,11 +12,11 @@ import {
   listCategoryTree,
 } from "@/modules/financial-base/services/categories-service";
 import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
-import { previousMonthPeriod } from "@/modules/financial-base/engine/period";
+import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
-import type { BudgetItem, BudgetType, Period } from "@/modules/financial-base/types";
+import type { BudgetItem, BudgetType, IncomeType, Period } from "@/modules/financial-base/types";
 import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
-import type { BudgetItemInput } from "@/modules/financial-base/schemas";
+import type { BudgetItemInput, IncomeSourceInput } from "@/modules/financial-base/schemas";
 import type { BudgetItemRow } from "@/lib/supabase/database.types";
 
 function rowToBudgetItem(r: BudgetItemRow): BudgetItem {
@@ -32,6 +32,8 @@ function rowToBudgetItem(r: BudgetItemRow): BudgetItem {
     periodYear: r.period_year,
     sourceKind: (r.source_kind ?? "manual") as BudgetItem["sourceKind"],
     sourceId: r.source_id ?? null,
+    incomeType: (r.income_type ?? "activo") as IncomeType,
+    recurringItemId: r.recurring_item_id ?? null,
   };
 }
 
@@ -79,6 +81,9 @@ export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
     frequency: input.frequency,
     period_month: input.periodMonth,
     period_year: input.periodYear,
+    // income_type solo aplica a ingresos; los gastos lo dejan null.
+    income_type: input.type === "income" ? (input.incomeType ?? "activo") : null,
+    recurring_item_id: input.recurringItemId ?? null,
   });
 }
 
@@ -126,6 +131,8 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
       frequency: input.frequency,
       period_month: input.periodMonth,
       period_year: input.periodYear,
+      income_type: input.type === "income" ? (input.incomeType ?? "activo") : null,
+      recurring_item_id: input.recurringItemId ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);
@@ -176,6 +183,132 @@ export async function setCategoryBudget(args: {
     periodMonth: args.period.month,
     periodYear: args.period.year,
   });
+}
+
+// ============================ Fuentes de ingreso (Fase 1) ============================
+// Una fuente = una línea budget_items (income) MANUAL y editable. Si es
+// recurrente, se crea/vincula una plantilla en recurring_items INACTIVA
+// (active=false): no la auto-sincroniza syncDerivedBudget; la copia al mes
+// actual el botón "Copiar ingresos del mes anterior" de la Fase 2.
+
+function periodFromDate(occurredOn: string): Period {
+  const [y, m] = occurredOn.split("-").map(Number);
+  return monthPeriod(y!, m!);
+}
+
+/** Crea la plantilla recurrente (inactiva) y devuelve su id. */
+async function createRecurringTemplate(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+  input: Pick<IncomeSourceInput, "name" | "amount" | "currency" | "frequency">,
+): Promise<string> {
+  const household_id = await getActiveHouseholdId(supabase, userId);
+  const { data, error } = await supabase
+    .from("recurring_items")
+    .insert({
+      user_id: userId,
+      household_id,
+      kind: "ingreso",
+      name: input.name,
+      amount: input.amount,
+      currency: input.currency,
+      frequency: input.frequency,
+      next_date: null,
+      active: false, // copy-on-demand: no auto-sync.
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data!.id;
+}
+
+export async function registerIncomeSource(input: IncomeSourceInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const period = periodFromDate(input.occurredOn);
+  const recurringItemId = input.recurrent
+    ? await createRecurringTemplate(supabase, user.id, input)
+    : null;
+  await createBudgetItem({
+    type: "income",
+    categoryId: null,
+    name: input.name,
+    amount: input.amount,
+    currency: input.currency,
+    frequency: input.recurrent ? input.frequency : "mensual",
+    periodMonth: period.month,
+    periodYear: period.year,
+    incomeType: input.incomeType,
+    recurringItemId,
+  });
+}
+
+export async function updateIncomeSource(id: string, input: IncomeSourceInput): Promise<void> {
+  await assertManualItem(id);
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: row } = await supabase
+    .from("budget_items")
+    .select("recurring_item_id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  let recurringItemId = row?.recurring_item_id ?? null;
+
+  if (input.recurrent && recurringItemId) {
+    // Mantiene sincronizada la plantilla recurrente con la fuente editada.
+    await supabase
+      .from("recurring_items")
+      .update({
+        name: input.name,
+        amount: input.amount,
+        currency: input.currency,
+        frequency: input.frequency,
+      })
+      .eq("id", recurringItemId)
+      .eq("user_id", user.id);
+  } else if (input.recurrent && !recurringItemId) {
+    recurringItemId = await createRecurringTemplate(supabase, user.id, input);
+  } else if (!input.recurrent && recurringItemId) {
+    // Dejó de ser recurrente: descarta la plantilla.
+    await supabase.from("recurring_items").delete().eq("id", recurringItemId).eq("user_id", user.id);
+    recurringItemId = null;
+  }
+
+  const period = periodFromDate(input.occurredOn);
+  await updateBudgetItem(id, {
+    type: "income",
+    categoryId: null,
+    name: input.name,
+    amount: input.amount,
+    currency: input.currency,
+    frequency: input.recurrent ? input.frequency : "mensual",
+    periodMonth: period.month,
+    periodYear: period.year,
+    incomeType: input.incomeType,
+    recurringItemId,
+  });
+}
+
+export async function deleteIncomeSource(id: string): Promise<void> {
+  await assertManualItem(id);
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data: row } = await supabase
+    .from("budget_items")
+    .select("recurring_item_id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  await supabase.from("budget_items").delete().eq("id", id).eq("user_id", user.id);
+  if (row?.recurring_item_id) {
+    await supabase
+      .from("recurring_items")
+      .delete()
+      .eq("id", row.recurring_item_id)
+      .eq("user_id", user.id);
+  }
 }
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;
