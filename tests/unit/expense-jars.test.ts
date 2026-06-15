@@ -105,6 +105,57 @@ describe("buildExpenseJars (Fase frascos)", () => {
     expect(jar.cta.href).toBe("/deudas?new=debt");
   });
 
+  it("frasco vinculado budget-aware (Deudas): cuota/pagado/restante por obligación + totales", () => {
+    const entities: JarEntities = {
+      ...NO_ENTITIES,
+      debt: [
+        { id: "d1", name: "Tarjeta BAC", sub: "Cuota mensual", amount: 45000 },
+        { id: "d2", name: "Préstamo auto", sub: "Cuota mensual", amount: 80000 },
+      ],
+    };
+    const jar = buildExpenseJars({
+      tree: [DEUDAS],
+      budgetByKey: {},
+      realByKey: {},
+      entities,
+      fmt,
+      linkedBudget: {
+        debt: {
+          // d1 toma la línea derivada (50000, ≠ monto de entidad); d2 cae al monto.
+          bySource: { d1: 50000 },
+          spentById: { d1: 20000 },
+          paymentCategoryId: "cat-deudas",
+        },
+      },
+    })[0]!;
+    if (jar.kind !== "linked") throw new Error("linked");
+    expect(jar.budgetAware).toBe(true);
+    expect(jar.paymentCategoryId).toBe("cat-deudas");
+
+    const d1 = jar.items.find((i) => i.id === "d1")!;
+    expect(d1.budget).toBe(50000); // línea derivada, no el monto de la entidad
+    expect(d1.spent).toBe(20000);
+    expect(d1.remaining).toBe(30000);
+
+    const d2 = jar.items.find((i) => i.id === "d2")!;
+    expect(d2.budget).toBe(80000); // fallback al monto de la entidad
+    expect(d2.spent).toBe(0);
+    expect(d2.remaining).toBe(80000);
+
+    expect(jar.totals).toEqual({ budget: 130000, spent: 20000, remaining: 110000 });
+  });
+
+  it("frasco vinculado SIN config de presupuesto: sigue plano (sin budget/spent)", () => {
+    const entities: JarEntities = {
+      ...NO_ENTITIES,
+      debt: [{ id: "d1", name: "Tarjeta BAC", sub: "Cuota mensual", amount: 45000 }],
+    };
+    const jar = buildExpenseJars({ tree: [DEUDAS], budgetByKey: {}, realByKey: {}, entities, fmt })[0]!;
+    if (jar.kind !== "linked") throw new Error("linked");
+    expect(jar.budgetAware).toBeUndefined();
+    expect(jar.items[0]!.budget).toBeUndefined();
+  });
+
   it("frasco vinculado vacío: texto exacto del diseño", () => {
     const jar = buildExpenseJars({ tree: [DEUDAS], budgetByKey: {}, realByKey: {}, entities: NO_ENTITIES, fmt })[0]!;
     if (jar.kind !== "linked") throw new Error("linked");
