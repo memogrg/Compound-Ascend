@@ -15,7 +15,7 @@ import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { addTransactionAction } from "@/modules/financial-base/api/v2-actions";
-import type { Jar } from "@/modules/financial-base/engine/expense-jars";
+import type { Jar, JarItem } from "@/modules/financial-base/engine/expense-jars";
 import type { Account } from "@/modules/financial-base/types";
 
 const CURRENCIES: { code: string; sym: string }[] = [
@@ -52,16 +52,30 @@ export function AddSpendModal({
   const normalJars = jars.filter(
     (j): j is Extract<Jar, { kind: "normal" }> => j.kind === "normal" && j.envelopes.length > 0,
   );
-  // Frasco de Deudas (budget-aware): cada obligación es un "sobre" pagable. El
-  // valor "debt:<id>" lo distingue de un sobre normal al guardar.
-  const debtJar = jars.find(
+  // Frascos vinculados budget-aware (Deudas, Ahorro): cada entidad es un "sobre"
+  // pagable. El valor "<linkedKind>:<id>" lo distingue de un sobre normal al
+  // guardar. Patrón genérico (sirve para debt y goal; holding/policy quedan fuera).
+  const linkedJars = jars.filter(
     (j): j is Extract<Jar, { kind: "linked" }> =>
-      j.kind === "linked" && j.linkedKind === "debt" && !!j.budgetAware && j.items.length > 0,
+      j.kind === "linked" && !!j.budgetAware && j.items.length > 0,
   );
-  const debtItems = debtJar?.items ?? [];
-  const firstEnv = normalJars[0]?.envelopes[0]?.id ?? (debtItems[0] ? `debt:${debtItems[0].id}` : "");
-  const hasOptions = normalJars.length > 0 || debtItems.length > 0;
+  const firstLinked = linkedJars[0]?.items[0];
+  const firstEnv =
+    normalJars[0]?.envelopes[0]?.id ??
+    (firstLinked ? `${linkedJars[0]!.linkedKind}:${firstLinked.id}` : "");
+  const hasOptions = normalJars.length > 0 || linkedJars.length > 0;
   const defaultAccount = accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "";
+
+  /** Resuelve un valor "<linkedKind>:<id>" al frasco + entidad correspondientes. */
+  function findLinked(value: string): { jar: Extract<Jar, { kind: "linked" }>; item: JarItem } | null {
+    const idx = value.indexOf(":");
+    if (idx < 0) return null;
+    const kind = value.slice(0, idx);
+    const id = value.slice(idx + 1);
+    const jar = linkedJars.find((j) => j.linkedKind === kind);
+    const item = jar?.items.find((it) => it.id === id);
+    return jar && item ? { jar, item } : null;
+  }
 
   // La moneda principal del usuario va primero aunque no esté en la lista base.
   const currencyOptions = CURRENCIES.some((c) => c.code === currency)
@@ -77,18 +91,15 @@ export function AddSpendModal({
   const [error, setError] = useState<string | null>(null);
 
   const sym = currencyOptions.find((c) => c.code === cur)?.sym ?? cur;
-  const isDebtSelected = sobre.startsWith("debt:");
+  const linkedSel = findLinked(sobre);
 
-  // Al elegir una deuda, pre-llena el monto con el restante de la cuota del mes
-  // (editable). El valor "debt:<id>" se desambigua al guardar.
+  // Al elegir una entidad vinculada, pre-llena el monto con su restante del mes
+  // (editable). El valor "<linkedKind>:<id>" se desambigua al guardar.
   function pickSobre(value: string) {
     setSobre(value);
-    if (value.startsWith("debt:")) {
-      const id = value.slice("debt:".length);
-      const obl = debtItems.find((it) => it.id === id);
-      if (obl && typeof obl.remaining === "number") {
-        setAmount(String(Math.max(0, obl.remaining)));
-      }
+    const sel = findLinked(value);
+    if (sel && typeof sel.item.remaining === "number") {
+      setAmount(String(Math.max(0, sel.item.remaining)));
     }
   }
 
@@ -98,19 +109,19 @@ export function AddSpendModal({
     if (!sobre) return setError("Elige un sobre.");
     setPending(true);
     setError(null);
-    // Deuda: imputa a la categoría de sistema "deudas" y vincula la entidad para
-    // que addTransactionAction propague el pago a debt_payments. Sobre normal:
-    // el categoryId ES el sobre (camino actual sin tocar).
-    const debtId = isDebtSelected ? sobre.slice("debt:".length) : null;
+    // Vinculado (deuda/meta): imputa a la categoría del frasco y vincula la
+    // entidad para que addTransactionAction propague (debt_payments / current_amount
+    // de la meta) UNA sola vez. Sobre normal: el categoryId ES el sobre (sin tocar).
+    const sel = findLinked(sobre);
     const res = await addTransactionAction({
       kind: "gasto",
       amount: amt,
       currency: cur,
       occurredOn: date,
-      categoryId: isDebtSelected ? (debtJar?.paymentCategoryId ?? undefined) : sobre,
+      categoryId: sel ? (sel.jar.paymentCategoryId ?? undefined) : sobre,
       accountId: defaultAccount || undefined,
       merchantOrSource: name.trim() || undefined,
-      ...(debtId ? { linkedKind: "debt" as const, linkedId: debtId } : {}),
+      ...(sel ? { linkedKind: sel.jar.linkedKind, linkedId: sel.item.id } : {}),
     });
     setPending(false);
     if (res.ok) {
@@ -193,7 +204,7 @@ export function AddSpendModal({
           </div>
         </div>
 
-        {/* Sobre (optgroup por frasco) + obligaciones de Deudas */}
+        {/* Sobre (optgroup por frasco) + entidades vinculadas (Deudas/Ahorro) */}
         <div className="fld" style={{ marginTop: 12 }}>
           <label className="fld-label">Sobre</label>
           {!hasOptions ? (
@@ -216,21 +227,23 @@ export function AddSpendModal({
                   ))}
                 </optgroup>
               ))}
-              {debtItems.length > 0 ? (
-                <optgroup label={debtJar?.name ?? "Deudas"}>
-                  {debtItems.map((it) => (
-                    <option key={it.id} value={`debt:${it.id}`}>
+              {linkedJars.map((j) => (
+                <optgroup key={j.group} label={j.name}>
+                  {j.items.map((it) => (
+                    <option key={it.id} value={`${j.linkedKind}:${it.id}`}>
                       {it.name}
                     </option>
                   ))}
                 </optgroup>
-              ) : null}
+              ))}
             </select>
           )}
           <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            {isDebtSelected
-              ? "Registra el pago de la deuda; se reflejará en su frasco y en /deudas."
-              : "Este gasto reducirá el presupuesto disponible del sobre seleccionado."}
+            {linkedSel?.jar.linkedKind === "goal"
+              ? "Registra el aporte a la meta; se reflejará en su frasco y en el tab de Ahorro."
+              : linkedSel
+                ? "Registra el pago de la deuda; se reflejará en su frasco y en /deudas."
+                : "Este gasto reducirá el presupuesto disponible del sobre seleccionado."}
           </div>
         </div>
       </div>
