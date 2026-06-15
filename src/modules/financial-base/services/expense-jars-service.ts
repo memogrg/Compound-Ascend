@@ -10,6 +10,8 @@ import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { formatMoney } from "@/lib/format";
 import { listLinkableEntitiesDetailed } from "@/modules/financial-base/services/linkable-entities-service";
+import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
+import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
 import {
   buildExpenseJars,
   type Jar,
@@ -18,6 +20,7 @@ import {
   type KeyedTotals,
 } from "@/modules/financial-base/engine/expense-jars";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
+import type { Period } from "@/modules/financial-base/types";
 
 export async function getExpenseJars(args: {
   tree: CategoryNode[];
@@ -58,5 +61,31 @@ export async function getExpenseJars(args: {
     realByKey: args.realByKey,
     entities,
     fmt: (n: number) => formatMoney(n, args.currency),
+  });
+}
+
+/**
+ * Frascos scopeados a una fecha de corte (filtro propio del tab de Gastos): el
+ * presupuesto es el del mes de `period`, y el gasto real se acumula SOLO hasta
+ * el día `asOf` (inclusive). Reutiliza getRealTotals con un periodo cuyo `to`
+ * se recorta a `asOf`, así la semántica es idéntica a la del mes completo
+ * cuando `asOf` es el último día. No re-scopea cards ni gráficas.
+ */
+export async function getExpenseJarsAsOf(args: {
+  tree: CategoryNode[];
+  period: Period;
+  asOf: string; // YYYY-MM-DD (dentro del mes de `period`)
+  currency: string;
+}): Promise<Jar[]> {
+  const cutoff: Period = { ...args.period, to: args.asOf };
+  const [budget, real] = await Promise.all([
+    getBudgetTotals(args.period),
+    getRealTotals(cutoff),
+  ]);
+  return getExpenseJars({
+    tree: args.tree,
+    budgetByKey: budget.expenseByKey,
+    realByKey: real.expenseByKey,
+    currency: args.currency,
   });
 }
