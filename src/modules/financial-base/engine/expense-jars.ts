@@ -15,7 +15,23 @@ import { mergeSuggestions } from "@/modules/financial-base/engine/expense-sugges
 export type KeyedTotals = Record<string, { label: string; value: number }>;
 
 export type JarEnvelope = { id: string; name: string; spent: number; budget: number };
-export type JarItem = { id: string; name: string; sub: string; amount: string; delta?: string };
+/**
+ * Elemento de un frasco vinculado. `amount` es el monto formateado (presupuesto
+ * de la obligación). Cuando el frasco es budget-aware (p.ej. Deudas), trae además
+ * `budget`/`spent`/`remaining` numéricos (moneda principal) para la barra.
+ */
+export type JarItem = {
+  id: string;
+  name: string;
+  sub: string;
+  amount: string;
+  delta?: string;
+  budget?: number;
+  spent?: number;
+  remaining?: number;
+};
+
+export type LinkedKind = "holding" | "debt" | "policy" | "goal";
 
 export type Jar =
   | {
@@ -34,12 +50,31 @@ export type Jar =
       name: string;
       color: string;
       icon: string;
-      linkedKind: "holding" | "debt" | "policy" | "goal";
+      linkedKind: LinkedKind;
       items: JarItem[];
       emptyText: string;
       cta: { label: string; href: string };
       fixedFunds?: { name: string; sub: string }[];
+      /** true cuando cada obligación trae presupuesto/gastado (Deudas). */
+      budgetAware?: boolean;
+      /** Totales del frasco = suma de sus obligaciones (solo budget-aware). */
+      totals?: { budget: number; spent: number; remaining: number };
+      /** Categoría de sistema a la que se imputa el pago (para Registrar gasto). */
+      paymentCategoryId?: string | null;
     };
+
+/**
+ * Datos de presupuesto/gastado de un linkedKind budget-aware (p.ej. Deudas):
+ * la cuota mensual por entidad (fuente: línea derivada `source_kind`), el
+ * pagado del periodo por entidad y la categoría de sistema del pago.
+ */
+export type LinkedBudgetData = {
+  bySource: Record<string, number>; // entityId → cuota mensual (moneda principal)
+  spentById: Record<string, number>; // entityId → pagado en el periodo
+  paymentCategoryId: string | null;
+};
+/** Config por linkedKind; solo los presentes se vuelven budget-aware. */
+export type LinkedBudgetConfig = Partial<Record<LinkedKind, LinkedBudgetData>>;
 
 /** Entidad real ya resuelta (id + etiqueta + monto numérico + subtítulo). */
 export type JarEntity = { id: string; name: string; sub: string; amount: number; delta?: string };
@@ -94,8 +129,10 @@ export function buildExpenseJars(args: {
   realByKey: KeyedTotals;
   entities: JarEntities;
   fmt: (n: number) => string;
+  /** Activa el modo budget-aware por linkedKind (esta entrega: solo `debt`). */
+  linkedBudget?: LinkedBudgetConfig;
 }): Jar[] {
-  const { tree, budgetByKey, realByKey, entities, fmt } = args;
+  const { tree, budgetByKey, realByKey, entities, fmt, linkedBudget } = args;
   const jars: Jar[] = [];
 
   for (const group of tree) {
@@ -107,6 +144,51 @@ export function buildExpenseJars(args: {
         linked.linkedKind === "holding"
           ? [...entities.holding, ...entities.rental]
           : entities[linked.linkedKind];
+      const lb = linkedBudget?.[linked.linkedKind];
+
+      if (lb) {
+        // Budget-aware: cada obligación trae cuota (línea derivada, fallback al
+        // monto de la entidad), pagado del periodo y restante. Totales = suma.
+        const items: JarItem[] = entityList.map((e) => {
+          const budget = lb.bySource[e.id] ?? e.amount;
+          const spent = lb.spentById[e.id] ?? 0;
+          return {
+            id: e.id,
+            name: e.name,
+            sub: e.sub,
+            amount: fmt(budget),
+            delta: e.delta,
+            budget,
+            spent,
+            remaining: budget - spent,
+          };
+        });
+        const totals = items.reduce(
+          (t, it) => ({
+            budget: t.budget + (it.budget ?? 0),
+            spent: t.spent + (it.spent ?? 0),
+            remaining: t.remaining + (it.remaining ?? 0),
+          }),
+          { budget: 0, spent: 0, remaining: 0 },
+        );
+        jars.push({
+          kind: "linked",
+          group: group.id,
+          name: group.name,
+          color: group.color ?? "var(--muted-2)",
+          icon: group.icon ?? "spark",
+          linkedKind: linked.linkedKind,
+          items,
+          emptyText: linked.emptyText,
+          cta: linked.cta,
+          fixedFunds: linked.fixedFunds,
+          budgetAware: true,
+          totals,
+          paymentCategoryId: lb.paymentCategoryId,
+        });
+        continue;
+      }
+
       jars.push({
         kind: "linked",
         group: group.id,
