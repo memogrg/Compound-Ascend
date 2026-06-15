@@ -91,6 +91,8 @@ export const incomeSourceInputSchema = z.object({
   incomeType: z.enum(["activo", "pasivo", "extraordinario"]),
   recurrent: z.boolean().default(false),
   frequency: frequency.default("mensual"),
+  // Subcategoría elegida (hoja del grupo del tipo); opcional.
+  categoryId: uuidOrNull.optional(),
 });
 
 /**

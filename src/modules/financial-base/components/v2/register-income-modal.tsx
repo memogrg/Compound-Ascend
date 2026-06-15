@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * Registro simplificado de una FUENTE de ingreso (tab Ingresos · Fase 1).
- * Una sola pantalla, 6 campos: Nombre · Moneda/Monto · Fecha · Categoría
- * (income_type) · Recurrente · Frecuencia (solo si recurrente). Sirve para alta
- * y edición. La fuente es una línea budget_items (income); si es recurrente se
- * crea/vincula una plantilla recurring_items copy-on-demand.
+ * Registro simplificado de una FUENTE de ingreso (tab Ingresos).
+ * Campos: Nombre · Moneda/Monto · Fecha · Categoría (tipo + subcategoría) ·
+ * Recurrente · Frecuencia. La subcategoría son las hojas del grupo del tipo
+ * (activo/pasivo/extraordinario); "Otro" crea una nueva bajo ese grupo. Si bajo
+ * Pasivo se elige "Alquileres" o "Dividendos", se dispara el sub-popup de stub
+ * de inversión (camino único; sin el viejo <select> de subtype).
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,8 +18,11 @@ import {
   registerIncomeSourceAction,
   updateIncomeSourceAction,
   registerPassiveIncomeWithStubAction,
+  addCategoryAction,
+  editCategoryAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
+import type { CategoryNode, Category } from "@/modules/financial-base/services/categories-service";
 
 type PassiveSubtype = "" | "renta" | "dividendos";
 
@@ -28,7 +32,13 @@ const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
   extraordinario: "Extraordinario",
 };
 
-// Frecuencias relevantes para una fuente recurrente (subconjunto del enum Zod).
+// Tipo → key del grupo de sistema (migración 20260615000004).
+const GROUP_KEY_BY_TYPE: Record<IncomeType, string> = {
+  activo: "inc_activo",
+  pasivo: "inc_pasivo",
+  extraordinario: "inc_extra",
+};
+
 const FREQUENCIES: { value: string; label: string }[] = [
   { value: "semanal", label: "Semanal" },
   { value: "quincenal", label: "Quincenal" },
@@ -47,12 +57,16 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+type Leaf = Pick<Category, "id" | "name" | "parentId" | "isSystem">;
+
 export function RegisterIncomeModal({
   currency,
+  incomeTree,
   item,
   onClose,
 }: {
   currency: string;
+  incomeTree: CategoryNode[];
   item?: BudgetItem;
   onClose: () => void;
 }) {
@@ -66,11 +80,16 @@ export function RegisterIncomeModal({
   const [date, setDate] = useState(
     item ? `${item.periodYear}-${String(item.periodMonth).padStart(2, "0")}-01` : todayISO(),
   );
-  const [incomeType, setIncomeType] = useState<IncomeType>(item?.incomeType ?? "activo");
+  const [incomeType, setIncomeTypeRaw] = useState<IncomeType>(item?.incomeType ?? "activo");
+  const [categoryId, setCategoryId] = useState<string>(item?.categoryId ?? "");
   const [recurrent, setRecurrent] = useState(Boolean(item?.recurringItemId));
   const [frequency, setFrequency] = useState<string>(item?.frequency ?? "mensual");
-  // Subtipo pasivo (Fase 3): renta de bienes raíces / dividendos → stub de inversión.
-  const [subtype, setSubtype] = useState<PassiveSubtype>("");
+  // Subcategorías creadas en esta sesión (se ven al instante; router.refresh las persiste).
+  const [extraLeaves, setExtraLeaves] = useState<Leaf[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [renameName, setRenameName] = useState("");
   const [stubStep, setStubStep] = useState(false);
   const [assetName, setAssetName] = useState("");
   const [baseValue, setBaseValue] = useState("");
@@ -78,6 +97,36 @@ export function RegisterIncomeModal({
   const [error, setError] = useState<string | null>(null);
 
   const currencyOptions = Array.from(new Set([curr, ...Object.keys(CURRENCY_SYMBOL)]));
+
+  // Hojas del grupo del tipo seleccionado (sistema + creadas en sesión).
+  const incomeRoot = incomeTree.find((r) => r.key === "g_ingresos") ?? incomeTree[0];
+  const group = incomeRoot?.children.find((c) => c.key === GROUP_KEY_BY_TYPE[incomeType]);
+  const groupId = group?.id ?? null;
+  const leaves: Leaf[] = groupId
+    ? [
+        ...(incomeRoot?.children.filter((c) => c.parentId === groupId) ?? []),
+        ...extraLeaves.filter((l) => l.parentId === groupId),
+      ]
+    : [];
+  const selectedLeaf = leaves.find((l) => l.id === categoryId) ?? null;
+
+  // Camino único de inversión: elegir Alquileres/Dividendos bajo Pasivo dispara el stub.
+  const subtype: PassiveSubtype =
+    incomeType === "pasivo" && selectedLeaf
+      ? selectedLeaf.name === "Alquileres"
+        ? "renta"
+        : selectedLeaf.name === "Dividendos"
+          ? "dividendos"
+          : ""
+      : "";
+  const needsStub = !editing && subtype !== "";
+
+  const setIncomeType = (t: IncomeType) => {
+    setIncomeTypeRaw(t);
+    setCategoryId(""); // las subcategorías cambian con el tipo
+    setCreating(false);
+    setRenaming(false);
+  };
 
   const incomePayload = () => ({
     name: name.trim(),
@@ -87,11 +136,8 @@ export function RegisterIncomeModal({
     incomeType,
     recurrent,
     frequency: recurrent ? frequency : "mensual",
+    categoryId: categoryId || null,
   });
-
-  // Un ingreso pasivo de renta/dividendos abre el sub-popup del stub (solo al
-  // crear; en edición se actualiza la fuente sin tocar la inversión vinculada).
-  const needsStub = !editing && incomeType === "pasivo" && subtype !== "";
 
   const finish = (res: { ok: boolean; message?: string }, okMsg: string) => {
     setPending(false);
@@ -100,6 +146,39 @@ export function RegisterIncomeModal({
       onClose();
       router.refresh();
     } else setError(res.message ?? "No pudimos guardar.");
+  };
+
+  const onCreateSub = async () => {
+    if (!newName.trim() || !groupId) return;
+    setError(null);
+    const res = await addCategoryAction({
+      name: newName.trim(),
+      parentId: groupId,
+      categoryType: "income",
+    });
+    if (res.ok && res.id) {
+      setExtraLeaves((prev) => [
+        ...prev,
+        { id: res.id!, name: newName.trim(), parentId: groupId, isSystem: false },
+      ]);
+      setCategoryId(res.id);
+      setCreating(false);
+      setNewName("");
+      router.refresh();
+    } else setError(res.message ?? "No pudimos crear la subcategoría.");
+  };
+
+  const onRenameSub = async () => {
+    if (!renameName.trim() || !categoryId) return;
+    setError(null);
+    const res = await editCategoryAction(categoryId, { name: renameName.trim() });
+    if (res.ok) {
+      setExtraLeaves((prev) =>
+        prev.map((l) => (l.id === categoryId ? { ...l, name: renameName.trim() } : l)),
+      );
+      setRenaming(false);
+      router.refresh();
+    } else setError(res.message ?? "No pudimos renombrar.");
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -129,7 +208,7 @@ export function RegisterIncomeModal({
     setPending(true);
     const res = await registerPassiveIncomeWithStubAction({
       income: incomePayload(),
-      subtype,
+      subtype: subtype === "renta" ? "renta" : "dividendos",
       assetName: assetName.trim(),
       baseValue: value,
     });
@@ -277,29 +356,104 @@ export function RegisterIncomeModal({
             </div>
           </div>
 
-          {incomeType === "pasivo" && !editing ? (
-            <div className="fld">
-              <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                Origen del ingreso pasivo
-                <span
-                  className="tip tip-wrap"
-                  data-tip="Renta de bienes raíces y dividendos crean una inversión vinculada que podrás completar luego en Patrimonio."
-                  style={{ display: "inline-flex", color: "var(--muted)", cursor: "help" }}
+          <div className="fld">
+            <label className="fld-label">Subcategoría</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {leaves.map((l) => (
+                <button
+                  key={l.id}
+                  type="button"
+                  className={categoryId === l.id ? "seg-btn on" : "seg-btn"}
+                  style={{ borderRadius: 999 }}
+                  onClick={() => {
+                    setCategoryId(l.id);
+                    setRenaming(false);
+                  }}
                 >
-                  <Icon name="info" />
-                </span>
-              </label>
-              <select
-                className="sel"
-                value={subtype}
-                onChange={(e) => setSubtype(e.target.value as PassiveSubtype)}
+                  {l.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="seg-btn"
+                style={{ borderRadius: 999 }}
+                onClick={() => {
+                  setCreating(true);
+                  setNewName("");
+                }}
               >
-                <option value="">Otro ingreso pasivo</option>
-                <option value="renta">Renta de bienes raíces</option>
-                <option value="dividendos">Dividendos</option>
-              </select>
+                + Otro
+              </button>
             </div>
-          ) : null}
+
+            {creating ? (
+              <div className="row" style={{ gap: 8, marginTop: 8, alignItems: "center" }}>
+                <input
+                  autoFocus
+                  className="inp"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Nombra la subcategoría…"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void onCreateSub();
+                    }
+                  }}
+                />
+                <button type="button" className="btn btn-secondary" style={{ padding: "7px 12px" }} onClick={() => void onCreateSub()}>
+                  Crear
+                </button>
+                <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Cancelar" onClick={() => setCreating(false)}>
+                  <Icon name="x" width={2} />
+                </button>
+              </div>
+            ) : null}
+
+            {/* Renombrar solo subcategorías propias (no de sistema). */}
+            {selectedLeaf && !selectedLeaf.isSystem ? (
+              renaming ? (
+                <div className="row" style={{ gap: 8, marginTop: 8, alignItems: "center" }}>
+                  <input
+                    autoFocus
+                    className="inp"
+                    value={renameName}
+                    onChange={(e) => setRenameName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void onRenameSub();
+                      }
+                    }}
+                  />
+                  <button type="button" className="btn btn-secondary" style={{ padding: "7px 12px" }} onClick={() => void onRenameSub()}>
+                    Guardar
+                  </button>
+                  <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Cancelar" onClick={() => setRenaming(false)}>
+                    <Icon name="x" width={2} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ alignSelf: "flex-start", padding: "4px 0", marginTop: 6, color: "var(--info)" }}
+                  onClick={() => {
+                    setRenameName(selectedLeaf.name);
+                    setRenaming(true);
+                  }}
+                >
+                  Renombrar “{selectedLeaf.name}”
+                </button>
+              )
+            ) : null}
+
+            {subtype !== "" ? (
+              <div className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+                Crearás una inversión vinculada que podrás completar luego en Patrimonio.
+              </div>
+            ) : null}
+          </div>
 
           <div className="fld">
             <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>

@@ -4,8 +4,15 @@
 import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { RegisterIncomeModal } from "@/modules/financial-base/components/v2/register-income-modal";
+import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 
-export function RegisterIncomeButton({ currency }: { currency: string }) {
+export function RegisterIncomeButton({
+  currency,
+  incomeTree,
+}: {
+  currency: string;
+  incomeTree: CategoryNode[];
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -17,7 +24,13 @@ export function RegisterIncomeButton({ currency }: { currency: string }) {
       >
         <Icon name="plus" width={2} /> Registrar ingreso
       </button>
-      {open ? <RegisterIncomeModal currency={currency} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <RegisterIncomeModal
+          currency={currency}
+          incomeTree={incomeTree}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
