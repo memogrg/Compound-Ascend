@@ -15,6 +15,7 @@ import { TransactionsBrowser } from "@/modules/financial-base/components/v2/tran
 import { IncomeSources } from "@/modules/financial-base/components/v2/income-sources";
 import { IncomeRangeFilter } from "@/modules/financial-base/components/v2/income-range-filter";
 import { RegisterIncomeButton } from "@/modules/financial-base/components/v2/register-income-button";
+import { CopyPreviousIncomeButton } from "@/modules/financial-base/components/v2/copy-previous-income-button";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
 import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
 import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
@@ -550,7 +551,10 @@ function IncomeSection({ view }: { view: V2View }) {
     <div className="grid">
       <div className="tab-toolbar">
         <div className="hint">Tus ingresos se registran aquí; confírmalos cuando los recibas.</div>
-        <RegisterIncomeButton currency={currency} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <CopyPreviousIncomeButton periodMonth={period.month} periodYear={period.year} />
+          <RegisterIncomeButton currency={currency} />
+        </div>
       </div>
 
       <div className="tab-toolbar">
@@ -580,7 +584,7 @@ function IncomeSection({ view }: { view: V2View }) {
 
       <IncomeSources
         items={incomeItems}
-        confirmedByKey={real.incomeConfirmedByKey}
+        received={real.incomeReceivedBySource}
         currency={currency}
       />
 
