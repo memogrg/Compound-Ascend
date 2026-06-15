@@ -1,28 +1,28 @@
 "use client";
 
 /**
- * Área "Ingreso" (tab Ingresos · Fase 1). Fusiona la antigua IncomeProgressCard
- * (barras buffer) con IncomeRows (acciones por fila) en un solo bloque centrado
- * en la FUENTE de ingreso (línea budget_items income). Cada fila:
+ * Área "Ingreso" (tab Ingresos). Cada fila = una FUENTE (línea budget_items
+ * income) con:
  *   · Nombre + barra buffer (% y recibido / planificado).
  *   · Tag de categoría: Activo / Pasivo / Extraordinario (income_type).
- *   · Botón "Recibido" (binario en Fase 1; multi-clic parcial en Fase 2).
+ *   · Botón "Recibido" multi-clic (Fase 2): abre un mini-input "¿Cuánto
+ *     recibiste?" y acumula; permite ≥100% y sobre-recepción.
  *   · Editar / Eliminar a la par de la barra; Duplicar en el kebab.
- * El % de la barra = ingresos confirmados de esa fuente ÷ planificado.
+ * El recibido por fuente llega ya agregado (real.incomeReceivedBySource), sumado
+ * de las transacciones de ingreso confirmadas con income_source_id = la fuente.
  */
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { CURRENCY_SYMBOL, formatMoney, formatPercent } from "@/lib/format";
 import { RegisterIncomeModal } from "@/modules/financial-base/components/v2/register-income-modal";
 import {
-  addTransactionAction,
+  receivePartialIncomeAction,
   deleteIncomeSourceAction,
   registerIncomeSourceAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
-import type { KeyedTotals } from "@/modules/financial-base/services/budget-service";
 
 const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
   activo: "Activo",
@@ -30,18 +30,33 @@ const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
   extraordinario: "Extraordinario",
 };
 
+// Fracción sugerida por clic en fuentes recurrentes sub-mensuales (ej. salario
+// bisemanal → la mitad). En el resto, se sugiere el restante.
+const RECURRENT_FRACTION: Record<string, number> = {
+  semanal: 0.25,
+  bisemanal: 0.5,
+  quincenal: 0.5,
+};
+
 function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function suggestedAmount(it: BudgetItem, received: number): number {
+  const frac = it.recurringItemId ? RECURRENT_FRACTION[it.frequency] : undefined;
+  if (frac) return Math.round(it.amount * frac * 100) / 100;
+  const remaining = Math.round((it.amount - received) * 100) / 100;
+  return remaining > 0 ? remaining : it.amount;
+}
+
 export function IncomeSources({
   items,
-  confirmedByKey,
+  received,
   currency,
 }: {
   items: BudgetItem[];
-  confirmedByKey: KeyedTotals;
+  received: Record<string, number>;
   currency: string;
 }) {
   const router = useRouter();
@@ -49,31 +64,14 @@ export function IncomeSources({
   const [editing, setEditing] = useState<BudgetItem | null>(null);
   const [, startTransition] = useTransition();
 
-  const run = (fn: () => Promise<{ ok: boolean }>, msg: string) =>
+  const run = (fn: () => Promise<{ ok: boolean; message?: string }>, msg: string) =>
     startTransition(async () => {
       const res = await fn();
       if (res.ok) {
         toast(msg);
         router.refresh();
-      } else toast("No se pudo completar", "error");
+      } else toast(res.message ?? "No se pudo completar", "error");
     });
-
-  // "Recibido" (binario · Fase 1): registra el monto planificado como un ingreso
-  // confirmado para esa fuente, llenando la barra. La Fase 2 lo vuelve parcial.
-  const markReceived = (it: BudgetItem) =>
-    run(
-      () =>
-        addTransactionAction({
-          kind: "ingreso",
-          amount: it.amount,
-          currency: it.currency,
-          occurredOn: todayISO(),
-          merchantOrSource: it.name,
-          status: "confirmed",
-          origin: "manual",
-        }),
-      "Ingreso recibido",
-    );
 
   const duplicate = (it: BudgetItem) =>
     run(
@@ -96,7 +94,7 @@ export function IncomeSources({
         <div>
           <div className="card-title">Ingreso</div>
           <div className="card-sub">
-            Recibido vs planificado · la barra se llena al confirmar “Recibido”
+            Recibido vs planificado · pulsa “Recibido” cada vez que llegue una parte
           </div>
         </div>
       </div>
@@ -111,9 +109,14 @@ export function IncomeSources({
             <SourceRow
               key={it.id}
               it={it}
-              confirmed={confirmedByKey[it.name.trim().toLowerCase()]?.value ?? 0}
+              received={received[it.id] ?? 0}
               currency={currency}
-              onReceive={() => markReceived(it)}
+              onReceive={(amount) =>
+                run(
+                  () => receivePartialIncomeAction({ budgetItemId: it.id, amount, date: todayISO() }),
+                  "Recibido registrado",
+                )
+              }
               onEdit={() => setEditing(it)}
               onDuplicate={() => duplicate(it)}
               onDelete={() => run(() => deleteIncomeSourceAction(it.id), "Fuente eliminada")}
@@ -131,7 +134,7 @@ export function IncomeSources({
 
 function SourceRow({
   it,
-  confirmed,
+  received,
   currency,
   onReceive,
   onEdit,
@@ -139,18 +142,35 @@ function SourceRow({
   onDelete,
 }: {
   it: BudgetItem;
-  confirmed: number;
+  received: number;
   currency: string;
-  onReceive: () => void;
+  onReceive: (amount: number) => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [receiving, setReceiving] = useState(false);
+  const [value, setValue] = useState("");
+
   const budget = it.amount;
-  const pct = budget > 0 ? Math.min(1, confirmed / budget) : confirmed > 0 ? 1 : 0;
-  const received = budget > 0 && confirmed >= budget;
+  const pct = budget > 0 ? received / budget : received > 0 ? 1 : 0;
+  const fullyReceived = budget > 0 && received >= budget;
+  const over = budget > 0 && received > budget;
   const incomeType = it.incomeType ?? "activo";
+
+  const openReceive = () => {
+    setValue(String(suggestedAmount(it, received)));
+    setReceiving(true);
+  };
+
+  const submitReceive = () => {
+    const amt = Number(value);
+    if (!Number.isFinite(amt) || amt <= 0) return;
+    onReceive(amt);
+    setReceiving(false);
+    setValue("");
+  };
 
   return (
     <div style={{ padding: "12px 24px" }}>
@@ -174,12 +194,11 @@ function SourceRow({
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <button
             type="button"
-            className={received ? "confirm-pill done" : "confirm-pill"}
-            onClick={received ? undefined : onReceive}
-            disabled={received}
-            title={received ? "Ingreso recibido" : "Marcar como recibido"}
+            className={fullyReceived ? "confirm-pill done" : "confirm-pill"}
+            onClick={openReceive}
+            title="Registrar lo recibido"
           >
-            <Icon name="check" width={received ? 3 : 2.4} />
+            <Icon name="check" width={fullyReceived ? 3 : 2.4} />
             Recibido
           </button>
           <button
@@ -222,22 +241,60 @@ function SourceRow({
           </div>
         </div>
       </div>
-      <div
-        className="row"
-        style={{ justifyContent: "space-between", gap: 10, marginBottom: 6 }}
-        aria-hidden
-      >
-        <span />
+
+      {receiving ? (
+        <div className="row" style={{ gap: 8, margin: "4px 0 10px", alignItems: "center" }}>
+          <span className="muted" style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>
+            ¿Cuánto recibiste?
+          </span>
+          <div className="inp-money" style={{ maxWidth: 160 }}>
+            <span className="pre">{CURRENCY_SYMBOL[it.currency] ?? ""}</span>
+            <input
+              autoFocus
+              inputMode="decimal"
+              type="number"
+              step="0.01"
+              min="0"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  submitReceive();
+                }
+              }}
+            />
+          </div>
+          <button type="button" className="btn btn-secondary" style={{ padding: "7px 12px" }} onClick={submitReceive}>
+            Agregar
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
+            style={{ width: 30, height: 30 }}
+            aria-label="Cancelar"
+            onClick={() => setReceiving(false)}
+          >
+            <Icon name="x" width={2} />
+          </button>
+        </div>
+      ) : null}
+
+      <div className="row" style={{ justifyContent: "flex-end", marginBottom: 6 }}>
         <span className="tnum muted" style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>
           {budget > 0
-            ? `${formatPercent(pct)} · ${formatMoney(confirmed, currency)} / ${formatMoney(budget, currency)}`
-            : `${formatMoney(confirmed, currency)} recibido`}
+            ? `${formatPercent(pct)} · ${formatMoney(received, currency)} / ${formatMoney(budget, currency)}`
+            : `${formatMoney(received, currency)} recibido`}
+          {over ? " · sobre-recibido" : ""}
         </span>
       </div>
       <div className="bar-track">
         <div
           className="bar-fill"
-          style={{ width: `${Math.round(pct * 100)}%`, background: "var(--pos)" }}
+          style={{
+            width: `${Math.min(100, Math.round(pct * 100))}%`,
+            background: over ? "var(--warn)" : "var(--pos)",
+          }}
         />
       </div>
     </div>

@@ -51,6 +51,8 @@ import {
   registerIncomeSource,
   updateIncomeSource,
   deleteIncomeSource,
+  receivePartialIncome,
+  copyPreviousMonthIncome,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import {
@@ -240,6 +242,56 @@ export async function deleteIncomeSourceAction(id: string): Promise<ActionResult
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+const receivePartialIncomeSchema = z.object({
+  budgetItemId: z.string().uuid(),
+  amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
+  date: z.string().min(8).max(10),
+});
+
+/** Recibido parcial (Fase 2): suma un ingreso confirmado a la barra de la fuente. */
+export async function receivePartialIncomeAction(raw: unknown): Promise<ActionResult> {
+  const parsed = receivePartialIncomeSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await receivePartialIncome(parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("receivePartialIncome fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    const msg =
+      err instanceof Error && err.message.includes("ya no existe")
+        ? err.message
+        : "No pudimos registrar lo recibido.";
+    return { ok: false, message: msg };
+  }
+}
+
+/** Copia al mes actual SOLO las fuentes de ingreso recurrentes del mes anterior. */
+export async function copyPreviousMonthIncomeAction(
+  raw: unknown,
+): Promise<ActionResult & { copied?: number }> {
+  const parsed = copyMonthSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const copied = await copyPreviousMonthIncome(
+      monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
+    );
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true, copied };
+  } catch (err) {
+    logger.error("copyPreviousMonthIncome fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos copiar los ingresos del mes anterior." };
   }
 }
 

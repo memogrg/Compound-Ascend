@@ -11,7 +11,10 @@ import {
   getCategoryNameMap,
   listCategoryTree,
 } from "@/modules/financial-base/services/categories-service";
-import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
+import {
+  getRealTotals,
+  createTransaction,
+} from "@/modules/financial-base/services/transaction-service";
 import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
 import type { BudgetItem, BudgetType, IncomeType, Period } from "@/modules/financial-base/types";
@@ -309,6 +312,71 @@ export async function deleteIncomeSource(id: string): Promise<void> {
       .eq("id", row.recurring_item_id)
       .eq("user_id", user.id);
   }
+}
+
+/**
+ * Recibido parcial (Fase 2): registra un ingreso confirmado atribuido a la
+ * fuente (income_source_id). Cada llamada acumula en la barra buffer; se permite
+ * pasar de 100% (sobre-recepción). La transacción nace con el nombre de la
+ * fuente como merchantOrSource para la composición/listados.
+ */
+export async function receivePartialIncome(args: {
+  budgetItemId: string;
+  amount: number;
+  date: string;
+}): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data: line } = await supabase
+    .from("budget_items")
+    .select("name,currency,type")
+    .eq("id", args.budgetItemId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!line || line.type !== "income") {
+    throw new Error("La fuente de ingreso ya no existe o no te pertenece.");
+  }
+  await createTransaction({
+    kind: "ingreso",
+    amount: args.amount,
+    currency: line.currency,
+    occurredOn: args.date,
+    merchantOrSource: line.name,
+    status: "confirmed",
+    origin: "manual",
+    incomeSourceId: args.budgetItemId,
+  });
+}
+
+/**
+ * Copia al periodo dado SOLO las fuentes de ingreso RECURRENTES del mes anterior
+ * (las que enlazan una plantilla recurring_items). Idempotente: no duplica una
+ * plantilla ya presente este mes. Devuelve cuántas copió. (Fase 2)
+ */
+export async function copyPreviousMonthIncome(period: Period): Promise<number> {
+  const prev = previousMonthPeriod(period);
+  const [prevItems, curItems] = await Promise.all([listBudgetItems(prev), listBudgetItems(period)]);
+  const present = new Set(
+    curItems.filter((i) => i.type === "income" && i.recurringItemId).map((i) => i.recurringItemId),
+  );
+  const toCopy = prevItems.filter(
+    (i) => i.type === "income" && i.recurringItemId && !present.has(i.recurringItemId),
+  );
+  for (const it of toCopy) {
+    await createBudgetItem({
+      type: "income",
+      categoryId: null,
+      name: it.name,
+      amount: it.amount,
+      currency: it.currency,
+      frequency: it.frequency,
+      periodMonth: period.month,
+      periodYear: period.year,
+      incomeType: it.incomeType,
+      recurringItemId: it.recurringItemId,
+    });
+  }
+  return toCopy.length;
 }
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;

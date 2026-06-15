@@ -98,6 +98,8 @@ export type Transaction = {
   linkedKind?: LinkedKind;
   linkedId?: string | null;
   recurringItemId?: string | null;
+  // Ingresos (Fase 2): fuente de ingreso (budget_items) a la que se atribuye.
+  incomeSourceId?: string | null;
 };
 
 /** Ítem de presupuesto, scopeado por mes. */

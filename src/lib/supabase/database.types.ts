@@ -289,6 +289,8 @@ export type TransactionRow = Timestamps & {
   linked_kind: string; // 'none' | 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
   linked_id: string | null;
   recurring_item_id: string | null;
+  // Ingresos (migración 20260615000002 · Fase 2): vínculo a la fuente de ingreso.
+  income_source_id: string | null;
 };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
