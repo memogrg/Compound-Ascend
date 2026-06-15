@@ -23,6 +23,7 @@ import {
   registerIncomeSourceAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
+import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 
 const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
   activo: "Activo",
@@ -54,10 +55,12 @@ export function IncomeSources({
   items,
   received,
   currency,
+  incomeTree,
 }: {
   items: BudgetItem[];
   received: Record<string, number>;
   currency: string;
+  incomeTree: CategoryNode[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -84,6 +87,7 @@ export function IncomeSources({
           incomeType: it.incomeType ?? "activo",
           recurrent: Boolean(it.recurringItemId),
           frequency: it.frequency,
+          categoryId: it.categoryId ?? null,
         }),
       "Fuente duplicada",
     );
@@ -126,7 +130,12 @@ export function IncomeSources({
       )}
 
       {editing ? (
-        <RegisterIncomeModal currency={currency} item={editing} onClose={() => setEditing(null)} />
+        <RegisterIncomeModal
+          currency={currency}
+          incomeTree={incomeTree}
+          item={editing}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
     </div>
   );

@@ -249,7 +249,7 @@ export async function registerIncomeSource(
       user_id: user.id,
       household_id,
       type: "income",
-      category_id: null,
+      category_id: input.categoryId ?? null,
       name: input.name,
       amount: input.amount,
       currency: input.currency,
@@ -303,7 +303,7 @@ export async function updateIncomeSource(id: string, input: IncomeSourceInput): 
   const period = periodFromDate(input.occurredOn);
   await updateBudgetItem(id, {
     type: "income",
-    categoryId: null,
+    categoryId: input.categoryId ?? null,
     name: input.name,
     amount: input.amount,
     currency: input.currency,

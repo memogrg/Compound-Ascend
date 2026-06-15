@@ -16,6 +16,7 @@ import { IncomeSources } from "@/modules/financial-base/components/v2/income-sou
 import { IncomeRangeFilter } from "@/modules/financial-base/components/v2/income-range-filter";
 import { RegisterIncomeButton } from "@/modules/financial-base/components/v2/register-income-button";
 import { CopyPreviousIncomeButton } from "@/modules/financial-base/components/v2/copy-previous-income-button";
+import { LinkedIncomeCard } from "@/modules/financial-base/components/v2/linked-income-card";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
 import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
 import { JarDatePicker } from "@/modules/financial-base/components/v2/expense-jars/jar-date-picker";
@@ -52,6 +53,7 @@ import type {
 import type { Category } from "@/modules/financial-base/services/categories-service";
 import type {
   Account,
+  BudgetItem,
   FinancialPressure,
   Period,
   Transaction,
@@ -532,33 +534,43 @@ export function IncomeExpenseSection({
 function IncomeSection({ view }: { view: V2View }) {
   const { budget, real, currency, history, period } = view;
   const range = view.range ?? "1m";
-  const rangeActive = range !== "1m";
   const incomeItems = budget.items.filter((b) => b.type === "income");
 
-  // Cuadros: agregan sobre el rango elegido (suma del histórico); en "1 mes"
-  // se usan los totales del periodo actual (comportamiento de siempre).
-  const realIncome = rangeActive
-    ? history.reduce((s, h) => s + h.realIncome, 0)
-    : real.realIncome;
-  const budgetIncome = rangeActive
-    ? history.reduce((s, h) => s + h.budgetIncome, 0)
-    : budget.budgetIncome;
+  // Fantasma-fix (Parte 1): cuadros y barras SOLO desde fuentes manuales no
+  // vinculadas a inversiones; lo vinculado va a su sección read-only. Así nada
+  // queda contado-pero-invisible en este tab (Mi Base/Transacciones ven todo).
+  const isLinked = (b: BudgetItem) => Boolean(b.holdingId) || b.sourceKind === "dividend";
+  const manualSources = incomeItems.filter(
+    (b) => (b.sourceKind ?? "manual") === "manual" && !isLinked(b),
+  );
+  const linkedSources = incomeItems.filter(isLinked);
+  const receivedOf = (b: BudgetItem) => real.incomeReceivedBySource[b.id] ?? 0;
+
+  const budgetIncome = manualSources.reduce((s, b) => s + b.amount, 0);
+  const realIncome = manualSources.reduce((s, b) => s + receivedOf(b), 0);
   const diff = realIncome - budgetIncome;
   const complPct = budgetIncome > 0 ? realIncome / budgetIncome : 0;
 
+  // Histórico: tendencia mensual (controlada por el rango). Composición: por
+  // fuente manual recibida (coherente con los cuadros).
   const incomeArea = history.map((h) => ({ date: h.label, value: h.realIncome }));
+  const incomeByManualSource: Record<string, { label: string; value: number }> = {};
+  for (const b of manualSources) {
+    const v = receivedOf(b);
+    if (v > 0) incomeByManualSource[b.id] = { label: b.name, value: v };
+  }
 
   const summary: SumCard[] = [
     {
       ttl: "Ingresos planificados",
       val: formatMoney(budgetIncome, currency),
-      sub: rangeActive ? "en el rango" : `${incomeItems.length} fuente(s)`,
+      sub: `${manualSources.length} fuente(s)`,
       tone: "pos",
     },
     {
       ttl: "Ingresos totales",
       val: formatMoney(realIncome, currency),
-      sub: rangeActive ? "recibido en el rango" : "recibido este mes",
+      sub: "recibido en fuentes",
       tone: "pos",
     },
     {
@@ -573,43 +585,53 @@ function IncomeSection({ view }: { view: V2View }) {
   return (
     <div className="grid">
       <div className="tab-toolbar">
-        <div className="hint">Tus ingresos se registran aquí; confírmalos cuando los recibas.</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <CopyPreviousIncomeButton periodMonth={period.month} periodYear={period.year} />
-          <RegisterIncomeButton currency={currency} />
-        </div>
-      </div>
-
-      <div className="tab-toolbar">
-        <div className="hint">Rango de los cuadros y el histórico</div>
+        <div className="hint">Rango del histórico</div>
         <IncomeRangeFilter range={range} periodParam={monthParam(period)} />
       </div>
 
       <SummaryStrip cards={summary} />
 
       <section className="cols-2">
-        <ChartCard title="Histórico de ingresos" hint="real vs presupuesto">
+        <ChartCard title="Histórico de ingresos" hint="recibido por mes">
           <PerformanceChart
             data={incomeArea}
             currency={currency}
             tone="pos"
-            goalValue={Math.round(budget.budgetIncome)}
+            goalValue={Math.round(budgetIncome)}
             height={160}
           />
         </ChartCard>
         <DonutCard
           title="Composición por fuente"
-          data={donutData(real.incomeByKey)}
-          total={real.realIncome}
+          data={donutData(incomeByManualSource)}
+          total={realIncome}
           currency={currency}
         />
       </section>
 
+      {/* Toolbar justo encima de la card de fuentes (Parte 3). */}
+      <div className="tab-toolbar">
+        <div className="hint">Tus ingresos se registran aquí; confírmalos cuando los recibas.</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <CopyPreviousIncomeButton periodMonth={period.month} periodYear={period.year} />
+          <RegisterIncomeButton currency={currency} incomeTree={view.incomeTree} />
+        </div>
+      </div>
+
       <IncomeSources
-        items={incomeItems}
+        items={manualSources}
         received={real.incomeReceivedBySource}
         currency={currency}
+        incomeTree={view.incomeTree}
       />
+
+      {linkedSources.length > 0 ? (
+        <LinkedIncomeCard
+          items={linkedSources}
+          received={real.incomeReceivedBySource}
+          currency={currency}
+        />
+      ) : null}
 
       <FinancialInsightCard reading={view.incomeCapsule} />
     </div>

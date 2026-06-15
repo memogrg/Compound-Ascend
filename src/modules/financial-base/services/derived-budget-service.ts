@@ -223,4 +223,70 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   if (toDeleteIds.length > 0) {
     await supabase.from("budget_items").delete().in("id", toDeleteIds).eq("user_id", user.id);
   }
+
+  // Barrido cross-period (Parte 1C): el diff de arriba solo limpia el periodo
+  // cargado. Esto borra líneas derivadas huérfanas (su entidad origen ya no
+  // existe) en CUALQUIER periodo. Best-effort: no debe bloquear el sync.
+  try {
+    await sweepOrphanedDerived(supabase, user.id);
+  } catch {
+    // noop — se reintenta en la próxima carga.
+  }
+}
+
+const ORIGIN_TABLE = {
+  debt: "debts",
+  goal: "savings_goals",
+  policy: "insurance_policies",
+  recurring: "recurring_items",
+  dividend: "investment_holdings",
+} as const;
+type OriginTable = (typeof ORIGIN_TABLE)[keyof typeof ORIGIN_TABLE];
+
+/**
+ * Borra budget_items derivados (source_kind<>'manual') cuyo source_id ya no
+ * existe en su tabla origen, en todos los periodos del usuario. Si la consulta
+ * a la tabla origen falla, NO borra ese kind (evita borrados por error de RLS).
+ */
+async function sweepOrphanedDerived(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+): Promise<void> {
+  const { data: derived } = await supabase
+    .from("budget_items")
+    .select("id,source_kind,source_id")
+    .eq("user_id", userId)
+    .neq("source_kind", "manual")
+    .not("source_id", "is", null);
+  if (!derived || derived.length === 0) return;
+
+  const byKind = new Map<string, Set<string>>();
+  for (const r of derived) {
+    if (!r.source_id) continue;
+    const set = byKind.get(r.source_kind) ?? new Set<string>();
+    set.add(r.source_id);
+    byKind.set(r.source_kind, set);
+  }
+
+  const orphanIds: string[] = [];
+  for (const [kind, ids] of byKind) {
+    const table = ORIGIN_TABLE[kind as keyof typeof ORIGIN_TABLE] as OriginTable | undefined;
+    if (!table) continue; // kind desconocido: no arriesgar borrado
+    const { data: alive, error } = await supabase
+      .from(table)
+      .select("id")
+      .eq("user_id", userId)
+      .in("id", [...ids]);
+    if (error) continue; // consulta fallida: no borrar este kind
+    const aliveSet = new Set(((alive ?? []) as { id: string }[]).map((a) => a.id));
+    for (const r of derived) {
+      if (r.source_kind === kind && r.source_id && !aliveSet.has(r.source_id)) {
+        orphanIds.push(r.id);
+      }
+    }
+  }
+
+  if (orphanIds.length > 0) {
+    await supabase.from("budget_items").delete().in("id", orphanIds).eq("user_id", userId);
+  }
 }
