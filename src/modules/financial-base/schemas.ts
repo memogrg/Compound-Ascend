@@ -71,6 +71,24 @@ export const budgetItemInputSchema = z.object({
   frequency: frequency.default("mensual"),
   periodMonth: z.number().int().min(1).max(12),
   periodYear: z.number().int().min(2000).max(3000),
+  // Ingresos (Fase 1): clasificación + plantilla recurrente copy-on-demand.
+  incomeType: z.enum(["activo", "pasivo", "extraordinario"]).optional(),
+  recurringItemId: uuidOrNull.optional(),
+});
+
+/**
+ * Registro simplificado de una FUENTE de ingreso (tab Ingresos · Fase 1). Una
+ * fuente = una línea budget_items de tipo income. `occurredOn` fija el periodo;
+ * si `recurrent`, se crea/vincula una plantilla en recurring_items (copy-on-demand).
+ */
+export const incomeSourceInputSchema = z.object({
+  name: z.string().trim().min(1, "Ponle un nombre").max(120),
+  amount: z.number({ error: "Monto inválido" }).nonnegative("No puede ser negativo"),
+  currency: z.string().length(3),
+  occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
+  incomeType: z.enum(["activo", "pasivo", "extraordinario"]),
+  recurrent: z.boolean().default(false),
+  frequency: frequency.default("mensual"),
 });
 
 export const txnInputSchema = z
@@ -179,6 +197,7 @@ export const templateInputSchema = z.object({
 });
 
 export type BudgetItemInput = z.infer<typeof budgetItemInputSchema>;
+export type IncomeSourceInput = z.infer<typeof incomeSourceInputSchema>;
 export type TxnInput = z.infer<typeof txnInputSchema>;
 export type AccountInput = z.infer<typeof accountInputSchema>;
 export type RuleInput = z.infer<typeof ruleInputSchema>;

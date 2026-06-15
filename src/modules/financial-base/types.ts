@@ -114,6 +114,9 @@ export type BudgetItem = {
   // Plan derivado (Fase 0 · passthrough, sin lógica todavía)
   sourceKind?: BudgetSourceKind;
   sourceId?: string | null;
+  // Ingresos (Fase 1): tipo de fuente + plantilla recurrente copy-on-demand.
+  incomeType?: IncomeType;
+  recurringItemId?: string | null;
 };
 
 export type Account = {

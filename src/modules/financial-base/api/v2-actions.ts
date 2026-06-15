@@ -8,6 +8,7 @@
 import { revalidatePath } from "next/cache";
 import {
   budgetItemInputSchema,
+  incomeSourceInputSchema,
   txnInputSchema,
   accountInputSchema,
   ruleInputSchema,
@@ -47,6 +48,9 @@ import {
   deleteBudgetItem,
   setCategoryBudget,
   copyPreviousMonthExpenseBudget,
+  registerIncomeSource,
+  updateIncomeSource,
+  deleteIncomeSource,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import {
@@ -189,6 +193,53 @@ export async function copyPreviousMonthBudgetAction(
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos copiar el presupuesto del mes anterior." };
+  }
+}
+
+// ---------- Fuentes de ingreso (tab Ingresos · Fase 1) ----------
+export async function registerIncomeSourceAction(raw: unknown): Promise<ActionResult> {
+  const parsed = incomeSourceInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await registerIncomeSource(parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("registerIncomeSource fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos registrar el ingreso." };
+  }
+}
+
+export async function updateIncomeSourceAction(id: string, raw: unknown): Promise<ActionResult> {
+  const parsed = incomeSourceInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateIncomeSource(id, parsed.data);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("updateIncomeSource fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos actualizar el ingreso." };
+  }
+}
+
+export async function deleteIncomeSourceAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    await deleteIncomeSource(id);
+    revalidate();
+    revalidatePath("/ingresos");
+    return { ok: true };
+  } catch {
+    return { ok: false };
   }
 }
 

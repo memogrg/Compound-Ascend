@@ -307,6 +307,9 @@ export type BudgetItemRow = Timestamps & {
   // Plan derivado (migración 0020 · Fase 0)
   source_kind: string; // 'manual' | 'debt' | 'goal' | 'policy' | 'recurring' | 'dividend'
   source_id: string | null;
+  // Ingresos (migración 20260615 · Fase 1)
+  income_type: string | null; // 'activo' | 'pasivo' | 'extraordinario' (solo ingresos)
+  recurring_item_id: string | null; // plantilla recurrente copy-on-demand
 };
 
 export type AccountRow = Timestamps & {

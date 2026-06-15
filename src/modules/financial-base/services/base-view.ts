@@ -13,6 +13,7 @@ import { getBudgetTotals } from "@/modules/financial-base/services/budget-servic
 import {
   getRealTotals,
   getRealHistory,
+  getEarliestTransactionDate,
   listTransactions,
 } from "@/modules/financial-base/services/transaction-service";
 import {
@@ -26,15 +27,40 @@ import { listTemplates } from "@/modules/financial-base/services/templates-servi
 import { listLinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 import { syncDerivedBudget } from "@/modules/financial-base/services/derived-budget-service";
 import { getExpenseJars } from "@/modules/financial-base/services/expense-jars-service";
-import { parseMonthParam, previousMonthPeriod } from "@/modules/financial-base/engine/period";
+import {
+  parseMonthParam,
+  parseRangeParam,
+  previousMonthPeriod,
+  rangeToMonths,
+  type RangeKey,
+} from "@/modules/financial-base/engine/period";
 import { tryGenerateMonthlySnapshot } from "@/modules/financial-base/services/snapshot-service";
 import { computeV2Totals, composition } from "@/modules/financial-base/engine/base-v2";
 import { buildBaseReading, buildCapsule } from "@/modules/financial-base/engine/reading";
 import type { V2View } from "@/modules/financial-base/components/v2/sections";
 
-export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
+export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promise<V2View | null> {
   if (!isSupabaseConfigured()) return null;
   const period = parseMonthParam(periodRaw, new Date());
+
+  // Rango del histórico/cuadros (solo lo pasa el tab de Ingresos). Sin rango se
+  // conserva la ventana de 6 meses que usan Mi Base, Gastos y Transacciones.
+  const range: RangeKey | undefined =
+    rangeRaw !== undefined ? parseRangeParam(rangeRaw) : undefined;
+  let monthsBack = 6;
+  if (range) {
+    monthsBack = rangeToMonths(range);
+    if (range === "all") {
+      const earliest = await getEarliestTransactionDate();
+      if (earliest) {
+        const e = new Date(earliest);
+        const months = (period.year - e.getFullYear()) * 12 + (period.month - (e.getMonth() + 1));
+        monthsBack = Math.min(120, Math.max(1, months + 1));
+      } else {
+        monthsBack = 1;
+      }
+    }
+  }
 
   // Plan derivado (Fase 3): sincroniza las líneas que nacen de entidades
   // ANTES de leer el presupuesto, para que el periodo refleje deudas/metas/
@@ -63,7 +89,7 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
   ] = await Promise.all([
     getBudgetTotals(period),
     getRealTotals(period),
-    getRealHistory(period, 6),
+    getRealHistory(period, monthsBack),
     listTransactions(period),
     listCategories(),
     listCategoryTree("expense"),
@@ -110,6 +136,7 @@ export async function loadBaseView(periodRaw?: string): Promise<V2View | null> {
 
   return {
     period,
+    range,
     currency,
     budget,
     real,
