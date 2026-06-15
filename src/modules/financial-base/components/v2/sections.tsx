@@ -16,6 +16,7 @@ import { TransactionsBrowser } from "@/modules/financial-base/components/v2/tran
 import { IncomeRows } from "@/modules/financial-base/components/v2/income-rows";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
 import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
+import { JarDatePicker } from "@/modules/financial-base/components/v2/expense-jars/jar-date-picker";
 import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
 import { ComposerButton } from "@/modules/financial-base/components/v2/composer-button";
 import { CategoryManagerButton } from "@/modules/financial-base/components/v2/category-manager";
@@ -513,8 +514,22 @@ function IncomeProgressCard({ bars, currency }: { bars: IncomeBar[]; currency: s
 }
 
 // ============================== INGRESOS / GASTOS ==============================
-export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "income" | "expense" }) {
+export function IncomeExpenseSection({
+  view,
+  kind,
+  jarsAsOf,
+  jarsPeriod,
+}: {
+  view: V2View;
+  kind: "income" | "expense";
+  /** Solo Gastos: fecha de corte (YYYY-MM-DD) y periodo que scopean los frascos. */
+  jarsAsOf?: string;
+  jarsPeriod?: Period;
+}) {
   const { budget, real, currency, history } = view;
+  // Los frascos se scopean por su propio filtro de fecha; el resto de la página
+  // (cards y gráficas) conserva su scope. Fallback al periodo de la vista.
+  const jarPeriod = jarsPeriod ?? view.period;
   const isIncome = kind === "income";
   const budgetTotal = isIncome ? budget.budgetIncome : budget.budgetExpense;
   const realTotal = isIncome ? real.realIncome : real.realExpense;
@@ -659,17 +674,20 @@ export function IncomeExpenseSection({ view, kind }: { view: V2View; kind: "inco
           <div className="card-head">
             <div>
               <div className="card-title">Categorías de gasto</div>
-              <div className="card-sub">Frascos por bloque · este mes</div>
+              <div className="card-sub">Frascos por bloque · gasto real al día elegido</div>
             </div>
-            <ExpenseToolbar
-              jars={view.jars}
-              accounts={view.accounts}
-              currency={currency}
-              period={view.period}
-              tree={view.tree}
-            />
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {jarsAsOf ? <JarDatePicker current={jarsAsOf} /> : null}
+              <ExpenseToolbar
+                jars={view.jars}
+                accounts={view.accounts}
+                currency={currency}
+                period={jarPeriod}
+                tree={view.tree}
+              />
+            </div>
           </div>
-          <ExpenseJars jars={view.jars} currency={currency} period={view.period} />
+          <ExpenseJars jars={view.jars} currency={currency} period={jarPeriod} />
         </div>
       )}
 
