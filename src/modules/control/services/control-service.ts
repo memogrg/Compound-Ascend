@@ -43,7 +43,7 @@ function rowToGoal(r: SavingsGoalRow): SavingsGoal {
     monthlyContribution: Number(r.monthly_contribution),
     currency: r.currency,
     targetDate: r.target_date,
-    priority: ((r.priority ?? undefined) as GoalPriority | undefined) ?? null,
+    priority: r.priority as GoalPriority | null,
     status: (r.status ?? "revisar") as GoalStatus,
   };
 }
@@ -61,7 +61,7 @@ function rowToDebt(r: DebtRow): Debt {
     isCurrent: r.is_current ?? true,
     delinquency: (r.delinquency ?? undefined) as Debt["delinquency"],
     stress: r.stress,
-    classification: ((r.classification ?? undefined) as DebtClassification | undefined) ?? null,
+    classification: r.classification as DebtClassification | null,
     originalAmount: r.original_amount === null ? null : Number(r.original_amount),
     rateType: (r.rate_type ?? null) as DebtRateType | null,
     rateIndex: (r.rate_index ?? null) as DebtRateIndex | null,
