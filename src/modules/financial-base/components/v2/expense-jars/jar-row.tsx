@@ -62,6 +62,76 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
   if (jar.kind === "linked") {
     // (linked branch — sin kebab)
     const n = jar.items.length;
+
+    // Budget-aware (Deudas): barra gastado/total + restante, igual que un frasco
+    // normal. La obligación es de solo lectura aquí; se paga vía "Registrar gasto".
+    if (jar.budgetAware && jar.totals) {
+      const { budget: tBudget, spent: tSpent, remaining } = jar.totals;
+      const over = tBudget > 0 && tSpent > tBudget;
+      const color = over ? "var(--neg)" : jar.color;
+      const width = pct(tSpent, tBudget);
+      const subList =
+        n > 0 ? jar.items.map((it) => it.name).join(", ") : jar.emptyText;
+      return (
+        <>
+          <button
+            type="button"
+            className={over ? "env exp-clickable over" : "env exp-clickable"}
+            style={{
+              width: "100%",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              font: "inherit",
+            }}
+            onClick={() => setOpen(true)}
+            aria-label={jar.name}
+          >
+            <div
+              className="env-ic"
+              style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
+            >
+              <Icon name={icon} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="env-name">
+                {jar.name} <span style={{ color: "var(--muted)" }}>›</span>
+              </div>
+              <div
+                className="env-sub"
+                style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {subList}
+              </div>
+            </div>
+            <div className="env-bar-cell">
+              <div className="bar-track">
+                <div className="bar-fill" style={{ width: `${width}%`, background: color }} />
+              </div>
+              <div className="env-bar-meta">
+                <span style={over ? { color: "var(--neg)" } : undefined}>
+                  {formatMoney(tSpent, currency)} pagado
+                </span>
+                <span>
+                  {over
+                    ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
+                    : `${formatMoney(remaining, currency)} restante`}
+                </span>
+              </div>
+            </div>
+            <div className="env-num" style={{ textAlign: "right" }}>
+              <div className="big">{formatMoney(tBudget, currency)}</div>
+              <div className="small">
+                {n} {n === 1 ? "obligación" : "obligaciones"}
+              </div>
+            </div>
+          </button>
+          {open ? <JarLinkedModal jar={jar} onClose={() => setOpen(false)} /> : null}
+        </>
+      );
+    }
+
     const sub =
       n > 0 ? `${n} ${n === 1 ? "elemento vinculado" : "elementos vinculados"}` : jar.emptyText;
     return (

@@ -435,6 +435,35 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
   };
 }
 
+/**
+ * Pagado del periodo por entidad vinculada (linked_id) de un `linkedKind` dado
+ * (p.ej. 'debt'), normalizado a la moneda de visualización. El `period.to`
+ * actúa como corte (lo aprovecha el filtro de fecha de los frascos). Para los
+ * frascos vinculados budget-aware del tab de Gastos.
+ */
+export async function getLinkedSpentByEntity(
+  period: Period,
+  linkedKind: string,
+): Promise<Record<string, number>> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
+  const { data } = await supabase
+    .from("transactions")
+    .select("amount,currency,linked_id")
+    .eq("user_id", user.id)
+    .eq("linked_kind", linkedKind)
+    .gte("occurred_on", period.from)
+    .lte("occurred_on", period.to);
+  const out: Record<string, number> = {};
+  for (const r of data ?? []) {
+    if (!r.linked_id) continue;
+    out[r.linked_id] =
+      (out[r.linked_id] ?? 0) + convertCurrency(Number(r.amount), r.currency, currency, rates);
+  }
+  return out;
+}
+
 export type HistoryPoint = {
   label: string;
   realIncome: number;

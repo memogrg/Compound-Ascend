@@ -220,6 +220,35 @@ export async function getBudgetTotals(period: Period): Promise<BudgetTotals> {
 }
 
 /**
+ * Cuota mensual por entidad (source_id) de un `source_kind` dado (p.ej. 'debt'),
+ * normalizada a la moneda de visualización. Fuente única de la obligación: las
+ * líneas derivadas que crea derived-budget-service ("Pago — {deuda}"). Para los
+ * frascos vinculados budget-aware del tab de Gastos.
+ */
+export async function getLinkedBudgetBySource(
+  period: Period,
+  sourceKind: string,
+): Promise<Record<string, number>> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
+  const { data } = await supabase
+    .from("budget_items")
+    .select("amount,currency,source_id")
+    .eq("user_id", user.id)
+    .eq("period_month", period.month)
+    .eq("period_year", period.year)
+    .eq("source_kind", sourceKind);
+  const out: Record<string, number> = {};
+  for (const r of data ?? []) {
+    if (!r.source_id) continue;
+    out[r.source_id] =
+      (out[r.source_id] ?? 0) + convertCurrency(Number(r.amount), r.currency, currency, rates);
+  }
+  return out;
+}
+
+/**
  * Presupuesto-vs-real agregado por GRUPO de Nivel 1 (rollup). Para vistas de
  * presupuesto jerárquico. No toca los agregados existentes.
  */

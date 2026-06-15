@@ -10,14 +10,16 @@ import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { formatMoney } from "@/lib/format";
 import { listLinkableEntitiesDetailed } from "@/modules/financial-base/services/linkable-entities-service";
-import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
-import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
+import { getBudgetTotals, getLinkedBudgetBySource } from "@/modules/financial-base/services/budget-service";
+import { getRealTotals, getLinkedSpentByEntity } from "@/modules/financial-base/services/transaction-service";
+import { getSystemCategoryId } from "@/modules/financial-base/services/linked-transaction-service";
 import {
   buildExpenseJars,
   type Jar,
   type JarEntities,
   type JarEntity,
   type KeyedTotals,
+  type LinkedBudgetConfig,
 } from "@/modules/financial-base/engine/expense-jars";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import type { Period } from "@/modules/financial-base/types";
@@ -27,6 +29,8 @@ export async function getExpenseJars(args: {
   budgetByKey: KeyedTotals;
   realByKey: KeyedTotals;
   currency: string;
+  /** Activa frascos vinculados budget-aware (esta entrega: solo `debt`). */
+  linkedBudget?: LinkedBudgetConfig;
 }): Promise<Jar[]> {
   const [detailed, rates] = await Promise.all([listLinkableEntitiesDetailed(), getFxRates()]);
 
@@ -61,6 +65,7 @@ export async function getExpenseJars(args: {
     realByKey: args.realByKey,
     entities,
     fmt: (n: number) => formatMoney(n, args.currency),
+    linkedBudget: args.linkedBudget,
   });
 }
 
@@ -78,14 +83,23 @@ export async function getExpenseJarsAsOf(args: {
   currency: string;
 }): Promise<Jar[]> {
   const cutoff: Period = { ...args.period, to: args.asOf };
-  const [budget, real] = await Promise.all([
+  const [budget, real, debtBudget, debtSpent, deudasCatId] = await Promise.all([
     getBudgetTotals(args.period),
     getRealTotals(cutoff),
+    // Deudas budget-aware: cuota derivada por deuda (mes) + pagado al corte +
+    // categoría de sistema del pago (para Registrar gasto). Solo `debt` en esta
+    // entrega; el engine queda listo para Libertad/Defensa/Ahorro.
+    getLinkedBudgetBySource(args.period, "debt"),
+    getLinkedSpentByEntity(cutoff, "debt"),
+    getSystemCategoryId("deudas"),
   ]);
   return getExpenseJars({
     tree: args.tree,
     budgetByKey: budget.expenseByKey,
     realByKey: real.expenseByKey,
     currency: args.currency,
+    linkedBudget: {
+      debt: { bySource: debtBudget, spentById: debtSpent, paymentCategoryId: deudasCatId },
+    },
   });
 }
