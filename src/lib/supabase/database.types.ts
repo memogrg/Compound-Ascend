@@ -312,6 +312,8 @@ export type BudgetItemRow = Timestamps & {
   // Ingresos (migración 20260615 · Fase 1)
   income_type: string | null; // 'activo' | 'pasivo' | 'extraordinario' (solo ingresos)
   recurring_item_id: string | null; // plantilla recurrente copy-on-demand
+  // Ingresos (migración 20260615000003 · Fase 3): inversión vinculada (stub).
+  holding_id: string | null;
 };
 
 export type AccountRow = Timestamps & {
@@ -479,6 +481,8 @@ export type InvestmentHoldingRow = Timestamps & {
   rental_income: number | null;
   rental_frequency: string | null;
   rental_subtype: string | null;
+  // Ingresos (migración 20260615000003 · Fase 3): stub por completar.
+  needs_detail: boolean;
 };
 
 export type RentalPaymentRow = Timestamps & {

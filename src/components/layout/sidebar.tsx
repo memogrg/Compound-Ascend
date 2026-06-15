@@ -12,9 +12,10 @@ type SidebarProps = {
   open: boolean;
   onNavigate: () => void;
   user?: { name: string; sub: string; initials: string };
+  navBadges?: Record<string, number>;
 };
 
-export function Sidebar({ open, onNavigate, user }: SidebarProps) {
+export function Sidebar({ open, onNavigate, user, navBadges }: SidebarProps) {
   const pathname = usePathname();
   const activeId = activeNavId(pathname);
   const u = user ?? { name: "Invitado", sub: "Configura tu perfil", initials: "CA" };
@@ -47,7 +48,11 @@ export function Sidebar({ open, onNavigate, user }: SidebarProps) {
                   <Icon name={it.icon} />
                 </span>
                 <span>{it.name}</span>
-                {it.badge ? <span className="nav-badge">{it.badge}</span> : null}
+                {navBadges?.[it.id] ? (
+                  <span className="nav-badge">{navBadges[it.id]}</span>
+                ) : it.badge ? (
+                  <span className="nav-badge">{it.badge}</span>
+                ) : null}
                 {it.dot ? <span className="nav-dot" style={{ background: it.dot }} /> : null}
               </Link>
             ))}

@@ -119,6 +119,8 @@ export type BudgetItem = {
   // Ingresos (Fase 1): tipo de fuente + plantilla recurrente copy-on-demand.
   incomeType?: IncomeType;
   recurringItemId?: string | null;
+  // Ingresos (Fase 3): inversión vinculada (stub de renta/dividendos).
+  holdingId?: string | null;
 };
 
 export type Account = {
