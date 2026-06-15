@@ -48,11 +48,19 @@ export function AddSpendModal({
   const router = useRouter();
   const toast = useToast();
 
-  // Solo frascos normales con sobres → opciones del selector (optgroup por frasco).
+  // Frascos normales con sobres → opciones del selector (optgroup por frasco).
   const normalJars = jars.filter(
     (j): j is Extract<Jar, { kind: "normal" }> => j.kind === "normal" && j.envelopes.length > 0,
   );
-  const firstEnv = normalJars[0]?.envelopes[0]?.id ?? "";
+  // Frasco de Deudas (budget-aware): cada obligación es un "sobre" pagable. El
+  // valor "debt:<id>" lo distingue de un sobre normal al guardar.
+  const debtJar = jars.find(
+    (j): j is Extract<Jar, { kind: "linked" }> =>
+      j.kind === "linked" && j.linkedKind === "debt" && !!j.budgetAware && j.items.length > 0,
+  );
+  const debtItems = debtJar?.items ?? [];
+  const firstEnv = normalJars[0]?.envelopes[0]?.id ?? (debtItems[0] ? `debt:${debtItems[0].id}` : "");
+  const hasOptions = normalJars.length > 0 || debtItems.length > 0;
   const defaultAccount = accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "";
 
   // La moneda principal del usuario va primero aunque no esté en la lista base.
@@ -69,6 +77,20 @@ export function AddSpendModal({
   const [error, setError] = useState<string | null>(null);
 
   const sym = currencyOptions.find((c) => c.code === cur)?.sym ?? cur;
+  const isDebtSelected = sobre.startsWith("debt:");
+
+  // Al elegir una deuda, pre-llena el monto con el restante de la cuota del mes
+  // (editable). El valor "debt:<id>" se desambigua al guardar.
+  function pickSobre(value: string) {
+    setSobre(value);
+    if (value.startsWith("debt:")) {
+      const id = value.slice("debt:".length);
+      const obl = debtItems.find((it) => it.id === id);
+      if (obl && typeof obl.remaining === "number") {
+        setAmount(String(Math.max(0, obl.remaining)));
+      }
+    }
+  }
 
   async function save() {
     const amt = Number(amount);
@@ -76,14 +98,19 @@ export function AddSpendModal({
     if (!sobre) return setError("Elige un sobre.");
     setPending(true);
     setError(null);
+    // Deuda: imputa a la categoría de sistema "deudas" y vincula la entidad para
+    // que addTransactionAction propague el pago a debt_payments. Sobre normal:
+    // el categoryId ES el sobre (camino actual sin tocar).
+    const debtId = isDebtSelected ? sobre.slice("debt:".length) : null;
     const res = await addTransactionAction({
       kind: "gasto",
       amount: amt,
       currency: cur,
       occurredOn: date,
-      categoryId: sobre,
+      categoryId: isDebtSelected ? (debtJar?.paymentCategoryId ?? undefined) : sobre,
       accountId: defaultAccount || undefined,
       merchantOrSource: name.trim() || undefined,
+      ...(debtId ? { linkedKind: "debt" as const, linkedId: debtId } : {}),
     });
     setPending(false);
     if (res.ok) {
@@ -166,10 +193,10 @@ export function AddSpendModal({
           </div>
         </div>
 
-        {/* Sobre (optgroup por frasco) */}
+        {/* Sobre (optgroup por frasco) + obligaciones de Deudas */}
         <div className="fld" style={{ marginTop: 12 }}>
           <label className="fld-label">Sobre</label>
-          {normalJars.length === 0 ? (
+          {!hasOptions ? (
             <div className="muted" style={{ fontSize: 12.5 }}>
               Crea primero un sobre dentro de un frasco para registrar gastos.
             </div>
@@ -177,7 +204,7 @@ export function AddSpendModal({
             <select
               className="inp"
               value={sobre}
-              onChange={(e) => setSobre(e.target.value)}
+              onChange={(e) => pickSobre(e.target.value)}
               style={{ width: "100%", boxSizing: "border-box" }}
             >
               {normalJars.map((j) => (
@@ -189,10 +216,21 @@ export function AddSpendModal({
                   ))}
                 </optgroup>
               ))}
+              {debtItems.length > 0 ? (
+                <optgroup label={debtJar?.name ?? "Deudas"}>
+                  {debtItems.map((it) => (
+                    <option key={it.id} value={`debt:${it.id}`}>
+                      {it.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
           )}
           <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            Este gasto reducirá el presupuesto disponible del sobre seleccionado.
+            {isDebtSelected
+              ? "Registra el pago de la deuda; se reflejará en su frasco y en /deudas."
+              : "Este gasto reducirá el presupuesto disponible del sobre seleccionado."}
           </div>
         </div>
       </div>
@@ -204,7 +242,7 @@ export function AddSpendModal({
         <button
           type="button"
           className="btn btn-primary"
-          disabled={pending || normalJars.length === 0}
+          disabled={pending || !hasOptions}
           onClick={() => void save()}
         >
           {pending ? (
