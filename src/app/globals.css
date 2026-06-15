@@ -1373,6 +1373,7 @@ a {
   gap: 12px;
   padding: 20px 22px 14px;
   border-bottom: 1px solid var(--line);
+  flex: none;
 }
 .modal-title {
   font-size: 16px;
@@ -1408,6 +1409,10 @@ a {
 .modal-body {
   padding: 20px 22px;
   overflow-y: auto;
+  /* Footer fijo: el body se encoge bajo su contenido y hace scroll interno
+     (min-height:0 vence el min-height:auto de flexbox); head/foot quedan fijos. */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .modal-foot {
   display: flex;
@@ -1415,6 +1420,7 @@ a {
   justify-content: flex-end;
   padding: 14px 22px;
   border-top: 1px solid var(--line);
+  flex: none;
 }
 @media (max-width: 560px) {
   .modal-scrim {
