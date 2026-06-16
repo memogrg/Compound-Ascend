@@ -70,7 +70,7 @@ export async function fetchBccr(externalId: string, from: Date, to: Date): Promi
   const qs = new URLSearchParams({
     fechaInicio: toSddeDate(from),
     fechaFin: toSddeDate(to),
-    idioma: "ES",
+    idioma: "es",
   });
   const url = `${BCCR_SDDE_BASE}/indicadoresEconomicos/${encodeURIComponent(externalId)}/series?${qs}`;
   const data = await fetchJson(url, {
