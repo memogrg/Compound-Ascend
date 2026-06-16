@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* shadcn/ui — el dark variant sigue TU mecanismo data-theme, no la clase .dark */
+@custom-variant dark (&:is([data-theme="dark"] *));
 
 /* ============================================================
    COMPOUND ASCEND — Sistema de diseño
@@ -3269,9 +3273,10 @@ a {
   min-width: 70px;
   text-align: right;
 }
-Módulo Transacciones · Composer premium,
-categorías,
-tooltips ============================================================ */ .cmp-seg {
+/* ============================================================
+   Módulo Transacciones · Composer premium, categorías, tooltips
+   ============================================================ */
+.cmp-seg {
   width: 100%;
   display: flex;
   margin-bottom: 16px;
@@ -3491,4 +3496,130 @@ summary:focus-visible {
   outline: 2px solid var(--info);
   outline-offset: 2px;
   border-radius: 8px;
+}
+
+/* ============================================================
+   shadcn/ui — TOKENS (aditivo, mapeados a tu design system)
+   ------------------------------------------------------------
+   Los componentes de shadcn/Aceternity/Magic UI usan utilidades
+   semánticas (bg-background, text-foreground, border-border…).
+   Aquí esas utilidades se reconducen a TUS variables (--bg, --ink,
+   --line…). El modo oscuro se hereda automáticamente porque estos
+   tokens referencian variables que ya cambian bajo [data-theme="dark"].
+   NOTA: NO se redeclara --muted (tu gris de texto); su versión
+   "fondo" de shadcn se mapea directo en @theme inline a --chip.
+   ============================================================ */
+:root {
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--bg);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--ink-2);
+  --muted-foreground: var(--muted);
+  --accent: var(--chip);
+  --accent-foreground: var(--ink);
+  --destructive: var(--neg);
+  --destructive-foreground: #ffffff;
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--ink-2);
+  --radius: var(--r-md);
+  --chart-1: var(--c-income);
+  --chart-2: var(--c-invest);
+  --chart-3: var(--gold);
+  --chart-4: var(--c-savings);
+  --chart-5: var(--c-debt);
+  --sidebar: var(--bg-elev);
+  --sidebar-foreground: var(--ink-2);
+  --sidebar-primary: var(--ink);
+  --sidebar-primary-foreground: var(--bg);
+  --sidebar-accent: var(--chip);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--ink-2);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--chip);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+  --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+  @keyframes shimmer-slide {
+    to {
+      transform: translate(calc(100cqw - 100%), 0);
+    }
+  }
+  @keyframes spin-around {
+    0% {
+      transform: translateZ(0) rotate(0);
+    }
+    15%,
+    35% {
+      transform: translateZ(0) rotate(90deg);
+    }
+    65%,
+    85% {
+      transform: translateZ(0) rotate(270deg);
+    }
+    100% {
+      transform: translateZ(0) rotate(360deg);
+    }
+  }
 }
