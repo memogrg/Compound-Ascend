@@ -1371,6 +1371,14 @@ a {
 .modal-scrim.open .modal {
   transform: none;
 }
+/* Footer fijo con wrapper <form>: varios modales envuelven body+foot en un
+   <form>, que como bloque crecía bajo su contenido y rompía la cadena flex de
+   .modal (el foot se clipeaba). display:contents disuelve la caja del form para
+   que .modal-body/.modal-foot sean hijos flex directos de .modal — sin afectar
+   el submit. Los modales sin form (body/foot directos) no se ven afectados. */
+.modal > form {
+  display: contents;
+}
 .modal-head {
   display: flex;
   align-items: flex-start;
