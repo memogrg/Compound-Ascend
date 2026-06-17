@@ -80,11 +80,18 @@ export function HoldingDetailButton({
 
 export function HoldingDetailModal({
   holding,
+  editHolding,
   currentPrice,
   currency,
   onClose,
 }: {
   holding: Holding;
+  /**
+   * Holding CRUDO para la edición (averageCost en su moneda real). El `holding`
+   * que pinta el detalle puede venir normalizado a la moneda principal para los
+   * agregados; si se omite, se cae a `holding`.
+   */
+  editHolding?: Holding;
   currentPrice: number | null;
   currency: string;
   onClose: () => void;
@@ -149,7 +156,7 @@ export function HoldingDetailModal({
         <div
           style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "10px 22px 0" }}
         >
-          <EditHoldingButton holding={holding} currency={currency} />
+          <EditHoldingButton holding={editHolding ?? holding} currency={currency} />
         </div>
         {/* Header metrics */}
         <div
