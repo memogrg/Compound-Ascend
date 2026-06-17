@@ -13,7 +13,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, currencySymbol } from "@/lib/format";
 import { withdrawGoalAction } from "@/modules/control/api/actions";
 import type { SavingsGoal } from "@/modules/control/types";
 
@@ -89,18 +89,22 @@ export function GoalWithdrawButton({ goal }: { goal: SavingsGoal }) {
               ) : null}
               <div className="fld">
                 <label className="fld-label">Monto a retirar</label>
-                <input
-                  className="inp"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={goal.currentAmount}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0"
-                  autoFocus
-                  required
-                />
+                {/* El retiro es siempre en la moneda de la meta; se muestra
+                    explícita como prefijo (no se captura en otra moneda). */}
+                <div className="inp-money">
+                  <span className="pre">{currencySymbol(goal.currency)}</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={goal.currentAmount}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0"
+                    autoFocus
+                    required
+                  />
+                </div>
                 {exceeds ? (
                   <p style={{ fontSize: 12, color: "var(--neg)", marginTop: 4 }}>
                     No puedes retirar más de {formatMoney(goal.currentAmount, goal.currency)}.

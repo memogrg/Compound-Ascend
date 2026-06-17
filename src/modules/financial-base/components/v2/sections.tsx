@@ -678,8 +678,8 @@ export function TransaccionesSection({ view }: { view: V2View }) {
             accounts={view.accounts}
             currency={currency}
           />
-          <CsvImportButton currency={currency} />
-          <TransferButton accounts={view.accounts} currency={currency} />
+          <CsvImportButton />
+          <TransferButton accounts={view.accounts} />
           <CategoryManagerButton tree={view.tree} />
           <RulesButton rules={view.rules} categories={view.categories} accounts={view.accounts} />
         </div>

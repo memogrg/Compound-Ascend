@@ -10,24 +10,25 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
+import { MoneyField } from "@/components/forms/money-field";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addCategoryAction, addBudgetItemAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 
 export function NewSobreModal({
   jars,
-  currency,
   period,
   onClose,
 }: {
   jars: Jar[];
-  currency: string;
   period: Period;
   onClose: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
+  const captureCurrency = useCaptureCurrency();
   // Solo frascos normales pueden tener sobres nuevos (los vinculados se nutren
   // de las entidades reales de su módulo).
   const normalJars = jars.filter((j): j is Extract<Jar, { kind: "normal" }> => j.kind === "normal");
@@ -35,6 +36,8 @@ export function NewSobreModal({
   const [group, setGroup] = useState(normalJars[0]?.group ?? "");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  // Moneda del presupuesto: default a la principal (estable), no a la de visualización.
+  const [currency, setCurrency] = useState(captureCurrency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,21 +111,16 @@ export function NewSobreModal({
               style={{ width: "100%", boxSizing: "border-box" }}
             />
           </div>
-          <div className="fld" style={{ flex: "1 1 120px", minWidth: 0, margin: 0 }}>
-            <label className="fld-label">Presupuesto del mes</label>
-            <div className="inp-money">
-              <span className="pre">{currency}</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                style={{ minWidth: 0 }}
-              />
-            </div>
+          <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <MoneyField
+              label="Presupuesto del mes"
+              amount={amount}
+              onAmount={setAmount}
+              currency={currency}
+              onCurrency={setCurrency}
+              defaultCurrency={captureCurrency}
+              tip="Moneda del presupuesto de este sobre. Por defecto, tu moneda principal."
+            />
           </div>
         </div>
       </div>

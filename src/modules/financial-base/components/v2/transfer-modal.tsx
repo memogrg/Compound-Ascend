@@ -1,12 +1,13 @@
 "use client";
 
 /** Transferencia entre cuentas (neutra: no cuenta como ingreso ni gasto). */
-import { CURRENCY_SYMBOL } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
+import { MoneyField } from "@/components/forms/money-field";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addTransferAction } from "@/modules/financial-base/api/v2-actions";
 import type { Account } from "@/modules/financial-base/types";
 
@@ -15,7 +16,7 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function TransferButton({ accounts, currency }: { accounts: Account[]; currency: string }) {
+export function TransferButton({ accounts }: { accounts: Account[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -28,27 +29,20 @@ export function TransferButton({ accounts, currency }: { accounts: Account[]; cu
       >
         <Icon name="repeat" width={2} /> Transferencia
       </button>
-      {open ? (
-        <TransferModal accounts={accounts} currency={currency} onClose={() => setOpen(false)} />
-      ) : null}
+      {open ? <TransferModal accounts={accounts} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
 
-function TransferModal({
-  accounts,
-  currency,
-  onClose,
-}: {
-  accounts: Account[];
-  currency: string;
-  onClose: () => void;
-}) {
+function TransferModal({ accounts, onClose }: { accounts: Account[]; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
+  const captureCurrency = useCaptureCurrency();
   const [fromId, setFromId] = useState(accounts[0]?.id ?? "");
   const [toId, setToId] = useState(accounts[1]?.id ?? "");
   const [amount, setAmount] = useState("");
+  // Moneda del traslado: default a la principal (estable), no a la de visualización.
+  const [currency, setCurrency] = useState(captureCurrency);
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
@@ -129,21 +123,14 @@ function TransferModal({
             </div>
           </div>
           <div className="fld-2">
-            <div className="fld">
-              <label className="fld-label">Monto</label>
-              <div className="inp-money">
-                <span className="pre">{CURRENCY_SYMBOL[currency] ?? ""}</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0"
-                  required
-                />
-              </div>
-            </div>
+            <MoneyField
+              amount={amount}
+              onAmount={setAmount}
+              currency={currency}
+              onCurrency={setCurrency}
+              defaultCurrency={captureCurrency}
+              tip="Moneda en que mueves el dinero. Por defecto, tu moneda principal."
+            />
             <div className="fld">
               <label className="fld-label">Fecha</label>
               <input
