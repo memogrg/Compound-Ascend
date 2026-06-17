@@ -1,4 +1,8 @@
+"use client";
 
+// Componente de presentación cliente: pasa un `formatValue` (función) a
+// PerformanceChart (client). Debe ser client component — pasar funciones a un
+// client component desde un server component lanza en RSC y tumbaba la sección.
 import { PerformanceChart } from "@/components/charts/lazy";
 import type {
   IndicatorCard,
