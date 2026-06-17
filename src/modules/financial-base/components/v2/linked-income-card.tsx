@@ -15,11 +15,10 @@ const TIP =
 export function LinkedIncomeCard({
   items,
   received,
-  currency,
 }: {
   items: BudgetItem[];
+  /** Recibido en la moneda NATIVA del ítem (sin convertir). */
   received: Record<string, number>;
-  currency: string;
 }) {
   if (items.length === 0) return null;
 
@@ -69,8 +68,8 @@ export function LinkedIncomeCard({
             </div>
             <span className="tnum muted" style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>
               {got > 0
-                ? `${formatMoney(got, currency)} recibido`
-                : `${formatMoney(b.amount, currency)} plan.`}
+                ? `${formatMoney(got, b.currency)} recibido`
+                : `${formatMoney(b.amount, b.currency)} plan.`}
             </span>
             <Link
               className="btn btn-ghost"
