@@ -12,7 +12,7 @@
  * Solo presentación: se alimenta del reporte/snapshots ya calculados y del motor
  * puro (portfolio-engine). No cambia firmas de services.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
@@ -21,6 +21,7 @@ import {
   allocationByNature,
   allocationByCategory,
   periodReturn,
+  monthlyIncomeByHolding,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { CATEGORY_META } from "@/modules/wealth/constants";
 import { HoldingIcon } from "./holding-icon";
@@ -50,6 +51,13 @@ const SUBTABS: { id: Subtab; label: string }[] = [
   { id: "monitor", label: "Monitor de Fondos" },
 ];
 
+/** Subtab a partir del hash de la URL ('#monitor' → 'monitor'); default portafolio. */
+function subtabFromHash(): Subtab {
+  if (typeof window === "undefined") return "portafolio";
+  const h = window.location.hash.replace(/^#/, "");
+  return SUBTABS.some((t) => t.id === h) ? (h as Subtab) : "portafolio";
+}
+
 function periodCutoff(period: Period): string | null {
   if (period === "Todo") return null;
   const d = new Date();
@@ -75,7 +83,20 @@ export function PortfolioView({
   /** Tasa de inversión (0-1) de BaseIndicators (financial-base). */
   investmentRate: number;
 }) {
+  // Subtab dirigido por el hash de la URL: permite deep-link (/patrimonio#monitor)
+  // y back/forward del navegador. Arranca en "portafolio" para no romper la
+  // hidratación SSR; tras montar lee el hash real y escucha cambios.
   const [subtab, setSubtab] = useState<Subtab>("portafolio");
+  useEffect(() => {
+    const sync = () => setSubtab(subtabFromHash());
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+  const selectSubtab = (id: Subtab) => {
+    window.location.hash = id; // dispara 'hashchange' → sync
+    setSubtab(id);
+  };
 
   return (
     <div className="grid">
@@ -87,7 +108,7 @@ export function PortfolioView({
             role="tab"
             aria-selected={subtab === t.id}
             className={subtab === t.id ? "seg-btn on" : "seg-btn"}
-            onClick={() => setSubtab(t.id)}
+            onClick={() => selectSubtab(t.id)}
           >
             {t.label}
           </button>
@@ -177,7 +198,7 @@ function PortfolioPanel({
   const byNature = useMemo(() => allocationByNature(holds), [holds]);
   const byCategory = useMemo(() => allocationByCategory(holds), [holds]);
   const rate = investmentRate; // 0-1, ya calculado en la página vía BaseIndicators
-  const monthlyIncome = useMemo(() => monthlyIncomeOf(holds), [holds]);
+  const monthlyIncome = useMemo(() => monthlyIncomeByHolding(holds), [holds]);
 
   return (
     <>
@@ -288,18 +309,6 @@ function PortfolioPanel({
       <ReadinessBlock summary={summary} />
     </>
   );
-}
-
-/** Ingreso mensual estimado por holding cashflow (renta normalizada a mes). */
-function monthlyIncomeOf(holds: HoldingPerformance[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const h of holds) {
-    if (h.rentalIncome && h.rentalIncome > 0) {
-      const months = FREQ_MONTHS[h.rentalFrequency ?? "mensual"] ?? 1;
-      m.set(h.id, h.rentalIncome / months);
-    }
-  }
-  return m;
 }
 
 // ── Filtro de periodo (seg) ────────────────────────────────────────

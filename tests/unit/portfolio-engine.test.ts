@@ -15,9 +15,14 @@ import {
   allocationByCategory,
   concentrationByCurrency,
   concentrationByRegion,
+  concentrations,
+  monthlyIncomeByHolding,
+  cashflowMonthlyIncome,
   periodReturn,
   investmentRate,
 } from "@/modules/wealth/engine/portfolio-engine";
+import { CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
+import { INVESTMENT_CATEGORIES } from "@/modules/wealth/types";
 import type {
   Holding,
   Dividend,
@@ -525,5 +530,51 @@ describe("portfolio-engine · taxonomía", () => {
   it("investmentRate: aporte ÷ ingreso (0 si no hay ingreso)", () => {
     expect(investmentRate(500, 2000)).toBeCloseTo(0.25);
     expect(investmentRate(100, 0)).toBe(0);
+  });
+
+  it("concentrations: agrega activo/moneda/región en una sola llamada", () => {
+    const a = computeHoldingPerformance(
+      holding({ symbol: "A", assetType: "accion", currency: "USD", region: "us", currentValueManual: 80 }),
+    );
+    const b = computeHoldingPerformance(
+      holding({ symbol: "B", assetType: "accion", currency: "CRC", currentValueManual: 20 }),
+    );
+    const c = concentrations([a, b]);
+    expect(c.byAsset.map((s) => s.label)).toEqual(["A", "B"]); // desc por valor
+    expect(c.byCurrency[0]).toMatchObject({ label: "USD", value: 80 });
+    expect(c.byRegion.map((s) => s.label).sort()).toEqual(["Sin definir", "us"]);
+  });
+
+  it("monthlyIncomeByHolding / cashflowMonthlyIncome: normaliza la renta a mes", () => {
+    const mensual = computeHoldingPerformance(
+      holding({ symbol: "ALQ", assetType: "inmueble", rentalIncome: 600, rentalFrequency: "mensual", currentValueManual: 1 }),
+    );
+    const anual = computeHoldingPerformance(
+      holding({ symbol: "REIT", assetType: "fondo", rentalIncome: 1200, rentalFrequency: "anual", currentValueManual: 1 }),
+    );
+    const sinRenta = computeHoldingPerformance(holding({ symbol: "VOO", assetType: "etf", currentValueManual: 1 }));
+
+    const map = monthlyIncomeByHolding([mensual, anual, sinRenta]);
+    expect(map.get(mensual.id)).toBe(600);
+    expect(map.get(anual.id)).toBe(100); // 1200 / 12
+    expect(map.has(sinRenta.id)).toBe(false);
+
+    expect(cashflowMonthlyIncome([mensual, anual, sinRenta])).toBe(700);
+    expect(cashflowMonthlyIncome([sinRenta])).toBe(0);
+  });
+});
+
+describe("wealth · constants (listas por naturaleza)", () => {
+  it("CASHFLOW_CATEGORIES y GROWTH_CATEGORIES particionan exactamente la taxonomía", () => {
+    expect(CASHFLOW_CATEGORIES.length + GROWTH_CATEGORIES.length).toBe(INVESTMENT_CATEGORIES.length);
+    // Disjuntas y sin slugs ajenos a la taxonomía.
+    const overlap = CASHFLOW_CATEGORIES.filter((c) => GROWTH_CATEGORIES.includes(c));
+    expect(overlap).toHaveLength(0);
+    for (const c of [...CASHFLOW_CATEGORIES, ...GROWTH_CATEGORIES]) {
+      expect(INVESTMENT_CATEGORIES).toContain(c);
+    }
+    // Muestras representativas de cada lado.
+    expect(CASHFLOW_CATEGORIES).toContain("accion_dividendo");
+    expect(GROWTH_CATEGORIES).toContain("cripto");
   });
 });
