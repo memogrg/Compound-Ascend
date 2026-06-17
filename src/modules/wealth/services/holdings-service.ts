@@ -17,8 +17,8 @@ import {
   positionIncreaseAmount,
 } from "@/modules/financial-base";
 import type { HoldingInput, HoldingSaleInput } from "@/modules/wealth/schemas";
-import type { Holding } from "@/modules/wealth/types";
-import type { AssetType } from "@/modules/wealth/types";
+import type { Holding, AssetType, InvestmentNature } from "@/modules/wealth/types";
+import { natureOfCategory } from "@/modules/wealth/constants";
 
 // Exportados para el snapshot de cron (sin sesión): mismo mapeo y columnas
 // que el resto del módulo, sin duplicar la forma del row.
@@ -38,6 +38,11 @@ export function rowToHolding(r: {
   rental_frequency?: string | null;
   rental_subtype?: string | null;
   needs_detail?: boolean | null;
+  nature?: string | null;
+  category?: string | null;
+  income_month?: number | null;
+  region?: string | null;
+  is_recurring?: boolean | null;
 }): Holding {
   return {
     id: r.id,
@@ -55,11 +60,16 @@ export function rowToHolding(r: {
     rentalFrequency: (r.rental_frequency ?? null) as Holding["rentalFrequency"],
     rentalSubtype: (r.rental_subtype ?? null) as Holding["rentalSubtype"],
     needsDetail: r.needs_detail ?? false,
+    nature: (r.nature ?? null) as Holding["nature"],
+    category: (r.category ?? null) as Holding["category"],
+    incomeMonth: r.income_month == null ? null : Number(r.income_month),
+    region: r.region ?? null,
+    isRecurring: r.is_recurring ?? false,
   };
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -100,6 +110,31 @@ function rentalColumns(input: HoldingInput) {
   };
 }
 
+/**
+ * Símbolo a persistir. La columna sigue NOT NULL; las categorías no cotizadas
+ * pueden venir sin símbolo, así que se rellena un placeholder derivado del
+ * nombre (label, ≤12 chars) o 'MANUAL'.
+ */
+function resolveSymbol(input: HoldingInput): string {
+  const explicit = input.symbol?.trim().toUpperCase();
+  if (explicit) return explicit;
+  const fromLabel = input.label?.trim().slice(0, 12).toUpperCase();
+  return fromLabel || "MANUAL";
+}
+
+/** Columnas de taxonomía (nature derivada de category si no viene). */
+function taxonomyColumns(input: HoldingInput) {
+  const nature: InvestmentNature | null =
+    input.nature ?? (input.category ? natureOfCategory(input.category) : null);
+  return {
+    nature,
+    category: input.category ?? null,
+    income_month: input.incomeMonth ?? null,
+    region: input.region ?? null,
+    is_recurring: input.isRecurring ?? false,
+  };
+}
+
 export async function listHoldings(): Promise<Holding[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -114,7 +149,7 @@ export async function listHoldings(): Promise<Holding[]> {
 export async function createHolding(input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const symbol = input.symbol.toUpperCase();
+  const symbol = resolveSymbol(input);
   const label = input.label?.trim() || null;
 
   // Merge key: symbol + assetType + currency + label.
@@ -195,6 +230,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
       broker: input.broker ?? null,
       currency: input.currency,
       ...rentalColumns(input),
+      ...taxonomyColumns(input),
     })
     .select("id")
     .single();
@@ -231,6 +267,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
 export async function updateHolding(id: string, input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const symbol = resolveSymbol(input);
 
   // Fase 4.1 (opt-in, default OFF en edits porque el flujo no distingue
   // "aporte" de "corrección de datos"): si el usuario lo marca y el edit
@@ -257,7 +294,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       if (amount > 0) {
         txnId = await registerPurchaseExpense({
           holdingId: id,
-          label: input.label?.trim() || input.symbol.toUpperCase(),
+          label: input.label?.trim() || symbol,
           currency: input.currency,
           purchaseDate: input.purchaseDate,
           amount,
@@ -271,7 +308,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
     .from("investment_holdings")
     .update({
       investment_id: input.investmentId ?? null,
-      symbol: input.symbol.toUpperCase(),
+      symbol,
       asset_type: input.assetType,
       quantity: input.quantity,
       average_cost: input.averageCost,
@@ -283,6 +320,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       // Completar el detalle de un stub (Fase 3) lo marca como completo.
       needs_detail: false,
       ...rentalColumns(input),
+      ...taxonomyColumns(input),
     })
     .eq("id", id)
     .eq("user_id", user.id);

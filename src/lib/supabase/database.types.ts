@@ -483,6 +483,12 @@ export type InvestmentHoldingRow = Timestamps & {
   rental_subtype: string | null;
   // Ingresos (migración 20260615000003 · Fase 3): stub por completar.
   needs_detail: boolean;
+  // Taxonomía de inversiones (migración 20260617000001).
+  nature: string | null;
+  category: string | null;
+  income_month: number | null;
+  region: string | null;
+  is_recurring: boolean;
 };
 
 export type RentalPaymentRow = Timestamps & {

@@ -1,5 +1,6 @@
 /** Validación Zod de inversiones y pólizas (Módulo 4). */
 import { z } from "zod";
+import { INVESTMENT_CATEGORIES } from "@/modules/wealth/types";
 
 export const investmentInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
@@ -69,7 +70,9 @@ const ASSET_TYPE_ENUM = [
 
 export const holdingInputSchema = z.object({
   investmentId: z.string().uuid().optional(),
-  symbol: z.string().trim().min(1, "El símbolo es obligatorio").max(12).toUpperCase(),
+  // Opcional: las categorías no cotizadas no necesitan símbolo (el servicio
+  // rellena un placeholder para satisfacer el NOT NULL de la columna).
+  symbol: z.string().trim().max(12).toUpperCase().optional(),
   assetType: z.enum(ASSET_TYPE_ENUM),
   quantity: z.number().positive("La cantidad debe ser mayor a 0"),
   averageCost: z.number().nonnegative("El costo promedio no puede ser negativo"),
@@ -82,6 +85,13 @@ export const holdingInputSchema = z.object({
   rentalIncome: z.number().nonnegative().optional(),
   rentalFrequency: z.enum(["mensual", "trimestral", "anual"]).optional(),
   rentalSubtype: z.enum(["alquiler", "airbnb", "auto", "negocio", "otro"]).optional(),
+  // Taxonomía de inversiones (PLAN §2.2). `nature` es derivable de `category`
+  // (el servicio la calcula si no viene).
+  nature: z.enum(["cashflow", "growth"]).optional(),
+  category: z.enum(INVESTMENT_CATEGORIES).optional(),
+  incomeMonth: z.number().int().min(1).max(12).optional(),
+  region: z.string().trim().max(20).optional(),
+  isRecurring: z.boolean().optional(),
   // Fase 4.1: registrar la compra/aporte como gasto vinculado en Base
   // Financiera (default ON al crear; OFF al editar — un edit puede ser
   // corrección de datos, no un aporte real).
