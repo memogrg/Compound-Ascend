@@ -10,6 +10,8 @@ import {
   yahoo,
   binance,
   coingecko,
+  yahooHistory,
+  coingeckoHistory,
   logProviderMiss,
   type Quote,
 } from "@/lib/market-data/providers";
@@ -47,6 +49,27 @@ export async function getMarketPrice(
   }
   logProviderMiss(symbol, assetType);
   return null;
+}
+
+/**
+ * Serie diaria (~1 mes) para el sparkline del Monitor. Best-effort: Yahoo para
+ * stock/ETF, CoinGecko para cripto; [] si no hay datos. Cacheada aparte del
+ * precio (TTL más largo) porque cambia poco intradía.
+ */
+export async function getMarketSparkline(
+  rawSymbol: string,
+  assetType: AssetType,
+): Promise<number[]> {
+  const symbol = rawSymbol.trim().toUpperCase();
+  if (!isValidSymbol(symbol)) return [];
+
+  const cacheKey = `spark:${assetType}:${symbol}`;
+  const cached = priceCache.get<number[]>(cacheKey);
+  if (cached) return cached;
+
+  const series = assetType === "crypto" ? await coingeckoHistory(symbol) : await yahooHistory(symbol);
+  if (series.length >= 2) priceCache.set(cacheKey, series, TTL.sparkline);
+  return series;
 }
 
 export type SymbolResult = { symbol: string; description: string };

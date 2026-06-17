@@ -6,7 +6,7 @@
  * + persistencia). La caché por símbolo evita superar el rate-limit de Finnhub
  * (60/min) en cargas repetidas; el batch se limita a un máximo prudente.
  */
-import { getMarketPrice } from "@/lib/market-data";
+import { getMarketPrice, getMarketSparkline } from "@/lib/market-data";
 import {
   listWatchlist,
   addWatchlistSymbol,
@@ -21,6 +21,10 @@ export type MonitorQuote = {
   price: number | null;
   currency: string | null;
   cached: boolean;
+  /** Variación % del día (-/+), o null si el proveedor no la expone. */
+  changePct: number | null;
+  /** Serie diaria (~1 mes) para el sparkline; [] si no hay datos. */
+  spark: number[];
 };
 
 const MAX_SYMBOLS = 30;
@@ -42,13 +46,19 @@ export async function getMonitorQuotesAction(
 
   return Promise.all(
     list.map(async (s) => {
-      const quote = await getMarketPrice(s.symbol, s.kind);
+      // Precio (con variación %) y sparkline en paralelo; cada uno cachea aparte.
+      const [quote, spark] = await Promise.all([
+        getMarketPrice(s.symbol, s.kind),
+        getMarketSparkline(s.symbol, s.kind),
+      ]);
       return {
         symbol: s.symbol.toUpperCase(),
         kind: s.kind,
         price: quote?.price ?? null,
         currency: quote?.currency ?? null,
         cached: quote?.cached ?? false,
+        changePct: quote?.changePct ?? null,
+        spark,
       };
     }),
   );

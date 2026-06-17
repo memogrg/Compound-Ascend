@@ -511,7 +511,7 @@ export type WatchlistSymbolRow = Timestamps & {
   user_id: string;
   household_id: string | null;
   symbol: string;
-  kind: string;
+  asset_type: string;
 };
 
 export type InvestmentTransactionRow = Timestamps & {

@@ -455,6 +455,49 @@ export function concentrationByRegion(holds: HoldingPerformance[]): AllocationSl
   return concentrationBy(holds, (h) => h.region?.trim() || "Sin definir");
 }
 
+export type Concentrations = {
+  byAsset: AllocationSlice[];
+  byCurrency: AllocationSlice[];
+  byRegion: AllocationSlice[];
+};
+
+/** Las tres vistas de concentración (activo, moneda, región) en una llamada. */
+export function concentrations(holds: HoldingPerformance[]): Concentrations {
+  return {
+    byAsset: concentrationByAsset(holds),
+    byCurrency: concentrationByCurrency(holds),
+    byRegion: concentrationByRegion(holds),
+  };
+}
+
+// ── Ingreso de flujo de caja (renta normalizada a mes) ───────────────
+
+const FREQ_MONTHS: Record<string, number> = {
+  mensual: 1,
+  trimestral: 3,
+  semestral: 6,
+  anual: 12,
+};
+
+/** Ingreso mensual estimado por holding con renta (id → monto/mes). */
+export function monthlyIncomeByHolding(holds: HoldingPerformance[]): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const h of holds) {
+    if (h.rentalIncome && h.rentalIncome > 0) {
+      const months = FREQ_MONTHS[h.rentalFrequency ?? "mensual"] ?? 1;
+      m.set(h.id, h.rentalIncome / months);
+    }
+  }
+  return m;
+}
+
+/** Ingreso mensual total de flujo de caja (suma de las rentas normalizadas). */
+export function cashflowMonthlyIncome(holds: HoldingPerformance[]): number {
+  let total = 0;
+  for (const v of monthlyIncomeByHolding(holds).values()) total += v;
+  return total;
+}
+
 // ── Rendimiento del periodo y tasa de inversión (Fase 3) ─────────────
 
 export type PeriodReturn = { abs: number; pct: number };

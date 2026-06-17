@@ -64,4 +64,6 @@ export const TTL = {
   etf: 60,
   crypto: 300,
   search: 300,
+  // El sparkline es una serie diaria: cambia poco intradía, se cachea más tiempo.
+  sparkline: 1800,
 } as const;
