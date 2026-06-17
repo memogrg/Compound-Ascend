@@ -98,6 +98,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
 
   const today = new Date().toISOString().slice(0, 10);
   const [pay, setPay] = useState<{ amount: number; date: string } | null>(null);
+  const [extraPay, setExtraPay] = useState(false);
   const [editPayment, setEditPayment] = useState<string | null>(null);
   const [deletePayment, setDeletePayment] = useState<string | null>(null);
 
@@ -125,12 +126,21 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
                 : " · tasa fija"}
             </div>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => setPay({ amount: vm.monthlyPayment || 0, date: today })}
-          >
-            Reportar pago
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setExtraPay(true)}
+              title="Abono directo a capital"
+            >
+              Pago extraordinario
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => setPay({ amount: vm.monthlyPayment || 0, date: today })}
+            >
+              Reportar pago
+            </button>
+          </div>
         </div>
 
         {vm.dueSoon && vm.nextDue ? (
@@ -303,6 +313,10 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
         />
       ) : null}
 
+      {extraPay ? (
+        <ExtraordinaryPaymentModal vm={vm} onClose={() => setExtraPay(false)} />
+      ) : null}
+
       {editing ? (
         <ReportPaymentModal
           vm={vm}
@@ -425,6 +439,7 @@ function PaymentsCard({
         const total = p.amount + p.extraAmount;
         const hasExtra = p.extraAmount > 0;
         const hasEstimate = p.principal != null && p.interest != null;
+        const isExtra = p.kind === "extraordinario";
         return (
           <div key={p.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
             <div style={{ minWidth: 0 }}>
@@ -447,9 +462,19 @@ function PaymentsCard({
                     {VIA_LABEL[p.viaSource]}
                   </span>
                 ) : null}
+                {isExtra ? (
+                  <span
+                    className="chip"
+                    style={{ fontSize: 10, background: "var(--warn-soft)", color: "var(--warn)" }}
+                  >
+                    extraordinario
+                  </span>
+                ) : null}
               </div>
               <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                {hasExtra ? (
+                {isExtra ? (
+                  <>Abono directo a capital · sin intereses</>
+                ) : hasExtra ? (
                   hasEstimate ? (
                     <>
                       Cuota {formatMoney(p.amount, currency)} + Extra{" "}
@@ -671,6 +696,7 @@ function ReportPaymentModal({
       amount: amountNum,
       extraAmount: extraNum,
       extraMode: extraNum > 0 ? mode : undefined,
+      kind: "ordinario" as const,
     };
     const res = editing
       ? await updateDebtPaymentAction(editing.id, payload)
@@ -777,6 +803,98 @@ function ReportPaymentModal({
           </button>
           <button type="submit" className="btn btn-primary" disabled={pending}>
             {pending ? "Guardando…" : editing ? "Guardar cambios" : "Registrar pago"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ── Pago extraordinario (abono directo a capital) ──────────────────
+
+function ExtraordinaryPaymentModal({ vm, onClose }: { vm: DebtDetailVM; onClose: () => void }) {
+  const router = useRouter();
+  const toast = useToast();
+  const today = new Date().toISOString().slice(0, 10);
+  const [amount, setAmount] = useState<string>("");
+  const [date, setDate] = useState(today);
+  const [pending, setPending] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(amount) || 0;
+    if (amt <= 0) {
+      toast("Ingresa un monto válido", "error");
+      return;
+    }
+    setPending(true);
+    const res = await reportPaymentAction({
+      debtId: vm.id,
+      paymentDate: date,
+      amount: amt,
+      extraAmount: 0,
+      kind: "extraordinario",
+    });
+    setPending(false);
+    if (res.ok) {
+      toast("Abono a capital registrado");
+      onClose();
+      router.refresh();
+    } else {
+      toast(res.message ?? "No se pudo registrar", "error");
+    }
+  };
+
+  return (
+    <Modal title="Pago extraordinario" sub="Abono directo a capital." onClose={onClose}>
+      <form onSubmit={submit}>
+        <div className="modal-body">
+          <div
+            className="auth-msg"
+            style={{ margin: "0 0 14px", fontSize: 12.5, lineHeight: 1.5 }}
+          >
+            <span
+              className="tip tip-wrap"
+              data-tip="Abono directo a capital. No paga intereses ni cuenta como la cuota del mes."
+              aria-label="Abono directo a capital. No paga intereses ni cuenta como la cuota del mes."
+              style={{ display: "inline-flex", color: "var(--muted)", cursor: "help", marginRight: 6 }}
+            >
+              <Icon name="info" />
+            </span>
+            Reduce el capital sin pagar intereses; no cuenta como la cuota del mes.
+          </div>
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">Monto del abono</label>
+              <div className="inp-money">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+            </div>
+            <div className="fld">
+              <label className="fld-label">Fecha</label>
+              <input
+                className="inp"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={pending}>
+            {pending ? "Guardando…" : "Registrar abono"}
           </button>
         </div>
       </form>
