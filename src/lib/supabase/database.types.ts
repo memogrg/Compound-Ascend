@@ -483,6 +483,12 @@ export type InvestmentHoldingRow = Timestamps & {
   rental_subtype: string | null;
   // Ingresos (migración 20260615000003 · Fase 3): stub por completar.
   needs_detail: boolean;
+  // Taxonomía de inversiones (migración 20260617000001).
+  nature: string | null;
+  category: string | null;
+  income_month: number | null;
+  region: string | null;
+  is_recurring: boolean;
 };
 
 export type RentalPaymentRow = Timestamps & {
@@ -497,6 +503,15 @@ export type RentalPaymentRow = Timestamps & {
   income_id: string | null;
   // Puente ledger↔transacción (migración 0021 · Fase 1)
   transaction_id: string | null;
+};
+
+// Watchlist del Monitor de Fondos (migración 20260617000002).
+export type WatchlistSymbolRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  symbol: string;
+  kind: string;
 };
 
 export type InvestmentTransactionRow = Timestamps & {
@@ -668,6 +683,7 @@ export interface Database {
       debt_payments: UserTable<DebtPaymentRow>;
       investments: UserTable<InvestmentRow>;
       investment_holdings: UserTable<InvestmentHoldingRow>;
+      watchlist_symbols: UserTable<WatchlistSymbolRow>;
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
       market_price_cache: TableShape<

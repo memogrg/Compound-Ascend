@@ -5,6 +5,7 @@ import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/servi
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
 import { getSnapshotHistory } from "@/modules/wealth/services/snapshot-service";
 import { listDividends } from "@/modules/wealth/services/dividend-service";
+import { getBaseSummary } from "@/modules/financial-base";
 import { listPendingHoldings } from "@/modules/wealth/services/holdings-service";
 import { PendingHoldingsCard } from "@/modules/wealth/components/pending-holdings-card";
 import { GrowthView } from "@/modules/wealth/components/growth-view";
@@ -24,13 +25,20 @@ import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
  * pinte de inmediato y la cartera llegue en streaming.
  */
 async function PortfolioSection({ summary }: { summary: WealthSummary }) {
-  const [report, snapshots, dividends] = await Promise.all([
+  const [report, snapshots, dividends, base] = await Promise.all([
     getPortfolioReport(),
     getSnapshotHistory("all"),
     listDividends(),
+    getBaseSummary(),
   ]);
   return (
-    <PortfolioView report={report} snapshots={snapshots} dividends={dividends} summary={summary} />
+    <PortfolioView
+      report={report}
+      snapshots={snapshots}
+      dividends={dividends}
+      summary={summary}
+      investmentRate={base.indicators.investmentRate}
+    />
   );
 }
 

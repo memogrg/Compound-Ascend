@@ -15,7 +15,10 @@ import type {
   AllocationSlice,
   InvestmentInsights,
   InvestmentReadiness,
+  InvestmentNature,
+  InvestmentCategory,
 } from "@/modules/wealth/types";
+import { CATEGORY_META } from "@/modules/wealth/constants";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -349,4 +352,139 @@ export function buildInvestmentInsights(
     ),
     allocationInsights: buildAllocationInsight(analytics, riskClass),
   };
+}
+
+// ── Taxonomía: asignación por naturaleza / categoría (Fase 3) ─────────
+//
+// Operan sobre HoldingPerformance[] (currentValue ya calculado). Puras y
+// aditivas: no tocan las analíticas por bucket existentes.
+
+const NATURE_LABEL: Record<InvestmentNature, string> = {
+  cashflow: "Flujo de caja",
+  growth: "Crecimiento",
+};
+const NATURE_COLOR: Record<InvestmentNature, string> = {
+  cashflow: "var(--teal)",
+  growth: "var(--pos)",
+};
+
+/** Paleta cíclica para las categorías (sin color fijo por slug). */
+const CONC_PALETTE = [
+  "var(--pos)",
+  "var(--info)",
+  "var(--gold)",
+  "var(--teal)",
+  "var(--c-networth)",
+  "var(--warn)",
+  "var(--c-protect)",
+  "var(--rose)",
+  "var(--muted-2)",
+];
+
+/** Naturaleza de un holding: explícita, derivada de su categoría, o 'growth'. */
+function resolveNature(h: HoldingPerformance): InvestmentNature {
+  if (h.nature === "cashflow" || h.nature === "growth") return h.nature;
+  if (h.category && CATEGORY_META[h.category]) return CATEGORY_META[h.category].nature;
+  return "growth";
+}
+
+/** 2 slices (flujo de caja / crecimiento) por valor de mercado. */
+export function allocationByNature(holds: HoldingPerformance[]): AllocationSlice[] {
+  const sums: Record<InvestmentNature, number> = { cashflow: 0, growth: 0 };
+  let total = 0;
+  for (const h of holds) {
+    sums[resolveNature(h)] += h.currentValue;
+    total += h.currentValue;
+  }
+  return (["cashflow", "growth"] as InvestmentNature[]).map((n) => ({
+    label: NATURE_LABEL[n],
+    value: sums[n],
+    pct: total > 0 ? sums[n] / total : 0,
+    color: NATURE_COLOR[n],
+  }));
+}
+
+/** Slices por las categorías presentes (las de valor > 0), desc por valor. */
+export function allocationByCategory(holds: HoldingPerformance[]): AllocationSlice[] {
+  const sums = new Map<InvestmentCategory, number>();
+  let total = 0;
+  for (const h of holds) {
+    if (!h.category || !CATEGORY_META[h.category]) continue;
+    sums.set(h.category, (sums.get(h.category) ?? 0) + h.currentValue);
+    total += h.currentValue;
+  }
+  return [...sums.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, value], i) => ({
+      label: CATEGORY_META[cat].label,
+      value,
+      pct: total > 0 ? value / total : 0,
+      color: CONC_PALETTE[i % CONC_PALETTE.length]!,
+    }));
+}
+
+/** Concentración genérica por una clave (activo, moneda, región), desc por valor. */
+export function concentrationBy(
+  holds: HoldingPerformance[],
+  keyFn: (h: HoldingPerformance) => string,
+): AllocationSlice[] {
+  const sums = new Map<string, number>();
+  let total = 0;
+  for (const h of holds) {
+    const k = keyFn(h);
+    sums.set(k, (sums.get(k) ?? 0) + h.currentValue);
+    total += h.currentValue;
+  }
+  return [...sums.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value], i) => ({
+      label,
+      value,
+      pct: total > 0 ? value / total : 0,
+      color: CONC_PALETTE[i % CONC_PALETTE.length]!,
+    }));
+}
+
+export function concentrationByAsset(holds: HoldingPerformance[]): AllocationSlice[] {
+  return concentrationBy(holds, (h) => h.label?.trim() || h.symbol);
+}
+export function concentrationByCurrency(holds: HoldingPerformance[]): AllocationSlice[] {
+  return concentrationBy(holds, (h) => h.currency);
+}
+export function concentrationByRegion(holds: HoldingPerformance[]): AllocationSlice[] {
+  return concentrationBy(holds, (h) => h.region?.trim() || "Sin definir");
+}
+
+// ── Rendimiento del periodo y tasa de inversión (Fase 3) ─────────────
+
+export type PeriodReturn = { abs: number; pct: number };
+
+/**
+ * Rendimiento del periodo a partir de snapshots YA filtrados (orden cronológico)
+ * descontando los aportes hechos en el periodo:
+ *   abs = valorFinal − valorInicial − aportes
+ *   pct = abs / (valorInicial + aportes)
+ * Con <2 snapshots no hay periodo medible → 0/0.
+ */
+export function periodReturn(
+  snapshots: { date: string; portfolioValue: number }[],
+  contributions: number,
+): PeriodReturn {
+  if (snapshots.length < 2) return { abs: 0, pct: 0 };
+  const start = snapshots[0]!.portfolioValue;
+  const end = snapshots[snapshots.length - 1]!.portfolioValue;
+  const base = start + contributions;
+  const abs = end - start - contributions;
+  return { abs, pct: base > 0 ? abs / base : 0 };
+}
+
+/**
+ * Tasa de inversión = aporte mensual recurrente ÷ ingreso mensual (0 si no hay
+ * ingreso). NOTA: el monto del aporte recurrente por holding aún no se persiste
+ * (Fase 2 solo guardó is_recurring); el llamador usa BaseIndicators.investmentRate
+ * / un agregado de financial-base como `recurringMonthly`.
+ */
+export function investmentRate(recurringMonthly: number, incomeMonthly: number): number {
+  if (incomeMonthly <= 0) return 0;
+  return recurringMonthly / incomeMonthly;
 }

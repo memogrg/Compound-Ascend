@@ -66,9 +66,19 @@ describe("holdingInputSchema", () => {
     expectFailAt(holdingInputSchema, { ...valid, investmentId: "no-es-uuid" }, ["investmentId"]);
   });
 
-  it("rechaza símbolo vacío o demasiado largo (>12)", () => {
-    expectFailAt(holdingInputSchema, { ...valid, symbol: "  " }, ["symbol"]);
+  it("acepta símbolo ausente o vacío (categorías no cotizadas) y rechaza >12", () => {
+    // symbol pasó a opcional: ausente o vacío es válido (el servicio rellena placeholder).
+    expect(holdingInputSchema.safeParse({ ...valid, symbol: undefined }).success).toBe(true);
+    expect(holdingInputSchema.safeParse({ ...valid, symbol: "  " }).success).toBe(true);
+    // demasiado largo sigue rechazado.
     expectFailAt(holdingInputSchema, { ...valid, symbol: "A".repeat(13) }, ["symbol"]);
+  });
+
+  it("acepta category de la taxonomía y rechaza un slug inválido", () => {
+    expect(holdingInputSchema.safeParse({ ...valid, category: "accion_dividendo" }).success).toBe(
+      true,
+    );
+    expectFailAt(holdingInputSchema, { ...valid, category: "no_existe" }, ["category"]);
   });
 });
 

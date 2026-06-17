@@ -11,6 +11,12 @@ import {
   buildPassiveIncomeInsight,
   buildAllocationInsight,
   buildInvestmentInsights,
+  allocationByNature,
+  allocationByCategory,
+  concentrationByCurrency,
+  concentrationByRegion,
+  periodReturn,
+  investmentRate,
 } from "@/modules/wealth/engine/portfolio-engine";
 import type {
   Holding,
@@ -453,5 +459,71 @@ describe("buildInvestmentInsights", () => {
     expect(insights.dividendInsights).toBe(buildDividendInsight(divs, "USD"));
     expect(insights.passiveIncomeInsights).toBe(buildPassiveIncomeInsight(10, 1000, "USD"));
     expect(insights.allocationInsights).toBe(buildAllocationInsight(analytics, "moderado"));
+  });
+});
+
+// ── Taxonomía (Fase 3) ────────────────────────────────────────────
+
+describe("portfolio-engine · taxonomía", () => {
+  // currentValueManual fija el currentValue sin precio (determinista).
+  const div = computeHoldingPerformance(
+    holding({ symbol: "VYM", assetType: "accion", category: "accion_dividendo", currentValueManual: 100 }),
+  );
+  const growth = computeHoldingPerformance(
+    holding({ symbol: "VOO", assetType: "etf", category: "etf_crecimiento", currentValueManual: 300 }),
+  );
+
+  it("allocationByNature: 2 slices por valor de mercado", () => {
+    const slices = allocationByNature([div, growth]);
+    const cash = slices.find((s) => s.label === "Flujo de caja")!;
+    const grw = slices.find((s) => s.label === "Crecimiento")!;
+    expect(cash.value).toBe(100);
+    expect(grw.value).toBe(300);
+    expect(cash.pct).toBeCloseTo(0.25);
+    expect(grw.pct).toBeCloseTo(0.75);
+  });
+
+  it("allocationByCategory: categorías presentes, desc por valor", () => {
+    const slices = allocationByCategory([div, growth]);
+    expect(slices).toHaveLength(2);
+    expect(slices[0]!.value).toBe(300); // crecimiento primero
+    expect(slices[0]!.label).toBe("ETFs o fondos de crecimiento");
+  });
+
+  it("nature: deriva de category cuando el holding no la trae explícita", () => {
+    // div/growth no setean `nature`; se infiere de la categoría.
+    const slices = allocationByNature([div]);
+    expect(slices.find((s) => s.label === "Flujo de caja")!.pct).toBe(1);
+  });
+
+  it("concentración por moneda y por región", () => {
+    const a = computeHoldingPerformance(
+      holding({ symbol: "A", assetType: "accion", currency: "USD", region: "us", currentValueManual: 80 }),
+    );
+    const b = computeHoldingPerformance(
+      holding({ symbol: "B", assetType: "accion", currency: "CRC", currentValueManual: 20 }),
+    );
+    const byCur = concentrationByCurrency([a, b]);
+    expect(byCur[0]).toMatchObject({ label: "USD", value: 80 });
+    const byReg = concentrationByRegion([a, b]);
+    expect(byReg.map((s) => s.label).sort()).toEqual(["Sin definir", "us"]);
+  });
+
+  it("periodReturn: valor final − inicial − aportes", () => {
+    const r = periodReturn(
+      [
+        { date: "2026-01-01", portfolioValue: 1000 },
+        { date: "2026-03-01", portfolioValue: 1300 },
+      ],
+      100,
+    );
+    expect(r.abs).toBe(200);
+    expect(r.pct).toBeCloseTo(200 / 1100);
+    expect(periodReturn([{ date: "x", portfolioValue: 1 }], 0)).toEqual({ abs: 0, pct: 0 });
+  });
+
+  it("investmentRate: aporte ÷ ingreso (0 si no hay ingreso)", () => {
+    expect(investmentRate(500, 2000)).toBeCloseTo(0.25);
+    expect(investmentRate(100, 0)).toBe(0);
   });
 });

@@ -15,6 +15,36 @@ export type AssetType =
   | "nft"
   | "otro";
 
+/** Taxonomía de inversiones (PLAN §2.1): 2 naturalezas × 20 categorías.
+ *  Fuente única de los slugs; la usan el schema (enum) y CATEGORY_META. */
+export const INVESTMENT_CATEGORIES = [
+  // cashflow (10)
+  "cuenta_remunerada",
+  "deposito_plazo",
+  "bono_gobierno",
+  "bono_empresa",
+  "fondo_conservador",
+  "prestamo_interes",
+  "propiedad_alquiler",
+  "reit",
+  "accion_dividendo",
+  "negocio_ingreso",
+  // growth (10)
+  "accion_crecimiento",
+  "etf_crecimiento",
+  "indexado_global",
+  "roboadvisor",
+  "propiedad_plusvalia",
+  "proyecto_inmobiliario",
+  "startup",
+  "compra_negocio",
+  "cripto",
+  "alternativo",
+] as const;
+
+export type InvestmentCategory = (typeof INVESTMENT_CATEGORIES)[number];
+export type InvestmentNature = "cashflow" | "growth";
+
 export type Investment = {
   id: string;
   assetType: AssetType;
@@ -130,6 +160,17 @@ export type Holding = {
   rentalSubtype?: RentalSubtype | null;
   /** Stub por completar (creado desde un ingreso pasivo · Fase 3). */
   needsDetail?: boolean;
+  // ── Taxonomía de inversiones (migración 20260617000001) ──
+  /** Naturaleza: 'cashflow' (genera ingreso) | 'growth' (plusvalía). */
+  nature?: InvestmentNature | null;
+  /** Categoría (uno de los 20 slugs). */
+  category?: InvestmentCategory | null;
+  /** Mes (1-12) de materialización del flujo de caja no recurrente. */
+  incomeMonth?: number | null;
+  /** Concentración geográfica (us|cr|eu|latam|global|otro; NULL = sin definir). */
+  region?: string | null;
+  /** Si el aporte mensual es real (recurrente). */
+  isRecurring?: boolean;
 };
 
 /** Evento de renta recibida (fuente: tabla rental_payments). */
