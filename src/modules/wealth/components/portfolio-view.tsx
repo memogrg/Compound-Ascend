@@ -33,6 +33,7 @@ import type { PortfolioReport } from "@/modules/wealth/services/portfolio-servic
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type {
   Dividend,
+  Holding,
   HoldingPerformance,
   PortfolioSnapshot,
   AllocationSlice,
@@ -155,6 +156,10 @@ function PortfolioPanel({
     () => [...analytics.holdingsWithPerformance].sort((a, b) => b.currentValue - a.currentValue),
     [analytics.holdingsWithPerformance],
   );
+  // Holdings CRUDOS (sin normalizar a la moneda principal): el costo/valor de la
+  // tabla viene normalizado para sumar agregados, pero la edición debe partir de
+  // los valores tal como el usuario los ingresó (averageCost en su moneda real).
+  const rawById = useMemo(() => new Map(report.holdings.map((h) => [h.id, h])), [report.holdings]);
 
   // Filtros de periodo INDEPENDIENTES: A → indicadores; B → resumen sobre tabla.
   const [periodA, setPeriodA] = useState<Period>("Todo");
@@ -297,7 +302,13 @@ function PortfolioPanel({
           </div>
         ) : (
           holds.map((h) => (
-            <HoldingTableRow key={h.id} h={h} currency={currency} monthlyIncome={monthlyIncome.get(h.id) ?? null} />
+            <HoldingTableRow
+              key={h.id}
+              h={h}
+              raw={rawById.get(h.id)}
+              currency={currency}
+              monthlyIncome={monthlyIncome.get(h.id) ?? null}
+            />
           ))
         )}
       </div>
@@ -434,10 +445,13 @@ function AllocationDonut({
 
 function HoldingTableRow({
   h,
+  raw,
   currency,
   monthlyIncome,
 }: {
   h: HoldingPerformance;
+  /** Holding crudo (sin normalizar) para la edición; cae a `h` si no está. */
+  raw?: Holding;
   currency: string;
   monthlyIncome: number | null;
 }) {
@@ -453,6 +467,7 @@ function HoldingTableRow({
       {open ? (
         <HoldingDetailModal
           holding={h}
+          editHolding={raw}
           currentPrice={h.currentPrice ?? null}
           currency={currency}
           onClose={() => setOpen(false)}
