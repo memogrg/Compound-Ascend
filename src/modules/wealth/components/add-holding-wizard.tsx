@@ -13,8 +13,9 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, currencySymbol, captureCurrencyDefault } from "@/lib/format";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import { addHoldingAction, editHoldingAction } from "@/modules/wealth/api/actions";
 import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
@@ -57,10 +58,6 @@ function categoryFromAssetType(assetType: AssetType): InvestmentCategory {
     otro: "alternativo",
   };
   return map[assetType] ?? "alternativo";
-}
-
-function sym(currency: string): string {
-  return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
 }
 
 // ── Triggers exportados ────────────────────────────────────────────
@@ -161,18 +158,23 @@ export function CompleteHoldingButton({
 // ── Modal de 2 pasos ───────────────────────────────────────────────
 
 function AddHoldingModal({
-  currency,
   onClose,
   prefill,
   editId,
 }: {
-  currency: string;
+  /**
+   * Moneda de visualización (legado). Ya NO define el default de captura —al
+   * crear se usa la principal vía useCaptureCurrency(); al editar/comprar, la del
+   * holding (prefill.currency). Se acepta para no romper los call-sites.
+   */
+  currency?: string;
   onClose: () => void;
   prefill?: Holding;
   editId?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
+  const captureCurrency = useCaptureCurrency();
   const isEdit = Boolean(editId);
 
   // Categoría precargada (edición/compra) o elección en el paso 1.
@@ -187,7 +189,9 @@ function AddHoldingModal({
   const investedPrefill =
     prefill && prefill.quantity > 0 ? String(prefill.quantity * prefill.averageCost) : "";
   const [invested, setInvested] = useState(investedPrefill);
-  const [cur, setCur] = useState(prefill?.currency ?? currency);
+  // Moneda de captura: al editar/comprar respeta la del holding; al crear, la
+  // principal del usuario (estable) — nunca la de visualización.
+  const [cur, setCur] = useState(captureCurrencyDefault(undefined, prefill?.currency, captureCurrency));
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
   const [aporteMensual, setAporteMensual] = useState(""); // informativo (sin columna aún)
 
@@ -285,6 +289,12 @@ function AddHoldingModal({
   const qtyNum = parseFloat(quantity) || 0;
   const canSave = !!category && name.trim().length > 0 && investedNum > 0;
 
+  // El precio en vivo puede venir en una moneda (p. ej. USD) distinta a la
+  // elegida (cur). NO lo mezclamos silenciosamente en el costo: solo se usa como
+  // referencia de costo si coincide con `cur` (el aviso al usuario se pinta en
+  // el campo del símbolo cuando difieren).
+  const liveMatchesCur = livePriceCurrency === cur;
+
   // ── Payload (HoldingInput) ──
   function buildPayload(): HoldingInput {
     const cat = category!;
@@ -293,7 +303,10 @@ function AddHoldingModal({
     // Resto → 1 "unidad" cuyo costo ES el monto invertido.
     const useUnits = m.quoted && qtyNum > 0;
     const finalQty = useUnits ? qtyNum : 1;
-    const finalAvg = useUnits ? (investedNum > 0 ? investedNum / qtyNum : (livePrice ?? 0)) : investedNum;
+    // Si no hay monto invertido, solo se cae al precio en vivo cuando su moneda
+    // coincide con `cur`; si difiere, no se asume (quedaría mal etiquetado).
+    const liveForCost = liveMatchesCur ? (livePrice ?? 0) : 0;
+    const finalAvg = useUnits ? (investedNum > 0 ? investedNum / qtyNum : liveForCost) : investedNum;
 
     const base: HoldingInput = {
       assetType: m.defaultAssetType,
@@ -610,7 +623,7 @@ function Step2Fields(props: {
         <div className="fld">
           <label className="fld-label">Monto invertido</label>
           <div className="inp-money">
-            <span className="pre">{sym(cur)}</span>
+            <span className="pre">{currencySymbol(cur)}</span>
             <input
               type="number"
               step="any"
@@ -652,9 +665,17 @@ function Step2Fields(props: {
                 Buscando precio…
               </span>
             ) : props.priceState === "ok" && props.livePrice !== null ? (
-              <span style={{ fontSize: 11.5, color: "var(--pos)" }}>
-                {formatMoney(props.livePrice, props.livePriceCurrency)} en vivo
-              </span>
+              <>
+                <span style={{ fontSize: 11.5, color: "var(--pos)" }}>
+                  {formatMoney(props.livePrice, props.livePriceCurrency)} en vivo
+                </span>
+                {props.livePriceCurrency !== cur ? (
+                  <span style={{ fontSize: 11, color: "var(--warn)", display: "block", marginTop: 2 }}>
+                    El precio está en {props.livePriceCurrency} y tu moneda es {cur}. Ingresa el monto
+                    invertido en {cur}; no convertimos automáticamente.
+                  </span>
+                ) : null}
+              </>
             ) : props.priceState === "error" ? (
               <span style={{ fontSize: 11, color: "var(--warn)" }}>Precio no disponible</span>
             ) : null}
@@ -682,7 +703,7 @@ function Step2Fields(props: {
             <HelpTip text="Cuánto vale hoy el activo. Si lo dejas vacío, usamos el monto invertido." />
           </label>
           <div className="inp-money">
-            <span className="pre">{sym(cur)}</span>
+            <span className="pre">{currencySymbol(cur)}</span>
             <input
               type="number"
               step="any"
@@ -702,7 +723,7 @@ function Step2Fields(props: {
             <div className="fld">
               <label className="fld-label">Ingreso que genera (opcional)</label>
               <div className="inp-money">
-                <span className="pre">{sym(cur)}</span>
+                <span className="pre">{currencySymbol(cur)}</span>
                 <input
                   type="number"
                   step="any"
@@ -773,7 +794,7 @@ function Step2Fields(props: {
       {props.aportoCadaMes ? (
         <div className="fld" style={{ marginTop: 6 }}>
           <div className="inp-money">
-            <span className="pre">{sym(cur)}</span>
+            <span className="pre">{currencySymbol(cur)}</span>
             <input
               type="number"
               step="any"

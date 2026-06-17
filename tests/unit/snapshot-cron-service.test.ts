@@ -14,7 +14,11 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: vi.fn(async () => ({})) }));
-vi.mock("@/lib/fx", () => ({ convertCurrency: (n: number) => n }));
+vi.mock("@/lib/fx", () => ({
+  convertCurrency: (n: number) => n,
+  // format.ts (importado transitivamente) deriva su lista de monedas de aquí.
+  SUPPORTED_CURRENCIES: ["USD", "CRC", "EUR", "MXN", "COP", "GBP"],
+}));
 vi.mock("@/modules/wealth/services/portfolio-service", () => ({
   fetchNormalizedPrices: vi.fn(async () => ({ VOO: 500 })),
 }));

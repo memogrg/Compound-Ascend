@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { PerformanceChart } from "@/components/charts/lazy";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, currencySymbol } from "@/lib/format";
 import {
   reportPaymentAction,
   updateDebtPaymentAction,
@@ -690,7 +690,10 @@ function ReportPaymentModal({
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Monto de la cuota</label>
+              {/* La moneda es SIEMPRE la de la deuda (el modelo de pagos es de
+                  una sola moneda por deuda); se muestra explícita como prefijo. */}
               <div className="inp-money">
+                <span className="pre">{currencySymbol(currency)}</span>
                 <input
                   type="number"
                   step="any"
@@ -715,6 +718,7 @@ function ReportPaymentModal({
           <div className="fld">
             <label className="fld-label">Pago extra (opcional)</label>
             <div className="inp-money">
+              <span className="pre">{currencySymbol(currency)}</span>
               <input
                 type="number"
                 min="0"

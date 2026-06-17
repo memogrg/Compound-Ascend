@@ -1,16 +1,23 @@
 /** Opciones del Setup Wizard (en español), extraídas de la Biblia (Módulo 1). */
 import type { IconName } from "@/components/ui/icon";
+import { CURRENCY_OPTIONS } from "@/lib/format";
 
 export type Option = { value: string; label: string; desc?: string; icon?: IconName };
 
-export const CURRENCIES: Option[] = [
-  { value: "CRC", label: "Colón costarricense (₡)" },
-  { value: "USD", label: "Dólar estadounidense ($)" },
-  { value: "EUR", label: "Euro (€)" },
-  { value: "MXN", label: "Peso mexicano (MX$)" },
-  { value: "COP", label: "Peso colombiano (COL$)" },
-  { value: "GBP", label: "Libra esterlina (£)" },
-];
+/** Nombre largo por moneda (la lista de códigos/símbolos vive en @/lib/format). */
+const CURRENCY_NAMES: Record<string, string> = {
+  CRC: "Colón costarricense",
+  USD: "Dólar estadounidense",
+  EUR: "Euro",
+  MXN: "Peso mexicano",
+  COP: "Peso colombiano",
+  GBP: "Libra esterlina",
+};
+
+export const CURRENCIES: Option[] = CURRENCY_OPTIONS.map(({ code, symbol }) => ({
+  value: code,
+  label: `${CURRENCY_NAMES[code] ?? code} (${symbol})`,
+}));
 
 /** Países de residencia (lista enfocada en LatAm + comunes). El valor es el
  *  nombre, que se guarda tal cual en personal_profiles.country. */

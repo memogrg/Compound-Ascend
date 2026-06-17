@@ -143,12 +143,7 @@ export function ExpenseToolbar({
         />
       ) : null}
       {sheet === "sobre" ? (
-        <NewSobreModal
-          jars={jars}
-          currency={currency}
-          period={period}
-          onClose={() => setSheet(null)}
-        />
+        <NewSobreModal jars={jars} period={period} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === "category" ? (
         <CategoryManagerModal tree={tree} onClose={() => setSheet(null)} />

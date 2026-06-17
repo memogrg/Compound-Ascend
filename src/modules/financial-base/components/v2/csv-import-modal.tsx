@@ -12,7 +12,8 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { importTransactionsAction } from "@/modules/financial-base/api/v2-actions";
 
 type Parsed = {
@@ -102,7 +103,7 @@ function parseCsv(text: string, defaultCurrency: string): { rows: Parsed[]; skip
   return { rows, skipped };
 }
 
-export function CsvImportButton({ currency }: { currency: string }) {
+export function CsvImportButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -114,19 +115,31 @@ export function CsvImportButton({ currency }: { currency: string }) {
       >
         <Icon name="upload" width={2} /> Importar CSV
       </button>
-      {open ? <CsvImportModal currency={currency} onClose={() => setOpen(false)} /> : null}
+      {open ? <CsvImportModal onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
 
-function CsvImportModal({ currency, onClose }: { currency: string; onClose: () => void }) {
+function CsvImportModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
+  const captureCurrency = useCaptureCurrency();
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<Parsed[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [fileName, setFileName] = useState("");
+  const [rawText, setRawText] = useState("");
+  // Moneda por defecto para filas SIN columna de moneda: la elige el usuario,
+  // default a la principal (estable), nunca a la de visualización.
+  const [fallbackCurrency, setFallbackCurrency] = useState(captureCurrency);
   const [pending, startTransition] = useTransition();
+
+  const applyParse = (text: string, fallback: string) => {
+    const res = parseCsv(text, fallback);
+    setRows(res.rows);
+    setSkipped(res.skipped);
+    return res;
+  };
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -134,10 +147,15 @@ function CsvImportModal({ currency, onClose }: { currency: string; onClose: () =
     if (!file) return;
     setFileName(file.name);
     const text = await file.text();
-    const res = parseCsv(text, currency);
-    setRows(res.rows);
-    setSkipped(res.skipped);
+    setRawText(text);
+    const res = applyParse(text, fallbackCurrency);
     if (res.rows.length === 0) toast("No encontré filas válidas. Revisa las columnas.", "error");
+  };
+
+  const onFallbackChange = (code: string) => {
+    setFallbackCurrency(code);
+    // Re-parsea para que las filas sin moneda adopten la nueva por defecto.
+    if (rawText) applyParse(rawText, code);
   };
 
   const doImport = () =>
@@ -165,6 +183,45 @@ function CsvImportModal({ currency, onClose }: { currency: string; onClose: () =
         >
           <Icon name="upload" width={2} /> {fileName || "Elegir archivo CSV"}
         </button>
+
+        <div className="fld" style={{ marginTop: 12 }}>
+          <label className="fld-label" htmlFor="csv-fallback-cur" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            Moneda por defecto
+            <span
+              className="tip"
+              data-tip="Se aplica solo a las filas que no traen columna de moneda. Por defecto, tu moneda principal."
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 15,
+                height: 15,
+                borderRadius: "50%",
+                border: "1px solid var(--line)",
+                color: "var(--muted)",
+                fontSize: 10,
+                fontWeight: 700,
+                flex: "none",
+              }}
+            >
+              ?
+            </span>
+          </label>
+          <select
+            id="csv-fallback-cur"
+            className="sel"
+            value={fallbackCurrency}
+            onChange={(e) => onFallbackChange(e.target.value)}
+            aria-label="Moneda por defecto del CSV"
+          >
+            {CURRENCY_OPTIONS.map((o) => (
+              <option key={o.code} value={o.code}>
+                {o.code}
+                {o.code === captureCurrency ? " (principal)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {rows.length > 0 ? (
           <>

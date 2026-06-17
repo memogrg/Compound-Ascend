@@ -5,11 +5,12 @@
  * transactions. Sirve para alta y edición. Teclado numérico nativo en móvil
  * (inputmode="decimal").
  */
-import { CURRENCY_SYMBOL } from "@/lib/format";
+import { CURRENCY_SYMBOL, CURRENCY_OPTIONS, captureCurrencyDefault } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import {
   addTransactionAction,
   editTransactionAction,
@@ -45,7 +46,6 @@ export function QuickAddModal({
   kind,
   categories,
   accounts,
-  currency,
   item,
   prefill,
   onClose,
@@ -53,20 +53,30 @@ export function QuickAddModal({
   kind: TxnKind;
   categories: Category[];
   accounts: Account[];
-  currency: string;
+  /**
+   * Moneda de visualización (legado). Ya NO se usa para el default de captura
+   * —ese es la principal vía useCaptureCurrency()—; se acepta para no romper los
+   * call-sites. Puede limpiarse en un follow-up.
+   */
+  currency?: string;
   item?: Transaction;
   prefill?: ScanPrefill;
   onClose: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
+  const captureCurrency = useCaptureCurrency();
   const editing = Boolean(item);
   const isGasto = kind === "gasto";
   const scanned = Boolean(prefill);
-  const effectiveCurrency = prefill?.currency || currency;
 
   const [amount, setAmount] = useState(
     item ? String(item.amount) : prefill?.amount ? String(prefill.amount) : "",
+  );
+  // Moneda de captura: al editar respeta la del ítem; con recibo, la detectada;
+  // si no, la principal del usuario (estable) — NUNCA la de visualización.
+  const [currency, setCurrency] = useState(
+    captureCurrencyDefault(item?.currency, prefill?.currency, captureCurrency),
   );
   const [categoryId, setCategoryId] = useState(item?.categoryId ?? categories[0]?.id ?? "");
   const [source, setSource] = useState(item?.merchantOrSource ?? INCOME_SOURCES[0]);
@@ -91,7 +101,7 @@ export function QuickAddModal({
     const payload = {
       kind,
       amount: amt,
-      currency: effectiveCurrency,
+      currency,
       occurredOn: date,
       categoryId: isGasto ? categoryId || null : null,
       accountId: accountId || null,
@@ -152,23 +162,60 @@ export function QuickAddModal({
           ) : null}
 
           <div className="fld">
-            <label className="fld-label">Monto</label>
-            <div className="inp-money" style={{ fontSize: 22 }}>
-              <span className="pre" style={{ fontSize: 20 }}>
-                {CURRENCY_SYMBOL[effectiveCurrency] ?? ""}
+            <label className="fld-label" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Monto
+              <span
+                className="tip"
+                data-tip="Elige la moneda en que registraste el monto. Por defecto, tu moneda principal — no la de visualización del topbar."
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 15,
+                  height: 15,
+                  borderRadius: "50%",
+                  border: "1px solid var(--line)",
+                  color: "var(--muted)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  flex: "none",
+                }}
+              >
+                ?
               </span>
-              <input
-                autoFocus
-                inputMode="decimal"
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                style={{ fontSize: 22, fontWeight: 600 }}
-                required
-              />
+            </label>
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              <div className="inp-money" style={{ fontSize: 22, flex: 1, minWidth: 0 }}>
+                <span className="pre" style={{ fontSize: 20 }}>
+                  {CURRENCY_SYMBOL[currency] ?? ""}
+                </span>
+                <input
+                  autoFocus
+                  inputMode="decimal"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  style={{ fontSize: 22, fontWeight: 600 }}
+                  required
+                />
+              </div>
+              <select
+                className="sel"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                aria-label="Moneda del monto"
+                style={{ flex: "0 0 auto", width: 104 }}
+              >
+                {CURRENCY_OPTIONS.map((o) => (
+                  <option key={o.code} value={o.code}>
+                    {o.code}
+                    {o.code === captureCurrency ? " (principal)" : ""}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
