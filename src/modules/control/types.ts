@@ -20,6 +20,8 @@ export type DebtClassification = "critica" | "controlada" | "estrategica" | "emo
 export type DebtRateType = "fija" | "variable";
 export type DebtRateIndex = "prime" | "tbp" | "tri";
 export type ExtraMode = "tiempo" | "cuota";
+/** Tipo de pago de deuda (Fase B): ordinario = cuota del mes; extraordinario = abono a capital. */
+export type PaymentKind = "ordinario" | "extraordinario";
 
 export type Debt = {
   id: string;
@@ -68,6 +70,8 @@ export type DebtPayment = {
   amount: number;
   extraAmount: number;
   extraMode?: ExtraMode | null;
+  /** Tipo de pago: ordinario (cuota) | extraordinario (abono a capital). */
+  kind: PaymentKind;
   /** Capital/interés estimados del pago (Fase 7); null si no hay tasa. */
   principal?: number | null;
   interest?: number | null;

@@ -439,6 +439,8 @@ export type DebtPaymentRow = Timestamps & {
   extra_mode: string | null;
   // Puente ledger↔transacción (migración 0021 · Fase 1)
   transaction_id: string | null;
+  // Tipo de pago (migración 20260617000003 · Fase B): 'ordinario' | 'extraordinario'.
+  kind: string;
 };
 
 // ---------- Módulo 4 — Patrimonio ----------

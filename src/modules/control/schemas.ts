@@ -44,6 +44,7 @@ export const debtPaymentInputSchema = z.object({
   amount: z.number().nonnegative(),
   extraAmount: z.number().nonnegative().default(0),
   extraMode: z.enum(["tiempo", "cuota"]).optional(),
+  kind: z.enum(["ordinario", "extraordinario"]).default("ordinario"),
 });
 
 export type GoalInput = z.infer<typeof goalInputSchema>;
