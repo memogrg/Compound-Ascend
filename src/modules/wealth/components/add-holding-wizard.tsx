@@ -17,43 +17,18 @@ import { formatMoney } from "@/lib/format";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import { addHoldingAction, editHoldingAction } from "@/modules/wealth/api/actions";
-import { CATEGORY_META } from "@/modules/wealth/constants";
-import { INVESTMENT_CATEGORIES } from "@/modules/wealth/types";
+import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
 import type { AssetType, Holding, InvestmentCategory } from "@/modules/wealth/types";
 import type { HoldingInput } from "@/modules/wealth/schemas";
 
 // ── Constantes UI ──────────────────────────────────────────────────
 
-/** Emoji por categoría (mock del PLAN §5); la grilla es UI pura. */
-const CATEGORY_EMOJI: Record<InvestmentCategory, string> = {
-  cuenta_remunerada: "🏦",
-  deposito_plazo: "📜",
-  bono_gobierno: "🏛️",
-  bono_empresa: "🏢",
-  fondo_conservador: "🛡️",
-  prestamo_interes: "🤝",
-  propiedad_alquiler: "🏠",
-  reit: "🏬",
-  accion_dividendo: "💸",
-  negocio_ingreso: "🏪",
-  accion_crecimiento: "🚀",
-  etf_crecimiento: "📊",
-  indexado_global: "🌐",
-  roboadvisor: "🤖",
-  propiedad_plusvalia: "🏗️",
-  proyecto_inmobiliario: "🧱",
-  startup: "💡",
-  compra_negocio: "🏭",
-  cripto: "₿",
-  alternativo: "🏆",
-};
-
 const REGIONS: { value: string; label: string }[] = [
-  { value: "us", label: "🇺🇸 US" },
-  { value: "cr", label: "🇨🇷 CR" },
-  { value: "eu", label: "🇪🇺 EU" },
-  { value: "latam", label: "🌎 LATAM" },
-  { value: "global", label: "🌐 Global" },
+  { value: "us", label: "US" },
+  { value: "cr", label: "CR" },
+  { value: "eu", label: "EU" },
+  { value: "latam", label: "LATAM" },
+  { value: "global", label: "Global" },
   { value: "otro", label: "Otro" },
 ];
 
@@ -383,7 +358,7 @@ function AddHoldingModal({
         step === 1
           ? "Elige el tipo de inversión"
           : meta
-            ? `${CATEGORY_EMOJI[category!]} ${meta.label}`
+            ? meta.label
             : "Datos de la inversión"
       }
       onClose={onClose}
@@ -467,8 +442,8 @@ function Step1Categories({ onChoose }: { onChoose: (c: InvestmentCategory) => vo
   const q = query.trim().toLowerCase();
   const match = (c: InvestmentCategory) =>
     !q || CATEGORY_META[c].label.toLowerCase().includes(q) || c.includes(q);
-  const cashflow = INVESTMENT_CATEGORIES.filter((c) => CATEGORY_META[c].nature === "cashflow" && match(c));
-  const growth = INVESTMENT_CATEGORIES.filter((c) => CATEGORY_META[c].nature === "growth" && match(c));
+  const cashflow = CASHFLOW_CATEGORIES.filter(match);
+  const growth = GROWTH_CATEGORIES.filter(match);
 
   return (
     <div>
@@ -478,14 +453,14 @@ function Step1Categories({ onChoose }: { onChoose: (c: InvestmentCategory) => vo
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="🔎 Buscar (ej. Airbnb, S&P 500, cripto…)"
+          placeholder="Buscar (ej. Airbnb, S&P 500, cripto…)"
           autoFocus
           autoComplete="off"
         />
       </div>
       {cashflow.length > 0 ? (
         <CategoryGroup
-          title="💵 Flujo de caja"
+          title="Flujo de caja"
           hint="generan ingreso recurrente"
           cats={cashflow}
           onChoose={onChoose}
@@ -493,7 +468,7 @@ function Step1Categories({ onChoose }: { onChoose: (c: InvestmentCategory) => vo
       ) : null}
       {growth.length > 0 ? (
         <CategoryGroup
-          title="📈 Crecimiento"
+          title="Crecimiento"
           hint="buscan plusvalía"
           cats={growth}
           onChoose={onChoose}
@@ -546,8 +521,21 @@ function CategoryGroup({
             }}
             onClick={() => onChoose(c)}
           >
-            <span style={{ fontSize: 18, flex: "none" }} aria-hidden>
-              {CATEGORY_EMOJI[c]}
+            <span
+              aria-hidden
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: "var(--chip)",
+                color: "var(--ink-2)",
+                flex: "none",
+              }}
+            >
+              <Icon name={CATEGORY_META[c].icon} width={1.9} />
             </span>
             <span
               style={{

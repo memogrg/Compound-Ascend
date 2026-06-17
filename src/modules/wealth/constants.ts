@@ -9,11 +9,12 @@
  * indexado_global, cripto. El resto es siempre valor manual.
  */
 import type { AssetType, InvestmentCategory, InvestmentNature } from "@/modules/wealth/types";
+import type { IconName } from "@/components/ui/icon";
 
 export type CategoryMeta = {
   nature: InvestmentNature;
   label: string;
-  icon: string;
+  icon: IconName; // ícono del design system (no emoji)
   defaultAssetType: AssetType;
   quoted: boolean;
 };
@@ -23,70 +24,70 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
   cuenta_remunerada: {
     nature: "cashflow",
     label: "Plata guardada que gana intereses",
-    icon: "piggy-bank",
+    icon: "savings",
     defaultAssetType: "certificado",
     quoted: false,
   },
   deposito_plazo: {
     nature: "cashflow",
     label: "Depósitos a plazo / CDP",
-    icon: "landmark",
+    icon: "networth",
     defaultAssetType: "certificado",
     quoted: false,
   },
   bono_gobierno: {
     nature: "cashflow",
     label: "Bonos del gobierno",
-    icon: "landmark",
+    icon: "networth",
     defaultAssetType: "bono",
     quoted: false,
   },
   bono_empresa: {
     nature: "cashflow",
     label: "Bonos de empresas",
-    icon: "building-2",
+    icon: "networth",
     defaultAssetType: "bono",
     quoted: false,
   },
   fondo_conservador: {
     nature: "cashflow",
     label: "Fondos conservadores",
-    icon: "shield",
+    icon: "defense",
     defaultAssetType: "fondo",
     quoted: false,
   },
   prestamo_interes: {
     nature: "cashflow",
     label: "Préstamos que generan intereses",
-    icon: "handshake",
+    icon: "income",
     defaultAssetType: "otro",
     quoted: false,
   },
   propiedad_alquiler: {
     nature: "cashflow",
     label: "Propiedades alquiladas",
-    icon: "home",
+    icon: "budget",
     defaultAssetType: "inmueble",
     quoted: false,
   },
   reit: {
     nature: "cashflow",
     label: "Fondos inmobiliarios / REITs",
-    icon: "building",
+    icon: "portfolio",
     defaultAssetType: "fondo",
     quoted: false,
   },
   accion_dividendo: {
     nature: "cashflow",
     label: "Acciones/ETFs que pagan dividendos",
-    icon: "banknote",
+    icon: "income",
     defaultAssetType: "accion",
     quoted: true,
   },
   negocio_ingreso: {
     nature: "cashflow",
     label: "Negocios que dejan ganancia",
-    icon: "store",
+    icon: "income",
     defaultAssetType: "negocio",
     quoted: false,
   },
@@ -94,70 +95,70 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
   accion_crecimiento: {
     nature: "growth",
     label: "Acciones con potencial de crecer",
-    icon: "trending-up",
+    icon: "invest",
     defaultAssetType: "accion",
     quoted: true,
   },
   etf_crecimiento: {
     nature: "growth",
     label: "ETFs o fondos de crecimiento",
-    icon: "chart-line",
+    icon: "invest",
     defaultAssetType: "etf",
     quoted: true,
   },
   indexado_global: {
     nature: "growth",
     label: "Fondos indexados globales",
-    icon: "globe",
+    icon: "portfolio",
     defaultAssetType: "etf",
     quoted: true,
   },
   roboadvisor: {
     nature: "growth",
     label: "Portafolios automáticos / retiro",
-    icon: "bot",
+    icon: "spark",
     defaultAssetType: "pension",
     quoted: false,
   },
   propiedad_plusvalia: {
     nature: "growth",
     label: "Propiedades por plusvalía",
-    icon: "map",
+    icon: "networth",
     defaultAssetType: "inmueble",
     quoted: false,
   },
   proyecto_inmobiliario: {
     nature: "growth",
     label: "Proyectos inmobiliarios",
-    icon: "hard-hat",
+    icon: "budget",
     defaultAssetType: "inmueble",
     quoted: false,
   },
   startup: {
     nature: "growth",
     label: "Startups o empresas nuevas",
-    icon: "rocket",
+    icon: "spark",
     defaultAssetType: "negocio",
     quoted: false,
   },
   compra_negocio: {
     nature: "growth",
     label: "Compra de negocios para escalar",
-    icon: "briefcase",
+    icon: "portfolio",
     defaultAssetType: "negocio",
     quoted: false,
   },
   cripto: {
     nature: "growth",
     label: "Cripto y activos digitales",
-    icon: "bitcoin",
+    icon: "invest",
     defaultAssetType: "cripto",
     quoted: true,
   },
   alternativo: {
     nature: "growth",
     label: "Activos alternativos",
-    icon: "gem",
+    icon: "spark",
     defaultAssetType: "commodity",
     quoted: false,
   },
@@ -167,3 +168,14 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
 export function natureOfCategory(category: InvestmentCategory): InvestmentNature {
   return CATEGORY_META[category].nature;
 }
+
+const categoriesOfNature = (nature: InvestmentNature): InvestmentCategory[] =>
+  (Object.keys(CATEGORY_META) as InvestmentCategory[]).filter(
+    (c) => CATEGORY_META[c].nature === nature,
+  );
+
+/** Slugs de naturaleza 'cashflow' (flujo de caja), en orden de declaración. */
+export const CASHFLOW_CATEGORIES: InvestmentCategory[] = categoriesOfNature("cashflow");
+
+/** Slugs de naturaleza 'growth' (crecimiento patrimonial), en orden de declaración. */
+export const GROWTH_CATEGORIES: InvestmentCategory[] = categoriesOfNature("growth");
