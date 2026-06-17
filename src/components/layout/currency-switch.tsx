@@ -8,9 +8,9 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDisplayCurrencyAction } from "@/modules/account/api/actions";
-import { CURRENCY_SYMBOL } from "@/lib/format";
+import { CURRENCY_SYMBOL, CURRENCY_OPTIONS } from "@/lib/format";
 
-const CODES = ["CRC", "USD", "EUR", "MXN", "COP", "GBP"] as const;
+const CODES = CURRENCY_OPTIONS.map((o) => o.code);
 
 export function CurrencySwitch({ current, primary }: { current: string; primary: string }) {
   const router = useRouter();
@@ -28,7 +28,7 @@ export function CurrencySwitch({ current, primary }: { current: string; primary:
         {CURRENCY_SYMBOL[current] ?? "¤"}
       </span>
       <select
-        value={CODES.includes(current as (typeof CODES)[number]) ? current : "CRC"}
+        value={CODES.includes(current) ? current : "CRC"}
         onChange={(e) => onChange(e.target.value)}
         disabled={pending}
         aria-label="Moneda de visualización"
