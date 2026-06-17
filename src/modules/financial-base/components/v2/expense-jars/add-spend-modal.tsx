@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addTransactionAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar, JarItem } from "@/modules/financial-base/engine/expense-jars";
 import type { Account } from "@/modules/financial-base/types";
@@ -82,9 +83,11 @@ export function AddSpendModal({
     ? CURRENCIES
     : [{ code: currency, sym: currency }, ...CURRENCIES];
 
+  const captureCurrency = useCaptureCurrency();
   const [name, setName] = useState("");
   const [date, setDate] = useState(todayISO());
-  const [cur, setCur] = useState(currency);
+  // Moneda de captura: default a la principal (estable), no a la de visualización.
+  const [cur, setCur] = useState(captureCurrency);
   const [amount, setAmount] = useState("");
   const [sobre, setSobre] = useState(firstEnv);
   const [pending, setPending] = useState(false);
