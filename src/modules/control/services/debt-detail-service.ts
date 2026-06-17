@@ -87,6 +87,23 @@ function buildPaidRows(
   let balance = input.originalAmount ?? input.balance;
   const sorted = [...pmts].sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
   return sorted.map((p, i) => {
+    if (p.kind === "extraordinario") {
+      // Abono a capital: interés 0, sin seguro, todo el monto reduce el saldo.
+      const principal = Math.min(p.amount, balance);
+      balance -= principal;
+      return {
+        month: i + 1,
+        date: p.paymentDate,
+        payment: round2(p.amount),
+        principal: round2(principal),
+        interest: 0,
+        insurance: 0,
+        balance: round2(Math.max(0, balance)),
+        paid: true,
+        paidExtra: false,
+        paymentId: p.id,
+      };
+    }
     const interest = balance * r;
     let principal = p.amount - interest + p.extraAmount;
     if (principal < 0) principal = 0;
@@ -161,6 +178,7 @@ export async function getDebtDetail(
             paymentDate: p.paymentDate,
             amount: p.amount,
             extraAmount: p.extraAmount,
+            kind: p.kind,
           })),
         )
       : null;
