@@ -4,6 +4,7 @@ import { getIndicatorsViewModel } from "@/modules/wealth/services/indicators-ser
 import { getMacroInsights, type MacroInsight } from "@/modules/wealth";
 import { IndicatorsView } from "@/modules/wealth/components/indicators-view";
 import { Icon } from "@/components/ui/icon";
+import { logger } from "@/lib/logger";
 import type { IndicatorsViewModel } from "@/modules/wealth/services/indicators-service";
 
 /**
@@ -13,7 +14,15 @@ import type { IndicatorsViewModel } from "@/modules/wealth/services/indicators-s
 export default async function Page() {
   const configured = isSupabaseConfigured();
   const [model, insights]: [IndicatorsViewModel, MacroInsight[]] = configured
-    ? await Promise.all([getIndicatorsViewModel(), getMacroInsights().catch(() => [])])
+    ? await Promise.all([
+        getIndicatorsViewModel().catch((e) => {
+          logger.error("indicadores: getIndicatorsViewModel falló", {
+            message: e instanceof Error ? e.message : String(e),
+          });
+          return { groups: [], hasData: false } as IndicatorsViewModel;
+        }),
+        getMacroInsights().catch(() => []),
+      ])
     : [{ groups: [], hasData: false }, []];
 
   return (
