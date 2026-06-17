@@ -8,6 +8,7 @@
  */
 import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
 import { indicatorCache, TTL } from "@/lib/economic-indicators/cache";
 import { fetchBccr, fetchFred, fetchHaciendaTc } from "@/lib/economic-indicators/providers";
 import { upsertIndicators } from "@/lib/economic-indicators/persist";
@@ -81,7 +82,14 @@ export async function getHistory(
   if (from) query = query.gte("observed_date", from);
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    logger.error("economic-indicators: getHistory falló", {
+      code,
+      table: "economic_indicators",
+      message: error.message,
+    });
+    throw new Error(error.message);
+  }
 
   const points: IndicatorPoint[] = (data ?? []).map((r) => ({
     date: r.observed_date,
@@ -105,7 +113,14 @@ export async function getLatest(code: string): Promise<IndicatorLatest | null> {
     .order("observed_date", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) {
+    logger.error("economic-indicators: getLatest falló", {
+      code,
+      table: "economic_indicators",
+      message: error.message,
+    });
+    throw new Error(error.message);
+  }
   if (!data) return null;
 
   const latest: IndicatorLatest = {
@@ -139,7 +154,14 @@ export async function getChange(code: string, months = 6): Promise<IndicatorChan
     .order("observed_date", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) throw new Error(error.message);
+  if (error) {
+    logger.error("economic-indicators: getChange falló", {
+      code,
+      table: "economic_indicators",
+      message: error.message,
+    });
+    throw new Error(error.message);
+  }
 
   const current = latest.value;
   const previous = data ? Number(data.value) : null;
