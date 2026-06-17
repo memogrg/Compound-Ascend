@@ -149,7 +149,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
           }}
         >
           <Stat label="Saldo actual" value={formatMoney(vm.balance, currency)} big />
-          <Stat label="TAE" value={`${vm.apr.toFixed(2)}%`} />
+          <Stat label="Tasa Anual Equivalente" value={`${vm.apr.toFixed(2)}%`} />
           <Stat
             label="Cuota mensual"
             value={formatMoney(vm.monthlyPayment + vm.insurance, currency)}
@@ -642,19 +642,25 @@ function ReportPaymentModal({
   const router = useRouter();
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
-  const [amount, setAmount] = useState(editing?.amount ?? preset?.amount ?? vm.monthlyPayment ?? 0);
+  // Estado string para permitir vacío (no un "0" pegado imposible de borrar);
+  // se coacciona a número solo al enviar (vacío → 0).
+  const initAmount = editing?.amount ?? preset?.amount ?? vm.monthlyPayment ?? 0;
+  const [amount, setAmount] = useState<string>(initAmount ? String(initAmount) : "");
   const [date, setDate] = useState(editing?.paymentDate ?? preset?.date ?? today);
-  const [extra, setExtra] = useState(editing?.extraAmount ?? 0);
+  const [extra, setExtra] = useState<string>(editing?.extraAmount ? String(editing.extraAmount) : "");
   const [mode, setMode] = useState<"tiempo" | "cuota">(editing?.extraMode ?? "tiempo");
   const [pending, setPending] = useState(false);
 
+  const amountNum = Number(amount) || 0;
+  const extraNum = Number(extra) || 0;
+
   const comparison = useMemo(() => {
-    if (extra <= 0) return null;
+    if (extraNum <= 0) return null;
     return {
-      tiempo: applyExtraDecision(input, extra, "tiempo"),
-      cuota: applyExtraDecision(input, extra, "cuota"),
+      tiempo: applyExtraDecision(input, extraNum, "tiempo"),
+      cuota: applyExtraDecision(input, extraNum, "cuota"),
     };
-  }, [input, extra]);
+  }, [input, extraNum]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -662,9 +668,9 @@ function ReportPaymentModal({
     const payload = {
       debtId: vm.id,
       paymentDate: date,
-      amount,
-      extraAmount: extra,
-      extraMode: extra > 0 ? mode : undefined,
+      amount: amountNum,
+      extraAmount: extraNum,
+      extraMode: extraNum > 0 ? mode : undefined,
     };
     const res = editing
       ? await updateDebtPaymentAction(editing.id, payload)
@@ -696,7 +702,8 @@ function ReportPaymentModal({
                   step="any"
                   min="0"
                   value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
                   required
                 />
               </div>
@@ -717,9 +724,11 @@ function ReportPaymentModal({
             <div className="inp-money">
               <input
                 type="number"
+                step="any"
                 min="0"
                 value={extra}
-                onChange={(e) => setExtra(Number(e.target.value))}
+                onChange={(e) => setExtra(e.target.value)}
+                placeholder="0"
               />
             </div>
           </div>
