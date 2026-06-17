@@ -24,6 +24,10 @@ export function Modal({
   children: React.ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Cierre por scrim solo si el gesto EMPIEZA y TERMINA en el scrim. Evita que
+  // un arrastre que nace dentro del modal (p. ej. seleccionar texto) y suelta
+  // sobre el fondo cierre el cuadro sin querer. Pointer events cubren mouse+touch.
+  const pointerDownOnScrim = useRef(false);
   const titleId = useId();
   const subId = useId();
   const [mounted, setMounted] = useState(false);
@@ -74,7 +78,16 @@ export function Modal({
   if (!mounted) return null;
 
   return createPortal(
-    <div className="modal-scrim open" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-scrim open"
+      onPointerDown={(e) => {
+        pointerDownOnScrim.current = e.target === e.currentTarget;
+      }}
+      onPointerUp={(e) => {
+        if (pointerDownOnScrim.current && e.target === e.currentTarget) onClose();
+        pointerDownOnScrim.current = false;
+      }}
+    >
       <div
         ref={dialogRef}
         className="modal"
