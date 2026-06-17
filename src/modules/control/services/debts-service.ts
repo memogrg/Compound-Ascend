@@ -16,7 +16,7 @@ import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { effectiveApr, buildRateNote } from "@/modules/control/services/index-rates";
 import { computeDueStatus } from "@/modules/control/engine/due-dates";
-import type { DebtRateType, DebtRateIndex } from "@/modules/control/types";
+import type { Debt, DebtRateType, DebtRateIndex } from "@/modules/control/types";
 
 export interface DebtVM {
   id: string;
@@ -57,6 +57,8 @@ export interface DebtsOverview {
   /** Valores actuales de los índices (prime/tbp/tri) para el form. */
   indexRates: Record<string, number>;
   debts: DebtVM[];
+  /** Deudas crudas (sin conversión) para precargar el form de edición. */
+  raw: Debt[];
 }
 
 export async function getDebtsOverview(
@@ -73,9 +75,8 @@ export async function getDebtsOverview(
   const conv = (n: number, from: string) => convertCurrency(n, from, currency, rates);
   const now = new Date();
 
-  const vms: DebtVM[] = debts
-    .filter((d) => d.isCurrent !== false)
-    .map((d) => {
+  const active = debts.filter((d) => d.isCurrent !== false);
+  const vms: DebtVM[] = active.map((d) => {
       const due = computeDueStatus(
         { payDay: d.payDay, startDate: d.startDate, paymentDates: paidThisMonthMap[d.id] ?? [] },
         now,
@@ -113,5 +114,6 @@ export async function getDebtsOverview(
     freeCashflow: base.indicators.freeCashflow,
     indexRates,
     debts: vms,
+    raw: active,
   };
 }

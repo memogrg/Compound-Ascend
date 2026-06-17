@@ -107,7 +107,7 @@ export function EditControlButton({
   );
 }
 
-function ControlDialog({
+export function ControlDialog({
   kind,
   currency,
   item,
@@ -534,11 +534,12 @@ function DebtForm({
             {effectiveTae != null ? (
               <div className="auth-msg" style={{ margin: "0 0 14px", fontSize: 12.5 }}>
                 {rateIndex.toUpperCase()} {idxVal!.toFixed(2)}% + {Number(rateSpread) || 0}% ={" "}
-                <strong>TAE efectiva {effectiveTae.toFixed(2)}%</strong>
+                <strong>Tasa Anual Equivalente efectiva {effectiveTae.toFixed(2)}%</strong>
               </div>
             ) : (
               <div className="muted" style={{ fontSize: 11.5, margin: "0 0 14px" }}>
-                Sin valor del índice todavía; ingresa la TAE efectiva manualmente abajo.
+                Sin valor del índice todavía; ingresa la Tasa Anual Equivalente efectiva manualmente
+                abajo.
               </div>
             )}
             {/* Tasa introductoria fija → luego variable (Punto 1.3) */}
@@ -555,7 +556,7 @@ function DebtForm({
                 />
               </div>
               <div className="fld">
-                <label className="fld-label">TAE fija inicial (%) (opcional)</label>
+                <label className="fld-label">Tasa Anual Equivalente fija inicial (%) (opcional)</label>
                 <input
                   className="inp"
                   type="number"
@@ -573,7 +574,7 @@ function DebtForm({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">
-              {rateType === "variable" ? "TAE efectiva actual (%)" : "Tasa anual (%)"}
+              {rateType === "variable" ? "Tasa Anual Equivalente efectiva actual (%)" : "Tasa anual (%)"}
             </label>
             <input
               className="inp"
