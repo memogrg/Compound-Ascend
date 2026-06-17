@@ -505,6 +505,15 @@ export type RentalPaymentRow = Timestamps & {
   transaction_id: string | null;
 };
 
+// Watchlist del Monitor de Fondos (migración 20260617000002).
+export type WatchlistSymbolRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  symbol: string;
+  kind: string;
+};
+
 export type InvestmentTransactionRow = Timestamps & {
   id: string;
   user_id: string;
@@ -674,6 +683,7 @@ export interface Database {
       debt_payments: UserTable<DebtPaymentRow>;
       investments: UserTable<InvestmentRow>;
       investment_holdings: UserTable<InvestmentHoldingRow>;
+      watchlist_symbols: UserTable<WatchlistSymbolRow>;
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
       market_price_cache: TableShape<
