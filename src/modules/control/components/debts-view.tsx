@@ -2,10 +2,15 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { PerformanceChart } from "@/components/charts/lazy";
-import { AddControlButton } from "./control-actions";
+import { AddControlButton, ControlDialog } from "./control-actions";
+import { removeDebtAction } from "@/modules/control/api/actions";
+import type { Debt } from "@/modules/control/types";
 import {
   simulateStrategy,
   recommendMethod,
@@ -177,6 +182,9 @@ function strategyCurve(
 
 export function DebtsView({ overview }: { overview: DebtsOverview }) {
   const { currency, incomeMonthly, debts, freeCashflow, indexRates } = overview;
+  // Deudas crudas por id (para precargar el form de edición sin perder campos
+  // que el VM no expone: currentPayment, delinquency, stress, notes).
+  const rawById = useMemo(() => new Map(overview.raw.map((d) => [d.id, d])), [overview.raw]);
   const noDecimals = ["CRC", "COP", "MXN"].includes(currency);
   const step = noDecimals ? 25000 : 50;
   // Extra por defecto = sobrante mensual del usuario (ajustable con ±).
@@ -395,7 +403,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               selected={activeMethod === "avalancha"}
               recommended={rec.method === "avalancha"}
               onSelect={() => setMethod("avalancha")}
-              note="Ataca la TAE más alta → menos intereses"
+              note="Ataca la tasa anual equivalente más alta → menos intereses"
             />
             <MethodCard
               label="Bola de nieve"
@@ -458,7 +466,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           danger={0.3}
         />
         <Kpi
-          label="TAE más alta"
+          label="Tasa Anual Equivalente más alta"
           value={`${totals.highestApr.toFixed(1)}%`}
           ratio={totals.highestApr / 60}
           danger={0.5}
@@ -487,8 +495,10 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
         {ordered.map((d, i) => {
           const s = summaries.get(d.id)!;
           const isHighest = d.apr === totals.highestApr && totals.highestApr > 0;
+          const raw = rawById.get(d.id);
           return (
-            <Link key={d.id} href={`/deudas/${d.id}`} className="debt-row">
+            <div key={d.id} style={{ position: "relative" }}>
+            <Link href={`/deudas/${d.id}`} className="debt-row">
               <span className="debt-ic" style={{ background: debtGradient(d.debtType) }}>
                 {i + 1}
               </span>
@@ -537,7 +547,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               </div>
               <div className={`drate${isHighest ? " high" : ""}`}>
                 <div className="r">{d.apr.toFixed(1)}%</div>
-                <div className="l">TAE</div>
+                <div className="l">Tasa Anual Equivalente</div>
               </div>
               <div className="dbal">
                 <div>
@@ -549,6 +559,10 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                 </span>
               </div>
             </Link>
+            {raw ? (
+              <DebtRowActions debt={raw} currency={currency} indexRates={indexRates} />
+            ) : null}
+            </div>
           );
         })}
       </div>
@@ -560,6 +574,111 @@ function payoffDateFromMonths(months: number): string {
   const d = new Date();
   d.setMonth(d.getMonth() + months);
   return d.toISOString().slice(0, 10);
+}
+
+/** Kebab (⋯) por deuda: Editar (DebtForm precargado) / Eliminar (confirmación).
+ *  Se renderiza FUERA del <Link> (hermano absoluto), así no hay anidamiento
+ *  interactivo inválido ni navegación accidental al accionar. */
+function DebtRowActions({
+  debt,
+  currency,
+  indexRates,
+}: {
+  debt: Debt;
+  currency: string;
+  indexRates: Record<string, number>;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [pending, setPending] = useState(false);
+
+  const onDelete = async () => {
+    setPending(true);
+    const res = await removeDebtAction(debt.id);
+    setPending(false);
+    if (res.ok) {
+      toast("Deuda eliminada");
+      setDeleting(false);
+      router.refresh();
+    } else toast(res.message ?? "No se pudo eliminar", "error");
+  };
+
+  return (
+    <div style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
+      <button
+        type="button"
+        className="icon-btn"
+        style={{ width: 30, height: 30, background: "var(--surface)" }}
+        aria-label="Acciones de la deuda"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Icon name="dots" />
+      </button>
+      {open ? (
+        <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setEditing(true);
+            }}
+          >
+            Editar
+          </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={() => {
+              setOpen(false);
+              setDeleting(true);
+            }}
+          >
+            Eliminar
+          </button>
+        </div>
+      ) : null}
+
+      {editing ? (
+        <ControlDialog
+          kind="debt"
+          currency={currency}
+          item={debt}
+          indexRates={indexRates}
+          onClose={() => setEditing(false)}
+        />
+      ) : null}
+
+      {deleting ? (
+        <Modal
+          title="Eliminar deuda"
+          sub="Se quita de tu lista de deudas y de la estrategia."
+          onClose={() => setDeleting(false)}
+        >
+          <div className="modal-body">
+            <p style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+              ¿Eliminar <strong>{debt.name}</strong>? Esta acción no se puede deshacer.
+            </p>
+          </div>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-ghost" onClick={() => setDeleting(false)}>
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={pending}
+              onClick={onDelete}
+            >
+              {pending ? "Eliminando…" : "Eliminar"}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+    </div>
+  );
 }
 
 function MethodCard({
