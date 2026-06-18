@@ -4,6 +4,7 @@
  * de transactions; el presupuesto de budget_items.
  */
 import { formatMoney, formatPercent } from "@/lib/format";
+import { convertCurrency } from "@/lib/fx";
 import { MetricCard, type MetricTone } from "@/components/shared/metric-card";
 import {
   FinancialInsightCard,
@@ -82,6 +83,8 @@ export type V2View = {
   period: Period;
   range?: RangeKey;
   currency: string;
+  /** Tasas FX a la moneda de display, para convertir agregados nativos. */
+  rates: Record<string, number>;
   budget: BudgetTotals;
   real: RealTotals;
   history: HistoryPoint[];
@@ -532,7 +535,7 @@ export function IncomeExpenseSection({
 // ── Tab de Ingresos (Fase 1): orden toolbar · rango · cuadros · histórico/
 //    composición · Área "Ingreso" (fuentes con barra buffer) · insight. ──
 function IncomeSection({ view }: { view: V2View }) {
-  const { budget, real, currency, history, period } = view;
+  const { budget, real, currency, rates, history, period } = view;
   const range = view.range ?? "1m";
   const incomeItems = budget.items.filter((b) => b.type === "income");
 
@@ -546,7 +549,13 @@ function IncomeSection({ view }: { view: V2View }) {
   const linkedSources = incomeItems.filter(isLinked);
   const receivedOf = (b: BudgetItem) => real.incomeReceivedBySource[b.id] ?? 0;
 
-  const budgetIncome = manualSources.reduce((s, b) => s + b.amount, 0);
+  // Agregados: una sola moneda (display). El planificado se convierte igual que
+  // el recibido (que ya viene convertido en incomeReceivedBySource) para que
+  // "Diferencia" y "% cumplimiento" comparen sobre la misma base.
+  const budgetIncome = manualSources.reduce(
+    (s, b) => s + convertCurrency(b.amount, b.currency, currency, rates),
+    0,
+  );
   const realIncome = manualSources.reduce((s, b) => s + receivedOf(b), 0);
   const diff = realIncome - budgetIncome;
   const complPct = budgetIncome > 0 ? realIncome / budgetIncome : 0;
@@ -620,17 +629,13 @@ function IncomeSection({ view }: { view: V2View }) {
 
       <IncomeSources
         items={manualSources}
-        received={real.incomeReceivedBySource}
+        received={real.incomeReceivedBySourceNative}
         currency={currency}
         incomeTree={view.incomeTree}
       />
 
       {linkedSources.length > 0 ? (
-        <LinkedIncomeCard
-          items={linkedSources}
-          received={real.incomeReceivedBySource}
-          currency={currency}
-        />
+        <LinkedIncomeCard items={linkedSources} received={real.incomeReceivedBySourceNative} />
       ) : null}
 
       <FinancialInsightCard reading={view.incomeCapsule} />

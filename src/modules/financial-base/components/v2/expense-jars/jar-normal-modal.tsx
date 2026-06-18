@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addCategoryAction, addBudgetItemAction } from "@/modules/financial-base/api/v2-actions";
 import { BudgetWarningModal } from "@/modules/financial-base/components/v2/expense-jars/budget-warning-modal";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
@@ -46,11 +47,13 @@ export function JarNormalModal({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const captureCurrency = useCaptureCurrency();
   const [extra, setExtra] = useState<JarEnvelope[]>([]);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
-  // Moneda del presupuesto del nuevo sobre (default = moneda de visualización).
-  const [subCur, setSubCur] = useState(currency);
+  // Moneda del presupuesto del nuevo sobre: default a la principal (estable),
+  // no a la de visualización. Persiste la elegida (subCur) tal cual.
+  const [subCur, setSubCur] = useState(captureCurrency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editEnv, setEditEnv] = useState<JarEnvelope | null>(null);

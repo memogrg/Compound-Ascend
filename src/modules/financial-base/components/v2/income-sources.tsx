@@ -114,7 +114,6 @@ export function IncomeSources({
               key={it.id}
               it={it}
               received={received[it.id] ?? 0}
-              currency={currency}
               onReceive={(amount) =>
                 run(
                   () => receivePartialIncomeAction({ budgetItemId: it.id, amount, date: todayISO() }),
@@ -144,15 +143,14 @@ export function IncomeSources({
 function SourceRow({
   it,
   received,
-  currency,
   onReceive,
   onEdit,
   onDuplicate,
   onDelete,
 }: {
   it: BudgetItem;
+  /** Recibido en la moneda NATIVA de la fuente (it.currency), sin convertir. */
   received: number;
-  currency: string;
   onReceive: (amount: number) => void;
   onEdit: () => void;
   onDuplicate: () => void;
@@ -292,8 +290,8 @@ function SourceRow({
       <div className="row" style={{ justifyContent: "flex-end", marginBottom: 6 }}>
         <span className="tnum muted" style={{ fontSize: 12.5, whiteSpace: "nowrap" }}>
           {budget > 0
-            ? `${formatPercent(pct)} · ${formatMoney(received, currency)} / ${formatMoney(budget, currency)}`
-            : `${formatMoney(received, currency)} recibido`}
+            ? `${formatPercent(pct)} · ${formatMoney(received, it.currency)} / ${formatMoney(budget, it.currency)}`
+            : `${formatMoney(received, it.currency)} recibido`}
           {over ? " · sobre-recibido" : ""}
         </span>
       </div>

@@ -20,6 +20,7 @@ import {
   listCategories,
   listCategoryTree,
 } from "@/modules/financial-base/services/categories-service";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import { listAccounts } from "@/modules/financial-base/services/accounts-service";
 import { listRules } from "@/modules/financial-base/services/rules-service";
 import { buildSuggestionIndex } from "@/modules/financial-base/services/suggestion-service";
@@ -86,6 +87,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     rules,
     linkables,
     base,
+    rates,
   ] = await Promise.all([
     getBudgetTotals(period),
     getRealTotals(period),
@@ -100,6 +102,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     listRules(),
     listLinkableEntities(),
     getBaseSummary(),
+    getFxRates(),
   ]);
 
   const currency = real.currency;
@@ -138,6 +141,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     period,
     range,
     currency,
+    rates,
     budget,
     real,
     history,

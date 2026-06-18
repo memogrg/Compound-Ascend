@@ -374,9 +374,12 @@ export type RealTotals = {
   /** Solo ingresos CONFIRMADOS (status='confirmed'), por fuente. Para las barras
    *  "recibido vs presupuestado" que se llenan al confirmar "Recibido". */
   incomeConfirmedByKey: KeyedTotals;
-  /** Recibido confirmado por FUENTE (income_source_id → monto). Llena la barra
-   *  buffer del tab de Ingresos (Fase 2 · recibido parcial acumulado). */
+  /** Recibido confirmado por FUENTE (income_source_id → monto), CONVERTIDO a la
+   *  moneda de visualización. Para agregados/donut (suma cross-moneda válida). */
   incomeReceivedBySource: Record<string, number>;
+  /** Recibido confirmado por FUENTE en la moneda NATIVA capturada (sin convertir).
+   *  Para mostrar la fila/barra de cada fuente en su propia moneda (it.currency). */
+  incomeReceivedBySourceNative: Record<string, number>;
   expenseByKey: KeyedTotals;
   topExpenseCategory: string | null;
   pendingCount: number;
@@ -398,6 +401,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
   const incomeByKey: KeyedTotals = {};
   const incomeConfirmedByKey: KeyedTotals = {};
   const incomeReceivedBySource: Record<string, number> = {};
+  const incomeReceivedBySourceNative: Record<string, number> = {};
   const expenseByKey: KeyedTotals = {};
 
   for (const t of txns) {
@@ -416,6 +420,10 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
         if (t.incomeSourceId) {
           incomeReceivedBySource[t.incomeSourceId] =
             (incomeReceivedBySource[t.incomeSourceId] ?? 0) + value;
+          // Nativo: monto tal cual se capturó (sin convertir), para mostrar la
+          // fila/barra de la fuente en su propia moneda.
+          incomeReceivedBySourceNative[t.incomeSourceId] =
+            (incomeReceivedBySourceNative[t.incomeSourceId] ?? 0) + t.amount;
         }
       }
     } else {
@@ -439,6 +447,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
     incomeByKey,
     incomeConfirmedByKey,
     incomeReceivedBySource,
+    incomeReceivedBySourceNative,
     expenseByKey,
     topExpenseCategory,
     pendingCount,
