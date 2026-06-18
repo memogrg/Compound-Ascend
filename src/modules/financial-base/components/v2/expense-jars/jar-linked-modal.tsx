@@ -131,6 +131,7 @@ export function JarLinkedModal({
                   const remaining = it.remaining ?? budget - spent;
                   const over = budget > 0 && spent > budget;
                   const color = over ? "var(--neg)" : jar.color;
+                  const extra = it.extraordinary ?? 0;
                   return (
                     <div
                       key={it.id}
@@ -191,6 +192,19 @@ export function JarLinkedModal({
                             : `${formatMoney(remaining, currency)} restante`}
                         </span>
                       </div>
+                      {extra > 0 ? (
+                        <span
+                          className="chip"
+                          style={{
+                            alignSelf: "flex-start",
+                            fontSize: 10,
+                            background: "var(--warn-soft)",
+                            color: "var(--warn)",
+                          }}
+                        >
+                          incluye {formatMoney(extra, currency)} extraordinario
+                        </span>
+                      ) : null}
                     </div>
                   );
                 })}

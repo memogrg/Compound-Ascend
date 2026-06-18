@@ -29,6 +29,8 @@ export type JarItem = {
   budget?: number;
   spent?: number;
   remaining?: number;
+  /** Parte del gastado que fue pago extraordinario (abono a capital). */
+  extraordinary?: number;
 };
 
 export type LinkedKind = "holding" | "debt" | "policy" | "goal";
@@ -71,6 +73,8 @@ export type Jar =
 export type LinkedBudgetData = {
   bySource: Record<string, number>; // entityId → cuota mensual (moneda principal)
   spentById: Record<string, number>; // entityId → pagado en el periodo
+  /** entityId → pagado extraordinario (subconjunto de spentById). */
+  extraordinaryById?: Record<string, number>;
   paymentCategoryId: string | null;
 };
 /** Config por linkedKind; solo los presentes se vuelven budget-aware. */
@@ -161,6 +165,7 @@ export function buildExpenseJars(args: {
             budget,
             spent,
             remaining: budget - spent,
+            extraordinary: lb.extraordinaryById?.[e.id] ?? 0,
           };
         });
         const totals = items.reduce(
