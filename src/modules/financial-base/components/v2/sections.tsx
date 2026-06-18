@@ -232,16 +232,6 @@ export function MiBaseSection({ view }: { view: V2View }) {
     budgetExpense: budget.budgetExpense,
     realExpense: real.realExpense,
   });
-  const incomeLine = history.map((h) => ({
-    label: h.label,
-    Real: h.realIncome,
-    Presupuesto: h.budgetIncome || Math.round(budget.budgetIncome),
-  }));
-  const expenseLine = history.map((h) => ({
-    label: h.label,
-    Real: h.realExpense,
-    Presupuesto: h.budgetExpense || Math.round(budget.budgetExpense),
-  }));
   const flujoLine = history.map((h) => ({
     label: h.label,
     Ingresos: h.realIncome,
@@ -301,25 +291,21 @@ export function MiBaseSection({ view }: { view: V2View }) {
 
       <section className="cols-2">
         <ChartCard title="A · Ingresos reales vs presupuestados" hint="por mes">
-          <PremiumLineChart
-            data={incomeLine}
-            xKey="label"
+          <PerformanceChart
+            data={history.map((h) => ({ date: h.label, value: h.realIncome }))}
             currency={currency}
-            series={[
-              { key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true },
-              { key: "Real", label: "Real", color: "var(--pos)" },
-            ]}
+            tone="pos"
+            goalValue={Math.round(budget.budgetIncome)}
+            height={160}
           />
         </ChartCard>
         <ChartCard title="B · Gastos reales vs presupuestados" hint="por mes">
-          <PremiumLineChart
-            data={expenseLine}
-            xKey="label"
+          <PerformanceChart
+            data={history.map((h) => ({ date: h.label, value: h.realExpense }))}
             currency={currency}
-            series={[
-              { key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true },
-              { key: "Real", label: "Real", color: "var(--c-expense)" },
-            ]}
+            tone="neg"
+            goalValue={Math.round(budget.budgetExpense)}
+            height={160}
           />
         </ChartCard>
       </section>
@@ -456,11 +442,6 @@ export function IncomeExpenseSection({
   const diff = realTotal - budgetTotal;
   const complPct = budgetTotal > 0 ? realTotal / budgetTotal : 0;
   const items = budget.items.filter((b) => b.type === "expense");
-  const lineData = history.map((h) => ({
-    label: h.label,
-    Real: h.realExpense,
-    Presupuesto: h.budgetExpense || Math.round(budgetTotal),
-  }));
 
   const summary: SumCard[] = [
     {
@@ -489,14 +470,12 @@ export function IncomeExpenseSection({
 
       <section className="cols-2">
         <ChartCard title="Histórico de gastos" hint="real vs presupuesto">
-          <PremiumLineChart
-            data={lineData}
-            xKey="label"
+          <PerformanceChart
+            data={history.map((h) => ({ date: h.label, value: h.realExpense }))}
             currency={currency}
-            series={[
-              { key: "Presupuesto", label: "Presupuesto", color: "var(--muted-2)", dashed: true },
-              { key: "Real", label: "Real", color: "var(--c-expense)" },
-            ]}
+            tone="neg"
+            goalValue={Math.round(budgetTotal)}
+            height={160}
           />
         </ChartCard>
         <DonutCard
