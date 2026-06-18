@@ -157,7 +157,7 @@ export function CompleteHoldingButton({
 
 // ── Modal de 2 pasos ───────────────────────────────────────────────
 
-function AddHoldingModal({
+export function AddHoldingModal({
   onClose,
   prefill,
   editId,
