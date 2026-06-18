@@ -1,12 +1,14 @@
 "use client";
 
 /**
- * Monitor de Fondos (Fase 4): lista curada de índices/fondos populares + la
- * watchlist del usuario, con precio en vivo (market-data layer, batched + caché),
- * variación % del día y un mini-sparkline (serie diaria ~1 mes). Todo es
- * best-effort: si un proveedor no expone variación/historial, se omite sin romper.
+ * Monitor de Fondos — re-skin fiel al prototipo (design-reference/investments):
+ * barra de búsqueda + status-pill (en vivo / caché) y filas mon-row con icono,
+ * precio, variación % del día y mini-sparkline. Lista combinada (curada +
+ * watchlist del usuario). Los precios vienen del SERVIDOR vía getMonitorQuotesAction
+ * (cadena de proveedores + caché que ocultan la llave). Sin fetch a APIs ni tokens
+ * en el cliente. Best-effort: si un proveedor no expone variación/historial se omite.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney, formatPercent } from "@/lib/format";
@@ -34,12 +36,20 @@ const KINDS: { value: WatchKind; label: string }[] = [
   { value: "crypto", label: "Cripto" },
 ];
 
+const KIND_GRADIENT: Record<WatchKind, string> = {
+  etf: "linear-gradient(135deg, var(--c-invest), var(--info))",
+  crypto: "linear-gradient(135deg, var(--gold), var(--warn))",
+  stock: "linear-gradient(135deg, var(--c-networth), var(--ink-2))",
+};
+
+type Row = { symbol: string; name?: string; kind: WatchKind; watchId?: string };
+
 export function FundMonitor() {
   const toast = useToast();
   const [watchlist, setWatchlist] = useState<WatchItem[]>([]);
   const [quotes, setQuotes] = useState<Map<string, MonitorQuote>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [symbol, setSymbol] = useState("");
+  const [query, setQuery] = useState("");
   const [kind, setKind] = useState<WatchKind>("etf");
   const [busy, setBusy] = useState(false);
 
@@ -57,182 +67,150 @@ export function FundMonitor() {
     void refresh();
   }, [refresh]);
 
-  async function add() {
-    const s = symbol.trim().toUpperCase();
+  const add = async () => {
+    const s = query.trim().toUpperCase();
     if (!s) return;
     setBusy(true);
     const res = await addWatchlistAction(s, kind);
     setBusy(false);
-    if (!res.ok) {
-      toast(res.message ?? "No se pudo agregar (¿aplicaste la migración?).");
-      return;
-    }
-    setSymbol("");
+    if (!res.ok) return toast(res.message ?? "No se pudo agregar (¿aplicaste la migración?).");
+    setQuery("");
     void refresh();
-  }
+  };
 
-  async function remove(id: string) {
+  const remove = async (id: string) => {
     await removeWatchlistAction(id);
     void refresh();
-  }
+  };
 
   const quoteOf = (sym: string, k: WatchKind) => quotes.get(`${k}:${sym.toUpperCase()}`);
 
+  const rows: Row[] = useMemo(() => {
+    const base: Row[] = [
+      ...CURATED.map((c) => ({ symbol: c.symbol, name: c.name, kind: c.kind })),
+      ...watchlist.map((w) => ({ symbol: w.symbol, kind: w.kind, watchId: w.id })),
+    ];
+    const q = query.trim().toUpperCase();
+    if (!q) return base;
+    return base.filter((r) => r.symbol.includes(q) || (r.name ?? "").toUpperCase().includes(q));
+  }, [watchlist, query]);
+
+  // En vivo si al menos una cotización trae precio y no viene de caché.
+  const live = useMemo(() => [...quotes.values()].some((q) => q.price != null && !q.cached), [quotes]);
+
   return (
-    <div className="grid">
-      <div className="card">
-        <div className="card-head">
-          <div>
-            <div className="card-title">Índices y fondos populares</div>
-            <div className="card-sub">Precios en vivo · cadena de proveedores con caché</div>
-          </div>
+    <div>
+      <div className="mon-bar">
+        <div className="mon-search">
+          <Icon name="search" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value.toUpperCase().slice(0, 16))}
+            placeholder="Buscar símbolo o fondo (AAPL, VOO, BTC…)"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void add();
+            }}
+          />
         </div>
-        {CURATED.map((c) => (
-          <MonitorRow key={`${c.kind}:${c.symbol}`} symbol={c.symbol} name={c.name} kind={c.kind} quote={quoteOf(c.symbol, c.kind)} loading={loading} />
-        ))}
+        <select className="sel" style={{ width: 110 }} value={kind} onChange={(e) => setKind(e.target.value as WatchKind)} aria-label="Tipo de activo">
+          {KINDS.map((k) => (
+            <option key={k.value} value={k.value}>{k.label}</option>
+          ))}
+        </select>
+        <button type="button" className="btn btn-primary" disabled={busy || !query.trim()} onClick={() => void add()}>
+          <Icon name="plus" width={2} /> Seguir
+        </button>
+        <button type="button" className="btn btn-secondary" onClick={() => void refresh()}>
+          <Icon name="repeat" width={2} /> Actualizar
+        </button>
+        <span className={`status-pill ${loading ? "cached" : live ? "live" : "cached"}`}>
+          <span className="d" />
+          {loading ? "Conectando…" : live ? "Precios en vivo" : "Datos en caché"}
+        </span>
       </div>
 
       <div className="card">
-        <div className="card-head">
-          <div>
-            <div className="card-title">Mi watchlist</div>
-            <div className="card-sub">{watchlist.length} símbolo(s) · solo para ti</div>
-          </div>
+        <div className="inv-th" style={{ gridTemplateColumns: "42px 1.6fr 1fr 1fr 1fr" }}>
+          <div />
+          <div>Activo</div>
+          <div style={{ textAlign: "right" }}>Precio</div>
+          <div style={{ textAlign: "right" }}>Cambio</div>
+          <div className="c-spark">7 días</div>
         </div>
-
-        <div style={{ display: "flex", gap: 8, padding: "12px 24px", flexWrap: "wrap", alignItems: "flex-end", borderBottom: "1px solid var(--line)" }}>
-          <div className="fld" style={{ margin: 0, flex: "1 1 140px", minWidth: 0 }}>
-            <label className="fld-label">Símbolo</label>
-            <input
-              className="inp"
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value.toUpperCase().slice(0, 12))}
-              placeholder="Ej. NVDA, SOL"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void add();
-              }}
-            />
-          </div>
-          <div className="fld" style={{ margin: 0, flex: "0 0 120px" }}>
-            <label className="fld-label">Tipo</label>
-            <select className="sel" value={kind} onChange={(e) => setKind(e.target.value as WatchKind)}>
-              {KINDS.map((k) => (
-                <option key={k.value} value={k.value}>
-                  {k.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="button" className="btn btn-primary" disabled={busy || !symbol.trim()} onClick={() => void add()}>
-            <Icon name="plus" width={2} /> Agregar
-          </button>
-        </div>
-
-        {watchlist.length === 0 ? (
-          <div className="muted" style={{ padding: "18px 24px", fontSize: 13 }}>
-            Agrega símbolos para seguir su precio. (Requiere la migración de watchlist aplicada.)
-          </div>
+        {rows.length === 0 ? (
+          <div className="muted" style={{ padding: "30px", textAlign: "center", fontSize: 13 }}>Sin resultados.</div>
         ) : (
-          watchlist.map((w) => (
+          rows.map((r) => (
             <MonitorRow
-              key={`${w.kind}:${w.symbol}`}
-              symbol={w.symbol}
-              kind={w.kind}
-              quote={quoteOf(w.symbol, w.kind)}
+              key={`${r.kind}:${r.symbol}`}
+              row={r}
+              quote={quoteOf(r.symbol, r.kind)}
               loading={loading}
-              onRemove={() => void remove(w.id)}
+              onRemove={r.watchId ? () => void remove(r.watchId!) : undefined}
             />
           ))
         )}
       </div>
+      <p className="muted" style={{ fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>
+        Precios vía cadena de proveedores (con caché) desde el servidor. La variación del día y el sparkline son best-effort
+        según el proveedor.
+      </p>
     </div>
   );
 }
 
 function MonitorRow({
-  symbol,
-  name,
-  kind,
+  row,
   quote,
   loading,
   onRemove,
 }: {
-  symbol: string;
-  name?: string;
-  kind: WatchKind;
+  row: Row;
   quote?: MonitorQuote;
   loading: boolean;
   onRemove?: () => void;
 }) {
-  const kindLabel = kind === "crypto" ? "Cripto" : kind === "etf" ? "ETF" : "Acción";
   const change = quote?.changePct ?? null;
-  const changeColor = change == null ? "var(--muted)" : change >= 0 ? "var(--pos)" : "var(--rose)";
+  const up = (change ?? 0) >= 0;
+  const priceFmt = quote && quote.price != null ? formatMoney(quote.price, quote.currency ?? "USD") : null;
   return (
-    <div className="hold-row" style={{ gridTemplateColumns: "1fr auto auto auto", alignItems: "center", gap: 12 }}>
+    <div className="mon-row">
+      <div className="mon-ic" style={{ background: KIND_GRADIENT[row.kind] }}>{row.symbol.slice(0, 4)}</div>
       <div style={{ minWidth: 0 }}>
-        <div className="hold-name" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {symbol}
-          <span className="chip" style={{ fontSize: 9.5, background: "var(--chip)", color: "var(--muted)" }}>
-            {kindLabel}
-          </span>
-        </div>
-        {name ? <div className="hold-sub">{name}</div> : null}
+        <div className="mon-name">{row.symbol}</div>
+        <div className="mon-sub">{row.name ?? (row.kind === "crypto" ? "Cripto" : row.kind === "etf" ? "ETF" : "Acción")}</div>
       </div>
-      <Sparkline series={quote?.spark ?? []} loading={loading} />
-      <div className="hold-val">
-        {loading ? (
-          <div className="muted" style={{ fontSize: 12 }}>
-            …
-          </div>
-        ) : quote && quote.price != null ? (
-          <>
-            <div className="v">{formatMoney(quote.price, quote.currency ?? "USD")}</div>
-            <div className="d" style={{ color: changeColor }}>
-              {change != null ? `${change >= 0 ? "+" : ""}${formatPercent(change / 100)}` : quote.cached ? "caché" : "en vivo"}
-            </div>
-          </>
-        ) : (
-          <div className="muted" style={{ fontSize: 12 }}>
-            sin precio
-          </div>
-        )}
+      <div className="mon-price">{loading ? "…" : (priceFmt ?? "sin precio")}</div>
+      <div className={`mon-chg ${change == null ? "" : up ? "pos" : "neg"}`} style={{ color: change == null ? "var(--muted)" : up ? "var(--pos)" : "var(--neg)" }}>
+        {change != null ? `${up ? "+" : ""}${formatPercent(change / 100)}` : quote?.cached ? "caché" : ""}
       </div>
-      {onRemove ? (
-        <button type="button" className="icon-btn" aria-label={`Quitar ${symbol}`} style={{ width: 30, height: 30 }} onClick={onRemove}>
-          <Icon name="x" />
-        </button>
-      ) : (
-        <span style={{ width: 30 }} />
-      )}
+      <div className="c-spark" style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
+        <Sparkline series={quote?.spark ?? []} up={up} loading={loading} />
+        {onRemove ? (
+          <button type="button" className="icon-btn" aria-label={`Quitar ${row.symbol}`} style={{ width: 26, height: 26, flex: "none" }} onClick={onRemove}>
+            <Icon name="x" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-const SPARK_W = 64;
-const SPARK_H = 22;
-
-/** Mini-sparkline SVG (sin librería). Color por tendencia (sube=pos, baja=rosa). */
-function Sparkline({ series, loading }: { series: number[]; loading: boolean }) {
-  if (loading || series.length < 2) return <span style={{ width: SPARK_W, display: "inline-block" }} aria-hidden />;
+/** Mini-sparkline (sin librería; no hay componente para series tan pequeñas). */
+function Sparkline({ series, up, loading }: { series: number[]; up: boolean; loading: boolean }) {
+  if (loading || series.length < 2) return <span className="mon-spark" aria-hidden />;
+  const W = 120;
+  const H = 34;
   const min = Math.min(...series);
   const max = Math.max(...series);
   const span = max - min || 1;
-  const stepX = SPARK_W / (series.length - 1);
-  const points = series
-    .map((v, i) => `${(i * stepX).toFixed(1)},${(SPARK_H - ((v - min) / span) * SPARK_H).toFixed(1)}`)
+  const stepX = W / (series.length - 1);
+  const d = series
+    .map((v, i) => `${i ? "L" : "M"}${(i * stepX).toFixed(1)},${(H - 2 - ((v - min) / span) * (H - 6)).toFixed(1)}`)
     .join(" ");
-  const up = series[series.length - 1]! >= series[0]!;
-  const color = up ? "var(--pos)" : "var(--rose)";
   return (
-    <svg width={SPARK_W} height={SPARK_H} viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} aria-hidden style={{ display: "block", flex: "none" }}>
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg className="mon-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
+      <path d={d} fill="none" stroke={up ? "var(--pos)" : "var(--neg)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
