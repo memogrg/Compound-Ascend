@@ -475,6 +475,42 @@ export async function getLinkedSpentByEntity(
   return out;
 }
 
+/**
+ * Gasto EXTRAORDINARIO por deuda en el periodo (subconjunto de getLinkedSpentByEntity).
+ * Suma las transacciones vinculadas (linked_kind='debt') cuyo debt_payment es
+ * kind='extraordinario'. Sirve para diferenciar en Gastos lo que no es la cuota.
+ */
+export async function getExtraordinarySpentByDebt(
+  period: Period,
+): Promise<Record<string, number>> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
+  const { data: pays } = await supabase
+    .from("debt_payments")
+    .select("transaction_id")
+    .eq("user_id", user.id)
+    .eq("kind", "extraordinario")
+    .gte("occurred_on", period.from)
+    .lte("occurred_on", period.to);
+  const txnIds = (pays ?? [])
+    .map((p) => p.transaction_id)
+    .filter((x): x is string => Boolean(x));
+  if (txnIds.length === 0) return {};
+  const { data: txns } = await supabase
+    .from("transactions")
+    .select("amount,currency,linked_id")
+    .eq("user_id", user.id)
+    .in("id", txnIds);
+  const out: Record<string, number> = {};
+  for (const t of txns ?? []) {
+    if (!t.linked_id) continue;
+    out[t.linked_id] =
+      (out[t.linked_id] ?? 0) + convertCurrency(Number(t.amount), t.currency, currency, rates);
+  }
+  return out;
+}
+
 /** Fecha (YYYY-MM-DD) de la transacción más antigua del usuario, o null. Sirve
  *  para acotar el rango "Todo el tiempo" del histórico de ingresos. */
 export async function getEarliestTransactionDate(): Promise<string | null> {

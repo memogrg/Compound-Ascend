@@ -11,7 +11,11 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { formatMoney } from "@/lib/format";
 import { listLinkableEntitiesDetailed } from "@/modules/financial-base/services/linkable-entities-service";
 import { getBudgetTotals, getLinkedBudgetBySource } from "@/modules/financial-base/services/budget-service";
-import { getRealTotals, getLinkedSpentByEntity } from "@/modules/financial-base/services/transaction-service";
+import {
+  getRealTotals,
+  getLinkedSpentByEntity,
+  getExtraordinarySpentByDebt,
+} from "@/modules/financial-base/services/transaction-service";
 import { getSystemCategoryId } from "@/modules/financial-base/services/linked-transaction-service";
 import {
   buildExpenseJars,
@@ -83,14 +87,15 @@ export async function getExpenseJarsAsOf(args: {
   currency: string;
 }): Promise<Jar[]> {
   const cutoff: Period = { ...args.period, to: args.asOf };
-  const [budget, real, debtBudget, debtSpent, deudasCatId, goalBudget, goalSpent] =
+  const [budget, real, debtBudget, debtSpent, debtExtra, deudasCatId, goalBudget, goalSpent] =
     await Promise.all([
       getBudgetTotals(args.period),
       getRealTotals(cutoff),
       // Deudas budget-aware: cuota derivada por deuda (mes) + pagado al corte +
-      // categoría de sistema del pago (para Registrar gasto).
+      // pagado extraordinario (subconjunto) + categoría de sistema del pago.
       getLinkedBudgetBySource(args.period, "debt"),
       getLinkedSpentByEntity(cutoff, "debt"),
+      getExtraordinarySpentByDebt(cutoff),
       getSystemCategoryId("deudas"),
       // Ahorro budget-aware: aporte derivado por meta (mes) + aportado al corte.
       getLinkedBudgetBySource(args.period, "goal"),
@@ -109,7 +114,12 @@ export async function getExpenseJarsAsOf(args: {
     realByKey: real.expenseByKey,
     currency: args.currency,
     linkedBudget: {
-      debt: { bySource: debtBudget, spentById: debtSpent, paymentCategoryId: deudasCatId },
+      debt: {
+        bySource: debtBudget,
+        spentById: debtSpent,
+        extraordinaryById: debtExtra,
+        paymentCategoryId: deudasCatId,
+      },
       goal: { bySource: goalBudget, spentById: goalSpent, paymentCategoryId: ahorroCatId },
     },
   });
