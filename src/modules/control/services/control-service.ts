@@ -30,6 +30,7 @@ import type {
   DebtRateType,
   DebtRateIndex,
   ExtraMode,
+  PaymentKind,
 } from "@/modules/control/types";
 import type { SavingsGoalRow, DebtRow, DebtPaymentRow } from "@/lib/supabase/database.types";
 
@@ -211,6 +212,7 @@ function rowToDebtPayment(
     amount: Number(r.amount),
     extraAmount: Number(r.extra_amount ?? 0),
     extraMode: (r.extra_mode ?? null) as ExtraMode | null,
+    kind: (r.kind ?? "ordinario") as PaymentKind,
     principal: r.principal == null ? null : Number(r.principal),
     interest: r.interest == null ? null : Number(r.interest),
     viaSource: r.txn?.source ?? null,
@@ -302,6 +304,7 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     amount: input.amount,
     extra_amount: input.extraAmount,
     extra_mode: input.extraMode ?? null,
+    kind: input.kind,
     transaction_id: txnId,
   });
   if (error) {

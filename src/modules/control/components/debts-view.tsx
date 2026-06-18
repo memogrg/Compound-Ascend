@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { PerformanceChart } from "@/components/charts/lazy";
 import { AddControlButton, ControlDialog } from "./control-actions";
-import { removeDebtAction } from "@/modules/control/api/actions";
+import { removeDebtAction, reportPaymentAction } from "@/modules/control/api/actions";
 import type { Debt } from "@/modules/control/types";
 import {
   simulateStrategy,
@@ -483,14 +483,17 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               {debts.length} deuda(s) · orden de ataque ({METHOD_LABEL[activeMethod].toLowerCase()})
             </div>
           </div>
-          <AddControlButton
-            kind="debt"
-            currency={currency}
-            label="Agregar deuda"
-            variant="btn-secondary"
-            indexRates={indexRates}
-            deepLinkKey="debt"
-          />
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <RegisterPaymentButton debts={debts} currency={currency} />
+            <AddControlButton
+              kind="debt"
+              currency={currency}
+              label="Agregar deuda"
+              variant="btn-secondary"
+              indexRates={indexRates}
+              deepLinkKey="debt"
+            />
+          </div>
         </div>
         {ordered.map((d, i) => {
           const s = summaries.get(d.id)!;
@@ -574,6 +577,171 @@ function payoffDateFromMonths(months: number): string {
   const d = new Date();
   d.setMonth(d.getMonth() + months);
   return d.toISOString().slice(0, 10);
+}
+
+/** "Registrar pago" desde la lista: elige deuda + tipo (normal/extraordinario). */
+function RegisterPaymentButton({ debts, currency }: { debts: DebtVM[]; currency: string }) {
+  const [open, setOpen] = useState(false);
+  if (debts.length === 0) return null;
+  return (
+    <>
+      <button className="btn btn-secondary" onClick={() => setOpen(true)}>
+        <Icon name="debt" width={2} /> Registrar pago
+      </button>
+      {open ? (
+        <RegisterPaymentModal debts={debts} currency={currency} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+function RegisterPaymentModal({
+  debts,
+  currency,
+  onClose,
+}: {
+  debts: DebtVM[];
+  currency: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const today = new Date().toISOString().slice(0, 10);
+  const cuotaOf = (id: string) => {
+    const d = debts.find((x) => x.id === id);
+    return d ? (d.monthlyPayment > 0 ? d.monthlyPayment : d.minPayment) : 0;
+  };
+  const [debtId, setDebtId] = useState(debts[0]!.id);
+  const [kind, setKind] = useState<"ordinario" | "extraordinario">("ordinario");
+  const [amount, setAmount] = useState<string>(() => {
+    const c = cuotaOf(debts[0]!.id);
+    return c ? String(c) : "";
+  });
+  const [date, setDate] = useState(today);
+  const [pending, setPending] = useState(false);
+
+  const onDebt = (id: string) => {
+    setDebtId(id);
+    if (kind === "ordinario") {
+      const c = cuotaOf(id);
+      setAmount(c ? String(c) : "");
+    }
+  };
+  const onKind = (k: "ordinario" | "extraordinario") => {
+    setKind(k);
+    if (k === "ordinario") {
+      const c = cuotaOf(debtId);
+      setAmount(c ? String(c) : "");
+    } else setAmount("");
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = Number(amount) || 0;
+    if (amt <= 0) {
+      toast("Ingresa un monto válido", "error");
+      return;
+    }
+    setPending(true);
+    const res = await reportPaymentAction({
+      debtId,
+      paymentDate: date,
+      amount: amt,
+      extraAmount: 0,
+      kind,
+    });
+    setPending(false);
+    if (res.ok) {
+      toast(kind === "extraordinario" ? "Abono a capital registrado" : "Pago registrado");
+      onClose();
+      router.refresh();
+    } else toast(res.message ?? "No se pudo registrar", "error");
+  };
+
+  return (
+    <Modal
+      title="Registrar pago"
+      sub="Elige la deuda y el tipo de pago."
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        <div className="modal-body">
+          <div className="fld">
+            <label className="fld-label">Deuda</label>
+            <select className="sel" value={debtId} onChange={(e) => onDebt(e.target.value)}>
+              {debts.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="fld">
+            <label className="fld-label">Tipo de pago</label>
+            <div className="seg" role="group">
+              <button
+                type="button"
+                className={`seg-btn${kind === "ordinario" ? " on" : ""}`}
+                onClick={() => onKind("ordinario")}
+              >
+                Pago normal
+              </button>
+              <button
+                type="button"
+                className={`seg-btn${kind === "extraordinario" ? " on" : ""}`}
+                onClick={() => onKind("extraordinario")}
+              >
+                Extraordinario
+              </button>
+            </div>
+            {kind === "extraordinario" ? (
+              <div className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+                Abono directo a capital: no paga intereses ni cuenta como la cuota del mes.
+              </div>
+            ) : null}
+          </div>
+
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">{kind === "extraordinario" ? "Monto del abono" : "Monto de la cuota"}</label>
+              <div className="inp-money">
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+            </div>
+            <div className="fld">
+              <label className="fld-label">Fecha</label>
+              <input
+                className="inp"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="muted" style={{ fontSize: 11 }}>
+            Moneda: {currency}
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primary" disabled={pending}>
+            {pending ? "Guardando…" : "Registrar"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
 
 /** Kebab (⋯) por deuda: Editar (DebtForm precargado) / Eliminar (confirmación).

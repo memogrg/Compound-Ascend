@@ -252,6 +252,8 @@ export interface PaymentRecord {
   paymentDate: string;
   amount: number;
   extraAmount?: number;
+  /** 'extraordinario' = abono directo a capital (interés 0); por defecto ordinario. */
+  kind?: "ordinario" | "extraordinario";
 }
 
 export interface RecomputeResult {
@@ -280,6 +282,14 @@ export function recomputeFromPayments(
 
   const sorted = [...payments].sort((a, b) => a.paymentDate.localeCompare(b.paymentDate));
   for (const p of sorted) {
+    if (p.kind === "extraordinario") {
+      // Abono directo a capital: interés 0, todo el monto reduce el saldo. No es
+      // la cuota del mes (no acumula interés del periodo).
+      const principal = Math.min(p.amount, balance);
+      balance -= principal;
+      paidPrincipal += principal;
+      continue;
+    }
     const interest = balance * r;
     let principal = p.amount - interest + (p.extraAmount ?? 0);
     if (principal < 0) principal = 0;
