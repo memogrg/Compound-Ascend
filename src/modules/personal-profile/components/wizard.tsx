@@ -248,6 +248,46 @@ const STEPS: Step[] = [
             onToggle={(v) => set({ hardest: toggle(d.hardest, v) })}
           />
         </div>
+        <div className="fld">
+          <label className="fld-label">Cuando recibes dinero, normalmente…</label>
+          <OptionCards
+            options={O.INCOME_REACTIONS}
+            value={d.incomeReaction}
+            onChange={(v) => set({ incomeReaction: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Después de una semana pesada, ¿qué pasa con tus gastos?</label>
+          <OptionCards
+            options={O.STRESS_SPENDING}
+            value={d.stressSpending}
+            onChange={(v) => set({ stressSpending: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Cuando ves algo que quieres pero no estaba planeado…</label>
+          <OptionCards
+            options={O.UNPLANNED_PURCHASE}
+            value={d.unplannedPurchase}
+            onChange={(v) => set({ unplannedPurchase: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Cuando ves que otros avanzan más rápido…</label>
+          <OptionCards
+            options={O.SOCIAL_COMPARISON}
+            value={d.socialComparison}
+            onChange={(v) => set({ socialComparison: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">¿Cuál frase se parece más a lo que a veces piensas sobre el dinero?</label>
+          <OptionCards
+            options={O.MONEY_SCRIPT_PHRASES}
+            value={d.moneyScriptPhrase}
+            onChange={(v) => set({ moneyScriptPhrase: v })}
+          />
+        </div>
       </div>
     ),
   },

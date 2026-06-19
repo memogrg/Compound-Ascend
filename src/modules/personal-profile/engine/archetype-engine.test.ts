@@ -37,6 +37,30 @@ describe("computeArchetype", () => {
     expect(r.initialFocus.length).toBeGreaterThan(0);
   });
 
+  it("moneyScriptPhrase construya_futuro → script 'crecimiento' y empuja constructor", () => {
+    const r = computeArchetype({ moneyScriptPhrase: "construya_futuro" });
+    expect(r.moneyScript).toBe("crecimiento");
+    expect(r.primary).toBe("constructor");
+  });
+
+  it("moneyScriptPhrase merezco_disfrutar → script 'estatus' y empuja disfrutador", () => {
+    const r = computeArchetype({ moneyScriptPhrase: "merezco_disfrutar" });
+    expect(r.moneyScript).toBe("estatus");
+    expect(r.primary).toBe("disfrutador");
+  });
+
+  it("stressSpending gusto → dominantEmotion 'culpa'", () => {
+    expect(computeArchetype({ stressSpending: "gusto" }).dominantEmotion).toBe("culpa");
+  });
+
+  it("socialComparison presiona → dominantEmotion 'frustracion'", () => {
+    expect(computeArchetype({ socialComparison: "presiona" }).dominantEmotion).toBe("frustracion");
+  });
+
+  it("sin frase de money script → moneyScript null", () => {
+    expect(computeArchetype({}).moneyScript).toBeNull();
+  });
+
   it("secundario solo si está a ≤2 pts del primario y > 0", () => {
     // proteger_familia: guardian+3, protector+1 → guardian 3, protector 1 (dif 2) → secundario protector.
     const r = computeArchetype({ lifeStage: "proteger_familia" });

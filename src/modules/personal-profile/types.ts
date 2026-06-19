@@ -62,6 +62,13 @@ export type ProfileDraft = {
   reviewHabit?: string;
   hardest?: string[];
 
+  // Paso 6 · psicología del dinero (Fase 3a). Claves de la opción elegida.
+  incomeReaction?: string; // 6.1
+  stressSpending?: string; // 6.2
+  unplannedPurchase?: string; // 6.4
+  socialComparison?: string; // 6.5
+  moneyScriptPhrase?: string; // 6.6 (clave de la frase elegida)
+
   // Conocimiento
   knowledgeLevel?: KnowledgeLevel;
   topicsKnown?: string[];
@@ -101,6 +108,15 @@ export type Archetype =
   | "guardian"
   | "constructor";
 
+/** "Money script": creencia profunda sobre el dinero (deriva de la frase elegida). */
+export type MoneyScript =
+  | "evitacion"
+  | "vigilancia"
+  | "estatus"
+  | "seguridad"
+  | "crecimiento"
+  | "suficiencia";
+
 export type DominantEmotion =
   | "tranquilidad"
   | "motivacion"
@@ -119,6 +135,8 @@ export type ArchetypeResult = {
   recommendedTone: string;
   /** Foco inicial sugerido (del playbook). */
   initialFocus: string;
+  /** Creencia dominante sobre el dinero (de la frase del Paso 6), si la hay. */
+  moneyScript: MoneyScript | null;
   scores: Record<Archetype, number>;
 };
 
@@ -137,4 +155,5 @@ export type ProfileDiagnosis = {
   dominantEmotion?: DominantEmotion;
   recommendedTone?: string;
   initialFocus?: string;
+  moneyScript?: MoneyScript;
 };

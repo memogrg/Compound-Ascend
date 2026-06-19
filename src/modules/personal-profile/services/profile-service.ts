@@ -86,6 +86,7 @@ export async function completeProfile(
     | "dominantEmotion"
     | "recommendedTone"
     | "initialFocus"
+    | "moneyScript"
   >
 > {
   const user = await requireUser();
@@ -112,6 +113,7 @@ export async function completeProfile(
       archetype_secondary: arche.secondary,
       dominant_emotion: arche.dominantEmotion,
       ai_tone_recommended: arche.recommendedTone,
+      money_script: arche.moneyScript,
       extra: { draft, richLifeVision: draft.richLifeVision ?? null },
     },
     { onConflict: "user_id" },
@@ -219,5 +221,6 @@ export async function completeProfile(
     dominantEmotion: arche.dominantEmotion,
     recommendedTone: arche.recommendedTone,
     initialFocus: arche.initialFocus,
+    moneyScript: arche.moneyScript ?? undefined,
   };
 }
