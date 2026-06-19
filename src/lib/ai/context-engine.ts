@@ -15,6 +15,11 @@ import "server-only";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 
+/** Coacciona un valor jsonb a string[] (las columnas jsonb llegan como unknown). */
+function asStrings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
 export async function buildFinancialContext(): Promise<FinancialContext> {
   const user = await getUser();
   const name = (user?.user_metadata?.display_name as string | undefined) ?? undefined;
@@ -109,6 +114,136 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     }
   } catch {
     // Portafolio no disponible.
+  }
+
+  // Perfil conductual (Fase · asesor conductual). Lectura best-effort con el
+  // cliente de sesión (respeta RLS); cada tabla en su try/catch para que un fallo
+  // aislado no degrade el resto del contexto.
+  try {
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const supabase = await createSupabaseServerClient();
+
+    // Perfil de riesgo.
+    try {
+      const { data } = await supabase
+        .from("risk_profiles")
+        .select("risk_class,loss_reaction,preference,horizon,volatility_comfort,has_invested")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        if (data.risk_class) ctx.riskClass = data.risk_class;
+        if (data.loss_reaction) ctx.lossReaction = data.loss_reaction;
+        if (data.preference) ctx.riskPreference = data.preference;
+        if (data.horizon) ctx.horizon = data.horizon;
+        if (data.volatility_comfort != null) ctx.volatilityComfort = data.volatility_comfort;
+        if (data.has_invested != null) ctx.hasInvested = data.has_invested;
+      }
+    } catch {
+      // Riesgo no disponible.
+    }
+
+    // Perfil conductual.
+    try {
+      const { data } = await supabase
+        .from("behavior_profiles")
+        .select("discipline,impulsivity,consistency,review_habit,hardest")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        if (data.discipline != null) ctx.discipline = data.discipline;
+        if (data.impulsivity != null) ctx.impulsivity = data.impulsivity;
+        if (data.review_habit) ctx.reviewHabit = String(data.review_habit).replaceAll("_", " ");
+        const hardest = asStrings(data.hardest);
+        if (hardest.length) ctx.hardest = hardest;
+      }
+    } catch {
+      // Conducta no disponible.
+    }
+
+    // Conocimiento financiero.
+    try {
+      const { data } = await supabase
+        .from("knowledge_profiles")
+        .select("level,topics_to_learn")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        if (data.level) ctx.knowledgeLevel = data.level;
+        const topics = asStrings(data.topics_to_learn);
+        if (topics.length) ctx.topicsToLearn = topics;
+      }
+    } catch {
+      // Conocimiento no disponible.
+    }
+
+    // Preferencias de coaching.
+    try {
+      const { data } = await supabase
+        .from("user_settings")
+        .select("coaching_tone,coaching_frequency,alert_intensity")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        if (data.coaching_tone) ctx.coachingTone = data.coaching_tone;
+        if (data.coaching_frequency) ctx.coachingFrequency = data.coaching_frequency;
+        if (data.alert_intensity) ctx.alertIntensity = data.alert_intensity;
+      }
+    } catch {
+      // Settings no disponibles.
+    }
+
+    // Prioridades (top 3 de las que el usuario prioriza, por rank).
+    try {
+      const { data } = await supabase
+        .from("user_priorities")
+        .select("priority,rank")
+        .eq("user_id", user.id)
+        .eq("kind", "prioriza")
+        .order("rank", { ascending: true, nullsFirst: false })
+        .limit(3);
+      const priorities = (data ?? [])
+        .map((r) => r.priority)
+        .filter((p): p is string => typeof p === "string" && p.length > 0)
+        .map((p) => p.replaceAll("_", " "));
+      if (priorities.length) ctx.priorities = priorities;
+    } catch {
+      // Prioridades no disponibles.
+    }
+
+    // Borrador del wizard (personal_profiles.extra.draft): Rich Life + percepción.
+    try {
+      const { data } = await supabase
+        .from("personal_profiles")
+        .select("extra")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const draft = (
+        (data?.extra ?? {}) as {
+          draft?: {
+            richLifePhrase?: unknown;
+            richLifeVision?: unknown;
+            urgency?: unknown;
+            perceivedControl?: unknown;
+            dependentsCount?: unknown;
+            financialNucleus?: unknown;
+            hasEmergencyFund?: unknown;
+          };
+        }
+      ).draft;
+      if (draft) {
+        if (typeof draft.richLifePhrase === "string") ctx.richLifePhrase = draft.richLifePhrase;
+        if (typeof draft.richLifeVision === "string") ctx.richLifeVision = draft.richLifeVision;
+        if (typeof draft.urgency === "string") ctx.urgency = draft.urgency;
+        if (typeof draft.perceivedControl === "number") ctx.perceivedControl = draft.perceivedControl;
+        if (typeof draft.dependentsCount === "number") ctx.dependentsCount = draft.dependentsCount;
+        if (typeof draft.financialNucleus === "string") ctx.financialNucleus = draft.financialNucleus;
+        if (typeof draft.hasEmergencyFund === "string") ctx.hasEmergencyFund = draft.hasEmergencyFund;
+      }
+    } catch {
+      // Borrador no disponible.
+    }
+  } catch {
+    // Sin cliente de sesión: el contexto sigue con lo que ya tiene.
   }
 
   // Entidades vinculables: la IA puede proponer transacciones ya vinculadas.

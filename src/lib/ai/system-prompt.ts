@@ -24,6 +24,32 @@ export type FinancialContext = {
   topDebtApr?: number;
   goalCount?: number;
   goalsProgressPct?: number;
+  // Perfil conductual (Fase · asesor conductual). Todos opcionales y best-effort:
+  // si el wizard no se completó, simplemente no aparecen.
+  riskClass?: string;
+  lossReaction?: string;
+  riskPreference?: string;
+  horizon?: string;
+  volatilityComfort?: number;
+  hasInvested?: boolean;
+  discipline?: number;
+  impulsivity?: number;
+  reviewHabit?: string;
+  hardest?: string[];
+  knowledgeLevel?: string;
+  topicsToLearn?: string[];
+  coachingTone?: string;
+  coachingFrequency?: string;
+  alertIntensity?: string;
+  priorities?: string[];
+  richLifePhrase?: string;
+  richLifeVision?: string;
+  urgency?: string;
+  perceivedControl?: number;
+  dependentsCount?: number;
+  financialNucleus?: string;
+  /** 'si' | 'no' | 'construyendo' | 'no_se' (del borrador del wizard). */
+  hasEmergencyFund?: string;
   /** Entidades a las que una transacción propuesta puede vincularse. */
   linkables?: {
     debt: { id: string; name: string }[];
@@ -64,6 +90,34 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
   }
 
+  // Perfil conductual (omitir los indefinidos, mismo patrón de facts).
+  if (ctx.riskClass) facts.push(`Perfil de riesgo: ${ctx.riskClass}.`);
+  if (ctx.riskPreference) facts.push(`Preferencia de inversión: ${ctx.riskPreference}.`);
+  if (ctx.lossReaction) facts.push(`Reacción ante pérdidas: ${ctx.lossReaction}.`);
+  if (ctx.horizon) facts.push(`Horizonte de inversión: ${ctx.horizon}.`);
+  if (ctx.volatilityComfort !== undefined)
+    facts.push(`Comodidad con la volatilidad: ${ctx.volatilityComfort}/10.`);
+  if (ctx.hasInvested !== undefined)
+    facts.push(`¿Ha invertido antes?: ${ctx.hasInvested ? "sí" : "no"}.`);
+  if (ctx.discipline !== undefined) facts.push(`Disciplina financiera: ${ctx.discipline}/10.`);
+  if (ctx.impulsivity !== undefined) facts.push(`Impulsividad: ${ctx.impulsivity}/10.`);
+  if (ctx.reviewHabit) facts.push(`Hábito de revisión: ${ctx.reviewHabit}.`);
+  if (ctx.hardest?.length) facts.push(`Lo que más le cuesta: ${ctx.hardest.join(", ")}.`);
+  if (ctx.knowledgeLevel) facts.push(`Nivel de conocimiento financiero: ${ctx.knowledgeLevel}.`);
+  if (ctx.topicsToLearn?.length) facts.push(`Quiere aprender sobre: ${ctx.topicsToLearn.join(", ")}.`);
+  if (ctx.priorities?.length) facts.push(`Sus prioridades: ${ctx.priorities.join(", ")}.`);
+  if (ctx.coachingTone) facts.push(`Tono de coaching preferido: ${ctx.coachingTone}.`);
+  if (ctx.coachingFrequency) facts.push(`Frecuencia de coaching: ${ctx.coachingFrequency}.`);
+  if (ctx.alertIntensity) facts.push(`Intensidad de alertas preferida: ${ctx.alertIntensity}.`);
+  if (ctx.urgency) facts.push(`Urgencia financiera percibida: ${ctx.urgency}.`);
+  if (ctx.perceivedControl !== undefined)
+    facts.push(`Control percibido sobre sus finanzas: ${ctx.perceivedControl}/10.`);
+  if (ctx.dependentsCount !== undefined) facts.push(`Personas que dependen de él/ella: ${ctx.dependentsCount}.`);
+  if (ctx.financialNucleus) facts.push(`Núcleo financiero: ${ctx.financialNucleus}.`);
+  if (ctx.hasEmergencyFund) facts.push(`Fondo de emergencia: ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`);
+  if (ctx.richLifePhrase) facts.push(`Su vida rica en una frase: "${ctx.richLifePhrase}".`);
+  if (ctx.richLifeVision) facts.push(`Su visión de vida rica: "${ctx.richLifeVision}".`);
+
   // Vinculables: la IA puede proponer la transacción ya conectada a su entidad.
   const linkFacts: string[] = [];
   if (ctx.linkables?.debt.length) {
@@ -77,13 +131,56 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
   }
 
+  // ── Bloque B: reglas de conducta derivadas del perfil ──
+  // La persona base (de la Biblia) se embebe SIEMPRE; las reglas condicionales se
+  // añaden según el perfil disponible. Si no hay perfil, queda solo la persona base.
+  const PERSONA =
+    "Eres un asesor financiero conductual, no un chatbot. Guía, no juez. Usa la " +
+    "fórmula: validación breve + dato relevante + recomendación concreta + beneficio " +
+    "emocional + opción de control. Nunca regañes, no uses vergüenza, no compares con " +
+    "otros usuarios, no prometas rendimientos, no des instrumentos específicos sin " +
+    "idoneidad. Toda recomendación incluye por qué, próximo paso y posible riesgo.";
+
+  const behaviorRules: string[] = [];
+  const tone: Record<string, string> = {
+    directo: "Tono: franco y sin rodeos, ve al punto.",
+    suave: "Tono: cálido y motivador, refuerza lo positivo.",
+    tecnico: "Tono: aporta datos y precisión, no simplifiques de más.",
+    simple: "Tono: explica paso a paso, sin jerga.",
+    coach: "Tono: retador pero de apoyo; empújalo a comprometerse con un paso.",
+  };
+  if (ctx.coachingTone && tone[ctx.coachingTone]) behaviorRules.push(tone[ctx.coachingTone]!);
+  if (ctx.knowledgeLevel === "basico")
+    behaviorRules.push("Nivel básico: usa analogías cotidianas y cero jerga técnica.");
+  if (ctx.knowledgeLevel === "experto")
+    behaviorRules.push("Nivel experto: ve directo a tasas, escenarios y números, sin rodeos didácticos.");
+  if (ctx.alertIntensity === "suaves")
+    behaviorRules.push("Alertas: sin alarmismo; plantea los riesgos con calma.");
+  if (ctx.alertIntensity === "directas")
+    behaviorRules.push("Alertas: sé claro y contundente al señalar riesgos.");
+  if (ctx.impulsivity !== undefined && ctx.impulsivity >= 7)
+    behaviorRules.push("Impulsividad alta: anticipa el impulso antes de las compras; ofrece una pausa o una regla simple antes de gastar.");
+  if (ctx.urgency === "alta" || ctx.urgency === "critica")
+    behaviorRules.push("Urgencia financiera alta: prioriza primero la estabilidad (liquidez), no inversión de riesgo.");
+  // Regla de seguridad (Biblia §18): sin fondo de emergencia (o sin saberlo) y bajo
+  // presión (urgencia alta/crítica o etapa de vida de presión/deuda) → estabilizar antes.
+  const noEmergencyFund = ctx.hasEmergencyFund === "no" || ctx.hasEmergencyFund === "no_se";
+  const underPressure =
+    ctx.urgency === "alta" ||
+    ctx.urgency === "critica" ||
+    (!!ctx.lifeStage && /deuda|presi|al d[ií]a/i.test(ctx.lifeStage));
+  if (noEmergencyFund && underPressure)
+    behaviorRules.push("Sin fondo de emergencia y bajo presión: prioriza estabilidad y construir el fondo de emergencia antes que cualquier inversión de riesgo; no propongas estrategias agresivas.");
+  if (ctx.dependentsCount !== undefined && ctx.dependentsCount > 0)
+    behaviorRules.push("Tiene dependientes: prioriza la protección (seguro, fondo de emergencia) antes que estrategias agresivas.");
+
   return [
     "Eres Ascend AI, el asesor financiero personal de la app Compound Ascend.",
     "Responde SIEMPRE en español, con tono humano, claro y sin culpa. Explica el porqué de cada recomendación.",
     "No prometas rendimientos garantizados. No des consejos de inversión específicos como certezas; habla de escenarios, riesgos y horizonte.",
     "Usa solo el contexto financiero proporcionado; no inventes datos del usuario.",
     "",
-    "Contexto financiero autorizado del usuario:",
+    "PERFIL DEL USUARIO:",
     ...facts.map((f) => `- ${f}`),
     ...(linkFacts.length
       ? [
@@ -92,6 +189,10 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
           ...linkFacts.map((f) => `- ${f}`),
         ]
       : []),
+    "",
+    "COMO HABLARLE A ESTE USUARIO:",
+    `- ${PERSONA}`,
+    ...behaviorRules.map((r) => `- ${r}`),
     "",
     "Si el usuario claramente quiere registrar una transacción, crear una meta, o aplicar una estrategia, PROPÓN una acción añadiendo al final un bloque:",
     "```action",
