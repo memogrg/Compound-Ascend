@@ -233,3 +233,58 @@ export const RICH_LIFE_PHRASES: Option[] = [
   { value: "sin_preocupacion", label: "Dejar de preocuparme por dinero" },
   { value: "opciones", label: "Tener opciones" },
 ];
+
+// ── Paso 6 · Psicología del dinero (Fase 3a) ──
+
+export const INCOME_REACTIONS: Option[] = [
+  { value: "distribuyo", label: "Lo distribuyo o planifico rápido." },
+  { value: "pago_urgente", label: "Pago lo urgente y después veo." },
+  { value: "gasto_mas", label: "Me relajo y gasto un poco más." },
+  { value: "guardo", label: "Prefiero guardarlo porque me da seguridad." },
+  { value: "invierto", label: "Pienso en invertirlo o hacerlo crecer." },
+  { value: "no_se", label: "No tengo claro a dónde se va." },
+  { value: "familia", label: "Lo uso para resolver pendientes familiares." },
+];
+
+export const STRESS_SPENDING: Option[] = [
+  { value: "gusto", label: "Me doy un gusto para compensar." },
+  { value: "controlo", label: "Me controlo, pero me cuesta." },
+  { value: "no_gasto_ansiedad", label: "No gasto porque me da ansiedad." },
+  { value: "reviso_metas", label: "Reviso mis metas antes de decidir." },
+  { value: "automatico", label: "Gasto en automático sin darme cuenta." },
+  { value: "ahorro", label: "Prefiero ahorrar para sentirme tranquilo." },
+  { value: "animo", label: "Depende mucho de mi estado de ánimo." },
+];
+
+export const UNPLANNED_PURCHASE: Option[] = [
+  { value: "compro", label: "Lo compro si puedo." },
+  { value: "pienso", label: "Lo pienso y decido después." },
+  { value: "reviso_presupuesto", label: "Reviso si cabe en mi presupuesto." },
+  { value: "evito", label: "Lo evito casi siempre." },
+  { value: "depende_dia", label: "Depende de cómo me sienta ese día." },
+  { value: "compro_acomodo", label: "Lo compro y luego veo cómo me acomodo." },
+  { value: "merezco", label: "Me cuesta decir que no si siento que lo merezco." },
+];
+
+export const SOCIAL_COMPARISON: Option[] = [
+  { value: "motiva", label: "Me motiva." },
+  { value: "presiona", label: "Me presiona." },
+  { value: "atrasado", label: "Me hace sentir atrasado." },
+  { value: "gastar_mas", label: "Me dan ganas de gastar más." },
+  { value: "igual", label: "Me da igual." },
+  { value: "mis_metas", label: "Me ayuda a pensar en mis propias metas." },
+  { value: "cuestiono", label: "Me hace cuestionar si estoy haciendo suficiente." },
+];
+
+export const MONEY_SCRIPT_PHRASES: Option[] = [
+  { value: "no_se_donde", label: "Nunca sé exactamente a dónde se va." },
+  { value: "controlo_todo", label: "Si no controlo todo, algo puede salir mal." },
+  { value: "merezco_disfrutar", label: "Trabajo duro, también merezco disfrutar." },
+  { value: "mas_seguridad", label: "Necesito más seguridad antes de avanzar." },
+  { value: "construya_futuro", label: "Quiero que mi dinero construya futuro." },
+  { value: "incomoda_hablar", label: "Me incomoda hablar de dinero." },
+  { value: "voy_tarde", label: "Siento que voy tarde." },
+  { value: "aprender", label: "Quiero aprender, pero no sé por dónde empezar." },
+  { value: "familia_depende", label: "Mi familia depende de que yo tome buenas decisiones." },
+  { value: "realmente_bien", label: "No quiero parecer exitoso; quiero estar realmente bien." },
+];

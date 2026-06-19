@@ -59,6 +59,8 @@ export type FinancialContext = {
   archetypeLabel?: string;
   archetypeLabel2?: string;
   archetypeGuidance?: string;
+  /** Money script (Fase 3a): evitacion|vigilancia|estatus|seguridad|crecimiento|suficiencia. */
+  moneyScript?: string;
   /** Entidades a las que una transacción propuesta puede vincularse. */
   linkables?: {
     debt: { id: string; name: string }[];
@@ -132,6 +134,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
   }
   if (ctx.dominantEmotion) facts.push(`Emoción dominante: ${ctx.dominantEmotion}.`);
+  if (ctx.moneyScript) facts.push(`Creencia dominante sobre el dinero: ${ctx.moneyScript}.`);
 
   // Vinculables: la IA puede proponer la transacción ya conectada a su entidad.
   const linkFacts: string[] = [];
@@ -167,6 +170,18 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
         `Tono recomendado por su arquetipo: ${ctx.recommendedTone}. Si choca con el tono que pidió el usuario, prioriza su preferencia pero modula con criterio.`,
       );
   }
+
+  // Money script: una regla de tono según la creencia dominante (Fase 3a).
+  const moneyScriptRule: Record<string, string> = {
+    evitacion: "Tiende a evitar el tema: usa cero juicio, microacciones y claridad gradual.",
+    vigilancia: "Tiende al sobrecontrol: dale permiso y equilibrio, no más alarmas.",
+    estatus: "Asocia dinero con estatus: redirige a metas propias, sin moralizar.",
+    seguridad: "Necesita seguridad primero: refuerza base antes que crecimiento.",
+    crecimiento: "Orientado a crecer: habla de escenarios y largo plazo, con control de riesgo.",
+    suficiencia: "Valora suficiencia: celebra lo que ya construyó y el progreso propio.",
+  };
+  if (ctx.moneyScript && moneyScriptRule[ctx.moneyScript])
+    behaviorRules.push(moneyScriptRule[ctx.moneyScript]!);
 
   const tone: Record<string, string> = {
     directo: "Tono: franco y sin rodeos, ve al punto.",

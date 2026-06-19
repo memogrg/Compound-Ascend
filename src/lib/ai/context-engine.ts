@@ -49,11 +49,14 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     const supabase = await createSupabaseServerClient();
     const { data: pp } = await supabase
       .from("personal_profiles")
-      .select("main_concern,life_stage,archetype_primary,archetype_secondary,dominant_emotion,ai_tone_recommended")
+      .select(
+        "main_concern,life_stage,archetype_primary,archetype_secondary,dominant_emotion,ai_tone_recommended,money_script",
+      )
       .eq("user_id", user.id)
       .maybeSingle();
     if (pp?.main_concern) ctx.topConcern = String(pp.main_concern).replaceAll("_", " ");
     if (pp?.life_stage) ctx.lifeStage = String(pp.life_stage).replaceAll("_", " ");
+    if (pp?.money_script) ctx.moneyScript = pp.money_script;
     if (pp?.archetype_primary) {
       const { ARCHETYPE_PLAYBOOKS } = await import("@/lib/ai/advisor-knowledge");
       const primary = pp.archetype_primary as keyof typeof ARCHETYPE_PLAYBOOKS;

@@ -77,6 +77,16 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).toContain(`Tono recomendado por su arquetipo: ${pb.recommendedTone}`);
   });
 
+  it("moneyScript='evitacion' produce su regla y se vuelca como creencia; sin él no rompe", () => {
+    const conScript = buildSystemPrompt({ currency: "CRC", moneyScript: "evitacion" });
+    expect(conScript).toContain("Creencia dominante sobre el dinero: evitacion.");
+    expect(conScript).toContain("Tiende a evitar el tema: usa cero juicio");
+
+    const sinScript = buildSystemPrompt({ currency: "CRC" });
+    expect(sinScript).toContain("COMO HABLARLE A ESTE USUARIO:");
+    expect(sinScript).not.toContain("Creencia dominante sobre el dinero:");
+  });
+
   it("sin arquetipo no rompe ni inyecta reglas de arquetipo", () => {
     const prompt = buildSystemPrompt({ currency: "CRC" });
     expect(prompt).toContain("COMO HABLARLE A ESTE USUARIO:");

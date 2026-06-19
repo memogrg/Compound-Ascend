@@ -40,6 +40,13 @@ export const profileDraftSchema = z.object({
   reviewHabit: z.string().max(40).optional(),
   hardest: z.array(z.string().max(60)).max(20).optional(),
 
+  // Paso 6 · psicología del dinero (Fase 3a).
+  incomeReaction: z.string().max(40).optional(),
+  stressSpending: z.string().max(40).optional(),
+  unplannedPurchase: z.string().max(40).optional(),
+  socialComparison: z.string().max(40).optional(),
+  moneyScriptPhrase: z.string().max(40).optional(),
+
   knowledgeLevel: z.enum(["basico", "intermedio", "avanzado", "experto"]).optional(),
   topicsKnown: z.array(z.string().max(60)).max(30).optional(),
   topicsToLearn: z.array(z.string().max(60)).max(30).optional(),
