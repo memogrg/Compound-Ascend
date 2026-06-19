@@ -48,12 +48,20 @@ export type ProfileDraft = {
   mainConcern?: string;
   /** Preocupaciones seleccionadas (hasta 5) — más contexto para la IA. */
   mainConcerns?: string[];
+  /** Paso 3 · emoción dominante respondida directo (sustituye la inferencia). */
+  dominantEmotionAnswer?: string; // 3.2
+  /** Paso 3 · la única cosa que querría resolver este mes. */
+  singleProblem?: string; // 3.3
 
   // Objetivos y prioridades
   goals?: string[]; // claves de objetivos seleccionados
   goalDetails?: GoalDraft[];
   priorities?: string[]; // top prioridades ordenadas
   willingToSacrifice?: string[];
+  /** Paso 5 · lo que el dinero debería darle primero (narrativa de valor). */
+  dineroPrimero?: string; // 5.2
+  /** Paso 5 · la frase con la que más conecta. */
+  conectaFrase?: string; // 5.3
 
   // Comportamiento
   discipline?: number;

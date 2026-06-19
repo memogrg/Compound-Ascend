@@ -47,7 +47,23 @@ const ARCHETYPES: Archetype[] = [
 ];
 
 /** Emoción dominante best-effort. La Fase 3 la reemplazará por respuesta directa. */
+/** Mapa de la respuesta directa del Paso 3 a la emoción dominante. */
+const EMOTION_ANSWER: Record<string, DominantEmotion> = {
+  tranquilidad: "tranquilidad",
+  motivacion: "motivacion",
+  confusion: "confusion",
+  presion: "presion",
+  culpa: "culpa",
+  miedo: "miedo",
+  frustracion: "frustracion",
+  evito: "evasion",
+};
+
 function inferDominantEmotion(d: ProfileDraft, concerns: string[]): DominantEmotion {
+  // Respuesta directa (Paso 3): si el usuario la dio, SUSTITUYE toda inferencia.
+  if (d.dominantEmotionAnswer && EMOTION_ANSWER[d.dominantEmotionAnswer]) {
+    return EMOTION_ANSWER[d.dominantEmotionAnswer]!;
+  }
   if (d.urgency === "critica" || d.urgency === "alta") return "presion";
   if (concerns.includes("fin_de_mes") || concerns.includes("deudas")) return "presion";
   if (d.reviewHabit === "nunca" || d.reviewHabit === "problemas") return "evasion";
@@ -331,6 +347,114 @@ export function computeArchetype(d: ProfileDraft): ArchetypeResult {
     case "realmente_bien":
       add("constructor", 1);
       add("protector", 1);
+      break;
+  }
+
+  // ── Pasos 3 y 5 · problema único y narrativa de valor (Fase 3b) ──
+  switch (d.singleProblem) {
+    case "salir_deuda":
+      add("liberador", 2);
+      break;
+    case "construir_fondo":
+      add("protector", 2);
+      break;
+    case "empezar_invertir":
+      add("constructor", 2);
+      break;
+    case "proteger_familia":
+      add("guardian", 2);
+      break;
+    case "ordenar_gastos":
+      add("organizador", 1);
+      break;
+    case "crear_presupuesto":
+      add("organizador", 1);
+      break;
+    case "ahorrar_algo":
+      add("protector", 1);
+      break;
+    case "entender":
+      add("clarificador", 1);
+      break;
+    case "dejar_estres":
+      add("navegante", 1);
+      add("clarificador", 1);
+      break;
+  }
+  switch (d.dineroPrimero) {
+    case "seguridad_familia":
+      add("guardian", 2);
+      break;
+    case "crecimiento":
+      add("constructor", 2);
+      break;
+    case "experiencias":
+      add("creador", 2);
+      break;
+    case "menos_deudas":
+      add("liberador", 2);
+      break;
+    case "tranquilidad":
+      add("protector", 1);
+      break;
+    case "libertad":
+      add("constructor", 1);
+      break;
+    case "control":
+      add("estratega", 1);
+      break;
+    case "opciones":
+      add("constructor", 1);
+      break;
+    case "menos_estres":
+      add("navegante", 1);
+      add("clarificador", 1);
+      break;
+  }
+  switch (d.conectaFrase) {
+    case "disfrutar_sin_desorden":
+      add("disfrutador", 2);
+      break;
+    case "dinero_trabaje":
+      add("constructor", 2);
+      break;
+    case "proteger":
+      add("guardian", 2);
+      break;
+    case "dormir_tranquilo":
+      add("protector", 1);
+      break;
+    case "no_voy_tarde":
+      add("creador", 1);
+      break;
+    case "mas_opciones":
+      add("constructor", 1);
+      break;
+    case "por_fin_control":
+      add("estratega", 1);
+      add("organizador", 1);
+      break;
+    case "avanzar_simple":
+      add("organizador", 1);
+      add("navegante", 1);
+      break;
+  }
+  // Nudge leve por la emoción directa.
+  switch (d.dominantEmotionAnswer) {
+    case "culpa":
+      add("disfrutador", 1);
+      break;
+    case "miedo":
+      add("protector", 1);
+      break;
+    case "presion":
+      add("navegante", 1);
+      break;
+    case "confusion":
+      add("clarificador", 1);
+      break;
+    case "evito":
+      add("clarificador", 1);
       break;
   }
 

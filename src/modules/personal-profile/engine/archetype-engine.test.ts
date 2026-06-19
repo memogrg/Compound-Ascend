@@ -61,6 +61,24 @@ describe("computeArchetype", () => {
     expect(computeArchetype({}).moneyScript).toBeNull();
   });
 
+  it("dominantEmotionAnswer='culpa' override la inferencia → 'culpa'", () => {
+    // Sin la respuesta directa, esta etapa daría "motivacion"; la respuesta gana.
+    const r = computeArchetype({ lifeStage: "hacer_crecer", dominantEmotionAnswer: "culpa" });
+    expect(r.dominantEmotion).toBe("culpa");
+  });
+
+  it("dominantEmotionAnswer='evito' → emoción 'evasion'", () => {
+    expect(computeArchetype({ dominantEmotionAnswer: "evito" }).dominantEmotion).toBe("evasion");
+  });
+
+  it("dineroPrimero='experiencias' empuja creador", () => {
+    expect(computeArchetype({ dineroPrimero: "experiencias" }).primary).toBe("creador");
+  });
+
+  it("conectaFrase='dinero_trabaje' empuja constructor", () => {
+    expect(computeArchetype({ conectaFrase: "dinero_trabaje" }).primary).toBe("constructor");
+  });
+
   it("secundario solo si está a ≤2 pts del primario y > 0", () => {
     // proteger_familia: guardian+3, protector+1 → guardian 3, protector 1 (dif 2) → secundario protector.
     const r = computeArchetype({ lifeStage: "proteger_familia" });
