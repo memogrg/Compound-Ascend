@@ -43,17 +43,39 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Sin base: contexto mínimo.
   }
 
-  // Perfil: preocupación principal y etapa de vida.
+  // Perfil: preocupación principal, etapa de vida y arquetipo conductual (Fase 2).
   try {
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const supabase = await createSupabaseServerClient();
     const { data: pp } = await supabase
       .from("personal_profiles")
-      .select("main_concern,life_stage")
+      .select("main_concern,life_stage,archetype_primary,archetype_secondary,dominant_emotion,ai_tone_recommended")
       .eq("user_id", user.id)
       .maybeSingle();
     if (pp?.main_concern) ctx.topConcern = String(pp.main_concern).replaceAll("_", " ");
     if (pp?.life_stage) ctx.lifeStage = String(pp.life_stage).replaceAll("_", " ");
+    if (pp?.archetype_primary) {
+      const { ARCHETYPE_PLAYBOOKS } = await import("@/lib/ai/advisor-knowledge");
+      const primary = pp.archetype_primary as keyof typeof ARCHETYPE_PLAYBOOKS;
+      const play = ARCHETYPE_PLAYBOOKS[primary];
+      if (play) {
+        ctx.archetypePrimary = primary;
+        ctx.archetypeLabel = play.label;
+        ctx.archetypeGuidance = play.guidance;
+        ctx.initialFocus = play.initialFocus;
+        // Preferir el tono persistido en el perfil; si no, el del playbook.
+        ctx.recommendedTone = pp.ai_tone_recommended ?? play.recommendedTone;
+      }
+      if (pp.archetype_secondary) {
+        const secondary = pp.archetype_secondary as keyof typeof ARCHETYPE_PLAYBOOKS;
+        const play2 = ARCHETYPE_PLAYBOOKS[secondary];
+        if (play2) {
+          ctx.archetypeSecondary = secondary;
+          ctx.archetypeLabel2 = play2.label;
+        }
+      }
+    }
+    if (pp?.dominant_emotion) ctx.dominantEmotion = pp.dominant_emotion;
   } catch {
     // Perfil no disponible.
   }

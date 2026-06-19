@@ -12,6 +12,7 @@ import { requireUser } from "@/lib/auth/session";
 import type { HouseholdRole } from "@/lib/supabase/database.types";
 import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { computeCompletion, computeRiskClass } from "@/modules/personal-profile/engine/diagnosis";
+import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
 
 export type HouseholdContext = { role: HouseholdRole | null; isInvitedMember: boolean };
 
@@ -75,13 +76,25 @@ export async function saveDraft(draft: ProfileDraft): Promise<void> {
  */
 export async function completeProfile(
   draft: ProfileDraft,
-): Promise<Pick<ProfileDiagnosis, "completion" | "riskClass">> {
+): Promise<
+  Pick<
+    ProfileDiagnosis,
+    | "completion"
+    | "riskClass"
+    | "archetypePrimary"
+    | "archetypeSecondary"
+    | "dominantEmotion"
+    | "recommendedTone"
+    | "initialFocus"
+  >
+> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const completion = computeCompletion(draft);
   const riskClass = computeRiskClass(draft);
+  const arche = computeArchetype(draft);
 
-  // 1) personal_profiles (columnas normalizadas + extra).
+  // 1) personal_profiles (columnas normalizadas + arquetipo + extra).
   await supabase.from("personal_profiles").upsert(
     {
       user_id: user.id,
@@ -95,6 +108,10 @@ export async function completeProfile(
       urgency: draft.urgency ?? null,
       main_concern: draft.mainConcerns?.[0] ?? draft.mainConcern ?? null,
       marital_status: draft.maritalStatus ?? null,
+      archetype_primary: arche.primary,
+      archetype_secondary: arche.secondary,
+      dominant_emotion: arche.dominantEmotion,
+      ai_tone_recommended: arche.recommendedTone,
       extra: { draft, richLifeVision: draft.richLifeVision ?? null },
     },
     { onConflict: "user_id" },
@@ -194,5 +211,13 @@ export async function completeProfile(
     await supabase.auth.updateUser({ data: { display_name: draft.displayName } });
   }
 
-  return { completion, riskClass };
+  return {
+    completion,
+    riskClass,
+    archetypePrimary: arche.primary,
+    archetypeSecondary: arche.secondary,
+    dominantEmotion: arche.dominantEmotion,
+    recommendedTone: arche.recommendedTone,
+    initialFocus: arche.initialFocus,
+  };
 }

@@ -50,6 +50,15 @@ export type FinancialContext = {
   financialNucleus?: string;
   /** 'si' | 'no' | 'construyendo' | 'no_se' (del borrador del wizard). */
   hasEmergencyFund?: string;
+  // Arquetipo conductual (Fase 2). Best-effort: si el perfil no se completó, no aparecen.
+  archetypePrimary?: string;
+  archetypeSecondary?: string;
+  dominantEmotion?: string;
+  recommendedTone?: string;
+  initialFocus?: string;
+  archetypeLabel?: string;
+  archetypeLabel2?: string;
+  archetypeGuidance?: string;
   /** Entidades a las que una transacción propuesta puede vincularse. */
   linkables?: {
     debt: { id: string; name: string }[];
@@ -117,6 +126,12 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.hasEmergencyFund) facts.push(`Fondo de emergencia: ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`);
   if (ctx.richLifePhrase) facts.push(`Su vida rica en una frase: "${ctx.richLifePhrase}".`);
   if (ctx.richLifeVision) facts.push(`Su visión de vida rica: "${ctx.richLifeVision}".`);
+  if (ctx.archetypeLabel) {
+    facts.push(
+      `Arquetipo: ${ctx.archetypeLabel}${ctx.archetypeLabel2 ? ` (secundario: ${ctx.archetypeLabel2})` : ""}.`,
+    );
+  }
+  if (ctx.dominantEmotion) facts.push(`Emoción dominante: ${ctx.dominantEmotion}.`);
 
   // Vinculables: la IA puede proponer la transacción ya conectada a su entidad.
   const linkFacts: string[] = [];
@@ -142,6 +157,17 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "idoneidad. Toda recomendación incluye por qué, próximo paso y posible riesgo.";
 
   const behaviorRules: string[] = [];
+
+  // Arquetipo primero: marca el tono y el foco de toda la conversación.
+  if (ctx.archetypeLabel) {
+    if (ctx.archetypeGuidance) behaviorRules.push(`Arquetipo ${ctx.archetypeLabel}: ${ctx.archetypeGuidance}`);
+    if (ctx.initialFocus) behaviorRules.push(`Foco inicial sugerido: ${ctx.initialFocus}.`);
+    if (ctx.recommendedTone)
+      behaviorRules.push(
+        `Tono recomendado por su arquetipo: ${ctx.recommendedTone}. Si choca con el tono que pidió el usuario, prioriza su preferencia pero modula con criterio.`,
+      );
+  }
+
   const tone: Record<string, string> = {
     directo: "Tono: franco y sin rodeos, ve al punto.",
     suave: "Tono: cálido y motivador, refuerza lo positivo.",

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt";
+import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
 
 const PERSONA_HINT = "asesor financiero conductual, no un chatbot";
 
@@ -54,6 +55,33 @@ describe("buildSystemPrompt · perfil conductual", () => {
     // Con fondo de emergencia ('si') NO debe disparar la regla aunque haya urgencia.
     const withFund = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "si", urgency: "critica" });
     expect(withFund).not.toContain("construir el fondo de emergencia antes que cualquier inversión de riesgo");
+  });
+
+  it("arquetipo en el ctx produce su etiqueta (Bloque A) y su guía + foco (Bloque B)", () => {
+    const pb = ARCHETYPE_PLAYBOOKS.liberador;
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      archetypePrimary: "liberador",
+      archetypeLabel: pb.label,
+      archetypeGuidance: pb.guidance,
+      initialFocus: pb.initialFocus,
+      recommendedTone: pb.recommendedTone,
+      dominantEmotion: "presion",
+    });
+    // Bloque A: etiqueta y emoción.
+    expect(prompt).toContain(`Arquetipo: ${pb.label}.`);
+    expect(prompt).toContain("Emoción dominante: presion.");
+    // Bloque B: guía, foco y tono recomendado.
+    expect(prompt).toContain(`Arquetipo ${pb.label}: ${pb.guidance}`);
+    expect(prompt).toContain(`Foco inicial sugerido: ${pb.initialFocus}.`);
+    expect(prompt).toContain(`Tono recomendado por su arquetipo: ${pb.recommendedTone}`);
+  });
+
+  it("sin arquetipo no rompe ni inyecta reglas de arquetipo", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toContain("COMO HABLARLE A ESTE USUARIO:");
+    expect(prompt).not.toContain("Foco inicial sugerido:");
+    expect(prompt).not.toContain("Arquetipo:");
   });
 
   it("vuelca el perfil de riesgo y los campos de Rich Life como hechos", () => {
