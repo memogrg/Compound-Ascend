@@ -88,6 +88,40 @@ export type ProfileDraft = {
   richLifePhrase?: string;
 };
 
+/** Arquetipo conductual del usuario (nombre POSITIVO, nunca etiqueta negativa). */
+export type Archetype =
+  | "organizador"
+  | "navegante"
+  | "liberador"
+  | "disfrutador"
+  | "clarificador"
+  | "protector"
+  | "estratega"
+  | "creador"
+  | "guardian"
+  | "constructor";
+
+export type DominantEmotion =
+  | "tranquilidad"
+  | "motivacion"
+  | "confusion"
+  | "presion"
+  | "culpa"
+  | "miedo"
+  | "frustracion"
+  | "evasion";
+
+export type ArchetypeResult = {
+  primary: Archetype;
+  secondary: Archetype | null;
+  dominantEmotion: DominantEmotion;
+  /** Descriptor corto del tono recomendado (del playbook). */
+  recommendedTone: string;
+  /** Foco inicial sugerido (del playbook). */
+  initialFocus: string;
+  scores: Record<Archetype, number>;
+};
+
 export type ProfileDiagnosis = {
   riskClass: RiskClass;
   stageSummary: string;
@@ -97,4 +131,10 @@ export type ProfileDiagnosis = {
   suggestedPath: string[];
   /** % de completitud del perfil (0-100). */
   completion: number;
+  // Arquetipo conductual (Fase 2), opcionales.
+  archetypePrimary?: Archetype;
+  archetypeSecondary?: Archetype | null;
+  dominantEmotion?: DominantEmotion;
+  recommendedTone?: string;
+  initialFocus?: string;
 };

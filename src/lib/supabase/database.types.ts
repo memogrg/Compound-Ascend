@@ -102,6 +102,10 @@ export type PersonalProfileRow = Timestamps & {
   satisfaction: number | null;
   urgency: string | null;
   main_concern: string | null;
+  archetype_primary: string | null;
+  archetype_secondary: string | null;
+  dominant_emotion: string | null;
+  ai_tone_recommended: string | null;
   extra: Json;
 };
 
