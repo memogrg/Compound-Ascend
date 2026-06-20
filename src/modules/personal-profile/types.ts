@@ -176,4 +176,8 @@ export type ProfileDiagnosis = {
   recommendedTone?: string;
   initialFocus?: string;
   moneyScript?: MoneyScript;
+  // Pantalla de cierre (Fase 3d): etiquetas y significado en positivo.
+  archetypeLabel?: string;
+  archetypeLabel2?: string;
+  archetypeMeaning?: string;
 };
