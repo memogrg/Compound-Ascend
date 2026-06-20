@@ -81,6 +81,9 @@ export type ProfileDraft = {
   knowledgeLevel?: KnowledgeLevel;
   topicsKnown?: string[];
   topicsToLearn?: string[];
+  /** Paso 7 · personalización (Fase 3c). */
+  explainStyle?: string; // 7.2
+  decisionComfort?: string; // 7.4
 
   // Riesgo
   lossReaction?: string;
@@ -92,15 +95,24 @@ export type ProfileDraft = {
   // Protección
   hasEmergencyFund?: "si" | "no" | "construyendo" | "no_se";
   insurances?: string[];
+  /** Paso 9 · personalización (Fase 3c). */
+  incomeStopCoverage?: string; // 9.2
+  protectionPerceived?: string; // 9.4
 
   // Acompañamiento
   coachingTone?: string;
   coachingFrequency?: string;
   alertIntensity?: string;
+  /** Paso 10 · personalización (Fase 3c). */
+  alertStyle?: string; // 10.2
+  interventionStyle?: string; // 10.5
 
   // Rich Life
   richLifeVision?: string;
   richLifePhrase?: string;
+  /** Paso 11 · personalización (Fase 3c). */
+  futureImage?: string; // 11.3
+  desiredFeeling?: string[]; // 11.4 (máx 3)
 };
 
 /** Arquetipo conductual del usuario (nombre POSITIVO, nunca etiqueta negativa). */

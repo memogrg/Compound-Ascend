@@ -56,6 +56,9 @@ export const profileDraftSchema = z.object({
   knowledgeLevel: z.enum(["basico", "intermedio", "avanzado", "experto"]).optional(),
   topicsKnown: z.array(z.string().max(60)).max(30).optional(),
   topicsToLearn: z.array(z.string().max(60)).max(30).optional(),
+  // Paso 7 · personalización (Fase 3c).
+  explainStyle: z.string().max(40).optional(),
+  decisionComfort: z.string().max(40).optional(),
 
   lossReaction: z.string().max(40).optional(),
   riskPreference: z.enum(["seguridad", "equilibrio", "crecimiento"]).optional(),
@@ -65,13 +68,22 @@ export const profileDraftSchema = z.object({
 
   hasEmergencyFund: z.enum(["si", "no", "construyendo", "no_se"]).optional(),
   insurances: z.array(z.string().max(40)).max(20).optional(),
+  // Paso 9 · personalización (Fase 3c).
+  incomeStopCoverage: z.string().max(40).optional(),
+  protectionPerceived: z.string().max(40).optional(),
 
   coachingTone: z.string().max(40).optional(),
   coachingFrequency: z.string().max(40).optional(),
   alertIntensity: z.string().max(40).optional(),
+  // Paso 10 · personalización (Fase 3c).
+  alertStyle: z.string().max(40).optional(),
+  interventionStyle: z.string().max(40).optional(),
 
   richLifeVision: z.string().max(2000).optional(),
   richLifePhrase: z.string().max(60).optional(),
+  // Paso 11 · personalización (Fase 3c).
+  futureImage: z.string().max(40).optional(),
+  desiredFeeling: z.array(z.string().max(40)).max(3).optional(),
 });
 
 export type ProfileDraftInput = z.infer<typeof profileDraftSchema>;
