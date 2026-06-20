@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -607,13 +607,10 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
   const step = STEPS[index]!;
   const completion = computeCompletion(draft);
 
-  // Microcelebración transitoria al avanzar (no en "Atrás" ni en el último paso).
+  // Microcelebración: frase del paso recién completado. Se muestra como un check
+  // sutil junto a "Continuar" (tooltip al hover/clic) y persiste todo el paso; se
+  // reemplaza solo al avanzar al siguiente.
   const [celebration, setCelebration] = useState<string | null>(null);
-  useEffect(() => {
-    if (!celebration) return;
-    const t = setTimeout(() => setCelebration(null), 2600);
-    return () => clearTimeout(t);
-  }, [celebration]);
 
   const goNext = async () => {
     // Guardado progresivo best-effort al avanzar.
@@ -703,29 +700,6 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
         </div>
 
         <div className="wiz-canvas">
-          {celebration ? (
-            <div
-              role="status"
-              aria-live="polite"
-              style={{
-                alignSelf: "center",
-                marginBottom: 14,
-                padding: "8px 14px",
-                borderRadius: 999,
-                background: "var(--pos-soft)",
-                color: "var(--pos)",
-                fontSize: 12.5,
-                fontWeight: 500,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                animation: "fadeUp 240ms ease",
-              }}
-            >
-              <Icon name="check" width={2.4} />
-              {celebration}
-            </div>
-          ) : null}
           <section className="step-frame" key={step.id}>
             <div className="step-eyebrow">{step.eyebrow}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -758,10 +732,15 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
               />
             ))}
           </div>
-          <button className="btn btn-primary" onClick={goNext} disabled={finishing}>
-            {finishing ? "Generando tu perfil…" : index === total - 1 ? "Finalizar" : "Continuar"}
-            <Icon name="chev" width={2.2} />
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {celebration ? (
+              <HelpTip icon="check" tone="pos" text={celebration} label="Paso completado" />
+            ) : null}
+            <button className="btn btn-primary" onClick={goNext} disabled={finishing}>
+              {finishing ? "Generando tu perfil…" : index === total - 1 ? "Finalizar" : "Continuar"}
+              <Icon name="chev" width={2.2} />
+            </button>
+          </div>
         </div>
       </main>
     </div>
