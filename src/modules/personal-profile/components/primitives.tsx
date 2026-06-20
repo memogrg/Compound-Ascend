@@ -1,12 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon, type IconName } from "@/components/ui/icon";
 import type { Option } from "@/modules/personal-profile/constants";
 import { cn } from "@/lib/utils";
 
-/** Burbuja de ayuda accesible (?) que explica para qué sirve un paso/campo. */
-export function HelpTip({ text, label = "Más información" }: { text: string; label?: string }) {
+/**
+ * Burbuja accesible con tooltip (hover + clic + foco). Por defecto muestra "?"
+ * (ayuda); con `icon` muestra ese ícono del design system, y con `tone="pos"` lo
+ * colorea en verde (p. ej. el check de "paso completado"). Misma mecánica de
+ * tooltip y a11y en ambos casos.
+ */
+export function HelpTip({
+  text,
+  label = "Más información",
+  icon,
+  tone,
+}: {
+  text: string;
+  label?: string;
+  icon?: IconName;
+  tone?: "pos";
+}) {
   const [open, setOpen] = useState(false);
   return (
     <span className="help-tip" onMouseLeave={() => setOpen(false)}>
@@ -18,8 +33,9 @@ export function HelpTip({ text, label = "Más información" }: { text: string; l
         onClick={() => setOpen((o) => !o)}
         onMouseEnter={() => setOpen(true)}
         onBlur={() => setOpen(false)}
+        style={tone === "pos" ? { color: "var(--pos)", borderColor: "var(--pos)" } : undefined}
       >
-        ?
+        {icon ? <Icon name={icon} width={2.4} /> : "?"}
       </button>
       {open ? (
         <span className="help-pop" role="tooltip">
