@@ -61,6 +61,8 @@ export type FinancialContext = {
   archetypeGuidance?: string;
   /** Money script (Fase 3a): evitacion|vigilancia|estatus|seguridad|crecimiento|suficiencia. */
   moneyScript?: string;
+  /** Lo que el usuario más quiere de su dinero (Paso 5 · narrativa de valor). */
+  dominantValue?: string;
   /** Entidades a las que una transacción propuesta puede vincularse. */
   linkables?: {
     debt: { id: string; name: string }[];
@@ -135,6 +137,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   }
   if (ctx.dominantEmotion) facts.push(`Emoción dominante: ${ctx.dominantEmotion}.`);
   if (ctx.moneyScript) facts.push(`Creencia dominante sobre el dinero: ${ctx.moneyScript}.`);
+  if (ctx.dominantValue) facts.push(`Lo que más quiere de su dinero: ${ctx.dominantValue}.`);
 
   // Vinculables: la IA puede proponer la transacción ya conectada a su entidad.
   const linkFacts: string[] = [];
