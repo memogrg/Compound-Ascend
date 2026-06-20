@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -25,6 +25,8 @@ type Step = {
   sub: string;
   /** Explicación del paso (para el tooltip de ayuda "?"). */
   help: string;
+  /** Microcelebración mostrada al avanzar DESDE este paso (UI transitoria). */
+  celebration?: string;
   render: (d: ProfileDraft, set: Update) => React.ReactNode;
 };
 
@@ -41,6 +43,7 @@ const STEPS: Step[] = [
     titleHTML: 'Cuéntanos un poco de <span class="it">ti</span>',
     sub: "Esto nos ayuda a adaptar cada recomendación a tu realidad. Puedes dejar en blanco lo que no sepas todavía.",
     help: "Estos datos básicos personalizan todo. Tu país y moneda definen el contexto; la moneda principal es la que verás en tus dashboards (puedes registrar datos en cualquier moneda y la app los convierte). Saber con quién gestionas tus finanzas y cuántas personas dependen de ti ajusta tus metas y tu protección.",
+    celebration: "Listo, ya hablamos tu idioma financiero.",
     render: (d, set) => (
       <div className="field-row">
         <div className="field-row two">
@@ -121,6 +124,7 @@ const STEPS: Step[] = [
     titleHTML: '¿Cuál describe mejor tu <span class="it">situación</span>?',
     sub: "No hay respuesta correcta. Esto define tu punto de partida para no recomendarte el cohete antes que el oxígeno.",
     help: "Tu etapa financiera define el punto de partida. No te diremos que inviertas si primero necesitas estabilidad: priorizamos las recomendaciones según dónde estás hoy.",
+    celebration: "Perfecto. Ya sabemos desde dónde arrancar sin saltarnos etapas.",
     render: (d, set) => (
       <div className="field-row">
         <OptionCards
@@ -161,6 +165,7 @@ const STEPS: Step[] = [
     titleHTML: '¿Qué te <span class="it">preocupa</span> más hoy?',
     sub: "Elige lo que más te quita tranquilidad (hasta 5). Lo tendremos presente en cada recomendación.",
     help: "Tus preocupaciones enfocan el plan. Puedes elegir varias (hasta 5): mientras más contexto, mejor entiende la IA qué te quita tranquilidad y qué atacar primero.",
+    celebration: "Bien. Ahora tu plan sabe qué te está quitando tranquilidad.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -200,6 +205,7 @@ const STEPS: Step[] = [
     titleHTML: '¿Qué quieres <span class="it">lograr</span> con tu dinero?',
     sub: "Selecciona los que apliquen. El dinero no se gestiona en abstracto: se gestiona para lograr algo.",
     help: "Tus objetivos guían las metas de ahorro e inversión y la ruta que te sugerimos. Puedes elegir varios; luego les pondremos montos y fechas.",
+    celebration: "Excelente. El dinero ya tiene dirección.",
     render: (d, set) => (
       <Chips
         options={O.GOALS}
@@ -215,6 +221,7 @@ const STEPS: Step[] = [
     titleHTML: 'Tus <span class="it">prioridades</span> en esta etapa',
     sub: "Elige hasta 5. Dos personas con el mismo ingreso pueden querer vidas muy distintas.",
     help: "Tus prioridades equilibran los consejos entre disfrutar hoy y asegurar el futuro. Es lo que hace que el plan se sienta tuyo y no genérico.",
+    celebration: "Esto hará que el plan se sienta tuyo, no genérico.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -251,6 +258,7 @@ const STEPS: Step[] = [
     titleHTML: 'Cómo te <span class="it">comportas</span> con el dinero',
     sub: "Esto ajusta el tono: hay quien necesita estructura, quien necesita motivación y quien necesita alertas.",
     help: "Tu relación con el dinero ajusta cómo te acompañamos: quién necesita estructura, quién motivación y quién alertas. Así el asesor te habla de la forma que mejor te funciona.",
+    celebration: "Muy bien. Ya estamos entendiendo tu patrón financiero real.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -338,6 +346,7 @@ const STEPS: Step[] = [
     titleHTML: '¿Cuánto sabes de <span class="it">finanzas</span>?',
     sub: "Para no hablarte ni como profesor universitario ni como TikTok financiero con corbata.",
     help: "Tu nivel de conocimiento ajusta cómo te explicamos las cosas: ni demasiado técnico ni demasiado básico. Y nos dice qué temas reforzar contigo.",
+    celebration: "Perfecto. Te explicaremos las cosas en el nivel correcto.",
     render: (d, set) => (
       <div className="field-row">
         <OptionCards
@@ -379,6 +388,7 @@ const STEPS: Step[] = [
     titleHTML: 'Tu perfil de <span class="it">riesgo</span>',
     sub: "Clave para futuras recomendaciones de inversión, ahorro y protección.",
     help: "Tu tolerancia al riesgo define qué inversiones y estrategias te recomendamos, acordes a lo que puedes sostener emocional y financieramente. De aquí sale tu perfil de riesgo.",
+    celebration: "Listo. Tu estrategia debe respetar tus números y tu tranquilidad.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -430,6 +440,7 @@ const STEPS: Step[] = [
     titleHTML: 'Tu <span class="it">protección</span> actual',
     sub: "Una persona puede ganar bien y aun así estar financieramente expuesta. Veamos cómo estás.",
     help: "Aquí medimos qué tan blindado estás ante imprevistos (fondo de emergencia y seguros). Ganar bien no es lo mismo que estar protegido: esto detecta tus brechas.",
+    celebration: "Bien. Ya vemos qué tan blindada está tu base financiera.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -479,6 +490,7 @@ const STEPS: Step[] = [
     titleHTML: '¿Cómo quieres que te <span class="it">acompañemos</span>?',
     sub: "Esto le da personalidad a tu asesor: desde coach amable hasta directo y exigente.",
     help: "Define la personalidad de tu asesor y cómo te avisa: desde coach amable hasta directo y exigente, con qué frecuencia te da recomendaciones y qué tan intensas quieres las alertas.",
+    celebration: "Tu asesor ya sabe cómo acompañarte.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -533,6 +545,7 @@ const STEPS: Step[] = [
     titleHTML: 'Tu <span class="it">Rich Life</span>',
     sub: "Conectemos el dinero con la vida que quieres. Cada recomendación se conectará con tu porqué.",
     help: "Conectamos el dinero con la vida que quieres. Cada recomendación se ligará a tu 'porqué' para que el plan tenga sentido para ti, no solo números.",
+    celebration: "Listo. Tu mapa financiero inicial está tomando forma.",
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
@@ -594,10 +607,19 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
   const step = STEPS[index]!;
   const completion = computeCompletion(draft);
 
+  // Microcelebración transitoria al avanzar (no en "Atrás" ni en el último paso).
+  const [celebration, setCelebration] = useState<string | null>(null);
+  useEffect(() => {
+    if (!celebration) return;
+    const t = setTimeout(() => setCelebration(null), 2600);
+    return () => clearTimeout(t);
+  }, [celebration]);
+
   const goNext = async () => {
     // Guardado progresivo best-effort al avanzar.
     void saveDraftAction(draft);
     if (index < total - 1) {
+      setCelebration(step.celebration ?? null);
       setIndex((i) => i + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
@@ -681,6 +703,29 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
         </div>
 
         <div className="wiz-canvas">
+          {celebration ? (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                alignSelf: "center",
+                marginBottom: 14,
+                padding: "8px 14px",
+                borderRadius: 999,
+                background: "var(--pos-soft)",
+                color: "var(--pos)",
+                fontSize: 12.5,
+                fontWeight: 500,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                animation: "fadeUp 240ms ease",
+              }}
+            >
+              <Icon name="check" width={2.4} />
+              {celebration}
+            </div>
+          ) : null}
           <section className="step-frame" key={step.id}>
             <div className="step-eyebrow">{step.eyebrow}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
