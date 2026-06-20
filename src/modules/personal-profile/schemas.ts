@@ -28,11 +28,17 @@ export const profileDraftSchema = z.object({
   urgency: z.enum(["baja", "media", "alta", "critica"]).optional(),
   mainConcern: z.string().max(60).optional(),
   mainConcerns: z.array(z.string().max(60)).max(5).optional(),
+  // Paso 3 · emoción directa y problema único (Fase 3b).
+  dominantEmotionAnswer: z.string().max(40).optional(),
+  singleProblem: z.string().max(40).optional(),
 
   goals: z.array(z.string().max(60)).max(20).optional(),
   goalDetails: z.array(goalDraftSchema).max(20).optional(),
   priorities: z.array(z.string().max(60)).max(10).optional(),
   willingToSacrifice: z.array(z.string().max(60)).max(20).optional(),
+  // Paso 5 · narrativa de valor (Fase 3b).
+  dineroPrimero: z.string().max(40).optional(),
+  conectaFrase: z.string().max(40).optional(),
 
   discipline: scale.optional(),
   impulsivity: scale.optional(),

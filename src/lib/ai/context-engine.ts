@@ -252,6 +252,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
             dependentsCount?: unknown;
             financialNucleus?: unknown;
             hasEmergencyFund?: unknown;
+            dineroPrimero?: unknown;
           };
         }
       ).draft;
@@ -263,6 +264,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
         if (typeof draft.dependentsCount === "number") ctx.dependentsCount = draft.dependentsCount;
         if (typeof draft.financialNucleus === "string") ctx.financialNucleus = draft.financialNucleus;
         if (typeof draft.hasEmergencyFund === "string") ctx.hasEmergencyFund = draft.hasEmergencyFund;
+        if (typeof draft.dineroPrimero === "string")
+          ctx.dominantValue = draft.dineroPrimero.replaceAll("_", " ");
       }
     } catch {
       // Borrador no disponible.

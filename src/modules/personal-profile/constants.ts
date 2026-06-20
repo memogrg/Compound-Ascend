@@ -288,3 +288,51 @@ export const MONEY_SCRIPT_PHRASES: Option[] = [
   { value: "familia_depende", label: "Mi familia depende de que yo tome buenas decisiones." },
   { value: "realmente_bien", label: "No quiero parecer exitoso; quiero estar realmente bien." },
 ];
+
+// ── Pasos 3 y 5 · Emoción directa y narrativa de valor (Fase 3b) ──
+
+export const DOMINANT_EMOTIONS: Option[] = [
+  { value: "tranquilidad", label: "Tranquilidad" },
+  { value: "motivacion", label: "Motivación" },
+  { value: "confusion", label: "Confusión" },
+  { value: "presion", label: "Presión" },
+  { value: "culpa", label: "Culpa" },
+  { value: "miedo", label: "Miedo" },
+  { value: "frustracion", label: "Frustración" },
+  { value: "evito", label: "Evito pensarlo" },
+];
+
+export const SINGLE_PROBLEMS: Option[] = [
+  { value: "ordenar_gastos", label: "Ordenar mis gastos." },
+  { value: "crear_presupuesto", label: "Crear un presupuesto." },
+  { value: "salir_deuda", label: "Salir de una deuda." },
+  { value: "ahorrar_algo", label: "Ahorrar algo, aunque sea poco." },
+  { value: "construir_fondo", label: "Construir mi fondo de emergencia." },
+  { value: "empezar_invertir", label: "Empezar a invertir." },
+  { value: "proteger_familia", label: "Proteger a mi familia." },
+  { value: "entender", label: "Entender mi situación real." },
+  { value: "dejar_estres", label: "Dejar de sentir estrés financiero." },
+];
+
+export const DINERO_PRIMERO: Option[] = [
+  { value: "tranquilidad", label: "Tranquilidad." },
+  { value: "libertad", label: "Libertad." },
+  { value: "seguridad_familia", label: "Seguridad para mi familia." },
+  { value: "crecimiento", label: "Crecimiento patrimonial." },
+  { value: "experiencias", label: "Más experiencias." },
+  { value: "menos_deudas", label: "Menos deudas." },
+  { value: "control", label: "Más control." },
+  { value: "opciones", label: "Más opciones." },
+  { value: "menos_estres", label: "Menos estrés." },
+];
+
+export const CONECTA_FRASES: Option[] = [
+  { value: "dormir_tranquilo", label: "Quiero dormir tranquilo." },
+  { value: "no_voy_tarde", label: "Quiero dejar de sentir que voy tarde." },
+  { value: "disfrutar_sin_desorden", label: "Quiero disfrutar más sin desordenarme." },
+  { value: "dinero_trabaje", label: "Quiero que mi dinero trabaje por mí." },
+  { value: "proteger", label: "Quiero proteger a quienes amo." },
+  { value: "mas_opciones", label: "Quiero construir una vida con más opciones." },
+  { value: "por_fin_control", label: "Quiero sentir que por fin tengo control." },
+  { value: "avanzar_simple", label: "Quiero avanzar sin complicarme tanto." },
+];

@@ -162,15 +162,35 @@ const STEPS: Step[] = [
     sub: "Elige lo que más te quita tranquilidad (hasta 5). Lo tendremos presente en cada recomendación.",
     help: "Tus preocupaciones enfocan el plan. Puedes elegir varias (hasta 5): mientras más contexto, mejor entiende la IA qué te quita tranquilidad y qué atacar primero.",
     render: (d, set) => (
-      <Chips
-        options={O.CONCERNS}
-        values={d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : [])}
-        onToggle={(v) => {
-          const next = toggle(d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : []), v);
-          set({ mainConcerns: next, mainConcern: next[0] });
-        }}
-        max={5}
-      />
+      <div className="field-row">
+        <div className="fld">
+          <Chips
+            options={O.CONCERNS}
+            values={d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : [])}
+            onToggle={(v) => {
+              const next = toggle(d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : []), v);
+              set({ mainConcerns: next, mainConcern: next[0] });
+            }}
+            max={5}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Cuando piensas en tus finanzas hoy, lo que más sientes es…</label>
+          <OptionCards
+            options={O.DOMINANT_EMOTIONS}
+            value={d.dominantEmotionAnswer}
+            onChange={(v) => set({ dominantEmotionAnswer: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Si resolvieras una sola cosa este mes, ¿cuál sería?</label>
+          <OptionCards
+            options={O.SINGLE_PROBLEMS}
+            value={d.singleProblem}
+            onChange={(v) => set({ singleProblem: v })}
+          />
+        </div>
+      </div>
     ),
   },
   {
@@ -196,12 +216,32 @@ const STEPS: Step[] = [
     sub: "Elige hasta 5. Dos personas con el mismo ingreso pueden querer vidas muy distintas.",
     help: "Tus prioridades equilibran los consejos entre disfrutar hoy y asegurar el futuro. Es lo que hace que el plan se sienta tuyo y no genérico.",
     render: (d, set) => (
-      <Chips
-        options={O.PRIORITIES}
-        values={d.priorities ?? []}
-        onToggle={(v) => set({ priorities: toggle(d.priorities, v) })}
-        max={5}
-      />
+      <div className="field-row">
+        <div className="fld">
+          <Chips
+            options={O.PRIORITIES}
+            values={d.priorities ?? []}
+            onToggle={(v) => set({ priorities: toggle(d.priorities, v) })}
+            max={5}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Si tu dinero tuviera que darte una cosa primero, sería…</label>
+          <OptionCards
+            options={O.DINERO_PRIMERO}
+            value={d.dineroPrimero}
+            onChange={(v) => set({ dineroPrimero: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">¿Con cuál frase conectas más?</label>
+          <OptionCards
+            options={O.CONECTA_FRASES}
+            value={d.conectaFrase}
+            onChange={(v) => set({ conectaFrase: v })}
+          />
+        </div>
+      </div>
     ),
   },
   {

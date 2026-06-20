@@ -87,6 +87,15 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(sinScript).not.toContain("Creencia dominante sobre el dinero:");
   });
 
+  it("dominantValue produce su hecho en el Bloque A; sin él no rompe", () => {
+    const conValor = buildSystemPrompt({ currency: "CRC", dominantValue: "seguridad para mi familia" });
+    expect(conValor).toContain("Lo que más quiere de su dinero: seguridad para mi familia.");
+
+    const sinValor = buildSystemPrompt({ currency: "CRC" });
+    expect(sinValor).toContain("PERFIL DEL USUARIO:");
+    expect(sinValor).not.toContain("Lo que más quiere de su dinero:");
+  });
+
   it("sin arquetipo no rompe ni inyecta reglas de arquetipo", () => {
     const prompt = buildSystemPrompt({ currency: "CRC" });
     expect(prompt).toContain("COMO HABLARLE A ESTE USUARIO:");
