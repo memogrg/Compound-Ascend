@@ -253,6 +253,13 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
             financialNucleus?: unknown;
             hasEmergencyFund?: unknown;
             dineroPrimero?: unknown;
+            explainStyle?: unknown;
+            decisionComfort?: unknown;
+            incomeStopCoverage?: unknown;
+            protectionPerceived?: unknown;
+            interventionStyle?: unknown;
+            futureImage?: unknown;
+            desiredFeeling?: unknown;
           };
         }
       ).draft;
@@ -266,6 +273,21 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
         if (typeof draft.hasEmergencyFund === "string") ctx.hasEmergencyFund = draft.hasEmergencyFund;
         if (typeof draft.dineroPrimero === "string")
           ctx.dominantValue = draft.dineroPrimero.replaceAll("_", " ");
+        // Personalización (Fase 3c).
+        if (typeof draft.explainStyle === "string") ctx.explainStyle = draft.explainStyle;
+        if (typeof draft.decisionComfort === "string")
+          ctx.decisionComfort = draft.decisionComfort.replaceAll("_", " ");
+        if (typeof draft.incomeStopCoverage === "string")
+          ctx.monthsCoverage = draft.incomeStopCoverage.replaceAll("_", " ");
+        if (typeof draft.protectionPerceived === "string")
+          ctx.protectionPerceived = draft.protectionPerceived.replaceAll("_", " ");
+        if (typeof draft.interventionStyle === "string") ctx.interventionStyle = draft.interventionStyle;
+        if (typeof draft.futureImage === "string")
+          ctx.futureImage = draft.futureImage.replaceAll("_", " ");
+        if (Array.isArray(draft.desiredFeeling)) {
+          const feelings = draft.desiredFeeling.filter((x): x is string => typeof x === "string");
+          if (feelings.length) ctx.desiredFeelings = feelings;
+        }
       }
     } catch {
       // Borrador no disponible.

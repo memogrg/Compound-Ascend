@@ -353,6 +353,22 @@ const STEPS: Step[] = [
             onToggle={(v) => set({ topicsToLearn: toggle(d.topicsToLearn, v) })}
           />
         </div>
+        <div className="fld">
+          <label className="fld-label">Cuando la app te explique algo, prefieres…</label>
+          <OptionCards
+            options={O.EXPLAIN_STYLES}
+            value={d.explainStyle}
+            onChange={(v) => set({ explainStyle: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">¿Qué tan cómodo te sientes tomando decisiones financieras?</label>
+          <OptionCards
+            options={O.DECISION_COMFORT}
+            value={d.decisionComfort}
+            onChange={(v) => set({ decisionComfort: v })}
+          />
+        </div>
       </div>
     ),
   },
@@ -437,6 +453,22 @@ const STEPS: Step[] = [
             onToggle={(v) => set({ insurances: toggle(d.insurances, v) })}
           />
         </div>
+        <div className="fld">
+          <label className="fld-label">Si mañana tu ingreso principal se detiene, ¿cuánto cubrirías?</label>
+          <OptionCards
+            options={O.INCOME_STOP_COVERAGE}
+            value={d.incomeStopCoverage}
+            onChange={(v) => set({ incomeStopCoverage: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">¿Qué tan protegido sientes tu futuro financiero?</label>
+          <OptionCards
+            options={O.PROTECTION_PERCEIVED}
+            value={d.protectionPerceived}
+            onChange={(v) => set({ protectionPerceived: v })}
+          />
+        </div>
       </div>
     ),
   },
@@ -475,6 +507,22 @@ const STEPS: Step[] = [
             cols={2}
           />
         </div>
+        <div className="fld">
+          <label className="fld-label">Cuando la app detecte algo importante, prefieres que…</label>
+          <OptionCards
+            options={O.ALERT_STYLES}
+            value={d.alertStyle}
+            onChange={(v) => set({ alertStyle: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Cuando estás por desviarte de una meta, ¿qué te ayuda más?</label>
+          <OptionCards
+            options={O.INTERVENTION_STYLES}
+            value={d.interventionStyle}
+            onChange={(v) => set({ interventionStyle: v })}
+          />
+        </div>
       </div>
     ),
   },
@@ -506,6 +554,23 @@ const STEPS: Step[] = [
             onChange={(e) => set({ richLifeVision: e.target.value })}
             placeholder="Sin deudas, con tiempo para mi familia, viajando una vez al año…"
             style={{ resize: "vertical", fontFamily: "inherit" }}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">Elige una imagen mental de tu futuro financiero</label>
+          <OptionCards
+            options={O.FUTURE_IMAGES}
+            value={d.futureImage}
+            onChange={(v) => set({ futureImage: v })}
+          />
+        </div>
+        <div className="fld">
+          <label className="fld-label">¿Qué quieres sentir cuando uses esta app? (máx. 3)</label>
+          <Chips
+            options={O.DESIRED_FEELINGS}
+            values={d.desiredFeeling ?? []}
+            onToggle={(v) => set({ desiredFeeling: toggle(d.desiredFeeling, v) })}
+            max={3}
           />
         </div>
       </div>

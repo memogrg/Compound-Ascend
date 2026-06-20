@@ -96,6 +96,25 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(sinValor).not.toContain("Lo que más quiere de su dinero:");
   });
 
+  it("personalización: explainStyle y exposición producen sus reglas; sin ellos no rompe", () => {
+    const conPerso = buildSystemPrompt({
+      currency: "CRC",
+      explainStyle: "muy_simple",
+      monthsCoverage: "menos 1 mes",
+      futureImage: "familia protegida",
+      desiredFeelings: ["claridad", "tranquilidad"],
+    });
+    expect(conPerso).toContain("Explicación: explica paso a paso, sin jerga.");
+    expect(conPerso).toContain("Muy expuesto ante una pérdida de ingreso");
+    expect(conPerso).toContain("Imagen de su futuro: familia protegida.");
+    expect(conPerso).toContain("Quiere sentir al usar la app: claridad, tranquilidad.");
+
+    const sinPerso = buildSystemPrompt({ currency: "CRC" });
+    expect(sinPerso).toContain("COMO HABLARLE A ESTE USUARIO:");
+    expect(sinPerso).not.toContain("Explicación:");
+    expect(sinPerso).not.toContain("Muy expuesto ante una pérdida de ingreso");
+  });
+
   it("sin arquetipo no rompe ni inyecta reglas de arquetipo", () => {
     const prompt = buildSystemPrompt({ currency: "CRC" });
     expect(prompt).toContain("COMO HABLARLE A ESTE USUARIO:");

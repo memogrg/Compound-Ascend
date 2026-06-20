@@ -336,3 +336,83 @@ export const CONECTA_FRASES: Option[] = [
   { value: "por_fin_control", label: "Quiero sentir que por fin tengo control." },
   { value: "avanzar_simple", label: "Quiero avanzar sin complicarme tanto." },
 ];
+
+// ── Pasos 7/9/10/11 · Personalización (Fase 3c) ──
+
+export const EXPLAIN_STYLES: Option[] = [
+  { value: "muy_simple", label: "Muy simple, paso a paso." },
+  { value: "ejemplos", label: "Con ejemplos cotidianos." },
+  { value: "numeros", label: "Con números y escenarios." },
+  { value: "tecnico", label: "Con explicación técnica." },
+  { value: "directo", label: "Directo al punto." },
+  { value: "resumen_detalle", label: "Primero resumen y luego detalle si quiero profundizar." },
+];
+
+export const DECISION_COMFORT: Option[] = [
+  { value: "perdido", label: "Me siento perdido." },
+  { value: "cuesta", label: "Me cuesta bastante." },
+  { value: "algunas", label: "Algunas decisiones sí, otras no." },
+  { value: "comodo", label: "Me siento bastante cómodo." },
+  { value: "seguro", label: "Me siento seguro tomando decisiones." },
+];
+
+export const INCOME_STOP_COVERAGE: Option[] = [
+  { value: "menos_1_mes", label: "Menos de 1 mes." },
+  { value: "1_2_meses", label: "1 a 2 meses." },
+  { value: "3_5_meses", label: "3 a 5 meses." },
+  { value: "6_12_meses", label: "6 a 12 meses." },
+  { value: "mas_12_meses", label: "Más de 12 meses." },
+  { value: "no_se", label: "No lo sé." },
+];
+
+export const PROTECTION_PERCEIVED: Option[] = [
+  { value: "muy_expuesto", label: "Muy expuesto." },
+  { value: "algo_expuesto", label: "Algo expuesto." },
+  { value: "mas_o_menos", label: "Más o menos protegido." },
+  { value: "bastante", label: "Bastante protegido." },
+  { value: "muy_protegido", label: "Muy protegido." },
+];
+
+export const ALERT_STYLES: Option[] = [
+  { value: "suavidad", label: "Que me avise con suavidad." },
+  { value: "directo", label: "Que me lo diga claro y directo." },
+  { value: "numeros", label: "Que me explique el impacto en números." },
+  { value: "opciones", label: "Que me dé opciones para decidir." },
+  { value: "que_hacer", label: "Que me diga qué hacer primero." },
+  { value: "meta", label: "Que me lo conecte con mi meta principal." },
+  { value: "solo_importante", label: "Que solo me avise si es realmente importante." },
+];
+
+export const INTERVENTION_STYLES: Option[] = [
+  { value: "recordatorio", label: "Un recordatorio amable." },
+  { value: "impacto_futuro", label: "Ver el impacto futuro." },
+  { value: "alerta_antes", label: "Una alerta antes de gastar." },
+  { value: "alternativa", label: "Una alternativa más barata." },
+  { value: "reto", label: "Un reto pequeño para corregir." },
+  { value: "directo", label: "Un mensaje directo." },
+  { value: "porque", label: "Que me recuerden mi porqué." },
+];
+
+export const FUTURE_IMAGES: Option[] = [
+  { value: "casa_estabilidad", label: "Casa y estabilidad." },
+  { value: "viajes", label: "Viajes y experiencias." },
+  { value: "familia_protegida", label: "Familia protegida." },
+  { value: "libertad_tiempo", label: "Libertad de tiempo." },
+  { value: "patrimonio", label: "Patrimonio creciendo." },
+  { value: "retiro", label: "Retiro tranquilo." },
+  { value: "negocio", label: "Negocio propio." },
+  { value: "vida_simple", label: "Vida simple y sin estrés." },
+  { value: "ingresos_pasivos", label: "Ingresos pasivos." },
+  { value: "opciones", label: "Opciones y flexibilidad." },
+];
+
+export const DESIRED_FEELINGS: Option[] = [
+  { value: "claridad", label: "Claridad." },
+  { value: "tranquilidad", label: "Tranquilidad." },
+  { value: "motivacion", label: "Motivación." },
+  { value: "control", label: "Control." },
+  { value: "seguridad", label: "Seguridad." },
+  { value: "progreso", label: "Progreso." },
+  { value: "libertad", label: "Libertad." },
+  { value: "confianza", label: "Confianza." },
+];

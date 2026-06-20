@@ -63,6 +63,14 @@ export type FinancialContext = {
   moneyScript?: string;
   /** Lo que el usuario más quiere de su dinero (Paso 5 · narrativa de valor). */
   dominantValue?: string;
+  // Personalización (Fase 3c).
+  explainStyle?: string;
+  monthsCoverage?: string;
+  protectionPerceived?: string;
+  decisionComfort?: string;
+  interventionStyle?: string;
+  futureImage?: string;
+  desiredFeelings?: string[];
   /** Entidades a las que una transacción propuesta puede vincularse. */
   linkables?: {
     debt: { id: string; name: string }[];
@@ -138,6 +146,12 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.dominantEmotion) facts.push(`Emoción dominante: ${ctx.dominantEmotion}.`);
   if (ctx.moneyScript) facts.push(`Creencia dominante sobre el dinero: ${ctx.moneyScript}.`);
   if (ctx.dominantValue) facts.push(`Lo que más quiere de su dinero: ${ctx.dominantValue}.`);
+  if (ctx.monthsCoverage) facts.push(`Cobertura si pierde su ingreso: ${ctx.monthsCoverage}.`);
+  if (ctx.protectionPerceived) facts.push(`Protección percibida: ${ctx.protectionPerceived}.`);
+  if (ctx.decisionComfort) facts.push(`Comodidad al decidir: ${ctx.decisionComfort}.`);
+  if (ctx.futureImage) facts.push(`Imagen de su futuro: ${ctx.futureImage}.`);
+  if (ctx.desiredFeelings?.length)
+    facts.push(`Quiere sentir al usar la app: ${ctx.desiredFeelings.join(", ")}.`);
 
   // Vinculables: la IA puede proponer la transacción ya conectada a su entidad.
   const linkFacts: string[] = [];
@@ -185,6 +199,34 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   };
   if (ctx.moneyScript && moneyScriptRule[ctx.moneyScript])
     behaviorRules.push(moneyScriptRule[ctx.moneyScript]!);
+
+  // Personalización (Fase 3c): cómo explicar e intervenir, y exposición ante pérdida.
+  const explainRule: Record<string, string> = {
+    muy_simple: "Explicación: explica paso a paso, sin jerga.",
+    ejemplos: "Explicación: usa ejemplos/analogías cotidianas.",
+    numeros: "Explicación: apóyate en cifras y escenarios.",
+    tecnico: "Explicación: puedes ser técnico y preciso.",
+    directo: "Explicación: ve directo al punto.",
+    resumen_detalle: "Explicación: da primero un resumen y ofrece profundizar.",
+  };
+  if (ctx.explainStyle && explainRule[ctx.explainStyle]) behaviorRules.push(explainRule[ctx.explainStyle]!);
+
+  const interventionRule: Record<string, string> = {
+    recordatorio: "Si se desvía de una meta: un recordatorio amable.",
+    impacto_futuro: "Si se desvía de una meta: muéstrale el impacto futuro.",
+    alerta_antes: "Si se desvía de una meta: avísale antes de gastar.",
+    alternativa: "Si se desvía de una meta: ofrece una alternativa más barata.",
+    reto: "Si se desvía de una meta: propón un reto pequeño.",
+    directo: "Si se desvía de una meta: un mensaje directo.",
+    porque: "Si se desvía de una meta: recuérdale su porqué.",
+  };
+  if (ctx.interventionStyle && interventionRule[ctx.interventionStyle])
+    behaviorRules.push(interventionRule[ctx.interventionStyle]!);
+
+  if (ctx.monthsCoverage === "menos 1 mes" || ctx.monthsCoverage === "1 2 meses")
+    behaviorRules.push(
+      "Muy expuesto ante una pérdida de ingreso: prioriza liquidez y fondo de emergencia antes que riesgo.",
+    );
 
   const tone: Record<string, string> = {
     directo: "Tono: franco y sin rodeos, ve al punto.",
