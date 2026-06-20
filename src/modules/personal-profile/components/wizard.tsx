@@ -617,7 +617,13 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
   };
 
   if (diagnosis) {
-    return <ProfileSummary diagnosis={diagnosis} onContinue={() => router.push("/dashboard")} />;
+    return (
+      <ProfileSummary
+        diagnosis={diagnosis}
+        onContinue={() => router.push("/dashboard")}
+        onEdit={() => setDiagnosis(null)}
+      />
+    );
   }
 
   if (!started) {

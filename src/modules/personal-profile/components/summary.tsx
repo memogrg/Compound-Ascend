@@ -16,9 +16,12 @@ const RISK_LABEL: Record<string, string> = {
 export function ProfileSummary({
   diagnosis,
   onContinue,
+  onEdit,
 }: {
   diagnosis: ProfileDiagnosis;
   onContinue: () => void;
+  /** Si se pasa, muestra "Editar mis respuestas" (vuelve al wizard). */
+  onEdit?: () => void;
 }) {
   return (
     <div className="wiz-canvas" style={{ minHeight: "100vh", justifyContent: "center" }}>
@@ -37,6 +40,34 @@ export function ProfileSummary({
         <h1 className="step-title">
           Tu perfil financiero <span className="it">inicial</span>
         </h1>
+
+        {diagnosis.archetypeLabel ? (
+          <div className="card card-pad" style={{ marginTop: 8 }}>
+            <div className="step-eyebrow">Tu mapa financiero inicial</div>
+            <div className="card-title" style={{ fontSize: 20, marginTop: 6 }}>
+              {diagnosis.archetypeLabel2 ? (
+                <>
+                  Tu perfil combina <span className="it">{diagnosis.archetypeLabel}</span> +{" "}
+                  <span className="it">{diagnosis.archetypeLabel2}</span>
+                </>
+              ) : (
+                <>
+                  Tu perfil es <span className="it">{diagnosis.archetypeLabel}</span>
+                </>
+              )}
+            </div>
+            {diagnosis.archetypeMeaning ? (
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+                {diagnosis.archetypeMeaning}
+              </p>
+            ) : null}
+            {diagnosis.initialFocus ? (
+              <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+                Tu plan empezará por {diagnosis.initialFocus}.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="card card-pad" style={{ marginTop: 8 }}>
           <div className="row" style={{ gap: 18, flexWrap: "wrap" }}>
@@ -121,6 +152,15 @@ export function ProfileSummary({
           Construir mi Base Financiera
           <Icon name="chev" width={2.2} />
         </button>
+        {onEdit ? (
+          <button
+            className="btn btn-ghost"
+            style={{ marginTop: 10, width: "100%", justifyContent: "center" }}
+            onClick={onEdit}
+          >
+            Editar mis respuestas
+          </button>
+        ) : null}
       </section>
     </div>
   );

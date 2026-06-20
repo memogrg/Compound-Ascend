@@ -4,6 +4,8 @@
  * Usable en cliente y servidor.
  */
 import type { ProfileDraft, ProfileDiagnosis, RiskClass } from "@/modules/personal-profile/types";
+import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
+import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
 
 const STAGE_LABEL: Record<string, string> = {
   ordenar: "ordenamiento y construcción de estabilidad",
@@ -121,12 +123,29 @@ export function buildDiagnosis(d: ProfileDraft): ProfileDiagnosis {
     "Avanzar hacia la libertad financiera",
   ];
 
+  // Arquetipo (Fase 3d): mismo cálculo puro que persiste completeProfile (inocuo
+  // duplicarlo, es determinista). Se expone para la pantalla de cierre.
+  const arche = computeArchetype(d);
+  const play = ARCHETYPE_PLAYBOOKS[arche.primary];
+
   return {
     riskClass,
     stageSummary,
     narrative,
     suggestedPath,
     completion: computeCompletion(d),
+    archetypePrimary: arche.primary,
+    archetypeLabel: play.label,
+    archetypeMeaning: play.userSummary,
+    initialFocus: arche.initialFocus,
+    dominantEmotion: arche.dominantEmotion,
+    moneyScript: arche.moneyScript ?? undefined,
+    ...(arche.secondary
+      ? {
+          archetypeSecondary: arche.secondary,
+          archetypeLabel2: ARCHETYPE_PLAYBOOKS[arche.secondary].label,
+        }
+      : {}),
   };
 }
 
