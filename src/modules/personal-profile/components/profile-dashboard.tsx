@@ -2,7 +2,21 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import * as O from "@/modules/personal-profile/constants";
 import type { Option } from "@/modules/personal-profile/constants";
-import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
+import type { Archetype, ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
+import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
+import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
+
+/** Etiquetas en español de la emoción dominante (para el motor financiero). */
+const EMOTION_LABEL: Record<string, string> = {
+  tranquilidad: "Tranquilidad",
+  motivacion: "Motivación",
+  confusion: "Confusión",
+  presion: "Presión",
+  culpa: "Culpa",
+  miedo: "Miedo",
+  frustracion: "Frustración",
+  evasion: "Evitar el tema",
+};
 
 const URGENCY: Record<string, string> = {
   baja: "Baja",
@@ -68,6 +82,21 @@ export function ProfileDashboard({
   if (typeof draft.discipline === "number") knows.push(`Tu disciplina es ${draft.discipline}/10.`);
   if (typeof draft.impulsivity === "number")
     knows.push(`Tu impulsividad es ${draft.impulsivity}/10.`);
+
+  // Mapa de arquetipos (B2a): top 3 por peso relativo del scoring.
+  const arche = computeArchetype(draft);
+  const totalScore = Object.values(arche.scores).reduce((a, b) => a + b, 0);
+  const bars = Object.entries(arche.scores)
+    .filter(([, s]) => s > 0)
+    .map(([a, s]) => ({ label: ARCHETYPE_PLAYBOOKS[a as Archetype].label, pct: Math.round((s / totalScore) * 100) }))
+    .sort((x, y) => y.pct - x.pct)
+    .slice(0, 3);
+
+  // Motor financiero (B2a): manifiesto en 2ª persona + mini-stats (solo lo que exista).
+  const dominantValue = pick(O.DINERO_PRIMERO, draft.dineroPrimero);
+  const topPriority = pick(O.PRIORITIES, draft.priorities?.[0]);
+  const topConcern = pick(O.CONCERNS, draft.mainConcerns?.[0] ?? draft.mainConcern);
+  const emotion = EMOTION_LABEL[arche.dominantEmotion];
 
   return (
     <div className="grid">
@@ -250,6 +279,55 @@ export function ProfileDashboard({
             ) : null}
           </Card>
         </>
+      ) : null}
+
+      {/* Mapa de arquetipos (B2a) */}
+      {bars.length > 0 ? (
+        <Card title="Tu mapa de arquetipos">
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {bars.map((b, i) => (
+              <div key={i}>
+                <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>
+                    {b.label}
+                  </span>
+                  <span className="tnum" style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+                    {b.pct}%
+                  </span>
+                </div>
+                <div className="bar-track" style={{ height: 10 }}>
+                  <div
+                    className="bar-fill"
+                    style={{ width: `${b.pct}%`, background: "var(--pos)" }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 14, lineHeight: 1.5 }}>
+            Tu perfil no es una etiqueta fija: es una lectura que evoluciona con tus hábitos, metas
+            y datos.
+          </p>
+        </Card>
+      ) : null}
+
+      {/* Tu motor financiero (B2a) */}
+      {dominantValue || topPriority || topConcern || emotion ? (
+        <Card title="Tu motor financiero">
+          {dominantValue || topPriority || topConcern ? (
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+              {dominantValue ? `Para ti, el dinero busca ${lc(dominantValue)}. ` : ""}
+              {topPriority ? `Tu prioridad dominante es ${lc(topPriority)}. ` : ""}
+              {topConcern ? `Hoy te ocupa ${lc(topConcern)}.` : ""}
+            </p>
+          ) : null}
+          <div className="cols-2" style={{ gap: "14px 28px", marginTop: 14 }}>
+            {dominantValue ? <Info label="Lo que más quieres" value={dominantValue} /> : null}
+            {topPriority ? <Info label="Prioridad dominante" value={topPriority} /> : null}
+            {topConcern ? <Info label="Preocupación activa" value={topConcern} /> : null}
+            {emotion ? <Info label="Motivador emocional" value={emotion} /> : null}
+          </div>
+        </Card>
       ) : null}
 
       {/* Identidad */}
