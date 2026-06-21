@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { RISK_DISPLAY } from "@/modules/personal-profile/constants";
+import { generateProfileMaticesAction } from "@/modules/personal-profile/api/actions";
 import type { ProfileDiagnosis } from "@/modules/personal-profile/types";
 
 /** Diagnóstico final del onboarding — mensaje de salida v2 (lectura conductual). */
@@ -20,6 +22,27 @@ export function ProfileSummary({
   onViewProfile?: () => void;
 }) {
   const r = diagnosis.reading;
+
+  // Matices de la IA (Fase A2): se piden tras montar, sin bloquear el cierre.
+  const [matices, setMatices] = useState<string | null>(null);
+  const [loadingMatices, setLoadingMatices] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    generateProfileMaticesAction()
+      .then((res) => {
+        if (alive) setMatices(res.matices);
+      })
+      .catch(() => {
+        if (alive) setMatices(null);
+      })
+      .finally(() => {
+        if (alive) setLoadingMatices(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const buttons = (
     <>
@@ -82,6 +105,23 @@ export function ProfileSummary({
                 {r.interpretation}
               </p>
             </div>
+
+            {/* Una nota para ti (matices IA) — no se renderiza si la IA no responde */}
+            {loadingMatices ? (
+              <div className="card card-pad" style={{ marginTop: 14 }}>
+                <div className="card-title">Una nota para ti</div>
+                <p className="muted" style={{ fontSize: 13.5, marginTop: 10, lineHeight: 1.6 }}>
+                  Afinando tu lectura personalizada…
+                </p>
+              </div>
+            ) : matices ? (
+              <div className="card card-pad" style={{ marginTop: 14 }}>
+                <div className="card-title">Una nota para ti</div>
+                <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+                  {matices}
+                </p>
+              </div>
+            ) : null}
 
             {/* Scorecard */}
             <div className="card card-pad" style={{ marginTop: 14 }}>
