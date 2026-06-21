@@ -24,6 +24,10 @@ function pick(options: Option[], value?: string): string | null {
 function pickMany(options: Option[], values?: string[]): string[] {
   return (values ?? []).map((v) => options.find((o) => o.value === v)?.label ?? v);
 }
+/** Minúscula inicial para hilar etiquetas dentro de una frase ("Buscas comprar casa."). */
+function lc(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
 
 /**
  * Dashboard de resultados del perfil financiero: muestra todo lo capturado en
@@ -49,40 +53,204 @@ export function ProfileDashboard({
   const insurances = pickMany(O.INSURANCES, draft.insurances);
   const topics = pickMany(O.TOPICS, draft.topicsToLearn);
 
+  // Lectura espejo (B1): si el perfil ya trae la lectura, el tab la lidera.
+  const r = diagnosis.reading;
+  const riskDisplay = O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass;
+
+  // "Lo que Ascend AI sabe de ti": líneas en 2ª persona derivadas del perfil.
+  const goalLabel = goals[0] ?? pick(O.DINERO_PRIMERO, draft.dineroPrimero) ?? undefined;
+  const knowledgeLabel = pick(O.KNOWLEDGE_LEVELS, draft.knowledgeLevel) ?? undefined;
+  const knows: string[] = [];
+  if (goalLabel) knows.push(`Buscas ${lc(goalLabel)}.`);
+  knows.push(`Tu tolerancia al riesgo es ${riskDisplay}.`);
+  if (knowledgeLabel) knows.push(`Tu conocimiento financiero es ${lc(knowledgeLabel)}.`);
+  if (concerns[0]) knows.push(`Te preocupa ${lc(concerns[0])}.`);
+  if (typeof draft.discipline === "number") knows.push(`Tu disciplina es ${draft.discipline}/10.`);
+  if (typeof draft.impulsivity === "number")
+    knows.push(`Tu impulsividad es ${draft.impulsivity}/10.`);
+
   return (
     <div className="grid">
-      {/* Hero: completitud + riesgo + editar */}
-      <section className="dash-hero">
-        <div
-          className="card card-pad"
-          style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}
-        >
-          <Ring value={completion} />
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div className="label">Perfil de riesgo</div>
-            <div className="num-xl" style={{ fontSize: 30, marginTop: 4 }}>
-              {O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass}
+      {/* Hero v2: lidera con el arquetipo (lectura espejo); fallback al hero clásico */}
+      {r ? (
+        <section className="dash-hero">
+          <div className="card card-pad">
+            <div className="label">Tu perfil</div>
+            <div className="card-title" style={{ fontSize: 22, marginTop: 4 }}>
+              Tu perfil es {diagnosis.archetypeLabel}
+              {diagnosis.archetypeLabel2 ? ` con rasgos de ${diagnosis.archetypeLabel2}` : ""}
             </div>
-            <div className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
-              {readOnly
-                ? "Perfil del hogar (solo lectura). Lo configuró quien creó el hogar."
-                : `Perfil completado al ${completion}%. Cuanto más completo, mejores tus recomendaciones.`}
-            </div>
+            <p
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                lineHeight: 1.5,
+                color: "var(--ink)",
+                marginTop: 10,
+              }}
+            >
+              {r.heroLine}
+            </p>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 8 }}>
+              {r.interpretation}
+            </p>
             {readOnly ? null : (
               <Link className="btn btn-primary" href="/bienvenida" style={{ marginTop: 14 }}>
                 <Icon name="edit" width={2} /> Editar mi perfil
               </Link>
             )}
           </div>
-        </div>
 
-        <div className="card card-pad">
-          <div className="card-title">Tu lectura</div>
-          <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
-            {diagnosis.narrative}
-          </p>
-        </div>
-      </section>
+          <div
+            className="card card-pad"
+            style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}
+          >
+            <Ring value={completion} />
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div className="label">Perfil de riesgo</div>
+              <div className="num-xl" style={{ fontSize: 24, marginTop: 4 }}>
+                {riskDisplay}
+              </div>
+              <div className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+                {r.riskReading}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="dash-hero">
+          <div
+            className="card card-pad"
+            style={{ display: "flex", alignItems: "center", gap: 22, flexWrap: "wrap" }}
+          >
+            <Ring value={completion} />
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div className="label">Perfil de riesgo</div>
+              <div className="num-xl" style={{ fontSize: 30, marginTop: 4 }}>
+                {riskDisplay}
+              </div>
+              <div className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+                {readOnly
+                  ? "Perfil del hogar (solo lectura). Lo configuró quien creó el hogar."
+                  : `Perfil completado al ${completion}%. Cuanto más completo, mejores tus recomendaciones.`}
+              </div>
+              {readOnly ? null : (
+                <Link className="btn btn-primary" href="/bienvenida" style={{ marginTop: 14 }}>
+                  <Icon name="edit" width={2} /> Editar mi perfil
+                </Link>
+              )}
+            </div>
+          </div>
+
+          <div className="card card-pad">
+            <div className="card-title">Tu lectura</div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+              {diagnosis.narrative}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Lectura espejo (B1): identidad-frase, números, significado, superpoder, riesgo, IA */}
+      {r ? (
+        <>
+          {r.moneyScriptReading ? (
+            <Card title="Tu relación con el dinero, en una frase">
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+                {r.moneyScriptReading}
+              </p>
+            </Card>
+          ) : null}
+
+          <Card title="Tu lectura en números">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                gap: 10,
+              }}
+            >
+              {r.scorecard.map((s, i) => (
+                <div
+                  key={i}
+                  style={{
+                    border: "1px solid var(--line)",
+                    borderRadius: 12,
+                    padding: "10px 12px",
+                    background: "var(--surface-2, var(--chip))",
+                  }}
+                >
+                  <div className="label" style={{ fontSize: 11.5 }}>
+                    {s.label}
+                  </div>
+                  <div className="num-xl" style={{ fontSize: 18, marginTop: 2 }}>
+                    {s.value}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11.5, marginTop: 3, lineHeight: 1.4 }}>
+                    {s.reading}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="Lo que esto dice de ti">
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>{r.whatThisSays}</p>
+          </Card>
+
+          <section className="cols-2">
+            <Card title={r.superpower.title}>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+                {r.superpower.body}
+              </p>
+            </Card>
+            <Card title={r.hiddenRisk.title}>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+                {r.hiddenRisk.body}
+              </p>
+            </Card>
+          </section>
+
+          <Card title="Cómo te acompaña Ascend AI">
+            <p style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
+              Tono <strong>{r.companionship.tone}</strong>.
+            </p>
+            <div className="label" style={{ fontSize: 11.5, marginTop: 12, marginBottom: 6 }}>
+              Priorizará
+            </div>
+            <ChipList items={r.companionship.priorities} />
+            <p className="muted" style={{ fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
+              Evitará: {r.companionship.avoids.join(", ")}.
+            </p>
+            {knows.length > 0 ? (
+              <div style={{ marginTop: 16 }}>
+                <div className="label" style={{ fontSize: 11.5, marginBottom: 6 }}>
+                  Lo que Ascend AI sabe de ti
+                </div>
+                <ul
+                  style={{
+                    margin: 0,
+                    paddingLeft: 0,
+                    listStyle: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  {knows.map((k, i) => (
+                    <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <Icon name="check" width={2} />
+                      <span style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+                        {k}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </Card>
+        </>
+      ) : null}
 
       {/* Identidad */}
       <Card title="Identidad" editHint={!readOnly}>
