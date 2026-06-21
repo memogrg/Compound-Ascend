@@ -160,6 +160,21 @@ export type ArchetypeResult = {
   scores: Record<Archetype, number>;
 };
 
+/** Una métrica del scorecard del cierre (valor + lectura corta). */
+export type ScoreItem = { label: string; value: string; reading: string };
+
+/** Lectura conductual del cierre del onboarding (determinista, 2ª persona). */
+export type ProfileReading = {
+  interpretation: string;
+  riskDisplay: string;
+  riskReading: string;
+  scorecard: ScoreItem[];
+  strengths: string[];
+  opportunities: string[];
+  companionship: { tone: string; priorities: string[]; avoids: string[] };
+  route: { step: string; why: string }[];
+};
+
 export type ProfileDiagnosis = {
   riskClass: RiskClass;
   stageSummary: string;
@@ -180,4 +195,6 @@ export type ProfileDiagnosis = {
   archetypeLabel?: string;
   archetypeLabel2?: string;
   archetypeMeaning?: string;
+  /** Lectura conductual completa del cierre (Fase A1). */
+  reading?: ProfileReading;
 };

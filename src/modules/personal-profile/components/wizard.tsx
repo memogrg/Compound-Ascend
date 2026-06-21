@@ -640,6 +640,7 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
       <ProfileSummary
         diagnosis={diagnosis}
         onContinue={() => router.push("/dashboard")}
+        onViewProfile={() => router.push("/mi-perfil-financiero")}
         onEdit={() => setDiagnosis(null)}
       />
     );

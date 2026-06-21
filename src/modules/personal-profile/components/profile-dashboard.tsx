@@ -2,15 +2,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
 import * as O from "@/modules/personal-profile/constants";
 import type { Option } from "@/modules/personal-profile/constants";
-import type { ProfileDraft, ProfileDiagnosis, RiskClass } from "@/modules/personal-profile/types";
-
-const RISK_LABEL: Record<RiskClass, string> = {
-  conservador: "Conservador",
-  moderado: "Moderado",
-  balanceado: "Balanceado",
-  crecimiento: "Crecimiento",
-  agresivo: "Agresivo",
-};
+import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 
 const URGENCY: Record<string, string> = {
   baja: "Baja",
@@ -69,7 +61,7 @@ export function ProfileDashboard({
           <div style={{ flex: 1, minWidth: 200 }}>
             <div className="label">Perfil de riesgo</div>
             <div className="num-xl" style={{ fontSize: 30, marginTop: 4 }}>
-              {RISK_LABEL[diagnosis.riskClass] ?? diagnosis.riskClass}
+              {O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass}
             </div>
             <div className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
               {readOnly
@@ -207,7 +199,7 @@ export function ProfileDashboard({
       <section className="cols-2">
         <Card title="Perfil de riesgo">
           <div className="num-xl" style={{ fontSize: 24, marginBottom: 10 }}>
-            {RISK_LABEL[diagnosis.riskClass] ?? diagnosis.riskClass}
+            {O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass}
           </div>
           <Info
             label="Ante una caída del 15%"

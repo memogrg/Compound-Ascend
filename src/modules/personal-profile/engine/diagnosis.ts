@@ -5,7 +5,9 @@
  */
 import type { ProfileDraft, ProfileDiagnosis, RiskClass } from "@/modules/personal-profile/types";
 import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
+import { buildProfileReading } from "@/modules/personal-profile/engine/profile-reading";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
+import { RISK_DISPLAY } from "@/modules/personal-profile/constants";
 
 const STAGE_LABEL: Record<string, string> = {
   ordenar: "ordenamiento y construcción de estabilidad",
@@ -87,21 +89,10 @@ export function computeCompletion(d: ProfileDraft): number {
   return Math.round((filled / total) * 100);
 }
 
-function riskWord(r: RiskClass): string {
-  return {
-    conservador: "conservadora",
-    moderado: "moderada",
-    balanceado: "balanceada",
-    crecimiento: "orientada al crecimiento",
-    agresivo: "agresiva",
-  }[r];
-}
-
-/** Construye el diagnóstico inicial al estilo de la Biblia. */
+/** Construye el diagnóstico inicial al estilo de la Biblia (segunda persona). */
 export function buildDiagnosis(d: ProfileDraft): ProfileDiagnosis {
   const riskClass = computeRiskClass(d);
   const stageSummary = STAGE_LABEL[d.lifeStage ?? "ordenar"] ?? "ordenamiento";
-  const name = d.displayName?.trim() || "tu perfil";
 
   const priorityText =
     d.priorities && d.priorities.length > 0
@@ -110,7 +101,7 @@ export function buildDiagnosis(d: ProfileDraft): ProfileDiagnosis {
 
   const narrative =
     `Actualmente estás en una etapa de ${stageSummary}. ${priorityText}, ` +
-    `mientras avanzas hacia tus objetivos. ${capitalize(name)} muestra una tolerancia al riesgo ${riskWord(riskClass)}. ` +
+    `mientras avanzas hacia tus objetivos. Muestras una tolerancia al riesgo ${RISK_DISPLAY[riskClass].toLowerCase()}. ` +
     `Te acompañaremos con recomendaciones claras, seguimiento mensual y alertas preventivas para tomar mejores decisiones.`;
 
   const suggestedPath = [
@@ -146,9 +137,6 @@ export function buildDiagnosis(d: ProfileDraft): ProfileDiagnosis {
           archetypeLabel2: ARCHETYPE_PLAYBOOKS[arche.secondary].label,
         }
       : {}),
+    reading: buildProfileReading(d),
   };
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
