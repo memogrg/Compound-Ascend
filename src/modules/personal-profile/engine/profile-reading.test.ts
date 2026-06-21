@@ -35,4 +35,31 @@ describe("buildProfileReading", () => {
     expect(r.route.length).toBe(7);
     expect(r.companionship.avoids).toContain("regaños");
   });
+
+  // ── Lectura espejo (Cierre v3) ──
+  it("siempre produce un heroLine no vacío", () => {
+    expect(buildProfileReading({}).heroLine.length).toBeGreaterThan(0);
+  });
+
+  it("disciplina 10 → superpoder de consistencia", () => {
+    expect(buildProfileReading({ discipline: 10 }).superpower.title).toContain("consistencia");
+  });
+
+  it("riskClass agresivo → riesgo oculto 'crecer con base'", () => {
+    const d: ProfileDraft = {
+      riskPreference: "crecimiento",
+      lossReaction: "invierto_mas",
+      volatilityComfort: 10,
+    };
+    expect(buildProfileReading(d).hiddenRisk.title).toBe("Lo que debes cuidar: crecer con base");
+  });
+
+  it("nextMove.cta es el CTA de marca de 7 minutos", () => {
+    expect(buildProfileReading({}).nextMove.cta).toBe("Crear mi mapa financiero en 7 minutos");
+  });
+
+  it("control 10 + urgencia crítica → whatThisSays resuelve la contradicción", () => {
+    const r = buildProfileReading({ perceivedControl: 10, urgency: "critica" });
+    expect(r.whatThisSays).toContain("acelerar con estrategia");
+  });
 });
