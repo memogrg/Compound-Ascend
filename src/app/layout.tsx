@@ -13,6 +13,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: "Compound Ascend — Sistema Financiero",
   description:
     "Tu asesor financiero personal con IA. Ordena tu dinero, toma control, construye y protege tu patrimonio, y mide tu Rich Life.",
