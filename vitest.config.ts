@@ -15,6 +15,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // 'server-only' no resuelve en node; en tests es un no-op (su única función
+      // es romper el build si se importa en cliente). Permite probar fns puras.
+      "server-only": fileURLToPath(new URL("./tests/stubs/server-only.ts", import.meta.url)),
     },
   },
 });

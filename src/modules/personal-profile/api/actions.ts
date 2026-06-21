@@ -8,12 +8,20 @@
  */
 import { revalidatePath } from "next/cache";
 import { profileDraftSchema } from "@/modules/personal-profile/schemas";
-import { saveDraft, completeProfile } from "@/modules/personal-profile/services/profile-service";
+import {
+  saveDraft,
+  completeProfile,
+  getDraft,
+} from "@/modules/personal-profile/services/profile-service";
 import {
   seedDemoTemplate,
   markOnboardingStarted,
 } from "@/modules/personal-profile/services/demo-template";
 import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
+import { buildProfileReading } from "@/modules/personal-profile/engine/profile-reading";
+import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
+import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
+import { generateMatices } from "@/lib/ai/profile-matices";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { sendEmail, isEmailConfigured } from "@/lib/email/send";
@@ -220,6 +228,47 @@ export async function updateDisplayNameAction(name: string): Promise<AcceptResul
   await supabase.auth.updateUser({ data: { display_name: parsed.data } });
   revalidatePath("/dashboard");
   return { ok: true };
+}
+
+export type MaticesResult = { matices: string | null };
+
+/**
+ * Genera la "nota personal" del cierre (Fase A2) leyendo el perfil ya guardado.
+ * No bloquea el cierre: ante cualquier fallo (sin sesión, sin draft, IA caída o
+ * timeout) devuelve { matices: null } y la UI cae con elegancia.
+ */
+export async function generateProfileMaticesAction(): Promise<MaticesResult> {
+  if (!isSupabaseConfigured()) return { matices: null };
+  try {
+    const user = await getUser();
+    if (!user) return { matices: null };
+
+    const draft = await getDraft();
+    if (!draft || Object.keys(draft).length === 0) return { matices: null };
+
+    const reading = buildProfileReading(draft);
+    const arche = computeArchetype(draft);
+    const name = (user.user_metadata?.display_name as string | undefined) ?? draft.displayName;
+
+    const matices = await generateMatices({
+      name,
+      archetypeLabel: ARCHETYPE_PLAYBOOKS[arche.primary].label,
+      archetypeLabel2: arche.secondary ? ARCHETYPE_PLAYBOOKS[arche.secondary].label : undefined,
+      dominantValue: draft.dineroPrimero?.replace(/_/g, " "),
+      moneyScript: arche.moneyScript ?? undefined,
+      dominantEmotion: arche.dominantEmotion,
+      recommendedTone: reading.companionship.tone,
+      topStrength: reading.strengths[0],
+      topOpportunity: reading.opportunities[0] ?? "",
+    });
+
+    return { matices };
+  } catch (err) {
+    logger.warn("generateProfileMatices fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { matices: null };
+  }
 }
 
 /** Traduce el mensaje de la excepción de Postgres a una copia segura en español. */
