@@ -1,5 +1,6 @@
 /** Opciones del Setup Wizard (en español), extraídas de la Biblia (Módulo 1). */
 import type { IconName } from "@/components/ui/icon";
+import type { RiskClass } from "@/modules/personal-profile/types";
 import { CURRENCY_OPTIONS } from "@/lib/format";
 
 export type Option = { value: string; label: string; desc?: string; icon?: IconName };
@@ -416,3 +417,25 @@ export const DESIRED_FEELINGS: Option[] = [
   { value: "libertad", label: "Libertad." },
   { value: "confianza", label: "Confianza." },
 ];
+
+// ── Presentación del perfil de riesgo (cierre v2 + tab) ──
+
+export const RISK_DISPLAY: Record<RiskClass, string> = {
+  conservador: "Conservador",
+  moderado: "Moderado",
+  balanceado: "Balanceado",
+  crecimiento: "Crecimiento",
+  agresivo: "Crecimiento alto",
+};
+
+/** Una frase positiva por clase de riesgo (segunda persona). */
+export const RISK_READING: Record<RiskClass, string> = {
+  conservador:
+    "Priorizas la seguridad y la estabilidad; te sientes mejor con riesgos acotados y previsibles.",
+  moderado: "Buscas equilibrio entre seguridad y crecimiento, sin sobresaltos.",
+  balanceado: "Equilibras crecimiento y protección según el momento, con flexibilidad.",
+  crecimiento:
+    "Estás dispuesto a asumir algo de volatilidad por un mayor crecimiento a largo plazo.",
+  agresivo:
+    "Toleras la volatilidad y piensas a largo plazo; puedes ser ambicioso si tu base está lista.",
+};
