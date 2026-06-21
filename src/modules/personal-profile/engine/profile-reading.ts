@@ -4,7 +4,13 @@
  * scorecard numérico, fortalezas y oportunidades en positivo, cómo acompañará la IA
  * y la ruta con su porqué. Sin IA (los matices llegan en A2). Sin IO.
  */
-import type { Archetype, ProfileDraft, ProfileReading, ScoreItem } from "@/modules/personal-profile/types";
+import type {
+  Archetype,
+  MoneyScript,
+  ProfileDraft,
+  ProfileReading,
+  ScoreItem,
+} from "@/modules/personal-profile/types";
 import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
 import { computeRiskClass } from "@/modules/personal-profile/engine/diagnosis";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
@@ -58,6 +64,45 @@ const ROUTE: { step: string; why: string }[] = [
   { step: "Proteger tu patrimonio", why: "Para cuidar lo que vas construyendo." },
   { step: "Avanzar hacia la libertad financiera", why: "Para ganar opciones y tranquilidad a largo plazo." },
 ];
+
+/** Lectura espejo (Cierre v3): titular en 2ª persona por arquetipo. */
+const HERO_BY_ARCHETYPE: Record<Archetype, string> = {
+  constructor: "Estás construyendo libertad y patrimonio.",
+  liberador: "Estás recuperando tu libertad financiera.",
+  navegante: "Estás recuperando el control y el aire.",
+  organizador: "Estás poniendo orden para despegar.",
+  clarificador: "Estás ganando claridad sobre tu dinero.",
+  protector: "Estás construyendo una base que te deja dormir tranquilo.",
+  estratega: "Estás afinando tu sistema financiero.",
+  creador: "Estás diseñando una vida mejor, con cabeza.",
+  guardian: "Estás protegiendo lo que más te importa.",
+  disfrutador: "Estás aprendiendo a disfrutar sin sabotear tu futuro.",
+};
+
+/** Lectura del money script (creencia dominante sobre el dinero), si la hay. */
+const MONEY_SCRIPT_READING: Record<MoneyScript, string> = {
+  crecimiento: "Para ti, el dinero es una herramienta para crecer y construir futuro.",
+  seguridad: "Para ti, el dinero representa seguridad y tranquilidad.",
+  estatus: "Para ti, el dinero está ligado a disfrutar lo que has logrado.",
+  vigilancia: "Para ti, el dinero pide control: te sientes mejor cuando todo está claro.",
+  evitacion:
+    "Tu relación con el dinero ha sido más de evitarlo que de mirarlo de frente — y eso se puede transformar.",
+  suficiencia: "Para ti, el dinero es para estar realmente bien, no para aparentar.",
+};
+
+/** Fragmento de la "próxima jugada" por arquetipo (se hila en el copy). */
+const NEXT_MOVE_PHRASE: Record<Archetype, string> = {
+  constructor: "convertir tu libertad financiera en números",
+  liberador: "ordenar el ataque a tus deudas",
+  navegante: "recuperar liquidez y aire",
+  organizador: "ver tu dinero con claridad",
+  clarificador: "ver tus números sin ruido",
+  protector: "asegurar tu base antes de crecer",
+  estratega: "medir tu patrimonio y optimizar",
+  creador: "equilibrar tu estilo de vida con tu patrimonio",
+  guardian: "proteger a los tuyos con un plan",
+  disfrutador: "disfrutar con un plan que te respalde",
+};
 
 export function buildProfileReading(d: ProfileDraft): ProfileReading {
   const arche = computeArchetype(d);
@@ -156,6 +201,86 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
     ],
   };
 
+  // ── Lectura espejo (Cierre v3) ──
+  const heroLine = HERO_BY_ARCHETYPE[arche.primary];
+  const moneyScriptReading = arche.moneyScript
+    ? MONEY_SCRIPT_READING[arche.moneyScript]
+    : undefined;
+  const growth = riskClass === "crecimiento" || riskClass === "agresivo";
+
+  // Superpoder (primer caso que aplique).
+  const superpower =
+    typeof d.discipline === "number" && d.discipline >= 7
+      ? {
+          title: "Tu superpoder: consistencia con visión de largo plazo",
+          body: "La mayoría falla porque no puede sostener el plan. En ti la disciplina aparece como fortaleza central; conectada a un sistema medible, se vuelve una ventaja enorme.",
+        }
+      : typeof d.impulsivity === "number" && d.impulsivity <= 3
+        ? {
+            title: "Tu superpoder: autocontrol",
+            body: "Tu baja impulsividad te protege de las decisiones que descarrilan a la mayoría. Es una base excelente para construir.",
+          }
+        : advanced
+          ? {
+              title: "Tu superpoder: criterio financiero",
+              body: "Manejas los conceptos con soltura, así que podemos ir directo a estrategia, sin rodeos.",
+            }
+          : typeof d.perceivedControl === "number" && d.perceivedControl >= 7
+            ? {
+                title: "Tu superpoder: claridad",
+                body: "Sientes el control de tus finanzas; eso te deja decidir con cabeza fría.",
+              }
+            : {
+                title: "Tu superpoder: la decisión de empezar",
+                body: "Diste el paso de conocerte financieramente. Ese es el inicio de todo cambio sostenible.",
+              };
+
+  // Riesgo oculto (en positivo; primer caso que aplique).
+  const hiddenRisk = growth
+    ? {
+        title: "Lo que debes cuidar: crecer con base",
+        body: "Tu ambición es una ventaja, pero necesita reglas. Tu principal cuidado no parece ser gastar de más, sino avanzar rápido sin validar liquidez, diversificación y protección. Crecimiento con estrategia, no por impulso.",
+      }
+    : typeof d.impulsivity === "number" && d.impulsivity >= 7
+      ? {
+          title: "Lo que debes cuidar: el impulso",
+          body: "Tu mayor cuidado está en las compras de momento. Con reglas simples —una pausa, un monto libre— tu impulso deja de competir con tus metas.",
+        }
+      : typeof d.discipline === "number" && d.discipline <= 4
+        ? {
+            title: "Lo que debes cuidar: sostener el plan",
+            body: "Tu reto no es saber qué hacer, sino mantenerlo en el tiempo. Hábitos pequeños y automáticos te cuidan más que la fuerza de voluntad.",
+          }
+        : noFund
+          ? {
+              title: "Lo que debes cuidar: tu base",
+              body: "Tu ambición va por delante de tu colchón. Asegurar tu fondo de emergencia primero hace que todo lo demás se sostenga.",
+            }
+          : {
+              title: "Lo que debes cuidar: el entusiasmo inicial",
+              body: "Tu mayor cuidado es mantener la constancia cuando pase la motivación del arranque. El sistema, no la motivación, es lo que sostiene.",
+            };
+
+  // "Lo que esto dice de ti" (fallback determinista del card de IA).
+  const highControl = typeof d.perceivedControl === "number" && d.perceivedControl >= 8;
+  const urgent = d.urgency === "critica" || d.urgency === "alta";
+  const disciplined = typeof d.discipline === "number" && d.discipline >= 7;
+  const whatThisSays =
+    highControl && urgent
+      ? "Tus respuestas muestran algo interesante: tienes control y a la vez urgencia. No estás apagando incendios — estás cerrando brechas de largo plazo. Tu reto no es ordenarte, es acelerar con estrategia."
+      : disciplined && growth
+        ? "No buscas ordenarte porque estés perdido, sino para construir sobre algo firme. Tu reto es convertir tu visión en una arquitectura medible."
+        : `${play.userSummary} Tu siguiente paso es convertir eso en un sistema.`;
+
+  // Próxima jugada.
+  const phrase = NEXT_MOVE_PHRASE[arche.primary];
+  const nextMove = {
+    title: `Tu próxima jugada: ${phrase}`,
+    body: `Antes de avanzar, Compound Ascend construye tu fotografía base: ingresos, gastos, activos, pasivos, liquidez y tu capacidad real de inversión. Ese es tu punto de partida para ${phrase}.`,
+    cta: "Crear mi mapa financiero en 7 minutos",
+    timeEstimate: "7 minutos",
+  };
+
   return {
     interpretation,
     riskDisplay,
@@ -165,5 +290,12 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
     opportunities: opportunities.slice(0, 5),
     companionship,
     route: ROUTE,
+    name: d.displayName,
+    heroLine,
+    moneyScriptReading,
+    whatThisSays,
+    superpower,
+    hiddenRisk,
+    nextMove,
   };
 }

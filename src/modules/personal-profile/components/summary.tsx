@@ -44,6 +44,9 @@ export function ProfileSummary({
     };
   }, []);
 
+  // Cierre v3: el CTA principal nombra la próxima jugada; fallback al label clásico.
+  const primaryLabel = r?.nextMove.cta ?? "Construir mi Base Financiera";
+
   const buttons = (
     <>
       <button
@@ -51,7 +54,7 @@ export function ProfileSummary({
         style={{ marginTop: 18, width: "100%", justifyContent: "center" }}
         onClick={onContinue}
       >
-        Construir mi Base Financiera
+        {primaryLabel}
         <Icon name="chev" width={2.2} />
       </button>
       {onViewProfile ? (
@@ -90,42 +93,44 @@ export function ProfileSummary({
 
         {r ? (
           <>
-            <div className="step-eyebrow">Tu perfil financiero</div>
-            <h1 className="step-title">
-              Tu perfil financiero está <span className="it">listo</span>.
-            </h1>
-            <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>
-              Esta es tu lectura inicial. Puedes afinarla cuando quieras.
+            {/* 1 · HERO emocional */}
+            {r.name ? (
+              <div className="step-eyebrow" style={{ marginBottom: 2 }}>
+                {r.name},
+              </div>
+            ) : null}
+            <h1 className="step-title">{r.heroLine}</h1>
+            <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.6 }}>
+              Tu perfil combina <span className="it">{diagnosis.archetypeLabel}</span>
+              {diagnosis.archetypeLabel2 ? (
+                <>
+                  {" "}
+                  + <span className="it">{diagnosis.archetypeLabel2}</span>
+                </>
+              ) : null}
+              . Compound Ascend usará esto para darte una ruta más estratégica y menos genérica.
             </p>
 
-            {/* Tu lectura */}
+            {/* 2 · Identidad financiera */}
             <div className="card card-pad" style={{ marginTop: 14 }}>
-              <div className="card-title">Tu lectura</div>
-              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+              <div className="card-title">
+                Eres {diagnosis.archetypeLabel}
+                {diagnosis.archetypeLabel2 ? ` con rasgos de ${diagnosis.archetypeLabel2}` : ""}
+              </div>
+              {r.moneyScriptReading ? (
+                <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+                  {r.moneyScriptReading}
+                </p>
+              ) : null}
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 8 }}>
                 {r.interpretation}
               </p>
             </div>
 
-            {/* Una nota para ti (matices IA) — no se renderiza si la IA no responde */}
-            {loadingMatices ? (
-              <div className="card card-pad" style={{ marginTop: 14 }}>
-                <div className="card-title">Una nota para ti</div>
-                <p className="muted" style={{ fontSize: 13.5, marginTop: 10, lineHeight: 1.6 }}>
-                  Afinando tu lectura personalizada…
-                </p>
-              </div>
-            ) : matices ? (
-              <div className="card card-pad" style={{ marginTop: 14 }}>
-                <div className="card-title">Una nota para ti</div>
-                <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
-                  {matices}
-                </p>
-              </div>
-            ) : null}
-
-            {/* Scorecard */}
+            {/* 3 · Tu lectura en números */}
             <div className="card card-pad" style={{ marginTop: 14 }}>
-              <div className="row" style={{ gap: 18, flexWrap: "wrap", alignItems: "center" }}>
+              <div className="card-title">Tu lectura en números</div>
+              <div className="row" style={{ gap: 18, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
                 <div className="ring-wrap">
                   <svg width="92" height="92" viewBox="0 0 42 42">
                     <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
@@ -192,39 +197,74 @@ export function ProfileSummary({
               </div>
             </div>
 
-            {/* Fortalezas */}
+            {/* 4 · Lo que esto dice de ti (matices IA con fallback determinista) */}
             <div className="card card-pad" style={{ marginTop: 14 }}>
-              <div className="card-title">Lo que ya juega a tu favor</div>
-              <ul style={{ marginTop: 10, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
-                {r.strengths.map((s, i) => (
-                  <li key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <Icon name="check" width={2.2} />
-                    <span style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>{s}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="card-title">Lo que esto dice de ti</div>
+              {loadingMatices ? (
+                <p className="muted" style={{ fontSize: 13.5, marginTop: 10, lineHeight: 1.6 }}>
+                  Afinando tu lectura personalizada…
+                </p>
+              ) : (
+                <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+                  {matices ?? r.whatThisSays}
+                </p>
+              )}
             </div>
 
-            {/* Oportunidades */}
+            {/* 5 · Tu superpoder */}
             <div className="card card-pad" style={{ marginTop: 14 }}>
-              <div className="card-title">Tu siguiente nivel</div>
-              <ul style={{ marginTop: 10, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
-                {r.opportunities.map((s, i) => (
-                  <li key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                    <Icon name="chev" width={2.2} />
-                    <span style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>{s}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="card-title">{r.superpower.title}</div>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+                {r.superpower.body}
+              </p>
             </div>
 
-            {/* Acompañamiento */}
+            {/* 6 · Lo que debes cuidar (riesgo oculto en positivo) */}
+            <div className="card card-pad" style={{ marginTop: 14 }}>
+              <div className="card-title">{r.hiddenRisk.title}</div>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+                {r.hiddenRisk.body}
+              </p>
+            </div>
+
+            {/* 7 · Tu próxima jugada (destacada) */}
+            <div
+              className="card card-pad"
+              style={{ marginTop: 14, borderColor: "var(--pos)", borderWidth: 1, borderStyle: "solid" }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div className="card-title" style={{ flex: 1 }}>
+                  {r.nextMove.title}
+                </div>
+                {r.nextMove.timeEstimate ? (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      padding: "5px 10px",
+                      borderRadius: 999,
+                      background: "var(--chip)",
+                      color: "var(--ink-2)",
+                    }}
+                  >
+                    {r.nextMove.timeEstimate}
+                  </span>
+                ) : null}
+              </div>
+              <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+                {r.nextMove.body}
+              </p>
+            </div>
+
+            {/* 8 · Cómo te acompañará Ascend AI */}
             <div className="card card-pad" style={{ marginTop: 14 }}>
               <div className="card-title">Cómo te acompañará Ascend AI</div>
               <p style={{ fontSize: 13.5, color: "var(--ink-2)", marginTop: 8, lineHeight: 1.5 }}>
-                Tono <strong>{r.companionship.tone}</strong>. Empezaremos por:
+                Tono <strong>{r.companionship.tone}</strong>.
               </p>
-              <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="label" style={{ fontSize: 11.5, marginTop: 12 }}>
+                Priorizará
+              </div>
+              <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {r.companionship.priorities.map((p, i) => (
                   <span
                     key={i}
@@ -241,11 +281,11 @@ export function ProfileSummary({
                 ))}
               </div>
               <p className="muted" style={{ fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
-                Sin {r.companionship.avoids.join(", ")}.
+                Evitará: {r.companionship.avoids.join(", ")}.
               </p>
             </div>
 
-            {/* Ruta con porqué */}
+            {/* 9 · Tu ruta sugerida */}
             <div className="card card-pad" style={{ marginTop: 14 }}>
               <div className="card-title">Tu ruta sugerida</div>
               <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -268,7 +308,9 @@ export function ProfileSummary({
                       {i + 1}
                     </span>
                     <div>
-                      <div style={{ fontSize: 13.5, color: "var(--ink)", lineHeight: 1.4 }}>{s.step}</div>
+                      <div style={{ fontSize: 13.5, color: "var(--ink)", lineHeight: 1.4, fontWeight: 600 }}>
+                        {s.step}
+                      </div>
                       <div className="muted" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.4 }}>
                         {s.why}
                       </div>
@@ -278,6 +320,7 @@ export function ProfileSummary({
               </div>
             </div>
 
+            {/* 10 · Botones */}
             {buttons}
           </>
         ) : (

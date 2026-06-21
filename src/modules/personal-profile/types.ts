@@ -173,6 +173,15 @@ export type ProfileReading = {
   opportunities: string[];
   companionship: { tone: string; priorities: string[]; avoids: string[] };
   route: { step: string; why: string }[];
+  // Lectura espejo (Cierre v3): piezas narrativas en 2ª persona.
+  name?: string;
+  heroLine: string;
+  moneyScriptReading?: string;
+  /** Fallback determinista del card de IA ("Lo que esto dice de ti"). */
+  whatThisSays: string;
+  superpower: { title: string; body: string };
+  hiddenRisk: { title: string; body: string };
+  nextMove: { title: string; body: string; cta: string; timeEstimate?: string };
 };
 
 export type ProfileDiagnosis = {
