@@ -2,6 +2,10 @@ import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getDebtsOverview } from "@/modules/control/services/debts-service";
 import { getIndexRates } from "@/modules/control/services/index-rates";
 import { DebtsView } from "@/modules/control/components/debts-view";
+import { getDraft } from "@/modules/personal-profile/services/profile-service";
+import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
+import { buildDebtAdvice, type DebtAdvice } from "@/modules/control/engine/debt-advice";
+import { AdvisorNote } from "@/components/shared/advisor-note";
 import type { DebtsOverview } from "@/modules/control/services/debts-service";
 
 /**
@@ -13,6 +17,30 @@ export default async function Page() {
   const overview: DebtsOverview = configured
     ? await getDebtsOverview(await getIndexRates())
     : { currency: "CRC", incomeMonthly: 0, freeCashflow: 0, indexRates: {}, debts: [], raw: [] };
+
+  // Nota del asesor (Fase 5a): recomendación sobre deudas en su tono. Best-effort.
+  let advice: DebtAdvice | null = null;
+  if (configured) {
+    try {
+      const draft = await getDraft();
+      if (Object.keys(draft).length > 0) {
+        const diag = buildDiagnosis(draft);
+        advice = buildDebtAdvice({
+          archetypeLabel: diag.archetypeLabel,
+          tone: diag.reading?.companionship.tone,
+          dominantValue: draft.dineroPrimero?.replace(/_/g, " "),
+          debts: overview.raw.map((d) => ({
+            name: d.name,
+            balance: d.balance,
+            apr: d.apr,
+            delinquency: d.delinquency,
+          })),
+        });
+      }
+    } catch {
+      // Sin perfil/diagnóstico: la página sigue sin la nota.
+    }
+  }
 
   return (
     <div className="grid">
@@ -34,6 +62,8 @@ export default async function Page() {
           </div>
         </div>
       </div>
+
+      {advice ? <AdvisorNote {...advice} /> : null}
 
       {!configured ? (
         <div className="auth-msg warn" style={{ margin: 0 }}>
