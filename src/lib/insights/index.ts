@@ -13,7 +13,15 @@ export type {
 export {
   getActiveInsights,
   getInsightsFreshness,
+  refreshInsights,
   syncInsights,
   dismissInsight,
   isStale,
 } from "@/lib/insights/insights-service";
+
+export {
+  detectStalledGoals,
+  detectGrowingDebt,
+  detectPositiveStreak,
+  runDetectors,
+} from "@/lib/insights/detectors";

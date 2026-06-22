@@ -8,6 +8,8 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
+import { logger } from "@/lib/logger";
+import { runDetectors } from "@/lib/insights/detectors";
 import type { UserInsightRow } from "@/lib/supabase/database.types";
 import type {
   DetectedInsight,
@@ -46,8 +48,29 @@ function rowToInsight(r: UserInsightRow): Insight {
 const keyOf = (kind: string, relatedId: string | null | undefined): string =>
   `${kind}::${relatedId ?? ""}`;
 
+/**
+ * Orquestador on-demand: si la última corrida está vieja, recalcula los insights
+ * a partir de los datos de control y los sincroniza. Best-effort: nunca rompe.
+ */
+export async function refreshInsights(): Promise<void> {
+  try {
+    const last = await getInsightsFreshness();
+    if (!isStale(last)) return; // guardia de frescura
+    // Import dinámico para no acoplar lib/insights con el módulo control.
+    const { listGoals, listDebts } = await import(
+      "@/modules/control/services/control-service"
+    );
+    const [goals, debts] = await Promise.all([listGoals(), listDebts()]);
+    await syncInsights(runDetectors({ goals, debts }));
+  } catch (err) {
+    logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
+  }
+}
+
 /** Insights activos, priorizados por severidad y luego por recencia. */
 export async function getActiveInsights(limit = 5): Promise<Insight[]> {
+  // Auto-activación: cualquier lectura refresca si está viejo (best-effort).
+  await refreshInsights();
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
