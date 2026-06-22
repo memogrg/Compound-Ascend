@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { logger } from "@/lib/logger";
-import { runDetectors } from "@/lib/insights/detectors";
+import { runDetectors, detectDisfruteSpike } from "@/lib/insights/detectors";
 import type { UserInsightRow } from "@/lib/supabase/database.types";
 import type {
   DetectedInsight,
@@ -61,10 +61,71 @@ export async function refreshInsights(): Promise<void> {
       "@/modules/control/services/control-service"
     );
     const [goals, debts] = await Promise.all([listGoals(), listDebts()]);
-    await syncInsights(runDetectors({ goals, debts }));
+    const detected = runDetectors({ goals, debts });
+    const spend = await getDisfruteSpend();
+    if (spend) detected.push(...detectDisfruteSpike(spend));
+    await syncInsights(detected);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
   }
+}
+
+/**
+ * Gasto del "frasco de jugar" (categoría 'disfrute' + descendientes): total del
+ * mes actual vs promedio de los 3 meses previos. null si no hay categoría disfrute.
+ */
+async function getDisfruteSpend(): Promise<{
+  current: number;
+  priorAvg: number;
+  categoryId: string;
+} | null> {
+  const { listCategories } = await import(
+    "@/modules/financial-base/services/categories-service"
+  );
+  const { listTransactions } = await import(
+    "@/modules/financial-base/services/transaction-service"
+  );
+  const { monthPeriod, previousMonthPeriod } = await import(
+    "@/modules/financial-base/engine/period"
+  );
+
+  const cats = await listCategories();
+  const root = cats.find((c) => c.key === "disfrute");
+  if (!root) return null;
+
+  // IDs del frasco de jugar: la categoría disfrute + todos sus descendientes.
+  const ids = new Set<string>([root.id]);
+  let added = true;
+  while (added) {
+    added = false;
+    for (const c of cats) {
+      if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) {
+        ids.add(c.id);
+        added = true;
+      }
+    }
+  }
+
+  const sumFor = async (period: ReturnType<typeof monthPeriod>): Promise<number> => {
+    const txns = await listTransactions(period, { kind: "gasto" });
+    return txns
+      .filter((t) => t.categoryId && ids.has(t.categoryId))
+      .reduce((acc, t) => acc + t.amount, 0);
+  };
+
+  const now = new Date();
+  const cur = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+  const p1 = previousMonthPeriod(cur);
+  const p2 = previousMonthPeriod(p1);
+  const p3 = previousMonthPeriod(p2);
+
+  const [current, s1, s2, s3] = await Promise.all([
+    sumFor(cur),
+    sumFor(p1),
+    sumFor(p2),
+    sumFor(p3),
+  ]);
+  return { current, priorAvg: (s1 + s2 + s3) / 3, categoryId: root.id };
 }
 
 /** Insights activos, priorizados por severidad y luego por recencia. */
