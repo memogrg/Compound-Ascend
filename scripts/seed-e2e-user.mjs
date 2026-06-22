@@ -66,24 +66,27 @@ await admin.from("profiles").upsert(
 // health.hasData es false e /dashboard renderiza el EmptyState en vez del HERO
 // ("Flujo de caja mensual"), y el smoke falla. amount_monthly_base alimenta
 // directamente incomeMonthly (moneda CRC = display por defecto, sin FX).
-const { data: memberships } = await admin
-  .from("household_members")
-  .select("household_id, role")
-  .eq("user_id", userId)
-  .eq("status", "active")
-  .order("created_at", { ascending: true });
-const householdId =
-  memberships?.find((m) => m.role === "owner")?.household_id ?? memberships?.[0]?.household_id ?? null;
+//
+// Se inserta con la sesión del propio usuario (no service-role): pasa la RLS
+// (user_id = auth.uid()) y usa el rol `authenticated`, que sí tiene grant sobre
+// income_sources — el service-role no lo tiene en el stack local.
+const anonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+if (!anonKey) {
+  console.error("Falta NEXT_PUBLIC_SUPABASE_ANON_KEY para sembrar datos del usuario");
+  process.exit(1);
+}
+const userClient = createClient(url, anonKey, { auth: { persistSession: false } });
+const { error: signInError } = await userClient.auth.signInWithPassword({ email, password });
+if (signInError) {
+  console.error("Sign-in del usuario E2E falló:", signInError.message);
+  process.exit(1);
+}
 
-const { data: existingIncome } = await admin
-  .from("income_sources")
-  .select("id")
-  .eq("user_id", userId)
-  .limit(1);
+const { data: existingIncome } = await userClient.from("income_sources").select("id").limit(1);
 if (!existingIncome || existingIncome.length === 0) {
-  const { error: incomeError } = await admin.from("income_sources").insert({
+  const { error: incomeError } = await userClient.from("income_sources").insert({
     user_id: userId,
-    household_id: householdId,
+    household_id: null,
     name: "Salario E2E",
     income_type: "activo",
     amount: 1_000_000,
