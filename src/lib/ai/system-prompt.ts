@@ -78,6 +78,8 @@ export type FinancialContext = {
   };
   /** Observaciones conductuales recientes (memoria conductual, Fase 4). */
   insights?: { severity: string; title: string; body: string }[];
+  /** Guía conductual recuperada de la Biblia para esta conversación (Fase 5c). */
+  knowledge?: string[];
 };
 
 export function buildSystemPrompt(ctx: FinancialContext): string {
@@ -295,6 +297,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "COMO HABLARLE A ESTE USUARIO:",
     `- ${PERSONA}`,
     ...behaviorRules.map((r) => `- ${r}`),
+    ...(ctx.knowledge?.length
+      ? [
+          "",
+          "Guía conductual aplicable a esta conversación (base de conocimiento):",
+          ...ctx.knowledge.map((k) => `- ${k}`),
+        ]
+      : []),
     "",
     "Si el usuario claramente quiere registrar una transacción, crear una meta, o aplicar una estrategia, PROPÓN una acción añadiendo al final un bloque:",
     "```action",
