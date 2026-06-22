@@ -3,6 +3,7 @@ import {
   detectStalledGoals,
   detectGrowingDebt,
   detectPositiveStreak,
+  detectDisfruteSpike,
 } from "@/lib/insights/detectors";
 import type { SavingsGoal, Debt } from "@/modules/control/types";
 
@@ -91,5 +92,25 @@ describe("detectPositiveStreak", () => {
 
   it("meta por debajo del 80% → nada", () => {
     expect(detectPositiveStreak([goal({ targetAmount: 1000, currentAmount: 700 })])).toHaveLength(0);
+  });
+});
+
+describe("detectDisfruteSpike", () => {
+  it("current justo en +30% (130 sobre 100) → NO dispara (umbral estricto)", () => {
+    expect(detectDisfruteSpike({ current: 130, priorAvg: 100 })).toHaveLength(0);
+  });
+
+  it("current por encima de +30% (140 sobre 100) → dispara", () => {
+    const out = detectDisfruteSpike({ current: 140, priorAvg: 100, categoryId: "c1" });
+    expect(out).toHaveLength(1);
+    expect(out[0]?.kind).toBe("gasto_disfrute_alza");
+    expect(out[0]?.severity).toBe("observar");
+    expect(out[0]?.relatedKind).toBe("category");
+    expect(out[0]?.relatedId).toBe("c1");
+    expect(out[0]?.metric).toBe(140);
+  });
+
+  it("priorAvg 0 (sin historial) → NO dispara", () => {
+    expect(detectDisfruteSpike({ current: 500, priorAvg: 0 })).toHaveLength(0);
   });
 });

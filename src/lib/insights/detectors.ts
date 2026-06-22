@@ -87,6 +87,29 @@ export function detectPositiveStreak(goals: SavingsGoal[]): DetectedInsight[] {
   return out;
 }
 
+/**
+ * Frasco de jugar: el gasto de disfrute del mes va muy por encima del promedio
+ * reciente (> +30%). Observación amable, no prohibición.
+ */
+export function detectDisfruteSpike(p: {
+  current: number;
+  priorAvg: number;
+  categoryId?: string;
+}): DetectedInsight[] {
+  if (!(p.priorAvg > 0 && p.current > p.priorAvg * 1.3)) return [];
+  return [
+    {
+      kind: "gasto_disfrute_alza",
+      severity: "observar",
+      relatedKind: "category",
+      relatedId: p.categoryId,
+      metric: Math.round(p.current),
+      title: "Tu frasco de jugar subió este mes",
+      body: "Tu gasto de disfrute va por encima de tu promedio reciente. No se trata de eliminarlo: define un monto libre para disfrutar sin culpa y proteger tus metas.",
+    },
+  ];
+}
+
 /** Corre los tres detectores snapshot sobre los datos de control. */
 export function runDetectors(
   { goals, debts }: { goals: SavingsGoal[]; debts: Debt[] },

@@ -23,5 +23,6 @@ export {
   detectStalledGoals,
   detectGrowingDebt,
   detectPositiveStreak,
+  detectDisfruteSpike,
   runDetectors,
 } from "@/lib/insights/detectors";
