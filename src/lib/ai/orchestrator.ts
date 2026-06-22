@@ -13,6 +13,7 @@ import { parseAction, type AIChatResponse } from "@/lib/ai/types";
 // El system prompt y su contexto viven en system-prompt.ts (puro, testeable);
 // el context-engine (Fase 5) arma el FinancialContext con datos autorizados.
 import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt";
+import { selectBibliaKnowledge } from "@/lib/ai/biblia-knowledge";
 
 export type { FinancialContext };
 
@@ -29,7 +30,14 @@ export async function financeChat(
   ctx: FinancialContext,
 ): Promise<AIChatResponse & { tokensIn: number; tokensOut: number; provider: string }> {
   const provider = getProvider();
-  const result = await provider.chat({ system: buildSystemPrompt(ctx), messages });
+  // Recuperación determinista de la Biblia: emoción dominante + tema del último
+  // mensaje del usuario → guía conductual inyectada en el system prompt.
+  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content;
+  const knowledge = selectBibliaKnowledge({ emotion: ctx.dominantEmotion, text: lastUser });
+  const result = await provider.chat({
+    system: buildSystemPrompt({ ...ctx, knowledge }),
+    messages,
+  });
   const parsed = parseAction(result.text);
   return {
     ...parsed,
