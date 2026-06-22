@@ -100,8 +100,8 @@ export function PerformanceChart({
             fontSize: 12,
             padding: "6px 10px",
           }}
-          formatter={(v: number) => [fmt(v), ""]}
-          labelFormatter={(l: string) => l}
+          formatter={(v) => [fmt(Number(v)), ""]}
+          labelFormatter={(l) => l}
           labelStyle={{ color: "var(--muted-2)", fontSize: 11, marginBottom: 2 }}
           cursor={{ stroke: "var(--muted-2)", strokeWidth: 1 }}
         />

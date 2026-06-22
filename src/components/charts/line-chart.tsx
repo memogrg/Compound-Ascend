@@ -63,7 +63,7 @@ export function PremiumLineChart({
             fontSize: 12.5,
           }}
           labelStyle={{ color: "var(--ink)", fontWeight: 600, marginBottom: 4 }}
-          formatter={(value: number, name: string) => [formatMoney(Number(value), currency), name]}
+          formatter={(value, name) => [formatMoney(Number(value), currency), name]}
         />
         {series.map((s) => (
           <Line
