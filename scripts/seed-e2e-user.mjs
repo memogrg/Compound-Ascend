@@ -62,4 +62,43 @@ await admin.from("profiles").upsert(
   { onConflict: "id" },
 );
 
+// Una fuente de ingreso mínima para que el dashboard tenga datos: sin ella,
+// health.hasData es false e /dashboard renderiza el EmptyState en vez del HERO
+// ("Flujo de caja mensual"), y el smoke falla. amount_monthly_base alimenta
+// directamente incomeMonthly (moneda CRC = display por defecto, sin FX).
+const { data: memberships } = await admin
+  .from("household_members")
+  .select("household_id, role")
+  .eq("user_id", userId)
+  .eq("status", "active")
+  .order("created_at", { ascending: true });
+const householdId =
+  memberships?.find((m) => m.role === "owner")?.household_id ?? memberships?.[0]?.household_id ?? null;
+
+const { data: existingIncome } = await admin
+  .from("income_sources")
+  .select("id")
+  .eq("user_id", userId)
+  .limit(1);
+if (!existingIncome || existingIncome.length === 0) {
+  const { error: incomeError } = await admin.from("income_sources").insert({
+    user_id: userId,
+    household_id: householdId,
+    name: "Salario E2E",
+    income_type: "activo",
+    amount: 1_000_000,
+    currency: "CRC",
+    frequency: "mensual",
+    is_fixed: true,
+    owner_scope: "usuario",
+    include_in_budget: true,
+    amount_monthly_base: 1_000_000,
+  });
+  if (incomeError) {
+    console.error("Seed de ingreso falló:", incomeError.message);
+    process.exit(1);
+  }
+  console.log("Ingreso E2E creado.");
+}
+
 console.log("Seed E2E listo:", email);
