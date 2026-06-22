@@ -1,12 +1,13 @@
 import "server-only";
 
 /**
- * Selector de proveedor de WhatsApp por entorno (hoy solo Twilio). Si faltan
- * credenciales, devuelve un proveedor Noop que omite el envío con gracia
- * (mismo patrón que `src/lib/email/send.ts`).
+ * Selector de proveedor de WhatsApp por entorno: se prefiere Meta Cloud API si
+ * está configurado, si no Twilio, y si faltan credenciales un proveedor Noop que
+ * omite el envío con gracia (mismo patrón que `src/lib/email/send.ts`).
  */
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { MetaWhatsAppProvider } from "@/lib/whatsapp/meta";
 import { TwilioWhatsAppProvider } from "@/lib/whatsapp/twilio";
 import type { DownloadedMedia, SendResult, WhatsAppProvider } from "@/lib/whatsapp/provider";
 
@@ -19,6 +20,7 @@ export type {
 
 export function isWhatsAppConfigured(): boolean {
   const env = getServerEnv();
+  if (env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN) return true;
   return Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_NUMBER);
 }
 
@@ -40,6 +42,13 @@ class NoopWhatsAppProvider implements WhatsAppProvider {
 
 export function getWhatsAppProvider(): WhatsAppProvider {
   const env = getServerEnv();
+  if (env.WHATSAPP_PHONE_NUMBER_ID && env.WHATSAPP_ACCESS_TOKEN) {
+    return new MetaWhatsAppProvider(
+      env.WHATSAPP_PHONE_NUMBER_ID,
+      env.WHATSAPP_ACCESS_TOKEN,
+      env.WHATSAPP_API_VERSION || "v21.0",
+    );
+  }
   if (env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_WHATSAPP_NUMBER) {
     return new TwilioWhatsAppProvider(
       env.TWILIO_ACCOUNT_SID,
