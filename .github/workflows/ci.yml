@@ -101,11 +101,12 @@ jobs:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
 
-      # Un ingreso mínimo para que health.hasData sea true y /dashboard pinte el
-      # HERO (no el EmptyState). Vía psql como superusuario: ni service_role ni
-      # authenticated tienen grant de INSERT sobre income_sources en el stack
-      # local. Idempotente (no-op si el usuario ya tiene ingresos).
-      - name: Seed datos E2E (ingreso vía SQL superuser)
+      # Datos mínimos para el smoke: un ingreso (para que health.hasData sea
+      # true y /dashboard pinte el HERO en vez del EmptyState) y un holding
+      # (para que /patrimonio liste una posición). Vía psql como superusuario:
+      # ni service_role ni authenticated tienen grant de INSERT en el stack
+      # local. Idempotente (no-op si el usuario ya tiene esos datos).
+      - name: Seed datos E2E (ingreso + holding vía SQL superuser)
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
         run: >
@@ -114,7 +115,12 @@ jobs:
           select u.id, 'Salario E2E', 'activo', 1000000, 'CRC', 'mensual', true, 'usuario', true, 1000000
           from auth.users u
           where u.email = '$E2E_EMAIL'
-          and not exists (select 1 from public.income_sources i where i.user_id = u.id);"
+          and not exists (select 1 from public.income_sources i where i.user_id = u.id);
+          insert into public.investment_holdings (user_id, symbol, asset_type, quantity, average_cost, cost_basis, currency, label)
+          select u.id, 'VOO', 'etf', 10, 400, 4000, 'USD', 'VOO'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.investment_holdings h where h.user_id = u.id);"
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
