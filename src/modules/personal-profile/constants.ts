@@ -439,3 +439,32 @@ export const RISK_READING: Record<RiskClass, string> = {
   agresivo:
     "Toleras la volatilidad y piensas a largo plazo; puedes ser ambicioso si tu base está lista.",
 };
+
+/** "Qué sí te permite" tu perfil de riesgo (segunda persona). */
+export const RISK_ALLOWS: Record<RiskClass, string> = {
+  conservador:
+    "preservar tu capital y dormir tranquilo, con instrumentos estables y líquidos.",
+  moderado: "una mezcla equilibrada entre seguridad y crecimiento.",
+  balanceado: "combinar protección y crecimiento con criterio.",
+  crecimiento: "estrategias orientadas a crecimiento, con horizonte y un plan claro.",
+  agresivo: "ser ambicioso con activos de mayor crecimiento, siempre que tu base esté lista.",
+};
+
+/** "Qué cuidar" según tu perfil de riesgo. */
+export const RISK_GUARD: Record<RiskClass, string[]> = {
+  conservador: ["No quedarte solo en liquidez y perder crecimiento de largo plazo."],
+  moderado: ["Definir qué parte proteges y qué parte haces crecer."],
+  balanceado: ["Rebalancear cuando una parte crezca de más."],
+  crecimiento: [
+    "No confundir tolerancia al riesgo con falta de estrategia.",
+    "No concentrar todo en una sola apuesta.",
+    "No invertir dinero que puedas necesitar pronto.",
+    "No decidir por FOMO ni euforia.",
+  ],
+  agresivo: [
+    "No confundir tolerancia al riesgo con falta de estrategia.",
+    "No concentrar todo en una sola apuesta.",
+    "No invertir dinero que puedas necesitar pronto.",
+    "No decidir por FOMO ni euforia.",
+  ],
+};
