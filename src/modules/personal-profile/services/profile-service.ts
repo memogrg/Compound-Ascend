@@ -44,6 +44,18 @@ export async function getHouseholdProfileDraft(): Promise<ProfileDraft> {
   return extra.draft ?? {};
 }
 
+/** Lee la nota personal cacheada por la IA (solo lectura; no genera). */
+export async function getProfileAiReading(): Promise<string | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("personal_profiles")
+    .select("ai_reading")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return data?.ai_reading ?? null;
+}
+
 /** Lee el borrador guardado (si existe). */
 export async function getDraft(): Promise<ProfileDraft> {
   const user = await requireUser();
