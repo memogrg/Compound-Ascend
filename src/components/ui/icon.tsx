@@ -92,6 +92,12 @@ export function Icon({ name, width = 1.8, filled = false, className, style }: Ic
   return (
     <svg
       viewBox="0 0 24 24"
+      // Tamaño por defecto (1em) para contextos sin CSS, donde el SVG sin
+      // width/height se inflaba. Atributo de presentación: cualquier regla CSS
+      // existente (.btn svg, navegación, etc.) lo sobreescribe. Distinto de
+      // `width` (prop), que controla el grosor del trazo (strokeWidth).
+      width="1em"
+      height="1em"
       fill={filled ? "currentColor" : "none"}
       stroke={filled ? "none" : "currentColor"}
       strokeWidth={width}
