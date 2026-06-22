@@ -8,8 +8,12 @@ import {
 } from "@/modules/personal-profile/services/profile-service";
 import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
 import { getFinancialState } from "@/modules/personal-profile/services/financial-state";
-import { captureProfileSnapshot } from "@/modules/personal-profile/services/profile-snapshots";
+import {
+  captureProfileSnapshot,
+  getProfileSnapshots,
+} from "@/modules/personal-profile/services/profile-snapshots";
 import { buildNextMove, type NextMove } from "@/modules/personal-profile/engine/next-move";
+import { buildEvolution, type Evolution } from "@/modules/personal-profile/engine/evolution";
 import { ProfileDashboard } from "@/modules/personal-profile/components/profile-dashboard";
 import { EmptyState } from "@/components/shared/states";
 
@@ -64,12 +68,21 @@ export default async function Page() {
     // Sin lectura cacheada: cae al fallback determinista en el tab.
   }
 
+  // Evolución del perfil (Palanca 4-2): compara snapshots; best-effort.
+  let evolution: Evolution | null = null;
+  try {
+    evolution = buildEvolution(await getProfileSnapshots());
+  } catch {
+    // Sin historial: el tab se muestra sin la card de evolución.
+  }
+
   return (
     <ProfileDashboard
       draft={draft}
       diagnosis={buildDiagnosis(draft)}
       nextMove={nextMove}
       aiReading={aiReading}
+      evolution={evolution}
     />
   );
 }
