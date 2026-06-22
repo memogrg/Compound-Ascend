@@ -309,5 +309,16 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Sin vinculables: la IA propone sin vínculo.
   }
 
+  // Memoria conductual (Fase 4c): observaciones recientes para que el asesor las
+  // mencione con tacto. getActiveInsights dispara refreshInsights (auto-activación).
+  try {
+    const { getActiveInsights } = await import("@/lib/insights");
+    const items = await getActiveInsights(4);
+    if (items.length)
+      ctx.insights = items.map((i) => ({ severity: i.severity, title: i.title, body: i.body }));
+  } catch {
+    // Sin insights: el contexto sigue.
+  }
+
   return ctx;
 }
