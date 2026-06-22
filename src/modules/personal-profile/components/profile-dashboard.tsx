@@ -103,6 +103,27 @@ export function ProfileDashboard({
   const topConcern = pick(O.CONCERNS, draft.mainConcerns?.[0] ?? draft.mainConcern);
   const emotion = EMOTION_LABEL[arche.dominantEmotion];
 
+  // Relación con el dinero (B2b): lectura interpretativa en 2ª persona (solo lo que aplique).
+  const relation: { label: string; text: string }[] = [];
+  const decide =
+    typeof draft.discipline === "number" && draft.discipline >= 7
+      ? "con estructura y visión de largo plazo"
+      : draft.reviewHabit === "semanal" || draft.reviewHabit === "diario"
+        ? "revisando seguido"
+        : null;
+  if (decide) relation.push({ label: "Cómo decides", text: decide });
+  const spend =
+    typeof draft.impulsivity === "number" && draft.impulsivity <= 3
+      ? "con autocontrol, sin depender de fuerza de voluntad"
+      : typeof draft.impulsivity === "number" && draft.impulsivity >= 7
+        ? "según tu ánimo: conviene una regla simple antes de comprar"
+        : null;
+  if (spend) relation.push({ label: "Cómo gastas", text: spend });
+  const motiva = r?.moneyScriptReading ?? (dominantValue ? lc(dominantValue) : null);
+  if (motiva) relation.push({ label: "Qué te motiva", text: motiva });
+  const careOf = r?.hiddenRisk.body ?? r?.moneyScriptReading ?? null;
+  if (careOf) relation.push({ label: "Qué cuidar", text: careOf });
+
   return (
     <div className="grid">
       {/* Hero v2: lidera con el arquetipo (lectura espejo); fallback al hero clásico */}
@@ -444,14 +465,55 @@ export function ProfileDashboard({
             <ChipList items={topics} />
           </div>
         ) : null}
+        {relation.length > 0 ? (
+          <div style={{ marginTop: 16, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+            <div className="label" style={{ fontSize: 11.5, marginBottom: 8 }}>
+              Tu lectura, en corto
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {relation.map((it, i) => (
+                <div key={i} style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
+                  <strong style={{ color: "var(--ink)" }}>{it.label}:</strong> {it.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       {/* Riesgo y protección */}
       <section className="cols-2">
         <Card title="Perfil de riesgo">
-          <div className="num-xl" style={{ fontSize: 24, marginBottom: 10 }}>
+          <div className="num-xl" style={{ fontSize: 24, marginBottom: 6 }}>
             {O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass}
           </div>
+          <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)" }}>
+            {O.RISK_READING[diagnosis.riskClass]}
+          </p>
+          <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 10 }}>
+            <strong>Esto te permite:</strong> {O.RISK_ALLOWS[diagnosis.riskClass]}
+          </p>
+          <div className="label" style={{ fontSize: 11.5, marginTop: 12, marginBottom: 6 }}>
+            Debes cuidar
+          </div>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
+            {O.RISK_GUARD[diagnosis.riskClass].map((g, i) => (
+              <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <Icon name="chev" width={2} />
+                <span style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>{g}</span>
+              </li>
+            ))}
+          </ul>
+          <div style={{ marginTop: 14 }} />
           <Info
             label="Ante una caída del 15%"
             value={pick(O.LOSS_REACTIONS, draft.lossReaction) ?? undefined}
