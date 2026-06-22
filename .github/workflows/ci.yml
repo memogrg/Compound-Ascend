@@ -64,14 +64,20 @@ jobs:
         run: |
           supabase start
           supabase migration up --local
-          # Exporta URL + service-role del stack efímero al entorno del job.
+          # Exporta URL + claves del stack efímero al entorno del job.
           # `supabase status -o env` entrecomilla los valores ("..."); hay que
           # quitar las comillas o GITHUB_ENV las conserva literales y rompen la
           # validación de URL en supabase-js (issue #94).
+          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el dev server (npm run
+          # dev) lee NEXT_PUBLIC_SUPABASE_URL/ANON_KEY en runtime para el login.
           supabase status -o env | while IFS='=' read -r key val; do
             val="${val%\"}"; val="${val#\"}"
             case "$key" in
-              API_URL) echo "SUPABASE_URL=$val" ;;
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
               SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
             esac
           done >> "$GITHUB_ENV"
