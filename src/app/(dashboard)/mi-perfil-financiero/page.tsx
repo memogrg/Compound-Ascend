@@ -4,6 +4,7 @@ import {
   getDraft,
   getHouseholdContext,
   getHouseholdProfileDraft,
+  getProfileAiReading,
 } from "@/modules/personal-profile/services/profile-service";
 import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
 import { getFinancialState } from "@/modules/personal-profile/services/financial-state";
@@ -51,8 +52,21 @@ export default async function Page() {
     // Sin estado: el tab se muestra sin la card de próxima jugada.
   }
 
+  // Lectura escrita por IA, cacheada (Palanca 3): solo lectura, best-effort.
+  let aiReading: string | null = null;
+  try {
+    aiReading = await getProfileAiReading();
+  } catch {
+    // Sin lectura cacheada: cae al fallback determinista en el tab.
+  }
+
   return (
-    <ProfileDashboard draft={draft} diagnosis={buildDiagnosis(draft)} nextMove={nextMove} />
+    <ProfileDashboard
+      draft={draft}
+      diagnosis={buildDiagnosis(draft)}
+      nextMove={nextMove}
+      aiReading={aiReading}
+    />
   );
 }
 

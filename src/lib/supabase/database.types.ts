@@ -107,6 +107,8 @@ export type PersonalProfileRow = Timestamps & {
   dominant_emotion: string | null;
   ai_tone_recommended: string | null;
   money_script: string | null;
+  ai_reading: string | null;
+  ai_reading_key: string | null;
   extra: Json;
 };
 

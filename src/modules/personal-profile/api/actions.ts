@@ -256,17 +256,53 @@ export async function generateProfileMaticesAction(): Promise<MaticesResult> {
     const arche = computeArchetype(draft);
     const name = (user.user_metadata?.display_name as string | undefined) ?? draft.displayName;
 
+    const archetypeLabel = ARCHETYPE_PLAYBOOKS[arche.primary].label;
+    const archetypeLabel2 = arche.secondary ? ARCHETYPE_PLAYBOOKS[arche.secondary].label : undefined;
+    const dominantValue = draft.dineroPrimero?.replace(/_/g, " ");
+    const topStrength = reading.strengths[0];
+    const topOpportunity = reading.opportunities[0] ?? "";
+
+    // Clave estable de los inputs: el caché se invalida solo si el perfil cambia.
+    const key = [
+      archetypeLabel,
+      archetypeLabel2 ?? "",
+      arche.moneyScript ?? "",
+      arche.dominantEmotion ?? "",
+      dominantValue ?? "",
+      topStrength ?? "",
+      topOpportunity,
+    ].join("|");
+
+    const supabase = await createSupabaseServerClient();
+    const { data: row } = await supabase
+      .from("personal_profiles")
+      .select("ai_reading, ai_reading_key")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    // Caché válido: misma clave y texto presente → no llamamos a Gemini.
+    if (row?.ai_reading_key === key && row.ai_reading) {
+      return { matices: row.ai_reading };
+    }
+
     const matices = await generateMatices({
       name,
-      archetypeLabel: ARCHETYPE_PLAYBOOKS[arche.primary].label,
-      archetypeLabel2: arche.secondary ? ARCHETYPE_PLAYBOOKS[arche.secondary].label : undefined,
-      dominantValue: draft.dineroPrimero?.replace(/_/g, " "),
+      archetypeLabel,
+      archetypeLabel2,
+      dominantValue,
       moneyScript: arche.moneyScript ?? undefined,
       dominantEmotion: arche.dominantEmotion,
       recommendedTone: reading.companionship.tone,
-      topStrength: reading.strengths[0],
-      topOpportunity: reading.opportunities[0] ?? "",
+      topStrength,
+      topOpportunity,
     });
+
+    // Solo persistimos cuando hay texto; si la IA no respondió, no tocamos el caché.
+    if (matices !== null) {
+      await supabase
+        .from("personal_profiles")
+        .update({ ai_reading: matices, ai_reading_key: key })
+        .eq("user_id", user.id);
+    }
 
     return { matices };
   } catch (err) {
