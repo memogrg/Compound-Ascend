@@ -122,6 +122,25 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).not.toContain("Arquetipo:");
   });
 
+  it("insights producen la sección de observaciones (A) y la regla de conducta (B); sin ellos no rompe", () => {
+    const conInsights = buildSystemPrompt({
+      currency: "CRC",
+      insights: [
+        { severity: "celebrar", title: "¡Estás muy cerca de \"Viaje\"!", body: "Un último empujón." },
+      ],
+    });
+    // Bloque A: sección + el insight como hecho.
+    expect(conInsights).toContain("Observaciones recientes de su comportamiento:");
+    expect(conInsights).toContain("Observación reciente (celebrar): ¡Estás muy cerca de \"Viaje\"! — Un último empujón.");
+    // Bloque B: la regla de uso con tacto.
+    expect(conInsights).toContain("Menciónalas SOLO si vienen al caso");
+
+    const sinInsights = buildSystemPrompt({ currency: "CRC" });
+    expect(sinInsights).toContain("PERFIL DEL USUARIO:");
+    expect(sinInsights).not.toContain("Observaciones recientes de su comportamiento:");
+    expect(sinInsights).not.toContain("Menciónalas SOLO si vienen al caso");
+  });
+
   it("vuelca el perfil de riesgo y los campos de Rich Life como hechos", () => {
     const prompt = buildSystemPrompt({
       currency: "CRC",

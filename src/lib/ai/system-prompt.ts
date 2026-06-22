@@ -76,6 +76,8 @@ export type FinancialContext = {
     debt: { id: string; name: string }[];
     goal: { id: string; name: string }[];
   };
+  /** Observaciones conductuales recientes (memoria conductual, Fase 4). */
+  insights?: { severity: string; title: string; body: string }[];
 };
 
 export function buildSystemPrompt(ctx: FinancialContext): string {
@@ -152,6 +154,14 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.futureImage) facts.push(`Imagen de su futuro: ${ctx.futureImage}.`);
   if (ctx.desiredFeelings?.length)
     facts.push(`Quiere sentir al usar la app: ${ctx.desiredFeelings.join(", ")}.`);
+
+  // Memoria conductual (Fase 4): observaciones recientes detectadas.
+  if (ctx.insights?.length) {
+    facts.push("Observaciones recientes de su comportamiento:");
+    for (const i of ctx.insights) {
+      facts.push(`Observación reciente (${i.severity}): ${i.title} — ${i.body}`);
+    }
+  }
 
   // Vinculables: la IA puede proponer la transacción ya conectada a su entidad.
   const linkFacts: string[] = [];
@@ -259,6 +269,12 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     behaviorRules.push("Sin fondo de emergencia y bajo presión: prioriza estabilidad y construir el fondo de emergencia antes que cualquier inversión de riesgo; no propongas estrategias agresivas.");
   if (ctx.dependentsCount !== undefined && ctx.dependentsCount > 0)
     behaviorRules.push("Tiene dependientes: prioriza la protección (seguro, fondo de emergencia) antes que estrategias agresivas.");
+
+  // Memoria conductual (Fase 4): cómo usar las observaciones recientes.
+  if (ctx.insights?.length)
+    behaviorRules.push(
+      "Tienes observaciones recientes de su comportamiento. Menciónalas SOLO si vienen al caso, con tacto y sin juicio; conéctalas con su meta o Rich Life; celebra las positivas; respeta su intensidad de alertas y su arquetipo. No las enumeres mecánicamente.",
+    );
 
   return [
     "Eres Ascend AI, el asesor financiero personal de la app Compound Ascend.",
