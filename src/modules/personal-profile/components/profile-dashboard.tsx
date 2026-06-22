@@ -5,6 +5,7 @@ import type { Option } from "@/modules/personal-profile/constants";
 import type { Archetype, ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
 import type { NextMove } from "@/modules/personal-profile/engine/next-move";
+import type { Evolution } from "@/modules/personal-profile/engine/evolution";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
 
 /** Etiquetas en español de la emoción dominante (para el motor financiero). */
@@ -43,6 +44,12 @@ function pickMany(options: Option[], values?: string[]): string[] {
 function lc(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
 }
+/** "YYYY-MM-DD" → fecha legible en español (cae al ISO si no parsea). */
+function formatSince(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" });
+}
 
 /**
  * Dashboard de resultados del perfil financiero: muestra todo lo capturado en
@@ -54,6 +61,7 @@ export function ProfileDashboard({
   readOnly = false,
   nextMove,
   aiReading,
+  evolution,
 }: {
   draft: ProfileDraft;
   diagnosis: ProfileDiagnosis;
@@ -63,6 +71,8 @@ export function ProfileDashboard({
   nextMove?: NextMove;
   /** Nota personal escrita por la IA, cacheada (Palanca 3); fallback al determinista. */
   aiReading?: string | null;
+  /** Evolución del perfil en el tiempo (Palanca 4-2); solo se muestra al dueño. */
+  evolution?: Evolution | null;
 }) {
   const completion = diagnosis.completion;
   const concerns = pickMany(
@@ -225,6 +235,32 @@ export function ProfileDashboard({
             <Icon name="chev" width={2} />
           </Link>
         </div>
+      ) : null}
+
+      {/* Cómo has evolucionado (Palanca 4-2): solo avances, framing positivo. */}
+      {evolution && !readOnly ? (
+        <Card title="Cómo has evolucionado">
+          <div className="label" style={{ fontSize: 11.5 }}>
+            Desde {formatSince(evolution.since)}
+          </div>
+          <ul
+            style={{
+              margin: "10px 0 0",
+              paddingLeft: 0,
+              listStyle: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {evolution.changes.map((c, i) => (
+              <li key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <Icon name="spark" width={2.2} />
+                <span style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>{c}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       ) : null}
 
       {/* Lectura espejo (B1): identidad-frase, números, significado, superpoder, riesgo, IA */}
