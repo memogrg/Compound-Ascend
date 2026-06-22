@@ -13,6 +13,7 @@ import * as O from "@/modules/personal-profile/constants";
 import { saveDraftAction, completeOnboardingAction } from "@/modules/personal-profile/api/actions";
 import { computeCompletion } from "@/modules/personal-profile/engine/diagnosis";
 import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
+import type { NextMove } from "@/modules/personal-profile/engine/next-move";
 import { cn } from "@/lib/utils";
 
 type Update = (patch: Partial<ProfileDraft>) => void;
@@ -597,6 +598,7 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
   const [index, setIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [diagnosis, setDiagnosis] = useState<ProfileDiagnosis | null>(null);
+  const [nextMove, setNextMove] = useState<NextMove | null>(null);
   // Pantalla inicial de 3 opciones; si ya hay borrador, va directo al wizard.
   const resuming = Boolean(initialDraft && Object.keys(initialDraft).length > 0);
   const [started, setStarted] = useState(resuming);
@@ -632,6 +634,7 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
     const res = await completeOnboardingAction({ ...draft, goalDetails });
     setFinishing(false);
     setDiagnosis(res.diagnosis);
+    setNextMove(res.nextMove ?? null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -639,7 +642,8 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
     return (
       <ProfileSummary
         diagnosis={diagnosis}
-        onContinue={() => router.push("/dashboard")}
+        nextMove={nextMove}
+        onContinue={() => router.push(nextMove?.route ?? "/dashboard")}
         onViewProfile={() => router.push("/mi-perfil-financiero")}
         onEdit={() => setDiagnosis(null)}
       />

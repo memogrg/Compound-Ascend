@@ -63,7 +63,13 @@ export async function startManualAction(): Promise<StartResult> {
     return { ok: true }; // no bloqueamos la navegación
   }
 }
-export type CompleteResult = { ok: boolean; diagnosis: ProfileDiagnosis; persisted: boolean };
+export type CompleteResult = {
+  ok: boolean;
+  diagnosis: ProfileDiagnosis;
+  persisted: boolean;
+  /** Próxima jugada dinámica calculada del estado financiero real (Palanca 1). */
+  nextMove?: import("@/modules/personal-profile/engine/next-move").NextMove;
+};
 
 const inviteSchema = z.array(z.string().trim().email().max(120)).min(1).max(4);
 
@@ -345,10 +351,22 @@ export async function completeOnboardingAction(draft: ProfileDraft): Promise<Com
 
   try {
     const { completion, riskClass } = await completeProfile(safe);
+    // Próxima jugada dinámica (Palanca 1), best-effort: no rompe el cierre.
+    let nextMove: CompleteResult["nextMove"];
+    try {
+      const { getFinancialState } = await import(
+        "@/modules/personal-profile/services/financial-state"
+      );
+      const { buildNextMove } = await import("@/modules/personal-profile/engine/next-move");
+      nextMove = buildNextMove(await getFinancialState(safe));
+    } catch {
+      // Sin estado: el cierre cae al nextMove estático del reading.
+    }
     return {
       ok: true,
       diagnosis: { ...diagnosis, completion, riskClass },
       persisted: true,
+      nextMove,
     };
   } catch (err) {
     logger.error("completeOnboarding fallido", {
