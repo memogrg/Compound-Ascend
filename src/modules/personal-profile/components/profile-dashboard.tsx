@@ -53,6 +53,7 @@ export function ProfileDashboard({
   diagnosis,
   readOnly = false,
   nextMove,
+  aiReading,
 }: {
   draft: ProfileDraft;
   diagnosis: ProfileDiagnosis;
@@ -60,6 +61,8 @@ export function ProfileDashboard({
   readOnly?: boolean;
   /** Próxima jugada dinámica (Palanca 2); solo se muestra al dueño. */
   nextMove?: NextMove;
+  /** Nota personal escrita por la IA, cacheada (Palanca 3); fallback al determinista. */
+  aiReading?: string | null;
 }) {
   const completion = diagnosis.completion;
   const concerns = pickMany(
@@ -268,7 +271,9 @@ export function ProfileDashboard({
           </Card>
 
           <Card title="Lo que esto dice de ti">
-            <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>{r.whatThisSays}</p>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}>
+              {aiReading ?? r.whatThisSays}
+            </p>
           </Card>
 
           <section className="cols-2">
