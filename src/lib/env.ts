@@ -56,6 +56,12 @@ const serverSchema = z.object({
   TWILIO_ACCOUNT_SID: optionalStr,
   TWILIO_AUTH_TOKEN: optionalStr, // también firma los webhooks (X-Twilio-Signature)
   TWILIO_WHATSAPP_NUMBER: optionalStr, // E.164, p. ej. +14155238886 (sandbox)
+  // WhatsApp (Meta Cloud API). Si están presentes, se prefiere sobre Twilio.
+  WHATSAPP_PHONE_NUMBER_ID: optionalStr, // ID del número (WhatsApp > API Setup)
+  WHATSAPP_ACCESS_TOKEN: optionalStr, // token permanente (System User)
+  WHATSAPP_VERIFY_TOKEN: optionalStr, // string propio para verificar el webhook (GET)
+  WHATSAPP_APP_SECRET: optionalStr, // firma X-Hub-Signature-256
+  WHATSAPP_API_VERSION: optionalStr, // p. ej. v21.0 (default si ausente)
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;
