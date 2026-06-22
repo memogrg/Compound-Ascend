@@ -79,6 +79,7 @@ jobs:
                 ;;
               ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
               SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
             esac
           done >> "$GITHUB_ENV"
 
@@ -87,6 +88,21 @@ jobs:
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # Un ingreso mínimo para que health.hasData sea true y /dashboard pinte el
+      # HERO (no el EmptyState). Vía psql como superusuario: ni service_role ni
+      # authenticated tienen grant de INSERT sobre income_sources en el stack
+      # local. Idempotente (no-op si el usuario ya tiene ingresos).
+      - name: Seed datos E2E (ingreso vía SQL superuser)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -v email="$E2E_EMAIL"
+          -c "insert into public.income_sources (user_id, name, income_type, amount, currency, frequency, is_fixed, owner_scope, include_in_budget, amount_monthly_base)
+          select u.id, 'Salario E2E', 'activo', 1000000, 'CRC', 'mensual', true, 'usuario', true, 1000000
+          from auth.users u
+          where u.email = :'email'
+          and not exists (select 1 from public.income_sources i where i.user_id = u.id);"
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
