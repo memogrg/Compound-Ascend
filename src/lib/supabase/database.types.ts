@@ -585,6 +585,14 @@ export type PortfolioSnapshotRow = {
   created_at: string;
 };
 
+export type ProfileSnapshotRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  captured_on: string;
+  metrics: Json;
+};
+
 export type UserInsightRow = Timestamps & {
   id: string;
   user_id: string;
@@ -710,6 +718,7 @@ export interface Database {
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
       user_insights: UserTable<UserInsightRow>;
+      profile_snapshots: UserTable<ProfileSnapshotRow>;
       market_price_cache: TableShape<
         MarketPriceCacheRow,
         Partial<MarketPriceCacheRow> & {

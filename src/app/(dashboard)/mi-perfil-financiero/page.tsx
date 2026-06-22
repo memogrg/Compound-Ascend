@@ -8,6 +8,7 @@ import {
 } from "@/modules/personal-profile/services/profile-service";
 import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
 import { getFinancialState } from "@/modules/personal-profile/services/financial-state";
+import { captureProfileSnapshot } from "@/modules/personal-profile/services/profile-snapshots";
 import { buildNextMove, type NextMove } from "@/modules/personal-profile/engine/next-move";
 import { ProfileDashboard } from "@/modules/personal-profile/components/profile-dashboard";
 import { EmptyState } from "@/components/shared/states";
@@ -43,6 +44,9 @@ export default async function Page() {
   if (Object.keys(draft).length === 0) {
     return <StartProfile />;
   }
+
+  // Snapshot diario del perfil (Palanca 4): captura idempotente, best-effort.
+  await captureProfileSnapshot(draft);
 
   // Próxima jugada dinámica (Palanca 2): se calcula del estado financiero real.
   let nextMove: NextMove | undefined;
