@@ -4,6 +4,7 @@ import * as O from "@/modules/personal-profile/constants";
 import type { Option } from "@/modules/personal-profile/constants";
 import type { Archetype, ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
+import type { NextMove } from "@/modules/personal-profile/engine/next-move";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
 
 /** Etiquetas en español de la emoción dominante (para el motor financiero). */
@@ -51,11 +52,14 @@ export function ProfileDashboard({
   draft,
   diagnosis,
   readOnly = false,
+  nextMove,
 }: {
   draft: ProfileDraft;
   diagnosis: ProfileDiagnosis;
   /** Vista del invitado: hereda el perfil del hogar, sin acciones de edición. */
   readOnly?: boolean;
+  /** Próxima jugada dinámica (Palanca 2); solo se muestra al dueño. */
+  nextMove?: NextMove;
 }) {
   const completion = diagnosis.completion;
   const concerns = pickMany(
@@ -205,6 +209,20 @@ export function ProfileDashboard({
           </div>
         </section>
       )}
+
+      {/* Próxima jugada dinámica (Palanca 2): la única siguiente acción de impacto. */}
+      {nextMove && !readOnly ? (
+        <div className="card card-pad" style={{ borderLeft: "3px solid var(--pos)" }}>
+          <div className="card-title">{nextMove.title}</div>
+          <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 8 }}>
+            {nextMove.body}
+          </p>
+          <Link className="btn btn-primary" href={nextMove.route} style={{ marginTop: 14 }}>
+            {nextMove.cta}
+            <Icon name="chev" width={2} />
+          </Link>
+        </div>
+      ) : null}
 
       {/* Lectura espejo (B1): identidad-frase, números, significado, superpoder, riesgo, IA */}
       {r ? (
