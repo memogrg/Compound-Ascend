@@ -20,10 +20,12 @@
 
 grant usage on schema public to anon, authenticated, service_role;
 
--- Objetos existentes.
+-- Objetos existentes. No se conceden routines en bloque: las funciones del app
+-- ya llevan su propio `grant execute` donde hace falta, y PG concede EXECUTE a
+-- PUBLIC por defecto — un `grant all on all routines` solo añade ruido
+-- (warnings 01007 sobre funciones de extensiones como citext).
 grant all on all tables    in schema public to anon, authenticated, service_role;
 grant all on all sequences in schema public to anon, authenticated, service_role;
-grant all on all routines  in schema public to anon, authenticated, service_role;
 
 -- Objetos futuros (creados por el rol que corre las migraciones): heredan el
 -- grant, de modo que las próximas migraciones no necesiten repetirlo.
@@ -31,5 +33,3 @@ alter default privileges in schema public
   grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public
   grant all on sequences to anon, authenticated, service_role;
-alter default privileges in schema public
-  grant all on routines to anon, authenticated, service_role;
