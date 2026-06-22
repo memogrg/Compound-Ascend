@@ -59,6 +59,11 @@ jobs:
         uses: supabase/setup-cli@v2
         with:
           version: latest
+        env:
+          # Autentica la consulta a la API de GitHub que resuelve el release
+          # "latest"; sin token pega contra el límite de 60/h por IP del runner.
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Levantar Supabase local + migraciones
         run: |
