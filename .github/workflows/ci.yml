@@ -88,17 +88,9 @@ jobs:
             esac
           done >> "$GITHUB_ENV"
 
-      # El stack local (solo migraciones) no concede privilegios a los roles de
-      # Supabase, así que la app (rol authenticated) no puede leer/escribir las
-      # tablas y el dashboard sale vacío. Supabase cloud ya los tiene; esto los
-      # replica. La RLS (FORCE) sigue gobernando la visibilidad por fila.
-      - name: Grants del stack local (paridad con Supabase cloud)
-        run: >
-          psql "$DB_URL" -v ON_ERROR_STOP=1
-          -c "grant usage on schema public to anon, authenticated, service_role;
-          grant all on all tables in schema public to anon, authenticated, service_role;
-          grant all on all sequences in schema public to anon, authenticated, service_role;
-          grant all on all routines in schema public to anon, authenticated, service_role;"
+      # Los grants a los roles de Supabase ahora viven en la migración
+      # 20260620000001_grants_public_roles.sql (issue #98), así que `supabase
+      # migration up` los aplica; ya no hace falta el paso de psql aquí.
 
       - name: Seed usuario E2E
         run: node scripts/seed-e2e-user.mjs
