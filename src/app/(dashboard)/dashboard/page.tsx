@@ -8,6 +8,7 @@ import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isDemoData } from "@/modules/account/services/account-service";
 import { DemoBanner } from "@/components/shared/demo-banner";
+import { Observations, type Observation } from "@/modules/dashboard/components/observations";
 
 /** Datos del panel en streaming: el shell pinta de inmediato con skeletons. */
 async function DashboardContent() {
@@ -39,6 +40,15 @@ async function DashboardContent() {
 
   const showDemoBanner = data.configured && (await isDemoData());
 
+  // Observaciones conductuales (memoria conductual, Fase 4d). Best-effort.
+  let observations: Observation[] = [];
+  try {
+    const { getActiveInsights } = await import("@/lib/insights");
+    observations = await getActiveInsights(5);
+  } catch {
+    // Sin observaciones: el panel sigue.
+  }
+
   return (
     <>
       {showDemoBanner ? (
@@ -46,6 +56,7 @@ async function DashboardContent() {
           <DemoBanner />
         </div>
       ) : null}
+      <Observations observations={observations} />
       <DashboardView
         name={data.name}
         summary={data.summary}
