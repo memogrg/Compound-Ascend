@@ -83,14 +83,19 @@ export function ProfileDashboard({
   if (typeof draft.impulsivity === "number")
     knows.push(`Tu impulsividad es ${draft.impulsivity}/10.`);
 
-  // Mapa de arquetipos (B2a): top 3 por peso relativo del scoring.
+  // Mapa de arquetipos (B2a): top 3 normalizado para sumar exactamente 100%.
   const arche = computeArchetype(draft);
-  const totalScore = Object.values(arche.scores).reduce((a, b) => a + b, 0);
-  const bars = Object.entries(arche.scores)
+  const top3 = Object.entries(arche.scores)
     .filter(([, s]) => s > 0)
-    .map(([a, s]) => ({ label: ARCHETYPE_PLAYBOOKS[a as Archetype].label, pct: Math.round((s / totalScore) * 100) }))
-    .sort((x, y) => y.pct - x.pct)
+    .sort((x, y) => y[1] - x[1])
     .slice(0, 3);
+  const subtotal = top3.reduce((acc, [, s]) => acc + s, 0);
+  const bars = top3.map(([a, s]) => ({
+    label: ARCHETYPE_PLAYBOOKS[a as Archetype].label,
+    pct: Math.round((s / subtotal) * 100),
+  }));
+  // Ajuste de redondeo: la barra mayor absorbe la diferencia para totalizar 100%.
+  if (bars[0]) bars[0].pct += 100 - bars.reduce((acc, b) => acc + b.pct, 0);
 
   // Motor financiero (B2a): manifiesto en 2ª persona + mini-stats (solo lo que exista).
   const dominantValue = pick(O.DINERO_PRIMERO, draft.dineroPrimero);
