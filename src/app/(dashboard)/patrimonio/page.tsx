@@ -12,6 +12,10 @@ import { GrowthView } from "@/modules/wealth/components/growth-view";
 import { PortfolioView } from "@/modules/wealth/components/portfolio-view";
 import { WealthActions } from "@/modules/wealth/components/wealth-actions";
 import { Icon } from "@/components/ui/icon";
+import { getDraft } from "@/modules/personal-profile/services/profile-service";
+import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
+import { buildWealthAdvice, type WealthAdvice } from "@/modules/wealth/engine/wealth-advice";
+import { AdvisorNote } from "@/components/shared/advisor-note";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 
 /**
@@ -31,14 +35,44 @@ async function PortfolioSection({ summary }: { summary: WealthSummary }) {
     listDividends(),
     getBaseSummary(),
   ]);
+
+  // Nota del asesor (Fase 5b): recomendación sobre el patrimonio en su tono. Best-effort.
+  let advice: WealthAdvice | null = null;
+  try {
+    const draft = await getDraft();
+    if (Object.keys(draft).length > 0) {
+      const diag = buildDiagnosis(draft);
+      const slices = Object.values(report.analytics.allocation);
+      const top = slices.reduce<(typeof slices)[number] | undefined>(
+        (a, b) => (a && a.pct >= b.pct ? a : b),
+        undefined,
+      );
+      advice = buildWealthAdvice({
+        archetypeLabel: diag.archetypeLabel,
+        riskClass: diag.riskClass,
+        hasEmergencyFund: draft.hasEmergencyFund,
+        dominantValue: draft.dineroPrimero?.replace(/_/g, " "),
+        value: report.analytics.totalPortfolioValue,
+        topLabel: top?.label,
+        topPct: top?.pct,
+        holdingsCount: report.holdings.length,
+      });
+    }
+  } catch {
+    // Sin perfil/diagnóstico: la sección sigue sin la nota.
+  }
+
   return (
-    <PortfolioView
-      report={report}
-      snapshots={snapshots}
-      dividends={dividends}
-      summary={summary}
-      investmentRate={base.indicators.investmentRate}
-    />
+    <>
+      {advice ? <AdvisorNote {...advice} /> : null}
+      <PortfolioView
+        report={report}
+        snapshots={snapshots}
+        dividends={dividends}
+        summary={summary}
+        investmentRate={base.indicators.investmentRate}
+      />
+    </>
   );
 }
 
