@@ -40,6 +40,13 @@ function pick(options: Option[], value?: string): string | null {
 function pickMany(options: Option[], values?: string[]): string[] {
   return (values ?? []).map((v) => options.find((o) => o.value === v)?.label ?? v);
 }
+/** Paleta de 3 tonos de verde para el donut de arquetipos (top 3). */
+const ARCH_COLORS = [
+  "var(--pos)",
+  "color-mix(in srgb, var(--pos) 55%, var(--bg))",
+  "color-mix(in srgb, var(--pos) 30%, var(--bg))",
+];
+
 /** Minúscula inicial para hilar etiquetas dentro de una frase ("Buscas comprar casa."). */
 function lc(s: string): string {
   return s.charAt(0).toLowerCase() + s.slice(1);
@@ -140,6 +147,19 @@ export function ProfileDashboard({
   if (motiva) relation.push({ label: "Qué te motiva", text: motiva });
   const careOf = r?.hiddenRisk.body ?? r?.moneyScriptReading ?? null;
   if (careOf) relation.push({ label: "Qué cuidar", text: careOf });
+
+  // Protección (Palanca 5): lectura de la base + brechas a fortalecer.
+  const protectionReading =
+    draft.hasEmergencyFund === "si"
+      ? "Tu base está cubierta: tienes fondo de emergencia, el cimiento que te deja crecer tranquilo."
+      : draft.hasEmergencyFund === "construyendo"
+        ? "Estás construyendo tu fondo de emergencia — vas en camino a una base sólida."
+        : "Tu base aún está expuesta: construir tu fondo de emergencia es tu próxima prioridad.";
+  const protectionGaps: string[] = [];
+  if (insurances.length === 0)
+    protectionGaps.push("Sin seguros registrados: vale revisar tu cobertura ante imprevistos.");
+  if ((draft.dependentsCount ?? 0) > 0)
+    protectionGaps.push("Con dependientes, prioriza seguro de vida y un fondo más amplio.");
 
   return (
     <div className="grid">
@@ -275,17 +295,12 @@ export function ProfileDashboard({
           ) : null}
 
           <Card title="Tu lectura en números">
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                gap: 10,
-              }}
-            >
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {r.scorecard.map((s, i) => (
                 <div
                   key={i}
                   style={{
+                    flex: "1 1 160px",
                     border: "1px solid var(--line)",
                     borderRadius: 12,
                     padding: "10px 12px",
@@ -369,25 +384,66 @@ export function ProfileDashboard({
       {/* Mapa de arquetipos (B2a) */}
       {bars.length > 0 ? (
         <Card title="Tu mapa de arquetipos">
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {bars.map((b, i) => (
-              <div key={i}>
-                <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>
-                    {b.label}
+          <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ position: "relative", width: 120, height: 120, flex: "none" }}>
+              <svg width="120" height="120" viewBox="0 0 42 42">
+                <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="5" />
+                {bars.map((b, i) => {
+                  const start = bars.slice(0, i).reduce((s, x) => s + x.pct, 0);
+                  return (
+                    <circle
+                      key={i}
+                      cx="21"
+                      cy="21"
+                      r="15.915"
+                      fill="none"
+                      stroke={ARCH_COLORS[i] ?? "var(--pos)"}
+                      strokeWidth="5"
+                      pathLength={100}
+                      strokeDasharray={`${b.pct} ${100 - b.pct}`}
+                      strokeDashoffset={`${25 - start}`}
+                      strokeLinecap="butt"
+                    />
+                  );
+                })}
+              </svg>
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                }}
+              >
+                {bars[0]?.pct ?? 0}%
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 10 }}>
+              {bars.map((b, i) => (
+                <div key={i} className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 999,
+                        background: ARCH_COLORS[i] ?? "var(--pos)",
+                        flex: "none",
+                      }}
+                    />
+                    <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>
+                      {b.label}
+                    </span>
                   </span>
-                  <span className="tnum" style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
+                  <span className="tnum" style={{ fontSize: 12.5, color: "var(--ink-2)", flex: "none" }}>
                     {b.pct}%
                   </span>
                 </div>
-                <div className="bar-track" style={{ height: 10 }}>
-                  <div
-                    className="bar-fill"
-                    style={{ width: `${b.pct}%`, background: "var(--pos)" }}
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           <p className="muted" style={{ fontSize: 12.5, marginTop: 14, lineHeight: 1.5 }}>
             Tu perfil no es una etiqueta fija: es una lectura que evoluciona con tus hábitos, metas
@@ -591,10 +647,15 @@ export function ProfileDashboard({
           />
         </Card>
         <Card title="Tu protección">
-          <Info
-            label="Fondo de emergencia"
-            value={draft.hasEmergencyFund ? EMERGENCY[draft.hasEmergencyFund] : undefined}
-          />
+          <p style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
+            {protectionReading}
+          </p>
+          <div style={{ marginTop: 8 }}>
+            <Info
+              label="Fondo de emergencia"
+              value={draft.hasEmergencyFund ? EMERGENCY[draft.hasEmergencyFund] : undefined}
+            />
+          </div>
           {insurances.length > 0 ? (
             <div style={{ marginTop: 12 }}>
               <div className="label" style={{ marginBottom: 6 }}>
@@ -602,11 +663,31 @@ export function ProfileDashboard({
               </div>
               <ChipList items={insurances} />
             </div>
-          ) : (
-            <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
-              Sin seguros registrados.
-            </p>
-          )}
+          ) : null}
+          {protectionGaps.length > 0 ? (
+            <div style={{ marginTop: 14 }}>
+              <div className="label" style={{ marginBottom: 6 }}>
+                A fortalecer
+              </div>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 0,
+                  listStyle: "none",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
+                {protectionGaps.map((g, i) => (
+                  <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <Icon name="chev" width={2} />
+                    <span style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>{g}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </Card>
       </section>
 
