@@ -9,13 +9,22 @@
  */
 import { createClient } from "@supabase/supabase-js";
 
-const url = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+/** Quita comillas y espacios envolventes (defensa ante exports tipo KEY="val"). */
+const clean = (v) => v?.trim().replace(/^["']|["']$/g, "");
+
+const url = clean(process.env.SUPABASE_URL);
+const serviceKey = clean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 const email = process.env.E2E_EMAIL ?? "e2e@ci.local";
 const password = process.env.E2E_PASSWORD;
 
 if (!url || !serviceKey || !password) {
   console.error("Faltan SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / E2E_PASSWORD");
+  process.exit(1);
+}
+
+if (!/^https?:\/\//i.test(url)) {
+  // Causa típica: el valor llegó con comillas literales desde GITHUB_ENV (issue #94).
+  console.error(`SUPABASE_URL inválida (debe empezar con http(s)://). Recibido: ${JSON.stringify(url)}`);
   process.exit(1);
 }
 
@@ -52,5 +61,9 @@ await admin.from("profiles").upsert(
   { id: userId, display_name: "E2E Bot", onboarding_completed: true },
   { onConflict: "id" },
 );
+
+// Los datos financieros mínimos (un ingreso, para que el dashboard tenga datos)
+// se siembran por SQL como superusuario en el workflow: ni service_role ni
+// authenticated tienen grant de INSERT sobre income_sources en el stack local.
 
 console.log("Seed E2E listo:", email);

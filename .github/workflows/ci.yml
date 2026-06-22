@@ -46,9 +46,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Node 22: supabase-js >=2.1xx inicializa Realtime en `createClient` y
+      # requiere WebSocket nativo (ausente en Node 20). Ver issue #94.
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - run: npm ci
@@ -57,19 +59,73 @@ jobs:
         uses: supabase/setup-cli@v2
         with:
           version: latest
+        env:
+          # Autentica la consulta a la API de GitHub que resuelve el release
+          # "latest"; sin token pega contra el límite de 60/h por IP del runner.
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Levantar Supabase local + migraciones
         run: |
           supabase start
           supabase migration up --local
-          # Exporta URL + service-role del stack efímero al entorno del job.
-          supabase status -o env | sed -E 's/^API_URL=/SUPABASE_URL=/; s/^SERVICE_ROLE_KEY=/SUPABASE_SERVICE_ROLE_KEY=/' >> "$GITHUB_ENV"
+          # Exporta URL + claves del stack efímero al entorno del job.
+          # `supabase status -o env` entrecomilla los valores ("..."); hay que
+          # quitar las comillas o GITHUB_ENV las conserva literales y rompen la
+          # validación de URL en supabase-js (issue #94).
+          # El seeder usa SUPABASE_URL/SERVICE_ROLE_KEY; el dev server (npm run
+          # dev) lee NEXT_PUBLIC_SUPABASE_URL/ANON_KEY en runtime para el login.
+          supabase status -o env | while IFS='=' read -r key val; do
+            val="${val%\"}"; val="${val#\"}"
+            case "$key" in
+              API_URL)
+                echo "SUPABASE_URL=$val"
+                echo "NEXT_PUBLIC_SUPABASE_URL=$val"
+                ;;
+              ANON_KEY) echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$val" ;;
+              SERVICE_ROLE_KEY) echo "SUPABASE_SERVICE_ROLE_KEY=$val" ;;
+              DB_URL) echo "DB_URL=$val" ;;
+            esac
+          done >> "$GITHUB_ENV"
+
+      # El stack local (solo migraciones) no concede privilegios a los roles de
+      # Supabase, así que la app (rol authenticated) no puede leer/escribir las
+      # tablas y el dashboard sale vacío. Supabase cloud ya los tiene; esto los
+      # replica. La RLS (FORCE) sigue gobernando la visibilidad por fila.
+      - name: Grants del stack local (paridad con Supabase cloud)
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "grant usage on schema public to anon, authenticated, service_role;
+          grant all on all tables in schema public to anon, authenticated, service_role;
+          grant all on all sequences in schema public to anon, authenticated, service_role;
+          grant all on all routines in schema public to anon, authenticated, service_role;"
 
       - name: Seed usuario E2E
         run: node scripts/seed-e2e-user.mjs
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # Datos mínimos para el smoke: un ingreso (para que health.hasData sea
+      # true y /dashboard pinte el HERO en vez del EmptyState) y un holding
+      # (para que /patrimonio liste una posición). Vía psql como superusuario:
+      # ni service_role ni authenticated tienen grant de INSERT en el stack
+      # local. Idempotente (no-op si el usuario ya tiene esos datos).
+      - name: Seed datos E2E (ingreso + holding vía SQL superuser)
+        env:
+          E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
+        run: >
+          psql "$DB_URL" -v ON_ERROR_STOP=1
+          -c "insert into public.income_sources (user_id, name, income_type, amount, currency, frequency, is_fixed, owner_scope, include_in_budget, amount_monthly_base)
+          select u.id, 'Salario E2E', 'activo', 1000000, 'CRC', 'mensual', true, 'usuario', true, 1000000
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.income_sources i where i.user_id = u.id);
+          insert into public.investment_holdings (user_id, symbol, asset_type, quantity, average_cost, cost_basis, currency, label)
+          select u.id, 'VOO', 'etf', 10, 400, 4000, 'USD', 'VOO'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.investment_holdings h where h.user_id = u.id);"
 
       - name: Navegador Playwright
         run: npx playwright install --with-deps chromium
@@ -79,3 +135,15 @@ jobs:
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      # Evidencia del fallo: Playwright ya guarda screenshot + trace en
+      # /tmp/compound-e2e-results (only-on-failure / retain-on-failure); sin
+      # subirlos no se pueden inspeccionar. Útil para diagnosticar el smoke.
+      - name: Subir evidencia E2E (si falla)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-playwright-results
+          path: /tmp/compound-e2e-results
+          retention-days: 7
+          if-no-files-found: ignore

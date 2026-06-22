@@ -29,8 +29,10 @@ test("login → dashboard → crear gasto → patrimonio", async ({ page }) => {
     }
   }
 
-  // 2) Dashboard carga con datos (streaming incluido)
-  await expect(page.getByText("FLUJO DE CAJA MENSUAL")).toBeVisible({ timeout: 20_000 });
+  // 2) Dashboard carga con datos (streaming incluido).
+  // El label se ve en mayúsculas por CSS (text-transform), pero el texto del
+  // DOM es "Flujo de caja mensual"; getByText matchea el DOM, no el render.
+  await expect(page.getByText(/flujo de caja mensual/i)).toBeVisible({ timeout: 20_000 });
 
   // 3) Crear un gasto desde el tab Gastos (frascos)
   await page.goto("/gastos");
