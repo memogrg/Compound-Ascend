@@ -97,11 +97,11 @@ jobs:
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
         run: >
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -v email="$E2E_EMAIL"
+          psql "$DB_URL" -v ON_ERROR_STOP=1
           -c "insert into public.income_sources (user_id, name, income_type, amount, currency, frequency, is_fixed, owner_scope, include_in_budget, amount_monthly_base)
           select u.id, 'Salario E2E', 'activo', 1000000, 'CRC', 'mensual', true, 'usuario', true, 1000000
           from auth.users u
-          where u.email = :'email'
+          where u.email = '$E2E_EMAIL'
           and not exists (select 1 from public.income_sources i where i.user_id = u.id);"
 
       - name: Navegador Playwright
