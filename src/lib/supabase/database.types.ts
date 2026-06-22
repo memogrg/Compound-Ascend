@@ -583,6 +583,20 @@ export type PortfolioSnapshotRow = {
   created_at: string;
 };
 
+export type UserInsightRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  kind: string;
+  severity: string;
+  title: string;
+  body: string;
+  metric: number | null;
+  related_kind: string | null;
+  related_id: string | null;
+  status: string;
+};
+
 export type InsurancePolicyRow = Timestamps & {
   id: string;
   user_id: string;
@@ -693,6 +707,7 @@ export interface Database {
       watchlist_symbols: UserTable<WatchlistSymbolRow>;
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
+      user_insights: UserTable<UserInsightRow>;
       market_price_cache: TableShape<
         MarketPriceCacheRow,
         Partial<MarketPriceCacheRow> & {
