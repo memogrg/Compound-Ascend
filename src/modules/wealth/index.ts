@@ -15,6 +15,8 @@ export {
 } from "./engine/portfolio-engine";
 export { getWealthSummary, buildDemoWealthSummary } from "./services/wealth-service";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
+export { getPatrimonioReport } from "./services/patrimonio-service";
+export type { PatrimonioServiceResult } from "./services/patrimonio-service";
 export { getSnapshotHistory, generateAndSaveSnapshot } from "./services/snapshot-service";
 export { getInvestmentInsights } from "./services/investment-insights";
 export { getMacroInsights, type MacroInsight } from "./services/macro-insights";
@@ -26,6 +28,8 @@ export type {
   Investment,
   InsurancePolicy,
   PolicyType,
+  ProtectionDiagnosis,
+  PortfolioStats,
   Holding,
   HoldingPerformance,
   Dividend,
