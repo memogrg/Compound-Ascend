@@ -171,6 +171,8 @@ export type Holding = {
   region?: string | null;
   /** Si el aporte mensual es real (recurrente). */
   isRecurring?: boolean;
+  /** Aporte mensual del recurrente, separado del total invertido (migración 20260623000001). */
+  monthlyContribution?: number | null;
 };
 
 /** Evento de renta recibida (fuente: tabla rental_payments). */

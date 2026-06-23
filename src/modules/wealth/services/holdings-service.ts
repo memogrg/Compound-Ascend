@@ -43,6 +43,7 @@ export function rowToHolding(r: {
   income_month?: number | null;
   region?: string | null;
   is_recurring?: boolean | null;
+  monthly_contribution?: number | null;
 }): Holding {
   return {
     id: r.id,
@@ -65,11 +66,12 @@ export function rowToHolding(r: {
     incomeMonth: r.income_month == null ? null : Number(r.income_month),
     region: r.region ?? null,
     isRecurring: r.is_recurring ?? false,
+    monthlyContribution: r.monthly_contribution == null ? null : Number(r.monthly_contribution),
   };
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -132,6 +134,8 @@ function taxonomyColumns(input: HoldingInput) {
     income_month: input.incomeMonth ?? null,
     region: input.region ?? null,
     is_recurring: input.isRecurring ?? false,
+    // Solo el recurrente lleva aporte mensual; el resto lo deja en NULL.
+    monthly_contribution: input.isRecurring ? (input.monthlyContribution ?? null) : null,
   };
 }
 

@@ -474,9 +474,9 @@ function InvRow({
         </div>
         <div className="inv-amt">{formatMoney(h.costBasis, h.currency)}</div>
         <div className="inv-amt c-aporte">
-          {h.isRecurring ? (
+          {h.isRecurring && h.monthlyContribution ? (
             <>
-              {formatMoney(h.costBasis, h.currency)}
+              {formatMoney(h.monthlyContribution, h.currency)}
               <span className="s">/mes</span>
             </>
           ) : (
