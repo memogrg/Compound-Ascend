@@ -11,7 +11,6 @@ import { listPendingHoldings } from "@/modules/wealth/services/holdings-service"
 import { PendingHoldingsCard } from "@/modules/wealth/components/pending-holdings-card";
 import { GrowthView } from "@/modules/wealth/components/growth-view";
 import { PortfolioView } from "@/modules/wealth/components/portfolio-view";
-import { WealthActions } from "@/modules/wealth/components/wealth-actions";
 import { Icon } from "@/components/ui/icon";
 import { getDraft } from "@/modules/personal-profile/services/profile-service";
 import { buildDiagnosis } from "@/modules/personal-profile/engine/diagnosis";
@@ -119,7 +118,6 @@ export default async function Page() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <WealthActions mode="investment" currency={summary.currency} />
           <Link className="btn btn-secondary" href="/patrimonio/indicadores">
             <Icon name="networth" width={2} /> Indicadores
           </Link>

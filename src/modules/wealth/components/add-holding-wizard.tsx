@@ -193,7 +193,6 @@ export function AddHoldingModal({
   // principal del usuario (estable) — nunca la de visualización.
   const [cur, setCur] = useState(captureCurrencyDefault(undefined, prefill?.currency, captureCurrency));
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
-  const [aporteMensual, setAporteMensual] = useState(""); // informativo (sin columna aún)
 
   // ── Perfil A (cotizado) ──
   const [symbol, setSymbol] = useState(prefill?.symbol ?? "");
@@ -390,8 +389,6 @@ export function AddHoldingModal({
             onCurrency={setCur}
             aportoCadaMes={aportoCadaMes}
             onAportoCadaMes={setAportoCadaMes}
-            aporteMensual={aporteMensual}
-            onAporteMensual={setAporteMensual}
             symbol={symbol}
             onSymbol={(v) => {
               setSymbol(v);
@@ -517,52 +514,23 @@ function CategoryGroup({
           · {hint}
         </span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      <select
+        className="sel"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onChoose(e.target.value as InvestmentCategory);
+        }}
+        aria-label={`Tipo de inversión · ${title}`}
+      >
+        <option value="" disabled>
+          Elegí un tipo…
+        </option>
         {cats.map((c) => (
-          <button
-            key={c}
-            type="button"
-            className="card"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              padding: "10px 12px",
-              textAlign: "left",
-              cursor: "pointer",
-              background: "var(--surface)",
-            }}
-            onClick={() => onChoose(c)}
-          >
-            <span
-              aria-hidden
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: "var(--chip)",
-                color: "var(--ink-2)",
-                flex: "none",
-              }}
-            >
-              <Icon name={CATEGORY_META[c].icon} width={1.9} />
-            </span>
-            <span
-              style={{
-                fontSize: 12.5,
-                fontWeight: 500,
-                color: "var(--ink)",
-                lineHeight: 1.25,
-              }}
-            >
-              {CATEGORY_META[c].label}
-            </span>
-          </button>
+          <option key={c} value={c}>
+            {CATEGORY_META[c].label}
+          </option>
         ))}
-      </div>
+      </select>
     </div>
   );
 }
@@ -579,8 +547,6 @@ function Step2Fields(props: {
   onCurrency: (v: string) => void;
   aportoCadaMes: boolean;
   onAportoCadaMes: (v: boolean) => void;
-  aporteMensual: string;
-  onAporteMensual: (v: string) => void;
   symbol: string;
   onSymbol: (v: string) => void;
   quantity: string;
@@ -621,7 +587,9 @@ function Step2Fields(props: {
       {/* Monto invertido + moneda */}
       <div className="fld-2">
         <div className="fld">
-          <label className="fld-label">Monto invertido</label>
+          <label className="fld-label">
+            {props.aportoCadaMes ? "Aporte mensual" : "Monto invertido"}
+          </label>
           <div className="inp-money">
             <span className="pre">{currencySymbol(cur)}</span>
             <input
@@ -789,23 +757,8 @@ function Step2Fields(props: {
           onChange={(e) => props.onAportoCadaMes(e.target.checked)}
         />
         Aporto cada mes
-        <HelpTip text="Marca esta posición como aporte recurrente. El monto mensual es informativo por ahora (se persistirá en una fase futura)." />
+        <HelpTip text="Marca esta posición como aporte recurrente; el monto de arriba se toma como tu aporte mensual." />
       </label>
-      {props.aportoCadaMes ? (
-        <div className="fld" style={{ marginTop: 6 }}>
-          <div className="inp-money">
-            <span className="pre">{currencySymbol(cur)}</span>
-            <input
-              type="number"
-              step="any"
-              min="0"
-              value={props.aporteMensual}
-              onChange={(e) => props.onAporteMensual(e.target.value)}
-              placeholder="Aporte mensual"
-            />
-          </div>
-        </div>
-      ) : null}
 
       {/* Común final · región */}
       <div className="fld" style={{ marginTop: 10 }}>
