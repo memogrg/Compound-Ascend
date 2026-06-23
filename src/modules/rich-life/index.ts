@@ -4,7 +4,11 @@ export {
   computeRichLifeScore,
   buildRichLifeSnapshot,
 } from "./engine/rich-life-engine";
-export { getRichLifeSummary, buildDemoRichLifeSummary } from "./services/rich-life-service";
+export {
+  getRichLifeSummary,
+  buildDemoRichLifeSummary,
+  aggregateNetWorth,
+} from "./services/rich-life-service";
 export { RichLifeDashboard } from "./components/rich-life-dashboard";
 export { RichActions } from "./components/rich-actions";
-export type { RichLifeSummary } from "./services/rich-life-service";
+export type { RichLifeSummary, NetWorthAggregate } from "./services/rich-life-service";

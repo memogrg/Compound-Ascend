@@ -24,7 +24,13 @@ import type {
   RichLifeSnapshot,
   RichLifeInput,
 } from "@/modules/rich-life/types";
-import type { Investment, InsurancePolicy, PolicyType } from "@/modules/wealth";
+import type {
+  Investment,
+  InsurancePolicy,
+  PolicyType,
+  ProtectionDiagnosis,
+  PortfolioStats,
+} from "@/modules/wealth";
 
 async function tryGetPortfolioMarketValues(): Promise<Record<string, number>> {
   try {
@@ -119,7 +125,28 @@ export type RichLifeSummary = {
   currency: string;
 };
 
-export async function getRichLifeSummary(): Promise<RichLifeSummary> {
+/**
+ * Núcleo de agregación de patrimonio, reutilizable. Devuelve activos/pasivos ya
+ * normalizados a la moneda principal + ingreso pasivo, indicadores base,
+ * protección y portfolio. Lo consumen getRichLifeSummary y patrimonio-service.
+ */
+export type NetWorthAggregate = {
+  assets: Asset[]; // normalizados a moneda principal (= assetsForEngine)
+  liabilities: Liability[]; // normalizados (= liabsForEngine)
+  passiveIncomeMonthly: number;
+  monthlyExpenses: number; // base.indicators.expenseMonthly
+  netMonthlyIncome: number; // base.indicators.incomeMonthly
+  freeCashflow: number;
+  protection: ProtectionDiagnosis;
+  portfolio: PortfolioStats;
+  currency: string;
+  // Extras para preservar EXACTO el resultado de getRichLifeSummary:
+  explicitAssets: Asset[]; // solo activos manuales (tabla `assets`)
+  explicitLiabilities: Liability[]; // solo pasivos manuales (tabla `liabilities`)
+  previousNetWorth: number | null; // último snapshot de patrimonio neto
+};
+
+export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
@@ -307,20 +334,46 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
     balance: convertCurrency(l.balance, l.currency, currency, rates),
   }));
 
-  const input: RichLifeInput = {
+  return {
     assets: assetsForEngine,
     liabilities: liabsForEngine,
     passiveIncomeMonthly,
     monthlyExpenses: base.indicators.expenseMonthly,
+    netMonthlyIncome: base.indicators.incomeMonthly,
     freeCashflow: base.indicators.freeCashflow,
-    protectionScore: protection.score,
-    diversification: portfolio.diversification,
-    previous: prevSnap.data ? { netWorth: Number(prevSnap.data.net_worth) } : null,
+    protection,
+    portfolio,
     currency,
+    explicitAssets,
+    explicitLiabilities: explicitLiabs,
+    previousNetWorth: prevSnap.data ? Number(prevSnap.data.net_worth) : null,
   };
+}
 
+/**
+ * Resumen Rich Life: arma el snapshot a partir de la agregación de patrimonio.
+ * Comportamiento idéntico al previo (solo se extrajo aggregateNetWorth).
+ */
+export async function getRichLifeSummary(): Promise<RichLifeSummary> {
+  const agg = await aggregateNetWorth();
+  const input: RichLifeInput = {
+    assets: agg.assets,
+    liabilities: agg.liabilities,
+    passiveIncomeMonthly: agg.passiveIncomeMonthly,
+    monthlyExpenses: agg.monthlyExpenses,
+    freeCashflow: agg.freeCashflow,
+    protectionScore: agg.protection.score,
+    diversification: agg.portfolio.diversification,
+    previous: agg.previousNetWorth !== null ? { netWorth: agg.previousNetWorth } : null,
+    currency: agg.currency,
+  };
   const snapshot = buildRichLifeSnapshot(input);
-  return { snapshot, assets: explicitAssets, liabilities: explicitLiabs, currency };
+  return {
+    snapshot,
+    assets: agg.explicitAssets,
+    liabilities: agg.explicitLiabilities,
+    currency: agg.currency,
+  };
 }
 
 /** Resumen Rich Life de demostración (no toca la BD). */
