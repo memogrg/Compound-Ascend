@@ -6,9 +6,13 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
+import { getBaseSummary, getDisplayCurrency, getLiquidityBalance } from "@/modules/financial-base";
 import { computeProtection, computePortfolio } from "@/modules/wealth";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
+import {
+  mapInvestmentLiquidity,
+  savingsLiquidity,
+} from "@/modules/rich-life/engine/asset-mapping";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { AssetInput, LiabilityInput } from "@/modules/rich-life/schemas";
@@ -125,8 +129,18 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
     getFxRates(),
   ]);
 
-  const [assetRows, liabRows, debtRows, invRows, policyRows, profileRow, prevSnap, marketValues] =
-    await Promise.all([
+  const [
+    assetRows,
+    liabRows,
+    debtRows,
+    invRows,
+    policyRows,
+    profileRow,
+    prevSnap,
+    marketValues,
+    liquidityBucket,
+    goalRows,
+  ] = await Promise.all([
       supabase.from("assets").select("*").eq("user_id", user.id),
       supabase.from("liabilities").select("*").eq("user_id", user.id),
       supabase
@@ -151,6 +165,12 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
         .limit(1)
         .maybeSingle(),
       tryGetPortfolioMarketValues(),
+      // Fase 1 · Patrimonio líquido real: saco de liquidez + metas de ahorro.
+      getLiquidityBalance(),
+      supabase
+        .from("savings_goals")
+        .select("id,name,current_amount,stored_in,status,currency")
+        .eq("user_id", user.id),
     ]);
 
   // Activos: explícitos + inversiones.
@@ -176,10 +196,43 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
       value,
       currency: currency,
       generatesIncome: cls === "productivo",
-      liquidity: null,
+      // Fuga #2: la liquidez de la inversión ahora se refleja (antes era null).
+      liquidity: mapInvestmentLiquidity(r.liquidity),
     };
   });
-  const assets = [...explicitAssets, ...investmentAssets];
+
+  // Fuga #1 · Patrimonio líquido real: el saco de liquidez (no asignado) y las
+  // metas de ahorro (asignado pero líquido) cuentan como activos líquidos.
+  // Disjuntos del saco por construcción (aportar a una meta es un gasto que ya
+  // bajó el saco en Fase 0), así que no hay doble conteo.
+  const liquidityAssets: Asset[] = [];
+  if (liquidityBucket.hasOpening) {
+    liquidityAssets.push({
+      id: "liquidity-saco",
+      name: "Tu Liquidez",
+      assetClass: "liquido",
+      value: liquidityBucket.balance,
+      currency: liquidityBucket.currency,
+      generatesIncome: false,
+      liquidity: "alta",
+    });
+  }
+  for (const g of goalRows.data ?? []) {
+    const amount = Number(g.current_amount);
+    if (amount > 0) {
+      liquidityAssets.push({
+        id: "goal-" + g.id,
+        name: g.name,
+        assetClass: "liquido",
+        value: amount,
+        currency: g.currency,
+        generatesIncome: false,
+        liquidity: savingsLiquidity(g.stored_in),
+      });
+    }
+  }
+
+  const assets = [...explicitAssets, ...investmentAssets, ...liquidityAssets];
 
   // Pasivos: explícitos + deudas.
   const explicitLiabs: Liability[] = (liabRows.data ?? []).map((r) => ({
