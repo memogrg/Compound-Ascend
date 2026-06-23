@@ -517,52 +517,23 @@ function CategoryGroup({
           · {hint}
         </span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+      <select
+        className="sel"
+        value=""
+        onChange={(e) => {
+          if (e.target.value) onChoose(e.target.value as InvestmentCategory);
+        }}
+        aria-label={`Tipo de inversión · ${title}`}
+      >
+        <option value="" disabled>
+          Elegí un tipo…
+        </option>
         {cats.map((c) => (
-          <button
-            key={c}
-            type="button"
-            className="card"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              padding: "10px 12px",
-              textAlign: "left",
-              cursor: "pointer",
-              background: "var(--surface)",
-            }}
-            onClick={() => onChoose(c)}
-          >
-            <span
-              aria-hidden
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: "var(--chip)",
-                color: "var(--ink-2)",
-                flex: "none",
-              }}
-            >
-              <Icon name={CATEGORY_META[c].icon} width={1.9} />
-            </span>
-            <span
-              style={{
-                fontSize: 12.5,
-                fontWeight: 500,
-                color: "var(--ink)",
-                lineHeight: 1.25,
-              }}
-            >
-              {CATEGORY_META[c].label}
-            </span>
-          </button>
+          <option key={c} value={c}>
+            {CATEGORY_META[c].label}
+          </option>
         ))}
-      </div>
+      </select>
     </div>
   );
 }
