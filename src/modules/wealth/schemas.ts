@@ -92,6 +92,8 @@ export const holdingInputSchema = z.object({
   incomeMonth: z.number().int().min(1).max(12).optional(),
   region: z.string().trim().max(20).optional(),
   isRecurring: z.boolean().optional(),
+  // Aporte mensual del recurrente (separado del total invertido).
+  monthlyContribution: z.number().nonnegative().optional(),
   // Fase 4.1: registrar la compra/aporte como gasto vinculado en Base
   // Financiera (default ON al crear; OFF al editar — un edit puede ser
   // corrección de datos, no un aporte real).

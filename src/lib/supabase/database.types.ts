@@ -498,6 +498,8 @@ export type InvestmentHoldingRow = Timestamps & {
   income_month: number | null;
   region: string | null;
   is_recurring: boolean;
+  // Aporte mensual separado del total invertido (migración 20260623000001).
+  monthly_contribution: number | null;
 };
 
 export type RentalPaymentRow = Timestamps & {
