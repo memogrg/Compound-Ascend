@@ -190,6 +190,17 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
     .select("id")
     .single();
   if (error) throw new Error(error.message);
+
+  // Saco de Liquidez: registra el delta de esta transacción. Best-effort: un
+  // fallo aquí no debe romper el registro (la transacción ya se persistió).
+  await recordLiquidityDelta({
+    transactionId: data.id,
+    kind: input.kind,
+    amount: input.amount,
+    currency: input.currency,
+    occurredOn: input.occurredOn,
+  });
+
   return { id: data.id, linkedKind, linkedId };
 }
 
@@ -215,6 +226,34 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
     })
     .eq("id", id)
     .eq("user_id", user.id);
+
+  // Saco de Liquidez: re-sincroniza el delta con el nuevo kind/amount. Si pasó a
+  // un kind sin delta (transferencia/ajuste), recordTransactionDelta borra la fila.
+  await recordLiquidityDelta({
+    transactionId: id,
+    kind: input.kind,
+    amount: input.amount,
+    currency: input.currency,
+    occurredOn: input.occurredOn,
+  });
+}
+
+/** Engancha el ledger de liquidez (import dinámico) sin romper el registro. */
+async function recordLiquidityDelta(args: {
+  transactionId: string;
+  kind: TxnKind;
+  amount: number;
+  currency: string;
+  occurredOn: string;
+}): Promise<void> {
+  try {
+    const { recordTransactionDelta } = await import(
+      "@/modules/financial-base/services/liquidity-service"
+    );
+    await recordTransactionDelta(args);
+  } catch {
+    // Liquidez best-effort: la reconciliación 1-toque corrige cualquier desfase.
+  }
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
