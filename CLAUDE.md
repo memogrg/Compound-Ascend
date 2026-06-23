@@ -40,7 +40,7 @@ Business logic lives in `src/modules/`, divided into 8 self-contained modules:
 | `account` | `/configuracion` | Account, plan, household invitations, WhatsApp link |
 | `assistant` | API only | AI chat + receipt scanner |
 
-WhatsApp lives outside modules (`src/lib/whatsapp/` + `/api/whatsapp/webhook`); household helpers in `src/lib/household/`.
+WhatsApp lives outside modules (`src/lib/whatsapp/` + `/api/whatsapp/webhook`); household helpers in `src/lib/household/`. The messaging provider is abstracted behind `WhatsAppProvider` (`provider.ts`): **Meta WhatsApp Cloud API** (`meta.ts`) is the active provider for both inbound (webhook verifies `X-Hub-Signature-256` via `meta-signature.ts`) and outbound. The legacy Twilio implementation (`twilio.ts` / `twilio-signature.ts`) is retained only as a rollback path and is no longer wired into the webhook — see issue #114 for its removal.
 
 Each module follows this internal layout:
 ```
