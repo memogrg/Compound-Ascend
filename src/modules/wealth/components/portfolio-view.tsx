@@ -447,11 +447,11 @@ function InvRow({
           <span className="tag" style={{ color: natureColor }}>{natureLabel}</span>
           {catLabel ? <div className="cell-sub" style={{ marginTop: 5 }}>{catLabel}</div> : null}
         </div>
-        <div className="inv-amt">{formatMoney(h.costBasis, currency)}</div>
+        <div className="inv-amt">{formatMoney(h.costBasis, h.currency)}</div>
         <div className="inv-amt c-aporte">
           {h.isRecurring ? (
             <>
-              {formatMoney(h.costBasis, currency)}
+              {formatMoney(h.costBasis, h.currency)}
               <span className="s">/mes</span>
             </>
           ) : (
@@ -465,7 +465,7 @@ function InvRow({
           </div>
           <div className={`cell-sub ${periodGain >= 0 ? "pos" : "neg"}`}>
             {periodGain >= 0 ? "+" : "−"}
-            {formatMoney(Math.abs(periodGain), currency)}
+            {formatMoney(Math.abs(periodGain), h.currency)}
           </div>
         </div>
         <div className="kebab-wrap">
@@ -508,7 +508,7 @@ function InvRow({
       {modal === "dashboard" ? (
         <HoldingDetailModal holding={h} editHolding={raw} currentPrice={h.currentPrice ?? null} currency={currency} onClose={close} />
       ) : null}
-      {modal === "valoracion" ? <ValuationModal holding={editHolding} currency={currency} onClose={close} /> : null}
+      {modal === "valoracion" ? <ValuationModal holding={editHolding} onClose={close} /> : null}
       {modal === "eliminar" ? <DeleteModal holding={editHolding} onClose={close} /> : null}
     </>
   );
@@ -516,7 +516,7 @@ function InvRow({
 
 // ── Modal · Valoración (current_value_manual + historial) ──────────
 
-function ValuationModal({ holding, currency, onClose }: { holding: Holding; currency: string; onClose: () => void }) {
+function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
@@ -575,7 +575,7 @@ function ValuationModal({ holding, currency, onClose }: { holding: Holding; curr
           <div className="fld">
             <label className="fld-label">Valor de cuenta</label>
             <div className="inp-money">
-              <span className="pre">{currency}</span>
+              <span className="pre">{holding.currency}</span>
               <input
                 inputMode="decimal"
                 value={value}
@@ -609,7 +609,7 @@ function ValuationModal({ holding, currency, onClose }: { holding: Holding; curr
                     <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
                       {Number(dd ?? 1)} {MONTH_ABBR[Number(mm ?? 1) - 1] ?? ""} {yy}
                     </span>
-                    <strong className="tnum" style={{ fontSize: 13.5 }}>{formatMoney(v.value, currency)}</strong>
+                    <strong className="tnum" style={{ fontSize: 13.5 }}>{formatMoney(v.value, holding.currency)}</strong>
                   </div>
                 );
               })
