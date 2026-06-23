@@ -8,7 +8,7 @@
  * del motor puro (portfolio-engine); las mutaciones usan las server actions
  * existentes (addHolding/edit/sell/remove via wizard, detalle y modales).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./portfolio-view.css";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
@@ -17,6 +17,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
+import { convertCurrency } from "@/lib/fx";
 import {
   allocationByNature,
   allocationByCategory,
@@ -80,6 +81,8 @@ export function PortfolioView({
   dividends,
   summary,
   investmentRate,
+  displayCurrency,
+  rates,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
@@ -87,6 +90,9 @@ export function PortfolioView({
   summary: WealthSummary;
   /** Tasa de inversión (0-1) de BaseIndicators (financial-base). */
   investmentRate: number;
+  /** Moneda del dropdown (display): solo afecta agregados/gráficas, no las filas. */
+  displayCurrency: string;
+  rates: Record<string, number>;
 }) {
   // Subtab dirigido por el hash (deep-link /patrimonio#monitor + back/forward).
   // Arranca en "portafolio" para no romper la hidratación SSR.
@@ -127,6 +133,8 @@ export function PortfolioView({
           dividends={dividends}
           summary={summary}
           investmentRate={investmentRate}
+          displayCurrency={displayCurrency}
+          rates={rates}
         />
       ) : subtab === "calculadora" ? (
         <CompoundCalculator defaultCapital={report.analytics.totalCostBasis} currency={report.currency} />
@@ -143,14 +151,25 @@ function PortfolioPanel({
   report,
   snapshots,
   investmentRate,
+  displayCurrency,
+  rates,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
   dividends: Dividend[];
   summary: WealthSummary;
   investmentRate: number;
+  displayCurrency: string;
+  rates: Record<string, number>;
 }) {
   const { analytics, currency } = report;
+  // Los agregados/gráficas siguen la moneda del dropdown (display): se calculan
+  // en `report.currency` (principal) y se convierten aquí, en la vista. Las filas
+  // NO se tocan (quedan nativas). Los snapshots tampoco: se guardan en principal.
+  const toDisplay = useCallback(
+    (v: number) => convertCurrency(v, currency, displayCurrency, rates),
+    [currency, displayCurrency, rates],
+  );
   const holds = useMemo(
     () => [...analytics.holdingsWithPerformance].sort((a, b) => b.currentValue - a.currentValue),
     [analytics.holdingsWithPerformance],
@@ -167,19 +186,25 @@ function PortfolioPanel({
     const cutoff = periodCutoff(indPeriod);
     const pts = snapshots
       .filter((s) => !cutoff || s.date >= cutoff)
-      .map((s) => ({ date: s.date, value: s.investmentValue || s.portfolioValue }));
+      .map((s) => ({ date: s.date, value: toDisplay(s.investmentValue || s.portfolioValue) }));
     if (pts.length >= 2) return pts;
     if (analytics.totalCostBasis > 0) {
       return [
-        { date: "Inicio", value: Math.round(analytics.totalCostBasis) },
-        { date: "Hoy", value: Math.round(analytics.totalPortfolioValue) },
+        { date: "Inicio", value: Math.round(toDisplay(analytics.totalCostBasis)) },
+        { date: "Hoy", value: Math.round(toDisplay(analytics.totalPortfolioValue)) },
       ];
     }
     return pts;
-  }, [snapshots, indPeriod, analytics.totalCostBasis, analytics.totalPortfolioValue]);
+  }, [snapshots, indPeriod, analytics.totalCostBasis, analytics.totalPortfolioValue, toDisplay]);
 
   const byNature = useMemo(() => allocationByNature(holds), [holds]);
   const byCategory = useMemo(() => allocationByCategory(holds), [holds]);
+  // Dona de naturaleza: muestra montos absolutos → convertir a display. Las
+  // proporciones/pct son invariantes al escalar todos los valores por igual.
+  const byNatureDisplay = useMemo(
+    () => byNature.map((s) => ({ ...s, value: toDisplay(s.value) })),
+    [byNature, toDisplay],
+  );
   const cashflowMonthly = useMemo(() => cashflowMonthlyIncome(holds), [holds]);
   const ratePct = Math.min(100, Math.round(investmentRate * 100));
   const categoriesCount = byCategory.filter((s) => s.value > 0).length;
@@ -202,10 +227,10 @@ function PortfolioPanel({
             Monto total invertido
             <TipQ text="Base de costo total: cuánto has puesto en tus inversiones." />
           </div>
-          <div className="val">{formatMoney(analytics.totalCostBasis, currency)}</div>
+          <div className="val">{formatMoney(toDisplay(analytics.totalCostBasis), displayCurrency)}</div>
           {investedSeries.length >= 2 ? (
             <div className="invline">
-              <PerformanceChart data={investedSeries} currency={currency} height={88} tone="pos" />
+              <PerformanceChart data={investedSeries} currency={displayCurrency} height={88} tone="pos" />
             </div>
           ) : null}
         </div>
@@ -229,7 +254,7 @@ function PortfolioPanel({
           </div>
           <div className="val" style={{ color: retInd.abs >= 0 ? "var(--pos)" : "var(--neg)" }}>
             {retInd.abs >= 0 ? "+" : ""}
-            {formatMoney(retInd.abs, currency)}
+            {formatMoney(toDisplay(retInd.abs), displayCurrency)}
           </div>
           <div className="sub">
             <span className={`delta ${retInd.abs >= 0 ? "up" : "down"}`}>
@@ -247,7 +272,7 @@ function PortfolioPanel({
           <div className="lab">Rentabilidad total acumulada</div>
           <div className="val" style={{ color: analytics.totalProfitLoss >= 0 ? "var(--pos)" : "var(--neg)" }}>
             {analytics.totalProfitLoss >= 0 ? "+" : ""}
-            {formatMoney(analytics.totalProfitLoss, currency)}
+            {formatMoney(toDisplay(analytics.totalProfitLoss), displayCurrency)}
           </div>
           <div className="sub">
             <span className={`delta ${analytics.totalProfitLoss >= 0 ? "up" : "down"}`}>
@@ -261,7 +286,7 @@ function PortfolioPanel({
             Ingreso mensual por flujo de caja
             <TipQ text="Dividendos, alquileres e intereses recurrentes de tus inversiones de flujo de caja." />
           </div>
-          <div className="val" style={{ color: "var(--c-income)" }}>{formatMoney(cashflowMonthly, currency)}</div>
+          <div className="val" style={{ color: "var(--c-income)" }}>{formatMoney(toDisplay(cashflowMonthly), displayCurrency)}</div>
           <div className="sub">dividendos, alquileres, intereses · recurrente</div>
         </div>
       </div>
@@ -270,10 +295,10 @@ function PortfolioPanel({
       <div className="donut-grid">
         <DonutCard
           title="Distribución por naturaleza"
-          slices={byNature}
-          centerTop={formatCompact(analytics.totalPortfolioValue, currency)}
+          slices={byNatureDisplay}
+          centerTop={formatCompact(toDisplay(analytics.totalPortfolioValue), displayCurrency)}
           centerSub="total"
-          currency={currency}
+          currency={displayCurrency}
           showAmount
         />
         <DonutCard
@@ -281,7 +306,7 @@ function PortfolioPanel({
           slices={byCategory}
           centerTop={String(categoriesCount)}
           centerSub="categorías"
-          currency={currency}
+          currency={displayCurrency}
         />
       </div>
 
@@ -447,11 +472,11 @@ function InvRow({
           <span className="tag" style={{ color: natureColor }}>{natureLabel}</span>
           {catLabel ? <div className="cell-sub" style={{ marginTop: 5 }}>{catLabel}</div> : null}
         </div>
-        <div className="inv-amt">{formatMoney(h.costBasis, currency)}</div>
+        <div className="inv-amt">{formatMoney(h.costBasis, h.currency)}</div>
         <div className="inv-amt c-aporte">
           {h.isRecurring ? (
             <>
-              {formatMoney(h.costBasis, currency)}
+              {formatMoney(h.costBasis, h.currency)}
               <span className="s">/mes</span>
             </>
           ) : (
@@ -465,7 +490,7 @@ function InvRow({
           </div>
           <div className={`cell-sub ${periodGain >= 0 ? "pos" : "neg"}`}>
             {periodGain >= 0 ? "+" : "−"}
-            {formatMoney(Math.abs(periodGain), currency)}
+            {formatMoney(Math.abs(periodGain), h.currency)}
           </div>
         </div>
         <div className="kebab-wrap">
@@ -508,7 +533,7 @@ function InvRow({
       {modal === "dashboard" ? (
         <HoldingDetailModal holding={h} editHolding={raw} currentPrice={h.currentPrice ?? null} currency={currency} onClose={close} />
       ) : null}
-      {modal === "valoracion" ? <ValuationModal holding={editHolding} currency={currency} onClose={close} /> : null}
+      {modal === "valoracion" ? <ValuationModal holding={editHolding} onClose={close} /> : null}
       {modal === "eliminar" ? <DeleteModal holding={editHolding} onClose={close} /> : null}
     </>
   );
@@ -516,7 +541,7 @@ function InvRow({
 
 // ── Modal · Valoración (current_value_manual + historial) ──────────
 
-function ValuationModal({ holding, currency, onClose }: { holding: Holding; currency: string; onClose: () => void }) {
+function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
@@ -575,7 +600,7 @@ function ValuationModal({ holding, currency, onClose }: { holding: Holding; curr
           <div className="fld">
             <label className="fld-label">Valor de cuenta</label>
             <div className="inp-money">
-              <span className="pre">{currency}</span>
+              <span className="pre">{holding.currency}</span>
               <input
                 inputMode="decimal"
                 value={value}
@@ -609,7 +634,7 @@ function ValuationModal({ holding, currency, onClose }: { holding: Holding; curr
                     <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
                       {Number(dd ?? 1)} {MONTH_ABBR[Number(mm ?? 1) - 1] ?? ""} {yy}
                     </span>
-                    <strong className="tnum" style={{ fontSize: 13.5 }}>{formatMoney(v.value, currency)}</strong>
+                    <strong className="tnum" style={{ fontSize: 13.5 }}>{formatMoney(v.value, holding.currency)}</strong>
                   </div>
                 );
               })

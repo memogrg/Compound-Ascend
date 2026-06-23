@@ -5,7 +5,8 @@ import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/servi
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
 import { getSnapshotHistory } from "@/modules/wealth/services/snapshot-service";
 import { listDividends } from "@/modules/wealth/services/dividend-service";
-import { getBaseSummary } from "@/modules/financial-base";
+import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import { listPendingHoldings } from "@/modules/wealth/services/holdings-service";
 import { PendingHoldingsCard } from "@/modules/wealth/components/pending-holdings-card";
 import { GrowthView } from "@/modules/wealth/components/growth-view";
@@ -29,11 +30,13 @@ import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
  * pinte de inmediato y la cartera llegue en streaming.
  */
 async function PortfolioSection({ summary }: { summary: WealthSummary }) {
-  const [report, snapshots, dividends, base] = await Promise.all([
+  const [report, snapshots, dividends, base, displayCurrency, rates] = await Promise.all([
     getPortfolioReport(),
     getSnapshotHistory("all"),
     listDividends(),
     getBaseSummary(),
+    getDisplayCurrency(),
+    getFxRates(),
   ]);
 
   // Nota del asesor (Fase 5b): recomendación sobre el patrimonio en su tono. Best-effort.
@@ -71,6 +74,8 @@ async function PortfolioSection({ summary }: { summary: WealthSummary }) {
         dividends={dividends}
         summary={summary}
         investmentRate={base.indicators.investmentRate}
+        displayCurrency={displayCurrency}
+        rates={rates}
       />
     </>
   );
