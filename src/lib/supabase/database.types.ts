@@ -595,6 +595,17 @@ export type ProfileSnapshotRow = Timestamps & {
   metrics: Json;
 };
 
+export type LiquidityLedgerRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  delta: number;
+  currency: string;
+  reason: string;
+  transaction_id: string | null;
+  occurred_on: string;
+};
+
 export type UserInsightRow = Timestamps & {
   id: string;
   user_id: string;
@@ -720,6 +731,7 @@ export interface Database {
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
       user_insights: UserTable<UserInsightRow>;
+      liquidity_ledger: UserTable<LiquidityLedgerRow>;
       profile_snapshots: UserTable<ProfileSnapshotRow>;
       market_price_cache: TableShape<
         MarketPriceCacheRow,

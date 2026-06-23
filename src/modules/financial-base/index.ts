@@ -11,6 +11,7 @@ export {
   DISPLAY_CURRENCY_COOKIE,
 } from "./services/base-service";
 export { createTransaction } from "./services/transaction-service";
+export { getLiquidityBalance } from "./services/liquidity-service";
 // Fase 3 · flujo inverso: al borrar un stub de inversión, wealth revierte las
 // fuentes de ingreso vinculadas (dirección wealth → financial-base).
 export { deleteIncomeSourcesByHolding } from "./services/budget-service";

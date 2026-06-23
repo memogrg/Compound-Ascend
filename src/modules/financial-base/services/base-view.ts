@@ -9,6 +9,7 @@ import "server-only";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/format";
 import { getBaseSummary } from "@/modules/financial-base/services/base-service";
+import { getLiquidityBalance } from "@/modules/financial-base/services/liquidity-service";
 import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
 import {
   getRealTotals,
@@ -88,6 +89,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     linkables,
     base,
     rates,
+    liquidity,
   ] = await Promise.all([
     getBudgetTotals(period),
     getRealTotals(period),
@@ -103,6 +105,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     listLinkableEntities(),
     getBaseSummary(),
     getFxRates(),
+    getLiquidityBalance(),
   ]);
 
   const currency = real.currency;
@@ -157,6 +160,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     linkables,
     jars,
     categoryNames,
+    liquidity,
     baseReading: buildBaseReading(readingInput),
     incomeCapsule: buildCapsule("income", readingInput),
     expenseCapsule: buildCapsule("expense", readingInput),

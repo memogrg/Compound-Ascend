@@ -12,6 +12,7 @@ import {
 } from "@/components/shared/financial-insight-card";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { PremiumLineChart, PerformanceChart } from "@/components/charts/lazy";
+import { LiquidityCard } from "@/modules/financial-base/components/v2/liquidity-card";
 import { TransactionsBrowser } from "@/modules/financial-base/components/v2/transactions-browser";
 import { IncomeSources } from "@/modules/financial-base/components/v2/income-sources";
 import { IncomeRangeFilter } from "@/modules/financial-base/components/v2/income-range-filter";
@@ -100,6 +101,8 @@ export type V2View = {
   rules: TransactionRule[];
   linkables: LinkableEntities;
   jars: Jar[];
+  /** Saco de Liquidez ("Tu Liquidez"): saldo real disponible + si ya hay apertura. */
+  liquidity: { balance: number; currency: string; hasOpening: boolean };
   baseReading: FinancialReading;
   incomeCapsule: FinancialReading;
   expenseCapsule: FinancialReading;
@@ -242,6 +245,11 @@ export function MiBaseSection({ view }: { view: V2View }) {
 
   return (
     <div className="grid">
+      <LiquidityCard
+        balance={view.liquidity.balance}
+        currency={view.liquidity.currency}
+        hasOpening={view.liquidity.hasOpening}
+      />
       <section className="cols-4">
         <MetricCard
           label="Ingresos presup."
