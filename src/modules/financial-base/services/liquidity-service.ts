@@ -8,6 +8,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -23,15 +24,16 @@ import type { LiquidityLedgerRow } from "@/lib/supabase/database.types";
 type LedgerSlice = Pick<LiquidityLedgerRow, "delta" | "currency" | "reason" | "occurred_on">;
 
 /** Filas del ledger del usuario, ya normalizadas a la moneda de display. */
-async function loadRows(): Promise<{ rows: LiquidityRow[]; currency: string; raw: LedgerSlice[] }> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+async function loadRows(
+  ctx?: AuthContext,
+): Promise<{ rows: LiquidityRow[]; currency: string; raw: LedgerSlice[] }> {
+  const { db, userId } = await resolveAuth(ctx);
   const [{ data }, currency, rates] = await Promise.all([
-    supabase
+    db
       .from("liquidity_ledger")
       .select("delta, currency, reason, occurred_on")
-      .eq("user_id", user.id),
-    getDisplayCurrency(),
+      .eq("user_id", userId),
+    getDisplayCurrency(ctx),
     getFxRates(),
   ]);
   const raw = (data ?? []) as LedgerSlice[];
@@ -44,12 +46,12 @@ async function loadRows(): Promise<{ rows: LiquidityRow[]; currency: string; raw
 }
 
 /** Saldo actual de liquidez + si el usuario ya fijó su saldo inicial. */
-export async function getLiquidityBalance(): Promise<{
+export async function getLiquidityBalance(ctx?: AuthContext): Promise<{
   balance: number;
   currency: string;
   hasOpening: boolean;
 }> {
-  const { rows, currency, raw } = await loadRows();
+  const { rows, currency, raw } = await loadRows(ctx);
   return {
     balance: computeLiquidityBalance(rows),
     currency,

@@ -6,6 +6,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   getBaseSummary,
   getDisplayCurrency,
@@ -37,11 +38,13 @@ import type {
   PortfolioStats,
 } from "@/modules/wealth";
 
-async function tryGetPortfolioMarketValues(): Promise<Record<string, number>> {
+async function tryGetPortfolioMarketValues(
+  ctx?: AuthContext,
+): Promise<Record<string, number>> {
   try {
     const { getPortfolioMarketValues } =
       await import("@/modules/wealth/services/portfolio-service");
-    const result = await getPortfolioMarketValues();
+    const result = await getPortfolioMarketValues(ctx);
     return result.byInvestmentId;
   } catch {
     return {};
@@ -173,14 +176,15 @@ export type NetWorthAggregate = {
   previousNetWorth: number | null; // último snapshot de patrimonio neto
 };
 
-export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function aggregateNetWorth(ctx?: AuthContext): Promise<NetWorthAggregate> {
+  // ctx undefined → sesión (requireUser + cliente por cookies), idéntico a hoy.
+  // ctx presente → cliente service-role + userId explícito (cron/push).
+  const { db, userId } = await resolveAuth(ctx);
 
   const [base, currency, primaryCurrency, rates] = await Promise.all([
-    getBaseSummary(),
-    getDisplayCurrency(),
-    getPrimaryCurrency(),
+    getBaseSummary(ctx),
+    getDisplayCurrency(ctx),
+    getPrimaryCurrency(ctx),
     getFxRates(),
   ]);
 
@@ -196,36 +200,36 @@ export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
     liquidityBucket,
     goalRows,
   ] = await Promise.all([
-      supabase.from("assets").select("*").eq("user_id", user.id),
-      supabase.from("liabilities").select("*").eq("user_id", user.id),
-      supabase
+      db.from("assets").select("*").eq("user_id", userId),
+      db.from("liabilities").select("*").eq("user_id", userId),
+      db
         .from("debts")
         .select("id,name,balance,classification,apr,delinquency,currency")
-        .eq("user_id", user.id),
-      supabase.from("investments").select("*").eq("user_id", user.id),
-      supabase
+        .eq("user_id", userId),
+      db.from("investments").select("*").eq("user_id", userId),
+      db
         .from("insurance_policies")
         .select("policy_type,coverage,premium,premium_frequency")
-        .eq("user_id", user.id),
-      supabase
+        .eq("user_id", userId),
+      db
         .from("personal_profiles")
         .select("dependents_count")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle(),
-      supabase
+      db
         .from("net_worth_snapshots")
         .select("net_worth,period")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("period", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      tryGetPortfolioMarketValues(),
+      tryGetPortfolioMarketValues(ctx),
       // Fase 1 · Patrimonio líquido real: saco de liquidez + metas de ahorro.
-      getLiquidityBalance(),
-      supabase
+      getLiquidityBalance(ctx),
+      db
         .from("savings_goals")
         .select("id,name,current_amount,stored_in,status,currency")
-        .eq("user_id", user.id),
+        .eq("user_id", userId),
     ]);
 
   // Activos: explícitos + inversiones.

@@ -11,6 +11,7 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { getPrimaryCurrency } from "@/modules/financial-base";
 import { listHoldings } from "@/modules/wealth/services/holdings-service";
+import type { AuthContext } from "@/lib/auth/auth-context";
 import { listDividends } from "@/modules/wealth/services/dividend-service";
 import {
   computePortfolioAnalytics,
@@ -155,14 +156,14 @@ export async function getPortfolioReport(): Promise<PortfolioReport> {
  * Devuelve un mapa investmentId → currentMarketValue en moneda principal.
  * Holdings sin investmentId se agrupan en "_standalone".
  */
-export async function getPortfolioMarketValues(): Promise<{
+export async function getPortfolioMarketValues(ctx?: AuthContext): Promise<{
   byInvestmentId: Record<string, number>;
   total: number;
   currency: string;
 }> {
   const [holdings, currency, rates] = await Promise.all([
-    listHoldings(),
-    getPrimaryCurrency(),
+    listHoldings(ctx),
+    getPrimaryCurrency(ctx),
     getFxRates(),
   ]);
 

@@ -3,6 +3,7 @@ import "server-only";
 /** CRUD de posiciones (investment_holdings). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import {
   registerLinkedTransaction,
@@ -139,13 +140,12 @@ function taxonomyColumns(input: HoldingInput) {
   };
 }
 
-export async function listHoldings(): Promise<Holding[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+export async function listHoldings(ctx?: AuthContext): Promise<Holding[]> {
+  const { db, userId } = await resolveAuth(ctx);
+  const { data } = await db
     .from("investment_holdings")
     .select(HOLDING_COLS)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToHolding);
 }
