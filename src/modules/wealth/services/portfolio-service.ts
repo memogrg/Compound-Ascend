@@ -70,8 +70,14 @@ export async function fetchNormalizedPrices(
   return prices;
 }
 
-/** Normaliza el costo promedio de cada holding a la moneda principal. */
-function normalizeHoldings(
+/**
+ * Normaliza a moneda principal los montos monetarios de un holding que están en
+ * su moneda nativa: averageCost, currentValueManual (no cotizados) y rentalIncome.
+ * Sin esto, el valor manual/renta quedaban en moneda nativa mientras el costo iba
+ * en principal y se mezclaban en profitLoss / valor total. Exportada para que el
+ * camino del cron (snapshot-service) reúse la misma lógica.
+ */
+export function normalizeHoldings(
   holdings: Holding[],
   primaryCurrency: string,
   rates: Record<string, number>,
@@ -79,6 +85,14 @@ function normalizeHoldings(
   return holdings.map((h) => ({
     ...h,
     averageCost: convertCurrency(h.averageCost, h.currency, primaryCurrency, rates),
+    currentValueManual:
+      h.currentValueManual == null
+        ? h.currentValueManual
+        : convertCurrency(h.currentValueManual, h.currency, primaryCurrency, rates),
+    rentalIncome:
+      h.rentalIncome == null
+        ? h.rentalIncome
+        : convertCurrency(h.rentalIncome, h.currency, primaryCurrency, rates),
   }));
 }
 

@@ -9,9 +9,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import { convertCurrency } from "@/lib/fx";
 import { computePortfolioAnalytics } from "@/modules/wealth/engine/portfolio-engine";
-import { fetchNormalizedPrices } from "@/modules/wealth/services/portfolio-service";
+import {
+  fetchNormalizedPrices,
+  normalizeHoldings,
+} from "@/modules/wealth/services/portfolio-service";
 import { rowToHolding, HOLDING_COLS } from "@/modules/wealth/services/holdings-service";
 import type { PortfolioSnapshot } from "@/modules/wealth/types";
 
@@ -169,10 +171,9 @@ export async function generateSnapshotForUserCron(
   const holdings = holdingRows.map(rowToHolding);
   const rates = await getFxRates();
 
-  const normalized = holdings.map((h) => ({
-    ...h,
-    averageCost: convertCurrency(h.averageCost, h.currency, currency, rates),
-  }));
+  // Misma normalización de moneda que el camino con sesión (averageCost +
+  // currentValueManual + rentalIncome a moneda principal).
+  const normalized = normalizeHoldings(holdings, currency, rates);
   // fetchNormalizedPrices solo usa symbol y assetType — no depende del
   // averageCost normalizado (mismo orden que el camino con sesión).
   const prices = await fetchNormalizedPrices(holdings, currency, rates);
