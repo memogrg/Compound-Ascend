@@ -49,6 +49,13 @@ const keyOf = (kind: string, relatedId: string | null | undefined): string =>
   `${kind}::${relatedId ?? ""}`;
 
 /**
+ * Espejo de daily-insight.RITUAL_KIND (evita un import estático del barrel de
+ * wealth —que arrastra componentes— en esta capa). El ritual se gestiona en su
+ * propia función (related_id null), por eso syncInsights NO debe resolverlo.
+ */
+const RITUAL_KIND = "ritual_patrimonio";
+
+/**
  * Orquestador on-demand: si la última corrida está vieja, recalcula los insights
  * a partir de los datos de control y los sincroniza. Best-effort: nunca rompe.
  */
@@ -128,10 +135,65 @@ async function getDisfruteSpend(): Promise<{
   return { current, priorAvg: (s1 + s2 + s3) / 3, categoryId: root.id };
 }
 
+/**
+ * Ritual diario patrimonial: genera (in-app, on-demand) UN insight del día con
+ * el Marco Patrimonial y lo deja activo en user_insights para "Qué noté". Reusa
+ * getPatrimonioReport por sesión; guardia diaria; uno activo a la vez. Best-effort.
+ */
+export async function refreshDailyPatrimonioInsight(): Promise<void> {
+  try {
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+
+    // Guardia diaria: si ya hay un ritual fresco (<20 h), no regenerar.
+    const { data: last } = await supabase
+      .from("user_insights")
+      .select("updated_at")
+      .eq("user_id", user.id)
+      .eq("kind", RITUAL_KIND)
+      .eq("status", "activo")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!isStale(last?.updated_at ? new Date(last.updated_at) : null, 20)) return;
+
+    const { getPatrimonioReport, buildDailyPatrimonioInsight } = await import("@/modules/wealth");
+    const { report, level, diagnosis } = await getPatrimonioReport();
+    const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
+    const household_id = await getActiveHouseholdId(supabase, user.id);
+
+    // Uno activo a la vez: como related_id es null, el upsert no dedupea; cerramos
+    // el ritual previo y luego insertamos el nuevo.
+    await supabase
+      .from("user_insights")
+      .update({ status: "resuelto" })
+      .eq("user_id", user.id)
+      .eq("kind", RITUAL_KIND)
+      .eq("status", "activo");
+    await supabase.from("user_insights").insert({
+      user_id: user.id,
+      household_id,
+      kind: detected.kind,
+      severity: detected.severity,
+      title: detected.title,
+      body: detected.body,
+      metric: detected.metric ?? null,
+      related_kind: detected.relatedKind ?? null,
+      related_id: detected.relatedId ?? null,
+      status: "activo" as const,
+    });
+  } catch (err) {
+    logger.warn("refreshDailyPatrimonioInsight fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+  }
+}
+
 /** Insights activos, priorizados por severidad y luego por recencia. */
 export async function getActiveInsights(limit = 5): Promise<Insight[]> {
   // Auto-activación: cualquier lectura refresca si está viejo (best-effort).
   await refreshInsights();
+  await refreshDailyPatrimonioInsight();
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
@@ -195,7 +257,8 @@ export async function syncInsights(detected: DetectedInsight[]): Promise<void> {
     .eq("status", "activo");
   const present = new Set(detected.map((d) => keyOf(d.kind, d.relatedId)));
   const toResolve = (actives ?? [])
-    .filter((a) => !present.has(keyOf(a.kind, a.related_id)))
+    // El ritual patrimonial se gestiona aparte; no lo resuelve esta pasada.
+    .filter((a) => a.kind !== RITUAL_KIND && !present.has(keyOf(a.kind, a.related_id)))
     .map((a) => a.id);
   if (toResolve.length > 0) {
     await supabase.from("user_insights").update({ status: "resuelto" }).in("id", toResolve);
