@@ -689,7 +689,7 @@ export function TransaccionesSection({ view }: { view: V2View }) {
       {/* Conciliación (Fase 6): sin-vincular + plan-vs-real por entidad. */}
       <ReconciliationCard
         candidates={findUnlinkedCandidates(view.transactions, view.categories, view.linkables)}
-        alerts={buildEntityAlerts(view.budget.items, view.transactions)}
+        alerts={buildEntityAlerts(view.budget.items, view.transactions, view.currency, view.rates)}
         linkables={view.linkables}
       />
 

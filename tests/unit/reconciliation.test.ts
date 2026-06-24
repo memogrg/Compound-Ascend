@@ -84,23 +84,31 @@ describe("sin vincular (Fase 6)", () => {
   });
 });
 
+// FX por-USD (igual que getFxRates): USD=1, CRC=455 ⇒ 1 USD = 455 CRC.
+// convertCurrency con from===to es identidad: los casos mono-moneda no cambian.
+const FX = { USD: 1, CRC: 455 };
+
 describe("alertas plan-vs-real por entidad (Fase 6)", () => {
   it("cumplido cuando lo real ≈ lo planeado", () => {
     const alerts = buildEntityAlerts(
       [budgetItem()],
       [txn({ linkedKind: "debt", linkedId: "d1", amount: 45000 })],
+      "CRC",
+      FX,
     );
     expect(alerts[0]!.status).toBe("cumplido");
     expect(alerts[0]!.real).toBe(45000);
   });
 
   it("sin_movimiento, parcial y excedido según el avance", () => {
-    expect(buildEntityAlerts([budgetItem()], [])[0]!.status).toBe("sin_movimiento");
+    expect(buildEntityAlerts([budgetItem()], [], "CRC", FX)[0]!.status).toBe("sin_movimiento");
     expect(
-      buildEntityAlerts([budgetItem()], [txn({ linkedKind: "debt", linkedId: "d1", amount: 20000 })])[0]!.status,
+      buildEntityAlerts([budgetItem()], [txn({ linkedKind: "debt", linkedId: "d1", amount: 20000 })], "CRC", FX)[0]!
+        .status,
     ).toBe("parcial");
     expect(
-      buildEntityAlerts([budgetItem()], [txn({ linkedKind: "debt", linkedId: "d1", amount: 90000 })])[0]!.status,
+      buildEntityAlerts([budgetItem()], [txn({ linkedKind: "debt", linkedId: "d1", amount: 90000 })], "CRC", FX)[0]!
+        .status,
     ).toBe("excedido");
   });
 
@@ -112,6 +120,8 @@ describe("alertas plan-vs-real por entidad (Fase 6)", () => {
         budgetItem(),
       ],
       [txn({ linkedKind: "debt", linkedId: "d1", amount: 90000 })],
+      "CRC",
+      FX,
     );
     expect(alerts).toHaveLength(2);
     expect(alerts[0]!.status).toBe("excedido");
@@ -122,7 +132,25 @@ describe("alertas plan-vs-real por entidad (Fase 6)", () => {
     const alerts = buildEntityAlerts(
       [budgetItem({ type: "income", sourceKind: "dividend", sourceId: "h1", name: "Dividendos — VOO", amount: 100 })],
       [txn({ kind: "ingreso", linkedKind: "holding", linkedId: "h1", amount: 100 })],
+      "CRC",
+      FX,
     );
     expect(alerts[0]!.status).toBe("cumplido");
+  });
+
+  it("normaliza moneda: transacciones en USD vs línea en CRC se comparan en display (CRC)", () => {
+    // Plan: 45 000 CRC. Real: 100 USD = 45 500 CRC → ratio ≈ 1.01 → cumplido.
+    const alerts = buildEntityAlerts(
+      [budgetItem({ amount: 45000, currency: "CRC" })],
+      [txn({ linkedKind: "debt", linkedId: "d1", amount: 100, currency: "USD" })],
+      "CRC",
+      FX,
+    );
+    expect(alerts[0]!.real).toBe(45500); // convertido, NO la suma cruda (100)
+    expect(alerts[0]!.planned).toBe(45000);
+    expect(alerts[0]!.currency).toBe("CRC");
+    expect(alerts[0]!.status).toBe("cumplido");
+    // Sin normalizar, real=100 vs planned=45000 habría dado "parcial" (el bug).
+    expect(alerts[0]!.status).not.toBe("parcial");
   });
 });

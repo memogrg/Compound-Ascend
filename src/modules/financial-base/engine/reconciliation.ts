@@ -8,6 +8,7 @@
  *    (deuda/meta/póliza/recurrente) comparada contra lo realmente
  *    transaccionado vinculado a esa entidad en el periodo.
  */
+import { convertCurrency } from "@/lib/fx";
 import type { Transaction, BudgetItem, LinkedKind } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
@@ -73,15 +74,19 @@ const SOURCE_TO_LINK: Record<string, string> = {
 export function buildEntityAlerts(
   derivedItems: BudgetItem[],
   transactions: Transaction[],
+  displayCurrency: string,
+  rates: Record<string, number>,
 ): EntityAlert[] {
-  // Suma de lo real por (linkedKind, linkedId). El plan de gastos se compara
-  // contra gastos; el de ingresos (dividendos) contra ingresos.
+  // Suma de lo real por (linkedKind, linkedId), normalizando a la moneda de
+  // visualización (una entidad puede tener transacciones en monedas mixtas). El
+  // plan de gastos se compara contra gastos; el de ingresos (dividendos) contra ingresos.
   const realByEntity = new Map<string, number>();
   for (const t of transactions) {
     const kind = t.linkedKind ?? "none";
     if (kind === "none" || !t.linkedId) continue;
     const key = `${kind}:${t.linkedId}:${t.kind === "ingreso" ? "income" : "expense"}`;
-    realByEntity.set(key, (realByEntity.get(key) ?? 0) + t.amount);
+    const amount = convertCurrency(t.amount, t.currency, displayCurrency, rates);
+    realByEntity.set(key, (realByEntity.get(key) ?? 0) + amount);
   }
 
   const alerts: EntityAlert[] = [];
@@ -91,7 +96,8 @@ export function buildEntityAlerts(
     const linkKind = SOURCE_TO_LINK[sk];
     if (!linkKind) continue;
     const real = realByEntity.get(`${linkKind}:${item.sourceId}:${item.type}`) ?? 0;
-    const planned = item.amount;
+    // Plan y real comparados en la MISMA moneda (la de visualización).
+    const planned = convertCurrency(item.amount, item.currency, displayCurrency, rates);
     const ratio = planned > 0 ? real / planned : 0;
     const status: EntityAlertStatus =
       real <= 0
@@ -105,9 +111,9 @@ export function buildEntityAlerts(
       sourceKind: sk,
       sourceId: item.sourceId,
       name: item.name,
-      planned,
+      planned: Math.round(planned),
       real: Math.round(real),
-      currency: item.currency,
+      currency: displayCurrency,
       status,
     });
   }
