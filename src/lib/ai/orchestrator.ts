@@ -13,7 +13,7 @@ import { parseAction, type AIChatResponse } from "@/lib/ai/types";
 // El system prompt y su contexto viven en system-prompt.ts (puro, testeable);
 // el context-engine (Fase 5) arma el FinancialContext con datos autorizados.
 import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt";
-import { selectBibliaKnowledge } from "@/lib/ai/biblia-knowledge";
+import { selectBibliaKnowledge, selectPatrimonioGuidance } from "@/lib/ai/biblia-knowledge";
 
 export type { FinancialContext };
 
@@ -33,7 +33,12 @@ export async function financeChat(
   // Recuperación determinista de la Biblia: emoción dominante + tema del último
   // mensaje del usuario → guía conductual inyectada en el system prompt.
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content;
-  const knowledge = selectBibliaKnowledge({ emotion: ctx.dominantEmotion, text: lastUser });
+  // Biblia conductual (emoción + tema) + guía patrimonial §15 (banderas del diagnóstico),
+  // fusionadas y acotadas para no inflar el prompt.
+  const knowledge = [
+    ...selectBibliaKnowledge({ emotion: ctx.dominantEmotion, text: lastUser }),
+    ...selectPatrimonioGuidance(ctx.patrimonioDiagnosis ?? []),
+  ].slice(0, 5);
   const result = await provider.chat({
     system: buildSystemPrompt({ ...ctx, knowledge }),
     messages,

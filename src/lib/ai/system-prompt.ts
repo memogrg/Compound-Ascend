@@ -16,6 +16,17 @@ export type FinancialContext = {
   portfolioValue?: number;
   portfolioReturnPct?: number;
   topAssetClass?: string;
+  // Marco Patrimonial (motor patrimonio-engine). Best-effort: si la lectura falla,
+  // no aparecen y el chat no se degrada.
+  indicePatrimonial?: number; // 0-100
+  nivelPatrimonial?: string; // level.name
+  numeroDeLibertad?: number; // capital para vivir del patrimonio
+  añosDeLibertad?: number; // años que cubre el patrimonio invertible
+  mesesDeLibertad?: number; // liquidez / gasto mensual
+  coberturaPasivaPct?: number; // ingreso pasivo / gasto, en %
+  calidadPatrimonio?: number; // 0-100
+  investableWealth?: number;
+  patrimonioDiagnosis?: string[]; // códigos de banderas §15
   // Fase 5 · context engine: perfil, deudas, metas y vinculables.
   lifeStage?: string;
   debtCount?: number;
@@ -98,6 +109,27 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.portfolioReturnPct !== undefined)
     facts.push(`Rendimiento del portafolio: ${(ctx.portfolioReturnPct * 100).toFixed(1)}%.`);
   if (ctx.topAssetClass) facts.push(`Clase de activo principal: ${ctx.topAssetClass}.`);
+  // Marco Patrimonial: cada línea solo si el campo existe (best-effort).
+  if (ctx.indicePatrimonial !== undefined)
+    facts.push(
+      `Índice Patrimonial: ${ctx.indicePatrimonial}/100${ctx.nivelPatrimonial ? ` (nivel: ${ctx.nivelPatrimonial})` : ""}.`,
+    );
+  if (ctx.numeroDeLibertad !== undefined)
+    facts.push(
+      `Número de Libertad Financiera: ${ctx.numeroDeLibertad} ${ctx.currency} (capital para vivir de tu patrimonio).`,
+    );
+  if (ctx.añosDeLibertad !== undefined)
+    facts.push(
+      `Años de Libertad: tu patrimonio invertible cubre ${ctx.añosDeLibertad} años de tu estilo de vida.`,
+    );
+  if (ctx.investableWealth !== undefined)
+    facts.push(`Patrimonio invertible: ${ctx.investableWealth} ${ctx.currency}.`);
+  if (ctx.mesesDeLibertad !== undefined)
+    facts.push(`Meses de Libertad (liquidez): ${ctx.mesesDeLibertad}.`);
+  if (ctx.coberturaPasivaPct !== undefined)
+    facts.push(`Cobertura de ingreso pasivo: ${ctx.coberturaPasivaPct}% del gasto.`);
+  if (ctx.calidadPatrimonio !== undefined)
+    facts.push(`Calidad del patrimonio: ${ctx.calidadPatrimonio}/100.`);
   if (ctx.lifeStage) facts.push(`Etapa de vida: ${ctx.lifeStage}.`);
   if (ctx.debtCount !== undefined && ctx.debtTotal !== undefined) {
     facts.push(

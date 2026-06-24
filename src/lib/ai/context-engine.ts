@@ -141,6 +141,24 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Portafolio no disponible.
   }
 
+  // Marco Patrimonial (motor patrimonio-engine) — best-effort: consume el reporte
+  // tal cual, sin recalcular. Si falla, el chat sigue sin estas métricas.
+  try {
+    const { getPatrimonioReport } = await import("@/modules/wealth");
+    const p = await getPatrimonioReport();
+    ctx.indicePatrimonial = Math.round(p.report.indice);
+    ctx.nivelPatrimonial = p.level.name;
+    ctx.numeroDeLibertad = Math.round(p.report.numeroDeLibertad);
+    ctx.añosDeLibertad = Math.round(p.report.añosDeLibertad);
+    ctx.mesesDeLibertad = Math.round(p.report.mesesDeLibertad);
+    ctx.coberturaPasivaPct = Math.round(p.report.coberturaPasiva * 100);
+    ctx.calidadPatrimonio = Math.round(p.report.calidadPatrimonio);
+    ctx.investableWealth = Math.round(p.report.investableWealth);
+    ctx.patrimonioDiagnosis = p.diagnosis.map((d) => d.code);
+  } catch {
+    // Marco Patrimonial no disponible.
+  }
+
   // Perfil conductual (Fase · asesor conductual). Lectura best-effort con el
   // cliente de sesión (respeta RLS); cada tabla en su try/catch para que un fallo
   // aislado no degrade el resto del contexto.
