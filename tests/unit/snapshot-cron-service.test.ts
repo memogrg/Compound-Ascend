@@ -21,6 +21,9 @@ vi.mock("@/lib/fx", () => ({
 }));
 vi.mock("@/modules/wealth/services/portfolio-service", () => ({
   fetchNormalizedPrices: vi.fn(async () => ({ VOO: 500 })),
+  // snapshot-service ahora normaliza holdings vía este helper (no afecta este
+  // test: la analítica está mockeada); identidad basta.
+  normalizeHoldings: <T,>(holdings: T) => holdings,
 }));
 vi.mock("@/modules/wealth/engine/portfolio-engine", () => ({
   computePortfolioAnalytics: vi.fn(() => ({ totalPortfolioValue: 6000, totalCostBasis: 4800 })),
