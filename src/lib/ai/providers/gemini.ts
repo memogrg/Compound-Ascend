@@ -11,6 +11,9 @@ import { AppError } from "@/lib/errors";
 const MODEL = "gemini-2.5-flash";
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const TIMEOUT_MS = 20000;
+// Reintentos para hipos transitorios del proveedor (5xx/429 y errores de red).
+const MAX_ATTEMPTS = 3; // 1 intento + 2 reintentos
+const RETRY_BASE_MS = 400;
 // Desactiva el "thinking" de 2.5 (consume tokens de salida y encarece/retrasa);
 // para asesoría conversacional y extracción de recibos no aporta y sí estabiliza.
 const THINKING_OFF = { thinkingBudget: 0 };
@@ -20,21 +23,57 @@ type GeminiResponse = {
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 };
 
+/** Solo reintentar fallos transitorios: 5xx del servidor o 429 (rate limit). */
+export function isRetryableStatus(status: number): boolean {
+  return status >= 500 || status === 429;
+}
+
+/** Backoff exponencial corto con jitter acotado: ~400-600ms, ~800-1000ms, … */
+export function backoffMs(attempt: number): number {
+  const base = RETRY_BASE_MS * 2 ** attempt;
+  const jitter = Math.random() * (RETRY_BASE_MS / 2);
+  return base + jitter;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function call(key: string, body: unknown): Promise<GeminiResponse> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(`${BASE}/${MODEL}:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new AppError("PROVIDER_ERROR", undefined, `gemini ${res.status}`);
-    return (await res.json()) as GeminiResponse;
-  } finally {
-    clearTimeout(timer);
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const isLast = attempt === MAX_ATTEMPTS - 1;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      let res: Response;
+      try {
+        res = await fetch(`${BASE}/${MODEL}:generateContent?key=${key}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } catch (e) {
+        // Timeout (AbortError): no reintentar para no apilar esperas de 20s.
+        if (e instanceof Error && e.name === "AbortError") {
+          throw new AppError("PROVIDER_ERROR", undefined, "gemini timeout");
+        }
+        // Error de red transitorio (p. ej. TypeError): reintentar.
+        if (isLast) throw new AppError("PROVIDER_ERROR", undefined, "gemini network");
+        await sleep(backoffMs(attempt));
+        continue;
+      }
+      if (res.ok) return (await res.json()) as GeminiResponse;
+      // No-ok transitorio (5xx/429): reintentar; el resto se lanza ya.
+      if (isRetryableStatus(res.status) && !isLast) {
+        await sleep(backoffMs(attempt));
+        continue;
+      }
+      throw new AppError("PROVIDER_ERROR", undefined, `gemini ${res.status}`);
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  // Inalcanzable (el loop siempre retorna o lanza), pero satisface el tipo.
+  throw new AppError("PROVIDER_ERROR", undefined, "gemini");
 }
 
 function extract(r: GeminiResponse): AIChatResult {
