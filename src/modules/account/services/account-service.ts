@@ -4,6 +4,12 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { aiTokenLimit, type Plan } from "@/lib/plan";
+import {
+  setNotificationChannel,
+  mergeNotificationPrefs,
+  type NotificationPrefs,
+  type NotificationChannel,
+} from "@/lib/notifications/preferences";
 
 /**
  * Tablas de datos financieros de nivel superior (para "empezar de cero").
@@ -29,6 +35,7 @@ export type AccountInfo = {
   tokensUsed: number;
   tokenLimit: number;
   currency: string;
+  notifications: NotificationPrefs;
   configured: boolean;
 };
 
@@ -50,6 +57,7 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       tokensUsed: 0,
       tokenLimit: aiTokenLimit("free"),
       currency: "CRC",
+      notifications: mergeNotificationPrefs(null),
       configured: false,
     };
   }
@@ -63,7 +71,11 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       .eq("user_id", user.id)
       .eq("period", currentPeriod())
       .maybeSingle(),
-    supabase.from("user_settings").select("primary_currency").eq("user_id", user.id).maybeSingle(),
+    supabase
+      .from("user_settings")
+      .select("primary_currency,notifications")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
   const plan = (profile?.plan ?? "free") as Plan;
   return {
@@ -73,8 +85,20 @@ export async function getAccountInfo(): Promise<AccountInfo> {
     currency: settings?.primary_currency ?? "CRC",
     tokensUsed: Number(usage?.tokens_used ?? 0),
     tokenLimit: aiTokenLimit(plan),
+    notifications: mergeNotificationPrefs(
+      (settings?.notifications ?? null) as Record<string, unknown> | null,
+    ),
     configured: true,
   };
+}
+
+/** Enciende/apaga un canal de notificación del usuario en sesión. */
+export async function updateNotificationChannel(
+  channel: NotificationChannel,
+  enabled: boolean,
+): Promise<void> {
+  const user = await requireUser();
+  await setNotificationChannel(user.id, channel, enabled);
 }
 
 /** True si los datos actuales provienen de la plantilla de ejemplo. */

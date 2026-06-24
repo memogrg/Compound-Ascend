@@ -6,7 +6,12 @@ import { z } from "zod";
 import {
   updatePrimaryCurrency,
   clearAllFinancialData,
+  updateNotificationChannel,
 } from "@/modules/account/services/account-service";
+import {
+  NOTIFICATION_CHANNELS,
+  type NotificationChannel,
+} from "@/lib/notifications/preferences";
 import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import {
@@ -77,6 +82,26 @@ export async function updateCurrencyAction(code: string): Promise<AccountActionR
   } catch (err) {
     logger.error("updateCurrency fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos cambiar la moneda." };
+  }
+}
+
+/** Enciende/apaga un canal de notificación del usuario. */
+export async function updateNotificationPrefAction(
+  channel: string,
+  enabled: boolean,
+): Promise<AccountActionResult> {
+  if (!(NOTIFICATION_CHANNELS as readonly string[]).includes(channel))
+    return { ok: false, message: "Canal no válido." };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await updateNotificationChannel(channel as NotificationChannel, enabled);
+    PATHS.forEach((p) => revalidatePath(p));
+    return { ok: true };
+  } catch (err) {
+    logger.error("updateNotificationPref fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos guardar tu preferencia." };
   }
 }
 
