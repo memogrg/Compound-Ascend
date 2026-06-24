@@ -6,8 +6,7 @@ import "server-only";
  * pasivos/protección/portfolio ya normalizados, y añade las piezas propias del
  * patrimonio (deuda mala, aporte mensual, edad). Respeta RLS y moneda de display.
  */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { monthlyize, type Frequency } from "@/modules/financial-base";
@@ -33,10 +32,22 @@ export type PatrimonioServiceResult = {
   currency: string;
 };
 
-export async function getPatrimonioReport(): Promise<PatrimonioServiceResult> {
-  const agg = await aggregateNetWorth();
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+/**
+ * Variante SIN sesión (cron/push): mismo reporte para `userId` usando el cliente
+ * service-role. Filtra siempre por userId explícito (bypassa RLS). Usa moneda
+ * primaria (no hay cookie de display). Queda exportada y dormida (cimiento).
+ */
+export async function getPatrimonioReportForUser(
+  userId: string,
+): Promise<PatrimonioServiceResult> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  return getPatrimonioReport({ db: createServiceRoleClient(), userId });
+}
+
+export async function getPatrimonioReport(ctx?: AuthContext): Promise<PatrimonioServiceResult> {
+  // ctx undefined → sesión, idéntico a hoy; ctx presente → service-role + userId.
+  const agg = await aggregateNetWorth(ctx);
+  const { db, userId } = await resolveAuth(ctx);
   const rates = await getFxRates();
   const currency = agg.currency;
 
@@ -44,16 +55,16 @@ export async function getPatrimonioReport(): Promise<PatrimonioServiceResult> {
   const totalLiabilities = agg.liabilities.reduce((s, l) => s + l.balance, 0);
 
   const [debtRows, invRows, goalRows, profileRow] = await Promise.all([
-    supabase
+    db
       .from("debts")
       .select("classification,apr,min_payment,current_payment,balance,currency")
-      .eq("user_id", user.id),
-    supabase
+      .eq("user_id", userId),
+    db
       .from("investments")
       .select("contribution,contribution_frequency")
-      .eq("user_id", user.id),
-    supabase.from("savings_goals").select("monthly_contribution,currency").eq("user_id", user.id),
-    supabase.from("personal_profiles").select("age").eq("user_id", user.id).maybeSingle(),
+      .eq("user_id", userId),
+    db.from("savings_goals").select("monthly_contribution,currency").eq("user_id", userId),
+    db.from("personal_profiles").select("age").eq("user_id", userId).maybeSingle(),
   ]);
 
   // Pago mensual de deuda MALA (Fuga #3): cuota actual (o mínima) de las deudas

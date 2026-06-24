@@ -15,7 +15,7 @@ export {
 } from "./engine/portfolio-engine";
 export { getWealthSummary, buildDemoWealthSummary } from "./services/wealth-service";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
-export { getPatrimonioReport } from "./services/patrimonio-service";
+export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
 export { buildDailyPatrimonioInsight, RITUAL_KIND } from "./engine/daily-insight";
 export { getSnapshotHistory, generateAndSaveSnapshot } from "./services/snapshot-service";

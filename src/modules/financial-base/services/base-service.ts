@@ -8,6 +8,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
@@ -59,24 +60,22 @@ function rowToExpense(r: ExpenseItemRow): ExpenseItem {
   };
 }
 
-export async function listIncomes(): Promise<IncomeSource[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+export async function listIncomes(ctx?: AuthContext): Promise<IncomeSource[]> {
+  const { db, userId } = await resolveAuth(ctx);
+  const { data } = await db
     .from("income_sources")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToIncome);
 }
 
-export async function listExpenses(): Promise<ExpenseItem[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+export async function listExpenses(ctx?: AuthContext): Promise<ExpenseItem[]> {
+  const { db, userId } = await resolveAuth(ctx);
+  const { data } = await db
     .from("expense_items")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToExpense);
 }
@@ -191,11 +190,11 @@ export type BaseSummary = {
 };
 
 /** Carga ítems y calcula los indicadores de la base financiera. */
-async function _getBaseSummary(): Promise<BaseSummary> {
+async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
   const [incomes, expenses, primary, rates] = await Promise.all([
-    listIncomes(),
-    listExpenses(),
-    getDisplayCurrency(),
+    listIncomes(ctx),
+    listExpenses(ctx),
+    getDisplayCurrency(ctx),
     getFxRates(),
   ]);
   // Los indicadores agregan dinero, así que normalizamos cada ítem a la moneda
@@ -283,13 +282,12 @@ async function computeV2Totals(
 
 /** Moneda principal del usuario (de user_settings); CRC por defecto.
  *  Es la moneda por defecto al registrar ítems nuevos. */
-async function _getPrimaryCurrency(): Promise<string> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+async function _getPrimaryCurrency(ctx?: AuthContext): Promise<string> {
+  const { db, userId } = await resolveAuth(ctx);
+  const { data } = await db
     .from("user_settings")
     .select("primary_currency")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   return data?.primary_currency ?? "CRC";
 }
@@ -303,7 +301,9 @@ export const DISPLAY_CURRENCY_COOKIE = "ca_display_currency";
  * MUESTRAN los totales — los datos se registran en la moneda que el usuario
  * elija y la app los convierte a esta para mostrarlos.
  */
-async function _getDisplayCurrency(): Promise<string> {
+async function _getDisplayCurrency(ctx?: AuthContext): Promise<string> {
+  // Sin sesión (cron): no hay cookie de override → se usa la moneda primaria.
+  if (ctx) return getPrimaryCurrency(ctx);
   const store = await cookies();
   const override = store.get(DISPLAY_CURRENCY_COOKIE)?.value;
   if (override && (SUPPORTED_CURRENCIES as readonly string[]).includes(override)) {
