@@ -3,6 +3,7 @@ import {
   getRichLifeSummary,
   buildDemoRichLifeSummary,
 } from "@/modules/rich-life/services/rich-life-service";
+import { getPatrimonioReport, type PatrimonioServiceResult } from "@/modules/wealth";
 import { RichLifeDashboard } from "@/modules/rich-life/components/rich-life-dashboard";
 import { RichActions } from "@/modules/rich-life/components/rich-actions";
 import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
@@ -16,6 +17,18 @@ export default async function Page() {
   const summary: RichLifeSummary = configured
     ? await getRichLifeSummary()
     : buildDemoRichLifeSummary();
+
+  // Marco Patrimonial (solo con datos reales). Best-effort: si falla, el dashboard
+  // cae al modo Rich Life Score sin romperse. Sí, reagrega además de getRichLifeSummary;
+  // es aceptable para una carga de página.
+  let patrimonio: PatrimonioServiceResult | undefined;
+  if (configured) {
+    try {
+      patrimonio = await getPatrimonioReport();
+    } catch {
+      patrimonio = undefined;
+    }
+  }
 
   return (
     <div className="grid">
@@ -46,7 +59,7 @@ export default async function Page() {
         </div>
       ) : null}
 
-      <RichLifeDashboard summary={summary} />
+      <RichLifeDashboard summary={summary} patrimonio={patrimonio} />
     </div>
   );
 }
