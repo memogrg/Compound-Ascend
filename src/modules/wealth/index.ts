@@ -18,6 +18,7 @@ export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfol
 export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
 export { buildDailyPatrimonioInsight, RITUAL_KIND } from "./engine/daily-insight";
+export { buildWeeklyDigest, type WeeklyDigest } from "./engine/weekly-digest";
 export { getSnapshotHistory, generateAndSaveSnapshot } from "./services/snapshot-service";
 export { getInvestmentInsights } from "./services/investment-insights";
 export { getMacroInsights, type MacroInsight } from "./services/macro-insights";
