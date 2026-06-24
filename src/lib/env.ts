@@ -52,6 +52,9 @@ const serverSchema = z.object({
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,
   CRON_SECRET: optionalStr,
+  // Firma HMAC de los tokens de baja de correo (ruta pública). Si falta, la baja
+  // por enlace se degrada con un error controlado (no crashea).
+  UNSUBSCRIBE_SECRET: optionalStr,
   // WhatsApp (Twilio). Si faltan, la integración se omite con gracia.
   TWILIO_ACCOUNT_SID: optionalStr,
   TWILIO_AUTH_TOKEN: optionalStr, // también firma los webhooks (X-Twilio-Signature)

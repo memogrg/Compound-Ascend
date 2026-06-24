@@ -1,5 +1,6 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { CurrencySelector } from "@/modules/account/components/currency-selector";
+import { NotificationPrefs } from "@/modules/account/components/notification-prefs";
 import { EmailTester } from "@/modules/account/components/email-tester";
 import { WhatsAppLink } from "@/modules/account/components/whatsapp-link";
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
@@ -92,6 +93,7 @@ export default async function Page() {
       </section>
 
       <section className="cols-2">
+        <NotificationPrefs prefs={acc.notifications} />
         <div className="card card-pad">
           <div className="card-title">Preferencias</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
