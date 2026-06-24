@@ -17,6 +17,7 @@ export { getWealthSummary, buildDemoWealthSummary } from "./services/wealth-serv
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getPatrimonioReport } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
+export { buildDailyPatrimonioInsight, RITUAL_KIND } from "./engine/daily-insight";
 export { getSnapshotHistory, generateAndSaveSnapshot } from "./services/snapshot-service";
 export { getInvestmentInsights } from "./services/investment-insights";
 export { getMacroInsights, type MacroInsight } from "./services/macro-insights";

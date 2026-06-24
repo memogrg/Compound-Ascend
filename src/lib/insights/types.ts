@@ -11,7 +11,8 @@ export type InsightKind =
   | "meta_estancada"
   | "gasto_disfrute_alza"
   | "deuda_creciendo"
-  | "racha_positiva";
+  | "racha_positiva"
+  | "ritual_patrimonio";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {
