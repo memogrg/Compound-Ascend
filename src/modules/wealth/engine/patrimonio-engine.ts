@@ -91,6 +91,21 @@ const INDEX_WEIGHTS = {
   diversificacion: 5,
 } as const;
 
+/**
+ * §6.10 · Pesos de Calidad del Patrimonio (suman 1.0). Decisión de producto
+ * ajustable: cada sub-puntaje está acotado a 0-1 y se promedia ponderadamente,
+ * para que la calidad sea honesta (no se infla por sumar bases distintas) e
+ * invariante a la moneda. No entra al Índice Patrimonial; solo se muestra.
+ */
+const CALIDAD_WEIGHTS = {
+  productive: 0.3,
+  liquid: 0.15,
+  diversification: 0.15,
+  protection: 0.15,
+  lowBadDebt: 0.15,
+  lowConcentration: 0.1,
+} as const;
+
 /** §8 · Niveles del Índice Patrimonial. */
 const LEVELS: PatrimonioLevel[] = [
   { min: 0, max: 15, name: "Punto de partida", reading: "Estás empezando a construir tu base patrimonial." },
@@ -152,14 +167,30 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
   const ratioDeudaMala = safeRatio(input.badDebtMonthlyPayment, input.netMonthlyIncome);
   const añosDeLibertad = safeRatio(investableWealth, annualExpenses);
 
-  // §6.10 · Calidad del patrimonio (0-100). Fracciones (0-1) escaladas ×100 y
-  // clampeadas; decisión de producto: la diversificación es palanca de calidad.
-  const prodPct = safeRatio(productiveWealth, totalAssets);
-  const liqPct = safeRatio(liquidWealth, totalAssets);
-  const protPct = netWorth > 0 ? clamp01(input.protectedCoverage / netWorth) : 0;
-  const bonusDiv = DIVERSIFICATION_SCORE[input.diversification];
-  const calidadRaw = prodPct + liqPct + protPct + bonusDiv - ratioDeudaMala - input.topConcentration;
-  const calidadPatrimonio = clamp(Math.round(calidadRaw * 100), 0, 100);
+  // §6.10 · Calidad del patrimonio (0-100): promedio ponderado de sub-puntajes
+  // acotados a 0-1 (no suma de bases distintas), así es honesta e invariante a
+  // la moneda. La protección usa el score acotado, no coverage/netWorth.
+  const calidadScores = {
+    productive: clamp01(safeRatio(productiveWealth, totalAssets)),
+    liquid: clamp01(safeRatio(liquidWealth, totalAssets) / 0.3), // ~30% líquido = pleno
+    diversification: DIVERSIFICATION_SCORE[input.diversification],
+    protection: clamp01(input.protectionScore / 100),
+    lowBadDebt: 1 - clamp01(ratioDeudaMala / 0.2), // 1 = sin deuda cara; 0 = ≥20% del ingreso
+    lowConcentration: 1 - clamp01(input.topConcentration), // 1 = sin concentración
+  };
+  const calidadPatrimonio = clamp(
+    Math.round(
+      (calidadScores.productive * CALIDAD_WEIGHTS.productive +
+        calidadScores.liquid * CALIDAD_WEIGHTS.liquid +
+        calidadScores.diversification * CALIDAD_WEIGHTS.diversification +
+        calidadScores.protection * CALIDAD_WEIGHTS.protection +
+        calidadScores.lowBadDebt * CALIDAD_WEIGHTS.lowBadDebt +
+        calidadScores.lowConcentration * CALIDAD_WEIGHTS.lowConcentration) *
+        100,
+    ),
+    0,
+    100,
+  );
 
   // §10.2 · Patrimonio esperado por edad e ingreso (regla de Stanley).
   const patrimonioEsperado =
