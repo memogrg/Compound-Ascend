@@ -141,6 +141,40 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(sinInsights).not.toContain("Menciónalas SOLO si vienen al caso");
   });
 
+  it("con métricas patrimoniales: rinde los facts y las reglas de uso directo", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      netWorth: 253650941,
+      expenseMonthly: 2575128,
+      indicePatrimonial: 39,
+      nivelPatrimonial: "Estabilidad inicial",
+      numeroDeLibertad: 772538304,
+      añosDeLibertad: 6,
+      mesesDeLibertad: 34,
+      coberturaPasivaPct: 35,
+      calidadPatrimonio: 0,
+      investableWealth: 199244964,
+      patrimonioDiagnosis: ["deuda_mala_alta"],
+    });
+    // (i) Los facts patrimoniales aparecen.
+    expect(prompt).toContain("Índice Patrimonial: 39/100 (nivel: Estabilidad inicial).");
+    expect(prompt).toContain("Número de Libertad Financiera: 772538304 CRC");
+    expect(prompt).toContain("Años de Libertad: tu patrimonio invertible cubre 6 años");
+    // (ii) Las nuevas instrucciones de uso de métricas y estilo directo.
+    expect(prompt).toContain("Usa SIEMPRE las métricas que ya vienen en tu contexto");
+    expect(prompt).toContain("NUNCA las recalcules a partir del patrimonio neto y los gastos");
+    expect(prompt).toContain("usa los Años de Libertad");
+    expect(prompt).toContain("Responde primero la respuesta concreta en 1-2 frases");
+    expect(prompt).toContain("haz UNA sola pregunta corta y espera la respuesta");
+  });
+
+  it("las reglas de estilo y uso de métricas se incluyen siempre (incluso ctx vacío)", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toContain("USA TUS MÉTRICAS YA CALCULADAS:");
+    expect(prompt).toContain("ESTILO DE RESPUESTA");
+    expect(prompt).toContain("Responde primero la respuesta concreta en 1-2 frases");
+  });
+
   it("vuelca el perfil de riesgo y los campos de Rich Life como hechos", () => {
     const prompt = buildSystemPrompt({
       currency: "CRC",
