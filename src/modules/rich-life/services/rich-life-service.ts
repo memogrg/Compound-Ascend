@@ -6,7 +6,12 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getDisplayCurrency, getLiquidityBalance } from "@/modules/financial-base";
+import {
+  getBaseSummary,
+  getDisplayCurrency,
+  getPrimaryCurrency,
+  getLiquidityBalance,
+} from "@/modules/financial-base";
 import { computeProtection, computePortfolio } from "@/modules/wealth";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import {
@@ -118,6 +123,28 @@ const INVESTMENT_CLASS: Record<string, AssetClass> = {
   negocio: "productivo",
 };
 
+/** Clave del bucket de holdings sin `investment_id` en getPortfolioMarketValues. */
+const STANDALONE_KEY = "_standalone";
+
+/**
+ * Valor de UNA inversión y su moneda. El market value (holdings ligados por id)
+ * y el `invested_amount` de fallback vienen ambos en moneda PRINCIPAL, así que el
+ * activo se etiqueta con esa moneda para que `assetsForEngine` lo convierta bien.
+ * NO usa el bucket `_standalone`: ese se cuenta una sola vez aparte (evita que el
+ * holding suelto se difunda/duplique en cada inversión sin match).
+ */
+export function resolveInvestmentValue(
+  investment: { id: string; investedAmount: number },
+  marketByInvestmentId: Record<string, number>,
+  primaryCurrency: string,
+): { value: number; currency: string } {
+  const marketValue = marketByInvestmentId[investment.id];
+  return {
+    value: marketValue !== undefined ? marketValue : investment.investedAmount,
+    currency: primaryCurrency,
+  };
+}
+
 export type RichLifeSummary = {
   snapshot: RichLifeSnapshot;
   assets: Asset[];
@@ -150,9 +177,10 @@ export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  const [base, currency, rates] = await Promise.all([
+  const [base, currency, primaryCurrency, rates] = await Promise.all([
     getBaseSummary(),
     getDisplayCurrency(),
+    getPrimaryCurrency(),
     getFxRates(),
   ]);
 
@@ -172,7 +200,7 @@ export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
       supabase.from("liabilities").select("*").eq("user_id", user.id),
       supabase
         .from("debts")
-        .select("id,name,balance,classification,apr,delinquency")
+        .select("id,name,balance,classification,apr,delinquency,currency")
         .eq("user_id", user.id),
       supabase.from("investments").select("*").eq("user_id", user.id),
       supabase
@@ -212,21 +240,43 @@ export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
   }));
   const investmentAssets: Asset[] = (invRows.data ?? []).map((r) => {
     const cls = INVESTMENT_CLASS[r.asset_type] ?? "inversion";
-    // Preferir valor de mercado actual cuando hay holdings con precios vivos;
-    // si no, recaer en el monto invertido registrado.
-    const marketValue = marketValues[r.id] ?? marketValues["_standalone"];
-    const value = marketValue !== undefined ? marketValue : Number(r.invested_amount);
+    // Valor de mercado (holding ligado por id) o el monto invertido; ambos en
+    // moneda PRINCIPAL. No usa el bucket _standalone (se cuenta aparte, abajo).
+    const { value, currency: valueCurrency } = resolveInvestmentValue(
+      { id: r.id, investedAmount: Number(r.invested_amount) },
+      marketValues,
+      primaryCurrency,
+    );
     return {
       id: "inv-" + r.id,
       name: r.name,
       assetClass: cls,
       value,
-      currency: currency,
+      currency: valueCurrency,
       generatesIncome: cls === "productivo",
       // Fuga #2: la liquidez de la inversión ahora se refleja (antes era null).
       liquidity: mapInvestmentLiquidity(r.liquidity),
     };
   });
+
+  // Bug A: el bucket de holdings SIN investment_id (`_standalone`) se cuenta UNA
+  // sola vez como un activo de inversión aparte (en moneda principal), en lugar de
+  // difundirse como fallback a cada inversión sin match.
+  const standaloneValue = marketValues[STANDALONE_KEY];
+  const standaloneAssets: Asset[] =
+    standaloneValue !== undefined && standaloneValue > 0
+      ? [
+          {
+            id: "inv-standalone",
+            name: "Inversiones sin vincular",
+            assetClass: "inversion",
+            value: standaloneValue,
+            currency: primaryCurrency,
+            generatesIncome: false,
+            liquidity: null,
+          },
+        ]
+      : [];
 
   // Fuga #1 · Patrimonio líquido real: el saco de liquidez (no asignado) y las
   // metas de ahorro (asignado pero líquido) cuentan como activos líquidos.
@@ -259,7 +309,7 @@ export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
     }
   }
 
-  const assets = [...explicitAssets, ...investmentAssets, ...liquidityAssets];
+  const assets = [...explicitAssets, ...investmentAssets, ...standaloneAssets, ...liquidityAssets];
 
   // Pasivos: explícitos + deudas.
   const explicitLiabs: Liability[] = (liabRows.data ?? []).map((r) => ({
@@ -280,7 +330,8 @@ export async function aggregateNetWorth(): Promise<NetWorthAggregate> {
           ? "patrimonial"
           : "consumo") as LiabilityClass,
       balance: Number(d.balance),
-      currency,
+      // Bug C: la deuda se etiqueta con su moneda REAL (antes display, sin convertir).
+      currency: d.currency,
     }));
   const liabilities = [...explicitLiabs, ...debtLiabs];
 
