@@ -189,6 +189,93 @@ export async function refreshDailyPatrimonioInsight(): Promise<void> {
   }
 }
 
+/**
+ * Escritura del ritual SIN sesión (cron/push): mismo efecto que la versión 5a
+ * pero con cliente service-role. Resuelve household_id por userId, cierra el
+ * ritual activo previo e inserta el nuevo. Filtra SIEMPRE por userId explícito.
+ */
+export async function writeDailyInsightForUserCron(
+  userId: string,
+  detected: DetectedInsight,
+): Promise<void> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const admin = createServiceRoleClient();
+  const household_id = await getActiveHouseholdId(admin, userId);
+
+  // Uno activo a la vez (related_id null no dedupea en upsert): cerrar el previo,
+  // luego insertar el nuevo.
+  await admin
+    .from("user_insights")
+    .update({ status: "resuelto" })
+    .eq("user_id", userId)
+    .eq("kind", RITUAL_KIND)
+    .eq("status", "activo");
+  await admin.from("user_insights").insert({
+    user_id: userId,
+    household_id,
+    kind: detected.kind,
+    severity: detected.severity,
+    title: detected.title,
+    body: detected.body,
+    metric: detected.metric ?? null,
+    related_kind: detected.relatedKind ?? null,
+    related_id: detected.relatedId ?? null,
+    status: "activo" as const,
+  });
+}
+
+/**
+ * Genera y persiste el ritual del día para UN usuario (service-role): corre el
+ * reporte patrimonial sin sesión, construye el insight y lo escribe. Lanza si
+ * algo falla (el orquestador lo trata best-effort).
+ */
+export async function generateDailyRitualForUser(userId: string): Promise<void> {
+  const { getPatrimonioReportForUser, buildDailyPatrimonioInsight } = await import(
+    "@/modules/wealth"
+  );
+  const { report, level, diagnosis } = await getPatrimonioReportForUser(userId);
+  const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
+  await writeDailyInsightForUserCron(userId, detected);
+}
+
+/**
+ * Itera usuarios best-effort: si uno falla, loguea y sigue con los demás.
+ * Puro/testeable (la función por-usuario se inyecta). Devuelve conteos.
+ */
+export async function runForUsersBestEffort(
+  userIds: string[],
+  fn: (userId: string) => Promise<void>,
+): Promise<{ total: number; ok: number; failed: number }> {
+  let ok = 0;
+  let failed = 0;
+  for (const userId of userIds) {
+    try {
+      await fn(userId);
+      ok += 1;
+    } catch (err) {
+      failed += 1;
+      logger.warn("ritual cron: usuario falló", {
+        userId,
+        message: err instanceof Error ? err.message : "?",
+      });
+    }
+  }
+  return { total: userIds.length, ok, failed };
+}
+
+/** Genera el ritual del día para TODOS los usuarios (Vercel Cron). Best-effort. */
+export async function generateDailyRitualForAllUsers(): Promise<{
+  total: number;
+  ok: number;
+  failed: number;
+}> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const admin = createServiceRoleClient();
+  const { data: users } = await admin.from("profiles").select("id");
+  const ids = (users ?? []).map((u) => u.id);
+  return runForUsersBestEffort(ids, generateDailyRitualForUser);
+}
+
 /** Insights activos, priorizados por severidad y luego por recencia. */
 export async function getActiveInsights(limit = 5): Promise<Insight[]> {
   // Auto-activación: cualquier lectura refresca si está viejo (best-effort).
