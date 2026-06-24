@@ -164,3 +164,62 @@ describe("computePatrimonio · bordes", () => {
     expect(sinEdad.ratioAcumulacion).toBeNull();
   });
 });
+
+describe("computePatrimonio · calidadPatrimonio (§6.10 · promedio ponderado)", () => {
+  it("perfil frágil (productivo 0%, deuda cara alta, alta concentración, div baja) → calidad baja, no inflada", () => {
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: { liquido: 5_000, inversion: 0, productivo: 0, uso_personal: 95_000, especial: 0 },
+        protectionScore: 10,
+        netMonthlyIncome: 1_000,
+        badDebtMonthlyPayment: 300, // ratioDeudaMala 0.3 ≥ 0.2 → lowBadDebt 0
+        topConcentration: 0.8,
+        diversification: "baja",
+      }),
+    );
+    expect(r.calidadPatrimonio).toBeLessThan(40);
+  });
+
+  it("perfil fuerte (productivo alto, sin deuda cara, baja concentración, div alta, buena protección) → calidad alta", () => {
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: { liquido: 30_000, inversion: 10_000, productivo: 60_000, uso_personal: 0, especial: 0 },
+        protectionScore: 90,
+        netMonthlyIncome: 1_000,
+        badDebtMonthlyPayment: 0,
+        topConcentration: 0.2,
+        diversification: "alta",
+      }),
+    );
+    expect(r.calidadPatrimonio).toBeGreaterThan(75);
+  });
+
+  it("invariante a la moneda: mismos ratios escalados por FX → misma calidad", () => {
+    const base = {
+      assetsByClass: { liquido: 30_000, inversion: 0, productivo: 60_000, uso_personal: 10_000, especial: 0 },
+      protectionScore: 70,
+      netMonthlyIncome: 2_000,
+      badDebtMonthlyPayment: 100,
+      topConcentration: 0.3,
+      diversification: "media" as const,
+    };
+    const crc = computePatrimonio(inp(base));
+    const k = 1 / 455; // simula conversión CRC→USD: escala todos los montos
+    const usd = computePatrimonio(
+      inp({
+        ...base,
+        assetsByClass: {
+          liquido: 30_000 * k,
+          inversion: 0,
+          productivo: 60_000 * k,
+          uso_personal: 10_000 * k,
+          especial: 0,
+        },
+        netMonthlyIncome: 2_000 * k,
+        badDebtMonthlyPayment: 100 * k,
+        currency: "USD",
+      }),
+    );
+    expect(usd.calidadPatrimonio).toBe(crc.calidadPatrimonio);
+  });
+});
