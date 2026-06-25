@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger";
 import { verifyMetaSignature } from "@/lib/whatsapp/meta-signature";
 import { getWhatsAppProvider } from "@/lib/whatsapp";
 import { routeInbound } from "@/lib/whatsapp/router";
+import { alreadyProcessed } from "@/lib/security/idempotency";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,7 @@ type MetaWebhook = {
     changes?: Array<{
       value?: {
         messages?: Array<{
+          id?: string;
           from?: string;
           type?: string;
           text?: { body?: string };
@@ -93,6 +95,12 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (!phone) return new NextResponse("ok", { status: 200 });
+
+  // 2.5) Idempotencia: Meta reenvía webhooks. Reclama el evento por su id (wamid)
+  // ANTES de rutear; si ya se procesó, responde 200 sin re-disparar IA/inserts.
+  if (msg.id && (await alreadyProcessed("whatsapp", msg.id))) {
+    return new NextResponse("ok", { status: 200 });
+  }
 
   // 3) Enrutar. Cualquier error se traga: siempre 200 a Meta.
   try {

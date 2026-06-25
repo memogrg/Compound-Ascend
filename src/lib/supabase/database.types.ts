@@ -672,6 +672,13 @@ export type NetWorthSnapshotRow = Timestamps & {
   breakdown: Json;
 };
 
+/** Idempotencia de webhooks: evento procesado por (provider, event_id). */
+export type ProcessedEventRow = {
+  provider: string;
+  event_id: string;
+  processed_at: string;
+};
+
 type TableShape<Row, Insert, Update> = {
   Row: Row;
   Insert: Insert;
@@ -773,6 +780,12 @@ export interface Database {
         Partial<ExpenseCategoryRow> & { name: string },
         Partial<ExpenseCategoryRow>
       >;
+      // Idempotencia de webhooks (migración 0026). Solo service-role escribe.
+      processed_events: TableShape<
+        ProcessedEventRow,
+        { provider: string; event_id: string; processed_at?: string },
+        Partial<ProcessedEventRow>
+      >;
     };
     // OJO: usar `{ [_ in never]: never }` (sin índice de cadena). `Record<string,
     // never>` tiene índice `[k]: never` y, vía `Tables & Views`, intersecta cada
@@ -802,6 +815,26 @@ export interface Database {
       get_household_profile: {
         Args: Record<string, never>;
         Returns: Record<string, unknown> | null;
+      };
+      // Pago de deuda atómico (migración 0025): transacción + debt_payment en
+      // una sola transacción de BD.
+      record_debt_payment: {
+        Args: { p_txn: Record<string, unknown>; p_payment: Record<string, unknown> };
+        Returns: { transaction_id: string; payment_id: string };
+      };
+      update_debt_payment: {
+        Args: {
+          p_payment_id: string;
+          p_occurred_on: string;
+          p_amount: number;
+          p_extra_amount: number;
+          p_extra_mode: string | null;
+        };
+        Returns: undefined;
+      };
+      delete_debt_payment: {
+        Args: { p_payment_id: string };
+        Returns: undefined;
       };
     };
     Enums: {

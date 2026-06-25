@@ -19,6 +19,7 @@ export { deleteIncomeSourcesByHolding } from "./services/budget-service";
 // control/wealth/assistant registren eventos de dinero (CLAUDE.md).
 export {
   registerLinkedTransaction,
+  buildLinkedTransactionRow,
   deleteLinkedTransaction,
   propagateLinkedTransaction,
   getSystemCategoryId,

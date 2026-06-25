@@ -13,11 +13,15 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { toSafeResponse, AppError } from "@/lib/errors";
+import { alreadyProcessed } from "@/lib/security/idempotency";
 
 export const runtime = "nodejs";
 
 const eventSchema = z.object({
   type: z.literal("plan.updated"),
+  // id del evento del proveedor (Stripe, etc.) para idempotencia. Opcional
+  // mientras el scaffold no esté conectado a un PSP real.
+  id: z.string().min(1).optional(),
   userId: z.string().uuid(),
   plan: z.enum(["free", "premium"]),
 });
@@ -39,6 +43,12 @@ export async function POST(req: Request) {
 
     const parsed = eventSchema.safeParse(JSON.parse(raw));
     if (!parsed.success) throw new AppError("VALIDATION", "Evento no soportado.");
+
+    // Idempotencia: si el proveedor manda un id de evento y ya se procesó, no
+    // se re-aplica (un reenvío no vuelve a tocar el plan).
+    if (parsed.data.id && (await alreadyProcessed("payment", parsed.data.id))) {
+      return NextResponse.json({ ok: true, deduped: true });
+    }
 
     const supabase = createServiceRoleClient();
     const { error } = await supabase

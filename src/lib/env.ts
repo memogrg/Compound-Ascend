@@ -49,6 +49,10 @@ const serverSchema = z.object({
   RESEND_API_KEY: optionalStr,
   EMAIL_FROM: optionalStr, // remitente, p. ej. "Compound Ascend <invitaciones@tudominio.com>"
   REDIS_URL: optionalStr,
+  // Upstash Redis (REST): rate-limit coherente entre instancias serverless en
+  // Vercel. Si faltan, el rate-limit cae a memoria por instancia (solo dev/local).
+  UPSTASH_REDIS_REST_URL: optionalStr, // https://<db>.upstash.io
+  UPSTASH_REDIS_REST_TOKEN: optionalStr, // token REST de la base Upstash
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,
   CRON_SECRET: optionalStr,

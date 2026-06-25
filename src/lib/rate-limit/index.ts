@@ -1,12 +1,15 @@
 /**
  * Rate limiting (ventana fija) con abstracción de almacenamiento.
  *
- * - Si existe REDIS_URL en el futuro, se enchufa un store Redis (mismo interfaz).
- * - Fallback seguro: store en memoria con expiración por entrada.
+ * - Si existen las credenciales de Upstash (UPSTASH_REDIS_REST_URL/_TOKEN), se
+ *   usa un store Redis coherente entre instancias (Vercel multi-lambda).
+ * - Fallback seguro: store en memoria con expiración por entrada (dev/local, o
+ *   si Redis no está configurado o falla en runtime).
  *
  * Buckets recomendados (más estrictos): auth, ai-chat, receipt-scan,
  * market-data, password-reset.
  */
+import { Redis } from "@upstash/redis";
 import { logger } from "@/lib/logger";
 
 export type RateLimitResult = {
@@ -45,12 +48,63 @@ class MemoryRateStore implements RateStore {
   }
 }
 
-const store: RateStore = new MemoryRateStore();
+/**
+ * Store en Redis (Upstash REST). Contador de ventana fija con INCR + PEXPIRE,
+ * coherente entre todas las instancias serverless de Vercel.
+ *
+ * Resiliencia: si Redis falla en runtime (red/cuota), se degrada al store en
+ * memoria local en vez de tumbar la petición (fail-open controlado). El evento
+ * queda logueado para alertar de la degradación.
+ */
+class RedisRateStore implements RateStore {
+  private readonly prefix = "ratelimit:";
+  private readonly fallback = new MemoryRateStore();
 
-if (process.env.REDIS_URL) {
-  // Placeholder: en F6/hardening se añade un RedisRateStore con la misma interfaz.
-  logger.info("rate-limit: REDIS_URL presente; usando memoria hasta integrar Redis");
+  constructor(private readonly redis: Redis) {}
+
+  async hit(key: string, windowMs: number) {
+    const now = Date.now();
+    const redisKey = this.prefix + key;
+    try {
+      const pipe = this.redis.pipeline();
+      pipe.incr(redisKey);
+      pipe.pttl(redisKey);
+      const [count, ttl] = (await pipe.exec()) as [number, number];
+
+      // Primer hit de la ventana (o key sin TTL) → fijar expiración.
+      if (count === 1 || ttl < 0) {
+        await this.redis.pexpire(redisKey, windowMs);
+        return { count, resetAt: now + windowMs };
+      }
+      return { count, resetAt: now + ttl };
+    } catch (error) {
+      logger.warn("rate-limit: Redis falló, degradando a memoria", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.fallback.hit(key, windowMs);
+    }
+  }
 }
+
+/** Selecciona el store: Redis si hay credenciales Upstash, si no memoria. */
+function createStore(): RateStore {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (url && token) {
+    try {
+      const redis = new Redis({ url, token });
+      logger.info("rate-limit: usando Upstash Redis (coherente entre instancias)");
+      return new RedisRateStore(redis);
+    } catch (error) {
+      logger.warn("rate-limit: no se pudo iniciar Redis; fallback a memoria", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return new MemoryRateStore();
+}
+
+const store: RateStore = createStore();
 
 export type RateLimitConfig = { limit: number; windowMs: number };
 
@@ -83,9 +137,14 @@ export async function rateLimit(
   return { ok, remaining, limit: config.limit, resetAt };
 }
 
+/** Extrae una IP aproximada de un objeto Headers (sirve para Server Actions). */
+export function clientIpFromHeaders(headers: Headers): string {
+  const fwd = headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]!.trim();
+  return headers.get("x-real-ip") ?? "unknown";
+}
+
 /** Extrae una IP aproximada de las cabeceras de la petición. */
 export function clientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  return clientIpFromHeaders(req.headers);
 }
