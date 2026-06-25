@@ -43,7 +43,7 @@ const FREQUENCIES: { value: string; label: string }[] = [
   { value: "semanal", label: "Semanal" },
   { value: "quincenal", label: "Quincenal" },
   { value: "mensual", label: "Mensual" },
-  { value: "bimensual", label: "Bimensual" },
+  { value: "bimensual", label: "Cada 2 meses" },
   { value: "trimestral", label: "Trimestral" },
   { value: "semestral", label: "Semestral" },
   { value: "anual", label: "Anual" },
