@@ -91,7 +91,20 @@ export type CreatedTransaction = {
 };
 
 /** Crea la transacción y devuelve id + vínculo final (post-reglas). */
-export async function createTransaction(input: TxnInput): Promise<CreatedTransaction> {
+/** Forma del insert de `transactions` (igual que el Insert de la BD). */
+export type TransactionInsert = Partial<TransactionRow> & { user_id: string };
+
+/**
+ * Resuelve TODOS los valores de la fila de `transactions` (auto-categorización
+ * por reglas, cuenta predeterminada, household, etiquetas) SIN insertarla.
+ *
+ * Se expone para que el orquestador de eventos de dinero pueda pasar la fila ya
+ * resuelta a una RPC transaccional (atomicidad real) sin duplicar esta lógica
+ * de negocio en SQL. `createTransaction` la usa para el camino normal.
+ */
+export async function buildTransactionRow(
+  input: TxnInput,
+): Promise<{ row: TransactionInsert; linkedKind: CreatedTransaction["linkedKind"]; linkedId: string | null }> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
@@ -161,34 +174,41 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
 
   const accountLabel = await accountLabelFor(accountId);
   const household_id = await getActiveHouseholdId(supabase, user.id);
-  const { data, error } = await supabase
-    .from("transactions")
-    .insert({
-      user_id: user.id,
-      household_id,
-      kind: input.kind,
-      description: input.description ?? null,
-      merchant_or_source: input.merchantOrSource ?? null,
-      amount: input.amount,
-      currency: input.currency,
-      occurred_on: input.occurredOn,
-      category_id: categoryId,
-      account_id: accountId,
-      account_label: accountLabel,
-      status: input.status,
-      origin: input.origin,
-      receipt_url: input.receiptUrl ?? null,
-      confidence_score_internal: input.confidence ?? null,
-      source:
-        input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual",
-      confirmed_by_user: input.status === "confirmed",
-      linked_kind: linkedKind,
-      linked_id: linkedId,
-      recurring_item_id: input.recurringItemId ?? null,
-      income_source_id: input.incomeSourceId ?? null,
-    })
-    .select("id")
-    .single();
+  const row: TransactionInsert = {
+    user_id: user.id,
+    household_id,
+    kind: input.kind,
+    description: input.description ?? null,
+    merchant_or_source: input.merchantOrSource ?? null,
+    amount: input.amount,
+    currency: input.currency,
+    occurred_on: input.occurredOn,
+    category_id: categoryId,
+    account_id: accountId,
+    account_label: accountLabel,
+    status: input.status,
+    origin: input.origin,
+    receipt_url: input.receiptUrl ?? null,
+    confidence_score_internal: input.confidence ?? null,
+    source:
+      input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual",
+    confirmed_by_user: input.status === "confirmed",
+    linked_kind: linkedKind,
+    linked_id: linkedId,
+    recurring_item_id: input.recurringItemId ?? null,
+    income_source_id: input.incomeSourceId ?? null,
+  };
+  return { row, linkedKind, linkedId };
+}
+
+/**
+ * Crea una transacción (camino normal, no atómico con un ledger). Resuelve la
+ * fila con `buildTransactionRow` y la inserta.
+ */
+export async function createTransaction(input: TxnInput): Promise<CreatedTransaction> {
+  const supabase = await createSupabaseServerClient();
+  const { row, linkedKind, linkedId } = await buildTransactionRow(input);
+  const { data, error } = await supabase.from("transactions").insert(row).select("id").single();
   if (error) throw new Error(error.message);
   return { id: data.id, linkedKind, linkedId };
 }

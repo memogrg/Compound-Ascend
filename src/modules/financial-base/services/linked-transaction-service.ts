@@ -19,7 +19,11 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
-import { createTransaction } from "@/modules/financial-base/services/transaction-service";
+import {
+  createTransaction,
+  buildTransactionRow,
+  type TransactionInsert,
+} from "@/modules/financial-base/services/transaction-service";
 import { txnInputSchema } from "@/modules/financial-base/schemas";
 import type { LinkedTxnInput } from "@/modules/financial-base/engine/linked";
 
@@ -31,6 +35,19 @@ export async function registerLinkedTransaction(input: LinkedTxnInput): Promise<
   const parsed = txnInputSchema.parse(input);
   const { id } = await createTransaction(parsed);
   return id;
+}
+
+/**
+ * Igual que `registerLinkedTransaction` pero NO inserta: valida el input y
+ * resuelve la fila de la transacción. Para flujos atómicos donde una RPC
+ * transaccional inserta la transacción y su ledger en una sola operación.
+ */
+export async function buildLinkedTransactionRow(
+  input: LinkedTxnInput,
+): Promise<TransactionInsert> {
+  const parsed = txnInputSchema.parse(input);
+  const { row } = await buildTransactionRow(parsed);
+  return row;
 }
 
 /**

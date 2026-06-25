@@ -7,6 +7,7 @@ import { getActiveHouseholdId } from "@/lib/household/active";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import {
   registerLinkedTransaction,
+  buildLinkedTransactionRow,
   deleteLinkedTransaction,
   getSystemCategoryId,
 } from "@/modules/financial-base";
@@ -279,9 +280,25 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   const debt = await getDebt(input.debtId);
   if (!debt) throw new Error("Deuda no encontrada");
   const total = input.amount + input.extraAmount;
-  let txnId: string | null = null;
+
+  // household: cubre el hueco del sub-PR household de main (no tocó este insert).
+  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const paymentRow = {
+    user_id: user.id,
+    household_id,
+    debt_id: input.debtId,
+    occurred_on: input.paymentDate,
+    amount: input.amount,
+    extra_amount: input.extraAmount,
+    extra_mode: input.extraMode ?? null,
+    kind: input.kind,
+  };
+
   if (total > 0) {
-    txnId = await registerLinkedTransaction(
+    // Atómico (RPC): el gasto vinculado y el debt_payment nacen en UNA sola
+    // transacción de BD. La lógica del gasto (reglas, categoría, household) se
+    // resuelve en TS y se pasa ya construida a la RPC.
+    const txnRow = await buildLinkedTransactionRow(
       debtPaymentToTxn({
         debtId: debt.id,
         debtName: debt.name,
@@ -292,25 +309,17 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
         categoryId: await getSystemCategoryId("deudas"),
       }),
     );
-  }
-
-  // household: cubre el hueco del sub-PR household de main (no tocó este insert).
-  const household_id = await getActiveHouseholdId(supabase, user.id);
-  const { error } = await supabase.from("debt_payments").insert({
-    user_id: user.id,
-    household_id,
-    debt_id: input.debtId,
-    occurred_on: input.paymentDate,
-    amount: input.amount,
-    extra_amount: input.extraAmount,
-    extra_mode: input.extraMode ?? null,
-    kind: input.kind,
-    transaction_id: txnId,
-  });
-  if (error) {
-    // Compensación: sin registro especializado no debe quedar la transacción.
-    if (txnId) await deleteLinkedTransaction(txnId);
-    throw new Error(error.message);
+    const { error } = await supabase.rpc("record_debt_payment", {
+      p_txn: txnRow,
+      p_payment: paymentRow,
+    });
+    if (error) throw new Error(error.message);
+  } else {
+    // Pago sin monto (caso raro): solo el registro, sin transacción vinculada.
+    const { error } = await supabase
+      .from("debt_payments")
+      .insert({ ...paymentRow, transaction_id: null });
+    if (error) throw new Error(error.message);
   }
 
   // Modo 'cuota': el extra baja la cuota futura → actualiza current_payment.
@@ -349,39 +358,20 @@ export async function updateDebtPayment(
   paymentId: string,
   input: DebtPaymentInput,
 ): Promise<void> {
-  const user = await requireUser();
+  await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  const { data: row, error } = await supabase
-    .from("debt_payments")
-    .select("id,transaction_id")
-    .eq("id", paymentId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Atómico (RPC): el pago y su transacción vinculada (monto = cuota + extra,
+  // fecha) se actualizan en UNA sola transacción. Antes, si el 2º update fallaba
+  // el 1º no se revertía (pago editado con gasto viejo).
+  const { error } = await supabase.rpc("update_debt_payment", {
+    p_payment_id: paymentId,
+    p_occurred_on: input.paymentDate,
+    p_amount: input.amount,
+    p_extra_amount: input.extraAmount,
+    p_extra_mode: input.extraMode ?? null,
+  });
   if (error) throw new Error(error.message);
-  if (!row) throw new Error("Pago no encontrado");
-
-  const { error: upErr } = await supabase
-    .from("debt_payments")
-    .update({
-      occurred_on: input.paymentDate,
-      amount: input.amount,
-      extra_amount: input.extraAmount,
-      extra_mode: input.extraMode ?? null,
-    })
-    .eq("id", paymentId)
-    .eq("user_id", user.id);
-  if (upErr) throw new Error(upErr.message);
-
-  // El gasto vinculado refleja el total (cuota + extra) y la fecha del pago.
-  if (row.transaction_id) {
-    const { error: txErr } = await supabase
-      .from("transactions")
-      .update({ amount: input.amount + input.extraAmount, occurred_on: input.paymentDate })
-      .eq("id", row.transaction_id)
-      .eq("user_id", user.id);
-    if (txErr) throw new Error(txErr.message);
-  }
 }
 
 /**
@@ -389,26 +379,13 @@ export async function updateDebtPayment(
  * mes desaparece). El saldo/proyección se recalculan desde los pagos restantes.
  */
 export async function deleteDebtPayment(paymentId: string): Promise<void> {
-  const user = await requireUser();
+  await requireUser();
   const supabase = await createSupabaseServerClient();
 
-  const { data: row, error } = await supabase
-    .from("debt_payments")
-    .select("id,transaction_id")
-    .eq("id", paymentId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Atómico (RPC): elimina el pago y su transacción vinculada en una sola
+  // transacción (antes eran 2 borrados secuenciales sin atomicidad).
+  const { error } = await supabase.rpc("delete_debt_payment", { p_payment_id: paymentId });
   if (error) throw new Error(error.message);
-  if (!row) throw new Error("Pago no encontrado");
-
-  const { error: delErr } = await supabase
-    .from("debt_payments")
-    .delete()
-    .eq("id", paymentId)
-    .eq("user_id", user.id);
-  if (delErr) throw new Error(delErr.message);
-
-  if (row.transaction_id) await deleteLinkedTransaction(row.transaction_id);
 }
 
 /**

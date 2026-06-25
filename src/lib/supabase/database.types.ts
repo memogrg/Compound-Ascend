@@ -789,6 +789,26 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Record<string, unknown> | null;
       };
+      // Pago de deuda atómico (migración 0025): transacción + debt_payment en
+      // una sola transacción de BD.
+      record_debt_payment: {
+        Args: { p_txn: Record<string, unknown>; p_payment: Record<string, unknown> };
+        Returns: { transaction_id: string; payment_id: string };
+      };
+      update_debt_payment: {
+        Args: {
+          p_payment_id: string;
+          p_occurred_on: string;
+          p_amount: number;
+          p_extra_amount: number;
+          p_extra_mode: string | null;
+        };
+        Returns: undefined;
+      };
+      delete_debt_payment: {
+        Args: { p_payment_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       plan: Plan;
