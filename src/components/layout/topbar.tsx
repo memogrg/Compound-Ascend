@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { CurrencySwitch } from "@/components/layout/currency-switch";
+import { BellNotifications } from "@/components/layout/bell-notifications";
 import { resolvePageMeta } from "@/lib/constants/page-meta";
 
 export function Topbar({
@@ -43,9 +44,7 @@ export function Topbar({
           <span className="kbd">⌘K</span>
         </div>
         {currency ? <CurrencySwitch current={currency.display} primary={currency.primary} /> : null}
-        <button className="icon-btn" aria-label="Notificaciones">
-          <Icon name="bell" />
-        </button>
+        <BellNotifications />
         <Link href="/configuracion" className="icon-btn" aria-label="Ajustes">
           <Icon name="gear" />
         </Link>
