@@ -7,6 +7,7 @@
  * no bloquear la experiencia.
  */
 import { revalidatePath } from "next/cache";
+import { escapeHtml } from "@/lib/security/escape-html";
 import { profileDraftSchema } from "@/modules/personal-profile/schemas";
 import {
   saveDraft,
@@ -352,13 +353,6 @@ function inviteHtml(inviter: string, acceptUrl: string): string {
       Si no esperabas esta invitación, puedes ignorar este correo.
     </p>
   </div>`;
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c,
-  );
 }
 
 /** Guardado progresivo (best-effort). */

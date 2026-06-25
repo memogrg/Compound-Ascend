@@ -12,6 +12,7 @@
  */
 import { NextResponse } from "next/server";
 import { corsHeaders } from "@/lib/security/cors";
+import { escapeHtml } from "@/lib/security/escape-html";
 import { toSafeResponse, AppError } from "@/lib/errors";
 import { formatMoney } from "@/lib/format";
 import { logger } from "@/lib/logger";
@@ -65,11 +66,12 @@ async function handle(req: Request) {
       }
       try {
         const cuota = formatMoney(r.payment, r.currency);
-        const banco = r.bank ? ` del banco ${r.bank}` : "";
+        // r.name y r.bank son datos del usuario → escapar al incrustarlos en HTML.
+        const banco = r.bank ? ` del banco ${escapeHtml(r.bank)}` : "";
         const subject = `Recordatorio: tu pago de ${r.name} vence el ${fmtDate(r.nextDue)}`;
         const html =
           `<p>Hola,</p>` +
-          `<p>Tu cuota de <strong>${r.name}</strong>${banco} por <strong>${cuota}</strong> ` +
+          `<p>Tu cuota de <strong>${escapeHtml(r.name)}</strong>${banco} por <strong>${cuota}</strong> ` +
           `vence el <strong>${fmtDate(r.nextDue)}</strong>.</p>` +
           `<p>Págala a tiempo para evitar intereses y cargos por mora.</p>` +
           `<p style="color:#888;font-size:12px">Compound Ascend · recordatorio automático</p>`;
