@@ -90,7 +90,7 @@ Three clients with different privilege levels — use the right one:
 - Stocks/ETF: Finnhub → AlphaVantage → Yahoo Finance
 - Crypto: Binance → CoinGecko
 
-Timeout is 6 s per provider; in-memory caching is used (Redis is planned but not yet wired up, so multi-instance deployments share no cache).
+Timeout is 3 s per provider for price lookups (`providers.ts`); FX-rate fetches (`fx-rates.ts`) use 6 s. In-memory caching is used (Redis is planned but not yet wired up for market data, so multi-instance deployments share no cache).
 
 ### Rate limiting
 
