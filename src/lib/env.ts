@@ -53,6 +53,9 @@ const serverSchema = z.object({
   // Vercel. Si faltan, el rate-limit cae a memoria por instancia (solo dev/local).
   UPSTASH_REDIS_REST_URL: optionalStr, // https://<db>.upstash.io
   UPSTASH_REDIS_REST_TOKEN: optionalStr, // token REST de la base Upstash
+  // Alertas operativas → Slack Incoming Webhook. Si falta, las alertas solo
+  // quedan en el log (no se notifica a nadie).
+  SLACK_ALERT_WEBHOOK_URL: optionalStr, // https://hooks.slack.com/services/...
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,
   CRON_SECRET: optionalStr,
