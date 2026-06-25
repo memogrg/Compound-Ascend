@@ -405,6 +405,7 @@ a {
   line-height: 1;
   letter-spacing: -0.02em;
   font-weight: 400;
+  margin: 0; /* neutraliza el margen por defecto del <h1> (es un h1 semántico). */
 }
 .page-title .it {
   font-style: italic;
