@@ -89,6 +89,7 @@ export function PerformanceChart({
           fill={`url(#${gradId})`}
           dot={false}
           activeDot={{ r: 3, fill: color }}
+          isAnimationActive={false}
         />
         <XAxis dataKey="date" hide />
         <Tooltip

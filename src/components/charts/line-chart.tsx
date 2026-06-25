@@ -76,7 +76,7 @@ export function PremiumLineChart({
             strokeDasharray={s.dashed ? "5 5" : undefined}
             dot={false}
             activeDot={{ r: 4 }}
-            animationDuration={650}
+            isAnimationActive={false}
           />
         ))}
       </LineChart>
