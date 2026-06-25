@@ -29,7 +29,7 @@ export function Topbar({
             <span className="crumb-sep">/</span>
             <span className="crumb-now">{meta.title}</span>
           </div>
-          <div
+          <h1
             className="page-title"
             dangerouslySetInnerHTML={{ __html: meta.titleHTML ?? meta.title }}
           />
