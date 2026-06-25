@@ -27,8 +27,9 @@
   --line-strong: rgba(20, 18, 14, 0.12);
   --ink: #15140f;
   --ink-2: #36342d;
-  --muted: #807c72;
-  --muted-2: #a6a199;
+  /* P1-8: oscurecidos para cumplir contraste WCAG AA (4.5:1) en texto secundario. */
+  --muted: #6a665d;
+  --muted-2: #6e6a60;
   --chip: rgba(20, 18, 14, 0.04);
   --chip-hover: rgba(20, 18, 14, 0.07);
   --shadow-card:
@@ -96,8 +97,9 @@
   --line-strong: rgba(255, 252, 240, 0.14);
   --ink: #f4f2ec;
   --ink-2: #d9d5c9;
+  /* P1-8: --muted ya cumple ~5:1; --muted-2 se aclara para llegar a AA en oscuro. */
   --muted: #8e8a7e;
-  --muted-2: #5f5c53;
+  --muted-2: #86827a;
   --chip: rgba(255, 252, 240, 0.05);
   --chip-hover: rgba(255, 252, 240, 0.09);
   --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.5);
