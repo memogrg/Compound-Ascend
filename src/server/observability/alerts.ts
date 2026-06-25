@@ -22,5 +22,29 @@ export function alert(
   const payload = { alert: kind, severity, ...meta };
   if (severity === "critical") logger.error("ALERT", payload);
   else logger.warn("ALERT", payload);
-  // TODO(prod): dispatch(payload) → transporte externo (Sentry/Slack/PagerDuty).
+  dispatch(kind, severity, meta);
+}
+
+/**
+ * Transporte externo de la alerta. Hoy: webhook de Slack (Incoming Webhook),
+ * gateado por env — si no está, solo queda el log. Fire-and-forget: nunca
+ * bloquea ni lanza (una alerta no debe tumbar el flujo que la origina).
+ *
+ * `meta` es operativo (bucket, código, conteos), no PII; aun así no se envían
+ * secretos. Para PagerDuty/otros, añadir aquí otro destino con la misma firma.
+ */
+function dispatch(kind: AlertKind, severity: AlertSeverity, meta: Record<string, unknown>): void {
+  const url = process.env.SLACK_ALERT_WEBHOOK_URL?.trim();
+  if (!url) return;
+  const emoji = severity === "critical" ? "🔴" : "🟠";
+  const text = `${emoji} *[${severity.toUpperCase()}] ${kind}* · Compound Ascend\n\`\`\`${JSON.stringify(meta)}\`\`\``;
+  void fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  }).catch((err) => {
+    logger.warn("alert: fallo al enviar al transporte externo", {
+      message: err instanceof Error ? err.message : "?",
+    });
+  });
 }
