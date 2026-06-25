@@ -1,5 +1,6 @@
 /** Validación Zod de objetivos y deudas (Módulo 3). */
 import { z } from "zod";
+import { notFutureDate, NOT_FUTURE_MSG } from "@/lib/validation";
 
 export const goalInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
@@ -40,7 +41,7 @@ export const debtInputSchema = z.object({
 /** Pago reportado sobre una deuda. */
 export const debtPaymentInputSchema = z.object({
   debtId: z.string().uuid(),
-  paymentDate: z.string().min(1),
+  paymentDate: z.string().min(1).refine(notFutureDate, { message: NOT_FUTURE_MSG }),
   amount: z.number().nonnegative(),
   extraAmount: z.number().nonnegative().default(0),
   extraMode: z.enum(["tiempo", "cuota"]).optional(),

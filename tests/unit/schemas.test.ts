@@ -267,3 +267,27 @@ describe("categoryInputSchema", () => {
     expectFailAt(categoryInputSchema, { name: "X", parentId: "abc" }, ["parentId"]);
   });
 });
+
+// ── Fechas futuras (P1-3): eventos que ya ocurrieron no aceptan futuro ──
+
+describe("validación de fechas no futuras", () => {
+  const isoFuture = new Date(Date.now() + 8 * 86400000).toISOString().slice(0, 10);
+  const isoPast = "2020-01-15";
+
+  it("dividendo: acepta fecha pasada y rechaza futura", () => {
+    const base = { holdingId: UUID, amount: 100, currency: "USD" };
+    expect(dividendInputSchema.safeParse({ ...base, paymentDate: isoPast }).success).toBe(true);
+    expectFailAt(dividendInputSchema, { ...base, paymentDate: isoFuture }, ["paymentDate"]);
+  });
+
+  it("renta cobrada: rechaza fecha futura", () => {
+    const base = { holdingId: UUID, amount: 100, currency: "CRC" };
+    expectFailAt(rentalPaymentInputSchema, { ...base, receivedOn: isoFuture }, ["receivedOn"]);
+  });
+
+  it("compra de holding: rechaza purchaseDate futura", () => {
+    const base = { assetType: "etf", quantity: 1, averageCost: 100, currency: "USD" };
+    expect(holdingInputSchema.safeParse({ ...base, purchaseDate: isoPast }).success).toBe(true);
+    expectFailAt(holdingInputSchema, { ...base, purchaseDate: isoFuture }, ["purchaseDate"]);
+  });
+});

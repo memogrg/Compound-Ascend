@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { notFutureDate, NOT_FUTURE_MSG } from "@/lib/validation";
 import {
   goalInputSchema,
   debtInputSchema,
@@ -155,7 +156,7 @@ export async function deleteDebtPaymentAction(
 const goalContributionSchema = z.object({
   goalId: z.string().uuid(),
   amount: z.number().positive("Debe ser mayor a 0"),
-  contributionDate: z.string().min(8).max(10),
+  contributionDate: z.string().min(8).max(10).refine(notFutureDate, { message: NOT_FUTURE_MSG }),
 });
 
 /** Aporte a meta: sube current_amount y crea la transacción vinculada. */
@@ -181,7 +182,7 @@ export async function addGoalContributionAction(raw: unknown): Promise<ActionRes
 const goalWithdrawalSchema = z.object({
   goalId: z.string().uuid(),
   amount: z.number().positive("Debe ser mayor a 0"),
-  withdrawalDate: z.string().min(8).max(10),
+  withdrawalDate: z.string().min(8).max(10).refine(notFutureDate, { message: NOT_FUTURE_MSG }),
   note: z.string().max(280).optional(),
 });
 

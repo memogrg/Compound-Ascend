@@ -1,6 +1,7 @@
 /** Validación Zod de inversiones y pólizas (Módulo 4). */
 import { z } from "zod";
 import { INVESTMENT_CATEGORIES } from "@/modules/wealth/types";
+import { pastDateSchema } from "@/lib/validation";
 
 export const investmentInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
@@ -76,7 +77,7 @@ export const holdingInputSchema = z.object({
   assetType: z.enum(ASSET_TYPE_ENUM),
   quantity: z.number().positive("La cantidad debe ser mayor a 0"),
   averageCost: z.number().nonnegative("El costo promedio no puede ser negativo"),
-  purchaseDate: z.string().date().optional(),
+  purchaseDate: pastDateSchema.optional(),
   broker: z.string().trim().max(80).optional(),
   currency: z.string().length(3),
   label: z.string().trim().max(120).optional(),
@@ -100,7 +101,7 @@ export const holdingInputSchema = z.object({
 
 export const rentalPaymentInputSchema = z.object({
   holdingId: z.string().uuid(),
-  receivedOn: z.string().date(),
+  receivedOn: pastDateSchema,
   amount: z.number().positive("El monto debe ser mayor a 0"),
   currency: z.string().length(3),
   frequency: z.enum(["mensual", "trimestral", "anual"]).optional(),
@@ -110,7 +111,7 @@ export const rentalPaymentInputSchema = z.object({
 
 export const dividendInputSchema = z.object({
   holdingId: z.string().uuid(),
-  paymentDate: z.string().date(),
+  paymentDate: pastDateSchema,
   amount: z.number().positive("El monto debe ser mayor a 0"),
   currency: z.string().length(3),
   yieldPct: z.number().positive().max(100).optional(),
@@ -122,7 +123,7 @@ export const dividendInputSchema = z.object({
 // Venta/retiro parcial de una posición (Fase 4 · flujos inversos).
 export const holdingSaleInputSchema = z.object({
   holdingId: z.string().uuid(),
-  saleDate: z.string().date(),
+  saleDate: pastDateSchema,
   amount: z.number().positive("El monto debe ser mayor a 0"),
   currency: z.string().length(3),
   quantitySold: z.number().positive().optional(),
