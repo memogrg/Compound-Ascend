@@ -659,6 +659,13 @@ export type NetWorthSnapshotRow = Timestamps & {
   breakdown: Json;
 };
 
+/** Idempotencia de webhooks: evento procesado por (provider, event_id). */
+export type ProcessedEventRow = {
+  provider: string;
+  event_id: string;
+  processed_at: string;
+};
+
 type TableShape<Row, Insert, Update> = {
   Row: Row;
   Insert: Insert;
@@ -758,6 +765,12 @@ export interface Database {
         ExpenseCategoryRow,
         Partial<ExpenseCategoryRow> & { name: string },
         Partial<ExpenseCategoryRow>
+      >;
+      // Idempotencia de webhooks (migración 0026). Solo service-role escribe.
+      processed_events: TableShape<
+        ProcessedEventRow,
+        { provider: string; event_id: string; processed_at?: string },
+        Partial<ProcessedEventRow>
       >;
     };
     // OJO: usar `{ [_ in never]: never }` (sin índice de cadena). `Record<string,
