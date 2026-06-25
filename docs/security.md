@@ -41,6 +41,14 @@ Documentamos controles y riesgos residuales.
   cadena de respaldo, pero conviene monitorear fallos por proveedor.
 - **Vulnerabilidad transitiva:** `postcss` interno de Next (moderada) — se resuelve
   al actualizar Next; nuestra dependencia directa de postcss está parcheada.
+- **CSP con `'unsafe-inline'` (script-src/style-src):** la política aún permite
+  scripts y estilos inline porque la app usa un script inline de inicialización de
+  tema (anti-FOUC, en `app/layout.tsx`) y varios `dangerouslySetInnerHTML`
+  controlados (títulos, íconos). Endurecer a nonces/hashes es un trabajo de mayor
+  riesgo (puede romper estilos/scripts si algo se escapa) y queda **pendiente como
+  P2 dedicado**. Mitigado en parte por `object-src 'none'`, `base-uri 'self'`,
+  `frame-ancestors 'none'`, `form-action 'self'` y los origin-checks de los
+  endpoints sensibles.
 
 ## Pruebas de seguridad
 
