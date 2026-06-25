@@ -19,6 +19,7 @@ import {
   duplicateTransactionAction,
   markReviewedAction,
 } from "@/modules/financial-base/api/v2-actions";
+import { TRANSACTIONS_LIST_CAP } from "@/modules/financial-base/constants";
 import type { Account, Transaction } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 
@@ -58,6 +59,8 @@ export function TransactionsBrowser({
   const toast = useToast();
   // Deep-link "ver movimientos ›" desde un sobre → filtra por esa categoría.
   const catParam = searchParams.get("cat");
+  // Si el período alcanzó el tope, la búsqueda local opera sobre los más recientes.
+  const capped = transactions.length >= TRANSACTIONS_LIST_CAP;
   const [items, setItems] = useState<Transaction[]>(transactions);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState(catParam ? `cat:${catParam}` : "all");
@@ -183,6 +186,7 @@ export function TransactionsBrowser({
             <div className="card-title">Todas las transacciones</div>
             <div className="card-sub">
               {visible.length} movimiento{visible.length === 1 ? "" : "s"} · {period}
+              {capped ? ` · mostrando los ${TRANSACTIONS_LIST_CAP} más recientes` : ""}
             </div>
           </div>
         </div>

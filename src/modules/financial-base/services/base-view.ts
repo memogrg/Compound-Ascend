@@ -28,6 +28,7 @@ import { listTemplates } from "@/modules/financial-base/services/templates-servi
 import { listLinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 import { syncDerivedBudget } from "@/modules/financial-base/services/derived-budget-service";
 import { getExpenseJars } from "@/modules/financial-base/services/expense-jars-service";
+import { TRANSACTIONS_LIST_CAP } from "@/modules/financial-base/constants";
 import {
   parseMonthParam,
   parseRangeParam,
@@ -92,7 +93,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     getBudgetTotals(period),
     getRealTotals(period),
     getRealHistory(period, monthsBack),
-    listTransactions(period),
+    listTransactions(period, {}, TRANSACTIONS_LIST_CAP),
     listCategories(),
     listCategoryTree("expense"),
     listCategoryTree("income"),

@@ -65,6 +65,7 @@ async function accountLabelFor(accountId: string | null | undefined): Promise<st
 export async function listTransactions(
   period: Period,
   filters: TxnFilters = {},
+  limit?: number,
 ): Promise<Transaction[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -79,6 +80,10 @@ export async function listTransactions(
   if (filters.kind) q = q.eq("kind", filters.kind);
   if (filters.status) q = q.eq("status", filters.status);
   if (filters.origin) q = q.eq("origin", filters.origin);
+  // Paginación mínima OPCIONAL: si el caller pasa `limit`, trae como mucho esas
+  // filas (las más recientes; el orden ya está aplicado). Sin `limit` no hay
+  // tope, para que las agregaciones (totales/histórico) sigan siendo exactas.
+  if (limit != null) q = q.range(0, limit - 1);
   const { data } = await q;
   return (data ?? []).map(rowToTransaction);
 }

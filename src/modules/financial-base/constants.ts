@@ -1,6 +1,13 @@
 /** Opciones del Módulo 2 (en español). */
 import type { Option } from "@/modules/personal-profile/constants";
 
+/**
+ * Tope de filas que `listTransactions` trae por período (paginación mínima):
+ * evita un fetch sin límite cuando hay muchos movimientos. La UI avisa cuando
+ * se alcanza el tope (muestra los más recientes del período).
+ */
+export const TRANSACTIONS_LIST_CAP = 500;
+
 export const FREQUENCIES: Option[] = [
   { value: "diario", label: "Diario" },
   { value: "semanal", label: "Semanal" },
