@@ -137,9 +137,14 @@ export async function rateLimit(
   return { ok, remaining, limit: config.limit, resetAt };
 }
 
+/** Extrae una IP aproximada de un objeto Headers (sirve para Server Actions). */
+export function clientIpFromHeaders(headers: Headers): string {
+  const fwd = headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0]!.trim();
+  return headers.get("x-real-ip") ?? "unknown";
+}
+
 /** Extrae una IP aproximada de las cabeceras de la petición. */
 export function clientIp(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  return clientIpFromHeaders(req.headers);
 }
