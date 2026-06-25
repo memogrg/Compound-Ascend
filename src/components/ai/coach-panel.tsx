@@ -488,6 +488,16 @@ function TxnConfirmCard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Limpia el timeout pendiente si la tarjeta se desmonta antes de los 1200ms
+  // (evita invocar onConfirmed sobre un componente ya desmontado).
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   const confirm = async () => {
     setPending(true);
@@ -496,7 +506,7 @@ function TxnConfirmCard({
     setPending(false);
     if (res.ok) {
       setOk(true);
-      setTimeout(onConfirmed, 1200);
+      timerRef.current = setTimeout(onConfirmed, 1200);
     } else {
       setError(res.message ?? "No se pudo guardar.");
     }

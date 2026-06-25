@@ -9,6 +9,11 @@ import { buildSecurityHeaders } from "./src/lib/security/headers";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Tree-shaking dirigido de librerías con muchos exports: importa solo lo usado
+  // en vez del barrel completo (mejora el tamaño de bundle y el cold start).
+  experimental: {
+    optimizePackageImports: ["recharts", "lucide-react", "@tabler/icons-react", "motion"],
+  },
   // typedRoutes se habilitará cuando el set de rutas se estabilice (las rutas de
   // navegación con anclas #seccion son strings dinámicos en F0).
   async headers() {
