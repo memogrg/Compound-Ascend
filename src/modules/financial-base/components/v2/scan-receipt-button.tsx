@@ -63,6 +63,12 @@ export function ScanReceiptButton({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    // Allowlist de tipos (defensa en cliente; el server y el bucket revalidan).
+    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast("Formato no admitido. Usa JPG, PNG, WEBP o HEIC.", "error");
+      return;
+    }
     if (file.size > 6_000_000) {
       toast("La imagen es muy grande (máx 6 MB).", "error");
       return;
