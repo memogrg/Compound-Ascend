@@ -11,7 +11,7 @@ export function SignOutButton() {
         className="icon-btn"
         aria-label="Cerrar sesión"
         title="Cerrar sesión"
-        style={{ width: 30, height: 30 }}
+        style={{ width: 36, height: 36 }}
       >
         <svg
           viewBox="0 0 24 24"
