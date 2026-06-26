@@ -30,6 +30,8 @@ import {
 } from "@/lib/whatsapp/links-service";
 import { createTransactionForUser } from "@/lib/whatsapp/write-service";
 import { formatMoney, todayIso } from "@/lib/whatsapp/format";
+import { parseNotification } from "@/lib/ingestion/sources";
+import { toPendingAction, dedupKey } from "@/lib/ingestion/normalize";
 import type { WhatsAppProvider } from "@/lib/whatsapp/provider";
 
 export type InboundMessage = {
@@ -139,6 +141,27 @@ async function handleActiveMessage(
       msg.phone,
       'Mandame una foto del recibo o escribí un gasto/ingreso, p. ej. "gasté 12000 en super".',
     );
+    return;
+  }
+
+  // Notificación de banco reenviada (capa de ingesta): si calza una plantilla,
+  // se propone como transacción con el flujo de confirmación de siempre.
+  const movs = parseNotification(msg.body);
+  if (movs.length) {
+    const mov = movs[0]!;
+    // Dedup: dedupKey(mov) identifica el movimiento. TODO(ingesta): persistir esta
+    // clave (p. ej. en whatsapp_links o una tabla) para no re-proponer la misma
+    // notificación si el usuario la reenvía dos veces. Sin estado global en memoria.
+    void dedupKey(mov);
+
+    const pendingTxn = toPendingAction(mov);
+    await setPendingAction(link.id, pendingTxn);
+    const low = mov.confidence < 0.7 ? " (verificá el monto)" : "";
+    const lead = `🏦 ${mov.kind === "ingreso" ? "Ingreso" : "Gasto"} de ${formatMoney(mov.amount, mov.currency)}${mov.merchant ? ` · ${mov.merchant}` : ""}.${low}`;
+    await provider.sendButtons(msg.phone, `${lead} ¿Lo agrego?`, [
+      { id: "yes", title: "Sí" },
+      { id: "edit", title: "Editar" },
+    ]);
     return;
   }
 
