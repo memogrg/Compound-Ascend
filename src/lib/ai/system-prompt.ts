@@ -27,6 +27,15 @@ export type FinancialContext = {
   calidadPatrimonio?: number; // 0-100
   investableWealth?: number;
   patrimonioDiagnosis?: string[]; // códigos de banderas §15
+  // Entorno macro/micro (no son datos del usuario; son del entorno). Best-effort.
+  inflacionYoYPct?: number; // IPC interanual de la moneda del usuario
+  tbpPct?: number; // Tasa Básica Pasiva (CR)
+  tbpChange6mPp?: number; // variación en puntos porcentuales, 6 meses
+  tpmPct?: number; // Tasa de Política Monetaria (CR)
+  tipoCambioVenta?: number; // USD/CRC venta
+  fedFundsPct?: number; // EE. UU.
+  treasury10yPct?: number; // EE. UU.
+  macroInsights?: { title: string; body: string; tone: string }[];
   // Fase 5 · context engine: perfil, deudas, metas y vinculables.
   lifeStage?: string;
   debtCount?: number;
@@ -130,6 +139,23 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(`Cobertura de ingreso pasivo: ${ctx.coberturaPasivaPct}% del gasto.`);
   if (ctx.calidadPatrimonio !== undefined)
     facts.push(`Calidad del patrimonio: ${ctx.calidadPatrimonio}/100.`);
+  // Entorno macro/micro (del entorno, no del usuario): cada línea solo si existe.
+  if (ctx.inflacionYoYPct !== undefined)
+    facts.push(`Inflación interanual: ${ctx.inflacionYoYPct.toFixed(1)}%.`);
+  if (ctx.tbpPct !== undefined)
+    facts.push(
+      `TBP (Tasa Básica Pasiva, CR): ${ctx.tbpPct}%${ctx.tbpChange6mPp !== undefined ? ` (variación 6m: ${ctx.tbpChange6mPp >= 0 ? "+" : ""}${ctx.tbpChange6mPp} pp)` : ""}.`,
+    );
+  if (ctx.tpmPct !== undefined) facts.push(`TPM (Tasa de Política Monetaria, CR): ${ctx.tpmPct}%.`);
+  if (ctx.tipoCambioVenta !== undefined)
+    facts.push(`Tipo de cambio USD/CRC (venta): ${ctx.tipoCambioVenta}.`);
+  if (ctx.fedFundsPct !== undefined) facts.push(`Fed Funds (EE. UU.): ${ctx.fedFundsPct}%.`);
+  if (ctx.treasury10yPct !== undefined)
+    facts.push(`Tesoro 10A (EE. UU.): ${ctx.treasury10yPct}%.`);
+  if (ctx.macroInsights?.length) {
+    facts.push("Lecturas del entorno económico:");
+    for (const m of ctx.macroInsights) facts.push(`Entorno (${m.tone}): ${m.title} — ${m.body}`);
+  }
   if (ctx.lifeStage) facts.push(`Etapa de vida: ${ctx.lifeStage}.`);
   if (ctx.debtCount !== undefined && ctx.debtTotal !== undefined) {
     facts.push(
@@ -328,6 +354,8 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "- Sé breve. No vuelques todas las métricas ni listas largas a menos que el usuario las pida. Nada de respuestas tipo informe con muchos encabezados y viñetas en el chat.",
     "- Si te falta UN dato clave para responder bien, haz UNA sola pregunta corta y espera la respuesta, en vez de asumir o explicarlo todo. Conversa como un asesor humano cercano, no como un reporte.",
     "- Evita repetir el contexto del usuario (su visión, su perfil) salvo que sea necesario para la respuesta.",
+    "",
+    "ENTORNO ECONÓMICO: cuando aconsejes sobre deuda, ahorro o inversión, USA el entorno macro disponible. Compara rendimientos esperados contra la inflación (rendimiento real). Para deuda en colones a tasa variable, considera la TBP y su tendencia. No inventes cifras macro: si una no está en el contexto, dilo en una frase. Explica el porqué citando la variable concreta (p. ej. 'con la inflación en X%, …').",
     "",
     "PERFIL DEL USUARIO:",
     ...facts.map((f) => `- ${f}`),

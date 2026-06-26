@@ -338,5 +338,69 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Sin insights: el contexto sigue.
   }
 
+  // Entorno macro/micro: indicadores económicos del entorno (no del usuario).
+  // Best-effort; cada lectura en su propio try/catch para que un fallo aislado no
+  // degrade el resto. Si un indicador no tiene datos (value null), no se inyecta.
+  try {
+    const { getLatest, getChange } = await import("@/lib/economic-indicators");
+
+    // Helper: lee el último valor de un código y, si existe, lo asigna.
+    const setLatest = async (code: string, set: (v: number) => void): Promise<void> => {
+      try {
+        const r = await getLatest(code);
+        if (r) set(r.value);
+      } catch {
+        // lectura aislada
+      }
+    };
+
+    // Inflación interanual del IPC de la moneda del usuario; se guarda como %.
+    try {
+      const { getYoYInflation } = await import("@/lib/economic-indicators/insights");
+      const cpiCode = ctx.currency === "CRC" ? "IPC" : "US_CPI";
+      const infl = await getYoYInflation(cpiCode);
+      if (infl !== null) ctx.inflacionYoYPct = infl * 100;
+    } catch {
+      // inflación no disponible
+    }
+
+    // TBP + variación 6m (puntos porcentuales).
+    try {
+      const tbp = await getLatest("TBP");
+      if (tbp) {
+        ctx.tbpPct = tbp.value;
+        const ch = await getChange("TBP", 6);
+        if (ch.absChange !== null) ctx.tbpChange6mPp = ch.absChange;
+      }
+    } catch {
+      // TBP no disponible
+    }
+
+    await setLatest("TPM", (v) => {
+      ctx.tpmPct = v;
+    });
+    await setLatest("USDCRC_VENTA", (v) => {
+      ctx.tipoCambioVenta = v;
+    });
+    await setLatest("FED_FUNDS", (v) => {
+      ctx.fedFundsPct = v;
+    });
+    await setLatest("US_TREASURY_10Y", (v) => {
+      ctx.treasury10yPct = v;
+    });
+
+    // Lecturas del entorno (macro-insights deterministas).
+    try {
+      const { getMacroInsights } = await import("@/modules/wealth");
+      const mi = await getMacroInsights();
+      if (mi.length)
+        ctx.macroInsights = mi.map((m) => ({ title: m.title, body: m.body, tone: m.tone }));
+    } catch {
+      // macro-insights no disponibles
+    }
+  } catch {
+    // Indicadores económicos no disponibles: el contexto sigue.
+  }
+
   return ctx;
 }

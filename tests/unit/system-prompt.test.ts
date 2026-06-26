@@ -188,4 +188,42 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).toContain("Sus prioridades: seguridad, familia.");
     expect(prompt).toContain('Su vida rica en una frase: "Tiempo con mi familia".');
   });
+
+  it("entorno macro: rinde los facts presentes y la regla de uso", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      inflacionYoYPct: 4.2,
+      tbpPct: 3.75,
+      tbpChange6mPp: -0.5,
+      tpmPct: 4,
+      tipoCambioVenta: 512.3,
+      fedFundsPct: 4.5,
+      treasury10yPct: 4.1,
+      macroInsights: [
+        { title: "Rendimiento real", body: "Tu portafolio supera la inflación.", tone: "pos" },
+      ],
+    });
+    expect(prompt).toContain("Inflación interanual: 4.2%.");
+    expect(prompt).toContain("TBP (Tasa Básica Pasiva, CR): 3.75% (variación 6m: -0.5 pp).");
+    expect(prompt).toContain("TPM (Tasa de Política Monetaria, CR): 4%.");
+    expect(prompt).toContain("Tipo de cambio USD/CRC (venta): 512.3.");
+    expect(prompt).toContain("Fed Funds (EE. UU.): 4.5%.");
+    expect(prompt).toContain("Tesoro 10A (EE. UU.): 4.1%.");
+    expect(prompt).toContain(
+      "Entorno (pos): Rendimiento real — Tu portafolio supera la inflación.",
+    );
+    // La regla de uso del entorno macro va siempre.
+    expect(prompt).toContain("ENTORNO ECONÓMICO:");
+    expect(prompt).toContain("rendimiento real");
+  });
+
+  it("ausencia de macro no rompe ni inyecta sus facts (la regla sí va)", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).not.toContain("Inflación interanual:");
+    expect(prompt).not.toContain("TBP (Tasa Básica Pasiva");
+    expect(prompt).not.toContain("Tipo de cambio USD/CRC");
+    expect(prompt).not.toContain("Entorno (");
+    // La instrucción de entorno es constante (no depende de los datos).
+    expect(prompt).toContain("ENTORNO ECONÓMICO:");
+  });
 });
