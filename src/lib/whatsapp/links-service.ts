@@ -87,8 +87,8 @@ export type PendingAction = {
   currency: string;
   occurredOn: string; // YYYY-MM-DD
   merchant?: string | null;
-  origin: "scanned" | "ai_assisted" | "manual";
-  source: "receipt" | "chat";
+  origin: "scanned" | "ai_assisted" | "manual" | "notification";
+  source: "receipt" | "chat" | "notification";
 };
 
 /** Moneda principal del usuario (default CRC). */
