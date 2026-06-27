@@ -7,6 +7,10 @@ import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { computeBaseIndicators } from "@/modules/financial-base";
 import { computeHealthScore, type HealthScore } from "@/modules/financial-base";
 import { buildInsights, type DashboardInsights } from "@/modules/dashboard/engine/insights";
+import { getControlSummary, type ControlSummary } from "@/modules/control";
+import { getRichLifeSummary, buildDemoRichLifeSummary, type RichLifeSummary } from "@/modules/rich-life";
+import { getWealthSummary, buildDemoWealthSummary, type WealthSummary } from "@/modules/wealth";
+import { buildPanel, type PanelVM } from "@/modules/dashboard/engine/pillars";
 import type { BaseSummary } from "@/modules/financial-base";
 import type { IncomeSource, ExpenseItem } from "@/modules/financial-base";
 
@@ -16,6 +20,7 @@ export type DashboardData = {
   summary: BaseSummary;
   health: HealthScore;
   insights: DashboardInsights;
+  panel: PanelVM;
   configured: boolean;
 };
 
@@ -64,7 +69,25 @@ export async function getDashboardData(): Promise<DashboardData> {
   const health = computeHealthScore(summary.indicators, summary.indicators.investmentRate);
   const insights = buildInsights(summary.indicators, health, currency);
 
-  return { name, currency, summary, health, insights, configured };
+  // Resúmenes de los otros pilares para la franja Norte y los 4 pilares.
+  // Best-effort y en paralelo: si un módulo falla, el panel degrada con gracia.
+  let control: ControlSummary | null = null;
+  let richLife: RichLifeSummary | null = null;
+  let wealth: WealthSummary | null = null;
+  if (configured && user) {
+    [control, richLife, wealth] = await Promise.all([
+      getControlSummary().catch(() => null),
+      getRichLifeSummary().catch(() => null),
+      getWealthSummary().catch(() => null),
+    ]);
+  } else if (!configured) {
+    // Demo: previsualiza el panel premium completo sin Supabase.
+    richLife = buildDemoRichLifeSummary();
+    wealth = buildDemoWealthSummary();
+  }
+  const panel = buildPanel({ ind: summary.indicators, currency, control, richLife, wealth });
+
+  return { name, currency, summary, health, insights, panel, configured };
 }
 
 function demoIncome(name: string, type: IncomeSource["incomeType"], m: number): IncomeSource {

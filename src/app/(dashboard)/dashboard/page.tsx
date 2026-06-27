@@ -63,6 +63,7 @@ async function DashboardContent() {
         currency={data.currency}
         health={data.health}
         insights={data.insights}
+        panel={data.panel}
         demo={!data.configured}
       />
     </>
