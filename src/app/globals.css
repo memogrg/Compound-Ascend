@@ -1640,6 +1640,127 @@ a {
   }
 }
 
+/* ---- Panel: franja Norte + 4 pilares (feat/panel-pilares-norte) ---- */
+.dash-norte {
+  display: grid;
+  grid-template-columns: 0.9fr 0.9fr 1.3fr;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.norte-cell {
+  padding: 20px 22px;
+  border-right: 1px solid var(--line);
+}
+.norte-cell:last-child {
+  border-right: 0;
+}
+.norte-nba {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--pos) 8%, var(--surface)),
+    color-mix(in srgb, var(--info) 7%, var(--surface))
+  );
+}
+.nba-spark {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(140deg, var(--pos), var(--teal));
+  color: #fff;
+  flex: none;
+}
+.trend-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 999px;
+}
+.freedom-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--chip);
+  overflow: hidden;
+  margin-top: 12px;
+}
+.freedom-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--info), var(--teal));
+}
+
+.dash-pillars {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.pillar {
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+}
+.pillar-ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.ai-read {
+  display: flex;
+  gap: 8px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.ai-read .ai-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(140deg, var(--info-soft), var(--pos-soft));
+  color: var(--ink-2);
+}
+.ai-read p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+@media (max-width: 1080px) {
+  .dash-pillars {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 880px) {
+  .dash-norte {
+    grid-template-columns: 1fr;
+  }
+  .norte-cell {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .norte-cell:last-child {
+    border-bottom: 0;
+  }
+}
+@media (max-width: 560px) {
+  .dash-pillars {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ============================================================ SETUP WIZARD ============================================================ */
 .wiz {
   display: grid;
