@@ -684,8 +684,8 @@ export type EmailIngestLinkRow = {
   id: string;
   user_id: string;
   household_id: string | null;
-  ingest_alias: string; // communications+<token>@dominio (plus-addressing)
-  forwarder_email: string | null; // informativo: correo personal del usuario
+  ingest_alias: string | null; // legado: alias plus-addressing (ya no se usa para match)
+  forwarder_email: string | null; // llave de match: destinatario original (correo del usuario)
   created_at: string;
 };
 

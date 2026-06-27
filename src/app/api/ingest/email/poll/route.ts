@@ -1,8 +1,9 @@
 /**
  * POST/GET /api/ingest/email/poll
  * Poller de ingesta por correo: lee el buzón IMAP (donde los usuarios reenvían
- * sus correos de banco), identifica al remitente por la allowlist, deduplica,
- * parsea y deja la propuesta en cola (ingest_proposals, status 'pending').
+ * sus correos de banco), identifica al usuario por el destinatario original del
+ * reenvío (forwarder_email en la allowlist), deduplica, parsea y deja la
+ * propuesta en cola (ingest_proposals, status 'pending').
  *
  * Este delta NO entrega nada al usuario (eso es el Delta 2). Nada se confirma
  * solo: las propuestas quedan 'pending' hasta que el usuario las acepte.
@@ -16,7 +17,6 @@ import { NextResponse } from "next/server";
 import { corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { getServerEnv } from "@/lib/env";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { parseNotification } from "@/lib/ingestion/sources";
 import {
@@ -45,11 +45,15 @@ function buildDeps(
   markSeenUid: (uid: number) => Promise<void>,
 ): EmailIngestDeps {
   return {
-    async lookupOwner(ingestAlias: string): Promise<EmailOwner | null> {
+    async lookupOwner(candidates: string[]): Promise<EmailOwner | null> {
+      if (candidates.length === 0) return null;
+      // forwarder_email es citext: la comparación es case-insensitive en BD. Se
+      // toma el primer link cuyo forwarder esté entre los candidatos.
       const { data, error } = await supabase
         .from("email_ingest_links")
         .select("user_id, household_id")
-        .eq("ingest_alias", ingestAlias)
+        .in("forwarder_email", candidates)
+        .limit(1)
         .maybeSingle();
       if (error || !data) return null;
       return { userId: data.user_id, householdId: data.household_id };
@@ -131,15 +135,12 @@ async function handle(req: Request) {
       );
     }
 
-    // El alias de ingesta se deriva de este buzón (base+token@dominio). Garantizado
-    // presente por isEmailIngestConfigured().
-    const imapUser = getServerEnv().GMAIL_IMAP_USER!;
     const client = await createImapClient();
     try {
       const messages = await fetchUnseen(client);
       const supabase = createServiceRoleClient();
       const deps = buildDeps(supabase, (uid) => client.markSeen(uid));
-      const summary = await processInboundEmails(messages, parseNotification, imapUser, deps);
+      const summary = await processInboundEmails(messages, parseNotification, deps);
       return NextResponse.json({ ok: true, ...summary }, { headers: cors });
     } finally {
       await client.close().catch(() => {});

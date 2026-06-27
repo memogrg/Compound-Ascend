@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   fetchUnseen,
-  matchIngestAlias,
   processInboundEmails,
   type EmailIngestDeps,
   type EmailOwner,
@@ -18,9 +17,9 @@ Comercio: AUTO MERCADO SANTA ANA  Ciudad y país: SAN JOSE, Costa Rica
 Fecha: Jun 11, 2026, 20:31  MASTER ***2062  Autorización: 425613
 Referencia: 35689751  Tipo de Transacción: COMPRA  Monto: CRC 11,490.00`;
 
-const IMAP_USER = "communications@aitechumbrella.com";
-const ALIAS = "communications+memo@aitechumbrella.com";
 const BANK_FROM = "notificacion@notificacionesbaccr.com"; // con auto-forward, el From es del banco
+const FLAT_INBOX = "communications@aitechumbrella.com"; // dirección plana del buzón
+const FORWARDER = "memogrg@gmail.com"; // destinatario original (forwarder conocido)
 
 /** Cliente IMAP falso: devuelve los correos dados, registra los marcados leídos. */
 function fakeClient(raw: RawImapMessage[]): ImapClient & { seen: number[] } {
@@ -35,12 +34,18 @@ function fakeClient(raw: RawImapMessage[]): ImapClient & { seen: number[] } {
   };
 }
 
-/** Deps en memoria: allowlist por alias, dedup por id, propuestas acumuladas. */
+/** Deps en memoria: allowlist por forwarder, dedup por id, propuestas acumuladas. */
 function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<string>()) {
   const proposals: { movements: number; owner: EmailOwner }[] = [];
   const markedSeen: number[] = [];
   const deps: EmailIngestDeps = {
-    lookupOwner: async (alias) => allowlist[alias] ?? null,
+    lookupOwner: async (candidates) => {
+      for (const c of candidates) {
+        const owner = allowlist[c];
+        if (owner) return owner;
+      }
+      return null;
+    },
     isProcessed: async (id) => processed.has(id),
     markProcessed: async (id) => {
       processed.add(id);
@@ -56,25 +61,14 @@ function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<str
   return { deps, proposals, markedSeen, processed };
 }
 
-describe("email ingestion · matchIngestAlias", () => {
-  it("toma el destinatario base+token@dominio (ignora el banco)", () => {
-    const got = matchIngestAlias(["BAC <notificacion@bac.com>", `Memo <${ALIAS}>`], IMAP_USER);
-    expect(got).toBe(ALIAS);
-  });
-  it("sin plus-address válido -> null", () => {
-    expect(matchIngestAlias([IMAP_USER, "otro@aitechumbrella.com"], IMAP_USER)).toBeNull();
-    expect(matchIngestAlias(["communications+@aitechumbrella.com"], IMAP_USER)).toBeNull();
-  });
-});
-
 describe("email ingestion · fetchUnseen", () => {
-  it("normaliza remitente, destinatarios y usa messageId como id", async () => {
+  it("normaliza remitente y destinatarios (minúsculas, sin duplicados)", async () => {
     const client = fakeClient([
       {
         uid: 7,
         messageId: "<abc@mail>",
         from: "BAC Credomatic <notificacion@notificacionesbaccr.com>",
-        recipients: [`Memo <${ALIAS}>`, "Comms <communications@aitechumbrella.com>"],
+        recipients: [`Comms <${FLAT_INBOX}>`, "MEMOGRG@gmail.com", FLAT_INBOX],
         subject: "Compra",
         text: "cuerpo",
       },
@@ -83,15 +77,15 @@ describe("email ingestion · fetchUnseen", () => {
     expect(m).toBeDefined();
     expect(m!.id).toBe("<abc@mail>");
     expect(m!.from).toBe(BANK_FROM);
-    expect(m!.recipients).toEqual([ALIAS, "communications@aitechumbrella.com"]);
+    expect(m!.recipients).toEqual([FLAT_INBOX, FORWARDER]); // lowercased + dedup
     expect(m!.uid).toBe(7);
   });
 
   it("usa uid:<n> si no hay messageId y descarta correos sin remitente o cuerpo", async () => {
     const client = fakeClient([
-      { uid: 9, messageId: null, from: "x@y.com", recipients: [ALIAS], subject: "s", text: "hola" },
-      { uid: 10, messageId: null, from: null, recipients: [ALIAS], subject: "s", text: "hola" }, // sin from
-      { uid: 11, messageId: null, from: "z@y.com", recipients: [ALIAS], subject: "s", text: "  " }, // sin cuerpo
+      { uid: 9, messageId: null, from: "x@y.com", recipients: [FORWARDER], subject: "s", text: "hola" },
+      { uid: 10, messageId: null, from: null, recipients: [FORWARDER], subject: "s", text: "hola" }, // sin from
+      { uid: 11, messageId: null, from: "z@y.com", recipients: [FORWARDER], subject: "s", text: "  " }, // sin cuerpo
     ]);
     const out = await fetchUnseen(client);
     expect(out).toHaveLength(1);
@@ -104,16 +98,16 @@ describe("email ingestion · processInboundEmails", () => {
   const msg = (over: Partial<ImapMessage>): ImapMessage => ({
     id: "<m1@bac>",
     from: BANK_FROM,
-    recipients: [ALIAS],
+    recipients: [FLAT_INBOX, FORWARDER], // el forwarder viaja entre los candidatos
     subject: "Compra",
     text: BAC_CARD,
     uid: 1,
     ...over,
   });
 
-  it("alias de destinatario conocido + notificación BAC -> 1 propuesta", async () => {
-    const { deps, proposals, markedSeen, processed } = fakeDeps({ [ALIAS]: owner });
-    const summary = await processInboundEmails([msg({})], parseNotification, IMAP_USER, deps);
+  it("forwarder conocido entre los candidatos + notificación BAC -> 1 propuesta", async () => {
+    const { deps, proposals, markedSeen, processed } = fakeDeps({ [FORWARDER]: owner });
+    const summary = await processInboundEmails([msg({})], parseNotification, deps);
     expect(summary).toEqual({ procesados: 1, propuestos: 1, ignorados: 0, duplicados: 0 });
     expect(proposals).toHaveLength(1);
     expect(proposals[0]!.movements).toBe(1);
@@ -121,12 +115,11 @@ describe("email ingestion · processInboundEmails", () => {
     expect(processed.has("<m1@bac>")).toBe(true);
   });
 
-  it("alias desconocido -> ignorado (no propone, no marca procesado)", async () => {
-    const { deps, proposals, markedSeen, processed } = fakeDeps({ [ALIAS]: owner });
+  it("forwarder desconocido -> ignorado (no propone, no marca procesado)", async () => {
+    const { deps, proposals, markedSeen, processed } = fakeDeps({ [FORWARDER]: owner });
     const summary = await processInboundEmails(
-      [msg({ recipients: ["communications+otro@aitechumbrella.com"], id: "<m2@bac>" })],
+      [msg({ recipients: [FLAT_INBOX, "otro@gmail.com"], id: "<m2@bac>" })],
       parseNotification,
-      IMAP_USER,
       deps,
     );
     expect(summary).toEqual({ procesados: 0, propuestos: 0, ignorados: 1, duplicados: 0 });
@@ -136,18 +129,17 @@ describe("email ingestion · processInboundEmails", () => {
   });
 
   it("id ya procesado -> duplicado (dedup por messageId)", async () => {
-    const { deps, proposals } = fakeDeps({ [ALIAS]: owner }, new Set(["<m1@bac>"]));
-    const summary = await processInboundEmails([msg({})], parseNotification, IMAP_USER, deps);
+    const { deps, proposals } = fakeDeps({ [FORWARDER]: owner }, new Set(["<m1@bac>"]));
+    const summary = await processInboundEmails([msg({})], parseNotification, deps);
     expect(summary).toEqual({ procesados: 0, propuestos: 0, ignorados: 0, duplicados: 1 });
     expect(proposals).toHaveLength(0);
   });
 
   it("correo conocido sin notificación -> procesado sin propuesta", async () => {
-    const { deps, proposals, markedSeen, processed } = fakeDeps({ [ALIAS]: owner });
+    const { deps, proposals, markedSeen, processed } = fakeDeps({ [FORWARDER]: owner });
     const summary = await processInboundEmails(
       [msg({ id: "<m3@x>", text: "Hola, ¿almorzamos el viernes?", uid: 3 })],
       parseNotification,
-      IMAP_USER,
       deps,
     );
     expect(summary).toEqual({ procesados: 1, propuestos: 0, ignorados: 0, duplicados: 0 });

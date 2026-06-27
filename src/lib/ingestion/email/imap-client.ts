@@ -66,12 +66,26 @@ function decodeBody(body: string, headers: string): string {
   return body;
 }
 
-/** Extrae las direcciones de las cabeceras `Delivered-To:` (pueden ser varias). */
-function parseDeliveredTo(headers: Buffer): string[] {
+// Cabeceras que con auto-forward de Gmail llevan el DESTINATARIO ORIGINAL del
+// correo reenviado. Se piden varias porque su presencia exacta varía; se matchea
+// contra cualquier candidato. Tras desplegar revisamos un correo real y afinamos.
+const RECIPIENT_HEADERS = /^(delivered-to|x-forwarded-for|x-forwarded-to):/i;
+const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+
+/**
+ * Extrae todas las direcciones de email de las cabeceras de destinatario original
+ * (Delivered-To apiladas, X-Forwarded-For/To). En minúsculas. Maneja líneas
+ * plegadas (continuación con espacio inicial) heredando la última cabecera vista.
+ */
+function parseRecipientCandidates(headers: Buffer): string[] {
   const out: string[] = [];
+  let inRecipientHeader = false;
   for (const line of headers.toString("utf8").split(/\r?\n/)) {
-    const m = line.match(/^delivered-to:\s*(.+)$/i);
-    if (m) out.push(m[1]!.trim());
+    const isContinuation = /^\s/.test(line);
+    if (!isContinuation) inRecipientHeader = RECIPIENT_HEADERS.test(line);
+    if (!inRecipientHeader) continue;
+    const matches = line.match(EMAIL_RE);
+    if (matches) for (const m of matches) out.push(m.toLowerCase());
   }
   return out;
 }
@@ -113,21 +127,27 @@ export async function createImapClient(): Promise<ImapClient> {
   return {
     async listUnseen(): Promise<RawImapMessage[]> {
       const out: RawImapMessage[] = [];
-      // Delivered-To no está en el envelope (es header): se pide aparte. Con
-      // auto-forward de Gmail trae el alias de destinatario real (plus-address).
+      // El destinatario original no está en el envelope: viaja en cabeceras del
+      // reenvío. Se piden aparte y se combinan con el To para armar candidatos.
       for await (const msg of flow.fetch(
         { seen: false },
-        { uid: true, envelope: true, source: true, headers: ["delivered-to"] },
+        {
+          uid: true,
+          envelope: true,
+          source: true,
+          headers: ["delivered-to", "x-forwarded-for", "x-forwarded-to"],
+        },
       )) {
         const to = (msg.envelope?.to ?? [])
-          .map((a) => a.address)
+          .map((a) => a.address?.toLowerCase())
           .filter((a): a is string => Boolean(a));
-        const deliveredTo = msg.headers ? parseDeliveredTo(msg.headers) : [];
+        const fromHeaders = msg.headers ? parseRecipientCandidates(msg.headers) : [];
+        const recipients = [...new Set([...to, ...fromHeaders])]; // dedup, ya en minúsculas
         out.push({
           uid: msg.uid,
           messageId: msg.envelope?.messageId ?? null,
           from: msg.envelope?.from?.[0]?.address ?? null,
-          recipients: [...to, ...deliveredTo],
+          recipients,
           subject: msg.envelope?.subject ?? null,
           text: msg.source ? mimeToText(msg.source) : "",
         });
