@@ -679,6 +679,38 @@ export type ProcessedEventRow = {
   processed_at: string;
 };
 
+/** Ingesta por correo: allowlist alias de destinatario -> usuario (migración 0027). */
+export type EmailIngestLinkRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  ingest_alias: string; // communications+<token>@dominio (plus-addressing)
+  forwarder_email: string | null; // informativo: correo personal del usuario
+  created_at: string;
+};
+
+export type IngestProposalStatus = "pending" | "confirmed" | "discarded";
+
+/** Cola de propuestas de ingesta por confirmar (migración 0027). */
+export type IngestProposalRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  kind: "gasto" | "ingreso";
+  amount: number;
+  currency: string;
+  occurred_on: string;
+  merchant: string | null;
+  description: string;
+  bank_code: string | null;
+  external_ref: string | null;
+  source_kind: string;
+  confidence: number;
+  status: IngestProposalStatus;
+  raw_text: string | null;
+  created_at: string;
+};
+
 type TableShape<Row, Insert, Update> = {
   Row: Row;
   Insert: Insert;
@@ -786,6 +818,9 @@ export interface Database {
         { provider: string; event_id: string; processed_at?: string },
         Partial<ProcessedEventRow>
       >;
+      // Ingesta por correo (migración 0027). El poller usa service-role.
+      email_ingest_links: UserTable<EmailIngestLinkRow>;
+      ingest_proposals: UserTable<IngestProposalRow>;
     };
     // OJO: usar `{ [_ in never]: never }` (sin índice de cadena). `Record<string,
     // never>` tiene índice `[k]: never` y, vía `Tables & Views`, intersecta cada

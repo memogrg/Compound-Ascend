@@ -72,6 +72,15 @@ const serverSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: optionalStr, // string propio para verificar el webhook (GET)
   WHATSAPP_APP_SECRET: optionalStr, // firma X-Hub-Signature-256
   WHATSAPP_API_VERSION: optionalStr, // p. ej. v21.0 (default si ausente)
+  // Ingesta por correo (IMAP). Buzón donde los usuarios reenvían sus correos de
+  // banco. Si GMAIL_IMAP_USER/PASSWORD faltan, el poller se omite con gracia.
+  // Usar App Password de Google (NO la contraseña normal de la cuenta).
+  GMAIL_IMAP_HOST: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().min(1).default("imap.gmail.com"),
+  ),
+  GMAIL_IMAP_USER: optionalStr, // correo del buzón de ingesta
+  GMAIL_IMAP_APP_PASSWORD: optionalStr, // App Password (16 chars) de Google
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;
