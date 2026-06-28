@@ -8,7 +8,11 @@ import "server-only";
 import { ImapFlow } from "imapflow";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
-import type { ImapClient, RawImapMessage } from "@/lib/ingestion/email/imap-poller";
+import {
+  extractRecipientCandidates,
+  type ImapClient,
+  type RawImapMessage,
+} from "@/lib/ingestion/email/imap-poller";
 
 /** ¿Están las credenciales del buzón de ingesta? Si no, el poller se omite. */
 export function isEmailIngestConfigured(): boolean {
@@ -66,28 +70,13 @@ function decodeBody(body: string, headers: string): string {
   return body;
 }
 
-// Cabeceras que con auto-forward de Gmail llevan el DESTINATARIO ORIGINAL del
-// correo reenviado. Se piden varias porque su presencia exacta varía; se matchea
-// contra cualquier candidato. Tras desplegar revisamos un correo real y afinamos.
-const RECIPIENT_HEADERS = /^(delivered-to|x-forwarded-for|x-forwarded-to):/i;
-const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
-
-/**
- * Extrae todas las direcciones de email de las cabeceras de destinatario original
- * (Delivered-To apiladas, X-Forwarded-For/To). En minúsculas. Maneja líneas
- * plegadas (continuación con espacio inicial) heredando la última cabecera vista.
- */
-function parseRecipientCandidates(headers: Buffer): string[] {
-  const out: string[] = [];
-  let inRecipientHeader = false;
-  for (const line of headers.toString("utf8").split(/\r?\n/)) {
-    const isContinuation = /^\s/.test(line);
-    if (!isContinuation) inRecipientHeader = RECIPIENT_HEADERS.test(line);
-    if (!inRecipientHeader) continue;
-    const matches = line.match(EMAIL_RE);
-    if (matches) for (const m of matches) out.push(m.toLowerCase());
-  }
-  return out;
+/** Devuelve el bloque de cabeceras de un RFC822 (todo antes del primer renglón
+ *  en blanco). Las cabeceras de reenvío (Delivered-To, X-Forwarded-For/To) viven
+ *  aquí, no en el envelope de IMAP. */
+function headerBlock(source: Buffer): string {
+  const raw = source.toString("utf8");
+  const sep = raw.search(/\r?\n\r?\n/);
+  return sep >= 0 ? raw.slice(0, sep) : raw;
 }
 
 /** Quita etiquetas HTML y colapsa espacios (fallback cuando no hay text/plain). */
@@ -128,20 +117,17 @@ export async function createImapClient(): Promise<ImapClient> {
     async listUnseen(): Promise<RawImapMessage[]> {
       const out: RawImapMessage[] = [];
       // El destinatario original no está en el envelope: viaja en cabeceras del
-      // reenvío. Se piden aparte y se combinan con el To para armar candidatos.
+      // reenvío (Delivered-To, X-Forwarded-For/To). Se extraen del header block del
+      // source completo (más robusto que el campo `headers` de imapflow) y se
+      // combinan con el To del envelope.
       for await (const msg of flow.fetch(
         { seen: false },
-        {
-          uid: true,
-          envelope: true,
-          source: true,
-          headers: ["delivered-to", "x-forwarded-for", "x-forwarded-to"],
-        },
+        { uid: true, envelope: true, source: true },
       )) {
         const to = (msg.envelope?.to ?? [])
           .map((a) => a.address?.toLowerCase())
           .filter((a): a is string => Boolean(a));
-        const fromHeaders = msg.headers ? parseRecipientCandidates(msg.headers) : [];
+        const fromHeaders = msg.source ? extractRecipientCandidates(headerBlock(msg.source)) : [];
         const recipients = [...new Set([...to, ...fromHeaders])]; // dedup, ya en minúsculas
         out.push({
           uid: msg.uid,
