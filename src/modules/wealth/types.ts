@@ -158,6 +158,16 @@ export type Holding = {
   rentalIncome?: number | null;
   rentalFrequency?: RentalFrequency | null;
   rentalSubtype?: RentalSubtype | null;
+  // ── Inmueble de renta: costos operativos para ROI (migración 20260628000002) ──
+  purchasePrice?: number | null;
+  closingCosts?: number | null;
+  vacancyPct?: number | null; // 0-1
+  mgmtPct?: number | null; // 0-1
+  maintenanceMonthly?: number | null;
+  hoaMonthly?: number | null;
+  propertyTaxAnnual?: number | null;
+  insuranceAnnual?: number | null;
+  servicesMonthly?: number | null;
   /** Stub por completar (creado desde un ingreso pasivo · Fase 3). */
   needsDetail?: boolean;
   // ── Taxonomía de inversiones (migración 20260617000001) ──

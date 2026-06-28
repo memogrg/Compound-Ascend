@@ -13,6 +13,8 @@ export {
   computeCryptoAnalytics,
   buildInvestmentInsights,
 } from "./engine/portfolio-engine";
+export { computeRentalRoi } from "./engine/rental-roi";
+export type { RentalRoi, RentalRoiInput } from "./engine/rental-roi";
 export { getWealthSummary, buildDemoWealthSummary } from "./services/wealth-service";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";

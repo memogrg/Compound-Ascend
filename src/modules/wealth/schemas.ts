@@ -86,6 +86,16 @@ export const holdingInputSchema = z.object({
   rentalIncome: z.number().nonnegative().optional(),
   rentalFrequency: z.enum(["mensual", "trimestral", "anual"]).optional(),
   rentalSubtype: z.enum(["alquiler", "airbnb", "auto", "negocio", "otro"]).optional(),
+  // Inmueble de renta: costos operativos (ratios 0-1 para vacancy/mgmt).
+  purchasePrice: z.number().nonnegative().optional(),
+  closingCosts: z.number().nonnegative().optional(),
+  vacancyPct: z.number().min(0).max(1).optional(),
+  mgmtPct: z.number().min(0).max(1).optional(),
+  maintenanceMonthly: z.number().nonnegative().optional(),
+  hoaMonthly: z.number().nonnegative().optional(),
+  propertyTaxAnnual: z.number().nonnegative().optional(),
+  insuranceAnnual: z.number().nonnegative().optional(),
+  servicesMonthly: z.number().nonnegative().optional(),
   // Taxonomía de inversiones (PLAN §2.2). `nature` es derivable de `category`
   // (el servicio la calcula si no viene).
   nature: z.enum(["cashflow", "growth"]).optional(),
