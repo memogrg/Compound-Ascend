@@ -21,6 +21,37 @@ const SINPE_IN_NORMAL = `BAC Credomatic le comunica que recibió una transferenc
 
 const SINPE_OUT = `BAC le comunica que la transferencia SINPE con el número de referencia 2026062210099887766 se aplicó con éxito en el ciclo del día 22/06/2026, debitando su cuenta IBAN CR7701XXXX5963 un monto de 97.00 Dolares, por concepto de Pago del Mentores Retreat. Día y hora 22/06/2026 09:54:46 p.m.`;
 
+// Caso real de correo: etiqueta y valor en LÍNEAS SEPARADAS (no inline).
+const CARD_EMAIL_MOYO = `Comercio:
+HELADOS MOYO
+Ciudad y país:
+SAN JOSE, Costa Rica
+Fecha:
+Jun 27, 2026, 18:55
+MASTER
+************2062
+Tipo de Transacción:
+COMPRA
+Referencia:
+617800725966
+Monto:
+CRC 6,900.00`;
+
+describe("BAC · compra por correo (layout en líneas separadas)", () => {
+  it("HELADOS MOYO: gasto, monto, fecha, comercio, referencia, último-4", () => {
+    const [m] = parse(CARD_EMAIL_MOYO);
+    expect(m).toBeDefined();
+    expect(m!.kind).toBe("gasto");
+    expect(m!.currency).toBe("CRC");
+    expect(m!.amount).toBe(6900);
+    expect(m!.occurredOn).toBe("2026-06-27");
+    expect(m!.merchant).toBe("HELADOS MOYO");
+    expect(m!.externalRef).toBe("617800725966");
+    expect(m!.cardLast4).toBe("2062");
+    expect(m!.confidence).toBeGreaterThanOrEqual(0.9);
+  });
+});
+
 describe("BAC · plantilla 1 (compra con tarjeta)", () => {
   it("CRC: gasto, monto, fecha, comercio, referencia", () => {
     const [m] = parse(CARD_CRC);

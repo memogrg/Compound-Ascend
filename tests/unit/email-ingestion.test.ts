@@ -35,10 +35,13 @@ function fakeClient(raw: RawImapMessage[]): ImapClient & { seen: number[] } {
   };
 }
 
-/** Deps en memoria: allowlist por forwarder, dedup por id, propuestas acumuladas. */
+/** Deps en memoria: allowlist por forwarder, dedup por id, propuestas acumuladas.
+ *  saveProposals simula el único (cuenta, external_ref): la misma compra en 2
+ *  correos se inserta una vez; la repetición cuenta como duplicado. */
 function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<string>()) {
   const proposals: { movements: number; owner: EmailOwner }[] = [];
   const markedSeen: number[] = [];
+  const seenRefs = new Set<string>(); // claves (cuenta, external_ref) ya insertadas
   const deps: EmailIngestDeps = {
     lookupOwner: async (candidates) => {
       for (const c of candidates) {
@@ -52,8 +55,20 @@ function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<str
       processed.add(id);
     },
     saveProposals: async (movements, owner) => {
-      proposals.push({ movements: movements.length, owner });
-      return movements.length; // sin choque de external_ref en estos tests
+      const account = owner.householdId ?? owner.userId;
+      let inserted = 0;
+      let duplicated = 0;
+      for (const m of movements) {
+        const key = m.externalRef ? `${account}:${m.externalRef}` : null;
+        if (key && seenRefs.has(key)) {
+          duplicated += 1;
+          continue;
+        }
+        if (key) seenRefs.add(key);
+        proposals.push({ movements: 1, owner });
+        inserted += 1;
+      }
+      return { inserted, duplicated };
     },
     markSeen: async (m) => {
       markedSeen.push(m.uid);
@@ -168,6 +183,19 @@ describe("email ingestion · processInboundEmails", () => {
     const summary = await processInboundEmails(messages, parseNotification, deps);
     expect(summary).toEqual({ procesados: 1, propuestos: 1, ignorados: 0, duplicados: 0 });
     expect(proposals).toHaveLength(1);
+  });
+
+  it("misma compra (cuenta, referencia) en 2 correos -> 1 propuesta + 1 duplicado", async () => {
+    const { deps, proposals } = fakeDeps({ [FORWARDER]: owner });
+    // Dos correos distintos (Message-ID distinto, así no choca el dedup por id) con
+    // la MISMA notificación BAC → misma (cuenta, external_ref).
+    const messages = [
+      msg({ id: "<copia-A@bac>", uid: 1 }),
+      msg({ id: "<copia-B@bac>", uid: 2 }),
+    ];
+    const summary = await processInboundEmails(messages, parseNotification, deps);
+    expect(summary).toEqual({ procesados: 2, propuestos: 1, ignorados: 0, duplicados: 1 });
+    expect(proposals).toHaveLength(1); // la compra entró una sola vez
   });
 
   it("forwarder conocido entre los candidatos + notificación BAC -> 1 propuesta", async () => {

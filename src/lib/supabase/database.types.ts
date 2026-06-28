@@ -707,7 +707,19 @@ export type IngestProposalRow = {
   source_kind: string;
   confidence: number;
   status: IngestProposalStatus;
+  card_last4: string | null;
   raw_text: string | null;
+  created_at: string;
+};
+
+/** Tarjeta por cuenta: el último-4 es etiqueta DENTRO de la cuenta (migración 0029). */
+export type AccountCardRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  last4: string;
+  label: string;
+  holder_name: string | null;
   created_at: string;
 };
 
@@ -821,6 +833,7 @@ export interface Database {
       // Ingesta por correo (migración 0027). El poller usa service-role.
       email_ingest_links: UserTable<EmailIngestLinkRow>;
       ingest_proposals: UserTable<IngestProposalRow>;
+      account_cards: UserTable<AccountCardRow>;
     };
     // OJO: usar `{ [_ in never]: never }` (sin índice de cadena). `Record<string,
     // never>` tiene índice `[k]: never` y, vía `Tables & Views`, intersecta cada

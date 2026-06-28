@@ -24,6 +24,7 @@ export interface RawMovement {
   bankCode: string | null; // "BNCR","BCR","BAC",… null si desconocido
   confidence: number; // 0-1; <0.6 = revisar
   externalRef: string | null; // id/hash del origen para deduplicar
+  cardLast4?: string | null; // últimos 4 de la tarjeta (etiqueta dentro de la cuenta)
   rawText: string | null; // texto crudo para auditoría/depuración
 }
 

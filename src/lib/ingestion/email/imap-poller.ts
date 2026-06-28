@@ -133,19 +133,22 @@ export interface EmailIngestDeps {
   isProcessed(eventId: string): Promise<boolean>;
   /** Registra el correo como procesado (processed_events). */
   markProcessed(eventId: string): Promise<void>;
-  /** Inserta las propuestas en cola; devuelve cuántas se insertaron de verdad
-   *  (las que chocan con el único (household_id, external_ref) no cuentan). */
-  saveProposals(movements: RawMovement[], owner: EmailOwner): Promise<number>;
+  /** Inserta las propuestas en cola. Devuelve cuántas se insertaron y cuántas
+   *  chocaron con el único (cuenta, external_ref) — la misma compra en 2 correos. */
+  saveProposals(
+    movements: RawMovement[],
+    owner: EmailOwner,
+  ): Promise<{ inserted: number; duplicated: number }>;
   /** Marca el correo como leído en el buzón (best-effort). */
   markSeen(message: ImapMessage): Promise<void>;
 }
 
-/** Resumen de una corrida del poller. Cada correo cae en una sola categoría. */
+/** Resumen de una corrida del poller. */
 export interface IngestSummary {
   procesados: number; // forwarder conocido y consumido (parseado + marcado)
   propuestos: number; // propuestas insertadas en ingest_proposals
   ignorados: number; // ningún candidato de destinatario está en la allowlist
-  duplicados: number; // correo ya procesado antes (dedup por id)
+  duplicados: number; // correo ya procesado (por id) o propuesta repetida (cuenta, ref)
 }
 
 /**
@@ -186,8 +189,11 @@ export async function processInboundEmails(
     // c) Parseo. Sin movimiento => no es notificación: se marca procesado y leído.
     const movements = parse(message.text);
     if (movements.length > 0) {
-      // d) Encolar propuestas (idempotente por external_ref a nivel de BD).
-      summary.propuestos += await deps.saveProposals(movements, owner);
+      // d) Encolar propuestas. Los choques (cuenta, external_ref) — la misma compra
+      //    llegada a 2 correos — cuentan como duplicados, no como propuestas.
+      const { inserted, duplicated } = await deps.saveProposals(movements, owner);
+      summary.propuestos += inserted;
+      summary.duplicados += duplicated;
     }
 
     // e) Cerrar el correo: procesado + leído.
