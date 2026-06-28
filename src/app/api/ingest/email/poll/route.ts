@@ -78,34 +78,40 @@ function buildDeps(
         );
     },
 
-    async saveProposals(movements, owner): Promise<number> {
-      const rows = movements.map((m) => ({
-        user_id: owner.userId,
-        household_id: owner.householdId,
-        kind: m.kind,
-        amount: m.amount,
-        currency: m.currency,
-        occurred_on: m.occurredOn,
-        merchant: m.merchant,
-        description: m.description,
-        bank_code: m.bankCode,
-        external_ref: m.externalRef,
-        source_kind: m.sourceKind,
-        confidence: m.confidence,
-        status: "pending" as const,
-        raw_text: m.rawText,
-      }));
-      // ignoreDuplicates respeta el único (household_id, external_ref): un correo
-      // reenviado dos veces no duplica la propuesta. `data` trae solo lo insertado.
-      const { data, error } = await supabase
-        .from("ingest_proposals")
-        .upsert(rows, { onConflict: "household_id,external_ref", ignoreDuplicates: true })
-        .select("id");
-      if (error) {
-        logger.warn("email-ingest: fallo al insertar propuestas", { message: error.message });
-        return 0;
+    async saveProposals(movements, owner): Promise<{ inserted: number; duplicated: number }> {
+      let inserted = 0;
+      let duplicated = 0;
+      // Insert por fila para distinguir choques: el índice único es por expresión
+      // (coalesce(household_id,user_id), external_ref) y parcial, así que no se
+      // puede targetear con onConflict de PostgREST. Una violación 23505 = la misma
+      // compra (cuenta, referencia) ya estaba → se cuenta como duplicado.
+      for (const m of movements) {
+        const { error } = await supabase.from("ingest_proposals").insert({
+          user_id: owner.userId,
+          household_id: owner.householdId,
+          kind: m.kind,
+          amount: m.amount,
+          currency: m.currency,
+          occurred_on: m.occurredOn,
+          merchant: m.merchant,
+          description: m.description,
+          bank_code: m.bankCode,
+          external_ref: m.externalRef,
+          source_kind: m.sourceKind,
+          confidence: m.confidence,
+          status: "pending" as const,
+          card_last4: m.cardLast4 ?? null,
+          raw_text: m.rawText,
+        });
+        if (!error) {
+          inserted += 1;
+        } else if (error.code === "23505") {
+          duplicated += 1;
+        } else {
+          logger.warn("email-ingest: fallo al insertar propuesta", { message: error.message });
+        }
       }
-      return Array.isArray(data) ? data.length : 0;
+      return { inserted, duplicated };
     },
 
     async markSeen(message: ImapMessage): Promise<void> {

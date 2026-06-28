@@ -1,12 +1,11 @@
 /**
- * Fuente de ingesta: notificaciones de BAC reenviadas por WhatsApp. Parser PURO
- * sobre anclas de texto estables (usa búsqueda, no full-match) para tolerar
- * cabeceras de reenvío ("Forwarded message", "From:", etc.). No custodia
- * credenciales; solo lee el texto que el usuario reenvía.
+ * Fuente de ingesta: notificaciones de BAC (reenviadas por WhatsApp o correo). El
+ * mismo banco manda dos layouts: etiqueta y valor en la MISMA línea (WhatsApp) o en
+ * líneas SEPARADAS (correo, p. ej. "Comercio:\nHELADOS MOYO"). `fieldAfterLabel`
+ * tolera ambos. Parser PURO; no custodia credenciales: solo lee el texto.
  *
- * Tres plantillas: compra con tarjeta, SINPE recibido y SINPE debitado. Si parece
- * de BAC pero no calza ninguna, un fallback de baja confianza para que el usuario
- * revise. Si no parece de BAC, devuelve [].
+ * Plantillas: compra con tarjeta y SINPE (recibido/debitado). Fallback de baja
+ * confianza como última red. Si no parece de BAC, devuelve [].
  */
 import type { IngestionSource, RawMovement } from "@/lib/ingestion/types";
 
@@ -30,7 +29,7 @@ function parseAmount(s: string): number {
   return parseFloat(s.replace(/,/g, ""));
 }
 
-/** "Jun 11, 2026" (mes inglés abreviado) → "2026-06-11". null si no calza. */
+/** "Jun 27, 2026, 18:55" (mes inglés abreviado) → "2026-06-27". null si no calza. */
 function parseSpanishMonthDate(text: string): string | null {
   const m = text.match(/([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})/);
   if (!m) return null;
@@ -51,6 +50,51 @@ function mapCurrencyWord(w: string): string {
   return /d[oó]lares/i.test(w) ? "USD" : "CRC";
 }
 
+/** Quita tildes para que las anclas SINPE matcheen con o sin acento. */
+function deburr(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/**
+ * Primer valor tras una etiqueta. Soporta dos layouts:
+ *  - inline: "Comercio: AUTO MERCADO …"  → lo que sigue al label en la misma línea.
+ *  - líneas separadas: "Comercio:\nHELADOS MOYO" → primera línea no vacía siguiente.
+ * Búsqueda case-insensitive del label como subcadena. null si no aparece.
+ */
+function fieldAfterLabel(text: string, label: string): string | null {
+  const lines = text.split(/\r?\n/);
+  const needle = label.toLowerCase();
+  for (let i = 0; i < lines.length; i++) {
+    const idx = lines[i]!.toLowerCase().indexOf(needle);
+    if (idx < 0) continue;
+    const inline = lines[i]!.slice(idx + label.length).trim();
+    if (inline) return inline; // valor en la misma línea (WhatsApp)
+    for (let j = i + 1; j < lines.length; j++) {
+      const v = lines[j]!.trim();
+      if (v) return v; // valor en la línea siguiente (correo)
+    }
+    return null;
+  }
+  return null;
+}
+
+/** Recorta el comercio en el primer separador fuerte (doble espacio o "Ciudad y país"). */
+function cleanMerchant(s: string | null): string | null {
+  if (!s) return null;
+  const cut = s.split(/\s{2,}|ciudad y pa[ií]s\s*:/i)[0]!.trim();
+  return cut || null;
+}
+
+/** Primeros dígitos de un campo (p. ej. "35689751  Tipo de Transacción…" → "35689751"). */
+function leadingDigits(s: string | null): string | null {
+  return s?.match(/\d+/)?.[0] ?? null;
+}
+
+/** Últimos 4 de la tarjeta: del enmascarado "************2062" o "MASTER ***2062". */
+function cardLast4(text: string): string | null {
+  return text.match(/\*{3,}\s*(\d{4})/)?.[1] ?? null;
+}
+
 const BANK = "BAC";
 
 function base(over: Partial<RawMovement>): RawMovement {
@@ -65,6 +109,7 @@ function base(over: Partial<RawMovement>): RawMovement {
     bankCode: BANK,
     confidence: 0,
     externalRef: null,
+    cardLast4: null,
     rawText: null,
     ...over,
   };
@@ -72,7 +117,7 @@ function base(over: Partial<RawMovement>): RawMovement {
 
 /** Aplica la regla de "CAMBIO DE DIVISA": baja confianza y antepone aviso. */
 function withDivisaRule(m: RawMovement, concept: string): RawMovement {
-  if (/CAMBIO DE DIVISA/i.test(concept)) {
+  if (/CAMBIO DE DIVISA/i.test(deburr(concept))) {
     return { ...m, confidence: 0.6, description: `[Cambio de divisa] ${m.description}` };
   }
   return m;
@@ -81,19 +126,24 @@ function withDivisaRule(m: RawMovement, concept: string): RawMovement {
 /** PLANTILLA 1 — Compra con tarjeta → gasto. */
 function parseCardPurchase(text: string): RawMovement | null {
   const isCard =
-    /Comercio:/i.test(text) &&
-    (/Tipo de Transacci[oó]n:/i.test(text) || /le detallamos la transacci[oó]n/i.test(text));
+    /Comercio\s*:/i.test(text) &&
+    (/Tipo de Transacci[oó]n\s*:/i.test(text) || /le detallamos la transacci[oó]n/i.test(text));
   if (!isCard) return null;
 
-  const money = text.match(/Monto:\s*(CRC|USD)\s*([\d.,]+)/i);
+  const montoField = fieldAfterLabel(text, "Monto:") ?? "";
+  const money = montoField.match(/(CRC|USD)\s*([\d.,]+)/i);
   if (!money) return null;
 
-  const merchantMatch = text.match(/Comercio:\s*(.+?)(?:\s{2,}|Ciudad y pa[ií]s:|[\r\n]|$)/i);
-  const merchant = merchantMatch ? merchantMatch[1]!.trim() : null;
-
-  const date = parseSpanishMonthDate((text.match(/Fecha:\s*(.+)/i)?.[1] ?? "").slice(0, 40));
+  const merchant = cleanMerchant(fieldAfterLabel(text, "Comercio:"));
+  const date = parseSpanishMonthDate(fieldAfterLabel(text, "Fecha:") ?? "");
   const ref =
-    text.match(/Referencia:\s*(\d+)/i)?.[1] ?? text.match(/Autorizaci[oó]n:\s*(\d+)/i)?.[1] ?? null;
+    leadingDigits(fieldAfterLabel(text, "Referencia:")) ??
+    leadingDigits(fieldAfterLabel(text, "Autorización:")) ??
+    leadingDigits(fieldAfterLabel(text, "Autorizacion:"));
+  const last4 = cardLast4(text);
+
+  // Alta confianza si hay monto + (comercio o referencia); si no, queda al fallback.
+  if (!merchant && !ref) return null;
 
   return base({
     kind: "gasto",
@@ -104,20 +154,22 @@ function parseCardPurchase(text: string): RawMovement | null {
     description: merchant ?? "Compra BAC",
     confidence: 0.95,
     externalRef: ref,
+    cardLast4: last4,
     rawText: text,
   });
 }
 
 /** PLANTILLA 2 — SINPE recibido → ingreso. */
 function parseSinpeReceived(text: string): RawMovement | null {
-  if (!/recibi[oó] una transferencia SINPE/i.test(text)) return null;
+  const flat = deburr(text);
+  if (!/recibio una transferencia/i.test(flat)) return null;
 
-  const money = text.match(/por un monto de\s*([\d.,]+)\s*(D[oó]lares|Colones)/i);
+  const money = flat.match(/por un monto de\s*([\d.,]+)\s*(Dolares|Colones)/i);
   if (!money) return null;
 
   const concept = text.match(/por concepto\s+(?:de\s+)?(.+?)\s*,\s*la cual/i)?.[1]?.trim() ?? "";
-  const date = parseDMY(text.match(/el d[ií]a\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1] ?? "");
-  const ref = text.match(/n[uú]mero de referencia\s*(\d+)/i)?.[1] ?? null;
+  const date = parseDMY(flat.match(/el dia\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1] ?? "");
+  const ref = flat.match(/numero de referencia\s*(\d+)/i)?.[1] ?? null;
 
   const m = base({
     kind: "ingreso",
@@ -135,17 +187,17 @@ function parseSinpeReceived(text: string): RawMovement | null {
 
 /** PLANTILLA 3 — SINPE debitado → gasto. */
 function parseSinpeDebited(text: string): RawMovement | null {
-  if (!/debitando su cuenta/i.test(text)) return null;
+  const flat = deburr(text);
+  if (!/debitando su cuenta/i.test(flat)) return null;
 
-  const money = text.match(/un monto de\s*([\d.,]+)\s*(D[oó]lares|Colones)/i);
+  const money = flat.match(/un monto de\s*([\d.,]+)\s*(Dolares|Colones)/i);
   if (!money) return null;
 
-  const concept =
-    text.match(/por concepto de\s+(.+?)(?:D[ií]a y hora|\.|$)/i)?.[1]?.trim() ?? "";
+  const concept = text.match(/por concepto de\s+(.+?)(?:D[ií]a y hora|\.|$)/i)?.[1]?.trim() ?? "";
   const date = parseDMY(
-    text.match(/(?:ciclo del d[ií]a|D[ií]a y hora)\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1] ?? "",
+    flat.match(/(?:ciclo del dia|Dia y hora)\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1] ?? "",
   );
-  const ref = text.match(/n[uú]mero de referencia\s*(\d+)/i)?.[1] ?? null;
+  const ref = flat.match(/numero de referencia\s*(\d+)/i)?.[1] ?? null;
 
   const m = base({
     kind: "gasto",
@@ -180,6 +232,7 @@ function parseFallback(text: string): RawMovement | null {
     occurredOn: today,
     description: "Movimiento BAC (revisá los datos)",
     confidence: 0.5,
+    cardLast4: cardLast4(text),
     rawText: text,
   });
 }

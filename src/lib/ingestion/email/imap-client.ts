@@ -6,6 +6,7 @@ import "server-only";
  * `ImapClient` y se prueba con un fake. Sin sesión de usuario: lo dispara el cron.
  */
 import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import {
@@ -21,53 +22,15 @@ export function isEmailIngestConfigured(): boolean {
 }
 
 /**
- * Decodificación best-effort de un correo MIME a texto plano. Suficiente para las
- * notificaciones de banco reenviadas (el parser BAC usa anclas tolerantes). Sin
- * dependencias extra; Delta 2 puede cambiar a `mailparser` si hace falta robustez.
+ * Cuerpo DECODIFICADO de un correo MIME, vía mailparser: resuelve
+ * quoted-printable/base64/multipart. Prefiere text/plain; si no hay, deriva del
+ * HTML. Esto arregla las notificaciones de BAC que llegaban en quoted-printable.
  */
-function mimeToText(source: Buffer): string {
-  const raw = source.toString("utf8");
-  // Separa cabeceras del cuerpo (primer renglón en blanco).
-  const sep = raw.search(/\r?\n\r?\n/);
-  const headers = sep >= 0 ? raw.slice(0, sep) : "";
-  let body = sep >= 0 ? raw.slice(sep).replace(/^\r?\n\r?\n/, "") : raw;
-
-  const boundary = headers.match(/boundary="?([^";\r\n]+)"?/i)?.[1];
-  if (boundary) {
-    // Multipart: prefiere la parte text/plain; si no hay, cae a text/html.
-    const parts = body.split(`--${boundary}`);
-    const plain = parts.find((p) => /content-type:\s*text\/plain/i.test(p));
-    const html = parts.find((p) => /content-type:\s*text\/html/i.test(p));
-    const chosen = plain ?? html;
-    if (chosen) {
-      const cut = chosen.search(/\r?\n\r?\n/);
-      const partHeaders = cut >= 0 ? chosen.slice(0, cut) : "";
-      let partBody = cut >= 0 ? chosen.slice(cut).replace(/^\r?\n\r?\n/, "") : chosen;
-      partBody = decodeBody(partBody, partHeaders);
-      return plain ? partBody.trim() : stripHtml(partBody);
-    }
-  }
-
-  body = decodeBody(body, headers);
-  return /content-type:\s*text\/html/i.test(headers) ? stripHtml(body) : body.trim();
-}
-
-/** Aplica el Content-Transfer-Encoding declarado (quoted-printable / base64). */
-function decodeBody(body: string, headers: string): string {
-  const cte = headers.match(/content-transfer-encoding:\s*([\w-]+)/i)?.[1]?.toLowerCase();
-  if (cte === "base64") {
-    try {
-      return Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8");
-    } catch {
-      return body;
-    }
-  }
-  if (cte === "quoted-printable") {
-    return body
-      .replace(/=\r?\n/g, "") // soft line breaks
-      .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-  }
-  return body;
+async function extractBodyText(source: Buffer): Promise<string> {
+  const parsed = await simpleParser(source);
+  const plain = (parsed.text ?? "").trim();
+  if (plain) return plain;
+  return parsed.html ? stripHtml(parsed.html) : "";
 }
 
 /** Devuelve el bloque de cabeceras de un RFC822 (todo antes del primer renglón
@@ -135,7 +98,7 @@ export async function createImapClient(): Promise<ImapClient> {
           from: msg.envelope?.from?.[0]?.address ?? null,
           recipients,
           subject: msg.envelope?.subject ?? null,
-          text: msg.source ? mimeToText(msg.source) : "",
+          text: msg.source ? await extractBodyText(msg.source) : "",
         });
       }
       return out;

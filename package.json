@@ -23,6 +23,7 @@
     "clsx": "^2.1.1",
     "imapflow": "^1.4.3",
     "lucide-react": "^1.21.0",
+    "mailparser": "^3.9.12",
     "motion": "^12.40.0",
     "next": "^15.5.19",
     "nodemailer": "^9.0.1",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@playwright/test": "^1.61.0",
     "@tailwindcss/postcss": "^4.3.1",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^20.16.5",
     "@types/nodemailer": "^7.0.12",
     "@types/react": "^19.2.17",
