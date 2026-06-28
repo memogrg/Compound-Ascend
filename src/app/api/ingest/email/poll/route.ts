@@ -140,6 +140,28 @@ async function handle(req: Request) {
       const messages = await fetchUnseen(client);
       const supabase = createServiceRoleClient();
       const deps = buildDeps(supabase, (uid) => client.markSeen(uid));
+
+      // Modo diagnóstico: ?debug=1 devuelve, por correo (hasta 10), el remitente,
+      // asunto y candidatos de destinatario + si matchean un forwarder conocido.
+      // NO procesa ni marca leído: sirve para ver qué cabecera trae la dirección
+      // sobre correos reales sin consumirlos.
+      if (new URL(req.url).searchParams.get("debug")) {
+        const samples = [];
+        for (const m of messages.slice(0, 10)) {
+          const owner = await deps.lookupOwner(m.recipients);
+          samples.push({
+            from: m.from,
+            subject: m.subject,
+            recipients: m.recipients,
+            matched: Boolean(owner),
+          });
+        }
+        return NextResponse.json(
+          { ok: true, debug: true, total: messages.length, samples },
+          { headers: cors },
+        );
+      }
+
       const summary = await processInboundEmails(messages, parseNotification, deps);
       return NextResponse.json({ ok: true, ...summary }, { headers: cors });
     } finally {

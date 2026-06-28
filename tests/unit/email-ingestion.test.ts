@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  extractRecipientCandidates,
   fetchUnseen,
   processInboundEmails,
   type EmailIngestDeps,
@@ -61,6 +62,35 @@ function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<str
   return { deps, proposals, markedSeen, processed };
 }
 
+describe("email ingestion · extractRecipientCandidates", () => {
+  it("saca el destinatario original de cabeceras de reenvío de Gmail (To por BCC vacío)", () => {
+    // Caso típico: el banco envía por BCC (To genérico), Gmail reenvía y agrega
+    // X-Forwarded-For/To + Delivered-To con la dirección original.
+    const headers = [
+      "Delivered-To: communications@aitechumbrella.com",
+      "X-Forwarded-To: communications@aitechumbrella.com",
+      "X-Forwarded-For: memogrg@gmail.com communications@aitechumbrella.com",
+      "Delivered-To: memogrg@gmail.com",
+      "From: BAC Credomatic <notificacion@notificacionesbaccr.com>",
+      "To: clientes@notificacionesbaccr.com",
+      "Subject: Compra",
+    ].join("\r\n");
+    const got = extractRecipientCandidates(headers);
+    expect(got).toContain("memogrg@gmail.com");
+    expect(got).toContain("communications@aitechumbrella.com");
+  });
+
+  it("despliega líneas plegadas y normaliza a minúsculas sin duplicados", () => {
+    const headers = "To: Memo\r\n <MEMOGRG@gmail.com>,\r\n memogrg@gmail.com";
+    expect(extractRecipientCandidates(headers)).toEqual(["memogrg@gmail.com"]);
+  });
+
+  it("ignora cabeceras que no son de destinatario", () => {
+    const headers = "From: banco@bac.com\r\nReply-To: noreply@bac.com\r\nSubject: x@y.com";
+    expect(extractRecipientCandidates(headers)).toEqual([]);
+  });
+});
+
 describe("email ingestion · fetchUnseen", () => {
   it("normaliza remitente y destinatarios (minúsculas, sin duplicados)", async () => {
     const client = fakeClient([
@@ -77,8 +107,24 @@ describe("email ingestion · fetchUnseen", () => {
     expect(m).toBeDefined();
     expect(m!.id).toBe("<abc@mail>");
     expect(m!.from).toBe(BANK_FROM);
-    expect(m!.recipients).toEqual([FLAT_INBOX, FORWARDER]); // lowercased + dedup
+    // candidatos = destinatarios + From (este último para reenvío manual)
+    expect(m!.recipients).toEqual([FLAT_INBOX, FORWARDER, BANK_FROM]);
     expect(m!.uid).toBe(7);
+  });
+
+  it("reenvío manual: el From entra como candidato de identificación", async () => {
+    const client = fakeClient([
+      {
+        uid: 21,
+        messageId: "<manual@gmail>",
+        from: `Memo <${FORWARDER}>`, // en reenvío manual, el usuario queda en From
+        recipients: [FLAT_INBOX], // el To es solo el buzón de ingesta
+        subject: "Fwd: Compra BAC",
+        text: BAC_CARD,
+      },
+    ]);
+    const [m] = await fetchUnseen(client);
+    expect(m!.recipients).toContain(FORWARDER); // el From se sumó a los candidatos
   });
 
   it("usa uid:<n> si no hay messageId y descarta correos sin remitente o cuerpo", async () => {
@@ -103,6 +149,25 @@ describe("email ingestion · processInboundEmails", () => {
     text: BAC_CARD,
     uid: 1,
     ...over,
+  });
+
+  it("reenvío manual (From = forwarder, To solo el buzón) -> 1 propuesta", async () => {
+    const { deps, proposals } = fakeDeps({ [FORWARDER]: owner });
+    // Pasa por fetchUnseen para que el From se sume a los candidatos (ruta real).
+    const client = fakeClient([
+      {
+        uid: 22,
+        messageId: "<manual2@gmail>",
+        from: FORWARDER,
+        recipients: [FLAT_INBOX],
+        subject: "Fwd: Compra BAC",
+        text: BAC_CARD,
+      },
+    ]);
+    const messages = await fetchUnseen(client);
+    const summary = await processInboundEmails(messages, parseNotification, deps);
+    expect(summary).toEqual({ procesados: 1, propuestos: 1, ignorados: 0, duplicados: 0 });
+    expect(proposals).toHaveLength(1);
   });
 
   it("forwarder conocido entre los candidatos + notificación BAC -> 1 propuesta", async () => {

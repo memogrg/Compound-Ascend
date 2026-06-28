@@ -48,10 +48,48 @@ function extractAddress(addr: string | null): string {
   return (angle ? angle[1]! : addr).trim().toLowerCase();
 }
 
+// Cabeceras que pueden cargar el DESTINATARIO ORIGINAL de un correo reenviado por
+// Gmail. Se barren varias porque su presencia exacta varía según el reenvío; se
+// matchea contra cualquier candidato. Regex estático (sin ReDoS).
+const RECIPIENT_HEADER_RE =
+  /^(to|cc|delivered-to|x-forwarded-for|x-forwarded-to|x-original-to|x-gm-original-to)$/i;
+const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+
+/**
+ * Extrae las direcciones de email de las cabeceras de destinatario de un bloque de
+ * cabeceras crudo (el header block de un RFC822). Despliega líneas plegadas
+ * (continuación con espacio/tab inicial). Devuelve direcciones en minúsculas, sin
+ * duplicados. Puro: testeable sin red.
+ */
+export function extractRecipientCandidates(rawHeaders: string): string[] {
+  // Unfolding: una línea que empieza con espacio/tab continúa la cabecera anterior.
+  const unfolded: string[] = [];
+  for (const line of rawHeaders.split(/\r?\n/)) {
+    if (/^[ \t]/.test(line) && unfolded.length) {
+      unfolded[unfolded.length - 1] += " " + line.trim();
+    } else {
+      unfolded.push(line);
+    }
+  }
+  const out = new Set<string>();
+  for (const line of unfolded) {
+    const colon = line.indexOf(":");
+    if (colon < 0) continue;
+    if (!RECIPIENT_HEADER_RE.test(line.slice(0, colon).trim())) continue;
+    const matches = line.slice(colon + 1).match(EMAIL_RE);
+    if (matches) for (const m of matches) out.add(m.toLowerCase());
+  }
+  return [...out];
+}
+
 /**
  * Trae los correos no leídos del buzón y los normaliza a `ImapMessage`. NO marca
  * nada como leído: eso queda para el route, tras procesar con éxito. Descarta
  * correos sin remitente o sin cuerpo (no hay nada que parsear).
+ *
+ * Los candidatos de identificación incluyen los destinatarios (To + cabeceras de
+ * reenvío) Y el remitente (From): en un reenvío MANUAL el usuario queda en From,
+ * así que sumarlo permite identificarlo igual. `from` se sigue exponiendo aparte.
  */
 export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
   const raw = await client.listUnseen();
@@ -60,10 +98,11 @@ export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
     const from = extractAddress(m.from);
     const text = m.text ?? "";
     if (!from || !text.trim()) continue;
+    const recipients = (m.recipients ?? []).map(extractAddress).filter(Boolean);
     out.push({
       id: m.messageId ?? `uid:${m.uid}`,
       from,
-      recipients: [...new Set((m.recipients ?? []).map(extractAddress).filter(Boolean))],
+      recipients: [...new Set([...recipients, from])], // + From para reenvío manual
       subject: m.subject ?? "",
       text,
       uid: m.uid,
