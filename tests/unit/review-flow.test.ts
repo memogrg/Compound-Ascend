@@ -64,11 +64,11 @@ function makeHarness(proposals: ProposalView[], txOk = true) {
 }
 
 describe("review-flow · helpers puros", () => {
-  it("proposalToPendingAction marca origin/source notification + proposalId + cardLabel", () => {
+  it("proposalToPendingAction marca origin=imported/source=email + proposalId + cardLabel", () => {
     const a = proposalToPendingAction(P1);
     expect(a.proposalId).toBe("p1");
-    expect(a.origin).toBe("notification");
-    expect(a.source).toBe("notification");
+    expect(a.origin).toBe("imported");
+    expect(a.source).toBe("email");
     expect(a.cardLabel).toBe("Mastercard personal");
     expect(a.description).toBe("HELADOS MOYO · Mastercard personal");
   });
