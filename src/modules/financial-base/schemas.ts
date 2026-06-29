@@ -118,6 +118,8 @@ export const txnInputSchema = z
     description: z.string().max(280).optional(),
     status: z.enum(["confirmed", "pending_review"]).default("confirmed"),
     origin: z.enum(["manual", "scanned", "imported", "recurring", "ai_assisted"]).default("manual"),
+    // Canal de origen. Si se omite, buildTransactionRow lo deriva de `origin`.
+    source: z.enum(["manual", "chat", "receipt", "recurring", "email"]).optional(),
     receiptUrl: z.string().max(500).optional(),
     confidence: z.number().min(0).max(1).optional(),
     // Vínculo transacción↔entidad (Fase 1 · orquestador). Opt-in: si se omite,

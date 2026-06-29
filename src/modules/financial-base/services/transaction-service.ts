@@ -196,7 +196,8 @@ export async function buildTransactionRow(
     receipt_url: input.receiptUrl ?? null,
     confidence_score_internal: input.confidence ?? null,
     source:
-      input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual",
+      input.source ??
+      (input.origin === "scanned" ? "receipt" : input.origin === "ai_assisted" ? "chat" : "manual"),
     confirmed_by_user: input.status === "confirmed",
     linked_kind: linkedKind,
     linked_id: linkedId,

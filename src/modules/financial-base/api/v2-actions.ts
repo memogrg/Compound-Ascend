@@ -79,7 +79,12 @@ import {
   linkExistingTransaction,
 } from "@/modules/financial-base/services/linked-transaction-service";
 import { z } from "zod";
-import { isSupabaseConfigured } from "@/lib/auth/session";
+import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  mapProposalRow,
+  proposalToTxnInput,
+} from "@/modules/financial-base/services/ingest-proposals-view";
 import { logger } from "@/lib/logger";
 
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
@@ -355,6 +360,75 @@ export async function addTransactionAction(raw: unknown): Promise<ActionResult> 
         ? err.message
         : "No pudimos guardar la transacción.";
     return { ok: false, message: msg };
+  }
+}
+
+const PROPOSAL_COLS = "id, kind, amount, currency, occurred_on, merchant, card_last4, confidence";
+
+/**
+ * Confirma una propuesta de ingesta (bandeja "Por revisar"): crea la transacción
+ * real por el mismo camino que addTransactionAction y marca la propuesta confirmed.
+ * Claim atómico (update ... where status='pending') para evitar doble confirmación;
+ * si la creación de la transacción falla, revierte el claim para poder reintentar.
+ */
+export async function confirmIngestProposalAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await requireUser();
+    const supabase = await createSupabaseServerClient();
+    // Reclama la propuesta: solo una confirmación gana (RLS la acota al dueño).
+    const { data: claimed } = await supabase
+      .from("ingest_proposals")
+      .update({ status: "confirmed" })
+      .eq("id", id)
+      .eq("status", "pending")
+      .select(PROPOSAL_COLS)
+      .maybeSingle();
+    if (!claimed) return { ok: false, message: "Esa propuesta ya no está disponible." };
+
+    const { data: cardRows } = await supabase
+      .from("account_cards")
+      .select("last4, label, holder_name");
+    const view = mapProposalRow(claimed, cardRows ?? []);
+
+    const res = await addTransactionAction(proposalToTxnInput(view));
+    if (!res.ok) {
+      // Revierte el claim: la transacción no se creó, la propuesta vuelve a pending.
+      await supabase.from("ingest_proposals").update({ status: "pending" }).eq("id", id);
+      return res;
+    }
+    revalidatePath("/transacciones");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    logger.error("confirmIngestProposal fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos confirmar el movimiento." };
+  }
+}
+
+/** Descarta una propuesta de ingesta (no crea transacción). Claim atómico. */
+export async function discardIngestProposalAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await requireUser();
+    const supabase = await createSupabaseServerClient();
+    const { data: claimed } = await supabase
+      .from("ingest_proposals")
+      .update({ status: "discarded" })
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (!claimed) return { ok: false, message: "Esa propuesta ya no está disponible." };
+    revalidatePath("/transacciones");
+    return { ok: true };
+  } catch (err) {
+    logger.error("discardIngestProposal fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos descartar el movimiento." };
   }
 }
 
