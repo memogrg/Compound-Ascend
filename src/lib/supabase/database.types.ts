@@ -500,6 +500,16 @@ export type InvestmentHoldingRow = Timestamps & {
   is_recurring: boolean;
   // Aporte mensual separado del total invertido (migración 20260623000001).
   monthly_contribution: number | null;
+  // Inmueble de renta: costos operativos para ROI (migración 20260628000002).
+  purchase_price: number | null;
+  closing_costs: number | null;
+  vacancy_pct: number | null;
+  mgmt_pct: number | null;
+  maintenance_monthly: number | null;
+  hoa_monthly: number | null;
+  property_tax_annual: number | null;
+  insurance_annual: number | null;
+  services_monthly: number | null;
 };
 
 export type RentalPaymentRow = Timestamps & {

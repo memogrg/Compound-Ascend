@@ -7,7 +7,7 @@
  * crecimiento manual) + región + registrar gasto. SOLO UI: valida con
  * holdingInputSchema (vía addHoldingAction/editHoldingAction); no toca services.
  */
-import { useState, useRef, useCallback, useEffect, useId, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, useId, type ChangeEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
@@ -19,8 +19,22 @@ import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import { addHoldingAction, editHoldingAction } from "@/modules/wealth/api/actions";
 import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
+import { computeRentalRoi } from "@/modules/wealth/engine/rental-roi";
 import type { AssetType, Holding, InvestmentCategory } from "@/modules/wealth/types";
 import type { HoldingInput } from "@/modules/wealth/schemas";
+
+/** Costos operativos del inmueble de renta (perfil B · propiedad_alquiler). */
+type RentalCosts = {
+  purchasePrice: string;
+  closingCosts: string;
+  vacancyPct: string;
+  mgmtPct: string;
+  maintenance: string;
+  hoa: string;
+  propertyTax: string;
+  insurance: string;
+  services: string;
+};
 
 // ── Constantes UI ──────────────────────────────────────────────────
 
@@ -215,6 +229,22 @@ export function AddHoldingModal({
   );
   const [incomeMonth, setIncomeMonth] = useState(prefill?.incomeMonth ? String(prefill.incomeMonth) : "1");
 
+  // ── Inmueble de renta (propiedad_alquiler): subtipo + costos operativos ──
+  const [subtype, setSubtype] = useState<"alquiler" | "airbnb">(
+    prefill?.rentalSubtype === "airbnb" ? "airbnb" : "alquiler",
+  );
+  const [rc, setRc] = useState<RentalCosts>({
+    purchasePrice: prefill?.purchasePrice != null ? String(prefill.purchasePrice) : "",
+    closingCosts: prefill?.closingCosts != null ? String(prefill.closingCosts) : "",
+    vacancyPct: prefill?.vacancyPct != null ? String(Math.round(prefill.vacancyPct * 100)) : "",
+    mgmtPct: prefill?.mgmtPct != null ? String(Math.round(prefill.mgmtPct * 100)) : "",
+    maintenance: prefill?.maintenanceMonthly != null ? String(prefill.maintenanceMonthly) : "",
+    hoa: prefill?.hoaMonthly != null ? String(prefill.hoaMonthly) : "",
+    propertyTax: prefill?.propertyTaxAnnual != null ? String(prefill.propertyTaxAnnual) : "",
+    insurance: prefill?.insuranceAnnual != null ? String(prefill.insuranceAnnual) : "",
+    services: prefill?.servicesMonthly != null ? String(prefill.servicesMonthly) : "",
+  });
+
   // ── Común final ──
   const [region, setRegion] = useState(prefill?.region ?? "global");
   const [registerExpense, setRegisterExpense] = useState(!isEdit);
@@ -338,6 +368,20 @@ export function AddHoldingModal({
           base.rentalFrequency = frequency;
           if (frequency !== "mensual") base.incomeMonth = parseInt(incomeMonth, 10) || undefined;
         }
+        if (cat === "propiedad_alquiler") {
+          base.rentalSubtype = subtype;
+          const n = (s: string) => parseFloat(s) || undefined;
+          const pct = (s: string) => (s ? (parseFloat(s) || 0) / 100 : undefined);
+          base.purchasePrice = n(rc.purchasePrice);
+          base.closingCosts = n(rc.closingCosts);
+          base.vacancyPct = pct(rc.vacancyPct);
+          base.mgmtPct = pct(rc.mgmtPct);
+          base.maintenanceMonthly = n(rc.maintenance);
+          base.hoaMonthly = n(rc.hoa);
+          base.propertyTaxAnnual = n(rc.propertyTax);
+          base.insuranceAnnual = n(rc.insurance);
+          base.servicesMonthly = n(rc.services);
+        }
       }
     }
     return base;
@@ -414,6 +458,11 @@ export function AddHoldingModal({
             onFrequency={setFrequency}
             incomeMonth={incomeMonth}
             onIncomeMonth={setIncomeMonth}
+            category={category}
+            subtype={subtype}
+            onSubtype={setSubtype}
+            rc={rc}
+            onRc={setRc}
             region={region}
             onRegion={setRegion}
             registerExpense={registerExpense}
@@ -571,6 +620,11 @@ function Step2Fields(props: {
   onFrequency: (v: "mensual" | "trimestral" | "anual") => void;
   incomeMonth: string;
   onIncomeMonth: (v: string) => void;
+  category: InvestmentCategory | null;
+  subtype: "alquiler" | "airbnb";
+  onSubtype: (v: "alquiler" | "airbnb") => void;
+  rc: RentalCosts;
+  onRc: (v: RentalCosts) => void;
   region: string;
   onRegion: (v: string) => void;
   registerExpense: boolean;
@@ -744,6 +798,19 @@ function Step2Fields(props: {
             </div>
           ) : null}
         </>
+      ) : null}
+
+      {props.category === "propiedad_alquiler" ? (
+        <RentalCostsBlock
+          cur={cur}
+          invested={props.invested}
+          income={props.income}
+          frequency={props.frequency}
+          subtype={props.subtype}
+          onSubtype={props.onSubtype}
+          rc={props.rc}
+          onRc={props.onRc}
+        />
       ) : null}
 
       {/* Común · aporto cada mes */}
@@ -947,5 +1014,126 @@ function PillButton({
     >
       {children}
     </button>
+  );
+}
+
+// ── Inmueble de renta: costos operativos + ROI en vivo ─────────────
+
+function RentalCostsBlock(props: {
+  cur: string;
+  invested: string;
+  income: string;
+  frequency: "mensual" | "trimestral" | "anual";
+  subtype: "alquiler" | "airbnb";
+  onSubtype: (v: "alquiler" | "airbnb") => void;
+  rc: RentalCosts;
+  onRc: (v: RentalCosts) => void;
+}) {
+  const { cur, rc, onRc } = props;
+  const set = (k: keyof RentalCosts) => (e: ChangeEvent<HTMLInputElement>) =>
+    onRc({ ...rc, [k]: e.target.value });
+
+  const investedCash =
+    (parseFloat(rc.purchasePrice) || 0) + (parseFloat(rc.closingCosts) || 0) ||
+    parseFloat(props.invested) ||
+    0;
+
+  const roi = computeRentalRoi({
+    rentalIncome: parseFloat(props.income) || 0,
+    rentalFrequency: props.frequency,
+    vacancyPct: (parseFloat(rc.vacancyPct) || 0) / 100,
+    mgmtPct: (parseFloat(rc.mgmtPct) || 0) / 100,
+    maintenanceMonthly: parseFloat(rc.maintenance) || 0,
+    hoaMonthly: parseFloat(rc.hoa) || 0,
+    servicesMonthly: parseFloat(rc.services) || 0,
+    propertyTaxAnnual: parseFloat(rc.propertyTax) || 0,
+    insuranceAnnual: parseFloat(rc.insurance) || 0,
+    investedCash,
+  });
+  const hasData = (parseFloat(props.income) || 0) > 0;
+
+  const money = (ph: string, k: keyof RentalCosts) => (
+    <div className="inp-money">
+      <span className="pre">{currencySymbol(cur)}</span>
+      <input type="number" step="any" min="0" value={rc[k]} onChange={set(k)} placeholder={ph} />
+    </div>
+  );
+  const pct = (k: keyof RentalCosts, ph: string) => (
+    <div className="inp-money">
+      <input type="number" step="any" min="0" max="100" value={rc[k]} onChange={set(k)} placeholder={ph} />
+      <span className="pre" style={{ paddingLeft: 4, paddingRight: 11 }}>%</span>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+      <div className="fld">
+        <label className="fld-label">Tipo de renta</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          {(["alquiler", "airbnb"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`btn ${props.subtype === s ? "btn-primary" : "btn-secondary"}`}
+              style={{ flex: 1, fontSize: 13 }}
+              onClick={() => props.onSubtype(s)}
+            >
+              {s === "alquiler" ? "Alquiler tradicional" : "Airbnb / corto plazo"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="fld-2">
+        <div className="fld"><label className="fld-label">Precio de compra <HelpTip text="Lo que pagaste por la propiedad. Base para plusvalía y ROI." /></label>{money("0", "purchasePrice")}</div>
+        <div className="fld"><label className="fld-label">Costos de cierre <HelpTip text="Traspaso, abogado, comisiones de compra." /></label>{money("0", "closingCosts")}</div>
+      </div>
+
+      <div className="fld-2">
+        <div className="fld"><label className="fld-label">Vacancia <HelpTip text="% de meses sin alquilar. Airbnb suele rondar 25-40%." /></label>{pct("vacancyPct", "0")}</div>
+        <div className="fld"><label className="fld-label">Administración <HelpTip text="Property manager o co-host, sobre la renta cobrada. CR: 8-12% alquiler, 15-25% Airbnb." /></label>{pct("mgmtPct", "0")}</div>
+      </div>
+
+      <div className="fld-2">
+        <div className="fld"><label className="fld-label">Mantenimiento (mes)</label>{money("0", "maintenance")}</div>
+        <div className="fld"><label className="fld-label">Condominio / HOA (mes)</label>{money("0", "hoa")}</div>
+      </div>
+
+      <div className="fld-2">
+        <div className="fld"><label className="fld-label">Imp. Bienes Inmuebles (año) <HelpTip text="CR: 0,25% anual del valor registrado. Editable." /></label>{money("0", "propertyTax")}</div>
+        <div className="fld"><label className="fld-label">Seguro (año)</label>{money("0", "insurance")}</div>
+      </div>
+
+      <div className="fld">
+        <label className="fld-label">Servicios + limpieza (mes) <HelpTip text="Agua/luz/internet/limpieza que cubre el dueño (común en Airbnb)." /></label>
+        {money("0", "services")}
+      </div>
+
+      {hasData ? (
+        <div
+          style={{
+            marginTop: 12,
+            padding: "12px 14px",
+            borderRadius: 12,
+            background: "var(--surface-2)",
+            border: "1px solid var(--line)",
+          }}
+        >
+          <div className="row" style={{ justifyContent: "space-between", fontSize: 12.5 }}>
+            <span className="muted">Flujo neto (sin deuda)</span>
+            <strong style={{ color: roi.netMonthly >= 0 ? "var(--pos)" : "var(--neg)" }}>
+              {formatMoney(roi.netMonthly, cur)}/mes
+            </strong>
+          </div>
+          <div className="row" style={{ justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}>
+            <span className="muted">ROI operativo anual</span>
+            <strong style={{ color: "var(--info)" }}>{(roi.operatingRoi * 100).toFixed(1)}%</strong>
+          </div>
+          <div className="muted" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+            La cuota de la deuda y la plusvalía se suman en el siguiente paso.
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

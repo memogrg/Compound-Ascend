@@ -45,6 +45,15 @@ export function rowToHolding(r: {
   region?: string | null;
   is_recurring?: boolean | null;
   monthly_contribution?: number | null;
+  purchase_price?: number | null;
+  closing_costs?: number | null;
+  vacancy_pct?: number | null;
+  mgmt_pct?: number | null;
+  maintenance_monthly?: number | null;
+  hoa_monthly?: number | null;
+  property_tax_annual?: number | null;
+  insurance_annual?: number | null;
+  services_monthly?: number | null;
 }): Holding {
   return {
     id: r.id,
@@ -68,11 +77,20 @@ export function rowToHolding(r: {
     region: r.region ?? null,
     isRecurring: r.is_recurring ?? false,
     monthlyContribution: r.monthly_contribution == null ? null : Number(r.monthly_contribution),
+    purchasePrice: r.purchase_price == null ? null : Number(r.purchase_price),
+    closingCosts: r.closing_costs == null ? null : Number(r.closing_costs),
+    vacancyPct: r.vacancy_pct == null ? null : Number(r.vacancy_pct),
+    mgmtPct: r.mgmt_pct == null ? null : Number(r.mgmt_pct),
+    maintenanceMonthly: r.maintenance_monthly == null ? null : Number(r.maintenance_monthly),
+    hoaMonthly: r.hoa_monthly == null ? null : Number(r.hoa_monthly),
+    propertyTaxAnnual: r.property_tax_annual == null ? null : Number(r.property_tax_annual),
+    insuranceAnnual: r.insurance_annual == null ? null : Number(r.insurance_annual),
+    servicesMonthly: r.services_monthly == null ? null : Number(r.services_monthly),
   };
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -110,6 +128,21 @@ function rentalColumns(input: HoldingInput) {
     rental_income: input.rentalIncome ?? null,
     rental_frequency: input.rentalFrequency ?? null,
     rental_subtype: input.rentalSubtype ?? null,
+  };
+}
+
+/** Columnas de costos del inmueble de renta (migración 20260628000002). */
+function costColumns(input: HoldingInput) {
+  return {
+    purchase_price: input.purchasePrice ?? null,
+    closing_costs: input.closingCosts ?? null,
+    vacancy_pct: input.vacancyPct ?? null,
+    mgmt_pct: input.mgmtPct ?? null,
+    maintenance_monthly: input.maintenanceMonthly ?? null,
+    hoa_monthly: input.hoaMonthly ?? null,
+    property_tax_annual: input.propertyTaxAnnual ?? null,
+    insurance_annual: input.insuranceAnnual ?? null,
+    services_monthly: input.servicesMonthly ?? null,
   };
 }
 
@@ -234,6 +267,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
       broker: input.broker ?? null,
       currency: input.currency,
       ...rentalColumns(input),
+      ...costColumns(input),
       ...taxonomyColumns(input),
     })
     .select("id")
@@ -324,6 +358,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       // Completar el detalle de un stub (Fase 3) lo marca como completo.
       needs_detail: false,
       ...rentalColumns(input),
+      ...costColumns(input),
       ...taxonomyColumns(input),
     })
     .eq("id", id)
