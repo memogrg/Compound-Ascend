@@ -4,7 +4,30 @@
  * flujo neto mensual y ROI operativo anual. La deuda (apalancamiento) y la
  * plusvalía se incorporan en prompts posteriores.
  */
-import { monthlyize, type Frequency } from "@/modules/financial-base";
+// `Frequency` se importa solo-tipo del barrel (se borra en build, no arrastra el
+// `server-only` que reexporta). El factor de mensualización se replica localmente
+// (fuente: financial-base/engine/monthlyize) porque este motor corre en el wizard
+// (cliente) y no puede importar el valor a través del barrel server-only.
+import type { Frequency } from "@/modules/financial-base";
+
+/** Factor monto→mensual. Espejo de FREQUENCY_FACTORS en financial-base/engine/monthlyize. */
+const MONTHLY_FACTOR: Record<Frequency, number> = {
+  diario: 30,
+  semanal: 52 / 12,
+  quincenal: 2,
+  mensual: 1,
+  bimensual: 0.5,
+  trimestral: 1 / 3,
+  cuatrimestral: 1 / 4,
+  semestral: 1 / 6,
+  anual: 1 / 12,
+  unico: 0,
+  variable: 1,
+};
+
+function monthlyize(amount: number, frequency: Frequency): number {
+  return Math.round(amount * (MONTHLY_FACTOR[frequency] ?? 0) * 100) / 100;
+}
 
 export type RentalRoiInput = {
   rentalIncome: number;
