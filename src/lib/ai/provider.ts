@@ -15,6 +15,9 @@ export type VisionInput = {
   prompt: string;
 };
 
+// Tipos de function-calling viven en tools.ts (puro). `import type` → sin ciclo runtime.
+import type { AiToolDecl, AiToolExecutor } from "@/lib/ai/tools";
+
 export interface AIProvider {
   readonly name: string;
   readonly model: string;
@@ -24,6 +27,18 @@ export interface AIProvider {
     maxTokens?: number;
   }): Promise<AIChatResult>;
   vision(opts: VisionInput): Promise<AIChatResult>;
+  /**
+   * Chat con herramientas (function-calling): el proveedor pide functionCalls, el
+   * orquestador las ejecuta vía `execute` y el proveedor cierra con texto. Opcional:
+   * los proveedores que no lo soportan caen al chat normal. Las tools SOLO calculan.
+   */
+  chatWithTools?(opts: {
+    system: string;
+    messages: ChatMessage[];
+    tools: AiToolDecl[];
+    execute: AiToolExecutor;
+    maxTokens?: number;
+  }): Promise<AIChatResult>;
 }
 
 /** Proveedor de respaldo cuando no hay credenciales: respuestas seguras y útiles. */
@@ -39,5 +54,13 @@ export class StubProvider implements AIProvider {
   }
   async vision(): Promise<AIChatResult> {
     return { text: "{}", tokensIn: 0, tokensOut: 0 };
+  }
+  /** No ejecuta herramientas: devuelve texto fijo (sirve para tests y dev). */
+  async chatWithTools(): Promise<AIChatResult> {
+    return {
+      text: "La IA aún no está configurada. Cuando se conecte un proveedor podré calcular y responder con tus datos.",
+      tokensIn: 0,
+      tokensOut: 0,
+    };
   }
 }

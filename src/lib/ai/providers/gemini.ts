@@ -5,6 +5,13 @@ import "server-only";
  * errores; nunca registra secretos.
  */
 import type { AIProvider, AIChatResult, ChatMessage, VisionInput } from "@/lib/ai/provider";
+import {
+  runToolLoop,
+  type AiToolDecl,
+  type AiToolExecutor,
+  type ModelTurn,
+  type ToolCallRecord,
+} from "@/lib/ai/tools";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 
@@ -18,8 +25,12 @@ const RETRY_BASE_MS = 400;
 // para asesoría conversacional y extracción de recibos no aporta y sí estabiliza.
 const THINKING_OFF = { thinkingBudget: 0 };
 
+type GeminiPart = {
+  text?: string;
+  functionCall?: { name: string; args?: Record<string, unknown> };
+};
 type GeminiResponse = {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
+  candidates?: { content?: { parts?: GeminiPart[] } }[];
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 };
 
@@ -85,6 +96,19 @@ function extract(r: GeminiResponse): AIChatResult {
   };
 }
 
+/** Interpreta la respuesta como un turno del loop: functionCall o texto. */
+function parseTurn(r: GeminiResponse): ModelTurn {
+  const parts = r.candidates?.[0]?.content?.parts ?? [];
+  const tokensIn = r.usageMetadata?.promptTokenCount ?? 0;
+  const tokensOut = r.usageMetadata?.candidatesTokenCount ?? 0;
+  const fc = parts.find((p) => p.functionCall)?.functionCall;
+  if (fc) {
+    return { kind: "call", name: fc.name, args: fc.args ?? {}, tokensIn, tokensOut };
+  }
+  const text = parts.map((p) => p.text ?? "").join("");
+  return { kind: "text", text, tokensIn, tokensOut };
+}
+
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
   readonly model = MODEL;
@@ -136,6 +160,54 @@ export class GeminiProvider implements AIProvider {
       },
     };
     return extract(await call(this.key, body));
+  }
+
+  async chatWithTools({
+    system,
+    messages,
+    tools,
+    execute,
+    maxTokens = 1024,
+  }: {
+    system: string;
+    messages: ChatMessage[];
+    tools: AiToolDecl[];
+    execute: AiToolExecutor;
+    maxTokens?: number;
+  }): Promise<AIChatResult> {
+    const baseContents = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+
+    // `ask` reconstruye los `contents` con cada functionCall/functionResponse ya
+    // ejecutados: turno model con el functionCall + turno tool con el functionResponse
+    // (rol "tool", contrato REST de Gemini).
+    const ask = async (priorCalls: ToolCallRecord[]): Promise<ModelTurn> => {
+      const contents: unknown[] = [...baseContents];
+      for (const c of priorCalls) {
+        contents.push({ role: "model", parts: [{ functionCall: { name: c.name, args: c.args } }] });
+        contents.push({
+          role: "tool",
+          parts: [{ functionResponse: { name: c.name, response: { result: c.result } } }],
+        });
+      }
+      const body = {
+        system_instruction: { parts: [{ text: system }] },
+        contents,
+        tools: [{ functionDeclarations: tools }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.4,
+          thinkingConfig: THINKING_OFF,
+        },
+      };
+      return parseTurn(await call(this.key, body));
+    };
+
+    return runToolLoop({ ask, execute });
   }
 }
 

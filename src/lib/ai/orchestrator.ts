@@ -14,8 +14,13 @@ import { parseAction, type AIChatResponse } from "@/lib/ai/types";
 // el context-engine (Fase 5) arma el FinancialContext con datos autorizados.
 import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt";
 import { selectBibliaKnowledge, selectPatrimonioGuidance } from "@/lib/ai/biblia-knowledge";
+import { SIMULATE_DEBT_TOOL, simulateDebtPayoff, type AiToolExecutor } from "@/lib/ai/tools";
+import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 
 export type { FinancialContext };
+
+/** Datos de solo lectura que habilitan las herramientas (chat web con sesión). */
+export type ToolContext = { debts: DebtInput[] };
 
 function getProvider(): AIProvider {
   if (getServerEnv().AI_PROVIDER === "gemini") {
@@ -42,6 +47,62 @@ export async function financeChat(
   const result = await provider.chat({
     system: buildSystemPrompt({ ...ctx, knowledge }),
     messages,
+  });
+  const parsed = parseAction(result.text);
+  return {
+    ...parsed,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
+    provider: provider.name,
+  };
+}
+
+/** Biblia conductual + guía §15, fusionadas y acotadas (compartido por ambos chats). */
+function buildKnowledge(messages: ChatMessage[], ctx: FinancialContext): string[] {
+  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content;
+  return [
+    ...selectBibliaKnowledge({ emotion: ctx.dominantEmotion, text: lastUser }),
+    ...selectPatrimonioGuidance(ctx.patrimonioDiagnosis ?? []),
+  ].slice(0, 5);
+}
+
+/**
+ * Construye el ejecutor de herramientas (SOLO lectura/cálculo) con los datos del
+ * usuario. Mapea cada nombre de tool a su motor puro; herramienta desconocida → error
+ * explicable (nunca escribe nada).
+ */
+export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
+  return async (name, args) => {
+    if (name === "simular_pago_deuda") return simulateDebtPayoff(toolContext.debts, args);
+    return { error: `herramienta no disponible: ${name}` };
+  };
+}
+
+const TOOLS_PROMPT_LINE =
+  "Cuando el usuario pregunte cuánto tardaría en pagar su deuda o cuánto ahorraría abonando " +
+  "extra, USÁ la herramienta de simulación; no inventes números.";
+
+/**
+ * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
+ * con sesión) y el proveedor lo soporta: la IA invoca motores de SOLO lectura y da
+ * números calculados, no inventados. Sin toolContext (p. ej. WhatsApp) o sin soporte
+ * del proveedor → idéntico a financeChat. La IA sigue PROPONIENDO, nunca ejecuta.
+ */
+export async function financeChatWithTools(
+  messages: ChatMessage[],
+  ctx: FinancialContext,
+  toolContext?: ToolContext,
+): Promise<AIChatResponse & { tokensIn: number; tokensOut: number; provider: string }> {
+  const provider = getProvider();
+  if (!toolContext || !provider.chatWithTools) {
+    return financeChat(messages, ctx);
+  }
+  const knowledge = buildKnowledge(messages, ctx);
+  const result = await provider.chatWithTools({
+    system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
+    messages,
+    tools: [SIMULATE_DEBT_TOOL],
+    execute: buildToolExecutor(toolContext),
   });
   const parsed = parseAction(result.text);
   return {
