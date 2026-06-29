@@ -28,8 +28,10 @@ export const SIMULATE_DEBT_TOOL: AiToolDecl = {
   name: "simular_pago_deuda",
   description:
     "Calcula en cuántos meses el usuario terminaría de pagar TODAS sus deudas y cuánto " +
-    "ahorraría en intereses si abona un monto extra cada mes. Solo lee y calcula; no " +
-    "modifica nada. Usala cuando pregunte cuánto tardaría o cuánto ahorraría abonando extra.",
+    "ahorraría en intereses si abona un monto extra cada mes. Los montos (aporte y " +
+    "resultados) van en la MONEDA PRINCIPAL del usuario; las deudas en otras monedas ya " +
+    "se convierten antes. Solo lee y calcula; no modifica nada. Usala cuando pregunte " +
+    "cuánto tardaría o cuánto ahorraría abonando extra.",
   parameters: {
     type: "object",
     properties: {
@@ -56,6 +58,8 @@ export type DebtSimResult = {
   intereses_ahorrados: number; // vs. abonar 0 extra
   orden_de_pago: string[]; // nombres en orden de liquidación
   estrategia: DebtMethod;
+  currency: string; // moneda principal en la que vienen los montos
+  fx_no_disponible: boolean; // true si no se pudo convertir (cálculo asume 1 moneda)
 };
 
 /** "bola_de_nieve" (arg de la IA) → "bola_nieve" (motor). Default avalancha. */
@@ -84,9 +88,12 @@ export function simulateDebtPayoff(
   debts: DebtInput[],
   args: Record<string, unknown>,
   today: Date = new Date(),
+  meta: { currency?: string; fxUnavailable?: boolean } = {},
 ): DebtSimResult {
   const estrategia = toMethod(args.estrategia);
   const extra = toPositive(args.aporte_extra_mensual);
+  const currency = meta.currency ?? "";
+  const fx_no_disponible = meta.fxUnavailable ?? false;
   const active = debts.filter((d) => d.balance > 0.01);
   if (active.length === 0) {
     return {
@@ -96,6 +103,8 @@ export function simulateDebtPayoff(
       intereses_ahorrados: 0,
       orden_de_pago: [],
       estrategia,
+      currency,
+      fx_no_disponible,
     };
   }
   const withExtra = simulateStrategy(active, estrategia, extra);
@@ -107,6 +116,8 @@ export function simulateDebtPayoff(
     intereses_ahorrados: Math.max(0, baseline.totalInterest - withExtra.totalInterest),
     orden_de_pago: withExtra.payoffOrder.map((p) => p.name),
     estrategia,
+    currency,
+    fx_no_disponible,
   };
 }
 
