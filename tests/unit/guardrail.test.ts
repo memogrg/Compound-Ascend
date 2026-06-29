@@ -5,7 +5,7 @@ describe("applyGuardrail · R1 rendimientos garantizados", () => {
   it("'te garantizo un 12% sin riesgo' → nota + flag promised_returns", () => {
     const r = applyGuardrail("Te garantizo un 12% sin riesgo si invertís acá.");
     expect(r.flags).toContain("promised_returns");
-    expect(r.reply).toContain("ninguna inversión garantiza rendimientos");
+    expect(r.reply).toContain("CARTERA+: ninguna inversión garantiza rendimientos");
     // No mutila el contenido original.
     expect(r.reply).toContain("Te garantizo un 12%");
   });
@@ -15,7 +15,7 @@ describe("applyGuardrail · R2 fiscal/legal directivo", () => {
   it("consejo directivo sobre impuestos → disclaimer + flag fiscal_legal", () => {
     const r = applyGuardrail("Deberías deducir esos gastos para pagar menos impuestos este año.");
     expect(r.flags).toContain("fiscal_legal");
-    expect(r.reply).toContain("orientación general, no asesoría fiscal/legal");
+    expect(r.reply).toContain("CARTERA+: es orientación general; para tu caso fiscal/legal");
   });
 
   it("mención fiscal SIN tono directivo → no dispara (sin falso positivo)", () => {
@@ -30,7 +30,7 @@ describe("applyGuardrail · R3 riesgo sin base", () => {
       hasEmergencyFund: "no",
     });
     expect(r.flags).toContain("risk_without_base");
-    expect(r.reply).toContain("asegurá tu fondo de emergencia");
+    expect(r.reply).toContain("CARTERA+: conviene asegurar tu fondo de emergencia antes de invertir");
   });
 
   it("misma recomendación pero CON fondo y urgencia baja → no dispara", () => {
