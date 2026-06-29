@@ -17,7 +17,12 @@ import { formatMoney, currencySymbol, captureCurrencyDefault } from "@/lib/forma
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
-import { addHoldingAction, editHoldingAction } from "@/modules/wealth/api/actions";
+import {
+  addHoldingAction,
+  editHoldingAction,
+  listLinkableDebtsAction,
+  type LinkableDebt,
+} from "@/modules/wealth/api/actions";
 import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
 import { computeRentalRoi } from "@/modules/wealth/engine/rental-roi";
 import type { AssetType, Holding, InvestmentCategory } from "@/modules/wealth/types";
@@ -244,6 +249,8 @@ export function AddHoldingModal({
     insurance: prefill?.insuranceAnnual != null ? String(prefill.insuranceAnnual) : "",
     services: prefill?.servicesMonthly != null ? String(prefill.servicesMonthly) : "",
   });
+  // Deuda que financia el inmueble (C-1b); "" = ninguna.
+  const [debtId, setDebtId] = useState(prefill?.debtId ?? "");
 
   // ── Común final ──
   const [region, setRegion] = useState(prefill?.region ?? "global");
@@ -381,6 +388,7 @@ export function AddHoldingModal({
           base.propertyTaxAnnual = n(rc.propertyTax);
           base.insuranceAnnual = n(rc.insurance);
           base.servicesMonthly = n(rc.services);
+          base.debtId = debtId || undefined;
         }
       }
     }
@@ -463,6 +471,8 @@ export function AddHoldingModal({
             onSubtype={setSubtype}
             rc={rc}
             onRc={setRc}
+            debtId={debtId}
+            onDebtId={setDebtId}
             region={region}
             onRegion={setRegion}
             registerExpense={registerExpense}
@@ -625,6 +635,8 @@ function Step2Fields(props: {
   onSubtype: (v: "alquiler" | "airbnb") => void;
   rc: RentalCosts;
   onRc: (v: RentalCosts) => void;
+  debtId: string;
+  onDebtId: (v: string) => void;
   region: string;
   onRegion: (v: string) => void;
   registerExpense: boolean;
@@ -810,6 +822,8 @@ function Step2Fields(props: {
           onSubtype={props.onSubtype}
           rc={props.rc}
           onRc={props.onRc}
+          debtId={props.debtId}
+          onDebtId={props.onDebtId}
         />
       ) : null}
 
@@ -1028,10 +1042,28 @@ function RentalCostsBlock(props: {
   onSubtype: (v: "alquiler" | "airbnb") => void;
   rc: RentalCosts;
   onRc: (v: RentalCosts) => void;
+  debtId: string;
+  onDebtId: (v: string) => void;
 }) {
   const { cur, rc, onRc } = props;
   const set = (k: keyof RentalCosts) => (e: ChangeEvent<HTMLInputElement>) =>
     onRc({ ...rc, [k]: e.target.value });
+
+  // Deudas del usuario para ligar la hipoteca (C-1b). Solo las de la misma
+  // moneda del inmueble: mezclar monedas en el flujo sería incorrecto.
+  const [debts, setDebts] = useState<LinkableDebt[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void listLinkableDebtsAction().then((d) => {
+      if (alive) setDebts(d);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const debtsSameCur = debts.filter((d) => d.currency === cur);
+  const linkedDebt = debts.find((d) => d.id === props.debtId) ?? null;
+  const debtServiceMonthly = linkedDebt ? linkedDebt.currentPayment : 0;
 
   const investedCash =
     (parseFloat(rc.purchasePrice) || 0) + (parseFloat(rc.closingCosts) || 0) ||
@@ -1049,6 +1081,7 @@ function RentalCostsBlock(props: {
     propertyTaxAnnual: parseFloat(rc.propertyTax) || 0,
     insuranceAnnual: parseFloat(rc.insurance) || 0,
     investedCash,
+    debtServiceMonthly,
   });
   const hasData = (parseFloat(props.income) || 0) > 0;
 
@@ -1109,6 +1142,29 @@ function RentalCostsBlock(props: {
         {money("0", "services")}
       </div>
 
+      <div className="fld">
+        <label className="fld-label">
+          Deuda que la financia <HelpTip text="Liga la hipoteca o préstamo de este inmueble; su cuota mensual se descuenta del flujo. Solo deudas en la misma moneda." />
+        </label>
+        <select
+          className="sel"
+          value={props.debtId}
+          onChange={(e) => props.onDebtId(e.target.value)}
+        >
+          <option value="">Sin deuda ligada</option>
+          {debtsSameCur.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name} · {formatMoney(d.currentPayment, d.currency)}/mes
+            </option>
+          ))}
+        </select>
+        {debts.length > 0 && debtsSameCur.length === 0 ? (
+          <span className="muted" style={{ fontSize: 11, marginTop: 4, display: "block" }}>
+            No tienes deudas en {cur}. Regístralas en Deudas para ligarlas.
+          </span>
+        ) : null}
+      </div>
+
       {hasData ? (
         <div
           style={{
@@ -1125,12 +1181,20 @@ function RentalCostsBlock(props: {
               {formatMoney(roi.netMonthly, cur)}/mes
             </strong>
           </div>
+          {linkedDebt ? (
+            <div className="row" style={{ justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}>
+              <span className="muted">Flujo neto con deuda</span>
+              <strong style={{ color: roi.leveredNetMonthly >= 0 ? "var(--pos)" : "var(--neg)" }}>
+                {formatMoney(roi.leveredNetMonthly, cur)}/mes
+              </strong>
+            </div>
+          ) : null}
           <div className="row" style={{ justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}>
             <span className="muted">ROI operativo anual</span>
             <strong style={{ color: "var(--info)" }}>{(roi.operatingRoi * 100).toFixed(1)}%</strong>
           </div>
           <div className="muted" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
-            La cuota de la deuda y la plusvalía se suman en el siguiente paso.
+            La plusvalía se suma en un paso posterior.
           </div>
         </div>
       ) : null}

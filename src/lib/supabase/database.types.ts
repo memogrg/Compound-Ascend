@@ -510,6 +510,8 @@ export type InvestmentHoldingRow = Timestamps & {
   property_tax_annual: number | null;
   insurance_annual: number | null;
   services_monthly: number | null;
+  // Deuda que financia el inmueble (migración 20260629000001).
+  debt_id: string | null;
 };
 
 export type RentalPaymentRow = Timestamps & {

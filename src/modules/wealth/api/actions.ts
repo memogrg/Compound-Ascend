@@ -9,6 +9,7 @@ import {
   dividendInputSchema,
   rentalPaymentInputSchema,
 } from "@/modules/wealth/schemas";
+import { listDebts } from "@/modules/control";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createInvestment,
@@ -305,6 +306,25 @@ export async function listDividendsAction(
   if (!isSupabaseConfigured()) return [];
   try {
     return await listDividends(holdingId);
+  } catch {
+    return [];
+  }
+}
+
+/** Deuda ligable a un inmueble (C-1b): forma mínima para el selector y el detalle. */
+export type LinkableDebt = { id: string; name: string; currentPayment: number; currency: string };
+
+/** Deudas del usuario para ligar a un inmueble de renta. Best-effort. */
+export async function listLinkableDebtsAction(): Promise<LinkableDebt[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const debts = await listDebts();
+    return debts.map((d) => ({
+      id: d.id,
+      name: d.name,
+      currentPayment: d.currentPayment,
+      currency: d.currency,
+    }));
   } catch {
     return [];
   }

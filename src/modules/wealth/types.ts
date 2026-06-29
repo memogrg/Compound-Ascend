@@ -168,6 +168,8 @@ export type Holding = {
   propertyTaxAnnual?: number | null;
   insuranceAnnual?: number | null;
   servicesMonthly?: number | null;
+  /** Deuda que financia el inmueble (migración 20260629000001 · C-1b). */
+  debtId?: string | null;
   /** Stub por completar (creado desde un ingreso pasivo · Fase 3). */
   needsDetail?: boolean;
   // ── Taxonomía de inversiones (migración 20260617000001) ──

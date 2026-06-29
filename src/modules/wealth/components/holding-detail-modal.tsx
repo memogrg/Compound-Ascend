@@ -16,6 +16,8 @@ import {
   addRentalIncomeAction,
   removeRentalPaymentAction,
   sellHoldingAction,
+  listLinkableDebtsAction,
+  type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
 import type { Holding, Dividend, RentalPayment } from "@/modules/wealth/types";
@@ -104,6 +106,7 @@ export function HoldingDetailModal({
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [divLoading, setDivLoading] = useState(true);
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
+  const [linkedDebt, setLinkedDebt] = useState<LinkableDebt | null>(null);
 
   const costBasis = holding.quantity * holding.averageCost;
   // No cotizados: valor manual del usuario (no precio×cantidad).
@@ -144,6 +147,17 @@ export function HoldingDetailModal({
     if (isRental) void listRentalPaymentsAction(holding.id).then(setRentals);
   }, [holding.id, isRental]);
 
+  // Deuda ligada (C-1b): muestra quién financia el inmueble. Solo si hay debtId.
+  useEffect(() => {
+    if (!holding.debtId) {
+      setLinkedDebt(null);
+      return;
+    }
+    void listLinkableDebtsAction().then((debts) => {
+      setLinkedDebt(debts.find((d) => d.id === holding.debtId) ?? null);
+    });
+  }, [holding.debtId]);
+
   const totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
 
   return (
@@ -158,6 +172,25 @@ export function HoldingDetailModal({
         >
           <EditHoldingButton holding={editHolding ?? holding} currency={currency} />
         </div>
+        {linkedDebt ? (
+          <div
+            style={{
+              margin: "8px 22px 0",
+              padding: "9px 12px",
+              borderRadius: 10,
+              background: "var(--surface-2)",
+              border: "1px solid var(--line)",
+              fontSize: 12.5,
+            }}
+          >
+            <span className="muted">Financiada por: </span>
+            <strong>{linkedDebt.name}</strong>
+            <span className="muted">
+              {" · "}
+              {formatMoney(linkedDebt.currentPayment, linkedDebt.currency)}/mes
+            </span>
+          </div>
+        ) : null}
         {/* Header metrics */}
         <div
           style={{
