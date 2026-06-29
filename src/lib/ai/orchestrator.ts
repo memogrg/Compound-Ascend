@@ -9,6 +9,8 @@ import { getServerEnv } from "@/lib/env";
 import { StubProvider, type AIProvider, type ChatMessage } from "@/lib/ai/provider";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import { parseAction, type AIChatResponse } from "@/lib/ai/types";
+import { applyGuardrail } from "@/lib/ai/guardrail";
+import { logger } from "@/lib/logger";
 
 // El system prompt y su contexto viven en system-prompt.ts (puro, testeable);
 // el context-engine (Fase 5) arma el FinancialContext con datos autorizados.
@@ -84,11 +86,31 @@ export async function financeChat(
   });
   const parsed = parseAction(result.text);
   return {
-    ...parsed,
+    ...guardReply(parsed, ctx, provider.name),
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
     provider: provider.name,
   };
+}
+
+/**
+ * Red post-generación: pasa el reply por el guardrail determinista (no muta la
+ * acción) y loguea las flags para observabilidad. No cambia el shape de la respuesta.
+ */
+function guardReply(
+  parsed: AIChatResponse,
+  ctx: FinancialContext,
+  provider: string,
+): AIChatResponse {
+  const guarded = applyGuardrail(parsed.reply, {
+    hasEmergencyFund: ctx.hasEmergencyFund,
+    urgency: ctx.urgency,
+    dependentsCount: ctx.dependentsCount,
+  });
+  if (guarded.flags.length) {
+    logger.info("ai-guardrail aplicado", { flags: guarded.flags, provider });
+  }
+  return { ...parsed, reply: guarded.reply };
 }
 
 /** Biblia conductual + guía §15, fusionadas y acotadas (compartido por ambos chats). */
@@ -147,7 +169,7 @@ export async function financeChatWithTools(
   });
   const parsed = parseAction(result.text);
   return {
-    ...parsed,
+    ...guardReply(parsed, ctx, provider.name),
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
     provider: provider.name,
