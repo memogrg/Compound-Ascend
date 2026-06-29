@@ -59,8 +59,9 @@ export type InboundMessage = {
 const NOT_LINKED =
   "Este número no está vinculado. Entrá a la app → Perfil → Vincular WhatsApp para empezar.";
 const OTP_RE = /^\d{6}$/;
-const CONFIRM_RE = /^(s[ií]|yes|ok|dale|confirmar|confirmo|listo)$/;
-const EDIT_RE = /^edit/;
+// Acepta texto y también la respuesta numérica del fallback de botones (1=Sí, 2=Editar).
+const CONFIRM_RE = /^(s[ií]|yes|ok|dale|confirmar|confirmo|listo|1)$/;
+const EDIT_RE = /^(edit(ar)?|2)$/;
 const REVIEW_RE = /^(revisar|revisi[oó]n|movimientos|pendientes)$/;
 const HELP_RE = /^(ayuda|men[uú]|hola|help|empezar|start|\?)$/;
 const HELP_TEXT =

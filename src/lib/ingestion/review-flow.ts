@@ -37,8 +37,8 @@ export function proposalToPendingAction(p: ProposalView): ProposalPending {
     currency: p.currency,
     occurredOn: p.occurredOn,
     merchant: p.merchant,
-    origin: "notification",
-    source: "notification",
+    origin: "imported",
+    source: "email",
     proposalId: p.id,
     cardLabel: p.cardLabel,
   };

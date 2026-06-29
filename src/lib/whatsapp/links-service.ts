@@ -88,8 +88,8 @@ export type PendingAction = {
   currency: string;
   occurredOn: string; // YYYY-MM-DD
   merchant?: string | null;
-  origin: "scanned" | "ai_assisted" | "manual" | "notification";
-  source: "receipt" | "chat" | "notification";
+  origin: "scanned" | "ai_assisted" | "manual" | "notification" | "imported";
+  source: "receipt" | "chat" | "notification" | "email";
   proposalId?: string; // fila de ingest_proposals que originó la propuesta
   cardLabel?: string | null; // etiqueta de tarjeta resuelta (último-4 → nombre)
 };
