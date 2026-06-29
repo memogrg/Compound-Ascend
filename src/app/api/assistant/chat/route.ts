@@ -13,7 +13,7 @@ import {
 } from "@/lib/ai/orchestrator";
 import { buildFinancialContext } from "@/lib/ai/context-engine";
 import { listDebts } from "@/modules/control";
-import { getDisplayCurrency } from "@/modules/financial-base";
+import { getPrimaryCurrency } from "@/modules/financial-base";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
@@ -58,7 +58,10 @@ export async function POST(req: Request) {
     let toolContext: ToolContext | undefined;
     if (user) {
       try {
-        const [debts, primary] = await Promise.all([listDebts(), getDisplayCurrency()]);
+        // Para CÁLCULO usamos la moneda PRINCIPAL (user_settings.primary_currency),
+        // no getDisplayCurrency(): esta honra la cookie de visualización y haría que el
+        // toolContext use la moneda con la que el usuario mira el dashboard, no la suya.
+        const [debts, primary] = await Promise.all([listDebts(), getPrimaryCurrency()]);
         let rates: Record<string, number> | null = null;
         try {
           rates = await getFxRates();
