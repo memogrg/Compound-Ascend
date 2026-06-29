@@ -6,9 +6,15 @@
  */
 import { NextResponse } from "next/server";
 import { chatRequestSchema } from "@/modules/assistant/schemas";
-import { financeChatWithTools, type ToolContext } from "@/lib/ai/orchestrator";
+import {
+  financeChatWithTools,
+  normalizeDebtsForTool,
+  type ToolContext,
+} from "@/lib/ai/orchestrator";
 import { buildFinancialContext } from "@/lib/ai/context-engine";
 import { listDebts } from "@/modules/control";
+import { getDisplayCurrency } from "@/modules/financial-base";
+import { getFxRates } from "@/lib/market-data/fx-rates";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
@@ -44,22 +50,25 @@ export async function POST(req: Request) {
       { role: "user", content: parsed.data.message },
     ];
 
-    // Habilita las herramientas (function-calling) sólo con sesión: lee las deudas
-    // del usuario como datos de SOLO lectura para el ejecutor. Best-effort: si la
-    // lectura falla, se sigue sin herramientas (chat normal). Asume una sola moneda
-    // (la principal); la conversión multi-moneda queda como mejora futura.
+    // Habilita las herramientas (function-calling) sólo con sesión: lee las deudas del
+    // usuario como datos de SOLO lectura y las normaliza a la moneda principal con FX
+    // antes de pasarlas (deudas en USD+CRC no se pueden sumar crudas). Best-effort: si
+    // la lectura falla, se sigue sin herramientas; si falla FX, no convierte y marca
+    // fxUnavailable para que la IA aclare que el cálculo asume una sola moneda.
     let toolContext: ToolContext | undefined;
     if (user) {
       try {
-        const debts = await listDebts();
+        const [debts, primary] = await Promise.all([listDebts(), getDisplayCurrency()]);
+        let rates: Record<string, number> | null = null;
+        try {
+          rates = await getFxRates();
+        } catch {
+          rates = null;
+        }
         toolContext = {
-          debts: debts.map((d) => ({
-            id: d.id,
-            name: d.name,
-            balance: d.balance,
-            apr: d.apr ?? 0,
-            minPayment: d.minPayment,
-          })),
+          currency: primary,
+          fxUnavailable: !rates,
+          debts: normalizeDebtsForTool(debts, primary, rates),
         };
       } catch {
         toolContext = undefined;

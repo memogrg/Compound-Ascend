@@ -6,7 +6,11 @@ import {
   type ToolCallRecord,
   type DebtSimResult,
 } from "@/lib/ai/tools";
-import { buildToolExecutor, financeChatWithTools } from "@/lib/ai/orchestrator";
+import {
+  buildToolExecutor,
+  financeChatWithTools,
+  normalizeDebtsForTool,
+} from "@/lib/ai/orchestrator";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import type { FinancialContext } from "@/lib/ai/system-prompt";
 
@@ -80,11 +84,19 @@ describe("tools · runToolLoop (sin Gemini real)", () => {
 });
 
 describe("orchestrator · buildToolExecutor / financeChatWithTools", () => {
-  it("el executor mapea simular_pago_deuda al motor y rechaza herramientas desconocidas", async () => {
-    const exec = buildToolExecutor({ debts: DEBTS });
+  it("el executor mapea simular_pago_deuda al motor (con moneda) y rechaza desconocidas", async () => {
+    const exec = buildToolExecutor({ debts: DEBTS, currency: "CRC" });
     const r = (await exec("simular_pago_deuda", { aporte_extra_mensual: 100_000 })) as DebtSimResult;
     expect(r.meses).toBeGreaterThan(0);
+    expect(r.currency).toBe("CRC");
+    expect(r.fx_no_disponible).toBe(false);
     expect(await exec("borrar_todo", {})).toEqual({ error: "herramienta no disponible: borrar_todo" });
+  });
+
+  it("fxUnavailable se propaga al resultado (la IA puede aclarar)", async () => {
+    const exec = buildToolExecutor({ debts: DEBTS, currency: "CRC", fxUnavailable: true });
+    const r = (await exec("simular_pago_deuda", { aporte_extra_mensual: 50_000 })) as DebtSimResult;
+    expect(r.fx_no_disponible).toBe(true);
   });
 
   it("sin toolContext se comporta como el chat de hoy (provider stub, sin tools)", async () => {
@@ -93,5 +105,29 @@ describe("orchestrator · buildToolExecutor / financeChatWithTools", () => {
     expect(out.provider).toBe("stub");
     expect(typeof out.reply).toBe("string");
     expect(out.reply.length).toBeGreaterThan(0);
+  });
+});
+
+describe("orchestrator · normalizeDebtsForTool (FX a moneda principal)", () => {
+  // Tasas "por USD": 1 USD = 500 CRC.
+  const RATES = { USD: 1, CRC: 500 };
+  const MIXED = [
+    { id: "u", name: "Tarjeta USD", balance: 1000, minPayment: 50, apr: 30, currency: "USD" },
+    { id: "c", name: "Préstamo CRC", balance: 500_000, minPayment: 30_000, apr: 20, currency: "CRC" },
+  ];
+
+  it("convierte cada deuda a la principal (no suma cruda USD+CRC)", () => {
+    const out = normalizeDebtsForTool(MIXED, "CRC", RATES);
+    // La deuda en USD se convierte ×500; la CRC queda igual.
+    expect(out.find((d) => d.id === "u")!.balance).toBe(500_000);
+    expect(out.find((d) => d.id === "u")!.minPayment).toBe(25_000);
+    expect(out.find((d) => d.id === "c")!.balance).toBe(500_000);
+    // APR intacta (es por deuda, no se convierte).
+    expect(out.find((d) => d.id === "u")!.apr).toBe(30);
+  });
+
+  it("sin tasas (FX no disponible) pasa los montos crudos", () => {
+    const out = normalizeDebtsForTool(MIXED, "CRC", null);
+    expect(out.find((d) => d.id === "u")!.balance).toBe(1000); // sin convertir
   });
 });

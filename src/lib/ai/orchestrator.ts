@@ -16,11 +16,45 @@ import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt
 import { selectBibliaKnowledge, selectPatrimonioGuidance } from "@/lib/ai/biblia-knowledge";
 import { SIMULATE_DEBT_TOOL, simulateDebtPayoff, type AiToolExecutor } from "@/lib/ai/tools";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
+import { convertCurrency } from "@/lib/fx";
 
 export type { FinancialContext };
 
-/** Datos de solo lectura que habilitan las herramientas (chat web con sesión). */
-export type ToolContext = { debts: DebtInput[] };
+/**
+ * Datos de solo lectura que habilitan las herramientas (chat web con sesión). Las
+ * deudas vienen YA normalizadas a `currency` (la moneda principal); `fxUnavailable`
+ * marca que no se pudieron convertir (cálculo asume una sola moneda).
+ */
+export type ToolContext = { debts: DebtInput[]; currency: string; fxUnavailable?: boolean };
+
+/** Deuda cruda (de listDebts) con su moneda, antes de normalizar para la herramienta. */
+type RawDebt = {
+  id: string;
+  name: string;
+  balance: number;
+  minPayment: number;
+  apr: number | null;
+  currency: string;
+};
+
+/**
+ * Normaliza las deudas a la moneda principal con FX (balance y cuota mínima; las APR
+ * quedan, son por deuda). Si no hay tasas (rates null), pasa los montos crudos. Puro
+ * y testeable: con deudas mixtas USD+CRC convierte cada una, no suma cruda.
+ */
+export function normalizeDebtsForTool(
+  debts: RawDebt[],
+  primary: string,
+  rates: Record<string, number> | null,
+): DebtInput[] {
+  return debts.map((d) => ({
+    id: d.id,
+    name: d.name,
+    apr: d.apr ?? 0,
+    balance: rates ? convertCurrency(d.balance, d.currency, primary, rates) : d.balance,
+    minPayment: rates ? convertCurrency(d.minPayment, d.currency, primary, rates) : d.minPayment,
+  }));
+}
 
 function getProvider(): AIProvider {
   if (getServerEnv().AI_PROVIDER === "gemini") {
@@ -73,14 +107,21 @@ function buildKnowledge(messages: ChatMessage[], ctx: FinancialContext): string[
  */
 export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
   return async (name, args) => {
-    if (name === "simular_pago_deuda") return simulateDebtPayoff(toolContext.debts, args);
+    if (name === "simular_pago_deuda") {
+      return simulateDebtPayoff(toolContext.debts, args, new Date(), {
+        currency: toolContext.currency,
+        fxUnavailable: toolContext.fxUnavailable,
+      });
+    }
     return { error: `herramienta no disponible: ${name}` };
   };
 }
 
 const TOOLS_PROMPT_LINE =
   "Cuando el usuario pregunte cuánto tardaría en pagar su deuda o cuánto ahorraría abonando " +
-  "extra, USÁ la herramienta de simulación; no inventes números.";
+  "extra, USÁ la herramienta de simulación; no inventes números. Los montos van en la moneda " +
+  "principal del usuario; si la herramienta devuelve fx_no_disponible:true, aclaralo (el " +
+  "cálculo asume una sola moneda).";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
