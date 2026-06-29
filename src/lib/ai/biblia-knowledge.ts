@@ -19,15 +19,27 @@ const EMOTION_RULES: Record<string, string> = {
   tranquilidad: "Tranquilo: tono estratégico, avanza hacia optimización y crecimiento.",
 };
 
-/** Fragmentos por tema, detectados por palabras clave en el mensaje del usuario. */
+/**
+ * Quita acentos y pasa a minúsculas para que el match tolere "inversión",
+ * "INVERSION" e "inversion" por igual. Las keys del catálogo se guardan YA
+ * normalizadas (sin acentos), así sólo hace falta normalizar el texto del usuario.
+ */
+export function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+/** Fragmentos por tema, detectados por palabras clave (keys ya normalizadas). */
 const TOPIC_CHUNKS: { keys: string[]; chunk: string }[] = [
   {
-    keys: ["invertir", "inversión", "inversion", "acciones", "bolsa", "cripto", "etf"],
+    keys: ["invertir", "inversion", "acciones", "bolsa", "cripto", "etf"],
     chunk:
       "Inversión: pregunta horizonte, liquidez y reacción ante pérdidas; explica el riesgo como rango de escenarios (no certeza); aportes graduales y automáticos; nada de rendimientos garantizados.",
   },
   {
-    keys: ["deuda", "deudas", "préstamo", "prestamo", "tarjeta", "crédito", "credito"],
+    keys: ["deuda", "deudas", "prestamo", "tarjeta", "credito"],
     chunk:
       "Deuda: ataca primero la más cara (mayor interés), busca victorias visibles, sin culpa ni regaños.",
   },
@@ -52,14 +64,50 @@ const TOPIC_CHUNKS: { keys: string[]; chunk: string }[] = [
       "Gasto impulsivo: nudge de pausa y costo anual; conéctalo con su meta principal, sin moralizar.",
   },
   {
-    keys: ["retiro", "jubil", "pensión", "pension"],
+    keys: ["retiro", "jubil", "pension"],
     chunk:
       "Retiro: proyecta escenarios (conservador/base/acelerado) conectados con su Rich Life de largo plazo.",
   },
   {
-    keys: ["emergencia", "imprevisto", "seguro", "protección", "proteccion"],
+    keys: ["emergencia", "imprevisto", "seguro", "proteccion"],
     chunk:
       "Protección: prioriza base (fondo de emergencia, seguros) antes de estrategias de crecimiento.",
+  },
+  // ---- Temas frecuentes de CR/LatAm (keys ya normalizadas, sin acentos) ----
+  {
+    keys: ["plazo fijo", "cdp", "certificado", "deposito a plazo"],
+    chunk:
+      "Renta fija (plazo fijo, CDP): segura y predecible, pero compará su rendimiento contra la inflación; sirve para liquidez y corto plazo, no para crecer patrimonio a largo plazo.",
+  },
+  {
+    keys: ["bono", "bonos", "deuda soberana"],
+    chunk:
+      "Bonos: cuando la tasa sube, el precio del bono baja; pesa también el riesgo del emisor; conectá con tu horizonte y liquidez, sin casarte con un emisor puntual.",
+  },
+  {
+    keys: ["fondo de inversion", "fondos", "fondo inmobiliario"],
+    chunk:
+      "Fondos de inversión: diversifican y los gestiona un tercero; revisá las comisiones y que calcen con tu perfil y horizonte; sin recomendar un fondo concreto.",
+  },
+  {
+    keys: ["impuesto", "impuestos", "hacienda", "renta", "tributacion"],
+    chunk:
+      "Impuestos: te oriento en general, pero validá tu caso con un contador; no tomes una respuesta fiscal puntual como certeza.",
+  },
+  {
+    keys: ["rop", "pension", "pensiones", "jubilacion"],
+    chunk:
+      "Pensión (ROP): aportes consistentes y horizonte largo; conectalo con tu Número de Libertad y escenarios, sin prometer montos.",
+  },
+  {
+    keys: ["dolar", "dolares", "colones", "tipo de cambio", "divisa"],
+    chunk:
+      "Moneda: decidí por la moneda de tus metas y gastos, no por especular; tené presente el riesgo cambiario.",
+  },
+  {
+    keys: ["sinpe", "transferencia"],
+    chunk:
+      "SINPE: útil para automatizar ahorro y pagos; es un medio de transferencia, no una inversión.",
   },
 ];
 
@@ -98,11 +146,11 @@ export function selectPatrimonioGuidance(flags: string[]): string[] {
 export function selectBibliaKnowledge(p: { emotion?: string; text?: string }): string[] {
   const out: string[] = [];
   if (p.emotion && EMOTION_RULES[p.emotion]) out.push(EMOTION_RULES[p.emotion]!);
-  const lower = (p.text ?? "").toLowerCase();
+  const text = normalize(p.text ?? "");
   let topics = 0;
   for (const t of TOPIC_CHUNKS) {
     if (topics >= 2) break;
-    if (t.keys.some((k) => lower.includes(k))) {
+    if (t.keys.some((k) => text.includes(k))) {
       out.push(t.chunk);
       topics++;
     }
