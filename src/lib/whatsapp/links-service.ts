@@ -79,7 +79,8 @@ export type ActiveLink = {
   phone: string;
 };
 
-/** Propuesta de transacción pendiente de confirmación (foto o texto). */
+/** Propuesta de transacción pendiente de confirmación (foto, texto o propuesta de
+ *  ingesta por banco). proposalId/cardLabel solo vienen de la cola ingest_proposals. */
 export type PendingAction = {
   kind: "gasto" | "ingreso";
   description: string;
@@ -89,6 +90,8 @@ export type PendingAction = {
   merchant?: string | null;
   origin: "scanned" | "ai_assisted" | "manual" | "notification";
   source: "receipt" | "chat" | "notification";
+  proposalId?: string; // fila de ingest_proposals que originó la propuesta
+  cardLabel?: string | null; // etiqueta de tarjeta resuelta (último-4 → nombre)
 };
 
 /** Moneda principal del usuario (default CRC). */

@@ -32,6 +32,20 @@ import { createTransactionForUser } from "@/lib/whatsapp/write-service";
 import { formatMoney, todayIso } from "@/lib/whatsapp/format";
 import { parseNotification } from "@/lib/ingestion/sources";
 import { toPendingAction, dedupKey } from "@/lib/ingestion/normalize";
+import {
+  surfaceNextProposal,
+  confirmProposal,
+  discardProposal,
+  buildPendingNudge,
+  type ReviewDeps,
+  type ProposalPending,
+} from "@/lib/ingestion/review-flow";
+import {
+  getOldestPendingProposal,
+  countPendingProposals,
+  markProposalConfirmed,
+  markProposalDiscarded,
+} from "@/lib/ingestion/proposals-service";
 import type { WhatsAppProvider } from "@/lib/whatsapp/provider";
 
 export type InboundMessage = {
@@ -47,6 +61,7 @@ const NOT_LINKED =
 const OTP_RE = /^\d{6}$/;
 const CONFIRM_RE = /^(s[ií]|yes|ok|dale|confirmar|confirmo|listo)$/;
 const EDIT_RE = /^edit/;
+const REVIEW_RE = /^(revisar|revisi[oó]n|movimientos|pendientes)$/;
 const HELP_RE = /^(ayuda|men[uú]|hola|help|empezar|start|\?)$/;
 const HELP_TEXT =
   "👋 Soy tu asistente de Compound Ascend. Puedo:\n\n" +
@@ -90,6 +105,23 @@ export async function routeInbound(provider: WhatsAppProvider, msg: InboundMessa
   await handleActiveMessage(provider, link, msg);
 }
 
+/** Arma los puertos de review-flow con el provider, el vínculo y los servicios. */
+function buildReviewDeps(
+  provider: WhatsAppProvider,
+  link: ActiveLink,
+  phone: string,
+): ReviewDeps {
+  return {
+    getOldestPending: () => getOldestPendingProposal(link.userId, link.householdId),
+    setPending: (action) => setPendingAction(link.id, action),
+    sendButtons: (text, buttons) => provider.sendButtons(phone, text, buttons),
+    sendText: (text) => provider.sendText(phone, text),
+    createTransaction: (action) => createTransactionForUser(link.userId, link.householdId, action),
+    markConfirmed: (id) => markProposalConfirmed(id),
+    markDiscarded: (id) => markProposalDiscarded(id),
+  };
+}
+
 /** Mensajes de un número ya vinculado. */
 async function handleActiveMessage(
   provider: WhatsAppProvider,
@@ -102,6 +134,12 @@ async function handleActiveMessage(
   // Confirmación de una propuesta pendiente.
   if (pending) {
     if (CONFIRM_RE.test(lower)) {
+      // Propuesta de la cola de ingesta: crea la transacción, marca confirmed y
+      // encadena la siguiente pendiente.
+      if (pending.proposalId) {
+        await confirmProposal(buildReviewDeps(provider, link, msg.phone), pending as ProposalPending);
+        return;
+      }
       const res = await createTransactionForUser(link.userId, link.householdId, pending);
       await setPendingAction(link.id, null);
       await provider.sendText(
@@ -113,6 +151,11 @@ async function handleActiveMessage(
       return;
     }
     if (EDIT_RE.test(lower)) {
+      // Propuesta de la cola: marcar discarded y pasar a la siguiente.
+      if (pending.proposalId) {
+        await discardProposal(buildReviewDeps(provider, link, msg.phone), pending as ProposalPending);
+        return;
+      }
       await setPendingAction(link.id, null);
       await provider.sendText(
         msg.phone,
@@ -124,9 +167,18 @@ async function handleActiveMessage(
     await setPendingAction(link.id, null);
   }
 
-  // Ayuda / saludo: respuesta rápida sin consumir IA.
+  // "revisar": ofrece la propuesta del banco más antigua por confirmar.
+  if (REVIEW_RE.test(lower)) {
+    await surfaceNextProposal(buildReviewDeps(provider, link, msg.phone));
+    return;
+  }
+
+  // Ayuda / saludo: respuesta rápida sin consumir IA. Con nudge si hay pendientes.
   if (HELP_RE.test(lower)) {
-    await provider.sendText(msg.phone, HELP_TEXT);
+    const nudge = buildPendingNudge(
+      await countPendingProposals(link.userId, link.householdId),
+    );
+    await provider.sendText(msg.phone, nudge ? `${HELP_TEXT}\n\n${nudge}` : HELP_TEXT);
     return;
   }
 
