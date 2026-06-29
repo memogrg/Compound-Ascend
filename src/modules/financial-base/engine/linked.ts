@@ -200,6 +200,8 @@ export function rentalPaymentToTxn(args: {
   receivedOn: string;
   amount: number;
   categoryId?: string | null;
+  /** Línea derivada de renta del periodo: llena su barra "Recibido" (C-2b). */
+  incomeSourceId?: string | null;
 }): LinkedTxnInput {
   return {
     kind: "ingreso",
@@ -213,5 +215,6 @@ export function rentalPaymentToTxn(args: {
     origin: "manual",
     linkedKind: "rental",
     linkedId: args.holdingId,
+    incomeSourceId: args.incomeSourceId ?? null,
   };
 }

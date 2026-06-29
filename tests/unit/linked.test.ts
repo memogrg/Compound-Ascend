@@ -85,6 +85,20 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
     expect(txn.kind).toBe("ingreso");
     expect(txn.linkedKind).toBe("rental");
     expect(txn.description).toBe("Renta — Apartamento Escazú");
+    expect(txn.incomeSourceId).toBeNull();
+    expect(() => txnInputSchema.parse(txn)).not.toThrow();
+  });
+
+  it("renta cobrada → se atribuye a la línea derivada (income_source_id, C-2b)", () => {
+    const txn = rentalPaymentToTxn({
+      holdingId: "55555555-5555-4555-8555-555555555555",
+      label: "Apartamento Escazú",
+      currency: "CRC",
+      receivedOn: "2026-06-05",
+      amount: 450000,
+      incomeSourceId: "66666666-6666-4666-8666-666666666666",
+    });
+    expect(txn.incomeSourceId).toBe("66666666-6666-4666-8666-666666666666");
     expect(() => txnInputSchema.parse(txn)).not.toThrow();
   });
 
