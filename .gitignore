@@ -29,6 +29,9 @@ yarn-debug.log*
 .vercel
 /coverage
 
+# Claude Code (estado local)
+.claude/scheduled_tasks.lock
+
 # supabase (local CLI)
 supabase/.temp
 supabase/.branches
