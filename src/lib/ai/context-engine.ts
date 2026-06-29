@@ -27,11 +27,21 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   let ctx: FinancialContext = { name, currency: "CRC" };
 
-  // Base Financiera: indicadores del mes.
+  // Base Financiera: indicadores del mes. El asesor usa SIEMPRE la moneda PRINCIPAL
+  // (no getDisplayCurrency(), que honra la cookie de visualización). Pasar un
+  // AuthContext explícito hace que getBaseSummary normalice los indicadores a la
+  // primaria (su getDisplayCurrency interno, con ctx, resuelve a primaria), de modo
+  // que ctx.currency y todos los montos quedan consistentes en la moneda principal.
   try {
-    const { getBaseSummary, getDisplayCurrency } =
-      await import("@/modules/financial-base/services/base-service");
-    const [base, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
+    const { getBaseSummary, getPrimaryCurrency } = await import(
+      "@/modules/financial-base/services/base-service"
+    );
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const authCtx = { db: await createSupabaseServerClient(), userId: user.id };
+    const [base, currency] = await Promise.all([
+      getBaseSummary(authCtx),
+      getPrimaryCurrency(authCtx),
+    ]);
     ctx = {
       ...ctx,
       currency,
