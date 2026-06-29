@@ -249,6 +249,16 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     await supabase.from("budget_items").delete().in("id", toDeleteIds).eq("user_id", user.id);
   }
 
+  // Conciliación de renta (C-2b): atribuye las transacciones de renta del
+  // periodo (linked_kind='rental') a su línea derivada, llenando la barra
+  // "Recibido". Solo toca las que aún no tienen income_source_id (idempotente),
+  // así rellena tanto los pagos legado como cualquier rezagado. Best-effort.
+  try {
+    await relinkRentalReceipts(supabase, user.id, period);
+  } catch {
+    // noop — se reintenta en la próxima carga.
+  }
+
   // Barrido cross-period (Parte 1C): el diff de arriba solo limpia el periodo
   // cargado. Esto borra líneas derivadas huérfanas (su entidad origen ya no
   // existe) en CUALQUIER periodo. Best-effort: no debe bloquear el sync.
@@ -256,6 +266,38 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     await sweepOrphanedDerived(supabase, user.id);
   } catch {
     // noop — se reintenta en la próxima carga.
+  }
+}
+
+/**
+ * Conciliación de renta (C-2b): por cada línea derivada de renta del periodo
+ * (source_kind='rental', source_id=holdingId), enlaza las transacciones de
+ * renta de ese holding ocurridas en el periodo que aún no apuntan a una fuente
+ * (income_source_id is null). No pisa atribuciones existentes: es idempotente.
+ */
+async function relinkRentalReceipts(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+  period: Period,
+): Promise<void> {
+  const { data: rentalLines } = await supabase
+    .from("budget_items")
+    .select("id,source_id")
+    .eq("user_id", userId)
+    .eq("source_kind", "rental")
+    .eq("period_month", period.month)
+    .eq("period_year", period.year);
+  for (const line of rentalLines ?? []) {
+    if (!line.source_id) continue;
+    await supabase
+      .from("transactions")
+      .update({ income_source_id: line.id })
+      .eq("user_id", userId)
+      .eq("linked_kind", "rental")
+      .eq("linked_id", line.source_id)
+      .is("income_source_id", null)
+      .gte("occurred_on", period.from)
+      .lte("occurred_on", period.to);
   }
 }
 

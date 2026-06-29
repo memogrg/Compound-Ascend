@@ -1,10 +1,13 @@
 import "server-only";
 
 /**
- * Eventos de renta recibida (alquiler/Airbnb/auto/negocio). Mismo patrón que
- * dividend-service: cada renta registrada crea y enlaza un `income_sources`
- * (pasivo, categoría "Renta / alquiler") para sumar al ingreso pasivo real, y
- * al borrar se revierte el ingreso vinculado. Respeta RLS por user_id.
+ * Eventos de renta recibida (alquiler/Airbnb/auto/negocio). Cada pago nace como
+ * transacción vinculada (ingreso, linked_kind='rental') atribuida a la LÍNEA
+ * DERIVADA de renta del periodo (income_source_id → budget_items), que llena su
+ * barra "Recibido" (C-2b). Ya NO se crea un `income_sources` por pago: la
+ * proyección la representa la línea derivada (C-2a). El primer pago siembra
+ * rental_income del holding si aún no tiene proyección, para que la barra
+ * siempre exista. Respeta RLS por user_id.
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
@@ -12,13 +15,13 @@ import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
   getSystemCategoryId,
+  syncDerivedBudget,
+  monthPeriod,
 } from "@/modules/financial-base";
 import { rentalPaymentToTxn } from "@/modules/financial-base";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";
-
-const FREQ_MONTHS: Record<string, number> = { mensual: 1, trimestral: 3, anual: 12 };
 
 function rowToRentalPayment(r: {
   id: string;
@@ -59,38 +62,43 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
   const supabase = await createSupabaseServerClient();
 
   const freq = input.frequency ?? "mensual";
-  const monthlyBase = input.amount / (FREQ_MONTHS[freq] ?? 1);
-  const incomeName = input.holdingLabel
-    ? `Renta — ${input.holdingLabel}`
-    : input.holdingSymbol
-      ? `Renta — ${input.holdingSymbol}`
-      : "Renta / alquiler";
-
-  // Ingreso vinculado en income_sources (pasivo), mismo patrón que dividendos.
   const household_id = await getActiveHouseholdId(supabase, user.id);
-  const { data: incomeRow, error: incomeErr } = await supabase
-    .from("income_sources")
-    .insert({
-      user_id: user.id,
-      household_id,
-      name: incomeName,
-      income_type: "pasivo",
-      category: "Renta / alquiler",
-      amount: input.amount,
-      currency: input.currency,
-      frequency: freq,
-      is_fixed: false,
-      certainty: "alta",
-      owner_scope: "personal",
-      include_in_budget: true,
-      amount_monthly_base: monthlyBase,
-    })
-    .select("id")
-    .single();
-  if (incomeErr) throw new Error(incomeErr.message);
 
-  // Fase 1 · orquestador: la renta nace también como transacción vinculada
-  // (ingreso, linked_kind='rental').
+  // "No saltar la barra": si el holding de flujo aún no tiene proyección de
+  // renta, el primer pago la siembra (rental_income/_frequency), para que la
+  // línea derivada de C-2a (y su barra "Recibido") exista en el periodo.
+  const { data: holding } = await supabase
+    .from("investment_holdings")
+    .select("nature,rental_income")
+    .eq("id", input.holdingId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (holding?.nature === "cashflow" && !(Number(holding.rental_income) > 0)) {
+    await supabase
+      .from("investment_holdings")
+      .update({ rental_income: input.amount, rental_frequency: freq })
+      .eq("id", input.holdingId)
+      .eq("user_id", user.id);
+  }
+
+  // Sincroniza el presupuesto del periodo del pago para materializar la línea
+  // derivada de renta y obtener su id (income_source_id de la transacción).
+  const [py, pm] = input.receivedOn.split("-").map(Number);
+  const period = monthPeriod(py!, pm!);
+  await syncDerivedBudget(period);
+  const { data: line } = await supabase
+    .from("budget_items")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("source_kind", "rental")
+    .eq("source_id", input.holdingId)
+    .eq("period_month", period.month)
+    .eq("period_year", period.year)
+    .maybeSingle();
+
+  // La renta nace como transacción vinculada (ingreso, linked_kind='rental')
+  // atribuida a la línea derivada: llena la barra "Recibido" sin duplicar en
+  // income_sources.
   const txnId = await registerLinkedTransaction(
     rentalPaymentToTxn({
       holdingId: input.holdingId,
@@ -99,6 +107,7 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
       receivedOn: input.receivedOn,
       amount: input.amount,
       categoryId: await getSystemCategoryId("inc_pasivo"),
+      incomeSourceId: line?.id ?? null,
     }),
   );
 
@@ -110,15 +119,12 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
     amount: input.amount,
     currency: input.currency,
     frequency: freq,
-    income_id: incomeRow?.id ?? null,
+    income_id: null,
     transaction_id: txnId,
   });
   if (rentErr) {
-    // Compensación: limpia transacción e ingreso si el ledger falla.
+    // Compensación: limpia la transacción si el ledger falla.
     await deleteLinkedTransaction(txnId);
-    if (incomeRow?.id) {
-      await supabase.from("income_sources").delete().eq("id", incomeRow.id).eq("user_id", user.id);
-    }
     throw new Error(rentErr.message);
   }
 }
@@ -141,9 +147,12 @@ export async function deleteRentalPayment(id: string): Promise<void> {
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
 
+  // income_id solo existe en pagos LEGADO (pre C-2b); los nuevos lo tienen null
+  // y su renta vive en la transacción vinculada.
   if (row?.income_id) {
     await supabase.from("income_sources").delete().eq("id", row.income_id).eq("user_id", user.id);
   }
+  // Borrar la transacción descuenta su aporte a la barra "Recibido" del periodo.
   if (row?.transaction_id) {
     await deleteLinkedTransaction(row.transaction_id);
   }
