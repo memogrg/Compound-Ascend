@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   simulateDebtPayoff,
+  compareDebtStrategies,
   runToolLoop,
   type ModelTurn,
   type ToolCallRecord,
   type DebtSimResult,
+  type CompareDebtResult,
 } from "@/lib/ai/tools";
 import {
   buildToolExecutor,
@@ -99,6 +101,17 @@ describe("orchestrator · buildToolExecutor / financeChatWithTools", () => {
     expect(r.fx_no_disponible).toBe(true);
   });
 
+  it("el executor mapea comparar_estrategias_deuda al motor (con moneda)", async () => {
+    const exec = buildToolExecutor({ debts: DEBTS, currency: "CRC" });
+    const r = (await exec("comparar_estrategias_deuda", {
+      aporte_extra_mensual: 100_000,
+    })) as CompareDebtResult;
+    expect(r.sin_deudas).toBe(false);
+    expect(r.currency).toBe("CRC");
+    expect(r.avalancha.meses).toBeGreaterThan(0);
+    expect(r.bola_nieve.meses).toBeGreaterThan(0);
+  });
+
   it("sin toolContext se comporta como el chat de hoy (provider stub, sin tools)", async () => {
     const ctx = { currency: "CRC" } as FinancialContext;
     const out = await financeChatWithTools([{ role: "user", content: "hola" }], ctx);
@@ -129,5 +142,41 @@ describe("orchestrator · normalizeDebtsForTool (FX a moneda principal)", () => 
   it("sin tasas (FX no disponible) pasa los montos crudos", () => {
     const out = normalizeDebtsForTool(MIXED, "CRC", null);
     expect(out.find((d) => d.id === "u")!.balance).toBe(1000); // sin convertir
+  });
+
+  it("normaliza mixtas y luego compareDebtStrategies usa los montos convertidos", () => {
+    const normalized = normalizeDebtsForTool(MIXED, "CRC", RATES);
+    const r = compareDebtStrategies(normalized, { aporte_extra_mensual: 50_000 }, TODAY, {
+      currency: "CRC",
+    });
+    expect(r.sin_deudas).toBe(false);
+    expect(r.avalancha.meses).toBeGreaterThan(0);
+    // Avalancha ataca el mayor APR (Tarjeta USD, 30%) primero; bola de nieve el menor saldo.
+    expect(r.avalancha.orden_de_pago[0]).toBe("Tarjeta USD");
+  });
+});
+
+describe("tools · compareDebtStrategies (motor real, sin red)", () => {
+  it("devuelve ambas estrategias con meses/intereses coherentes y moneda", () => {
+    const r = compareDebtStrategies(DEBTS, { aporte_extra_mensual: 100_000 }, TODAY, {
+      currency: "CRC",
+    });
+    expect(r.sin_deudas).toBe(false);
+    expect(r.currency).toBe("CRC");
+    expect(r.avalancha.meses).toBeGreaterThan(0);
+    expect(r.bola_nieve.meses).toBeGreaterThan(0);
+    expect(r.avalancha.intereses).toBeGreaterThanOrEqual(0);
+    // Avalancha ataca el mayor APR (Tarjeta 45%); bola de nieve el menor saldo (Préstamo).
+    expect(r.avalancha.orden_de_pago[0]).toBe("Tarjeta");
+    expect(r.bola_nieve.orden_de_pago[0]).toBe("Préstamo");
+    // Con las mismas deudas, avalancha no paga más intereses que bola de nieve.
+    expect(r.avalancha.intereses).toBeLessThanOrEqual(r.bola_nieve.intereses);
+  });
+
+  it("sin deudas → sin_deudas y outcomes vacíos", () => {
+    const r = compareDebtStrategies([], { aporte_extra_mensual: 100_000 }, TODAY, { currency: "CRC" });
+    expect(r.sin_deudas).toBe(true);
+    expect(r.avalancha.meses).toBe(0);
+    expect(r.bola_nieve.orden_de_pago).toEqual([]);
   });
 });

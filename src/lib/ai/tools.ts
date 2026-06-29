@@ -7,6 +7,7 @@ import {
   simulateStrategy,
   type DebtInput,
   type DebtMethod,
+  type DebtSimulation,
 } from "@/modules/control/engine/debt-strategy";
 import type { AIChatResult } from "@/lib/ai/provider";
 
@@ -116,6 +117,82 @@ export function simulateDebtPayoff(
     intereses_ahorrados: Math.max(0, baseline.totalInterest - withExtra.totalInterest),
     orden_de_pago: withExtra.payoffOrder.map((p) => p.name),
     estrategia,
+    currency,
+    fx_no_disponible,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Herramienta: comparar avalancha vs bola de nieve (SOLO lectura/cálculo)
+// ---------------------------------------------------------------------------
+
+export const COMPARE_DEBT_TOOL: AiToolDecl = {
+  name: "comparar_estrategias_deuda",
+  description:
+    "Compara dos estrategias de pago de deuda con un mismo aporte extra mensual: avalancha " +
+    "(ataca la de mayor interés, ahorra más intereses) vs bola de nieve (la de menor saldo, " +
+    "da victorias más rápido). Devuelve por cada una los meses para saldar TODO y los " +
+    "intereses totales. Montos en la MONEDA PRINCIPAL del usuario. Solo lee y calcula; no " +
+    "modifica nada. Usala cuando pregunte qué estrategia le conviene.",
+  parameters: {
+    type: "object",
+    properties: {
+      aporte_extra_mensual: {
+        type: "number",
+        description: "Monto extra mensual que abonaría, en la moneda principal del usuario.",
+      },
+    },
+    required: ["aporte_extra_mensual"],
+  },
+};
+
+/** Resultado por estrategia (meses para saldar todo + intereses totales + orden). */
+export type StrategyOutcome = {
+  meses: number;
+  intereses: number;
+  orden_de_pago: string[];
+};
+
+export type CompareDebtResult = {
+  sin_deudas: boolean;
+  avalancha: StrategyOutcome;
+  bola_nieve: StrategyOutcome;
+  currency: string;
+  fx_no_disponible: boolean;
+};
+
+function toOutcome(sim: DebtSimulation): StrategyOutcome {
+  return {
+    meses: sim.months,
+    intereses: sim.totalInterest,
+    orden_de_pago: sim.payoffOrder.map((p) => p.name),
+  };
+}
+
+/**
+ * Corre el motor con avalancha y con bola de nieve (mismo aporte extra) y devuelve
+ * ambos resultados para que la IA explique el trade-off (interés vs. rapidez). PURO:
+ * usa el motor real, sin IO. Reusa la misma normalización que simulateDebtPayoff
+ * (las deudas ya vienen en la moneda principal). `_today` no se usa (no hay fecha).
+ */
+export function compareDebtStrategies(
+  debts: DebtInput[],
+  args: Record<string, unknown>,
+  _today: Date = new Date(),
+  meta: { currency?: string; fxUnavailable?: boolean } = {},
+): CompareDebtResult {
+  const extra = toPositive(args.aporte_extra_mensual);
+  const currency = meta.currency ?? "";
+  const fx_no_disponible = meta.fxUnavailable ?? false;
+  const active = debts.filter((d) => d.balance > 0.01);
+  const empty: StrategyOutcome = { meses: 0, intereses: 0, orden_de_pago: [] };
+  if (active.length === 0) {
+    return { sin_deudas: true, avalancha: empty, bola_nieve: empty, currency, fx_no_disponible };
+  }
+  return {
+    sin_deudas: false,
+    avalancha: toOutcome(simulateStrategy(active, "avalancha", extra)),
+    bola_nieve: toOutcome(simulateStrategy(active, "bola_nieve", extra)),
     currency,
     fx_no_disponible,
   };
