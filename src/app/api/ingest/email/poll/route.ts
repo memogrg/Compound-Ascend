@@ -39,25 +39,34 @@ function isCronRequest(req: Request): boolean {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+/**
+ * Resuelve el dueño por forwarder_email. SOLO filas VERIFICADAS (verified=true): el
+ * poller no procesa remitentes sin verificar (onboarding self-serve). forwarder_email
+ * es citext → comparación case-insensitive. Exportada para testear el filtro.
+ */
+export async function lookupOwnerByForwarder(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  candidates: string[],
+): Promise<EmailOwner | null> {
+  if (candidates.length === 0) return null;
+  const { data, error } = await supabase
+    .from("email_ingest_links")
+    .select("user_id, household_id")
+    .eq("verified", true)
+    .in("forwarder_email", candidates)
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return { userId: data.user_id, householdId: data.household_id };
+}
+
 /** Construye las dependencias del poller con service-role + el cliente IMAP. */
 function buildDeps(
   supabase: ReturnType<typeof createServiceRoleClient>,
   markSeenUid: (uid: number) => Promise<void>,
 ): EmailIngestDeps {
   return {
-    async lookupOwner(candidates: string[]): Promise<EmailOwner | null> {
-      if (candidates.length === 0) return null;
-      // forwarder_email es citext: la comparación es case-insensitive en BD. Se
-      // toma el primer link cuyo forwarder esté entre los candidatos.
-      const { data, error } = await supabase
-        .from("email_ingest_links")
-        .select("user_id, household_id")
-        .in("forwarder_email", candidates)
-        .limit(1)
-        .maybeSingle();
-      if (error || !data) return null;
-      return { userId: data.user_id, householdId: data.household_id };
-    },
+    lookupOwner: (candidates: string[]) => lookupOwnerByForwarder(supabase, candidates),
 
     async isProcessed(eventId: string): Promise<boolean> {
       const { data } = await supabase
