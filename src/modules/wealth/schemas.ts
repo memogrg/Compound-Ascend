@@ -96,6 +96,8 @@ export const holdingInputSchema = z.object({
   propertyTaxAnnual: z.number().nonnegative().optional(),
   insuranceAnnual: z.number().nonnegative().optional(),
   servicesMonthly: z.number().nonnegative().optional(),
+  // Deuda que financia el inmueble (C-1b).
+  debtId: z.string().uuid().optional(),
   // Taxonomía de inversiones (PLAN §2.2). `nature` es derivable de `category`
   // (el servicio la calcula si no viene).
   nature: z.enum(["cashflow", "growth"]).optional(),

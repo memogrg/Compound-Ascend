@@ -54,6 +54,7 @@ export function rowToHolding(r: {
   property_tax_annual?: number | null;
   insurance_annual?: number | null;
   services_monthly?: number | null;
+  debt_id?: string | null;
 }): Holding {
   return {
     id: r.id,
@@ -86,11 +87,12 @@ export function rowToHolding(r: {
     propertyTaxAnnual: r.property_tax_annual == null ? null : Number(r.property_tax_annual),
     insuranceAnnual: r.insurance_annual == null ? null : Number(r.insurance_annual),
     servicesMonthly: r.services_monthly == null ? null : Number(r.services_monthly),
+    debtId: r.debt_id ?? null,
   };
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -144,6 +146,11 @@ function costColumns(input: HoldingInput) {
     insurance_annual: input.insuranceAnnual ?? null,
     services_monthly: input.servicesMonthly ?? null,
   };
+}
+
+/** Deuda que financia el inmueble (C-1b · migración 20260629000001). */
+function debtColumns(input: HoldingInput) {
+  return { debt_id: input.debtId ?? null };
 }
 
 /**
@@ -268,6 +275,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
       currency: input.currency,
       ...rentalColumns(input),
       ...costColumns(input),
+      ...debtColumns(input),
       ...taxonomyColumns(input),
     })
     .select("id")
@@ -359,6 +367,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       needs_detail: false,
       ...rentalColumns(input),
       ...costColumns(input),
+      ...debtColumns(input),
       ...taxonomyColumns(input),
     })
     .eq("id", id)

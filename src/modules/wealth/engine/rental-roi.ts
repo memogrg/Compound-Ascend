@@ -41,6 +41,8 @@ export type RentalRoiInput = {
   insuranceAnnual: number;
   /** Efectivo invertido: precio de compra + cierre (o monto invertido). */
   investedCash: number;
+  /** Cuota mensual de la deuda que financia el inmueble (C-1b). 0 si no hay. */
+  debtServiceMonthly?: number;
 };
 
 export type RentalRoi = {
@@ -51,6 +53,8 @@ export type RentalRoi = {
   netMonthly: number; // NOI mensual (sin deuda)
   noiAnnual: number;
   operatingRoi: number; // 0-1 = NOI anual / efectivo invertido
+  debtServiceMonthly: number; // cuota mensual de la deuda ligada (0 si no hay)
+  leveredNetMonthly: number; // flujo neto mensual después de la cuota (netMonthly - deuda)
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -69,5 +73,18 @@ export function computeRentalRoi(i: RentalRoiInput): RentalRoi {
   const netMonthly = collected - mgmtCost - fixedMonthly;
   const noiAnnual = netMonthly * 12;
   const operatingRoi = i.investedCash > 0 ? noiAnnual / i.investedCash : 0;
-  return { grossMonthly, vacancyLoss, mgmtCost, fixedMonthly, netMonthly, noiAnnual, operatingRoi };
+  // El ROI operativo se mantiene sin apalancar; la deuda solo afecta el flujo.
+  const debtServiceMonthly = Math.max(0, i.debtServiceMonthly ?? 0);
+  const leveredNetMonthly = netMonthly - debtServiceMonthly;
+  return {
+    grossMonthly,
+    vacancyLoss,
+    mgmtCost,
+    fixedMonthly,
+    netMonthly,
+    noiAnnual,
+    operatingRoi,
+    debtServiceMonthly,
+    leveredNetMonthly,
+  };
 }

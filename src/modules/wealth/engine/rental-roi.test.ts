@@ -23,6 +23,30 @@ describe("computeRentalRoi", () => {
     expect(r.operatingRoi).toBeCloseTo(0.0792);
   });
 
+  it("descuenta la cuota de la deuda en el flujo apalancado (sin tocar el ROI operativo)", () => {
+    const base = {
+      rentalIncome: 1000,
+      rentalFrequency: "mensual" as const,
+      vacancyPct: 0.2,
+      mgmtPct: 0.1,
+      maintenanceMonthly: 50,
+      hoaMonthly: 0,
+      servicesMonthly: 0,
+      propertyTaxAnnual: 120,
+      insuranceAnnual: 0,
+      investedCash: 100_000,
+    };
+    const sinDeuda = computeRentalRoi(base);
+    expect(sinDeuda.debtServiceMonthly).toBe(0);
+    expect(sinDeuda.leveredNetMonthly).toBeCloseTo(660); // = netMonthly cuando no hay deuda
+
+    const conDeuda = computeRentalRoi({ ...base, debtServiceMonthly: 450 });
+    expect(conDeuda.netMonthly).toBeCloseTo(660); // NOI no cambia
+    expect(conDeuda.operatingRoi).toBeCloseTo(0.0792); // ROI operativo no cambia
+    expect(conDeuda.debtServiceMonthly).toBe(450);
+    expect(conDeuda.leveredNetMonthly).toBeCloseTo(210); // 660 - 450
+  });
+
   it("sin efectivo invertido el ROI es 0 (no divide por cero)", () => {
     const r = computeRentalRoi({
       rentalIncome: 500, rentalFrequency: "mensual", vacancyPct: 0, mgmtPct: 0,
