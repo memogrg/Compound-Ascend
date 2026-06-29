@@ -160,7 +160,7 @@ describe("confirmIngestEmail", () => {
 // ---------------------------------------------------------------------------
 // lookupOwnerByForwarder: SOLO procesa filas verified=true.
 // ---------------------------------------------------------------------------
-import { lookupOwnerByForwarder } from "@/app/api/ingest/email/poll/route";
+import { lookupOwnerByForwarder } from "@/lib/ingestion/email/forwarder-lookup";
 
 type EqCall = [string, unknown];
 function lookupFake(row: { user_id: string; household_id: string | null } | null) {
