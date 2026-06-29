@@ -16,7 +16,13 @@ import { logger } from "@/lib/logger";
 // el context-engine (Fase 5) arma el FinancialContext con datos autorizados.
 import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt";
 import { selectBibliaKnowledge, selectPatrimonioGuidance } from "@/lib/ai/biblia-knowledge";
-import { SIMULATE_DEBT_TOOL, simulateDebtPayoff, type AiToolExecutor } from "@/lib/ai/tools";
+import {
+  SIMULATE_DEBT_TOOL,
+  COMPARE_DEBT_TOOL,
+  simulateDebtPayoff,
+  compareDebtStrategies,
+  type AiToolExecutor,
+} from "@/lib/ai/tools";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { convertCurrency } from "@/lib/fx";
 
@@ -128,12 +134,13 @@ function buildKnowledge(messages: ChatMessage[], ctx: FinancialContext): string[
  * explicable (nunca escribe nada).
  */
 export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
+  const meta = { currency: toolContext.currency, fxUnavailable: toolContext.fxUnavailable };
   return async (name, args) => {
     if (name === "simular_pago_deuda") {
-      return simulateDebtPayoff(toolContext.debts, args, new Date(), {
-        currency: toolContext.currency,
-        fxUnavailable: toolContext.fxUnavailable,
-      });
+      return simulateDebtPayoff(toolContext.debts, args, new Date(), meta);
+    }
+    if (name === "comparar_estrategias_deuda") {
+      return compareDebtStrategies(toolContext.debts, args, new Date(), meta);
     }
     return { error: `herramienta no disponible: ${name}` };
   };
@@ -143,7 +150,9 @@ const TOOLS_PROMPT_LINE =
   "Cuando el usuario pregunte cuánto tardaría en pagar su deuda o cuánto ahorraría abonando " +
   "extra, USÁ la herramienta de simulación; no inventes números. Los montos van en la moneda " +
   "principal del usuario; si la herramienta devuelve fx_no_disponible:true, aclaralo (el " +
-  "cálculo asume una sola moneda).";
+  "cálculo asume una sola moneda). Si el usuario pregunta qué estrategia le conviene " +
+  "(avalancha vs bola de nieve), USÁ comparar_estrategias_deuda y explicá cuál ahorra más " +
+  "intereses y cuál da victorias más rápido; no inventes.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -164,7 +173,7 @@ export async function financeChatWithTools(
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages,
-    tools: [SIMULATE_DEBT_TOOL],
+    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL],
     execute: buildToolExecutor(toolContext),
   });
   const parsed = parseAction(result.text);
