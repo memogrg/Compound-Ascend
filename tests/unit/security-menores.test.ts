@@ -40,6 +40,7 @@ vi.mock("@/lib/whatsapp/router", () => ({ routeInbound: vi.fn() }));
 // assistant/chat: todo mockeado para llegar al return de éxito.
 vi.mock("@/lib/ai/orchestrator", () => ({
   financeChat: vi.fn(async () => ({ reply: "hola", action: null, usage: { totalTokens: 10 } })),
+  financeChatWithTools: vi.fn(async () => ({ reply: "hola", action: null, usage: { totalTokens: 10 } })),
 }));
 vi.mock("@/lib/ai/context-engine", () => ({ buildFinancialContext: vi.fn(async () => ({})) }));
 vi.mock("@/lib/ai/usage", () => ({
