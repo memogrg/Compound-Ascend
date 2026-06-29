@@ -1,0 +1,23 @@
+name: Email ingest poll
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {} # permitir corrida manual desde la pestaña Actions
+
+permissions:
+  contents: read
+
+concurrency:
+  group: email-ingest-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger email ingest poll
+        run: |
+          curl --fail-with-body -sS -X POST \
+            "https://carteraplus.vercel.app/api/ingest/email/poll" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"
