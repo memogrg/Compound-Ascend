@@ -13,6 +13,37 @@ describe("selectBibliaKnowledge", () => {
     expect(out.some((c) => c.startsWith("Inversión:"))).toBe(true);
   });
 
+  it("acentos y mayúsculas: 'inversión' e 'INVERSION' matchean igual", () => {
+    expect(
+      selectBibliaKnowledge({ text: "consejos de inversión" }).some((c) =>
+        c.startsWith("Inversión:"),
+      ),
+    ).toBe(true);
+    expect(
+      selectBibliaKnowledge({ text: "DUDAS SOBRE INVERSION" }).some((c) =>
+        c.startsWith("Inversión:"),
+      ),
+    ).toBe(true);
+  });
+
+  it("tema nuevo CR/LatAm: 'plazo fijo' → chunk de renta fija", () => {
+    const out = selectBibliaKnowledge({ text: "quiero un plazo fijo" });
+    expect(out.some((c) => c.startsWith("Renta fija"))).toBe(true);
+  });
+
+  it("texto vacío o ausente no rompe", () => {
+    expect(selectBibliaKnowledge({ text: "" })).toEqual([]);
+    expect(() => selectBibliaKnowledge({})).not.toThrow();
+  });
+
+  it("respeta el tope: máx 2 temas / 3 fragmentos totales", () => {
+    const out = selectBibliaKnowledge({
+      emotion: "presion",
+      text: "plazo fijo, bonos, fondos, impuestos, pension y dolares",
+    });
+    expect(out.length).toBe(3); // 1 emoción + 2 temas (tope)
+  });
+
   it("sin emoción ni tema → []", () => {
     expect(selectBibliaKnowledge({ text: "hola, ¿cómo estás?" })).toEqual([]);
     expect(selectBibliaKnowledge({})).toEqual([]);
