@@ -12,7 +12,8 @@ import "server-only";
  *
  * Nada se escribe sin confirmación explícita del usuario.
  */
-import { financeChat, scanReceipt } from "@/lib/ai/orchestrator";
+import { financeChatWithTools, scanReceipt } from "@/lib/ai/orchestrator";
+import { buildWhatsAppToolContext } from "@/lib/whatsapp/tool-context";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { AppError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/ai/provider";
@@ -242,7 +243,16 @@ async function handleText(
 
   const ctx = await buildContextForUser(link.userId, link.householdId);
   const messages: ChatMessage[] = [{ role: "user", content: msg.body }];
-  const result = await financeChat(messages, ctx);
+  // Habilita la herramienta de deuda (function-calling) también en WhatsApp. El
+  // toolContext se arma con service-role (sin sesión) y en moneda PRINCIPAL.
+  // Best-effort: si falla, financeChatWithTools sin toolContext = chat normal.
+  let toolContext;
+  try {
+    toolContext = await buildWhatsAppToolContext(link.userId, link.householdId);
+  } catch {
+    toolContext = undefined;
+  }
+  const result = await financeChatWithTools(messages, ctx, toolContext);
   await recordUsage(link.userId, result.tokensIn, result.tokensOut);
 
   const action =
