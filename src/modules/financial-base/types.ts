@@ -76,7 +76,7 @@ export type AccountKind = "banco" | "efectivo" | "tarjeta" | "otro";
 /** Entidad a la que puede vincularse una transacción (Fase 0 · solo schema). */
 export type LinkedKind = "none" | "debt" | "goal" | "holding" | "policy" | "rental";
 /** Fuente de la que se deriva un ítem de presupuesto (Fase 0 · solo schema). */
-export type BudgetSourceKind = "manual" | "debt" | "goal" | "policy" | "recurring" | "dividend";
+export type BudgetSourceKind = "manual" | "debt" | "goal" | "policy" | "recurring" | "dividend" | "rental";
 
 /** Transacción real (fuente de verdad de lo ocurrido). */
 export type Transaction = {

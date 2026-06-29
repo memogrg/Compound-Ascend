@@ -8,6 +8,7 @@ import "server-only";
  *   · pólizas con prima     → gasto "Prima — {seguro}"      (source_kind 'policy')
  *   · recurrentes activos   → ingreso/gasto según su kind   (source_kind 'recurring')
  *   · dividendos (12 meses) → ingreso "Dividendos — {pos.}" (source_kind 'dividend')
+ *   · renta de inversiones  → ingreso "Ingreso — {posición}" (source_kind 'rental')
  *
  * Las líneas derivadas se editan en su entidad (candado en la UI); las
  * manuales no se tocan. Lecturas: SELECTs ligeros con RLS (mismo criterio que
@@ -162,6 +163,30 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     }
   }
 
+  // Renta de inversiones de flujo de caja (Airbnb/alquiler/CDP/bono/negocio…):
+  // proyección recurrente como ingreso derivado, mismo riel que dividendos.
+  // La conciliación de pagos reales (Recibido) se hace en C-2b vía
+  // transactions.income_source_id; aquí solo la línea proyectada (mensualizada).
+  const { data: rentalHoldings } = await supabase
+    .from("investment_holdings")
+    .select("id,label,symbol,currency,rental_income,rental_frequency")
+    .eq("user_id", user.id)
+    .eq("nature", "cashflow")
+    .gt("rental_income", 0);
+  for (const h of rentalHoldings ?? []) {
+    const monthly = toMonthly(Number(h.rental_income), h.rental_frequency);
+    if (monthly <= 0) continue;
+    desired.push({
+      type: "income",
+      name: `Ingreso — ${h.label ?? h.symbol}`,
+      amount: monthly,
+      currency: h.currency,
+      categoryId: null,
+      sourceKind: "rental",
+      sourceId: h.id,
+    });
+  }
+
   // Diff contra las líneas derivadas existentes del periodo.
   const { data: existingRows } = await supabase
     .from("budget_items")
@@ -240,6 +265,7 @@ const ORIGIN_TABLE = {
   policy: "insurance_policies",
   recurring: "recurring_items",
   dividend: "investment_holdings",
+  rental: "investment_holdings",
 } as const;
 type OriginTable = (typeof ORIGIN_TABLE)[keyof typeof ORIGIN_TABLE];
 
