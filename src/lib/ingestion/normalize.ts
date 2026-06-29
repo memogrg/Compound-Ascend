@@ -9,8 +9,9 @@ import type { PendingAction } from "@/lib/whatsapp/links-service";
 import type { RawMovement } from "@/lib/ingestion/types";
 
 /**
- * Mapea un RawMovement al shape PendingAction. La ingesta marca origin/source
- * como "notification" (valores nuevos de la unión, CAMBIO 3).
+ * Mapea un RawMovement al shape PendingAction. La ingesta marca origin="imported"
+ * y source="email" (alineado con review-flow): son valores aceptados por los CHECK
+ * de `transactions` (origin/source), así que la transacción confirmada persiste.
  */
 export function toPendingAction(m: RawMovement): PendingAction {
   return {
@@ -20,8 +21,8 @@ export function toPendingAction(m: RawMovement): PendingAction {
     currency: m.currency,
     occurredOn: m.occurredOn,
     merchant: m.merchant,
-    origin: "notification",
-    source: "notification",
+    origin: "imported",
+    source: "email",
   };
 }
 

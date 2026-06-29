@@ -18,7 +18,7 @@ const movement = (over: Partial<RawMovement> = {}): RawMovement => ({
 });
 
 describe("toPendingAction", () => {
-  it("mapea un RawMovement al shape PendingAction (origin/source = notification)", () => {
+  it("mapea un RawMovement al shape PendingAction (origin=imported / source=email)", () => {
     const pa = toPendingAction(movement());
     expect(pa).toEqual({
       kind: "gasto",
@@ -27,8 +27,8 @@ describe("toPendingAction", () => {
       currency: "CRC",
       occurredOn: "2026-06-26",
       merchant: "Automercado",
-      origin: "notification",
-      source: "notification",
+      origin: "imported",
+      source: "email",
     });
   });
 
