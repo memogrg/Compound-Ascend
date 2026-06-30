@@ -131,6 +131,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     const { getRichLifeSummary } = await import("@/modules/rich-life/services/rich-life-service");
     const summary = await getRichLifeSummary();
     ctx.netWorth = Math.round(summary.snapshot.indicators.netWorth);
+    // Respaldo REAL (meses de independencia): señal dura para el guardrail R3 (fondo de paz).
+    ctx.emergencyMonths = Math.round(summary.snapshot.indicators.monthsOfIndependence);
   } catch {
     // Rich Life no disponible.
   }

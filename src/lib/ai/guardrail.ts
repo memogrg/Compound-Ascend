@@ -9,9 +9,10 @@
 import { normalize } from "@/lib/ai/biblia-knowledge";
 
 export type GuardrailContext = {
-  hasEmergencyFund?: string; // "si" | "no" | "no_se" | …
+  hasEmergencyFund?: string; // "si" | "no" | "no_se" | … (auto-reportado por el usuario)
   urgency?: string; // "baja" | "media" | "alta" | "critica"
   dependentsCount?: number;
+  emergencyMonths?: number; // respaldo REAL computado (meses de independencia); pisa al auto-reporte
 };
 
 export type GuardrailResult = { reply: string; flags: string[] };
@@ -65,12 +66,16 @@ export function applyGuardrail(reply: string, ctx: GuardrailContext = {}): Guard
   // R2 — fiscal/legal directivo.
   if (FISCAL_TOPIC.test(t) && DIRECTIVE.test(t)) fire(NOTE_FISCAL, "fiscal_legal");
 
-  // R3 — riesgo sin base (recomienda invertir y no hay colchón / urgencia alta).
+  // R3 — riesgo sin base (recomienda invertir y no hay colchón / urgencia alta). Si el respaldo
+  // REAL computado (emergencyMonths) ya cubre ≥3 meses (fondo de paz, Biblia), NO disparamos
+  // aunque el auto-reporte diga "no": la señal computada pisa al campo auto-reportado.
+  const tieneBaseReal = ctx.emergencyMonths != null && ctx.emergencyMonths >= 3;
   const sinBase =
-    ctx.hasEmergencyFund === "no" ||
-    ctx.hasEmergencyFund === "no_se" ||
-    ctx.urgency === "alta" ||
-    ctx.urgency === "critica";
+    !tieneBaseReal &&
+    (ctx.hasEmergencyFund === "no" ||
+      ctx.hasEmergencyFund === "no_se" ||
+      ctx.urgency === "alta" ||
+      ctx.urgency === "critica");
   if (sinBase && INVEST.test(t) && RECOMMEND.test(t)) fire(NOTE_RISK_BASE, "risk_without_base");
 
   return { reply: out, flags };
