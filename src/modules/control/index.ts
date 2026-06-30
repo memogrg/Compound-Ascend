@@ -19,7 +19,7 @@ export type {
   PaymentRecord,
   RecomputeResult,
 } from "./engine/amortization";
-export { getControlSummary, listDebts } from "./services/control-service";
+export { getControlSummary, listDebts, listGoals } from "./services/control-service";
 export { getDebtsOverview } from "./services/debts-service";
 export { getDebtDetail } from "./services/debt-detail-service";
 export { getIndexRates, effectiveApr, buildRateNote } from "./services/index-rates";

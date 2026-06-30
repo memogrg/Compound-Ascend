@@ -7,7 +7,13 @@ import {
   type ToolContext,
 } from "@/lib/ai/orchestrator";
 import { NOTE_RETURNS, NOTE_FISCAL, NOTE_RISK_BASE } from "@/lib/ai/guardrail";
-import { simulateDebtPayoff, projectInvestment, projectFreedom } from "@/lib/ai/tools";
+import {
+  simulateDebtPayoff,
+  projectInvestment,
+  projectFreedom,
+  projectGoals,
+  type GoalForTool,
+} from "@/lib/ai/tools";
 import type { ChatMessage } from "@/lib/ai/provider";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { ScriptedProvider, type ScriptedScript } from "../stubs/scripted-provider";
@@ -34,6 +40,10 @@ const SIM_ARGS = { estrategia: "avalancha", aporte_extra_mensual: 50000 };
 const PROJ_ARGS = { aporte_mensual: 100000, anios: 20, rendimiento_anual_pct: 8 };
 const FREEDOM_CTX = { freedomNumber: 50_000_000, investableWealth: 5_000_000 };
 const FREEDOM_ARGS = { aporte_mensual: 200000, anios: 25 };
+const GOALS_CTX: GoalForTool[] = [
+  { nombre: "Viaje", objetivo: 3_000_000, actual: 1_200_000, aporte_mensual: 150_000, fecha_objetivo: null },
+];
+const GOALS_ARGS = {};
 
 // Bloque ```action``` (regla de oro): se construye por concatenación para no chocar con los
 // backticks del template literal.
@@ -131,6 +141,7 @@ const SCENARIOS: Scenario[] = [
         "comparar_estrategias_deuda",
         "proyectar_inversion",
         "proyectar_libertad_financiera",
+        "proyectar_metas",
         "simular_pago_deuda",
       ]);
       expect(provider.lastSystem).toContain(TOOLS_PROMPT_LINE);
@@ -139,21 +150,21 @@ const SCENARIOS: Scenario[] = [
 
   // 4b) Tool de proyección: el cerebro publica el valor_futuro REAL del motor.
   {
-    name: "tools: proyectar_inversion → reply contiene el valor_futuro real + 4 decls",
+    name: "tools: proyectar_inversion → reply contiene el valor_futuro real + 5 decls",
     messages: ask("¿cuánto tendré si ahorro 100000 al mes 20 años?"),
     tools: { debts: [], currency: "CRC" },
     script: { reply: "Te proyecto el crecimiento:", toolCall: { name: "proyectar_inversion", args: PROJ_ARGS } },
     assert: ({ result, provider }) => {
       const expected = projectInvestment(PROJ_ARGS, "CRC");
       expect(result.reply).toContain(String(expected.valor_futuro));
-      expect(provider.lastTools).toHaveLength(4);
+      expect(provider.lastTools).toHaveLength(5);
       expect(provider.lastTools.map((t) => t.name)).toContain("proyectar_inversion");
     },
   },
 
   // 4c) Tool de libertad financiera: usa los DATOS REALES del toolContext (número + invertible).
   {
-    name: "tools: proyectar_libertad_financiera → reply con el Número real + 4 decls",
+    name: "tools: proyectar_libertad_financiera → reply con el Número real + 5 decls",
     messages: ask("¿cuánto me falta para mi libertad financiera?"),
     tools: { debts: [], currency: "CRC", ...FREEDOM_CTX },
     script: {
@@ -167,8 +178,27 @@ const SCENARIOS: Scenario[] = [
         expect(result.reply).toContain(String(expected.numero_de_libertad));
         expect(result.reply).toContain(String(expected.valor_futuro));
       }
-      expect(provider.lastTools).toHaveLength(4);
+      expect(provider.lastTools).toHaveLength(5);
       expect(provider.lastTools.map((t) => t.name)).toContain("proyectar_libertad_financiera");
+    },
+  },
+
+  // 4d) Tool de metas: usa las metas REALES del toolContext (faltante/meses reales).
+  {
+    name: "tools: proyectar_metas → reply con faltante/meses reales + 5 decls",
+    messages: ask("¿cómo voy con mis metas de ahorro?"),
+    tools: { debts: [], currency: "CRC", goals: GOALS_CTX },
+    script: { reply: "Tus metas:", toolCall: { name: "proyectar_metas", args: GOALS_ARGS } },
+    assert: ({ result, provider }) => {
+      const expected = projectGoals(GOALS_ARGS, { goals: GOALS_CTX, currency: "CRC" });
+      expect(expected.disponible).toBe(true);
+      if (expected.disponible) {
+        const meta = expected.metas[0]!;
+        expect(result.reply).toContain(String(meta.faltante));
+        expect(result.reply).toContain(String(meta.meses_para_meta));
+      }
+      expect(provider.lastTools).toHaveLength(5);
+      expect(provider.lastTools.map((t) => t.name)).toContain("proyectar_metas");
     },
   },
 

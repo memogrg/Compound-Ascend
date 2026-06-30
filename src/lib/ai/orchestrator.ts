@@ -22,10 +22,13 @@ import {
   COMPARE_DEBT_TOOL,
   PROJECT_INVESTMENT_TOOL,
   FREEDOM_TOOL,
+  GOALS_TOOL,
   simulateDebtPayoff,
   compareDebtStrategies,
   projectInvestment,
   projectFreedom,
+  projectGoals,
+  type GoalForTool,
   type AiToolExecutor,
 } from "@/lib/ai/tools";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
@@ -46,6 +49,8 @@ export type ToolContext = {
   fxUnavailable?: boolean;
   freedomNumber?: number;
   investableWealth?: number;
+  /** Metas de ahorro del usuario en moneda PRINCIPAL (best-effort; vacío/undefined → tool degrada). */
+  goals?: GoalForTool[];
 };
 
 /** Deuda cruda (de listDebts) con su moneda, antes de normalizar para la herramienta. */
@@ -168,6 +173,10 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
         currency: toolContext.currency,
       });
     }
+    if (name === "proyectar_metas") {
+      // Metas reales del usuario, ya en moneda principal.
+      return projectGoals(args, { goals: toolContext.goals, currency: toolContext.currency });
+    }
     return { error: `herramienta no disponible: ${name}` };
   };
 }
@@ -183,7 +192,9 @@ export const TOOLS_PROMPT_LINE =
   "inventes cifras de crecimiento y aclará que el rendimiento es un SUPUESTO, no una garantía. " +
   "Si pregunta cuánto le falta o cuánto al mes para SU libertad financiera, USÁ " +
   "proyectar_libertad_financiera (usa su patrimonio real); si devuelve disponible:false, decile " +
-  "que primero registre gastos/patrimonio para calcular su Número de Libertad.";
+  "que primero registre gastos/patrimonio para calcular su Número de Libertad. Si pregunta por el " +
+  "avance o cuándo alcanza sus metas de ahorro, USÁ proyectar_metas (datos reales); si devuelve " +
+  "disponible:false, decile que primero registre una meta.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -205,7 +216,7 @@ export async function financeChatWithTools(
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages,
-    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL, PROJECT_INVESTMENT_TOOL, FREEDOM_TOOL],
+    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL, PROJECT_INVESTMENT_TOOL, FREEDOM_TOOL, GOALS_TOOL],
     execute: buildToolExecutor(toolContext),
   });
   const parsed = parseAction(result.text);
