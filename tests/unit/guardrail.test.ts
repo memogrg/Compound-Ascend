@@ -45,6 +45,29 @@ describe("applyGuardrail · R3 riesgo sin base", () => {
     const r = applyGuardrail("Conviene invertir parte en acciones.", { urgency: "critica" });
     expect(r.flags).toContain("risk_without_base");
   });
+
+  const INVERTIR = "Te recomiendo invertir en un ETF para que crezca tu dinero.";
+
+  it("respaldo REAL ≥3 meses pisa al auto-reporte 'no' → NO dispara (fix del falso positivo)", () => {
+    const r = applyGuardrail(INVERTIR, { hasEmergencyFund: "no", emergencyMonths: 62 });
+    expect(r.flags).not.toContain("risk_without_base");
+    expect(r.reply).not.toContain("CARTERA+: conviene asegurar tu fondo de emergencia");
+  });
+
+  it("respaldo REAL <3 meses + 'no' → SÍ dispara", () => {
+    const r = applyGuardrail(INVERTIR, { hasEmergencyFund: "no", emergencyMonths: 2 });
+    expect(r.flags).toContain("risk_without_base");
+  });
+
+  it("emergencyMonths undefined → comportamiento viejo (con 'no' sigue disparando)", () => {
+    const r = applyGuardrail(INVERTIR, { hasEmergencyFund: "no" });
+    expect(r.flags).toContain("risk_without_base");
+  });
+
+  it("respaldo REAL ≥3 también prevalece sobre urgencia (corta todo el sinBase)", () => {
+    const r = applyGuardrail(INVERTIR, { urgency: "critica", emergencyMonths: 62 });
+    expect(r.flags).not.toContain("risk_without_base");
+  });
 });
 
 describe("applyGuardrail · sin falsos positivos e idempotencia", () => {

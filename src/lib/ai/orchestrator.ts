@@ -131,6 +131,7 @@ function guardReply(
     hasEmergencyFund: ctx.hasEmergencyFund,
     urgency: ctx.urgency,
     dependentsCount: ctx.dependentsCount,
+    emergencyMonths: ctx.emergencyMonths,
   });
   if (guarded.flags.length) {
     logger.info("ai-guardrail aplicado", { flags: guarded.flags, provider });

@@ -70,6 +70,8 @@ export type FinancialContext = {
   financialNucleus?: string;
   /** 'si' | 'no' | 'construyendo' | 'no_se' (del borrador del wizard). */
   hasEmergencyFund?: string;
+  /** Respaldo REAL computado (meses de independencia, Rich Life); señal dura del fondo de paz. */
+  emergencyMonths?: number;
   // Arquetipo conductual (Fase 2). Best-effort: si el perfil no se completó, no aparecen.
   archetypePrimary?: string;
   archetypeSecondary?: string;
