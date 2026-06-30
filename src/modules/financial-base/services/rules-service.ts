@@ -128,6 +128,48 @@ export async function upsertRuleForMerchant(
 }
 
 /**
+ * Variante de `upsertRuleForMerchant` para el WEBHOOK (service-role, sin sesión): lee y
+ * escribe las reglas de `userId`. Mismo criterio de igualdad EXACTA (case-insensitive, no
+ * substring) para no pisar reglas más genéricas. Solo cambia la categoría sugerida.
+ */
+export async function upsertRuleForUser(
+  userId: string,
+  merchant: string,
+  type: "income" | "expense",
+  categoryId: string,
+): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const target = merchant.trim().toLowerCase();
+  const { data } = await supabase
+    .from("transaction_rules")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("active", true);
+  const existing = (data ?? [])
+    .map(rowToRule)
+    .find((r) => r.type === type && r.merchantPattern.trim().toLowerCase() === target);
+  if (existing) {
+    await supabase
+      .from("transaction_rules")
+      .update({ suggested_category_id: categoryId })
+      .eq("id", existing.id)
+      .eq("user_id", userId);
+    return;
+  }
+  await supabase.from("transaction_rules").insert({
+    user_id: userId,
+    merchant_pattern: merchant,
+    suggested_category_id: categoryId,
+    suggested_account_id: null,
+    type,
+    active: true,
+    priority: 0,
+    linked_kind: null,
+    linked_id: null,
+  });
+}
+
+/**
  * Matching PURO: primera regla activa del tipo cuyo patrón (substring,
  * case-insensitive) esté contenido en el texto del comercio. Determinista, sin IA.
  * Las reglas vienen ya ordenadas (mayor prioridad / más reciente primero).

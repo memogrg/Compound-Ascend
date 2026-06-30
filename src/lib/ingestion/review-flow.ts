@@ -104,8 +104,10 @@ export async function confirmProposal(deps: ReviewDeps, pending: ProposalPending
   await deps.markConfirmed(pending.proposalId);
   const enDonde = pending.merchant ? ` en ${pending.merchant}` : "";
   const sobre = res.categoryName ? ` · en ${res.categoryName}` : " · por clasificar";
+  const moveHint =
+    "\n↩️ ¿Sobre equivocado? Respondé *mover a <sobre>* (agregá *siempre* para recordarlo).";
   await deps.sendText(
-    `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${enDonde}${sobre}.`,
+    `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${enDonde}${sobre}.${moveHint}`,
   );
   await surfaceNextProposal(deps); // encadena el siguiente
 }
