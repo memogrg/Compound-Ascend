@@ -85,5 +85,37 @@ export async function buildWhatsAppToolContext(
     // deja los campos undefined
   }
 
+  // Metas de ahorro (service-role) normalizadas a la moneda PRINCIPAL. Best-effort.
+  try {
+    const goalsRes = await supabase
+      .from("savings_goals")
+      .select("name, target_amount, current_amount, monthly_contribution, currency, target_date")
+      .eq("user_id", userId);
+    const mapped = (goalsRes.data ?? [])
+      .map((g) => ({
+        name: g.name,
+        target: Number(g.target_amount),
+        current: Number(g.current_amount),
+        monthly: Number(g.monthly_contribution),
+        currency: g.currency,
+        targetDate: g.target_date,
+      }))
+      .filter((g) => g.target > 0 && (g.currency === primary || !!rates))
+      .map((g) => {
+        const conv = (n: number) =>
+          g.currency === primary ? n : convertCurrency(n, g.currency, primary, rates!);
+        return {
+          nombre: g.name,
+          objetivo: conv(g.target),
+          actual: conv(g.current),
+          aporte_mensual: conv(g.monthly),
+          fecha_objetivo: g.targetDate ?? null,
+        };
+      });
+    if (mapped.length) toolContext.goals = mapped;
+  } catch {
+    // deja goals undefined
+  }
+
   return toolContext;
 }

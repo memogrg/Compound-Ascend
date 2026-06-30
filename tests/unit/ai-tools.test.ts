@@ -4,7 +4,9 @@ import {
   compareDebtStrategies,
   projectInvestment,
   projectFreedom,
+  projectGoals,
   runToolLoop,
+  type GoalForTool,
   type ModelTurn,
   type ToolCallRecord,
   type DebtSimResult,
@@ -167,6 +169,57 @@ describe("tools · projectFreedom (datos reales, reusa projectInvestment)", () =
       expect(r.anios_para_alcanzar === null || typeof r.anios_para_alcanzar === "number").toBe(true);
       if (typeof r.anios_para_alcanzar === "number") expect(r.anios_para_alcanzar).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("tools · projectGoals (progreso/proyección de metas, puro)", () => {
+  const TODAY = new Date(2026, 5, 30); // determinista
+  const GOALS: GoalForTool[] = [
+    { nombre: "Viaje a Japón", objetivo: 3_000_000, actual: 1_200_000, aporte_mensual: 150_000, fecha_objetivo: "2027-06-30" },
+    { nombre: "Fondo emergencia", objetivo: 2_000_000, actual: 2_000_000, aporte_mensual: 0, fecha_objetivo: null },
+    { nombre: "Carro", objetivo: 8_000_000, actual: 500_000, aporte_mensual: 0, fecha_objetivo: null },
+  ];
+
+  it("sin metas → disponible:false con motivo", () => {
+    const r = projectGoals({}, { goals: [], currency: "CRC" }, TODAY);
+    expect(r.disponible).toBe(false);
+    if (!r.disponible) expect(r.motivo).toMatch(/metas/i);
+  });
+
+  it("faltante y meses correctos; cumplida cuando actual>=objetivo; aporte 0 → meses null", () => {
+    const r = projectGoals({}, { goals: GOALS, currency: "CRC" }, TODAY);
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    const viaje = r.metas.find((m) => m.nombre === "Viaje a Japón")!;
+    expect(viaje.faltante).toBe(1_800_000);
+    expect(viaje.meses_para_meta).toBe(Math.ceil(1_800_000 / 150_000)); // 12
+    expect(viaje.cumplida).toBe(false);
+    expect(viaje.progreso_pct).toBe(0.4);
+
+    const fondo = r.metas.find((m) => m.nombre === "Fondo emergencia")!;
+    expect(fondo.cumplida).toBe(true);
+    expect(fondo.meses_para_meta).toBe(0);
+
+    const carro = r.metas.find((m) => m.nombre === "Carro")!;
+    expect(carro.meses_para_meta).toBeNull(); // falta y aporte 0 → nunca
+  });
+
+  it("aporte_extra acelera (menos meses)", () => {
+    const base = projectGoals({}, { goals: GOALS, currency: "CRC" }, TODAY);
+    const fast = projectGoals({ aporte_extra_mensual: 150_000 }, { goals: GOALS, currency: "CRC" }, TODAY);
+    if (!base.disponible || !fast.disponible) throw new Error("disponible");
+    const vBase = base.metas.find((m) => m.nombre === "Viaje a Japón")!.meses_para_meta!;
+    const vFast = fast.metas.find((m) => m.nombre === "Viaje a Japón")!.meses_para_meta!;
+    expect(vFast).toBeLessThan(vBase);
+    // El carro, antes inalcanzable (aporte 0), ahora tiene meses finitos.
+    expect(fast.metas.find((m) => m.nombre === "Carro")!.meses_para_meta).not.toBeNull();
+  });
+
+  it("filtro por nombre (substring, normalizado)", () => {
+    const r = projectGoals({ nombre: "japon" }, { goals: GOALS, currency: "CRC" }, TODAY);
+    if (!r.disponible) throw new Error("disponible");
+    expect(r.metas).toHaveLength(1);
+    expect(r.metas[0]!.nombre).toBe("Viaje a Japón");
   });
 });
 

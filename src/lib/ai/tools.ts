@@ -436,6 +436,119 @@ export function projectFreedom(
 }
 
 // ---------------------------------------------------------------------------
+// Herramienta: progreso y proyección de metas de ahorro (datos reales)
+// ---------------------------------------------------------------------------
+
+/** Meta de ahorro del usuario, en moneda PRINCIPAL (se arma en los context builders). */
+export type GoalForTool = {
+  nombre: string;
+  objetivo: number;
+  actual: number;
+  aporte_mensual: number;
+  fecha_objetivo?: string | null; // YYYY-MM-DD
+};
+
+export const GOALS_TOOL: AiToolDecl = {
+  name: "proyectar_metas",
+  description:
+    "Muestra el progreso de las metas de ahorro REALES del usuario y proyecta en cuántos meses " +
+    "las alcanza con su aporte actual. Opcional: filtrar una meta por nombre o simular un aporte " +
+    "extra mensual para ver cuánto se acelera. Montos en la MONEDA PRINCIPAL del usuario. Solo lee " +
+    "y calcula; no modifica nada.",
+  parameters: {
+    type: "object",
+    properties: {
+      nombre: {
+        type: "string",
+        description: "Filtra una meta por coincidencia de nombre (opcional).",
+      },
+      aporte_extra_mensual: {
+        type: "number",
+        description: "Aporte extra mensual a sumar a TODAS las metas para simular aceleración (opcional).",
+      },
+    },
+  },
+};
+
+export type GoalProjection = {
+  nombre: string;
+  objetivo: number;
+  actual: number;
+  progreso_pct: number; // 0..1
+  faltante: number;
+  aporte_mensual: number; // efectivo (base + extra)
+  meses_para_meta: number | null; // null si no llega (aporte efectivo 0 y falta)
+  cumplida: boolean;
+  en_camino: boolean | null; // vs. fecha_objetivo; null si no hay fecha
+};
+
+export type GoalsResult =
+  | { disponible: false; motivo: string }
+  | { disponible: true; moneda: string; metas: GoalProjection[] };
+
+const normTool = (s: string): string =>
+  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+/** Meses (calendario) desde `today` hasta `dateStr` (YYYY-MM-DD); null si inválida. */
+function monthsUntil(today: Date, dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return (d.getFullYear() - today.getFullYear()) * 12 + (d.getMonth() - today.getMonth());
+}
+
+/**
+ * Progreso y proyección de metas de ahorro con datos REALES. PURA. Sin metas → disponible:false.
+ * Filtra por nombre (substring) y simula un aporte extra. `today` inyectable para tests.
+ */
+export function projectGoals(
+  args: { nombre?: unknown; aporte_extra_mensual?: unknown },
+  ctx: { goals?: GoalForTool[]; currency: string },
+  today: Date = new Date(),
+): GoalsResult {
+  const goals = ctx.goals ?? [];
+  if (goals.length === 0) {
+    return { disponible: false, motivo: "Aún no tenés metas de ahorro registradas." };
+  }
+  const filtro = typeof args.nombre === "string" ? normTool(args.nombre.trim()) : "";
+  const extra = toPositive(args.aporte_extra_mensual);
+  const selected = filtro ? goals.filter((g) => normTool(g.nombre).includes(filtro)) : goals;
+
+  const metas: GoalProjection[] = selected.map((g) => {
+    const objetivo = Math.max(0, g.objetivo);
+    const actual = Math.max(0, g.actual);
+    const faltante = Math.max(0, objetivo - actual);
+    const progreso = objetivo > 0 ? Math.min(1, actual / objetivo) : 1;
+    const aporteEfectivo = Math.max(0, g.aporte_mensual) + extra;
+    const cumplida = faltante <= 0;
+    const meses = cumplida ? 0 : aporteEfectivo > 0 ? Math.ceil(faltante / aporteEfectivo) : null;
+
+    let en_camino: boolean | null = null;
+    if (g.fecha_objetivo) {
+      const mu = monthsUntil(today, g.fecha_objetivo);
+      if (mu == null) en_camino = null;
+      else if (cumplida) en_camino = true;
+      else if (meses == null) en_camino = false; // no llega con el aporte actual
+      else en_camino = meses <= mu;
+    }
+
+    return {
+      nombre: g.nombre,
+      objetivo: round2(objetivo),
+      actual: round2(actual),
+      progreso_pct: round2(progreso),
+      faltante: round2(faltante),
+      aporte_mensual: round2(aporteEfectivo),
+      meses_para_meta: meses,
+      cumplida,
+      en_camino,
+    };
+  });
+
+  return { disponible: true, moneda: ctx.currency, metas };
+}
+
+// ---------------------------------------------------------------------------
 // Driver del loop de tool-calling (agnóstico de proveedor)
 // ---------------------------------------------------------------------------
 

@@ -12,7 +12,7 @@ import {
   type ToolContext,
 } from "@/lib/ai/orchestrator";
 import { buildFinancialContext } from "@/lib/ai/context-engine";
-import { listDebts } from "@/modules/control";
+import { listDebts, listGoals } from "@/modules/control";
 import { getPrimaryCurrency } from "@/modules/financial-base";
 import { getPatrimonioReport } from "@/modules/wealth/services/patrimonio-service";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -95,6 +95,26 @@ export async function POST(req: Request) {
           }
         } catch {
           // deja freedomNumber/investableWealth undefined
+        }
+        // Metas de ahorro (datos reales) normalizadas a la moneda PRINCIPAL. Best-effort.
+        try {
+          const goals = await listGoals();
+          const mapped = goals
+            .filter((g) => g.targetAmount > 0 && (g.currency === primary || !!rates))
+            .map((g) => {
+              const conv = (n: number) =>
+                g.currency === primary ? n : convertCurrency(n, g.currency, primary, rates!);
+              return {
+                nombre: g.name,
+                objetivo: conv(g.targetAmount),
+                actual: conv(g.currentAmount),
+                aporte_mensual: conv(g.monthlyContribution),
+                fecha_objetivo: g.targetDate ?? null,
+              };
+            });
+          if (mapped.length) toolContext.goals = mapped;
+        } catch {
+          // deja goals undefined
         }
       } catch {
         toolContext = undefined;
