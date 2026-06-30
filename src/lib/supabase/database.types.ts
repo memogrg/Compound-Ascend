@@ -691,6 +691,16 @@ export type ProcessedEventRow = {
   processed_at: string;
 };
 
+/** Caché de sugerencias de sobre por (usuario, comercio) por IA (migración 0032). */
+export type MerchantSuggestionCacheRow = {
+  id: string;
+  user_id: string;
+  merchant_norm: string; // comercio normalizado (acentos/minúsculas)
+  category_id: string | null; // sobre sugerido; null = "ninguno aplica" (igual se cachea)
+  confidence: number | null; // 0..1
+  created_at: string;
+};
+
 /** Ingesta por correo: allowlist alias de destinatario -> usuario (migración 0027). */
 export type EmailIngestLinkRow = {
   id: string;
@@ -849,6 +859,8 @@ export interface Database {
       email_ingest_links: UserTable<EmailIngestLinkRow>;
       ingest_proposals: UserTable<IngestProposalRow>;
       account_cards: UserTable<AccountCardRow>;
+      // Caché de sugerencias de sobre por (usuario, comercio) (migración 0032).
+      merchant_suggestion_cache: UserTable<MerchantSuggestionCacheRow>;
     };
     // OJO: usar `{ [_ in never]: never }` (sin índice de cadena). `Record<string,
     // never>` tiene índice `[k]: never` y, vía `Tables & Views`, intersecta cada

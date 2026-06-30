@@ -21,9 +21,12 @@ const HELP =
 export function PorClasificarCard({
   items,
   categories,
+  suggested,
 }: {
   items: Transaction[];
   categories: SelectableCategory[];
+  /** Pre-relleno sugerido por IA: txnId → categoryId (editable, no auto-asigna). */
+  suggested?: Record<string, string>;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -128,6 +131,8 @@ export function PorClasificarCard({
           {visible.map((t) => {
             const rowBusy = pending && busy === t.id;
             const options = categories.filter((c) => categoryMatchesKind(c.categoryType, t.kind as "gasto" | "ingreso"));
+            const sug = suggested?.[t.id];
+            const sugName = sug ? options.find((o) => o.id === sug)?.name : undefined;
             return (
               <div
                 key={t.id}
@@ -161,6 +166,26 @@ export function PorClasificarCard({
                 <span
                   style={{ display: "inline-flex", gap: 8, marginLeft: "auto", alignItems: "center", flex: "none" }}
                 >
+                  {sug && sugName ? (
+                    <span
+                      className="tip"
+                      data-tip="Sugerido por IA según comercios parecidos. Tocá «usar» o elegí otro."
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, flex: "none" }}
+                    >
+                      <span className="chip" style={{ fontSize: 10.5 }}>
+                        ✨ {sugName}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: "2px 8px", fontSize: 11 }}
+                        disabled={rowBusy}
+                        onClick={() => assign(t, sug)}
+                      >
+                        usar
+                      </button>
+                    </span>
+                  ) : null}
                   <label className="tip" data-tip="Crear una regla para este comercio" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}>
                     <input
                       type="checkbox"
@@ -173,7 +198,7 @@ export function PorClasificarCard({
                   <select
                     className="sel"
                     style={{ width: "auto", fontSize: 12, padding: "4px 8px" }}
-                    defaultValue=""
+                    defaultValue={sug ?? ""}
                     disabled={rowBusy}
                     onChange={(e) => assign(t, e.target.value)}
                   >
