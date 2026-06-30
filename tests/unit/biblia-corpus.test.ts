@@ -41,7 +41,7 @@ describe("chunkDocument", () => {
     const chunks = chunkDocument(para);
     expect(chunks.length).toBeGreaterThan(1);
     for (const c of chunks) {
-      expect(c.length).toBeLessThanOrEqual(1000);
+      expect(c.length).toBeLessThanOrEqual(1200);
       expect(c.trim().endsWith(".")).toBe(true); // termina en límite de oración
     }
     // No se pierde ni se duplica contenido: cada oración aparece una vez.
@@ -55,6 +55,55 @@ describe("chunkDocument", () => {
     );
     const chunks = chunkDocument(doc);
     expect(chunks.length).toBeGreaterThanOrEqual(1);
-    for (const c of chunks) expect(c.length).toBeLessThanOrEqual(1000);
+    for (const c of chunks) expect(c.length).toBeLessThanOrEqual(1200);
+  });
+});
+
+describe("chunkDocument · heading-aware (markdown)", () => {
+  it("antepone la ruta de encabezados (H1 > H2) como contexto en cada chunk de la sección", () => {
+    const doc = [
+      "# Dinero",
+      "",
+      "## Deudas",
+      "",
+      "Atacá primero la deuda más cara y celebrá las victorias visibles.",
+      "",
+      "## Ahorro",
+      "",
+      "Automatizá el ahorro para no depender de la fuerza de voluntad.",
+    ].join("\n");
+    const chunks = chunkDocument(doc);
+    const deuda = chunks.find((c) => c.includes("más cara"));
+    const ahorro = chunks.find((c) => c.includes("Automatizá"));
+    expect(deuda?.startsWith("Dinero > Deudas\n\n")).toBe(true);
+    expect(ahorro?.startsWith("Dinero > Ahorro\n\n")).toBe(true);
+  });
+
+  it("encabezado huérfano (sin cuerpo) se fusiona en la ruta de la sección siguiente", () => {
+    const doc = [
+      "# Curso",
+      "## Módulo 1",
+      "### Lección",
+      "",
+      "El contenido real de la lección vive bajo tres encabezados anidados sin cuerpo intermedio.",
+    ].join("\n");
+    const chunks = chunkDocument(doc);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]!.startsWith("Curso > Módulo 1 > Lección\n\n")).toBe(true);
+  });
+
+  it("respeta el cap (~1200) sin cortar oraciones y descarta fragmentos < 40 chars", () => {
+    const body = Array.from(
+      { length: 60 },
+      (_, i) => `Oración ${i} con suficiente texto de relleno para el chunk.`,
+    ).join(" ");
+    const doc = `# Sección\n\n${body}\n\n## Vacía\n\n.`; // "." → fragmento corto, se descarta
+    const chunks = chunkDocument(doc);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const c of chunks) {
+      expect(c.length).toBeLessThanOrEqual(1200);
+      expect(c.trim().endsWith(".")).toBe(true);
+      expect(c.length).toBeGreaterThanOrEqual(40);
+    }
   });
 });
