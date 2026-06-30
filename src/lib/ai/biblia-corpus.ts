@@ -134,7 +134,9 @@ export const BIBLIA_SEED_ENTRIES: BibliaSeedEntry[] = [
   ...Object.values(PATRIMONIO_GUIDANCE).map((content) => ({ tag: "patrimonio", content })),
 ];
 
-const CHUNK_MAX = 1000;
+const CHUNK_MAX = 1200; // cap por chunk (incluye el prefijo de encabezados)
+const MIN_CHUNK = 40; // descartar fragmentos demasiado cortos (encabezados sueltos, ruido)
+const HEADING_RE = /^(#{1,6})\s+(.+?)\s*#*$/; // ATX markdown: #, ##, ###…
 
 /** Parte un párrafo largo por oraciones (. ! ?), acumulando sin pasar `max` ni cortar a media oración. */
 function splitSentences(paragraph: string, max: number): string[] {
@@ -155,11 +157,10 @@ function splitSentences(paragraph: string, max: number): string[] {
 }
 
 /**
- * Parte un documento en chunks de ~500-1000 chars para ingestar: corta por párrafos/headings
- * (líneas en blanco), acumula párrafos pequeños y, si un párrafo excede el máximo, lo divide por
- * oraciones. Nunca corta a media oración. Listo para el ingestor de documentos (Fase 2b-2).
+ * Chunking de texto plano (sin encabezados): corta por párrafos (líneas en blanco), acumula los
+ * pequeños y divide por oraciones los párrafos que superan `max`. Nunca corta a media oración.
  */
-export function chunkDocument(text: string): string[] {
+function chunkPlainText(text: string, max: number): string[] {
   const paragraphs = text
     .split(/\n\s*\n/)
     .map((p) => p.trim())
@@ -172,12 +173,69 @@ export function chunkDocument(text: string): string[] {
     buf = "";
   };
   for (const paragraph of paragraphs) {
-    const pieces = paragraph.length > CHUNK_MAX ? splitSentences(paragraph, CHUNK_MAX) : [paragraph];
+    const pieces = paragraph.length > max ? splitSentences(paragraph, max) : [paragraph];
     for (const piece of pieces) {
-      if (buf && buf.length + 2 + piece.length > CHUNK_MAX) flush();
+      if (buf && buf.length + 2 + piece.length > max) flush();
       buf = buf ? `${buf}\n\n${piece}` : piece;
     }
   }
   flush();
   return chunks;
+}
+
+type Section = { path: string[]; body: string };
+
+/**
+ * Parte un markdown en secciones por encabezados ATX, arrastrando la RUTA de encabezados
+ * (stack por nivel) como contexto. Los encabezados huérfanos (sin cuerpo) no emiten sección: su
+ * título queda en la ruta de la sección siguiente (se fusionan con su contenido).
+ */
+function parseSections(text: string): Section[] {
+  const sections: Section[] = [];
+  const stack: { level: number; title: string }[] = [];
+  let path: string[] = [];
+  let body: string[] = [];
+  const flush = () => {
+    const b = body.join("\n").trim();
+    if (b) sections.push({ path: [...path], body: b });
+    body = [];
+  };
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(HEADING_RE);
+    if (m) {
+      flush(); // cierra la sección previa con su ruta actual
+      const level = m[1]!.length;
+      while (stack.length && stack[stack.length - 1]!.level >= level) stack.pop();
+      stack.push({ level, title: m[2]!.trim() });
+      path = stack.map((s) => s.title);
+    } else {
+      body.push(line);
+    }
+  }
+  flush();
+  return sections;
+}
+
+/**
+ * Parte un documento en chunks (~1200 chars) para ingestar al corpus. Heading-aware: respeta los
+ * encabezados markdown y antepone la ruta de encabezados ("H1 > H2 > H3") como contexto en cada
+ * chunk de su sección; fusiona encabezados huérfanos; descarta fragmentos < MIN_CHUNK. Para
+ * documentos sin encabezados se comporta como el chunker plano (compat con el uso actual).
+ */
+export function chunkDocument(text: string): string[] {
+  const sections = parseSections(text);
+  const hasHeadings = sections.some((s) => s.path.length > 0);
+  if (!hasHeadings) {
+    return chunkPlainText(text, CHUNK_MAX).filter((c) => c.length >= MIN_CHUNK);
+  }
+  const out: string[] = [];
+  for (const section of sections) {
+    const prefix = section.path.join(" > ");
+    const budget = Math.max(CHUNK_MAX - prefix.length - 2, 300); // deja lugar para el prefijo
+    for (const bodyChunk of chunkPlainText(section.body, budget)) {
+      const chunk = prefix ? `${prefix}\n\n${bodyChunk}` : bodyChunk;
+      if (chunk.length >= MIN_CHUNK) out.push(chunk);
+    }
+  }
+  return out;
 }
