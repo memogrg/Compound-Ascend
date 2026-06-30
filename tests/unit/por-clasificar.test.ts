@@ -102,10 +102,10 @@ vi.mock("@/modules/financial-base/services/transaction-service", async (orig) =>
   setTransactionCategory: (...a: unknown[]) => setTransactionCategory(...a),
 }));
 
-const createRule = vi.fn(async (..._a: unknown[]) => "rule1");
+const upsertRuleForMerchant = vi.fn(async (..._a: unknown[]) => {});
 vi.mock("@/modules/financial-base/services/rules-service", async (orig) => ({
   ...(await orig<typeof import("@/modules/financial-base/services/rules-service")>()),
-  createRule: (...a: unknown[]) => createRule(...a),
+  upsertRuleForMerchant: (...a: unknown[]) => upsertRuleForMerchant(...a),
 }));
 
 import { assignCategoryAction } from "@/modules/financial-base/api/v2-actions";
@@ -122,10 +122,10 @@ describe("assignCategoryAction", () => {
     const res = await assignCategoryAction({ transactionId: TXN, categoryId: CAT });
     expect(res.ok).toBe(true);
     expect(setTransactionCategory).toHaveBeenCalledWith(TXN, CAT);
-    expect(createRule).not.toHaveBeenCalled();
+    expect(upsertRuleForMerchant).not.toHaveBeenCalled();
   });
 
-  it("con crearRegla + merchant → crea la regla para el comercio", async () => {
+  it("con crearRegla + merchant → upsert de la regla del comercio (no duplica)", async () => {
     const res = await assignCategoryAction({
       transactionId: TXN,
       categoryId: CAT,
@@ -135,15 +135,8 @@ describe("assignCategoryAction", () => {
     });
     expect(res.ok).toBe(true);
     expect(setTransactionCategory).toHaveBeenCalledWith(TXN, CAT);
-    expect(createRule).toHaveBeenCalledTimes(1);
-    const arg = createRule.mock.calls[0]![0] as {
-      merchantPattern: string;
-      suggestedCategoryId: string;
-      type: string;
-    };
-    expect(arg.merchantPattern).toBe("Starbucks");
-    expect(arg.suggestedCategoryId).toBe(CAT);
-    expect(arg.type).toBe("expense");
+    expect(upsertRuleForMerchant).toHaveBeenCalledTimes(1);
+    expect(upsertRuleForMerchant).toHaveBeenCalledWith("Starbucks", "expense", CAT);
   });
 
   it("entrada inválida (sin categoryId) → error, no escribe", async () => {
