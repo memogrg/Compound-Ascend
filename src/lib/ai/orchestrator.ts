@@ -75,8 +75,10 @@ function getProvider(): AIProvider {
 export async function financeChat(
   messages: ChatMessage[],
   ctx: FinancialContext,
+  // Seam de inyección (ADITIVO): por defecto el proveedor real; los evals end-to-end
+  // inyectan un proveedor scripted. Ningún caller actual cambia (param opcional).
+  provider: AIProvider = getProvider(),
 ): Promise<AIChatResponse & { tokensIn: number; tokensOut: number; provider: string }> {
-  const provider = getProvider();
   // Recuperación determinista de la Biblia: emoción dominante + tema del último
   // mensaje del usuario → guía conductual inyectada en el system prompt.
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content;
@@ -146,7 +148,7 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
   };
 }
 
-const TOOLS_PROMPT_LINE =
+export const TOOLS_PROMPT_LINE =
   "Cuando el usuario pregunte cuánto tardaría en pagar su deuda o cuánto ahorraría abonando " +
   "extra, USÁ la herramienta de simulación; no inventes números. Los montos van en la moneda " +
   "principal del usuario; si la herramienta devuelve fx_no_disponible:true, aclaralo (el " +
@@ -164,10 +166,11 @@ export async function financeChatWithTools(
   messages: ChatMessage[],
   ctx: FinancialContext,
   toolContext?: ToolContext,
+  // Seam de inyección (ADITIVO): mismo proveedor para el fallback sin tools.
+  provider: AIProvider = getProvider(),
 ): Promise<AIChatResponse & { tokensIn: number; tokensOut: number; provider: string }> {
-  const provider = getProvider();
   if (!toolContext || !provider.chatWithTools) {
-    return financeChat(messages, ctx);
+    return financeChat(messages, ctx, provider);
   }
   const knowledge = buildKnowledge(messages, ctx);
   const result = await provider.chatWithTools({
