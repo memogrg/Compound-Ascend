@@ -64,6 +64,8 @@ export function dividendToTxn(args: {
   paymentDate: string;
   amount: number;
   categoryId?: string | null;
+  /** Línea derivada de dividendos del periodo: llena su barra "Recibido". */
+  incomeSourceId?: string | null;
 }): LinkedTxnInput {
   return {
     kind: "ingreso",
@@ -77,6 +79,7 @@ export function dividendToTxn(args: {
     origin: "manual",
     linkedKind: "holding",
     linkedId: args.holdingId,
+    incomeSourceId: args.incomeSourceId ?? null,
   };
 }
 
