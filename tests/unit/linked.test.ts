@@ -71,6 +71,21 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
     expect(txn.linkedKind).toBe("holding");
     expect(txn.linkedId).toBe("44444444-4444-4444-8444-444444444444");
     expect(txn.description).toBe("Dividendo — VOO");
+    expect(txn.incomeSourceId).toBeNull();
+    expect(() => txnInputSchema.parse(txn)).not.toThrow();
+  });
+
+  it("dividendo → se atribuye a la línea derivada (income_source_id)", () => {
+    const txn = dividendToTxn({
+      holdingId: "44444444-4444-4444-8444-444444444444",
+      label: "VOO",
+      currency: "USD",
+      paymentDate: "2026-06-20",
+      amount: 125.5,
+      categoryId: null,
+      incomeSourceId: "77777777-7777-4777-8777-777777777777",
+    });
+    expect(txn.incomeSourceId).toBe("77777777-7777-4777-8777-777777777777");
     expect(() => txnInputSchema.parse(txn)).not.toThrow();
   });
 

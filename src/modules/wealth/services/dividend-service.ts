@@ -1,25 +1,26 @@
 import "server-only";
 
-/** CRUD de dividendos + creación de ingreso vinculado en income_sources. */
+/**
+ * CRUD de dividendos. Cada pago nace como transacción vinculada (ingreso,
+ * linked_kind='holding') atribuida a la LÍNEA DERIVADA de dividendos del periodo
+ * (income_source_id → budget_items), que llena su barra "Recibido". Ya NO se
+ * crea un `income_sources` por pago: la proyección la representa la línea
+ * derivada (promedio 12m, source_kind='dividend'). Mismo patrón que
+ * createRentalPayment. Respeta RLS por user_id.
+ */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
   getSystemCategoryId,
+  syncDerivedBudget,
+  monthPeriod,
 } from "@/modules/financial-base";
 import { dividendToTxn } from "@/modules/financial-base";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";
-
-// Meses que hay en un año según frecuencia (para calcular amount_monthly_base).
-const FREQ_MONTHS: Record<string, number> = {
-  mensual: 1,
-  trimestral: 3,
-  semestral: 6,
-  anual: 12,
-};
 
 function rowToDividend(r: {
   id: string;
@@ -62,68 +63,74 @@ export async function createDividend(input: DividendInput): Promise<void> {
   const supabase = await createSupabaseServerClient();
 
   const freq = input.frequency ?? "anual";
-  const monthlyBase = input.amount / (FREQ_MONTHS[freq] ?? 12);
-  const incomeName = input.holdingLabel
-    ? `Dividendo — ${input.holdingLabel}`
-    : input.holdingSymbol
-      ? `Dividendo — ${input.holdingSymbol}`
-      : "Dividendo";
-
-  // Crea el ingreso vinculado en income_sources.
   const household_id = await getActiveHouseholdId(supabase, user.id);
-  const { data: incomeRow, error: incomeErr } = await supabase
-    .from("income_sources")
+  const label = input.holdingLabel ?? input.holdingSymbol ?? "Dividendo";
+
+  // 1) Inserta el dividendo SIN income_id: ya no se duplica en income_sources.
+  //    Su renta vive en la transacción vinculada + la línea derivada.
+  const { data: divRow, error: divErr } = await supabase
+    .from("dividends")
     .insert({
       user_id: user.id,
       household_id,
-      name: incomeName,
-      income_type: "dividendo",
-      category: "Dividendos",
+      holding_id: input.holdingId,
+      payment_date: input.paymentDate,
       amount: input.amount,
       currency: input.currency,
+      yield_pct: input.yieldPct ?? null,
       frequency: freq,
-      is_fixed: false,
-      certainty: "alta",
-      owner_scope: "personal",
-      include_in_budget: true,
-      amount_monthly_base: monthlyBase,
+      income_id: null,
+      transaction_id: null,
     })
     .select("id")
     .single();
-  if (incomeErr) throw new Error(incomeErr.message);
+  if (divErr) throw new Error(divErr.message);
 
-  // Fase 1 · orquestador: el dividendo nace también como transacción
-  // vinculada (ingreso, linked_kind='holding').
-  const txnId = await registerLinkedTransaction(
-    dividendToTxn({
-      holdingId: input.holdingId,
-      label: input.holdingLabel ?? input.holdingSymbol ?? "Dividendo",
-      currency: input.currency,
-      paymentDate: input.paymentDate,
-      amount: input.amount,
-      categoryId: await getSystemCategoryId("inc_pasivo"),
-    }),
-  );
+  // 2) Materializa la línea derivada de dividendos del periodo (promedio 12m,
+  //    source_kind='dividend') y obtén su id para la barra "Recibido".
+  const [py, pm] = input.paymentDate.split("-").map(Number);
+  const period = monthPeriod(py!, pm!);
+  await syncDerivedBudget(period);
+  const { data: line } = await supabase
+    .from("budget_items")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("source_kind", "dividend")
+    .eq("source_id", input.holdingId)
+    .eq("period_month", period.month)
+    .eq("period_year", period.year)
+    .maybeSingle();
 
-  const { error: divErr } = await supabase.from("dividends").insert({
-    user_id: user.id,
-    household_id,
-    holding_id: input.holdingId,
-    payment_date: input.paymentDate,
-    amount: input.amount,
-    currency: input.currency,
-    yield_pct: input.yieldPct ?? null,
-    frequency: freq,
-    income_id: incomeRow?.id ?? null,
-    transaction_id: txnId,
-  });
-  if (divErr) {
-    // Compensación: limpia la transacción (y el ingreso) si el ledger falla.
+  // 3) El dividendo nace como transacción vinculada (ingreso, linked_kind='holding')
+  //    atribuida a esa línea: llena "Recibido" SIN duplicar en income_sources.
+  let txnId: string;
+  try {
+    txnId = await registerLinkedTransaction(
+      dividendToTxn({
+        holdingId: input.holdingId,
+        label,
+        currency: input.currency,
+        paymentDate: input.paymentDate,
+        amount: input.amount,
+        categoryId: await getSystemCategoryId("inc_pasivo"),
+        incomeSourceId: line?.id ?? null,
+      }),
+    );
+  } catch (err) {
+    // Compensación: quita el dividendo si el ledger falla.
+    await supabase.from("dividends").delete().eq("id", divRow!.id).eq("user_id", user.id);
+    throw err;
+  }
+
+  const { error: upErr } = await supabase
+    .from("dividends")
+    .update({ transaction_id: txnId })
+    .eq("id", divRow!.id)
+    .eq("user_id", user.id);
+  if (upErr) {
     await deleteLinkedTransaction(txnId);
-    if (incomeRow?.id) {
-      await supabase.from("income_sources").delete().eq("id", incomeRow.id).eq("user_id", user.id);
-    }
-    throw new Error(divErr.message);
+    await supabase.from("dividends").delete().eq("id", divRow!.id).eq("user_id", user.id);
+    throw new Error(upErr.message);
   }
 }
 
