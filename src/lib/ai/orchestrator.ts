@@ -21,9 +21,11 @@ import {
   SIMULATE_DEBT_TOOL,
   COMPARE_DEBT_TOOL,
   PROJECT_INVESTMENT_TOOL,
+  FREEDOM_TOOL,
   simulateDebtPayoff,
   compareDebtStrategies,
   projectInvestment,
+  projectFreedom,
   type AiToolExecutor,
 } from "@/lib/ai/tools";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
@@ -34,9 +36,17 @@ export type { FinancialContext };
 /**
  * Datos de solo lectura que habilitan las herramientas (chat web con sesión). Las
  * deudas vienen YA normalizadas a `currency` (la moneda principal); `fxUnavailable`
- * marca que no se pudieron convertir (cálculo asume una sola moneda).
+ * marca que no se pudieron convertir (cálculo asume una sola moneda). `freedomNumber` e
+ * `investableWealth` (Número de Libertad y patrimonio invertible, en moneda PRINCIPAL) son
+ * opcionales y best-effort: si no se pudieron leer, la tool de libertad lo aclara.
  */
-export type ToolContext = { debts: DebtInput[]; currency: string; fxUnavailable?: boolean };
+export type ToolContext = {
+  debts: DebtInput[];
+  currency: string;
+  fxUnavailable?: boolean;
+  freedomNumber?: number;
+  investableWealth?: number;
+};
 
 /** Deuda cruda (de listDebts) con su moneda, antes de normalizar para la herramienta. */
 type RawDebt = {
@@ -150,6 +160,14 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       // Pura: solo necesita la moneda principal (no ToolContext nuevo).
       return projectInvestment(args, toolContext.currency);
     }
+    if (name === "proyectar_libertad_financiera") {
+      // Datos reales del usuario (número + invertible), ya en moneda principal.
+      return projectFreedom(args, {
+        freedomNumber: toolContext.freedomNumber,
+        investableWealth: toolContext.investableWealth,
+        currency: toolContext.currency,
+      });
+    }
     return { error: `herramienta no disponible: ${name}` };
   };
 }
@@ -162,7 +180,10 @@ export const TOOLS_PROMPT_LINE =
   "(avalancha vs bola de nieve), USÁ comparar_estrategias_deuda y explicá cuál ahorra más " +
   "intereses y cuál da victorias más rápido; no inventes. Si pregunta cuánto podría crecer su " +
   "dinero, en cuánto llegaría a una meta o a su Número de Libertad, USÁ proyectar_inversion; no " +
-  "inventes cifras de crecimiento y aclará que el rendimiento es un SUPUESTO, no una garantía.";
+  "inventes cifras de crecimiento y aclará que el rendimiento es un SUPUESTO, no una garantía. " +
+  "Si pregunta cuánto le falta o cuánto al mes para SU libertad financiera, USÁ " +
+  "proyectar_libertad_financiera (usa su patrimonio real); si devuelve disponible:false, decile " +
+  "que primero registre gastos/patrimonio para calcular su Número de Libertad.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -184,7 +205,7 @@ export async function financeChatWithTools(
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages,
-    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL, PROJECT_INVESTMENT_TOOL],
+    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL, PROJECT_INVESTMENT_TOOL, FREEDOM_TOOL],
     execute: buildToolExecutor(toolContext),
   });
   const parsed = parseAction(result.text);

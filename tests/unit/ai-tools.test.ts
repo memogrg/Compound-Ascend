@@ -3,6 +3,7 @@ import {
   simulateDebtPayoff,
   compareDebtStrategies,
   projectInvestment,
+  projectFreedom,
   runToolLoop,
   type ModelTurn,
   type ToolCallRecord,
@@ -123,6 +124,49 @@ describe("tools · projectInvestment (interés compuesto, puro)", () => {
     expect(Number.isFinite(r.valor_futuro)).toBe(true);
     expect(r.valor_futuro).toBe(0); // aporte y años saneados a 0
     expect(r.rendimiento_supuesto_pct).toBe(8); // default
+  });
+});
+
+describe("tools · projectFreedom (datos reales, reusa projectInvestment)", () => {
+  const CTX = { freedomNumber: 50_000_000, investableWealth: 5_000_000, currency: "CRC" };
+
+  it("sin Número de Libertad → disponible:false con motivo", () => {
+    const r = projectFreedom({ aporte_mensual: 100_000, anios: 20 }, { currency: "CRC" });
+    expect(r.disponible).toBe(false);
+    if (!r.disponible) expect(r.motivo).toMatch(/Número de Libertad/i);
+  });
+
+  it("con aporte + años: alcanza/faltante coherentes y números == projectInvestment directo", () => {
+    const r = projectFreedom({ aporte_mensual: 200_000, anios: 25, rendimiento_anual_pct: 8 }, CTX);
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    const proj = projectInvestment(
+      { aporte_mensual: 200_000, anios: 25, rendimiento_anual_pct: 8, monto_inicial: 5_000_000, objetivo: 50_000_000 },
+      "CRC",
+    );
+    expect(r.valor_futuro).toBe(proj.valor_futuro);
+    expect(r.alcanza).toBe(proj.valor_futuro >= 50_000_000);
+    expect(r.faltante_o_excedente).toBe(Math.round((proj.valor_futuro - 50_000_000) * 100) / 100);
+    expect(r.numero_de_libertad).toBe(50_000_000);
+    expect(r.patrimonio_invertible_actual).toBe(5_000_000);
+  });
+
+  it("con años, sin aporte → aporte_mensual_requerido (> 0)", () => {
+    const r = projectFreedom({ anios: 20 }, CTX);
+    expect(r.disponible).toBe(true);
+    if (r.disponible) {
+      expect(typeof r.aporte_mensual_requerido).toBe("number");
+      expect(r.aporte_mensual_requerido!).toBeGreaterThan(0);
+    }
+  });
+
+  it("con aporte, sin años → anios_para_alcanzar (número o null)", () => {
+    const r = projectFreedom({ aporte_mensual: 300_000 }, CTX);
+    expect(r.disponible).toBe(true);
+    if (r.disponible) {
+      expect(r.anios_para_alcanzar === null || typeof r.anios_para_alcanzar === "number").toBe(true);
+      if (typeof r.anios_para_alcanzar === "number") expect(r.anios_para_alcanzar).toBeGreaterThan(0);
+    }
   });
 });
 

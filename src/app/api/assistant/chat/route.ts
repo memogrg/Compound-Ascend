@@ -14,7 +14,9 @@ import {
 import { buildFinancialContext } from "@/lib/ai/context-engine";
 import { listDebts } from "@/modules/control";
 import { getPrimaryCurrency } from "@/modules/financial-base";
+import { getPatrimonioReport } from "@/modules/wealth/services/patrimonio-service";
 import { getFxRates } from "@/lib/market-data/fx-rates";
+import { convertCurrency } from "@/lib/fx";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
@@ -73,6 +75,27 @@ export async function POST(req: Request) {
           fxUnavailable: !rates,
           debts: normalizeDebtsForTool(debts, primary, rates),
         };
+        // Número de Libertad + patrimonio invertible (datos reales), normalizados a la moneda
+        // PRINCIPAL. Best-effort: si falla, la tool de libertad degrada con un motivo explicable.
+        try {
+          const pat = await getPatrimonioReport();
+          let numero = pat.report.numeroDeLibertad;
+          let invertible = pat.report.investableWealth;
+          if (pat.currency !== primary) {
+            if (rates) {
+              numero = convertCurrency(numero, pat.currency, primary, rates);
+              invertible = convertCurrency(invertible, pat.currency, primary, rates);
+            } else {
+              numero = NaN; // sin FX no podemos pasar a principal → dejamos los campos fuera
+            }
+          }
+          if (Number.isFinite(numero)) {
+            toolContext.freedomNumber = numero;
+            toolContext.investableWealth = invertible;
+          }
+        } catch {
+          // deja freedomNumber/investableWealth undefined
+        }
       } catch {
         toolContext = undefined;
       }
