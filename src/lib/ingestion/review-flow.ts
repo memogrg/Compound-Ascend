@@ -67,7 +67,7 @@ export interface ReviewDeps {
   // usamos, por eso `unknown`.
   sendButtons(text: string, buttons: Button[]): Promise<unknown>;
   sendText(text: string): Promise<unknown>;
-  createTransaction(action: PendingAction): Promise<{ ok: boolean }>;
+  createTransaction(action: PendingAction): Promise<{ ok: boolean; categoryName?: string | null }>;
   markConfirmed(proposalId: string): Promise<void>;
   markDiscarded(proposalId: string): Promise<void>;
 }
@@ -103,8 +103,9 @@ export async function confirmProposal(deps: ReviewDeps, pending: ProposalPending
   }
   await deps.markConfirmed(pending.proposalId);
   const enDonde = pending.merchant ? ` en ${pending.merchant}` : "";
+  const sobre = res.categoryName ? ` · en ${res.categoryName}` : " · por clasificar";
   await deps.sendText(
-    `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${enDonde}.`,
+    `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${enDonde}${sobre}.`,
   );
   await surfaceNextProposal(deps); // encadena el siguiente
 }

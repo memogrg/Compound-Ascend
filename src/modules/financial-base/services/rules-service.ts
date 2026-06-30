@@ -2,6 +2,7 @@ import "server-only";
 
 /** CRUD + matching de reglas de auto-categorización (transaction_rules). RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireUser } from "@/lib/auth/session";
 import type { TransactionRuleRow } from "@/lib/supabase/database.types";
 import type { RuleInput } from "@/modules/financial-base/schemas";
@@ -88,19 +89,51 @@ export async function deleteRule(id: string): Promise<void> {
 }
 
 /**
- * Busca la primera regla activa cuyo patrón (substring, case-insensitive) esté
- * contenido en el texto del comercio. Determinista, sin IA.
+ * Matching PURO: primera regla activa del tipo cuyo patrón (substring,
+ * case-insensitive) esté contenido en el texto del comercio. Determinista, sin IA.
+ * Las reglas vienen ya ordenadas (mayor prioridad / más reciente primero).
  */
-export async function findMatchingRule(
+export function pickMatchingRule(
+  rules: TransactionRule[],
   merchant: string | null | undefined,
   type: "income" | "expense",
-): Promise<TransactionRule | null> {
+): TransactionRule | null {
   if (!merchant) return null;
   const haystack = merchant.toLowerCase();
-  const rules = await listRules();
   return (
     rules.find(
       (r) => r.active && r.type === type && haystack.includes(r.merchantPattern.toLowerCase()),
     ) ?? null
   );
+}
+
+/** Regla que matchea para el usuario de sesión (RLS). */
+export async function findMatchingRule(
+  merchant: string | null | undefined,
+  type: "income" | "expense",
+): Promise<TransactionRule | null> {
+  if (!merchant) return null;
+  return pickMatchingRule(await listRules(), merchant, type);
+}
+
+/**
+ * Igual que findMatchingRule pero para el WEBHOOK (service-role, sin sesión): lee
+ * las reglas ACTIVAS de `userId` y aplica el matching puro. Así WhatsApp/ingesta
+ * auto-categorizan usando las reglas que el usuario crea en "Por clasificar"/web.
+ */
+export async function findMatchingRuleForUser(
+  userId: string,
+  merchant: string | null | undefined,
+  type: "income" | "expense",
+): Promise<TransactionRule | null> {
+  if (!merchant) return null;
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("transaction_rules")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("active", true)
+    .order("priority", { ascending: false })
+    .order("created_at", { ascending: false });
+  return pickMatchingRule((data ?? []).map(rowToRule), merchant, type);
 }
