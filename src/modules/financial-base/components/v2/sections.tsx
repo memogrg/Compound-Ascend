@@ -33,6 +33,7 @@ import {
   selectUncategorized,
   selectableCategoryLeaves,
 } from "@/modules/financial-base/engine/classify";
+import { getSuggestionsFor } from "@/modules/financial-base/services/ai-categorize";
 import {
   findUnlinkedCandidates,
   buildEntityAlerts,
@@ -636,8 +637,26 @@ function IncomeSection({ view }: { view: V2View }) {
 }
 
 // ============================== TRANSACCIONES ==============================
-export function TransaccionesSection({ view }: { view: V2View }) {
+export async function TransaccionesSection({ view }: { view: V2View }) {
   const { real, currency } = view;
+
+  // Sugerencia de sobre por IA para los movimientos sin clasificar (best-effort, cacheada).
+  const uncategorized = selectUncategorized(view.transactions);
+  let suggested: Record<string, string> = {};
+  try {
+    const suggestions = await getSuggestionsFor(
+      uncategorized.map((t) => ({
+        id: t.id,
+        merchant: t.merchantOrSource ?? t.description ?? null,
+        kind: t.kind as "gasto" | "ingreso",
+      })),
+    );
+    suggested = Object.fromEntries(
+      [...suggestions].flatMap(([id, s]) => (s.categoryId ? [[id, s.categoryId] as const] : [])),
+    );
+  } catch {
+    suggested = {}; // si la sugerencia falla, la lista funciona igual (sin pre-relleno).
+  }
   const summary: SumCard[] = [
     {
       ttl: "Saldo neto",
@@ -693,8 +712,9 @@ export function TransaccionesSection({ view }: { view: V2View }) {
 
       {/* Por clasificar: movimientos sin sobre (WhatsApp/ingesta sin regla). */}
       <PorClasificarCard
-        items={selectUncategorized(view.transactions)}
+        items={uncategorized}
         categories={selectableCategoryLeaves(view.categories)}
+        suggested={suggested}
       />
 
       {/* Conciliación (Fase 6): sin-vincular + plan-vs-real por entidad. */}
