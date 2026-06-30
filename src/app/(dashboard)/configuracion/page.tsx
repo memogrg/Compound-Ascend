@@ -3,6 +3,11 @@ import { CurrencySelector } from "@/modules/account/components/currency-selector
 import { NotificationPrefs } from "@/modules/account/components/notification-prefs";
 import { EmailTester } from "@/modules/account/components/email-tester";
 import { WhatsAppLink } from "@/modules/account/components/whatsapp-link";
+import { IngestEmails } from "@/modules/account/components/ingest-emails";
+import {
+  listMyIngestEmails,
+  type IngestEmailRow,
+} from "@/modules/account/services/ingest-email-service";
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { isSupabaseConfigured } from "@/lib/auth/session";
@@ -20,6 +25,16 @@ export default async function Page() {
     acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
   const whatsappLink = isSupabaseConfigured() ? await getMyLink() : null;
   const whatsappConfigured = isWhatsAppConfigured();
+
+  // Correos del banco (onboarding de ingesta). Best-effort: si falla, lista vacía.
+  let ingestEmails: IngestEmailRow[] = [];
+  if (isSupabaseConfigured()) {
+    try {
+      ingestEmails = await listMyIngestEmails();
+    } catch {
+      ingestEmails = [];
+    }
+  }
 
   return (
     <div className="grid">
@@ -90,6 +105,7 @@ export default async function Page() {
 
       <section className="cols-2">
         <WhatsAppLink initial={whatsappLink} configured={whatsappConfigured} />
+        <IngestEmails initial={ingestEmails} />
       </section>
 
       <section className="cols-2">
