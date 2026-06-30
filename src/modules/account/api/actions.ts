@@ -21,6 +21,11 @@ import {
   sendEmail,
 } from "@/lib/email/send";
 import { generateLinkOtp, revokeLink } from "@/lib/whatsapp/links-service";
+import {
+  requestIngestEmailVerification,
+  confirmIngestEmail,
+  removeIngestEmail,
+} from "@/modules/account/services/ingest-email-service";
 import { logger } from "@/lib/logger";
 
 export type AccountActionResult = { ok: boolean; message?: string };
@@ -191,5 +196,46 @@ export async function clearAllDataAction(): Promise<AccountActionResult> {
   } catch (err) {
     logger.error("clearAllData fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos borrar los datos." };
+  }
+}
+
+// ---------- Ingesta por correo: onboarding self-serve ----------
+
+export async function requestIngestEmailAction(email: string): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const res = await requestIngestEmailVerification(email);
+    if (res.ok) revalidatePath("/configuracion");
+    return res;
+  } catch (err) {
+    logger.error("requestIngestEmail fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos enviar el código." };
+  }
+}
+
+export async function confirmIngestEmailAction(
+  email: string,
+  code: string,
+): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const res = await confirmIngestEmail(email, code);
+    if (res.ok) revalidatePath("/configuracion");
+    return res;
+  } catch (err) {
+    logger.error("confirmIngestEmail fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos confirmar el correo." };
+  }
+}
+
+export async function removeIngestEmailAction(id: string): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  try {
+    const res = await removeIngestEmail(id);
+    if (res.ok) revalidatePath("/configuracion");
+    return res;
+  } catch (err) {
+    logger.error("removeIngestEmail fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos eliminar el correo." };
   }
 }

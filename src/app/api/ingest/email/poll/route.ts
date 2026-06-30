@@ -23,10 +23,10 @@ import {
   fetchUnseen,
   processInboundEmails,
   type EmailIngestDeps,
-  type EmailOwner,
   type ImapMessage,
 } from "@/lib/ingestion/email/imap-poller";
 import { createImapClient, isEmailIngestConfigured } from "@/lib/ingestion/email/imap-client";
+import { lookupOwnerByForwarder } from "@/lib/ingestion/email/forwarder-lookup";
 
 export const runtime = "nodejs";
 
@@ -45,19 +45,7 @@ function buildDeps(
   markSeenUid: (uid: number) => Promise<void>,
 ): EmailIngestDeps {
   return {
-    async lookupOwner(candidates: string[]): Promise<EmailOwner | null> {
-      if (candidates.length === 0) return null;
-      // forwarder_email es citext: la comparación es case-insensitive en BD. Se
-      // toma el primer link cuyo forwarder esté entre los candidatos.
-      const { data, error } = await supabase
-        .from("email_ingest_links")
-        .select("user_id, household_id")
-        .in("forwarder_email", candidates)
-        .limit(1)
-        .maybeSingle();
-      if (error || !data) return null;
-      return { userId: data.user_id, householdId: data.household_id };
-    },
+    lookupOwner: (candidates: string[]) => lookupOwnerByForwarder(supabase, candidates),
 
     async isProcessed(eventId: string): Promise<boolean> {
       const { data } = await supabase

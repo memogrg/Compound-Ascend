@@ -698,6 +698,9 @@ export type EmailIngestLinkRow = {
   household_id: string | null;
   ingest_alias: string | null; // legado: alias plus-addressing (ya no se usa para match)
   forwarder_email: string | null; // llave de match: destinatario original (correo del usuario)
+  verified: boolean; // solo se procesan remitentes verificados (migración 0031)
+  verify_code_hash: string | null; // sha256 del código de verificación; null tras verificar
+  verify_expires_at: string | null; // vigencia del código
   created_at: string;
 };
 
