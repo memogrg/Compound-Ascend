@@ -928,6 +928,11 @@ export interface Database {
         Args: { p_payment_id: string };
         Returns: undefined;
       };
+      // Recuperación semántica de la Biblia (migración 0034). Solo lee dato de entorno.
+      match_biblia_chunks: {
+        Args: { query_embedding: number[]; match_count: number; min_similarity: number };
+        Returns: { content: string; tag: string; similarity: number }[];
+      };
     };
     Enums: {
       plan: Plan;

@@ -35,18 +35,31 @@ export function selectPatrimonioGuidance(flags: string[]): string[] {
   return out;
 }
 
-/** Selecciona la guía aplicable: 1 por emoción + hasta 2 por tema (máx 3). */
-export function selectBibliaKnowledge(p: { emotion?: string; text?: string }): string[] {
+/** Guía por emoción dominante (determinista, NO semántica). null si no aplica. */
+export function bibliaEmotionRule(emotion?: string): string | null {
+  return emotion && EMOTION_RULES[emotion] ? EMOTION_RULES[emotion]! : null;
+}
+
+/** Hasta 2 temas por keyword (includes() sobre texto normalizado), SIN la emoción. */
+export function selectBibliaTopicsKeyword(text?: string): string[] {
+  const t = normalize(text ?? "");
   const out: string[] = [];
-  if (p.emotion && EMOTION_RULES[p.emotion]) out.push(EMOTION_RULES[p.emotion]!);
-  const text = normalize(p.text ?? "");
   let topics = 0;
-  for (const t of TOPIC_CHUNKS) {
+  for (const chunk of TOPIC_CHUNKS) {
     if (topics >= 2) break;
-    if (t.keys.some((k) => text.includes(k))) {
-      out.push(t.chunk);
+    if (chunk.keys.some((k) => t.includes(k))) {
+      out.push(chunk.chunk);
       topics++;
     }
   }
+  return out;
+}
+
+/** Selecciona la guía aplicable: 1 por emoción + hasta 2 por tema keyword (máx 3). */
+export function selectBibliaKnowledge(p: { emotion?: string; text?: string }): string[] {
+  const out: string[] = [];
+  const er = bibliaEmotionRule(p.emotion);
+  if (er) out.push(er);
+  out.push(...selectBibliaTopicsKeyword(p.text));
   return out; // máx 3 fragmentos → no infla el prompt
 }

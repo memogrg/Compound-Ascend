@@ -15,7 +15,8 @@ import { logger } from "@/lib/logger";
 // El system prompt y su contexto viven en system-prompt.ts (puro, testeable);
 // el context-engine (Fase 5) arma el FinancialContext con datos autorizados.
 import { buildSystemPrompt, type FinancialContext } from "@/lib/ai/system-prompt";
-import { selectBibliaKnowledge, selectPatrimonioGuidance } from "@/lib/ai/biblia-knowledge";
+import { selectPatrimonioGuidance } from "@/lib/ai/biblia-knowledge";
+import { retrieveBiblia } from "@/lib/ai/biblia-retrieval";
 import {
   SIMULATE_DEBT_TOOL,
   COMPARE_DEBT_TOOL,
@@ -79,13 +80,12 @@ export async function financeChat(
   // inyectan un proveedor scripted. Ningún caller actual cambia (param opcional).
   provider: AIProvider = getProvider(),
 ): Promise<AIChatResponse & { tokensIn: number; tokensOut: number; provider: string }> {
-  // Recuperación determinista de la Biblia: emoción dominante + tema del último
-  // mensaje del usuario → guía conductual inyectada en el system prompt.
+  // Recuperación de la Biblia: emoción dominante (determinista) + temas (semántico con
+  // fallback keyword) del último mensaje → guía conductual inyectada en el system prompt.
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content;
-  // Biblia conductual (emoción + tema) + guía patrimonial §15 (banderas del diagnóstico),
-  // fusionadas y acotadas para no inflar el prompt.
+  // Biblia conductual + guía patrimonial §15 (banderas del diagnóstico), fusionadas y acotadas.
   const knowledge = [
-    ...selectBibliaKnowledge({ emotion: ctx.dominantEmotion, text: lastUser }),
+    ...(await retrieveBiblia({ emotion: ctx.dominantEmotion, text: lastUser })),
     ...selectPatrimonioGuidance(ctx.patrimonioDiagnosis ?? []),
   ].slice(0, 5);
   const result = await provider.chat({
@@ -122,10 +122,10 @@ function guardReply(
 }
 
 /** Biblia conductual + guía §15, fusionadas y acotadas (compartido por ambos chats). */
-function buildKnowledge(messages: ChatMessage[], ctx: FinancialContext): string[] {
+async function buildKnowledge(messages: ChatMessage[], ctx: FinancialContext): Promise<string[]> {
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content;
   return [
-    ...selectBibliaKnowledge({ emotion: ctx.dominantEmotion, text: lastUser }),
+    ...(await retrieveBiblia({ emotion: ctx.dominantEmotion, text: lastUser })),
     ...selectPatrimonioGuidance(ctx.patrimonioDiagnosis ?? []),
   ].slice(0, 5);
 }
@@ -172,7 +172,7 @@ export async function financeChatWithTools(
   if (!toolContext || !provider.chatWithTools) {
     return financeChat(messages, ctx, provider);
   }
-  const knowledge = buildKnowledge(messages, ctx);
+  const knowledge = await buildKnowledge(messages, ctx);
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages,
