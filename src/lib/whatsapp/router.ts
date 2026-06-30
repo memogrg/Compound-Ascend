@@ -144,10 +144,11 @@ async function handleActiveMessage(
       }
       const res = await createTransactionForUser(link.userId, link.householdId, pending);
       await setPendingAction(link.id, null);
+      const sobre = res.categoryName ? ` · en ${res.categoryName}` : " · por clasificar";
       await provider.sendText(
         msg.phone,
         res.ok
-          ? `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${pending.merchant ? ` en ${pending.merchant}` : ""}.`
+          ? `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${pending.merchant ? ` en ${pending.merchant}` : ""}${sobre}.`
           : "No pude guardarlo. Probá de nuevo en un momento.",
       );
       return;
