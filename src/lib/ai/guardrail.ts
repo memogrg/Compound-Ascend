@@ -18,11 +18,11 @@ export type GuardrailResult = { reply: string; flags: string[] };
 
 // Notas que se anexan (texto exacto → idempotencia por includes()). Voz de CARTERA+:
 // el consejo es de CARTERA+; la decisión y ejecución quedan en el usuario.
-const NOTE_RETURNS =
+export const NOTE_RETURNS =
   "CARTERA+: ninguna inversión garantiza rendimientos; la decisión final es tuya.";
-const NOTE_FISCAL =
+export const NOTE_FISCAL =
   "CARTERA+: es orientación general; para tu caso fiscal/legal, confirmá con un profesional.";
-const NOTE_RISK_BASE =
+export const NOTE_RISK_BASE =
   "CARTERA+: conviene asegurar tu fondo de emergencia antes de invertir — vos decidís el paso.";
 
 // R1 — promesas de rendimiento (regex sobre texto normalizado: sin acentos, minúsculas).
