@@ -48,7 +48,11 @@ export function backoffMs(attempt: number): number {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function call(key: string, body: unknown): Promise<GeminiResponse> {
+/**
+ * POST JSON con timeout + reintentos transitorios (5xx/429 y red) → AppError. Genérico para
+ * cualquier endpoint de Gemini (generateContent, batchEmbedContents). Mismo contrato que antes.
+ */
+async function postJsonWithRetry(url: string, body: unknown): Promise<unknown> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const isLast = attempt === MAX_ATTEMPTS - 1;
     const controller = new AbortController();
@@ -56,7 +60,7 @@ async function call(key: string, body: unknown): Promise<GeminiResponse> {
     try {
       let res: Response;
       try {
-        res = await fetch(`${BASE}/${MODEL}:generateContent?key=${key}`, {
+        res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -72,7 +76,7 @@ async function call(key: string, body: unknown): Promise<GeminiResponse> {
         await sleep(backoffMs(attempt));
         continue;
       }
-      if (res.ok) return (await res.json()) as GeminiResponse;
+      if (res.ok) return await res.json();
       // No-ok transitorio (5xx/429): reintentar; el resto se lanza ya.
       if (isRetryableStatus(res.status) && !isLast) {
         await sleep(backoffMs(attempt));
@@ -85,6 +89,46 @@ async function call(key: string, body: unknown): Promise<GeminiResponse> {
   }
   // Inalcanzable (el loop siempre retorna o lanza), pero satisface el tipo.
   throw new AppError("PROVIDER_ERROR", undefined, "gemini");
+}
+
+async function call(key: string, body: unknown): Promise<GeminiResponse> {
+  return (await postJsonWithRetry(
+    `${BASE}/${MODEL}:generateContent?key=${key}`,
+    body,
+  )) as GeminiResponse;
+}
+
+// Embeddings (Fase 2b-1): modelo dedicado y dimensión fija para la columna vector(768).
+const EMBED_MODEL = "gemini-embedding-001";
+const EMBED_DIM = 768;
+
+type BatchEmbedResponse = { embeddings?: { values?: number[] }[] };
+
+/**
+ * Embebe `texts` en lote con :batchEmbedContents (outputDimensionality 768). taskType
+ * RETRIEVAL_DOCUMENT al sembrar el corpus, RETRIEVAL_QUERY para consultas (Fase 2b-2). Mismo
+ * timeout/retry/AppError que `call`. Sin GEMINI_API_KEY lanza AppError (el caller hará fallback).
+ */
+export async function embedTexts(
+  texts: string[],
+  taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY",
+): Promise<number[][]> {
+  if (texts.length === 0) return [];
+  const key = getServerEnv().GEMINI_API_KEY;
+  if (!key) throw new AppError("PROVIDER_ERROR", undefined, "gemini embed: sin API key");
+  const body = {
+    requests: texts.map((text) => ({
+      model: `models/${EMBED_MODEL}`,
+      content: { parts: [{ text }] },
+      taskType,
+      outputDimensionality: EMBED_DIM,
+    })),
+  };
+  const json = (await postJsonWithRetry(
+    `${BASE}/${EMBED_MODEL}:batchEmbedContents?key=${key}`,
+    body,
+  )) as BatchEmbedResponse;
+  return (json.embeddings ?? []).map((e) => e.values ?? []);
 }
 
 function extract(r: GeminiResponse): AIChatResult {
