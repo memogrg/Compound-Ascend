@@ -7,7 +7,7 @@ import {
   type ToolContext,
 } from "@/lib/ai/orchestrator";
 import { NOTE_RETURNS, NOTE_FISCAL, NOTE_RISK_BASE } from "@/lib/ai/guardrail";
-import { simulateDebtPayoff } from "@/lib/ai/tools";
+import { simulateDebtPayoff, projectInvestment } from "@/lib/ai/tools";
 import type { ChatMessage } from "@/lib/ai/provider";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { ScriptedProvider, type ScriptedScript } from "../stubs/scripted-provider";
@@ -31,6 +31,7 @@ const DEBTS: DebtInput[] = [
   { id: "d2", name: "Préstamo", balance: 1000000, apr: 18, minPayment: 40000 },
 ];
 const SIM_ARGS = { estrategia: "avalancha", aporte_extra_mensual: 50000 };
+const PROJ_ARGS = { aporte_mensual: 100000, anios: 20, rendimiento_anual_pct: 8 };
 
 // Bloque ```action``` (regla de oro): se construye por concatenación para no chocar con los
 // backticks del template literal.
@@ -125,9 +126,23 @@ const SCENARIOS: Scenario[] = [
       expect(result.reply).toContain(String(expected.meses));
       expect(result.reply).toContain(String(expected.intereses_ahorrados));
       expect(provider.lastTools.map((t) => t.name).sort()).toEqual(
-        ["comparar_estrategias_deuda", "simular_pago_deuda"],
+        ["comparar_estrategias_deuda", "proyectar_inversion", "simular_pago_deuda"],
       );
       expect(provider.lastSystem).toContain(TOOLS_PROMPT_LINE);
+    },
+  },
+
+  // 4b) Tool de proyección: el cerebro publica el valor_futuro REAL del motor.
+  {
+    name: "tools: proyectar_inversion → reply contiene el valor_futuro real + 3 decls",
+    messages: ask("¿cuánto tendré si ahorro 100000 al mes 20 años?"),
+    tools: { debts: [], currency: "CRC" },
+    script: { reply: "Te proyecto el crecimiento:", toolCall: { name: "proyectar_inversion", args: PROJ_ARGS } },
+    assert: ({ result, provider }) => {
+      const expected = projectInvestment(PROJ_ARGS, "CRC");
+      expect(result.reply).toContain(String(expected.valor_futuro));
+      expect(provider.lastTools).toHaveLength(3);
+      expect(provider.lastTools.map((t) => t.name)).toContain("proyectar_inversion");
     },
   },
 

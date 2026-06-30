@@ -199,6 +199,121 @@ export function compareDebtStrategies(
 }
 
 // ---------------------------------------------------------------------------
+// Herramienta: proyección de interés compuesto (SOLO cálculo, PURA)
+// ---------------------------------------------------------------------------
+
+export const PROJECT_INVESTMENT_TOOL: AiToolDecl = {
+  name: "proyectar_inversion",
+  description:
+    "Proyecta el crecimiento de un ahorro/inversión con INTERÉS COMPUESTO (aportes mensuales). " +
+    "Usala para retiro, el Número de Libertad o metas de ahorro de largo plazo. El rendimiento " +
+    "es un SUPUESTO, no una garantía. Los montos van en la MONEDA PRINCIPAL del usuario. Si se da " +
+    "un objetivo, calcula también el aporte mensual requerido y en cuántos meses se alcanza. Solo " +
+    "calcula; no modifica nada.",
+  parameters: {
+    type: "object",
+    properties: {
+      aporte_mensual: {
+        type: "number",
+        description: "Monto que aportaría cada mes, en la moneda principal del usuario.",
+      },
+      anios: { type: "number", description: "Horizonte de la proyección, en años." },
+      rendimiento_anual_pct: {
+        type: "number",
+        description: "Rendimiento anual SUPUESTO en % (default 8). Es un supuesto, no una garantía.",
+      },
+      monto_inicial: {
+        type: "number",
+        description: "Capital inicial ya invertido (default 0), en la moneda principal.",
+      },
+      objetivo: {
+        type: "number",
+        description:
+          "Monto meta opcional (p. ej. el Número de Libertad o una meta de ahorro). Si se da, " +
+          "se calcula el aporte mensual requerido y los meses para alcanzarlo.",
+      },
+    },
+    required: ["aporte_mensual", "anios"],
+  },
+};
+
+export type InvestmentProjection = {
+  moneda: string;
+  valor_futuro: number;
+  total_aportado: number;
+  interes_ganado: number;
+  aporte_mensual_requerido?: number | null;
+  meses_para_objetivo?: number | null;
+  rendimiento_supuesto_pct: number;
+};
+
+/** Número finito o `fallback` (defensivo ante args del modelo). */
+function toNumberOr(v: unknown, fallback: number): number {
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+const round2 = (x: number): number => Math.round(x * 100) / 100;
+
+/** Aporte mensual requerido para llegar a `objetivo` en `n` meses (o null si n≤0). */
+function requiredMonthly(objetivo: number, inicial: number, n: number, r: number): number | null {
+  if (n <= 0) return null;
+  if (r === 0) return Math.max(0, (objetivo - inicial) / n);
+  const g = Math.pow(1 + r, n);
+  return Math.max(0, (objetivo - inicial * g) / ((g - 1) / r));
+}
+
+/** Meses para que `inicial` + aportes alcancen `objetivo`. null si nunca (r=0 y aporte no llega). */
+function monthsToReach(objetivo: number, inicial: number, aporte: number, r: number): number | null {
+  if (objetivo <= inicial) return 0;
+  if (r === 0) return aporte > 0 ? Math.ceil((objetivo - inicial) / aporte) : null;
+  const k = aporte / r;
+  const denom = inicial + k;
+  if (denom <= 0) return null;
+  const g = (objetivo + k) / denom; // (1+r)^m
+  if (g <= 1) return 0;
+  const m = Math.log(g) / Math.log(1 + r);
+  return Number.isFinite(m) && m > 0 ? Math.ceil(m) : null;
+}
+
+/**
+ * Proyecta interés compuesto con aportes mensuales. PURA: sin IO. Defensiva ante args inválidos
+ * (montos negativos/no numéricos → 0; rendimiento fuera de 0..100 se acota; default 8%). Si hay
+ * `objetivo`, agrega el aporte requerido para el horizonte y los meses para alcanzarlo.
+ */
+export function projectInvestment(
+  args: Record<string, unknown>,
+  currency: string,
+): InvestmentProjection {
+  const aporte = toPositive(args.aporte_mensual);
+  const anios = toPositive(args.anios);
+  const inicial = toPositive(args.monto_inicial);
+  const objetivo = toPositive(args.objetivo); // 0 = sin objetivo
+  const rendPct = Math.min(100, Math.max(0, toNumberOr(args.rendimiento_anual_pct, 8)));
+
+  const n = Math.round(anios * 12);
+  const r = rendPct / 100 / 12;
+  const g = r === 0 ? 1 : Math.pow(1 + r, n);
+
+  const valorFuturo = r === 0 ? inicial + aporte * n : inicial * g + aporte * ((g - 1) / r);
+  const totalAportado = inicial + aporte * n;
+
+  const base: InvestmentProjection = {
+    moneda: currency,
+    valor_futuro: round2(valorFuturo),
+    total_aportado: round2(totalAportado),
+    interes_ganado: round2(valorFuturo - totalAportado),
+    rendimiento_supuesto_pct: rendPct,
+  };
+  if (objetivo > 0) {
+    const req = requiredMonthly(objetivo, inicial, n, r);
+    base.aporte_mensual_requerido = req == null ? null : round2(req);
+    base.meses_para_objetivo = monthsToReach(objetivo, inicial, aporte, r);
+  }
+  return base;
+}
+
+// ---------------------------------------------------------------------------
 // Driver del loop de tool-calling (agnóstico de proveedor)
 // ---------------------------------------------------------------------------
 

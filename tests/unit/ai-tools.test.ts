@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   simulateDebtPayoff,
   compareDebtStrategies,
+  projectInvestment,
   runToolLoop,
   type ModelTurn,
   type ToolCallRecord,
@@ -51,6 +52,77 @@ describe("tools · simulateDebtPayoff (motor real, sin red)", () => {
     expect(r.meses).toBe(0);
     expect(r.fecha_libre_deuda).toBeNull();
     expect(r.orden_de_pago).toEqual([]);
+  });
+});
+
+describe("tools · projectInvestment (interés compuesto, puro)", () => {
+  it("FV de aportes mensuales coincide con el cálculo directo", () => {
+    const aporte = 100_000;
+    const anios = 10;
+    const rendPct = 8;
+    const r = projectInvestment(
+      { aporte_mensual: aporte, anios, rendimiento_anual_pct: rendPct },
+      "CRC",
+    );
+    const i = rendPct / 100 / 12;
+    const n = anios * 12;
+    const g = Math.pow(1 + i, n);
+    const fvExpected = aporte * ((g - 1) / i); // monto_inicial 0
+    expect(r.moneda).toBe("CRC");
+    expect(r.valor_futuro).toBe(Math.round(fvExpected * 100) / 100);
+    expect(r.total_aportado).toBe(aporte * n);
+    expect(r.interes_ganado).toBeGreaterThan(0);
+    expect(r.rendimiento_supuesto_pct).toBe(8);
+    expect(r.aporte_mensual_requerido).toBeUndefined(); // sin objetivo
+  });
+
+  it("rendimiento 0 → crecimiento lineal (sin interés)", () => {
+    const r = projectInvestment(
+      { aporte_mensual: 50_000, anios: 2, rendimiento_anual_pct: 0, monto_inicial: 100_000 },
+      "CRC",
+    );
+    expect(r.valor_futuro).toBe(100_000 + 50_000 * 24);
+    expect(r.interes_ganado).toBe(0);
+  });
+
+  it("con objetivo → aporte requerido y meses para alcanzarlo (coherentes)", () => {
+    const objetivo = 20_000_000;
+    const r = projectInvestment(
+      { aporte_mensual: 100_000, anios: 10, rendimiento_anual_pct: 8, objetivo },
+      "CRC",
+    );
+    expect(typeof r.aporte_mensual_requerido).toBe("number");
+    expect(r.aporte_mensual_requerido!).toBeGreaterThan(0);
+    // El aporte dado (100k) es menor al requerido para 10 años → tarda MÁS de 120 meses.
+    expect(r.meses_para_objetivo).not.toBeNull();
+    expect(r.meses_para_objetivo!).toBeGreaterThan(120);
+  });
+
+  it("objetivo ya cubierto por el monto inicial → 0 meses y aporte requerido 0", () => {
+    const r = projectInvestment(
+      { aporte_mensual: 10_000, anios: 5, rendimiento_anual_pct: 8, monto_inicial: 1_000_000, objetivo: 500_000 },
+      "CRC",
+    );
+    expect(r.meses_para_objetivo).toBe(0);
+    expect(r.aporte_mensual_requerido).toBe(0);
+  });
+
+  it("objetivo inalcanzable (r=0 y sin aporte) → meses null", () => {
+    const r = projectInvestment(
+      { aporte_mensual: 0, anios: 5, rendimiento_anual_pct: 0, monto_inicial: 100_000, objetivo: 999_999 },
+      "CRC",
+    );
+    expect(r.meses_para_objetivo).toBeNull();
+  });
+
+  it("args inválidos no rompen (defensivo) y usa el rendimiento por defecto", () => {
+    const r = projectInvestment(
+      { aporte_mensual: "abc", anios: -3, rendimiento_anual_pct: "x" },
+      "USD",
+    );
+    expect(Number.isFinite(r.valor_futuro)).toBe(true);
+    expect(r.valor_futuro).toBe(0); // aporte y años saneados a 0
+    expect(r.rendimiento_supuesto_pct).toBe(8); // default
   });
 });
 

@@ -20,8 +20,10 @@ import { retrieveBiblia } from "@/lib/ai/biblia-retrieval";
 import {
   SIMULATE_DEBT_TOOL,
   COMPARE_DEBT_TOOL,
+  PROJECT_INVESTMENT_TOOL,
   simulateDebtPayoff,
   compareDebtStrategies,
+  projectInvestment,
   type AiToolExecutor,
 } from "@/lib/ai/tools";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
@@ -144,6 +146,10 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
     if (name === "comparar_estrategias_deuda") {
       return compareDebtStrategies(toolContext.debts, args, new Date(), meta);
     }
+    if (name === "proyectar_inversion") {
+      // Pura: solo necesita la moneda principal (no ToolContext nuevo).
+      return projectInvestment(args, toolContext.currency);
+    }
     return { error: `herramienta no disponible: ${name}` };
   };
 }
@@ -154,7 +160,9 @@ export const TOOLS_PROMPT_LINE =
   "principal del usuario; si la herramienta devuelve fx_no_disponible:true, aclaralo (el " +
   "cálculo asume una sola moneda). Si el usuario pregunta qué estrategia le conviene " +
   "(avalancha vs bola de nieve), USÁ comparar_estrategias_deuda y explicá cuál ahorra más " +
-  "intereses y cuál da victorias más rápido; no inventes.";
+  "intereses y cuál da victorias más rápido; no inventes. Si pregunta cuánto podría crecer su " +
+  "dinero, en cuánto llegaría a una meta o a su Número de Libertad, USÁ proyectar_inversion; no " +
+  "inventes cifras de crecimiento y aclará que el rendimiento es un SUPUESTO, no una garantía.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -176,7 +184,7 @@ export async function financeChatWithTools(
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages,
-    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL],
+    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL, PROJECT_INVESTMENT_TOOL],
     execute: buildToolExecutor(toolContext),
   });
   const parsed = parseAction(result.text);
