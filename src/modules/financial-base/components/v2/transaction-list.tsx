@@ -17,7 +17,13 @@ import {
   duplicateTransactionAction,
   markReviewedAction,
   getReceiptUrlAction,
+  assignCategoryAction,
 } from "@/modules/financial-base/api/v2-actions";
+import {
+  selectableCategoryLeaves,
+  categoryMatchesKind,
+  type SelectableCategory,
+} from "@/modules/financial-base/engine/classify";
 import type { Account, Transaction } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 
@@ -109,6 +115,27 @@ export function TransactionList({
       } else toast("No se pudo completar", "error");
     });
 
+  // Hojas seleccionables (mismo criterio que "Por clasificar"): activas, no padre, no transfer.
+  const leaves = selectableCategoryLeaves(categories);
+
+  // Re-clasificar desde la lista: override puntual (applyFuture=false) o también la regla
+  // del comercio (applyFuture=true → upsert en la action, no duplica).
+  const recategorize = (t: Transaction, categoryId: string, applyFuture: boolean) =>
+    startTransition(async () => {
+      const merchant = t.merchantOrSource ?? t.description ?? undefined;
+      const res = await assignCategoryAction({
+        transactionId: t.id,
+        categoryId,
+        crearRegla: applyFuture && Boolean(merchant),
+        merchant,
+        type: t.kind === "gasto" ? "expense" : "income",
+      });
+      if (res.ok) {
+        toast(applyFuture ? "Sobre cambiado y regla actualizada" : "Sobre cambiado");
+        router.refresh();
+      } else toast(res.message ?? "No se pudo cambiar el sobre", "error");
+    });
+
   const visible = items.filter((t) => matches(t, chip));
 
   return (
@@ -148,10 +175,12 @@ export function TransactionList({
                     ? "Sin categoría"
                     : "—"
               }
+              leaves={leaves}
               onEdit={() => setEditing(t)}
               onDelete={() => requestDelete(t)}
               onDuplicate={() => runAction(() => duplicateTransactionAction(t.id), "Duplicada")}
               onMarkReviewed={() => runAction(() => markReviewedAction(t.id), "Marcada revisada")}
+              onRecategorize={(categoryId, applyFuture) => recategorize(t, categoryId, applyFuture)}
             />
           ))
         )}
@@ -174,20 +203,31 @@ export function TransactionList({
 function Row({
   t,
   categoryName,
+  leaves,
   onEdit,
   onDelete,
   onDuplicate,
   onMarkReviewed,
+  onRecategorize,
 }: {
   t: Transaction;
   categoryName: string;
+  leaves: SelectableCategory[];
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onMarkReviewed: () => void;
+  onRecategorize: (categoryId: string, applyFuture: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [recat, setRecat] = useState(false);
+  const [applyFuture, setApplyFuture] = useState(false);
   const [dx, setDx] = useState(0);
+  // Solo gasto/ingreso van a un sobre (transferencia/ajuste no se re-clasifican).
+  const canRecat = t.kind === "gasto" || t.kind === "ingreso";
+  const recatOptions = canRecat
+    ? leaves.filter((c) => categoryMatchesKind(c.categoryType, t.kind as "gasto" | "ingreso"))
+    : [];
   const startX = useRef<number | null>(null);
   const isIncome = t.kind === "ingreso";
   const isTransfer = t.kind === "transferencia";
@@ -289,6 +329,16 @@ function Row({
               >
                 Editar
               </button>
+              {canRecat ? (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    setRecat((v) => !v);
+                  }}
+                >
+                  Cambiar sobre
+                </button>
+              ) : null}
               <button
                 onClick={() => {
                   setOpen(false);
@@ -321,6 +371,64 @@ function Row({
           ) : null}
         </div>
       </div>
+      {recat ? (
+        <div
+          className="list-row"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            padding: "8px 12px",
+            borderTop: "1px solid var(--line)",
+            background: "var(--surface-2, transparent)",
+            fontSize: 12,
+          }}
+        >
+          <span className="muted" style={{ flex: "none" }}>
+            Cambiar sobre:
+          </span>
+          <select
+            className="sel"
+            style={{ width: "auto", fontSize: 12, padding: "4px 8px" }}
+            defaultValue=""
+            onChange={(e) => {
+              if (!e.target.value) return;
+              onRecategorize(e.target.value, applyFuture);
+              setRecat(false);
+            }}
+          >
+            <option value="" disabled>
+              Elegí un sobre
+            </option>
+            {recatOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <label
+            className="tip"
+            data-tip="Actualiza (o crea) la regla del comercio para que los próximos caigan solos en este sobre."
+            style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+          >
+            <input
+              type="checkbox"
+              checked={applyFuture}
+              onChange={(e) => setApplyFuture(e.target.checked)}
+            />
+            aplicar a futuros
+          </label>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            style={{ flex: "none", padding: "2px 10px", marginLeft: "auto" }}
+            onClick={() => setRecat(false)}
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

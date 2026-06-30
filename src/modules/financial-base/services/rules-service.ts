@@ -89,6 +89,45 @@ export async function deleteRule(id: string): Promise<void> {
 }
 
 /**
+ * UPSERT de la regla de un comercio: si ya existe una regla ACTIVA del mismo tipo cuyo
+ * patrón coincide EXACTAMENTE (igualdad case-insensitive, no substring) con `merchant`,
+ * solo le cambia la categoría sugerida (sin duplicar ni pisar reglas más genéricas);
+ * si no, crea una nueva. La igualdad exacta —en vez de substring como el matching— evita
+ * que re-clasificar "Starbucks" reescriba una regla más amplia como "Starbucks Centro".
+ */
+export async function upsertRuleForMerchant(
+  merchant: string,
+  type: "income" | "expense",
+  categoryId: string,
+): Promise<void> {
+  const target = merchant.trim().toLowerCase();
+  const rules = await listRules();
+  const existing = rules.find(
+    (r) => r.active && r.type === type && r.merchantPattern.trim().toLowerCase() === target,
+  );
+  if (existing) {
+    await updateRule(existing.id, {
+      merchantPattern: existing.merchantPattern,
+      type: existing.type,
+      suggestedCategoryId: categoryId,
+      suggestedAccountId: existing.suggestedAccountId,
+      active: existing.active,
+      priority: existing.priority,
+      linkedKind: existing.linkedKind as RuleInput["linkedKind"],
+      linkedId: existing.linkedId,
+    });
+    return;
+  }
+  await createRule({
+    merchantPattern: merchant,
+    type,
+    suggestedCategoryId: categoryId,
+    active: true,
+    priority: 0,
+  });
+}
+
+/**
  * Matching PURO: primera regla activa del tipo cuyo patrón (substring,
  * case-insensitive) esté contenido en el texto del comercio. Determinista, sin IA.
  * Las reglas vienen ya ordenadas (mayor prioridad / más reciente primero).

@@ -25,6 +25,7 @@ import {
   createRule,
   updateRule,
   deleteRule,
+  upsertRuleForMerchant,
 } from "@/modules/financial-base/services/rules-service";
 import {
   createCategory,
@@ -598,16 +599,12 @@ export async function assignCategoryAction(raw: unknown): Promise<ActionResult> 
 
     if (crearRegla && merchant && type) {
       try {
-        await createRule({
-          merchantPattern: merchant,
-          suggestedCategoryId: categoryId,
-          type,
-          active: true,
-          priority: 0,
-        });
+        // UPSERT: re-clasificar "a futuros" actualiza la regla del comercio en vez de
+        // duplicarla. Best-effort: la categoría ya quedó asignada arriba.
+        await upsertRuleForMerchant(merchant, type, categoryId);
       } catch (ruleErr) {
         // La categoría ya se asignó; la regla es un extra opcional.
-        logger.warn("assignCategory: no se pudo crear la regla", {
+        logger.warn("assignCategory: no se pudo actualizar la regla", {
           message: ruleErr instanceof Error ? ruleErr.message : "?",
         });
       }
