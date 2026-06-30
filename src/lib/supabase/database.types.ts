@@ -692,6 +692,16 @@ export type ProcessedEventRow = {
 };
 
 /** Caché de sugerencias de sobre por (usuario, comercio) por IA (migración 0032). */
+/** Corpus semántico de la Biblia (migración 0033). Dato de entorno, sin user_id. */
+export type BibliaChunkRow = {
+  id: string;
+  tag: string;
+  content: string;
+  embedding: number[] | null; // vector(768)
+  source: string;
+  created_at: string;
+};
+
 export type MerchantSuggestionCacheRow = {
   id: string;
   user_id: string;
@@ -861,6 +871,13 @@ export interface Database {
       account_cards: UserTable<AccountCardRow>;
       // Caché de sugerencias de sobre por (usuario, comercio) (migración 0032).
       merchant_suggestion_cache: UserTable<MerchantSuggestionCacheRow>;
+      // Corpus semántico de la Biblia (migración 0033). Dato de entorno (sin user_id);
+      // lectura para autenticados, escritura solo service-role.
+      biblia_chunks: TableShape<
+        BibliaChunkRow,
+        { tag: string; content: string; embedding?: number[] | null; source?: string },
+        Partial<BibliaChunkRow>
+      >;
     };
     // OJO: usar `{ [_ in never]: never }` (sin índice de cadena). `Record<string,
     // never>` tiene índice `[k]: never` y, vía `Tables & Views`, intersecta cada
