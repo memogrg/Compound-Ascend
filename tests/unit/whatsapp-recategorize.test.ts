@@ -55,6 +55,8 @@ import {
   parseMoveCommand,
   resolveCategoryByName,
   moveLastTransaction,
+  moveTransaction,
+  getTransactionByAmount,
 } from "@/lib/whatsapp/recategorize-service";
 
 const cat = (over: Record<string, unknown>) => ({
@@ -89,15 +91,64 @@ beforeEach(() => {
 // parseMoveCommand (puro)
 // ---------------------------------------------------------------------------
 describe("parseMoveCommand", () => {
-  it("parsea 'mover a Paseos' (sin tocar regla)", () => {
-    expect(parseMoveCommand("mover a Paseos")).toEqual({ sobre: "Paseos", alsoRule: false });
+  it("parsea 'mover a Paseos' (último, sin tocar regla)", () => {
+    expect(parseMoveCommand("mover a Paseos")).toEqual({
+      sobre: "Paseos",
+      alsoRule: false,
+      amount: null,
+    });
   });
   it("parsea 'mover a Paseos siempre' (toca regla)", () => {
-    expect(parseMoveCommand("mover a Paseos siempre")).toEqual({ sobre: "Paseos", alsoRule: true });
+    expect(parseMoveCommand("mover a Paseos siempre")).toEqual({
+      sobre: "Paseos",
+      alsoRule: true,
+      amount: null,
+    });
   });
   it("acepta cambiar/recategorizar y 'a futuro'", () => {
-    expect(parseMoveCommand("cambiar Comida fuera")).toEqual({ sobre: "Comida fuera", alsoRule: false });
-    expect(parseMoveCommand("recategorizar a Super a futuro")).toEqual({ sobre: "Super", alsoRule: true });
+    expect(parseMoveCommand("cambiar Comida fuera")).toEqual({
+      sobre: "Comida fuera",
+      alsoRule: false,
+      amount: null,
+    });
+    expect(parseMoveCommand("recategorizar a Super a futuro")).toEqual({
+      sobre: "Super",
+      alsoRule: true,
+      amount: null,
+    });
+  });
+  it("parsea selector de monto: 'mover el de 12000 a Paseos'", () => {
+    expect(parseMoveCommand("mover el de 12000 a Paseos")).toEqual({
+      sobre: "Paseos",
+      alsoRule: false,
+      amount: 12000,
+    });
+  });
+  it("monto con separador de miles + 'siempre': 'mover el de 12.000 a Paseos siempre'", () => {
+    expect(parseMoveCommand("mover el de 12.000 a Paseos siempre")).toEqual({
+      sobre: "Paseos",
+      alsoRule: true,
+      amount: 12000,
+    });
+  });
+  it("monto sin 'el' ni 'a': 'mover de 5000 a Comida fuera' / 'cambiar el gasto de 800 a Super'", () => {
+    expect(parseMoveCommand("mover de 5000 a Comida fuera")).toEqual({
+      sobre: "Comida fuera",
+      alsoRule: false,
+      amount: 5000,
+    });
+    expect(parseMoveCommand("cambiar el gasto de 800 a Super")).toEqual({
+      sobre: "Super",
+      alsoRule: false,
+      amount: 800,
+    });
+  });
+  it("no confunde un sobre con 'de' sin dígitos: 'mover a Cuentas de casa'", () => {
+    expect(parseMoveCommand("mover a Cuentas de casa")).toEqual({
+      sobre: "Cuentas de casa",
+      alsoRule: false,
+      amount: null,
+    });
   });
   it("ignora lo que no es comando", () => {
     expect(parseMoveCommand("gasté 12000 en super")).toBeNull();
@@ -178,6 +229,41 @@ describe("moveLastTransaction", () => {
     h.lastTxn = { id: "t1", merchant_or_source: "X", kind: "gasto" };
     const res = await moveLastTransaction("u1", "comida", false);
     expect(res.status).toBe("ambiguous");
+    expect(h.updateSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// moveTransaction (por monto) + getTransactionByAmount
+// ---------------------------------------------------------------------------
+describe("moveTransaction / getTransactionByAmount", () => {
+  it("getTransactionByAmount devuelve la transacción con ese monto", async () => {
+    h.lastTxn = { id: "t9", merchant_or_source: "Auto Mercado", kind: "gasto" };
+    const t = await getTransactionByAmount("u1", 12000);
+    expect(t).toEqual({ id: "t9", merchant: "Auto Mercado", kind: "gasto" });
+  });
+
+  it("amount null → mueve la última (delegación a getLastTransaction)", async () => {
+    h.lastTxn = { id: "t1", merchant_or_source: "Cine", kind: "gasto" };
+    const res = await moveTransaction("u1", null, "Paseos", false);
+    expect(res.status).toBe("ok");
+    const payload = h.updateSpy.mock.calls[0]![0] as Record<string, unknown>;
+    expect(payload.category_id).toBe("c-paseos");
+  });
+
+  it("con monto → mueve esa transacción; con alsoRule hace upsert", async () => {
+    h.lastTxn = { id: "t9", merchant_or_source: "Auto Mercado", kind: "gasto" };
+    const res = await moveTransaction("u1", 12000, "Paseos", true);
+    expect(res.status).toBe("ok");
+    if (res.status === "ok") expect(res.ruleUpdated).toBe(true);
+    expect(upsertRuleForUser).toHaveBeenCalledWith("u1", "Auto Mercado", "expense", "c-paseos");
+  });
+
+  it("monto sin coincidencia → no_txn con el monto buscado (explicable, no escribe)", async () => {
+    h.lastTxn = null;
+    const res = await moveTransaction("u1", 99999, "Paseos", false);
+    expect(res.status).toBe("no_txn");
+    if (res.status === "no_txn") expect(res.amount).toBe(99999);
     expect(h.updateSpy).not.toHaveBeenCalled();
   });
 });
