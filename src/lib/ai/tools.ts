@@ -314,6 +314,128 @@ export function projectInvestment(
 }
 
 // ---------------------------------------------------------------------------
+// Herramienta: proyección hacia el Número de Libertad Financiera (datos reales)
+// ---------------------------------------------------------------------------
+
+export const FREEDOM_TOOL: AiToolDecl = {
+  name: "proyectar_libertad_financiera",
+  description:
+    "Proyecta cuánto le falta al usuario para SU Número de Libertad Financiera, usando su " +
+    "patrimonio invertible REAL como punto de partida. Según los parámetros: con aporte mensual y " +
+    "años dice si alcanza y cuánto falta/sobra; con años dice el aporte mensual requerido; con " +
+    "aporte dice en cuántos años llega. El rendimiento es un SUPUESTO, no una garantía. Montos en " +
+    "la MONEDA PRINCIPAL del usuario. Solo lee y calcula; no modifica nada.",
+  parameters: {
+    type: "object",
+    properties: {
+      aporte_mensual: {
+        type: "number",
+        description: "Aporte mensual que haría, en la moneda principal (opcional).",
+      },
+      anios: { type: "number", description: "Horizonte en años (opcional)." },
+      rendimiento_anual_pct: {
+        type: "number",
+        description: "Rendimiento anual SUPUESTO en % (default 8). Es un supuesto, no una garantía.",
+      },
+    },
+  },
+};
+
+export type FreedomContext = {
+  freedomNumber?: number;
+  investableWealth?: number;
+  currency: string;
+};
+
+export type FreedomProjection =
+  | { disponible: false; motivo: string }
+  | {
+      disponible: true;
+      moneda: string;
+      numero_de_libertad: number;
+      patrimonio_invertible_actual: number;
+      rendimiento_supuesto_pct: number;
+      valor_futuro?: number;
+      alcanza?: boolean;
+      faltante_o_excedente?: number; // valor_futuro - número (positivo = excede)
+      pct_del_numero?: number; // valor_futuro / número * 100
+      aporte_mensual_requerido?: number | null;
+      anios_para_alcanzar?: number | null;
+    };
+
+/**
+ * Proyección hacia el Número de Libertad usando datos REALES del usuario (objetivo = su número,
+ * capital inicial = su patrimonio invertible). Reusa `projectInvestment`. PURA. Si no hay número
+ * calculado, devuelve `disponible:false` con un motivo explicable (la IA lo comunica).
+ */
+export function projectFreedom(
+  args: { aporte_mensual?: unknown; anios?: unknown; rendimiento_anual_pct?: unknown },
+  ctx: FreedomContext,
+): FreedomProjection {
+  const freedom = typeof ctx.freedomNumber === "number" ? ctx.freedomNumber : 0;
+  if (!(freedom > 0)) {
+    return {
+      disponible: false,
+      motivo: "Aún no tengo tu Número de Libertad calculado (registrá tus gastos/patrimonio).",
+    };
+  }
+  const inicial = Math.max(0, typeof ctx.investableWealth === "number" ? ctx.investableWealth : 0);
+  const aporte = toPositive(args.aporte_mensual);
+  const anios = toPositive(args.anios);
+  const rendPct = Math.min(100, Math.max(0, toNumberOr(args.rendimiento_anual_pct, 8)));
+
+  const base = {
+    disponible: true as const,
+    moneda: ctx.currency,
+    numero_de_libertad: round2(freedom),
+    patrimonio_invertible_actual: round2(inicial),
+    rendimiento_supuesto_pct: rendPct,
+  };
+
+  // Reusa el engine de interés compuesto con objetivo = número y capital inicial = invertible.
+  const proj = projectInvestment(
+    {
+      aporte_mensual: aporte,
+      anios,
+      rendimiento_anual_pct: rendPct,
+      monto_inicial: inicial,
+      objetivo: freedom,
+    },
+    ctx.currency,
+  );
+  const aniosParaAlcanzar =
+    proj.meses_para_objetivo == null ? null : round2(proj.meses_para_objetivo / 12);
+
+  // Con aporte + años: ¿alcanza al horizonte? cuánto falta/sobra y % del número.
+  if (aporte > 0 && anios > 0) {
+    const vf = proj.valor_futuro;
+    return {
+      ...base,
+      valor_futuro: vf,
+      alcanza: vf >= freedom,
+      faltante_o_excedente: round2(vf - freedom),
+      pct_del_numero: round2((vf / freedom) * 100),
+    };
+  }
+  // Con años, sin aporte: aporte mensual requerido para llegar en ese plazo.
+  if (anios > 0) {
+    return { ...base, aporte_mensual_requerido: proj.aporte_mensual_requerido ?? null };
+  }
+  // Con aporte, sin años: en cuántos años llega (o null si nunca).
+  if (aporte > 0) {
+    return { ...base, anios_para_alcanzar: aniosParaAlcanzar };
+  }
+  // Sin parámetros: foto actual (patrimonio invertible vs. número).
+  return {
+    ...base,
+    valor_futuro: round2(inicial),
+    alcanza: inicial >= freedom,
+    faltante_o_excedente: round2(inicial - freedom),
+    pct_del_numero: round2((inicial / freedom) * 100),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Driver del loop de tool-calling (agnóstico de proveedor)
 // ---------------------------------------------------------------------------
 

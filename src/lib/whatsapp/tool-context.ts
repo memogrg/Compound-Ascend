@@ -10,6 +10,8 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getUserCurrency } from "@/lib/whatsapp/links-service";
 import { getFxRates } from "@/lib/market-data/fx-rates";
+import { getPatrimonioReportForUser } from "@/modules/wealth/services/patrimonio-service";
+import { convertCurrency } from "@/lib/fx";
 import { normalizeDebtsForTool, type ToolContext } from "@/lib/ai/orchestrator";
 
 type DebtRow = {
@@ -55,9 +57,33 @@ export async function buildWhatsAppToolContext(
     rates = null;
   }
 
-  return {
+  const toolContext: ToolContext = {
     currency: primary,
     fxUnavailable: !rates,
     debts: normalizeDebtsForTool(raw, primary, rates),
   };
+
+  // Número de Libertad + patrimonio invertible (service-role, ya en moneda primaria).
+  // Best-effort: si falla, la tool de libertad degrada con un motivo explicable.
+  try {
+    const pat = await getPatrimonioReportForUser(userId);
+    let numero = pat.report.numeroDeLibertad;
+    let invertible = pat.report.investableWealth;
+    if (pat.currency !== primary) {
+      if (rates) {
+        numero = convertCurrency(numero, pat.currency, primary, rates);
+        invertible = convertCurrency(invertible, pat.currency, primary, rates);
+      } else {
+        numero = NaN;
+      }
+    }
+    if (Number.isFinite(numero)) {
+      toolContext.freedomNumber = numero;
+      toolContext.investableWealth = invertible;
+    }
+  } catch {
+    // deja los campos undefined
+  }
+
+  return toolContext;
 }
