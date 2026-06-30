@@ -30,6 +30,7 @@ import {
   type PendingAction,
 } from "@/lib/whatsapp/links-service";
 import { createTransactionForUser } from "@/lib/whatsapp/write-service";
+import { moveLastTransaction, parseMoveCommand } from "@/lib/whatsapp/recategorize-service";
 import { formatMoney, todayIso } from "@/lib/whatsapp/format";
 import { parseNotification } from "@/lib/ingestion/sources";
 import { toPendingAction, dedupKey } from "@/lib/ingestion/normalize";
@@ -65,10 +66,12 @@ const CONFIRM_RE = /^(s[ií]|yes|ok|dale|confirmar|confirmo|listo|1)$/;
 const EDIT_RE = /^(edit(ar)?|2)$/;
 const REVIEW_RE = /^(revisar|revisi[oó]n|movimientos|pendientes)$/;
 const HELP_RE = /^(ayuda|men[uú]|hola|help|empezar|start|\?)$/;
+const MOVE_HINT = "\n↩️ ¿Sobre equivocado? Respondé *mover a <sobre>* (agregá *siempre* para recordarlo).";
 const HELP_TEXT =
   "👋 Soy tu asistente de Compound Ascend. Puedo:\n\n" +
   "📸 Registrar un gasto: enviá una *foto* del recibo.\n" +
   '✍️ Registrar por texto: "gasté 12000 en super" o "me entraron 50000 de freelance".\n' +
+  '🔁 Re-clasificar lo último: "mover a Paseos" (o "mover a Paseos siempre" para recordarlo).\n' +
   '📊 Responder consultas: "¿cuánto gasté este mes?", "¿cómo va mi presupuesto?".\n\n' +
   "Siempre te pido confirmar antes de guardar.";
 
@@ -148,7 +151,7 @@ async function handleActiveMessage(
       await provider.sendText(
         msg.phone,
         res.ok
-          ? `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${pending.merchant ? ` en ${pending.merchant}` : ""}${sobre}.`
+          ? `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${pending.merchant ? ` en ${pending.merchant}` : ""}${sobre}.${MOVE_HINT}`
           : "No pude guardarlo. Probá de nuevo en un momento.",
       );
       return;
@@ -182,6 +185,13 @@ async function handleActiveMessage(
       await countPendingProposals(link.userId, link.householdId),
     );
     await provider.sendText(msg.phone, nudge ? `${HELP_TEXT}\n\n${nudge}` : HELP_TEXT);
+    return;
+  }
+
+  // "mover/cambiar a <sobre> [siempre]": re-clasifica la última transacción.
+  const move = parseMoveCommand(msg.body);
+  if (move) {
+    await handleMoveCommand(provider, link, msg.phone, move.sobre, move.alsoRule);
     return;
   }
 
@@ -222,6 +232,47 @@ async function handleActiveMessage(
 
   // Texto libre: gasto/ingreso (con confirmación) o consulta de solo lectura.
   await handleText(provider, link, msg);
+}
+
+/** Comando "mover a <sobre> [siempre]": re-clasifica la última transacción del usuario. */
+async function handleMoveCommand(
+  provider: WhatsAppProvider,
+  link: ActiveLink,
+  phone: string,
+  sobre: string,
+  alsoRule: boolean,
+): Promise<void> {
+  if (!sobre) {
+    await provider.sendText(phone, '¿A qué sobre lo movemos? Probá: *mover a Paseos*.');
+    return;
+  }
+  const res = await moveLastTransaction(link.userId, sobre, alsoRule);
+  switch (res.status) {
+    case "ok":
+      await provider.sendText(
+        phone,
+        `✅ Movido a ${res.categoryName}` +
+          (res.ruleUpdated && res.merchant ? ` · lo recordaré para ${res.merchant}.` : "."),
+      );
+      return;
+    case "ambiguous":
+      await provider.sendText(
+        phone,
+        `¿Cuál sobre? Tengo varios parecidos: ${res.options.join(", ")}. Escribí el nombre exacto.`,
+      );
+      return;
+    case "not_found":
+      await provider.sendText(
+        phone,
+        `No encontré un sobre que se llame "${res.name}". Mirá tus sobres en la app o probá otro nombre.`,
+      );
+      return;
+    case "no_txn":
+      await provider.sendText(phone, "No tenés un movimiento reciente para mover.");
+      return;
+    default:
+      await provider.sendText(phone, "No pude moverlo. Probá de nuevo en un momento.");
+  }
 }
 
 /** Texto libre: arma el contexto del hogar, consulta a la IA y, si propone una
