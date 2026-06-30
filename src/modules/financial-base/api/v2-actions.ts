@@ -60,6 +60,7 @@ import { monthPeriod } from "@/modules/financial-base/engine/period";
 import {
   createTransaction,
   updateTransaction,
+  setTransactionCategory,
   deleteTransaction,
   duplicateTransaction,
   markReviewed,
@@ -570,6 +571,55 @@ export async function addRuleAction(raw: unknown): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false, message: "No pudimos guardar la regla." };
+  }
+}
+
+const assignCategorySchema = z.object({
+  transactionId: z.string().uuid(),
+  categoryId: z.string().uuid(),
+  crearRegla: z.boolean().optional(),
+  merchant: z.string().trim().max(160).optional(),
+  type: z.enum(["expense", "income"]).optional(),
+});
+
+/**
+ * Asigna el sobre (categoría) a una transacción sin clasificar y, opcional, crea la
+ * regla para que la próxima del mismo comercio caiga sola. La regla es best-effort:
+ * si falla, la categoría ya quedó asignada (no se pierde el avance del usuario).
+ */
+export async function assignCategoryAction(raw: unknown): Promise<ActionResult> {
+  const parsed = assignCategorySchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  const { transactionId, categoryId, crearRegla, merchant, type } = parsed.data;
+  try {
+    await requireUser();
+    await setTransactionCategory(transactionId, categoryId);
+
+    if (crearRegla && merchant && type) {
+      try {
+        await createRule({
+          merchantPattern: merchant,
+          suggestedCategoryId: categoryId,
+          type,
+          active: true,
+          priority: 0,
+        });
+      } catch (ruleErr) {
+        // La categoría ya se asignó; la regla es un extra opcional.
+        logger.warn("assignCategory: no se pudo crear la regla", {
+          message: ruleErr instanceof Error ? ruleErr.message : "?",
+        });
+      }
+    }
+
+    revalidatePath("/transacciones");
+    revalidatePath("/gastos");
+    revalidate();
+    return { ok: true };
+  } catch (err) {
+    logger.error("assignCategory fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos clasificar el movimiento." };
   }
 }
 
