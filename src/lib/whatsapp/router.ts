@@ -30,7 +30,7 @@ import {
   type PendingAction,
 } from "@/lib/whatsapp/links-service";
 import { createTransactionForUser } from "@/lib/whatsapp/write-service";
-import { moveLastTransaction, parseMoveCommand } from "@/lib/whatsapp/recategorize-service";
+import { moveTransaction, parseMoveCommand } from "@/lib/whatsapp/recategorize-service";
 import { formatMoney, todayIso } from "@/lib/whatsapp/format";
 import { parseNotification } from "@/lib/ingestion/sources";
 import { toPendingAction, dedupKey } from "@/lib/ingestion/normalize";
@@ -71,7 +71,7 @@ const HELP_TEXT =
   "👋 Soy tu asistente de Compound Ascend. Puedo:\n\n" +
   "📸 Registrar un gasto: enviá una *foto* del recibo.\n" +
   '✍️ Registrar por texto: "gasté 12000 en super" o "me entraron 50000 de freelance".\n' +
-  '🔁 Re-clasificar lo último: "mover a Paseos" (o "mover a Paseos siempre" para recordarlo).\n' +
+  '🔁 Re-clasificar: "mover a Paseos" (lo último), "mover el de 12000 a Paseos" (por monto) o agregá "siempre" para recordarlo.\n' +
   '📊 Responder consultas: "¿cuánto gasté este mes?", "¿cómo va mi presupuesto?".\n\n' +
   "Siempre te pido confirmar antes de guardar.";
 
@@ -188,10 +188,10 @@ async function handleActiveMessage(
     return;
   }
 
-  // "mover/cambiar a <sobre> [siempre]": re-clasifica la última transacción.
+  // "mover [el de <monto>] a <sobre> [siempre]": re-clasifica una transacción.
   const move = parseMoveCommand(msg.body);
   if (move) {
-    await handleMoveCommand(provider, link, msg.phone, move.sobre, move.alsoRule);
+    await handleMoveCommand(provider, link, msg.phone, move);
     return;
   }
 
@@ -234,19 +234,18 @@ async function handleActiveMessage(
   await handleText(provider, link, msg);
 }
 
-/** Comando "mover a <sobre> [siempre]": re-clasifica la última transacción del usuario. */
+/** Comando "mover [el de <monto>] a <sobre> [siempre]": re-clasifica una transacción. */
 async function handleMoveCommand(
   provider: WhatsAppProvider,
   link: ActiveLink,
   phone: string,
-  sobre: string,
-  alsoRule: boolean,
+  move: { sobre: string; alsoRule: boolean; amount: number | null },
 ): Promise<void> {
-  if (!sobre) {
+  if (!move.sobre) {
     await provider.sendText(phone, '¿A qué sobre lo movemos? Probá: *mover a Paseos*.');
     return;
   }
-  const res = await moveLastTransaction(link.userId, sobre, alsoRule);
+  const res = await moveTransaction(link.userId, move.amount, move.sobre, move.alsoRule);
   switch (res.status) {
     case "ok":
       await provider.sendText(
@@ -268,7 +267,15 @@ async function handleMoveCommand(
       );
       return;
     case "no_txn":
-      await provider.sendText(phone, "No tenés un movimiento reciente para mover.");
+      if (res.amount != null) {
+        const currency = await getUserCurrency(link.userId);
+        await provider.sendText(
+          phone,
+          `No encontré un movimiento de ${formatMoney(res.amount, currency)}. Probá con otro monto o "mover a <sobre>" para el último.`,
+        );
+      } else {
+        await provider.sendText(phone, "No tenés un movimiento reciente para mover.");
+      }
       return;
     default:
       await provider.sendText(phone, "No pude moverlo. Probá de nuevo en un momento.");
