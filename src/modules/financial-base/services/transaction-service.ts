@@ -230,6 +230,24 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
   return { id: data.id, linkedKind, linkedId };
 }
 
+/**
+ * Asigna SOLO la categoría de una transacción (vista "Por clasificar"). Escritura
+ * enfocada — no recalcula el resto de la fila como updateTransaction. RLS acota a
+ * las transacciones del usuario.
+ */
+export async function setTransactionCategory(
+  id: string,
+  categoryId: string | null,
+): Promise<void> {
+  await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("transactions")
+    .update({ category_id: categoryId })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export async function updateTransaction(id: string, input: TxnInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

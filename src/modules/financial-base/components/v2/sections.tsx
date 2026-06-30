@@ -28,6 +28,11 @@ import { ComposerButton } from "@/modules/financial-base/components/v2/composer-
 import { CategoryManagerButton } from "@/modules/financial-base/components/v2/category-manager";
 import { RulesButton } from "@/modules/financial-base/components/v2/rules-panel";
 import { ReconciliationCard } from "@/modules/financial-base/components/v2/reconciliation-card";
+import { PorClasificarCard } from "@/modules/financial-base/components/v2/por-clasificar-card";
+import {
+  selectUncategorized,
+  selectableCategoryLeaves,
+} from "@/modules/financial-base/engine/classify";
 import {
   findUnlinkedCandidates,
   buildEntityAlerts,
@@ -684,6 +689,12 @@ export function TransaccionesSection({ view }: { view: V2View }) {
         accounts={view.accounts}
         currency={currency}
         period={view.period.label}
+      />
+
+      {/* Por clasificar: movimientos sin sobre (WhatsApp/ingesta sin regla). */}
+      <PorClasificarCard
+        items={selectUncategorized(view.transactions)}
+        categories={selectableCategoryLeaves(view.categories)}
       />
 
       {/* Conciliación (Fase 6): sin-vincular + plan-vs-real por entidad. */}
