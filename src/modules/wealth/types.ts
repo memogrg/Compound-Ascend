@@ -137,7 +137,7 @@ export type PortfolioStats = {
 
 // ── Motor de inversiones ──────────────────────────────────────────
 
-export type RentalFrequency = "mensual" | "trimestral" | "semestral" | "anual";
+export type RentalFrequency = "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
 export type RentalSubtype = "alquiler" | "airbnb" | "auto" | "negocio" | "otro";
 
 export type Holding = {
