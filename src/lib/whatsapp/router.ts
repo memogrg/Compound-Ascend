@@ -31,8 +31,9 @@ import {
   touchLastSeen,
   type ActiveLink,
   type PendingAction,
+  type GoalPending,
 } from "@/lib/whatsapp/links-service";
-import { createTransactionForUser } from "@/lib/whatsapp/write-service";
+import { createTransactionForUser, createGoalForUser } from "@/lib/whatsapp/write-service";
 import { moveTransaction, parseMoveCommand } from "@/lib/whatsapp/recategorize-service";
 import { formatMoney, todayIso } from "@/lib/whatsapp/format";
 import { parseNotification } from "@/lib/ingestion/sources";
@@ -140,29 +141,51 @@ async function handleActiveMessage(
   const pending = await getPendingAction(link.id);
 
   // Confirmación de una propuesta pendiente.
-  if (pending) {
+  if (pending && "type" in pending && pending.type === "goal") {
+    // Meta pendiente: confirmar la creación o descartar.
+    if (CONFIRM_RE.test(lower)) {
+      const res = await createGoalForUser(link.userId, link.householdId, pending);
+      await setPendingAction(link.id, null);
+      await provider.sendText(
+        msg.phone,
+        res.ok
+          ? `✅ Meta creada: ${pending.name} (objetivo ${formatMoney(pending.targetAmount, pending.currency)}).`
+          : "No pude crear la meta. Probá de nuevo en un momento.",
+      );
+      return;
+    }
+    if (EDIT_RE.test(lower)) {
+      await setPendingAction(link.id, null);
+      await provider.sendText(msg.phone, "Listo, descarté esa meta. Escribime de nuevo cómo la querés.");
+      return;
+    }
+    // No es confirmación: descartamos la meta vieja y seguimos con el input nuevo.
+    await setPendingAction(link.id, null);
+  } else if (pending) {
+    // Transacción pendiente (forma histórica, sin `type`). La meta ya se manejó arriba.
+    const txn = pending as PendingAction;
     if (CONFIRM_RE.test(lower)) {
       // Propuesta de la cola de ingesta: crea la transacción, marca confirmed y
       // encadena la siguiente pendiente.
-      if (pending.proposalId) {
-        await confirmProposal(buildReviewDeps(provider, link, msg.phone), pending as ProposalPending);
+      if (txn.proposalId) {
+        await confirmProposal(buildReviewDeps(provider, link, msg.phone), txn as ProposalPending);
         return;
       }
-      const res = await createTransactionForUser(link.userId, link.householdId, pending);
+      const res = await createTransactionForUser(link.userId, link.householdId, txn);
       await setPendingAction(link.id, null);
       const sobre = res.categoryName ? ` · en ${res.categoryName}` : " · por clasificar";
       await provider.sendText(
         msg.phone,
         res.ok
-          ? `✅ Anotado: ${pending.kind} de ${formatMoney(pending.amount, pending.currency)}${pending.merchant ? ` en ${pending.merchant}` : ""}${sobre}.${MOVE_HINT}`
+          ? `✅ Anotado: ${txn.kind} de ${formatMoney(txn.amount, txn.currency)}${txn.merchant ? ` en ${txn.merchant}` : ""}${sobre}.${MOVE_HINT}`
           : "No pude guardarlo. Probá de nuevo en un momento.",
       );
       return;
     }
     if (EDIT_RE.test(lower)) {
       // Propuesta de la cola: marcar discarded y pasar a la siguiente.
-      if (pending.proposalId) {
-        await discardProposal(buildReviewDeps(provider, link, msg.phone), pending as ProposalPending);
+      if (txn.proposalId) {
+        await discardProposal(buildReviewDeps(provider, link, msg.phone), txn as ProposalPending);
         return;
       }
       await setPendingAction(link.id, null);
@@ -336,6 +359,25 @@ async function handleText(
     ]);
   }
 
+  // Meta propuesta por la IA: la proponemos y el usuario confirma (recién ahí se crea).
+  if (result.action?.type === "create_goal") {
+    const goal = toGoalAction(result.action.payload, ctx.currency);
+    if (goal) {
+      await setPendingAction(link.id, goal);
+      const objetivo = formatMoney(goal.targetAmount, goal.currency);
+      const aporte = formatMoney(goal.monthlyContribution, goal.currency);
+      await provider.sendButtons(
+        msg.phone,
+        `¿Creo la meta "${goal.name}" (objetivo ${objetivo}, aporte ${aporte}/mes)?`,
+        [
+          { id: "yes", title: "Sí" },
+          { id: "edit", title: "Editar" },
+        ],
+      );
+      return;
+    }
+  }
+
   const action =
     result.action?.type === "create_transaction"
       ? toTxnAction(result.action.payload, ctx.currency)
@@ -359,6 +401,23 @@ async function handleText(
     result.reply ||
       'No entendí. Probá: "gasté 12000 en super", "¿cuánto gasté este mes?" o enviá una foto del recibo.',
   );
+}
+
+/** Mapea el payload de la acción `create_goal` a una GoalPending (o null si es inválida). */
+function toGoalAction(
+  payload: Record<string, unknown>,
+  fallbackCurrency: string,
+): GoalPending | null {
+  const name = typeof payload.name === "string" ? payload.name.trim() : "";
+  const targetAmount = Number(payload.targetAmount);
+  if (!name || !Number.isFinite(targetAmount) || targetAmount <= 0) return null;
+  const monthlyRaw = Number(payload.monthlyContribution);
+  const monthlyContribution = Number.isFinite(monthlyRaw) && monthlyRaw > 0 ? monthlyRaw : 0;
+  const currency =
+    typeof payload.currency === "string" && payload.currency ? payload.currency : fallbackCurrency;
+  const targetDate =
+    typeof payload.targetDate === "string" && payload.targetDate.trim() ? payload.targetDate : null;
+  return { type: "goal", name, targetAmount, monthlyContribution, currency, targetDate };
 }
 
 /** Mapea el payload de la acción `create_transaction` a una PendingAction. */

@@ -8,6 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { transactionInputSchema } from "@/modules/assistant/schemas";
 import { createTransaction } from "@/modules/assistant/services/transaction-service";
+import { createGoal, goalInputSchema } from "@/modules/control";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -41,5 +42,30 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
         ? err.message
         : "No pudimos guardar la transacción.";
     return { ok: false, message: msg };
+  }
+}
+
+/**
+ * Confirma y crea una meta de ahorro propuesta por la IA. Mismo patrón que
+ * confirmTransactionAction: valida con goalInputSchema y crea recién tras la confirmación
+ * explícita del usuario (la ActionCard). El endpoint de chat nunca crea.
+ */
+export async function confirmGoalAction(raw: unknown): Promise<ConfirmResult> {
+  const parsed = goalInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, message: "Conecta Supabase para guardar la meta." };
+  }
+  try {
+    await createGoal(parsed.data);
+    revalidatePath("/ahorro");
+    revalidatePath("/dashboard");
+    revalidatePath("/control-financiero");
+    return { ok: true };
+  } catch (err) {
+    logger.error("confirmGoal fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos crear la meta." };
   }
 }

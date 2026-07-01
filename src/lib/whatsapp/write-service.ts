@@ -8,7 +8,7 @@ import "server-only";
  */
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { findMatchingRuleForUser } from "@/modules/financial-base/services/rules-service";
-import type { PendingAction } from "@/lib/whatsapp/links-service";
+import type { PendingAction, GoalPending } from "@/lib/whatsapp/links-service";
 
 export async function createTransactionForUser(
   userId: string,
@@ -78,4 +78,30 @@ export async function createTransactionForUser(
     }
   }
   return { ok: true, categoryName };
+}
+
+/**
+ * Crea una meta de ahorro desde WhatsApp con SERVICE ROLE (omite RLS). Uso EXCLUSIVO del webhook,
+ * SOLO tras confirmación explícita. Setea user_id + household_id (misma regla que las transacciones)
+ * para que el hogar también la vea. `current_amount` arranca en 0; `status` en 'revisar'.
+ */
+export async function createGoalForUser(
+  userId: string,
+  householdId: string | null,
+  goal: GoalPending,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createServiceRoleClient();
+  const { error } = await supabase.from("savings_goals").insert({
+    user_id: userId,
+    household_id: householdId,
+    name: goal.name,
+    target_amount: goal.targetAmount,
+    current_amount: 0,
+    monthly_contribution: goal.monthlyContribution,
+    currency: goal.currency,
+    target_date: goal.targetDate ?? null,
+    status: "revisar",
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
