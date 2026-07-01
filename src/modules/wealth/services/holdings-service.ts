@@ -214,7 +214,15 @@ export async function createHolding(input: HoldingInput): Promise<void> {
 
   const isRental = !QUOTED_TYPES.has(input.assetType);
 
-  if (existing) {
+  // Merge por promedio de costo SOLO para cotizados (comprar más acciones/ETF/
+  // cripto promedia el costo unitario). Los activos manuales/flujo (inmueble,
+  // préstamo, CDP, bono) son posiciones ÚNICAS: fusionarlas por nombre promediaba
+  // el monto invertido (se veía distinto/menos) y el UPDATE no reescribía
+  // rental_income/nature, así que el ingreso no llegaba a Ingresos. Cada una se
+  // inserta aparte; para “aportar” a una posición manual, se edita.
+  const canMerge = QUOTED_TYPES.has(input.assetType);
+
+  if (existing && canMerge) {
     // Aporte a posición existente: el gasto vinculado nace primero (el id de
     // la entidad ya existe); si el update falla, se compensa borrándolo.
     let txnId: string | null = null;
