@@ -94,6 +94,22 @@ export type PendingAction = {
   cardLabel?: string | null; // etiqueta de tarjeta resuelta (último-4 → nombre)
 };
 
+/** Meta de ahorro propuesta por la IA, pendiente de confirmación (discriminada por `type`). */
+export type GoalPending = {
+  type: "goal";
+  name: string;
+  targetAmount: number;
+  monthlyContribution: number;
+  currency: string;
+  targetDate?: string | null; // YYYY-MM-DD
+};
+
+/**
+ * Confirmación pendiente almacenada en el vínculo: transacción (sin `type`, forma histórica) o
+ * meta (`type:"goal"`). El discriminador `type` distingue el camino de confirmación.
+ */
+export type StoredPending = PendingAction | GoalPending;
+
 /** Moneda principal del usuario (default CRC). */
 export async function getUserCurrency(userId: string): Promise<string> {
   const supabase = createServiceRoleClient();
@@ -108,20 +124,20 @@ export async function getUserCurrency(userId: string): Promise<string> {
 /** Guarda/limpia la confirmación pendiente del vínculo. */
 export async function setPendingAction(
   linkId: string,
-  action: PendingAction | null,
+  action: StoredPending | null,
 ): Promise<void> {
   const supabase = createServiceRoleClient();
   await supabase.from("whatsapp_links").update({ pending_action: action }).eq("id", linkId);
 }
 
-export async function getPendingAction(linkId: string): Promise<PendingAction | null> {
+export async function getPendingAction(linkId: string): Promise<StoredPending | null> {
   const supabase = createServiceRoleClient();
   const { data } = await supabase
     .from("whatsapp_links")
     .select("pending_action")
     .eq("id", linkId)
     .maybeSingle();
-  return (data?.pending_action as PendingAction | null) ?? null;
+  return (data?.pending_action as StoredPending | null) ?? null;
 }
 
 /** Vínculo activo por número (E.164). Devuelve null si no está vinculado. */

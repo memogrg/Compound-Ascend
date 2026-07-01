@@ -3,11 +3,9 @@
  * La IA PROPONE; ninguna acción se ejecuta sin confirmación explícita del usuario.
  */
 
-export type AIActionType =
-  | "create_transaction"
-  | "create_goal"
-  | "suggest_debt_strategy"
-  | "suggest_budget_adjustment";
+// Solo acciones EJECUTABLES (propuesta → confirmación → creación). Las "sugerencias" no
+// ejecutables (estrategia de deuda, ajuste de presupuesto) van como texto normal, no como acción.
+export type AIActionType = "create_transaction" | "create_goal";
 
 export type AIActionProposal = {
   type: AIActionType;
@@ -49,10 +47,5 @@ export function parseAction(text: string): AIChatResponse {
 }
 
 function isValidType(t: string): t is AIActionType {
-  return [
-    "create_transaction",
-    "create_goal",
-    "suggest_debt_strategy",
-    "suggest_budget_adjustment",
-  ].includes(t);
+  return t === "create_transaction" || t === "create_goal";
 }

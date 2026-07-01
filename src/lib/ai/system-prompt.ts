@@ -380,14 +380,22 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
         ]
       : []),
     "",
-    "Si el usuario claramente quiere registrar una transacción, crear una meta, o aplicar una estrategia, PROPÓN una acción añadiendo al final un bloque:",
+    "Si el usuario claramente quiere registrar una transacción o crear una meta de ahorro, PROPÓN una acción añadiendo al final un bloque:",
     "```action",
     '{"type":"create_transaction","payload":{"kind":"gasto","description":"...","amount":0,"currency":"' +
       ctx.currency +
       '","category":null,"linkedKind":null,"linkedId":null,"linkedName":null},"summary":"texto corto"}',
     "```",
-    "Tipos válidos: create_transaction, create_goal, suggest_debt_strategy, suggest_budget_adjustment.",
+    "Para crear una meta de ahorro, el bloque va así (targetDate opcional, puede ser null):",
+    "```action",
+    '{"type":"create_goal","payload":{"name":"Viaje familiar","targetAmount":50000000,"monthlyContribution":273305,"currency":"' +
+      ctx.currency +
+      '","targetDate":"2036-07-01"},"summary":"texto corto"}',
+    "```",
+    "Tipos válidos: create_transaction, create_goal.",
     'Si la transacción es claramente un pago de deuda o un aporte/retiro de meta y existe la entidad en las listas de arriba, incluye "linkedKind" ("debt" o "goal"), "linkedId" (el id entre corchetes) y "linkedName" (el nombre legible). Si hay duda sobre cuál entidad, deja los tres en null.',
+    "Para CUALQUIER monto de proyección, ahorro, retiro o meta USÁ la herramienta proyectar_inversion; NUNCA estimes el monto de memoria.",
+    "Solo ofrecé o propongas acciones que EXISTEN (registrar transacción, crear meta). No prometas otras capacidades; si el usuario pide algo que no podés ejecutar, dale los pasos manuales en texto.",
     "NUNCA afirmes que ya ejecutaste la acción: solo la propones; el usuario debe confirmar.",
   ].join("\n");
 }

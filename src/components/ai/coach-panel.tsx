@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { confirmTransactionAction } from "@/modules/assistant/api/actions";
+import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/modules/financial-base/constants";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
@@ -315,14 +315,31 @@ function ActionCard({ action }: { action: AIActionProposal }) {
       </div>
     );
   }
-  // Sugerencias no ejecutables: solo informativas.
-  return (
-    <div style={{ padding: "6px 0 0 36px" }}>
-      <div className="coach-bubble" style={{ borderLeft: "2px solid var(--info)" }}>
-        {action.summary ?? "Sugerencia registrada. Revísala en el módulo correspondiente."}
+  if (action.type === "create_goal") {
+    const p = action.payload as Record<string, unknown>;
+    const targetDate =
+      typeof p.targetDate === "string" && p.targetDate.trim() ? p.targetDate : null;
+    const draft: DraftGoal = {
+      name: String(p.name ?? action.summary ?? "Meta"),
+      targetAmount: Number(p.targetAmount ?? 0),
+      monthlyContribution: Number(p.monthlyContribution ?? 0),
+      currency: String(p.currency ?? "CRC"),
+      targetDate,
+    };
+    return (
+      <div style={{ padding: "4px 0 0 36px" }}>
+        {done ? null : (
+          <GoalConfirmCard
+            draft={draft}
+            onCancel={() => setDone(true)}
+            onConfirmed={() => setDone(true)}
+          />
+        )}
       </div>
-    </div>
-  );
+    );
+  }
+  // Ya no hay otros tipos de acción ejecutables; nada que mostrar.
+  return null;
 }
 
 // ----------------------------------------------------------------------------
@@ -564,6 +581,103 @@ function TxnConfirmCard({
           disabled={pending}
         >
           {pending ? "Guardando…" : "Confirmar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Confirmación de meta propuesta por la IA (create_goal)
+// ----------------------------------------------------------------------------
+type DraftGoal = {
+  name: string;
+  targetAmount: number;
+  monthlyContribution: number;
+  currency: string;
+  targetDate: string | null;
+};
+
+function GoalConfirmCard({
+  draft,
+  onCancel,
+  onConfirmed,
+}: {
+  draft: DraftGoal;
+  onCancel: () => void;
+  onConfirmed: () => void;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const confirm = async () => {
+    setPending(true);
+    setError(null);
+    const res = await confirmGoalAction({
+      name: draft.name,
+      targetAmount: draft.targetAmount,
+      monthlyContribution: draft.monthlyContribution,
+      currency: draft.currency,
+      ...(draft.targetDate ? { targetDate: draft.targetDate } : {}),
+    });
+    setPending(false);
+    if (res.ok) {
+      setOk(true);
+      timerRef.current = setTimeout(onConfirmed, 1200);
+    } else {
+      setError(res.message ?? "No se pudo crear la meta.");
+    }
+  };
+
+  if (ok) {
+    return (
+      <div className="coach-bubble" style={{ borderLeft: "2px solid var(--pos)" }}>
+        ✓ Meta creada.
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <div className="eyebrow">Crear meta</div>
+      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 6 }}>{draft.name}</div>
+      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+        Objetivo: {draft.currency} {draft.targetAmount.toLocaleString("es-CR")}
+        {draft.monthlyContribution > 0
+          ? ` · ${draft.currency} ${draft.monthlyContribution.toLocaleString("es-CR")}/mes`
+          : ""}
+        {draft.targetDate ? ` · para ${draft.targetDate}` : ""}
+      </div>
+      {error ? (
+        <div className="auth-err" style={{ marginTop: 6 }}>
+          {error}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button
+          className="btn btn-secondary"
+          style={{ flex: 1, justifyContent: "center" }}
+          onClick={onCancel}
+          disabled={pending}
+        >
+          Cancelar
+        </button>
+        <button
+          className="btn btn-primary"
+          style={{ flex: 1, justifyContent: "center" }}
+          onClick={confirm}
+          disabled={pending}
+        >
+          {pending ? "Creando…" : "Confirmar"}
         </button>
       </div>
     </div>

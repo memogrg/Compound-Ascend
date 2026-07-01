@@ -19,6 +19,23 @@ describe("parseAction", () => {
     expect((r.action?.payload as { amount: number }).amount).toBe(5000);
   });
 
+  it("extrae acción create_goal", () => {
+    const text =
+      'Te propongo la meta.\n```action\n{"type":"create_goal","payload":{"name":"Viaje","targetAmount":50000000,"monthlyContribution":273305,"currency":"CRC"},"summary":"Meta viaje"}\n```';
+    const r = parseAction(text);
+    expect(r.action?.type).toBe("create_goal");
+    expect((r.action?.payload as { targetAmount: number }).targetAmount).toBe(50000000);
+  });
+
+  it("RECHAZA los tipos fantasma quitados (suggest_debt_strategy / suggest_budget_adjustment)", () => {
+    expect(
+      parseAction('ok ```action\n{"type":"suggest_debt_strategy","payload":{}}\n```').action,
+    ).toBeNull();
+    expect(
+      parseAction('ok ```action\n{"type":"suggest_budget_adjustment","payload":{}}\n```').action,
+    ).toBeNull();
+  });
+
   it("ignora tipo de acción inválido", () => {
     const r = parseAction('ok ```action\n{"type":"hackear","payload":{}}\n```');
     expect(r.action).toBeNull();
