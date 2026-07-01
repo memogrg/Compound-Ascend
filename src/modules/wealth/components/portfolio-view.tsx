@@ -575,6 +575,7 @@ function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () =>
       region: holding.region,
       isRecurring: holding.isRecurring,
       incomeMonth: holding.incomeMonth,
+      annualRatePct: holding.annualRatePct,
       rentalIncome: holding.rentalIncome,
       rentalFrequency: holding.rentalFrequency,
       currentValueManual: v,
