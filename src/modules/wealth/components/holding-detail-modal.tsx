@@ -768,7 +768,9 @@ function RentalSection({
     holding.rentalIncome != null ? String(holding.rentalIncome) : "",
   );
   const [date, setDate] = useState(today);
-  const [freq, setFreq] = useState<"semanal" | "mensual" | "trimestral" | "semestral" | "anual">(cfgFreq);
+  const [freq, setFreq] = useState<
+    "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento"
+  >(cfgFreq);
   const [rentCurrency, setRentCurrency] = useState(holding.currency);
   const [pending, setPending] = useState(false);
 

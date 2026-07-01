@@ -170,7 +170,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   const { data: rentalHoldings } = await supabase
     .from("investment_holdings")
     .select(
-      "id,label,symbol,currency,category,rental_income,rental_frequency,income_month,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly",
+      "id,label,symbol,currency,category,rental_income,rental_frequency,income_month,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,maturity_date",
     )
     .eq("user_id", user.id)
     .gt("rental_income", 0);
@@ -210,6 +210,22 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     // elimina de ese periodo.
     const perPayment = Number(h.rental_income) || 0;
     if (perPayment <= 0) continue;
+    // Al vencimiento: pago ÚNICO en el mes+año de vencimiento (no se repite).
+    if (h.rental_frequency === "al_vencimiento") {
+      if (!h.maturity_date) continue;
+      const [my, mm] = String(h.maturity_date).split("-").map(Number);
+      if (period.year !== my || period.month !== mm) continue;
+      desired.push({
+        type: "income",
+        name: `Ingreso — ${h.label ?? h.symbol}`,
+        amount: Math.round(perPayment * 100) / 100,
+        currency: h.currency,
+        categoryId: null,
+        sourceKind: "rental",
+        sourceId: h.id,
+      });
+      continue;
+    }
     const anchor = ((((Number(h.income_month) || 1) - 1) % 12) + 12) % 12; // 0-11
     const paymentMonths: number[] | null =
       h.rental_frequency === "trimestral"
