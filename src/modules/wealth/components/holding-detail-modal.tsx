@@ -23,7 +23,7 @@ import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizar
 import type { Holding, Dividend, RentalPayment } from "@/modules/wealth/types";
 import type { Period } from "@/modules/wealth/services/holding-history-service";
 
-const RENTAL_FREQ_PER_YEAR: Record<string, number> = { mensual: 12, trimestral: 4, anual: 1 };
+const RENTAL_FREQ_PER_YEAR: Record<string, number> = { mensual: 12, trimestral: 4, semestral: 2, anual: 1 };
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
 const PERIODS: { label: string; value: Period }[] = [
@@ -768,7 +768,7 @@ function RentalSection({
     holding.rentalIncome != null ? String(holding.rentalIncome) : "",
   );
   const [date, setDate] = useState(today);
-  const [freq, setFreq] = useState<"mensual" | "trimestral" | "anual">(cfgFreq);
+  const [freq, setFreq] = useState<"mensual" | "trimestral" | "semestral" | "anual">(cfgFreq);
   const [rentCurrency, setRentCurrency] = useState(holding.currency);
   const [pending, setPending] = useState(false);
 

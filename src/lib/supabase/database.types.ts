@@ -512,6 +512,8 @@ export type InvestmentHoldingRow = Timestamps & {
   services_monthly: number | null;
   // Deuda que financia el inmueble (migración 20260629000001).
   debt_id: string | null;
+  // % rendimiento anual (renta fija: bono/CDP) (migración 20260706000001).
+  annual_rate_pct: number | null;
 };
 
 export type RentalPaymentRow = Timestamps & {

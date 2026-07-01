@@ -137,7 +137,7 @@ export type PortfolioStats = {
 
 // ── Motor de inversiones ──────────────────────────────────────────
 
-export type RentalFrequency = "mensual" | "trimestral" | "anual";
+export type RentalFrequency = "mensual" | "trimestral" | "semestral" | "anual";
 export type RentalSubtype = "alquiler" | "airbnb" | "auto" | "negocio" | "otro";
 
 export type Holding = {
@@ -157,6 +157,8 @@ export type Holding = {
   /** Renta recurrente que genera el activo (proyección informativa). */
   rentalIncome?: number | null;
   rentalFrequency?: RentalFrequency | null;
+  /** % rendimiento anual (renta fija: bono/CDP); informativo + cálculo del pago. */
+  annualRatePct?: number | null;
   rentalSubtype?: RentalSubtype | null;
   // ── Inmueble de renta: costos operativos para ROI (migración 20260628000002) ──
   purchasePrice?: number | null;

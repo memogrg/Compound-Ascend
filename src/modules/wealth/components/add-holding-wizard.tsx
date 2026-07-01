@@ -229,10 +229,13 @@ export function AddHoldingModal({
     prefill?.currentValueManual != null ? String(prefill.currentValueManual) : "",
   );
   const [income, setIncome] = useState(prefill?.rentalIncome != null ? String(prefill.rentalIncome) : "");
-  const [frequency, setFrequency] = useState<"mensual" | "trimestral" | "anual">(
+  const [frequency, setFrequency] = useState<"mensual" | "trimestral" | "semestral" | "anual">(
     prefill?.rentalFrequency ?? "mensual",
   );
   const [incomeMonth, setIncomeMonth] = useState(prefill?.incomeMonth ? String(prefill.incomeMonth) : "1");
+  const [annualRatePct, setAnnualRatePct] = useState(
+    prefill?.annualRatePct != null ? String(prefill.annualRatePct) : "",
+  );
 
   // ── Inmueble de renta (propiedad_alquiler): subtipo + costos operativos ──
   const [subtype, setSubtype] = useState<"alquiler" | "airbnb">(
@@ -375,6 +378,7 @@ export function AddHoldingModal({
           base.rentalFrequency = frequency;
           if (frequency !== "mensual") base.incomeMonth = parseInt(incomeMonth, 10) || undefined;
         }
+        base.annualRatePct = parseFloat(annualRatePct) || undefined;
         if (cat === "propiedad_alquiler") {
           base.rentalSubtype = subtype;
           const n = (s: string) => parseFloat(s) || undefined;
@@ -466,6 +470,8 @@ export function AddHoldingModal({
             onFrequency={setFrequency}
             incomeMonth={incomeMonth}
             onIncomeMonth={setIncomeMonth}
+            annualRatePct={annualRatePct}
+            onAnnualRatePct={setAnnualRatePct}
             category={category}
             subtype={subtype}
             onSubtype={setSubtype}
@@ -603,6 +609,24 @@ function CategoryGroup({
 
 // ── Paso 2: campos condicionales ───────────────────────────────────
 
+/** Pago por periodo estimado desde monto × % anual, según la frecuencia. */
+function perPaymentFromRate(invested: string, ratePct: string, freq: string): string {
+  const principal = parseFloat(invested) || 0;
+  const rate = parseFloat(ratePct) || 0;
+  if (principal <= 0 || rate <= 0) return "";
+  const annual = (principal * rate) / 100;
+  const divisor = freq === "mensual" ? 12 : freq === "trimestral" ? 4 : freq === "semestral" ? 2 : 1;
+  return String(Math.round((annual / divisor) * 100) / 100);
+}
+/** Meses de pago derivados del mes ancla (1-12) + frecuencia. */
+function derivedMonths(freq: string, anchor: number): number[] {
+  const a = ((((anchor || 1) - 1) % 12) + 12) % 12;
+  if (freq === "trimestral") return [0, 3, 6, 9].map((k) => ((a + k) % 12) + 1);
+  if (freq === "semestral") return [0, 6].map((k) => ((a + k) % 12) + 1);
+  if (freq === "anual") return [a + 1];
+  return [];
+}
+
 function Step2Fields(props: {
   profile: "A" | "B" | "C" | null;
   cur: string;
@@ -626,10 +650,12 @@ function Step2Fields(props: {
   onCurrentValue: (v: string) => void;
   income: string;
   onIncome: (v: string) => void;
-  frequency: "mensual" | "trimestral" | "anual";
-  onFrequency: (v: "mensual" | "trimestral" | "anual") => void;
+  frequency: "mensual" | "trimestral" | "semestral" | "anual";
+  onFrequency: (v: "mensual" | "trimestral" | "semestral" | "anual") => void;
   incomeMonth: string;
   onIncomeMonth: (v: string) => void;
+  annualRatePct: string;
+  onAnnualRatePct: (v: string) => void;
   category: InvestmentCategory | null;
   subtype: "alquiler" | "airbnb";
   onSubtype: (v: "alquiler" | "airbnb") => void;
@@ -760,6 +786,28 @@ function Step2Fields(props: {
       {/* Perfil B · ingreso que genera */}
       {profile === "B" ? (
         <>
+          <div className="fld">
+            <label className="fld-label">
+              % rendimiento anual (opcional){" "}
+              <HelpTip text="Renta fija (bono/CDP): % anual sobre el monto invertido. Calcula el ingreso por pago; podés ajustarlo a mano." />
+            </label>
+            <div className="inp-money">
+              <span className="pre">%</span>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={props.annualRatePct}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  props.onAnnualRatePct(v);
+                  const pp = perPaymentFromRate(props.invested, v, props.frequency);
+                  if (pp) props.onIncome(pp);
+                }}
+                placeholder="0"
+              />
+            </div>
+          </div>
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Ingreso que genera (opcional)</label>
@@ -780,10 +828,16 @@ function Step2Fields(props: {
               <select
                 className="sel"
                 value={props.frequency}
-                onChange={(e) => props.onFrequency(e.target.value as typeof props.frequency)}
+                onChange={(e) => {
+                  const f = e.target.value as typeof props.frequency;
+                  props.onFrequency(f);
+                  const pp = perPaymentFromRate(props.invested, props.annualRatePct, f);
+                  if (pp) props.onIncome(pp);
+                }}
               >
                 <option value="mensual">Mensual</option>
                 <option value="trimestral">Trimestral</option>
+                <option value="semestral">Semestral</option>
                 <option value="anual">Anual</option>
               </select>
             </div>
@@ -791,8 +845,8 @@ function Step2Fields(props: {
           {props.frequency !== "mensual" ? (
             <div className="fld">
               <label className="fld-label">
-                Mes en que se materializa{" "}
-                <HelpTip text="Para ingresos no mensuales, el mes (1-12) en que normalmente se recibe." />
+                Mes ancla (primer pago){" "}
+                <HelpTip text="Elegí el primer mes de pago; los demás se calculan según la frecuencia y caen automáticamente en el área de Ingresos." />
               </label>
               <select
                 className="sel"
@@ -807,6 +861,29 @@ function Step2Fields(props: {
                   ),
                 )}
               </select>
+              {(() => {
+                const L = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                const ms = derivedMonths(props.frequency, parseInt(props.incomeMonth, 10) || 1);
+                return ms.length > 1 ? (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                    {ms.map((m) => (
+                      <span
+                        key={m}
+                        style={{
+                          fontSize: 12,
+                          padding: "4px 9px",
+                          borderRadius: 8,
+                          background: "var(--info-soft)",
+                          color: "var(--info)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {L[m - 1]}
+                      </span>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </div>
           ) : null}
         </>
@@ -1037,7 +1114,7 @@ function RentalCostsBlock(props: {
   cur: string;
   invested: string;
   income: string;
-  frequency: "mensual" | "trimestral" | "anual";
+  frequency: "mensual" | "trimestral" | "semestral" | "anual";
   subtype: "alquiler" | "airbnb";
   onSubtype: (v: "alquiler" | "airbnb") => void;
   rc: RentalCosts;
