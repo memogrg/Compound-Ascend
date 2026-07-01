@@ -98,16 +98,18 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient
 async function loadHistoryDominant(
   supabase: SupabaseServerClient,
   norms: string[],
+  userId?: string,
 ): Promise<Map<string, string>> {
   const want = new Set(norms);
   const dominant = new Map<string, string>();
   try {
-    const { data } = await supabase
+    let query = supabase
       .from("transactions")
       .select("merchant_or_source, description, category_id, kind")
-      .not("category_id", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(HISTORY_LIMIT);
+      .not("category_id", "is", null);
+    // Sesión → RLS filtra por hogar; service-role (webhook) → scoping explícito por usuario.
+    if (userId) query = query.eq("user_id", userId);
+    const { data } = await query.order("created_at", { ascending: false }).limit(HISTORY_LIMIT);
 
     // norm → (category_id → {count, idx}); idx = posición en orden desc (menor = más reciente).
     const agg = new Map<string, Map<string, { count: number; idx: number }>>();
@@ -144,6 +146,85 @@ async function loadHistoryDominant(
     });
   }
   return dominant;
+}
+
+/** Umbral de confianza para AUTO-ASIGNAR al registrar (señales deterministas, sin IA en vivo). */
+export const AUTO_ASSIGN_MIN_CONFIDENCE = 0.9;
+
+/**
+ * Valida que `categoryId` sea usable como sobre para `kind`: existe, activa, HOJA (no es padre de
+ * otra categoría activa) y su naturaleza matchea (gasto→expense/both, ingreso→income/both). Sin
+ * depender de listCategories (que es de sesión) → sirve también con service-role.
+ */
+async function validateLeafForKind(
+  supabase: SupabaseServerClient,
+  categoryId: string,
+  kind: "gasto" | "ingreso",
+): Promise<boolean> {
+  const { data: cat } = await supabase
+    .from("expense_categories")
+    .select("category_type, is_active")
+    .eq("id", categoryId)
+    .maybeSingle();
+  if (!cat || cat.is_active === false) return false;
+  if (!categoryMatchesKind(cat.category_type, kind)) return false;
+  // Hoja = no es padre de ninguna categoría activa.
+  const { count } = await supabase
+    .from("expense_categories")
+    .select("id", { count: "exact", head: true })
+    .eq("parent_id", categoryId)
+    .eq("is_active", true);
+  return (count ?? 0) === 0;
+}
+
+/**
+ * AUTO-ASIGNACIÓN al registrar (cascada 3-3): resuelve el sobre de un comercio con señales
+ * DETERMINISTAS ya guardadas — historial del usuario/hogar (0.95) y, si no hay, la caché de
+ * sugerencias — SIN llamar a la IA. Solo devuelve algo si la confianza ≥ AUTO_ASSIGN_MIN_CONFIDENCE
+ * Y la categoría valida como hoja de la naturaleza correcta. Cualquier fallo → null (best-effort,
+ * nunca rompe el registro; el movimiento cae a "Por clasificar").
+ */
+export async function resolveAutoCategory(opts: {
+  supabase: SupabaseServerClient;
+  userId?: string;
+  merchant: string;
+  kind: "gasto" | "ingreso";
+}): Promise<{ categoryId: string; source: "historial" | "cache" } | null> {
+  const { supabase, userId, merchant, kind } = opts;
+  const norm = normalize(merchant.trim());
+  if (!norm) return null;
+
+  try {
+    // 1) Historial (0.95): dominante del comercio.
+    const dominant = (await loadHistoryDominant(supabase, [norm], userId)).get(norm);
+    let candidate: { categoryId: string; confidence: number; source: "historial" | "cache" } | null =
+      dominant ? { categoryId: dominant, confidence: 0.95, source: "historial" } : null;
+
+    // 2) Caché (si no hay historial).
+    if (!candidate) {
+      let q = supabase
+        .from("merchant_suggestion_cache")
+        .select("category_id, confidence")
+        .eq("merchant_norm", norm);
+      if (userId) q = q.eq("user_id", userId);
+      const { data } = await q.limit(1).maybeSingle();
+      if (data?.category_id) {
+        candidate = {
+          categoryId: data.category_id,
+          confidence: Number(data.confidence ?? 0),
+          source: "cache",
+        };
+      }
+    }
+
+    // 3) Umbral + validación de hoja/naturaleza.
+    if (!candidate || candidate.confidence < AUTO_ASSIGN_MIN_CONFIDENCE) return null;
+    const ok = await validateLeafForKind(supabase, candidate.categoryId, kind);
+    return ok ? { categoryId: candidate.categoryId, source: candidate.source } : null;
+  } catch (err) {
+    logger.warn("resolveAutoCategory falló", { message: err instanceof Error ? err.message : "?" });
+    return null;
+  }
 }
 
 /**

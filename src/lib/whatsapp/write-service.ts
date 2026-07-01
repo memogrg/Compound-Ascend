@@ -27,6 +27,21 @@ export async function createTransactionForUser(
       action.kind === "gasto" ? "expense" : "income",
     );
     categoryId = rule?.suggestedCategoryId ?? null;
+
+    // Sin regla → auto-asignar con SEÑAL FUERTE (historial/caché, sin IA en vivo). Service-role →
+    // scoping explícito por userId. Best-effort: si no hay señal fuerte, cae a "Por clasificar".
+    if (!categoryId) {
+      const { resolveAutoCategory } = await import(
+        "@/modules/financial-base/services/ai-categorize"
+      );
+      const auto = await resolveAutoCategory({
+        supabase,
+        userId,
+        merchant: action.merchant,
+        kind: action.kind,
+      });
+      categoryId = auto?.categoryId ?? null;
+    }
   }
 
   const { error } = await supabase.from("transactions").insert({
