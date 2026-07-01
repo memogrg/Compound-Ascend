@@ -546,20 +546,33 @@ function IncomeSection({ view }: { view: V2View }) {
   // Agregados: una sola moneda (display). El planificado se convierte igual que
   // el recibido (que ya viene convertido en incomeReceivedBySource) para que
   // "Diferencia" y "% cumplimiento" comparen sobre la misma base.
-  const budgetIncome = manualSources.reduce(
-    (s, b) => s + convertCurrency(b.amount, b.currency, currency, rates),
-    0,
-  );
-  const realIncome = manualSources.reduce((s, b) => s + receivedOf(b), 0);
+  const conv = (b: BudgetItem) => convertCurrency(b.amount, b.currency, currency, rates);
+  // El ingreso vinculado a inversiones (renta + dividendos) es un estimado
+  // recurrente que SÍ suma al total del mes. Si hay pago real conciliado
+  // (Recibido > 0) se usa ese; si no, el estimado planificado.
+  const linkedValueOf = (b: BudgetItem) => {
+    const r = receivedOf(b);
+    return r > 0 ? r : conv(b);
+  };
+  const budgetIncome =
+    manualSources.reduce((s, b) => s + conv(b), 0) +
+    linkedSources.reduce((s, b) => s + conv(b), 0);
+  const realIncome =
+    manualSources.reduce((s, b) => s + receivedOf(b), 0) +
+    linkedSources.reduce((s, b) => s + linkedValueOf(b), 0);
   const diff = realIncome - budgetIncome;
   const complPct = budgetIncome > 0 ? realIncome / budgetIncome : 0;
 
   // Histórico: tendencia mensual (controlada por el rango). Composición: por
-  // fuente manual recibida (coherente con los cuadros).
+  // fuente (manual recibida + inversión), coherente con los cuadros.
   const incomeArea = history.map((h) => ({ date: h.label, value: h.realIncome }));
   const incomeByManualSource: Record<string, { label: string; value: number }> = {};
   for (const b of manualSources) {
     const v = receivedOf(b);
+    if (v > 0) incomeByManualSource[b.id] = { label: b.name, value: v };
+  }
+  for (const b of linkedSources) {
+    const v = linkedValueOf(b);
     if (v > 0) incomeByManualSource[b.id] = { label: b.name, value: v };
   }
 
@@ -567,13 +580,13 @@ function IncomeSection({ view }: { view: V2View }) {
     {
       ttl: "Ingresos planificados",
       val: formatMoney(budgetIncome, currency),
-      sub: `${manualSources.length} fuente(s)`,
+      sub: `${manualSources.length + linkedSources.length} fuente(s)`,
       tone: "pos",
     },
     {
       ttl: "Ingresos totales",
       val: formatMoney(realIncome, currency),
-      sub: "recibido en fuentes",
+      sub: "recibido + inversiones",
       tone: "pos",
     },
     {
