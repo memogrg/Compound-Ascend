@@ -5,6 +5,7 @@ const h = vi.hoisted(() => ({
   provider: null as { chat: ReturnType<typeof vi.fn> } | null,
   aiText: '{"categoryId":null,"confidence":0}',
   cacheRows: [] as Record<string, unknown>[],
+  historyRows: [] as Record<string, unknown>[],
   upsertSpy: vi.fn(),
   cats: [] as Record<string, unknown>[],
 }));
@@ -14,12 +15,16 @@ vi.mock("@/lib/ai/providers/gemini", () => ({ createGeminiProvider: () => h.prov
 vi.mock("@/lib/auth/session", () => ({ requireUser: async () => ({ id: "u1" }) }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
-    from: () => {
+    from: (table: string) => {
+      const data = table === "transactions" ? h.historyRows : h.cacheRows;
       const b: Record<string, unknown> = {
         select: () => b,
         in: () => b,
+        not: () => b,
+        order: () => b,
+        limit: () => b,
         then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
-          Promise.resolve({ data: h.cacheRows, error: null }).then(r, j),
+          Promise.resolve({ data, error: null }).then(r, j),
         upsert: (payload: Record<string, unknown>) => {
           h.upsertSpy(payload);
           return Promise.resolve({ error: null });
@@ -56,6 +61,7 @@ beforeEach(() => {
   h.provider = fakeProvider();
   h.aiText = '{"categoryId":null,"confidence":0}';
   h.cacheRows = [];
+  h.historyRows = [];
   h.upsertSpy.mockClear();
   h.cats = [
     cat({ id: "c-comida", name: "Comida", categoryType: "expense" }),
@@ -99,7 +105,7 @@ describe("getSuggestionsFor", () => {
   it("cache hit → NO llama a la IA ni reescribe el caché", async () => {
     h.cacheRows = [{ merchant_norm: "starbucks", category_id: "c-comida", confidence: 0.9 }];
     const res = await getSuggestionsFor([{ id: "t1", merchant: "Starbucks", kind: "gasto" }]);
-    expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.9 });
+    expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.9, source: "cache" });
     expect(h.provider!.chat).not.toHaveBeenCalled();
     expect(h.upsertSpy).not.toHaveBeenCalled();
   });
@@ -108,7 +114,7 @@ describe("getSuggestionsFor", () => {
     h.aiText = '{"categoryId":"c-comida","confidence":0.8}';
     const res = await getSuggestionsFor([{ id: "t1", merchant: "Starbucks", kind: "gasto" }]);
     expect(h.provider!.chat).toHaveBeenCalledTimes(1);
-    expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.8 });
+    expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.8, source: "ia" });
     const payload = h.upsertSpy.mock.calls[0]![0] as Record<string, unknown>;
     expect(payload.user_id).toBe("u1");
     expect(payload.merchant_norm).toBe("starbucks");
@@ -130,5 +136,47 @@ describe("getSuggestionsFor", () => {
     }));
     await getSuggestionsFor(items);
     expect(h.provider!.chat).toHaveBeenCalledTimes(MAX_NEW_SUGGESTION_CALLS);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSuggestionsFor · capa de HISTORIAL (precede a cache/IA)
+// ---------------------------------------------------------------------------
+describe("getSuggestionsFor · historial del usuario", () => {
+  it("historial gana: usa la categoría del comercio y NO llama a la IA ni mira cache", async () => {
+    h.historyRows = [{ merchant_or_source: "Starbucks", description: null, category_id: "c-comida", kind: "gasto" }];
+    h.cacheRows = [{ merchant_norm: "starbucks", category_id: "c-salario", confidence: 0.9 }]; // no debería usarse
+    const res = await getSuggestionsFor([{ id: "t1", merchant: "Starbucks", kind: "gasto" }]);
+    expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.95, source: "historial" });
+    expect(h.provider!.chat).not.toHaveBeenCalled();
+  });
+
+  it("dominante = más frecuente; desempate por más reciente", async () => {
+    // 'c-comida' aparece 2 veces, 'c-salario' 1 → dominante c-comida.
+    h.historyRows = [
+      { merchant_or_source: "Auto Mercado", description: null, category_id: "c-comida", kind: "gasto" },
+      { merchant_or_source: "Auto Mercado", description: null, category_id: "c-comida", kind: "gasto" },
+      { merchant_or_source: "Auto Mercado", description: null, category_id: "c-salario", kind: "gasto" },
+    ];
+    const res = await getSuggestionsFor([{ id: "t1", merchant: "Auto Mercado", kind: "gasto" }]);
+    expect(res.get("t1")?.categoryId).toBe("c-comida");
+    expect(res.get("t1")?.source).toBe("historial");
+  });
+
+  it("kind mismatch: categoría de otra naturaleza → ignora historial y cae a cache/IA", async () => {
+    // El historial del comercio es 'c-salario' (income) pero el item es un GASTO → no aplica.
+    h.historyRows = [{ merchant_or_source: "Freelance", description: null, category_id: "c-salario", kind: "ingreso" }];
+    h.cacheRows = [{ merchant_norm: "freelance", category_id: "c-comida", confidence: 0.7 }];
+    const res = await getSuggestionsFor([{ id: "t1", merchant: "Freelance", kind: "gasto" }]);
+    expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.7, source: "cache" }); // cae a cache
+    expect(h.provider!.chat).not.toHaveBeenCalled();
+  });
+
+  it("sin historial → flujo actual intacto (cae a IA)", async () => {
+    h.historyRows = [];
+    h.aiText = '{"categoryId":"c-comida","confidence":0.8}';
+    const res = await getSuggestionsFor([{ id: "t1", merchant: "Nuevo Comercio", kind: "gasto" }]);
+    expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.8, source: "ia" });
+    expect(h.provider!.chat).toHaveBeenCalledTimes(1);
   });
 });

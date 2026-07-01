@@ -14,12 +14,21 @@ import { listCategories } from "@/modules/financial-base/services/categories-ser
 import {
   selectableCategoryLeaves,
   categoryMatchesKind,
+  type SelectableCategory,
 } from "@/modules/financial-base/engine/classify";
 import { normalize } from "@/lib/ai/biblia-knowledge";
 import { logger } from "@/lib/logger";
 
 export type Sobre = { id: string; name: string };
-export type Suggestion = { categoryId: string | null; confidence: number };
+/** `source` es solo observabilidad; la UI del chip no lo usa. */
+export type Suggestion = {
+  categoryId: string | null;
+  confidence: number;
+  source?: "historial" | "cache" | "ia";
+};
+
+/** Cuántas transacciones categorizadas del hogar se miran para inferir el sobre dominante. */
+const HISTORY_LIMIT = 1000;
 
 /** Tope de llamadas NUEVAS a la IA por invocación (acota costo/latencia por carga). */
 export const MAX_NEW_SUGGESTION_CALLS = 8;
@@ -78,6 +87,65 @@ export async function suggestSobre(merchant: string, sobres: Sobre[]): Promise<S
 
 export type SuggestItem = { id: string; merchant: string | null; kind: "gasto" | "ingreso" };
 
+type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+/**
+ * Capa de HISTORIAL (gratis y precisa): la categoría DOMINANTE que el hogar ya le dio a cada
+ * comercio en transacciones pasadas. Una sola query (RLS filtra por hogar). Dominante = más
+ * frecuente; desempate = la más reciente. Devuelve Map<norm, categoryId> solo para los `norms`
+ * pedidos. Si algo falla, devuelve vacío (degrada al flujo cache/IA).
+ */
+async function loadHistoryDominant(
+  supabase: SupabaseServerClient,
+  norms: string[],
+): Promise<Map<string, string>> {
+  const want = new Set(norms);
+  const dominant = new Map<string, string>();
+  try {
+    const { data } = await supabase
+      .from("transactions")
+      .select("merchant_or_source, description, category_id, kind")
+      .not("category_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(HISTORY_LIMIT);
+
+    // norm → (category_id → {count, idx}); idx = posición en orden desc (menor = más reciente).
+    const agg = new Map<string, Map<string, { count: number; idx: number }>>();
+    (data ?? []).forEach((row, idx) => {
+      const catId = row.category_id;
+      if (!catId) return;
+      const label = (row.merchant_or_source ?? row.description ?? "").trim();
+      const norm = normalize(label);
+      if (!norm || !want.has(norm)) return;
+      let byCat = agg.get(norm);
+      if (!byCat) {
+        byCat = new Map();
+        agg.set(norm, byCat);
+      }
+      const cur = byCat.get(catId);
+      if (cur) cur.count++;
+      else byCat.set(catId, { count: 1, idx }); // primera aparición (desc) = uso más reciente
+    });
+
+    for (const [norm, byCat] of agg) {
+      let bestId = "";
+      let best = { count: -1, idx: Number.POSITIVE_INFINITY };
+      for (const [catId, v] of byCat) {
+        if (v.count > best.count || (v.count === best.count && v.idx < best.idx)) {
+          best = v;
+          bestId = catId;
+        }
+      }
+      if (bestId) dominant.set(norm, bestId);
+    }
+  } catch (err) {
+    logger.warn("historial de categorización falló", {
+      message: err instanceof Error ? err.message : "?",
+    });
+  }
+  return dominant;
+}
+
 /**
  * Sugerencias para una lista de movimientos sin clasificar. Por cada COMERCIO distinto
  * (normalizado): cache hit en merchant_suggestion_cache → usar; si miss y hay sobres de esa
@@ -92,26 +160,48 @@ export async function getSuggestionsFor(items: SuggestItem[]): Promise<Map<strin
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const leaves = selectableCategoryLeaves(await listCategories());
+  const leafById = new Map<string, SelectableCategory>(leaves.map((c) => [c.id, c]));
 
   const normOf = (i: SuggestItem) => normalize(i.merchant!.trim());
   const norms = [...new Set(withMerchant.map(normOf))];
 
-  // 1) Cache hits en bloque.
-  const cache = new Map<string, Suggestion>();
-  const { data: cached } = await supabase
-    .from("merchant_suggestion_cache")
-    .select("merchant_norm, category_id, confidence")
-    .in("merchant_norm", norms);
-  for (const row of cached ?? []) {
-    cache.set(row.merchant_norm, {
-      categoryId: row.category_id,
-      confidence: Number(row.confidence ?? 0),
-    });
+  // 1) HISTORIAL (capa 2): la categoría dominante que el hogar ya dio al comercio. Precisa y
+  //    GRATIS; pisa cache/IA. Solo vale si esa categoría es una hoja seleccionable que matchea
+  //    la naturaleza del movimiento.
+  const historyDominant = await loadHistoryDominant(supabase, norms);
+  const resolved = new Map<string, Suggestion>();
+  for (const norm of norms) {
+    const catId = historyDominant.get(norm);
+    if (!catId) continue;
+    const leaf = leafById.get(catId);
+    const sample = withMerchant.find((i) => normOf(i) === norm)!;
+    if (leaf && categoryMatchesKind(leaf.categoryType, sample.kind)) {
+      resolved.set(norm, { categoryId: catId, confidence: 0.95, source: "historial" });
+    }
   }
 
-  // 2) Misses: llamar a la IA hasta el tope y cachear el resultado.
+  // Los norms cubiertos por historial NO consultan cache ni IA.
+  const pending = norms.filter((n) => !resolved.has(n));
+
+  // 2) Cache hits en bloque (solo para los pendientes).
+  const cache = new Map<string, Suggestion>();
+  if (pending.length > 0) {
+    const { data: cached } = await supabase
+      .from("merchant_suggestion_cache")
+      .select("merchant_norm, category_id, confidence")
+      .in("merchant_norm", pending);
+    for (const row of cached ?? []) {
+      cache.set(row.merchant_norm, {
+        categoryId: row.category_id,
+        confidence: Number(row.confidence ?? 0),
+        source: "cache",
+      });
+    }
+  }
+
+  // 3) Misses: llamar a la IA hasta el tope y cachear el resultado.
   let newCalls = 0;
-  for (const norm of norms) {
+  for (const norm of pending) {
     if (cache.has(norm)) continue;
     if (newCalls >= MAX_NEW_SUGGESTION_CALLS) continue;
 
@@ -123,7 +213,7 @@ export async function getSuggestionsFor(items: SuggestItem[]): Promise<Map<strin
 
     newCalls++;
     const sug = await suggestSobre(sample.merchant!.trim(), sobres);
-    cache.set(norm, sug);
+    cache.set(norm, { ...sug, source: "ia" });
     try {
       await supabase
         .from("merchant_suggestion_cache")
@@ -143,10 +233,18 @@ export async function getSuggestionsFor(items: SuggestItem[]): Promise<Map<strin
     }
   }
 
-  // 3) Mapear cada txn a su sugerencia (solo las que tienen sobre).
+  // 4) Mapear cada txn a su sugerencia (historial pisa cache/IA; solo las que tienen sobre).
   for (const it of withMerchant) {
-    const sug = cache.get(normOf(it));
-    if (sug && sug.categoryId) out.set(it.id, sug);
+    const norm = normOf(it);
+    const sug = resolved.get(norm) ?? cache.get(norm);
+    if (!sug || !sug.categoryId) continue;
+    // El historial se validó con el item muestra; re-chequeamos la naturaleza por item
+    // (por si dos movimientos comparten comercio con distinta naturaleza).
+    if (sug.source === "historial") {
+      const leaf = leafById.get(sug.categoryId);
+      if (!leaf || !categoryMatchesKind(leaf.categoryType, it.kind)) continue;
+    }
+    out.set(it.id, sug);
   }
   return out;
 }
