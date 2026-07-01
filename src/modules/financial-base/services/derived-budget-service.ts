@@ -173,7 +173,6 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
       "id,label,symbol,currency,category,rental_income,rental_frequency,income_month,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly",
     )
     .eq("user_id", user.id)
-    .eq("nature", "cashflow")
     .gt("rental_income", 0);
   for (const h of rentalHoldings ?? []) {
     // Inmueble de renta → ingreso recurrente MENSUAL, monto NETO operativo
