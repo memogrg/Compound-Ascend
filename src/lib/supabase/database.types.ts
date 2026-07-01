@@ -713,6 +713,16 @@ export type MerchantSuggestionCacheRow = {
   created_at: string;
 };
 
+/** Memoria conversacional del asesor IA (chat web + WhatsApp). */
+export type AiConversationTurnRow = {
+  id: string;
+  user_id: string;
+  channel: string; // 'web' | 'whatsapp'
+  role: string; // 'user' | 'assistant'
+  content: string;
+  created_at: string;
+};
+
 /** Ingesta por correo: allowlist alias de destinatario -> usuario (migración 0027). */
 export type EmailIngestLinkRow = {
   id: string;
@@ -873,6 +883,8 @@ export interface Database {
       account_cards: UserTable<AccountCardRow>;
       // Caché de sugerencias de sobre por (usuario, comercio) (migración 0032).
       merchant_suggestion_cache: UserTable<MerchantSuggestionCacheRow>;
+      // Memoria conversacional del asesor IA (chat web + WhatsApp). RLS dueño.
+      ai_conversation_turns: UserTable<AiConversationTurnRow>;
       // Corpus semántico de la Biblia (migración 0033). Dato de entorno (sin user_id);
       // lectura para autenticados, escritura solo service-role.
       biblia_chunks: TableShape<

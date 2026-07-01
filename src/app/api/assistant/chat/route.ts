@@ -24,6 +24,7 @@ import { assertTrustedOrigin, corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
 import { alert } from "@/server/observability/alerts";
 import type { ChatMessage } from "@/lib/ai/provider";
+import { loadRecentTurns, appendTurns } from "@/lib/ai/conversation-store";
 
 export const runtime = "nodejs";
 
@@ -47,10 +48,10 @@ export async function POST(req: Request) {
     if (user) await assertTokenBudget(user.id);
 
     const ctx = await buildFinancialContext();
-    const messages: ChatMessage[] = [
-      ...parsed.data.history.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
-      { role: "user", content: parsed.data.message },
-    ];
+    // Memoria persistente (fuente de verdad): historial reciente del usuario. `history` del cliente
+    // se sigue aceptando por compat en el schema, pero NO se usa para el contexto.
+    const recent = await loadRecentTurns();
+    const messages: ChatMessage[] = [...recent, { role: "user", content: parsed.data.message }];
 
     // Habilita las herramientas (function-calling) sólo con sesión: lee las deudas del
     // usuario como datos de SOLO lectura y las normaliza a la moneda principal con FX
@@ -123,6 +124,12 @@ export async function POST(req: Request) {
 
     const result = await financeChatWithTools(messages, ctx, toolContext);
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
+
+    // Persistir el turno (best-effort; no bloquea la respuesta si falla).
+    await appendTurns(undefined, [
+      { role: "user", content: parsed.data.message, channel: "web" },
+      { role: "assistant", content: result.reply, channel: "web" },
+    ]);
 
     return NextResponse.json({ reply: result.reply, action: result.action }, { headers: corsHeaders(req.headers.get("origin")) });
   } catch (err) {
