@@ -41,6 +41,8 @@ vi.mock("@/modules/financial-base/services/categories-service", () => ({
 import {
   suggestSobre,
   getSuggestionsFor,
+  resolveAutoCategory,
+  AUTO_ASSIGN_MIN_CONFIDENCE,
   MAX_NEW_SUGGESTION_CALLS,
 } from "@/modules/financial-base/services/ai-categorize";
 
@@ -178,5 +180,114 @@ describe("getSuggestionsFor · historial del usuario", () => {
     const res = await getSuggestionsFor([{ id: "t1", merchant: "Nuevo Comercio", kind: "gasto" }]);
     expect(res.get("t1")).toEqual({ categoryId: "c-comida", confidence: 0.8, source: "ia" });
     expect(h.provider!.chat).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveAutoCategory (auto-asignar al registrar, SIN IA en vivo)
+// ---------------------------------------------------------------------------
+type FakeCfg = {
+  historyRows?: Record<string, unknown>[];
+  cacheRow?: Record<string, unknown> | null;
+  catRow?: Record<string, unknown> | null;
+  childCount?: number;
+};
+
+// Fake del cliente Supabase: builder por tabla. transactions→historyRows (await),
+// merchant_suggestion_cache→cacheRow (maybeSingle), expense_categories→catRow (maybeSingle) o
+// childCount (count/head). Sirve para probar resolveAutoCategory pasándoselo directo.
+function fakeClient(cfg: FakeCfg) {
+  const builder = (thenResult: unknown, single: unknown) => {
+    const b: Record<string, unknown> = {
+      select: () => b,
+      eq: () => b,
+      not: () => b,
+      in: () => b,
+      order: () => b,
+      limit: () => b,
+      maybeSingle: () => Promise.resolve(single),
+      then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
+        Promise.resolve(thenResult).then(r, j),
+    };
+    return b;
+  };
+  return {
+    from: (table: string) => {
+      if (table === "transactions") return builder({ data: cfg.historyRows ?? [], error: null }, { data: null });
+      if (table === "merchant_suggestion_cache")
+        return builder({ data: [], error: null }, { data: cfg.cacheRow ?? null, error: null });
+      if (table === "expense_categories")
+        return builder({ count: cfg.childCount ?? 0, error: null }, { data: cfg.catRow ?? null, error: null });
+      return builder({ data: [], error: null }, { data: null });
+    },
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const asClient = (c: ReturnType<typeof fakeClient>) => c as any;
+const EXPENSE_LEAF = { category_type: "expense", is_active: true };
+
+describe("resolveAutoCategory · auto-asignar sin IA", () => {
+  it("historial ≥ umbral → asigna (source historial)", async () => {
+    const supabase = fakeClient({
+      historyRows: [{ merchant_or_source: "Starbucks", description: null, category_id: "c-comida", kind: "gasto" }],
+      catRow: EXPENSE_LEAF,
+      childCount: 0,
+    });
+    const r = await resolveAutoCategory({ supabase: asClient(supabase), merchant: "Starbucks", kind: "gasto" });
+    expect(r).toEqual({ categoryId: "c-comida", source: "historial" });
+  });
+
+  it("caché ≥ 0.9 (sin historial) → asigna (source cache)", async () => {
+    const supabase = fakeClient({
+      historyRows: [],
+      cacheRow: { category_id: "c-comida", confidence: 0.92 },
+      catRow: EXPENSE_LEAF,
+      childCount: 0,
+    });
+    const r = await resolveAutoCategory({ supabase: asClient(supabase), userId: "u1", merchant: "Starbucks", kind: "gasto" });
+    expect(r).toEqual({ categoryId: "c-comida", source: "cache" });
+  });
+
+  it("caché < 0.9 → null (no auto-asigna)", async () => {
+    const supabase = fakeClient({ historyRows: [], cacheRow: { category_id: "c-comida", confidence: 0.7 }, catRow: EXPENSE_LEAF });
+    const r = await resolveAutoCategory({ supabase: asClient(supabase), merchant: "Starbucks", kind: "gasto" });
+    expect(r).toBeNull();
+  });
+
+  it("kind mismatch (categoría de otra naturaleza) → null", async () => {
+    const supabase = fakeClient({
+      historyRows: [{ merchant_or_source: "Freelance", description: null, category_id: "c-salario", kind: "ingreso" }],
+      catRow: { category_type: "income", is_active: true },
+      childCount: 0,
+    });
+    const r = await resolveAutoCategory({ supabase: asClient(supabase), merchant: "Freelance", kind: "gasto" });
+    expect(r).toBeNull();
+  });
+
+  it("categoría que es PADRE de otra activa (no hoja) → null", async () => {
+    const supabase = fakeClient({
+      historyRows: [{ merchant_or_source: "Hogar", description: null, category_id: "c-hogar", kind: "gasto" }],
+      catRow: EXPENSE_LEAF,
+      childCount: 2, // tiene hijas activas → no es hoja
+    });
+    const r = await resolveAutoCategory({ supabase: asClient(supabase), merchant: "Hogar", kind: "gasto" });
+    expect(r).toBeNull();
+  });
+
+  it("sin señales (ni historial ni caché) → null", async () => {
+    const supabase = fakeClient({ historyRows: [], cacheRow: null });
+    const r = await resolveAutoCategory({ supabase: asClient(supabase), merchant: "Desconocido", kind: "gasto" });
+    expect(r).toBeNull();
+  });
+
+  it("nunca lanza: si el cliente falla, devuelve null", async () => {
+    const throwing = { from: () => { throw new Error("db down"); } };
+    const r = await resolveAutoCategory({ supabase: asClient(throwing as never), merchant: "X", kind: "gasto" });
+    expect(r).toBeNull();
+  });
+
+  it("umbral exportado es 0.9", () => {
+    expect(AUTO_ASSIGN_MIN_CONFIDENCE).toBe(0.9);
   });
 });

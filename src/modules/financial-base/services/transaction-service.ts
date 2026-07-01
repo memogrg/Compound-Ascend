@@ -151,6 +151,21 @@ export async function buildTransactionRow(
         }
       }
     }
+
+    // Cascada 3-3: si NINGUNA regla asignó sobre, auto-asignar con SEÑAL FUERTE (historial/caché,
+    // sin IA en vivo) cuando la confianza ≥ umbral. Si no, sigue null → "Por clasificar". RLS
+    // (sesión) → sin userId. Best-effort: no bloquea el registro.
+    if (!categoryId) {
+      const { resolveAutoCategory } = await import(
+        "@/modules/financial-base/services/ai-categorize"
+      );
+      const auto = await resolveAutoCategory({
+        supabase,
+        merchant: input.merchantOrSource,
+        kind: input.kind,
+      });
+      categoryId = auto?.categoryId ?? null;
+    }
   }
 
   // Fase 6.1: un vínculo pedido explícitamente (composer, chat/scanner,
