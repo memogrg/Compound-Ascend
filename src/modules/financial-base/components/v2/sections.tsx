@@ -535,7 +535,8 @@ function IncomeSection({ view }: { view: V2View }) {
   // Fantasma-fix (Parte 1): cuadros y barras SOLO desde fuentes manuales no
   // vinculadas a inversiones; lo vinculado va a su sección read-only. Así nada
   // queda contado-pero-invisible en este tab (Mi Base/Transacciones ven todo).
-  const isLinked = (b: BudgetItem) => Boolean(b.holdingId) || b.sourceKind === "dividend";
+  const isLinked = (b: BudgetItem) =>
+    Boolean(b.holdingId) || b.sourceKind === "dividend" || b.sourceKind === "rental";
   const manualSources = incomeItems.filter(
     (b) => (b.sourceKind ?? "manual") === "manual" && !isLinked(b),
   );
