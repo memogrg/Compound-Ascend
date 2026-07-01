@@ -15,6 +15,17 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).toContain("create_transaction");
   });
 
+  it("distingue HERRAMIENTAS de cálculo vs ACCIONES y ofrece create_goal como acción proponible", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    // create_goal es una acción proponible (bloque action), no una herramienta.
+    expect(prompt).toContain("create_goal");
+    // La distinción explícita de los dos mecanismos.
+    expect(prompt).toContain("HERRAMIENTAS de CÁLCULO");
+    expect(prompt).toContain("ACCIONES que PROPONÉS");
+    // No debe empujar el mensaje-bug de "herramienta no disponible" para metas.
+    expect(prompt).toContain("crear metas SÍ está disponible");
+  });
+
   it("coachingTone='suave' y knowledgeLevel='basico' producen sus reglas de conducta", () => {
     const ctx: FinancialContext = {
       currency: "CRC",
