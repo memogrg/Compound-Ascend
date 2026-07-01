@@ -169,17 +169,37 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   // transactions.income_source_id; aquí solo la línea proyectada (mensualizada).
   const { data: rentalHoldings } = await supabase
     .from("investment_holdings")
-    .select("id,label,symbol,currency,rental_income,rental_frequency")
+    .select(
+      "id,label,symbol,currency,category,rental_income,rental_frequency,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly",
+    )
     .eq("user_id", user.id)
     .eq("nature", "cashflow")
     .gt("rental_income", 0);
   for (const h of rentalHoldings ?? []) {
-    const monthly = toMonthly(Number(h.rental_income), h.rental_frequency);
+    const gross = toMonthly(Number(h.rental_income), h.rental_frequency);
+    if (gross <= 0) continue;
+    // Inmueble de renta → línea de ingreso = flujo NETO operativo (renta −
+    // vacancia − administración − costos fijos), igual que computeRentalRoi.
+    // Otras inversiones de flujo (préstamos, CDP…) sin costos: neto = bruto.
+    let monthly = gross;
+    if (h.category === "propiedad_alquiler") {
+      const r01 = (v: unknown) => Math.max(0, Math.min(1, Number(v) || 0));
+      const n = (v: unknown) => Number(v) || 0;
+      const collected = gross * (1 - r01(h.vacancy_pct));
+      const mgmt = collected * r01(h.mgmt_pct);
+      const fixed =
+        n(h.maintenance_monthly) +
+        n(h.hoa_monthly) +
+        n(h.services_monthly) +
+        n(h.property_tax_annual) / 12 +
+        n(h.insurance_annual) / 12;
+      monthly = collected - mgmt - fixed;
+    }
     if (monthly <= 0) continue;
     desired.push({
       type: "income",
       name: `Ingreso — ${h.label ?? h.symbol}`,
-      amount: monthly,
+      amount: Math.round(monthly * 100) / 100,
       currency: h.currency,
       categoryId: null,
       sourceKind: "rental",
