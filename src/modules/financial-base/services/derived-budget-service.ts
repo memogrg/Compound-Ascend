@@ -170,19 +170,17 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   const { data: rentalHoldings } = await supabase
     .from("investment_holdings")
     .select(
-      "id,label,symbol,currency,category,rental_income,rental_frequency,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly",
+      "id,label,symbol,currency,category,rental_income,rental_frequency,income_month,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly",
     )
     .eq("user_id", user.id)
     .eq("nature", "cashflow")
     .gt("rental_income", 0);
   for (const h of rentalHoldings ?? []) {
-    const gross = toMonthly(Number(h.rental_income), h.rental_frequency);
-    if (gross <= 0) continue;
-    // Inmueble de renta → línea de ingreso = flujo NETO operativo (renta −
-    // vacancia − administración − costos fijos), igual que computeRentalRoi.
-    // Otras inversiones de flujo (préstamos, CDP…) sin costos: neto = bruto.
-    let monthly = gross;
+    // Inmueble de renta → ingreso recurrente MENSUAL, monto NETO operativo
+    // (renta − vacancia − administración − costos fijos). Cae todos los meses.
     if (h.category === "propiedad_alquiler") {
+      const gross = toMonthly(Number(h.rental_income), h.rental_frequency);
+      if (gross <= 0) continue;
       const r01 = (v: unknown) => Math.max(0, Math.min(1, Number(v) || 0));
       const n = (v: unknown) => Number(v) || 0;
       const collected = gross * (1 - r01(h.vacancy_pct));
@@ -193,13 +191,41 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
         n(h.services_monthly) +
         n(h.property_tax_annual) / 12 +
         n(h.insurance_annual) / 12;
-      monthly = collected - mgmt - fixed;
+      const net = collected - mgmt - fixed;
+      if (net <= 0) continue;
+      desired.push({
+        type: "income",
+        name: `Ingreso — ${h.label ?? h.symbol}`,
+        amount: Math.round(net * 100) / 100,
+        currency: h.currency,
+        categoryId: null,
+        sourceKind: "rental",
+        sourceId: h.id,
+      });
+      continue;
     }
-    if (monthly <= 0) continue;
+
+    // Bonos / CDP / préstamos: CALENDARIO por mes ancla. El monto es el PAGO
+    // COMPLETO del periodo y aparece SOLO en los meses que toca (derivados de
+    // income_month + frecuencia). Fuera de esos meses no hay línea → el diff la
+    // elimina de ese periodo.
+    const perPayment = Number(h.rental_income) || 0;
+    if (perPayment <= 0) continue;
+    const anchor = ((((Number(h.income_month) || 1) - 1) % 12) + 12) % 12; // 0-11
+    const paymentMonths: number[] | null =
+      h.rental_frequency === "trimestral"
+        ? [0, 3, 6, 9].map((k) => ((anchor + k) % 12) + 1)
+        : h.rental_frequency === "semestral"
+          ? [0, 6].map((k) => ((anchor + k) % 12) + 1)
+          : h.rental_frequency === "anual"
+            ? [anchor + 1]
+            : null; // mensual (o sin frecuencia) → todos los meses
+    if (paymentMonths && !paymentMonths.includes(period.month)) continue;
+
     desired.push({
       type: "income",
       name: `Ingreso — ${h.label ?? h.symbol}`,
-      amount: Math.round(monthly * 100) / 100,
+      amount: Math.round(perPayment * 100) / 100,
       currency: h.currency,
       categoryId: null,
       sourceKind: "rental",
