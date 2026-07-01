@@ -18,6 +18,9 @@ import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
 import { AppError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/ai/provider";
 import { buildContextForUser } from "@/lib/whatsapp/context-service";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { loadRecentTurns, appendTurns } from "@/lib/ai/conversation-store";
+import type { AuthContext } from "@/lib/auth/auth-context";
 import {
   activateLinkByOtp,
   getActiveLinkByPhone,
@@ -301,7 +304,17 @@ async function handleText(
   }
 
   const ctx = await buildContextForUser(link.userId, link.householdId);
-  const messages: ChatMessage[] = [{ role: "user", content: msg.body }];
+  // Memoria conversacional (service-role, sin sesión): historial reciente del usuario. TODO
+  // best-effort: si el cliente service-role o la lectura fallan, el chat sigue sin memoria.
+  let authCtx: AuthContext | undefined;
+  let recent: ChatMessage[] = [];
+  try {
+    authCtx = { db: createServiceRoleClient(), userId: link.userId };
+    recent = await loadRecentTurns(authCtx);
+  } catch {
+    authCtx = undefined;
+  }
+  const messages: ChatMessage[] = [...recent, { role: "user", content: msg.body }];
   // Habilita la herramienta de deuda (function-calling) también en WhatsApp. El
   // toolContext se arma con service-role (sin sesión) y en moneda PRINCIPAL.
   // Best-effort: si falla, financeChatWithTools sin toolContext = chat normal.
@@ -313,6 +326,15 @@ async function handleText(
   }
   const result = await financeChatWithTools(messages, ctx, toolContext);
   await recordUsage(link.userId, result.tokensIn, result.tokensOut);
+
+  // Persistir el turno (best-effort; cubre tanto el camino de acción como el de respuesta). Solo
+  // si el authCtx service-role se creó bien (sin sesión no hay otro camino de escritura).
+  if (authCtx) {
+    await appendTurns(authCtx, [
+      { role: "user", content: msg.body, channel: "whatsapp" },
+      { role: "assistant", content: result.reply, channel: "whatsapp" },
+    ]);
+  }
 
   const action =
     result.action?.type === "create_transaction"
