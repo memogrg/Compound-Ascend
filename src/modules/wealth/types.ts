@@ -137,7 +137,13 @@ export type PortfolioStats = {
 
 // ── Motor de inversiones ──────────────────────────────────────────
 
-export type RentalFrequency = "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
+export type RentalFrequency =
+  | "semanal"
+  | "mensual"
+  | "trimestral"
+  | "semestral"
+  | "anual"
+  | "al_vencimiento";
 export type RentalSubtype = "alquiler" | "airbnb" | "auto" | "negocio" | "otro";
 
 export type Holding = {
@@ -159,6 +165,8 @@ export type Holding = {
   rentalFrequency?: RentalFrequency | null;
   /** % rendimiento anual (renta fija: bono/CDP); informativo + cálculo del pago. */
   annualRatePct?: number | null;
+  /** Fecha de vencimiento (renta fija de pago único: al_vencimiento). */
+  maturityDate?: string | null;
   rentalSubtype?: RentalSubtype | null;
   // ── Inmueble de renta: costos operativos para ROI (migración 20260628000002) ──
   purchasePrice?: number | null;

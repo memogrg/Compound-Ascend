@@ -84,8 +84,11 @@ export const holdingInputSchema = z.object({
   // Activos de renta / no cotizados.
   currentValueManual: z.number().nonnegative().optional(),
   rentalIncome: z.number().nonnegative().optional(),
-  rentalFrequency: z.enum(["semanal", "mensual", "trimestral", "semestral", "anual"]).optional(),
+  rentalFrequency: z
+    .enum(["semanal", "mensual", "trimestral", "semestral", "anual", "al_vencimiento"])
+    .optional(),
   annualRatePct: z.number().nonnegative().optional(),
+  maturityDate: z.string().optional(),
   rentalSubtype: z.enum(["alquiler", "airbnb", "auto", "negocio", "otro"]).optional(),
   // Inmueble de renta: costos operativos (ratios 0-1 para vacancy/mgmt).
   purchasePrice: z.number().nonnegative().optional(),

@@ -514,6 +514,8 @@ export type InvestmentHoldingRow = Timestamps & {
   debt_id: string | null;
   // % rendimiento anual (renta fija: bono/CDP) (migración 20260706000001).
   annual_rate_pct: number | null;
+  // Fecha de vencimiento (renta fija pago único) (migración 20260708000001).
+  maturity_date: string | null;
 };
 
 export type RentalPaymentRow = Timestamps & {

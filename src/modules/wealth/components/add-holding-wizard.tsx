@@ -229,12 +229,15 @@ export function AddHoldingModal({
     prefill?.currentValueManual != null ? String(prefill.currentValueManual) : "",
   );
   const [income, setIncome] = useState(prefill?.rentalIncome != null ? String(prefill.rentalIncome) : "");
-  const [frequency, setFrequency] = useState<"semanal" | "mensual" | "trimestral" | "semestral" | "anual">(
+  const [frequency, setFrequency] = useState<"semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento">(
     prefill?.rentalFrequency ?? "mensual",
   );
   const [incomeMonth, setIncomeMonth] = useState(prefill?.incomeMonth ? String(prefill.incomeMonth) : "1");
   const [annualRatePct, setAnnualRatePct] = useState(
     prefill?.annualRatePct != null ? String(prefill.annualRatePct) : "",
+  );
+  const [maturityDate, setMaturityDate] = useState(
+    prefill?.maturityDate ? String(prefill.maturityDate).slice(0, 7) : "",
   );
 
   // ── Inmueble de renta (propiedad_alquiler): subtipo + costos operativos ──
@@ -380,6 +383,7 @@ export function AddHoldingModal({
             base.incomeMonth = parseInt(incomeMonth, 10) || undefined;
         }
         base.annualRatePct = parseFloat(annualRatePct) || undefined;
+        base.maturityDate = maturityDate ? `${maturityDate}-01` : undefined;
         if (cat === "propiedad_alquiler") {
           base.rentalSubtype = subtype;
           const n = (s: string) => parseFloat(s) || undefined;
@@ -473,6 +477,8 @@ export function AddHoldingModal({
             onIncomeMonth={setIncomeMonth}
             annualRatePct={annualRatePct}
             onAnnualRatePct={setAnnualRatePct}
+            maturityDate={maturityDate}
+            onMaturityDate={setMaturityDate}
             category={category}
             subtype={subtype}
             onSubtype={setSubtype}
@@ -612,6 +618,7 @@ function CategoryGroup({
 
 /** Pago por periodo estimado desde monto × % anual, según la frecuencia. */
 function perPaymentFromRate(invested: string, ratePct: string, freq: string): string {
+  if (freq === "al_vencimiento") return "";
   const principal = parseFloat(invested) || 0;
   const rate = parseFloat(ratePct) || 0;
   if (principal <= 0 || rate <= 0) return "";
@@ -652,12 +659,14 @@ function Step2Fields(props: {
   onCurrentValue: (v: string) => void;
   income: string;
   onIncome: (v: string) => void;
-  frequency: "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
-  onFrequency: (v: "semanal" | "mensual" | "trimestral" | "semestral" | "anual") => void;
+  frequency: "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento";
+  onFrequency: (v: "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento") => void;
   incomeMonth: string;
   onIncomeMonth: (v: string) => void;
   annualRatePct: string;
   onAnnualRatePct: (v: string) => void;
+  maturityDate: string;
+  onMaturityDate: (v: string) => void;
   category: InvestmentCategory | null;
   subtype: "alquiler" | "airbnb";
   onSubtype: (v: "alquiler" | "airbnb") => void;
@@ -842,10 +851,13 @@ function Step2Fields(props: {
                 <option value="trimestral">Trimestral</option>
                 <option value="semestral">Semestral</option>
                 <option value="anual">Anual</option>
+                <option value="al_vencimiento">Al vencimiento</option>
               </select>
             </div>
           </div>
-          {props.frequency !== "mensual" && props.frequency !== "semanal" ? (
+          {props.frequency !== "mensual" &&
+          props.frequency !== "semanal" &&
+          props.frequency !== "al_vencimiento" ? (
             <div className="fld">
               <label className="fld-label">
                 Mes ancla (primer pago){" "}
@@ -887,6 +899,20 @@ function Step2Fields(props: {
                   </div>
                 ) : null;
               })()}
+            </div>
+          ) : null}
+          {props.frequency === "al_vencimiento" ? (
+            <div className="fld">
+              <label className="fld-label">
+                Fecha de vencimiento{" "}
+                <HelpTip text="Mes y año en que recibís el pago único. El ingreso aparece en Ingresos solo en ese mes." />
+              </label>
+              <input
+                className="inp"
+                type="month"
+                value={props.maturityDate}
+                onChange={(e) => props.onMaturityDate(e.target.value)}
+              />
             </div>
           ) : null}
         </>
@@ -1117,7 +1143,7 @@ function RentalCostsBlock(props: {
   cur: string;
   invested: string;
   income: string;
-  frequency: "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
+  frequency: "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento";
   subtype: "alquiler" | "airbnb";
   onSubtype: (v: "alquiler" | "airbnb") => void;
   rc: RentalCosts;
@@ -1152,7 +1178,8 @@ function RentalCostsBlock(props: {
 
   const roi = computeRentalRoi({
     rentalIncome: parseFloat(props.income) || 0,
-    rentalFrequency: props.frequency,
+    // al_vencimiento no aplica a inmueble; para el ROI se trata como anual.
+    rentalFrequency: props.frequency === "al_vencimiento" ? "anual" : props.frequency,
     vacancyPct: (parseFloat(rc.vacancyPct) || 0) / 100,
     mgmtPct: (parseFloat(rc.mgmtPct) || 0) / 100,
     maintenanceMonthly: parseFloat(rc.maintenance) || 0,
