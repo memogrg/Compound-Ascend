@@ -221,10 +221,13 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
             : null; // mensual (o sin frecuencia) → todos los meses
     if (paymentMonths && !paymentMonths.includes(period.month)) continue;
 
+    // Semanal: ingreso todas las semanas → equivalente mensual (×52/12), todos
+    // los meses. El resto usa el pago completo del periodo.
+    const monthly = h.rental_frequency === "semanal" ? perPayment * (52 / 12) : perPayment;
     desired.push({
       type: "income",
       name: `Ingreso — ${h.label ?? h.symbol}`,
-      amount: Math.round(perPayment * 100) / 100,
+      amount: Math.round(monthly * 100) / 100,
       currency: h.currency,
       categoryId: null,
       sourceKind: "rental",

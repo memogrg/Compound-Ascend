@@ -229,7 +229,7 @@ export function AddHoldingModal({
     prefill?.currentValueManual != null ? String(prefill.currentValueManual) : "",
   );
   const [income, setIncome] = useState(prefill?.rentalIncome != null ? String(prefill.rentalIncome) : "");
-  const [frequency, setFrequency] = useState<"mensual" | "trimestral" | "semestral" | "anual">(
+  const [frequency, setFrequency] = useState<"semanal" | "mensual" | "trimestral" | "semestral" | "anual">(
     prefill?.rentalFrequency ?? "mensual",
   );
   const [incomeMonth, setIncomeMonth] = useState(prefill?.incomeMonth ? String(prefill.incomeMonth) : "1");
@@ -376,7 +376,8 @@ export function AddHoldingModal({
         if (inc > 0) {
           base.rentalIncome = inc;
           base.rentalFrequency = frequency;
-          if (frequency !== "mensual") base.incomeMonth = parseInt(incomeMonth, 10) || undefined;
+          if (frequency !== "mensual" && frequency !== "semanal")
+            base.incomeMonth = parseInt(incomeMonth, 10) || undefined;
         }
         base.annualRatePct = parseFloat(annualRatePct) || undefined;
         if (cat === "propiedad_alquiler") {
@@ -615,7 +616,8 @@ function perPaymentFromRate(invested: string, ratePct: string, freq: string): st
   const rate = parseFloat(ratePct) || 0;
   if (principal <= 0 || rate <= 0) return "";
   const annual = (principal * rate) / 100;
-  const divisor = freq === "mensual" ? 12 : freq === "trimestral" ? 4 : freq === "semestral" ? 2 : 1;
+  const divisor =
+    freq === "semanal" ? 52 : freq === "mensual" ? 12 : freq === "trimestral" ? 4 : freq === "semestral" ? 2 : 1;
   return String(Math.round((annual / divisor) * 100) / 100);
 }
 /** Meses de pago derivados del mes ancla (1-12) + frecuencia. */
@@ -650,8 +652,8 @@ function Step2Fields(props: {
   onCurrentValue: (v: string) => void;
   income: string;
   onIncome: (v: string) => void;
-  frequency: "mensual" | "trimestral" | "semestral" | "anual";
-  onFrequency: (v: "mensual" | "trimestral" | "semestral" | "anual") => void;
+  frequency: "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
+  onFrequency: (v: "semanal" | "mensual" | "trimestral" | "semestral" | "anual") => void;
   incomeMonth: string;
   onIncomeMonth: (v: string) => void;
   annualRatePct: string;
@@ -835,6 +837,7 @@ function Step2Fields(props: {
                   if (pp) props.onIncome(pp);
                 }}
               >
+                <option value="semanal">Semanal</option>
                 <option value="mensual">Mensual</option>
                 <option value="trimestral">Trimestral</option>
                 <option value="semestral">Semestral</option>
@@ -842,7 +845,7 @@ function Step2Fields(props: {
               </select>
             </div>
           </div>
-          {props.frequency !== "mensual" ? (
+          {props.frequency !== "mensual" && props.frequency !== "semanal" ? (
             <div className="fld">
               <label className="fld-label">
                 Mes ancla (primer pago){" "}
@@ -1114,7 +1117,7 @@ function RentalCostsBlock(props: {
   cur: string;
   invested: string;
   income: string;
-  frequency: "mensual" | "trimestral" | "semestral" | "anual";
+  frequency: "semanal" | "mensual" | "trimestral" | "semestral" | "anual";
   subtype: "alquiler" | "airbnb";
   onSubtype: (v: "alquiler" | "airbnb") => void;
   rc: RentalCosts;
