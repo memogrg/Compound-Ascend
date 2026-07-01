@@ -59,6 +59,8 @@ jobs:
         uses: supabase/setup-cli@v2
         with:
           version: latest
+          # Autentica la consulta a la API de GitHub que resuelve "latest" (5000/h vs 60/h sin token).
+          github-token: ${{ github.token }}
         env:
           # Autentica la consulta a la API de GitHub que resuelve el release
           # "latest"; sin token pega contra el límite de 60/h por IP del runner.
