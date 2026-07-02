@@ -29,7 +29,7 @@ export function UpgradePrompt({ compact = false }: { compact?: boolean }) {
         >
           <Icon name="spark" filled width={0} />
         </span>
-        <div className="card-title">Compound Ascend Premium</div>
+        <div className="card-title">CARTERA+ Premium</div>
       </div>
       {!compact ? (
         <ul

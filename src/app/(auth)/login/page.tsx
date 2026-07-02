@@ -3,7 +3,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton } from "@/components/auth/google-button";
 import { LoginForm } from "@/components/auth/login-form";
 
-export const metadata = { title: "Iniciar sesión — Compound Ascend" };
+export const metadata = { title: "Iniciar sesión — CARTERA+" };
 
 export default async function LoginPage({
   searchParams,

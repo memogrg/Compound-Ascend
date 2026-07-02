@@ -43,3 +43,6 @@ supabase/.branches
 /Reestructuracion_Transacciones/
 /test-results
 /playwright-report
+
+# Bundle de diseño (no versionar)
+design-handoff/

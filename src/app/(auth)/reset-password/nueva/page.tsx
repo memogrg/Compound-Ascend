@@ -1,7 +1,7 @@
 import { AuthShell } from "@/components/auth/auth-shell";
 import { UpdatePasswordForm } from "@/components/auth/reset-form";
 
-export const metadata = { title: "Nueva contraseña — Compound Ascend" };
+export const metadata = { title: "Nueva contraseña — CARTERA+" };
 
 /**
  * Destino del enlace de restablecimiento. El callback ya intercambió el código

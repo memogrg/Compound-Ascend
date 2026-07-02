@@ -95,7 +95,7 @@ export function ProfileDashboard({
   const r = diagnosis.reading;
   const riskDisplay = O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass;
 
-  // "Lo que Ascend AI sabe de ti": líneas en 2ª persona derivadas del perfil.
+  // "Lo que My Agent C+ sabe de ti": líneas en 2ª persona derivadas del perfil.
   const goalLabel = goals[0] ?? pick(O.DINERO_PRIMERO, draft.dineroPrimero) ?? undefined;
   const knowledgeLabel = pick(O.KNOWLEDGE_LEVELS, draft.knowledgeLevel) ?? undefined;
   const knows: string[] = [];
@@ -340,7 +340,7 @@ export function ProfileDashboard({
             </Card>
           </section>
 
-          <Card title="Cómo te acompaña Ascend AI">
+          <Card title="Cómo te acompaña My Agent C+">
             <p style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>
               Tono <strong>{r.companionship.tone}</strong>.
             </p>
@@ -354,7 +354,7 @@ export function ProfileDashboard({
             {knows.length > 0 ? (
               <div style={{ marginTop: 16 }}>
                 <div className="label" style={{ fontSize: 11.5, marginBottom: 6 }}>
-                  Lo que Ascend AI sabe de ti
+                  Lo que My Agent C+ sabe de ti
                 </div>
                 <ul
                   style={{

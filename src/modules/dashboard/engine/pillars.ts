@@ -1,7 +1,7 @@
 /**
  * Construye la franja "Norte" (¿me hago más rico o más pobre?, libertad
  * financiera, próxima mejor decisión) y los 4 pilares del panel, cada uno con
- * su lectura de Ascend AI. Determinista: solo cadenas en español a partir de
+ * su lectura de My Agent C+. Determinista: solo cadenas en español a partir de
  * datos ya calculados por los módulos. No hace fetch ni cálculos pesados.
  */
 import type { IconName } from "@/components/ui/icon";
@@ -35,7 +35,7 @@ export type PillarVM = {
   ratio: number; // 0-1, ancho de la barra
   barColor: string;
   href: string;
-  ai: string; // lectura Ascend AI del pilar
+  ai: string; // lectura My Agent C+ del pilar
 };
 
 export type PanelVM = { norte: NorteVM; pillars: PillarVM[] };

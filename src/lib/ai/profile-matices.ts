@@ -27,7 +27,7 @@ const MAX_CHARS = 600;
 /** Construye el prompt (system + user) de forma pura y testeable. */
 export function buildMaticesPrompt(p: MaticesInput): { system: string; user: string } {
   const system = [
-    "Eres Ascend AI, asesor financiero conductual de Compound Ascend. Escribe una nota personal y",
+    "Eres My Agent C+, asesor financiero conductual de CARTERA+. Escribe una nota personal y",
     "BREVE (2 a 4 frases) para el usuario que acaba de completar su perfil. Háblale en segunda",
     `persona, en español, con tono ${p.recommendedTone}, cálido y motivador. Hila quién es`,
     "(arquetipo), lo que más quiere de su dinero y su siguiente nivel, en un párrafo natural.",

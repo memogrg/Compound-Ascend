@@ -47,7 +47,7 @@ const serverSchema = z.object({
   SMTP_PASS: optionalStr, // App Password de Google (no la contraseña normal)
   // Vía 2 (alternativa): Resend.
   RESEND_API_KEY: optionalStr,
-  EMAIL_FROM: optionalStr, // remitente, p. ej. "Compound Ascend <invitaciones@tudominio.com>"
+  EMAIL_FROM: optionalStr, // remitente, p. ej. "CARTERA+ <invitaciones@tudominio.com>"
   REDIS_URL: optionalStr,
   // Upstash Redis (REST): rate-limit coherente entre instancias serverless en
   // Vercel. Si faltan, el rate-limit cae a memoria por instancia (solo dev/local).
