@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import {
   requestPasswordResetAction,
@@ -16,7 +17,29 @@ export function RequestResetForm() {
   const [state, action] = useActionState(requestPasswordResetAction, initial);
 
   if (state.ok && state.message) {
-    return <div className="auth-msg">{state.message}</div>;
+    return (
+      <div className="auth-success">
+        <div className="ok">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 6h16v12H4z" />
+            <path d="m4 7 8 6 8-6" />
+          </svg>
+        </div>
+        <h2>Revisa tu correo</h2>
+        <p>{state.message}</p>
+        <Link href="/login" className="btn btn-primary">
+          Volver a iniciar sesión
+        </Link>
+      </div>
+    );
   }
 
   return (

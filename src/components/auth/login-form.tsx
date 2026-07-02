@@ -25,6 +25,11 @@ export function LoginForm({ next }: { next?: string } = {}) {
       />
       <Field
         label="Contraseña"
+        labelEnd={
+          <Link className="auth-link" href="/reset-password">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        }
         name="password"
         type="password"
         autoComplete="current-password"
@@ -32,11 +37,6 @@ export function LoginForm({ next }: { next?: string } = {}) {
         error={state.fieldErrors?.password}
         required
       />
-      <div style={{ textAlign: "right", marginBottom: 16 }}>
-        <Link className="auth-link" href="/reset-password">
-          ¿Olvidaste tu contraseña?
-        </Link>
-      </div>
       <SubmitButton>Iniciar sesión</SubmitButton>
     </form>
   );
