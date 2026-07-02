@@ -174,7 +174,7 @@ export function JarDatePicker({ current }: { current: string }) {
             position: "absolute",
             top: "calc(100% + 6px)",
             right: 0,
-            zIndex: 50,
+            zIndex: 25, // bajo el topbar sticky (z30)
             width: 256,
             padding: 12,
             boxShadow: "0 12px 32px rgba(0,0,0,.18)",
