@@ -220,6 +220,10 @@ export function AddHoldingModal({
   // ── Perfil A (cotizado) ──
   const [symbol, setSymbol] = useState(prefill?.symbol ?? "");
   const [quantity, setQuantity] = useState(prefill && prefill.quantity > 0 ? String(prefill.quantity) : "");
+  // Precio de compra por unidad (cotizados). Al editar, precarga el costo promedio.
+  const [unitPrice, setUnitPrice] = useState(
+    prefill && prefill.quantity > 0 ? String(prefill.averageCost) : "",
+  );
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [livePriceCurrency, setLivePriceCurrency] = useState("USD");
   const [priceState, setPriceState] = useState<"idle" | "loading" | "ok" | "error">("idle");
@@ -347,12 +351,23 @@ export function AddHoldingModal({
     const m = CATEGORY_META[cat];
     // Cotizado con cantidad → cantidad real + costo unitario (cost_basis = invertido).
     // Resto → 1 "unidad" cuyo costo ES el monto invertido.
-    const useUnits = m.quoted && qtyNum > 0;
-    const finalQty = useUnits ? qtyNum : 1;
+    // Cotizado: el "precio de compra" (por unidad) tiene prioridad. Con precio +
+    // monto, la cantidad se deriva (monto ÷ precio) y el costo unitario ES ese
+    // precio. Sin precio, se usa la cantidad ingresada (costo = monto ÷ cantidad).
+    // Sin nada, 1 "unidad" cuyo costo es el monto invertido.
+    const priceNum = parseFloat(unitPrice) || 0;
     // Si no hay monto invertido, solo se cae al precio en vivo cuando su moneda
     // coincide con `cur`; si difiere, no se asume (quedaría mal etiquetado).
     const liveForCost = liveMatchesCur ? (livePrice ?? 0) : 0;
-    const finalAvg = useUnits ? (investedNum > 0 ? investedNum / qtyNum : liveForCost) : investedNum;
+    let finalQty = 1;
+    let finalAvg = investedNum;
+    if (m.quoted && priceNum > 0) {
+      finalAvg = priceNum;
+      finalQty = investedNum > 0 ? investedNum / priceNum : qtyNum || 0;
+    } else if (m.quoted && qtyNum > 0) {
+      finalQty = qtyNum;
+      finalAvg = investedNum > 0 ? investedNum / qtyNum : liveForCost;
+    }
 
     const base: HoldingInput = {
       assetType: m.defaultAssetType,
@@ -464,6 +479,8 @@ export function AddHoldingModal({
             }}
             quantity={quantity}
             onQuantity={setQuantity}
+            unitPrice={unitPrice}
+            onUnitPrice={setUnitPrice}
             livePrice={livePrice}
             livePriceCurrency={livePriceCurrency}
             priceState={priceState}
@@ -652,6 +669,8 @@ function Step2Fields(props: {
   onSymbol: (v: string) => void;
   quantity: string;
   onQuantity: (v: string) => void;
+  unitPrice: string;
+  onUnitPrice: (v: string) => void;
   livePrice: number | null;
   livePriceCurrency: string;
   priceState: "idle" | "loading" | "ok" | "error";
@@ -726,6 +745,7 @@ function Step2Fields(props: {
 
       {/* Perfil A · cotizado */}
       {profile === "A" ? (
+        <>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">
@@ -759,18 +779,45 @@ function Step2Fields(props: {
             ) : null}
           </div>
           <div className="fld">
-            <label className="fld-label">Cantidad (opcional)</label>
-            <input
-              className="inp"
-              type="number"
-              step="any"
-              min="0"
-              value={props.quantity}
-              onChange={(e) => props.onQuantity(e.target.value)}
-              placeholder="0"
-            />
+            <label className="fld-label">
+              Precio de compra <HelpTip text="El precio por unidad al que compraste. Base para el promedio ponderado del costo." />
+            </label>
+            <div className="inp-money">
+              <span className="pre">{currencySymbol(cur)}</span>
+              <input
+                type="number"
+                step="any"
+                min="0"
+                value={props.unitPrice}
+                onChange={(e) => props.onUnitPrice(e.target.value)}
+                placeholder="0"
+              />
+            </div>
           </div>
         </div>
+        <div className="fld">
+          <label className="fld-label">Cantidad (opcional)</label>
+          <input
+            className="inp"
+            type="number"
+            step="any"
+            min="0"
+            value={
+              (parseFloat(props.unitPrice) || 0) > 0 && (parseFloat(props.invested) || 0) > 0
+                ? String(+((parseFloat(props.invested) || 0) / (parseFloat(props.unitPrice) || 1)).toFixed(8))
+                : props.quantity
+            }
+            onChange={(e) => props.onQuantity(e.target.value)}
+            readOnly={(parseFloat(props.unitPrice) || 0) > 0}
+            placeholder="0"
+          />
+          {(parseFloat(props.unitPrice) || 0) > 0 ? (
+            <span className="muted" style={{ fontSize: 11 }}>
+              Calculado: monto ÷ precio. Ingresá precio o cantidad; el otro se deriva.
+            </span>
+          ) : null}
+        </div>
+        </>
       ) : null}
 
       {/* Perfil B / C · valor actual manual */}
