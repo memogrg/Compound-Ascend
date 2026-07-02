@@ -661,7 +661,7 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
           <BrandMark />
           <div>
             <div className="brand-name">
-              Compound <span className="ascend">Ascend</span>
+              CARTERA<span className="ascend">+</span>
             </div>
             <div className="brand-sub">Tu perfil · {total} pasos</div>
           </div>

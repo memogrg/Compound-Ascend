@@ -3,7 +3,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton } from "@/components/auth/google-button";
 import { SignupForm } from "@/components/auth/signup-form";
 
-export const metadata = { title: "Crear cuenta — Compound Ascend" };
+export const metadata = { title: "Crear cuenta — CARTERA+" };
 
 export default async function SignupPage({
   searchParams,

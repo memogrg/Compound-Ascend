@@ -276,7 +276,7 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
   const phrase = NEXT_MOVE_PHRASE[arche.primary];
   const nextMove = {
     title: `Tu próxima jugada: ${phrase}`,
-    body: `Antes de avanzar, Compound Ascend construye tu fotografía base: ingresos, gastos, activos, pasivos, liquidez y tu capacidad real de inversión. Ese es tu punto de partida para ${phrase}.`,
+    body: `Antes de avanzar, CARTERA+ construye tu fotografía base: ingresos, gastos, activos, pasivos, liquidez y tu capacidad real de inversión. Ese es tu punto de partida para ${phrase}.`,
     cta: "Crear mi mapa financiero en 7 minutos",
     timeEstimate: "7 minutos",
   };

@@ -8,7 +8,7 @@ import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { NameStep } from "@/modules/personal-profile/components/name-step";
 
-export const metadata = { title: "Tu nombre — Compound Ascend" };
+export const metadata = { title: "Tu nombre — CARTERA+" };
 
 const TITLE_HTML = 'Te damos la <span class="it">bienvenida</span>';
 

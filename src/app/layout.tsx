@@ -1,23 +1,32 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Serif } from "next/font/google";
+import { Manrope, Sora, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/layout/theme-provider";
 
-/** Tipografía serif del design system (cifras y títulos). */
-const instrumentSerif = Instrument_Serif({
-  weight: "400",
-  style: ["normal", "italic"],
+/** Tipografías del design system v2: Sora (display), Manrope (cuerpo), Space Mono (datos). */
+const sora = Sora({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-instrument-serif",
+  variable: "--font-sora",
+});
+const manrope = Manrope({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-manrope",
+});
+const spaceMono = Space_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-space-mono",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: "Compound Ascend — Sistema Financiero",
+  title: "CARTERA+ — Sistema Financiero",
   description:
     "Tu asesor financiero personal con IA. Ordena tu dinero, toma control, construye y protege tu patrimonio, y mide tu Rich Life.",
-  applicationName: "Compound Ascend",
+  applicationName: "CARTERA+",
 };
 
 export const viewport: Viewport = {
@@ -25,13 +34,17 @@ export const viewport: Viewport = {
   initialScale: 1,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#F4F2EC" },
-    { media: "(prefers-color-scheme: dark)", color: "#0D0D0B" },
+    { media: "(prefers-color-scheme: dark)", color: "#15140F" },
   ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es" className={instrumentSerif.variable} suppressHydrationWarning>
+    <html
+      lang="es"
+      className={`${sora.variable} ${manrope.variable} ${spaceMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {/* Anti-parpadeo de tema: fija data-theme antes de pintar. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

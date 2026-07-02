@@ -2,7 +2,7 @@
   "name": "compound-ascend",
   "version": "0.1.0",
   "private": true,
-  "description": "Compound Ascend — Sistema financiero personal con IA",
+  "description": "CARTERA+ — Sistema financiero personal con IA",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

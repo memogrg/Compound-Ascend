@@ -20,7 +20,7 @@ export function buildNextMove(s: FinancialState): NextMove {
   if (!s.hasBase) {
     return {
       title: "Tu próxima jugada: conocer tu realidad",
-      body: "Antes de cualquier estrategia, Compound Ascend necesita tu fotografía: ingresos, gastos y tu capacidad real de inversión.",
+      body: "Antes de cualquier estrategia, CARTERA+ necesita tu fotografía: ingresos, gastos y tu capacidad real de inversión.",
       cta: "Construir mi Base Financiera",
       route: "/mi-base-financiera",
     };

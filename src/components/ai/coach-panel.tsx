@@ -75,21 +75,21 @@ export function CoachPanel() {
       <button
         className={`coach-fab${open ? " hide" : ""}`}
         onClick={() => setOpen(true)}
-        aria-label="Abrir Ascend AI"
+        aria-label="Abrir My Agent C+"
       >
         <span className="spark">
           <Icon name="spark" filled />
         </span>
-        Pregúntale a Ascend AI
+        Pregúntale a My Agent C+
       </button>
 
-      <div className={`coach-panel${open ? " open" : ""}`} role="dialog" aria-label="Ascend AI">
+      <div className={`coach-panel${open ? " open" : ""}`} role="dialog" aria-label="My Agent C+">
         <div className="coach-top">
           <span className="spark">
             <Icon name="spark" filled />
           </span>
           <div>
-            <div className="coach-title">Ascend AI</div>
+            <div className="coach-title">My Agent C+</div>
             <div className="coach-status">Tu asesor financiero</div>
           </div>
           <button
@@ -191,7 +191,7 @@ function FinanceChat() {
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "ai",
-      html: "Hola, soy <strong>Ascend AI</strong>. Pregúntame sobre tu dinero. Si propongo registrar algo, te pediré confirmación.",
+      html: "Hola, soy <strong>My Agent C+</strong>. Pregúntame sobre tu dinero. Si propongo registrar algo, te pediré confirmación.",
     },
   ]);
   const [value, setValue] = useState("");
@@ -271,7 +271,7 @@ function FinanceChat() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send(value)}
-          aria-label="Mensaje para Ascend AI"
+          aria-label="Mensaje para My Agent C+"
         />
         <button className="coach-send" aria-label="Enviar" onClick={() => send(value)}>
           <Icon name="send" width={2} />

@@ -74,7 +74,7 @@ async function handle(req: Request) {
           `<p>Tu cuota de <strong>${escapeHtml(r.name)}</strong>${banco} por <strong>${cuota}</strong> ` +
           `vence el <strong>${fmtDate(r.nextDue)}</strong>.</p>` +
           `<p>Págala a tiempo para evitar intereses y cargos por mora.</p>` +
-          `<p style="color:#888;font-size:12px">Compound Ascend · recordatorio automático</p>`;
+          `<p style="color:#888;font-size:12px">CARTERA+ · recordatorio automático</p>`;
 
         const res = await sendEmail({ to: r.email, subject, html });
         if (res.ok) {

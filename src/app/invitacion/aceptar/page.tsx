@@ -10,7 +10,7 @@ import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AcceptInvitation } from "@/modules/personal-profile/components/accept-invitation";
 
-export const metadata = { title: "Aceptar invitación — Compound Ascend" };
+export const metadata = { title: "Aceptar invitación — CARTERA+" };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

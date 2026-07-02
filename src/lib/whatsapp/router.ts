@@ -72,7 +72,7 @@ const REVIEW_RE = /^(revisar|revisi[oó]n|movimientos|pendientes)$/;
 const HELP_RE = /^(ayuda|men[uú]|hola|help|empezar|start|\?)$/;
 const MOVE_HINT = "\n↩️ ¿Sobre equivocado? Respondé *mover a <sobre>* (agregá *siempre* para recordarlo).";
 const HELP_TEXT =
-  "👋 Soy tu asistente de Compound Ascend. Puedo:\n\n" +
+  "👋 Soy tu asistente de CARTERA+. Puedo:\n\n" +
   "📸 Registrar un gasto: enviá una *foto* del recibo.\n" +
   '✍️ Registrar por texto: "gasté 12000 en super" o "me entraron 50000 de freelance".\n' +
   '🔁 Re-clasificar: "mover a Paseos" (lo último), "mover el de 12000 a Paseos" (por monto) o agregá "siempre" para recordarlo.\n' +
@@ -89,7 +89,7 @@ export async function routeInbound(provider: WhatsAppProvider, msg: InboundMessa
       const name = await getUserDisplayName(res.userId);
       await provider.sendText(
         msg.phone,
-        `✅ Listo${name ? `, ${name}` : ""}. Tu WhatsApp quedó vinculado a tu familia en Compound Ascend.`,
+        `✅ Listo${name ? `, ${name}` : ""}. Tu WhatsApp quedó vinculado a tu familia en CARTERA+.`,
       );
     } else if (res.reason === "phone_taken") {
       await provider.sendText(

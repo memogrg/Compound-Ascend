@@ -10,7 +10,7 @@ const ACCENT: Record<Accent, string> = {
 };
 
 /**
- * Nota del asesor (Ascend AI) embebida en una pantalla: recomendación corta en
+ * Nota del asesor (My Agent C+) embebida en una pantalla: recomendación corta en
  * su tono, con marca de color por intención. Componente de servidor reutilizable.
  */
 export function AdvisorNote({
@@ -33,7 +33,7 @@ export function AdvisorNote({
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="label" style={{ fontSize: 11, color, letterSpacing: 0.3 }}>
-          Ascend AI
+          My Agent C+
         </div>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginTop: 4, lineHeight: 1.4 }}>
           {title}

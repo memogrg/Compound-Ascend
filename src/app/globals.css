@@ -5,61 +5,107 @@
 @custom-variant dark (&:is([data-theme="dark"] *));
 
 /* ============================================================
-   COMPOUND ASCEND — Sistema de diseño
-   Portado fielmente del handoff (assets/app.css): tokens, shell,
-   componentes, responsive. Añade: navegación inferior móvil.
+   CARTERA+ — Design System v2.0
+   Tokens v2 (handoff assets/cartera.css) + aliases legacy → v2
+   para que las clases existentes adopten el look sin reescribirse.
+   Light es el default; dark bajo [data-theme="dark"].
    ============================================================ */
 
 :root {
-  /* Type */
-  --sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui,
-    sans-serif;
-  --serif: var(--font-instrument-serif), "Instrument Serif", "Times New Roman", serif;
-  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* ---- Type (Sora/Manrope/Space Mono via next/font en layout.tsx) ---- */
+  --font-display: var(--font-sora), "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: var(--font-manrope), "Manrope", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), "Space Mono", ui-monospace, Menlo, monospace;
+  --sans: var(--font-body);
+  --serif: var(--font-display);
+  --mono: var(--font-mono);
 
-  /* ---- Light — warm paper ---- */
-  --bg: #f4f2ec;
-  --bg-elev: #faf8f3;
+  /* ---- LIGHT · default ---- */
+  --canvas: #f4f2ec;
   --surface: #ffffff;
   --surface-2: #fbfaf6;
-  --line: rgba(20, 18, 14, 0.07);
-  --line-strong: rgba(20, 18, 14, 0.12);
-  --ink: #15140f;
-  --ink-2: #36342d;
-  /* P1-8: oscurecidos lo justo para cumplir contraste WCAG AA (4.5:1) en texto
-     secundario, manteniendo el gris lo más claro posible. */
-  --muted: #726e64;
-  --muted-2: #767168;
-  --chip: rgba(20, 18, 14, 0.04);
-  --chip-hover: rgba(20, 18, 14, 0.07);
-  --shadow-card:
-    0 1px 0 rgba(20, 18, 14, 0.04), 0 1px 3px rgba(20, 18, 14, 0.04),
-    0 12px 32px -16px rgba(20, 18, 14, 0.08);
-  --shadow-pop: 0 4px 12px -2px rgba(20, 18, 14, 0.1), 0 16px 40px -12px rgba(20, 18, 14, 0.14);
-  --shadow-float: 0 8px 24px -6px rgba(20, 18, 14, 0.16), 0 24px 60px -20px rgba(20, 18, 14, 0.24);
-
-  /* ---- Semantic / financial status ---- */
-  --pos: oklch(0.55 0.11 152);
-  --pos-soft: oklch(0.94 0.04 152);
-  --neg: oklch(0.58 0.15 25);
-  --neg-soft: oklch(0.95 0.03 25);
-  --warn: oklch(0.7 0.12 70);
-  --warn-soft: oklch(0.95 0.05 80);
+  --border: #e7e4dc;
+  --text: #1e1c16;
+  --text-muted: #807c72;
+  --accent: #378451;
+  --accent-ink: #ffffff;
+  --success: #378451;
+  --warning: #b07a2e;
+  --danger: #c34f4b;
   --info: oklch(0.52 0.1 235);
+  --accent-soft: rgba(55, 132, 81, 0.12);
+  --success-soft: var(--accent-soft);
+  --danger-soft: rgba(195, 79, 75, 0.12);
+  --warning-soft: rgba(176, 122, 46, 0.12);
   --info-soft: oklch(0.94 0.03 235);
 
-  /* ---- Layer / domain accents ---- */
-  --c-income: oklch(0.55 0.11 152);
-  --c-expense: oklch(0.58 0.06 50);
-  --c-savings: oklch(0.62 0.08 195);
-  --c-debt: oklch(0.58 0.15 25);
-  --c-invest: oklch(0.52 0.1 235);
-  --c-protect: oklch(0.58 0.07 160);
-  --c-networth: oklch(0.45 0.04 250);
-  --gold: oklch(0.72 0.1 85);
+  /* ---- Data viz series (--s6 extiende el handoff con el teal legacy) ---- */
+  --s1: #378451;
+  --s2: #b07a2e;
+  --s3: #c34f4b;
+  --s4: #6b8a5f;
+  --s5: #43a064;
+  --s6: oklch(0.62 0.08 195);
 
-  --teal: oklch(0.62 0.08 195);
+  /* ---- Spacing (base 4) ---- */
+  --sp1: 4px;
+  --sp2: 8px;
+  --sp3: 12px;
+  --sp4: 16px;
+  --sp6: 24px;
+  --sp8: 32px;
+  --sp12: 48px;
+  --sp16: 64px;
+
+  /* ---- Radii ---- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+  --r-btn: 10px;
+  --r-xl: 18px;
+  --r-2xl: 24px;
+
+  /* ---- Elevation ---- */
+  --e1: 0 1px 2px rgba(20, 18, 14, 0.06);
+  --e2: 0 4px 14px -6px rgba(20, 18, 14, 0.12);
+  --e3: 0 14px 40px -16px rgba(20, 18, 14, 0.18);
+
+  --sidebar-w: 248px;
+
+  /* ---- Aliases legacy → v2 (consumidos por las clases existentes) ---- */
+  --bg: var(--canvas);
+  --bg-elev: var(--surface);
+  --line: var(--border);
+  --line-strong: color-mix(in srgb, var(--text) 16%, transparent);
+  --ink: var(--text);
+  --ink-2: color-mix(in srgb, var(--text) 84%, var(--canvas));
+  --muted: var(--text-muted);
+  --muted-2: var(--text-muted);
+  --chip: rgba(20, 18, 14, 0.04);
+  --chip-hover: rgba(20, 18, 14, 0.07);
+  --shadow-card: var(--e1);
+  --shadow-pop: var(--e2);
+  --shadow-float: var(--e3);
+
+  --pos: var(--success);
+  --pos-soft: var(--success-soft);
+  --neg: var(--danger);
+  --neg-soft: var(--danger-soft);
+  --warn: var(--warning);
+  --warn-soft: var(--warning-soft);
+
+  /* ---- Layer / domain accents (re-derivados de la paleta v2) ---- */
+  --c-income: var(--success);
+  --c-expense: var(--s2);
+  --c-savings: var(--s6);
+  --c-debt: var(--danger);
+  --c-invest: var(--info);
+  --c-protect: var(--s4);
+  --c-networth: oklch(0.45 0.04 250);
+  --gold: var(--s2);
+
+  --teal: var(--s6);
   --green: var(--pos);
   --green-soft: var(--pos-soft);
   --blue: var(--info);
@@ -68,64 +114,42 @@
   --amber-soft: var(--warn-soft);
   --rose: var(--neg);
   --rose-soft: var(--neg-soft);
-
-  --s1: 4px;
-  --s2: 8px;
-  --s3: 12px;
-  --s4: 16px;
-  --s5: 20px;
-  --s6: 24px;
-  --s7: 32px;
-  --s8: 40px;
-  --s9: 56px;
-  --s10: 72px;
-
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 14px;
-  --r-xl: 18px;
-  --r-2xl: 24px;
-
-  --sidebar-w: 252px;
 }
 
 [data-theme="dark"] {
-  --bg: #0d0d0b;
-  --bg-elev: #131311;
-  --surface: #1a1a17;
-  --surface-2: #1f1f1c;
-  --line: rgba(255, 252, 240, 0.07);
-  --line-strong: rgba(255, 252, 240, 0.14);
-  --ink: #f4f2ec;
-  --ink-2: #d9d5c9;
-  /* P1-8: --muted ya cumple ~5:1; --muted-2 se aclara para llegar a AA en oscuro. */
-  --muted: #8e8a7e;
-  --muted-2: #86827a;
-  --chip: rgba(255, 252, 240, 0.05);
-  --chip-hover: rgba(255, 252, 240, 0.09);
-  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.4), 0 12px 32px -16px rgba(0, 0, 0, 0.5);
-  --shadow-pop: 0 4px 12px -2px rgba(0, 0, 0, 0.5), 0 16px 40px -12px rgba(0, 0, 0, 0.6);
-  --shadow-float: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 24px 60px -20px rgba(0, 0, 0, 0.7);
-
-  --pos: oklch(0.74 0.13 152);
-  --pos-soft: oklch(0.28 0.06 152);
-  --neg: oklch(0.7 0.15 25);
-  --neg-soft: oklch(0.28 0.06 25);
-  --warn: oklch(0.8 0.13 75);
-  --warn-soft: oklch(0.3 0.05 75);
+  --canvas: #15140f;
+  --surface: #1e1c16;
+  --surface-2: #26241c;
+  --border: #2e2c24;
+  --text: #f4f2ec;
+  --text-muted: #a6a199;
+  --accent: #51af6f;
+  --accent-ink: #0c2114;
+  --success: #51af6f;
+  --warning: #d9a85a;
+  --danger: #d46b62;
   --info: oklch(0.72 0.11 235);
+  --accent-soft: rgba(81, 175, 111, 0.14);
+  --danger-soft: rgba(212, 107, 98, 0.16);
+  --warning-soft: rgba(217, 168, 90, 0.16);
   --info-soft: oklch(0.26 0.05 235);
 
-  --c-income: oklch(0.74 0.13 152);
-  --c-expense: oklch(0.74 0.05 60);
-  --c-savings: oklch(0.74 0.08 195);
-  --c-debt: oklch(0.7 0.15 25);
-  --c-invest: oklch(0.72 0.11 235);
-  --c-protect: oklch(0.72 0.08 160);
-  --c-networth: oklch(0.7 0.04 250);
-  --gold: oklch(0.8 0.1 85);
+  --s1: #51af6f;
+  --s2: #d9a85a;
+  --s3: #d46b62;
+  --s4: #3c5a3f;
+  --s5: #43a064;
+  --s6: oklch(0.74 0.08 195);
 
-  --teal: oklch(0.74 0.08 195);
+  --e1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --e2: 0 4px 14px -6px rgba(0, 0, 0, 0.5);
+  --e3: 0 14px 40px -16px rgba(0, 0, 0, 0.6);
+
+  /* aliases legacy que no se re-derivan solos en oscuro */
+  --line-strong: color-mix(in srgb, var(--text) 20%, transparent);
+  --chip: rgba(255, 252, 240, 0.05);
+  --chip-hover: rgba(255, 252, 240, 0.09);
+  --c-networth: oklch(0.7 0.04 250);
 }
 
 * {
@@ -143,8 +167,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  font-feature-settings: "ss01", "cv11", "tnum";
-  letter-spacing: -0.005em;
+  font-size: 15px;
+  line-height: 1.5;
+  font-feature-settings: "tnum";
   transition:
     background 240ms ease,
     color 240ms ease;
@@ -155,7 +180,7 @@ a {
   text-decoration: none;
 }
 ::selection {
-  background: color-mix(in srgb, var(--pos) 24%, transparent);
+  background: var(--accent-soft);
 }
 
 /* ============================================================ APP SHELL ============================================================ */
@@ -236,12 +261,11 @@ a {
   white-space: nowrap;
 }
 .brand-name .ascend {
-  font-family: var(--serif);
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 17px;
   letter-spacing: -0.015em;
-  color: var(--ink-2);
+  color: var(--accent);
 }
 .brand-sub {
   font-size: 11px;
@@ -673,14 +697,12 @@ a {
   height: 14px;
 }
 .btn-primary {
-  background: var(--ink);
-  color: var(--bg);
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.1),
-    0 6px 14px -6px rgba(0, 0, 0, 0.3);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--e1);
 }
 .btn-primary:hover {
-  background: color-mix(in srgb, var(--ink) 88%, var(--pos));
+  filter: brightness(1.04);
 }
 .btn-secondary {
   background: var(--surface);
@@ -3653,7 +3675,7 @@ summary:focus-visible {
 }
 .search:has(:focus-visible),
 .cur-switch:has(:focus-visible) {
-  outline: 2px solid var(--info);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -3665,8 +3687,11 @@ summary:focus-visible {
    Aquí esas utilidades se reconducen a TUS variables (--bg, --ink,
    --line…). El modo oscuro se hereda automáticamente porque estos
    tokens referencian variables que ya cambian bajo [data-theme="dark"].
-   NOTA: NO se redeclara --muted (tu gris de texto); su versión
-   "fondo" de shadcn se mapea directo en @theme inline a --chip.
+   NOTA: NO se redeclaran --muted, --accent, --border ni --input
+   (tokens de marca v2); sus versiones shadcn se mapean directo en
+   @theme inline (--color-muted → --chip, --color-accent → --chip,
+   --color-border/--color-input → --border). Así ningún bloque pisa
+   los tokens CARTERA+ y la cascada deja de importar.
    ============================================================ */
 :root {
   --background: var(--bg);
@@ -3675,32 +3700,28 @@ summary:focus-visible {
   --card-foreground: var(--ink);
   --popover: var(--surface);
   --popover-foreground: var(--ink);
-  --primary: var(--ink);
-  --primary-foreground: var(--bg);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-ink);
   --secondary: var(--surface-2);
   --secondary-foreground: var(--ink-2);
   --muted-foreground: var(--muted);
-  --accent: var(--chip);
-  --accent-foreground: var(--ink);
   --destructive: var(--neg);
   --destructive-foreground: #ffffff;
-  --border: var(--line);
-  --input: var(--line);
-  --ring: var(--ink-2);
+  --ring: var(--accent);
   --radius: var(--r-md);
-  --chart-1: var(--c-income);
-  --chart-2: var(--c-invest);
-  --chart-3: var(--gold);
-  --chart-4: var(--c-savings);
-  --chart-5: var(--c-debt);
+  --chart-1: var(--s1);
+  --chart-2: var(--s2);
+  --chart-3: var(--s3);
+  --chart-4: var(--s4);
+  --chart-5: var(--s5);
   --sidebar: var(--bg-elev);
   --sidebar-foreground: var(--ink-2);
-  --sidebar-primary: var(--ink);
-  --sidebar-primary-foreground: var(--bg);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--accent-ink);
   --sidebar-accent: var(--chip);
   --sidebar-accent-foreground: var(--ink);
-  --sidebar-border: var(--line);
-  --sidebar-ring: var(--ink-2);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent);
 }
 
 @theme inline {
@@ -3716,12 +3737,12 @@ summary:focus-visible {
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--chip);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--chip);
+  --color-accent-foreground: var(--text);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
-  --color-input: var(--input);
+  --color-input: var(--border);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
