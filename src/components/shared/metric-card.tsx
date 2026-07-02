@@ -5,10 +5,17 @@
 export type MetricTone = "pos" | "warn" | "neg" | "neutral";
 
 const TONE_COLOR: Record<MetricTone, string> = {
-  pos: "var(--pos)",
-  warn: "var(--warn)",
-  neg: "var(--neg)",
-  neutral: "var(--ink)",
+  pos: "var(--success)",
+  warn: "var(--warning)",
+  neg: "var(--danger)",
+  neutral: "var(--text)",
+};
+
+const DLT_CLASS: Record<MetricTone, string> = {
+  pos: "dlt up",
+  warn: "dlt warn",
+  neg: "dlt down",
+  neutral: "dlt",
 };
 
 export function MetricCard({
@@ -27,21 +34,29 @@ export function MetricCard({
   valueTone?: MetricTone;
 }) {
   return (
-    <div className="card kpi" style={{ padding: "16px 18px" }}>
-      <div className="label" style={{ fontSize: 11 }}>
-        {label}
-      </div>
-      <div className="num-xl" style={{ fontSize: 25, marginTop: 9, color: TONE_COLOR[valueTone] }}>
+    <div className="card kpi" style={{ padding: "15px 16px" }}>
+      <div className="met-k">{label}</div>
+      <div className="num-xl" style={{ fontSize: 22, marginTop: 9, color: TONE_COLOR[valueTone] }}>
         {value}
       </div>
       <div
-        style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7, flexWrap: "wrap" }}
+        style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}
       >
         {delta ? (
-          <span
-            className="tnum"
-            style={{ fontSize: 11.5, fontWeight: 600, color: TONE_COLOR[deltaTone] }}
-          >
+          <span className={DLT_CLASS[deltaTone]}>
+            {deltaTone === "pos" || deltaTone === "neg" || deltaTone === "warn" ? (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d={deltaTone === "pos" ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} />
+              </svg>
+            ) : null}
             {delta}
           </span>
         ) : null}
