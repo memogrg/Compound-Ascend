@@ -144,20 +144,16 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
         </div>
 
         {vm.dueSoon && vm.nextDue ? (
-          <div className="auth-msg warn" style={{ margin: "14px 0 0", fontSize: 12.5 }}>
-            Tu pago de <strong>{vm.name}</strong> vence el <strong>{fmtDay(vm.nextDue)}</strong> —{" "}
-            {formatMoney(vm.monthlyPayment + vm.insurance, currency)}.
+          <div className="due-banner">
+            <Icon name="bell" width={2} />
+            <span>
+              Tu pago de <strong>{vm.name}</strong> vence el <strong>{fmtDay(vm.nextDue)}</strong>{" "}
+              — {formatMoney(vm.monthlyPayment + vm.insurance, currency)}.
+            </span>
           </div>
         ) : null}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))",
-            gap: 14,
-            marginTop: 18,
-          }}
-        >
+        <div className="dstat-grid">
           <Stat label="Saldo actual" value={formatMoney(vm.balance, currency)} big />
           <Stat label="Tasa Anual Equivalente" value={`${vm.apr.toFixed(2)}%`} />
           <Stat
@@ -184,6 +180,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
               className="row"
               style={{
                 justifyContent: "space-between",
+                fontFamily: "var(--font-mono)",
                 fontSize: 11.5,
                 color: "var(--muted)",
                 marginBottom: 6,
@@ -441,23 +438,19 @@ function PaymentsCard({
         const hasEstimate = p.principal != null && p.interest != null;
         const isExtra = p.kind === "extraordinario";
         return (
-          <div key={p.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
+          <div key={p.id} className="pay-row">
             <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
+              <div className="pay-nm">
                 {fmtDay(p.paymentDate)}
                 {p.viaSource && VIA_LABEL[p.viaSource] ? (
                   <span
                     className="chip"
-                    style={{ fontSize: 10, background: "var(--chip)", color: "var(--muted)" }}
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      background: "var(--chip)",
+                      color: "var(--muted)",
+                    }}
                   >
                     {VIA_LABEL[p.viaSource]}
                   </span>
@@ -465,13 +458,18 @@ function PaymentsCard({
                 {isExtra ? (
                   <span
                     className="chip"
-                    style={{ fontSize: 10, background: "var(--warn-soft)", color: "var(--warn)" }}
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      background: "var(--warn-soft)",
+                      color: "var(--warn)",
+                    }}
                   >
                     extraordinario
                   </span>
                 ) : null}
               </div>
-              <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+              <div className="pay-br">
                 {isExtra ? (
                   <>Abono directo a capital · sin intereses</>
                 ) : hasExtra ? (
@@ -508,9 +506,7 @@ function PaymentsCard({
                 )}
               </div>
             </div>
-            <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500 }}>
-              {formatMoney(total, currency)}
-            </span>
+            <span className="pay-amt tnum">{formatMoney(total, currency)}</span>
             <PaymentMenu onEdit={() => onEdit(p.id)} onDelete={() => onDelete(p.id)} />
           </div>
         );
@@ -531,19 +527,10 @@ function Stat({
   big?: boolean;
 }) {
   return (
-    <div>
-      <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{label}</div>
-      <div
-        className={big ? "num-xl" : ""}
-        style={{ fontSize: big ? 24 : 15, fontWeight: big ? 400 : 600, marginTop: 4 }}
-      >
-        {value}
-      </div>
-      {sub ? (
-        <div className="muted" style={{ fontSize: 11 }}>
-          {sub}
-        </div>
-      ) : null}
+    <div className={`dstat${big ? " big" : ""}`}>
+      <div className="k">{label}</div>
+      <div className="v">{value}</div>
+      {sub ? <div className="s">{sub}</div> : null}
     </div>
   );
 }
@@ -599,7 +586,7 @@ function ScenarioCalculator({ input, currency }: { input: AmortizationInput; cur
               />
             </div>
           </div>
-          <div className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.55 }}>
+          <div className="scen-res">
             Saldrías{" "}
             <strong style={{ color: "var(--pos)" }}>{monthsToText(cmp.monthsSaved)} antes</strong> y
             ahorrarías{" "}
@@ -627,13 +614,11 @@ function ScenarioCalculator({ input, currency }: { input: AmortizationInput; cur
               onChange={(e) => setTargetYears(Number(e.target.value))}
             />
           </div>
-          <div className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.55 }}>
+          <div className="scen-res">
             {needed > 0 ? (
               <>
                 Necesitas pagar{" "}
-                <strong style={{ color: "var(--ink-2)" }}>
-                  {formatMoney(needed, currency)} extra al mes
-                </strong>{" "}
+                <strong>{formatMoney(needed, currency)} extra al mes</strong>{" "}
                 para terminar en {targetYears} año(s).
               </>
             ) : (

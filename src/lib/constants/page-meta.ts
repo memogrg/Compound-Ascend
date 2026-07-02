@@ -36,6 +36,11 @@ export const PAGE_META: Record<string, PageMeta> = {
     title: "Ahorro",
     titleHTML: 'Tu <span class="it">ahorro</span>',
   },
+  "/deudas": {
+    crumb: "Control",
+    title: "Deudas y Préstamos",
+    titleHTML: 'Tus <span class="it">deudas</span>',
+  },
   "/patrimonio": {
     crumb: "Crecimiento",
     title: "Portafolio de inversiones",

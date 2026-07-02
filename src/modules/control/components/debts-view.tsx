@@ -287,7 +287,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           >
             <div>
               <div className="label">Deuda total</div>
-              <div className="num-xl" style={{ fontSize: 44, color: "var(--neg)", marginTop: 8 }}>
+              <div className="num-xl" style={{ fontSize: 38, color: "var(--neg)", marginTop: 8 }}>
                 {formatMoney(totals.totalDebt, currency)}
               </div>
               <div
@@ -322,6 +322,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               <span
                 className="chip"
                 style={{
+                  fontWeight: 700,
                   background: `color-mix(in srgb, ${dtiHealth(totals.dti).color} 16%, transparent)`,
                   color: dtiHealth(totals.dti).color,
                 }}
@@ -349,53 +350,36 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
             <span
               className="chip"
               style={{
-                background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
-                color: "var(--ink-2)",
+                fontWeight: 700,
+                background: "var(--accent-soft)",
+                color: "var(--success)",
               }}
             >
               {METHOD_LABEL[rec.method]} recomendado
             </span>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 14,
-              flexWrap: "wrap",
-            }}
-          >
-            <span className="muted" style={{ fontSize: 12.5 }}>
-              Pago extra mensual
-            </span>
-            <div className="seg" role="group" aria-label="Ajustar pago extra">
-              <button
-                className="seg-btn"
-                onClick={() => setExtra((e) => Math.max(0, e - step))}
-                aria-label="Reducir"
-              >
+          <div className="extra-adj">
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Pago extra mensual</div>
+              {freeCashflow > 0 ? (
+                <div className="muted" style={{ fontSize: 11.5 }}>
+                  de tu sobrante {formatMoney(freeCashflow, currency)}
+                </div>
+              ) : null}
+            </div>
+            <div className="stepper" role="group" aria-label="Ajustar pago extra">
+              <button onClick={() => setExtra((e) => Math.max(0, e - step))} aria-label="Reducir">
                 −
               </button>
-              <span className="seg-btn on tnum" style={{ minWidth: 96, textAlign: "center" }}>
-                {formatMoney(extra, currency)}
-              </span>
-              <button
-                className="seg-btn"
-                onClick={() => setExtra((e) => e + step)}
-                aria-label="Aumentar"
-              >
+              <span className="v tnum">{formatMoney(extra, currency)}</span>
+              <button onClick={() => setExtra((e) => e + step)} aria-label="Aumentar">
                 +
               </button>
             </div>
-            {freeCashflow > 0 ? (
-              <span className="muted" style={{ fontSize: 11 }}>
-                de tu sobrante {formatMoney(freeCashflow, currency)}
-              </span>
-            ) : null}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="methods">
             <MethodCard
               label="Avalancha"
               sim={strategy.avalancha}
@@ -422,17 +406,12 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               <div className="label" style={{ fontSize: 11, marginBottom: 8 }}>
                 Orden de ataque · {METHOD_LABEL[activeMethod].toLowerCase()}
               </div>
-              <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6 }}>
+              <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
                 {attackPlan.map((p, i) => {
                   const d = debtById.get(p.id);
                   return (
-                    <li
-                      key={p.id}
-                      style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12.5 }}
-                    >
-                      <span className="tnum" style={{ color: "var(--muted)", minWidth: 16 }}>
-                        {i + 1}º
-                      </span>
+                    <li key={p.id} className="atk">
+                      <span className="n">{i + 1}</span>
                       <span style={{ fontWeight: 500 }}>{d?.name ?? p.name}</span>
                       <span className="muted">— liquida en ~{monthsToText(p.monthPaid)}</span>
                     </li>
@@ -466,7 +445,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           danger={0.3}
         />
         <Kpi
-          label="Tasa Anual Equivalente más alta"
+          label="TAE más alta"
           value={`${totals.highestApr.toFixed(1)}%`}
           ratio={totals.highestApr / 60}
           danger={0.5}
@@ -550,7 +529,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               </div>
               <div className={`drate${isHighest ? " high" : ""}`}>
                 <div className="r">{d.apr.toFixed(1)}%</div>
-                <div className="l">Tasa Anual Equivalente</div>
+                <div className="l">TAE</div>
               </div>
               <div className="dbal">
                 <div>
@@ -871,35 +850,28 @@ function MethodCard({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className="card-pad"
-      style={{
-        textAlign: "left",
-        cursor: "pointer",
-        font: "inherit",
-        border: `1px solid ${selected ? "var(--ink)" : "var(--line)"}`,
-        borderRadius: "var(--r-md)",
-        background: selected ? "var(--surface-2)" : "transparent",
-      }}
+      className={`method${selected ? " on" : ""}`}
     >
-      <div className="row" style={{ justifyContent: "space-between", gap: 6 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}>{label}</span>
+      <div className="mn">
+        {label}
         {recommended ? (
           <span
             className="chip"
-            style={{ background: "var(--pos-soft)", color: "var(--pos)", fontSize: 10 }}
+            style={{
+              background: "var(--accent-soft)",
+              color: "var(--success)",
+              fontSize: 10,
+              fontWeight: 700,
+            }}
           >
             Recomendado
           </span>
         ) : null}
       </div>
-      <div className="num-xl" style={{ fontSize: 22, marginTop: 6 }}>
-        {sim.feasible ? monthsToText(sim.months) : "—"}
-      </div>
-      <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+      <div className="md">{note}</div>
+      <div className="mm">
+        <b>{sim.feasible ? monthsToText(sim.months) : "—"}</b> ·{" "}
         {formatMoney(sim.totalInterest, currency)} en intereses
-      </div>
-      <div className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>
-        {note}
       </div>
     </button>
   );
