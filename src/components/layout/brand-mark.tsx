@@ -1,22 +1,20 @@
-/** Logotipo de Compound Ascend (curva ascendente). */
+/** Isotipo de CARTERA+ ("C" con el "+" en el color de acento). */
 export function BrandMark() {
   return (
-    <div className="brand-mark" aria-label="Compound Ascend">
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <div className="brand-mark" aria-label="CARTERA+">
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
         <path
-          d="M4 20 C 4 14, 8 9, 14 7"
+          d="M45 18.5 A 19 19 0 1 0 45 45.5"
           stroke="currentColor"
-          strokeWidth="1.9"
-          strokeLinecap="round"
-          opacity="0.45"
-        />
-        <path
-          d="M4 20 C 8 17, 13 13, 19 5"
-          stroke="currentColor"
-          strokeWidth="1.9"
+          strokeWidth="7"
           strokeLinecap="round"
         />
-        <circle cx="19" cy="5" r="1.9" fill="currentColor" />
+        <path
+          d="M46 26 V38 M40 32 H52"
+          stroke="var(--accent)"
+          strokeWidth="4.6"
+          strokeLinecap="round"
+        />
       </svg>
     </div>
   );

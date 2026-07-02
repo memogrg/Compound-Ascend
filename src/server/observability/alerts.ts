@@ -37,7 +37,7 @@ function dispatch(kind: AlertKind, severity: AlertSeverity, meta: Record<string,
   const url = process.env.SLACK_ALERT_WEBHOOK_URL?.trim();
   if (!url) return;
   const emoji = severity === "critical" ? "🔴" : "🟠";
-  const text = `${emoji} *[${severity.toUpperCase()}] ${kind}* · Compound Ascend\n\`\`\`${JSON.stringify(meta)}\`\`\``;
+  const text = `${emoji} *[${severity.toUpperCase()}] ${kind}* · CARTERA+\n\`\`\`${JSON.stringify(meta)}\`\`\``;
   void fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

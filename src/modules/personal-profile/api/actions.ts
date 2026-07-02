@@ -164,7 +164,7 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
       const acceptUrl = `${appUrl}/invitacion/aceptar?token=${token}`;
       const r = await sendEmail({
         to,
-        subject: `${inviter} te invitó a su hogar en Compound Ascend`,
+        subject: `${inviter} te invitó a su hogar en CARTERA+`,
         html: inviteHtml(inviter, acceptUrl),
         replyTo: user.email ?? undefined,
       });
@@ -331,10 +331,10 @@ function friendlyAcceptError(message: string): string {
 function inviteHtml(inviter: string, acceptUrl: string): string {
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a">
-    <h1 style="font-size:20px;margin:0 0 12px">Compound Ascend</h1>
+    <h1 style="font-size:20px;margin:0 0 12px">CARTERA+</h1>
     <p style="font-size:15px;line-height:1.6">
       <strong>${escapeHtml(inviter)}</strong> te invitó a unirte a su hogar para gestionar las
-      finanzas en <strong>Compound Ascend</strong>, su asesor financiero con IA.
+      finanzas en <strong>CARTERA+</strong>, su asesor financiero con IA.
     </p>
     <p style="font-size:15px;line-height:1.6">
       Acepta la invitación con este mismo correo. Te sumarás al hogar compartido sin volver a

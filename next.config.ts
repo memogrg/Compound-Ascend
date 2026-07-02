@@ -3,7 +3,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 import { buildSecurityHeaders } from "./src/lib/security/headers";
 
 /**
- * Compound Ascend — configuración Next.js
+ * CARTERA+ — configuración Next.js
  * Las cabeceras de seguridad se construyen por ambiente en lib/security/headers.
  */
 const nextConfig: NextConfig = {

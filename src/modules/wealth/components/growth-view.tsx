@@ -140,7 +140,7 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
               color: "var(--ink-2)",
             }}
           >
-            Ascend AI
+            My Agent C+
           </span>
         </div>
         <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: 0 }}>

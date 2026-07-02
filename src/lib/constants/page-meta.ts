@@ -54,7 +54,7 @@ export const PAGE_META: Record<string, PageMeta> = {
   "/configuracion": { crumb: "Cuenta", title: "Configuración" },
 };
 
-const DEFAULT_META: PageMeta = { crumb: "Resumen", title: "Compound Ascend" };
+const DEFAULT_META: PageMeta = { crumb: "Resumen", title: "CARTERA+" };
 
 /** Devuelve los metadatos de la ruta más específica que coincida. */
 export function resolvePageMeta(pathname: string): PageMeta {

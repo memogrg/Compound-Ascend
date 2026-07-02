@@ -53,7 +53,7 @@ export function aiTokenLimit(plan: Plan): number {
 
 /** Beneficios mostrados en la página de plan (para el upsell). */
 export const PREMIUM_BENEFITS: string[] = [
-  "Conversaciones ilimitadas con Ascend AI (límite muy amplio)",
+  "Conversaciones ilimitadas con My Agent C+ (límite muy amplio)",
   "Simulador avanzado de escenarios",
   "Revisión experta de inversiones y seguros",
   "Acompañamiento patrimonial personalizado",

@@ -23,7 +23,7 @@ function page(title: string, message: string, status: number): Response {
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex" />
-<title>${title} · Compound Ascend</title>
+<title>${title} · CARTERA+</title>
 <style>body{font-family:system-ui,sans-serif;background:#0f1115;color:#e8eaed;display:grid;place-items:center;min-height:100vh;margin:0}
 .card{max-width:420px;padding:32px;background:#171a21;border:1px solid #262b36;border-radius:16px;text-align:center}
 h1{font-size:18px;margin:0 0 10px}p{font-size:14px;line-height:1.55;color:#aab1bd;margin:0}</style>

@@ -1,5 +1,5 @@
 /**
- * Modelo de navegación de Compound Ascend (en español).
+ * Modelo de navegación de CARTERA+ (en español).
  * Agrupado por las 5 capas de la "escalera financiera" de la Biblia:
  * Resumen · Presupuesto · Control · Crecimiento · Perfil.
  * "Mi Perfil Financiero" va al final (debajo de Patrimonio).

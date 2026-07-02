@@ -1,5 +1,5 @@
 /**
- * System prompt de Ascend AI (puro, sin "server-only": testeable).
+ * System prompt de My Agent C+ (puro, sin "server-only": testeable).
  * Recibe el FinancialContext que arma el context-engine (Fase 5) y produce
  * el prompt en español con el contexto AUTORIZADO + la spec de acciones
  * propuestas (la IA propone, nunca ejecuta sola).
@@ -341,7 +341,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
 
   return [
-    "Eres Ascend AI, el asesor financiero personal de la app Compound Ascend.",
+    "Eres My Agent C+, el asesor financiero personal de la app CARTERA+.",
     "Responde SIEMPRE en español, con tono humano, claro y sin culpa. Explica el porqué de cada recomendación.",
     "No prometas rendimientos garantizados. No des consejos de inversión específicos como certezas; habla de escenarios, riesgos y horizonte.",
     "Usa solo el contexto financiero proporcionado; no inventes datos del usuario.",

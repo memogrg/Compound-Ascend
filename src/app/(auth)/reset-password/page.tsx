@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { RequestResetForm } from "@/components/auth/reset-form";
 
-export const metadata = { title: "Restablecer contraseña — Compound Ascend" };
+export const metadata = { title: "Restablecer contraseña — CARTERA+" };
 
 export default function ResetPasswordPage() {
   return (
