@@ -33,8 +33,15 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
       <section className="dash-hero">
         <div className="card card-pad" style={{ display: "flex", alignItems: "center", gap: 22 }}>
           <div className="ring-wrap">
-            <svg width="120" height="120" viewBox="0 0 42 42">
-              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
+            <svg width="132" height="132" viewBox="0 0 42 42">
+              <circle
+                cx="21"
+                cy="21"
+                r="15.915"
+                fill="none"
+                stroke="var(--surface-2)"
+                strokeWidth="4"
+              />
               <circle
                 cx="21"
                 cy="21"
@@ -73,6 +80,7 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
               className="chip"
               style={{
                 marginTop: 8,
+                fontWeight: 700,
                 background: "color-mix(in srgb," + sem.color + " 16%, transparent)",
                 color: sem.color,
               }}
@@ -88,21 +96,21 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
         <div className="card card-pad">
           <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
             <div className="card-title">Tu próxima mejor acción</div>
-            <span
-              className="chip"
-              style={{
-                background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
-                color: "var(--ink-2)",
-              }}
-            >
-              Motor de Prioridad
-            </span>
+            <span className="chip-ai">Motor de Prioridad</span>
           </div>
           <p style={{ fontSize: 15, lineHeight: 1.55, color: "var(--ink)", margin: "0 0 12px" }}>
             {d.nextBestAction}
           </p>
-          <div style={{ fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>
-            <strong style={{ color: "var(--ink-2)" }}>Por qué:</strong> {d.impact}
+          <div
+            style={{
+              fontSize: 12.5,
+              color: "var(--text-muted)",
+              lineHeight: 1.5,
+              paddingTop: 12,
+              borderTop: "1px solid var(--border)",
+            }}
+          >
+            <strong style={{ color: "var(--success)" }}>Por qué:</strong> {d.impact}
           </div>
         </div>
       </section>
@@ -127,15 +135,16 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span
                 style={{
-                  width: 22,
-                  height: 22,
+                  width: 28,
+                  height: 28,
                   borderRadius: 999,
-                  background: "var(--chip)",
-                  color: "var(--ink-2)",
+                  background: "var(--accent-soft)",
+                  color: "var(--accent)",
                   display: "grid",
                   placeItems: "center",
-                  fontSize: 11,
-                  fontWeight: 600,
+                  fontFamily: "var(--font-display)",
+                  fontSize: 13,
+                  fontWeight: 700,
                   flex: "none",
                 }}
               >
@@ -151,7 +160,10 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                 ) : null}
               </span>
               {a.amount > 0 ? (
-                <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500 }}>
+                <span
+                  className="tnum"
+                  style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700 }}
+                >
                   {formatMoney(a.amount, currency)}
                 </span>
               ) : null}
@@ -164,22 +176,13 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
       {d.alerts.length > 0 ? (
         <div className="card card-pad">
           <div className="card-title">Alertas</div>
-          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ marginTop: 4 }}>
             {d.alerts.map((a, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "flex-start",
-                  fontSize: 13,
-                  color: "var(--ink-2)",
-                }}
-              >
-                <span style={{ color: "var(--warn)", flex: "none" }}>
+              <div key={i} className="li-ic alert">
+                <span className="ic">
                   <Icon name="bell" width={2} />
                 </span>
-                {a}
+                <div className="tx">{a}</div>
               </div>
             ))}
           </div>
@@ -206,44 +209,40 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
           {goals.length === 0 ? (
             <Empty text="Aún no agregas objetivos de ahorro." />
           ) : (
-            goals.map((g) => {
-              const rec = d.goalRecs.find((r) => r.goalId === g.id);
-              const a = rec ? ACTION[rec.action] : ACTION.mantener;
-              const progress =
-                g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
-              return (
-                <div key={g.id} className="list-row" style={{ gridTemplateColumns: "1fr auto" }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
-                    >
-                      <span style={{ fontSize: 13.5, fontWeight: 500 }}>{g.name}</span>
-                      <span className="chip" style={{ background: a.bg, color: a.color }}>
+            <div className="goals-grid">
+              {goals.map((g) => {
+                const rec = d.goalRecs.find((r) => r.goalId === g.id);
+                const a = rec ? ACTION[rec.action] : ACTION.mantener;
+                const progress =
+                  g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
+                return (
+                  <div key={g.id} className="goal">
+                    <div className="gt">
+                      <span className="gn">{g.name}</span>
+                      <span
+                        className="chip"
+                        style={{ background: a.bg, color: a.color, fontWeight: 700 }}
+                      >
                         {a.label}
                       </span>
                     </div>
-                    <div className="bar-track" style={{ marginTop: 8, maxWidth: 260 }}>
-                      <div
-                        className="bar-fill"
-                        style={{ width: `${progress}%`, background: "var(--c-savings)" }}
-                      />
+                    <div className="bar">
+                      <div className="fl" style={{ width: `${progress}%` }} />
                     </div>
-                    <div
-                      className="muted"
-                      style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.45 }}
-                    >
-                      {formatMoney(g.currentAmount, g.currency)} /{" "}
-                      {formatMoney(g.targetAmount, g.currency)} · {rec?.reason}
+                    <div className="gs">
+                      <span className="gnum">{formatMoney(g.currentAmount, g.currency)}</span> /{" "}
+                      {formatMoney(g.targetAmount, g.currency)}
+                      {rec?.reason ? <> · {rec.reason}</> : null}
+                    </div>
+                    <div className="acts">
+                      <GoalWithdrawButton goal={g} />
+                      <EditControlButton kind="goal" item={g} currency={currency} />
+                      <DeleteButton id={g.id} kind="goal" />
                     </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <GoalWithdrawButton goal={g} />
-                    <EditControlButton kind="goal" item={g} currency={currency} />
-                    <DeleteButton id={g.id} kind="goal" />
-                  </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
       </section>
@@ -251,13 +250,13 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
       {/* Plan de 30 días */}
       <div className="card card-pad">
         <div className="card-title">Tu plan de 30 días</div>
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ marginTop: 4 }}>
           {d.plan30.map((step, i) => (
-            <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <span style={{ color: "var(--pos)", flex: "none", marginTop: 1 }}>
+            <div key={i} className="li-ic plan">
+              <span className="ic">
                 <Icon name="check" width={2.4} />
               </span>
-              <span style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>{step}</span>
+              <div className="tx">{step}</div>
             </div>
           ))}
         </div>

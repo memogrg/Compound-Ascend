@@ -1610,8 +1610,8 @@ input[type="radio"] {
 }
 .dash-hero {
   display: grid;
-  grid-template-columns: 1.15fr 1fr;
-  gap: 18px;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 /* Saludo del dashboard (v2 .greet) */
 .greet {
@@ -3541,6 +3541,104 @@ input[type="radio"] {
 }
 .modal-body .chip:hover {
   border-color: var(--accent);
+}
+
+/* Filas con ícono en caja (alertas / plan 30 días) — v2 .li-ic */
+.li-ic {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 11px 0;
+  border-top: 1px solid var(--border);
+}
+.li-ic:first-of-type {
+  border-top: 0;
+  padding-top: 4px;
+}
+.li-ic .ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.li-ic .ic svg {
+  width: 15px;
+  height: 15px;
+}
+.li-ic.alert .ic {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.li-ic.plan .ic {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.li-ic .tx {
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* Cards de objetivo (v2 .goals-grid / .goal) */
+.goals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+@media (max-width: 980px) {
+  .goals-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.goal {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 16px;
+}
+.goal .gt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.goal .gn {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+}
+.goal .bar {
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin: 12px 0 8px;
+}
+.goal .bar .fl {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  transition: width 300ms ease;
+}
+.goal .gs {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.goal .gs .gnum {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text);
+}
+.goal .acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 /* Sugerencia IA en "Por clasificar" (v2 .ai-sug) */
