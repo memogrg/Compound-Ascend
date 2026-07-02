@@ -62,7 +62,10 @@ export function LinkedIncomeCard({
               >
                 {b.name}
               </div>
-              <span className="inc-tag" style={{ marginTop: 4, display: "inline-block" }}>
+              <span
+                className={`inc-tag ${b.sourceKind === "dividend" ? "dividendos" : "inversion"}`}
+                style={{ marginTop: 4, display: "inline-block" }}
+              >
                 {chip}
               </span>
             </div>

@@ -18,7 +18,7 @@ export function RegisterIncomeButton({
     <>
       <button
         type="button"
-        className="btn btn-secondary"
+        className="btn btn-primary"
         style={{ padding: "8px 14px" }}
         onClick={() => setOpen(true)}
       >

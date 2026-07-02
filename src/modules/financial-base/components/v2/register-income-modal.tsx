@@ -264,7 +264,7 @@ export function RegisterIncomeModal({
             <button type="button" className="btn btn-ghost" onClick={() => setStubStep(false)}>
               ← Atrás
             </button>
-            <button type="submit" className="btn btn-secondary" disabled={pending}>
+            <button type="submit" className="btn btn-primary" disabled={pending}>
               {pending ? "Guardando…" : "Guardar ingreso"}
             </button>
           </div>
@@ -511,7 +511,7 @@ export function RegisterIncomeModal({
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-secondary" disabled={pending}>
+          <button type="submit" className="btn btn-primary" disabled={pending}>
             {pending
               ? "Guardando…"
               : needsStub

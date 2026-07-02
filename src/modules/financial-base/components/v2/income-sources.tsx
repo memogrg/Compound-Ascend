@@ -194,7 +194,10 @@ function SourceRow({
           >
             {it.name}
           </div>
-          <span className="inc-tag" style={{ marginTop: 4, display: "inline-block" }}>
+          <span
+            className={`inc-tag ${incomeType}`}
+            style={{ marginTop: 4, display: "inline-block" }}
+          >
             {INCOME_TYPE_LABEL[incomeType]}
           </span>
         </div>
