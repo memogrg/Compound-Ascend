@@ -30,7 +30,7 @@ export function AppShell({ children, user, currency, navBadges }: AppShellProps)
           <Sidebar open={drawer} onNavigate={close} user={user} navBadges={navBadges} />
           <main className="main">
             <Topbar onMenu={() => setDrawer(true)} currency={currency} />
-            {children}
+            <div className="content">{children}</div>
           </main>
         </div>
 

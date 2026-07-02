@@ -105,7 +105,7 @@ export function ExpenseToolbar({
             position: "absolute",
             top: "calc(100% + 6px)",
             right: 0,
-            zIndex: 40,
+            zIndex: 25, // bajo el topbar sticky (z30)
             minWidth: 210,
             padding: 6,
             display: "flex",
