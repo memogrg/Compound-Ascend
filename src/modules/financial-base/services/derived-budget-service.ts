@@ -276,10 +276,13 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   if (toInsert.length > 0) {
     // household: las líneas derivadas comparten hogar igual que las manuales.
     const household_id = await getActiveHouseholdId(supabase, user.id);
-    // El índice único 0023 evita duplicados si dos syncs corren a la vez;
-    // la carrera perdedora recibe 23505 y se ignora (la línea ya existe).
-    const { error } = await supabase.from("budget_items").insert(
-      toInsert.map((l) => ({
+    // Insert fila-por-fila: un batch atómico dropea TODAS las filas si una sola
+    // viola una constraint (y el error se perdía). Fila-por-fila, una fila mala
+    // se saltea y las buenas entran. El índice único 0023 evita duplicados si dos
+    // syncs corren a la vez: 23505 = duplicado por carrera concurrente (la línea
+    // ya existe), se ignora. Cualquier otro error se loguea y se sigue.
+    for (const l of toInsert) {
+      const { error } = await supabase.from("budget_items").insert({
         user_id: user.id,
         household_id,
         type: l.type,
@@ -292,9 +295,15 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
         period_year: period.year,
         source_kind: l.sourceKind,
         source_id: l.sourceId,
-      })),
-    );
-    if (error && error.code !== "23505") throw new Error(error.message);
+      });
+      if (error && error.code !== "23505") {
+        console.error(
+          `[syncDerivedBudget] insert de línea derivada falló ` +
+            `(source_kind=${l.sourceKind}, source_id=${l.sourceId}, ` +
+            `code=${error.code}): ${error.message}`,
+        );
+      }
+    }
   }
   for (const u of toUpdate) {
     await supabase
