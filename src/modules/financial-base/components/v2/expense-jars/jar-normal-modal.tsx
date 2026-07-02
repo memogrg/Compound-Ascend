@@ -121,46 +121,19 @@ export function JarNormalModal({
       onClose={onClose}
     >
       <div className="modal-body" style={{ maxWidth: "100%", overflowX: "hidden" }}>
-        {/* Cabecera: gastado este mes + chip % usado */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            marginBottom: 14,
-          }}
-        >
+        {/* Cabecera: gastado este mes + chip % usado (v2 .env-head) */}
+        <div className="env-head">
           <div>
-            <div
-              className="muted"
-              style={{ fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".04em" }}
-            >
-              Gastado este mes
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2 }}>
+            <div className="lb">Gastado este mes</div>
+            <div className="v">
               {formatMoney(totalSpent, currency)}
-              <span className="muted" style={{ fontSize: 14, fontWeight: 500 }}>
+              <span className="muted" style={{ fontSize: 13, fontWeight: 500 }}>
                 {" "}
-                /{formatMoney(totalBudget, currency)}
+                / {formatMoney(totalBudget, currency)}
               </span>
             </div>
           </div>
-          <span
-            className="chip"
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "4px 10px",
-              borderRadius: 999,
-              background: usedOver
-                ? "color-mix(in srgb, var(--neg) 14%, transparent)"
-                : "color-mix(in srgb, var(--pos) 14%, transparent)",
-              color: usedOver ? "var(--neg)" : "var(--pos)",
-            }}
-          >
-            {usedPct}% usado
-          </span>
+          <span className={usedOver ? "env-pill over" : "env-pill"}>{usedPct}% usado</span>
         </div>
 
         {/* Sobres */}
