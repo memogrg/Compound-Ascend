@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
+import { getUser } from "@/lib/auth/session";
+import { Landing } from "@/components/marketing/landing";
 
 /**
- * Raíz. En F1, una vez exista Supabase Auth, redirige a /login si no hay sesión
- * o a /dashboard si la hay (o a /bienvenida si el onboarding no está completo).
- * Por ahora va directo al panel.
+ * Raíz pública: los visitantes ven la landing CARTERA+;
+ * con sesión activa se redirige al panel.
  */
-export default function Home() {
-  redirect("/dashboard");
+export default async function Home() {
+  const user = await getUser();
+  if (user) redirect("/dashboard");
+  return <Landing />;
 }

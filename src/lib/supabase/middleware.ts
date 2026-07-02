@@ -15,6 +15,8 @@ function isPublic(pathname: string): boolean {
   // Las rutas /api gestionan su propia autenticación y responden JSON; el
   // middleware nunca debe redirigirlas a /login (rompería los fetch).
   if (pathname.startsWith("/api/")) return true;
+  // La raíz es la landing pública; page.tsx redirige a /dashboard si hay sesión.
+  if (pathname === "/") return true;
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
