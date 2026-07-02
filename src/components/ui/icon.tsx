@@ -1,6 +1,6 @@
 /**
- * Set de iconos (inline SVG) portado del design system (assets/shell.js).
- * Trazo por defecto 1.8; usa `filled` para iconos rellenos (spark).
+ * Set de iconos (inline SVG) portado del design system CARTERA+ v2.
+ * Trazo por defecto 1.9; usa `filled` para iconos rellenos (spark).
  */
 import type { CSSProperties } from "react";
 
@@ -52,18 +52,18 @@ const PATHS: Record<IconName, string> = {
     '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2.5v3M16 2.5v3"/>',
   dashboard:
     '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
-  budget: '<path d="M3 7h18M6 7v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7M9 7V5a3 3 0 0 1 6 0v2"/>',
+  budget: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 15h5"/>',
   income: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
   expense: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   txn: '<path d="M4 7h13M4 7l3-3M4 7l3 3M20 17H7M20 17l-3-3M20 17l-3 3"/>',
   savings:
     '<path d="M19 7c0-1.7-3.1-3-7-3S5 5.3 5 7m14 0v10c0 1.7-3.1 3-7 3s-7-1.3-7-3V7m14 0c0 1.7-3.1 3-7 3S5 8.7 5 7"/>',
   debt: '<path d="M3 12c0-4 3.5-7 9-7s9 3 9 7-3.5 7-9 7c-1.6 0-3.1-.2-4.4-.7L3 20l1.4-3.6C3.5 15.2 3 13.7 3 12Z"/><path d="M9 12h6"/>',
-  invest: '<path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h6v6"/>',
+  invest: '<path d="M3 17l6-6 4 4 8-9"/><path d="M14 6h6v6"/>',
   portfolio:
     '<path d="M4 7h16v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7Z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M4 12h16"/>',
   networth:
-    '<g transform="translate(24,0) scale(-1,1)"><path d="M12 3v18M5 8c0-1.7 1.5-3 4-3h6c2.5 0 4 1.3 4 3s-1.5 3-4 3H9c-2.5 0-4 1.3-4 3s1.5 3 4 3h6c2.5 0 4-1.3 4-3"/></g>',
+    '<path d="M12 3v18M6 8c0-1.7 1.5-3 4-3h4c2.2 0 4 1.3 4 3s-1.8 3-4 3h-4c-2.2 0-4 1.3-4 3s1.8 3 4 3h4c2.5 0 4-1.3 4-3"/>',
   defense: '<path d="M12 2 4 6v6c0 5 3.4 9 8 10 4.6-1 8-5 8-10V6l-8-4Z"/><path d="m9 12 2 2 4-4"/>',
   profile: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
@@ -88,7 +88,7 @@ type IconProps = {
   style?: CSSProperties;
 };
 
-export function Icon({ name, width = 1.8, filled = false, className, style }: IconProps) {
+export function Icon({ name, width = 1.9, filled = false, className, style }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"

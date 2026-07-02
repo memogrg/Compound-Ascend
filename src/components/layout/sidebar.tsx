@@ -32,33 +32,35 @@ export function Sidebar({ open, onNavigate, user, navBadges }: SidebarProps) {
         </div>
       </div>
 
-      {NAV.map((group) => (
-        <div key={group.label}>
-          <div className="nav-label">{group.label}</div>
-          <nav className="nav">
-            {group.items.map((it) => (
-              <Link
-                key={it.id}
-                href={it.href}
-                data-nav={it.id}
-                onClick={onNavigate}
-                className={cn("nav-item", it.id === activeId && "active")}
-              >
-                <span className="nav-icon">
-                  <Icon name={it.icon} />
-                </span>
-                <span>{it.name}</span>
-                {navBadges?.[it.id] ? (
-                  <span className="nav-badge">{navBadges[it.id]}</span>
-                ) : it.badge ? (
-                  <span className="nav-badge">{it.badge}</span>
-                ) : null}
-                {it.dot ? <span className="nav-dot" style={{ background: it.dot }} /> : null}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      ))}
+      <div className="nav-scroll">
+        {NAV.map((group) => (
+          <div key={group.label} className="nav-group">
+            <div className="nav-label">{group.label}</div>
+            <nav className="nav">
+              {group.items.map((it) => (
+                <Link
+                  key={it.id}
+                  href={it.href}
+                  data-nav={it.id}
+                  onClick={onNavigate}
+                  className={cn("nav-item", it.id === activeId && "active")}
+                >
+                  <span className="nav-icon">
+                    <Icon name={it.icon} />
+                  </span>
+                  <span>{it.name}</span>
+                  {navBadges?.[it.id] ? (
+                    <span className="nav-badge">{navBadges[it.id]}</span>
+                  ) : it.badge ? (
+                    <span className="nav-badge">{it.badge}</span>
+                  ) : null}
+                  {it.dot ? <span className="nav-dot" style={{ background: it.dot }} /> : null}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        ))}
+      </div>
 
       <div className="sidebar-foot">
         <div className="user-row">

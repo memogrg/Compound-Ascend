@@ -6,13 +6,7 @@ import { signOutAction } from "@/lib/auth/actions";
 export function SignOutButton() {
   return (
     <form action={signOutAction}>
-      <button
-        type="submit"
-        className="icon-btn"
-        aria-label="Cerrar sesión"
-        title="Cerrar sesión"
-        style={{ width: 36, height: 36 }}
-      >
+      <button type="submit" className="icon-btn" aria-label="Cerrar sesión" title="Cerrar sesión">
         <svg
           viewBox="0 0 24 24"
           fill="none"
