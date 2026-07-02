@@ -56,7 +56,14 @@
 .invx .kebab { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; display: grid; place-items: center; }
 .invx .kebab:hover { background: var(--surface-2); color: var(--ink); border-color: var(--line-strong); }
 .invx .kebab svg { width: 16px; height: 16px; }
-.invx .kmenu { position: absolute; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line); border-radius: 11px; box-shadow: var(--shadow-pop); padding: 6px; min-width: 200px; z-index: 20; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+.invx .kmenu { position: absolute; right: 0; top: calc(100% + 4px); background: var(--surface); border: 1px solid var(--line); border-radius: 11px; box-shadow: var(--shadow-pop); padding: 6px; min-width: 200px; z-index: 90; display: flex; flex-direction: column; gap: 2px; text-align: left; }
+/* Las inversiones del fondo de la lista abren el menú hacia arriba,
+   así no se cortan contra el borde inferior ni el botón de chat. */
+.invx .inv-row:last-child .kmenu,
+.invx .inv-row:nth-last-child(2) .kmenu {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
 .invx .kmenu button { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 0; background: transparent; border-radius: 8px; font: inherit; font-size: 13px; color: var(--ink-2); cursor: pointer; width: 100%; text-align: left; }
 .invx .kmenu button:hover { background: var(--chip); }
 .invx .kmenu button.danger:hover { background: var(--neg-soft); color: var(--neg); }
