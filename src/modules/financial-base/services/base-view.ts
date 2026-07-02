@@ -71,8 +71,10 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
   // carga igual con lo que haya.
   try {
     await syncDerivedBudget(period);
-  } catch {
-    // noop — el sync se reintenta en la próxima carga.
+  } catch (err) {
+    // Best-effort: la vista carga igual. Pero logueamos (antes el catch vacío
+    // escondió un fallo del sync durante horas).
+    console.error("[loadBaseView] syncDerivedBudget falló:", err);
   }
 
   const [
