@@ -169,8 +169,8 @@ export async function testEmailAction(): Promise<EmailTestResult> {
 
   const sent = await sendEmail({
     to,
-    subject: "Prueba de correo · Compound Ascend",
-    html: "<p>Si recibes este correo, el envío de Compound Ascend quedó funcional. ✅</p>",
+    subject: "Prueba de correo · CARTERA+",
+    html: "<p>Si recibes este correo, el envío de CARTERA+ quedó funcional. ✅</p>",
   });
   if (!sent.ok) {
     return {

@@ -1,4 +1,4 @@
-# Base de datos — Compound Ascend
+# Base de datos — CARTERA+
 
 Postgres gestionado por Supabase. Migraciones **versionadas y ordenadas**; se
 aplican en orden ascendente.

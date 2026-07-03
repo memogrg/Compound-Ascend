@@ -24,7 +24,7 @@ export function AuthShell({
           <BrandMark />
           <div>
             <div className="brand-name">
-              Compound <span className="ascend">Ascend</span>
+              CARTERA<span className="ascend">+</span>
             </div>
             <div className="brand-sub">Sistema Financiero</div>
           </div>

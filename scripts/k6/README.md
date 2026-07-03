@@ -1,6 +1,6 @@
 # Pruebas de carga (k6)
 
-Scripts de carga para Compound Ascend. **Correr SIEMPRE contra un entorno de
+Scripts de carga para CARTERA+. **Correr SIEMPRE contra un entorno de
 prueba/efímero, NUNCA contra producción real**: consume recursos y dispara los
 rate-limits de usuarios reales.
 

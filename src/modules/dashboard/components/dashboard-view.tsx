@@ -51,7 +51,7 @@ export function DashboardView({
       {/* ① NORTE: ¿más rico o más pobre? + libertad + próxima mejor decisión */}
       <NorteBand norte={panel.norte} currency={currency} />
 
-      {/* ② Los 4 pilares (cada uno con su lectura Ascend AI) */}
+      {/* ② Los 4 pilares (cada uno con su lectura My Agent C+) */}
       <section className="dash-pillars">
         {panel.pillars.map((p) => (
           <PillarCard key={p.key} pillar={p} />
@@ -68,7 +68,7 @@ export function DashboardView({
         />
       </section>
 
-      {/* ④ Perspectivas de Ascend AI (reusadas) */}
+      {/* ④ Perspectivas de My Agent C+ (reusadas) */}
       <PerspectivesCard insights={insights} />
     </div>
   );
@@ -135,7 +135,7 @@ function NorteBand({ norte, currency }: { norte: NorteVM; currency: string }) {
           <div>
             <div style={{ fontSize: 13, fontWeight: 600 }}>Tu próxima mejor decisión</div>
             <div className="muted" style={{ fontSize: 11 }}>
-              Ascend AI · prioridad #1
+              My Agent C+ · prioridad #1
             </div>
           </div>
         </div>
@@ -303,7 +303,7 @@ function PerspectivesCard({ insights }: { insights: DashboardInsights }) {
   return (
     <div className="card card-pad">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
-        <div className="card-title">Perspectivas de Ascend AI</div>
+        <div className="card-title">Perspectivas de My Agent C+</div>
         <span
           className="chip"
           style={{
@@ -311,7 +311,7 @@ function PerspectivesCard({ insights }: { insights: DashboardInsights }) {
             color: "var(--ink-2)",
           }}
         >
-          Ascend AI
+          My Agent C+
         </span>
       </div>
       {insights.insights.map((i, idx) => (
