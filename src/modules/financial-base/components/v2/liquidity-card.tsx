@@ -57,7 +57,7 @@ export function LiquidityCard({
   return (
     <div className="card card-pad">
       <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-        <div className="card-title">Tu Liquidez</div>
+        <div className="label">Tu Liquidez</div>
         <span
           className="muted"
           title={HELP}
@@ -116,8 +116,8 @@ export function LiquidityCard({
           ) : (
             <button
               type="button"
-              className="btn btn-ghost"
-              style={{ marginTop: 12, padding: "8px 14px" }}
+              className="btn btn-secondary"
+              style={{ marginTop: 12 }}
               onClick={() => setAdjusting(true)}
             >
               <Icon name="edit" width={2} /> Ajustar saldo

@@ -14,14 +14,8 @@ export function FinancialInsightCard({ reading }: { reading: FinancialReading })
     <div className="card card-pad">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
         <div className="card-title">{reading.title}</div>
-        <span
-          className="chip"
-          style={{
-            background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
-            color: "var(--ink-2)",
-          }}
-        >
-          <Icon name="spark" filled width={2} /> IA
+        <span className="chip-ai" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <Icon name="spark" filled width={2} /> My Agent C+
         </span>
       </div>
       <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink)", margin: "4px 0 14px" }}>

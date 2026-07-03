@@ -163,14 +163,8 @@ function TopTable({
         <div className="card-title">{title}</div>
       </div>
       <div
-        className="list-row"
-        style={{
-          gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr",
-          fontSize: 11,
-          color: "var(--muted)",
-          textTransform: "uppercase",
-          letterSpacing: 0.3,
-        }}
+        className="list-row tbl-h"
+        style={{ gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr" }}
       >
         <span>{dimLabel}</span>
         <span style={{ textAlign: "right" }}>Presup.</span>
@@ -205,20 +199,12 @@ function TopTable({
             <span className="tnum" style={{ textAlign: "right", fontSize: 12.5, fontWeight: 500 }}>
               {formatMoney(r.real, currency)}
             </span>
-            <span
-              className="tnum"
-              style={{
-                textAlign: "right",
-                fontSize: 12.5,
-                color:
-                  r.status === "over"
-                    ? "var(--neg)"
-                    : r.status === "warn"
-                      ? "var(--warn)"
-                      : "var(--pos)",
-              }}
-            >
-              {formatPercent(r.sharePct)}
+            <span style={{ textAlign: "right" }}>
+              <span
+                className={`pctb ${r.status === "over" ? "r" : r.status === "warn" ? "a" : "g"}`}
+              >
+                {formatPercent(r.sharePct)}
+              </span>
             </span>
           </div>
         ))
