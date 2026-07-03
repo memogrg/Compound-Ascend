@@ -6,6 +6,15 @@ import { BOTTOM_NAV } from "@/lib/constants/nav";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
+/** Etiquetas cortas del tabbar (los nombres completos del NAV no caben en móvil). */
+const SHORT_LABEL: Record<string, string> = {
+  dashboard: "Centro",
+  base: "Base",
+  control: "Ahorro",
+  wealth: "Portafolio",
+  "rich-life": "Patrimonio",
+};
+
 /** Barra de navegación inferior — visible solo en móvil (CSS @media). */
 export function BottomNav() {
   const pathname = usePathname();
@@ -16,7 +25,7 @@ export function BottomNav() {
         return (
           <Link key={it.id} href={it.href} className={cn("bn-item", active && "active")}>
             <Icon name={it.icon} />
-            <span>{it.name}</span>
+            <span>{SHORT_LABEL[it.id] ?? it.name}</span>
           </Link>
         );
       })}
