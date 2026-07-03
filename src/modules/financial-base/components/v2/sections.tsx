@@ -725,24 +725,24 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
       />
 
       {view.transactions.length > 0 ? (
-        <div
-          className="card card-pad"
-          style={{ borderColor: "color-mix(in srgb, var(--info) 35%, var(--line))" }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              fontSize: 13.5,
-              color: "var(--ink-2)",
-            }}
+        <div className="infobox">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
           >
-            <span style={{ color: "var(--info)" }}>●</span>
+            <path d="M12 16v-4M12 8h.01" />
+            <circle cx="12" cy="12" r="9" />
+          </svg>
+          <p>
             {real.topExpenseCategory
               ? `Tu mayor gasto del periodo es "${real.topExpenseCategory}". Registrar todo te ayuda a detectar fugas hormiga.`
               : "Asigna categorías a tus movimientos para ver patrones útiles."}
-          </div>
+          </p>
         </div>
       ) : null}
     </div>

@@ -172,13 +172,10 @@ export function PorClasificarCard({
                       data-tip="Sugerido por IA según comercios parecidos. Tocá «usar» o elegí otro."
                       style={{ display: "inline-flex", alignItems: "center", gap: 6, flex: "none" }}
                     >
-                      <span className="chip" style={{ fontSize: 10.5 }}>
-                        ✨ {sugName}
-                      </span>
+                      <span className="ai-sug">✨ {sugName}</span>
                       <button
                         type="button"
-                        className="btn btn-ghost"
-                        style={{ padding: "2px 8px", fontSize: 11 }}
+                        className="use-btn"
                         disabled={rowBusy}
                         onClick={() => assign(t, sug)}
                       >
