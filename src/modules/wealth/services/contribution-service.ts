@@ -124,3 +124,96 @@ export async function ensureMonthlyContributions(): Promise<void> {
     }
   }
 }
+
+export type OpenContribution = {
+  id: string;
+  holdingId: string;
+  amount: number;
+  unitPrice: number | null;
+  currency: string;
+  status: string;
+};
+
+/** Aportes abiertos (auto/pendiente) del mes en curso, para el render de la brecha. */
+export async function listOpenContributions(): Promise<OpenContribution[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const now = new Date();
+  const { data, error } = await supabase
+    .from("holding_contributions")
+    .select("id, holding_id, amount, unit_price, currency, status")
+    .eq("user_id", user.id)
+    .eq("period_year", now.getFullYear())
+    .eq("period_month", now.getMonth() + 1)
+    .in("status", ["auto", "pendiente"]);
+  if (error || !data) return [];
+  return data.map((r) => ({
+    id: r.id,
+    holdingId: r.holding_id,
+    amount: Number(r.amount),
+    unitPrice: r.unit_price !== null ? Number(r.unit_price) : null,
+    currency: r.currency,
+    status: r.status,
+  }));
+}
+
+/**
+ * Ajusta el precio de un aporte del mes: revierte el aporte al precio viejo y lo
+ * re-mergea al nuevo. El monto es fijo, así que solo cambian cantidad/costo del
+ * holding; el gasto vinculado (transactions) no se toca. Marca 'confirmado'.
+ * (El promedio ponderado es order-independent: revertir es correcto aunque haya
+ * habido otras compras entremedio.)
+ */
+export async function adjustContributionPrice(
+  contributionId: string,
+  newPrice: number,
+): Promise<void> {
+  if (!(newPrice > 0)) throw new Error("El precio debe ser mayor a 0.");
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: c, error: cErr } = await supabase
+    .from("holding_contributions")
+    .select("id, holding_id, amount, unit_price")
+    .eq("id", contributionId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (cErr || !c) throw new Error("Aporte no encontrado.");
+
+  const { data: h, error: hErr } = await supabase
+    .from("investment_holdings")
+    .select("id, quantity, average_cost")
+    .eq("id", c.holding_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (hErr || !h) throw new Error("Holding no encontrado.");
+
+  const amount = Number(c.amount);
+  const oldPrice = Number(c.unit_price ?? 0);
+  const curQty = Number(h.quantity ?? 0);
+  const curAvg = Number(h.average_cost ?? 0);
+
+  // Quitar el aporte viejo del promedio (si estaba mergeado a un precio).
+  const oldQty = oldPrice > 0 ? amount / oldPrice : 0;
+  const baseQty = curQty - oldQty;
+  const baseAvg = baseQty > 0 ? (curQty * curAvg - oldQty * oldPrice) / baseQty : 0;
+
+  // Re-mergear al precio nuevo.
+  const newQty = amount / newPrice;
+  const finalQty = baseQty + newQty;
+  const finalAvg = finalQty > 0 ? (baseQty * baseAvg + newQty * newPrice) / finalQty : newPrice;
+
+  const { error: updErr } = await supabase
+    .from("investment_holdings")
+    .update({ quantity: finalQty, average_cost: finalAvg, cost_basis: finalQty * finalAvg })
+    .eq("id", h.id)
+    .eq("user_id", user.id);
+  if (updErr) throw new Error(updErr.message);
+
+  const { error: setErr } = await supabase
+    .from("holding_contributions")
+    .update({ unit_price: newPrice, status: "confirmado", updated_at: new Date().toISOString() })
+    .eq("id", c.id)
+    .eq("user_id", user.id);
+  if (setErr) throw new Error(setErr.message);
+}
