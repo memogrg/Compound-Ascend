@@ -166,28 +166,20 @@ export function ProfileDashboard({
       {/* Hero v2: lidera con el arquetipo (lectura espejo); fallback al hero clásico */}
       {r ? (
         <section className="dash-hero">
-          <div className="card card-pad">
+          <div className="card card-pad prof-hero">
             <div className="label">Tu perfil</div>
-            <div className="card-title" style={{ fontSize: 22, marginTop: 4 }}>
-              Tu perfil es {diagnosis.archetypeLabel}
-              {diagnosis.archetypeLabel2 ? ` con rasgos de ${diagnosis.archetypeLabel2}` : ""}
-            </div>
-            <p
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                lineHeight: 1.5,
-                color: "var(--ink)",
-                marginTop: 10,
-              }}
-            >
-              {r.heroLine}
-            </p>
-            <p style={{ fontSize: 13.5, lineHeight: 1.6, color: "var(--ink-2)", marginTop: 8 }}>
-              {r.interpretation}
-            </p>
+            <h2 className="big">
+              Tu perfil es <em>{diagnosis.archetypeLabel}</em>
+            </h2>
+            {diagnosis.archetypeLabel2 ? (
+              <div className="trait">
+                con rasgos de <b>{diagnosis.archetypeLabel2}</b>
+              </div>
+            ) : null}
+            <p className="phrase">{r.heroLine}</p>
+            <p className="interp">{r.interpretation}</p>
             {readOnly ? null : (
-              <Link className="btn btn-primary" href="/bienvenida" style={{ marginTop: 14 }}>
+              <Link className="btn btn-secondary" href="/bienvenida" style={{ marginTop: 16 }}>
                 <Icon name="edit" width={2} /> Editar mi perfil
               </Link>
             )}
@@ -263,23 +255,16 @@ export function ProfileDashboard({
           <div className="label" style={{ fontSize: 11.5 }}>
             Desde {formatSince(evolution.since)}
           </div>
-          <ul
-            style={{
-              margin: "10px 0 0",
-              paddingLeft: 0,
-              listStyle: "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
+          <div style={{ marginTop: 4 }}>
             {evolution.changes.map((c, i) => (
-              <li key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <Icon name="spark" width={2.2} />
-                <span style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.5 }}>{c}</span>
-              </li>
+              <div key={i} className="li-ic plan">
+                <span className="ic">
+                  <Icon name="spark" width={2.2} />
+                </span>
+                <div className="tx">{c}</div>
+              </div>
             ))}
-          </ul>
+          </div>
         </Card>
       ) : null}
 
@@ -297,23 +282,12 @@ export function ProfileDashboard({
           <Card title="Tu lectura en números">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {r.scorecard.map((s, i) => (
-                <div
-                  key={i}
-                  style={{
-                    flex: "1 1 160px",
-                    border: "1px solid var(--line)",
-                    borderRadius: 12,
-                    padding: "10px 12px",
-                    background: "var(--surface-2, var(--chip))",
-                  }}
-                >
-                  <div className="label" style={{ fontSize: 11.5 }}>
-                    {s.label}
-                  </div>
-                  <div className="num-xl" style={{ fontSize: 18, marginTop: 2 }}>
+                <div key={i} className="cstat" style={{ flex: "1 1 160px" }}>
+                  <div className="k">{s.label}</div>
+                  <div className="v" style={{ fontSize: 18 }}>
                     {s.value}
                   </div>
-                  <div className="muted" style={{ fontSize: 11.5, marginTop: 3, lineHeight: 1.4 }}>
+                  <div className="muted" style={{ fontSize: 11.5, marginTop: 4, lineHeight: 1.4 }}>
                     {s.reading}
                   </div>
                 </div>
@@ -356,25 +330,14 @@ export function ProfileDashboard({
                 <div className="label" style={{ fontSize: 11.5, marginBottom: 6 }}>
                   Lo que My Agent C+ sabe de ti
                 </div>
-                <ul
-                  style={{
-                    margin: 0,
-                    paddingLeft: 0,
-                    listStyle: "none",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                  }}
-                >
+                <div>
                   {knows.map((k, i) => (
-                    <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <Icon name="check" width={2} />
-                      <span style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
-                        {k}
-                      </span>
-                    </li>
+                    <div key={i} className="know-row">
+                      <span className="kd" />
+                      <div>{k}</div>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             ) : null}
           </Card>
@@ -384,10 +347,17 @@ export function ProfileDashboard({
       {/* Mapa de arquetipos (B2a) */}
       {bars.length > 0 ? (
         <Card title="Tu mapa de arquetipos">
-          <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ position: "relative", width: 120, height: 120, flex: "none" }}>
-              <svg width="120" height="120" viewBox="0 0 42 42">
-                <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="5" />
+          <div className="arc-wrap">
+            <div className="arc-donut">
+              <svg width="150" height="150" viewBox="0 0 42 42">
+                <circle
+                  cx="21"
+                  cy="21"
+                  r="15.915"
+                  fill="none"
+                  stroke="var(--surface-2)"
+                  strokeWidth="5"
+                />
                 {bars.map((b, i) => {
                   const start = bars.slice(0, i).reduce((s, x) => s + x.pct, 0);
                   return (
@@ -407,40 +377,25 @@ export function ProfileDashboard({
                   );
                 })}
               </svg>
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: "var(--ink)",
-                }}
-              >
-                {bars[0]?.pct ?? 0}%
+              <div className="cc">
+                <div className="n">{bars[0]?.label ?? ""}</div>
+                <div className="t">Dominante</div>
               </div>
             </div>
-            <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="arc-bars">
               {bars.map((b, i) => (
-                <div key={i} className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <div key={i} className="arc-b">
+                  <span className="abn">{b.label}</span>
+                  <span className="abr">
                     <span
+                      className="abf"
                       style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 999,
+                        width: `${b.pct}%`,
                         background: ARCH_COLORS[i] ?? "var(--pos)",
-                        flex: "none",
                       }}
                     />
-                    <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>
-                      {b.label}
-                    </span>
                   </span>
-                  <span className="tnum" style={{ fontSize: 12.5, color: "var(--ink-2)", flex: "none" }}>
-                    {b.pct}%
-                  </span>
+                  <span className="abp">{b.pct}%</span>
                 </div>
               ))}
             </div>
@@ -462,11 +417,31 @@ export function ProfileDashboard({
               {topConcern ? `Hoy te ocupa ${lc(topConcern)}.` : ""}
             </p>
           ) : null}
-          <div className="cols-2" style={{ gap: "14px 28px", marginTop: 14 }}>
-            {dominantValue ? <Info label="Lo que más quieres" value={dominantValue} /> : null}
-            {topPriority ? <Info label="Prioridad dominante" value={topPriority} /> : null}
-            {topConcern ? <Info label="Preocupación activa" value={topConcern} /> : null}
-            {emotion ? <Info label="Motivador emocional" value={emotion} /> : null}
+          <div className="eng-grid" style={{ marginTop: 14 }}>
+            {dominantValue ? (
+              <div className="eng-card">
+                <div className="eng-lb">Lo que más quieres</div>
+                <div className="eng-v">{dominantValue}</div>
+              </div>
+            ) : null}
+            {topPriority ? (
+              <div className="eng-card">
+                <div className="eng-lb">Prioridad dominante</div>
+                <div className="eng-v">{topPriority}</div>
+              </div>
+            ) : null}
+            {topConcern ? (
+              <div className="eng-card">
+                <div className="eng-lb">Preocupación activa</div>
+                <div className="eng-v">{topConcern}</div>
+              </div>
+            ) : null}
+            {emotion ? (
+              <div className="eng-card">
+                <div className="eng-lb">Motivador emocional</div>
+                <div className="eng-v">{emotion}</div>
+              </div>
+            ) : null}
           </div>
         </Card>
       ) : null}
@@ -732,7 +707,14 @@ function Ring({ value }: { value: number }) {
   return (
     <div className="ring-wrap">
       <svg width="108" height="108" viewBox="0 0 42 42">
-        <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
+        <circle
+          cx="21"
+          cy="21"
+          r="15.915"
+          fill="none"
+          stroke="var(--surface-2)"
+          strokeWidth="4"
+        />
         <circle
           cx="21"
           cy="21"
@@ -829,20 +811,16 @@ function ChipList({ items, accent }: { items: string[]; accent?: boolean }) {
 
 function ScaleBar({ label, value, tone }: { label: string; value: number; tone?: "warn" }) {
   const pct = Math.round((value / 10) * 100);
-  const color = tone === "warn" ? "var(--warn)" : "var(--pos)";
+  const color = tone === "warn" ? "var(--gold)" : "var(--accent)";
   return (
-    <div style={{ marginTop: 14 }}>
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 6 }}>
-        <span className="label" style={{ fontSize: 11.5 }}>
-          {label}
-        </span>
-        <span className="tnum" style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
-          {value}/10
-        </span>
+    <div className="meterline">
+      <div>
+        <div className="ml-lb">{label}</div>
+        <div className="meter">
+          <div className="fl" style={{ width: `${pct}%`, background: color }} />
+        </div>
       </div>
-      <div className="bar-track" style={{ height: 10 }}>
-        <div className="bar-fill" style={{ width: `${pct}%`, background: color }} />
-      </div>
+      <span className="ml-v">{value}/10</span>
     </div>
   );
 }
