@@ -41,6 +41,7 @@ import {
   type Period,
 } from "@/modules/wealth/services/holding-history-service";
 import type { Holding } from "@/modules/wealth/types";
+import { adjustContributionPrice } from "@/modules/wealth/services/contribution-service";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -327,5 +328,23 @@ export async function listLinkableDebtsAction(): Promise<LinkableDebt[]> {
     }));
   } catch {
     return [];
+  }
+}
+
+export async function adjustContributionPriceAction(
+  contributionId: string,
+  newPrice: number,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (!(newPrice > 0)) return { ok: false, message: "El precio debe ser mayor a 0." };
+  try {
+    await adjustContributionPrice(contributionId, newPrice);
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch (err) {
+    logger.error("adjustContributionPrice fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos actualizar el precio del aporte." };
   }
 }
