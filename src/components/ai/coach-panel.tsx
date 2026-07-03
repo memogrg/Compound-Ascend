@@ -12,6 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { AgentMark } from "@/components/ui/agent-mark";
 import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/modules/financial-base/constants";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
@@ -75,18 +76,18 @@ export function CoachPanel() {
       <button
         className={`coach-fab${open ? " hide" : ""}`}
         onClick={() => setOpen(true)}
-        aria-label="Abrir My Agent C+"
+        aria-label="Pregúntale a My Agent C+"
       >
         <span className="spark">
-          <Icon name="spark" filled />
+          <AgentMark />
         </span>
-        Pregúntale a My Agent C+
+        <span className="coach-fab-label">Pregúntale a My Agent C+</span>
       </button>
 
       <div className={`coach-panel${open ? " open" : ""}`} role="dialog" aria-label="My Agent C+">
         <div className="coach-top">
           <span className="spark">
-            <Icon name="spark" filled />
+            <AgentMark />
           </span>
           <div>
             <div className="coach-title">My Agent C+</div>
@@ -244,7 +245,7 @@ function FinanceChat() {
             <div className={`coach-msg${m.role === "me" ? " me" : ""}`}>
               {m.role === "ai" ? (
                 <span className="ava">
-                  <Icon name="spark" filled />
+                  <AgentMark />
                 </span>
               ) : null}
               <div className="coach-bubble" dangerouslySetInnerHTML={{ __html: m.html }} />

@@ -852,8 +852,9 @@ input[type="radio"] {
   z-index: 80;
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 12px 17px 12px 13px;
+  gap: 0;
+  /* Colapsado = círculo (padding simétrico alrededor del isotipo). */
+  padding: 9px;
   border-radius: var(--r-pill);
   background: var(--accent);
   color: var(--accent-ink);
@@ -864,11 +865,9 @@ input[type="radio"] {
   font-size: 14px;
   font-weight: 600;
   transition:
+    padding 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
     transform 160ms cubic-bezier(0.2, 0.7, 0.2, 1),
     opacity 160ms;
-}
-.coach-fab:hover {
-  transform: translateY(-2px);
 }
 .coach-fab .spark {
   width: 24px;
@@ -883,6 +882,41 @@ input[type="radio"] {
 .coach-fab .spark svg {
   width: 15px;
   height: 15px;
+}
+/* Texto del FAB: colapsado por defecto; se revela al expandir. */
+.coach-fab-label {
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    margin-left 240ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 160ms ease;
+}
+/* Solo en punteros con hover real (desktop): al pasar el cursor o enfocar con
+   teclado, el FAB se expande a píldora y revela el texto. En touch se queda
+   círculo y abre el panel al tocar. */
+@media (hover: hover) and (pointer: fine) {
+  .coach-fab:hover,
+  .coach-fab:focus-visible {
+    padding-right: 18px;
+    transform: translateY(-2px);
+  }
+  .coach-fab:hover .coach-fab-label,
+  .coach-fab:focus-visible .coach-fab-label {
+    max-width: 220px;
+    margin-left: 9px;
+    opacity: 1;
+  }
+}
+/* Sin animación si el usuario la reduce: el texto aparece al instante. */
+@media (prefers-reduced-motion: reduce) {
+  .coach-fab,
+  .coach-fab-label {
+    transition: none;
+  }
 }
 .coach-fab.hide {
   opacity: 0;
