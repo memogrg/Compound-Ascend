@@ -13,6 +13,13 @@ export async function dismissInsightAction(id: string): Promise<void> {
   revalidatePath("/dashboard");
 }
 
+/** Restaura los insights descartados ("Recordar acciones" de la campana). */
+export async function restoreInsightsAction(): Promise<void> {
+  const { restoreDismissedInsights } = await import("@/lib/insights");
+  await restoreDismissedInsights();
+  revalidatePath("/dashboard");
+}
+
 export type BellInsight = { id: string; severity: string; title: string; body: string };
 export type BellData = { inApp: boolean; insights: BellInsight[] };
 

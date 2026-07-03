@@ -16,6 +16,7 @@ export {
   refreshInsights,
   syncInsights,
   dismissInsight,
+  restoreDismissedInsights,
   isStale,
 } from "@/lib/insights/insights-service";
 

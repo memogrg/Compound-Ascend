@@ -145,13 +145,15 @@ export async function refreshDailyPatrimonioInsight(): Promise<void> {
     const user = await requireUser();
     const supabase = await createSupabaseServerClient();
 
-    // Guardia diaria: si ya hay un ritual fresco (<20 h), no regenerar.
+    // Guardia diaria: si ya se generó un ritual fresco (<20 h), no regenerar.
+    // Sin filtrar por status: un ritual descartado también cuenta como "el del
+    // día" — si la guardia solo mirara activos, descartarlo la vaciaría y el
+    // ritual renacería en la misma lectura (imposible cerrarlo).
     const { data: last } = await supabase
       .from("user_insights")
       .select("updated_at")
       .eq("user_id", user.id)
       .eq("kind", RITUAL_KIND)
-      .eq("status", "activo")
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -321,19 +323,32 @@ export async function syncInsights(detected: DetectedInsight[]): Promise<void> {
   const household_id = await getActiveHouseholdId(supabase, user.id);
 
   if (detected.length > 0) {
-    const rows = detected.map((d) => ({
-      user_id: user.id,
-      household_id,
-      kind: d.kind,
-      severity: d.severity,
-      title: d.title,
-      body: d.body,
-      metric: d.metric ?? null,
-      related_kind: d.relatedKind ?? null,
-      related_id: d.relatedId ?? null,
-      status: "activo" as const,
-    }));
-    await supabase.from("user_insights").upsert(rows, { onConflict: "user_id,kind,related_id" });
+    // El upsert fija status 'activo': si incluyera keys descartadas las
+    // reviviría. Un descarte persiste hasta que el usuario lo revierte con
+    // "Recordar acciones" (restoreDismissedInsights).
+    const { data: dismissed } = await supabase
+      .from("user_insights")
+      .select("kind, related_id")
+      .eq("user_id", user.id)
+      .eq("status", "descartado");
+    const dismissedKeys = new Set((dismissed ?? []).map((d) => keyOf(d.kind, d.related_id)));
+    const rows = detected
+      .filter((d) => !dismissedKeys.has(keyOf(d.kind, d.relatedId)))
+      .map((d) => ({
+        user_id: user.id,
+        household_id,
+        kind: d.kind,
+        severity: d.severity,
+        title: d.title,
+        body: d.body,
+        metric: d.metric ?? null,
+        related_kind: d.relatedKind ?? null,
+        related_id: d.relatedId ?? null,
+        status: "activo" as const,
+      }));
+    if (rows.length > 0) {
+      await supabase.from("user_insights").upsert(rows, { onConflict: "user_id,kind,related_id" });
+    }
   }
 
   // Cierra los activos que ya no detecta ninguna pasada (se consideran resueltos).
@@ -354,8 +369,42 @@ export async function syncInsights(detected: DetectedInsight[]): Promise<void> {
 
 /** Descarta un insight (lo oculta sin marcarlo resuelto). Para la 4d. */
 export async function dismissInsight(id: string): Promise<void> {
+  const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("user_insights").update({ status: "descartado" }).eq("id", id);
+  await supabase
+    .from("user_insights")
+    .update({ status: "descartado" })
+    .eq("id", id)
+    .eq("user_id", user.id);
+}
+
+/**
+ * Restaura los insights descartados ("Recordar acciones" de la campana).
+ * Conserva el invariante de UN ritual activo a la vez: si al restaurar
+ * coexisten varios, deja solo el más reciente y resuelve los demás. Los
+ * insights cuya condición ya no aplica se auto-limpian en la siguiente
+ * pasada de detectores (syncInsights los marca 'resuelto').
+ */
+export async function restoreDismissedInsights(): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase
+    .from("user_insights")
+    .update({ status: "activo" })
+    .eq("user_id", user.id)
+    .eq("status", "descartado");
+
+  const { data: rituals } = await supabase
+    .from("user_insights")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("kind", RITUAL_KIND)
+    .eq("status", "activo")
+    .order("updated_at", { ascending: false });
+  const extra = (rituals ?? []).slice(1).map((r) => r.id);
+  if (extra.length > 0) {
+    await supabase.from("user_insights").update({ status: "resuelto" }).in("id", extra);
+  }
 }
 
 /** Puro y testeable: ¿la última corrida está vieja (o no existe)? */
