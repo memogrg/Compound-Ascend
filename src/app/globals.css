@@ -3707,6 +3707,205 @@ input[type="radio"] {
   box-shadow: var(--e2);
 }
 
+/* Perfil financiero v2 (Mi Perfil Financiero.html) */
+.prof-hero {
+  position: relative;
+  overflow: hidden;
+}
+.prof-hero .big {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(24px, 4vw, 34px);
+  letter-spacing: -0.02em;
+  margin: 8px 0 0;
+  line-height: 1.1;
+}
+.prof-hero .big em {
+  font-style: normal;
+  color: var(--accent);
+}
+.prof-hero .trait {
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.prof-hero .trait b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.prof-hero .phrase {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  margin: 16px 0 0;
+  max-width: 60ch;
+}
+.prof-hero .interp {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 10px 0 0;
+  max-width: 64ch;
+}
+.know-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.know-row:first-of-type {
+  border-top: 0;
+}
+.know-row .kd {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+  margin-top: 7px;
+}
+.meterline {
+  display: grid;
+  grid-template-columns: 1fr 42px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.meterline .ml-lb {
+  font-size: 13.5px;
+}
+.meter {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+  margin-top: 7px;
+}
+.meter .fl {
+  height: 100%;
+  border-radius: var(--r-pill);
+}
+.meterline .ml-v {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  text-align: right;
+}
+.arc-wrap {
+  display: flex;
+  gap: 26px;
+  align-items: center;
+  padding: 8px 4px;
+}
+.arc-donut {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.arc-donut .cc {
+  position: absolute;
+  text-align: center;
+  max-width: 96px;
+}
+.arc-donut .cc .n {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.2;
+}
+.arc-donut .cc .t {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.arc-bars {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-width: 0;
+}
+.arc-b {
+  display: grid;
+  grid-template-columns: 110px 1fr 34px;
+  gap: 11px;
+  align-items: center;
+  font-size: 13px;
+}
+.arc-b .abn {
+  color: var(--ink);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arc-b .abr {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.arc-b .abf {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+}
+.arc-b .abp {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-align: right;
+}
+@media (max-width: 720px) {
+  .arc-wrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .arc-donut {
+    margin-inline: auto;
+  }
+  .arc-b {
+    grid-template-columns: 90px 1fr 34px;
+  }
+}
+.eng-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.eng-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+.eng-lb {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eng-v {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  margin-top: 8px;
+  line-height: 1.2;
+}
+
 /* ============================================================
    DISEÑO CLAUDE — Presupuesto (Ingresos / Gastos / Transacciones)
    Clases porteadas de testing/project/Budget.html + assets/app.css.
