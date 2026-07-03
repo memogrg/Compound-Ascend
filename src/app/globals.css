@@ -1763,6 +1763,47 @@ input[type="radio"] {
   color: var(--success);
   flex: none;
 }
+.bell-recall {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 7px;
+}
+.bell-recall:hover {
+  color: var(--ink);
+  background: var(--chip);
+}
+.bell-recall:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.bell-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  z-index: 50;
+  box-shadow: var(--shadow-pop);
+  padding: 0;
+}
+/* En pantallas chicas la campana queda cerca del borde y el ancho fijo se
+   salía del viewport: se ancla al viewport, no al botón. */
+@media (max-width: 480px) {
+  .bell-pop {
+    position: fixed;
+    top: 64px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
 .obs-card {
   display: flex;
   gap: 12px;

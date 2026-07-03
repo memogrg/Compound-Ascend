@@ -6,6 +6,7 @@ import { Icon, type IconName } from "@/components/ui/icon";
 import {
   listActiveInsightsAction,
   dismissInsightAction,
+  restoreInsightsAction,
   type BellInsight,
 } from "@/modules/dashboard/api/actions";
 
@@ -62,6 +63,22 @@ export function BellNotifications() {
     }
   };
 
+  // "Recordar acciones": revierte los descartes y repuebla la lista.
+  const [restoring, setRestoring] = useState(false);
+  const restore = async () => {
+    setRestoring(true);
+    try {
+      await restoreInsightsAction();
+      const data = await listActiveInsightsAction();
+      setInApp(data.inApp);
+      setItems(data.insights);
+    } catch {
+      // si falla, la lista queda como estaba.
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
       <button
@@ -97,21 +114,7 @@ export function BellNotifications() {
       </button>
 
       {open ? (
-        <div
-          role="menu"
-          className="card"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: 0,
-            width: 320,
-            maxHeight: 420,
-            overflowY: "auto",
-            zIndex: 50,
-            boxShadow: "var(--shadow-pop)",
-            padding: 0,
-          }}
-        >
+        <div role="menu" className="card bell-pop">
           <div
             style={{
               display: "flex",
@@ -188,6 +191,25 @@ export function BellNotifications() {
               })}
             </div>
           )}
+
+          {!loading && inApp ? (
+            <div
+              style={{
+                padding: "9px 14px",
+                borderTop: "1px solid var(--line)",
+                textAlign: "center",
+              }}
+            >
+              <button
+                type="button"
+                className="bell-recall"
+                onClick={restore}
+                disabled={restoring}
+              >
+                {restoring ? "Recordando…" : "Recordar acciones"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
