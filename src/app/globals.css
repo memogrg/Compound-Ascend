@@ -179,6 +179,10 @@ a {
   color: inherit;
   text-decoration: none;
 }
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+}
 ::selection {
   background: var(--accent-soft);
 }
@@ -3420,18 +3424,22 @@ a {
 /* Sobres / categorías de gasto (barra presupuesto vs real) */
 .env {
   display: grid;
-  grid-template-columns: 38px 1fr 220px 120px;
-  gap: 16px;
+  grid-template-columns: 44px 1fr 220px 120px;
+  gap: 14px;
   align-items: center;
-  padding: 15px 24px;
-  border-top: 1px solid var(--line);
+  padding: 15px 18px;
+  border-top: 1px solid var(--border);
+  transition: background 100ms;
 }
 .env:first-of-type {
   border-top: 0;
 }
+.env.exp-clickable:hover {
+  background: var(--surface-2);
+}
 @media (max-width: 780px) {
   .env {
-    grid-template-columns: 38px 1fr;
+    grid-template-columns: 44px 1fr;
     row-gap: 12px;
   }
   .env .env-bar-cell,
@@ -3443,33 +3451,39 @@ a {
   }
 }
 .env-ic {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
 }
 .env-ic svg {
-  width: 17px;
-  height: 17px;
+  width: 21px;
+  height: 21px;
 }
 .env-name {
-  font-size: 13.5px;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .env-sub {
-  font-size: 11.5px;
-  color: var(--muted);
-  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
 }
 .env-bar-cell .bar-track {
   height: 7px;
+  background: var(--surface-2);
 }
 .env-bar-meta {
   display: flex;
   justify-content: space-between;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--muted);
+  color: var(--text-muted);
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
@@ -3477,17 +3491,87 @@ a {
   text-align: right;
 }
 .env-num .big {
-  font-size: 14px;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .env-num .small {
   font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
+  color: var(--text-muted);
+  margin-top: 3px;
 }
 .env.over .env-num .big {
-  color: var(--neg);
+  color: var(--danger);
+}
+/* Sobre presupuesto: la barra pisa el color de categoría (inline) con danger */
+.env.over .env-bar-cell .bar-fill {
+  background: var(--danger) !important;
+}
+/* Chip "vinculado" (v2) */
+.chip-linked {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--info-soft);
+  color: var(--info);
+  white-space: nowrap;
+}
+/* Chips de sugerencia dentro de modales (v2 .sug .s) */
+.modal-body .chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: border-color 120ms;
+}
+.modal-body .chip:hover {
+  border-color: var(--accent);
+}
+
+/* Resumen del grupo dentro del modal de sobres (v2 .env-head) */
+.env-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 15px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 14px;
+}
+.env-head .lb {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.env-head .v {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  margin-top: 3px;
+}
+.env-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--success);
+  white-space: nowrap;
+}
+.env-pill.over {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* Toolbar de pestaña (hint + acciones) */

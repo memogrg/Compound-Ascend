@@ -98,7 +98,8 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
             </div>
             <div style={{ minWidth: 0 }}>
               <div className="env-name">
-                {jar.name} <span style={{ color: "var(--muted)" }}>›</span>
+                {jar.name} <span className="chip-linked">vinculado</span>{" "}
+                <span style={{ color: "var(--text-muted)" }}>›</span>
               </div>
               <div
                 className="env-sub"
@@ -163,13 +164,14 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
           </div>
           <div style={{ minWidth: 0 }}>
             <div className="env-name">
-              {jar.name} <span style={{ color: "var(--muted)" }}>›</span>
+              {jar.name} <span className="chip-linked">vinculado</span>{" "}
+              <span style={{ color: "var(--text-muted)" }}>›</span>
             </div>
             <div className="env-sub">{sub}</div>
           </div>
           <div className="env-bar-cell" />
           <div className="env-num">
-            <div className="small">vinculado</div>
+            <div className="small">Ver</div>
           </div>
         </button>
         {open ? <JarLinkedModal jar={jar} currency={currency} onClose={() => setOpen(false)} /> : null}
