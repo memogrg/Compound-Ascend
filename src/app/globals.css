@@ -3535,6 +3535,109 @@ input[type="radio"] {
   color: var(--success);
 }
 
+/* Defensa patrimonial v2 (Defensa patrimonial.html) */
+.cov-ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+.cov-ic svg {
+  width: 19px;
+  height: 19px;
+}
+.pol-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+.pol-row:first-of-type {
+  border-top: 0;
+}
+.gap-row {
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.gap-row:first-of-type {
+  border-top: 0;
+}
+.sev {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  flex: none;
+}
+.sev.alto {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.sev.medio {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.sev.bajo {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.cost-num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  margin: 8px 0 6px;
+}
+.cstat {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 13px 14px;
+}
+.cstat .k {
+  font-size: 11px;
+  color: var(--muted);
+}
+.cstat .v {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  margin-top: 5px;
+}
+
+/* Indicadores v2 (Indicadores.html) */
+.ind-src {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  flex: none;
+}
+.ind-src.bccr {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.ind-src.fred {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.ind-date {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
 /* ============================================================
    DISEÑO CLAUDE — Presupuesto (Ingresos / Gastos / Transacciones)
    Clases porteadas de testing/project/Budget.html + assets/app.css.

@@ -51,6 +51,11 @@ export const PAGE_META: Record<string, PageMeta> = {
     title: "Defensa Patrimonial",
     titleHTML: 'Defensa <span class="it">patrimonial</span>',
   },
+  "/patrimonio/indicadores": {
+    crumb: "Crecimiento",
+    title: "Mercado e indicadores",
+    titleHTML: 'Mercado e <span class="it">indicadores</span>',
+  },
   "/mi-rich-life": {
     crumb: "Crecimiento",
     title: "Patrimonio",
