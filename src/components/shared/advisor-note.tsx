@@ -1,4 +1,4 @@
-import { Icon } from "@/components/ui/icon";
+import { AgentMark } from "@/components/ui/agent-mark";
 
 type Accent = "pos" | "warn" | "neg" | "muted";
 
@@ -29,7 +29,7 @@ export function AdvisorNote({
       style={{ borderLeft: `3px solid ${color}`, display: "flex", gap: 12, alignItems: "flex-start" }}
     >
       <span style={{ color, flex: "none", marginTop: 2 }}>
-        <Icon name="spark" width={2.6} />
+        <AgentMark />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="label" style={{ fontSize: 11, color, letterSpacing: 0.3 }}>

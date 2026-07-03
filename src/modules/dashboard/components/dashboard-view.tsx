@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
+import { AgentMark } from "@/components/ui/agent-mark";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { EXPENSE_NATURES, NATURE_COLOR } from "@/modules/financial-base/constants";
 import type { BaseSummary, HealthScore, ExpenseNature } from "@/modules/financial-base";
@@ -133,7 +134,7 @@ function NorteBand({ norte, currency }: { norte: NorteVM; currency: string }) {
       <div className="norte-cell norte-nba">
         <div className="row" style={{ gap: 9, marginBottom: 10 }}>
           <span className="nba-spark">
-            <Icon name="spark" filled width={0} />
+            <AgentMark />
           </span>
           <div>
             <div className="nba-title">Tu próxima mejor decisión</div>
@@ -170,7 +171,7 @@ function PillarCard({ pillar: p }: { pillar: PillarVM }) {
       </div>
       <div className="ai-read">
         <span className="ai-dot">
-          <Icon name="spark" filled width={0} />
+          <AgentMark />
         </span>
         <p>{p.ai}</p>
       </div>
@@ -339,7 +340,7 @@ function PerspectivesCard({ insights }: { insights: DashboardInsights }) {
               flex: "none",
             }}
           >
-            <Icon name="spark" filled width={0} />
+            <AgentMark />
           </span>
           <div>
             <div style={{ fontSize: 13.5, fontWeight: 600, fontFamily: "var(--font-display)" }}>
