@@ -25,7 +25,8 @@ import {
   cashflowMonthlyIncome,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { CATEGORY_META } from "@/modules/wealth/constants";
-import { editHoldingAction, removeHoldingAction, getHoldingHistoryAction } from "@/modules/wealth/api/actions";
+import { editHoldingAction, removeHoldingAction, getHoldingHistoryAction, adjustContributionPriceAction } from "@/modules/wealth/api/actions";
+import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 import { AddHoldingButton, AddHoldingModal } from "./add-holding-wizard";
 import { HoldingDetailModal } from "./holding-detail-modal";
 import { CompoundCalculator } from "./compound-calculator";
@@ -83,6 +84,7 @@ export function PortfolioView({
   investmentRate,
   displayCurrency,
   rates,
+  openContributions,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
@@ -93,6 +95,7 @@ export function PortfolioView({
   /** Moneda del dropdown (display): solo afecta agregados/gráficas, no las filas. */
   displayCurrency: string;
   rates: Record<string, number>;
+  openContributions: OpenContribution[];
 }) {
   // Subtab dirigido por el hash (deep-link /patrimonio#monitor + back/forward).
   // Arranca en "portafolio" para no romper la hidratación SSR.
@@ -135,6 +138,7 @@ export function PortfolioView({
           investmentRate={investmentRate}
           displayCurrency={displayCurrency}
           rates={rates}
+          openContributions={openContributions}
         />
       ) : subtab === "calculadora" ? (
         <CompoundCalculator defaultCapital={report.analytics.totalCostBasis} currency={report.currency} />
@@ -153,6 +157,7 @@ function PortfolioPanel({
   investmentRate,
   displayCurrency,
   rates,
+  openContributions,
 }: {
   report: PortfolioReport;
   snapshots: PortfolioSnapshot[];
@@ -161,6 +166,7 @@ function PortfolioPanel({
   investmentRate: number;
   displayCurrency: string;
   rates: Record<string, number>;
+  openContributions: OpenContribution[];
 }) {
   const { analytics, currency } = report;
   // Los agregados/gráficas siguen la moneda del dropdown (display): se calculan
@@ -176,6 +182,10 @@ function PortfolioPanel({
   );
   // Holdings CRUDOS para la edición/valoración (averageCost en su moneda real).
   const rawById = useMemo(() => new Map(report.holdings.map((h) => [h.id, h])), [report.holdings]);
+  const contribById = useMemo(
+    () => new Map(openContributions.map((c) => [c.holdingId, c])),
+    [openContributions],
+  );
 
   const [indPeriod, setIndPeriod] = useState<Period>("ytd");
   const [tablePeriod, setTablePeriod] = useState<Period>("ytd");
@@ -336,7 +346,7 @@ function PortfolioPanel({
           </div>
         ) : (
           holds.map((h) => (
-            <InvRow key={h.id} h={h} raw={rawById.get(h.id)} currency={currency} period={tablePeriod} />
+            <InvRow key={h.id} h={h} raw={rawById.get(h.id)} currency={currency} period={tablePeriod} contribution={contribById.get(h.id)} />
           ))
         )}
       </div>
@@ -423,16 +433,62 @@ function DonutCard({
 
 type RowModal = "movimiento" | "valoracion" | "dashboard" | "editar" | "eliminar" | null;
 
+function BrechaBanner({ contribution }: { contribution: OpenContribution }) {
+  const router = useRouter();
+  const [price, setPrice] = useState(
+    contribution.unitPrice != null ? String(contribution.unitPrice) : "",
+  );
+  const [saving, setSaving] = useState(false);
+
+  const confirm = async () => {
+    const p = parseFloat(price);
+    if (!(p > 0) || saving) return;
+    setSaving(true);
+    const res = await adjustContributionPriceAction(contribution.id, p);
+    setSaving(false);
+    if (res.ok) router.refresh();
+  };
+
+  return (
+    <div className="brecha-aporte">
+      <span className="brecha-dot" />
+      <span className="brecha-txt">Aporte del mes · confirmá el precio de compra</span>
+      <span className="brecha-monto">{formatMoney(contribution.amount, contribution.currency)}</span>
+      <div className="brecha-inp-wrap">
+        <span className="pre">{contribution.currency}</span>
+        <input
+          className="brecha-inp"
+          type="number"
+          step="any"
+          min="0"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          placeholder="precio"
+        />
+      </div>
+      <button
+        className="btn-brecha"
+        onClick={confirm}
+        disabled={saving || !(parseFloat(price) > 0)}
+      >
+        {saving ? "…" : "Confirmar"}
+      </button>
+    </div>
+  );
+}
+
 function InvRow({
   h,
   raw,
   currency,
   period,
+  contribution,
 }: {
   h: HoldingPerformance;
   raw?: Holding;
   currency: string;
   period: Period;
+  contribution?: OpenContribution;
 }) {
   const [menu, setMenu] = useState(false);
   const [modal, setModal] = useState<RowModal>(null);
@@ -523,6 +579,8 @@ function InvRow({
           ) : null}
         </div>
       </div>
+
+      {contribution ? <BrechaBanner contribution={contribution} /> : null}
 
       {/* Movimientos de capital · aporte/compra reusa el wizard. El retiro/venta
           vive en el Dashboard (HoldingDetailModal), que ya lo soporta. */}
