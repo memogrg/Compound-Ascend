@@ -27,6 +27,7 @@ const ROWS: Row[] = [
   },
 ];
 
+/** Filas de canales con switch v2 (cuerpo de su set-row). */
 export function NotificationPrefs({ prefs }: { prefs: NotificationPrefs }) {
   const router = useRouter();
   const toast = useToast();
@@ -48,46 +49,28 @@ export function NotificationPrefs({ prefs }: { prefs: NotificationPrefs }) {
   };
 
   return (
-    <div className="card card-pad">
-      <div className="card-title">Notificaciones</div>
-      <p className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
-        Elige por dónde quieres recibir tu acompañamiento. Puedes apagar lo que no quieras.
-      </p>
-      <div style={{ marginTop: 14, display: "grid", gap: 12 }}>
-        {ROWS.map((r) => (
-          <label
-            key={r.key}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 14,
-              opacity: r.disabled ? 0.55 : 1,
-              cursor: r.disabled ? "default" : "pointer",
-            }}
-          >
-            <span>
-              <span style={{ fontSize: 13.5, fontWeight: 500 }}>
-                {r.label}
-                {r.badge ? (
-                  <span className="chip" style={{ marginLeft: 8, fontSize: 10 }}>
-                    {r.badge}
-                  </span>
-                ) : null}
-              </span>
-              <span className="muted" style={{ display: "block", fontSize: 11.5, marginTop: 2 }}>
-                {r.hint}
-              </span>
-            </span>
+    <div>
+      {ROWS.map((r) => (
+        <div key={r.key} className={`notif${r.disabled ? " dis" : ""}`}>
+          <div>
+            <div className="nt">
+              {r.label}
+              {r.badge ? <span className="badge-soon">{r.badge}</span> : null}
+            </div>
+            <div className="nd">{r.hint}</div>
+          </div>
+          <label className="sw-toggle">
             <input
               type="checkbox"
               checked={state[r.key]}
               disabled={r.disabled || busy === r.key}
+              aria-label={r.label}
               onChange={(e) => toggle(r.key, e.target.checked)}
             />
+            <span className="tr" />
           </label>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -4,9 +4,11 @@
  * Tarjeta de vinculación de WhatsApp por OTP. Muestra el código a enviar al
  * número del bot; el vínculo se confirma cuando el usuario manda ese código por
  * WhatsApp (lo procesa el webhook). El número nunca se asocia sin verificar.
+ * Cuerpo de su set-row (el título/descripción viven en la página).
  */
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Icon } from "@/components/ui/icon";
 import { linkWhatsAppAction, revokeWhatsAppAction } from "@/modules/account/api/actions";
 
 type LinkState = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
@@ -47,22 +49,19 @@ export function WhatsAppLink({ initial, configured }: { initial: LinkState; conf
     });
 
   return (
-    <div className="card card-pad">
-      <div className="card-title">Asistente de WhatsApp</div>
-      <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
-        Registra gastos por foto o texto y consulta tu presupuesto desde WhatsApp. Tu número se
-        vincula a tu familia solo tras confirmar un código.
-      </p>
-
+    <div className="statecard">
       {isActive ? (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>
-            ✅ Vinculado{initial?.phone ? ` · ${initial.phone}` : ""}
+        <div>
+          <div className="linked">
+            <span className="ok">
+              <Icon name="check" width={2.4} />
+            </span>
+            Vinculado{initial?.phone ? ` · ${initial.phone}` : ""}
           </div>
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ marginTop: 12 }}
+            style={{ marginTop: 14 }}
             onClick={revoke}
             disabled={pending}
           >
@@ -70,34 +69,37 @@ export function WhatsAppLink({ initial, configured }: { initial: LinkState; conf
           </button>
         </div>
       ) : otp ? (
-        <div className="auth-msg" style={{ marginTop: 14, lineHeight: 1.6 }}>
-          Envía este código por WhatsApp al número <strong>{otp.botNumber ?? "del bot"}</strong>:
-          <div
-            className="tnum"
-            style={{ fontSize: 30, fontWeight: 700, letterSpacing: 4, margin: "10px 0" }}
-          >
-            {otp.code}
+        <div>
+          <div style={{ fontSize: 13.5 }}>
+            Envía este código por WhatsApp al número{" "}
+            <strong>{otp.botNumber ?? "del bot"}</strong>:
           </div>
-          <span className="muted" style={{ fontSize: 12.5 }}>
+          <div className="otp-code">{otp.code}</div>
+          <div className="otp-exp">
             Expira en {otp.expiresInMin} minutos. Al recibirlo, te confirmaremos por WhatsApp.
-          </span>
+          </div>
         </div>
       ) : (
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{ marginTop: 14 }}
-          onClick={generate}
-          disabled={pending}
-        >
-          {pending ? "Generando…" : "Vincular WhatsApp"}
-        </button>
+        <div>
+          <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 14 }}>
+            Aún no has vinculado un número de WhatsApp.
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={generate}
+            disabled={pending}
+          >
+            {pending ? "Generando…" : "Vincular WhatsApp"}
+          </button>
+        </div>
       )}
 
       {!configured ? (
-        <p className="muted" style={{ fontSize: 11.5, marginTop: 12 }}>
+        <div className="unconfig" style={{ marginTop: 12 }}>
+          <Icon name="info" />
           La integración de WhatsApp aún no está configurada en el servidor.
-        </p>
+        </div>
       ) : null}
       {error ? (
         <span className="auth-err" role="alert" style={{ display: "block", marginTop: 10 }}>

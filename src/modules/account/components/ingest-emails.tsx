@@ -5,10 +5,10 @@
  * de los avisos del banco a la dirección de ingesta y registra aquí el correo desde
  * el que reenvía; la propiedad se prueba con un código de 6 dígitos enviado a esa
  * dirección. Calca el flujo de whatsapp-link.tsx (código → verificación).
+ * Cuerpo de su set-row (el título/descripción viven en la página).
  */
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import {
   requestIngestEmailAction,
@@ -16,12 +16,6 @@ import {
   removeIngestEmailAction,
 } from "@/modules/account/api/actions";
 import type { IngestEmailRow } from "@/modules/account/services/ingest-email-service";
-
-const INGEST_TARGET = "communications@aitechumbrella.com";
-const HELP =
-  "Al reenviar los avisos de tu banco a esta dirección, CARTERA+ los lee y registra tus " +
-  "movimientos sin que los teclees. Solo procesamos correos del remitente que verificaste; " +
-  "nada se guarda sin tu confirmación.";
 
 export function IngestEmails({ initial }: { initial: IngestEmailRow[] }) {
   const router = useRouter();
@@ -73,71 +67,52 @@ export function IngestEmails({ initial }: { initial: IngestEmailRow[] }) {
     });
 
   return (
-    <div className="card card-pad">
-      <div className="row" style={{ alignItems: "center", gap: 8 }}>
-        <div className="card-title">Correos del banco</div>
-        <span
-          className="tip"
-          data-tip={HELP}
-          style={{ display: "inline-flex", color: "var(--muted)" }}
-        >
-          <Icon name="info" style={{ width: 14, height: 14 }} />
-        </span>
-      </div>
-
-      <p className="muted" style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>
-        Configurá en tu correo un reenvío de los avisos de tu banco a{" "}
-        <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el que
-        reenviás.
-      </p>
-
+    <div className="statecard">
       {/* Lista de correos registrados. */}
       {initial.length > 0 ? (
-        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
-          {initial.map((e) => (
-            <div
-              key={e.id}
-              className="row"
-              style={{ justifyContent: "space-between", gap: 8, fontSize: 13 }}
-            >
-              <span
-                style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-              >
-                {e.forwarderEmail}
-              </span>
-              <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flex: "none" }}>
-                <span
-                  className="chip"
-                  style={
-                    e.verified
-                      ? { background: "var(--pos-soft, rgba(60,140,90,.12))", color: "var(--pos)" }
-                      : { background: "var(--warn-soft, rgba(190,140,40,.12))", color: "var(--warn)" }
-                  }
+        <table className="mailtab" style={{ marginBottom: 14 }}>
+          <tbody>
+            {initial.map((e) => (
+              <tr key={e.id}>
+                <td
+                  style={{
+                    width: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    maxWidth: 0,
+                  }}
                 >
-                  {e.verified ? "Verificado" : "Pendiente"}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  style={{ fontSize: 11, padding: "4px 10px" }}
-                  disabled={pending && busyId === e.id}
-                  onClick={() => remove(e.id)}
-                >
-                  Quitar
-                </button>
-              </span>
-            </div>
-          ))}
-        </div>
+                  {e.forwarderEmail}
+                </td>
+                <td>
+                  <span className={`vchip ${e.verified ? "ok" : "pend"}`}>
+                    {e.verified ? "Verificado" : "Pendiente"}
+                  </span>
+                </td>
+                <td style={{ textAlign: "right", paddingLeft: 12 }}>
+                  <button
+                    type="button"
+                    className="linkbtn"
+                    disabled={pending && busyId === e.id}
+                    onClick={() => remove(e.id)}
+                  >
+                    Quitar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : null}
 
       {/* Alta: email → enviar código → confirmar. */}
       {verifying ? (
-        <div style={{ marginTop: 14 }}>
-          <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+        <div>
+          <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 8px" }}>
             Ingresá el código de 6 dígitos que enviamos a <strong>{verifying}</strong>:
           </p>
-          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
             <input
               className="inp tnum"
               inputMode="numeric"
@@ -145,7 +120,12 @@ export function IngestEmails({ initial }: { initial: IngestEmailRow[] }) {
               placeholder="000000"
               value={code}
               onChange={(ev) => setCode(ev.target.value.replace(/\D/g, ""))}
-              style={{ width: 120, letterSpacing: 3 }}
+              style={{
+                maxWidth: 150,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.3em",
+                textAlign: "center",
+              }}
             />
             <button
               type="button"
@@ -166,18 +146,18 @@ export function IngestEmails({ initial }: { initial: IngestEmailRow[] }) {
           </div>
         </div>
       ) : (
-        <div className="row" style={{ gap: 8, marginTop: 14 }}>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
           <input
             className="inp"
             type="email"
-            placeholder="tucorreo@gmail.com"
+            placeholder="correo-desde-el-que-reenvias@correo.com"
             value={email}
             onChange={(ev) => setEmail(ev.target.value)}
-            style={{ flex: 1, minWidth: 0 }}
+            style={{ flex: 1, minWidth: 180 }}
           />
           <button
             type="button"
-            className="btn btn-primary"
+            className="btn btn-secondary"
             onClick={sendCode}
             disabled={pending || email.trim().length < 5}
           >

@@ -6,6 +6,7 @@ import { CURRENCIES } from "@/modules/personal-profile/constants";
 import { updateCurrencyAction } from "@/modules/account/api/actions";
 import { useToast } from "@/components/ui/toast";
 
+/** Selector de moneda principal (cuerpo de su set-row; el título vive en la página). */
 export function CurrencySelector({ current }: { current: string }) {
   const router = useRouter();
   const toast = useToast();
@@ -27,24 +28,19 @@ export function CurrencySelector({ current }: { current: string }) {
   };
 
   return (
-    <div className="card card-pad">
-      <div className="card-title">Moneda principal</div>
-      <p className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
-        Se usa para mostrar tus cifras y como predeterminada al agregar ítems nuevos.
-      </p>
-      <select
-        className="sel"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={busy}
-        style={{ marginTop: 12, maxWidth: 240 }}
-      >
-        {CURRENCIES.map((c) => (
-          <option key={c.value} value={c.value}>
-            {c.label}
-          </option>
-        ))}
-      </select>
-    </div>
+    <select
+      className="sel"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={busy}
+      aria-label="Moneda principal"
+      style={{ maxWidth: 280 }}
+    >
+      {CURRENCIES.map((c) => (
+        <option key={c.value} value={c.value}>
+          {c.label}
+        </option>
+      ))}
+    </select>
   );
 }
