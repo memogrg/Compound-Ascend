@@ -3638,6 +3638,75 @@ input[type="radio"] {
   color: var(--muted);
 }
 
+/* Rich Life v2 (Mi Rich Life.html) */
+.nw-k {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.nw-v {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 15px;
+  margin-top: 3px;
+}
+.nw-v.pos {
+  color: var(--success);
+}
+.nw-v.neg {
+  color: var(--danger);
+}
+.chip.gold {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(199, 154, 58, 0.16);
+  color: #b8862b;
+}
+[data-theme="dark"] .chip.gold {
+  color: #d9b24a;
+}
+.ft-bar {
+  position: relative;
+  height: 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  margin: 20px 0 30px;
+}
+.ft-fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, #d9b24a, #c79a3a);
+}
+.ft-cap {
+  position: absolute;
+  top: -6px;
+  width: 2px;
+  height: 26px;
+  background: var(--line);
+}
+.ft-lb {
+  position: absolute;
+  top: 20px;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.ft-knob {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #c79a3a;
+  border: 3px solid var(--surface);
+  box-shadow: var(--e2);
+}
+
 /* ============================================================
    DISEÑO CLAUDE — Presupuesto (Ingresos / Gastos / Transacciones)
    Clases porteadas de testing/project/Budget.html + assets/app.css.
