@@ -113,3 +113,25 @@
 
 /* ---- Tip "?" ---- */
 .invx .tip-q { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--line); color: var(--muted); font-size: 10px; font-weight: 700; flex: none; cursor: help; }
+
+/* Brecha de aporte mensual (DCA): banner en la fila recurrente. */
+.invx .brecha-aporte {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 2px 0 10px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+  background: color-mix(in srgb, var(--warn-soft) 55%, var(--surface));
+  border-radius: 11px;
+  font-size: 12.5px;
+}
+.invx .brecha-aporte .brecha-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex: none; }
+.invx .brecha-aporte .brecha-txt { color: var(--ink-2); font-weight: 600; }
+.invx .brecha-aporte .brecha-monto { color: var(--muted); font-variant-numeric: tabular-nums; }
+.invx .brecha-aporte .brecha-inp-wrap { display: flex; align-items: center; margin-left: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding-left: 9px; }
+.invx .brecha-aporte .brecha-inp-wrap .pre { color: var(--muted); font-size: 11px; }
+.invx .brecha-aporte .brecha-inp { border: 0; background: transparent; padding: 7px 9px; font: inherit; font-size: 12.5px; width: 90px; outline: none; font-variant-numeric: tabular-nums; color: var(--ink); }
+.invx .brecha-aporte .btn-brecha { font: inherit; font-size: 12px; font-weight: 600; padding: 7px 13px; border-radius: 9px; border: 0; background: var(--ink); color: var(--bg); cursor: pointer; }
+.invx .brecha-aporte .btn-brecha:disabled { opacity: 0.5; cursor: default; }
