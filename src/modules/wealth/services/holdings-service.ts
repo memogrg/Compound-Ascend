@@ -105,7 +105,7 @@ const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
  * (linked_kind='holding', categoría 'inversiones'). Devuelve el id de la
  * transacción para poder compensar si la escritura del holding falla.
  */
-async function registerPurchaseExpense(args: {
+export async function registerPurchaseExpense(args: {
   holdingId: string;
   label: string;
   currency: string;

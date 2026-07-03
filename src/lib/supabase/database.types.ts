@@ -518,6 +518,21 @@ export type InvestmentHoldingRow = Timestamps & {
   maturity_date: string | null;
 };
 
+// Aportes mensuales por holding recurrente (brecha DCA) (migración 20260710000001).
+export type HoldingContributionRow = Timestamps & {
+  id: string;
+  holding_id: string;
+  user_id: string;
+  household_id: string | null;
+  period_year: number;
+  period_month: number;
+  amount: number;
+  unit_price: number | null;
+  currency: string;
+  status: string;
+  expense_item_id: string | null;
+};
+
 export type RentalPaymentRow = Timestamps & {
   id: string;
   user_id: string;
@@ -827,6 +842,7 @@ export interface Database {
       debt_payments: UserTable<DebtPaymentRow>;
       investments: UserTable<InvestmentRow>;
       investment_holdings: UserTable<InvestmentHoldingRow>;
+      holding_contributions: UserTable<HoldingContributionRow>;
       watchlist_symbols: UserTable<WatchlistSymbolRow>;
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
