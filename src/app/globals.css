@@ -1746,6 +1746,8 @@ input[type="radio"] {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Respiro respecto al "Hola, {nombre}" que viene inmediatamente debajo. */
+  margin-bottom: var(--sp6);
 }
 .obs-empty {
   display: flex;
