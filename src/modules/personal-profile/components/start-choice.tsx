@@ -54,30 +54,30 @@ export function StartChoice({ onGuided }: { onGuided: () => void }) {
   };
 
   return (
-    <div className="wiz-canvas" style={{ minHeight: "100vh", justifyContent: "center" }}>
-      <section className="step-frame wide">
-        <div className="brand" style={{ border: 0, padding: 0, marginBottom: 20 }}>
+    <div className="wiz-canvas wiz-stage" style={{ minHeight: "100vh", justifyContent: "center" }}>
+      <section className="step-frame">
+        <div className="wiz-brand">
           <BrandMark />
-          <div>
-            <div className="brand-name">
-              CARTERA<span className="ascend">+</span>
-            </div>
-            <div className="brand-sub">Tu asesor financiero personal</div>
+          <div className="brand-name">
+            CARTERA<span className="ascend">+</span>
           </div>
         </div>
+        <div className="wiz-brand-sub">Tu asesor financiero personal</div>
 
-        <div className="step-eyebrow">Bienvenido</div>
-        <h1 className="step-title">
-          ¿Cómo quieres <span className="it">empezar</span>?
-        </h1>
-        <p className="step-sub">
-          Elige la forma que más te acomode. Puedes cambiar de opinión cuando quieras: todo es
-          editable.
-        </p>
+        <div style={{ textAlign: "center" }}>
+          <div className="step-eyebrow">Bienvenido</div>
+          <h1 className="step-title">
+            ¿Cómo quieres <span className="it">empezar</span>?
+          </h1>
+          <p className="step-sub" style={{ marginInline: "auto", maxWidth: 460 }}>
+            Elige la forma que más te acomode. Puedes cambiar de opinión cuando quieras: todo es
+            editable.
+          </p>
+        </div>
 
         {error ? <div className="auth-msg warn">{error}</div> : null}
 
-        <div className="opt-grid c3">
+        <div className="opt-list">
           {OPTIONS.map((o) => (
             <button
               key={o.id}
@@ -86,33 +86,21 @@ export function StartChoice({ onGuided }: { onGuided: () => void }) {
               disabled={busy !== null}
               style={{ textAlign: "left", opacity: busy && busy !== o.id ? 0.5 : 1 }}
             >
-              {o.badge ? (
-                <span
-                  className="chip"
-                  style={{
-                    position: "absolute",
-                    top: 14,
-                    right: 14,
-                    background: "var(--pos-soft)",
-                    color: "var(--pos)",
-                  }}
-                >
-                  {o.badge}
-                </span>
-              ) : null}
-              <span
-                className="opt-icon"
-                style={{ background: "var(--green-soft)", color: "var(--green)" }}
-              >
+              <span className="opt-icon">
                 <Icon name={o.icon} filled={o.icon === "spark"} />
               </span>
-              <span className="opt-name">{o.title}</span>
-              <span className="opt-desc">{o.desc}</span>
-              {busy === o.id ? (
-                <span className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                  {o.id === "demo" ? "Creando tu ejemplo…" : "Preparando…"}
+              <span style={{ minWidth: 0 }}>
+                <span className="opt-name">
+                  {o.title}
+                  {o.badge ? <span className="badge-rec">{o.badge}</span> : null}
                 </span>
-              ) : null}
+                <span className="opt-desc">{o.desc}</span>
+                {busy === o.id ? (
+                  <span className="muted" style={{ display: "block", fontSize: 12, marginTop: 6 }}>
+                    {o.id === "demo" ? "Creando tu ejemplo…" : "Preparando…"}
+                  </span>
+                ) : null}
+              </span>
             </button>
           ))}
         </div>

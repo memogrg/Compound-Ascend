@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -609,10 +609,14 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
   const step = STEPS[index]!;
   const completion = computeCompletion(draft);
 
-  // Microcelebración: frase del paso recién completado. Se muestra como un check
-  // sutil junto a "Continuar" (tooltip al hover/clic) y persiste todo el paso; se
-  // reemplaza solo al avanzar al siguiente.
+  // Microcelebración: frase del paso recién completado, como overlay breve
+  // (estilo v2) que se descarta solo o con un clic.
   const [celebration, setCelebration] = useState<string | null>(null);
+  useEffect(() => {
+    if (!celebration) return;
+    const t = setTimeout(() => setCelebration(null), 1150);
+    return () => clearTimeout(t);
+  }, [celebration]);
 
   const goNext = async () => {
     // Guardado progresivo best-effort al avanzar.
@@ -656,55 +660,38 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
 
   return (
     <div className="wiz">
-      <aside className="wiz-side">
-        <div className="brand">
-          <BrandMark />
-          <div>
+      <main className="wiz-main">
+        <div className="wiz-top">
+          <div className="wiz-brand">
+            <BrandMark />
             <div className="brand-name">
               CARTERA<span className="ascend">+</span>
             </div>
-            <div className="brand-sub">Tu perfil · {total} pasos</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ThemeToggle />
+            <button className="exit-btn" onClick={() => router.push("/dashboard")}>
+              Guardar y salir
+            </button>
           </div>
         </div>
-        <div className="side-eyebrow">Tu configuración</div>
-        <ol className="stepper">
-          {STEPS.map((s, i) => (
-            <li
-              key={s.id}
-              className={cn("step-item", i === index && "active", i < index && "done")}
-              onClick={() => setIndex(i)}
-            >
-              <span className="marker">{i < index ? <Icon name="check" width={3} /> : i + 1}</span>
-              <span>{s.label}</span>
-            </li>
-          ))}
-        </ol>
-        <div className="side-footer">
-          <ThemeToggle />
-          <div className="meta">Guardado automático</div>
-        </div>
-      </aside>
 
-      <main className="wiz-main">
-        <div className="wiz-top">
-          <div className="progress">
-            <span>
-              Paso <strong>{index + 1}</strong> de <strong>{total}</strong>
-            </span>
+        <div className="wiz-canvas">
+          <div className="wiz-progress">
             <div className="progress-bar">
               <div
                 className="progress-bar-fill"
                 style={{ width: `${((index + 1) / total) * 100}%` }}
               />
             </div>
-            <span>{completion}% de perfil</span>
+            <div className="progress-txt">
+              <span>
+                Paso {index + 1} de {total}
+              </span>
+              <span>{completion}% de perfil · Guardado automático</span>
+            </div>
           </div>
-          <button className="exit-btn" onClick={() => router.push("/dashboard")}>
-            Guardar y salir
-          </button>
-        </div>
 
-        <div className="wiz-canvas">
           <section className="step-frame" key={step.id}>
             <div className="step-eyebrow">{step.eyebrow}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -721,26 +708,23 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
         </div>
 
         <div className="wiz-foot">
-          <button
-            className="btn btn-ghost"
-            onClick={() => setIndex((i) => Math.max(0, i - 1))}
-            disabled={index === 0}
-            style={index === 0 ? { opacity: 0.4 } : undefined}
-          >
-            Atrás
-          </button>
-          <div className="dots">
-            {STEPS.map((s, i) => (
-              <span
-                key={s.id}
-                className={cn("dot", i === index && "active", i < index && "done")}
-              />
-            ))}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {celebration ? (
-              <HelpTip icon="check" tone="pos" text={celebration} label="Paso completado" />
-            ) : null}
+          <div className="wiz-foot-in">
+            <button
+              className="btn btn-secondary"
+              onClick={() => setIndex((i) => Math.max(0, i - 1))}
+              disabled={index === 0}
+              style={index === 0 ? { visibility: "hidden" } : undefined}
+            >
+              Atrás
+            </button>
+            <div className="dots">
+              {STEPS.map((s, i) => (
+                <span
+                  key={s.id}
+                  className={cn("dot", i === index && "active", i < index && "done")}
+                />
+              ))}
+            </div>
             <button className="btn btn-primary" onClick={goNext} disabled={finishing}>
               {finishing ? "Generando tu perfil…" : index === total - 1 ? "Finalizar" : "Continuar"}
               <Icon name="chev" width={2.2} />
@@ -748,6 +732,17 @@ export function Wizard({ initialDraft }: { initialDraft?: ProfileDraft }) {
           </div>
         </div>
       </main>
+
+      {celebration ? (
+        <div className="celebrate show" onClick={() => setCelebration(null)} aria-live="polite">
+          <div className="cc">
+            <div className="ok">
+              <Icon name="check" width={2.6} />
+            </div>
+            <p>{celebration}</p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
