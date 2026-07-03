@@ -3147,21 +3147,23 @@ input[type="radio"] {
   gap: 12px;
 }
 .health-cell {
-  padding: 14px 16px;
+  padding: 15px 16px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
+  box-shadow: var(--e1);
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 8px;
 }
 .health-cell .hc-label {
   font-size: 11.5px;
   color: var(--muted);
 }
 .health-cell .hc-val {
-  font-size: 19px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
@@ -3170,11 +3172,16 @@ input[type="radio"] {
     grid-template-columns: 1fr 1fr;
   }
 }
+@media (max-width: 520px) {
+  .health-strip {
+    grid-template-columns: 1fr;
+  }
+}
 
 .debt-row {
   display: grid;
-  grid-template-columns: 40px 1.4fr 1fr 92px 120px;
-  gap: 16px;
+  grid-template-columns: 40px 1.3fr 1.2fr 90px 120px;
+  gap: 14px;
   align-items: center;
   padding: 15px 24px;
   border-top: 1px solid var(--line);
@@ -3201,19 +3208,21 @@ input[type="radio"] {
   }
 }
 .debt-ic {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   color: white;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 13px;
   flex: none;
 }
 .debt-name {
-  font-size: 13.5px;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 600;
 }
 .debt-sub {
   font-size: 11.5px;
@@ -3227,25 +3236,26 @@ input[type="radio"] {
 .dbar-meta {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   color: var(--muted);
   margin-top: 6px;
-  font-variant-numeric: tabular-nums;
 }
 
 .drate {
   text-align: center;
 }
 .drate .r {
+  font-family: var(--font-mono);
   font-size: 14px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 .drate.high .r {
   color: var(--neg);
 }
 .drate .l {
-  font-size: 10.5px;
+  font-size: 9.5px;
   color: var(--muted);
 }
 
@@ -3257,12 +3267,12 @@ input[type="radio"] {
   justify-content: flex-end;
 }
 .dbal .b {
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 .dbal .m {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--muted);
   margin-top: 2px;
 }
@@ -3280,23 +3290,32 @@ input[type="radio"] {
   text-align: right;
   padding: 8px 14px;
   color: var(--muted);
-  font-weight: 500;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   position: sticky;
   top: 0;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
-.amort-table th:nth-child(2),
-.amort-table td:nth-child(2) {
+.amort-table th:nth-child(-n + 2),
+.amort-table td:nth-child(-n + 2) {
   text-align: left;
 }
 .amort-table td {
   text-align: right;
-  padding: 7px 14px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.amort-table td:nth-child(2) {
+  font-family: var(--font-body);
+  font-size: 12px;
 }
 .amort-table tbody tr:hover {
   background: var(--surface-2);
@@ -3305,6 +3324,215 @@ input[type="radio"] {
   .scenario-grid {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* Deudas v2 — estrategia de pago (Deudas.html) */
+.extra-adj {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-btn);
+  padding: 3px;
+}
+.stepper button {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+}
+.stepper button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.stepper .v {
+  min-width: 96px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+.methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 760px) {
+  .methods {
+    grid-template-columns: 1fr;
+  }
+}
+.method {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px;
+  cursor: pointer;
+  background: var(--surface-2);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
+}
+.method:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.method.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--surface);
+}
+.method .mn {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.method .md {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.method .mm {
+  font-size: 12px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+.method .mm b {
+  font-family: var(--font-display);
+}
+.atk {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  padding: 4px 0;
+}
+.atk .n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  flex: none;
+}
+
+/* Deudas v2 — detalle: stats, banner de vencimiento, pagos */
+.dstat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+.dstat {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 13px 14px;
+}
+.dstat .k {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.dstat .v {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  margin-top: 5px;
+}
+.dstat.big .v {
+  font-size: 24px;
+  color: var(--neg);
+}
+.dstat .s {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.due-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--r-md);
+  padding: 11px 14px;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.due-banner svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.pay-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 24px;
+  border-top: 1px solid var(--line);
+}
+.pay-row:first-of-type {
+  border-top: 0;
+}
+.pay-nm {
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pay-br {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.pay-amt {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.scen-res {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--accent-soft);
+  border-radius: var(--r-md);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.scen-res strong {
+  color: var(--success);
 }
 
 /* ============================================================
