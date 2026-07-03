@@ -3907,6 +3907,11 @@ input[type="radio"] {
   align-items: center;
   padding: 8px 4px;
 }
+.donut-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
 .arc-donut {
   position: relative;
   width: 150px;
@@ -3917,8 +3922,8 @@ input[type="radio"] {
 }
 .arc-donut .cc {
   position: absolute;
-  text-align: center;
-  max-width: 96px;
+  display: grid;
+  place-items: center;
 }
 .arc-donut .cc .n {
   font-family: var(--font-display);
