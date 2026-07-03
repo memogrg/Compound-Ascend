@@ -530,7 +530,7 @@ export type HoldingContributionRow = Timestamps & {
   unit_price: number | null;
   currency: string;
   status: string;
-  expense_item_id: string | null;
+  transaction_id: string | null;
 };
 
 export type RentalPaymentRow = Timestamps & {

@@ -117,7 +117,7 @@ export async function ensureMonthlyContributions(): Promise<void> {
 
       await supabase
         .from("holding_contributions")
-        .update({ unit_price: price, expense_item_id: expenseId })
+        .update({ unit_price: price, transaction_id: expenseId })
         .eq("id", reserved.id);
     } catch (err) {
       console.error(`[ensureMonthlyContributions] error en holding ${h.id}:`, err);
