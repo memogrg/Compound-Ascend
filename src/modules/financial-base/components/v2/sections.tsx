@@ -3,7 +3,7 @@
  * Reciben los datos ya calculados desde la página. Sincronización: lo real sale
  * de transactions; el presupuesto de budget_items.
  */
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent, formatCompact } from "@/lib/format";
 import { convertCurrency } from "@/lib/fx";
 import { MetricCard, type MetricTone } from "@/components/shared/metric-card";
 import {
@@ -297,6 +297,7 @@ export function MiBaseSection({ view }: { view: V2View }) {
             tone="pos"
             goalValue={Math.round(budget.budgetIncome)}
             height={160}
+            axes="full"
           />
         </ChartCard>
         <ChartCard title="B · Gastos reales vs presupuestados" hint="por mes">
@@ -306,6 +307,7 @@ export function MiBaseSection({ view }: { view: V2View }) {
             tone="neg"
             goalValue={Math.round(budget.budgetExpense)}
             height={160}
+            axes="full"
           />
         </ChartCard>
       </section>
@@ -375,7 +377,7 @@ function DonutCard({
       <div
         style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
       >
-        <DonutChart data={data} centerLabel={formatMoney(total, currency)} centerSub="al mes" />
+        <DonutChart data={data} centerLabel={formatCompact(total, currency)} centerSub="al mes" />
         <div style={{ flex: 1, minWidth: 150, display: "flex", flexDirection: "column", gap: 7 }}>
           {data.length === 0 ? (
             <span className="muted" style={{ fontSize: 12.5 }}>
@@ -476,6 +478,7 @@ export function IncomeExpenseSection({
             tone="neg"
             goalValue={Math.round(budgetTotal)}
             height={160}
+            axes="full"
           />
         </ChartCard>
         <DonutCard
@@ -601,6 +604,7 @@ function IncomeSection({ view }: { view: V2View }) {
             tone="pos"
             goalValue={Math.round(budgetIncome)}
             height={160}
+            axes="full"
           />
         </ChartCard>
         <DonutCard
