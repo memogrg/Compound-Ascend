@@ -68,7 +68,7 @@ export function GoalWithdrawButton({ goal }: { goal: SavingsGoal }) {
     <>
       <button
         type="button"
-        className="btn btn-ghost"
+        className="btn btn-secondary"
         style={{ fontSize: 12, padding: "5px 10px" }}
         onClick={() => setOpen(true)}
       >
