@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { signUpAction, type ActionState } from "@/lib/auth/actions";
 import { Field } from "@/components/auth/field";
@@ -17,7 +18,28 @@ export function SignupForm({
   const [state, action] = useActionState(signUpAction, initial);
 
   if (state.ok && state.message) {
-    return <div className="auth-msg">{state.message}</div>;
+    return (
+      <div className="auth-success">
+        <div className="ok">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m5 12 5 5 9-11" />
+          </svg>
+        </div>
+        <h2>¡Tu cuenta está lista!</h2>
+        <p>{state.message}</p>
+        <Link href="/login" className="btn btn-primary">
+          Ir a iniciar sesión
+        </Link>
+      </div>
+    );
   }
 
   return (

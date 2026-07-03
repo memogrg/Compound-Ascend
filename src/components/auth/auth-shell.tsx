@@ -1,7 +1,7 @@
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Icon } from "@/components/ui/icon";
 
-/** Cascarón premium de las pantallas de autenticación. */
+/** Cascarón premium de las pantallas de autenticación (CARTERA+ v2). */
 export function AuthShell({
   title,
   titleHTML,
@@ -19,27 +19,28 @@ export function AuthShell({
 }) {
   return (
     <div className="auth-wrap">
-      <div className="auth-card">
+      <div className="auth-shell">
         <div className="auth-brand">
           <BrandMark />
-          <div>
-            <div className="brand-name">
-              CARTERA<span className="ascend">+</span>
-            </div>
-            <div className="brand-sub">Sistema Financiero</div>
+          <div className="brand-name">
+            CARTERA<span className="ascend">+</span>
           </div>
         </div>
 
-        {titleHTML ? (
-          <h1 className="auth-title" dangerouslySetInnerHTML={{ __html: titleHTML }} />
-        ) : (
-          <h1 className="auth-title">{title}</h1>
-        )}
-        <p className="auth-sub">{subtitle}</p>
+        <div className="auth-card">
+          <div className="auth-head">
+            {titleHTML ? (
+              <h1 className="auth-title" dangerouslySetInnerHTML={{ __html: titleHTML }} />
+            ) : (
+              <h1 className="auth-title">{title}</h1>
+            )}
+            <p className="auth-sub">{subtitle}</p>
+          </div>
 
-        {children}
+          {children}
 
-        {footer ? <div className="auth-foot">{footer}</div> : null}
+          {footer ? <div className="auth-foot">{footer}</div> : null}
+        </div>
 
         {showTrust ? (
           <div className="auth-trust">
