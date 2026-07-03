@@ -57,6 +57,9 @@
   --sp12: 48px;
   --sp16: 64px;
 
+  /* Peso de cifras grandes (num-xl, KPIs, montos hero). Apple-like: 600, no 700. */
+  --figure-weight: 600;
+
   /* ---- Radii ---- */
   --r-sm: 8px;
   --r-md: 12px;
@@ -821,9 +824,10 @@ input[type="radio"] {
 
 .num-xl {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   letter-spacing: -0.02em;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .tnum {
   font-variant-numeric: tabular-nums;
@@ -2542,7 +2546,7 @@ input[type="radio"] {
   text-align: center;
   font-family: var(--font-display);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3256,7 +3260,7 @@ input[type="radio"] {
 .health-cell .hc-val {
   font-family: var(--font-display);
   font-size: 21px;
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
@@ -3362,7 +3366,7 @@ input[type="radio"] {
 .dbal .b {
   font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: var(--figure-weight);
 }
 .dbal .m {
   font-size: 10.5px;
@@ -3458,7 +3462,7 @@ input[type="radio"] {
   min-width: 96px;
   text-align: center;
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   font-size: 15px;
 }
 .methods {
@@ -3557,7 +3561,7 @@ input[type="radio"] {
 }
 .dstat .v {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   font-size: 17px;
   margin-top: 5px;
 }
@@ -3684,8 +3688,8 @@ input[type="radio"] {
 }
 .cost-num {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 34px;
+  font-weight: var(--figure-weight);
+  font-size: 32px;
   letter-spacing: -0.02em;
   margin: 8px 0 6px;
 }
@@ -3701,7 +3705,7 @@ input[type="radio"] {
 }
 .cstat .v {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   font-size: 22px;
   margin-top: 5px;
 }
@@ -4379,7 +4383,7 @@ input[type="radio"] {
 }
 .sum .val {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   font-size: 22px;
   line-height: 1;
   margin-top: 10px;
@@ -4542,7 +4546,7 @@ input[type="radio"] {
 .env-num .big {
   font-family: var(--font-display);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   font-variant-numeric: tabular-nums;
 }
 .env-num .small {
@@ -4749,7 +4753,7 @@ input[type="radio"] {
 }
 .env-head .v {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: var(--figure-weight);
   font-size: 18px;
   margin-top: 3px;
 }
@@ -4797,7 +4801,7 @@ input[type="radio"] {
   }
 }
 .perf-amt {
-  font-size: 48px;
+  font-size: 44px;
 }
 @media (max-width: 520px) {
   .perf-amt {
