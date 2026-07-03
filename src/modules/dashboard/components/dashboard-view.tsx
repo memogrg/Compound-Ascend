@@ -37,8 +37,11 @@ export function DashboardView({
 
   return (
     <div className="grid">
-      <div className="page-title" style={{ fontSize: 26 }}>
-        Hola, <span className="it">{name}</span>
+      <div>
+        <h2 className="greet">
+          Hola, <span className="it">{name}</span>
+        </h2>
+        <p className="greet-sub">Esto es lo más importante de tus finanzas hoy.</p>
       </div>
 
       {demo ? (
@@ -128,18 +131,18 @@ function NorteBand({ norte, currency }: { norte: NorteVM; currency: string }) {
       </div>
 
       <div className="norte-cell norte-nba">
-        <div className="row" style={{ gap: 8, marginBottom: 8 }}>
+        <div className="row" style={{ gap: 9, marginBottom: 10 }}>
           <span className="nba-spark">
             <Icon name="spark" filled width={0} />
           </span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Tu próxima mejor decisión</div>
-            <div className="muted" style={{ fontSize: 11 }}>
+            <div className="nba-title">Tu próxima mejor decisión</div>
+            <div className="muted" style={{ fontSize: 10.5 }}>
               My Agent C+ · prioridad #1
             </div>
           </div>
         </div>
-        <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-2)", margin: 0 }}>
+        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: 0 }}>
           {norte.nextBestAction}
         </p>
       </div>
@@ -154,9 +157,7 @@ function PillarCard({ pillar: p }: { pillar: PillarVM }) {
         <span className="pillar-ic" style={{ background: p.soft, color: p.accent }}>
           <Icon name={p.icon} width={2} />
         </span>
-        <span className="muted" style={{ fontSize: 12.5, fontWeight: 500 }}>
-          {p.label}
-        </span>
+        <span className="label">{p.label}</span>
       </div>
       <div className="num-xl" style={{ fontSize: 26, marginTop: 12 }}>
         {p.value}
@@ -187,13 +188,20 @@ function HealthCard({ health }: { health: HealthScore }) {
       <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 14 }}>
         <div className="ring-wrap">
           <svg width="120" height="120" viewBox="0 0 42 42">
-            <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
             <circle
               cx="21"
               cy="21"
               r="15.915"
               fill="none"
-              stroke="var(--pos)"
+              stroke="var(--surface-2)"
+              strokeWidth="4"
+            />
+            <circle
+              cx="21"
+              cy="21"
+              r="15.915"
+              fill="none"
+              stroke="var(--accent)"
               strokeWidth="4"
               strokeLinecap={health.score >= 100 ? "butt" : "round"}
               pathLength={100}
@@ -305,12 +313,7 @@ function PerspectivesCard({ insights }: { insights: DashboardInsights }) {
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
         <div className="card-title">Perspectivas de My Agent C+</div>
         <span
-          className="chip"
-          style={{
-            background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
-            color: "var(--ink-2)",
-          }}
-        >
+          className="chip-ai">
           My Agent C+
         </span>
       </div>
@@ -321,7 +324,7 @@ function PerspectivesCard({ insights }: { insights: DashboardInsights }) {
             display: "flex",
             gap: 11,
             padding: "13px 0",
-            borderTop: idx === 0 ? "none" : "1px solid var(--line)",
+            borderTop: idx === 0 ? "none" : "1px solid var(--border)",
           }}
         >
           <span
@@ -331,16 +334,18 @@ function PerspectivesCard({ insights }: { insights: DashboardInsights }) {
               borderRadius: 8,
               display: "grid",
               placeItems: "center",
-              background: "linear-gradient(140deg, var(--pos), var(--teal))",
-              color: "white",
+              background: "var(--accent)",
+              color: "#fff",
               flex: "none",
             }}
           >
             <Icon name="spark" filled width={0} />
           </span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500 }}>{i.h}</div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, fontFamily: "var(--font-display)" }}>
+              {i.h}
+            </div>
+            <div className="muted" style={{ fontSize: 12.5, marginTop: 3, lineHeight: 1.5 }}>
               {i.d}
             </div>
           </div>
