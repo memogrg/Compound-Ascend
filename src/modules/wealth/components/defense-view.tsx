@@ -46,7 +46,14 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
           </div>
           <div className="ring-wrap" style={{ margin: "14px 0 6px" }}>
             <svg width="150" height="150" viewBox="0 0 42 42">
-              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
+              <circle
+                cx="21"
+                cy="21"
+                r="15.915"
+                fill="none"
+                stroke="var(--surface-2)"
+                strokeWidth="4"
+              />
               <circle
                 cx="21"
                 cy="21"
@@ -66,7 +73,15 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
                 <div className="num-xl" style={{ fontSize: 44 }}>
                   {score}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-protect)" }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    color: "var(--c-protect)",
+                  }}
+                >
                   {score >= 80 ? "PROTEGIDO" : score >= 50 ? "PARCIAL" : "EXPUESTO"}
                 </div>
               </div>
@@ -85,6 +100,7 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
             <span
               className="chip"
               style={{
+                fontWeight: 700,
                 background: "color-mix(in srgb,var(--c-protect) 14%, transparent)",
                 color: "var(--c-protect)",
               }}
@@ -96,8 +112,8 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: "16px 24px",
-              marginTop: 18,
+              gap: 12,
+              marginTop: 14,
             }}
           >
             <Stat label="Cobertura total" value={formatMoney(p.totalCoverage, currency)} />
@@ -117,18 +133,7 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
         <section className="cols-4">
           {p.coverageByType.map((c) => (
             <div key={c.type} className="card card-pad">
-              <div
-                className="ic"
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 11,
-                  display: "grid",
-                  placeItems: "center",
-                  background: "color-mix(in srgb,var(--c-protect) 14%,transparent)",
-                  color: "var(--c-protect)",
-                }}
-              >
+              <div className="cov-ic">
                 <Icon name="defense" />
               </div>
               <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 13 }}>
@@ -136,11 +141,16 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
               </div>
               <div
                 className="chip"
-                style={{ marginTop: 4, background: "var(--pos-soft)", color: "var(--pos)" }}
+                style={{
+                  marginTop: 4,
+                  fontWeight: 700,
+                  background: "var(--pos-soft)",
+                  color: "var(--pos)",
+                }}
               >
                 Activa
               </div>
-              <div className="num-xl" style={{ fontSize: 22, marginTop: 12 }}>
+              <div className="num-xl" style={{ fontSize: 18, marginTop: 11 }}>
                 {formatMoney(c.coverage, currency)}
               </div>
             </div>
@@ -172,32 +182,38 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
               <WealthActions mode="policy" currency={currency} />
             </div>
           ) : (
-            policies.map((pol) => (
-              <div
-                key={pol.id}
-                className="list-row"
-                style={{ gridTemplateColumns: "1fr auto auto" }}
-              >
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 500 }}>
-                    {POLICY_LABEL[pol.policyType]}
+            <div style={{ padding: "0 24px 12px" }}>
+              {policies.map((pol) => (
+                <div key={pol.id} className="pol-row">
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>
+                      {POLICY_LABEL[pol.policyType]}
+                    </div>
+                    <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                      {pol.provider ?? "—"}
+                      {pol.coverage ? ` · cobertura ${formatMoney(pol.coverage, pol.currency)}` : ""}
+                    </div>
                   </div>
-                  <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                    {pol.provider ?? "—"}
-                    {pol.coverage ? ` · ${formatMoney(pol.coverage, pol.currency)}` : ""}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ textAlign: "right" }}>
+                      <div
+                        className="tnum"
+                        style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700 }}
+                      >
+                        {pol.premium ? formatMoney(pol.premium, pol.currency) : "—"}
+                      </div>
+                      {pol.premium ? (
+                        <div className="muted" style={{ fontSize: 10.5 }}>
+                          /{(pol.premiumFrequency ?? "año").slice(0, 3)}
+                        </div>
+                      ) : null}
+                    </div>
+                    <EditWealthButton mode="policy" item={pol} currency={currency} />
+                    <DeleteButton id={pol.id} kind="policy" />
                   </div>
                 </div>
-                <span className="tnum" style={{ fontSize: 12.5, color: "var(--muted)" }}>
-                  {pol.premium
-                    ? `${formatMoney(pol.premium, pol.currency)}/${(pol.premiumFrequency ?? "año").slice(0, 3)}`
-                    : "—"}
-                </span>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <EditWealthButton mode="policy" item={pol} currency={currency} />
-                  <DeleteButton id={pol.id} kind="policy" />
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
@@ -213,39 +229,30 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
           ) : (
             p.gaps.map((g, i) => {
               const sev = SEV[g.severity] ?? SEV.medio!;
+              const sevCls = ["alto", "medio", "bajo"].includes(g.severity)
+                ? g.severity
+                : "medio";
               return (
-                <div
-                  key={i}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 12,
-                    alignItems: "flex-start",
-                    padding: "13px 0",
-                    borderTop: i === 0 ? "none" : "1px solid var(--line)",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{g.type}</div>
-                    <div
-                      className="muted"
-                      style={{ fontSize: 11.5, marginTop: 2, lineHeight: 1.45 }}
-                    >
-                      {g.description}
-                    </div>
-                    <div style={{ fontSize: 11.5, marginTop: 4, color: "var(--ink-2)" }}>
-                      {g.recommendation}
-                    </div>
-                  </div>
-                  <span
-                    className="chip"
+                <div key={i} className="gap-row">
+                  <div
                     style={{
-                      background: "color-mix(in srgb," + sev.cls + " 16%, transparent)",
-                      color: sev.cls,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 10,
                     }}
                   >
-                    {sev.label}
-                  </span>
+                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{g.type}</div>
+                    <span className={`sev ${sevCls}`}>{sev.label}</span>
+                  </div>
+                  <div className="muted" style={{ fontSize: 12.5, marginTop: 5, lineHeight: 1.5 }}>
+                    {g.description}
+                  </div>
+                  <div
+                    style={{ fontSize: 12, marginTop: 6, color: "var(--accent)", fontWeight: 600 }}
+                  >
+                    → {g.recommendation}
+                  </div>
                 </div>
               );
             })
@@ -257,9 +264,9 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
       <section className="cols-2">
         <div className="card card-pad">
           <div className="label">Costo de seguro recurrente</div>
-          <div className="num-xl" style={{ fontSize: 28, marginTop: 8 }}>
+          <div className="cost-num">
             {formatMoney(monthly, currency)}{" "}
-            <span style={{ fontSize: 14, color: "var(--muted)" }}>/mes</span>
+            <span style={{ fontSize: 15, color: "var(--muted)", fontWeight: 500 }}>/mes</span>
           </div>
           <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
             Seguido en tu Base Financiera como gasto de protección.
@@ -267,9 +274,9 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
         </div>
         <div className="card card-pad">
           <div className="label">Gasto anual en protección</div>
-          <div className="num-xl" style={{ fontSize: 28, marginTop: 8 }}>
+          <div className="cost-num">
             {formatMoney(p.annualPremium, currency)}{" "}
-            <span style={{ fontSize: 14, color: "var(--muted)" }}>/año</span>
+            <span style={{ fontSize: 15, color: "var(--muted)", fontWeight: 500 }}>/año</span>
           </div>
           <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
             Protegerte evita que un evento destruya años de avance.
@@ -282,9 +289,9 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: string }) {
   return (
-    <div>
-      <div style={{ fontSize: 12, color: "var(--muted)" }}>{label}</div>
-      <div className="num-xl" style={{ fontSize: 24, marginTop: 6, color: accent }}>
+    <div className="cstat">
+      <div className="k">{label}</div>
+      <div className="v" style={accent ? { color: accent } : undefined}>
         {value}
       </div>
     </div>

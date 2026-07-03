@@ -66,7 +66,7 @@ function Card({ card }: { card: IndicatorCard }) {
             {card.description}
           </div>
         </div>
-        <span className="chip" style={{ fontSize: 10.5 }}>
+        <span className={`ind-src ${card.source.toLowerCase() === "bccr" ? "bccr" : "fred"}`}>
           {card.source}
         </span>
       </div>
@@ -78,15 +78,11 @@ function Card({ card }: { card: IndicatorCard }) {
               {formatValue(card.value!, card.unit)}
             </span>
             {change !== null && (
-              <span
-                style={{
-                  fontSize: 12.5,
-                  fontWeight: 500,
-                  color: positive ? "var(--pos)" : "var(--neg)",
-                }}
-              >
-                {formatChange(change, card.unit)}
-                <span className="muted" style={{ fontWeight: 400, marginLeft: 4 }}>
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                <span className={`delta ${positive ? "up" : "down"}`}>
+                  {formatChange(change, card.unit)}
+                </span>
+                <span className="muted" style={{ fontSize: 10.5 }}>
                   vs hace 6m
                 </span>
               </span>
@@ -96,9 +92,7 @@ function Card({ card }: { card: IndicatorCard }) {
           <PerformanceChart data={card.history} currency="CRC" formatValue={fmtTooltip} />
 
           {card.observedDate && (
-            <div className="muted" style={{ fontSize: 11.5 }}>
-              Último dato: {card.observedDate}
-            </div>
+            <div className="ind-date">Último dato: {card.observedDate}</div>
           )}
         </>
       ) : (
@@ -164,17 +158,7 @@ export function IndicatorsView({
       <MacroInsightsPanel insights={insights} />
       {model.groups.map((g) => (
         <section key={g.group} className="grid" style={{ gap: 12 }}>
-          <div
-            className="card-title"
-            style={{
-              fontSize: 13,
-              color: "var(--muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-            }}
-          >
-            {g.group}
-          </div>
+          <div className="label">{g.group}</div>
           <div
             style={{
               display: "grid",
