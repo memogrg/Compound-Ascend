@@ -30,6 +30,12 @@ export function DonutChart({
     total > 0 ? data.filter((d) => d.value > 0) : [{ name: "—", value: 1, color: "var(--chip)" }];
   const r = size / 2;
 
+  // Auto-fit: el número central se escala según su largo para caber SIEMPRE
+  // dentro del hueco interior del anillo (nunca se sobrepone al aro).
+  const innerWidth = size * 0.68 * 0.9; // diámetro del hueco, con margen
+  const labelLen = (centerLabel ?? "").length || 1;
+  const centerFont = Math.max(11, Math.min(20, innerWidth / (labelLen * 0.6)));
+
   return (
     <div
       role="img"
@@ -69,7 +75,7 @@ export function DonutChart({
         >
           <div>
             {centerLabel ? (
-              <div className="num-xl" style={{ fontSize: 18 }}>
+              <div className="num-xl" style={{ fontSize: centerFont, lineHeight: 1 }}>
                 {centerLabel}
               </div>
             ) : null}
