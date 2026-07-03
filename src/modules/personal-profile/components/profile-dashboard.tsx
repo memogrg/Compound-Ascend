@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Icon } from "@/components/ui/icon";
+import { DonutCenter } from "@/components/charts/donut-center";
 import * as O from "@/modules/personal-profile/constants";
 import type { Option } from "@/modules/personal-profile/constants";
 import type { Archetype, ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
@@ -378,8 +379,14 @@ export function ProfileDashboard({
                 })}
               </svg>
               <div className="cc">
-                <div className="n">{bars[0]?.label ?? ""}</div>
-                <div className="t">Dominante</div>
+                <DonutCenter
+                  value={bars[0]?.label ?? ""}
+                  sub="Dominante"
+                  inner={96}
+                  mode="label"
+                  valueClassName="n"
+                  subClassName="t"
+                />
               </div>
             </div>
             <div className="arc-bars">

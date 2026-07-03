@@ -350,6 +350,11 @@ input[type="radio"] {
   cursor: pointer;
   transition: background 120ms;
 }
+/* El botón de cerrar sesión nunca se encoge ni lo tapa el texto largo. */
+.user-row form {
+  flex: none;
+  display: flex;
+}
 .user-row:hover {
   background: var(--surface-2);
 }
@@ -370,11 +375,15 @@ input[type="radio"] {
   font-size: 12.5px;
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .user-mail {
   font-size: 11px;
   color: var(--text-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* Logout del pie: botón fantasma compacto (spec .sb-foot .lo) */
 .sidebar-foot .icon-btn {
@@ -3898,6 +3907,11 @@ input[type="radio"] {
   align-items: center;
   padding: 8px 4px;
 }
+.donut-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 2px;
+}
 .arc-donut {
   position: relative;
   width: 150px;
@@ -3908,8 +3922,8 @@ input[type="radio"] {
 }
 .arc-donut .cc {
   position: absolute;
-  text-align: center;
-  max-width: 96px;
+  display: grid;
+  place-items: center;
 }
 .arc-donut .cc .n {
   font-family: var(--font-display);
