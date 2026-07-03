@@ -1747,6 +1747,22 @@ input[type="radio"] {
   flex-direction: column;
   gap: 10px;
 }
+.obs-empty {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 11px 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+}
+.obs-empty svg {
+  width: 14px;
+  height: 14px;
+  color: var(--success);
+  flex: none;
+}
 .obs-card {
   display: flex;
   gap: 12px;

@@ -17,7 +17,16 @@ const STYLE: Record<string, { sev: string; icon: IconName }> = {
  * descarte va por server action en un <form>.
  */
 export function Observations({ observations }: { observations: Observation[] }) {
-  if (observations.length === 0) return null;
+  if (observations.length === 0) {
+    return (
+      <div className="obs">
+        <div className="obs-empty">
+          <Icon name="check" width={2.4} />
+          Estás al día — sin acciones pendientes.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="obs">
