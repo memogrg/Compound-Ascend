@@ -42,42 +42,52 @@ export function RichLifeDashboard({
       <section className="dash-hero">
         <div className="card card-pad">
           <div className="label">Patrimonio neto</div>
-          <div className="num-xl" style={{ fontSize: 46, marginTop: 8 }}>
+          <div className="num-xl" style={{ fontSize: 34, marginTop: 10 }}>
             {formatMoney(ind.netWorth, currency)}
           </div>
-          <span className={`delta ${trend.delta}`} style={{ marginTop: 12, color: trend.cls }}>
-            {trend.label}
-            {ind.wealthVelocity !== null
-              ? ` · ${formatMoney(ind.wealthVelocity, currency)}/mes`
-              : ""}
-          </span>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 10 }}
+          >
+            <span className={`delta ${trend.delta}`} style={{ marginTop: 0 }}>
+              {trend.label}
+            </span>
+            {ind.wealthVelocity !== null ? (
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: ind.wealthVelocity >= 0 ? "var(--success)" : "var(--danger)",
+                }}
+              >
+                {ind.wealthVelocity >= 0 ? "+" : ""}
+                {formatMoney(ind.wealthVelocity, currency)}/mes
+              </span>
+            ) : null}
+          </div>
           <div
             style={{
               display: "flex",
-              gap: 22,
+              gap: 26,
               marginTop: 16,
-              fontSize: 12.5,
-              color: "var(--muted)",
+              paddingTop: 15,
+              borderTop: "1px solid var(--line)",
               flexWrap: "wrap",
             }}
           >
             <div>
-              Activos{" "}
-              <strong style={{ color: "var(--pos)" }}>
-                {formatMoney(ind.totalAssets, currency)}
-              </strong>
+              <div className="nw-k">Activos</div>
+              <div className="nw-v pos">{formatMoney(ind.totalAssets, currency)}</div>
             </div>
             <div>
-              Pasivos{" "}
-              <strong style={{ color: "var(--ink-2)" }}>
-                {formatMoney(ind.totalLiabilities, currency)}
-              </strong>
+              <div className="nw-k">Pasivos</div>
+              <div className="nw-v neg">{formatMoney(ind.totalLiabilities, currency)}</div>
             </div>
             <div>
-              Activos/Pasivos{" "}
-              <strong style={{ color: "var(--ink-2)" }}>
-                {ind.assetLiabilityRatio === Infinity ? "∞" : ind.assetLiabilityRatio}
-              </strong>
+              <div className="nw-k">Ratio A / P</div>
+              <div className="nw-v">
+                {ind.assetLiabilityRatio === Infinity ? "∞" : `${ind.assetLiabilityRatio}×`}
+              </div>
             </div>
           </div>
         </div>
@@ -95,14 +105,21 @@ export function RichLifeDashboard({
               <>
                 <div className="ring-wrap">
                   <svg width="120" height="120" viewBox="0 0 42 42">
-                    <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" strokeWidth="4" />
+                    <circle
+                      cx="21"
+                      cy="21"
+                      r="15.915"
+                      fill="none"
+                      stroke="var(--surface-2)"
+                      strokeWidth="5"
+                    />
                     <circle
                       cx="21"
                       cy="21"
                       r="15.915"
                       fill="none"
                       stroke="var(--gold)"
-                      strokeWidth="4"
+                      strokeWidth="5"
                       strokeLinecap={ringValue >= 100 ? "butt" : "round"}
                       pathLength={100}
                       strokeDasharray={`${ringValue} 100`}
@@ -126,14 +143,7 @@ export function RichLifeDashboard({
                       <TipQ text="Tu Índice Patrimonial (0-100) resume qué tan sólido y libre es tu patrimonio: combina cuánto trabaja para ti, tu liquidez, protección y calidad de deuda. Sube cuando aumentas patrimonio invertible y reduces deuda cara." />
                     ) : null}
                   </div>
-                  <div
-                    className="chip"
-                    style={{
-                      marginTop: 8,
-                      background: "color-mix(in srgb,var(--gold) 18%, transparent)",
-                      color: "var(--gold)",
-                    }}
-                  >
+                  <div className="chip gold" style={{ marginTop: 8 }}>
                     {chipText}
                   </div>
                   <p className="muted" style={{ fontSize: 12.5, marginTop: 10, lineHeight: 1.5 }}>
@@ -195,23 +205,40 @@ export function RichLifeDashboard({
       {/* Termómetro de libertad financiera (solo en modo sin Marco Patrimonial). */}
       {!patrimonio ? (
         <div className="card card-pad">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <div className="card-title">Libertad financiera</div>
-            <span className="muted" style={{ fontSize: 12 }}>
-              Ingresos pasivos cubren {freedomPct}% de tus gastos
-            </span>
-          </div>
-          <div className="bar-track" style={{ marginTop: 14, height: 12 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap" }}
+          >
+            <div className="card-title">Termómetro de libertad financiera</div>
             <div
-              className="bar-fill"
               style={{
-                width: `${freedomPct}%`,
-                background: "linear-gradient(90deg, var(--pos), var(--teal))",
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: 26,
+                color: "#c79a3a",
               }}
-            />
+            >
+              {freedomPct}%
+            </div>
           </div>
-          <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
-            Meta: 100% = tus ingresos pasivos cubren todos tus gastos (independencia financiera).
+          <div className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+            Ingresos pasivos cubren {freedomPct}% de tus gastos. Meta: 100% = independencia
+            financiera.
+          </div>
+          <div className="ft-bar">
+            <div className="ft-fill" style={{ width: `${freedomPct}%` }} />
+            <div className="ft-knob" style={{ left: `${freedomPct}%` }} />
+            {[25, 50, 75, 100].map((m) => (
+              <div key={m} style={{ display: "contents" }}>
+                <div className="ft-cap" style={{ left: `${m}%` }} />
+                <div
+                  className="ft-lb"
+                  style={m === 100 ? { left: "100%", transform: "translateX(-100%)" } : { left: `${m}%` }}
+                >
+                  {m}%
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}
@@ -220,15 +247,7 @@ export function RichLifeDashboard({
       <div className="card card-pad">
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
           <div className="card-title">Tu próxima mejor acción</div>
-          <span
-            className="chip"
-            style={{
-              background: "linear-gradient(140deg,var(--pos-soft),var(--info-soft))",
-              color: "var(--ink-2)",
-            }}
-          >
-            Rich Life Snapshot
-          </span>
+          <span className="chip-ai">Rich Life Snapshot</span>
         </div>
         <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--ink)", margin: 0 }}>
           {s.nextBestAction}
@@ -497,9 +516,23 @@ function DonutCard({
                   fontSize: 12.5,
                 }}
               >
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                <span style={{ color: "var(--ink-2)" }}>{d.name}</span>
-                <span className="muted tnum">{formatMoney(d.value, currency)}</span>
+                <span style={{ width: 9, height: 9, borderRadius: 3, background: d.color }} />
+                <span
+                  style={{
+                    color: "var(--muted)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {d.name}
+                </span>
+                <span
+                  className="tnum"
+                  style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)" }}
+                >
+                  {formatMoney(d.value, currency)}
+                </span>
               </div>
             ))
           )}
@@ -562,7 +595,7 @@ function ListCard({
         items.map((it) => (
           <div key={it.id} className="list-row" style={{ gridTemplateColumns: "1fr auto auto" }}>
             <div>
-              <div style={{ fontSize: 13.5, fontWeight: 500 }}>{it.name}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{it.name}</div>
               <div
                 className="muted"
                 style={{ fontSize: 11.5, marginTop: 2, textTransform: "capitalize" }}
@@ -570,7 +603,15 @@ function ListCard({
                 {it.sub}
               </div>
             </div>
-            <span className="tnum" style={{ fontSize: 13.5, fontWeight: 500, color: it.color }}>
+            <span
+              className="tnum"
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 13,
+                fontWeight: 700,
+                color: it.color,
+              }}
+            >
               {it.amount}
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
