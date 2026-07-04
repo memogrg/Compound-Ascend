@@ -503,8 +503,12 @@ function InvRow({
   // Rendimiento del periodo por fila: escala el acumulado por el factor del periodo
   // (los snapshots son del portafolio, no por posición — aproximación honesta).
   const periodFactor = period === "all" ? 1 : period === "ytd" ? 1 : period === "3m" ? 0.48 : 0.2;
+  // El invertido de la fila va en la moneda NATIVA del holding.
+  // analytics.holdingsWithPerformance viene normalizado a la moneda principal;
+  // el dato nativo está en `raw` (averageCost en su moneda real).
+  const nativeCostBasis = raw ? raw.quantity * raw.averageCost : h.costBasis;
   const periodRet = h.returnPct * periodFactor;
-  const periodGain = h.costBasis * periodRet;
+  const periodGain = nativeCostBasis * periodRet;
   const pos = periodRet >= 0;
 
   const close = () => setModal(null);
@@ -528,7 +532,7 @@ function InvRow({
           <span className="tag" style={{ color: natureColor }}>{natureLabel}</span>
           {catLabel ? <div className="cell-sub" style={{ marginTop: 5 }}>{catLabel}</div> : null}
         </div>
-        <div className="inv-amt">{formatMoney(h.costBasis, h.currency)}</div>
+        <div className="inv-amt">{formatMoney(nativeCostBasis, h.currency)}</div>
         <div className="inv-amt c-aporte">
           {h.isRecurring && h.monthlyContribution ? (
             <>
