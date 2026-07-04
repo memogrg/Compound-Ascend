@@ -5,6 +5,7 @@
  */
 import type { SavingsGoal, Debt } from "@/modules/control/types";
 import type { DetectedInsight } from "@/lib/insights/types";
+import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
 /** Meses enteros desde `now` hasta una fecha ISO (puede ser negativo si pasó). */
 function monthsUntil(dateIso: string, now: Date): number {
@@ -120,4 +121,23 @@ export function runDetectors(
     ...detectGrowingDebt(debts),
     ...detectPositiveStreak(goals),
   ];
+}
+
+/**
+ * Aportes del mes sin confirmar → un insight 'accionar' por holding. relatedId =
+ * holdingId para que syncInsights lo resuelva al confirmar el precio.
+ */
+export function detectOpenContributions(contributions: OpenContribution[]): DetectedInsight[] {
+  const out: DetectedInsight[] = [];
+  for (const c of contributions) {
+    out.push({
+      kind: "aporte_pendiente",
+      severity: "accionar",
+      title: `Confirmá el precio de tu aporte a ${c.label}`,
+      body: "Registramos tu aporte del mes al precio en vivo. Confirmá o ajustá el precio de compra en el Portafolio para promediar bien tu costo.",
+      relatedKind: "holding",
+      relatedId: c.holdingId,
+    });
+  }
+  return out;
 }

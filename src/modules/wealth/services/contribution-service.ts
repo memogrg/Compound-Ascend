@@ -128,6 +128,7 @@ export async function ensureMonthlyContributions(): Promise<void> {
 export type OpenContribution = {
   id: string;
   holdingId: string;
+  label: string;
   amount: number;
   unitPrice: number | null;
   currency: string;
@@ -147,9 +148,19 @@ export async function listOpenContributions(): Promise<OpenContribution[]> {
     .eq("period_month", now.getMonth() + 1)
     .in("status", ["auto", "pendiente"]);
   if (error || !data) return [];
+  const holdingIds = [...new Set(data.map((r) => r.holding_id))];
+  const labelById = new Map<string, string>();
+  if (holdingIds.length > 0) {
+    const { data: hs } = await supabase
+      .from("investment_holdings")
+      .select("id, label")
+      .in("id", holdingIds);
+    for (const h of hs ?? []) labelById.set(h.id, h.label ?? "tu inversión");
+  }
   return data.map((r) => ({
     id: r.id,
     holdingId: r.holding_id,
+    label: labelById.get(r.holding_id) ?? "tu inversión",
     amount: Number(r.amount),
     unitPrice: r.unit_price !== null ? Number(r.unit_price) : null,
     currency: r.currency,

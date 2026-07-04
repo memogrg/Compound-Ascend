@@ -9,7 +9,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { logger } from "@/lib/logger";
-import { runDetectors, detectDisfruteSpike } from "@/lib/insights/detectors";
+import { runDetectors, detectDisfruteSpike, detectOpenContributions } from "@/lib/insights/detectors";
 import type { UserInsightRow } from "@/lib/supabase/database.types";
 import type {
   DetectedInsight,
@@ -71,6 +71,15 @@ export async function refreshInsights(): Promise<void> {
     const detected = runDetectors({ goals, debts });
     const spend = await getDisfruteSpend();
     if (spend) detected.push(...detectDisfruteSpike(spend));
+    try {
+      const { listOpenContributions } = await import(
+        "@/modules/wealth/services/contribution-service"
+      );
+      const contribs = await listOpenContributions();
+      detected.push(...detectOpenContributions(contribs));
+    } catch {
+      // best-effort: si falla, no bloquea el resto de los insights.
+    }
     await syncInsights(detected);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
