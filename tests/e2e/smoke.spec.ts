@@ -15,7 +15,10 @@ test("login → dashboard → crear gasto → patrimonio", async ({ page }) => {
   // interactuar (un submit pre-hidratación se pierde).
   await page.waitForLoadState("networkidle");
   await page.getByLabel("Correo").fill(EMAIL);
-  await page.getByLabel("Contraseña").fill(PASSWORD);
+  // #password (no getByLabel): el toggle de visibilidad tiene aria-label
+  // "Mostrar contraseña", que también matchea el substring "Contraseña" y
+  // rompe el strict mode de Playwright con 2 elementos.
+  await page.locator("#password").fill(PASSWORD);
   // El primer submit puede perderse en dev (accion recompilada en vuelo):
   // un reintento lo cubre. Hallazgo anotado en docs/revision/06-cobertura.md.
   for (let intento = 0; intento < 3; intento++) {
