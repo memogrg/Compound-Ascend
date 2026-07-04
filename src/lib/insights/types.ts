@@ -5,14 +5,15 @@
 
 export type InsightSeverity = "celebrar" | "info" | "observar" | "accionar";
 export type InsightStatus = "activo" | "descartado" | "resuelto";
-export type InsightRelatedKind = "goal" | "debt" | "category";
+export type InsightRelatedKind = "goal" | "debt" | "category" | "holding";
 
 export type InsightKind =
   | "meta_estancada"
   | "gasto_disfrute_alza"
   | "deuda_creciendo"
   | "racha_positiva"
-  | "ritual_patrimonio";
+  | "ritual_patrimonio"
+  | "aporte_pendiente";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {
