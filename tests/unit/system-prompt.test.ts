@@ -267,3 +267,39 @@ describe("buildSystemPrompt · identidad del asesor", () => {
     expect(idxIdentidad).toBeLessThan(idxPerfil);
   });
 });
+
+describe("buildSystemPrompt · reality-check con palancas y no-disculpas", () => {
+  it("con topExpenseCategory: incluye la regla de reality-check y NOMBRA la categoría", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      incomeMonthly: 3_500_000,
+      expenseMonthly: 2_100_000,
+      freeCashflow: 1_400_000,
+      topExpenseCategory: { name: "estilo vida", monthly: 900_000, pct: 43 },
+      savingsRatePct: 40,
+    });
+    // La regla de reality-check con palancas.
+    expect(prompt).toContain("REALITY-CHECK CON PALANCAS");
+    expect(prompt).toContain("contra el flujo libre real del usuario");
+    expect(prompt).toContain("palancas concretas");
+    // Nombra la categoría de gasto más pesada (en el fact y dentro de la regla).
+    expect(prompt).toContain("Gasto más pesado: estilo vida");
+    expect(prompt).toContain("43% del gasto");
+    expect(prompt).toContain("Tasa de ahorro: 40% del ingreso.");
+    // El flujo libre real se cita dentro de la regla.
+    expect(prompt).toContain("(1400000 CRC)");
+  });
+
+  it("incluye la regla de no-disculpas (lenguaje simple, sin perdón repetido)", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toContain("No te disculpes de forma repetitiva");
+    expect(prompt).toContain("lenguaje simple");
+  });
+
+  it("sin topExpenseCategory: la regla va igual, pero no nombra categoría ni rompe", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toContain("REALITY-CHECK CON PALANCAS");
+    expect(prompt).not.toContain("Gasto más pesado:");
+    expect(prompt).not.toContain("Tasa de ahorro:");
+  });
+});

@@ -49,7 +49,7 @@ export async function buildContextForUser(
     : `user_id.eq.${userId}`;
   const [{ data: inc }, { data: exp }] = await Promise.all([
     supabase.from("income_sources").select("amount_monthly_base").or(orFilter),
-    supabase.from("expense_items").select("amount_monthly_base").or(orFilter),
+    supabase.from("expense_items").select("amount_monthly_base, nature, currency").or(orFilter),
   ]);
   const incomeMonthly = sumMonthly(inc);
   const expenseMonthly = sumMonthly(exp);
@@ -61,13 +61,47 @@ export async function buildContextForUser(
     expenseMonthly,
     freeCashflow: incomeMonthly - expenseMonthly,
   };
+  if (incomeMonthly > 0)
+    ctx.savingsRatePct = Math.round(((incomeMonthly - expenseMonthly) / incomeMonthly) * 100);
 
-  // FX una sola vez, compartido por Marco Patrimonial y deudas. Best-effort.
+  // FX una sola vez, compartido por Marco Patrimonial, deudas y gasto más pesado. Best-effort.
   let rates: Record<string, number> | null = null;
   try {
     rates = await getFxRates();
   } catch {
     rates = null;
+  }
+
+  // ── Gasto más pesado por naturaleza (normalizado a la principal con FX). ──
+  try {
+    const byNature = new Map<string, number>();
+    for (const e of exp ?? []) {
+      const raw = Number(e.amount_monthly_base ?? 0);
+      if (!(raw > 0)) continue;
+      const cur = String(e.currency ?? primary);
+      const nature = String(e.nature ?? "miscelaneo");
+      const val = rates && cur !== primary ? convertCurrency(raw, cur, primary, rates) : raw;
+      byNature.set(nature, (byNature.get(nature) ?? 0) + val);
+    }
+    let topName: string | null = null;
+    let topVal = 0;
+    let total = 0;
+    for (const [nature, val] of byNature) {
+      total += val;
+      if (val > topVal) {
+        topVal = val;
+        topName = nature;
+      }
+    }
+    if (topName && total > 0) {
+      ctx.topExpenseCategory = {
+        name: topName.replaceAll("_", " "),
+        monthly: Math.round(topVal),
+        pct: Math.round((topVal / total) * 100),
+      };
+    }
+  } catch {
+    // Gasto más pesado no disponible.
   }
 
   // ── 1) Marco Patrimonial (service-role, normalizado a la principal). ──

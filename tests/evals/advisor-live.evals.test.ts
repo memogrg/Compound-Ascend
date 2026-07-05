@@ -47,6 +47,8 @@ const CTX: FinancialContext = {
   incomeMonthly: 3_500_000,
   expenseMonthly: 2_100_000,
   freeCashflow: 1_400_000,
+  topExpenseCategory: { name: "estilo vida", monthly: 900_000, pct: 43 },
+  savingsRatePct: 40,
 };
 
 // ToolContext para habilitar function-calling (como el chat web con sesión): la proyección
@@ -270,6 +272,28 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
     const saysAlias = /ascend ai|compound ascend/i.test(reply);
     const passed = saysIdentity && !saysAlias;
     record("identidad", passed, reply);
+    expect(passed).toBe(true);
+  });
+
+  it("reality-check → señala que la meta supera el flujo libre y propone palancas (no solo la cifra)", { timeout: LIVE_TIMEOUT }, async () => {
+    // Caso del chat real: quiere 1 millón de USD en 10 años; con el plazo dado, el aporte
+    // requerido (≈ varios M CRC/mes) supera su flujo libre (1,4M) → debe dispararse el reality-check.
+    const { reply } = await chat(
+      ask("quiero ahorrar un millón de dólares en 10 años, ¿cuánto tendría que aportar al mes?"),
+    );
+    expect(reply).toBeTypeOf("string");
+
+    const low = norm(reply);
+    // (a) Reconoce la brecha contra el flujo libre (no se queda solo en la cifra).
+    const flagsGap =
+      /no alcanza|no te da|no da|supera|excede|m[aá]s de lo que|no es suficiente|no cubr|por encima|fuera de tu alcance|flujo libre/.test(
+        low,
+      );
+    // (b) Propone al menos una palanca concreta: subir ingresos o recortar el gasto más pesado.
+    const proposesLever =
+      /ingreso/.test(low) || /recort|reduc|ajust|baj/.test(low) || low.includes("estilo vida");
+    const passed = flagsGap && proposesLever;
+    record("reality-check con palancas", passed, reply);
     expect(passed).toBe(true);
   });
 });
