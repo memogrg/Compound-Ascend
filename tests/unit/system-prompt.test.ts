@@ -238,3 +238,32 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).toContain("ENTORNO ECONÓMICO:");
   });
 });
+
+describe("buildSystemPrompt · identidad del asesor", () => {
+  it("afirma la identidad canónica My Agent C+ / CARTERA+ (siempre, incluso ctx vacío)", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toContain("Eres My Agent C+, el asesor financiero personal de la app CARTERA+.");
+    expect(prompt).toContain("My Agent C+");
+    expect(prompt).toContain("CARTERA+");
+  });
+
+  it("refuerza la identidad con una regla estricta que prohíbe nombres inventados", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    // La regla estricta existe y prohíbe explícitamente los alias inventados que el modelo usó.
+    expect(prompt).toContain("IDENTIDAD (regla estricta)");
+    expect(prompt).toContain("NUNCA");
+    expect(prompt).toContain("Ascend AI");
+    expect(prompt).toContain("Compound Ascend");
+    expect(prompt).toContain("Aurora");
+    // Y dice cómo responder ante "¿quién sos?".
+    expect(prompt).toContain("respondé como My Agent C+ de CARTERA+");
+  });
+
+  it("la regla de identidad va temprano: antes del bloque de PERFIL DEL USUARIO", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    const idxIdentidad = prompt.indexOf("IDENTIDAD (regla estricta)");
+    const idxPerfil = prompt.indexOf("PERFIL DEL USUARIO:");
+    expect(idxIdentidad).toBeGreaterThanOrEqual(0);
+    expect(idxIdentidad).toBeLessThan(idxPerfil);
+  });
+});
