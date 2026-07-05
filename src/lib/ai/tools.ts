@@ -208,8 +208,10 @@ export const PROJECT_INVESTMENT_TOOL: AiToolDecl = {
     "Proyecta el crecimiento de un ahorro/inversión con INTERÉS COMPUESTO (aportes mensuales). " +
     "Usala para retiro, el Número de Libertad o metas de ahorro de largo plazo. El rendimiento " +
     "es un SUPUESTO, no una garantía. Los montos van en la MONEDA PRINCIPAL del usuario. Si se da " +
-    "un objetivo, calcula también el aporte mensual requerido y en cuántos meses se alcanza. Solo " +
-    "calcula; no modifica nada.",
+    "un objetivo, calcula también el aporte mensual requerido y en cuántos meses se alcanza. " +
+    "Devuelve además 'cronograma_anual': el desglose AÑO A AÑO (saldo inicial, aportes, interés " +
+    "y saldo final) para armar tablas de crecimiento sin calcularlas a mano. Solo calcula; no " +
+    "modifica nada.",
   parameters: {
     type: "object",
     properties: {
@@ -237,6 +239,15 @@ export const PROJECT_INVESTMENT_TOOL: AiToolDecl = {
   },
 };
 
+/** Una fila del cronograma anual: cómo evoluciona el saldo en un año concreto. */
+export type AnnualScheduleRow = {
+  anio: number;
+  saldo_inicial: number;
+  aportes: number;
+  interes: number;
+  saldo_final: number;
+};
+
 export type InvestmentProjection = {
   moneda: string;
   valor_futuro: number;
@@ -245,6 +256,8 @@ export type InvestmentProjection = {
   aporte_mensual_requerido?: number | null;
   meses_para_objetivo?: number | null;
   rendimiento_supuesto_pct: number;
+  /** Desglose año a año (aditivo): el saldo_final del último año coincide con valor_futuro. */
+  cronograma_anual: AnnualScheduleRow[];
 };
 
 /** Número finito o `fallback` (defensivo ante args del modelo). */
@@ -254,6 +267,36 @@ function toNumberOr(v: unknown, fallback: number): number {
 }
 
 const round2 = (x: number): number => Math.round(x * 100) / 100;
+
+/**
+ * Cronograma AÑO A AÑO con la MISMA recurrencia mensual de interés compuesto que
+ * usa projectInvestment (aporte al final de cada mes: saldo = saldo·(1+r) + aporte).
+ * Agrega por año: saldo inicial, aportes del año, interés generado y saldo final.
+ * Por construcción, el saldo_final del último año coincide con valor_futuro.
+ * Pura y determinista; si n=0 devuelve [].
+ */
+function annualSchedule(inicial: number, aporte: number, n: number, r: number): AnnualScheduleRow[] {
+  const rows: AnnualScheduleRow[] = [];
+  let saldo = inicial;
+  let anio = 0;
+  for (let desde = 0; desde < n; desde += 12) {
+    anio += 1;
+    const saldoInicial = saldo;
+    const meses = Math.min(12, n - desde);
+    for (let m = 0; m < meses; m += 1) {
+      saldo = r === 0 ? saldo + aporte : saldo * (1 + r) + aporte;
+    }
+    const aportes = aporte * meses;
+    rows.push({
+      anio,
+      saldo_inicial: round2(saldoInicial),
+      aportes: round2(aportes),
+      interes: round2(saldo - saldoInicial - aportes),
+      saldo_final: round2(saldo),
+    });
+  }
+  return rows;
+}
 
 /** Aporte mensual requerido para llegar a `objetivo` en `n` meses (o null si n≤0). */
 function requiredMonthly(objetivo: number, inicial: number, n: number, r: number): number | null {
@@ -304,6 +347,7 @@ export function projectInvestment(
     total_aportado: round2(totalAportado),
     interes_ganado: round2(valorFuturo - totalAportado),
     rendimiento_supuesto_pct: rendPct,
+    cronograma_anual: annualSchedule(inicial, aporte, n, r),
   };
   if (objetivo > 0) {
     const req = requiredMonthly(objetivo, inicial, n, r);

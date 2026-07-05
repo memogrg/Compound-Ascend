@@ -195,7 +195,10 @@ export const TOOLS_PROMPT_LINE =
   "proyectar_libertad_financiera (usa su patrimonio real); si devuelve disponible:false, decile " +
   "que primero registre gastos/patrimonio para calcular su Número de Libertad. Si pregunta por el " +
   "avance o cuándo alcanza sus metas de ahorro, USÁ proyectar_metas (datos reales); si devuelve " +
-  "disponible:false, decile que primero registre una meta.";
+  "disponible:false, decile que primero registre una meta. " +
+  "Para CUALQUIER tabla o desglose año-por-año de crecimiento o ahorro, USÁ el 'cronograma_anual' " +
+  "que devuelve proyectar_inversion (saldo inicial, aportes, interés y saldo final por año). " +
+  "NUNCA construyas una tabla numérica a mano ni calcules el interés compuesto de memoria.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
