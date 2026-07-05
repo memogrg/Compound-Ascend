@@ -596,13 +596,22 @@ export function projectGoals(
 // Driver del loop de tool-calling (agnóstico de proveedor)
 // ---------------------------------------------------------------------------
 
-export type ToolCallRecord = { name: string; args: Record<string, unknown>; result: unknown };
+// thoughtSignature: firma opaca que los modelos de razonamiento (Gemini 3.x) adjuntan a cada
+// functionCall y EXIGEN de vuelta al reenviar el historial del tool-loop. En modelos sin thinking
+// (p. ej. gemini-2.5-flash de producción) es undefined → no cambia nada.
+export type ToolCallRecord = {
+  name: string;
+  args: Record<string, unknown>;
+  result: unknown;
+  thoughtSignature?: string;
+};
 
 export type ModelTurn =
   | {
       kind: "call";
       name: string;
       args: Record<string, unknown>;
+      thoughtSignature?: string;
       tokensIn: number;
       tokensOut: number;
     }
@@ -629,7 +638,7 @@ export async function runToolLoop(opts: {
     tokensOut += turn.tokensOut;
     if (turn.kind === "text") return { text: turn.text, tokensIn, tokensOut };
     const result = await opts.execute(turn.name, turn.args);
-    calls.push({ name: turn.name, args: turn.args, result });
+    calls.push({ name: turn.name, args: turn.args, result, thoughtSignature: turn.thoughtSignature });
   }
   // Agotó el tope sin texto final: una consulta más para que cierre con palabras.
   const final = await opts.ask(calls);

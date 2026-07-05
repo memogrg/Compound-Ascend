@@ -6,12 +6,14 @@ import {
   projectFreedom,
   projectGoals,
   runToolLoop,
+  PROJECT_INVESTMENT_TOOL,
   type GoalForTool,
   type ModelTurn,
   type ToolCallRecord,
   type DebtSimResult,
   type CompareDebtResult,
 } from "@/lib/ai/tools";
+import { GeminiProvider } from "@/lib/ai/providers/gemini";
 import {
   buildToolExecutor,
   financeChatWithTools,
@@ -296,6 +298,97 @@ describe("tools · runToolLoop (sin Gemini real)", () => {
     const out = await runToolLoop({ ask, execute: async () => ({}), maxIterations: 3 });
     expect(asks).toBe(4); // 3 iteraciones + la consulta final de cierre
     expect(out.text).toBe(""); // nunca dio texto
+  });
+
+  it("propaga el thoughtSignature del turno al ToolCallRecord reenviado (Gemini 3.x)", async () => {
+    // Gemini 3.x exige recibir de vuelta el thoughtSignature de cada functionCall en el
+    // siguiente turno; el loop debe llevarlo del ModelTurn al ToolCallRecord.
+    const seen: (string | undefined)[] = [];
+    const ask = async (prior: ToolCallRecord[]): Promise<ModelTurn> => {
+      if (prior.length === 0) {
+        return { kind: "call", name: "t", args: {}, thoughtSignature: "SIG-abc", tokensIn: 1, tokensOut: 1 };
+      }
+      seen.push(prior[0]!.thoughtSignature);
+      return { kind: "text", text: "ok", tokensIn: 1, tokensOut: 1 };
+    };
+    await runToolLoop({ ask, execute: async () => ({}) });
+    expect(seen).toEqual(["SIG-abc"]);
+  });
+
+  it("sin thoughtSignature (caso 2.5-flash) el ToolCallRecord lo deja undefined (sin cambios)", async () => {
+    const seen: (string | undefined)[] = [];
+    const ask = async (prior: ToolCallRecord[]): Promise<ModelTurn> => {
+      if (prior.length === 0) {
+        return { kind: "call", name: "t", args: {}, tokensIn: 1, tokensOut: 1 }; // sin thoughtSignature
+      }
+      seen.push(prior[0]!.thoughtSignature);
+      return { kind: "text", text: "ok", tokensIn: 1, tokensOut: 1 };
+    };
+    await runToolLoop({ ask, execute: async () => ({}) });
+    expect(seen).toEqual([undefined]);
+  });
+});
+
+describe("gemini · chatWithTools reenvía el thoughtSignature (round-trip del provider)", () => {
+  type GenPart = {
+    text?: string;
+    functionCall?: { name: string; args?: Record<string, unknown> };
+    thoughtSignature?: string;
+    functionResponse?: unknown;
+  };
+  type GenBody = { contents: { role: string; parts: GenPart[] }[] };
+
+  it("reconstruye el 2º request con la functionCall + su thoughtSignature", async () => {
+    const bodies: GenBody[] = [];
+    const responses = [
+      // Turno 1: el modelo pide la herramienta y adjunta su thoughtSignature (Gemini 3.x).
+      {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  functionCall: { name: "proyectar_inversion", args: { aporte_mensual: 1, anios: 1 } },
+                  thoughtSignature: "SIG-XYZ",
+                },
+              ],
+            },
+          },
+        ],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, thoughtsTokenCount: 3 },
+      },
+      // Turno 2: cierra con texto.
+      {
+        candidates: [{ content: { parts: [{ text: "listo" }] } }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 2 },
+      },
+    ];
+    let i = 0;
+    const fetchMock = vi.fn(async (_url: string, init: { body: string }) => {
+      bodies.push(JSON.parse(init.body) as GenBody);
+      const body = responses[i] ?? responses[responses.length - 1]!;
+      i += 1;
+      return { ok: true, json: async () => body } as unknown as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const provider = new GeminiProvider("test-key", "gemini-3.5-flash");
+      const out = await provider.chatWithTools({
+        system: "s",
+        messages: [{ role: "user", content: "proyectá" }],
+        tools: [PROJECT_INVESTMENT_TOOL],
+        execute: async () => ({ ok: true }),
+      });
+      expect(out.text).toBe("listo");
+      // thoughtsTokenCount (3) se suma a la salida facturable del turno 1: 1 + 3 + 2 = 6.
+      expect(out.tokensOut).toBe(6);
+      // El 2º request reenvía la functionCall del modelo CON su thoughtSignature.
+      const modelPart = bodies[1]!.contents.find((c) => c.role === "model")?.parts?.[0];
+      expect(modelPart?.functionCall?.name).toBe("proyectar_inversion");
+      expect(modelPart?.thoughtSignature).toBe("SIG-XYZ");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

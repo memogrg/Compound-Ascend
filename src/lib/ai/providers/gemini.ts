@@ -25,14 +25,35 @@ const RETRY_BASE_MS = 400;
 // para asesoría conversacional y extracción de recibos no aporta y sí estabiliza.
 const THINKING_OFF = { thinkingBudget: 0 };
 
+// Solo los modelos flash/lite permiten DESACTIVAR el thinking (thinkingBudget:0). Los de
+// razonamiento (p. ej. *-pro) lo REQUIEREN activo y rechazan el override → para ellos devolvemos
+// undefined (que JSON.stringify descarta) y usan su thinking por defecto. Producción
+// (gemini-2.5-flash) es flash → sin cambios.
+function thinkingConfigFor(model: string): typeof THINKING_OFF | undefined {
+  return /flash|lite/i.test(model) ? THINKING_OFF : undefined;
+}
+
 type GeminiPart = {
   text?: string;
   functionCall?: { name: string; args?: Record<string, unknown> };
+  // Firma opaca del razonamiento (Gemini 3.x) adjunta a la functionCall; hay que reenviarla.
+  thoughtSignature?: string;
 };
 type GeminiResponse = {
   candidates?: { content?: { parts?: GeminiPart[] } }[];
-  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
+  // thoughtsTokenCount: tokens de "thinking" (facturados como salida). En flash con thinking
+  // OFF es 0 → prod sin cambios; en modelos de razonamiento es real y cuenta para el costo.
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
+  };
 };
+
+/** Salida facturable = tokens de respuesta + tokens de thinking (0 en flash con thinking off). */
+function outTokens(u: GeminiResponse["usageMetadata"]): number {
+  return (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0);
+}
 
 /** Solo reintentar fallos transitorios: 5xx del servidor o 429 (rate limit). */
 export function isRetryableStatus(status: number): boolean {
@@ -136,7 +157,7 @@ function extract(r: GeminiResponse): AIChatResult {
   return {
     text,
     tokensIn: r.usageMetadata?.promptTokenCount ?? 0,
-    tokensOut: r.usageMetadata?.candidatesTokenCount ?? 0,
+    tokensOut: outTokens(r.usageMetadata),
   };
 }
 
@@ -144,10 +165,18 @@ function extract(r: GeminiResponse): AIChatResult {
 function parseTurn(r: GeminiResponse): ModelTurn {
   const parts = r.candidates?.[0]?.content?.parts ?? [];
   const tokensIn = r.usageMetadata?.promptTokenCount ?? 0;
-  const tokensOut = r.usageMetadata?.candidatesTokenCount ?? 0;
-  const fc = parts.find((p) => p.functionCall)?.functionCall;
+  const tokensOut = outTokens(r.usageMetadata);
+  const fcPart = parts.find((p) => p.functionCall);
+  const fc = fcPart?.functionCall;
   if (fc) {
-    return { kind: "call", name: fc.name, args: fc.args ?? {}, tokensIn, tokensOut };
+    return {
+      kind: "call",
+      name: fc.name,
+      args: fc.args ?? {},
+      thoughtSignature: fcPart?.thoughtSignature,
+      tokensIn,
+      tokensOut,
+    };
   }
   const text = parts.map((p) => p.text ?? "").join("");
   return { kind: "text", text, tokensIn, tokensOut };
@@ -186,7 +215,7 @@ export class GeminiProvider implements AIProvider {
       generationConfig: {
         maxOutputTokens: maxTokens,
         temperature: 0.4,
-        thinkingConfig: THINKING_OFF,
+        thinkingConfig: thinkingConfigFor(this.model),
       },
     };
     return extract(await call(this.key, this.model, body));
@@ -203,7 +232,7 @@ export class GeminiProvider implements AIProvider {
       generationConfig: {
         maxOutputTokens: 512,
         temperature: 0.1,
-        thinkingConfig: THINKING_OFF,
+        thinkingConfig: thinkingConfigFor(this.model),
       },
     };
     return extract(await call(this.key, this.model, body));
@@ -235,7 +264,12 @@ export class GeminiProvider implements AIProvider {
     const ask = async (priorCalls: ToolCallRecord[]): Promise<ModelTurn> => {
       const contents: unknown[] = [...baseContents];
       for (const c of priorCalls) {
-        contents.push({ role: "model", parts: [{ functionCall: { name: c.name, args: c.args } }] });
+        // Reenviamos el thoughtSignature junto a la functionCall (lo exigen los modelos 3.x;
+        // undefined en flash → JSON.stringify lo descarta y el contrato queda igual que antes).
+        contents.push({
+          role: "model",
+          parts: [{ functionCall: { name: c.name, args: c.args }, thoughtSignature: c.thoughtSignature }],
+        });
         contents.push({
           role: "tool",
           parts: [{ functionResponse: { name: c.name, response: { result: c.result } } }],
@@ -248,7 +282,7 @@ export class GeminiProvider implements AIProvider {
         generationConfig: {
           maxOutputTokens: maxTokens,
           temperature: 0.4,
-          thinkingConfig: THINKING_OFF,
+          thinkingConfig: thinkingConfigFor(this.model),
         },
       };
       return parseTurn(await call(this.key, this.model, body));
