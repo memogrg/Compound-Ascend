@@ -4,8 +4,16 @@ import {
   type FinancialContext,
   type ToolContext,
 } from "@/lib/ai/orchestrator";
-import { createGeminiProvider } from "@/lib/ai/providers/gemini";
-import type { AIProvider, ChatMessage } from "@/lib/ai/provider";
+import type { ChatMessage } from "@/lib/ai/provider";
+import {
+  RUN_LIVE,
+  USE_JUDGE,
+  EVAL_MODEL,
+  JUDGE_MODEL,
+  makeModelProvider,
+  makeJudgeProvider,
+  judgeAveraged,
+} from "./eval-harness";
 
 /**
  * EVALS DIFÍCILES — APAGADOS POR DEFECTO.
@@ -19,20 +27,18 @@ import type { AIProvider, ChatMessage } from "@/lib/ai/provider";
  * y credenciales reales. Puntaje por caso impreso al final para comparar motores.
  *
  * Envs:
- *   RUN_LIVE_EVALS=1   enciende el bloque (requiere GEMINI_API_KEY).
- *   EVAL_MODEL=<id>    modelo bajo prueba (default = el de producción del provider).
- *   EVAL_JUDGE=1       habilita los sub-asserts semánticos con un modelo juez (0/1).
+ *   RUN_LIVE_EVALS=1     enciende el bloque (requiere GEMINI_API_KEY).
+ *   EVAL_MODEL=<id>      modelo bajo prueba (default = el de producción del provider).
+ *   EVAL_JUDGE=1         habilita los sub-asserts semánticos con el JUEZ FIJO (promediado).
+ *   EVAL_JUDGE_MODEL=<id> modelo juez fijo (default = razonamiento tope; ver eval-harness).
  *
  * Ejemplo:  RUN_LIVE_EVALS=1 EVAL_JUDGE=1 EVAL_MODEL=gemini-2.5-flash npx vitest run tests/evals/advisor-hard.evals.test.ts
  */
-const RUN_LIVE = !!process.env.RUN_LIVE_EVALS;
-const USE_JUDGE = !!process.env.EVAL_JUDGE;
-const EVAL_MODEL = process.env.EVAL_MODEL; // undefined → modelo por defecto del provider
-
-const provider: AIProvider | undefined = RUN_LIVE
-  ? (createGeminiProvider(EVAL_MODEL) ?? undefined)
-  : undefined;
+// Provider del modelo bajo prueba + juez fijo (ambos solo en modo vivo). Ver eval-harness.
+const provider = makeModelProvider();
+const judgeProvider = makeJudgeProvider();
 const MODEL_LABEL = provider?.model ?? EVAL_MODEL ?? "sin-proveedor";
+const SUITE = "hard"; // etiqueta de suite para la línea EVALJSON (comparación multi-modelo)
 
 // Mismo fixture que los casos dorados, EXTENDIDO con deuda cara + macro + fondo de emergencia
 // (necesarios para el juicio deuda-vs-inversión). Mantiene las cifras base y topExpenseCategory.
@@ -66,7 +72,16 @@ const TOOL_CTX: ToolContext = {
 };
 
 const ask = (content: string): ChatMessage[] => [{ role: "user", content }];
-const chat = (messages: ChatMessage[]) => financeChatWithTools(messages, CTX, TOOL_CTX, provider);
+
+// Tokens del MODELO BAJO PRUEBA acumulados en todo el suite (para el costo por conversación).
+let tokIn = 0;
+let tokOut = 0;
+async function chat(messages: ChatMessage[]) {
+  const r = await financeChatWithTools(messages, CTX, TOOL_CTX, provider);
+  tokIn += r.tokensIn;
+  tokOut += r.tokensOut;
+  return r;
+}
 
 /** Conduce una conversación multiturno REAL: realimenta cada respuesta del modelo. */
 async function runConversation(userTurns: string[]): Promise<{ user: string; reply: string }[]> {
@@ -147,22 +162,8 @@ function record(name: string, passed: boolean, reply?: string): CaseResult {
   return r;
 }
 
-/** Juez opcional (EVAL_JUDGE=1): puntúa 0/1 según una rúbrica corta. */
-async function judge(rubric: string, transcript: string): Promise<number> {
-  if (!provider) return 0;
-  const system =
-    "Sos un evaluador estricto de un asesor financiero. Puntuá 1 si la respuesta CUMPLE la " +
-    "rúbrica, 0 si NO la cumple. Respondé SOLO el dígito 1 o 0, sin explicaciones.";
-  const { text } = await provider.chat({
-    system,
-    messages: [
-      { role: "user", content: `RÚBRICA: ${rubric}\n\nTRANSCRIPCIÓN:\n${transcript}\n\nPuntaje (0 o 1):` },
-    ],
-    maxTokens: 4,
-  });
-  const m = text.match(/[01](?:\.\d+)?/);
-  return m?.[0] ? Number(m[0]) : 0;
-}
+/** Juez FIJO promediado (EVAL_JUDGE=1): el mismo modelo fuerte para todos los candidatos. */
+const judge = (rubric: string, transcript: string) => judgeAveraged(judgeProvider, rubric, transcript);
 
 afterAll(() => {
   if (!RUN_LIVE || results.length === 0) return;
@@ -174,10 +175,26 @@ afterAll(() => {
     .filter((r) => !r.passed && r.reply)
     .map((r) => `\n  ── ${r.name} ──\n  ${r.reply!.replace(/\s+/g, " ").slice(0, 500)}`)
     .join("\n");
+  const perConv = results.length ? Math.round((tokIn + tokOut) / results.length) : 0;
+  const judgeLine = USE_JUDGE ? ` · juez=${JUDGE_MODEL}` : "";
   process.stdout.write(
-    `\n===== EVALS DIFÍCILES · modelo=${MODEL_LABEL} =====\n${lines}\n  PUNTAJE: ${passed}/${results.length}\n` +
+    `\n===== EVALS DIFÍCILES · modelo=${MODEL_LABEL}${judgeLine} =====\n${lines}\n  PUNTAJE: ${passed}/${results.length}\n` +
+      `  TOKENS (modelo bajo prueba): in=${tokIn} out=${tokOut} · ~${perConv}/conversación\n` +
       (fails ? `\n  Respuestas de casos fallidos:${fails}\n` : "") +
       "\n",
+  );
+  // Línea máquina-legible (una sola) para el driver de comparación resiliente.
+  process.stdout.write(
+    `EVALJSON ${JSON.stringify({
+      model: MODEL_LABEL,
+      suite: SUITE,
+      judge: USE_JUDGE ? JUDGE_MODEL : null,
+      passed,
+      total: results.length,
+      tokIn,
+      tokOut,
+      cases: results.map((r) => ({ name: r.name, passed: r.passed, judge: r.judge ?? null })),
+    })}\n`,
   );
 });
 
@@ -315,16 +332,11 @@ describe.skipIf(!RUN_LIVE)("evals DIFÍCILES · discriminan modelos (RUN_LIVE_EV
   it("explicación numérica sin inventar → interés compuesto correcto", { timeout: HARD_TIMEOUT }, async () => {
     // Conversación de 2 turnos: primero fija el cálculo, luego pide el porqué.
     const first = await chat(ask("¿cuánto tendría que aportar al mes para llegar a mi número de libertad en 20 años al 8%?"));
-    const { reply } = await financeChatWithTools(
-      [
-        ...ask("¿cuánto tendría que aportar al mes para llegar a mi número de libertad en 20 años al 8%?"),
-        { role: "assistant", content: first.reply },
-        ...ask("¿por qué con 2% más de rendimiento (10%) baja tanto el aporte mensual necesario?"),
-      ],
-      CTX,
-      TOOL_CTX,
-      provider,
-    );
+    const { reply } = await chat([
+      ...ask("¿cuánto tendría que aportar al mes para llegar a mi número de libertad en 20 años al 8%?"),
+      { role: "assistant", content: first.reply },
+      ...ask("¿por qué con 2% más de rendimiento (10%) baja tanto el aporte mensual necesario?"),
+    ]);
     expect(reply).toBeTypeOf("string");
     const low = norm(reply);
 
