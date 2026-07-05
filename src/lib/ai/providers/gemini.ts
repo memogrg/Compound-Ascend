@@ -91,9 +91,9 @@ async function postJsonWithRetry(url: string, body: unknown): Promise<unknown> {
   throw new AppError("PROVIDER_ERROR", undefined, "gemini");
 }
 
-async function call(key: string, body: unknown): Promise<GeminiResponse> {
+async function call(key: string, model: string, body: unknown): Promise<GeminiResponse> {
   return (await postJsonWithRetry(
-    `${BASE}/${MODEL}:generateContent?key=${key}`,
+    `${BASE}/${model}:generateContent?key=${key}`,
     body,
   )) as GeminiResponse;
 }
@@ -155,11 +155,14 @@ function parseTurn(r: GeminiResponse): ModelTurn {
 
 export class GeminiProvider implements AIProvider {
   readonly name = "gemini";
-  readonly model = MODEL;
+  readonly model: string;
   private key: string;
 
-  constructor(key: string) {
+  // `model` es aditivo: default = el modelo de producción. Permite instanciar el
+  // provider apuntando a otro modelo (p. ej. evals vivos que comparan motores).
+  constructor(key: string, model: string = MODEL) {
     this.key = key;
+    this.model = model;
   }
 
   async chat({
@@ -186,7 +189,7 @@ export class GeminiProvider implements AIProvider {
         thinkingConfig: THINKING_OFF,
       },
     };
-    return extract(await call(this.key, body));
+    return extract(await call(this.key, this.model, body));
   }
 
   async vision({ imageBase64, mimeType, prompt }: VisionInput): Promise<AIChatResult> {
@@ -203,7 +206,7 @@ export class GeminiProvider implements AIProvider {
         thinkingConfig: THINKING_OFF,
       },
     };
-    return extract(await call(this.key, body));
+    return extract(await call(this.key, this.model, body));
   }
 
   async chatWithTools({
@@ -248,14 +251,14 @@ export class GeminiProvider implements AIProvider {
           thinkingConfig: THINKING_OFF,
         },
       };
-      return parseTurn(await call(this.key, body));
+      return parseTurn(await call(this.key, this.model, body));
     };
 
     return runToolLoop({ ask, execute });
   }
 }
 
-export function createGeminiProvider(): GeminiProvider | null {
+export function createGeminiProvider(model?: string): GeminiProvider | null {
   const key = getServerEnv().GEMINI_API_KEY;
-  return key ? new GeminiProvider(key) : null;
+  return key ? new GeminiProvider(key, model ?? MODEL) : null;
 }

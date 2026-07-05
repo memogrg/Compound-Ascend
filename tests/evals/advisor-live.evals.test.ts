@@ -1,20 +1,42 @@
-import { describe, it, expect } from "vitest";
-import { financeChat, type FinancialContext } from "@/lib/ai/orchestrator";
-import type { ChatMessage } from "@/lib/ai/provider";
+import { afterAll, describe, it, expect } from "vitest";
+import {
+  financeChatWithTools,
+  type FinancialContext,
+  type ToolContext,
+} from "@/lib/ai/orchestrator";
+import { createGeminiProvider } from "@/lib/ai/providers/gemini";
+import { projectInvestment } from "@/lib/ai/tools";
+import type { AIProvider, ChatMessage } from "@/lib/ai/provider";
 
 /**
  * EVALS VIVOS — APAGADOS POR DEFECTO.
  *
- * Replayean preguntas reales del chat contra el proveedor REAL (getProvider() por
- * defecto). NO corren en CI ni en `npm run test`: se activan con RUN_LIVE_EVALS=1
- * cuando decidamos el motor (Ola 2). Hoy cada caso solo hace un smoke del pipeline;
- * el assert "dorado" (criterio semántico) queda como TODO(Ola 2) documentado.
+ * Replayean preguntas reales del chat contra el proveedor REAL. NO corren en CI ni en
+ * `npm run test`: el describe se salta salvo con RUN_LIVE_EVALS=1 y credenciales reales.
+ *
+ * Cada caso tiene un assert "dorado" heurístico determinista sobre el `reply` del modelo
+ * y suma a un PUNTAJE (casos pasados / total) que se imprime al final para comparar motores.
+ *
+ * Envs:
+ *   RUN_LIVE_EVALS=1   enciende el bloque (requiere GEMINI_API_KEY).
+ *   EVAL_MODEL=<id>    modelo bajo prueba (default = el de producción del provider).
+ *   EVAL_JUDGE=1       habilita sub-asserts semánticos con un modelo juez (0/1).
+ *
+ * Ejemplo:  RUN_LIVE_EVALS=1 EVAL_MODEL=gemini-2.5-flash npx vitest run tests/evals/advisor-live.evals.test.ts
  */
 const RUN_LIVE = !!process.env.RUN_LIVE_EVALS;
+const USE_JUDGE = !!process.env.EVAL_JUDGE;
+const EVAL_MODEL = process.env.EVAL_MODEL; // undefined → modelo por defecto del provider
 
-const ask = (content: string): ChatMessage[] => [{ role: "user", content }];
+// El provider real SOLO se construye cuando corremos vivo (evita tocar credenciales/red
+// en `npm run test`, donde además el describe se salta).
+const provider: AIProvider | undefined = RUN_LIVE
+  ? (createGeminiProvider(EVAL_MODEL) ?? undefined)
+  : undefined;
+const MODEL_LABEL = provider?.model ?? EVAL_MODEL ?? "sin-proveedor";
 
-// Contexto con métricas REALES pobladas, como en la conversación que falló.
+// Fixture representativo: las mismas cifras del chat real que falló. Los asserts verifican
+// que la respuesta USA estas cifras (no inventa patrimonio ni dice "no tengo acceso").
 const CTX: FinancialContext = {
   currency: "CRC",
   name: "Memo",
@@ -22,50 +44,232 @@ const CTX: FinancialContext = {
   portfolioValue: 61_581_512,
   investableWealth: 13_000_000,
   numeroDeLibertad: 290_400_000,
+  incomeMonthly: 3_500_000,
+  expenseMonthly: 2_100_000,
+  freeCashflow: 1_400_000,
 };
 
+// ToolContext para habilitar function-calling (como el chat web con sesión): la proyección
+// y la tabla pueden así usar proyectar_inversion en vez de improvisar la aritmética.
+const TOOL_CTX: ToolContext = {
+  debts: [],
+  currency: "CRC",
+  freedomNumber: CTX.numeroDeLibertad,
+  investableWealth: CTX.investableWealth,
+  goals: [],
+};
+
+const ask = (content: string): ChatMessage[] => [{ role: "user", content }];
+const chat = (messages: ChatMessage[]) => financeChatWithTools(messages, CTX, TOOL_CTX, provider);
+
+// Las llamadas al modelo REAL (con function-calling multiturno) exceden el testTimeout
+// por defecto de Vitest (5s). Damos margen amplio; sigue siendo opt-in y local.
+const LIVE_TIMEOUT = 90_000;
+
+// ── Helpers de heurística determinista sobre texto libre ──
+
+/** minúsculas + sin acentos, para comparar frases de forma robusta. */
+function norm(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Extrae los enteros del texto tolerando separadores de miles (. o ,) y una parte decimal
+ * final. Descarta primero el decimal final (sep + 1-2 dígitos al final del token) para no
+ * fusionarlo con los miles: "₡16,966,928.9" → 16966928; "61.581.512" → 61581512.
+ */
+function extractNumbers(text: string): number[] {
+  const out: number[] = [];
+  for (const m of text.matchAll(/\d[\d.,]*\d|\d/g)) {
+    const tok = (m[0] ?? "").replace(/[.,]\d{1,2}$/, ""); // quita la parte decimal final
+    const digits = tok.replace(/[^\d]/g, ""); // quita separadores de miles restantes
+    if (digits) out.push(Number(digits));
+  }
+  return out;
+}
+
+/** ¿Algún número del texto está dentro de `tol` (fracción) del objetivo? */
+function hasNumberNear(text: string, target: number, tol: number): boolean {
+  if (target <= 0) return false;
+  return extractNumbers(text).some((n) => Math.abs(n - target) / target <= tol);
+}
+
+/** ¿Menciona el objetivo en forma compacta de millones? ("61,6 M", "62 millones", "61.58M"). */
+function mentionsMillions(text: string, target: number): boolean {
+  const m = target / 1_000_000;
+  const forms = [
+    String(Math.round(m)),
+    m.toFixed(1),
+    m.toFixed(1).replace(".", ","),
+    m.toFixed(2),
+    m.toFixed(2).replace(".", ","),
+  ];
+  const low = norm(text);
+  return forms.some((f) => low.includes(`${f} m`) || low.includes(`${f}m`) || low.includes(`${f} mill`));
+}
+
+/** ¿El texto refleja/cita el objetivo (número exacto-ish o forma compacta en millones)? */
+function citesAmount(text: string, target: number): boolean {
+  return hasNumberNear(text, target, 0.05) || mentionsMillions(text, target);
+}
+
+// ── Puntaje agregado (se imprime al final) ──
+type CaseResult = { name: string; passed: boolean; judge?: number; reply?: string };
+const results: CaseResult[] = [];
+function record(name: string, passed: boolean, reply?: string): CaseResult {
+  const r: CaseResult = { name, passed, reply };
+  results.push(r);
+  return r;
+}
+
+/**
+ * Juez opcional (EVAL_JUDGE=1): pide a un modelo puntuar 0/1 según una rúbrica corta.
+ * Simple y no-fatal: sin provider o sin flag, no se llama. Devuelve 0..1.
+ */
+async function judge(rubric: string, transcript: string): Promise<number> {
+  if (!provider) return 0;
+  const system =
+    "Sos un evaluador estricto de un asesor financiero. Puntuá 1 si la respuesta CUMPLE la " +
+    "rúbrica, 0 si NO la cumple. Respondé SOLO el dígito 1 o 0, sin explicaciones.";
+  const { text } = await provider.chat({
+    system,
+    messages: [
+      { role: "user", content: `RÚBRICA: ${rubric}\n\nTRANSCRIPCIÓN:\n${transcript}\n\nPuntaje (0 o 1):` },
+    ],
+    maxTokens: 4,
+  });
+  const m = text.match(/[01](?:\.\d+)?/);
+  return m?.[0] ? Number(m[0]) : 0;
+}
+
+afterAll(() => {
+  if (!RUN_LIVE || results.length === 0) return;
+  const passed = results.filter((r) => r.passed).length;
+  const lines = results
+    .map((r) => `  ${r.passed ? "OK " : "XX "}${r.name}${r.judge != null ? ` · juez=${r.judge}` : ""}`)
+    .join("\n");
+  // De los casos que fallan, mostramos la respuesta (recortada) para diagnosticar el modelo.
+  const fails = results
+    .filter((r) => !r.passed && r.reply)
+    .map((r) => `\n  ── ${r.name} ──\n  ${r.reply!.replace(/\s+/g, " ").slice(0, 400)}`)
+    .join("\n");
+  // process.stdout.write (no console.log): Vitest intercepta console y oculta el resumen
+  // cuando todos los casos pasan; esto garantiza que el PUNTAJE siempre se imprima.
+  process.stdout.write(
+    `\n===== EVALS VIVOS · modelo=${MODEL_LABEL} =====\n${lines}\n  PUNTAJE: ${passed}/${results.length}\n` +
+      (fails ? `\n  Respuestas de casos fallidos:${fails}\n` : "") +
+      "\n",
+  );
+});
+
 describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () => {
-  it("valor en inversiones → da la cifra real, nunca 'no tengo acceso'", async () => {
-    const { reply } = await financeChat(ask("¿cuál es mi valor en inversiones actualmente?"), CTX);
+  it("valor en inversiones → cita la cifra real del contexto, nunca 'no tengo acceso'", { timeout: LIVE_TIMEOUT }, async () => {
+    const { reply } = await chat(ask("¿cuál es mi valor en inversiones actualmente?"));
     expect(reply).toBeTypeOf("string");
-    // TODO(Ola 2): la respuesta debe citar el portfolioValue del contexto (≈ ₡61,6M)
-    //   y NO decir "no tengo acceso":
-    //   expect(reply).toContain("61"); expect(reply.toLowerCase()).not.toContain("no tengo acceso");
+
+    const noAccess = norm(reply).includes("no tengo acceso");
+    const citesPortfolio = citesAmount(reply, CTX.portfolioValue!);
+    const passed = !noAccess && citesPortfolio;
+    record("valor en inversiones", passed, reply);
+    expect(passed).toBe(true);
   });
 
-  it("proyección a 15 años @10% → usa el patrimonio del contexto, no lo inventa", async () => {
-    const { reply } = await financeChat(ask("hazme una proyección a 15 años al 10%"), CTX);
-    expect(reply).toBeTypeOf("string");
-    // TODO(Ola 2): debe partir del patrimonio invertible/portafolio del contexto como monto inicial,
-    //   NO inventar un patrimonio inicial arbitrario.
-  });
-
-  it("tabla de aportes y crecimiento anual → usa la herramienta, no improvisa", async () => {
-    const { reply } = await financeChat(ask("dame una tabla de aportes y crecimiento anual"), CTX);
-    expect(reply).toBeTypeOf("string");
-    // TODO(Ola 2): los números deben coincidir con projectInvestment (proyectar_inversion),
-    //   no ser cifras improvisadas por el modelo.
-  });
-
-  it("consistencia entre turnos → no confunde Número de Libertad con aporte mensual", async () => {
-    const first = await financeChat(ask("¿cuál es mi número de libertad?"), CTX);
-    const second = await financeChat(
-      [
-        ...ask("¿cuál es mi número de libertad?"),
-        { role: "assistant", content: first.reply },
-        ...ask("¿y cuál es mi aporte mensual?"),
-      ],
-      CTX,
+  it("proyección a 15 años @10% → parte del patrimonio del contexto, no lo inventa", { timeout: LIVE_TIMEOUT }, async () => {
+    const { reply } = await chat(
+      ask("hazme una proyección a 15 años al 10% partiendo de lo que tengo invertido"),
     );
-    expect(second.reply).toBeTypeOf("string");
-    // TODO(Ola 2): el turno 2 NO debe repetir el Número de Libertad como si fuera el aporte mensual;
-    //   ambos conceptos se mantienen separados entre turnos.
+    expect(reply).toBeTypeOf("string");
+
+    // Debe anclar el arranque en una cifra del contexto: "lo que tengo invertido" es el
+    // portafolio; aceptamos también invertible o patrimonio neto. Lo que NO vale es inventar.
+    const startsFromContext =
+      citesAmount(reply, CTX.portfolioValue!) ||
+      citesAmount(reply, CTX.investableWealth!) ||
+      citesAmount(reply, CTX.netWorth!);
+    const passed = startsFromContext;
+    const rec = record("proyección 15a @10%", passed, reply);
+    expect(passed).toBe(true);
+
+    // Sub-assert semántico opcional: que NO invente un patrimonio inicial ajeno al contexto.
+    if (USE_JUDGE) {
+      rec.judge = await judge(
+        "El monto INICIAL de la proyección coincide con el patrimonio del usuario " +
+          `(invertible ₡${CTX.investableWealth} o neto ₡${CTX.netWorth}); NO inventa un patrimonio de arranque distinto.`,
+        reply,
+      );
+      expect(rec.judge).toBeGreaterThanOrEqual(0.5);
+    }
   });
 
-  it("identidad → responde 'My Agent C+', nunca 'Ascend AI' ni 'Compound Ascend'", async () => {
-    const { reply } = await financeChat(ask("¿cómo te llamás?"), CTX);
+  it("tabla año-por-año → cronograma coherente cuyo saldo final ≈ projectInvestment (usó la herramienta)", { timeout: LIVE_TIMEOUT }, async () => {
+    const inicial = CTX.investableWealth!;
+    const aporte = 207_365;
+    const anios = 15;
+    const rendPct = 10;
+    const { reply } = await chat(
+      ask(
+        `dame una tabla año por año del crecimiento de una inversión de ${inicial} colones, ` +
+          `con aportes de ${aporte} al mes, durante ${anios} años, a un ${rendPct}% anual`,
+      ),
+    );
     expect(reply).toBeTypeOf("string");
-    // TODO(Ola 2): expect(reply).toContain("My Agent C+");
-    //   expect(reply).not.toMatch(/Ascend AI|Compound Ascend/i);
+
+    // Cronograma determinista de la herramienta (la fuente de verdad).
+    const cronograma = projectInvestment(
+      { monto_inicial: inicial, aporte_mensual: aporte, anios, rendimiento_anual_pct: rendPct },
+      "CRC",
+    ).cronograma_anual;
+
+    // Señal de que USÓ la herramienta (no improvisó): el año 1 del cronograma —siempre
+    // presente, nunca truncado— aparece con su APORTE ANUAL agregado (207.365×12 = 2.488.380,
+    // que un modelo improvisando no produciría) y su SALDO FINAL de interés compuesto. La tabla
+    // completa de 15 años suele truncarse por el límite de tokens, así que anclamos en el año 1.
+    const y1 = cronograma[0];
+    const coincideConHerramienta =
+      !!y1 && hasNumberNear(reply, y1.aportes, 0.02) && hasNumberNear(reply, y1.saldo_final, 0.02);
+    const variasFilas = extractNumbers(reply).length >= 10; // una tabla trae muchas cifras
+    const passed = coincideConHerramienta && variasFilas;
+    record("tabla año-por-año", passed, reply);
+    expect(passed).toBe(true);
+  });
+
+  it("consistencia entre turnos → el Número de Libertad no se confunde con el aporte mensual", { timeout: LIVE_TIMEOUT }, async () => {
+    const first = await chat(ask("¿cuál es mi número de libertad?"));
+    const second = await chat([
+      ...ask("¿cuál es mi número de libertad?"),
+      { role: "assistant", content: first.reply },
+      ...ask("¿y cuánto tendría que aportar al mes para llegar?"),
+    ]);
+    expect(second.reply).toBeTypeOf("string");
+
+    // T1 enuncia el Número de Libertad (≈ 290,4M).
+    const t1CitesNdL = citesAmount(first.reply, CTX.numeroDeLibertad!);
+    // El bug real a detectar: confundir el NdL con el aporte mensual (repetir 290,4M como si
+    // fuera el aporte). Correcto: T2 NO presenta el NdL como aporte — da un monto mensual, o
+    // pide el plazo faltante (ambas válidas). Falla solo si repite la cifra del NdL en T2.
+    const notConfused = !hasNumberNear(second.reply, CTX.numeroDeLibertad!, 0.02);
+    const passed = t1CitesNdL && notConfused;
+    const rec = record("consistencia entre turnos", passed, `T1: ${first.reply}\nT2: ${second.reply}`);
+    expect(passed).toBe(true);
+
+    if (USE_JUDGE) {
+      rec.judge = await judge(
+        "En el turno 2, el 'aporte mensual' es una cifra mensual razonable y NO es el Número de " +
+          `Libertad (₡${CTX.numeroDeLibertad}); ambos conceptos se mantienen separados.`,
+        `T1: ${first.reply}\n---\nT2: ${second.reply}`,
+      );
+      expect(rec.judge).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it("identidad → responde 'My Agent C+', nunca 'Ascend AI' ni 'Compound Ascend'", { timeout: LIVE_TIMEOUT }, async () => {
+    const { reply } = await chat(ask("¿cómo te llamás?"));
+    expect(reply).toBeTypeOf("string");
+
+    const saysIdentity = reply.includes("My Agent C+");
+    const saysAlias = /ascend ai|compound ascend/i.test(reply);
+    const passed = saysIdentity && !saysAlias;
+    record("identidad", passed, reply);
+    expect(passed).toBe(true);
   });
 });
