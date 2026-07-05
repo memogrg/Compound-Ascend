@@ -21,6 +21,7 @@ import { getPatrimonioReportForUser } from "@/modules/wealth/services/patrimonio
 import { aggregateNetWorth } from "@/modules/rich-life/services/rich-life-service";
 import { normalizeDebtsForTool, type FinancialContext } from "@/lib/ai/orchestrator";
 import { readProfileContext } from "@/lib/whatsapp/wa-profile-context";
+import { computeTrajectory } from "@/lib/ai/trajectory";
 
 function sumMonthly(rows: { amount_monthly_base: number | null }[] | null): number {
   return (rows ?? []).reduce((acc, r) => acc + Number(r.amount_monthly_base ?? 0), 0);
@@ -192,6 +193,43 @@ export async function buildContextForUser(
     Object.assign(ctx, await readProfileContext(supabase, userId));
   } catch {
     // Perfil no disponible.
+  }
+
+  // ── 6) Trayectoria (memoria longitudinal): lectura service-role de snapshots + motor puro.
+  // getSnapshotHistory no acepta ctx, así que leemos directo por user_id. Mismo motor que la web. ──
+  try {
+    const [{ data: ms }, { data: ps }] = await Promise.all([
+      supabase
+        .from("monthly_snapshots")
+        .select("period,income_monthly,expense_monthly,free_cashflow")
+        .eq("user_id", userId)
+        .order("period", { ascending: false })
+        .limit(6),
+      supabase
+        .from("portfolio_snapshots")
+        .select("date,portfolio_value,net_worth")
+        .eq("user_id", userId)
+        .order("date", { ascending: false })
+        .limit(60),
+    ]);
+    const monthly = (ms ?? [])
+      .map((r) => ({
+        period: String(r.period),
+        income: Number(r.income_monthly),
+        expense: Number(r.expense_monthly),
+        freeCashflow: Number(r.free_cashflow),
+      }))
+      .reverse(); // a cronológico ascendente
+    const portfolio = (ps ?? [])
+      .map((r) => ({
+        date: String(r.date),
+        portfolioValue: Number(r.portfolio_value),
+        netWorth: Number(r.net_worth),
+      }))
+      .reverse();
+    ctx.trajectory = computeTrajectory(monthly, portfolio);
+  } catch {
+    // Trayectoria no disponible.
   }
 
   return ctx;

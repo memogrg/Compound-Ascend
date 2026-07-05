@@ -164,6 +164,37 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Portafolio no disponible.
   }
 
+  // Trayectoria (memoria longitudinal): tendencias mes a mes vía el motor puro. Best-effort;
+  // si hay <3 meses de historia el motor devuelve undefined (no inventamos tendencias).
+  try {
+    const { getSnapshotHistory } = await import(
+      "@/modules/financial-base/services/snapshot-service"
+    );
+    const { computeTrajectory } = await import("@/lib/ai/trajectory");
+    const monthly = (await getSnapshotHistory(6)).map((h) => ({
+      period: h.period,
+      income: h.realIncome,
+      expense: h.realExpense,
+      freeCashflow: h.freeCashflow,
+    }));
+    let portfolio: { date: string; portfolioValue: number; netWorth: number }[] = [];
+    try {
+      const { getSnapshotHistory: getPortfolioHistory } = await import(
+        "@/modules/wealth/services/snapshot-service"
+      );
+      portfolio = (await getPortfolioHistory("6M")).map((p) => ({
+        date: p.date,
+        portfolioValue: p.portfolioValue,
+        netWorth: p.netWorth,
+      }));
+    } catch {
+      // Sin historia de portafolio: la trayectoria usa solo lo mensual.
+    }
+    ctx.trajectory = computeTrajectory(monthly, portfolio);
+  } catch {
+    // Trayectoria no disponible (usuario nuevo o sin snapshots).
+  }
+
   // Marco Patrimonial (motor patrimonio-engine) — best-effort: consume el reporte
   // tal cual, sin recalcular. Si falla, el chat sigue sin estas métricas.
   try {
