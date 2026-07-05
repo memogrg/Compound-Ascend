@@ -53,6 +53,13 @@ const CTX: FinancialContext = {
   freeCashflow: 1_400_000,
   topExpenseCategory: { name: "estilo vida", monthly: 900_000, pct: 43 },
   savingsRatePct: 40,
+  // Memoria longitudinal: viene ahorrando MENOS (tasa de ahorro cayendo ~5 pp en 4 meses).
+  trajectory: {
+    months: 4,
+    savingsRate: { dir: "baja", deltaPp: -5 },
+    expense: { dir: "sube", pct: 9 },
+    netWorth: { dir: "sube", pct: 6 },
+  },
 };
 
 // ToolContext para habilitar function-calling (como el chat web con sesión): la proyección
@@ -309,5 +316,29 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
     const passed = flagsGap && proposesLever;
     record("reality-check con palancas", passed, reply);
     expect(passed).toBe(true);
+  });
+
+  it("trayectoria → referencia la tendencia real (tasa de ahorro viene bajando), no solo la foto", { timeout: LIVE_TIMEOUT }, async () => {
+    // El fixture tiene trajectory.savingsRate.dir = "baja". El asesor debe NOTAR la deriva.
+    const { reply } = await chat(ask("¿cómo vengo con mi ahorro en los últimos meses?"));
+    expect(reply).toBeTypeOf("string");
+
+    const low = norm(reply);
+    // Menciona el ahorro/tasa Y reconoce la dirección descendente (no dice que va bien/subiendo).
+    const mentionsSavings = /(ahorro|ahorrando|tasa de ahorro)/.test(low);
+    const notesDownTrend = /(baj|cay|disminu|descend|menos|reduci[eé]ndo|deterior|ven[ií]s ahorrando menos)/.test(low);
+    const passed = mentionsSavings && notesDownTrend;
+    const rec = record("trayectoria del ahorro", passed, reply);
+    expect(passed).toBe(true);
+
+    if (USE_JUDGE) {
+      rec.judge = await judge(
+        "Reconoce la TENDENCIA de la tasa de ahorro del usuario: que viene BAJANDO en los últimos " +
+          "meses (no la trata como estática ni dice erróneamente que va mejorando).",
+        reply,
+      );
+      rec.passed = passed && rec.judge >= 0.5;
+      expect(rec.judge).toBeGreaterThanOrEqual(0.5);
+    }
   });
 });

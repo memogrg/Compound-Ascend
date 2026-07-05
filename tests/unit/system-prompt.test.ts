@@ -303,3 +303,38 @@ describe("buildSystemPrompt · reality-check con palancas y no-disculpas", () =>
     expect(prompt).not.toContain("Tasa de ahorro:");
   });
 });
+
+describe("buildSystemPrompt · trayectoria (memoria longitudinal)", () => {
+  it("con trajectory poblada: rinde los facts de tendencia y la regla de uso con tacto", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      trajectory: {
+        months: 4,
+        savingsRate: { dir: "baja", deltaPp: -3 },
+        expense: { dir: "sube", pct: 8 },
+        netWorth: { dir: "sube", pct: 12 },
+      },
+    });
+    // Facts de tendencia legibles.
+    expect(prompt).toContain("Trayectoria (4 meses): tu tasa de ahorro viene bajando ~3 pp.");
+    expect(prompt).toContain("Trayectoria: tu gasto mensual viene subiendo ~8%.");
+    expect(prompt).toContain("Trayectoria: tu patrimonio neto viene subiendo ~12%.");
+    // La regla de conducta (con tacto) va presente.
+    expect(prompt).toContain("Tenés la trayectoria del usuario (cómo viene mes a mes)");
+    expect(prompt).toContain("sin culpa");
+  });
+
+  it("dir 'estable' se rinde como 'se mantiene estable' (sin magnitud)", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      trajectory: { months: 5, savingsRate: { dir: "estable", deltaPp: 0.5 } },
+    });
+    expect(prompt).toContain("Trayectoria (5 meses): tu tasa de ahorro se mantiene estable.");
+  });
+
+  it("sin trajectory (usuario nuevo): no aparecen facts de tendencia ni la regla", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).not.toContain("Trayectoria");
+    expect(prompt).not.toContain("Tenés la trayectoria del usuario");
+  });
+});

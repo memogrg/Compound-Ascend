@@ -5,6 +5,8 @@
  * propuestas (la IA propone, nunca ejecuta sola).
  */
 
+import type { Trajectory } from "@/lib/ai/trajectory";
+
 export type FinancialContext = {
   name?: string;
   currency: string;
@@ -13,6 +15,8 @@ export type FinancialContext = {
   freeCashflow?: number;
   /** Categoría (naturaleza) de gasto más pesada, ya en moneda principal. Best-effort. */
   topExpenseCategory?: { name: string; monthly: number; pct: number };
+  /** Trayectoria mes a mes (memoria longitudinal). Best-effort; undefined si es usuario nuevo. */
+  trajectory?: Trajectory;
   /** Tasa de ahorro (ahorro/ingreso) en %, 0-100. Best-effort. */
   savingsRatePct?: number;
   netWorth?: number;
@@ -124,6 +128,19 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.savingsRatePct !== undefined)
     facts.push(`Tasa de ahorro: ${ctx.savingsRatePct}% del ingreso.`);
   if (ctx.netWorth !== undefined) facts.push(`Patrimonio neto: ${ctx.netWorth} ${ctx.currency}.`);
+  if (ctx.trajectory) {
+    const t = ctx.trajectory;
+    const trend = (dir: "sube" | "baja" | "estable", mag: string): string =>
+      dir === "estable" ? "se mantiene estable" : `viene ${dir === "sube" ? "subiendo" : "bajando"} ${mag}`;
+    if (t.savingsRate)
+      facts.push(
+        `Trayectoria (${t.months} meses): tu tasa de ahorro ${trend(t.savingsRate.dir, `~${Math.abs(t.savingsRate.deltaPp)} pp`)}.`,
+      );
+    if (t.expense)
+      facts.push(`Trayectoria: tu gasto mensual ${trend(t.expense.dir, `~${Math.abs(t.expense.pct)}%`)}.`);
+    if (t.netWorth)
+      facts.push(`Trayectoria: tu patrimonio neto ${trend(t.netWorth.dir, `~${Math.abs(t.netWorth.pct)}%`)}.`);
+  }
   if (ctx.topConcern) facts.push(`Principal preocupación: ${ctx.topConcern}.`);
   if (ctx.portfolioValue !== undefined)
     facts.push(`Valor de mercado del portafolio: ${ctx.portfolioValue} ${ctx.currency}.`);
@@ -348,6 +365,12 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.insights?.length)
     behaviorRules.push(
       "Tienes observaciones recientes de su comportamiento. Menciónalas SOLO si vienen al caso, con tacto y sin juicio; conéctalas con su meta o Rich Life; celebra las positivas; respeta su intensidad de alertas y su arquetipo. No las enumeres mecánicamente.",
+    );
+
+  // Memoria longitudinal: cómo usar la trayectoria mes a mes.
+  if (ctx.trajectory)
+    behaviorRules.push(
+      "Tenés la trayectoria del usuario (cómo viene mes a mes). Usala con TACTO y solo cuando venga al caso: celebrá el progreso real, señalá una deriva negativa sin culpa y conectala con su meta. No la enumeres mecánicamente ni la menciones si no aporta.",
     );
 
   return [
