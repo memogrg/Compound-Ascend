@@ -4,9 +4,17 @@ import {
   type FinancialContext,
   type ToolContext,
 } from "@/lib/ai/orchestrator";
-import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import { projectInvestment } from "@/lib/ai/tools";
-import type { AIProvider, ChatMessage } from "@/lib/ai/provider";
+import type { ChatMessage } from "@/lib/ai/provider";
+import {
+  RUN_LIVE,
+  USE_JUDGE,
+  EVAL_MODEL,
+  JUDGE_MODEL,
+  makeModelProvider,
+  makeJudgeProvider,
+  judgeAveraged,
+} from "./eval-harness";
 
 /**
  * EVALS VIVOS — APAGADOS POR DEFECTO.
@@ -18,22 +26,18 @@ import type { AIProvider, ChatMessage } from "@/lib/ai/provider";
  * y suma a un PUNTAJE (casos pasados / total) que se imprime al final para comparar motores.
  *
  * Envs:
- *   RUN_LIVE_EVALS=1   enciende el bloque (requiere GEMINI_API_KEY).
- *   EVAL_MODEL=<id>    modelo bajo prueba (default = el de producción del provider).
- *   EVAL_JUDGE=1       habilita sub-asserts semánticos con un modelo juez (0/1).
+ *   RUN_LIVE_EVALS=1     enciende el bloque (requiere GEMINI_API_KEY).
+ *   EVAL_MODEL=<id>      modelo bajo prueba (default = el de producción del provider).
+ *   EVAL_JUDGE=1         habilita los sub-asserts semánticos con el JUEZ FIJO (promediado).
+ *   EVAL_JUDGE_MODEL=<id> modelo juez fijo (default = razonamiento tope; ver eval-harness).
  *
- * Ejemplo:  RUN_LIVE_EVALS=1 EVAL_MODEL=gemini-2.5-flash npx vitest run tests/evals/advisor-live.evals.test.ts
+ * Ejemplo:  RUN_LIVE_EVALS=1 EVAL_JUDGE=1 EVAL_MODEL=gemini-2.5-flash npx vitest run tests/evals/advisor-live.evals.test.ts
  */
-const RUN_LIVE = !!process.env.RUN_LIVE_EVALS;
-const USE_JUDGE = !!process.env.EVAL_JUDGE;
-const EVAL_MODEL = process.env.EVAL_MODEL; // undefined → modelo por defecto del provider
-
-// El provider real SOLO se construye cuando corremos vivo (evita tocar credenciales/red
-// en `npm run test`, donde además el describe se salta).
-const provider: AIProvider | undefined = RUN_LIVE
-  ? (createGeminiProvider(EVAL_MODEL) ?? undefined)
-  : undefined;
+// Provider del modelo bajo prueba + juez fijo (ambos solo en modo vivo). Ver eval-harness.
+const provider = makeModelProvider();
+const judgeProvider = makeJudgeProvider();
 const MODEL_LABEL = provider?.model ?? EVAL_MODEL ?? "sin-proveedor";
+const SUITE = "live"; // etiqueta de suite para la línea EVALJSON (comparación multi-modelo)
 
 // Fixture representativo: las mismas cifras del chat real que falló. Los asserts verifican
 // que la respuesta USA estas cifras (no inventa patrimonio ni dice "no tengo acceso").
@@ -62,7 +66,16 @@ const TOOL_CTX: ToolContext = {
 };
 
 const ask = (content: string): ChatMessage[] => [{ role: "user", content }];
-const chat = (messages: ChatMessage[]) => financeChatWithTools(messages, CTX, TOOL_CTX, provider);
+
+// Tokens del MODELO BAJO PRUEBA acumulados en todo el suite (para el costo por conversación).
+let tokIn = 0;
+let tokOut = 0;
+async function chat(messages: ChatMessage[]) {
+  const r = await financeChatWithTools(messages, CTX, TOOL_CTX, provider);
+  tokIn += r.tokensIn;
+  tokOut += r.tokensOut;
+  return r;
+}
 
 // Las llamadas al modelo REAL (con function-calling multiturno) exceden el testTimeout
 // por defecto de Vitest (5s). Damos margen amplio; sigue siendo opt-in y local.
@@ -124,25 +137,8 @@ function record(name: string, passed: boolean, reply?: string): CaseResult {
   return r;
 }
 
-/**
- * Juez opcional (EVAL_JUDGE=1): pide a un modelo puntuar 0/1 según una rúbrica corta.
- * Simple y no-fatal: sin provider o sin flag, no se llama. Devuelve 0..1.
- */
-async function judge(rubric: string, transcript: string): Promise<number> {
-  if (!provider) return 0;
-  const system =
-    "Sos un evaluador estricto de un asesor financiero. Puntuá 1 si la respuesta CUMPLE la " +
-    "rúbrica, 0 si NO la cumple. Respondé SOLO el dígito 1 o 0, sin explicaciones.";
-  const { text } = await provider.chat({
-    system,
-    messages: [
-      { role: "user", content: `RÚBRICA: ${rubric}\n\nTRANSCRIPCIÓN:\n${transcript}\n\nPuntaje (0 o 1):` },
-    ],
-    maxTokens: 4,
-  });
-  const m = text.match(/[01](?:\.\d+)?/);
-  return m?.[0] ? Number(m[0]) : 0;
-}
+/** Juez FIJO promediado (EVAL_JUDGE=1): el mismo modelo fuerte para todos los candidatos. */
+const judge = (rubric: string, transcript: string) => judgeAveraged(judgeProvider, rubric, transcript);
 
 afterAll(() => {
   if (!RUN_LIVE || results.length === 0) return;
@@ -157,10 +153,26 @@ afterAll(() => {
     .join("\n");
   // process.stdout.write (no console.log): Vitest intercepta console y oculta el resumen
   // cuando todos los casos pasan; esto garantiza que el PUNTAJE siempre se imprima.
+  const perConv = results.length ? Math.round((tokIn + tokOut) / results.length) : 0;
+  const judgeLine = USE_JUDGE ? ` · juez=${JUDGE_MODEL}` : "";
   process.stdout.write(
-    `\n===== EVALS VIVOS · modelo=${MODEL_LABEL} =====\n${lines}\n  PUNTAJE: ${passed}/${results.length}\n` +
+    `\n===== EVALS VIVOS · modelo=${MODEL_LABEL}${judgeLine} =====\n${lines}\n  PUNTAJE: ${passed}/${results.length}\n` +
+      `  TOKENS (modelo bajo prueba): in=${tokIn} out=${tokOut} · ~${perConv}/conversación\n` +
       (fails ? `\n  Respuestas de casos fallidos:${fails}\n` : "") +
       "\n",
+  );
+  // Línea máquina-legible (una sola) para el driver de comparación resiliente.
+  process.stdout.write(
+    `EVALJSON ${JSON.stringify({
+      model: MODEL_LABEL,
+      suite: SUITE,
+      judge: USE_JUDGE ? JUDGE_MODEL : null,
+      passed,
+      total: results.length,
+      tokIn,
+      tokOut,
+      cases: results.map((r) => ({ name: r.name, passed: r.passed, judge: r.judge ?? null })),
+    })}\n`,
   );
 });
 
@@ -199,6 +211,7 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
           `(invertible ₡${CTX.investableWealth} o neto ₡${CTX.netWorth}); NO inventa un patrimonio de arranque distinto.`,
         reply,
       );
+      rec.passed = passed && rec.judge >= 0.5;
       expect(rec.judge).toBeGreaterThanOrEqual(0.5);
     }
   });
@@ -260,6 +273,7 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
           `Libertad (₡${CTX.numeroDeLibertad}); ambos conceptos se mantienen separados.`,
         `T1: ${first.reply}\n---\nT2: ${second.reply}`,
       );
+      rec.passed = passed && rec.judge >= 0.5;
       expect(rec.judge).toBeGreaterThanOrEqual(0.5);
     }
   });
