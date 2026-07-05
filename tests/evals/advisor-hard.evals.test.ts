@@ -310,8 +310,9 @@ describe.skipIf(!RUN_LIVE)("evals DIFÍCILES · discriminan modelos (RUN_LIVE_EV
     // Debe nombrar la categoría de gasto más pesada REAL del contexto (estilo vida), no genérica.
     const namesRealCategory = /estilo de vida|estilo vida/.test(low);
     // Y decir claramente que no alcanza / no es realista con el flujo actual.
+    // (El modelo suele decir "no TE alcanza" o "N veces mayor"; ambos son señal válida.)
     const saysNotEnough =
-      /no alcanza|no te da|no da|no es posible|no es realista|inviable|fuera de tu alcance|muy dif[ií]cil|no lo lograr[ií]as|supera|excede/.test(
+      /no (te )?alcanz|no te da|no es (posible|realista)|inviable|fuera de tu alcance|muy dif[ií]cil|no lo lograr[ií]as|supera|excede|veces (mayor|m[aá]s)/.test(
         low,
       );
     const passed = namesRealCategory && saysNotEnough;

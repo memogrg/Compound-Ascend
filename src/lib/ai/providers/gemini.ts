@@ -15,7 +15,11 @@ import {
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 
-const MODEL = "gemini-2.5-flash";
+// Modelo de VISIÓN/recibos (alto volumen, salida estructurada): flash barato, no necesita el
+// modelo de asesoría. También es el fallback del constructor. El modelo de CHAT/asesoría es
+// configurable por env (GEMINI_MODEL, default gemini-3.5-flash) y lo inyecta createGeminiProvider.
+const VISION_MODEL = "gemini-2.5-flash";
+const MODEL = VISION_MODEL;
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const TIMEOUT_MS = 20000;
 // Reintentos para hipos transitorios del proveedor (5xx/429 y errores de red).
@@ -232,10 +236,11 @@ export class GeminiProvider implements AIProvider {
       generationConfig: {
         maxOutputTokens: 512,
         temperature: 0.1,
-        thinkingConfig: thinkingConfigFor(this.model),
+        thinkingConfig: thinkingConfigFor(VISION_MODEL),
       },
     };
-    return extract(await call(this.key, this.model, body));
+    // Recibos SIEMPRE en el flash barato, independiente del modelo de chat del provider.
+    return extract(await call(this.key, VISION_MODEL, body));
   }
 
   async chatWithTools({
@@ -293,6 +298,7 @@ export class GeminiProvider implements AIProvider {
 }
 
 export function createGeminiProvider(model?: string): GeminiProvider | null {
-  const key = getServerEnv().GEMINI_API_KEY;
-  return key ? new GeminiProvider(key, model ?? MODEL) : null;
+  const env = getServerEnv();
+  // Chat/asesoría: modelo explícito (evals) o el configurado por env (default gemini-3.5-flash).
+  return env.GEMINI_API_KEY ? new GeminiProvider(env.GEMINI_API_KEY, model ?? env.GEMINI_MODEL) : null;
 }
