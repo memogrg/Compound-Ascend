@@ -126,6 +126,51 @@ describe("tools · projectInvestment (interés compuesto, puro)", () => {
     expect(Number.isFinite(r.valor_futuro)).toBe(true);
     expect(r.valor_futuro).toBe(0); // aporte y años saneados a 0
     expect(r.rendimiento_supuesto_pct).toBe(8); // default
+    expect(r.cronograma_anual).toEqual([]); // n=0 → sin filas
+  });
+
+  it("cronograma_anual coincide con el interés compuesto hecho a mano (caso del chat) y cierra en valor_futuro", () => {
+    // Mismo caso que erró el modelo en el chat: 13.000.000 inicial, 207.365/mes, 15 años, 10%.
+    const inicial = 13_000_000;
+    const aporte = 207_365;
+    const anios = 15;
+    const rendPct = 10;
+    const r = projectInvestment(
+      { aporte_mensual: aporte, anios, rendimiento_anual_pct: rendPct, monto_inicial: inicial },
+      "CRC",
+    );
+
+    // Referencia a mano: misma recurrencia mensual (aporte al final de cada mes), agregada por año.
+    const i = rendPct / 100 / 12;
+    const esperado: { saldoInicial: number; aportes: number; interes: number; saldoFinal: number }[] = [];
+    let saldo = inicial;
+    for (let a = 0; a < anios; a += 1) {
+      const saldoInicial = saldo;
+      for (let m = 0; m < 12; m += 1) saldo = saldo * (1 + i) + aporte;
+      const aportes = aporte * 12;
+      esperado.push({ saldoInicial, aportes, interes: saldo - saldoInicial - aportes, saldoFinal: saldo });
+    }
+
+    expect(r.cronograma_anual).toHaveLength(anios);
+    r.cronograma_anual.forEach((fila, idx) => {
+      const esp = esperado[idx]!;
+      expect(fila.anio).toBe(idx + 1);
+      expect(fila.saldo_inicial).toBeCloseTo(esp.saldoInicial, 1);
+      expect(fila.aportes).toBeCloseTo(esp.aportes, 1);
+      expect(fila.interes).toBeCloseTo(esp.interes, 1);
+      expect(fila.saldo_final).toBeCloseTo(esp.saldoFinal, 1);
+      // Coherencia interna: saldo_final == saldo_inicial + aportes + interes.
+      expect(fila.saldo_final).toBeCloseTo(fila.saldo_inicial + fila.aportes + fila.interes, 1);
+    });
+
+    // Continuidad entre años: saldo_final[k] == saldo_inicial[k+1].
+    for (let k = 0; k < r.cronograma_anual.length - 1; k += 1) {
+      expect(r.cronograma_anual[k + 1]!.saldo_inicial).toBe(r.cronograma_anual[k]!.saldo_final);
+    }
+
+    // El saldo_final del último año coincide con el agregado valor_futuro.
+    const ultimo = r.cronograma_anual[r.cronograma_anual.length - 1]!;
+    expect(ultimo.saldo_final).toBeCloseTo(r.valor_futuro, 1);
   });
 });
 
