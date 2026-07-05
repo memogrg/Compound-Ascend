@@ -49,6 +49,17 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
       expenseMonthly: base.indicators.expenseMonthly,
       freeCashflow: base.indicators.freeCashflow,
     };
+    // Gasto más pesado por naturaleza (ya normalizado a la principal) + tasa de ahorro.
+    const natureEntries = Object.entries(base.indicators.expenseByNature).filter(([, v]) => v > 0);
+    if (natureEntries.length > 0 && base.indicators.expenseMonthly > 0) {
+      const top = natureEntries.reduce((a, b) => (b[1] > a[1] ? b : a));
+      ctx.topExpenseCategory = {
+        name: top[0].replaceAll("_", " "),
+        monthly: Math.round(top[1]),
+        pct: Math.round((top[1] / base.indicators.expenseMonthly) * 100),
+      };
+    }
+    ctx.savingsRatePct = Math.round(base.indicators.savingsRate * 100);
   } catch {
     // Sin base: contexto mínimo.
   }

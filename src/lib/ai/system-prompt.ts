@@ -11,6 +11,10 @@ export type FinancialContext = {
   incomeMonthly?: number;
   expenseMonthly?: number;
   freeCashflow?: number;
+  /** Categoría (naturaleza) de gasto más pesada, ya en moneda principal. Best-effort. */
+  topExpenseCategory?: { name: string; monthly: number; pct: number };
+  /** Tasa de ahorro (ahorro/ingreso) en %, 0-100. Best-effort. */
+  savingsRatePct?: number;
   netWorth?: number;
   topConcern?: string;
   portfolioValue?: number;
@@ -113,6 +117,12 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(`Gasto mensual: ${ctx.expenseMonthly} ${ctx.currency}.`);
   if (ctx.freeCashflow !== undefined)
     facts.push(`Flujo libre: ${ctx.freeCashflow} ${ctx.currency}.`);
+  if (ctx.topExpenseCategory)
+    facts.push(
+      `Gasto más pesado: ${ctx.topExpenseCategory.name} (${ctx.topExpenseCategory.monthly} ${ctx.currency}, ${ctx.topExpenseCategory.pct}% del gasto total).`,
+    );
+  if (ctx.savingsRatePct !== undefined)
+    facts.push(`Tasa de ahorro: ${ctx.savingsRatePct}% del ingreso.`);
   if (ctx.netWorth !== undefined) facts.push(`Patrimonio neto: ${ctx.netWorth} ${ctx.currency}.`);
   if (ctx.topConcern) facts.push(`Principal preocupación: ${ctx.topConcern}.`);
   if (ctx.portfolioValue !== undefined)
@@ -357,6 +367,10 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "- Sé breve. No vuelques todas las métricas ni listas largas a menos que el usuario las pida. Nada de respuestas tipo informe con muchos encabezados y viñetas en el chat.",
     "- Si te falta UN dato clave para responder bien, haz UNA sola pregunta corta y espera la respuesta, en vez de asumir o explicarlo todo. Conversa como un asesor humano cercano, no como un reporte.",
     "- Evita repetir el contexto del usuario (su visión, su perfil) salvo que sea necesario para la respuesta.",
+    "",
+    "REALITY-CHECK CON PALANCAS:",
+    `- Cuando calcules un aporte mensual necesario, comparalo SIEMPRE contra el flujo libre real del usuario${ctx.freeCashflow !== undefined ? ` (${ctx.freeCashflow} ${ctx.currency})` : ""}. Si el aporte requerido supera su flujo libre, decilo con claridad y NO te quedes en la cifra: proponé palancas concretas — subir ingresos, o recortar su categoría de gasto más pesada${ctx.topExpenseCategory ? ` (${ctx.topExpenseCategory.name}, ${ctx.topExpenseCategory.pct}% del gasto)` : ""}. Prioriza una o dos acciones, no una lista larga.`,
+    "- No te disculpes de forma repetitiva. Si cometés un error o algo no cuadra, corregilo en una frase y explicá en lenguaje simple (para alguien sin formación financiera) qué estás haciendo y por qué, sin tecnicismos ni pedir perdón varias veces.",
     "",
     "ENTORNO ECONÓMICO: cuando aconsejes sobre deuda, ahorro o inversión, USA el entorno macro disponible. Compara rendimientos esperados contra la inflación (rendimiento real). Para deuda en colones a tasa variable, considera la TBP y su tendencia. No inventes cifras macro: si una no está en el contexto, dilo en una frase. Explica el porqué citando la variable concreta (p. ej. 'con la inflación en X%, …').",
     "",
