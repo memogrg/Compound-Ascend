@@ -14,6 +14,7 @@ import {
 } from "@/lib/ai/tools";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 
 // Modelo de VISIÓN/recibos (alto volumen, salida estructurada): flash barato, no necesita el
 // modelo de asesoría. También es el fallback del constructor. El modelo de CHAT/asesoría es
@@ -21,7 +22,11 @@ import { AppError } from "@/lib/errors";
 const VISION_MODEL = "gemini-2.5-flash";
 const MODEL = VISION_MODEL;
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const TIMEOUT_MS = 20000;
+// Timeout por llamada. Subido de 20s a 35s: producción usa gemini-3.5-flash, más lento que el
+// gemini-2.5-flash para el que se calibró 20s → a 20s se abortaban llamadas legítimas. Con
+// maxDuration=60 en las rutas hay margen de sobra, así que 35s da aire sin arriesgar el
+// presupuesto total. La lógica de reintentos no cambia.
+const TIMEOUT_MS = 35000;
 // Reintentos para hipos transitorios del proveedor (5xx/429 y errores de red).
 const MAX_ATTEMPTS = 3; // 1 intento + 2 reintentos
 const RETRY_BASE_MS = 400;
@@ -74,10 +79,28 @@ export function backoffMs(attempt: number): number {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Extracto corto y seguro del cuerpo de error para el log. La GEMINI_API_KEY viaja en la URL
+ * (query string), NO en el cuerpo, así que el body de error de Gemini no la contiene; aun así
+ * lo truncamos. Defensivo: si el Response no expone `.text()` (mocks de test) o la lectura
+ * falla, devuelve "".
+ */
+async function errorBodyExcerpt(res: Response): Promise<string> {
+  try {
+    if (typeof res.text !== "function") return "";
+    return (await res.text()).slice(0, 200);
+  } catch {
+    return "";
+  }
+}
+
+/**
  * POST JSON con timeout + reintentos transitorios (5xx/429 y red) → AppError. Genérico para
  * cualquier endpoint de Gemini (generateContent, batchEmbedContents). Mismo contrato que antes.
+ * `model` es SOLO para el log accionable (nunca la URL con la key). Antes de lanzar el
+ * PROVIDER_ERROR genérico, registra la causa real (status/abort/red + modelo + extracto del
+ * cuerpo) para distinguir en Vercel cuota (429/RESOURCE_EXHAUSTED) de timeout o 5xx.
  */
-async function postJsonWithRetry(url: string, body: unknown): Promise<unknown> {
+async function postJsonWithRetry(url: string, body: unknown, model: string): Promise<unknown> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const isLast = attempt === MAX_ATTEMPTS - 1;
     const controller = new AbortController();
@@ -92,21 +115,48 @@ async function postJsonWithRetry(url: string, body: unknown): Promise<unknown> {
           signal: controller.signal,
         });
       } catch (e) {
-        // Timeout (AbortError): no reintentar para no apilar esperas de 20s.
+        // Timeout (AbortError): no reintentar para no apilar esperas.
         if (e instanceof Error && e.name === "AbortError") {
+          logger.error("gemini: llamada abortada por timeout", {
+            model,
+            abort: true,
+            timeoutMs: TIMEOUT_MS,
+            attempt,
+          });
           throw new AppError("PROVIDER_ERROR", undefined, "gemini timeout");
         }
         // Error de red transitorio (p. ej. TypeError): reintentar.
-        if (isLast) throw new AppError("PROVIDER_ERROR", undefined, "gemini network");
+        if (isLast) {
+          logger.error("gemini: error de red tras agotar reintentos", {
+            model,
+            network: e instanceof Error ? e.name : "?",
+            attempt,
+          });
+          throw new AppError("PROVIDER_ERROR", undefined, "gemini network");
+        }
         await sleep(backoffMs(attempt));
         continue;
       }
       if (res.ok) return await res.json();
-      // No-ok transitorio (5xx/429): reintentar; el resto se lanza ya.
+      // No-ok transitorio (5xx/429) con reintentos disponibles: avisar y reintentar.
       if (isRetryableStatus(res.status) && !isLast) {
+        logger.warn("gemini: status transitorio, reintentando", {
+          model,
+          status: res.status,
+          attempt,
+        });
         await sleep(backoffMs(attempt));
         continue;
       }
+      // Terminal (4xx no reintentable, o transitorio ya sin reintentos): log con status + cuerpo.
+      const excerpt = await errorBodyExcerpt(res);
+      logger.error("gemini: respuesta no-2xx", {
+        model,
+        status: res.status,
+        retryable: isRetryableStatus(res.status),
+        attempt,
+        body: excerpt,
+      });
       throw new AppError("PROVIDER_ERROR", undefined, `gemini ${res.status}`);
     } finally {
       clearTimeout(timer);
@@ -120,6 +170,7 @@ async function call(key: string, model: string, body: unknown): Promise<GeminiRe
   return (await postJsonWithRetry(
     `${BASE}/${model}:generateContent?key=${key}`,
     body,
+    model,
   )) as GeminiResponse;
 }
 
@@ -152,6 +203,7 @@ export async function embedTexts(
   const json = (await postJsonWithRetry(
     `${BASE}/${EMBED_MODEL}:batchEmbedContents?key=${key}`,
     body,
+    EMBED_MODEL,
   )) as BatchEmbedResponse;
   return (json.embeddings ?? []).map((e) => e.values ?? []);
 }
