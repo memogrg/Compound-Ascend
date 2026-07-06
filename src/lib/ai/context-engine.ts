@@ -14,6 +14,7 @@ import "server-only";
  */
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
+import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 
 /** Coacciona un valor jsonb a string[] (las columnas jsonb llegan como unknown). */
 function asStrings(v: unknown): string[] {
@@ -146,6 +147,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     ctx.netWorth = Math.round(summary.snapshot.indicators.netWorth);
     // Respaldo REAL (meses de independencia): señal dura para el guardrail R3 (fondo de paz).
     ctx.emergencyMonths = Math.round(summary.snapshot.indicators.monthsOfIndependence);
+    // Desglose invertido/líquido/otros sobre el MISMO set agregado (paridad con WhatsApp).
+    ctx.wealthBreakdown = computeWealthBreakdown(summary.allAssets);
   } catch {
     // Rich Life no disponible.
   }

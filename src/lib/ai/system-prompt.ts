@@ -36,6 +36,14 @@ export type FinancialContext = {
   coberturaPasivaPct?: number; // ingreso pasivo / gasto, en %
   calidadPatrimonio?: number; // 0-100
   investableWealth?: number;
+  /** Desglose del patrimonio por naturaleza (motor wealth-breakdown), en moneda principal:
+   *  cuánto invertido, cuánto líquido/ahorros, cuánto otros, y las clases principales. */
+  wealthBreakdown?: {
+    invested: number;
+    liquid: number;
+    other: number;
+    topClasses: { label: string; value: number }[];
+  };
   patrimonioDiagnosis?: string[]; // códigos de banderas §15
   // Entorno macro/micro (no son datos del usuario; son del entorno). Best-effort.
   inflacionYoYPct?: number; // IPC interanual de la moneda del usuario
@@ -168,6 +176,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
   if (ctx.investableWealth !== undefined)
     facts.push(`Patrimonio invertible: ${ctx.investableWealth} ${ctx.currency}.`);
+  if (ctx.wealthBreakdown) {
+    const w = ctx.wealthBreakdown;
+    const top = w.topClasses.map((c) => `${c.label} ${c.value} ${ctx.currency}`).join(", ");
+    facts.push(
+      `Distribución de tu patrimonio: invertido ${w.invested} ${ctx.currency}, en ahorros/líquido ${w.liquid} ${ctx.currency}, otros ${w.other} ${ctx.currency}${top ? `; principales clases: ${top}` : ""}.`,
+    );
+  }
   if (ctx.mesesDeLibertad !== undefined)
     facts.push(`Meses de Libertad (liquidez): ${ctx.mesesDeLibertad}.`);
   if (ctx.coberturaPasivaPct !== undefined)
@@ -406,6 +421,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "USA TUS MÉTRICAS YA CALCULADAS:",
     "- Usa SIEMPRE las métricas que ya vienen en tu contexto (Índice Patrimonial, Número/Años/Meses de Libertad, cobertura, calidad). NUNCA las recalcules a partir del patrimonio neto y los gastos.",
     '- "¿Cuántos años puedo vivir de mi patrimonio?" → usa los Años de Libertad. "¿Cuánto necesito para vivir de mi patrimonio?" → el Número de Libertad. "¿Cuál es mi patrimonio líquido / cuántos meses cubro?" → los Meses de Libertad y la liquidez. "¿Voy bien?" → el Índice Patrimonial y su nivel.',
+    '- "¿Cuánto tengo ya invertido / cuánto en ahorros o líquido / cómo está distribuido mi patrimonio?" → usá la "Distribución de tu patrimonio" (invertido / líquido / otros y las clases principales) que viene en tu contexto. Si está disponible, NO digas que no tenés el desglose.',
     "- Si una métrica no está en el contexto, dilo en una frase y ofrece calcularla; no la inventes.",
     "",
     "ESTILO DE RESPUESTA (directo y conversacional):",

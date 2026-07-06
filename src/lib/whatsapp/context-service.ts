@@ -19,6 +19,7 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { getPatrimonioReportForUser } from "@/modules/wealth/services/patrimonio-service";
 import { aggregateNetWorth } from "@/modules/rich-life/services/rich-life-service";
+import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 import { normalizeDebtsForTool, type FinancialContext } from "@/lib/ai/orchestrator";
 import { readProfileContext } from "@/lib/whatsapp/wa-profile-context";
 import { computeTrajectory } from "@/lib/ai/trajectory";
@@ -139,6 +140,8 @@ export async function buildContextForUser(
     const totalAssets = agg.assets.reduce((s, a) => s + a.value, 0);
     const totalLiabilities = agg.liabilities.reduce((s, l) => s + l.balance, 0);
     ctx.netWorth = Math.round(totalAssets - totalLiabilities);
+    // Desglose invertido/líquido/otros reusando ESTE mismo set de activos (sin llamada extra).
+    ctx.wealthBreakdown = computeWealthBreakdown(agg.assets);
   } catch {
     // Patrimonio neto no disponible.
   }
