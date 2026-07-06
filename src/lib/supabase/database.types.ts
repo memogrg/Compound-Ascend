@@ -561,6 +561,7 @@ export type InvestmentTransactionRow = Timestamps & {
   user_id: string;
   household_id: string | null;
   investment_id: string | null;
+  holding_id: string | null;
   tx_type: string | null;
   amount: number;
   quantity: number | null;
