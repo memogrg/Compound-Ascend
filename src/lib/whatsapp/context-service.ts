@@ -64,6 +64,8 @@ export async function buildContextForUser(
   };
   if (incomeMonthly > 0)
     ctx.savingsRatePct = Math.round(((incomeMonthly - expenseMonthly) / incomeMonthly) * 100);
+  // Fuentes de ingreso activas (para señalar concentración si es una sola).
+  ctx.incomeSourceCount = (inc ?? []).filter((r) => Number(r.amount_monthly_base ?? 0) > 0).length;
 
   // FX una sola vez, compartido por Marco Patrimonial, deudas y gasto más pesado. Best-effort.
   let rates: Record<string, number> | null = null;
