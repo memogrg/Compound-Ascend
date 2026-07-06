@@ -49,6 +49,17 @@ const CTX: FinancialContext = {
   portfolioValue: 61_581_512,
   investableWealth: 13_000_000,
   numeroDeLibertad: 290_400_000,
+  // Desglose del patrimonio (invertido / líquido / otros) para el caso "cuánto invertido / ahorros".
+  wealthBreakdown: {
+    invested: 61_581_512,
+    liquid: 8_400_000,
+    other: 35_058_523,
+    topClasses: [
+      { label: "Inversión", value: 61_581_512 },
+      { label: "Productivos", value: 35_058_523 },
+      { label: "Líquidos", value: 8_400_000 },
+    ],
+  },
   incomeMonthly: 3_500_000,
   expenseMonthly: 2_100_000,
   freeCashflow: 1_400_000,
@@ -383,6 +394,34 @@ describe.skipIf(!RUN_LIVE)("evals DIFÍCILES · discriminan modelos (RUN_LIVE_EV
       rec.judge = await judge(
         "Muestra cuánto tardaría pagando SOLO el mínimo (años) y el interés total, y lo contrasta con " +
           "salir en un plazo corto (p. ej. 12 meses) o la tasa efectiva; coherente con una herramienta, no inventado.",
+        reply,
+      );
+      rec.passed = passed && rec.judge >= 0.5;
+      expect(rec.judge).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it("desglose del patrimonio → da invertido y líquido/ahorros del contexto (no 'no tengo ese dato')", { timeout: HARD_TIMEOUT }, async () => {
+    // CTX trae wealthBreakdown (invertido 61.58M, líquido 8.4M): el asesor debe desglosar, no negar.
+    const { reply } = await chat(ask("¿cuánto tengo ya invertido y cuánto en ahorros?"));
+    expect(reply).toBeTypeOf("string");
+
+    const low = norm(reply);
+    // (a) Nombra ambas naturalezas y (b) cita al menos uno de los montos reales del contexto.
+    const namesInvested = /invert/.test(low);
+    const namesLiquid = /(ahorro|l[ií]quid)/.test(low);
+    const citesFigure = citesAmount(reply, 61_581_512) || citesAmount(reply, 8_400_000);
+    // (c) NO se excusa de no tener el desglose (el dato SÍ está en el contexto).
+    const notMissing =
+      !/no (tengo|dispongo|cuento con|manejo)[^.]{0,40}(dato|desglose|distribu|informaci|detalle)/.test(low);
+    const passed = namesInvested && namesLiquid && citesFigure && notMissing;
+    const rec = record("desglose del patrimonio", passed, reply);
+    expect(passed).toBe(true);
+
+    if (USE_JUDGE) {
+      rec.judge = await judge(
+        "Desglosa el patrimonio: dice cuánto está invertido y cuánto en ahorros/líquido usando las cifras " +
+          "del contexto, sin afirmar que no tiene ese dato ni inventar montos distintos.",
         reply,
       );
       rec.passed = passed && rec.judge >= 0.5;

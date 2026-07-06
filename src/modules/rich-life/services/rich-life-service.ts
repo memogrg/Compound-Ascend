@@ -150,7 +150,10 @@ export function resolveInvestmentValue(
 
 export type RichLifeSummary = {
   snapshot: RichLifeSnapshot;
-  assets: Asset[];
+  assets: Asset[]; // solo activos manuales (tabla `assets`), para la UI editable
+  /** Activos AGREGADOS y normalizados a la principal (manuales + inversiones + liquidez):
+   *  el mismo set que usa el motor de patrimonio. Para desgloses (invertido/líquido/otros). */
+  allAssets: Asset[];
   liabilities: Liability[];
   currency: string;
 };
@@ -426,6 +429,7 @@ export async function getRichLifeSummary(): Promise<RichLifeSummary> {
   return {
     snapshot,
     assets: agg.explicitAssets,
+    allAssets: agg.assets,
     liabilities: agg.explicitLiabilities,
     currency: agg.currency,
   };
@@ -493,5 +497,5 @@ export function buildDemoRichLifeSummary(): RichLifeSummary {
     previous: { netWorth: 29_500_000 },
     currency,
   };
-  return { snapshot: buildRichLifeSnapshot(input), assets, liabilities, currency };
+  return { snapshot: buildRichLifeSnapshot(input), assets, allAssets: assets, liabilities, currency };
 }

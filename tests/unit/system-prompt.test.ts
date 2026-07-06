@@ -41,6 +41,35 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).toContain("Tono de coaching preferido: suave.");
   });
 
+  it("wealthBreakdown se vuelca como fact legible (invertido/líquido/otros + clases) y activa la regla", () => {
+    const ctx: FinancialContext = {
+      currency: "CRC",
+      wealthBreakdown: {
+        invested: 4_200_000,
+        liquid: 3_000_000,
+        other: 47_000_000,
+        topClasses: [
+          { label: "Productivos", value: 38_000_000 },
+          { label: "Uso personal", value: 9_000_000 },
+          { label: "Inversión", value: 4_200_000 },
+        ],
+      },
+    };
+    const prompt = buildSystemPrompt(ctx);
+    // El fact con los tres montos y las clases principales.
+    expect(prompt).toContain(
+      "Distribución de tu patrimonio: invertido 4200000 CRC, en ahorros/líquido 3000000 CRC, otros 47000000 CRC; principales clases: Productivos 38000000 CRC, Uso personal 9000000 CRC, Inversión 4200000 CRC.",
+    );
+    // La regla que le dice al modelo que use el desglose y no diga que no lo tiene.
+    expect(prompt).toContain("Distribución de tu patrimonio");
+    expect(prompt).toContain("NO digas que no tenés el desglose");
+  });
+
+  it("sin wealthBreakdown no aparece el fact de distribución", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).not.toContain("Distribución de tu patrimonio: invertido");
+  });
+
   it("impulsividad alta, urgencia alta y dependientes activan sus reglas", () => {
     const prompt = buildSystemPrompt({
       currency: "USD",
