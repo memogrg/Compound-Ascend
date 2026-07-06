@@ -10,8 +10,9 @@ npm run build        # Production build
 npm run lint         # ESLint
 npm run typecheck    # TypeScript strict check
 npm run format       # Prettier
-npm run test         # Vitest (unit tests, run once)
+npm run test         # Vitest (unit + integration, run once)
 npm run test:watch   # Vitest in watch mode
+npm run test:eval    # Advisor eval suite (tests/evals) — gated on AI credentials
 ```
 
 To run a single test file:
@@ -19,7 +20,9 @@ To run a single test file:
 npx vitest run tests/unit/control.test.ts
 ```
 
-The RLS isolation test (`tests/rls/isolation.test.ts`) requires real Supabase credentials and is skipped in CI unless those env vars are set.
+The E2E smoke test is Playwright, not Vitest: `npx playwright test tests/e2e/smoke.spec.ts`. Its `webServer` config boots `npm run dev` (reusing an existing server) and needs `E2E_EMAIL`/`E2E_PASSWORD` for a seeded sandbox user. In CI it's a non-blocking job that seeds the user + a holding via service-role SQL before running.
+
+Test layout: `tests/unit` (pure logic), `tests/rls` (real-Supabase RLS isolation — skipped in CI unless creds are set), `tests/evals` (advisor quality, some live AI), `tests/e2e` (Playwright smoke), `tests/stubs` (e.g. a `server-only` no-op aliased in `vitest.config.ts` so server modules import in the node test env). `npm run test` matches `*.test.ts` everywhere, so eval files run too but self-skip without AI credentials.
 
 ## Architecture
 
@@ -41,6 +44,8 @@ Business logic lives in `src/modules/`, divided into 8 self-contained modules:
 | `assistant` | API only | AI chat + receipt scanner |
 
 WhatsApp lives outside modules (`src/lib/whatsapp/` + `/api/whatsapp/webhook`); household helpers in `src/lib/household/`. The messaging provider is abstracted behind `WhatsAppProvider` (`provider.ts`): **Meta WhatsApp Cloud API** (`meta.ts`) is the active provider for both inbound (webhook verifies `X-Hub-Signature-256` via `meta-signature.ts`) and outbound. The legacy Twilio implementation (`twilio.ts` / `twilio-signature.ts`) is retained only as a rollback path and is no longer wired into the webhook — see issue #114 for its removal.
+
+Email receipt ingestion is a second external-input path (`src/lib/ingestion/`): an IMAP poller (`ingestion/email/imap-poller.ts`) parses forwarded bank/card emails into `ingest_proposals` the user reviews. Like the WhatsApp webhook it has no user session, so it writes with the **service-role** client and its rows surface for categorisation rather than being auto-applied.
 
 Each module follows this internal layout:
 ```
@@ -82,7 +87,15 @@ Three clients with different privilege levels — use the right one:
 
 ### AI layer
 
-`src/lib/ai/provider.ts` defines the `AIProvider` interface — Gemini is the real implementation; `StubProvider` is used in tests. The orchestrator in `src/modules/assistant/` builds a Spanish-language system prompt with the user's financial context. AI responses return text + a proposed action object; actions are **never auto-executed** — they're surfaced for user confirmation.
+`src/lib/ai/provider.ts` defines the `AIProvider` interface — Gemini is the real implementation (`GEMINI_MODEL`, default `gemini-3.5-flash`; vision uses `gemini-2.5-flash`); `StubProvider` is used in tests. The orchestrator in `src/modules/assistant/` builds a Spanish-language system prompt with the user's financial context. AI responses return text + a proposed action object; actions are **never auto-executed** — they're surfaced for user confirmation.
+
+### Insights (the bell / campana)
+
+`src/lib/insights/` powers the dashboard notification bell. Pure `detect*` functions in `detectors.ts` each turn some slice of user data into `DetectedInsight`s (kind + severity + optional `relatedKind`/`relatedId`). `refreshInsights()` runs them behind a **freshness guard** (only if the last run is stale) and hands the result to `syncInsights()`, which **reconciles by `(kind, related_id)`**: a detector that stops emitting an insight marks the persisted row `resuelto` automatically — this is how an insight self-clears once the underlying condition is fixed. `getActiveInsights()` triggers a refresh on read. Keep side-effectful work (merges, expense writes) **out of `refreshInsights()`** — it also runs from the AI context-engine; do such work in the page load instead (see the DCA gap below).
+
+### DCA gap (brecha de aporte) — cross-module example
+
+A worked example of the patterns above. Recurring quoted holdings (`is_recurring`, `monthly_contribution > 0`) auto-register a monthly contribution at the live price when Patrimonio **or** the dashboard loads (`ensureMonthlyContributions()`, best-effort, idempotent via a unique index on `(holding_id, period_year, period_month)`). Each contribution row (`holding_contributions`) links to its expense `transaction_id`; the user confirms/adjusts the price (`adjustContributionPrice`, reverse + re-merge — the weighted average is order-independent). Open contributions surface as an `aporte_pendiente` insight that self-resolves on confirmation. Every purchase is also persisted to `investment_transactions` (`tx_type='compra'`, with `holding_id`) for DCA history — the holding's running average is unchanged by this, it's history only.
 
 ### Market data
 
@@ -94,7 +107,7 @@ Timeout is 3 s per provider for price lookups (`providers.ts`); FX-rate fetches 
 
 ### Rate limiting
 
-`src/lib/rate-limit/` is in-memory, keyed by user ID or IP. Same caveat: no Redis backing yet, so limits are per-instance. Don't add new in-memory global state — surface the Redis hook when you need persistence.
+`src/lib/rate-limit/` uses a fixed-window counter behind a `RateStore` abstraction: **Upstash Redis** (`RedisRateStore`, INCR + PEXPIRE) when `UPSTASH_REDIS_REST_URL`/`_TOKEN` are set — coherent across Vercel's serverless instances — else an in-memory fallback (`MemoryRateStore`). Redis failures at runtime degrade to memory (fail-open, logged). Buckets are declared in `RATE_LIMITS` (auth, aiChat, receiptScan, marketData, passwordReset, webhook). Note the split: rate-limit is Redis-backed, but the **market-data and economic-indicators caches (`*/cache.ts`) are still memory-only** even when `REDIS_URL` is present — they log and use the in-memory TTL store until a Redis adapter is wired.
 
 ### Security constraints
 
@@ -146,7 +159,7 @@ The expense panel renders jars (`financial-base/components/v2/expense-jars/` + p
 
 - `next lint` is deprecated (removal in Next.js 16) — migration to ESLint CLI pending.
 - Some `revalidatePath("/ahorro")` calls reference a non-existent route; the savings screen is `/control-financiero`.
-- Migrations: 34 files. `20260610000001-3` (household, from main) and `20260610100001-3` (interconexión, renamed to avoid version collision) coexist on purpose — don't "fix" the numbering.
+- Migrations: ~76 files in `supabase/migrations/`, hand-numbered `YYYYMMDD######`. Numbering has intentional gaps (skipped/renamed versions) — e.g. `20260610000001-3` (household) and `20260610100001-3` (interconexión, renamed to avoid a version collision) coexist on purpose; don't "fix" the numbering. Migrations are applied **manually** (SQL Editor), then reconciled with `supabase migration repair --status applied <version>` — not `supabase db push`. Adding a column to a table means the generated `src/lib/supabase/database.types.ts` won't know about it (types aren't auto-regenerated), so add the field to the relevant `*Row` type in the same change or inserts/updates won't typecheck.
 - `npm run build` and `npm run dev` can't run simultaneously (shared `.next`).
 
 ### Localisation
