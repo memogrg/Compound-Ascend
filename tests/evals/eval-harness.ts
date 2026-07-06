@@ -50,20 +50,29 @@ export async function judgeAveraged(
   let sum = 0;
   let n = 0;
   for (let i = 0; i < runs; i += 1) {
-    const { text } = await judgeProvider.chat({
-      system: JUDGE_SYSTEM,
-      messages: [
-        { role: "user", content: `RÚBRICA: ${rubric}\n\nTRANSCRIPCIÓN:\n${transcript}\n\nPuntaje (0 o 1):` },
-      ],
-      // Amplio a propósito: un juez de razonamiento (p. ej. *-pro) consume tokens de thinking
-      // antes de emitir el dígito; con un tope chico se truncaría y devolvería vacío.
-      maxTokens: 2048,
-    });
-    const m = text.match(/[01](?:\.\d+)?/);
-    if (m?.[0]) {
-      sum += Number(m[0]);
-      n += 1;
+    // Resiliente: un hipo transitorio del proveedor del juez (p. ej. 429/5xx en modelos -pro
+    // de baja RPM) no debe crashear el eval; se salta esa corrida y se promedian las exitosas.
+    try {
+      const { text } = await judgeProvider.chat({
+        system: JUDGE_SYSTEM,
+        messages: [
+          { role: "user", content: `RÚBRICA: ${rubric}\n\nTRANSCRIPCIÓN:\n${transcript}\n\nPuntaje (0 o 1):` },
+        ],
+        // Amplio a propósito: un juez de razonamiento (p. ej. *-pro) consume tokens de thinking
+        // antes de emitir el dígito; con un tope chico se truncaría y devolvería vacío.
+        maxTokens: 2048,
+      });
+      const m = text.match(/[01](?:\.\d+)?/);
+      if (m?.[0]) {
+        sum += Number(m[0]);
+        n += 1;
+      }
+    } catch {
+      // corrida del juez fallida → se ignora
     }
+    // Espaciamos las llamadas para no gatillar el rate-limit del juez pro.
+    if (i < runs - 1) await new Promise((r) => setTimeout(r, 900));
   }
-  return n > 0 ? Math.round((sum / n) * 100) / 100 : 0;
+  // NaN señala "juez no disponible" (todas las corridas fallaron); el caller decide el fallback.
+  return n > 0 ? Math.round((sum / n) * 100) / 100 : NaN;
 }

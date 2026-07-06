@@ -338,3 +338,42 @@ describe("buildSystemPrompt · trayectoria (memoria longitudinal)", () => {
     expect(prompt).not.toContain("Tenés la trayectoria del usuario");
   });
 });
+
+describe("buildSystemPrompt · comportamientos de asesor experto (reglas condicionales)", () => {
+  it("emergencyMonths<3 → regla de proteger antes de crecer (no si el respaldo es suficiente)", () => {
+    const bajo = buildSystemPrompt({ currency: "CRC", emergencyMonths: 1 });
+    expect(bajo).toContain("Su respaldo de emergencia es bajo (menos de 3 meses)");
+    expect(bajo).toContain("reforzar la base");
+    const ok = buildSystemPrompt({ currency: "CRC", emergencyMonths: 8 });
+    expect(ok).not.toContain("Su respaldo de emergencia es bajo");
+  });
+
+  it("cerca del Número de Libertad (invertible ≥80%) → regla de riesgo de secuencia", () => {
+    const cerca = buildSystemPrompt({
+      currency: "CRC",
+      numeroDeLibertad: 200_000_000,
+      investableWealth: 190_000_000,
+    });
+    expect(cerca).toContain("RIESGO DE SECUENCIA");
+    expect(cerca).toContain("cubetas");
+    // Lejos del número → no aplica.
+    const lejos = buildSystemPrompt({
+      currency: "CRC",
+      numeroDeLibertad: 200_000_000,
+      investableWealth: 13_000_000,
+    });
+    expect(lejos).not.toContain("RIESGO DE SECUENCIA");
+  });
+
+  it("regla de seguros (vida/invalidez) presente y condicionada a que pregunte", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toContain("SEGUROS (aplicá solo si el usuario pregunta por seguros)");
+    expect(prompt).toContain("INVALIDEZ/incapacidad");
+    expect(prompt).toContain("sin dependientes, no es necesario");
+  });
+
+  it("incomeSourceCount=1 rinde el fact de una sola fuente", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC", incomeSourceCount: 1 });
+    expect(prompt).toContain("Fuentes de ingreso activas: 1 (una sola fuente).");
+  });
+});

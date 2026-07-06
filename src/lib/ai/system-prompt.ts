@@ -11,6 +11,8 @@ export type FinancialContext = {
   name?: string;
   currency: string;
   incomeMonthly?: number;
+  /** Cuántas fuentes de ingreso activas tiene (1 = dependencia de una sola fuente). Best-effort. */
+  incomeSourceCount?: number;
   expenseMonthly?: number;
   freeCashflow?: number;
   /** Categoría (naturaleza) de gasto más pesada, ya en moneda principal. Best-effort. */
@@ -117,6 +119,10 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.name) facts.push(`El usuario se llama ${ctx.name}.`);
   if (ctx.incomeMonthly !== undefined)
     facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}.`);
+  if (ctx.incomeSourceCount !== undefined)
+    facts.push(
+      `Fuentes de ingreso activas: ${ctx.incomeSourceCount}${ctx.incomeSourceCount === 1 ? " (una sola fuente)" : ""}.`,
+    );
   if (ctx.expenseMonthly !== undefined)
     facts.push(`Gasto mensual: ${ctx.expenseMonthly} ${ctx.currency}.`);
   if (ctx.freeCashflow !== undefined)
@@ -361,6 +367,23 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.dependentsCount !== undefined && ctx.dependentsCount > 0)
     behaviorRules.push("Tiene dependientes: prioriza la protección (seguro, fondo de emergencia) antes que estrategias agresivas.");
 
+  // Proteger antes de crecer: respaldo de emergencia bajo (señal dura, independiente de urgencia).
+  if (ctx.emergencyMonths !== undefined && ctx.emergencyMonths < 3)
+    behaviorRules.push(
+      "Su respaldo de emergencia es bajo (menos de 3 meses). Si pregunta por invertir (sobre todo agresivo), señalá PRIMERO reforzar la base —fondo de emergencia/liquidez— antes de crecer; recién después hablás de inversión. Con tacto y sin alargar.",
+    );
+
+  // Riesgo de secuencia: cerca del Número de Libertad (patrimonio invertible ≥ 80% del número).
+  if (
+    ctx.numeroDeLibertad !== undefined &&
+    ctx.investableWealth !== undefined &&
+    ctx.numeroDeLibertad > 0 &&
+    ctx.investableWealth >= ctx.numeroDeLibertad * 0.8
+  )
+    behaviorRules.push(
+      "Está muy cerca de su Número de Libertad. Si pregunta por RETIRAR o vivir de su patrimonio, advertí el RIESGO DE SECUENCIA de retornos (la 'zona roja' de los primeros años de retiro) y ofrecé una mitigación concreta (estrategia de cubetas/buckets o retiros con barandas). Solo si viene al caso; breve.",
+    );
+
   // Memoria conductual (Fase 4): cómo usar las observaciones recientes.
   if (ctx.insights?.length)
     behaviorRules.push(
@@ -394,6 +417,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "REALITY-CHECK CON PALANCAS:",
     `- Cuando calcules un aporte mensual necesario, comparalo SIEMPRE contra el flujo libre real del usuario${ctx.freeCashflow !== undefined ? ` (${ctx.freeCashflow} ${ctx.currency})` : ""}. Si el aporte requerido supera su flujo libre, decilo con claridad y NO te quedes en la cifra: proponé 1-2 palancas concretas.${ctx.topExpenseCategory ? ` Entre esas palancas DEBÉS incluir, nombrándola EXPLÍCITAMENTE por su nombre y su monto, recortar su categoría de gasto más pesada: "${ctx.topExpenseCategory.name}" (${ctx.topExpenseCategory.monthly} ${ctx.currency}, ${ctx.topExpenseCategory.pct}% del gasto) — aunque también sugieras subir ingresos. PROHIBIDO reemplazarla por un consejo genérico tipo "reducí gastos" o "multiplicá tus ingresos" sin nombrar esa categoría real.` : " Prioriza subir ingresos o recortar el gasto más pesado; no una lista larga."}`,
     "- No te disculpes de forma repetitiva. Si cometés un error o algo no cuadra, corregilo en una frase y explicá en lenguaje simple (para alguien sin formación financiera) qué estás haciendo y por qué, sin tecnicismos ni pedir perdón varias veces.",
+    "- SEGUROS (aplicá solo si el usuario pregunta por seguros): pensá en severidad, no frecuencia. El seguro de VIDA solo es prioritario si hay personas que dependen de su ingreso; sin dependientes, no es necesario. No omitas la INVALIDEZ/incapacidad: es la cobertura más desatendida para quien vive de su ingreso laboral. Recomendá con criterio, sin vender ni alargar.",
     "",
     "ENTORNO ECONÓMICO: cuando aconsejes sobre deuda, ahorro o inversión, USA el entorno macro disponible. Compara rendimientos esperados contra la inflación (rendimiento real). Para deuda en colones a tasa variable, considera la TBP y su tendencia. No inventes cifras macro: si una no está en el contexto, dilo en una frase. Explica el porqué citando la variable concreta (p. ej. 'con la inflación en X%, …').",
     "",

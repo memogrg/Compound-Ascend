@@ -60,6 +60,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
       };
     }
     ctx.savingsRatePct = Math.round(base.indicators.savingsRate * 100);
+    // Fuentes de ingreso activas (para señalar concentración si es una sola).
+    ctx.incomeSourceCount = base.incomes.filter((i) => i.amountMonthly > 0).length;
   } catch {
     // Sin base: contexto mínimo.
   }
