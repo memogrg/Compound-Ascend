@@ -23,11 +23,13 @@ import {
   PROJECT_INVESTMENT_TOOL,
   FREEDOM_TOOL,
   GOALS_TOOL,
+  YEARS_TO_FREEDOM_TOOL,
   simulateDebtPayoff,
   compareDebtStrategies,
   projectInvestment,
   projectFreedom,
   projectGoals,
+  yearsToFreedom,
   type GoalForTool,
   type AiToolExecutor,
 } from "@/lib/ai/tools";
@@ -178,6 +180,14 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       // Metas reales del usuario, ya en moneda principal.
       return projectGoals(args, { goals: toolContext.goals, currency: toolContext.currency });
     }
+    if (name === "anios_para_libertad") {
+      // Años hasta la libertad al ritmo actual + sensibilidad (número + invertible reales).
+      return yearsToFreedom(args, {
+        freedomNumber: toolContext.freedomNumber,
+        investableWealth: toolContext.investableWealth,
+        currency: toolContext.currency,
+      });
+    }
     return { error: `herramienta no disponible: ${name}` };
   };
 }
@@ -198,7 +208,10 @@ export const TOOLS_PROMPT_LINE =
   "disponible:false, decile que primero registre una meta. " +
   "Para CUALQUIER tabla o desglose año-por-año de crecimiento o ahorro, USÁ el 'cronograma_anual' " +
   "que devuelve proyectar_inversion (saldo inicial, aportes, interés y saldo final por año). " +
-  "NUNCA construyas una tabla numérica a mano ni calcules el interés compuesto de memoria.";
+  "NUNCA construyas una tabla numérica a mano ni calcules el interés compuesto de memoria. " +
+  "Si el usuario pregunta en cuánto tiempo llegaría a su libertad financiera con su ritmo de " +
+  "ahorro ACTUAL, o cuánto se acortaría si ahorra más, USÁ anios_para_libertad (no estimes de " +
+  "memoria); el rendimiento es un SUPUESTO.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -220,7 +233,14 @@ export async function financeChatWithTools(
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages,
-    tools: [SIMULATE_DEBT_TOOL, COMPARE_DEBT_TOOL, PROJECT_INVESTMENT_TOOL, FREEDOM_TOOL, GOALS_TOOL],
+    tools: [
+      SIMULATE_DEBT_TOOL,
+      COMPARE_DEBT_TOOL,
+      PROJECT_INVESTMENT_TOOL,
+      FREEDOM_TOOL,
+      GOALS_TOOL,
+      YEARS_TO_FREEDOM_TOOL,
+    ],
     execute: buildToolExecutor(toolContext),
   });
   const parsed = parseAction(result.text);

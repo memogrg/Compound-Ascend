@@ -480,6 +480,103 @@ export function projectFreedom(
 }
 
 // ---------------------------------------------------------------------------
+// Herramienta: años hasta la libertad al ritmo ACTUAL + sensibilidad de ahorrar más
+// ---------------------------------------------------------------------------
+
+export const YEARS_TO_FREEDOM_TOOL: AiToolDecl = {
+  name: "anios_para_libertad",
+  description:
+    "Traduce el ritmo de ahorro ACTUAL del usuario en años estimados hasta SU Número de Libertad " +
+    "Financiera, partiendo de su patrimonio invertible REAL. Devuelve además una SENSIBILIDAD: " +
+    "cuántos años se acorta el camino si aporta 25%, 50% o 100% más al mes (para mostrar que la " +
+    "tasa de ahorro es la palanca dominante). El rendimiento es un SUPUESTO (default 5% real), no " +
+    "una garantía. Montos en la MONEDA PRINCIPAL. Solo lee y calcula; no modifica nada.",
+  parameters: {
+    type: "object",
+    properties: {
+      aporte_mensual: {
+        type: "number",
+        description:
+          "Ahorro mensual actual del usuario (tomalo de su flujo libre), en la moneda principal.",
+      },
+      rendimiento_anual_pct: {
+        type: "number",
+        description: "Rendimiento anual REAL SUPUESTO en % (default 5). Es un supuesto, no una garantía.",
+      },
+    },
+    required: ["aporte_mensual"],
+  },
+};
+
+/** Un escenario de la sensibilidad: aporte incrementado → años, y cuántos años acorta vs. el actual. */
+export type FreedomScenario = {
+  aporte_mensual: number;
+  incremento_pct: number; // 25 | 50 | 100
+  anios: number | null;
+  ahorra_anios: number | null; // años que acorta respecto del aporte actual (null si no aplica)
+};
+
+export type YearsToFreedomProjection =
+  | { disponible: false; motivo: string }
+  | {
+      disponible: true;
+      moneda: string;
+      numero_de_libertad: number;
+      patrimonio_invertible_actual: number;
+      aporte_mensual: number;
+      rendimiento_supuesto_pct: number;
+      anios_para_libertad: number | null; // al ritmo actual (null si nunca llega)
+      sensibilidad: FreedomScenario[];
+    };
+
+/**
+ * Años hasta el Número de Libertad al ritmo de ahorro ACTUAL + sensibilidad de aportar más.
+ * PURA: reusa `monthsToReach` (interés compuesto mensual) con objetivo = número y capital inicial
+ * = patrimonio invertible. Sin número calculado → `disponible:false`. Años con 1 decimal.
+ */
+export function yearsToFreedom(
+  args: { aporte_mensual?: unknown; rendimiento_anual_pct?: unknown },
+  ctx: FreedomContext,
+): YearsToFreedomProjection {
+  const freedom = typeof ctx.freedomNumber === "number" ? ctx.freedomNumber : 0;
+  if (!(freedom > 0)) {
+    return {
+      disponible: false,
+      motivo: "Aún no tengo tu Número de Libertad calculado (registrá tus gastos/patrimonio).",
+    };
+  }
+  const inicial = Math.max(0, typeof ctx.investableWealth === "number" ? ctx.investableWealth : 0);
+  const aporte = toPositive(args.aporte_mensual);
+  const rendPct = Math.min(100, Math.max(0, toNumberOr(args.rendimiento_anual_pct, 5)));
+  const r = rendPct / 100 / 12;
+  const round1 = (x: number): number => Math.round(x * 10) / 10;
+  const yearsFor = (a: number): number | null => {
+    const m = monthsToReach(freedom, inicial, a, r);
+    return m == null ? null : round1(m / 12);
+  };
+
+  const aniosActual = yearsFor(aporte);
+  // Sensibilidad: 25/50/100% más de aporte → cuántos años acorta (la palanca de la tasa de ahorro).
+  const sensibilidad: FreedomScenario[] = [25, 50, 100].map((incremento_pct) => {
+    const aporte_mensual = round2(aporte * (1 + incremento_pct / 100));
+    const anios = yearsFor(aporte_mensual);
+    const ahorra_anios = aniosActual != null && anios != null ? round1(aniosActual - anios) : null;
+    return { aporte_mensual, incremento_pct, anios, ahorra_anios };
+  });
+
+  return {
+    disponible: true,
+    moneda: ctx.currency,
+    numero_de_libertad: round2(freedom),
+    patrimonio_invertible_actual: round2(inicial),
+    aporte_mensual: round2(aporte),
+    rendimiento_supuesto_pct: rendPct,
+    anios_para_libertad: aniosActual,
+    sensibilidad,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Herramienta: progreso y proyección de metas de ahorro (datos reales)
 // ---------------------------------------------------------------------------
 
