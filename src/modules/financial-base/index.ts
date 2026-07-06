@@ -10,7 +10,7 @@ export {
   getPrimaryCurrency,
   DISPLAY_CURRENCY_COOKIE,
 } from "./services/base-service";
-export { createTransaction } from "./services/transaction-service";
+export { createTransaction, listTransactions } from "./services/transaction-service";
 export { getLiquidityBalance } from "./services/liquidity-service";
 // Líneas derivadas del presupuesto (renta/dividendos/…): wealth las sincroniza
 // al registrar un pago para conciliarlo contra la barra "Recibido".
@@ -43,3 +43,4 @@ export { BaseDashboard } from "./components/base-dashboard";
 export { BaseActions } from "./components/base-actions";
 export type { BaseSummary } from "./services/base-service";
 export type { BaseIndicators, IncomeSource, ExpenseItem, ExpenseNature } from "./types";
+export type { Transaction, TxnKind, Period } from "./types";
