@@ -5,6 +5,7 @@ import {
   projectInvestment,
   projectFreedom,
   projectGoals,
+  yearsToFreedom,
   runToolLoop,
   PROJECT_INVESTMENT_TOOL,
   type GoalForTool,
@@ -216,6 +217,70 @@ describe("tools · projectFreedom (datos reales, reusa projectInvestment)", () =
       expect(r.anios_para_alcanzar === null || typeof r.anios_para_alcanzar === "number").toBe(true);
       if (typeof r.anios_para_alcanzar === "number") expect(r.anios_para_alcanzar).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("tools · yearsToFreedom (años al ritmo actual + sensibilidad, puro)", () => {
+  // Referencia a mano de monthsToReach (r≠0) → años con 1 decimal, para verificar la tool.
+  const refYears = (objetivo: number, inicial: number, aporte: number, rendPct: number): number => {
+    if (objetivo <= inicial) return 0;
+    const r = rendPct / 100 / 12;
+    const k = aporte / r;
+    const g = (objetivo + k) / (inicial + k);
+    const m = Math.ceil(Math.log(g) / Math.log(1 + r));
+    return Math.round((m / 12) * 10) / 10;
+  };
+
+  it("sin freedomNumber → disponible:false con motivo", () => {
+    const r = yearsToFreedom({ aporte_mensual: 1_400_000 }, { currency: "CRC" });
+    expect(r.disponible).toBe(false);
+    if (!r.disponible) expect(r.motivo).toMatch(/Número de Libertad/i);
+  });
+
+  it("años y sensibilidad coinciden con el interés compuesto a mano (5% real por defecto)", () => {
+    const ctx = { freedomNumber: 290_400_000, investableWealth: 13_000_000, currency: "CRC" };
+    const aporte = 1_400_000;
+    const r = yearsToFreedom({ aporte_mensual: aporte }, ctx); // rendimiento default 5%
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    expect(r.rendimiento_supuesto_pct).toBe(5);
+    expect(r.numero_de_libertad).toBe(290_400_000);
+    expect(r.patrimonio_invertible_actual).toBe(13_000_000);
+    // Años al ritmo actual == referencia.
+    expect(r.anios_para_libertad).toBe(refYears(290_400_000, 13_000_000, aporte, 5));
+    // Sensibilidad: 3 escenarios 25/50/100% más, cada uno con su aporte y años == referencia.
+    expect(r.sensibilidad.map((s) => s.incremento_pct)).toEqual([25, 50, 100]);
+    for (const s of r.sensibilidad) {
+      const aporteEsc = Math.round(aporte * (1 + s.incremento_pct / 100) * 100) / 100;
+      expect(s.aporte_mensual).toBe(aporteEsc);
+      expect(s.anios).toBe(refYears(290_400_000, 13_000_000, aporteEsc, 5));
+      expect(s.ahorra_anios).toBe(Math.round((r.anios_para_libertad! - s.anios!) * 10) / 10);
+    }
+    // Aportar más SIEMPRE acorta (o iguala) el camino: años monótonos no crecientes, ahorro creciente.
+    const anios = r.sensibilidad.map((s) => s.anios!);
+    expect(anios[0]!).toBeGreaterThanOrEqual(anios[1]!);
+    expect(anios[1]!).toBeGreaterThanOrEqual(anios[2]!);
+    expect(r.sensibilidad[2]!.ahorra_anios!).toBeGreaterThan(0);
+  });
+
+  it("patrimonio ya ≥ número → 0 años y sensibilidad sin acortamiento", () => {
+    const r = yearsToFreedom(
+      { aporte_mensual: 1_000_000 },
+      { freedomNumber: 100_000_000, investableWealth: 120_000_000, currency: "CRC" },
+    );
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    expect(r.anios_para_libertad).toBe(0);
+    expect(r.sensibilidad.every((s) => s.anios === 0 && s.ahorra_anios === 0)).toBe(true);
+  });
+
+  it("respeta un rendimiento supuesto explícito (10%) distinto del default", () => {
+    const ctx = { freedomNumber: 200_000_000, investableWealth: 20_000_000, currency: "CRC" };
+    const r = yearsToFreedom({ aporte_mensual: 1_000_000, rendimiento_anual_pct: 10 }, ctx);
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    expect(r.rendimiento_supuesto_pct).toBe(10);
+    expect(r.anios_para_libertad).toBe(refYears(200_000_000, 20_000_000, 1_000_000, 10));
   });
 });
 

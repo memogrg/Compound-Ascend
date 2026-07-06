@@ -341,4 +341,33 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
       expect(rec.judge).toBeGreaterThanOrEqual(0.5);
     }
   });
+
+  it("años para la libertad → usa la herramienta: da los años al ritmo actual + sensibilidad de ahorrar más", { timeout: LIVE_TIMEOUT }, async () => {
+    // TOOL_CTX trae freedomNumber (290,4M) e investableWealth (13M); con el flujo libre (1,4M/mes)
+    // la herramienta anios_para_libertad da ~11-12 años y muestra cuánto acorta aportar más.
+    const { reply } = await chat(ask("¿en cuánto tiempo llego a mi libertad financiera con lo que ahorro hoy?"));
+    expect(reply).toBeTypeOf("string");
+
+    const low = norm(reply);
+    // (a) Da un plazo en años (al ritmo actual, ~11-12 según la tool).
+    const mentionsYears = /a[ñn]os/.test(low) && extractNumbers(reply).some((n) => n >= 8 && n <= 16);
+    // (b) Muestra la sensibilidad: aportar más acorta el camino (no se queda en un solo número).
+    const showsSensitivity =
+      /(si (ahorr|apor|guard|sub[ií]s)|aportar[aá]s? m[aá]s|aumentar|el doble|acort|adelant|reduc[ií]|25\s*%|50\s*%|100\s*%)/.test(
+        low,
+      );
+    const passed = mentionsYears && showsSensitivity;
+    const rec = record("años para la libertad", passed, reply);
+    expect(passed).toBe(true);
+
+    if (USE_JUDGE) {
+      rec.judge = await judge(
+        "Da un plazo en AÑOS hasta la libertad financiera al ritmo de ahorro actual, y muestra la " +
+          "SENSIBILIDAD (cuánto se acorta si aporta más al mes). Coherente con una herramienta, no inventado.",
+        reply,
+      );
+      rec.passed = passed && rec.judge >= 0.5;
+      expect(rec.judge).toBeGreaterThanOrEqual(0.5);
+    }
+  });
 });
