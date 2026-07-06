@@ -4,7 +4,7 @@
  * al usuario se envía por el provider (no en el body HTTP). No registra el
  * contenido del mensaje (puede contener montos).
  */
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { getServerEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -14,6 +14,35 @@ import { routeInbound } from "@/lib/whatsapp/router";
 import { alreadyProcessed } from "@/lib/security/idempotency";
 
 export const runtime = "nodejs";
+// El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
+// tardar. Sin maxDuration, Vercel mata la función en el default y el usuario queda en
+// silencio. 60s da margen de sobra (Fluid Compute / plan Pro lo permiten).
+export const maxDuration = 60;
+
+// Aviso corto para NUNCA dejar al usuario sin respuesta si el proceso falla o se acerca
+// al límite de tiempo. Reintentar desde su lado es seguro (la marca de idempotencia es
+// por evento de Meta, no por intento del usuario).
+const BUSY_FALLBACK = "Dame un momento… no pude procesarlo ahora, probá de nuevo en un ratito.";
+// Margen bajo maxDuration (60s): si el ruteo no termina a tiempo, avisamos en vez de que
+// Vercel mate la función a mitad de un envío (silencio). Deja ~10s para el aviso.
+const PROCESS_BUDGET_MS = 50_000;
+
+/** Rechaza si `p` no resuelve en `ms` (no cancela `p`; solo deja de esperarlo). */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("process timeout")), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
 
 /** Verificación del webhook de Meta: responde el hub.challenge si el token coincide. */
 export async function GET(request: Request): Promise<Response> {
@@ -102,14 +131,32 @@ export async function POST(request: Request): Promise<Response> {
     return new NextResponse("ok", { status: 200 });
   }
 
-  // 3) Enrutar. Cualquier error se traga: siempre 200 a Meta.
-  try {
-    await routeInbound(getWhatsAppProvider(), { phone, body, numMedia, mediaUrl, mediaType });
-  } catch (err) {
-    logger.error("whatsapp webhook: fallo en ruteo", {
-      message: err instanceof Error ? err.message : "?",
-    });
-  }
+  // 3) Ack inmediato + proceso en segundo plano. Respondemos 200 a Meta YA (así no
+  // reintenta por timeout) y ruteamos DESPUÉS con after() (Next 15), dentro del
+  // presupuesto de maxDuration. La marca de idempotencia (arriba) queda ANTES del
+  // after(): un reintento de Meta se deduplica y no duplica IA/inserts.
+  after(async () => {
+    const provider = getWhatsAppProvider();
+    try {
+      await withTimeout(
+        routeInbound(provider, { phone, body, numMedia, mediaUrl, mediaType }),
+        PROCESS_BUDGET_MS,
+      );
+    } catch (err) {
+      // NUNCA silencio: si el ruteo falla o se acerca al límite, avisamos al usuario
+      // en vez de dejarlo sin respuesta. El envío del aviso va en su propio try.
+      logger.error("whatsapp webhook: fallo/timeout en ruteo", {
+        message: err instanceof Error ? err.message : "?",
+      });
+      try {
+        await provider.sendText(phone, BUSY_FALLBACK);
+      } catch (sendErr) {
+        logger.error("whatsapp webhook: no se pudo enviar el aviso de reintento", {
+          message: sendErr instanceof Error ? sendErr.message : "?",
+        });
+      }
+    }
+  });
 
   return new NextResponse("ok", { status: 200 });
 }

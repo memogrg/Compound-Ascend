@@ -27,6 +27,9 @@ import type { ChatMessage } from "@/lib/ai/provider";
 import { loadRecentTurns, appendTurns } from "@/lib/ai/conversation-store";
 
 export const runtime = "nodejs";
+// El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
+// tardar; sin maxDuration Vercel lo mataría en el default. 60s da margen (Fluid Compute).
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {
