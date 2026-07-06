@@ -565,7 +565,7 @@ function InvRow({
           {menu ? (
             <div className="kmenu" onMouseLeave={() => setMenu(false)}>
               <button onClick={() => act("movimiento")}>
-                <Icon name="repeat" /> Movimientos de capital
+                <Icon name="repeat" /> Agregar compra
               </button>
               <button onClick={() => act("valoracion")}>
                 <Icon name="invest" /> Valoración de la inversión
@@ -588,7 +588,7 @@ function InvRow({
 
       {/* Movimientos de capital · aporte/compra reusa el wizard. El retiro/venta
           vive en el Dashboard (HoldingDetailModal), que ya lo soporta. */}
-      {modal === "movimiento" ? <AddHoldingModal prefill={editHolding} currency={currency} onClose={close} /> : null}
+      {modal === "movimiento" ? <AddHoldingModal prefill={editHolding} mode="compra" currency={currency} onClose={close} /> : null}
       {modal === "editar" ? (
         <AddHoldingModal prefill={editHolding} editId={editHolding.id} currency={currency} onClose={close} />
       ) : null}
