@@ -127,6 +127,34 @@ export async function registerPurchaseExpense(args: {
   );
 }
 
+/**
+ * Registra una compra en investment_transactions (historial DCA). Best-effort:
+ * si falla, loguea pero no rompe la creación del holding. Incluye household_id
+ * (invariante CLAUDE.md) para que el resto del hogar vea el historial.
+ */
+async function recordPurchaseTx(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+  holdingId: string,
+  input: HoldingInput,
+) {
+  const qty = input.quantity ?? 0;
+  const price = input.averageCost ?? 0;
+  if (!(qty > 0) || !(price > 0)) return; // solo compras cuantificables
+  const household_id = await getActiveHouseholdId(supabase, userId);
+  const { error } = await supabase.from("investment_transactions").insert({
+    user_id: userId,
+    household_id,
+    holding_id: holdingId,
+    tx_type: "compra",
+    amount: qty * price,
+    quantity: qty,
+    currency: input.currency,
+    occurred_on: input.purchaseDate ?? new Date().toISOString().slice(0, 10),
+  });
+  if (error) console.error(`[recordPurchaseTx] falló (${holdingId}): ${error.message}`);
+}
+
 /** Columnas de renta / valor manual compartidas por insert y update. */
 function rentalColumns(input: HoldingInput) {
   return {
@@ -267,6 +295,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
       if (txnId) await deleteLinkedTransaction(txnId);
       throw new Error(error.message);
     }
+    await recordPurchaseTx(supabase, user.id, existing.id, input);
     return;
   }
 
@@ -295,6 +324,8 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     .select("id")
     .single();
   if (error) throw new Error(error.message);
+
+  if (canMerge && created) await recordPurchaseTx(supabase, user.id, created.id, input);
 
   // Compra nueva: el holding existe primero (la transacción lo referencia);
   // si el gasto vinculado falla, se compensa borrando el holding recién creado.
