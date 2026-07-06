@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   simulateDebtPayoff,
   compareDebtStrategies,
+  analyzeMinPayment,
   projectInvestment,
   projectFreedom,
   projectGoals,
@@ -550,5 +551,112 @@ describe("tools · compareDebtStrategies (motor real, sin red)", () => {
     expect(r.sin_deudas).toBe(true);
     expect(r.avalancha.meses).toBe(0);
     expect(r.bola_nieve.orden_de_pago).toEqual([]);
+  });
+});
+
+describe("tools · analyzeMinPayment (trampa del mínimo + tasa efectiva, puro)", () => {
+  // Referencias a mano (mismo cálculo que la tool) para verificar exactitud.
+  const round2 = (x: number): number => Math.round(x * 100) / 100;
+  const effRate = (apr: number): number => round2((Math.pow(1 + apr / 100 / 12, 12) - 1) * 100);
+  const refTrap = (
+    saldo: number,
+    apr: number,
+    minPay: number,
+  ): { nunca: boolean; months?: number; interes?: number; pagado?: number } => {
+    const r = apr / 100 / 12;
+    if (minPay <= saldo * r) return { nunca: true };
+    let balance = saldo;
+    let interest = 0;
+    let pagado = 0;
+    let months = 0;
+    while (balance > 0.01 && months < 1200) {
+      const i = balance * r;
+      const pay = Math.min(minPay, balance + i);
+      interest += i;
+      pagado += pay;
+      balance = balance + i - pay;
+      months += 1;
+    }
+    if (balance > 0.01) return { nunca: true };
+    return { nunca: false, months, interes: round2(interest), pagado: round2(pagado) };
+  };
+  const refCuota = (saldo: number, apr: number, n: number): number => {
+    const r = apr / 100 / 12;
+    return r === 0 ? saldo / n : (saldo * r) / (1 - Math.pow(1 + r, -n));
+  };
+
+  const D = (over: Partial<DebtInput> = {}): DebtInput => ({
+    id: "d1",
+    name: "Tarjeta",
+    balance: 1_000_000,
+    apr: 30,
+    minPayment: 50_000,
+    ...over,
+  });
+
+  it("sin deudas → disponible:false con motivo", () => {
+    const r = analyzeMinPayment([], {}, { currency: "CRC" });
+    expect(r.disponible).toBe(false);
+    if (!r.disponible) expect(r.motivo).toMatch(/deudas/i);
+  });
+
+  it("tasa efectiva, meses/interés del mínimo, plan a 12 meses y ahorro cuadran a mano", () => {
+    const debt = D({ balance: 1_000_000, apr: 30, minPayment: 50_000 });
+    const r = analyzeMinPayment([debt], {}, { currency: "CRC" });
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    // Tasa efectiva anual desde la nominal.
+    expect(r.tasa_nominal_pct).toBe(30);
+    expect(r.tasa_efectiva_pct).toBe(effRate(30));
+    // Trampa del mínimo (50k > interés del 1er mes 25k → se salda).
+    const trap = refTrap(1_000_000, 30, 50_000);
+    expect(r.nunca_se_salda).toBe(false);
+    expect(r.meses_minimo).toBe(trap.months);
+    expect(r.anios_minimo).toBe(Math.round((trap.months! / 12) * 10) / 10);
+    expect(r.interes_total_minimo).toBe(trap.interes);
+    expect(r.total_pagado_minimo).toBe(trap.pagado);
+    // Plan corto (12 meses por defecto).
+    expect(r.meses_objetivo).toBe(12);
+    const cuota = round2(refCuota(1_000_000, 30, 12));
+    expect(r.cuota_plan_corto).toBe(cuota);
+    expect(r.interes_total_plan_corto).toBe(round2(refCuota(1_000_000, 30, 12) * 12 - 1_000_000));
+    // Ahorro = interés del mínimo − interés del plan corto (positivo).
+    expect(r.ahorro_intereses).toBe(round2(r.interes_total_minimo! - r.interes_total_plan_corto));
+    expect(r.ahorro_intereses!).toBeGreaterThan(0);
+  });
+
+  it("respeta meses_objetivo explícito (24) para el plan corto", () => {
+    const r = analyzeMinPayment([D()], { meses_objetivo: 24 }, { currency: "CRC" });
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    expect(r.meses_objetivo).toBe(24);
+    expect(r.cuota_plan_corto).toBe(Math.round(refCuota(1_000_000, 30, 24) * 100) / 100);
+  });
+
+  it("el mínimo no cubre el interés → nunca_se_salda y montos del mínimo en null", () => {
+    // 45% sobre 1M → interés 1er mes 37.500; mínimo 30.000 < 37.500.
+    const r = analyzeMinPayment([D({ apr: 45, minPayment: 30_000 })], {}, { currency: "CRC" });
+    expect(r.disponible).toBe(true);
+    if (!r.disponible) return;
+    expect(r.nunca_se_salda).toBe(true);
+    expect(r.meses_minimo).toBeNull();
+    expect(r.interes_total_minimo).toBeNull();
+    expect(r.ahorro_intereses).toBeNull();
+    // El plan corto SÍ se calcula (la salida accionable).
+    expect(r.cuota_plan_corto).toBeGreaterThan(0);
+  });
+
+  it("elige la deuda por nombre; sin nombre, la de mayor APR", () => {
+    const debts: DebtInput[] = [
+      { id: "d1", name: "Tarjeta", balance: 500_000, apr: 45, minPayment: 40_000 },
+      { id: "d2", name: "Préstamo personal", balance: 2_000_000, apr: 18, minPayment: 80_000 },
+    ];
+    // Sin nombre → la más cara (Tarjeta, 45%).
+    const top = analyzeMinPayment(debts, {}, { currency: "CRC" });
+    expect(top.disponible && top.deuda).toBe("Tarjeta");
+    // Por nombre → Préstamo.
+    const byName = analyzeMinPayment(debts, { deuda: "préstamo" }, { currency: "CRC" });
+    expect(byName.disponible && byName.deuda).toBe("Préstamo personal");
+    if (byName.disponible) expect(byName.tasa_nominal_pct).toBe(18);
   });
 });

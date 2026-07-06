@@ -199,6 +199,145 @@ export function compareDebtStrategies(
 }
 
 // ---------------------------------------------------------------------------
+// Herramienta: trampa del pago mínimo + tasa efectiva (nativo CR / TITA)
+// ---------------------------------------------------------------------------
+
+export const MIN_PAYMENT_TOOL: AiToolDecl = {
+  name: "analizar_pago_minimo",
+  description:
+    "Expone la TRAMPA del pago mínimo de una tarjeta/deuda: cuántos años tardaría el usuario pagando " +
+    "SOLO el mínimo y cuánto interés total pagaría, frente a la cuota para salir en un plazo corto y " +
+    "el ahorro en intereses. Calcula además la TASA EFECTIVA anual a partir de la nominal (APR). " +
+    "Opera sobre las deudas REALES del usuario: elige la que nombre, o la más cara. En Costa Rica la " +
+    "cifra honesta incluye comisiones (tasa efectiva/TITA); esto asume solo la tasa. Montos en la " +
+    "MONEDA PRINCIPAL. Solo lee y calcula; no modifica nada.",
+  parameters: {
+    type: "object",
+    properties: {
+      deuda: {
+        type: "string",
+        description: "Nombre de la deuda a analizar (opcional; si no se da, la de mayor interés).",
+      },
+      meses_objetivo: {
+        type: "number",
+        description: "Plazo objetivo del plan corto, en meses (default 12).",
+      },
+    },
+  },
+};
+
+export type MinPaymentAnalysis =
+  | { disponible: false; motivo: string }
+  | {
+      disponible: true;
+      moneda: string;
+      deuda: string;
+      saldo: number;
+      pago_minimo: number;
+      tasa_nominal_pct: number; // APR nominal
+      tasa_efectiva_pct: number; // (1 + apr/12)^12 - 1
+      nunca_se_salda: boolean; // el mínimo no cubre el interés → saldo no baja
+      // Trampa del mínimo (null si nunca_se_salda):
+      meses_minimo: number | null;
+      anios_minimo: number | null;
+      interes_total_minimo: number | null;
+      total_pagado_minimo: number | null;
+      // Plan corto: salir en meses_objetivo.
+      meses_objetivo: number;
+      cuota_plan_corto: number;
+      interes_total_plan_corto: number;
+      ahorro_intereses: number | null; // interés del mínimo − del plan corto (null si nunca_se_salda)
+      nota: string;
+    };
+
+const MAX_PAYOFF_MONTHS = 1200; // 100 años: más allá se considera, en la práctica, "no se salda"
+
+/**
+ * Analiza una deuda: tasa EFECTIVA anual (desde la nominal), la TRAMPA del pago mínimo (meses e
+ * interés total pagando solo el mínimo —fijo, supuesto que no baja—, con `nunca_se_salda` si el
+ * mínimo no cubre el interés) y un PLAN CORTO (cuota para salir en `meses_objetivo` + ahorro en
+ * intereses). PURA, sin IO. Elige la deuda por nombre (match laxo) o, si no, la de mayor APR.
+ */
+export function analyzeMinPayment(
+  debts: DebtInput[],
+  args: { deuda?: unknown; meses_objetivo?: unknown },
+  meta: { currency?: string } = {},
+): MinPaymentAnalysis {
+  const active = debts.filter((d) => d.balance > 0.01);
+  if (active.length === 0) {
+    return { disponible: false, motivo: "No tengo deudas registradas para analizar." };
+  }
+  // Deuda: por nombre si se da (match laxo); si no, la de mayor APR.
+  let debt = active.reduce((a, b) => (b.apr > a.apr ? b : a));
+  if (typeof args.deuda === "string" && args.deuda.trim()) {
+    const q = args.deuda.trim().toLowerCase();
+    const byName = active.find(
+      (d) => d.name.toLowerCase().includes(q) || q.includes(d.name.toLowerCase()),
+    );
+    if (byName) debt = byName;
+  }
+
+  const saldo = debt.balance;
+  const apr = Math.max(0, debt.apr);
+  const minPay = Math.max(0, debt.minPayment);
+  const r = apr / 100 / 12;
+  const tasaEfectiva = (Math.pow(1 + r, 12) - 1) * 100;
+  const mesesObjetivo = Math.max(1, Math.round(toNumberOr(args.meses_objetivo, 12)));
+
+  // Trampa del mínimo: pago fijo = mínimo. nunca_se_salda si no cubre el interés del 1er mes.
+  let nunca = minPay <= saldo * r;
+  let mesesMin: number | null = null;
+  let interesMin: number | null = null;
+  let totalPagadoMin: number | null = null;
+  if (!nunca) {
+    let balance = saldo;
+    let interest = 0;
+    let pagado = 0;
+    let months = 0;
+    while (balance > 0.01 && months < MAX_PAYOFF_MONTHS) {
+      const i = balance * r;
+      const pay = Math.min(minPay, balance + i); // último mes: paga lo que queda
+      interest += i;
+      pagado += pay;
+      balance = balance + i - pay;
+      months += 1;
+    }
+    if (balance > 0.01) {
+      nunca = true; // superó el tope → en la práctica es una trampa
+    } else {
+      mesesMin = months;
+      interesMin = round2(interest);
+      totalPagadoMin = round2(pagado);
+    }
+  }
+
+  // Plan corto: cuota de amortización para saldar en mesesObjetivo + su interés total.
+  const n = mesesObjetivo;
+  const cuotaCorto = r === 0 ? saldo / n : (saldo * r) / (1 - Math.pow(1 + r, -n));
+  const interesCorto = round2(cuotaCorto * n - saldo);
+
+  return {
+    disponible: true,
+    moneda: meta.currency ?? "",
+    deuda: debt.name,
+    saldo: round2(saldo),
+    pago_minimo: round2(minPay),
+    tasa_nominal_pct: round2(apr),
+    tasa_efectiva_pct: round2(tasaEfectiva),
+    nunca_se_salda: nunca,
+    meses_minimo: mesesMin,
+    anios_minimo: mesesMin == null ? null : Math.round((mesesMin / 12) * 10) / 10,
+    interes_total_minimo: interesMin,
+    total_pagado_minimo: totalPagadoMin,
+    meses_objetivo: n,
+    cuota_plan_corto: round2(cuotaCorto),
+    interes_total_plan_corto: interesCorto,
+    ahorro_intereses: interesMin == null ? null : round2(interesMin - interesCorto),
+    nota: "En Costa Rica la cifra honesta incluye comisiones (tasa efectiva/TITA); esto asume solo la tasa de interés.",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Herramienta: proyección de interés compuesto (SOLO cálculo, PURA)
 // ---------------------------------------------------------------------------
 

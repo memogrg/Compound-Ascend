@@ -96,15 +96,16 @@ function norm(s: string): string {
 }
 
 /**
- * Extrae los enteros del texto tolerando separadores de miles (. o ,) y una parte decimal
- * final. Descarta primero el decimal final (sep + 1-2 dígitos al final del token) para no
- * fusionarlo con los miles: "₡16,966,928.9" → 16966928; "61.581.512" → 61581512.
+ * Extrae los enteros del texto tolerando separadores de miles (. , o ESPACIO) y una parte
+ * decimal final. Descarta primero el decimal final (sep + 1-2 dígitos al final del token) para
+ * no fusionarlo con los miles: "₡16,966,928.9" → 16966928; "61.581.512" → 61581512;
+ * "290 400 000" → 290400000 (algunos modelos separan miles con espacios).
  */
 function extractNumbers(text: string): number[] {
   const out: number[] = [];
-  for (const m of text.matchAll(/\d[\d.,]*\d|\d/g)) {
+  for (const m of text.matchAll(/\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?|\d[\d.,]*\d|\d/g)) {
     const tok = (m[0] ?? "").replace(/[.,]\d{1,2}$/, ""); // quita la parte decimal final
-    const digits = tok.replace(/[^\d]/g, ""); // quita separadores de miles restantes
+    const digits = tok.replace(/[^\d]/g, ""); // quita separadores de miles restantes (incl. espacios)
     if (digits) out.push(Number(digits));
   }
   return out;

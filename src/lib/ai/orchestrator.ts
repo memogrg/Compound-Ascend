@@ -20,12 +20,14 @@ import { retrieveBiblia } from "@/lib/ai/biblia-retrieval";
 import {
   SIMULATE_DEBT_TOOL,
   COMPARE_DEBT_TOOL,
+  MIN_PAYMENT_TOOL,
   PROJECT_INVESTMENT_TOOL,
   FREEDOM_TOOL,
   GOALS_TOOL,
   YEARS_TO_FREEDOM_TOOL,
   simulateDebtPayoff,
   compareDebtStrategies,
+  analyzeMinPayment,
   projectInvestment,
   projectFreedom,
   projectGoals,
@@ -164,6 +166,10 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
     if (name === "comparar_estrategias_deuda") {
       return compareDebtStrategies(toolContext.debts, args, new Date(), meta);
     }
+    if (name === "analizar_pago_minimo") {
+      // Trampa del mínimo + tasa efectiva sobre las deudas reales (moneda principal).
+      return analyzeMinPayment(toolContext.debts, args, { currency: toolContext.currency });
+    }
     if (name === "proyectar_inversion") {
       // Pura: solo necesita la moneda principal (no ToolContext nuevo).
       return projectInvestment(args, toolContext.currency);
@@ -211,7 +217,10 @@ export const TOOLS_PROMPT_LINE =
   "NUNCA construyas una tabla numérica a mano ni calcules el interés compuesto de memoria. " +
   "Si el usuario pregunta en cuánto tiempo llegaría a su libertad financiera con su ritmo de " +
   "ahorro ACTUAL, o cuánto se acortaría si ahorra más, USÁ anios_para_libertad (no estimes de " +
-  "memoria); el rendimiento es un SUPUESTO.";
+  "memoria); el rendimiento es un SUPUESTO. " +
+  "Si el usuario pregunta cuánto tardaría pagando solo el mínimo de su tarjeta/deuda, cuánto " +
+  "interés le cuesta, o cuál es la tasa efectiva real, USÁ analizar_pago_minimo (no estimes de " +
+  "memoria); recordá que en CR la cifra honesta incluye comisiones (TITA).";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -236,6 +245,7 @@ export async function financeChatWithTools(
     tools: [
       SIMULATE_DEBT_TOOL,
       COMPARE_DEBT_TOOL,
+      MIN_PAYMENT_TOOL,
       PROJECT_INVESTMENT_TOOL,
       FREEDOM_TOOL,
       GOALS_TOOL,

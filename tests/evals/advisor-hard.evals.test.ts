@@ -107,7 +107,8 @@ function norm(s: string): string {
 
 function extractNumbers(text: string): number[] {
   const out: number[] = [];
-  for (const m of text.matchAll(/\d[\d.,]*\d|\d/g)) {
+  // Tolera separadores de miles . , o ESPACIO ("290 400 000") y un decimal final.
+  for (const m of text.matchAll(/\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?|\d[\d.,]*\d|\d/g)) {
     const tok = (m[0] ?? "").replace(/[.,]\d{1,2}$/, "");
     const digits = tok.replace(/[^\d]/g, "");
     if (digits) out.push(Number(digits));
@@ -354,6 +355,34 @@ describe.skipIf(!RUN_LIVE)("evals DIFÍCILES · discriminan modelos (RUN_LIVE_EV
       rec.judge = await judge(
         "Explica CORRECTAMENTE por qué un mayor rendimiento reduce el aporte necesario (interés compuesto: " +
           "los rendimientos se reinvierten y hacen más trabajo), SIN inventar cifras; idealmente apoyándose en el cálculo de la herramienta.",
+        reply,
+      );
+      rec.passed = passed && rec.judge >= 0.5;
+      expect(rec.judge).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it("trampa del pago mínimo → usa la herramienta: años + interés + contraste con salir en 12 meses", { timeout: HARD_TIMEOUT }, async () => {
+    // TOOL_CTX trae la Tarjeta (2M, 45%, mínimo 100k): pagando solo el mínimo tarda años y paga
+    // mucho interés; la tool analizar_pago_minimo lo expone + el plan a 12 meses + la tasa efectiva.
+    const { reply } = await chat(ask("¿cuánto tardo si pago solo el mínimo de mi tarjeta de crédito?"));
+    expect(reply).toBeTypeOf("string");
+
+    const low = norm(reply);
+    // (a) Expone la trampa: cuánto tarda pagando SOLO el mínimo (años/meses) y su costo en interés.
+    const showsTrap =
+      /(m[ií]nimo)/.test(low) && /(a[ñn]os|meses)/.test(low) && /(inter[eé]s|intereses)/.test(low);
+    // (b) Contrasta con un plan corto / tasa efectiva (no se queda en el mínimo).
+    const showsContrast =
+      /(12 meses|un a[ñn]o|efectiv|ahorr|en vez|si pag[aá]s m[aá]s|plan|salir antes|acort)/.test(low);
+    const passed = showsTrap && showsContrast;
+    const rec = record("trampa del pago mínimo", passed, reply);
+    expect(passed).toBe(true);
+
+    if (USE_JUDGE) {
+      rec.judge = await judge(
+        "Muestra cuánto tardaría pagando SOLO el mínimo (años) y el interés total, y lo contrasta con " +
+          "salir en un plazo corto (p. ej. 12 meses) o la tasa efectiva; coherente con una herramienta, no inventado.",
         reply,
       );
       rec.passed = passed && rec.judge >= 0.5;

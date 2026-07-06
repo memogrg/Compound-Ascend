@@ -138,6 +138,7 @@ const SCENARIOS: Scenario[] = [
       expect(result.reply).toContain(String(expected.meses));
       expect(result.reply).toContain(String(expected.intereses_ahorrados));
       expect(provider.lastTools.map((t) => t.name).sort()).toEqual([
+        "analizar_pago_minimo",
         "anios_para_libertad",
         "comparar_estrategias_deuda",
         "proyectar_inversion",
@@ -151,21 +152,21 @@ const SCENARIOS: Scenario[] = [
 
   // 4b) Tool de proyección: el cerebro publica el valor_futuro REAL del motor.
   {
-    name: "tools: proyectar_inversion → reply contiene el valor_futuro real + 6 decls",
+    name: "tools: proyectar_inversion → reply contiene el valor_futuro real + 7 decls",
     messages: ask("¿cuánto tendré si ahorro 100000 al mes 20 años?"),
     tools: { debts: [], currency: "CRC" },
     script: { reply: "Te proyecto el crecimiento:", toolCall: { name: "proyectar_inversion", args: PROJ_ARGS } },
     assert: ({ result, provider }) => {
       const expected = projectInvestment(PROJ_ARGS, "CRC");
       expect(result.reply).toContain(String(expected.valor_futuro));
-      expect(provider.lastTools).toHaveLength(6);
+      expect(provider.lastTools).toHaveLength(7);
       expect(provider.lastTools.map((t) => t.name)).toContain("proyectar_inversion");
     },
   },
 
   // 4c) Tool de libertad financiera: usa los DATOS REALES del toolContext (número + invertible).
   {
-    name: "tools: proyectar_libertad_financiera → reply con el Número real + 6 decls",
+    name: "tools: proyectar_libertad_financiera → reply con el Número real + 7 decls",
     messages: ask("¿cuánto me falta para mi libertad financiera?"),
     tools: { debts: [], currency: "CRC", ...FREEDOM_CTX },
     script: {
@@ -179,14 +180,14 @@ const SCENARIOS: Scenario[] = [
         expect(result.reply).toContain(String(expected.numero_de_libertad));
         expect(result.reply).toContain(String(expected.valor_futuro));
       }
-      expect(provider.lastTools).toHaveLength(6);
+      expect(provider.lastTools).toHaveLength(7);
       expect(provider.lastTools.map((t) => t.name)).toContain("proyectar_libertad_financiera");
     },
   },
 
   // 4d) Tool de metas: usa las metas REALES del toolContext (faltante/meses reales).
   {
-    name: "tools: proyectar_metas → reply con faltante/meses reales + 6 decls",
+    name: "tools: proyectar_metas → reply con faltante/meses reales + 7 decls",
     messages: ask("¿cómo voy con mis metas de ahorro?"),
     tools: { debts: [], currency: "CRC", goals: GOALS_CTX },
     script: { reply: "Tus metas:", toolCall: { name: "proyectar_metas", args: GOALS_ARGS } },
@@ -198,7 +199,7 @@ const SCENARIOS: Scenario[] = [
         expect(result.reply).toContain(String(meta.faltante));
         expect(result.reply).toContain(String(meta.meses_para_meta));
       }
-      expect(provider.lastTools).toHaveLength(6);
+      expect(provider.lastTools).toHaveLength(7);
       expect(provider.lastTools.map((t) => t.name)).toContain("proyectar_metas");
     },
   },
