@@ -66,9 +66,9 @@ export default async function MobilePerfil() {
           </div>
         </div>
 
-        {/* Acceso al wizard del ADN financiero (/m/perfil-financiero) */}
+        {/* Acceso a Mi Perfil Financiero: muestra resultados si está completo, o el wizard */}
         <Link
-          href="/m/perfil-financiero"
+          href="/m/mi-perfil-financiero"
           className="card card-p srow"
           style={{ marginBottom: 14, textDecoration: "none", color: "inherit" }}
         >
