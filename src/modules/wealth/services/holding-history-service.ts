@@ -81,3 +81,32 @@ export async function getHoldingHistory(
   }
   return points;
 }
+
+export type HoldingPurchase = {
+  id: string;
+  occurredOn: string;
+  amount: number;
+  quantity: number;
+  currency: string;
+};
+
+/** Compras de un holding (investment_transactions, tx_type='compra'), cronológico. */
+export async function listHoldingPurchases(holdingId: string): Promise<HoldingPurchase[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("investment_transactions")
+    .select("id, amount, quantity, currency, occurred_on")
+    .eq("user_id", user.id)
+    .eq("holding_id", holdingId)
+    .eq("tx_type", "compra")
+    .order("occurred_on", { ascending: true });
+  if (error || !data) return [];
+  return data.map((r) => ({
+    id: r.id,
+    occurredOn: r.occurred_on,
+    amount: Number(r.amount),
+    quantity: Number(r.quantity ?? 0),
+    currency: r.currency,
+  }));
+}
