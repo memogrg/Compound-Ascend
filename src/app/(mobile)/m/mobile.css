@@ -472,6 +472,29 @@
   background: var(--accent);
   color: var(--accent-ink);
 }
+/* botón OAuth (Continuar con Google): superficie blanca con borde, G de 4 colores */
+.m-shell .m-oauth {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  min-height: 50px;
+  padding: 0 20px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  box-shadow: var(--e1);
+}
+.m-shell .m-oauth:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
 .m-shell .m-divider {
   display: flex;
   align-items: center;

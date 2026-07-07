@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MobileLoginForm } from "../components/mobile-login-form";
+import { MobileGoogleButton } from "../components/mobile-google-button";
 
 /**
  * Login del móvil (/m/login). Vive fuera del grupo (app), así que NO pasa por la
@@ -39,6 +40,10 @@ export default function MobileLogin() {
             Tu asesor financiero te está esperando.
           </div>
         </div>
+
+        <MobileGoogleButton />
+
+        <div className="m-divider">o con tu correo</div>
 
         <MobileLoginForm />
 
