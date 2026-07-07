@@ -1,0 +1,37 @@
+/// <reference types="@capacitor/cli" />
+import type { CapacitorConfig } from '@capacitor/cli';
+
+// Modo DUAL (se decide al correr `cap sync`/`cap copy`, que evalúan este archivo):
+//  - Si defines la variable de entorno CAP_SERVER_URL, la app carga esa URL remota
+//    → modo HÍBRIDO / remote URL (dev live-reload contra Next.js, o tu deploy de producción).
+//  - Si NO la defines, la app usa el contenido empaquetado en www/ → modo BUNDLED (default).
+const serverUrl = process.env.CAP_SERVER_URL?.trim();
+
+const config: CapacitorConfig = {
+  appId: 'com.compoundascend.cartera',
+  appName: 'CARTERA+',
+  // webDir: diseño estático empaquetado (fallback bundled si no hay CAP_SERVER_URL).
+  webDir: 'www',
+  backgroundColor: '#F1EFE8',
+  // Solo se agrega `server` cuando hay CAP_SERVER_URL; si no, queda bundled (sin server.url).
+  ...(serverUrl
+    ? {
+        server: {
+          url: serverUrl,
+          // cleartext=true permite http en LAN (dev). En https es inofensivo.
+          cleartext: serverUrl.startsWith('http://'),
+        },
+      }
+    : {}),
+  android: {
+    // Fondo detrás del webview / status bar acorde a la canvas CLARA del diseño (--canvas).
+    backgroundColor: '#F1EFE8',
+  },
+  ios: {
+    backgroundColor: '#F1EFE8',
+    // Respeta las safe areas (notch / home indicator) junto con viewport-fit=cover del HTML.
+    contentInset: 'always',
+  },
+};
+
+export default config;

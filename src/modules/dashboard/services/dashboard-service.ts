@@ -24,9 +24,14 @@ export type DashboardData = {
   configured: boolean;
 };
 
-export async function getDashboardData(): Promise<DashboardData> {
-  const configured = isSupabaseConfigured();
-  const user = await getUser();
+export async function getDashboardData(
+  opts: { previewDemo?: boolean } = {},
+): Promise<DashboardData> {
+  // previewDemo (solo para vistas de PREVIEW sin sesión, p. ej. el móvil en dev):
+  // fuerza el mismo camino de DEMO que cuando Supabase no está configurado, sin
+  // tocar el resto de la lógica. Opt-in y off por defecto → la web no cambia.
+  const configured = isSupabaseConfigured() && !opts.previewDemo;
+  const user = opts.previewDemo ? null : await getUser();
 
   let summary: BaseSummary;
   let currency = "CRC";

@@ -7,7 +7,12 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 /** Rutas públicas de PÁGINA (no requieren sesión). */
 // `/invitacion` debe ser pública: el invitado sin sesión llega por el enlace del
 // correo y la propia página decide si pedir registro/login o aceptar.
-const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth", "/invitacion"];
+// `/m` = grupo móvil (app híbrida). Su propio layout (mobile)/m/(app) es dueño de
+// la guarda de sesión y redirige a /m/login cuando no hay sesión; el middleware no
+// debe interceptarlo hacia /login (rompería el flujo de auth del móvil). Ninguna ruta
+// web existente empieza con "/m/" ni es exactamente "/m" (p. ej. "/mi-perfil…" no
+// coincide), así que este prefijo no afecta a la web.
+const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth", "/invitacion", "/m"];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
 

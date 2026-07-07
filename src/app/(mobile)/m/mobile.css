@@ -1,0 +1,1018 @@
+/**
+ * Piel del diseño móvil (design-movil/project/CARTERA Movil.html), SCOPED a `.m-shell`.
+ * Este archivo solo se importa en el layout del grupo (mobile)/m → Next lo carga únicamente
+ * en las rutas /m/*, no en la web. Además todas las reglas cuelgan de `.m-shell` para no
+ * chocar con los estilos globales del design system de escritorio.
+ *
+ * Tokens = valores del :root del diseño (tema OSCURO, la base de marca #15140F). Las tipografías
+ * reutilizan las variables que el layout raíz ya carga vía next/font (Sora/Manrope/Space Mono),
+ * sin recargar Google Fonts.
+ */
+
+.m-shell {
+  /* tipografías: reutiliza next/font del layout raíz, con fallback */
+  --font-display: var(--font-sora), "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: var(--font-manrope), "Manrope", "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), "Space Mono", ui-monospace, Menlo, monospace;
+
+  /* radios (independientes del tema) */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+  --r-pill: 999px;
+
+  /* ===== tema CLARO = DEFAULT (data-theme="light" del diseño) ===== */
+  --canvas: #f1efe8;
+  --surface: #ffffff;
+  --surface-2: #faf8f3;
+  --surface-3: #f1eee6;
+  --border: #e7e4dc;
+  --text: #1e1c16;
+  --text-muted: #807c72;
+  --text-dim: #a6a199;
+  --accent: #378451;
+  --accent-ink: #ffffff;
+  --success: #378451;
+  --warning: #b07a2e;
+  --danger: #c34f4b;
+  --s1: #378451;
+  --s2: #b07a2e;
+  --s3: #c34f4b;
+  --s4: #6b8a5f;
+  --s5: #43a064;
+  --accent-soft: rgba(55, 132, 81, 0.12);
+  --danger-soft: rgba(195, 79, 75, 0.12);
+  --warning-soft: rgba(176, 122, 46, 0.12);
+  --e1: 0 1px 2px rgba(20, 18, 14, 0.08);
+  --e2: 0 8px 24px -10px rgba(20, 18, 14, 0.2);
+  --e3: 0 20px 50px -18px rgba(20, 18, 14, 0.28);
+  --e-raised: 0 1px 2px rgba(20, 18, 14, 0.06), 0 8px 20px -14px rgba(20, 18, 14, 0.3);
+
+  position: relative;
+  min-height: 100dvh;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  /* respeta las safe areas del notch / home indicator (viewport-fit=cover) */
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ===== tema OSCURO = opción secundaria (LISTA, no activada) =====
+   Para alternar: poné data-theme="dark" (o class="dark") en el <div.m-shell>. */
+.m-shell[data-theme="dark"],
+.m-shell.dark {
+  --canvas: #15140f;
+  --surface: #1e1c16;
+  --surface-2: #26241c;
+  --surface-3: #2e2c22;
+  --border: #2e2c24;
+  --text: #f4f2ec;
+  --text-muted: #a6a199;
+  --text-dim: #726e64;
+  --accent: #51af6f;
+  --accent-ink: #0c2114;
+  --success: #51af6f;
+  --warning: #d9a85a;
+  --danger: #d46b62;
+  --s1: #51af6f;
+  --s2: #d9a85a;
+  --s3: #d46b62;
+  --s4: #3c5a3f;
+  --s5: #43a064;
+  --accent-soft: rgba(81, 175, 111, 0.14);
+  --danger-soft: rgba(212, 107, 98, 0.16);
+  --warning-soft: rgba(217, 168, 90, 0.16);
+  --e1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --e2: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
+  --e3: 0 20px 50px -18px rgba(0, 0, 0, 0.7);
+  --e-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 24px -16px rgba(0, 0, 0, 0.7);
+}
+.m-shell * {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* zona scrolleable de contenido: deja aire para la tab bar inferior fija */
+.m-scroll {
+  min-height: 100dvh;
+  padding: 20px 0 calc(84px + env(safe-area-inset-bottom));
+}
+.m-pad {
+  padding: 0 20px;
+}
+
+/* ===== tipografía / helpers ===== */
+.m-shell .mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.m-shell .muted {
+  color: var(--text-muted);
+}
+.m-shell .pos {
+  color: var(--success);
+}
+.m-shell .neg {
+  color: var(--danger);
+}
+.m-shell .warn {
+  color: var(--warning);
+}
+.m-shell .sec-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+}
+.m-shell .row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.m-shell .between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ===== header (saludo) ===== */
+.m-shell .m-greeting {
+  font-weight: 700;
+  font-size: 16px;
+}
+.m-shell .iso {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 18%, var(--surface)), var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  display: grid;
+  place-items: center;
+  flex: none;
+  box-shadow:
+    0 6px 18px -8px color-mix(in srgb, var(--accent) 50%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+}
+.m-shell .iso svg {
+  width: 30px;
+  height: 30px;
+}
+.m-shell .icon-btn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+}
+.m-shell .icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ===== net-worth hero ===== */
+.m-shell .wgt-nw {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border-radius: 28px;
+  padding: 20px;
+  color: var(--text);
+  background:
+    radial-gradient(120% 120% at 85% -20%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 55%),
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface) 70%);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  box-shadow:
+    0 18px 44px -20px color-mix(in srgb, var(--accent) 40%, transparent),
+    var(--e2);
+}
+.m-shell .wlabel {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.m-shell .wchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--canvas) 60%, transparent);
+}
+.m-shell .wchip.pos {
+  color: var(--success);
+}
+.m-shell .wchip.neg {
+  color: var(--danger);
+}
+.m-shell .hero-amt {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 42px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: baseline;
+}
+.m-shell .hero-amt .cur {
+  font-size: 22px;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+.m-shell .hero-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+.m-shell .spark {
+  width: 100%;
+  height: 48px;
+  display: block;
+  margin-top: 12px;
+}
+
+/* ===== quick actions ===== */
+.m-shell .action-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px;
+  margin: 0 -20px;
+  padding-inline: 20px;
+  scrollbar-width: none;
+}
+.m-shell .action-strip::-webkit-scrollbar {
+  display: none;
+}
+.m-shell .qact {
+  flex: none;
+  width: 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+.m-shell .qact .qc {
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--e1);
+}
+.m-shell .qact .qc svg {
+  width: 24px;
+  height: 24px;
+}
+.m-shell .qact span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ===== widget genérico (insight / próxima acción) ===== */
+.m-shell .wgt {
+  position: relative;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 16px;
+  overflow: hidden;
+  box-shadow: var(--e2);
+}
+.m-shell .wic {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.m-shell .wic svg {
+  width: 19px;
+  height: 19px;
+}
+.m-shell .wgt-nba {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+/* ===== lista de movimientos ===== */
+.m-shell .lrow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 0;
+  border-top: 1px solid var(--border);
+}
+.m-shell .lrow:first-child {
+  border-top: 0;
+}
+.m-shell .lic {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--text);
+}
+.m-shell .lic svg {
+  width: 18px;
+  height: 18px;
+}
+.m-shell .lname {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.m-shell .lsub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+.m-shell .lamt {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ===== tab bar inferior fija ===== */
+.m-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: saturate(150%) blur(18px);
+  -webkit-backdrop-filter: saturate(150%) blur(18px);
+  border-top: 1px solid var(--border);
+}
+.m-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  padding-top: 8px;
+  text-decoration: none;
+}
+.m-tab svg {
+  width: 24px;
+  height: 24px;
+}
+.m-tab.on {
+  color: var(--accent);
+}
+
+/* ===== stub "pronto" ===== */
+.m-stub {
+  min-height: 70dvh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0 32px;
+}
+
+/* ===== login / formulario ===== */
+.m-shell .m-auth {
+  min-height: 78dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.m-shell .m-field {
+  display: block;
+  margin-bottom: 14px;
+}
+.m-shell .m-field-l {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 7px;
+}
+.m-shell .m-inp {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  width: 100%;
+}
+.m-shell .m-inp::placeholder {
+  color: var(--text-dim);
+}
+.m-shell .m-inp:focus {
+  outline: 2px solid var(--accent);
+  border-color: var(--accent);
+}
+.m-shell .m-field-err {
+  display: block;
+  color: var(--danger);
+  font-size: 12.5px;
+  margin-top: 6px;
+}
+.m-shell .m-btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  min-height: 50px;
+  padding: 0 20px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.m-shell .m-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.m-shell .m-btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.m-shell .m-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.m-shell .m-divider::before,
+.m-shell .m-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.m-shell .m-auth-msg {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: var(--r-md);
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.m-shell .m-authlink {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ===== lote de pantallas (patrimonio / inversiones / perfil) — clases del diseño ===== */
+.m-shell .ov {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.m-shell .h-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+.m-shell .display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* tarjetas */
+.m-shell .card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.m-shell .card-p {
+  padding: 18px;
+}
+.m-shell .delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+/* hero de patrimonio */
+.m-shell .hero-nw {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  padding: 22px 20px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), var(--surface) 62%);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+}
+
+/* segmented control (periodos) */
+.m-shell .seg {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+  padding: 3px;
+  gap: 2px;
+}
+.m-shell .seg button {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-pill);
+  padding: 7px 13px;
+  cursor: pointer;
+}
+.m-shell .seg button.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* anillo (donut) */
+.m-shell .ring-wrap {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+.m-shell .ring-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+/* barras de progreso */
+.m-shell .bar {
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.m-shell .bar > i {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+/* KPIs en grilla */
+.m-shell .mini-kpi {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.m-shell .kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+.m-shell .kpi .k {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.m-shell .kpi .kv {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 22px;
+  margin-top: 9px;
+  letter-spacing: -0.01em;
+}
+
+/* badge */
+.m-shell .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: var(--r-pill);
+}
+.m-shell .badge.neutral {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+/* botón secundario */
+.m-shell .m-btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+/* filas de ajustes (perfil) */
+.m-shell .srow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.m-shell .srow:first-child {
+  border-top: 0;
+}
+.m-shell .srow .st {
+  font-weight: 600;
+  font-size: 14px;
+}
+.m-shell .srow .ss {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.m-shell .srow .sr {
+  margin-left: auto;
+}
+
+/* interruptor (toggle) — decorativo por ahora */
+.m-shell .sw {
+  position: relative;
+  width: 46px;
+  height: 28px;
+  flex: none;
+  cursor: pointer;
+}
+.m-shell .sw input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.m-shell .sw .tr {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-3);
+  border-radius: 999px;
+  transition: 0.2s;
+}
+.m-shell .sw .tr::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  top: 3px;
+  left: 3px;
+  transition: 0.2s;
+  box-shadow: var(--e1);
+}
+.m-shell .sw input:checked + .tr {
+  background: var(--accent);
+}
+.m-shell .sw input:checked + .tr::before {
+  transform: translateX(18px);
+}
+
+/* ===== lote 2 (gastos / deudas / ingresos) — clases del diseño ===== */
+/* cabecera con botón atrás */
+.m-shell .hdr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.m-shell .bk {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  flex: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+.m-shell .bk svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* badges up/down (sobre-presupuesto, etc.) */
+.m-shell .badge.up {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.m-shell .badge.down {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* pill tabs (filtros de gastos) */
+.m-shell .pill-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.m-shell .pill-tabs::-webkit-scrollbar {
+  display: none;
+}
+.m-shell .ptab {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.m-shell .ptab.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+/* frascos / sobres */
+.m-shell .jar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--e-raised);
+}
+.m-shell .jar-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.m-shell .jar-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.m-shell .jar-ic svg {
+  width: 20px;
+  height: 20px;
+}
+.m-shell .jar-amt {
+  margin-left: auto;
+  text-align: right;
+}
+.m-shell .jar-amt .a {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+}
+.m-shell .jar-amt .b {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.m-shell .sobre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 0;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.m-shell .sobre .sn {
+  font-weight: 600;
+}
+.m-shell .sobre .sv {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.m-shell .jar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.m-shell .jar-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* chips de sugerencia */
+.m-shell .qchip {
+  display: inline-flex;
+  padding: 9px 13px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* tarjetas de método (estrategia de deuda) */
+.m-shell .mcard {
+  flex: 1;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+.m-shell .mcard.sel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.m-shell .mcard .mt {
+  font-weight: 700;
+  font-size: 14px;
+}
+.m-shell .mcard .md {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.m-shell .mcard .mm {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 8px;
+}
+
+/* mini-barras (ingresos) */
+.m-shell .wminibars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 44px;
+}
+.m-shell .wminibars i {
+  flex: 1;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--accent-soft);
+}
+.m-shell .wminibars i.hi {
+  background: var(--accent);
+}
+
+/* chip de frecuencia (fuentes de ingreso) */
+.m-shell .schip {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+/* ===== lote 3 (metas / indicadores / protección) — clases del diseño ===== */
+/* metas */
+.m-shell .goal {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.m-shell .goal .gtop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.m-shell .goal .gemoji {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.m-shell .goal .gemoji svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* grid de widgets (indicadores) */
+.m-shell .wgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.m-shell .wgt.tall {
+  min-height: 172px;
+  display: flex;
+  flex-direction: column;
+}
+.m-shell .wgt .wtop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.m-shell .wgt .wbig {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.m-shell .wgt .wsub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* filas de brechas de protección */
+.m-shell .gap-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.m-shell .gap-row:first-of-type {
+  border-top: 0;
+}
+.m-shell .sev {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  flex: none;
+  margin-top: 1px;
+}
+.m-shell .sev.alto {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.m-shell .sev.medio {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.m-shell .sev.bajo {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
