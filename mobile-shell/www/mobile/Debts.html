@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Compound Ascend — Deudas (Móvil)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<link rel="stylesheet" href="m.css">
+<style>
+  .total-amt { font-family: var(--serif); font-size: 34px; letter-spacing: -0.02em; line-height: 1; }
+  .strat { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .strat-card { border: 1px solid var(--line); border-radius: 13px; padding: 13px; cursor: pointer; background: var(--surface-2); }
+  .strat-card.on { border-color: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 10%, transparent); background: var(--surface); }
+  .strat-card .nm { font-size: 12.5px; font-weight: 600; }
+  .strat-card .dsc { font-size: 10.5px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .strat-card .res { font-size: 11px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; }
+  .strat-card .res b { font-family: var(--serif); font-size: 14px; font-weight: 400; }
+
+  .debt-row { display: grid; grid-template-columns: 36px 1fr auto; gap: 11px; align-items: center; padding: 13px 16px; border-top: 1px solid var(--line); cursor: pointer; }
+  .debt-row:first-of-type { border-top: 0; }
+  .debt-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; color: white; font-weight: 600; font-size: 12px; }
+  .debt-name { font-size: 13px; font-weight: 500; }
+  .debt-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .debt-bal { font-size: 13px; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+  .debt-rate { font-size: 10.5px; text-align: right; margin-top: 1px; }
+  .debt-bar { grid-column: 1 / -1; }
+  .debt-bar .bar-track { height: 5px; }
+  .hs { padding: 12px 13px; }
+  .hs .ttl { font-size: 10.5px; color: var(--muted); }
+  .hs .val { font-family: var(--serif); font-size: 19px; margin-top: 5px; }
+  .pay-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+  .pay-row:first-of-type { border-top: 0; }
+  .pay-ic { width: 26px; height: 26px; border-radius: 8px; background: var(--pos-soft); color: var(--pos); display: grid; place-items: center; }
+  .pay-ic svg { width: 12px; height: 12px; }
+  .dt-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .dt-stat { background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; }
+  .dt-stat .l { font-size: 10.5px; color: var(--muted); }
+  .dt-stat .v { font-family: var(--serif); font-size: 17px; margin-top: 3px; }
+</style>
+</head>
+<body>
+<div class="m-app">
+  <main class="m-main">
+
+    <div class="card card-pad m-section">
+      <div class="label">Deuda total</div>
+      <div class="total-amt" style="color:var(--neg); margin-top:8px">$145.872</div>
+      <div class="row" style="gap:14px; margin-top:10px; font-size:11px; color:var(--muted); flex-wrap:wrap">
+        <div>Pagos <strong style="color:var(--ink-2)">$2.870/mes</strong></div>
+        <div>Libre <strong style="color:var(--pos)">Ago 2031</strong></div>
+      </div>
+      <div class="strat">
+        <div class="strat-card on"><div class="nm">Avalancha</div><div class="dsc">Mayor interés primero.</div><div class="res"><span class="muted">Ahorras</span><b style="color:var(--pos)">$8.410</b></div></div>
+        <div class="strat-card"><div class="nm">Bola de nieve</div><div class="dsc">Menor saldo primero.</div><div class="res"><span class="muted">1er pago</span><b>4 meses</b></div></div>
+      </div>
+    </div>
+
+    <div class="m-grid2 m-section">
+      <div class="card hs"><div class="ttl">Deuda / ingresos</div><div class="val" style="color:var(--pos)">9%</div></div>
+      <div class="card hs"><div class="ttl">Uso de crédito</div><div class="val" style="color:var(--warn)">31%</div></div>
+      <div class="card hs"><div class="ttl">TAE más alta</div><div class="val" style="color:var(--neg)">21,5%</div></div>
+      <div class="card hs"><div class="ttl">Interés / año</div><div class="val">$6.240</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><div class="card-title">Tus deudas</div><div class="card-sub">Toca para detalle y pagos</div></div>
+        <button class="btn btn-secondary" id="addDebtBtn" style="padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Añadir</button>
+      </div>
+      <div id="debtList"></div>
+    </div>
+
+  </main>
+</div>
+<script>
+  window.PAGE = { id: "debts", title: "Deudas y Préstamos", crumb: "Control", titleHTML: 'Deudas y <span class="it">préstamos</span>' };
+  window.COACH = {
+    greeting: "Tu deuda está <strong>bien controlada</strong> — 9% de tus ingresos. La tarjeta al 21,5% es lo único urgente.",
+    chips: ["¿Bola de nieve o avalancha?", "¿Cuándo seré libre de deudas?", "¿Refinancio el auto?"]
+  };
+</script>
+<script src="m.js"></script>
+<script>
+(function(){
+  const fmt = n => Number(n).toLocaleString('es-ES');
+  const DEBTS = {
+    sapphire:{ name:'Chase Sapphire', sub:'Tarjeta · pagar primero', color:'linear-gradient(135deg,var(--neg),var(--warn))', bal:'$3.210', rate:'21,5%', rateCol:'var(--neg)', min:'$98', payoff:'4 meses', pct:32,
+      hist:[['Pago de octubre','12 Oct','$250'],['Pago de septiembre','12 Sep','$200']] },
+    tesla:{ name:'Préstamo auto Tesla', sub:'Vehículo · 48 meses', color:'linear-gradient(135deg,var(--warn),var(--gold))', bal:'$24.820', rate:'4,9%', rateCol:'var(--ink-2)', min:'$612', payoff:'3,4 años', pct:65,
+      hist:[['Cuota de octubre','5 Oct','$612'],['Cuota de septiembre','5 Sep','$612']] },
+    sallie:{ name:'Sallie Mae · posgrado', sub:'Estudiantil · federal', color:'linear-gradient(135deg,var(--info),var(--teal))', bal:'$18.420', rate:'5,3%', rateCol:'var(--ink-2)', min:'$320', payoff:'5 años', pct:42,
+      hist:[['Pago de octubre','21 Oct','$320'],['Pago extra','8 Sep','$500']] },
+    mortgage:{ name:'Hipoteca · 14 Linden', sub:'Wells Fargo · 22 años', color:'linear-gradient(135deg,var(--c-networth),var(--ink-2))', bal:'$118.420', rate:'3,25%', rateCol:'var(--ink-2)', min:'$1.840', payoff:'22 años', pct:24,
+      hist:[['Cuota de octubre','1 Oct','$1.840'],['Cuota de septiembre','1 Sep','$1.840']] }
+  };
+  const list=document.getElementById('debtList');
+  list.innerHTML=Object.entries(DEBTS).map(([id,d],i)=>`
+    <div class="debt-row" data-debt="${id}">
+      <div class="debt-ic" style="background:${d.color}">${i+1}</div>
+      <div><div class="debt-name">${d.name}</div><div class="debt-sub">${d.sub}</div></div>
+      <div><div class="debt-bal">${d.bal}</div><div class="debt-rate" style="color:${d.rateCol}">${d.rate} TAE</div></div>
+      <div class="debt-bar"><div class="bar-track"><div class="bar-fill" style="width:${d.pct}%;background:${d.rateCol==='var(--neg)'?'var(--neg)':'var(--info)'}"></div></div></div>
+    </div>`).join('');
+
+  function openDebt(id){
+    const d=DEBTS[id];
+    App.openModal({ large:true, title:d.name, sub:d.sub,
+      body:`<div class="dt-stats">
+          <div class="dt-stat"><div class="l">Saldo</div><div class="v" style="color:var(--neg)">${d.bal}</div></div>
+          <div class="dt-stat"><div class="l">TAE</div><div class="v">${d.rate}</div></div>
+          <div class="dt-stat"><div class="l">Pago mínimo</div><div class="v">${d.min}/mes</div></div>
+          <div class="dt-stat"><div class="l">Libre en</div><div class="v" style="color:var(--pos)">${d.payoff}</div></div>
+        </div>
+        <div style="font-weight:600;font-size:12.5px;margin-bottom:6px">Registrar un pago</div>
+        <div class="fld-2">
+          <div class="fld"><div class="inp-money"><span class="pre">$</span><input id="payAmt" inputmode="decimal" value="${d.min.replace('$','')}"></div></div>
+          <div class="fld"><input class="inp" id="payDate" type="date"></div>
+        </div>
+        <button class="btn btn-primary" id="payAdd" style="width:100%;justify-content:center;margin-bottom:16px">Registrar pago</button>
+        <div style="font-weight:600;font-size:12.5px;margin-bottom:2px">Historial</div>
+        <div id="payHist">${d.hist.map(p=>`<div class="pay-row"><div class="pay-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg></div><div><div style="font-size:12px;font-weight:500">${p[0]}</div><div style="font-size:10.5px;color:var(--muted)">${p[1]}</div></div><div style="font-size:12.5px;font-weight:500">${p[2]}</div></div>`).join('')}</div>`,
+      footer:'<button class="btn btn-ghost" onclick="App.closeModal()">Cerrar</button>' });
+    document.getElementById('payDate').value=new Date().toISOString().slice(0,10);
+    document.getElementById('payAdd').addEventListener('click',()=>{
+      const amt=document.getElementById('payAmt').value||'0';
+      document.getElementById('payHist').insertAdjacentHTML('afterbegin',
+        `<div class="pay-row"><div class="pay-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg></div><div><div style="font-size:12px;font-weight:500">Pago registrado</div><div style="font-size:10.5px;color:var(--muted)">Hoy</div></div><div style="font-size:12.5px;font-weight:500">$${amt}</div></div>`);
+      App.toast('Pago de $'+amt+' registrado');
+    });
+  }
+  list.addEventListener('click', e=>{ const r=e.target.closest('.debt-row'); if(r) openDebt(r.dataset.debt); });
+  document.querySelectorAll('.strat-card').forEach(c=>c.addEventListener('click',()=>{ document.querySelectorAll('.strat-card').forEach(x=>x.classList.remove('on')); c.classList.add('on'); }));
+  function openAdd(){
+    App.openModal({ title:'Añadir deuda', sub:'Saldo con interés',
+      body:`<div class="fld"><span class="fld-label">Nombre</span><input class="inp" placeholder="p. ej. Tarjeta Amex"></div>
+        <div class="fld-2"><div class="fld"><span class="fld-label">Saldo</span><div class="inp-money"><span class="pre">$</span><input inputmode="decimal" placeholder="0"></div></div>
+        <div class="fld"><span class="fld-label">TAE</span><div class="inp-money"><span class="pre">%</span><input inputmode="decimal" placeholder="0,0"></div></div></div>
+        <div class="fld"><span class="fld-label">Pago mínimo mensual</span><div class="inp-money"><span class="pre">$</span><input inputmode="decimal" placeholder="0"></div></div>`,
+      footer:'<button class="btn btn-ghost" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="App.closeModal();App.toast(\'Deuda añadida\')">Añadir</button>' });
+  }
+  document.getElementById('addDebtBtn').addEventListener('click', openAdd);
+  if(location.hash==='#add') setTimeout(openAdd, 300);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+/* ============================================================
+   COMPOUND ASCEND — Mobile (iPhone) layer
+   Loads on top of ../assets/app.css (tokens, modal, toast, forms)
+   ============================================================ */
+
+html, body { max-width: 100%; overflow-x: hidden; }
+body { -webkit-tap-highlight-color: transparent; }
+
+.m-app { min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ---------- Header ---------- */
+.m-head {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 16px 10px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: saturate(150%) blur(14px);
+  -webkit-backdrop-filter: saturate(150%) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.m-brand { width: 34px; height: 34px; border-radius: 10px; flex: none;
+  background: linear-gradient(155deg,#1f1e1a 0%,#34322b 100%); color: #F4F2EC;
+  display: grid; place-items: center; position: relative; overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.18); }
+.m-brand::after { content:""; position:absolute; inset:0; background:radial-gradient(120% 85% at 30% 0%, rgba(255,255,255,0.14), transparent 55%); }
+[data-theme="dark"] .m-brand { background: linear-gradient(155deg,#F6F3EA 0%,#D6D0C2 100%); color:#15140F; }
+.m-brand svg { width: 21px; height: 21px; position: relative; z-index: 1; }
+.m-head-titles { flex: 1; min-width: 0; }
+.m-crumb { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.m-title { font-family: var(--serif); font-size: 21px; line-height: 1.05; letter-spacing: -0.02em; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-title .it { font-style: italic; color: var(--ink-2); }
+
+/* compact theme toggle */
+.m-theme { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; flex: none; }
+.m-theme svg { width: 16px; height: 16px; }
+[data-theme="light"] .m-theme .moon { display: none; }
+[data-theme="dark"] .m-theme .sun { display: none; }
+
+/* ---------- Content ---------- */
+.m-main { flex: 1; padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); min-width: 0; }
+.m-main .card { border-radius: 16px; }
+.m-main .card-pad { padding: 16px; }
+.m-main .card-head { padding: 14px 16px 10px; }
+.m-section { margin-bottom: 16px; }
+
+/* generic 2-col stat grid */
+.m-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.m-stack { display: flex; flex-direction: column; gap: 12px; }
+
+/* horizontal scroll tab chips */
+.m-tabs { display: flex; gap: 7px; overflow-x: auto; padding: 2px 2px 10px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; scrollbar-width: none; }
+.m-tabs::-webkit-scrollbar { display: none; }
+.m-tab { flex: none; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 999px; background: var(--chip); color: var(--muted); cursor: pointer; border: 1px solid transparent; white-space: nowrap; transition: all 140ms; }
+.m-tab.on { background: var(--ink); color: var(--bg); }
+
+/* panels */
+.panel { display: none; }
+.panel.on { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel.on { animation: mfade 280ms cubic-bezier(0.2,0.6,0.2,1); }
+}
+@keyframes mfade { from { transform: translateY(8px) } to { transform: translateY(0) } }
+
+/* list rows reused */
+.list-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 11px; align-items: center; padding: 11px 16px; border-top: 1px solid var(--line); }
+.list-row:first-of-type { border-top: 0; }
+
+/* ---------- Bottom tab bar ---------- */
+.m-tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
+  backdrop-filter: saturate(150%) blur(16px);
+  -webkit-backdrop-filter: saturate(150%) blur(16px);
+  border-top: 1px solid var(--line);
+}
+.m-tabbar a, .m-tabbar button {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 2px; border: 0; background: transparent; cursor: pointer;
+  color: var(--muted); font: inherit; font-size: 10px; font-weight: 500;
+  border-radius: 10px; text-decoration: none; min-height: 48px;
+}
+.m-tabbar .ico { width: 22px; height: 22px; display: grid; place-items: center; }
+.m-tabbar .ico svg { width: 21px; height: 21px; }
+.m-tabbar .on { color: var(--ink); }
+.m-tabbar .on .ico { color: var(--ink); }
+
+/* ---------- "Más" sheet ---------- */
+.m-sheet-scrim { position: fixed; inset: 0; z-index: 70; background: rgba(20,18,14,0.36); backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity 200ms; }
+.m-sheet-scrim.open { opacity: 1; pointer-events: auto; }
+.m-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 71;
+  background: var(--surface); border-radius: 20px 20px 0 0; border: 1px solid var(--line); border-bottom: 0;
+  padding: 10px 16px calc(20px + env(safe-area-inset-bottom));
+  transform: translateY(102%); transition: transform 260ms cubic-bezier(0.2,0.7,0.2,1);
+  box-shadow: var(--shadow-float); }
+.m-sheet.open { transform: none; }
+.m-sheet .grab { width: 38px; height: 4px; border-radius: 999px; background: var(--line-strong); margin: 2px auto 12px; }
+.m-sheet-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; padding: 0 2px; }
+.m-sheet a { display: flex; align-items: center; gap: 12px; padding: 12px 10px; border-radius: 11px; color: var(--ink-2); font-size: 14px; font-weight: 500; text-decoration: none; }
+.m-sheet a:active, .m-sheet a:hover { background: var(--chip); }
+.m-sheet a .si { width: 34px; height: 34px; border-radius: 10px; background: var(--chip); display: grid; place-items: center; color: var(--ink-2); flex: none; }
+.m-sheet a .si svg { width: 16px; height: 16px; }
+.m-sheet a .chev { margin-left: auto; color: var(--muted-2); }
+.m-sheet a .chev svg { width: 14px; height: 14px; }
+
+/* ---------- Coach (mobile placement) ---------- */
+.coach-fab { right: 14px !important; bottom: calc(86px + env(safe-area-inset-bottom)) !important; padding: 11px 14px 11px 11px !important; font-size: 12.5px !important; }
+.coach-panel { right: 0 !important; left: 0 !important; bottom: 0 !important; width: 100% !important; max-width: 100% !important; height: 86vh !important; border-radius: 20px 20px 0 0 !important; z-index: 90 !important; }
+
+/* ---------- Modal: always bottom sheet on mobile ---------- */
+.modal-scrim { padding: 0 !important; align-items: flex-end !important; z-index: 95 !important; }
+.modal, .modal.lg { width: 100% !important; border-radius: 20px 20px 0 0 !important; max-height: 90vh !important; }
+.modal-body { -webkit-overflow-scrolling: touch; }
+
+/* toast above tabbar */
+.toast-wrap { bottom: calc(92px + env(safe-area-inset-bottom)) !important; z-index: 96 !important; }
+
+/* big numerals scale down */
+.num-xl { letter-spacing: -0.02em; }
+
+/* env rows (budget categories) mobile compact */
+.env { display: grid; grid-template-columns: 36px 1fr auto 22px; gap: 11px; align-items: center; padding: 13px 16px; border-top: 1px solid var(--line); position: relative; }
+.env:first-of-type { border-top: 0; }
+.env-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.env-ic svg { width: 16px; height: 16px; }
+.env-name { font-size: 13.5px; font-weight: 500; }
+.env-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.env-num { text-align: right; }
+.env-num .big { font-size: 13.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.env-num .small { font-size: 10.5px; color: var(--muted); }
+.env-bar-row { grid-column: 1 / -1; }
+.env-bar-row .bar-track { height: 6px; }
+.env-bar-meta { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+/* safe horizontal scroll charts */
+.m-chart { width: 100%; display: block; }

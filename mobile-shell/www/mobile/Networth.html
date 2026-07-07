@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Compound Ascend — Patrimonio (Móvil)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<link rel="stylesheet" href="m.css">
+<style>
+  .nw-amt { font-family: var(--serif); font-size: 34px; letter-spacing: -0.02em; line-height: 1; }
+  .ab-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 11px; align-items: center; padding: 11px 16px; border-top: 1px solid var(--line); }
+  .ab-row:first-of-type { border-top: 0; }
+  .ab-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; }
+  .ab-ic svg { width: 14px; height: 14px; }
+  .ab-name { font-size: 12.5px; font-weight: 500; }
+  .ab-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .ab-val { font-size: 12.5px; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+  .ab-d { font-size: 10.5px; text-align: right; margin-top: 1px; }
+  .composition { display: flex; height: 11px; border-radius: 999px; overflow: hidden; gap: 2px; margin: 4px 0 12px; }
+  .goal { padding: 14px 16px; border-top: 1px solid var(--line); }
+  .goal:first-of-type { border-top: 0; }
+  .goal .h { display: flex; justify-content: space-between; align-items: center; }
+  .goal .t { font-size: 12.5px; font-weight: 500; }
+  .goal .tag { font-size: 10px; color: var(--muted); }
+  .goal .amt { font-family: var(--serif); font-size: 18px; margin-top: 7px; }
+  .goal .amt .of { font-size: 11px; color: var(--muted); }
+  .goal .foot { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10.5px; color: var(--muted); }
+  .goal .bar-track { height: 5px; margin-top: 9px; }
+</style>
+</head>
+<body>
+<div class="m-app">
+  <main class="m-main">
+
+    <div class="card card-pad m-section">
+      <div class="label">Patrimonio neto</div>
+      <div class="nw-amt" style="margin-top:8px">$1.284.902</div>
+      <span class="delta up" style="margin-top:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>+$312.840 · 24,3% / año</span>
+      <svg class="m-chart" viewBox="0 0 340 100" preserveAspectRatio="none" style="height:100px;margin-top:10px">
+        <defs><linearGradient id="nF" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--c-networth)" stop-opacity="0.2"/><stop offset="1" stop-color="var(--c-networth)" stop-opacity="0"/></linearGradient></defs>
+        <g stroke="var(--line)" stroke-width="1"><line x1="0" y1="28" x2="340" y2="28"/><line x1="0" y1="56" x2="340" y2="56"/><line x1="0" y1="84" x2="340" y2="84"/></g>
+        <path d="M0,88 C50,84 90,78 140,68 C200,56 250,42 340,16 L340,100 L0,100 Z" fill="url(#nF)"/>
+        <path d="M0,88 C50,84 90,78 140,68 C200,56 250,42 340,16" fill="none" stroke="var(--c-networth)" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <div class="card card-pad m-section">
+      <div class="card-title">Composición</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px">Activos</div>
+      <div class="num-xl" style="font-size:19px;color:var(--pos);margin:3px 0 2px">$1.412.560</div>
+      <div class="composition">
+        <span style="background:var(--info);width:42%"></span><span style="background:var(--pos);width:26%"></span>
+        <span style="background:var(--warn);width:17%"></span><span style="background:var(--teal);width:9%"></span>
+        <span style="background:var(--c-networth);width:6%"></span>
+      </div>
+      <div style="font-size:11px;color:var(--muted)">Pasivos</div>
+      <div class="num-xl" style="font-size:19px;color:var(--neg);margin:3px 0 2px">$127.658</div>
+      <div class="composition"><span style="background:var(--neg);width:92%"></span><span style="background:var(--warn);width:8%"></span></div>
+    </div>
+
+    <div class="card m-section">
+      <div class="card-head"><div><div class="card-title">Activos</div><div class="card-sub">5 categorías</div></div><span class="chip" style="background:var(--pos-soft);color:var(--pos)">$1,41M</span></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--info-soft);color:var(--info)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h6v6"/></svg></div><div><div class="ab-name">Cuentas de inversión</div><div class="ab-sub">Corretaje · 401(k) · IRA</div></div><div><div class="ab-val">$836.099</div><div class="ab-d" style="color:var(--pos)">+12,7%</div></div></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--pos-soft);color:var(--pos)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10 12 3l9 7M5 10v10h14V10"/></svg></div><div><div class="ab-name">Inmuebles</div><div class="ab-sub">Principal + alquiler</div></div><div><div class="ab-val">$412.000</div><div class="ab-d" style="color:var(--pos)">+4,1%</div></div></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--teal);color:white"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg></div><div><div class="ab-name">Efectivo y ahorros</div><div class="ab-sub">Corriente · HYSA</div></div><div><div class="ab-val">$96.461</div><div class="ab-d muted">4,6% TAE</div></div></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--warn-soft);color:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg></div><div><div class="ab-name">Vehículos</div><div class="ab-sub">RAV4 · Model 3</div></div><div><div class="ab-val">$60.600</div><div class="ab-d" style="color:var(--neg)">−8,2%</div></div></div>
+    </div>
+
+    <div class="card m-section">
+      <div class="card-head"><div><div class="card-title">Pasivos</div><div class="card-sub">4 obligaciones</div></div><span class="chip" style="background:var(--neg-soft);color:var(--neg)">$127,7k</span></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--neg-soft);color:var(--neg)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10 12 3l9 7M5 10v10h14V10"/></svg></div><div><div class="ab-name">Hipoteca</div><div class="ab-sub">3,25% · 22 años</div></div><div class="ab-val" style="color:var(--neg)">$118.420</div></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--warn-soft);color:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg></div><div><div class="ab-name">Préstamo auto</div><div class="ab-sub">Tesla · 4,9%</div></div><div class="ab-val" style="color:var(--neg)">$24.820</div></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--info-soft);color:var(--info)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><div class="ab-name">Préstamo estudiantil</div><div class="ab-sub">Federal · 5,3%</div></div><div class="ab-val" style="color:var(--neg)">$18.420</div></div>
+      <div class="ab-row"><div class="ab-ic" style="background:var(--neg-soft);color:var(--neg)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div><div><div class="ab-name">Tarjeta de crédito</div><div class="ab-sub">Sapphire · 21,5%</div></div><div class="ab-val" style="color:var(--neg)">$3.210</div></div>
+      <div style="padding:12px 16px;border-top:1px solid var(--line)"><a class="ghost-link" href="Debts.html">Gestionar en Deudas <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a></div>
+    </div>
+
+    <div class="card" id="savings">
+      <div class="card-head"><div><div class="card-title">Ahorros y metas</div><div class="card-sub">4 activas</div></div>
+        <button class="btn btn-secondary" id="addGoalBtn" style="padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Nueva</button></div>
+      <div class="goal"><div class="h"><span class="t">Fondo de emergencia</span><span class="tag">9 meses</span></div><div class="amt">$48.000 <span class="of">/ $54k</span></div><div class="bar-track"><div class="bar-fill" style="width:89%;background:linear-gradient(90deg,var(--c-savings),var(--teal))"></div></div><div class="foot"><span>89%</span><span>2 meses restantes</span></div></div>
+      <div class="goal"><div class="h"><span class="t">Mejora del hogar</span><span class="tag">Jun 2027</span></div><div class="amt">$84.200 <span class="of">/ $150k</span></div><div class="bar-track"><div class="bar-fill" style="width:56%;background:linear-gradient(90deg,var(--pos),var(--teal))"></div></div><div class="foot"><span>56%</span><span>+$1.200/mes</span></div></div>
+      <div class="goal"><div class="h"><span class="t">Año sabático · Kioto</span><span class="tag">Abr 2026</span></div><div class="amt">$12.400 <span class="of">/ $28k</span></div><div class="bar-track"><div class="bar-fill" style="width:44%;background:linear-gradient(90deg,var(--warn),var(--gold))"></div></div><div class="foot"><span>44%</span><span>+$650/mes</span></div></div>
+      <div class="goal"><div class="h"><span class="t">Jubilación · 60 años</span><span class="tag">2046</span></div><div class="amt">$242k <span class="of">/ $1,8M</span></div><div class="bar-track"><div class="bar-fill" style="width:13%;background:linear-gradient(90deg,var(--info),var(--c-networth))"></div></div><div class="foot"><span>13%</span><span>Adelantada</span></div></div>
+    </div>
+
+  </main>
+</div>
+<script>
+  window.PAGE = { id: "networth", title: "Patrimonio Neto", crumb: "Patrimonio", titleHTML: 'Patrimonio <span class="it">neto</span>' };
+  window.COACH = {
+    greeting: "Tu patrimonio creció <strong>24% en el último año</strong> hasta $1,28M.",
+    chips: ["¿Cómo evoluciona mi patrimonio?", "¿Tengo demasiado efectivo?", "Proyecta mi patrimonio a los 60"]
+  };
+</script>
+<script src="m.js"></script>
+<script>
+(function(){
+  function openAdd(){
+    App.openModal({ title:'Nuevo objetivo', sub:'Define una meta de ahorro',
+      body:`<div class="fld"><span class="fld-label">Nombre</span><input class="inp" placeholder="p. ej. Entrada para casa"></div>
+        <div class="fld-2"><div class="fld"><span class="fld-label">Monto objetivo</span><div class="inp-money"><span class="pre">$</span><input inputmode="decimal" placeholder="0"></div></div>
+        <div class="fld"><span class="fld-label">Fecha meta</span><input class="inp" type="date"></div></div>
+        <div class="fld"><span class="fld-label">Aporte mensual</span><div class="inp-money"><span class="pre">$</span><input inputmode="decimal" placeholder="0"></div></div>`,
+      footer:'<button class="btn btn-ghost" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="App.closeModal();App.toast(\'Objetivo creado\')">Crear</button>' });
+  }
+  document.getElementById('addGoalBtn').addEventListener('click', openAdd);
+  if(location.hash==='#add-goal') setTimeout(openAdd, 300);
+  if(location.hash==='#savings'){ const el=document.getElementById('savings'); if(el) setTimeout(()=>window.scrollTo({top: el.getBoundingClientRect().top + window.scrollY - 80, behavior:'smooth'}), 200); }
+})();
+</script>
+</body>
+</html>
