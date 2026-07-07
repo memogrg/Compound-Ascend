@@ -9,14 +9,16 @@ import "./mobile.css";
  * viven en el layout interno (app), para que /m/login quede fuera de la guarda.
  */
 export const viewport: Viewport = {
-  // Status bar acorde al tema oscuro del diseño + respeto de safe areas (notch/home).
-  themeColor: "#15140F",
+  // Status bar acorde a la canvas CLARA (tema por defecto) + safe areas (notch/home).
+  themeColor: "#F1EFE8",
   viewportFit: "cover",
 };
 
 export default function MobileRootLayout({ children }: { children: React.ReactNode }) {
+  // Tema CLARO por defecto (como el diseño). Para alternar a oscuro, cambiar este
+  // atributo a data-theme="dark" (mobile.css tiene el scope listo). No se fuerza oscuro.
   return (
-    <div className="m-shell" data-mobile>
+    <div className="m-shell" data-mobile data-theme="light">
       {children}
     </div>
   );

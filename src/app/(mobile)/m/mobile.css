@@ -15,7 +15,49 @@
   --font-body: var(--font-manrope), "Manrope", "Segoe UI", system-ui, sans-serif;
   --font-mono: var(--font-space-mono), "Space Mono", ui-monospace, Menlo, monospace;
 
-  /* paleta oscura del diseño */
+  /* radios (independientes del tema) */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
+  --r-pill: 999px;
+
+  /* ===== tema CLARO = DEFAULT (data-theme="light" del diseño) ===== */
+  --canvas: #f1efe8;
+  --surface: #ffffff;
+  --surface-2: #faf8f3;
+  --surface-3: #f1eee6;
+  --border: #e7e4dc;
+  --text: #1e1c16;
+  --text-muted: #807c72;
+  --text-dim: #a6a199;
+  --accent: #378451;
+  --accent-ink: #ffffff;
+  --success: #378451;
+  --warning: #b07a2e;
+  --danger: #c34f4b;
+  --s5: #43a064;
+  --accent-soft: rgba(55, 132, 81, 0.12);
+  --danger-soft: rgba(195, 79, 75, 0.12);
+  --warning-soft: rgba(176, 122, 46, 0.12);
+  --e1: 0 1px 2px rgba(20, 18, 14, 0.08);
+  --e2: 0 8px 24px -10px rgba(20, 18, 14, 0.2);
+  --e3: 0 20px 50px -18px rgba(20, 18, 14, 0.28);
+
+  position: relative;
+  min-height: 100dvh;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  /* respeta las safe areas del notch / home indicator (viewport-fit=cover) */
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ===== tema OSCURO = opción secundaria (LISTA, no activada) =====
+   Para alternar: poné data-theme="dark" (o class="dark") en el <div.m-shell>. */
+.m-shell[data-theme="dark"],
+.m-shell.dark {
   --canvas: #15140f;
   --surface: #1e1c16;
   --surface-2: #26241c;
@@ -33,25 +75,9 @@
   --accent-soft: rgba(81, 175, 111, 0.14);
   --danger-soft: rgba(212, 107, 98, 0.16);
   --warning-soft: rgba(217, 168, 90, 0.16);
-
-  /* radios y sombras */
-  --r-sm: 10px;
-  --r-md: 14px;
-  --r-lg: 20px;
-  --r-xl: 26px;
-  --r-pill: 999px;
   --e1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --e2: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
   --e3: 0 20px 50px -18px rgba(0, 0, 0, 0.7);
-
-  position: relative;
-  min-height: 100dvh;
-  background: var(--canvas);
-  color: var(--text);
-  font-family: var(--font-body);
-  -webkit-font-smoothing: antialiased;
-  /* respeta las safe areas del notch / home indicator (viewport-fit=cover) */
-  padding-top: env(safe-area-inset-top);
 }
 .m-shell * {
   box-sizing: border-box;
