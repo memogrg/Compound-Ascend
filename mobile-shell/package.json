@@ -1,0 +1,31 @@
+{
+  "name": "cartera-mobile-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shell de Capacitor (modo BUNDLED) que empaqueta el diseño móvil estático de CARTERA+ como app nativa Android/iOS. Aislado del build de Next.js del repo; no depende de src/.",
+  "scripts": {
+    "sync": "cap sync",
+    "copy": "cap copy",
+    "open:android": "cap open android",
+    "open:ios": "cap open ios",
+    "run:android": "cap run android",
+    "run:ios": "cap run ios"
+  },
+  "keywords": [
+    "capacitor",
+    "cartera",
+    "mobile-shell"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor/android": "^7.6.7",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/browser": "^7.0.5",
+    "@capacitor/core": "^7.6.7",
+    "@capacitor/ios": "^7.6.7"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.7",
+    "typescript": "^6.0.3"
+  }
+}

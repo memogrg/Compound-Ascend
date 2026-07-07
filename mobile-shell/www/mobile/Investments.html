@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Compound Ascend — Inversiones (Móvil)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<link rel="stylesheet" href="m.css">
+<style>
+  .pf-amt { font-family: var(--serif); font-size: 34px; letter-spacing: -0.02em; line-height: 1; }
+  .hold-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 11px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line); }
+  .hold-row:first-of-type { border-top: 0; }
+  .hold-ic { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-weight: 600; font-size: 10px; color: white; letter-spacing: 0.02em; }
+  .hold-name { font-size: 12.5px; font-weight: 500; }
+  .hold-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .hold-val { text-align: right; }
+  .hold-val .v { font-size: 12.5px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .hold-val .d { font-size: 10.5px; margin-top: 1px; }
+  .al-row { display: grid; grid-template-columns: 9px 1fr auto auto; gap: 8px; align-items: center; font-size: 11.5px; padding: 3px 0; }
+  .al-row .sw { width: 7px; height: 7px; border-radius: 2px; }
+  .al-row .pc { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .al-row .am { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat { padding: 12px 13px; }
+  .stat .ttl { font-size: 10.5px; color: var(--muted); }
+  .stat .val { font-family: var(--serif); font-size: 18px; margin-top: 5px; }
+  .div-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
+  .div-row:first-of-type { border-top: 0; }
+  .div-day { width: 34px; text-align: center; }
+  .div-day .d { font-family: var(--serif); font-size: 15px; line-height: 1; }
+  .div-day .m { font-size: 9px; color: var(--muted); text-transform: uppercase; }
+  .metric { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+  .metric:first-of-type { border-top: 0; }
+  .metric .ml { font-size: 12px; font-weight: 500; }
+  .metric .ms { font-size: 10.5px; color: var(--muted); }
+  .metric .mv { font-family: var(--serif); font-size: 16px; }
+</style>
+</head>
+<body>
+<div class="m-app">
+  <main class="m-main">
+
+    <div class="m-tabs" id="tabs">
+      <button class="m-tab on" data-tab="resumen">Resumen</button>
+      <button class="m-tab" data-tab="portfolio">Cartera</button>
+      <button class="m-tab" data-tab="dividendos">Dividendos</button>
+      <button class="m-tab" data-tab="rendimiento">Rendimiento</button>
+    </div>
+
+    <!-- RESUMEN -->
+    <section class="panel on" data-panel="resumen">
+      <div class="card card-pad m-section">
+        <div class="label">Valor de la cartera</div>
+        <div class="pf-amt" style="margin-top:8px">$836.099</div>
+        <span class="delta up" style="margin-top:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>+$94.210 · 12,7% anual</span>
+        <svg class="m-chart" viewBox="0 0 340 110" preserveAspectRatio="none" style="height:110px;margin-top:10px">
+          <defs><linearGradient id="pF" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--info)" stop-opacity="0.18"/><stop offset="1" stop-color="var(--info)" stop-opacity="0"/></linearGradient></defs>
+          <g stroke="var(--line)" stroke-width="1"><line x1="0" y1="30" x2="340" y2="30"/><line x1="0" y1="60" x2="340" y2="60"/><line x1="0" y1="90" x2="340" y2="90"/></g>
+          <path d="M0,92 C50,84 90,80 130,68 C180,56 230,62 280,44 C310,36 325,32 340,24 L340,110 L0,110 Z" fill="url(#pF)"/>
+          <path d="M0,96 C60,90 130,80 200,72 C260,64 310,56 340,48" fill="none" stroke="var(--muted-2)" stroke-width="1.3" stroke-dasharray="4 4" opacity="0.6"/>
+          <path d="M0,92 C50,84 90,80 130,68 C180,56 230,62 280,44 C310,36 325,32 340,24" fill="none" stroke="var(--info)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <div class="row" style="gap:12px; font-size:10.5px; color:var(--muted); margin-top:4px">
+          <span class="row" style="gap:5px"><span style="width:12px;height:2px;background:var(--info);display:inline-block"></span>Tu cartera +12,7%</span>
+          <span class="row" style="gap:5px"><span style="width:12px;height:0;border-top:2px dashed var(--muted-2);display:inline-block"></span>S&amp;P 500 +9,2%</span>
+        </div>
+      </div>
+
+      <div class="card card-pad m-section">
+        <div class="card-title">Distribución de activos</div>
+        <div class="row" style="gap:16px; align-items:center; margin-top:12px">
+          <div class="ring-wrap">
+            <svg style="width:104px;height:104px" viewBox="0 0 42 42">
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" stroke-width="5"/>
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--info)" stroke-width="5" stroke-dasharray="52 48" stroke-dashoffset="25"/>
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--pos)" stroke-width="5" stroke-dasharray="22 78" stroke-dashoffset="-27"/>
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--warn)" stroke-width="5" stroke-dasharray="15 85" stroke-dashoffset="-49"/>
+              <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--teal)" stroke-width="5" stroke-dasharray="11 89" stroke-dashoffset="-64"/>
+            </svg>
+            <div class="ring-center"><div><div class="num-xl" style="font-size:16px">$836k</div></div></div>
+          </div>
+          <div style="flex:1">
+            <div class="al-row"><span class="sw" style="background:var(--info)"></span><span>EE.UU.</span><span class="pc">52%</span><span class="am">$435k</span></div>
+            <div class="al-row"><span class="sw" style="background:var(--pos)"></span><span>Int'l</span><span class="pc">22%</span><span class="am">$184k</span></div>
+            <div class="al-row"><span class="sw" style="background:var(--warn)"></span><span>Bonos</span><span class="pc">15%</span><span class="am">$125k</span></div>
+            <div class="al-row"><span class="sw" style="background:var(--teal)"></span><span>REITs</span><span class="pc">11%</span><span class="am">$92k</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="m-grid2">
+        <div class="card stat"><div class="ttl">Retorno total</div><div class="val" style="color:var(--pos)">+$94.210</div></div>
+        <div class="card stat"><div class="ttl">Dividendos/año</div><div class="val">$14.820</div></div>
+        <div class="card stat"><div class="ttl">Ingreso pasivo</div><div class="val" style="color:var(--pos)">$3.185/m</div></div>
+        <div class="card stat"><div class="ttl">Coste base</div><div class="val">$741.889</div></div>
+      </div>
+    </section>
+
+    <!-- CARTERA -->
+    <section class="panel" data-panel="portfolio">
+      <div class="card m-section">
+        <div class="card-head"><div><div class="card-title">Por cuenta</div><div class="card-sub">3 cuentas</div></div>
+          <button class="btn btn-secondary" id="addHoldBtn" style="padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Añadir</button></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--info),var(--teal))">VG</div><div><div class="hold-name">Corretaje · Vanguard</div><div class="hold-sub">Conjunta · imponible</div></div><div class="hold-val"><div class="v">$486.210</div><div class="d muted">58%</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--warn),var(--gold))">FD</div><div><div class="hold-name">401(k) · Fidelity</div><div class="hold-sub">Jubilación</div></div><div class="hold-val"><div class="v">$242.889</div><div class="d muted">29%</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--pos),var(--teal))">SW</div><div><div class="hold-name">Roth IRA · Schwab</div><div class="hold-sub">Libre de impuestos</div></div><div class="hold-val"><div class="v">$107.000</div><div class="d muted">13%</div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">Posiciones</div><div class="card-sub">11 · por valor</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--info),var(--teal))">VTI</div><div><div class="hold-name">Vanguard Total Market</div><div class="hold-sub">312 acciones · 34%</div></div><div class="hold-val"><div class="v">$284.512</div><div class="d" style="color:var(--pos)">+14,2%</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--pos),var(--teal))">VXUS</div><div><div class="hold-name">Vanguard Int'l</div><div class="hold-sub">2.140 acciones · 22%</div></div><div class="hold-val"><div class="v">$183.820</div><div class="d" style="color:var(--pos)">+8,1%</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--warn),var(--gold))">BND</div><div><div class="hold-name">Bonos mercado total</div><div class="hold-sub">1.680 acciones · 15%</div></div><div class="hold-val"><div class="v">$125.160</div><div class="d" style="color:var(--neg)">−1,3%</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--teal),var(--info))">VNQ</div><div><div class="hold-name">ETF inmobiliario</div><div class="hold-sub">980 acciones · 11%</div></div><div class="hold-val"><div class="v">$91.924</div><div class="d" style="color:var(--pos)">+5,7%</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--c-networth),var(--ink-2))">SCHD</div><div><div class="hold-name">Schwab Dividendos</div><div class="hold-sub">640 acciones · 6%</div></div><div class="hold-val"><div class="v">$49.984</div><div class="d" style="color:var(--pos)">+9,4%</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--ink-2),var(--c-networth))">AAPL</div><div><div class="hold-name">Apple Inc.</div><div class="hold-sub">95 acciones · 2,2%</div></div><div class="hold-val"><div class="v">$18.202</div><div class="d" style="color:var(--pos)">+22,4%</div></div></div>
+      </div>
+    </section>
+
+    <!-- DIVIDENDOS -->
+    <section class="panel" data-panel="dividendos">
+      <div class="m-grid2 m-section">
+        <div class="card stat"><div class="ttl">Dividendos/año</div><div class="val" style="color:var(--pos)">$14.820</div></div>
+        <div class="card stat"><div class="ttl">Rentabilidad</div><div class="val">1,77%</div></div>
+        <div class="card stat"><div class="ttl">Media mensual</div><div class="val">$1.235</div></div>
+        <div class="card stat"><div class="ttl">DRIP</div><div class="val" style="color:var(--pos)">Activa</div></div>
+      </div>
+      <div class="card m-section">
+        <div class="card-head"><div><div class="card-title">Principales pagadores</div><div class="card-sub">Por dividendo anual</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--c-networth),var(--ink-2))">SCHD</div><div><div class="hold-name">Schwab Dividendos</div><div class="hold-sub">3,6% · trimestral</div></div><div class="hold-val"><div class="v" style="color:var(--pos)">$4.380</div><div class="d muted">/año</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--pos),var(--info))">VYM</div><div><div class="hold-name">Alto Dividendo</div><div class="hold-sub">2,8% · trimestral</div></div><div class="hold-val"><div class="v" style="color:var(--pos)">$3.640</div><div class="d muted">/año</div></div></div>
+        <div class="hold-row"><div class="hold-ic" style="background:linear-gradient(135deg,var(--teal),var(--pos))">O</div><div><div class="hold-name">Realty Income</div><div class="hold-sub">5,1% · mensual</div></div><div class="hold-val"><div class="v" style="color:var(--pos)">$2.208</div><div class="d muted">/año</div></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><div class="card-title">Calendario de pagos</div><div class="card-sub">Próximos 90 días</div></div><span class="chip" style="background:var(--pos-soft);color:var(--pos)">+$4.726</span></div>
+        <div class="div-row"><div class="div-day"><div class="d">10</div><div class="m">Jul</div></div><div><div class="hold-name">VYM</div><div class="hold-sub">$0,84/acción · 380</div></div><div class="hold-val"><div class="v" style="color:var(--pos)">+$612</div></div></div>
+        <div class="div-row"><div class="div-day"><div class="d">15</div><div class="m">Jul</div></div><div><div class="hold-name">SCHD</div><div class="hold-sub">$0,68/acción · 640</div></div><div class="hold-val"><div class="v" style="color:var(--pos)">+$438</div></div></div>
+        <div class="div-row"><div class="div-day"><div class="d">22</div><div class="m">Jul</div></div><div><div class="hold-name">O · Realty Income</div><div class="hold-sub">mensual</div></div><div class="hold-val"><div class="v" style="color:var(--pos)">+$184</div></div></div>
+        <div class="div-row"><div class="div-day"><div class="d">28</div><div class="m">Jul</div></div><div><div class="hold-name">VTI</div><div class="hold-sub">$1,56/acción · 312</div></div><div class="hold-val"><div class="v" style="color:var(--pos)">+$486</div></div></div>
+      </div>
+    </section>
+
+    <!-- RENDIMIENTO -->
+    <section class="panel" data-panel="rendimiento">
+      <div class="card card-pad m-section">
+        <div class="label">Retorno acumulado · 5 años</div>
+        <div class="pf-amt" style="margin-top:8px; color:var(--pos)">+71,4%</div>
+        <span class="delta up" style="margin-top:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>11,3% anualizado</span>
+        <svg class="m-chart" viewBox="0 0 340 100" preserveAspectRatio="none" style="height:100px;margin-top:10px">
+          <defs><linearGradient id="rF" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--pos)" stop-opacity="0.16"/><stop offset="1" stop-color="var(--pos)" stop-opacity="0"/></linearGradient></defs>
+          <path d="M0,90 C50,84 100,76 150,64 C200,52 260,40 340,14 L340,100 L0,100 Z" fill="url(#rF)"/>
+          <path d="M0,92 C60,86 130,78 200,68 C260,58 310,42 340,28" fill="none" stroke="var(--muted-2)" stroke-width="1.3" stroke-dasharray="4 4" opacity="0.6"/>
+          <path d="M0,90 C50,84 100,76 150,64 C200,52 260,40 340,14" fill="none" stroke="var(--pos)" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="card card-pad m-section">
+        <div class="card-title">Métricas de riesgo</div>
+        <div class="metric"><div><div class="ml">Volatilidad</div><div class="ms">Desv. estándar anual</div></div><div class="mv">12,4%</div></div>
+        <div class="metric"><div><div class="ml">Ratio de Sharpe</div><div class="ms">Ajustado al riesgo</div></div><div class="mv" style="color:var(--pos)">1,38</div></div>
+        <div class="metric"><div><div class="ml">Beta</div><div class="ms">vs mercado</div></div><div class="mv">0,92</div></div>
+        <div class="metric"><div><div class="ml">Caída máxima</div><div class="ms">Mar–Oct 2022</div></div><div class="mv" style="color:var(--neg)">−18,2%</div></div>
+      </div>
+      <div class="m-grid2">
+        <div class="card stat"><div class="ttl">Año</div><div class="val" style="color:var(--pos)">+12,7%</div></div>
+        <div class="card stat"><div class="ttl">1 año</div><div class="val" style="color:var(--pos)">+15,2%</div></div>
+        <div class="card stat"><div class="ttl">3 años anual.</div><div class="val" style="color:var(--pos)">+9,8%</div></div>
+        <div class="card stat"><div class="ttl">5 años anual.</div><div class="val" style="color:var(--pos)">+11,3%</div></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<script>
+  window.PAGE = { id: "invest", title: "Inversiones", crumb: "Crecimiento", titleHTML: 'Inversiones y <span class="it">cartera</span>' };
+  window.COACH = {
+    greeting: "Tu cartera <strong>supera al S&P 500 en 3,5%</strong> este año.",
+    chips: ["¿Estoy bien diversificada?", "¿Debería reequilibrar?", "Proyecta mis dividendos"]
+  };
+</script>
+<script src="m.js"></script>
+<script>
+(function(){
+  const tabs=document.getElementById('tabs');
+  function activate(n){
+    if(!document.querySelector(`[data-panel="${n}"]`)) return;
+    tabs.querySelectorAll('.m-tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===n));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.dataset.panel===n));
+    try{ history.replaceState(null,'','#'+n);}catch(e){}
+    window.scrollTo({top:0});
+  }
+  tabs.addEventListener('click',e=>{ const t=e.target.closest('.m-tab'); if(t) activate(t.dataset.tab); });
+  function fromHash(){ const n=(location.hash||'').slice(1); if(document.querySelector(`[data-panel="${n}"]`)) activate(n); }
+  window.addEventListener('hashchange', fromHash);
+  if(location.hash) fromHash();
+  document.getElementById('addHoldBtn').addEventListener('click',()=>{
+    App.openModal({ title:'Añadir posición', sub:'Acción, ETF o fondo',
+      body:`<div class="fld"><span class="fld-label">Símbolo</span><input class="inp" placeholder="p. ej. QQQ"></div>
+        <div class="fld"><span class="fld-label">Cuenta</span><select class="sel"><option>Corretaje · Vanguard</option><option>401(k) · Fidelity</option><option>Roth IRA · Schwab</option></select></div>
+        <div class="fld-2"><div class="fld"><span class="fld-label">Acciones</span><input class="inp" inputmode="decimal" placeholder="0"></div>
+        <div class="fld"><span class="fld-label">Coste/acción</span><div class="inp-money"><span class="pre">$</span><input inputmode="decimal" placeholder="0"></div></div></div>`,
+      footer:'<button class="btn btn-ghost" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="App.closeModal();App.toast(\'Posición añadida\')">Añadir</button>' });
+  });
+})();
+</script>
+</body>
+</html>

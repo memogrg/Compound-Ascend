@@ -1,0 +1,25 @@
+# Shell de Capacitor — artefactos que NO se versionan.
+# Los proyectos nativos (android/, ios/) SÍ se versionan; sus build outputs no.
+
+node_modules/
+.DS_Store
+
+# Capacitor copia el webDir (www/) dentro de los proyectos nativos en cada `cap sync`.
+# Esas copias son regenerables → no se versionan.
+android/app/src/main/assets/public/
+ios/App/App/public/
+
+# iOS — dependencias y build
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/App/DerivedData/
+ios/DerivedData/
+
+# Android — build y config local
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+android/.idea/

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Compound Ascend — Defensa Patrimonial (Móvil)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/app.css">
+<link rel="stylesheet" href="m.css">
+<style>
+  .pscore { font-family: var(--serif); font-size: 30px; line-height: 1; }
+  .pgrade { font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; color: var(--c-protect); margin-top: 2px; }
+  .cov { padding: 14px; }
+  .cov .ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; }
+  .cov .ic svg { width: 16px; height: 16px; }
+  .cov .nm { font-size: 12px; font-weight: 600; margin-top: 9px; }
+  .cov .st { font-size: 10.5px; margin-top: 3px; display: flex; align-items: center; gap: 5px; color: var(--pos); font-weight: 500; }
+  .cov .st::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--pos); }
+  .cov .amt { font-family: var(--serif); font-size: 16px; margin-top: 8px; }
+  .cov .lab { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .pol-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 11px; align-items: center; padding: 11px 16px; border-top: 1px solid var(--line); }
+  .pol-row:first-of-type { border-top: 0; }
+  .pol-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; }
+  .pol-ic svg { width: 14px; height: 14px; }
+  .pol-name { font-size: 12.5px; font-weight: 500; }
+  .pol-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .pol-cost { font-size: 12.5px; font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+  .pol-renew { font-size: 10.5px; text-align: right; margin-top: 1px; color: var(--muted); }
+  .risk-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+  .risk-row:first-of-type { border-top: 0; padding-top: 2px; }
+  .risk-name { font-size: 12.5px; font-weight: 500; }
+  .risk-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .risk-pill { font-size: 10px; padding: 4px 9px; border-radius: 999px; font-weight: 500; }
+  .rp-low { background: var(--pos-soft); color: var(--pos); }
+  .rp-med { background: var(--warn-soft); color: var(--warn); }
+  .rp-high { background: var(--neg-soft); color: var(--neg); }
+</style>
+</head>
+<body>
+<div class="m-app">
+  <main class="m-main">
+
+    <!-- Score + summary -->
+    <div class="card card-pad m-section">
+      <div class="row" style="gap:16px; align-items:center">
+        <div class="ring-wrap">
+          <svg style="width:92px;height:92px" viewBox="0 0 42 42">
+            <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--chip)" stroke-width="4"/>
+            <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--c-protect)" stroke-width="4" stroke-linecap="round" stroke-dasharray="71 100" stroke-dashoffset="25" transform="rotate(-90 21 21)"/>
+          </svg>
+          <div class="ring-center"><div><div class="pscore">71</div><div class="pgrade">PROTEGIDO</div></div></div>
+        </div>
+        <div style="flex:1">
+          <div class="card-title" style="font-size:14px">Puntuación de protección</div>
+          <div style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:5px">5 de 7 protecciones activas. Cerrar <strong style="color:var(--ink-2)">invalidez</strong> y <strong style="color:var(--ink-2)">paraguas</strong> la sube a 92.</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+        <div><div style="font-size:10.5px;color:var(--muted)">Cobertura total</div><div class="num-xl" style="font-size:18px;margin-top:3px">$2.420.000</div></div>
+        <div><div style="font-size:10.5px;color:var(--muted)">Primas anuales</div><div class="num-xl" style="font-size:18px;margin-top:3px">$8.640</div></div>
+      </div>
+    </div>
+
+    <!-- Coverage 2x2 -->
+    <div class="m-grid2 m-section">
+      <div class="card cov"><div class="ic" style="background:color-mix(in srgb,var(--c-protect) 14%,transparent);color:var(--c-protect)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 9 8 10 4.6-1 8-5 8-10V6l-8-4Z"/></svg></div><div class="nm">Vida</div><div class="st">Activa</div><div class="amt">$1.500.000</div><div class="lab">Temporal · ambos</div></div>
+      <div class="card cov"><div class="ic" style="background:var(--info-soft);color:var(--info)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10 12 3l9 7M5 10v10h14V10"/></svg></div><div class="nm">Hogar</div><div class="st">Activa</div><div class="amt">$580.000</div><div class="lab">Vivienda + contenido</div></div>
+      <div class="card cov"><div class="ic" style="background:var(--pos-soft);color:var(--pos)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0 0 6h2v6a3 3 0 0 0 6 0v-6h2a3 3 0 0 0 0-6h-2V5a3 3 0 0 0-3-3Z"/></svg></div><div class="nm">Médica</div><div class="st">Activa</div><div class="amt">$300.000</div><div class="lab">PPO familiar</div></div>
+      <div class="card cov"><div class="ic" style="background:var(--warn-soft);color:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg></div><div class="nm">Vehículos</div><div class="st">Activa</div><div class="amt">$40.000</div><div class="lab">2 autos · total</div></div>
+    </div>
+
+    <!-- Policies -->
+    <div class="card m-section">
+      <div class="card-head"><div><div class="card-title">Pólizas y renovaciones</div><div class="card-sub">5 activas</div></div>
+        <button class="btn btn-secondary" id="addPolicyBtn" style="padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Añadir</button></div>
+      <div class="pol-row"><div class="pol-ic" style="background:color-mix(in srgb,var(--c-protect) 14%,transparent);color:var(--c-protect)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 9 8 10 4.6-1 8-5 8-10V6l-8-4Z"/></svg></div><div><div class="pol-name">Vida temporal · 20 años</div><div class="pol-sub">Haven Life · $1,5M</div></div><div><div class="pol-cost">$1.840/año</div><div class="pol-renew">Mar 2044</div></div></div>
+      <div class="pol-row"><div class="pol-ic" style="background:var(--info-soft);color:var(--info)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10 12 3l9 7M5 10v10h14V10"/></svg></div><div><div class="pol-name">Hogar</div><div class="pol-sub">State Farm · HO-3</div></div><div><div class="pol-cost">$2.180/año</div><div class="pol-renew" style="color:var(--warn)">62 días</div></div></div>
+      <div class="pol-row"><div class="pol-ic" style="background:var(--pos-soft);color:var(--pos)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0 0 6h2v6a3 3 0 0 0 6 0v-6h2a3 3 0 0 0 0-6h-2V5a3 3 0 0 0-3-3Z"/></svg></div><div><div class="pol-name">PPO de salud familiar</div><div class="pol-sub">Blue Shield</div></div><div><div class="pol-cost">$3.360/año</div><div class="pol-renew">Ene 2027</div></div></div>
+      <div class="pol-row"><div class="pol-ic" style="background:var(--warn-soft);color:var(--warn)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="17.5" r="2.5"/></svg></div><div><div class="pol-name">Auto · 2 vehículos</div><div class="pol-sub">Geico · total</div></div><div><div class="pol-cost">$1.260/año</div><div class="pol-renew" style="color:var(--warn)">28 días</div></div></div>
+    </div>
+
+    <!-- Risk -->
+    <div class="card card-pad m-section">
+      <div class="card-title">Exposición al riesgo</div>
+      <div class="card-sub" style="margin-bottom:6px">Dónde es vulnerable tu patrimonio</div>
+      <div class="risk-row"><div><div class="risk-name">Pérdida de ingresos · invalidez</div><div class="risk-sub">Sin cobertura</div></div><span class="risk-pill rp-high">Alto</span></div>
+      <div class="risk-row"><div><div class="risk-name">Responsabilidad civil</div><div class="risk-sub">Sin póliza paraguas</div></div><span class="risk-pill rp-med">Medio</span></div>
+      <div class="risk-row"><div><div class="risk-name">Sucesión / herencia</div><div class="risk-sub">Testamento sin notarizar</div></div><span class="risk-pill rp-med">Medio</span></div>
+      <div class="risk-row"><div><div class="risk-name">Fallecimiento prematuro</div><div class="risk-sub">$1,5M cubre 12× ingresos</div></div><span class="risk-pill rp-low">Bajo</span></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px">Cerrar 2 brechas con Ascend AI</button>
+    </div>
+
+    <div class="m-grid2">
+      <div class="card cov"><div class="lab">Coste recurrente</div><div class="amt" style="font-size:19px">$720<span style="font-size:11px;color:var(--muted)">/mes</span></div></div>
+      <div class="card cov"><div class="lab">Gasto anual</div><div class="amt" style="font-size:19px">$8.640<span style="font-size:11px;color:var(--muted)">/año</span></div></div>
+    </div>
+
+  </main>
+</div>
+<script>
+  window.PAGE = { id: "defense", title: "Defensa Patrimonial", crumb: "Patrimonio", titleHTML: 'Defensa <span class="it">patrimonial</span>' };
+  window.COACH = {
+    greeting: "Tu patrimonio está <strong>71% protegido</strong>. Las brechas de invalidez y paraguas son las correcciones de mayor impacto.",
+    chips: ["¿Qué protección me falta?", "¿Cuánta cobertura de vida necesito?", "Explica el seguro paraguas"]
+  };
+</script>
+<script src="m.js"></script>
+<script>
+(function(){
+  function openAdd(){
+    App.openModal({ title:'Añadir póliza', sub:'Registra una protección',
+      body:`<div class="fld"><span class="fld-label">Tipo</span><select class="sel"><option>Vida</option><option>Hogar</option><option>Salud</option><option>Auto</option><option>Invalidez</option><option>Paraguas</option></select></div>
+        <div class="fld"><span class="fld-label">Aseguradora</span><input class="inp" placeholder="p. ej. Haven Life"></div>
+        <div class="fld-2"><div class="fld"><span class="fld-label">Cobertura</span><div class="inp-money"><span class="pre">$</span><input inputmode="decimal" placeholder="0"></div></div>
+        <div class="fld"><span class="fld-label">Prima anual</span><div class="inp-money"><span class="pre">$</span><input inputmode="decimal" placeholder="0"></div></div></div>`,
+      footer:'<button class="btn btn-ghost" onclick="App.closeModal()">Cancelar</button><button class="btn btn-primary" onclick="App.closeModal();App.toast(\'Póliza añadida\')">Añadir</button>' });
+  }
+  document.getElementById('addPolicyBtn').addEventListener('click', openAdd);
+  if(location.hash==='#add') setTimeout(openAdd, 300);
+})();
+</script>
+</body>
+</html>

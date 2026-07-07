@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CARTERA+</string>
+    <string name="title_activity_main">CARTERA+</string>
+    <string name="package_name">com.compoundascend.cartera</string>
+    <string name="custom_url_scheme">com.compoundascend.cartera</string>
+</resources>
