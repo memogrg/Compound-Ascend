@@ -47,11 +47,12 @@ const KIND_LABEL: Record<Transaction["kind"], string> = {
 
 export default async function MobileHome() {
   const now = new Date();
-  // En dev sin sesión el layout permite una vista DEMO: getDashboardData({previewDemo})
-  // usa el mismo camino de datos de ejemplo del dashboard; los movimientos (que exigen
-  // sesión) se omiten. Con sesión, todo es real.
+  // Con sesión, todo es real. La vista DEMO solo aplica si está la bandera
+  // MOBILE_DEMO_PREVIEW=1 (por defecto off: sin sesión el layout ya redirige a /m/login,
+  // así que aquí siempre hay usuario). getDashboardData({previewDemo}) usa el camino de
+  // datos de ejemplo del dashboard; los movimientos (que exigen sesión) se omiten.
   const user = await getUser();
-  const preview = !user;
+  const preview = !user && process.env.MOBILE_DEMO_PREVIEW === "1";
   const data = await getDashboardData({ previewDemo: preview });
   const recent = preview
     ? ([] as Transaction[])

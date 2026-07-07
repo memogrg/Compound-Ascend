@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MobileLoginForm } from "../components/mobile-login-form";
 
 /**
- * Placeholder de login del móvil. Vive fuera del grupo (app), así que NO pasa por
- * la guarda de sesión (evita el bucle) y es alcanzable sin sesión. El login real
- * (formulario + Server Action de auth) llega en un delta posterior. Por ahora, si
- * ya tienes sesión web, entra directo a /m.
+ * Login del móvil (/m/login). Vive fuera del grupo (app), así que NO pasa por la
+ * guarda de sesión y es alcanzable sin sesión. Es la puerta de entrada: en éxito
+ * la Server Action reutilizada redirige a /m. Piel del diseño (data-screen="login").
  */
 export const metadata: Metadata = { title: "Entrar · CARTERA+" };
 
-export default function MobileLoginPlaceholder() {
+export default function MobileLogin() {
   return (
     <div className="m-scroll">
-      <div className="m-pad" style={{ minHeight: "80dvh", display: "flex", flexDirection: "column", justifyContent: "center", gap: 22 }}>
-        <div className="row" style={{ gap: 12 }}>
-          <span className="iso" aria-hidden>
-            <svg viewBox="0 0 64 64" fill="none">
+      <div className="m-pad">
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
+          <span
+            className="iso"
+            style={{ width: 64, height: 64, borderRadius: 20, margin: "0 auto 16px" }}
+            aria-hidden
+          >
+            <svg viewBox="0 0 64 64" fill="none" style={{ width: 42, height: 42 }}>
               <path
                 d="M44 19 A 18 18 0 1 0 44 45"
                 stroke="currentColor"
@@ -26,32 +30,24 @@ export default function MobileLoginPlaceholder() {
               <path d="M45 27 V37 M40 32 H50" stroke="#51AF6F" strokeWidth={3.6} strokeLinecap="round" />
             </svg>
           </span>
-          <div>
-            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 22, letterSpacing: "-0.02em" }}>
-              CARTERA+
-            </div>
-            <div className="muted" style={{ fontSize: 13 }}>
-              Tu sistema financiero
-            </div>
+          <div
+            style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 26, letterSpacing: "-0.02em" }}
+          >
+            Bienvenido de vuelta
+          </div>
+          <div className="muted" style={{ fontSize: 13.5, marginTop: 6 }}>
+            Tu asesor financiero te está esperando.
           </div>
         </div>
 
-        <div className="wgt">
-          <div className="sec-title" style={{ marginBottom: 8 }}>
-            Inicia sesión
-          </div>
-          <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>
-            El acceso desde la app llega pronto. Por ahora, entra con tu cuenta en la web y vuelve a
-            abrir tu Inicio.
-          </div>
-        </div>
+        <MobileLoginForm />
 
-        <Link href="/login" className="wgt" style={{ display: "block", textAlign: "center", background: "var(--accent)", color: "var(--accent-ink)", fontWeight: 700, padding: "16px", borderColor: "transparent" }}>
-          Ir a iniciar sesión
-        </Link>
-        <Link href="/m" className="muted" style={{ textAlign: "center", fontSize: 13, fontWeight: 600 }}>
-          Ya tengo sesión → ir a mi Inicio
-        </Link>
+        <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--text-muted)" }}>
+          ¿No tienes cuenta?{" "}
+          <Link href="/signup" className="m-authlink">
+            Crea una
+          </Link>
+        </div>
       </div>
     </div>
   );

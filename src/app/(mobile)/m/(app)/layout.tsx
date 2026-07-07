@@ -12,11 +12,11 @@ import { MobileTabBar } from "../components/mobile-tab-bar";
  */
 export default async function MobileAppLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
-  // En PRODUCCIÓN, sin sesión → a /m/login. En DESARROLLO se permite una vista
-  // DEMO sin sesión (para poder previsualizar /m sin depender del login local);
-  // la propia pantalla marca que es demo. Nunca aplica en producción.
-  const allowDevPreview = !user && process.env.NODE_ENV !== "production";
-  if (!user && !allowDevPreview) redirect("/m/login");
+  // Sin sesión → la puerta de entrada es /m/login (login real reutilizando Supabase).
+  // El modo DEMO (datos de ejemplo sin sesión) queda detrás de una bandera DESACTIVADA
+  // por defecto: solo se muestra si MOBILE_DEMO_PREVIEW=1 (previsualización opcional).
+  const demoAllowed = process.env.MOBILE_DEMO_PREVIEW === "1";
+  if (!user && !demoAllowed) redirect("/m/login");
 
   return (
     <>
