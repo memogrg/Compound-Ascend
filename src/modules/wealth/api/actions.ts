@@ -37,6 +37,7 @@ import {
 } from "@/modules/wealth/services/rental-service";
 import {
   getHoldingHistory,
+  listHoldingPurchases,
   type HistoryPoint,
   type Period,
 } from "@/modules/wealth/services/holding-history-service";
@@ -307,6 +308,17 @@ export async function listDividendsAction(
   if (!isSupabaseConfigured()) return [];
   try {
     return await listDividends(holdingId);
+  } catch {
+    return [];
+  }
+}
+
+export async function listHoldingPurchasesAction(
+  holdingId: string,
+): Promise<import("@/modules/wealth/services/holding-history-service").HoldingPurchase[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    return await listHoldingPurchases(holdingId);
   } catch {
     return [];
   }

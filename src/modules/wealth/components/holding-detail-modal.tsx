@@ -17,11 +17,12 @@ import {
   removeRentalPaymentAction,
   sellHoldingAction,
   listLinkableDebtsAction,
+  listHoldingPurchasesAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
 import type { Holding, Dividend, RentalPayment } from "@/modules/wealth/types";
-import type { Period } from "@/modules/wealth/services/holding-history-service";
+import type { Period, HoldingPurchase } from "@/modules/wealth/services/holding-history-service";
 
 const RENTAL_FREQ_PER_YEAR: Record<string, number> = { semanal: 52, mensual: 12, trimestral: 4, semestral: 2, anual: 1 };
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
@@ -105,6 +106,7 @@ export function HoldingDetailModal({
   const [histLoading, setHistLoading] = useState(true);
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [divLoading, setDivLoading] = useState(true);
+  const [purchases, setPurchases] = useState<HoldingPurchase[]>([]);
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [linkedDebt, setLinkedDebt] = useState<LinkableDebt | null>(null);
 
@@ -147,6 +149,11 @@ export function HoldingDetailModal({
     if (isRental) void listRentalPaymentsAction(holding.id).then(setRentals);
   }, [holding.id, isRental]);
 
+  // Load compras (historial DCA, solo cotizados)
+  useEffect(() => {
+    if (!isRental) void listHoldingPurchasesAction(holding.id).then(setPurchases);
+  }, [holding.id, isRental]);
+
   // Deuda ligada (C-1b): muestra quién financia el inmueble. Solo si hay debtId.
   useEffect(() => {
     if (!holding.debtId) {
@@ -159,6 +166,19 @@ export function HoldingDetailModal({
   }, [holding.debtId]);
 
   const totalDividends = dividends.reduce((s, d) => s + d.amount, 0);
+
+  let cumAmount = 0;
+  let cumQty = 0;
+  const purchaseRows = purchases.map((p) => {
+    cumAmount += p.amount;
+    cumQty += p.quantity;
+    return {
+      ...p,
+      price: p.quantity > 0 ? p.amount / p.quantity : 0,
+      avgAfter: cumQty > 0 ? cumAmount / cumQty : 0,
+    };
+  });
+  const avgFinal = cumQty > 0 ? cumAmount / cumQty : 0;
 
   return (
     <Modal
@@ -290,6 +310,38 @@ export function HoldingDetailModal({
             </div>
           )}
         </div>
+
+        {/* Compras: historial + promedio acumulado (solo cotizados) */}
+        {!isRental && purchases.length > 0 && (
+          <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>Compras</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+              Precio promedio acumulado: {formatMoney(avgFinal, currency)} · {purchases.length} compra(s)
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {purchaseRows.map((r) => (
+                <div
+                  key={r.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    padding: "7px 10px",
+                    background: "var(--surface-2)",
+                    borderRadius: "var(--r-md)",
+                    fontSize: 12.5,
+                  }}
+                >
+                  <span style={{ color: "var(--muted)", minWidth: 78 }}>{r.occurredOn}</span>
+                  <span style={{ fontWeight: 500 }}>{formatMoney(r.amount, r.currency)}</span>
+                  <span style={{ color: "var(--muted)" }}>@ {formatMoney(r.price, r.currency)}</span>
+                  <span style={{ fontWeight: 600 }}>prom. {formatMoney(r.avgAfter, r.currency)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Dividendos: solo activos cotizados (no se mezcla con renta) */}
         {!isRental && (
