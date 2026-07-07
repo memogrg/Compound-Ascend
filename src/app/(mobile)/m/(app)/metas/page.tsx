@@ -1,5 +1,6 @@
 import { getControlSummary } from "@/modules/control";
 import { formatMoney } from "@/lib/format";
+import { MobileMenu } from "../../components/mobile-menu";
 
 /**
  * /m/metas — "Metas": metas de ahorro con progreso + lectura del MOTOR DE
@@ -36,11 +37,12 @@ export default async function MobileMetas() {
       <div className="m-pad">
         <div className="between" style={{ marginBottom: 16 }}>
           <div>
-            <div className="ov">Ahorro</div>
+            <div className="ov">Control</div>
             <div className="h-title" style={{ marginTop: 6 }}>
-              Metas
+              Ahorro
             </div>
           </div>
+          <MobileMenu />
         </div>
 
         {/* Motor de prioridades */}

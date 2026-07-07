@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAccountInfo } from "@/modules/account/services/account-service";
+import { MobileMenu } from "../../components/mobile-menu";
 import { getMyLink } from "@/lib/whatsapp/links-service";
 import { signOutAction } from "@/lib/auth/actions";
 import { PLAN_LABEL } from "@/lib/plan";
@@ -30,11 +31,14 @@ export default async function MobilePerfil() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div style={{ marginBottom: 16 }}>
-          <div className="ov">Cuenta</div>
-          <div className="h-title" style={{ marginTop: 6 }}>
-            Tu perfil
+        <div className="between" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="ov">Cuenta</div>
+            <div className="h-title" style={{ marginTop: 6 }}>
+              Configuración
+            </div>
           </div>
+          <MobileMenu />
         </div>
 
         {/* Identidad */}
@@ -66,9 +70,9 @@ export default async function MobilePerfil() {
           </div>
         </div>
 
-        {/* Acceso al wizard del ADN financiero (/m/perfil-financiero) */}
+        {/* Acceso a Mi Perfil Financiero: muestra resultados si está completo, o el wizard */}
         <Link
-          href="/m/perfil-financiero"
+          href="/m/mi-perfil-financiero"
           className="card card-p srow"
           style={{ marginBottom: 14, textDecoration: "none", color: "inherit" }}
         >

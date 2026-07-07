@@ -1196,6 +1196,9 @@
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
+  /* el .m-chip debe medir por contenido; anula el .sel global (select, width:100%)
+     de globals.css que se filtra sobre .m-chip.sel dentro de .m-shell */
+  width: auto;
 }
 .m-shell .m-chip.sel {
   background: var(--accent);
@@ -1543,4 +1546,92 @@
 .m-shell .m-chat-send:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* ===== Menú de navegación (☰ + drawer), presente en todas las pantallas /m ===== */
+.m-shell .m-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+}
+.m-shell .m-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(20, 18, 14, 0.42);
+  cursor: pointer;
+  animation: m-menu-fade 0.18s ease;
+}
+.m-shell .m-menu-panel {
+  position: relative;
+  width: min(320px, 86%);
+  height: 100%;
+  background: var(--canvas);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--e3);
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  animation: m-menu-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.m-shell .m-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.m-shell .m-menu-brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.m-shell .m-menu-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px calc(16px + env(safe-area-inset-bottom));
+}
+.m-shell .m-menu-group {
+  margin-top: 14px;
+}
+.m-shell .m-menu-group:first-child {
+  margin-top: 6px;
+}
+.m-shell .m-menu-glabel {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+.m-shell .m-menu-item {
+  display: block;
+  padding: 11px 12px;
+  border-radius: var(--r-md);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+.m-shell .m-menu-item.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+@keyframes m-menu-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes m-menu-slide {
+  from {
+    transform: translateX(12px);
+    opacity: 0.4;
+  }
 }

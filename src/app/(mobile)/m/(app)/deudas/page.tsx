@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileMenu } from "../../components/mobile-menu";
 import {
   getDebtsOverview,
   getIndexRates,
@@ -208,11 +209,12 @@ function Header() {
         </svg>
       </Link>
       <div style={{ flex: 1 }}>
-        <div className="ov">Libérate</div>
+        <div className="ov">Control</div>
         <div className="h-title" style={{ marginTop: 2 }}>
-          Deudas
+          Deudas y Préstamos
         </div>
       </div>
+      <MobileMenu />
     </div>
   );
 }

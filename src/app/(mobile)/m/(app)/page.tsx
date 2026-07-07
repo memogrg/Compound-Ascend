@@ -3,6 +3,7 @@ import { getUser } from "@/lib/auth/session";
 import { getDashboardData } from "@/modules/dashboard";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
+import { MobileMenu } from "../components/mobile-menu";
 
 /**
  * Pantalla de Inicio del móvil (/m) — "centro de mando" del diseño
@@ -52,6 +53,14 @@ const M_ROUTE: Record<string, string> = {
   ahorro: "/m/metas",
   deudas: "/m/deudas",
   inversiones: "/m/inversiones",
+};
+
+/** Labels canónicos (nav.ts) para los accesos rápidos: el pilar "flujo" es Gastos, etc. */
+const M_LABEL: Record<string, string> = {
+  flujo: "Gastos",
+  ahorro: "Ahorro",
+  deudas: "Deudas y Préstamos",
+  inversiones: "Portafolio de inversiones",
 };
 
 export default async function MobileHome() {
@@ -117,13 +126,17 @@ export default async function MobileHome() {
               <div className="m-greeting">{data.name}</div>
             </div>
           </div>
-          {/* Acceso al Asistente IA (chat + escáner de recibos) */}
-          <Link href="/m/asistente" className="icon-btn" aria-label="Asistente IA" title="Asistente IA">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-              <path d="M12 8.5v4M10 10.5h4" />
-            </svg>
-          </Link>
+          <div className="row" style={{ gap: 8 }}>
+            {/* Acceso al Asistente IA (chat + escáner de recibos) */}
+            <Link href="/m/asistente" className="icon-btn" aria-label="Asistente IA" title="Asistente IA">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
+                <path d="M12 8.5v4M10 10.5h4" />
+              </svg>
+            </Link>
+            {/* Menú de navegación (replica el sidebar web) */}
+            <MobileMenu />
+          </div>
         </header>
 
         {/* Hero: patrimonio neto + mini-tendencia del mes */}
@@ -192,7 +205,7 @@ export default async function MobileHome() {
               <span className="qc" style={{ color: p.accent }}>
                 <PillarIcon k={p.key} />
               </span>
-              <span>{p.label}</span>
+              <span>{M_LABEL[p.key] ?? p.label}</span>
             </Link>
           ))}
         </div>
