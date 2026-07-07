@@ -180,6 +180,7 @@ export function AddHoldingModal({
   onClose,
   prefill,
   editId,
+  mode,
 }: {
   /**
    * Moneda de visualización (legado). Ya NO define el default de captura —al
@@ -190,11 +191,13 @@ export function AddHoldingModal({
   onClose: () => void;
   prefill?: Holding;
   editId?: string;
+  mode?: "compra";
 }) {
   const router = useRouter();
   const toast = useToast();
   const captureCurrency = useCaptureCurrency();
   const isEdit = Boolean(editId);
+  const isPurchase = mode === "compra";
 
   // Categoría precargada (edición/compra) o elección en el paso 1.
   const initialCategory = prefill
@@ -206,7 +209,9 @@ export function AddHoldingModal({
   // ── Comunes ──
   const [name, setName] = useState(prefill?.label ?? prefill?.symbol ?? "");
   const investedPrefill =
-    prefill && prefill.quantity > 0 ? String(prefill.quantity * prefill.averageCost) : "";
+    !isPurchase && prefill && prefill.quantity > 0
+      ? String(prefill.quantity * prefill.averageCost)
+      : "";
   const [invested, setInvested] = useState(investedPrefill);
   // Moneda de captura: al editar/comprar respeta la del holding; al crear, la
   // principal del usuario (estable) — nunca la de visualización.
@@ -219,10 +224,12 @@ export function AddHoldingModal({
 
   // ── Perfil A (cotizado) ──
   const [symbol, setSymbol] = useState(prefill?.symbol ?? "");
-  const [quantity, setQuantity] = useState(prefill && prefill.quantity > 0 ? String(prefill.quantity) : "");
+  const [quantity, setQuantity] = useState(
+    !isPurchase && prefill && prefill.quantity > 0 ? String(prefill.quantity) : "",
+  );
   // Precio de compra por unidad (cotizados). Al editar, precarga el costo promedio.
   const [unitPrice, setUnitPrice] = useState(
-    prefill && prefill.quantity > 0 ? String(prefill.averageCost) : "",
+    !isPurchase && prefill && prefill.quantity > 0 ? String(prefill.averageCost) : "",
   );
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [livePriceCurrency, setLivePriceCurrency] = useState("USD");
@@ -316,6 +323,7 @@ export function AddHoldingModal({
           const data = (await res.json()) as { price?: number; currency?: string };
           if (typeof data.price === "number" && data.price > 0) {
             setLivePrice(data.price);
+            if (isPurchase) setUnitPrice((prev) => (prev === "" ? String(data.price) : prev));
             setLivePriceCurrency(data.currency ?? "USD");
             setPriceState("ok");
           } else {
@@ -326,7 +334,7 @@ export function AddHoldingModal({
         }
       }, 350);
     },
-    [],
+    [isPurchase],
   );
 
   function chooseCategory(c: InvestmentCategory) {
@@ -446,7 +454,13 @@ export function AddHoldingModal({
 
   return (
     <Modal
-      title={isEdit ? `Editar — ${prefill?.label ?? prefill?.symbol}` : "Agregar inversión"}
+      title={
+        isEdit
+          ? `Editar — ${prefill?.label ?? prefill?.symbol}`
+          : isPurchase
+            ? `Agregar compra — ${prefill?.label ?? prefill?.symbol}`
+            : "Agregar inversión"
+      }
       sub={
         step === 1
           ? "Elige el tipo de inversión"
