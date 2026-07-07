@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getPortfolioReport } from "@/modules/wealth";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
@@ -29,10 +30,24 @@ export default async function MobileInversiones() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div style={{ marginBottom: 16 }}>
-          <div className="ov">Crecimiento</div>
-          <div className="h-title" style={{ marginTop: 6 }}>
-            Inversiones
+        <div className="between" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="ov">Crecimiento</div>
+            <div className="h-title" style={{ marginTop: 6 }}>
+              Inversiones
+            </div>
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <Link href="/m/indicadores" className="icon-btn" aria-label="Indicadores">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 19, height: 19 }}>
+                <path d="M3 3v18h18M7 15l4-4 3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+            <Link href="/m/proteccion" className="icon-btn" aria-label="Protección">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 19, height: 19 }}>
+                <path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6Z" strokeLinejoin="round" />
+              </svg>
+            </Link>
           </div>
         </div>
 

@@ -925,3 +925,94 @@
   background: var(--surface-2);
   color: var(--text-muted);
 }
+
+/* ===== lote 3 (metas / indicadores / protección) — clases del diseño ===== */
+/* metas */
+.m-shell .goal {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+}
+.m-shell .goal .gtop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.m-shell .goal .gemoji {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.m-shell .goal .gemoji svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* grid de widgets (indicadores) */
+.m-shell .wgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.m-shell .wgt.tall {
+  min-height: 172px;
+  display: flex;
+  flex-direction: column;
+}
+.m-shell .wgt .wtop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.m-shell .wgt .wbig {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.m-shell .wgt .wsub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* filas de brechas de protección */
+.m-shell .gap-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.m-shell .gap-row:first-of-type {
+  border-top: 0;
+}
+.m-shell .sev {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  flex: none;
+  margin-top: 1px;
+}
+.m-shell .sev.alto {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.m-shell .sev.medio {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.m-shell .sev.bajo {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

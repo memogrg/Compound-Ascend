@@ -45,10 +45,11 @@ const KIND_LABEL: Record<Transaction["kind"], string> = {
   ajuste: "Ajuste",
 };
 
-/** Ruta móvil por pilar para los accesos rápidos (pantallas /m ya construidas). */
+/** Ruta móvil por pilar para los accesos rápidos (pantallas /m ya construidas).
+ *  "ahorro" apunta a las metas de ahorro (/m/ingresos sigue accesible por URL). */
 const M_ROUTE: Record<string, string> = {
   flujo: "/m/gastos",
-  ahorro: "/m/ingresos",
+  ahorro: "/m/metas",
   deudas: "/m/deudas",
   inversiones: "/m/inversiones",
 };
