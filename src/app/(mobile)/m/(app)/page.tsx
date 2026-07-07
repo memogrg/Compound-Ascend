@@ -45,6 +45,14 @@ const KIND_LABEL: Record<Transaction["kind"], string> = {
   ajuste: "Ajuste",
 };
 
+/** Ruta móvil por pilar para los accesos rápidos (pantallas /m ya construidas). */
+const M_ROUTE: Record<string, string> = {
+  flujo: "/m/gastos",
+  ahorro: "/m/ingresos",
+  deudas: "/m/deudas",
+  inversiones: "/m/inversiones",
+};
+
 export default async function MobileHome() {
   const now = new Date();
   // Con sesión, todo es real. La vista DEMO solo aplica si está la bandera
@@ -169,10 +177,10 @@ export default async function MobileHome() {
           </svg>
         </Link>
 
-        {/* Accesos rápidos: los 4 pilares reales (label + ruta de su feature) */}
+        {/* Accesos rápidos: los 4 pilares reales, enlazados a su pantalla móvil (/m/*). */}
         <div className="action-strip" style={{ marginBottom: 16 }}>
           {panel.pillars.map((p) => (
-            <Link key={p.key} href={p.href} className="qact">
+            <Link key={p.key} href={M_ROUTE[p.key] ?? p.href} className="qact">
               <span className="qc" style={{ color: p.accent }}>
                 <PillarIcon k={p.key} />
               </span>

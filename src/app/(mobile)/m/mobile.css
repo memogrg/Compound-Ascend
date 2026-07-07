@@ -47,6 +47,7 @@
   --e1: 0 1px 2px rgba(20, 18, 14, 0.08);
   --e2: 0 8px 24px -10px rgba(20, 18, 14, 0.2);
   --e3: 0 20px 50px -18px rgba(20, 18, 14, 0.28);
+  --e-raised: 0 1px 2px rgba(20, 18, 14, 0.06), 0 8px 20px -14px rgba(20, 18, 14, 0.3);
 
   position: relative;
   min-height: 100dvh;
@@ -86,6 +87,7 @@
   --e1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --e2: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
   --e3: 0 20px 50px -18px rgba(0, 0, 0, 0.7);
+  --e-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 24px -16px rgba(0, 0, 0, 0.7);
 }
 .m-shell * {
   box-sizing: border-box;
@@ -711,4 +713,215 @@
 }
 .m-shell .sw input:checked + .tr::before {
   transform: translateX(18px);
+}
+
+/* ===== lote 2 (gastos / deudas / ingresos) — clases del diseño ===== */
+/* cabecera con botón atrás */
+.m-shell .hdr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.m-shell .bk {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  flex: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+.m-shell .bk svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* badges up/down (sobre-presupuesto, etc.) */
+.m-shell .badge.up {
+  background: var(--accent-soft);
+  color: var(--success);
+}
+.m-shell .badge.down {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* pill tabs (filtros de gastos) */
+.m-shell .pill-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.m-shell .pill-tabs::-webkit-scrollbar {
+  display: none;
+}
+.m-shell .ptab {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.m-shell .ptab.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+/* frascos / sobres */
+.m-shell .jar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--e-raised);
+}
+.m-shell .jar-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.m-shell .jar-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.m-shell .jar-ic svg {
+  width: 20px;
+  height: 20px;
+}
+.m-shell .jar-amt {
+  margin-left: auto;
+  text-align: right;
+}
+.m-shell .jar-amt .a {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+}
+.m-shell .jar-amt .b {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.m-shell .sobre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 0;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.m-shell .sobre .sn {
+  font-weight: 600;
+}
+.m-shell .sobre .sv {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.m-shell .jar-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.m-shell .jar-link svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* chips de sugerencia */
+.m-shell .qchip {
+  display: inline-flex;
+  padding: 9px 13px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* tarjetas de método (estrategia de deuda) */
+.m-shell .mcard {
+  flex: 1;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+}
+.m-shell .mcard.sel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.m-shell .mcard .mt {
+  font-weight: 700;
+  font-size: 14px;
+}
+.m-shell .mcard .md {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.m-shell .mcard .mm {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 8px;
+}
+
+/* mini-barras (ingresos) */
+.m-shell .wminibars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 44px;
+}
+.m-shell .wminibars i {
+  flex: 1;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--accent-soft);
+}
+.m-shell .wminibars i.hi {
+  background: var(--accent);
+}
+
+/* chip de frecuencia (fuentes de ingreso) */
+.m-shell .schip {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
 }
