@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileMenu } from "../../components/mobile-menu";
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
 import { monthPeriod } from "@/modules/financial-base";
@@ -234,6 +235,7 @@ function Header({ pct }: { pct?: number | null }) {
         </div>
       </div>
       {pct != null && <span className="badge neutral">{pct}%</span>}
+      <MobileMenu />
     </div>
   );
 }

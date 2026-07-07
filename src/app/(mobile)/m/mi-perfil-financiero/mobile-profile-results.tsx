@@ -4,6 +4,8 @@ import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/
 import { RISK_DISPLAY } from "@/modules/personal-profile/constants";
 import * as O from "@/modules/personal-profile/constants";
 
+import { MobileMenu } from "../components/mobile-menu";
+
 /**
  * Resultados del ADN financiero en móvil — la vista que la web muestra en
  * /mi-perfil-financiero cuando el perfil está completo (ProfileDashboard). Se construye
@@ -50,9 +52,12 @@ export function MobileProfileResults({
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </Link>
-          <Link href="/m/perfil-financiero" className="m-authlink" style={{ fontSize: 13.5 }}>
-            Editar
-          </Link>
+          <div className="row" style={{ gap: 10 }}>
+            <Link href="/m/perfil-financiero" className="m-authlink" style={{ fontSize: 13.5 }}>
+              Editar
+            </Link>
+            <MobileMenu />
+          </div>
         </div>
 
         {/* Hero */}

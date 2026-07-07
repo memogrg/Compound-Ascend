@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileMenu } from "../../components/mobile-menu";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
 
@@ -31,11 +32,12 @@ export default async function MobileIngresos() {
             </svg>
           </Link>
           <div style={{ flex: 1 }}>
-            <div className="ov">Base</div>
+            <div className="ov">Presupuesto</div>
             <div className="h-title" style={{ marginTop: 2 }}>
               Ingresos
             </div>
           </div>
+          <MobileMenu />
         </div>
 
         {/* Hero: ingreso mensual */}

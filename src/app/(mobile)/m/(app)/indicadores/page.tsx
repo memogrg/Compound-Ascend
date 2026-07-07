@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileMenu } from "../../components/mobile-menu";
 import {
   getIndicatorsViewModel,
   type IndicatorCard,
@@ -62,9 +63,10 @@ export default async function MobileIndicadores() {
           <div style={{ flex: 1 }}>
             <div className="ov">Contexto macro</div>
             <div className="h-title" style={{ marginTop: 2 }}>
-              Indicadores
+              Mercado e indicadores
             </div>
           </div>
+          <MobileMenu />
         </div>
 
         {/* Lectura de contexto (best-effort) */}

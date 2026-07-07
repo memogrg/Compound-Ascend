@@ -1,10 +1,11 @@
 import { getRichLifeSummary } from "@/modules/rich-life";
+import { MobileMenu } from "../../components/mobile-menu";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 
 /**
- * /m/patrimonio — "Tu riqueza". Reutiliza el barrel rich-life (getRichLifeSummary:
+ * /m/patrimonio — "Patrimonio" (nombre canónico de nav.ts). Reutiliza el barrel rich-life (getRichLifeSummary:
  * patrimonio neto, indicadores, distribución por clase, pasivos) + el helper puro
  * computeWealthBreakdown (invertido/líquido/otros). Sin reimplementar cálculos.
  * Piel del diseño (data-screen="patrimonio"), es-MX tono "tú", tema claro.
@@ -30,11 +31,14 @@ export default async function MobilePatrimonio() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div style={{ marginBottom: 16 }}>
-          <div className="ov">Patrimonio</div>
-          <div className="h-title" style={{ marginTop: 6 }}>
-            Tu riqueza
+        <div className="between" style={{ marginBottom: 16 }}>
+          <div>
+            <div className="ov">Crecimiento</div>
+            <div className="h-title" style={{ marginTop: 6 }}>
+              Patrimonio
+            </div>
           </div>
+          <MobileMenu />
         </div>
 
         {/* Hero: patrimonio neto + cambio del mes */}

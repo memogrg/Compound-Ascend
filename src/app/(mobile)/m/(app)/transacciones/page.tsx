@@ -2,6 +2,7 @@ import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { formatMoney } from "@/lib/format";
 
 import { MobileTxnList } from "./mobile-txn-list";
+import { MobileMenu } from "../../components/mobile-menu";
 
 /**
  * /m/transacciones — paridad con la web /transacciones ("Transacciones", nombre exacto
@@ -34,14 +35,17 @@ export default async function MobileTransacciones() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div style={{ marginBottom: 16 }}>
-          <div className="ov">Movimientos · {period.label}</div>
-          <div className="h-title" style={{ marginTop: 6 }}>
-            Transacciones
+        <div className="between" style={{ marginBottom: 16, alignItems: "flex-start" }}>
+          <div>
+            <div className="ov">Movimientos · {period.label}</div>
+            <div className="h-title" style={{ marginTop: 6 }}>
+              Transacciones
+            </div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+              Todos tus movimientos del periodo.
+            </div>
           </div>
-          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Todos tus movimientos del periodo.
-          </div>
+          <MobileMenu />
         </div>
 
         {/* Franja de resumen (misma que la web: saldo neto, ingresos, gastos, movimientos) */}

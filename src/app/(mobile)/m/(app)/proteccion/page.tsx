@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileMenu } from "../../components/mobile-menu";
 import { getWealthSummary } from "@/modules/wealth";
 import { formatMoney, formatCompact } from "@/lib/format";
 
@@ -50,11 +51,12 @@ export default async function MobileProteccion() {
             </svg>
           </Link>
           <div style={{ flex: 1 }}>
-            <div className="ov">Defensa patrimonial</div>
+            <div className="ov">Crecimiento</div>
             <div className="h-title" style={{ marginTop: 2 }}>
-              Protección
+              Defensa Patrimonial
             </div>
           </div>
+          <MobileMenu />
         </div>
 
         {/* Score de protección */}

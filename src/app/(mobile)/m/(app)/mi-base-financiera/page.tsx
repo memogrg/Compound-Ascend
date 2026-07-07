@@ -2,6 +2,7 @@ import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { computeV2Totals } from "@/modules/financial-base/engine/base-v2";
 import type { FinancialPressure } from "@/modules/financial-base/types";
 import { formatMoney, formatPercent } from "@/lib/format";
+import { MobileMenu } from "../../components/mobile-menu";
 
 /**
  * /m/mi-base-financiera — paridad con la web /mi-base-financiera ("Mi Base Financiera",
@@ -58,14 +59,17 @@ export default async function MobileMiBase() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div style={{ marginBottom: 16 }}>
-          <div className="ov">Presupuesto · {period.label}</div>
-          <div className="h-title" style={{ marginTop: 6 }}>
-            Mi Base Financiera
+        <div className="between" style={{ marginBottom: 16, alignItems: "flex-start" }}>
+          <div>
+            <div className="ov">Presupuesto · {period.label}</div>
+            <div className="h-title" style={{ marginTop: 6 }}>
+              Mi Base Financiera
+            </div>
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+              Tu centro operativo: presupuesto vs real del mes.
+            </div>
           </div>
-          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Tu centro operativo: presupuesto vs real del mes.
-          </div>
+          <MobileMenu />
         </div>
 
         {/* Liquidez */}

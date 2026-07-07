@@ -25,7 +25,9 @@ const TABS: Tab[] = [
   },
   {
     href: "/m/inversiones",
-    label: "Invertir",
+    // Canónico "Portafolio de inversiones" (nav.ts); abreviado en la tab por espacio.
+    // El nombre completo vive en el menú ☰.
+    label: "Portafolio",
     icon: (
       <path
         d="M3 17l6-6 4 4 8-9M14 6h6v6"
@@ -47,7 +49,8 @@ const TABS: Tab[] = [
   },
   {
     href: "/m/perfil",
-    label: "Perfil",
+    // /m/perfil ahora es "Configuración"; en la tab va abreviado "Ajustes".
+    label: "Ajustes",
     icon: (
       <>
         <circle cx="12" cy="8" r="4" />
