@@ -1345,3 +1345,202 @@
     transform: rotate(360deg);
   }
 }
+
+/* ===== Asistente IA (/m/asistente) ===== */
+.m-shell .m-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.m-shell .m-chat-head {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--canvas) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.m-shell .m-chat-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+/* zona de mensajes: deja aire abajo para la barra de entrada fija */
+.m-shell .m-chat-scroll {
+  flex: 1;
+  padding: 16px 16px calc(84px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* burbujas */
+.m-shell .m-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 88%;
+}
+.m-shell .m-msg.me {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+.m-shell .m-ava {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.m-shell .m-ava svg {
+  width: 15px;
+  height: 15px;
+}
+.m-shell .m-bubble {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  border-top-left-radius: 5px;
+  padding: 11px 14px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.m-shell .m-msg.me .m-bubble {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: 16px;
+  border-top-right-radius: 5px;
+}
+
+/* indicador de "escribiendo" */
+.m-shell .m-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 14px;
+}
+.m-shell .m-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: m-typing 1s infinite ease-in-out;
+}
+.m-shell .m-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.m-shell .m-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes m-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* tarjeta de confirmación de acción (indentada bajo el avatar) */
+.m-shell .m-confirm {
+  margin: 2px 0 2px 36px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+  box-shadow: var(--e1);
+}
+.m-shell .m-confirm-eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.m-shell .m-confirm-amt {
+  font-weight: 700;
+  font-size: 18px;
+  margin-top: 6px;
+}
+.m-shell .m-confirm-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.m-shell .m-confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.m-shell .m-confirm-actions .m-btn {
+  flex: 1;
+  min-height: 44px;
+  font-size: 14px;
+}
+.m-shell .m-confirm-done {
+  margin: 2px 0 2px 36px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  color: var(--success);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* barra de entrada fija (abajo, respeta safe area; sin tab bar en esta ruta) */
+.m-shell .m-chat-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--canvas) 94%, transparent);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-top: 1px solid var(--border);
+}
+.m-shell .m-chat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  background: var(--surface);
+}
+.m-shell .m-chat-cam {
+  flex: none;
+}
+.m-shell .m-chat-send {
+  flex: none;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+}
+.m-shell .m-chat-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
