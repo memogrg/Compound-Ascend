@@ -1196,6 +1196,9 @@
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
+  /* el .m-chip debe medir por contenido; anula el .sel global (select, width:100%)
+     de globals.css que se filtra sobre .m-chip.sel dentro de .m-shell */
+  width: auto;
 }
 .m-shell .m-chip.sel {
   background: var(--accent);
