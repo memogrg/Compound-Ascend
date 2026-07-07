@@ -1049,3 +1049,299 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+/* ===== Wizard ADN financiero (/m/perfil-financiero) ===== */
+/* highlight de acento dentro de títulos */
+.m-shell .g {
+  color: var(--accent);
+}
+/* el wizard no lleva tab bar → menos aire inferior que .m-scroll */
+.m-scroll.m-scroll-flush {
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}
+.m-shell .m-wz {
+  padding-top: 6px;
+}
+.m-shell .m-wz-head {
+  margin-bottom: 22px;
+}
+.m-shell .m-wz-progtxt {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 9px;
+  letter-spacing: 0.02em;
+}
+.m-shell .m-wz-eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.m-shell .m-wz-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1.14;
+  letter-spacing: -0.02em;
+  margin: 6px 0 0;
+}
+.m-shell .m-wz-body {
+  margin-top: 22px;
+}
+.m-shell .m-qfield {
+  margin-bottom: 22px;
+}
+.m-shell .m-qlabel {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+  line-height: 1.35;
+}
+
+/* select + textarea sobre la base de .m-inp */
+.m-shell .m-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 2px),
+    calc(100% - 15px) calc(50% - 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+.m-shell .m-textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* tarjetas de opción (selección única) */
+.m-shell .m-optlist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.m-shell .m-opt {
+  display: flex;
+  width: 100%;
+  text-align: left;
+  padding: 15px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--e1);
+}
+.m-shell .m-opt.sel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.m-shell .m-opt-t {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+}
+.m-shell .m-opt-d {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
+/* grilla compacta (selección única sin descripción) */
+.m-shell .m-optgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.m-shell .m-opt-sm {
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 13px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.m-shell .m-opt-sm.sel {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* chips (selección múltiple) */
+.m-shell .m-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.m-shell .m-chip {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px 13px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.m-shell .m-chip.sel {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+.m-shell .m-chips-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 9px;
+}
+
+/* escala 1–10 */
+.m-shell .m-scale-val {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+  color: var(--accent);
+  text-align: center;
+  margin-bottom: 6px;
+}
+.m-shell .m-scale input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  outline: none;
+}
+.m-shell .m-scale input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  box-shadow: var(--e2);
+  cursor: pointer;
+}
+.m-shell .m-scale input[type="range"]::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+  box-shadow: var(--e2);
+  cursor: pointer;
+}
+.m-shell .m-scale-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* stepper +/- */
+.m-shell .m-stepper {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.m-shell .m-stepper button {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.m-shell .m-stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.m-shell .m-stepper-v {
+  font-size: 20px;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* sí/no */
+.m-shell .m-yesno {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* lista de correos (núcleo familiar) */
+.m-shell .m-emailrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.m-shell .m-emailrm {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.m-shell .m-emailadd {
+  margin-top: 4px;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+/* navegación del wizard */
+.m-shell .m-wznav {
+  display: flex;
+  gap: 10px;
+  margin-top: 28px;
+}
+.m-shell .m-wznav .m-btn {
+  flex: 1;
+}
+
+/* estado "generando" (cierre) */
+.m-shell .m-wz-center {
+  min-height: 72dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.m-shell .m-wz-spinner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--surface-3);
+  border-top-color: var(--accent);
+  animation: m-wz-spin 0.8s linear infinite;
+}
+@keyframes m-wz-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
