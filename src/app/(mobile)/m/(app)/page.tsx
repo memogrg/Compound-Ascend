@@ -117,6 +117,13 @@ export default async function MobileHome() {
               <div className="m-greeting">{data.name}</div>
             </div>
           </div>
+          {/* Acceso al Asistente IA (chat + escáner de recibos) */}
+          <Link href="/m/asistente" className="icon-btn" aria-label="Asistente IA" title="Asistente IA">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
+              <path d="M12 8.5v4M10 10.5h4" />
+            </svg>
+          </Link>
         </header>
 
         {/* Hero: patrimonio neto + mini-tendencia del mes */}

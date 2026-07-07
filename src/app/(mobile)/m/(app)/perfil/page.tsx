@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { getMyLink } from "@/lib/whatsapp/links-service";
 import { signOutAction } from "@/lib/auth/actions";
@@ -64,6 +65,25 @@ export default async function MobilePerfil() {
             </div>
           </div>
         </div>
+
+        {/* Acceso al wizard del ADN financiero (/m/perfil-financiero) */}
+        <Link
+          href="/m/perfil-financiero"
+          className="card card-p srow"
+          style={{ marginBottom: 14, textDecoration: "none", color: "inherit" }}
+        >
+          <span className="lic" style={{ background: "var(--accent-soft)", color: "var(--accent)" }} aria-hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+              <path d="M12 2a7 7 0 0 0-4 12.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3A7 7 0 0 0 12 2Z" />
+              <path d="M9 22h6" />
+            </svg>
+          </span>
+          <div style={{ flex: 1 }}>
+            <div className="st">Tu ADN financiero</div>
+            <div className="ss">Completa o edita tu perfil financiero</div>
+          </div>
+          <Chevron />
+        </Link>
 
         {/* Plan + uso de IA */}
         <div className="card card-p" style={{ marginBottom: 14 }}>
