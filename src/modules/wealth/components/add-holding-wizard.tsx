@@ -253,6 +253,9 @@ export function AddHoldingModal({
   const [termYears, setTermYears] = useState(
     prefill?.termYears != null ? String(prefill.termYears) : "",
   );
+  const [startDate, setStartDate] = useState(
+    prefill?.purchaseDate ?? new Date().toISOString().slice(0, 10),
+  );
 
   // ── Inmueble de renta (propiedad_alquiler): subtipo + costos operativos ──
   const [subtype, setSubtype] = useState<"alquiler" | "airbnb">(
@@ -402,6 +405,7 @@ export function AddHoldingModal({
       if (cat === "plan_inversion") {
         base.termYears = parseInt(termYears, 10) || undefined;
         base.maturityDate = maturityDate ? `${maturityDate}-01` : undefined;
+        if (startDate) base.purchaseDate = startDate;
       }
       if (m.nature === "cashflow") {
         // Perfil B: ingreso + frecuencia; si no es mensual, mes de materialización.
@@ -519,6 +523,8 @@ export function AddHoldingModal({
             onMaturityDate={setMaturityDate}
             termYears={termYears}
             onTermYears={setTermYears}
+            startDate={startDate}
+            onStartDate={setStartDate}
             category={category}
             subtype={subtype}
             onSubtype={setSubtype}
@@ -711,6 +717,8 @@ function Step2Fields(props: {
   onMaturityDate: (v: string) => void;
   termYears: string;
   onTermYears: (v: string) => void;
+  startDate: string;
+  onStartDate: (v: string) => void;
   category: InvestmentCategory | null;
   subtype: "alquiler" | "airbnb";
   onSubtype: (v: "alquiler" | "airbnb") => void;
@@ -907,6 +915,17 @@ function Step2Fields(props: {
               Vence: {props.maturityDate} · el aporte deja de contar al vencer.
             </span>
           ) : null}
+          <div className="fld" style={{ marginTop: 10 }}>
+            <label className="fld-label">
+              Fecha de inicio del plan <HelpTip text="Cuándo empezó el plan. Define el progreso (año X de N) y el vencimiento." />
+            </label>
+            <input
+              className="inp"
+              type="date"
+              value={props.startDate}
+              onChange={(e) => props.onStartDate(e.target.value)}
+            />
+          </div>
         </div>
       ) : null}
 
