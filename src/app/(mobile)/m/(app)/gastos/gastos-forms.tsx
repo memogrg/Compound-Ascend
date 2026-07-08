@@ -155,8 +155,9 @@ function SobreField({ label, onOpen }: { label: string; onOpen: () => void }) {
   );
 }
 
-/** Picker de sobre agrupado por frasco (BottomSheet anidado). */
-function SobrePicker({
+/** Picker de sobre agrupado por frasco (BottomSheet anidado). Reutilizado también por
+ *  el registro de transacciones (/m/transacciones). */
+export function SobrePicker({
   open,
   jars,
   currency,
