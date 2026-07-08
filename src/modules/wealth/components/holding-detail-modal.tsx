@@ -128,6 +128,17 @@ export function HoldingDetailModal({
   const returnPct = costBasis > 0 ? profitLoss / costBasis : 0;
   const positive = profitLoss >= 0;
 
+  // Plan a plazo · progreso del plazo (P5).
+  const termMonths = (holding.termYears ?? 0) * 12;
+  const premium = holding.monthlyContribution ?? 0;
+  const primasPagadas = premium > 0 ? Math.round(costBasis / premium) : 0;
+  const planStart = holding.purchaseDate ? new Date(holding.purchaseDate) : null;
+  const elapsedMonths = planStart
+    ? Math.max(0, Math.round((Date.now() - planStart.getTime()) / (1000 * 60 * 60 * 24 * 30.44)))
+    : 0;
+  const planYearOf = Math.min(Math.floor(elapsedMonths / 12) + 1, holding.termYears ?? 1);
+  const planPct = termMonths > 0 ? Math.min(elapsedMonths / termMonths, 1) : 0;
+
   // Load history
   const loadHistory = useCallback(async () => {
     setHistLoading(true);
@@ -336,6 +347,29 @@ export function HoldingDetailModal({
           )}
         </div>
 
+        {/* Plan a plazo · progreso del plazo */}
+        {isPlan && holding.termYears ? (
+          <div style={{ padding: "14px 22px 0" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
+              <span>Progreso del plazo</span>
+              <span>
+                <b style={{ color: "var(--ink)" }}>Año {planYearOf} de {holding.termYears}</b> · {Math.round(planPct * 100)}%
+              </span>
+            </div>
+            <div style={{ height: 8, background: "var(--chip)", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${planPct * 100}%`, background: "var(--info)", borderRadius: 999 }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 10 }}>
+              <span style={{ color: "var(--muted)" }}>Vence</span>
+              <span>{holding.maturityDate ?? "—"}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+              <span style={{ color: "var(--muted)" }}>Primas</span>
+              <span>{primasPagadas} de {termMonths}</span>
+            </div>
+          </div>
+        ) : null}
+
         {/* Plan a plazo · valor del estado de cuenta + curva */}
         {isPlan && (
           <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
@@ -496,7 +530,7 @@ export function HoldingDetailModal({
           </div>
         )}
 
-        {isRental && (
+        {isRental && !isPlan && (
           <RentalSection
             holding={holding}
             currency={currency}

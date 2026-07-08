@@ -511,6 +511,16 @@ function InvRow({
   const periodGain = nativeCostBasis * periodRet;
   const pos = periodRet >= 0;
 
+  const planYearOf =
+    h.category === "plan_inversion" && h.purchaseDate && h.termYears
+      ? Math.min(
+          Math.floor(
+            (Date.now() - new Date(h.purchaseDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25),
+          ) + 1,
+          h.termYears,
+        )
+      : 0;
+
   const close = () => setModal(null);
   const act = (m: RowModal) => {
     setMenu(false);
@@ -521,7 +531,24 @@ function InvRow({
     <>
       <div className="inv-row">
         <div style={{ minWidth: 0 }}>
-          <div className="inv-name">{h.label ?? h.symbol}</div>
+          <div className="inv-name">
+            {h.label ?? h.symbol}
+            {planYearOf ? (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--info)",
+                  background: "var(--info-soft)",
+                  padding: "1px 7px",
+                  borderRadius: 999,
+                  marginLeft: 6,
+                }}
+              >
+                Año {planYearOf} de {h.termYears}
+              </span>
+            ) : null}
+          </div>
           <div className="inv-sub">
             <span className="nat-dot" style={{ background: natureColor }} />
             {h.currency} · {h.region || "—"}
