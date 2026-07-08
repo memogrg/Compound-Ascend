@@ -38,7 +38,10 @@ import {
 import {
   getHoldingHistory,
   listHoldingPurchases,
+  listHoldingValuations,
+  recordHoldingValuation,
   type HistoryPoint,
+  type HoldingValuation,
   type Period,
 } from "@/modules/wealth/services/holding-history-service";
 import type { Holding } from "@/modules/wealth/types";
@@ -321,6 +324,36 @@ export async function listHoldingPurchasesAction(
     return await listHoldingPurchases(holdingId);
   } catch {
     return [];
+  }
+}
+
+export async function listHoldingValuationsAction(
+  holdingId: string,
+): Promise<HoldingValuation[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    return await listHoldingValuations(holdingId);
+  } catch {
+    return [];
+  }
+}
+
+export async function recordHoldingValuationAction(
+  holdingId: string,
+  asOf: string,
+  value: number,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (!(value > 0) || !asOf) return { ok: false, message: "Valor y fecha requeridos." };
+  try {
+    await recordHoldingValuation(holdingId, asOf, value);
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch (err) {
+    logger.error("recordHoldingValuation fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos guardar el valor." };
   }
 }
 

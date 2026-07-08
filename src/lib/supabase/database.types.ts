@@ -535,6 +535,18 @@ export type HoldingContributionRow = Timestamps & {
   transaction_id: string | null;
 };
 
+// Historial de valores del estado de cuenta de un plan a plazo (migración 20260712000001).
+export type HoldingValuationRow = {
+  id: string;
+  holding_id: string;
+  user_id: string;
+  household_id: string | null;
+  as_of: string;
+  value: number;
+  currency: string;
+  created_at: string;
+};
+
 export type RentalPaymentRow = Timestamps & {
   id: string;
   user_id: string;
@@ -846,6 +858,7 @@ export interface Database {
       investments: UserTable<InvestmentRow>;
       investment_holdings: UserTable<InvestmentHoldingRow>;
       holding_contributions: UserTable<HoldingContributionRow>;
+      holding_valuations: UserTable<HoldingValuationRow>;
       watchlist_symbols: UserTable<WatchlistSymbolRow>;
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
