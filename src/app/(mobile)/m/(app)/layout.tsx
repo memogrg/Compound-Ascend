@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
 import { MobileTabBar } from "../components/mobile-tab-bar";
+import { ToastProvider } from "../components/form-kit/toast";
 
 /**
  * Layout de las pantallas AUTENTICADAS del móvil. Usa la sesión existente
@@ -19,9 +20,9 @@ export default async function MobileAppLayout({ children }: { children: React.Re
   if (!user && !demoAllowed) redirect("/m/login");
 
   return (
-    <>
+    <ToastProvider>
       {children}
       <MobileTabBar />
-    </>
+    </ToastProvider>
   );
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MobileMenu } from "../../components/mobile-menu";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
+import { IncomeQuickAdd } from "./income-quick-add";
 
 /**
  * /m/ingresos — "Ingresos": ingreso mensual + fuentes. Reutiliza el barrel
@@ -105,6 +106,9 @@ export default async function MobileIngresos() {
           </div>
         </div>
       </div>
+
+      {/* Demo del form kit: FAB → hoja de alta de ingreso (addIncomeAction) */}
+      <IncomeQuickAdd currency={currency} />
     </div>
   );
 }
