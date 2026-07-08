@@ -113,7 +113,7 @@ export async function registerPurchaseExpense(args: {
   currency: string;
   purchaseDate: string | null | undefined;
   amount: number;
-  verb: "Compra" | "Aporte";
+  verb: "Compra" | "Aporte" | "Prima";
 }): Promise<string | null> {
   if (args.amount <= 0) return null;
   return registerLinkedTransaction(
