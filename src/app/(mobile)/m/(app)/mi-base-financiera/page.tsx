@@ -3,6 +3,7 @@ import { computeV2Totals } from "@/modules/financial-base/engine/base-v2";
 import type { FinancialPressure } from "@/modules/financial-base/types";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { MobileMenu } from "../../components/mobile-menu";
+import { LiquidityManager } from "./liquidity-manager";
 
 /**
  * /m/mi-base-financiera — paridad con la web /mi-base-financiera ("Mi Base Financiera",
@@ -72,20 +73,12 @@ export default async function MobileMiBase() {
           <MobileMenu />
         </div>
 
-        {/* Liquidez */}
-        <div className="card card-p" style={{ marginBottom: 14 }}>
-          <div className="ov" style={{ marginBottom: 6 }}>
-            Tu liquidez
-          </div>
-          <div className="mono" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em" }}>
-            {formatMoney(liquidity.balance, liquidity.currency)}
-          </div>
-          {!liquidity.hasOpening ? (
-            <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
-              Define tu saldo inicial para afinar este cálculo.
-            </div>
-          ) : null}
-        </div>
+        {/* Liquidez (gestionable: fijar saldo inicial / ajustar saldo) */}
+        <LiquidityManager
+          balance={liquidity.balance}
+          currency={liquidity.currency}
+          hasOpening={liquidity.hasOpening}
+        />
 
         {/* Presupuesto vs real */}
         <div className="card card-p" style={{ marginBottom: 14 }}>
