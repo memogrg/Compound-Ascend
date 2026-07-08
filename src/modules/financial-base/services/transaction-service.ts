@@ -263,9 +263,28 @@ export async function setTransactionCategory(
   if (error) throw new Error(error.message);
 }
 
+/** Mensaje de bloqueo al intentar editar en crudo una transacción vinculada. */
+export const LINKED_TXN_EDIT_BLOCKED =
+  "Esta transacción está vinculada a otra sección (deuda, meta o inversión). Edítala desde su pantalla de origen para mantener todo sincronizado.";
+
 export async function updateTransaction(id: string, input: TxnInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+
+  // Integridad: las transacciones VINCULADAS no se editan en crudo aquí. Cambiar el
+  // monto/fecha desincronizaría su ledger de origen (debt_payments, current_amount).
+  // Se gestionan desde su pantalla (Deudas "editar pago", Ahorro), que actualiza
+  // ambos lados de forma atómica.
+  const { data: existing } = await supabase
+    .from("transactions")
+    .select("linked_kind")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (existing && (existing.linked_kind ?? "none") !== "none") {
+    throw new Error(LINKED_TXN_EDIT_BLOCKED);
+  }
+
   const accountLabel = await accountLabelFor(input.accountId);
   await supabase
     .from("transactions")
@@ -318,6 +337,33 @@ async function recordLiquidityDelta(args: {
 export async function deleteTransaction(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+
+  // Integridad: si la transacción está VINCULADA (pago de deuda, aporte/retiro de
+  // meta, …), revierte primero su ledger de origen para no dejarlo huérfano (un
+  // debt_payment sin gasto, un current_amount inflado). Se lee el vínculo ANTES de
+  // borrar. Import dinámico → evita el ciclo con linked-transaction-service.
+  const { data: txn } = await supabase
+    .from("transactions")
+    .select("kind, amount, occurred_on, linked_kind, linked_id")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (txn && (txn.linked_kind ?? "none") !== "none") {
+    const { reverseLinkedTransaction } = await import(
+      "@/modules/financial-base/services/linked-transaction-service"
+    );
+    await reverseLinkedTransaction({
+      transactionId: id,
+      kind: txn.kind,
+      linkedKind: txn.linked_kind as string,
+      linkedId: txn.linked_id,
+      amount: Number(txn.amount),
+      occurredOn: txn.occurred_on,
+    });
+  }
+
+  // Borra la transacción. Idempotente: en deudas la RPC de reversión ya la borró
+  // junto al debt_payment, así que este delete queda como no-op.
   await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id);
 }
 
