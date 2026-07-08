@@ -110,3 +110,67 @@ export async function listHoldingPurchases(holdingId: string): Promise<HoldingPu
     currency: r.currency,
   }));
 }
+
+export type HoldingValuation = {
+  id: string;
+  asOf: string;
+  value: number;
+  currency: string;
+};
+
+export async function listHoldingValuations(holdingId: string): Promise<HoldingValuation[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("holding_valuations")
+    .select("id, as_of, value, currency")
+    .eq("user_id", user.id)
+    .eq("holding_id", holdingId)
+    .order("as_of", { ascending: true });
+  if (error || !data) return [];
+  return data.map((r) => ({ id: r.id, asOf: r.as_of, value: Number(r.value), currency: r.currency }));
+}
+
+/** Guarda un valor del estado de cuenta y actualiza el valor actual del plan al más reciente. */
+export async function recordHoldingValuation(
+  holdingId: string,
+  asOf: string,
+  value: number,
+): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { data: h } = await supabase
+    .from("investment_holdings")
+    .select("household_id, currency")
+    .eq("id", holdingId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const { error } = await supabase.from("holding_valuations").upsert(
+    {
+      holding_id: holdingId,
+      user_id: user.id,
+      household_id: h?.household_id ?? null,
+      as_of: asOf,
+      value,
+      currency: h?.currency ?? "USD",
+    },
+    { onConflict: "holding_id,as_of" },
+  );
+  if (error) throw new Error(error.message);
+
+  const { data: latest } = await supabase
+    .from("holding_valuations")
+    .select("value")
+    .eq("holding_id", holdingId)
+    .eq("user_id", user.id)
+    .order("as_of", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest) {
+    await supabase
+      .from("investment_holdings")
+      .update({ current_value_manual: Number(latest.value) })
+      .eq("id", holdingId)
+      .eq("user_id", user.id);
+  }
+}

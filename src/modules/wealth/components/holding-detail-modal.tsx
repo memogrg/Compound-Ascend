@@ -18,11 +18,13 @@ import {
   sellHoldingAction,
   listLinkableDebtsAction,
   listHoldingPurchasesAction,
+  listHoldingValuationsAction,
+  recordHoldingValuationAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
 import type { Holding, Dividend, RentalPayment } from "@/modules/wealth/types";
-import type { Period, HoldingPurchase } from "@/modules/wealth/services/holding-history-service";
+import type { Period, HoldingPurchase, HoldingValuation } from "@/modules/wealth/services/holding-history-service";
 
 const RENTAL_FREQ_PER_YEAR: Record<string, number> = { semanal: 52, mensual: 12, trimestral: 4, semestral: 2, anual: 1 };
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
@@ -109,10 +111,15 @@ export function HoldingDetailModal({
   const [purchases, setPurchases] = useState<HoldingPurchase[]>([]);
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [linkedDebt, setLinkedDebt] = useState<LinkableDebt | null>(null);
+  const [valuations, setValuations] = useState<HoldingValuation[]>([]);
+  const [valDate, setValDate] = useState(new Date().toISOString().slice(0, 10));
+  const [valAmount, setValAmount] = useState("");
+  const [savingVal, setSavingVal] = useState(false);
 
   const costBasis = holding.quantity * holding.averageCost;
   // No cotizados: valor manual del usuario (no precio×cantidad).
   const isRental = !QUOTED_TYPES.has(holding.assetType);
+  const isPlan = holding.category === "plan_inversion";
   const currentValue =
     currentPrice !== null
       ? holding.quantity * currentPrice
@@ -154,6 +161,11 @@ export function HoldingDetailModal({
     if (!isRental) void listHoldingPurchasesAction(holding.id).then(setPurchases);
   }, [holding.id, isRental]);
 
+  // Load valores del estado de cuenta (solo planes a plazo)
+  useEffect(() => {
+    if (isPlan) void listHoldingValuationsAction(holding.id).then(setValuations);
+  }, [holding.id, isPlan]);
+
   // Deuda ligada (C-1b): muestra quién financia el inmueble. Solo si hay debtId.
   useEffect(() => {
     if (!holding.debtId) {
@@ -179,6 +191,19 @@ export function HoldingDetailModal({
     };
   });
   const avgFinal = cumQty > 0 ? cumAmount / cumQty : 0;
+
+  const saveValuation = async () => {
+    const v = parseFloat(valAmount);
+    if (!(v > 0) || savingVal) return;
+    setSavingVal(true);
+    const res = await recordHoldingValuationAction(holding.id, valDate, v);
+    setSavingVal(false);
+    if (res.ok) {
+      setValAmount("");
+      void listHoldingValuationsAction(holding.id).then(setValuations);
+      router.refresh();
+    }
+  };
 
   return (
     <Modal
@@ -310,6 +335,59 @@ export function HoldingDetailModal({
             </div>
           )}
         </div>
+
+        {/* Plan a plazo · valor del estado de cuenta + curva */}
+        {isPlan && (
+          <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>Valor del estado de cuenta</div>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+              Cargá el valor de tu estado de cuenta. Actualiza el valor actual del plan.
+            </div>
+            {valuations.length > 1 && (
+              <svg viewBox="0 0 300 60" preserveAspectRatio="none" style={{ width: "100%", height: 60, marginBottom: 10 }}>
+                <polyline
+                  fill="none"
+                  stroke="var(--info)"
+                  strokeWidth="2"
+                  points={(() => {
+                    const vals = valuations.map((v) => v.value);
+                    const min = Math.min(...vals);
+                    const max = Math.max(...vals);
+                    const span = max - min || 1;
+                    return valuations
+                      .map((v, i) => {
+                        const x = (i / (valuations.length - 1)) * 300;
+                        const y = 56 - ((v.value - min) / span) * 52;
+                        return `${x.toFixed(1)},${y.toFixed(1)}`;
+                      })
+                      .join(" ");
+                  })()}
+                />
+              </svg>
+            )}
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>Fecha</label>
+                <input type="date" value={valDate} onChange={(e) => setValDate(e.target.value)} className="inp" style={{ width: "100%" }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>Valor</label>
+                <input type="number" step="any" min="0" value={valAmount} onChange={(e) => setValAmount(e.target.value)} placeholder="0" className="inp" style={{ width: "100%" }} />
+              </div>
+              <button className="btn btn-primary" onClick={saveValuation} disabled={savingVal || !(parseFloat(valAmount) > 0)} style={{ height: 38 }}>
+                {savingVal ? "…" : "Actualizar"}
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {[...valuations].reverse().map((v) => (
+                <div key={v.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "5px 0", borderTop: "1px solid var(--line)" }}>
+                  <span style={{ color: "var(--muted)" }}>{v.asOf}</span>
+                  <span style={{ fontWeight: 500 }}>{formatMoney(v.value, v.currency)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Compras: historial + promedio acumulado (solo cotizados) */}
         {!isRental && purchases.length > 0 && (
