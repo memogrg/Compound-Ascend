@@ -57,6 +57,7 @@ export function rowToHolding(r: {
   debt_id?: string | null;
   annual_rate_pct?: number | null;
   maturity_date?: string | null;
+  term_years?: number | null;
 }): Holding {
   return {
     id: r.id,
@@ -79,6 +80,7 @@ export function rowToHolding(r: {
     incomeMonth: r.income_month == null ? null : Number(r.income_month),
     annualRatePct: r.annual_rate_pct == null ? null : Number(r.annual_rate_pct),
     maturityDate: r.maturity_date ?? null,
+    termYears: r.term_years == null ? null : Number(r.term_years),
     region: r.region ?? null,
     isRecurring: r.is_recurring ?? false,
     monthlyContribution: r.monthly_contribution == null ? null : Number(r.monthly_contribution),
@@ -96,7 +98,7 @@ export function rowToHolding(r: {
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date,term_years";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -207,6 +209,7 @@ function taxonomyColumns(input: HoldingInput) {
     income_month: input.incomeMonth ?? null,
     annual_rate_pct: input.annualRatePct ?? null,
     maturity_date: input.maturityDate ?? null,
+    term_years: input.termYears ?? null,
     region: input.region ?? null,
     is_recurring: input.isRecurring ?? false,
     // Solo el recurrente lleva aporte mensual; el resto lo deja en NULL.

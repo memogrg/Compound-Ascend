@@ -516,6 +516,8 @@ export type InvestmentHoldingRow = Timestamps & {
   annual_rate_pct: number | null;
   // Fecha de vencimiento (renta fija pago único) (migración 20260708000001).
   maturity_date: string | null;
+  // Plazo del plan a plazo (unit-linked) en años (migración 20260712000001).
+  term_years: number | null;
 };
 
 // Aportes mensuales por holding recurrente (brecha DCA) (migración 20260710000001).
