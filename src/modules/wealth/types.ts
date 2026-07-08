@@ -40,6 +40,7 @@ export const INVESTMENT_CATEGORIES = [
   "compra_negocio",
   "cripto",
   "alternativo",
+  "plan_inversion",
 ] as const;
 
 export type InvestmentCategory = (typeof INVESTMENT_CATEGORIES)[number];

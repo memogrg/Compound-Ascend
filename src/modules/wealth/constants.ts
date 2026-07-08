@@ -162,6 +162,13 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
     defaultAssetType: "commodity",
     quoted: false,
   },
+  plan_inversion: {
+    nature: "growth",
+    label: "Plan de inversión a plazo (unit-linked)",
+    icon: "invest",
+    defaultAssetType: "fondo",
+    quoted: false,
+  },
 };
 
 /** Naturaleza ('cashflow' | 'growth') de una categoría. */
