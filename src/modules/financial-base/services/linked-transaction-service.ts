@@ -198,6 +198,79 @@ export async function deleteLinkedTransaction(transactionId: string): Promise<vo
 }
 
 /**
+ * Reversión del ledger especializado al ELIMINAR una transacción vinculada
+ * (integridad · Fase 1 · orquestador). Inversa de `propagateLinkedTransaction`:
+ * deshace el efecto que el evento de dinero dejó en su módulo dueño para que no
+ * queden registros huérfanos (un debt_payment sin su gasto, un current_amount
+ * inflado, etc.).
+ *
+ *  - debt  → borra el `debt_payment` ligado (y su transacción) vía la RPC atómica
+ *    `delete_debt_payment`. El saldo de la deuda se recalcula desde los pagos
+ *    restantes, así que no hay que tocarlo a mano.
+ *  - goal  → aplica el delta inverso a `savings_goals.current_amount`: un APORTE
+ *    (gasto) lo había subido → se resta; un RETIRO (ingreso) lo había bajado → se
+ *    suma. Nunca baja de 0.
+ *  - holding / policy / rental → sin reversión definida aquí: sus ledgers
+ *    especializados (dividends, holding_contributions, pólizas, renta) se
+ *    gestionan/borran en sus propios módulos; revertirlos parcialmente desde este
+ *    orquestador arriesgaría corromper datos. Se deja documentado (no-op).
+ *
+ * Idempotente y defensivo: si el registro de origen ya no existe, no falla.
+ */
+export async function reverseLinkedTransaction(args: {
+  transactionId: string;
+  /** kind de la transacción ('gasto' | 'ingreso' | …): fija el sentido en metas. */
+  kind: string;
+  linkedKind: string;
+  linkedId: string | null;
+  amount: number;
+  occurredOn: string;
+}): Promise<void> {
+  if (!args.linkedId) return;
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  if (args.linkedKind === "debt") {
+    const { data: pay, error: pErr } = await supabase
+      .from("debt_payments")
+      .select("id")
+      .eq("transaction_id", args.transactionId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (pErr) throw new Error(pErr.message);
+    if (pay) {
+      const { error } = await supabase.rpc("delete_debt_payment", { p_payment_id: pay.id });
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
+  if (args.linkedKind === "goal") {
+    // Delta inverso: aporte (gasto) subió → resta; retiro (ingreso) bajó → suma.
+    const delta = args.kind === "gasto" ? -args.amount : args.amount;
+    const { data: goal, error: gErr } = await supabase
+      .from("savings_goals")
+      .select("current_amount")
+      .eq("id", args.linkedId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (gErr) throw new Error(gErr.message);
+    if (goal) {
+      const next = Math.max(0, Number(goal.current_amount) + delta);
+      const { error } = await supabase
+        .from("savings_goals")
+        .update({ current_amount: next })
+        .eq("id", args.linkedId)
+        .eq("user_id", user.id);
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
+  // holding / policy / rental: reversión no definida (ver nota arriba).
+}
+
+/**
  * Id de una categoría de sistema por key (p. ej. 'deudas', 'inc_pasivo').
  * Best-effort: si no existe devuelve null y la transacción queda sin categoría
  * (el vínculo linked_kind/linked_id sigue contando la historia).

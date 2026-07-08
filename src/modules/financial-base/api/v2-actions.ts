@@ -69,6 +69,7 @@ import {
   createTransfer,
   importTransactions,
   getReceiptSignedUrl,
+  LINKED_TXN_EDIT_BLOCKED,
 } from "@/modules/financial-base/services/transaction-service";
 import {
   createAccount,
@@ -472,7 +473,12 @@ export async function editTransactionAction(id: string, raw: unknown): Promise<A
     return { ok: true };
   } catch (err) {
     logger.error("editTransaction fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: "No pudimos actualizar la transacción." };
+    // Bloqueo de edición de vinculadas: surface el mensaje que remite al origen.
+    const msg =
+      err instanceof Error && err.message === LINKED_TXN_EDIT_BLOCKED
+        ? err.message
+        : "No pudimos actualizar la transacción.";
+    return { ok: false, message: msg };
   }
 }
 
