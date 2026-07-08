@@ -45,7 +45,7 @@ import {
   type Period,
 } from "@/modules/wealth/services/holding-history-service";
 import type { Holding } from "@/modules/wealth/types";
-import { adjustContributionPrice } from "@/modules/wealth/services/contribution-service";
+import { adjustContributionPrice, advancePremiums } from "@/modules/wealth/services/contribution-service";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -391,5 +391,21 @@ export async function adjustContributionPriceAction(
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos actualizar el precio del aporte." };
+  }
+}
+
+export async function advancePremiumsAction(
+  holdingId: string,
+  globalAmount: number,
+): Promise<ActionResult & { advanced?: number }> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (!(globalAmount > 0)) return { ok: false, message: "Ingresá un monto válido." };
+  try {
+    const { advanced } = await advancePremiums(holdingId, globalAmount);
+    revalidatePath("/patrimonio");
+    return { ok: true, advanced };
+  } catch (err) {
+    logger.error("advancePremiums fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: err instanceof Error ? err.message : "No pudimos adelantar cuotas." };
   }
 }
