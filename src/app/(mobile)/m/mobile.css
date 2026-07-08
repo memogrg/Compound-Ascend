@@ -495,6 +495,14 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  /* Ancho por contenido por defecto: los botones EN LÍNEA (dentro de filas junto a
+     texto) no deben estirarse ni tapar el texto. Los botones full-width se marcan
+     explícitamente con .m-btn-block (submits, auth, CTAs de card/hoja). */
+  width: auto;
+}
+/* Modificador full-width: botones que deben ocupar todo el ancho (submit de formularios,
+   login, cerrar sesión, CTAs de hoja/card). */
+.m-shell .m-btn-block {
   width: 100%;
 }
 .m-shell .m-btn:disabled {
@@ -969,13 +977,17 @@
   border-radius: var(--r-lg);
   padding: 16px;
 }
-.m-shell .goal .gtop {
+/* Fila/ícono de meta. NB: los sobres de metas se renderizan dentro de un `.card`
+   compartido (no un `.goal`), así que estas reglas son standalone — como `.lic`/
+   `.jar-ic` — para no depender de un ancestro `.goal` inexistente (si no, el SVG del
+   ícono no tendría tamaño y se dispararía a pantalla completa). */
+.m-shell .gtop {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 14px;
 }
-.m-shell .goal .gemoji {
+.m-shell .gemoji {
   width: 44px;
   height: 44px;
   border-radius: 13px;
@@ -983,7 +995,7 @@
   place-items: center;
   flex: none;
 }
-.m-shell .goal .gemoji svg {
+.m-shell .gemoji svg {
   width: 20px;
   height: 20px;
 }
@@ -1314,6 +1326,7 @@
   margin-top: 4px;
   min-height: 44px;
   font-size: 14px;
+  width: 100%; /* botón "añadir correo" a lo ancho, bajo el input */
 }
 
 /* navegación del wizard */

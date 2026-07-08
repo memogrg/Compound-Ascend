@@ -75,7 +75,7 @@ export function FormShell<T>({
         }}
       >
         {children}
-        <button type="submit" className="m-btn m-btn-primary" disabled={pending} style={{ marginTop: 6 }}>
+        <button type="submit" className="m-btn m-btn-block m-btn-primary" disabled={pending} style={{ marginTop: 6 }}>
           {pending ? pendingLabel : submitLabel}
         </button>
       </form>
