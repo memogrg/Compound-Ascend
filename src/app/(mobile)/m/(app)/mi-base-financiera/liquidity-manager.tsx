@@ -54,7 +54,7 @@ export function LiquidityManager({
           <div className="muted" style={{ fontSize: 12, margin: "6px 0 12px" }}>
             Define tu saldo inicial para afinar este cálculo.
           </div>
-          <button type="button" className="m-btn m-btn-primary" onClick={openSheet}>
+          <button type="button" className="m-btn m-btn-block m-btn-primary" onClick={openSheet}>
             Fijar saldo inicial
           </button>
         </>

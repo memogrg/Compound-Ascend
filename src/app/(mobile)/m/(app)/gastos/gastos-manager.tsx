@@ -150,7 +150,7 @@ export function GastosManager({
             })}
             <button
               type="button"
-              className="m-btn m-btn-secondary"
+              className="m-btn m-btn-block m-btn-secondary"
               style={{ marginTop: 2 }}
               onClick={() => setCreatingSobreIn(detailJar.group)}
             >
