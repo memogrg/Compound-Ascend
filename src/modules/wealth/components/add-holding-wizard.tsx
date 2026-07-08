@@ -250,6 +250,9 @@ export function AddHoldingModal({
   const [maturityDate, setMaturityDate] = useState(
     prefill?.maturityDate ? String(prefill.maturityDate).slice(0, 7) : "",
   );
+  const [termYears, setTermYears] = useState(
+    prefill?.termYears != null ? String(prefill.termYears) : "",
+  );
 
   // ── Inmueble de renta (propiedad_alquiler): subtipo + costos operativos ──
   const [subtype, setSubtype] = useState<"alquiler" | "airbnb">(
@@ -396,6 +399,10 @@ export function AddHoldingModal({
     } else {
       // Manual (B/C): valor actual; default = invertido.
       base.currentValueManual = parseFloat(currentValue) || investedNum || undefined;
+      if (cat === "plan_inversion") {
+        base.termYears = parseInt(termYears, 10) || undefined;
+        base.maturityDate = maturityDate ? `${maturityDate}-01` : undefined;
+      }
       if (m.nature === "cashflow") {
         // Perfil B: ingreso + frecuencia; si no es mensual, mes de materialización.
         const inc = parseFloat(income) || 0;
@@ -510,6 +517,8 @@ export function AddHoldingModal({
             onAnnualRatePct={setAnnualRatePct}
             maturityDate={maturityDate}
             onMaturityDate={setMaturityDate}
+            termYears={termYears}
+            onTermYears={setTermYears}
             category={category}
             subtype={subtype}
             onSubtype={setSubtype}
@@ -700,6 +709,8 @@ function Step2Fields(props: {
   onAnnualRatePct: (v: string) => void;
   maturityDate: string;
   onMaturityDate: (v: string) => void;
+  termYears: string;
+  onTermYears: (v: string) => void;
   category: InvestmentCategory | null;
   subtype: "alquiler" | "airbnb";
   onSubtype: (v: "alquiler" | "airbnb") => void;
@@ -852,6 +863,50 @@ function Step2Fields(props: {
               placeholder="= monto invertido"
             />
           </div>
+        </div>
+      ) : null}
+
+      {/* Plan a plazo · selector de plazo (deriva el vencimiento) */}
+      {props.category === "plan_inversion" ? (
+        <div className="fld">
+          <label className="fld-label">
+            Plazo <HelpTip text="Duración del plan. Deriva el vencimiento; el aporte deja de contar al vencer." />
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[5, 10, 15, 20].map((y) => {
+              const on = props.termYears === String(y);
+              return (
+                <button
+                  key={y}
+                  type="button"
+                  onClick={() => {
+                    props.onTermYears(String(y));
+                    const d = new Date();
+                    d.setFullYear(d.getFullYear() + y);
+                    props.onMaturityDate(d.toISOString().slice(0, 7));
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "9px 0",
+                    borderRadius: 10,
+                    border: on ? "1px solid var(--ink)" : "1px solid var(--line)",
+                    background: on ? "var(--ink)" : "var(--surface)",
+                    color: on ? "var(--bg)" : "var(--ink-2)",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  {y} años
+                </button>
+              );
+            })}
+          </div>
+          {props.termYears && props.maturityDate ? (
+            <span className="muted" style={{ fontSize: 11 }}>
+              Vence: {props.maturityDate} · el aporte deja de contar al vencer.
+            </span>
+          ) : null}
         </div>
       ) : null}
 

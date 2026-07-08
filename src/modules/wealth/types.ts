@@ -168,6 +168,8 @@ export type Holding = {
   annualRatePct?: number | null;
   /** Fecha de vencimiento (renta fija de pago único: al_vencimiento). */
   maturityDate?: string | null;
+  /** Plazo del plan a plazo (unit-linked) en años; deriva maturityDate (migración 20260712000001). */
+  termYears?: number | null;
   rentalSubtype?: RentalSubtype | null;
   // ── Inmueble de renta: costos operativos para ROI (migración 20260628000002) ──
   purchasePrice?: number | null;
