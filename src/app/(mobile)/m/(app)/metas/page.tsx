@@ -1,6 +1,7 @@
 import { getControlSummary } from "@/modules/control";
-import { formatMoney } from "@/lib/format";
+import { getDisplayCurrency } from "@/modules/financial-base";
 import { MobileMenu } from "../../components/mobile-menu";
+import { GoalManager } from "./goal-manager";
 
 /**
  * /m/metas — "Metas": metas de ahorro con progreso + lectura del MOTOR DE
@@ -15,20 +16,8 @@ const SEMAFORO: Record<string, { label: string; color: string }> = {
   amarillo: { label: "Atención", color: "var(--warning)" },
   rojo: { label: "En riesgo", color: "var(--danger)" },
 };
-const STATUS_BADGE: Record<string, string> = {
-  saludable: "up",
-  atrasado: "neutral",
-  no_viable: "down",
-  revisar: "neutral",
-};
-
-function fmtMonth(iso: string | null | undefined): string {
-  if (!iso) return "Sin fecha límite";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
-}
-
 export default async function MobileMetas() {
-  const summary = await getControlSummary();
+  const [summary, currency] = await Promise.all([getControlSummary(), getDisplayCurrency()]);
   const { goals, diagnosis } = summary;
   const sem = SEMAFORO[diagnosis.semaforo] ?? SEMAFORO.amarillo!;
 
@@ -58,65 +47,16 @@ export default async function MobileMetas() {
           <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>{diagnosis.nextBestAction}</div>
         </div>
 
-        {/* Metas */}
-        {goals.length === 0 ? (
-          <div className="card card-p">
-            <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-              Aún no tienes metas de ahorro. Crea una para ponerle nombre y fecha a lo que quieres lograr.
-            </div>
-          </div>
-        ) : (
-          goals.map((g) => {
-            const pct = g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0;
-            const missing = Math.max(0, g.targetAmount - g.currentAmount);
-            const months = g.monthlyContribution > 0 ? Math.ceil(missing / g.monthlyContribution) : null;
-            const badgeCls = STATUS_BADGE[g.status] ?? "neutral";
-            return (
-              <div className="goal" style={{ marginBottom: 14 }} key={g.id}>
-                <div className="gtop">
-                  <span
-                    className="gemoji"
-                    style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
-                    aria-hidden
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="9" />
-                      <circle cx="12" cy="12" r="4" />
-                    </svg>
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{g.name}</div>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      {fmtMonth(g.targetDate)}
-                    </div>
-                  </div>
-                  <span className={`badge ${badgeCls}`}>{Math.round(pct * 100)}%</span>
-                </div>
-                <div className="between" style={{ marginBottom: 8 }}>
-                  <div className="display" style={{ fontSize: 22 }}>
-                    {formatMoney(g.currentAmount, g.currency)}
-                  </div>
-                  <div className="muted mono" style={{ fontSize: 12 }}>
-                    de {formatMoney(g.targetAmount, g.currency)}
-                  </div>
-                </div>
-                <div className="bar" style={{ height: 9 }}>
-                  <i style={{ width: `${Math.round(pct * 100)}%`, background: "linear-gradient(90deg, var(--s1), var(--s5))" }} />
-                </div>
-                <div className="between" style={{ marginTop: 10 }}>
-                  <span className="muted" style={{ fontSize: 11.5 }}>
-                    Faltan {formatMoney(missing, g.currency)}
-                  </span>
-                  {months != null && (
-                    <span className="mono" style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                      {months} {months === 1 ? "mes" : "meses"}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
+        {/* Metas gestionables: SwipeRow (editar/eliminar) + Aporte/Retirar + FAB de alta */}
+        <div className="between" style={{ marginBottom: 6 }}>
+          <div className="sec-title">Tus metas</div>
+          {goals.length > 0 && (
+            <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>
+              {goals.length} {goals.length === 1 ? "meta" : "metas"}
+            </span>
+          )}
+        </div>
+        <GoalManager goals={goals} currency={currency} />
       </div>
     </div>
   );
