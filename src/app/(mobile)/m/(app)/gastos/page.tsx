@@ -2,9 +2,10 @@ import Link from "next/link";
 import { MobileMenu } from "../../components/mobile-menu";
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
-import { monthPeriod } from "@/modules/financial-base";
+import { monthPeriod, getBaseSummary } from "@/modules/financial-base";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import { formatMoney } from "@/lib/format";
+import { ExpenseManager } from "./expense-manager";
 
 /**
  * /m/gastos — "Gastos": frascos (grupos) con sobres (categorías), presupuesto vs
@@ -52,6 +53,8 @@ export default async function MobileGastos() {
   const asOf = now.toISOString().slice(0, 10);
   const currency = view.currency;
   const jars = await getExpenseJarsAsOf({ tree: view.tree, period, asOf, currency });
+  // Lista gestionable (líneas de gasto), en paralelo a la vista de frascos.
+  const expenses = (await getBaseSummary()).expenses;
 
   const totals = jars.reduce(
     (acc, j) => {
@@ -97,6 +100,17 @@ export default async function MobileGastos() {
         ) : (
           jars.map((jar) => <JarCard key={jar.group} jar={jar} currency={currency} />)
         )}
+
+        {/* Tus gastos: lista gestionable (SwipeRow editar/eliminar) + FAB de alta */}
+        <div className="between" style={{ margin: "18px 0 6px" }}>
+          <div className="sec-title">Tus gastos</div>
+          {expenses.length > 0 && (
+            <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>
+              {expenses.length} {expenses.length === 1 ? "línea" : "líneas"}
+            </span>
+          )}
+        </div>
+        <ExpenseManager expenses={expenses} currency={currency} />
       </div>
     </div>
   );

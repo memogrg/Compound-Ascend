@@ -21,3 +21,4 @@ export type { Opt } from "./fields";
 export { SwipeRow } from "./swipe-row";
 export { ConfirmDialog } from "./confirm-dialog";
 export { Fab } from "./fab";
+export { FREQ_OPTS, CUR_OPTS } from "./options";

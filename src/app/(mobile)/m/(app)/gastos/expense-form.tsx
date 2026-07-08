@@ -4,7 +4,6 @@ import {
   FormShell,
   TextField,
   MoneyField,
-  Segmented,
   SheetSelect,
   FREQ_OPTS,
   CUR_OPTS,
@@ -13,26 +12,32 @@ import {
 } from "../../components/form-kit";
 
 /**
- * Formulario de ingreso reutilizable por ALTA y EDICIÓN (mismo incomeInputSchema).
- * Es agnóstico de la action: recibe `action` (addIncomeAction o editIncomeAction ligada
- * a un id). FormShell envuelve pending/fieldErrors/toast/refresh. No duplica lógica.
+ * Formulario de gasto reutilizable por ALTA y EDICIÓN (mismo expenseInputSchema),
+ * espejo de IncomeForm. Agnóstico de la action: recibe `action` (addExpenseAction o
+ * editExpenseAction ligada a un id). FormShell maneja pending/fieldErrors/toast/refresh.
  */
 
-export type IncomeValues = {
+export type ExpenseValues = {
   name: string;
   amount: number | undefined;
-  incomeType: string;
+  nature: string;
   frequency: string;
   currency: string;
 };
 
-const TYPE_OPTS: Opt[] = [
-  { value: "activo", label: "Activo" },
-  { value: "pasivo", label: "Pasivo" },
-  { value: "extraordinario", label: "Extraordinario" },
+const NATURE_OPTS: Opt[] = [
+  { value: "esencial", label: "Esencial" },
+  { value: "estilo_vida", label: "Estilo de vida" },
+  { value: "financiero", label: "Financiero" },
+  { value: "proteccion", label: "Protección" },
+  { value: "crecimiento", label: "Crecimiento" },
+  { value: "ahorro", label: "Ahorro" },
+  { value: "inversion", label: "Inversión" },
+  { value: "donacion", label: "Donación" },
+  { value: "miscelaneo", label: "Misceláneo" },
 ];
 
-export function IncomeForm({
+export function ExpenseForm({
   initial,
   currency,
   action,
@@ -40,20 +45,20 @@ export function IncomeForm({
   successMessage,
   onSuccess,
 }: {
-  initial?: Partial<IncomeValues>;
+  initial?: Partial<ExpenseValues>;
   currency: string;
-  action: (raw: IncomeValues) => Promise<ActionResult>;
+  action: (raw: ExpenseValues) => Promise<ActionResult>;
   submitLabel: string;
   successMessage: string;
   onSuccess: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [amount, setAmount] = useState<number | undefined>(initial?.amount);
-  const [incomeType, setIncomeType] = useState(initial?.incomeType ?? "activo");
+  const [nature, setNature] = useState(initial?.nature ?? "esencial");
   const [frequency, setFrequency] = useState(initial?.frequency ?? "mensual");
   const [cur, setCur] = useState(initial?.currency ?? currency);
 
-  const values: IncomeValues = { name, amount, incomeType, frequency, currency: cur };
+  const values: ExpenseValues = { name, amount, nature, frequency, currency: cur };
 
   return (
     <FormShell
@@ -68,12 +73,12 @@ export function IncomeForm({
         label="Nombre"
         value={name}
         onChange={setName}
-        placeholder="Salario, alquiler…"
+        placeholder="Vivienda, alimentación…"
         maxLength={120}
         autoFocus
       />
       <MoneyField name="amount" label="Monto" value={amount} onChange={setAmount} currency={cur} />
-      <Segmented name="incomeType" label="Tipo de ingreso" value={incomeType} onChange={setIncomeType} options={TYPE_OPTS} />
+      <SheetSelect name="nature" label="Naturaleza" value={nature} onChange={setNature} options={NATURE_OPTS} sheetTitle="Naturaleza del gasto" />
       <SheetSelect name="frequency" label="Frecuencia" value={frequency} onChange={setFrequency} options={FREQ_OPTS} sheetTitle="Frecuencia" />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
     </FormShell>
