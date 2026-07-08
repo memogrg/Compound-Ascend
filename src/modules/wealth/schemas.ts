@@ -89,6 +89,7 @@ export const holdingInputSchema = z.object({
     .optional(),
   annualRatePct: z.number().nonnegative().optional(),
   maturityDate: z.string().optional(),
+  termYears: z.number().int().optional(),
   rentalSubtype: z.enum(["alquiler", "airbnb", "auto", "negocio", "otro"]).optional(),
   // Inmueble de renta: costos operativos (ratios 0-1 para vacancy/mgmt).
   purchasePrice: z.number().nonnegative().optional(),
