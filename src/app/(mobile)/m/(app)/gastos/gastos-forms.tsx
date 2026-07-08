@@ -5,6 +5,7 @@ import {
   addCategoryAction,
   addBudgetItemAction,
   setEnvelopeBudgetAction,
+  editCategoryAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Account, Period } from "@/modules/financial-base/types";
@@ -346,5 +347,41 @@ export function BudgetEditForm({
         </div>
       )}
     </>
+  );
+}
+
+// ── Editar sobre (nombre + favorito) — solo sobres del USUARIO ──────────────
+export function EditSobreForm({
+  envelope,
+  initialFavorite,
+  onSuccess,
+}: {
+  envelope: JarEnvelope;
+  initialFavorite: boolean;
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState(envelope.name);
+  const [favorite, setFavorite] = useState(initialFavorite);
+
+  const action = (v: { name: string; isFavorite: boolean }): Promise<ActionResult> =>
+    editCategoryAction(envelope.id, { name: v.name, isFavorite: v.isFavorite });
+
+  return (
+    <FormShell
+      action={action}
+      values={{ name: name.trim(), isFavorite: favorite }}
+      submitLabel="Guardar cambios"
+      successMessage="Sobre actualizado"
+      onSuccess={onSuccess}
+    >
+      <TextField name="name" label="Nombre del sobre" value={name} onChange={setName} maxLength={60} autoFocus />
+      <Toggle
+        name="isFavorite"
+        label="Favorito"
+        value={favorite}
+        onChange={setFavorite}
+        hint="Los sobres favoritos aparecen dentro del frasco."
+      />
+    </FormShell>
   );
 }

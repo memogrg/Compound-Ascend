@@ -64,11 +64,24 @@ export default async function MobileGastos() {
   );
   const headerPct = totals.budget > 0 ? Math.round((totals.spent / totals.budget) * 100) : null;
 
+  // Metadatos por categoría (sistema vs. usuario, favorito) para saber qué sobres son
+  // editables/borrables: solo los del USUARIO (is_system=false), como la web.
+  const categoryMeta: Record<string, { isSystem: boolean; isFavorite: boolean }> = {};
+  for (const c of view.categories) {
+    categoryMeta[c.id] = { isSystem: c.isSystem, isFavorite: c.isFavorite };
+  }
+
   return (
     <div className="m-scroll">
       <div className="m-pad">
         <Header pct={headerPct} />
-        <GastosManager jars={jars} currency={currency} accounts={view.accounts} period={period} />
+        <GastosManager
+          jars={jars}
+          currency={currency}
+          accounts={view.accounts}
+          period={period}
+          categoryMeta={categoryMeta}
+        />
       </div>
     </div>
   );

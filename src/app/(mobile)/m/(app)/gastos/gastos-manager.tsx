@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+import { removeCategoryAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Account, Period } from "@/modules/financial-base/types";
 import { formatMoney } from "@/lib/format";
 
-import { Fab, BottomSheet } from "../../components/form-kit";
-import { AddSpendForm, CreateSobreForm, BudgetEditForm } from "./gastos-forms";
+import { Fab, BottomSheet, SheetSelect, useToast } from "../../components/form-kit";
+import { AddSpendForm, CreateSobreForm, BudgetEditForm, EditSobreForm } from "./gastos-forms";
 
 /**
  * Gestión V2 de Gastos en /m/gastos — mismo modelo y acciones que la web /gastos
@@ -50,16 +52,59 @@ export function GastosManager({
   currency,
   accounts,
   period,
+  categoryMeta,
 }: {
   jars: Jar[];
   currency: string;
   accounts: Account[];
   period: Period;
+  /** Metadatos por categoría (sistema vs. usuario, favorito): decide qué sobres son editables/borrables. */
+  categoryMeta: Record<string, { isSystem: boolean; isFavorite: boolean }>;
 }) {
+  const router = useRouter();
+  const toast = useToast();
   const [addingSpend, setAddingSpend] = useState(false);
   const [detailJar, setDetailJar] = useState<NormalJar | null>(null);
   const [creatingSobreIn, setCreatingSobreIn] = useState<string | null>(null); // jar.group
   const [editingEnv, setEditingEnv] = useState<JarEnvelope | null>(null);
+  // Gestión de sobre del USUARIO: menú de acciones, editar (nombre/favorito), eliminar (con reasignación).
+  const [managingSobre, setManagingSobre] = useState<JarEnvelope | null>(null);
+  const [editingSobre, setEditingSobre] = useState<JarEnvelope | null>(null);
+  const [deletingSobre, setDeletingSobre] = useState<JarEnvelope | null>(null);
+  const [reassignTo, setReassignTo] = useState("");
+  const [sobrePending, setSobrePending] = useState(false);
+
+  /** Sobre del usuario (no sistema) → editable/borrable. Si no hay meta, se trata como sistema. */
+  const isUserSobre = (id: string) => categoryMeta[id] != null && !categoryMeta[id]!.isSystem;
+
+  const confirmDeleteSobre = async () => {
+    if (!deletingSobre) return;
+    setSobrePending(true);
+    const res = await removeCategoryAction({ id: deletingSobre.id, reassignToId: reassignTo || null });
+    setSobrePending(false);
+    if (res.ok) {
+      toast.show(reassignTo ? "Sobre eliminado (movimientos reasignados)" : "Sobre eliminado", "success");
+      setDeletingSobre(null);
+      setReassignTo("");
+      router.refresh();
+    } else {
+      toast.show(res.message ?? "No se pudo eliminar el sobre.", "error");
+    }
+  };
+
+  // Destinos de reasignación: cualquier otro sobre (de cualquier frasco), agrupado por frasco.
+  const reassignOpts = deletingSobre
+    ? [
+        { value: "", label: "Sin reasignar (quedan sin categoría)" },
+        ...jars
+          .filter((j): j is NormalJar => j.kind === "normal")
+          .flatMap((j) =>
+            j.envelopes
+              .filter((e) => e.id !== deletingSobre.id)
+              .map((e) => ({ value: e.id, label: `${j.name} · ${e.name}` })),
+          ),
+      ]
+    : [];
 
   const totals = jars.reduce(
     (acc, j) => {
@@ -140,6 +185,20 @@ export function GastosManager({
                           <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
                         </svg>
                       </button>
+                      {isUserSobre(e.id) ? (
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          aria-label="Opciones del sobre"
+                          onClick={() => setManagingSobre(e)}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                            <circle cx="12" cy="5" r="1" />
+                            <circle cx="12" cy="12" r="1" />
+                            <circle cx="12" cy="19" r="1" />
+                          </svg>
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   <div className="bar" style={{ height: 6 }}>
@@ -181,6 +240,78 @@ export function GastosManager({
             period={period}
             onSuccess={() => setEditingEnv(null)}
           />
+        ) : null}
+      </BottomSheet>
+
+      {/* Acciones de un sobre del usuario (editar / eliminar) */}
+      <BottomSheet open={!!managingSobre} onClose={() => setManagingSobre(null)} title={managingSobre?.name ?? "Sobre"}>
+        {managingSobre ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            <button
+              type="button"
+              className="m-btn m-btn-block m-btn-secondary"
+              onClick={() => {
+                setEditingSobre(managingSobre);
+                setManagingSobre(null);
+              }}
+            >
+              Editar sobre (nombre / favorito)
+            </button>
+            <button
+              type="button"
+              className="m-btn m-btn-block m-btn-danger"
+              onClick={() => {
+                setReassignTo("");
+                setDeletingSobre(managingSobre);
+                setManagingSobre(null);
+              }}
+            >
+              Eliminar sobre
+            </button>
+          </div>
+        ) : null}
+      </BottomSheet>
+
+      {/* Editar sobre (nombre + favorito) → editCategoryAction */}
+      <BottomSheet open={!!editingSobre} onClose={() => setEditingSobre(null)} title="Editar sobre">
+        {editingSobre ? (
+          <EditSobreForm
+            envelope={editingSobre}
+            initialFavorite={categoryMeta[editingSobre.id]?.isFavorite ?? true}
+            onSuccess={() => setEditingSobre(null)}
+          />
+        ) : null}
+      </BottomSheet>
+
+      {/* Eliminar sobre (con reasignación opcional) → removeCategoryAction */}
+      <BottomSheet open={!!deletingSobre} onClose={() => setDeletingSobre(null)} title="Eliminar sobre">
+        {deletingSobre ? (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Se eliminará el sobre <strong>{deletingSobre.name}</strong>.
+              {deletingSobre.spent > 0 || deletingSobre.budget > 0
+                ? " Tiene movimientos o presupuesto: elige a dónde reasignarlos para no perder el histórico (o déjalo sin reasignar y quedarán sin categoría)."
+                : " No tiene movimientos ni presupuesto."}
+            </div>
+            {deletingSobre.spent > 0 || deletingSobre.budget > 0 ? (
+              <SheetSelect
+                name="reassignTo"
+                label="Reasignar a (opcional)"
+                value={reassignTo}
+                onChange={setReassignTo}
+                options={reassignOpts}
+                sheetTitle="Reasignar movimientos a"
+              />
+            ) : null}
+            <button
+              type="button"
+              className="m-btn m-btn-block m-btn-danger"
+              disabled={sobrePending}
+              onClick={confirmDeleteSobre}
+            >
+              {sobrePending ? "Eliminando…" : "Eliminar sobre"}
+            </button>
+          </div>
         ) : null}
       </BottomSheet>
     </>
