@@ -2,21 +2,24 @@ import Link from "next/link";
 import { MobileMenu } from "../../components/mobile-menu";
 import {
   getDebtsOverview,
+  getDebtDetail,
   getIndexRates,
   simulateStrategy,
   orderDebts,
   recommendMethod,
   type DebtVM,
+  type DebtPayment,
 } from "@/modules/control";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
+import { DebtManager, type DebtItem } from "./debt-manager";
 
 /**
- * /m/deudas — "Libérate": deuda total, estrategia de pago (avalancha/bola de
- * nieve), próximo pago y lista ordenada. Reutiliza el barrel control
- * (getDebtsOverview + engine simulateStrategy/orderDebts/recommendMethod). Sin
- * reimplementar cálculos. Piel del diseño (data-screen="deudas"), es-MX "tú",
- * tema claro.
+ * /m/deudas — "Deudas y Préstamos": deuda total, estrategia de pago (avalancha/bola de
+ * nieve), próximo pago y gestión completa de deudas. Reutiliza el barrel control
+ * (getDebtsOverview + engine simulateStrategy/orderDebts/recommendMethod) para la lectura
+ * y las Server Actions del módulo (vía DebtManager) para CRUD + reportar pago (transacción
+ * vinculada) + historial. Sin reimplementar cálculos. es-MX "tú", tema claro.
  */
 export const dynamic = "force-dynamic"; // datos por sesión
 
@@ -35,7 +38,28 @@ function fmtDate(iso: string | null): string {
 export default async function MobileDeudas() {
   const rates = await getIndexRates();
   const ov = await getDebtsOverview(rates);
-  const { currency, debts, freeCashflow } = ov;
+  const { currency, debts, freeCashflow, raw } = ov;
+
+  // Pagos por deuda (moneda de visualización, ya normalizada por getDebtDetail).
+  const details = await Promise.all(debts.map((d) => getDebtDetail(d.id, rates)));
+  const paymentsByDebt: Record<string, DebtPayment[]> = {};
+  for (const det of details) {
+    if (det) paymentsByDebt[det.id] = det.payments;
+  }
+
+  if (debts.length === 0) {
+    return (
+      <div className="m-scroll">
+        <div className="m-pad">
+          <Header />
+          <div className="ov" style={{ marginBottom: 8 }}>
+            Sin deudas registradas 🎉
+          </div>
+          <DebtManager items={[]} raw={raw} paymentsByDebt={paymentsByDebt} currency={currency} />
+        </div>
+      </div>
+    );
+  }
 
   const total = debts.reduce((s, d) => s + d.balance, 0);
   const inputs: DebtInput[] = debts.map((d) => ({
@@ -59,21 +83,11 @@ export default async function MobileDeudas() {
     .filter((d): d is DebtVM => Boolean(d));
   const next = ordered[0];
 
-  if (debts.length === 0) {
-    return (
-      <div className="m-scroll">
-        <div className="m-pad">
-          <Header />
-          <div className="card card-p" style={{ marginTop: 4 }}>
-            <div style={{ fontWeight: 700, fontSize: 16 }}>Sin deudas registradas 🎉</div>
-            <div className="muted" style={{ fontSize: 13.5, marginTop: 6, lineHeight: 1.5 }}>
-              No tienes deudas cargadas. Si tienes alguna, agrégala para armar tu plan de pago.
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const items: DebtItem[] = ordered.map((vm, i) => ({
+    vm,
+    rank: i + 1,
+    months: monthsById.get(vm.id) ?? null,
+  }));
 
   return (
     <div className="m-scroll">
@@ -137,13 +151,13 @@ export default async function MobileDeudas() {
                 </div>
               </div>
               <div className="display" style={{ fontSize: 22 }}>
-                {formatMoney(next.monthlyPayment || next.minPayment, next.currency)}
+                {formatMoney(next.monthlyPayment || next.minPayment, currency)}
               </div>
             </div>
           </div>
         )}
 
-        {/* Lista de deudas */}
+        {/* Lista de deudas gestionable (SwipeRow editar/eliminar + reportar pago + historial) */}
         <div>
           <div className="between" style={{ marginBottom: 6 }}>
             <div className="sec-title">Tus deudas</div>
@@ -151,49 +165,7 @@ export default async function MobileDeudas() {
               orden · {METHOD_LABEL[rec.method]?.toLowerCase() ?? rec.method}
             </span>
           </div>
-          {ordered.map((d, i) => {
-            const pct = d.originalAmount && d.originalAmount > 0 ? Math.min(1, d.balance / d.originalAmount) : 1;
-            const cuota = d.monthlyPayment || d.minPayment;
-            const months = monthsById.get(d.id);
-            const barColor = i === 0 ? "var(--danger)" : "var(--warning)";
-            return (
-              <div className="card card-p" style={{ marginBottom: 12 }} key={d.id}>
-                <div className="between" style={{ marginBottom: 12 }}>
-                  <div className="row" style={{ gap: 11 }}>
-                    <span
-                      className="lic"
-                      style={i === 0 ? { background: "var(--danger-soft)", color: "var(--danger)" } : undefined}
-                    >
-                      {i + 1}
-                    </span>
-                    <div>
-                      <div className="lname">{d.name}</div>
-                      <div className="lsub">
-                        {d.debtType ?? "Deuda"} · {formatPercent(d.apr / 100, 1)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="jar-amt">
-                    <div className="a neg">{formatMoney(d.balance, d.currency)}</div>
-                    {d.originalAmount ? <div className="b">de {formatMoney(d.originalAmount, d.currency)}</div> : null}
-                  </div>
-                </div>
-                <div className="bar" style={{ height: 7 }}>
-                  <i style={{ width: `${Math.round(pct * 100)}%`, background: barColor }} />
-                </div>
-                <div className="between" style={{ marginTop: 9 }}>
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    Cuota {formatMoney(cuota, d.currency)}/mes
-                  </span>
-                  {months != null && (
-                    <span className="mono" style={{ fontSize: 11 }}>
-                      ≈ {months} {months === 1 ? "mes" : "meses"}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          <DebtManager items={items} raw={raw} paymentsByDebt={paymentsByDebt} currency={currency} />
         </div>
       </div>
     </div>
