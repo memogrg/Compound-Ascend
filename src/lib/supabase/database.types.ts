@@ -251,6 +251,23 @@ export type ExpenseCategoryRow = Timestamps & {
   merged_into_id: string | null;
   // Vínculo transacción↔entidad (migración 0020 · Fase 0)
   linked_kind: string | null; // 'debt' | 'goal' | 'holding' | 'policy' | 'rental'
+  // Personalización compartida por hogar (migración 20260709000001). Las custom/fork
+  // llevan el household_id del hogar; las de sistema lo tienen null.
+  household_id: string | null;
+};
+
+/**
+ * Override por-hogar (o por-usuario en modo solo) sobre una categoría BASE:
+ * `hidden` la oculta; `fork_id` apunta a la copia del hogar que la reemplaza.
+ * (Migración 20260709000001.)
+ */
+export type CategoryOverrideRow = Timestamps & {
+  id: string;
+  user_id: string; // autor
+  household_id: string | null; // scope; null = modo solo
+  category_id: string; // la categoría base intervenida
+  hidden: boolean;
+  fork_id: string | null;
 };
 
 export type MonthlySnapshotRow = Timestamps & {
@@ -905,6 +922,8 @@ export interface Database {
         Partial<ExpenseCategoryRow> & { name: string },
         Partial<ExpenseCategoryRow>
       >;
+      // Overrides de personalización de categorías por hogar (migración 20260709000001).
+      category_overrides: UserTable<CategoryOverrideRow>;
       // Idempotencia de webhooks (migración 0026). Solo service-role escribe.
       processed_events: TableShape<
         ProcessedEventRow,
