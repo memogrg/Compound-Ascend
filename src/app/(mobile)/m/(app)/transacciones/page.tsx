@@ -1,4 +1,6 @@
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
+import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
+import { monthPeriod } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
 
 import { MobileTxnList } from "./mobile-txn-list";
@@ -29,8 +31,19 @@ export default async function MobileTransacciones() {
     );
   }
 
-  const { real, currency, transactions, categoryNames, period } = view;
+  const { real, currency, transactions, categoryNames, period, accounts } = view;
   const net = real.freeCashflowReal;
+
+  // Frascos para el selector de categoría (sobre) del registro de gastos (misma
+  // orquestación que /m/gastos; excluye los frascos vinculados).
+  const now = new Date();
+  const jarsPeriod = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+  const jars = await getExpenseJarsAsOf({
+    tree: view.tree,
+    period: jarsPeriod,
+    asOf: now.toISOString().slice(0, 10),
+    currency,
+  });
 
   return (
     <div className="m-scroll">
@@ -61,6 +74,8 @@ export default async function MobileTransacciones() {
           categoryNames={categoryNames}
           currency={currency}
           periodLabel={period.label}
+          jars={jars}
+          accounts={accounts}
         />
       </div>
     </div>
