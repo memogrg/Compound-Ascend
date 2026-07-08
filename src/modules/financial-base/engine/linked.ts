@@ -128,7 +128,7 @@ export function holdingPurchaseToTxn(args: {
   currency: string;
   purchaseDate: string;
   amount: number;
-  verb: "Compra" | "Aporte";
+  verb: "Compra" | "Aporte" | "Prima";
   categoryId?: string | null;
 }): LinkedTxnInput {
   return {

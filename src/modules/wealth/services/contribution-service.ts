@@ -228,3 +228,87 @@ export async function adjustContributionPrice(
     .eq("user_id", user.id);
   if (setErr) throw new Error(setErr.message);
 }
+
+/**
+ * Registra la prima mensual de cada plan a plazo (recurrente) como gasto del mes y
+ * la suma a lo invertido — acotado al maturity_date. Después del vencimiento no
+ * cuenta más. Sin precio ni merge (el valor del plan es manual, del estado de
+ * cuenta). El índice único (holding_id, period) serializa; best-effort por plan.
+ */
+export async function ensureMonthlyPremiums(): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const now = new Date();
+  const periodYear = now.getFullYear();
+  const periodMonth = now.getMonth() + 1;
+  const periodStart = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
+
+  const { data: plans, error } = await supabase
+    .from("investment_holdings")
+    .select("id, currency, label, cost_basis, monthly_contribution, household_id")
+    .eq("user_id", user.id)
+    .eq("is_recurring", true)
+    .eq("category", "plan_inversion")
+    .gt("monthly_contribution", 0)
+    .or(`maturity_date.is.null,maturity_date.gte.${periodStart}`); // acota al vencimiento
+  if (error || !plans) return;
+
+  for (const p of plans) {
+    try {
+      const premium = Number(p.monthly_contribution);
+      if (!(premium > 0)) continue;
+
+      // Reservar la prima del mes (idempotente por el índice único).
+      const { data: reserved, error: insErr } = await supabase
+        .from("holding_contributions")
+        .insert({
+          holding_id: p.id,
+          user_id: user.id,
+          household_id: p.household_id,
+          period_year: periodYear,
+          period_month: periodMonth,
+          amount: premium,
+          currency: p.currency,
+          status: "confirmado", // prima fija: no hay precio que confirmar
+        })
+        .select("id")
+        .maybeSingle();
+      if (insErr) {
+        if (insErr.code !== "23505") {
+          console.error(`[ensureMonthlyPremiums] reserva falló (${p.id}): ${insErr.code} ${insErr.message}`);
+        }
+        continue;
+      }
+      if (!reserved) continue;
+
+      // La prima aumenta lo invertido (primas pagadas). El valor es manual (P4).
+      const newCostBasis = Number(p.cost_basis ?? 0) + premium;
+      const { error: updErr } = await supabase
+        .from("investment_holdings")
+        .update({ cost_basis: newCostBasis, average_cost: newCostBasis, quantity: 1 })
+        .eq("id", p.id)
+        .eq("user_id", user.id);
+      if (updErr) {
+        console.error(`[ensureMonthlyPremiums] update falló (${p.id}): ${updErr.message}`);
+        continue;
+      }
+
+      // Gasto del mes = la prima.
+      const expenseId = await registerPurchaseExpense({
+        holdingId: p.id,
+        label: p.label ?? "Plan a plazo",
+        currency: p.currency,
+        purchaseDate: periodStart,
+        amount: premium,
+        verb: "Prima",
+      });
+
+      await supabase
+        .from("holding_contributions")
+        .update({ transaction_id: expenseId })
+        .eq("id", reserved.id);
+    } catch (err) {
+      console.error(`[ensureMonthlyPremiums] error en plan ${p.id}:`, err);
+    }
+  }
+}
