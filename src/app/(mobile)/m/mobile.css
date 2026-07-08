@@ -1981,3 +1981,16 @@
 .m-shell .m-fab:active {
   transform: scale(0.95);
 }
+
+/* SwipeRow en lista dentro de .card: divisores entre filas + padding horizontal
+   (el .lrow trae padding 13px 0 pensado para .card-p; aquí lo damos en el swipe). */
+.m-shell .m-swipe {
+  border-top: 1px solid var(--border);
+}
+.m-shell .m-swipe:first-child {
+  border-top: 0;
+}
+.m-shell .m-swipe-content .lrow {
+  padding-left: 18px;
+  padding-right: 18px;
+}

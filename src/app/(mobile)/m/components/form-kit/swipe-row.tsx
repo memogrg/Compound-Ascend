@@ -42,7 +42,11 @@ export function SwipeRow({
       axis.current = Math.abs(dX) > Math.abs(dY) ? "h" : "v";
       if (axis.current === "h") {
         setDragging(true);
-        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        try {
+          (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        } catch {
+          // setPointerCapture puede lanzar si el puntero ya no está activo; no es crítico.
+        }
       }
     }
     if (axis.current !== "h") return; // gesto vertical → lo maneja el scroll

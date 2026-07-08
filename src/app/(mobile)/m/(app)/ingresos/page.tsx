@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MobileMenu } from "../../components/mobile-menu";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
-import { IncomeQuickAdd } from "./income-quick-add";
+import { IncomeManager } from "./income-manager";
 
 /**
  * /m/ingresos — "Ingresos": ingreso mensual + fuentes. Reutiliza el barrel
@@ -11,12 +11,6 @@ import { IncomeQuickAdd } from "./income-quick-add";
  * tema claro.
  */
 export const dynamic = "force-dynamic"; // datos por sesión
-
-const TYPE_LABEL: Record<string, string> = {
-  activo: "Activo",
-  pasivo: "Pasivo",
-  extraordinario: "Extraordinario",
-};
 
 export default async function MobileIngresos() {
   const [summary, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
@@ -62,53 +56,10 @@ export default async function MobileIngresos() {
               </span>
             )}
           </div>
-          <div className="card card-p">
-            {sources.length === 0 ? (
-              <div className="muted" style={{ padding: "12px 0", fontSize: 13.5, lineHeight: 1.5 }}>
-                Aún no registras fuentes de ingreso. Agrégalas para ver tu ingreso mensual real.
-              </div>
-            ) : (
-              sources.map((s) => {
-                const passive = s.incomeType === "pasivo";
-                return (
-                  <div className="lrow" key={s.id}>
-                    <span
-                      className="lic"
-                      style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
-                      aria-hidden
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-                        {passive ? (
-                          <>
-                            <path d="M4 11l8-6 8 6" />
-                            <path d="M6 10v9h12v-9" />
-                          </>
-                        ) : (
-                          <>
-                            <rect x="2" y="7" width="20" height="14" rx="2" />
-                            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </>
-                        )}
-                      </svg>
-                    </span>
-                    <div>
-                      <div className="lname">{s.name}</div>
-                      <div className="lsub">
-                        <span className="schip">{s.frequency.toUpperCase()}</span> ·{" "}
-                        {TYPE_LABEL[s.incomeType] ?? s.incomeType}
-                      </div>
-                    </div>
-                    <div className="lamt pos">+{formatMoney(s.amountMonthly, s.currency)}</div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {/* Lista gestionable: cada fuente en SwipeRow (Editar/Eliminar) + FAB de alta */}
+          <IncomeManager sources={sources} currency={currency} />
         </div>
       </div>
-
-      {/* Demo del form kit: FAB → hoja de alta de ingreso (addIncomeAction) */}
-      <IncomeQuickAdd currency={currency} />
     </div>
   );
 }
