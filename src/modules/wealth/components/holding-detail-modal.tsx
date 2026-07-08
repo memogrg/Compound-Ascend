@@ -20,6 +20,7 @@ import {
   listHoldingPurchasesAction,
   listHoldingValuationsAction,
   recordHoldingValuationAction,
+  advancePremiumsAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
@@ -115,6 +116,9 @@ export function HoldingDetailModal({
   const [valDate, setValDate] = useState(new Date().toISOString().slice(0, 10));
   const [valAmount, setValAmount] = useState("");
   const [savingVal, setSavingVal] = useState(false);
+  const [advOpen, setAdvOpen] = useState(false);
+  const [advAmount, setAdvAmount] = useState("");
+  const [advancing, setAdvancing] = useState(false);
 
   const costBasis = holding.quantity * holding.averageCost;
   // No cotizados: valor manual del usuario (no precio×cantidad).
@@ -212,6 +216,19 @@ export function HoldingDetailModal({
     if (res.ok) {
       setValAmount("");
       void listHoldingValuationsAction(holding.id).then(setValuations);
+      router.refresh();
+    }
+  };
+
+  const doAdvance = async () => {
+    const amt = parseFloat(advAmount);
+    if (!(amt > 0) || advancing) return;
+    setAdvancing(true);
+    const res = await advancePremiumsAction(holding.id, amt);
+    setAdvancing(false);
+    if (res.ok) {
+      setAdvAmount("");
+      setAdvOpen(false);
       router.refresh();
     }
   };
@@ -366,6 +383,39 @@ export function HoldingDetailModal({
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
               <span style={{ color: "var(--muted)" }}>Primas</span>
               <span>{primasPagadas} de {termMonths}</span>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              {!advOpen ? (
+                <button className="btn btn-secondary" onClick={() => setAdvOpen(true)}>
+                  Adelantar cuotas
+                </button>
+              ) : (
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+                      Monto a adelantar {premium > 0 && parseFloat(advAmount) > 0
+                        ? `· ${Math.round(parseFloat(advAmount) / premium)} cuota(s)`
+                        : ""}
+                    </label>
+                    <input
+                      className="inp"
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={advAmount}
+                      onChange={(e) => setAdvAmount(e.target.value)}
+                      placeholder="0"
+                      style={{ width: "100%" }}
+                    />
+                  </div>
+                  <button className="btn btn-primary" onClick={doAdvance} disabled={advancing || !(parseFloat(advAmount) > 0)} style={{ height: 38 }}>
+                    {advancing ? "…" : "Confirmar"}
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => setAdvOpen(false)} style={{ height: 38 }}>
+                    Cancelar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : null}

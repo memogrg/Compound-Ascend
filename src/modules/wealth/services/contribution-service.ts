@@ -312,3 +312,91 @@ export async function ensureMonthlyPremiums(): Promise<void> {
     }
   }
 }
+
+/**
+ * Adelanta cuotas de un plan: pre-crea las filas de los próximos meses no pagados
+ * (para que ensureMonthlyPremiums no los recobre), suma a lo invertido y registra
+ * UN solo gasto por el total adelantado. Tope: no pasa el maturity_date.
+ */
+export async function advancePremiums(
+  holdingId: string,
+  globalAmount: number,
+): Promise<{ advanced: number }> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: p } = await supabase
+    .from("investment_holdings")
+    .select("id, currency, label, cost_basis, monthly_contribution, maturity_date, household_id")
+    .eq("id", holdingId)
+    .eq("user_id", user.id)
+    .eq("category", "plan_inversion")
+    .maybeSingle();
+  const prima = Number(p?.monthly_contribution ?? 0);
+  if (!p || !(prima > 0)) throw new Error("Plan no válido.");
+  const cuotas = Math.round(globalAmount / prima);
+  if (cuotas < 1) throw new Error("El monto no cubre ni una cuota.");
+
+  // Arrancar desde el mes siguiente a la última cuota registrada (o el mes actual).
+  const { data: last } = await supabase
+    .from("holding_contributions")
+    .select("period_year, period_month")
+    .eq("holding_id", holdingId)
+    .order("period_year", { ascending: false })
+    .order("period_month", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let y: number;
+  let m: number;
+  if (last) {
+    y = last.period_year;
+    m = last.period_month + 1;
+    if (m > 12) { m = 1; y += 1; }
+  } else {
+    const now = new Date();
+    y = now.getFullYear();
+    m = now.getMonth() + 1;
+  }
+
+  const maturity = p.maturity_date ? new Date(p.maturity_date) : null;
+  let advanced = 0;
+  for (let i = 0; i < cuotas; i++) {
+    const monthStart = new Date(`${y}-${String(m).padStart(2, "0")}-01`);
+    if (maturity && monthStart > maturity) break; // tope al vencimiento
+    const { error } = await supabase.from("holding_contributions").insert({
+      holding_id: holdingId,
+      user_id: user.id,
+      household_id: p.household_id,
+      period_year: y,
+      period_month: m,
+      amount: prima,
+      currency: p.currency,
+      status: "confirmado",
+    });
+    if (!error) advanced += 1;
+    else if (error.code !== "23505") throw new Error(error.message); // ya existe → saltar
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  if (advanced === 0) return { advanced: 0 };
+
+  const total = advanced * prima;
+  const newCostBasis = Number(p.cost_basis ?? 0) + total;
+  await supabase
+    .from("investment_holdings")
+    .update({ cost_basis: newCostBasis, average_cost: newCostBasis, quantity: 1 })
+    .eq("id", holdingId)
+    .eq("user_id", user.id);
+
+  const now = new Date();
+  await registerPurchaseExpense({
+    holdingId,
+    label: p.label ?? "Plan a plazo",
+    currency: p.currency,
+    purchaseDate: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`,
+    amount: total,
+    verb: "Adelanto",
+  });
+
+  return { advanced };
+}
