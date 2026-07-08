@@ -1,0 +1,303 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+
+import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
+import type { Account, Period } from "@/modules/financial-base/types";
+import { formatMoney } from "@/lib/format";
+
+import { Fab, BottomSheet } from "../../components/form-kit";
+import { AddSpendForm, CreateSobreForm, BudgetEditForm } from "./gastos-forms";
+
+/**
+ * Gestión V2 de Gastos en /m/gastos — mismo modelo y acciones que la web /gastos
+ * (expense-jars/*): frascos (grupos) con sobres (categorías hoja), gasto real (transactions)
+ * y presupuesto por sobre (budget_items). Reemplaza el CRUD legacy (addExpenseAction):
+ *  - FAB "Registrar gasto" → addTransactionAction (selector de sobre agrupado por frasco).
+ *  - Tocar un frasco normal → detalle con sus sobres + "Editar presupuesto" (3 checks,
+ *    setEnvelopeBudgetAction) + "Crear sobre" (addCategoryAction + addBudgetItemAction).
+ *  - Los frascos vinculados (deudas/metas/…) quedan read-only con deep-link a su pantalla.
+ * Lo capturado aquí sincroniza con la web (mismas transactions/expense_categories).
+ */
+
+type NormalJar = Extract<Jar, { kind: "normal" }>;
+
+const LINKED_HREF: Record<string, string> = {
+  debt: "/m/deudas",
+  goal: "/m/metas",
+  holding: "/m/patrimonio",
+  policy: "/m/proteccion",
+};
+
+/** Total gastado/presupuestado de un frasco (normal = suma de sobres; vinculado = totals). */
+function jarTotals(jar: Jar): { spent: number; budget: number } {
+  if (jar.kind === "normal") {
+    return jar.envelopes.reduce(
+      (acc, e) => ({ spent: acc.spent + e.spent, budget: acc.budget + e.budget }),
+      { spent: 0, budget: 0 },
+    );
+  }
+  if (jar.totals) return { spent: jar.totals.spent, budget: jar.totals.budget };
+  return jar.items.reduce(
+    (acc, it) => ({ spent: acc.spent + (it.spent ?? 0), budget: acc.budget + (it.budget ?? 0) }),
+    { spent: 0, budget: 0 },
+  );
+}
+
+export function GastosManager({
+  jars,
+  currency,
+  accounts,
+  period,
+}: {
+  jars: Jar[];
+  currency: string;
+  accounts: Account[];
+  period: Period;
+}) {
+  const [addingSpend, setAddingSpend] = useState(false);
+  const [detailJar, setDetailJar] = useState<NormalJar | null>(null);
+  const [creatingSobreIn, setCreatingSobreIn] = useState<string | null>(null); // jar.group
+  const [editingEnv, setEditingEnv] = useState<JarEnvelope | null>(null);
+
+  const totals = jars.reduce(
+    (acc, j) => {
+      const t = jarTotals(j);
+      return { spent: acc.spent + t.spent, budget: acc.budget + t.budget };
+    },
+    { spent: 0, budget: 0 },
+  );
+  const pct = totals.budget > 0 ? Math.min(1, totals.spent / totals.budget) : 0;
+  const available = totals.budget - totals.spent;
+  // Muestra los frascos siempre que existan (aunque sin presupuesto): son el punto de
+  // entrada para crear sobres y registrar gastos, igual que la web.
+  const anyData = jars.length > 0;
+
+  return (
+    <>
+      {/* Resumen del mes */}
+      <div className="card card-p" style={{ marginBottom: 16 }}>
+        <div className="between" style={{ marginBottom: 10 }}>
+          <span className="ov">Gastado del mes</span>
+          <span className="mono" style={{ fontSize: 12.5 }}>
+            {formatMoney(totals.spent, currency)} / {formatMoney(totals.budget, currency)}
+          </span>
+        </div>
+        <div className="bar" style={{ height: 9 }}>
+          <i style={{ width: `${Math.round(pct * 100)}%`, background: totals.spent > totals.budget ? "var(--danger)" : "var(--accent)" }} />
+        </div>
+        <div className="between" style={{ marginTop: 10 }}>
+          <span className="muted" style={{ fontSize: 11.5 }}>
+            {available >= 0 ? `Disponible ${formatMoney(available, currency)}` : `Excedido ${formatMoney(-available, currency)}`}
+          </span>
+        </div>
+      </div>
+
+      {/* Frascos */}
+      {!anyData ? (
+        <div className="card card-p">
+          <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+            Aún no tienes presupuesto por categorías. Toca “Registrar gasto” o crea un sobre para empezar.
+          </div>
+        </div>
+      ) : (
+        jars.map((jar) => (
+          <JarCard key={jar.group} jar={jar} currency={currency} onOpen={jar.kind === "normal" ? () => setDetailJar(jar) : undefined} />
+        ))
+      )}
+
+      <Fab onClick={() => setAddingSpend(true)} label="Registrar gasto" />
+
+      {/* Registrar gasto (global) */}
+      <BottomSheet open={addingSpend} onClose={() => setAddingSpend(false)} title="Registrar gasto">
+        <AddSpendForm jars={jars} currency={currency} accounts={accounts} onSuccess={() => setAddingSpend(false)} />
+      </BottomSheet>
+
+      {/* Detalle de un frasco: sobres + editar presupuesto + crear sobre */}
+      <BottomSheet open={!!detailJar} onClose={() => setDetailJar(null)} title={detailJar?.name ?? "Frasco"}>
+        {detailJar ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            {detailJar.envelopes.map((e) => {
+              const over = e.spent > e.budget && e.budget > 0;
+              const ep = e.budget > 0 ? Math.min(100, Math.round((e.spent / e.budget) * 100)) : 0;
+              return (
+                <div key={e.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+                  <div className="between" style={{ marginBottom: 6, gap: 10 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{e.name}</span>
+                    <div className="row" style={{ gap: 8, flex: "none", alignItems: "center" }}>
+                      <span className="mono muted" style={{ fontSize: 12 }} data-over={over ? "1" : undefined}>
+                        {formatMoney(e.spent, currency)} / {formatMoney(e.budget, currency)}
+                      </span>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label="Editar presupuesto"
+                        onClick={() => setEditingEnv(e)}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="bar" style={{ height: 6 }}>
+                    <i style={{ width: `${ep}%`, background: over ? "var(--danger)" : "var(--accent)" }} />
+                  </div>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              className="m-btn m-btn-secondary"
+              style={{ marginTop: 2 }}
+              onClick={() => setCreatingSobreIn(detailJar.group)}
+            >
+              + Crear sobre en {detailJar.name}
+            </button>
+          </div>
+        ) : null}
+      </BottomSheet>
+
+      {/* Crear sobre (encima del detalle) */}
+      <BottomSheet open={!!creatingSobreIn} onClose={() => setCreatingSobreIn(null)} title="Nuevo sobre">
+        {creatingSobreIn ? (
+          <CreateSobreForm
+            jarGroup={creatingSobreIn}
+            currency={currency}
+            period={period}
+            onSuccess={() => setCreatingSobreIn(null)}
+          />
+        ) : null}
+      </BottomSheet>
+
+      {/* Editar presupuesto de un sobre (3 checks + líneas derivadas) */}
+      <BottomSheet open={!!editingEnv} onClose={() => setEditingEnv(null)} title="Editar presupuesto">
+        {editingEnv ? (
+          <BudgetEditForm
+            envelope={editingEnv}
+            currency={currency}
+            period={period}
+            onSuccess={() => setEditingEnv(null)}
+          />
+        ) : null}
+      </BottomSheet>
+    </>
+  );
+}
+
+function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen?: () => void }) {
+  const { spent, budget } = jarTotals(jar);
+  const over = spent > budget && budget > 0;
+  const pct = budget > 0 ? Math.min(1, spent / budget) : 0;
+  const sub =
+    jar.kind === "normal"
+      ? `${jar.envelopes.length} ${jar.envelopes.length === 1 ? "sobre" : "sobres"} · toca para gestionar`
+      : "Pagos del mes";
+
+  return (
+    <div
+      className="jar"
+      onClick={onOpen}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onKeyDown={onOpen ? (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onOpen(); } } : undefined}
+      style={onOpen ? { cursor: "pointer" } : undefined}
+    >
+      <div className="jar-top">
+        <span
+          className="jar-ic"
+          style={over ? { background: "var(--danger-soft)", color: "var(--danger)" } : { background: "var(--accent-soft)", color: "var(--accent)" }}
+          aria-hidden
+        >
+          <JarIcon jar={jar} />
+        </span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>
+            {jar.name}
+            {over && <span className="badge down" style={{ marginLeft: 6 }}>{Math.round((spent / budget) * 100)}%</span>}
+          </div>
+          <div className="muted" style={{ fontSize: 12 }}>{sub}</div>
+        </div>
+        <div className="jar-amt">
+          <div className={`a${over ? " neg" : ""}`}>{formatMoney(spent, currency)}</div>
+          {budget > 0 ? <div className="b">de {formatMoney(budget, currency)}</div> : null}
+        </div>
+      </div>
+
+      {budget > 0 && (
+        <div className="bar" style={{ height: 7, marginTop: 12 }}>
+          <i style={{ width: `${Math.round(pct * 100)}%`, background: over ? "var(--danger)" : "var(--accent)" }} />
+        </div>
+      )}
+
+      {jar.kind === "normal"
+        ? jar.envelopes.map((e) => (
+            <div className="sobre" key={e.id}>
+              <span className="sn">{e.name}</span>
+              <span className="sv" style={e.spent > e.budget && e.budget > 0 ? { color: "var(--danger)" } : undefined}>
+                {formatMoney(e.spent, currency)} / {formatMoney(e.budget, currency)}
+              </span>
+            </div>
+          ))
+        : jar.items.map((it) => (
+            <div className="sobre" key={it.id}>
+              <span className="sn">{it.name}</span>
+              <span className="sv">{it.amount}</span>
+            </div>
+          ))}
+
+      {jar.kind === "linked" && LINKED_HREF[jar.linkedKind] && (
+        <Link href={LINKED_HREF[jar.linkedKind]!} className="jar-link" onClick={(ev) => ev.stopPropagation()}>
+          {jar.cta.label}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function JarIcon({ jar }: { jar: Jar }) {
+  const kind = jar.kind === "linked" ? jar.linkedKind : "normal";
+  const common = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+  if (kind === "debt") {
+    return (
+      <svg {...common}>
+        <rect x="3" y="6" width="18" height="13" rx="2" />
+        <path d="M3 10h18" />
+      </svg>
+    );
+  }
+  if (kind === "goal") {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    );
+  }
+  if (kind === "holding") {
+    return (
+      <svg {...common}>
+        <path d="M3 17l6-6 4 4 8-9M14 6h6v6" />
+      </svg>
+    );
+  }
+  if (kind === "policy") {
+    return (
+      <svg {...common}>
+        <path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z" />
+      <path d="M17 9h2a2.5 2.5 0 0 1 0 5h-2" />
+      <path d="M7 3v2M11 3v2" />
+    </svg>
+  );
+}
