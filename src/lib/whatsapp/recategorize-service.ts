@@ -9,6 +9,9 @@ import "server-only";
  */
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { upsertRuleForUser } from "@/modules/financial-base/services/rules-service";
+import { getScopeOverrides } from "@/modules/financial-base/services/categories-service";
+import { resolveCategoryOverrides } from "@/modules/financial-base/engine/category-overrides";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import { categoryMatchesKind } from "@/modules/financial-base/engine/classify";
 import { normalize } from "@/lib/ai/biblia-knowledge";
 
@@ -131,16 +134,25 @@ export async function resolveCategoryByName(
   if (!target) return { status: "none" };
 
   const supabase = createServiceRoleClient();
+  // Scope del hogar (service-role → resolución explícita por userId).
+  const householdId = await getActiveHouseholdId(supabase, userId);
+  const orParts = [`user_id.eq.${userId}`, "user_id.is.null"];
+  if (householdId) orParts.push(`household_id.eq.${householdId}`);
   const { data } = await supabase
     .from("expense_categories")
     .select("id, name, parent_id, category_type, is_active, user_id")
-    .or(`user_id.eq.${userId},user_id.is.null`)
+    .or(orParts.join(","))
     .eq("is_active", true);
 
-  const rows = data ?? [];
-  // Hoja = no es padre de ninguna otra categoría activa visible.
-  const parentIds = new Set(rows.map((c) => c.parent_id).filter(Boolean));
-  const leaves = rows.filter(
+  // Respeta la personalización del hogar: quita las ocultas, reemplaza por el fork
+  // (adoptando su subárbol) y descarta huérfanos, antes de resolver por nombre.
+  const overrides = await getScopeOverrides(supabase, { userId, householdId });
+  const rows = (data ?? []).map((c) => ({ ...c, parentId: c.parent_id as string | null }));
+  const visible = resolveCategoryOverrides(rows, overrides);
+
+  // Hoja = no es padre de ninguna otra categoría visible.
+  const parentIds = new Set(visible.map((c) => c.parentId).filter(Boolean));
+  const leaves = visible.filter(
     (c) => !parentIds.has(c.id) && categoryMatchesKind(c.category_type, kind),
   );
 

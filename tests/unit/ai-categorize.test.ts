@@ -36,6 +36,8 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/modules/financial-base/services/categories-service", () => ({
   listCategories: async () => h.cats,
+  // Sin overrides en estos tests: la resolución es identidad.
+  resolveOverrideTarget: async (_sb: unknown, _scope: unknown, id: string) => id,
 }));
 
 import {
@@ -201,6 +203,7 @@ function fakeClient(cfg: FakeCfg) {
     const b: Record<string, unknown> = {
       select: () => b,
       eq: () => b,
+      is: () => b,
       not: () => b,
       in: () => b,
       order: () => b,

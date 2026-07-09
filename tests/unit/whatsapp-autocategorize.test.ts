@@ -18,6 +18,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
+        is: () => b,
         order: () => b,
         maybeSingle: () => Promise.resolve(result),
         then: (res: (v: unknown) => unknown, rej?: (e: unknown) => unknown) =>
@@ -30,6 +31,8 @@ vi.mock("@/lib/supabase/service-role", () => ({
         if (table === "transaction_rules") return builder({ data: h.rules, error: null });
         if (table === "expense_categories")
           return builder({ data: h.categoryName ? { name: h.categoryName } : null, error: null });
+        // category_overrides: sin override → resolveOverrideTarget deja el id igual.
+        if (table === "category_overrides") return builder({ data: null, error: null });
         // transactions
         return {
           insert: (row: Record<string, unknown>) => {

@@ -201,6 +201,24 @@ export const categoryDeleteSchema = z.object({
   reassignToId: uuidOrNull.optional(),
 });
 
+// ---------- Personalización por hogar (Fase 1: ocultar / forkear) ----------
+export const categoryHideSchema = z.object({
+  baseId: z.string().uuid(),
+  reassignToId: uuidOrNull.optional(),
+});
+
+export const categoryForkSchema = z.object({
+  baseId: z.string().uuid(),
+  name: z.string().trim().min(1, "Ponle un nombre").max(60).optional(),
+  icon: z.string().max(40).optional().nullable(),
+  color: z.string().max(40).optional().nullable(),
+  isFavorite: z.boolean().optional(),
+});
+
+export const categoryRevertSchema = z.object({
+  baseId: z.string().uuid(),
+});
+
 // ---------- Plantillas / favoritos de transacción ----------
 export const templateInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(80),
@@ -226,4 +244,7 @@ export type CsvTxnInput = z.infer<typeof csvTxnSchema>;
 export type CategoryInput = z.infer<typeof categoryInputSchema>;
 export type CategoryMergeInput = z.infer<typeof categoryMergeSchema>;
 export type CategoryDeleteInput = z.infer<typeof categoryDeleteSchema>;
+export type CategoryHideInput = z.infer<typeof categoryHideSchema>;
+export type CategoryForkInput = z.infer<typeof categoryForkSchema>;
+export type CategoryRevertInput = z.infer<typeof categoryRevertSchema>;
 export type TemplateInput = z.infer<typeof templateInputSchema>;
