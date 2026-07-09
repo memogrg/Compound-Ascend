@@ -6,10 +6,15 @@ import {
   addBudgetItemAction,
   setEnvelopeBudgetAction,
   editCategoryAction,
+  forkCategoryAction,
+  hideCategoryAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Account, Period } from "@/modules/financial-base/types";
 import { formatMoney } from "@/lib/format";
+import { Icon, type IconName } from "@/components/ui/icon";
+// Reutiliza la MISMA paleta que el fork de la web (tokens globales del design system).
+import { CAT_COLORS } from "@/modules/financial-base/components/v2/expense-jars/category-kebab";
 
 import {
   BottomSheet,
@@ -22,6 +27,7 @@ import {
   CUR_OPTS,
   useFormError,
   type ActionResult,
+  type Opt,
 } from "../../components/form-kit";
 
 /**
@@ -347,6 +353,163 @@ export function BudgetEditForm({
         </div>
       )}
     </>
+  );
+}
+
+// ── Personalizar (fork) un frasco/sobre BASE del hogar ──────────────────────
+/** Iconos ofrecidos al forkear (subconjunto del set del design system, como la web). */
+const FORK_ICONS: IconName[] = [
+  "budget",
+  "expense",
+  "savings",
+  "invest",
+  "defense",
+  "spark",
+  "profile",
+  "networth",
+];
+
+export type PersonalizeTarget = {
+  id: string;
+  name: string;
+  isFavorite: boolean;
+  icon: string | null;
+  color: string | null;
+};
+
+/**
+ * Crea una copia editable del hogar (nombre/icono/color/favorito) que reemplaza a la
+ * base. Reutiliza `forkCategoryAction` (Fase 1). Paridad con ForkCategoryModal de la web.
+ */
+export function ForkCategoryForm({
+  target,
+  onSuccess,
+}: {
+  target: PersonalizeTarget;
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState(target.name);
+  const [favorite, setFavorite] = useState(target.isFavorite);
+  const [icon, setIcon] = useState<string | null>(target.icon);
+  const [color, setColor] = useState<string | null>(target.color);
+
+  const action = (v: { name: string }): Promise<ActionResult> =>
+    forkCategoryAction({ baseId: target.id, name: v.name, icon, color, isFavorite: favorite });
+
+  return (
+    <FormShell
+      action={action}
+      values={{ name: name.trim() }}
+      submitLabel="Guardar copia"
+      successMessage="Personalizada para el hogar"
+      onSuccess={onSuccess}
+    >
+      <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginBottom: 4 }}>
+        Se crea una copia para tu hogar que reemplaza a la original. Puedes revertir cuando quieras.
+      </div>
+      <TextField name="name" label="Nombre" value={name} onChange={setName} maxLength={60} autoFocus />
+      <Toggle
+        name="isFavorite"
+        label="Favorito"
+        value={favorite}
+        onChange={setFavorite}
+        hint="Los favoritos aparecen como sobre dentro del frasco."
+      />
+      <div className="m-qfield">
+        <div className="m-qlabel">Icono</div>
+        <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+          {FORK_ICONS.map((ic) => (
+            <button
+              key={ic}
+              type="button"
+              aria-label={`Icono ${ic}`}
+              aria-pressed={icon === ic}
+              className="icon-btn"
+              onClick={() => setIcon(ic)}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                border: icon === ic ? "2px solid var(--accent)" : "1px solid var(--border)",
+              }}
+            >
+              <Icon name={ic} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="m-qfield">
+        <div className="m-qlabel">Color</div>
+        <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>
+          {CAT_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={`Color ${c}`}
+              aria-pressed={color === c}
+              onClick={() => setColor(c)}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: c,
+                border: color === c ? "2px solid var(--ink)" : "2px solid transparent",
+                boxShadow: "0 0 0 1px var(--border)",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </FormShell>
+  );
+}
+
+// ── Ocultar un frasco/sobre BASE del hogar (con reasignación opcional) ───────
+/**
+ * Oculta la categoría base para el hogar; opcionalmente reasigna sus movimientos.
+ * Reutiliza `hideCategoryAction` (Fase 1). Paridad con HideCategoryModal de la web.
+ */
+export function HideCategoryForm({
+  target,
+  hasMovements,
+  reassignOpts,
+  onSuccess,
+}: {
+  target: { id: string; name: string };
+  hasMovements: boolean;
+  reassignOpts: Opt[];
+  onSuccess: () => void;
+}) {
+  const [reassignTo, setReassignTo] = useState("");
+
+  const action = (): Promise<ActionResult> =>
+    hideCategoryAction({ baseId: target.id, reassignToId: reassignTo || null });
+
+  return (
+    <FormShell
+      action={action}
+      values={{ reassignTo }}
+      submitLabel="Ocultar para el hogar"
+      successMessage="Ocultada para el hogar"
+      onSuccess={onSuccess}
+    >
+      <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
+        <strong>{target.name}</strong> dejará de verse para todo el hogar. Su histórico no se pierde;
+        {hasMovements
+          ? " elige a dónde mover sus movimientos (o déjalos sin categoría)."
+          : " no tiene movimientos."}
+      </div>
+      {hasMovements ? (
+        <SheetSelect
+          name="reassignTo"
+          label="Mover sus movimientos a (opcional)"
+          value={reassignTo}
+          onChange={setReassignTo}
+          options={reassignOpts}
+          sheetTitle="Reasignar movimientos a"
+        />
+      ) : null}
+    </FormShell>
   );
 }
 
