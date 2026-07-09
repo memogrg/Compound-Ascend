@@ -159,11 +159,16 @@ export function JarNormalModal({
             </div>
           ) : (
             envelopes.map((e) => {
-              const over = e.budget > 0 && e.spent > e.budget;
+              // Cada sobre se muestra en SU moneda nativa (independiente del selector
+              // de arriba). El total del frasco sigue en display sumando e.budget.
+              const eBudget = e.nativeBudget;
+              const eSpent = e.nativeSpent;
+              const eCur = e.currency;
+              const over = eBudget > 0 && eSpent > eBudget;
               const color = over ? "var(--neg)" : jar.color;
-              const remaining = e.budget - e.spent;
+              const remaining = eBudget - eSpent;
               const ePct =
-                e.budget > 0 ? Math.round((e.spent / e.budget) * 100) : e.spent > 0 ? 100 : 0;
+                eBudget > 0 ? Math.round((eSpent / eBudget) * 100) : eSpent > 0 ? 100 : 0;
               // Personalización del sobre: el "(general)" del grupo no se personaliza
               // (es el frasco). TODO sobre real (base de sistema, fork o del usuario) lo
               // tiene para editores del hogar.
@@ -198,7 +203,7 @@ export function JarNormalModal({
                       ) : null}
                     </span>
                     <span style={{ fontSize: 13.5, fontWeight: 700 }}>
-                      {formatMoney(e.budget, currency)}
+                      {formatMoney(eBudget, eCur)}
                     </span>
                     <button
                       type="button"
@@ -231,7 +236,7 @@ export function JarNormalModal({
                   {/* gastado de presupuesto · ver movimientos */}
                   <div style={{ fontSize: 12, marginTop: 3 }}>
                     <span className="muted">
-                      {formatMoney(e.spent, currency)} de {formatMoney(e.budget, currency)}
+                      {formatMoney(eSpent, eCur)} de {formatMoney(eBudget, eCur)}
                     </span>
                     {" · "}
                     <Link
@@ -245,7 +250,7 @@ export function JarNormalModal({
                   <div className="bar-track" style={{ marginTop: 6 }}>
                     <div
                       className="bar-fill"
-                      style={{ width: `${pct(e.spent, e.budget)}%`, background: color }}
+                      style={{ width: `${pct(eSpent, eBudget)}%`, background: color }}
                     />
                   </div>
                   <div
@@ -264,8 +269,8 @@ export function JarNormalModal({
                     </span>
                     <span style={over ? { color: "var(--neg)", fontWeight: 600 } : undefined}>
                       {over
-                        ? `−${formatMoney(Math.abs(remaining), currency)} excedido`
-                        : `${formatMoney(remaining, currency)} restante`}
+                        ? `−${formatMoney(Math.abs(remaining), eCur)} excedido`
+                        : `${formatMoney(remaining, eCur)} restante`}
                     </span>
                   </div>
                 </div>
