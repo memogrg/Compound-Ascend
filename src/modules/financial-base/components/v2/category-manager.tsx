@@ -260,9 +260,9 @@ export function CategoryManagerModal({
         {/* Personalización del hogar (Fase 2): categorías ocultas → Mostrar. Solo editores. */}
         {canPersonalize && personalization.hidden.length > 0 ? (
           <div className="fld" style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-            <label className="fld-label">Ocultas para el hogar</label>
+            <label className="fld-label">Removidas para el hogar</label>
             <span className="muted" style={{ fontSize: 11.5, marginBottom: 8 }}>
-              Estas categorías base están ocultas para todo tu hogar. Puedes volver a mostrarlas.
+              Estas categorías base están removidas para todo tu hogar. Puedes volver a mostrarlas.
             </span>
             {personalization.hidden.map((hcat) => (
               <div key={hcat.id} className="cmp-cat-row">

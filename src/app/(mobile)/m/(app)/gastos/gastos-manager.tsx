@@ -231,7 +231,7 @@ export function GastosManager({
           style={{ marginTop: 4 }}
           onClick={() => setShowHidden(true)}
         >
-          Ver categorías ocultas ({personalization.hidden.length})
+          Ver categorías removidas ({personalization.hidden.length})
         </button>
       ) : null}
 
@@ -349,7 +349,7 @@ export function GastosManager({
                         })
                       }
                     >
-                      Ocultar frasco para el hogar
+                      Remover frasco
                     </button>
                   </>
                 )}
@@ -438,7 +438,7 @@ export function GastosManager({
                       setManagingSobre(null);
                     }}
                   >
-                    Ocultar para el hogar
+                    Remover
                   </button>
                 </div>
               );
@@ -524,7 +524,7 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Ocultar un frasco/sobre base → hideCategoryAction (con reasignación opcional) */}
-      <BottomSheet open={!!hidingTarget} onClose={() => setHidingTarget(null)} title="Ocultar categoría">
+      <BottomSheet open={!!hidingTarget} onClose={() => setHidingTarget(null)} title="Remover categoría">
         {hidingTarget ? (
           <HideCategoryForm
             target={{ id: hidingTarget.id, name: hidingTarget.name }}
@@ -536,10 +536,10 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Categorías ocultas del hogar → Mostrar (unhideCategoryAction) */}
-      <BottomSheet open={showHidden} onClose={() => setShowHidden(false)} title="Categorías ocultas">
+      <BottomSheet open={showHidden} onClose={() => setShowHidden(false)} title="Categorías removidas">
         <div style={{ display: "grid", gap: 10 }}>
           <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-            Estas categorías base están ocultas para todo tu hogar. Vuelve a mostrarlas cuando quieras.
+            Estas categorías base están removidas para todo tu hogar. Vuelve a mostrarlas cuando quieras.
           </div>
           {personalization.hidden.map((h) => (
             <div key={h.id} className="between" style={{ gap: 10 }}>

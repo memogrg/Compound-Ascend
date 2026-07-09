@@ -132,7 +132,7 @@ export function PersonalizeMenuButtons({
   ) : (
     <>
       <MenuButton icon="edit" label="Personalizar (editar)" onClick={onEdit} />
-      <MenuButton icon="filter" label="Ocultar para el hogar" onClick={onHide} />
+      <MenuButton icon="filter" label="Remover" onClick={onHide} />
     </>
   );
 }
@@ -331,17 +331,17 @@ export function HideCategoryModal({
         reassignToId: reassignTo || null,
       });
       if (res.ok) {
-        toast(`"${target.name}" ocultada para el hogar`);
+        toast(`"${target.name}" removida para el hogar`);
         router.refresh();
         onDone();
       } else {
-        setError(res.message ?? "No pudimos ocultar la categoría.");
+        setError(res.message ?? "No pudimos remover la categoría.");
       }
     });
   }
 
   return (
-    <Modal title="Ocultar categoría" sub={target.name} onClose={onClose}>
+    <Modal title="Remover categoría" sub={target.name} onClose={onClose}>
       <div className="modal-body">
         <p style={{ fontSize: 13.5, marginBottom: 12 }}>
           <strong>{target.name}</strong> dejará de verse para todo el hogar. Su histórico no se
@@ -379,7 +379,7 @@ export function HideCategoryModal({
           onClick={submit}
           disabled={pending}
         >
-          {pending ? "…" : "Ocultar"}
+          {pending ? "…" : "Remover"}
         </button>
       </div>
     </Modal>
