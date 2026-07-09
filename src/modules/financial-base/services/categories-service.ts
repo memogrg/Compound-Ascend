@@ -120,6 +120,43 @@ async function loadScopeOverrides(supabase: Client, userId: string): Promise<Ove
 }
 
 /**
+ * Estado de personalización del hogar activo para la UI (Fase 2): qué categorías
+ * BASE están ocultas sin fork (para ofrecer "Mostrar") y el mapeo fork→base (para
+ * ofrecer "Revertir" desde la copia visible y marcarla como personalizada). Amplio
+ * en nombres (usa `listRawCategories`, que incluye bases ocultas). Vacío → sin
+ * personalización (la UI no muestra estados especiales).
+ */
+export type CategoryPersonalization = {
+  /** Bases ocultas sin fork: no tienen fila visible → se listan para "Mostrar". */
+  hidden: { id: string; name: string }[];
+  /** forkId → baseId de la base que reemplaza (para "Revertir" y badge "editado"). */
+  forkToBase: Record<string, string>;
+};
+
+/** ¿El usuario actual puede personalizar categorías del hogar? (editor owner/adult). */
+export async function canPersonalizeCategories(): Promise<boolean> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  return isActiveHouseholdEditor(supabase, user.id);
+}
+
+export async function getCategoryPersonalization(): Promise<CategoryPersonalization> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const overrides = await loadScopeOverrides(supabase, user.id);
+  if (overrides.length === 0) return { hidden: [], forkToBase: {} };
+
+  const nameOf = new Map((await fetchRawCategories(supabase)).map((c) => [c.id, c.name]));
+  const hidden: { id: string; name: string }[] = [];
+  const forkToBase: Record<string, string> = {};
+  for (const o of overrides) {
+    if (o.forkId) forkToBase[o.forkId] = o.categoryId;
+    else if (o.hidden) hidden.push({ id: o.categoryId, name: nameOf.get(o.categoryId) ?? "Categoría" });
+  }
+  return { hidden, forkToBase };
+}
+
+/**
  * Lista plana AMPLIA de TODAS las categorías visibles (sistema + propias + hogar),
  * SIN resolver overrides. Para etiquetar agregados/históricos (incluye inactivas y
  * bases ocultas), donde ocultar rompería la resolución de nombres pasados.

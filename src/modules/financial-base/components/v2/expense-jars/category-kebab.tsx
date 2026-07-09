@@ -29,6 +29,7 @@ export function CategoryKebab({
   onPickColor,
   onReset,
   onDelete,
+  personalizeSlot,
 }: {
   name: string;
   currentColor: string;
@@ -37,6 +38,8 @@ export function CategoryKebab({
   onPickColor: (color: string) => void;
   onReset: () => void;
   onDelete: () => void;
+  /** Acciones de personalización por hogar (Fase 2), arriba del menú. Cierra al usarse. */
+  personalizeSlot?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -84,6 +87,22 @@ export function CategoryKebab({
             boxShadow: "0 12px 32px rgba(0,0,0,.18)",
           }}
         >
+          {personalizeSlot ? (
+            <div style={{ marginBottom: 8, borderBottom: "1px solid var(--line)", paddingBottom: 6 }}>
+              <div
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  letterSpacing: ".06em",
+                  color: "var(--muted)",
+                  marginBottom: 4,
+                }}
+              >
+                PERSONALIZAR
+              </div>
+              <div onClick={() => setOpen(false)}>{personalizeSlot}</div>
+            </div>
+          ) : null}
           <div
             style={{
               fontSize: 10.5,

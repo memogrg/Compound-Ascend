@@ -58,7 +58,10 @@ import type {
   RealTotals,
   HistoryPoint,
 } from "@/modules/financial-base/services/transaction-service";
-import type { Category } from "@/modules/financial-base/services/categories-service";
+import type {
+  Category,
+  CategoryPersonalization,
+} from "@/modules/financial-base/services/categories-service";
 import type {
   Account,
   BudgetItem,
@@ -107,6 +110,9 @@ export type V2View = {
   rules: TransactionRule[];
   linkables: LinkableEntities;
   jars: Jar[];
+  /** Personalización por hogar (Fase 2): puede el usuario editar + estado actual. */
+  canPersonalize: boolean;
+  personalization: CategoryPersonalization;
   /** Saco de Liquidez ("Tu Liquidez"): saldo real disponible + si ya hay apertura. */
   liquidity: { balance: number; currency: string; hasOpening: boolean };
   baseReading: FinancialReading;
@@ -503,10 +509,19 @@ export function IncomeExpenseSection({
               currency={currency}
               period={jarPeriod}
               tree={view.tree}
+              canPersonalize={view.canPersonalize}
+              personalization={view.personalization}
             />
           </div>
         </div>
-        <ExpenseJars jars={view.jars} currency={currency} period={jarPeriod} />
+        <ExpenseJars
+          jars={view.jars}
+          currency={currency}
+          period={jarPeriod}
+          categories={view.categories}
+          canPersonalize={view.canPersonalize}
+          personalization={view.personalization}
+        />
       </div>
 
       <FinancialInsightCard reading={view.expenseCapsule} />
@@ -700,7 +715,11 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
           />
           <CsvImportButton />
           <TransferButton accounts={view.accounts} />
-          <CategoryManagerButton tree={view.tree} />
+          <CategoryManagerButton
+            tree={view.tree}
+            canPersonalize={view.canPersonalize}
+            personalization={view.personalization}
+          />
           <RulesButton rules={view.rules} categories={view.categories} accounts={view.accounts} />
         </div>
       </div>

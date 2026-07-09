@@ -13,9 +13,17 @@ import { formatMoney } from "@/lib/format";
 import { JarNormalModal } from "@/modules/financial-base/components/v2/expense-jars/jar-normal-modal";
 import { JarLinkedModal } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
 import { CategoryKebab } from "@/modules/financial-base/components/v2/expense-jars/category-kebab";
+import {
+  usePersonalize,
+  PersonalizeMenuButtons,
+} from "@/modules/financial-base/components/v2/expense-jars/personalize-category";
 import { removeCategoryAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
+import type {
+  Category,
+  CategoryPersonalization,
+} from "@/modules/financial-base/services/categories-service";
 
 // Los iconos sembrados en BD (home/car/food/heart/book/bank…) no existen en el
 // set del design system: mapéalos a uno válido; fallback genérico.
@@ -42,7 +50,21 @@ function pct(spent: number, budget: number): number {
   return Math.min(100, Math.round((spent / budget) * 100));
 }
 
-export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; period: Period }) {
+export function JarRow({
+  jar,
+  currency,
+  period,
+  categories,
+  canPersonalize,
+  personalization,
+}: {
+  jar: Jar;
+  currency: string;
+  period: Period;
+  categories: Category[];
+  canPersonalize: boolean;
+  personalization: CategoryPersonalization;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -58,6 +80,26 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
     }
   }, [storageKey]);
   const icon = iconFor(jar.icon);
+
+  // Personalización (Fase 2): hook izado ANTES del early-return de vinculados
+  // (regla de hooks). Solo se usa en la rama de frasco normal.
+  const jarBaseId = personalization.forkToBase[jar.group] ?? null;
+  const jarIsFork = jarBaseId != null;
+  const personalize = usePersonalize({
+    target: {
+      id: jar.group,
+      name: jar.name,
+      isSystem: jar.kind === "normal" ? jar.isSystem : false,
+      icon: jar.icon,
+      color: jar.color,
+      isFavorite: false,
+    },
+    isFork: jarIsFork,
+    baseIdIfFork: jarBaseId,
+    reassignOptions: categories
+      .filter((c) => c.id !== jar.group)
+      .map((c) => ({ id: c.id, label: c.name })),
+  });
 
   if (jar.kind === "linked") {
     // (linked branch — sin kebab)
@@ -287,14 +329,31 @@ export function JarRow({ jar, currency, period }: { jar: Jar; currency: string; 
             onPickColor={pickColor}
             onReset={resetColor}
             onDelete={() => void deleteCategory()}
+            personalizeSlot={
+              canPersonalize && (jar.isSystem || jarIsFork) ? (
+                <PersonalizeMenuButtons
+                  isFork={jarIsFork}
+                  pending={personalize.pending}
+                  onEdit={personalize.openFork}
+                  onHide={personalize.openHide}
+                  onRevert={personalize.revert}
+                />
+              ) : null
+            }
           />
         </div>
+        {jarIsFork ? <span className="chip-linked">personalizado</span> : null}
       </div>
+      {/* Modales de personalización izados: sobreviven al cierre del kebab. */}
+      {canPersonalize ? personalize.modals : null}
       {open ? (
         <JarNormalModal
           jar={jar}
           currency={currency}
           period={period}
+          categories={categories}
+          canPersonalize={canPersonalize}
+          personalization={personalization}
           onClose={() => setOpen(false)}
         />
       ) : null}

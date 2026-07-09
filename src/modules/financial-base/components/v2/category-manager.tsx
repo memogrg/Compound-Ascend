@@ -16,9 +16,21 @@ import {
   removeCategoryAction,
   mergeCategoryAction,
 } from "@/modules/financial-base/api/v2-actions";
-import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
+import { UnhideButton } from "@/modules/financial-base/components/v2/expense-jars/personalize-category";
+import type {
+  CategoryNode,
+  CategoryPersonalization,
+} from "@/modules/financial-base/services/categories-service";
 
-export function CategoryManagerButton({ tree }: { tree: CategoryNode[] }) {
+export function CategoryManagerButton({
+  tree,
+  canPersonalize,
+  personalization,
+}: {
+  tree: CategoryNode[];
+  canPersonalize: boolean;
+  personalization: CategoryPersonalization;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -29,16 +41,27 @@ export function CategoryManagerButton({ tree }: { tree: CategoryNode[] }) {
       >
         <Icon name="gear" width={2} /> Categorías
       </button>
-      {open ? <CategoryManagerModal tree={tree} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <CategoryManagerModal
+          tree={tree}
+          canPersonalize={canPersonalize}
+          personalization={personalization}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
     </>
   );
 }
 
 export function CategoryManagerModal({
   tree,
+  canPersonalize,
+  personalization,
   onClose,
 }: {
   tree: CategoryNode[];
+  canPersonalize: boolean;
+  personalization: CategoryPersonalization;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -233,6 +256,23 @@ export function CategoryManagerModal({
             marcarlas como favoritas desde aquí en el futuro.
           </div>
         )}
+
+        {/* Personalización del hogar (Fase 2): categorías ocultas → Mostrar. Solo editores. */}
+        {canPersonalize && personalization.hidden.length > 0 ? (
+          <div className="fld" style={{ borderTop: "1px solid var(--line)", paddingTop: 14 }}>
+            <label className="fld-label">Ocultas para el hogar</label>
+            <span className="muted" style={{ fontSize: 11.5, marginBottom: 8 }}>
+              Estas categorías base están ocultas para todo tu hogar. Puedes volver a mostrarlas.
+            </span>
+            {personalization.hidden.map((hcat) => (
+              <div key={hcat.id} className="cmp-cat-row">
+                <span className="cmp-dot" style={{ background: "var(--muted-2)" }} />
+                <span style={{ flex: 1, fontSize: 13, color: "var(--muted)" }}>{hcat.name}</span>
+                <UnhideButton baseId={hcat.id} name={hcat.name} />
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="modal-foot">
         <button type="button" className="btn btn-ghost" onClick={onClose}>

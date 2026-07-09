@@ -7,15 +7,25 @@
 import { JarRow } from "@/modules/financial-base/components/v2/expense-jars/jar-row";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
+import type {
+  Category,
+  CategoryPersonalization,
+} from "@/modules/financial-base/services/categories-service";
 
 export function ExpenseJars({
   jars,
   currency,
   period,
+  categories,
+  canPersonalize,
+  personalization,
 }: {
   jars: Jar[];
   currency: string;
   period: Period;
+  categories: Category[];
+  canPersonalize: boolean;
+  personalization: CategoryPersonalization;
 }) {
   if (jars.length === 0) {
     return (
@@ -27,7 +37,15 @@ export function ExpenseJars({
   return (
     <div className="exp-list">
       {jars.map((jar) => (
-        <JarRow key={jar.group} jar={jar} currency={currency} period={period} />
+        <JarRow
+          key={jar.group}
+          jar={jar}
+          currency={currency}
+          period={period}
+          categories={categories}
+          canPersonalize={canPersonalize}
+          personalization={personalization}
+        />
       ))}
     </div>
   );

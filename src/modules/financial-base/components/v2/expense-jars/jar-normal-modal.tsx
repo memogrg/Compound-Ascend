@@ -16,8 +16,13 @@ import { formatMoney } from "@/lib/format";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addCategoryAction, addBudgetItemAction } from "@/modules/financial-base/api/v2-actions";
 import { BudgetWarningModal } from "@/modules/financial-base/components/v2/expense-jars/budget-warning-modal";
+import { PersonalizeKebab } from "@/modules/financial-base/components/v2/expense-jars/personalize-category";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
+import type {
+  Category,
+  CategoryPersonalization,
+} from "@/modules/financial-base/services/categories-service";
 
 function pct(spent: number, budget: number): number {
   if (budget <= 0) return spent > 0 ? 100 : 0;
@@ -38,13 +43,20 @@ export function JarNormalModal({
   jar,
   currency,
   period,
+  categories,
+  canPersonalize,
+  personalization,
   onClose,
 }: {
   jar: Extract<Jar, { kind: "normal" }>;
   currency: string;
   period: Period;
+  categories: Category[];
+  canPersonalize: boolean;
+  personalization: CategoryPersonalization;
   onClose: () => void;
 }) {
+  const catById = new Map(categories.map((c) => [c.id, c]));
   const router = useRouter();
   const toast = useToast();
   const captureCurrency = useCaptureCurrency();
@@ -149,13 +161,23 @@ export function JarNormalModal({
               const remaining = e.budget - e.spent;
               const ePct =
                 e.budget > 0 ? Math.round((e.spent / e.budget) * 100) : e.spent > 0 ? 100 : 0;
+              // Personalización del sobre (Fase 2): el "(general)" del grupo no se
+              // personaliza (es el frasco); el resto, si es base de sistema o fork.
+              const cat = catById.get(e.id);
+              const sobreBaseId = personalization.forkToBase[e.id] ?? null;
+              const sobreIsFork = sobreBaseId != null;
+              const showSobreMenu =
+                canPersonalize &&
+                e.id !== jar.group &&
+                !!cat &&
+                (cat.isSystem || sobreIsFork);
               return (
                 <div
                   key={e.id}
                   className="subenv"
                   style={{ padding: "11px 0", borderTop: "1px solid var(--line)" }}
                 >
-                  {/* Nombre · presupuesto del sobre · candado */}
+                  {/* Nombre · presupuesto del sobre · candado · personalizar */}
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span
                       style={{
@@ -169,6 +191,11 @@ export function JarNormalModal({
                       }}
                     >
                       {e.name}
+                      {sobreIsFork ? (
+                        <span className="chip-linked" style={{ marginLeft: 6 }}>
+                          personalizado
+                        </span>
+                      ) : null}
                     </span>
                     <span style={{ fontSize: 13.5, fontWeight: 700 }}>
                       {formatMoney(e.budget, currency)}
@@ -183,6 +210,23 @@ export function JarNormalModal({
                     >
                       <Icon name="lock" />
                     </button>
+                    {showSobreMenu ? (
+                      <PersonalizeKebab
+                        target={{
+                          id: e.id,
+                          name: e.name,
+                          isSystem: cat?.isSystem ?? false,
+                          icon: cat?.icon ?? null,
+                          color: cat?.color ?? null,
+                          isFavorite: cat?.isFavorite ?? false,
+                        }}
+                        isFork={sobreIsFork}
+                        baseIdIfFork={sobreBaseId}
+                        reassignOptions={categories
+                          .filter((c) => c.id !== e.id)
+                          .map((c) => ({ id: c.id, label: c.name }))}
+                      />
+                    ) : null}
                   </div>
                   {/* gastado de presupuesto · ver movimientos */}
                   <div style={{ fontSize: 12, marginTop: 3 }}>
