@@ -64,11 +64,20 @@ export default async function MobileGastos() {
   );
   const headerPct = totals.budget > 0 ? Math.round((totals.spent / totals.budget) * 100) : null;
 
-  // Metadatos por categoría (sistema vs. usuario, favorito) para saber qué sobres son
-  // editables/borrables: solo los del USUARIO (is_system=false), como la web.
-  const categoryMeta: Record<string, { isSystem: boolean; isFavorite: boolean }> = {};
+  // Metadatos por categoría (sistema vs. usuario, favorito, icono/color/nombre) para
+  // decidir qué es editable/borrable/personalizable, como la web.
+  const categoryMeta: Record<
+    string,
+    { isSystem: boolean; isFavorite: boolean; icon: string | null; color: string | null; name: string }
+  > = {};
   for (const c of view.categories) {
-    categoryMeta[c.id] = { isSystem: c.isSystem, isFavorite: c.isFavorite };
+    categoryMeta[c.id] = {
+      isSystem: c.isSystem,
+      isFavorite: c.isFavorite,
+      icon: c.icon,
+      color: c.color,
+      name: c.name,
+    };
   }
 
   return (
@@ -81,6 +90,8 @@ export default async function MobileGastos() {
           accounts={view.accounts}
           period={period}
           categoryMeta={categoryMeta}
+          canPersonalize={view.canPersonalize}
+          personalization={view.personalization}
         />
       </div>
     </div>
