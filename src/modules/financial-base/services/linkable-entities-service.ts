@@ -175,21 +175,18 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
   }
   for (const h of holdings.data ?? []) {
     const name = h.label ?? h.symbol;
-    const value =
-      h.current_value_manual != null
-        ? Number(h.current_value_manual)
-        : Number(h.quantity) * Number(h.average_cost);
+    // El frasco Libertad Financiera cuenta el APORTE mensual, no el valor del activo.
+    const aporte = h.is_recurring ? Number(h.monthly_contribution ?? 0) : 0;
     if (h.rental_subtype) {
       out.rental.push({
         id: h.id,
         name,
-        sub: String(h.rental_subtype),
-        amount: value,
+        sub: h.is_recurring ? "aporte mensual" : String(h.rental_subtype),
+        amount: aporte,
         currency: h.currency,
         kind: "rental",
       });
     } else {
-      const aporte = h.is_recurring ? Number(h.monthly_contribution ?? 0) : 0;
       out.holding.push({
         id: h.id,
         name,
