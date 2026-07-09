@@ -36,6 +36,36 @@ jobs:
       - run: npm run test
       - run: npm run build
 
+  # Guard BLOQUEANTE: toda la cadena de migraciones debe aplicar sobre una BD
+  # LIMPIA. Corto (~30-60s: solo Supabase CLI + Docker; sin Node/build/Playwright).
+  # Atrapa migraciones que rompen el apply-en-fresco ANTES de mergear (p.ej. el
+  # `min(uuid)` de #311, que en prod se registró sin ejecutarse pero reventaba en
+  # fresco). Independiente de `ci` para dar feedback en paralelo.
+  # NOTA: marcar este check como REQUERIDO en branch protection para que bloquee.
+  migrations:
+    name: Migraciones aplican en BD fresca
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+          # Autentica la consulta a la API de GitHub que resuelve "latest".
+          github-token: ${{ github.token }}
+        env:
+          SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # `supabase start` arranca el stack aplicando migraciones; `supabase db reset`
+      # fuerza un re-apply LIMPIO de TODA la cadena y sale con código ≠ 0 si alguna
+      # migración falla → el job (y el PR) fallan. Sin seed ni app: solo el esquema.
+      - name: Apply fresco de toda la cadena de migraciones
+        run: |
+          supabase start
+          supabase db reset
+
   e2e:
     name: E2E smoke (no bloqueante por ahora)
     runs-on: ubuntu-latest
