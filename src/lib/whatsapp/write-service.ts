@@ -42,6 +42,15 @@ export async function createTransactionForUser(
       });
       categoryId = auto?.categoryId ?? null;
     }
+
+    // Respeta la personalización del hogar: si la categoría (de regla o auto) fue
+    // forkeada usa la copia; si fue ocultada sin fork, cae a "Por clasificar".
+    if (categoryId) {
+      const { resolveOverrideTarget } = await import(
+        "@/modules/financial-base/services/categories-service"
+      );
+      categoryId = await resolveOverrideTarget(supabase, { userId, householdId }, categoryId);
+    }
   }
 
   const { error } = await supabase.from("transactions").insert({

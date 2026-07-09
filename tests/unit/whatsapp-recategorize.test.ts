@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Estado compartido por el fake del cliente service-role.
 const h = vi.hoisted(() => ({
   cats: [] as Record<string, unknown>[],
+  members: [] as Record<string, unknown>[],
+  overrides: [] as Record<string, unknown>[],
   lastTxn: null as Record<string, unknown> | null,
   updateSpy: vi.fn(),
   updateError: null as string | null,
@@ -20,18 +22,25 @@ vi.mock("@/lib/supabase/service-role", () => ({
       then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
         Promise.resolve(result).then(r, j),
     });
+    // Builder de LECTURA (await → {data}): expense_categories / household_members /
+    // category_overrides. Soporta select/or/eq/is/order encadenados.
+    const listBuilder = (data: unknown) => {
+      const b: Record<string, unknown> = {
+        select: () => b,
+        or: () => b,
+        eq: () => b,
+        is: () => b,
+        order: () => b,
+        then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
+          Promise.resolve({ data, error: null }).then(r, j),
+      };
+      return b;
+    };
     return {
       from: (table: string) => {
-        if (table === "expense_categories") {
-          const b: Record<string, unknown> = {
-            select: () => b,
-            or: () => b,
-            eq: () => b,
-            then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
-              Promise.resolve({ data: h.cats, error: null }).then(r, j),
-          };
-          return b;
-        }
+        if (table === "expense_categories") return listBuilder(h.cats);
+        if (table === "household_members") return listBuilder(h.members);
+        if (table === "category_overrides") return listBuilder(h.overrides);
         // transactions: read (maybeSingle) o update (.eq().eq()).
         const b: Record<string, unknown> = {
           select: () => b,
@@ -81,6 +90,8 @@ const CATS = [
 
 beforeEach(() => {
   h.cats = CATS;
+  h.members = [];
+  h.overrides = [];
   h.lastTxn = null;
   h.updateError = null;
   h.updateSpy.mockClear();
@@ -182,6 +193,25 @@ describe("resolveCategoryByName", () => {
   });
   it("sin coincidencia → none", async () => {
     expect((await resolveCategoryByName("u1", "xyz", "gasto")).status).toBe("none");
+  });
+
+  it("respeta overrides del hogar: una base OCULTA sin fork no se resuelve", async () => {
+    h.members = [{ household_id: "H", role: "owner" }];
+    h.overrides = [{ category_id: "c-paseos", hidden: true, fork_id: null }];
+    expect((await resolveCategoryByName("u1", "paseos", "gasto")).status).toBe("none");
+  });
+
+  it("respeta overrides del hogar: el FORK reemplaza a la base al resolver por nombre", async () => {
+    h.cats = [...CATS, cat({ id: "c-paseos-fork", name: "Salidas" })];
+    h.members = [{ household_id: "H", role: "owner" }];
+    h.overrides = [{ category_id: "c-paseos", hidden: true, fork_id: "c-paseos-fork" }];
+    // La base "Paseos" ya no resuelve; su reemplazo "Salidas" sí.
+    expect((await resolveCategoryByName("u1", "paseos", "gasto")).status).toBe("none");
+    expect(await resolveCategoryByName("u1", "salidas", "gasto")).toEqual({
+      status: "ok",
+      categoryId: "c-paseos-fork",
+      categoryName: "Salidas",
+    });
   });
 });
 

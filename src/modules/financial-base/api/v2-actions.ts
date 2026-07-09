@@ -18,6 +18,9 @@ import {
   categoryInputSchema,
   categoryMergeSchema,
   categoryDeleteSchema,
+  categoryHideSchema,
+  categoryForkSchema,
+  categoryRevertSchema,
   templateInputSchema,
 } from "@/modules/financial-base/schemas";
 import type { CsvTxnInput } from "@/modules/financial-base/schemas";
@@ -32,6 +35,10 @@ import {
   updateCategory,
   deleteCategory,
   mergeCategory,
+  hideCategory,
+  forkCategory,
+  unhideCategory,
+  unforkCategory,
 } from "@/modules/financial-base/services/categories-service";
 import {
   listTemplates,
@@ -750,6 +757,81 @@ export async function mergeCategoryAction(raw: unknown): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false, message: "No pudimos fusionar las categorías." };
+  }
+}
+
+// ---------- Personalización por hogar (Fase 1: ocultar / forkear) ----------
+/** Un error de gating (viewer del hogar) se surfacea; el resto es genérico. */
+function personalizationError(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message.includes("editor del hogar") ? err.message : fallback;
+}
+
+/** Oculta una categoría base para el hogar, con reasignación opcional de movimientos. */
+export async function hideCategoryAction(raw: unknown): Promise<ActionResult> {
+  const parsed = categoryHideSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await hideCategory(parsed.data.baseId, parsed.data.reassignToId ?? null);
+    revalidate();
+    revalidatePath("/gastos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("hideCategory fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: personalizationError(err, "No pudimos ocultar la categoría.") };
+  }
+}
+
+/** Forkea una categoría base (copia editable del hogar). Devuelve el id de la copia. */
+export async function forkCategoryAction(raw: unknown): Promise<ActionResult & { id?: string }> {
+  const parsed = categoryForkSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const id = await forkCategory(parsed.data.baseId, {
+      name: parsed.data.name,
+      icon: parsed.data.icon,
+      color: parsed.data.color,
+      isFavorite: parsed.data.isFavorite,
+    });
+    revalidate();
+    revalidatePath("/gastos");
+    return { ok: true, id: id ?? undefined };
+  } catch (err) {
+    logger.error("forkCategory fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: personalizationError(err, "No pudimos personalizar la categoría.") };
+  }
+}
+
+/** Re-muestra una categoría base oculta (revierte el override). */
+export async function unhideCategoryAction(raw: unknown): Promise<ActionResult> {
+  const parsed = categoryRevertSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await unhideCategory(parsed.data.baseId);
+    revalidate();
+    revalidatePath("/gastos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("unhideCategory fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: personalizationError(err, "No pudimos restaurar la categoría.") };
+  }
+}
+
+/** Deshace el fork de una categoría base (borra la copia y el override). */
+export async function unforkCategoryAction(raw: unknown): Promise<ActionResult> {
+  const parsed = categoryRevertSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await unforkCategory(parsed.data.baseId);
+    revalidate();
+    revalidatePath("/gastos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("unforkCategory fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: personalizationError(err, "No pudimos deshacer la personalización.") };
   }
 }
 

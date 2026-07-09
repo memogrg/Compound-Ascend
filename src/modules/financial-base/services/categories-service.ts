@@ -1,19 +1,30 @@
 import "server-only";
 
 /**
- * Servicio de categorías (sistema + propias) para el módulo de Transacciones.
+ * Servicio de categorías (sistema + propias + del hogar) para el módulo de
+ * Transacciones.
  *
  * Modelo: árbol jerárquico en `expense_categories` (parent_id). El sistema trae
  * 8 grupos de Nivel 1 (key `g_*`) y categorías legadas re-parentadas como Nivel 2.
  * La UI presenta 2 niveles visibles: Grupo → (sub)categoría seleccionable.
  *
- * RLS permite ver las categorías de sistema (user_id null) y las propias.
- * Retro-compatibilidad: `listCategories()` sigue devolviendo la lista plana con
- * los mismos campos antiguos (ahora enriquecidos con campos opcionales).
+ * RLS permite ver las categorías de sistema (user_id null), las propias y las del
+ * hogar. Personalización por hogar (Fase 1): `listCategories()`/`listCategoryTree()`
+ * RESUELVEN los `category_overrides` del hogar activo (ocultar/forkear), mientras
+ * que `getCategoryNameMap()` se queda AMPLIO para etiquetar históricos (incluidas
+ * bases ocultas). `getSystemCategoryId` (is_system=true) sigue intacto.
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import type { ExpenseCategoryRow } from "@/lib/supabase/database.types";
+import { getActiveHouseholdId, isActiveHouseholdEditor } from "@/lib/household/active";
+import {
+  resolveCategoryOverrides,
+  type OverrideLite,
+} from "@/modules/financial-base/engine/category-overrides";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database, ExpenseCategoryRow } from "@/lib/supabase/database.types";
+
+type Client = SupabaseClient<Database>;
 
 export type Category = {
   id: string;
@@ -73,14 +84,8 @@ function rowToCategory(r: CategoryRowLite): Category {
   };
 }
 
-/**
- * Lista plana de TODAS las categorías visibles (sistema + propias), activas e
- * inactivas. Mantiene compatibilidad: etiquetar agregados requiere ver también
- * las inactivas/fusionadas para resolver nombres históricos.
- */
-export async function listCategories(): Promise<Category[]> {
-  await requireUser();
-  const supabase = await createSupabaseServerClient();
+/** Fetch AMPLIO (sistema + propias + hogar) sin resolver overrides. */
+async function fetchRawCategories(supabase: Client): Promise<Category[]> {
   const { data } = await supabase
     .from("expense_categories")
     .select(SELECT_COLS)
@@ -89,9 +94,63 @@ export async function listCategories(): Promise<Category[]> {
   return ((data ?? []) as CategoryRowLite[]).map(rowToCategory);
 }
 
-/** Mapa id → nombre, para etiquetar agregados por categoría (incluye inactivas). */
+/**
+ * Overrides de un scope EXPLÍCITO (hogar si lo hay, si no el usuario en modo solo).
+ * Reutilizable por sesión (RLS) y por caminos service-role (WhatsApp/ingesta), que
+ * ya conocen su scope. Vacío → la resolución es identidad.
+ */
+export async function getScopeOverrides(
+  supabase: Client,
+  scope: { userId: string; householdId: string | null },
+): Promise<OverrideLite[]> {
+  const base = supabase.from("category_overrides").select("category_id, hidden, fork_id");
+  const scoped = scope.householdId
+    ? base.eq("household_id", scope.householdId)
+    : base.eq("user_id", scope.userId).is("household_id", null);
+  const { data } = await scoped;
+  return ((data ?? []) as { category_id: string; hidden: boolean; fork_id: string | null }[]).map(
+    (r) => ({ categoryId: r.category_id, hidden: r.hidden, forkId: r.fork_id }),
+  );
+}
+
+/** Overrides del scope ACTIVO del usuario (deriva el hogar). Para la sesión. */
+async function loadScopeOverrides(supabase: Client, userId: string): Promise<OverrideLite[]> {
+  const householdId = await getActiveHouseholdId(supabase, userId);
+  return getScopeOverrides(supabase, { userId, householdId });
+}
+
+/**
+ * Lista plana AMPLIA de TODAS las categorías visibles (sistema + propias + hogar),
+ * SIN resolver overrides. Para etiquetar agregados/históricos (incluye inactivas y
+ * bases ocultas), donde ocultar rompería la resolución de nombres pasados.
+ */
+export async function listRawCategories(): Promise<Category[]> {
+  await requireUser();
+  const supabase = await createSupabaseServerClient();
+  return fetchRawCategories(supabase);
+}
+
+/**
+ * Lista plana RESUELTA (sistema + propias + hogar) con los overrides del hogar
+ * aplicados: bases ocultas quitadas, forks reemplazando al original (adoptando su
+ * subárbol), huérfanos descartados. IDENTIDAD cuando el hogar no tiene overrides.
+ */
+export async function listCategories(): Promise<Category[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const [raw, overrides] = await Promise.all([
+    fetchRawCategories(supabase),
+    loadScopeOverrides(supabase, user.id),
+  ]);
+  return resolveCategoryOverrides(raw, overrides);
+}
+
+/**
+ * Mapa id → nombre AMPLIO (incluye inactivas, fusionadas y bases ocultas) para
+ * etiquetar agregados históricos por categoría. NO resuelve overrides a propósito.
+ */
 export async function getCategoryNameMap(): Promise<Record<string, string>> {
-  const cats = await listCategories();
+  const cats = await listRawCategories();
   const map: Record<string, string> = {};
   for (const c of cats) map[c.id] = c.name;
   return map;
@@ -100,7 +159,7 @@ export async function getCategoryNameMap(): Promise<Record<string, string>> {
 /**
  * Árbol de Nivel 1 → descendientes seleccionables (aplanados, activos), para el
  * selector premium. `type` filtra por naturaleza de la categoría; 'expense' es
- * el caso por defecto del registro de gastos.
+ * el caso por defecto del registro de gastos. Parte de la lista RESUELTA.
  */
 export async function listCategoryTree(
   type: "expense" | "income" = "expense",
@@ -138,9 +197,9 @@ function sortCats(a: Category, b: Category): number {
   return a.name.localeCompare(b.name, "es");
 }
 
-/** Ruta legible "Grupo › Sub" para tooltips/etiquetas. */
+/** Ruta legible "Grupo › Sub" para tooltips/etiquetas. Sobre la lista AMPLIA. */
 export async function getCategoryPath(id: string): Promise<string> {
-  const all = await listCategories();
+  const all = await listRawCategories();
   const byId = new Map(all.map((c) => [c.id, c]));
   const parts: string[] = [];
   let cur = byId.get(id);
@@ -151,6 +210,37 @@ export async function getCategoryPath(id: string): Promise<string> {
     guard += 1;
   }
   return parts.join(" › ");
+}
+
+/**
+ * Resuelve una categoría BASE a su destino EFECTIVO en el scope activo:
+ *   - si está forkeada → la copia (`fork_id`),
+ *   - si está oculta sin fork → null (no debe usarse: ya no es visible),
+ *   - si no tiene override → la misma id (identidad).
+ * Reutilizable por sesión (RLS) y por caminos service-role (WhatsApp/ingesta), que
+ * pasan el scope explícito. Best-effort: un fallo de lectura devuelve la id original.
+ */
+export async function resolveOverrideTarget(
+  supabase: Client,
+  scope: { userId: string; householdId: string | null },
+  categoryId: string,
+): Promise<string | null> {
+  try {
+    const base = supabase
+      .from("category_overrides")
+      .select("hidden, fork_id")
+      .eq("category_id", categoryId);
+    const scoped = scope.householdId
+      ? base.eq("household_id", scope.householdId)
+      : base.eq("user_id", scope.userId).is("household_id", null);
+    const { data } = await scoped.maybeSingle();
+    if (!data) return categoryId;
+    if (data.fork_id) return data.fork_id;
+    if (data.hidden) return null;
+    return categoryId;
+  } catch {
+    return categoryId;
+  }
 }
 
 // ============================================================
@@ -164,21 +254,30 @@ export type CategoryWriteInput = {
   icon?: string | null;
   color?: string | null;
   isFavorite?: boolean;
+  /** Interno (fork): preserva la key del original; no expuesto en el schema Zod. */
+  key?: string | null;
+  /** Interno (fork): preserva el vínculo a entidad del original. */
+  linkedKind?: string | null;
 };
 
 export async function createCategory(input: CategoryWriteInput): Promise<string | null> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // household_id del hogar activo: así el resto del hogar también ve la categoría.
+  const householdId = await getActiveHouseholdId(supabase, user.id);
   const { data } = await supabase
     .from("expense_categories")
     .insert({
       user_id: user.id,
+      household_id: householdId,
       parent_id: input.parentId ?? null,
+      key: input.key ?? null,
       name: input.name,
       category_type: input.categoryType ?? "expense",
       icon: input.icon ?? null,
       color: input.color ?? null,
       is_favorite: input.isFavorite ?? false,
+      linked_kind: input.linkedKind ?? null,
       is_system: false,
       is_active: true,
     })
@@ -215,8 +314,9 @@ export async function updateCategory(
 export async function deleteCategory(id: string, reassignToId?: string | null): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const householdId = await getActiveHouseholdId(supabase, user.id);
   if (reassignToId) {
-    await reassignReferences(id, reassignToId, user.id);
+    await reassignReferences(supabase, id, reassignToId, user.id, householdId);
   }
   await supabase.from("expense_categories").delete().eq("id", id).eq("user_id", user.id);
 }
@@ -230,7 +330,8 @@ export async function mergeCategory(fromId: string, intoId: string): Promise<voi
   if (fromId === intoId) return;
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await reassignReferences(fromId, intoId, user.id);
+  const householdId = await getActiveHouseholdId(supabase, user.id);
+  await reassignReferences(supabase, fromId, intoId, user.id, householdId);
   await supabase
     .from("expense_categories")
     .update({ merged_into_id: intoId, is_active: false })
@@ -239,30 +340,232 @@ export async function mergeCategory(fromId: string, intoId: string): Promise<voi
   await supabase.from("expense_categories").delete().eq("id", fromId).eq("user_id", user.id);
 }
 
-/** Re-apunta transactions, expense_items, budget_items y categorías hijas. */
-async function reassignReferences(fromId: string, intoId: string, userId: string): Promise<void> {
+// ============================================================
+// Personalización por hogar (Fase 1): ocultar / forkear frascos y sobres
+// ============================================================
+
+/** Solo un EDITOR (owner/adult) del hogar puede personalizar; un viewer no. */
+async function assertEditor(supabase: Client, userId: string): Promise<void> {
+  if (!(await isActiveHouseholdEditor(supabase, userId))) {
+    throw new Error("Solo un editor del hogar puede personalizar las categorías.");
+  }
+}
+
+/** Inserta o actualiza el override del scope para una categoría base. */
+async function upsertOverride(
+  supabase: Client,
+  args: {
+    userId: string;
+    householdId: string | null;
+    categoryId: string;
+    hidden: boolean;
+    forkId: string | null;
+  },
+): Promise<void> {
+  const { userId, householdId, categoryId, hidden, forkId } = args;
+  const base = supabase.from("category_overrides").select("id").eq("category_id", categoryId);
+  const scoped = householdId
+    ? base.eq("household_id", householdId)
+    : base.eq("user_id", userId).is("household_id", null);
+  const { data: existing } = await scoped.maybeSingle();
+  if (existing?.id) {
+    await supabase
+      .from("category_overrides")
+      .update({ hidden, fork_id: forkId })
+      .eq("id", existing.id);
+  } else {
+    await supabase.from("category_overrides").insert({
+      user_id: userId,
+      household_id: householdId,
+      category_id: categoryId,
+      hidden,
+      fork_id: forkId,
+    });
+  }
+}
+
+/** Ids de todos los descendientes visibles de `baseId` (BFS sobre el árbol amplio). */
+async function visibleDescendantIds(supabase: Client, baseId: string): Promise<string[]> {
+  const raw = await fetchRawCategories(supabase);
+  const childrenOf = new Map<string, string[]>();
+  for (const c of raw) {
+    if (!c.parentId) continue;
+    const list = childrenOf.get(c.parentId);
+    if (list) list.push(c.id);
+    else childrenOf.set(c.parentId, [c.id]);
+  }
+  const out: string[] = [];
+  const seen = new Set<string>([baseId]);
+  const stack = [baseId];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    for (const ch of childrenOf.get(cur) ?? []) {
+      if (seen.has(ch)) continue;
+      seen.add(ch);
+      out.push(ch);
+      stack.push(ch);
+    }
+  }
+  return out;
+}
+
+/**
+ * OCULTA una categoría base para el hogar (override hidden) y, opcionalmente,
+ * reasigna sus movimientos (y los de sus sobres descendientes, si es un frasco) a
+ * `reassignToId`. No muta el árbol de categorías: la resolución descarta la base
+ * (y sus huérfanos) en memoria. Gateado a editores del hogar.
+ */
+export async function hideCategory(baseId: string, reassignToId?: string | null): Promise<void> {
+  const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  await assertEditor(supabase, user.id);
+  const householdId = await getActiveHouseholdId(supabase, user.id);
+
+  if (reassignToId) {
+    await reassignMovements(supabase, baseId, reassignToId, user.id, householdId);
+    // Frasco: sus sobres quedarían huérfanos al ocultarlo sin fork → mueve también
+    // sus movimientos al destino para no perder histórico.
+    for (const descId of await visibleDescendantIds(supabase, baseId)) {
+      await reassignMovements(supabase, descId, reassignToId, user.id, householdId);
+    }
+  }
+
+  await upsertOverride(supabase, {
+    userId: user.id,
+    householdId,
+    categoryId: baseId,
+    hidden: true,
+    forkId: null,
+  });
+}
+
+/**
+ * FORKEA una categoría base: crea una copia del hogar preservando
+ * key/parent_id/linked_kind/category_type y aplicando el `patch`
+ * (name/icon/color/is_favorite), registra el override {hidden, fork_id} y reasigna
+ * los movimientos de la base a la copia. Los hijos de la base se adoptan al fork en
+ * la resolución (por parent_id). Gateado a editores del hogar. Devuelve el id de la copia.
+ */
+export async function forkCategory(
+  baseId: string,
+  patch: { name?: string; icon?: string | null; color?: string | null; isFavorite?: boolean },
+): Promise<string | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await assertEditor(supabase, user.id);
+
+  const { data: base } = await supabase
+    .from("expense_categories")
+    .select("key,parent_id,linked_kind,category_type,name,icon,color,is_favorite")
+    .eq("id", baseId)
+    .maybeSingle();
+  if (!base) throw new Error("La categoría base no existe.");
+
+  const forkId = await createCategory({
+    name: patch.name ?? base.name,
+    parentId: base.parent_id,
+    categoryType: (base.category_type ?? "expense") as CategoryWriteInput["categoryType"],
+    icon: patch.icon !== undefined ? patch.icon : base.icon,
+    color: patch.color !== undefined ? patch.color : base.color,
+    isFavorite: patch.isFavorite !== undefined ? patch.isFavorite : Boolean(base.is_favorite),
+    key: base.key,
+    linkedKind: base.linked_kind,
+  });
+  if (!forkId) throw new Error("No pudimos crear la copia de la categoría.");
+
+  const householdId = await getActiveHouseholdId(supabase, user.id);
+  await upsertOverride(supabase, {
+    userId: user.id,
+    householdId,
+    categoryId: baseId,
+    hidden: true,
+    forkId,
+  });
+  await reassignMovements(supabase, baseId, forkId, user.id, householdId);
+  return forkId;
+}
+
+/**
+ * Revierte la personalización de una base: borra el override del scope y, si había
+ * fork, devuelve los movimientos de la copia a la base y borra la copia. Gateado a
+ * editores. `unhideCategory`/`unforkCategory` comparten esta lógica (una re-muestra
+ * un ocultamiento simple; la otra deshace un fork con copia).
+ */
+async function revertOverride(baseId: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await assertEditor(supabase, user.id);
+  const householdId = await getActiveHouseholdId(supabase, user.id);
+
+  const base = supabase
+    .from("category_overrides")
+    .select("id, fork_id")
+    .eq("category_id", baseId);
+  const scoped = householdId
+    ? base.eq("household_id", householdId)
+    : base.eq("user_id", user.id).is("household_id", null);
+  const { data: ov } = await scoped.maybeSingle();
+  if (!ov) return;
+
+  if (ov.fork_id) {
+    await reassignMovements(supabase, ov.fork_id, baseId, user.id, householdId);
+    await supabase.from("expense_categories").delete().eq("id", ov.fork_id);
+  }
+  await supabase.from("category_overrides").delete().eq("id", ov.id);
+}
+
+/** Re-muestra una categoría base oculta para el hogar (revierte el override). */
+export async function unhideCategory(baseId: string): Promise<void> {
+  return revertOverride(baseId);
+}
+
+/** Deshace el fork de una categoría base: borra la copia y el override. */
+export async function unforkCategory(baseId: string): Promise<void> {
+  return revertOverride(baseId);
+}
+
+// ============================================================
+// Reasignación de referencias (household-scoped)
+// ============================================================
+
+/**
+ * Mueve los MOVIMIENTOS (transactions, budget_items, expense_items) de `fromId` a
+ * `intoId`. Cuando hay hogar activo, filtra por `household_id` para mover también
+ * los de OTROS miembros del hogar (categorías compartidas); en modo solo, por
+ * `user_id`. No toca el árbol de categorías.
+ */
+async function reassignMovements(
+  supabase: Client,
+  fromId: string,
+  intoId: string,
+  userId: string,
+  householdId: string | null,
+): Promise<void> {
+  const txns = supabase.from("transactions").update({ category_id: intoId }).eq("category_id", fromId);
+  const budget = supabase.from("budget_items").update({ category_id: intoId }).eq("category_id", fromId);
+  const items = supabase.from("expense_items").update({ category_id: intoId }).eq("category_id", fromId);
   await Promise.all([
-    supabase
-      .from("transactions")
-      .update({ category_id: intoId })
-      .eq("category_id", fromId)
-      .eq("user_id", userId),
-    supabase
-      .from("budget_items")
-      .update({ category_id: intoId })
-      .eq("category_id", fromId)
-      .eq("user_id", userId),
-    supabase
-      .from("expense_items")
-      .update({ category_id: intoId })
-      .eq("category_id", fromId)
-      .eq("user_id", userId),
-    // Hijas del usuario suben de nivel hacia el destino.
-    supabase
-      .from("expense_categories")
-      .update({ parent_id: intoId })
-      .eq("parent_id", fromId)
-      .eq("user_id", userId),
+    householdId ? txns.eq("household_id", householdId) : txns.eq("user_id", userId),
+    householdId ? budget.eq("household_id", householdId) : budget.eq("user_id", userId),
+    householdId ? items.eq("household_id", householdId) : items.eq("user_id", userId),
   ]);
+}
+
+/**
+ * Re-apunta movimientos (vía `reassignMovements`) y, además, sube las categorías
+ * HIJAS al destino (para delete/merge, que sí mutan el árbol). Household-scoped.
+ */
+async function reassignReferences(
+  supabase: Client,
+  fromId: string,
+  intoId: string,
+  userId: string,
+  householdId: string | null,
+): Promise<void> {
+  await reassignMovements(supabase, fromId, intoId, userId, householdId);
+  const children = supabase
+    .from("expense_categories")
+    .update({ parent_id: intoId })
+    .eq("parent_id", fromId);
+  await (householdId ? children.eq("household_id", householdId) : children.eq("user_id", userId));
 }

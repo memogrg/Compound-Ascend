@@ -10,7 +10,11 @@ import "server-only";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { listCategories } from "@/modules/financial-base/services/categories-service";
+import { getActiveHouseholdId } from "@/lib/household/active";
+import {
+  listCategories,
+  resolveOverrideTarget,
+} from "@/modules/financial-base/services/categories-service";
 import {
   selectableCategoryLeaves,
   categoryMatchesKind,
@@ -220,7 +224,19 @@ export async function resolveAutoCategory(opts: {
     // 3) Umbral + validación de hoja/naturaleza.
     if (!candidate || candidate.confidence < AUTO_ASSIGN_MIN_CONFIDENCE) return null;
     const ok = await validateLeafForKind(supabase, candidate.categoryId, kind);
-    return ok ? { categoryId: candidate.categoryId, source: candidate.source } : null;
+    if (!ok) return null;
+
+    // 4) Respeta la personalización del hogar: forkeada → usa la copia; oculta sin
+    // fork → no auto-asignes (el movimiento cae a "Por clasificar"). En sesión el
+    // userId no viaja (RLS); lo resolvemos para acotar el scope del override.
+    const scopeUserId = userId ?? (await requireUser()).id;
+    const householdId = await getActiveHouseholdId(supabase, scopeUserId);
+    const target = await resolveOverrideTarget(
+      supabase,
+      { userId: scopeUserId, householdId },
+      candidate.categoryId,
+    );
+    return target ? { categoryId: target, source: candidate.source } : null;
   } catch (err) {
     logger.warn("resolveAutoCategory falló", { message: err instanceof Error ? err.message : "?" });
     return null;
