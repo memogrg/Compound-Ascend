@@ -292,6 +292,16 @@ export function AddHoldingModal({
         ? "B"
         : "C";
 
+  // Plan a plazo: el vencimiento se deriva de la fecha de inicio + plazo,
+  // recomputado cuando cambia cualquiera de los dos.
+  useEffect(() => {
+    if (category === "plan_inversion" && startDate && termYears) {
+      const d = new Date(startDate);
+      d.setFullYear(d.getFullYear() + parseInt(termYears, 10));
+      setMaturityDate(d.toISOString().slice(0, 7));
+    }
+  }, [category, startDate, termYears]);
+
   // ── Precio en vivo (perfil A, símbolo opcional) ──
   const priceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const priceAbort = useRef<AbortController | null>(null);
@@ -889,9 +899,6 @@ function Step2Fields(props: {
                   type="button"
                   onClick={() => {
                     props.onTermYears(String(y));
-                    const d = new Date();
-                    d.setFullYear(d.getFullYear() + y);
-                    props.onMaturityDate(d.toISOString().slice(0, 7));
                   }}
                   style={{
                     flex: 1,
