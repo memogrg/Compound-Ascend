@@ -138,7 +138,7 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
       .order("created_at"),
     supabase
       .from("investment_holdings")
-      .select("id,label,symbol,quantity,average_cost,current_value_manual,rental_subtype,currency")
+      .select("id,label,symbol,quantity,average_cost,current_value_manual,rental_subtype,currency,monthly_contribution,is_recurring")
       .eq("user_id", user.id)
       .order("created_at"),
     supabase
@@ -189,11 +189,12 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
         kind: "rental",
       });
     } else {
+      const aporte = h.is_recurring ? Number(h.monthly_contribution ?? 0) : 0;
       out.holding.push({
         id: h.id,
         name,
-        sub: h.symbol ?? "Inversión",
-        amount: value,
+        sub: h.is_recurring ? "aporte mensual" : (h.symbol ?? "Inversión"),
+        amount: aporte,
         currency: h.currency,
         kind: "holding",
       });
