@@ -87,7 +87,8 @@ export async function getExpenseJarsAsOf(args: {
   currency: string;
 }): Promise<Jar[]> {
   const cutoff: Period = { ...args.period, to: args.asOf };
-  const [budget, real, debtBudget, debtSpent, debtExtra, deudasCatId, goalBudget, goalSpent] =
+  const [budget, real, debtBudget, debtSpent, debtExtra, deudasCatId, goalBudget, goalSpent,
+    holdingSpent, policyBudget, policySpent] =
     await Promise.all([
       getBudgetTotals(args.period),
       getRealTotals(cutoff),
@@ -100,13 +101,21 @@ export async function getExpenseJarsAsOf(args: {
       // Ahorro budget-aware: aporte derivado por meta (mes) + aportado al corte.
       getLinkedBudgetBySource(args.period, "goal"),
       getLinkedSpentByEntity(cutoff, "goal"),
+      // Libertad (holding): sin budget_items → el engine cae al aporte mensual
+      // (e.amount); aportado = transacciones vinculadas del corte.
+      getLinkedSpentByEntity(cutoff, "holding"),
+      // Defensa (policy): prima derivada por póliza (mes) + pagado al corte.
+      getLinkedBudgetBySource(args.period, "policy"),
+      getLinkedSpentByEntity(cutoff, "policy"),
     ]);
 
   // La línea derivada de metas nace con categoryId NULL, pero Registrar gasto
-  // exige un uuid. Imputamos el aporte a la categoría del GRUPO Ahorro
-  // (key='g_ahorro_lp', del tree) — uuid válido y existente; el vínculo real lo
-  // lleva linked_kind='goal'/linked_id. Holding/policy quedan fuera de esta entrega.
+  // exige un uuid. Imputamos el aporte a la categoría del GRUPO correspondiente
+  // (key del tree) — uuid válido y existente; el vínculo real lo lleva
+  // linked_kind/linked_id. Holding no tiene budget_items: cae al aporte mensual.
   const ahorroCatId = args.tree.find((g) => g.key === "g_ahorro_lp")?.id ?? null;
+  const libertadCatId = args.tree.find((g) => g.key === "g_libertad")?.id ?? null;
+  const defensaCatId = args.tree.find((g) => g.key === "g_defensa")?.id ?? null;
 
   return getExpenseJars({
     tree: args.tree,
@@ -121,6 +130,16 @@ export async function getExpenseJarsAsOf(args: {
         paymentCategoryId: deudasCatId,
       },
       goal: { bySource: goalBudget, spentById: goalSpent, paymentCategoryId: ahorroCatId },
+      holding: {
+        bySource: {}, // sin budget_items: cae a e.amount (el aporte) en el engine
+        spentById: holdingSpent,
+        paymentCategoryId: libertadCatId,
+      },
+      policy: {
+        bySource: policyBudget,
+        spentById: policySpent,
+        paymentCategoryId: defensaCatId,
+      },
     },
   });
 }
