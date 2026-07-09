@@ -112,8 +112,9 @@ export function JarRow({
       const over = tBudget > 0 && tSpent > tBudget;
       const color = over ? "var(--neg)" : jar.color;
       const width = pct(tSpent, tBudget);
-      // Verbo según el tipo: deudas "pagado", metas "aportado".
-      const doneVerb = jar.linkedKind === "goal" ? "aportado" : "pagado";
+      // Verbo según el tipo: metas/inversiones "aportado", deudas/pólizas "pagado".
+      const doneVerb =
+        jar.linkedKind === "goal" || jar.linkedKind === "holding" ? "aportado" : "pagado";
       const subList =
         n > 0 ? jar.items.map((it) => it.name).join(", ") : jar.emptyText;
       return (
