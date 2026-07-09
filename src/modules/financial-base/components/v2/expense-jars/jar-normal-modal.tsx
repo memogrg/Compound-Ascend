@@ -118,7 +118,10 @@ export function JarNormalModal({
         periodYear: period.year,
       });
     }
-    setExtra((prev) => [...prev, { id: cat.id!, name: n, spent: 0, budget: amt }]);
+    setExtra((prev) => [
+      ...prev,
+      { id: cat.id!, name: n, spent: 0, budget: amt, nativeSpent: 0, nativeBudget: amt, currency: subCur },
+    ]);
     setName("");
     setAmount("");
     setPending(false);

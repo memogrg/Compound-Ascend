@@ -9,12 +9,21 @@
  * reales del módulo origen (inversiones, deudas, pólizas, metas); si no hay,
  * muestra el texto vacío exacto y un CTA al pop-up de creación del módulo.
  */
+import { convertCurrency } from "@/lib/fx";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import { mergeSuggestions } from "@/modules/financial-base/engine/expense-suggestions";
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;
 
-export type JarEnvelope = { id: string; name: string; spent: number; budget: number };
+export type JarEnvelope = {
+  id: string;
+  name: string;
+  spent: number; // display (para el total del frasco)
+  budget: number; // display
+  nativeSpent: number; // en la moneda del sobre
+  nativeBudget: number; // en la moneda del sobre
+  currency: string; // moneda del sobre
+};
 /**
  * Elemento de un frasco vinculado. `amount` es el monto formateado (presupuesto
  * de la obligación). Cuando el frasco es budget-aware (p.ej. Deudas), trae además
@@ -133,11 +142,34 @@ export function buildExpenseJars(args: {
   realByKey: KeyedTotals;
   entities: JarEntities;
   fmt: (n: number) => string;
+  /** Moneda de visualización (origen de las conversiones a moneda nativa). */
+  currency?: string;
+  /** Presupuesto por sobre en su moneda nativa (para S2). */
+  nativeBudgetByKey?: Record<string, { value: number; currency: string }>;
+  rates?: Record<string, number>;
   /** Activa el modo budget-aware por linkedKind (esta entrega: solo `debt`). */
   linkedBudget?: LinkedBudgetConfig;
 }): Jar[] {
   const { tree, budgetByKey, realByKey, entities, fmt, linkedBudget } = args;
   const jars: Jar[] = [];
+
+  // Deriva los campos nativos de un sobre: presupuesto nativo (sin convertir) y
+  // gastado convertido a la moneda del sobre (opción A). Si no llega el dato de
+  // moneda nativa (fallback), los nativos igualan al display.
+  const displayCur = args.currency ?? "";
+  const rates = args.rates ?? {};
+  const nativeOf = (id: string, displaySpent: number, displayBudget: number) => {
+    const nb = args.nativeBudgetByKey?.[id];
+    const cur = nb?.currency ?? displayCur;
+    return {
+      currency: cur,
+      nativeBudget: nb?.value ?? displayBudget,
+      nativeSpent:
+        cur && displayCur && cur !== displayCur
+          ? convertCurrency(displaySpent, displayCur, cur, rates)
+          : displaySpent,
+    };
+  };
 
   for (const group of tree) {
     const key = group.key ?? "";
@@ -226,15 +258,19 @@ export function buildExpenseJars(args: {
         name: `${group.name} (general)`,
         spent: groupSpent,
         budget: groupBudget,
+        ...nativeOf(group.id, groupSpent, groupBudget),
       });
     }
     for (const c of group.children) {
       if (!(c.isFavorite || !c.isSystem)) continue;
+      const dSpent = realByKey[c.id]?.value ?? 0;
+      const dBudget = budgetByKey[c.id]?.value ?? 0;
       envelopes.push({
         id: c.id,
         name: c.name,
-        spent: realByKey[c.id]?.value ?? 0,
-        budget: budgetByKey[c.id]?.value ?? 0,
+        spent: dSpent,
+        budget: dBudget,
+        ...nativeOf(c.id, dSpent, dBudget),
       });
     }
 

@@ -126,6 +126,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     tree,
     budgetByKey: budget.expenseByKey,
     realByKey: real.expenseByKey,
+    nativeBudgetByKey: budget.nativeByKey,
     currency,
   });
 

@@ -470,11 +470,13 @@ export async function copyPreviousMonthIncome(period: Period): Promise<number> {
 }
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;
+export type NativeKeyedTotals = Record<string, { label: string; value: number; currency: string }>;
 export type BudgetTotals = {
   budgetIncome: number;
   budgetExpense: number;
   incomeByKey: KeyedTotals;
   expenseByKey: KeyedTotals;
+  nativeByKey: NativeKeyedTotals;
   items: BudgetItem[];
   currency: string;
 };
@@ -492,6 +494,7 @@ export async function getBudgetTotals(period: Period): Promise<BudgetTotals> {
   let budgetExpense = 0;
   const incomeByKey: KeyedTotals = {};
   const expenseByKey: KeyedTotals = {};
+  const nativeByKey: NativeKeyedTotals = {};
 
   for (const it of items) {
     const value = convertCurrency(it.amount, it.currency, currency, rates);
@@ -504,10 +507,15 @@ export async function getBudgetTotals(period: Period): Promise<BudgetTotals> {
       const key = it.categoryId ?? `name:${it.name.trim().toLowerCase()}`;
       const label = it.categoryId ? (catMap[it.categoryId] ?? it.name) : it.name;
       expenseByKey[key] = { label, value: (expenseByKey[key]?.value ?? 0) + value };
+      nativeByKey[key] = {
+        label,
+        value: (nativeByKey[key]?.value ?? 0) + it.amount, // nativo, sin convertir
+        currency: it.currency,
+      };
     }
   }
 
-  return { budgetIncome, budgetExpense, incomeByKey, expenseByKey, items, currency };
+  return { budgetIncome, budgetExpense, incomeByKey, expenseByKey, nativeByKey, items, currency };
 }
 
 /**
