@@ -1128,32 +1128,66 @@ function Step2Fields(props: {
         </div>
       </div>
 
-      {/* Switch · registrar gasto */}
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginTop: 12,
-          fontSize: 12.5,
-          color: "var(--ink-2)",
-          cursor: "pointer",
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={props.registerExpense}
-          onChange={(e) => props.onRegisterExpense(e.target.checked)}
-        />
-        Registrar como gasto este mes (solo si lo compraste ahora)
-        <HelpTip
-          text={
-            props.isEdit
-              ? "Solo si este cambio es un aporte real: crea el gasto vinculado por el aumento de posición."
-              : "Crea la transacción de gasto vinculada (Compra/Aporte) en Base Financiera. Desmárcalo si cargas histórico."
-          }
-        />
-      </label>
+      {/* Al crear: radio nueva/existente. Al editar: check de aporte real. */}
+      {props.isEdit ? (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 12,
+            fontSize: 12.5,
+            color: "var(--ink-2)",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={props.registerExpense}
+            onChange={(e) => props.onRegisterExpense(e.target.checked)}
+          />
+          Registrar como gasto este mes (solo si es un aporte real)
+          <HelpTip text="Solo si este cambio es un aporte real: crea el gasto vinculado por el aumento de posición." />
+        </label>
+      ) : (
+        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+          <span
+            style={{
+              fontSize: 12.5,
+              fontWeight: 500,
+              color: "var(--ink-2)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            ¿Esta inversión es nueva o ya la tenías?
+            <HelpTip text="Si ya la tenías, solo se registra la posición: su valor NO cuenta como gasto de este mes. Si la compraste ahora, el monto se registra como gasto. El aporte mensual cuenta igual en ambos casos." />
+          </span>
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-2)", cursor: "pointer" }}
+          >
+            <input
+              type="radio"
+              name="inv-origen"
+              checked={!props.registerExpense}
+              onChange={() => props.onRegisterExpense(false)}
+            />
+            Ya la tenía · registrar solo la posición
+          </label>
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-2)", cursor: "pointer" }}
+          >
+            <input
+              type="radio"
+              name="inv-origen"
+              checked={props.registerExpense}
+              onChange={() => props.onRegisterExpense(true)}
+            />
+            La compré ahora · registrar el monto como gasto de este mes
+          </label>
+        </div>
+      )}
     </div>
   );
 }
