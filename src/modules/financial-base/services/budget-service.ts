@@ -391,7 +391,7 @@ export async function deleteIncomeSourcesByHolding(holdingId: string): Promise<v
     .from("budget_items")
     .select("id,recurring_item_id")
     .eq("user_id", user.id)
-    .eq("holding_id", holdingId);
+    .or(`holding_id.eq.${holdingId},source_id.eq.${holdingId}`);
   for (const r of rows ?? []) {
     await supabase.from("budget_items").delete().eq("id", r.id).eq("user_id", user.id);
     if (r.recurring_item_id) {
