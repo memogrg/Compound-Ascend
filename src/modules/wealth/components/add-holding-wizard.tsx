@@ -277,7 +277,7 @@ export function AddHoldingModal({
 
   // ── Común final ──
   const [region, setRegion] = useState(prefill?.region ?? "global");
-  const [registerExpense, setRegisterExpense] = useState(!isEdit);
+  const [registerExpense, setRegisterExpense] = useState(false);
 
   const [pending, setPending] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1145,7 +1145,7 @@ function Step2Fields(props: {
           checked={props.registerExpense}
           onChange={(e) => props.onRegisterExpense(e.target.checked)}
         />
-        Registrar como gasto este mes
+        Registrar como gasto este mes (solo si lo compraste ahora)
         <HelpTip
           text={
             props.isEdit
