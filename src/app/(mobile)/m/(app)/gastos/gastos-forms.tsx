@@ -489,8 +489,8 @@ export function HideCategoryForm({
     <FormShell
       action={action}
       values={{ reassignTo }}
-      submitLabel="Ocultar para el hogar"
-      successMessage="Ocultada para el hogar"
+      submitLabel="Remover"
+      successMessage="Removida para el hogar"
       onSuccess={onSuccess}
     >
       <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>

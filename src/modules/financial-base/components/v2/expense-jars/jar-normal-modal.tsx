@@ -161,16 +161,13 @@ export function JarNormalModal({
               const remaining = e.budget - e.spent;
               const ePct =
                 e.budget > 0 ? Math.round((e.spent / e.budget) * 100) : e.spent > 0 ? 100 : 0;
-              // Personalización del sobre (Fase 2): el "(general)" del grupo no se
-              // personaliza (es el frasco); el resto, si es base de sistema o fork.
+              // Personalización del sobre: el "(general)" del grupo no se personaliza
+              // (es el frasco). TODO sobre real (base de sistema, fork o del usuario) lo
+              // tiene para editores del hogar.
               const cat = catById.get(e.id);
               const sobreBaseId = personalization.forkToBase[e.id] ?? null;
               const sobreIsFork = sobreBaseId != null;
-              const showSobreMenu =
-                canPersonalize &&
-                e.id !== jar.group &&
-                !!cat &&
-                (cat.isSystem || sobreIsFork);
+              const showSobreMenu = canPersonalize && e.id !== jar.group && !!cat;
               return (
                 <div
                   key={e.id}
