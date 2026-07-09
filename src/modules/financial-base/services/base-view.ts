@@ -20,6 +20,8 @@ import {
 import {
   listCategories,
   listCategoryTree,
+  getCategoryPersonalization,
+  canPersonalizeCategories,
 } from "@/modules/financial-base/services/categories-service";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { listAccounts } from "@/modules/financial-base/services/accounts-service";
@@ -93,6 +95,8 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     base,
     rates,
     liquidity,
+    canPersonalize,
+    personalization,
   ] = await Promise.all([
     getBudgetTotals(period),
     getRealTotals(period),
@@ -109,6 +113,8 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     getBaseSummary(),
     getFxRates(),
     getLiquidityBalance(),
+    canPersonalizeCategories(),
+    getCategoryPersonalization(),
   ]);
 
   const currency = real.currency;
@@ -164,6 +170,8 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     jars,
     categoryNames,
     liquidity,
+    canPersonalize,
+    personalization,
     baseReading: buildBaseReading(readingInput),
     incomeCapsule: buildCapsule("income", readingInput),
     expenseCapsule: buildCapsule("expense", readingInput),

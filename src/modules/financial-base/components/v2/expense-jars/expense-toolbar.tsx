@@ -16,7 +16,10 @@ import { CategoryManagerModal } from "@/modules/financial-base/components/v2/cat
 import { copyPreviousMonthBudgetAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Account, Period } from "@/modules/financial-base/types";
-import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
+import type {
+  CategoryNode,
+  CategoryPersonalization,
+} from "@/modules/financial-base/services/categories-service";
 
 type Sheet = null | "spend" | "sobre" | "category";
 
@@ -26,12 +29,16 @@ export function ExpenseToolbar({
   currency,
   period,
   tree,
+  canPersonalize,
+  personalization,
 }: {
   jars: Jar[];
   accounts: Account[];
   currency: string;
   period: Period;
   tree: CategoryNode[];
+  canPersonalize: boolean;
+  personalization: CategoryPersonalization;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -146,7 +153,12 @@ export function ExpenseToolbar({
         <NewSobreModal jars={jars} period={period} onClose={() => setSheet(null)} />
       ) : null}
       {sheet === "category" ? (
-        <CategoryManagerModal tree={tree} onClose={() => setSheet(null)} />
+        <CategoryManagerModal
+          tree={tree}
+          canPersonalize={canPersonalize}
+          personalization={personalization}
+          onClose={() => setSheet(null)}
+        />
       ) : null}
     </div>
   );
