@@ -36,9 +36,9 @@ with inv_cat as (
   select id from public.expense_categories where key = 'inversiones'
 ),
 matches as (
-  select t.id       as txn_id,
-         min(h.id)   as holding_id,
-         count(*)    as n_match
+  select t.id                as txn_id,
+         (array_agg(h.id))[1] as holding_id,  -- uuid: no hay min(uuid); con n_match=1 es el único
+         count(*)             as n_match
     from public.transactions t
     join public.investment_holdings h
       on h.user_id = t.user_id
