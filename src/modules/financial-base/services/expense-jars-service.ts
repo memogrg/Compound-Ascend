@@ -32,6 +32,8 @@ export async function getExpenseJars(args: {
   tree: CategoryNode[];
   budgetByKey: KeyedTotals;
   realByKey: KeyedTotals;
+  /** Presupuesto por sobre en su moneda nativa (S1: llega al engine, aún sin render). */
+  nativeBudgetByKey?: Record<string, { value: number; currency: string }>;
   currency: string;
   /** Activa frascos vinculados budget-aware (esta entrega: solo `debt`). */
   linkedBudget?: LinkedBudgetConfig;
@@ -69,6 +71,9 @@ export async function getExpenseJars(args: {
     realByKey: args.realByKey,
     entities,
     fmt: (n: number) => formatMoney(n, args.currency),
+    currency: args.currency,
+    nativeBudgetByKey: args.nativeBudgetByKey ?? {},
+    rates,
     linkedBudget: args.linkedBudget,
   });
 }
@@ -121,6 +126,7 @@ export async function getExpenseJarsAsOf(args: {
     tree: args.tree,
     budgetByKey: budget.expenseByKey,
     realByKey: real.expenseByKey,
+    nativeBudgetByKey: budget.nativeByKey,
     currency: args.currency,
     linkedBudget: {
       debt: {
