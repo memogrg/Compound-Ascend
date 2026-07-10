@@ -6,7 +6,7 @@
  * Tras continuar: editar el monto del sobre → mensaje de éxito. Texto literal
  * del diseño.
  */
-import { CURRENCY_SYMBOL } from "@/lib/format";
+import { CURRENCY_SYMBOL, CURRENCY_OPTIONS } from "@/lib/format";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -61,8 +61,6 @@ export function BudgetWarningModal({
 
   const periodLabel = `${MONTHS[period.month - 1] ?? ""} ${period.year}`;
   const sym = CURRENCY_SYMBOL[cur] ?? cur;
-  const CURS = ["CRC", "USD", "EUR"];
-  const curOptions = CURS.includes(cur) ? CURS : [cur, ...CURS];
 
   async function save() {
     const amt = Number(amount);
@@ -175,9 +173,9 @@ export function BudgetWarningModal({
                 onChange={(e) => setCur(e.target.value)}
                 style={{ fontSize: 14 }}
               >
-                {curOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {CURRENCY_OPTIONS.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} · {c.symbol}
                   </option>
                 ))}
               </select>
