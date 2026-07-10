@@ -22,9 +22,11 @@
     "@capacitor/app": "^7.1.2",
     "@capacitor/browser": "^7.0.5",
     "@capacitor/core": "^7.6.7",
-    "@capacitor/ios": "^7.6.7"
+    "@capacitor/ios": "^7.6.7",
+    "@capacitor/splash-screen": "^7.0.5"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.6.7",
     "typescript": "^6.0.3"
   }
