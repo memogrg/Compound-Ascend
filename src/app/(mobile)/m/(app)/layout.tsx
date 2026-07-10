@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
 import { MobileTabBar } from "../components/mobile-tab-bar";
 import { ToastProvider } from "../components/form-kit/toast";
+import { AppLockOverlay } from "../components/app-lock-overlay";
 
 /**
  * Layout de las pantallas AUTENTICADAS del móvil. Usa la sesión existente
@@ -21,6 +22,9 @@ export default async function MobileAppLayout({ children }: { children: React.Re
 
   return (
     <ToastProvider>
+      {/* Candado local con biometría (solo app nativa): se monta primero para tapar
+          la UI lo antes posible al reanudar. No afecta a la web. */}
+      <AppLockOverlay />
       {children}
       <MobileTabBar />
     </ToastProvider>

@@ -1,0 +1,141 @@
+/**
+ * Candado local (app-lock) con biometría para la app híbrida (Capacitor).
+ *
+ * IMPORTANTE: NO es re-login. La sesión del WebView y de Supabase se MANTIENE;
+ * esto solo tapa la UI ya autenticada con una pantalla de bloqueo hasta que el
+ * usuario pase Face ID / huella (o la credencial del dispositivo como fallback).
+ *
+ * Aísla el acceso a los plugins nativos con imports DINÁMICOS: así el bundle no
+ * los evalúa en SSR ni en la web de escritorio, solo dentro del WebView nativo.
+ * El candado únicamente aplica cuando `isNativeApp()` es true.
+ */
+
+/** Clave del flag persistido en @capacitor/preferences. */
+export const APP_LOCK_KEY = "appLock.enabled";
+
+/** Evento in-app para que el overlay reaccione al cambiar el flag desde el toggle. */
+export const APP_LOCK_EVENT = "cartera:applock";
+
+type CapacitorGlobal = { isNativePlatform?: () => boolean };
+
+/** ¿Estamos dentro del contenedor nativo de Capacitor? En la web normal → false. */
+export function isNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+  const cap = (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor;
+  return Boolean(cap?.isNativePlatform?.());
+}
+
+async function preferences() {
+  const { Preferences } = await import("@capacitor/preferences");
+  return Preferences;
+}
+
+async function biometricAuth() {
+  const { BiometricAuth } = await import("@aparajita/capacitor-biometric-auth");
+  return BiometricAuth;
+}
+
+/** Lee el flag persistido nativamente (false si no es la app nativa o falla). */
+export async function isAppLockEnabled(): Promise<boolean> {
+  if (!isNativeApp()) return false;
+  try {
+    const Preferences = await preferences();
+    const { value } = await Preferences.get({ key: APP_LOCK_KEY });
+    return value === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Persiste el flag. Uso interno (enable/disable lo hacen tras verificar biometría). */
+async function writeFlag(enabled: boolean): Promise<void> {
+  const Preferences = await preferences();
+  if (enabled) await Preferences.set({ key: APP_LOCK_KEY, value: "true" });
+  else await Preferences.remove({ key: APP_LOCK_KEY });
+}
+
+/**
+ * Borra el flag SIN pedir biometría. Solo para el modo de recuperación del overlay,
+ * que además cierra la sesión: no revela la app (destruye la sesión), así que es un
+ * escape seguro si la biometría del sistema quedó inaccesible con el candado activo.
+ */
+export async function clearAppLockFlagForRecovery(): Promise<void> {
+  if (!isNativeApp()) return;
+  try {
+    await writeFlag(false);
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Notifica a los listeners (overlay) que el flag cambió. */
+function notifyChanged(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(APP_LOCK_EVENT, { detail: { enabled } }));
+}
+
+/** ¿El dispositivo tiene biometría disponible y enrolada? */
+export async function checkBiometryAvailable(): Promise<{ available: boolean; reason: string }> {
+  if (!isNativeApp()) return { available: false, reason: "No es la app nativa." };
+  try {
+    const BiometricAuth = await biometricAuth();
+    const r = await BiometricAuth.checkBiometry();
+    return { available: r.isAvailable, reason: r.reason || "" };
+  } catch (e) {
+    return { available: false, reason: e instanceof Error ? e.message : "?" };
+  }
+}
+
+// Opciones de la verificación: permite fallback a la credencial del dispositivo
+// (PIN/patrón/passcode) cuando la biometría falla o no está disponible.
+const AUTH_OPTIONS = {
+  reason: "Desbloquea CARTERA+",
+  cancelTitle: "Cancelar",
+  allowDeviceCredential: true,
+  androidTitle: "CARTERA+ bloqueado",
+  androidSubtitle: "Usa tu biometría o el bloqueo del dispositivo",
+  iosFallbackTitle: "Usar código",
+};
+
+/** Corre la verificación biométrica. `ok=true` si autenticó; si no, incluye el `code`. */
+export async function verifyIdentity(): Promise<{ ok: boolean; code?: string }> {
+  if (!isNativeApp()) return { ok: false, code: "not-native" };
+  try {
+    const BiometricAuth = await biometricAuth();
+    await BiometricAuth.authenticate(AUTH_OPTIONS);
+    return { ok: true };
+  } catch (e) {
+    const code = (e as { code?: string })?.code ?? "unknown";
+    return { ok: false, code };
+  }
+}
+
+/**
+ * Activa el candado: exige biometría disponible + una verificación de PRUEBA, y solo
+ * si pasa persiste el flag. Si el dispositivo no tiene biometría/enrolamiento, NO se
+ * activa (el flag nunca se guarda → la app no queda inaccesible).
+ */
+export async function enableAppLock(): Promise<{ ok: boolean; message?: string }> {
+  const avail = await checkBiometryAvailable();
+  if (!avail.available) {
+    return {
+      ok: false,
+      message:
+        "Tu dispositivo no tiene biometría configurada. Actívala (Face ID / huella o PIN) en los ajustes del sistema para usar el candado.",
+    };
+  }
+  const v = await verifyIdentity();
+  if (!v.ok) return { ok: false, message: "No se pudo verificar tu identidad. Inténtalo de nuevo." };
+  await writeFlag(true);
+  notifyChanged(true);
+  return { ok: true };
+}
+
+/** Desactiva el candado: pide biometría una vez y borra el flag. */
+export async function disableAppLock(): Promise<{ ok: boolean; message?: string }> {
+  const v = await verifyIdentity();
+  if (!v.ok) return { ok: false, message: "No se pudo verificar tu identidad." };
+  await writeFlag(false);
+  notifyChanged(false);
+  return { ok: true };
+}
