@@ -40,7 +40,7 @@ export function BudgetWarningModal({
   currency,
   onClose,
 }: {
-  envelope: { id: string; name: string; budget: number };
+  envelope: { id: string; name: string; budget: number; nativeBudget: number; currency: string };
   period: Period;
   currency: string;
   onClose: () => void;
@@ -48,7 +48,10 @@ export function BudgetWarningModal({
   const router = useRouter();
   const [checked, setChecked] = useState<boolean[]>([false, false, false]);
   const [phase, setPhase] = useState<"warning" | "edit" | "success">("warning");
-  const [amount, setAmount] = useState(String(Math.round(envelope.budget) || ""));
+  const [cur, setCur] = useState(envelope.currency || currency);
+  const [amount, setAmount] = useState(
+    String(Math.round(envelope.nativeBudget ?? envelope.budget) || ""),
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,7 +60,9 @@ export function BudgetWarningModal({
   const isEnabled = (i: number) => i === 0 || checked.slice(0, i).every(Boolean);
 
   const periodLabel = `${MONTHS[period.month - 1] ?? ""} ${period.year}`;
-  const sym = CURRENCY_SYMBOL[currency] ?? "";
+  const sym = CURRENCY_SYMBOL[cur] ?? cur;
+  const CURS = ["CRC", "USD", "EUR"];
+  const curOptions = CURS.includes(cur) ? CURS : [cur, ...CURS];
 
   async function save() {
     const amt = Number(amount);
@@ -68,7 +73,7 @@ export function BudgetWarningModal({
       categoryId: envelope.id,
       name: envelope.name,
       amount: amt,
-      currency,
+      currency: cur,
       periodMonth: period.month,
       periodYear: period.year,
     });
@@ -160,6 +165,23 @@ export function BudgetWarningModal({
                 style={{ fontSize: 22, fontWeight: 650 }}
               />
             </div>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink-2)" }}>
+                Moneda del sobre
+              </span>
+              <select
+                className="inp"
+                value={cur}
+                onChange={(e) => setCur(e.target.value)}
+                style={{ fontSize: 14 }}
+              >
+                {curOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         ) : (
           <p style={{ fontSize: 14, padding: "8px 0", lineHeight: 1.5 }}>
