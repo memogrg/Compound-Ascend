@@ -2,6 +2,7 @@ import { getPortfolioReport } from "@/modules/wealth";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MobileMenu } from "../../components/mobile-menu";
+import { InversionesManager } from "./inversiones-manager";
 
 /**
  * /m/inversiones — "Inversiones". Reutiliza el barrel wealth (getPortfolioReport:
@@ -12,8 +13,6 @@ import { MobileMenu } from "../../components/mobile-menu";
 export const dynamic = "force-dynamic"; // datos por sesión + precios en vivo
 
 const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
-
-const NATURE_LABEL: Record<string, string> = { cashflow: "Flujo", growth: "Crecimiento" };
 
 export default async function MobileInversiones() {
   const report = await getPortfolioReport();
@@ -93,7 +92,7 @@ export default async function MobileInversiones() {
           </div>
         )}
 
-        {/* Holdings */}
+        {/* Holdings + gestión (alta/edición/eliminar · compra/venta/dividendo) */}
         <div>
           <div className="between" style={{ marginBottom: 6 }}>
             <div className="sec-title">Mis inversiones</div>
@@ -103,49 +102,7 @@ export default async function MobileInversiones() {
               </span>
             )}
           </div>
-          <div className="card card-p">
-            {holdings.length === 0 ? (
-              <div className="muted" style={{ padding: "12px 0", fontSize: 13.5, lineHeight: 1.5 }}>
-                Aún no registras inversiones. Agrega tu primer activo para seguir su rendimiento.
-              </div>
-            ) : (
-              holdings.map((h) => {
-                const name = h.label || h.symbol || "Inversión";
-                const sub = h.nature ? NATURE_LABEL[h.nature] ?? h.assetType : h.assetType;
-                const badge = (h.symbol || name).slice(0, 4).toUpperCase();
-                return (
-                  <div className="lrow" key={h.id}>
-                    <span
-                      className="lic"
-                      style={{
-                        background: "linear-gradient(135deg, var(--s1), var(--s5))",
-                        color: "#fff",
-                        fontFamily: "var(--font-mono)",
-                        fontWeight: 700,
-                        fontSize: 11,
-                      }}
-                      aria-hidden
-                    >
-                      {badge}
-                    </span>
-                    <div>
-                      <div className="lname">{name}</div>
-                      <div className="lsub">{sub}</div>
-                    </div>
-                    <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                      <div className="lamt" style={{ margin: 0 }}>
-                        {formatMoney(h.currentValue, currency)}
-                      </div>
-                      <div className={`mono ${h.returnPct >= 0 ? "pos" : "neg"}`} style={{ fontSize: 11 }}>
-                        {h.returnPct >= 0 ? "+" : ""}
-                        {formatPercent(h.returnPct, 1)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <InversionesManager holdings={holdings} currency={currency} />
         </div>
       </div>
     </div>
