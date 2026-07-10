@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addCategoryAction, addBudgetItemAction } from "@/modules/financial-base/api/v2-actions";
 import { BudgetWarningModal } from "@/modules/financial-base/components/v2/expense-jars/budget-warning-modal";
@@ -28,16 +28,6 @@ function pct(spent: number, budget: number): number {
   if (budget <= 0) return spent > 0 ? 100 : 0;
   return Math.min(100, Math.round((spent / budget) * 100));
 }
-
-// Mismo set/símbolos que el switch de moneda del topbar (currency-switch.tsx).
-const SUB_CURRENCIES: { code: string; sym: string }[] = [
-  { code: "CRC", sym: "₡" },
-  { code: "USD", sym: "$" },
-  { code: "EUR", sym: "€" },
-  { code: "MXN", sym: "MX$" },
-  { code: "COP", sym: "COL$" },
-  { code: "GBP", sym: "£" },
-];
 
 export function JarNormalModal({
   jar,
@@ -83,10 +73,10 @@ export function JarNormalModal({
       : "Nombre de la subcategoría";
 
   // La moneda de visualización va primero aunque no esté en el set base.
-  const subCurOptions = SUB_CURRENCIES.some((c) => c.code === currency)
-    ? SUB_CURRENCIES
-    : [{ code: currency, sym: currency }, ...SUB_CURRENCIES];
-  const subSym = subCurOptions.find((c) => c.code === subCur)?.sym ?? subCur;
+  const subCurOptions = CURRENCY_OPTIONS.some((c) => c.code === currency)
+    ? CURRENCY_OPTIONS
+    : [{ code: currency, symbol: currency }, ...CURRENCY_OPTIONS];
+  const subSym = subCurOptions.find((c) => c.code === subCur)?.symbol ?? subCur;
 
   async function addSubcategory() {
     const n = name.trim();
