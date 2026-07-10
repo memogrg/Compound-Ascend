@@ -176,7 +176,9 @@ export async function setCategoryBudget(args: {
       categoryId: args.categoryId,
       name: existing.name,
       amount: args.amount,
-      currency: existing.currency,
+      // Honra la moneda entrante (el editor permite cambiarla); antes fijaba
+      // existing.currency y la edición no podía cambiar la moneda del sobre.
+      currency: args.currency,
       frequency: existing.frequency,
       periodMonth: args.period.month,
       periodYear: args.period.year,
