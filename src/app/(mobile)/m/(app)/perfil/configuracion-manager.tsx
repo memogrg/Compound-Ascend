@@ -33,6 +33,7 @@ import type { NotificationChannel, NotificationPrefs } from "@/lib/notifications
 import type { IngestEmailRow } from "@/modules/account/services/ingest-email-service";
 
 import { BottomSheet, ConfirmDialog, useToast } from "../../components/form-kit";
+import { AppLockToggle } from "../../components/app-lock-toggle";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
 type SheetId = "currency" | "whatsapp" | "household" | null;
@@ -106,6 +107,9 @@ export function ConfiguracionManager({
           }
         />
       </div>
+
+      {/* Seguridad — candado con biometría (solo visible dentro de la app nativa) */}
+      <AppLockToggle />
 
       {/* Notificaciones */}
       <div className="card card-p" style={{ marginBottom: 14 }}>
