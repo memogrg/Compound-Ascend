@@ -25,21 +25,17 @@ import {
 } from "@/modules/wealth/api/actions";
 import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
 import { computeRentalRoi } from "@/modules/wealth/engine/rental-roi";
+// buildPayload + helpers viven en el engine (compartidos con el wizard móvil).
+import {
+  buildHoldingPayload,
+  categoryFromAssetType,
+  perPaymentFromRate,
+  derivedMonths,
+  profileForCategory,
+  type RentalCosts,
+  type HoldingFormValues,
+} from "@/modules/wealth/engine/holding-payload";
 import type { AssetType, Holding, InvestmentCategory } from "@/modules/wealth/types";
-import type { HoldingInput } from "@/modules/wealth/schemas";
-
-/** Costos operativos del inmueble de renta (perfil B · propiedad_alquiler). */
-type RentalCosts = {
-  purchasePrice: string;
-  closingCosts: string;
-  vacancyPct: string;
-  mgmtPct: string;
-  maintenance: string;
-  hoa: string;
-  propertyTax: string;
-  insurance: string;
-  services: string;
-};
 
 // ── Constantes UI ──────────────────────────────────────────────────
 
@@ -57,27 +53,6 @@ const API_TYPE_MAP: Partial<Record<AssetType, string>> = {
   accion: "stock",
   cripto: "crypto",
 };
-
-/** assetType → categoría, para precargar holdings viejos sin `category`. Mismo
- *  mapeo que el backfill de la migración (PLAN §2.2). */
-function categoryFromAssetType(assetType: AssetType): InvestmentCategory {
-  const map: Record<AssetType, InvestmentCategory> = {
-    cripto: "cripto",
-    etf: "etf_crecimiento",
-    accion: "accion_crecimiento",
-    bono: "bono_gobierno",
-    fondo: "fondo_conservador",
-    certificado: "deposito_plazo",
-    inmueble: "propiedad_alquiler",
-    negocio: "negocio_ingreso",
-    pension: "roboadvisor",
-    commodity: "alternativo",
-    arte: "alternativo",
-    nft: "cripto",
-    otro: "alternativo",
-  };
-  return map[assetType] ?? "alternativo";
-}
 
 // ── Triggers exportados ────────────────────────────────────────────
 
@@ -284,13 +259,7 @@ export function AddHoldingModal({
 
   // ── Perfil derivado de la categoría ──
   const meta = category ? CATEGORY_META[category] : null;
-  const profile: "A" | "B" | "C" | null = !meta
-    ? null
-    : meta.quoted
-      ? "A"
-      : meta.nature === "cashflow"
-        ? "B"
-        : "C";
+  const profile = profileForCategory(category);
 
   // Plan a plazo: el vencimiento se deriva de la fecha de inicio + plazo,
   // recomputado cuando cambia cualquiera de los dos.
@@ -360,92 +329,36 @@ export function AddHoldingModal({
 
   // ── Derivados ──
   const investedNum = parseFloat(invested) || 0;
-  const qtyNum = parseFloat(quantity) || 0;
   const canSave = !!category && name.trim().length > 0 && investedNum > 0;
 
-  // El precio en vivo puede venir en una moneda (p. ej. USD) distinta a la
-  // elegida (cur). NO lo mezclamos silenciosamente en el costo: solo se usa como
-  // referencia de costo si coincide con `cur` (el aviso al usuario se pinta en
-  // el campo del símbolo cuando difieren).
-  const liveMatchesCur = livePriceCurrency === cur;
-
-  // ── Payload (HoldingInput) ──
-  function buildPayload(): HoldingInput {
-    const cat = category!;
-    const m = CATEGORY_META[cat];
-    // Cotizado con cantidad → cantidad real + costo unitario (cost_basis = invertido).
-    // Resto → 1 "unidad" cuyo costo ES el monto invertido.
-    // Cotizado: el "precio de compra" (por unidad) tiene prioridad. Con precio +
-    // monto, la cantidad se deriva (monto ÷ precio) y el costo unitario ES ese
-    // precio. Sin precio, se usa la cantidad ingresada (costo = monto ÷ cantidad).
-    // Sin nada, 1 "unidad" cuyo costo es el monto invertido.
-    const priceNum = parseFloat(unitPrice) || 0;
-    // Si no hay monto invertido, solo se cae al precio en vivo cuando su moneda
-    // coincide con `cur`; si difiere, no se asume (quedaría mal etiquetado).
-    const liveForCost = liveMatchesCur ? (livePrice ?? 0) : 0;
-    let finalQty = 1;
-    let finalAvg = investedNum;
-    if (m.quoted && priceNum > 0) {
-      finalAvg = priceNum;
-      finalQty = investedNum > 0 ? investedNum / priceNum : qtyNum || 0;
-    } else if (m.quoted && qtyNum > 0) {
-      finalQty = qtyNum;
-      finalAvg = investedNum > 0 ? investedNum / qtyNum : liveForCost;
-    }
-
-    const base: HoldingInput = {
-      assetType: m.defaultAssetType,
-      category: cat,
-      nature: m.nature,
-      quantity: finalQty,
-      averageCost: finalAvg,
-      currency: cur,
-      label: name.trim() || undefined,
+  // ── Valores del formulario → engine compartido `buildHoldingPayload` ──
+  function buildValues(): HoldingFormValues {
+    return {
+      category: category!,
+      name,
+      invested,
+      cur,
+      symbol,
+      quantity,
+      unitPrice,
+      livePrice,
+      livePriceCurrency,
+      currentValue,
+      income,
+      frequency,
+      incomeMonth,
+      annualRatePct,
+      maturityDate,
+      termYears,
+      startDate,
+      subtype,
+      rc,
+      debtId,
       region,
-      isRecurring: aportoCadaMes,
-      monthlyContribution: aportoCadaMes ? parseFloat(aporteMensual) || undefined : undefined,
+      aportoCadaMes,
+      aporteMensual,
       registerExpense,
-      purchaseDate: new Date().toISOString().slice(0, 10),
     };
-    if (m.quoted) {
-      base.symbol = symbol.trim() ? symbol.trim().toUpperCase() : undefined;
-    } else {
-      // Manual (B/C): valor actual; default = invertido.
-      base.currentValueManual = parseFloat(currentValue) || investedNum || undefined;
-      if (cat === "plan_inversion") {
-        base.termYears = parseInt(termYears, 10) || undefined;
-        base.maturityDate = maturityDate ? `${maturityDate}-01` : undefined;
-        if (startDate) base.purchaseDate = startDate;
-      }
-      if (m.nature === "cashflow") {
-        // Perfil B: ingreso + frecuencia; si no es mensual, mes de materialización.
-        const inc = parseFloat(income) || 0;
-        if (inc > 0) {
-          base.rentalIncome = inc;
-          base.rentalFrequency = frequency;
-          if (frequency !== "mensual" && frequency !== "semanal")
-            base.incomeMonth = parseInt(incomeMonth, 10) || undefined;
-        }
-        base.annualRatePct = parseFloat(annualRatePct) || undefined;
-        base.maturityDate = maturityDate ? `${maturityDate}-01` : undefined;
-        if (cat === "propiedad_alquiler") {
-          base.rentalSubtype = subtype;
-          const n = (s: string) => parseFloat(s) || undefined;
-          const pct = (s: string) => (s ? (parseFloat(s) || 0) / 100 : undefined);
-          base.purchasePrice = n(rc.purchasePrice);
-          base.closingCosts = n(rc.closingCosts);
-          base.vacancyPct = pct(rc.vacancyPct);
-          base.mgmtPct = pct(rc.mgmtPct);
-          base.maintenanceMonthly = n(rc.maintenance);
-          base.hoaMonthly = n(rc.hoa);
-          base.propertyTaxAnnual = n(rc.propertyTax);
-          base.insuranceAnnual = n(rc.insurance);
-          base.servicesMonthly = n(rc.services);
-          base.debtId = debtId || undefined;
-        }
-      }
-    }
-    return base;
   }
 
   async function handleSave() {
@@ -456,7 +369,7 @@ export function AddHoldingModal({
     }
     setPending(true);
     try {
-      const payload = buildPayload();
+      const payload = buildHoldingPayload(buildValues());
       const result = editId
         ? await editHoldingAction(editId, payload)
         : await addHoldingAction(payload);
@@ -671,26 +584,6 @@ function CategoryGroup({
 }
 
 // ── Paso 2: campos condicionales ───────────────────────────────────
-
-/** Pago por periodo estimado desde monto × % anual, según la frecuencia. */
-function perPaymentFromRate(invested: string, ratePct: string, freq: string): string {
-  if (freq === "al_vencimiento") return "";
-  const principal = parseFloat(invested) || 0;
-  const rate = parseFloat(ratePct) || 0;
-  if (principal <= 0 || rate <= 0) return "";
-  const annual = (principal * rate) / 100;
-  const divisor =
-    freq === "semanal" ? 52 : freq === "mensual" ? 12 : freq === "trimestral" ? 4 : freq === "semestral" ? 2 : 1;
-  return String(Math.round((annual / divisor) * 100) / 100);
-}
-/** Meses de pago derivados del mes ancla (1-12) + frecuencia. */
-function derivedMonths(freq: string, anchor: number): number[] {
-  const a = ((((anchor || 1) - 1) % 12) + 12) % 12;
-  if (freq === "trimestral") return [0, 3, 6, 9].map((k) => ((a + k) % 12) + 1);
-  if (freq === "semestral") return [0, 6].map((k) => ((a + k) % 12) + 1);
-  if (freq === "anual") return [a + 1];
-  return [];
-}
 
 function Step2Fields(props: {
   profile: "A" | "B" | "C" | null;
