@@ -632,6 +632,8 @@ export type DividendRow = {
   amount: number;
   currency: string;
   created_at: string;
+  // updated_at: el trigger set_updated_at() lo fija en cada UPDATE (migración 20260715000001).
+  updated_at: string;
   yield_pct: number | null;
   frequency: string | null;
   income_id: string | null;
@@ -648,6 +650,8 @@ export type PortfolioSnapshotRow = {
   net_worth: number;
   currency: string;
   created_at: string;
+  // updated_at: añadida en 20260715000001 (la tabla ya tenía el trigger set_updated_at()).
+  updated_at: string;
 };
 
 export type ProfileSnapshotRow = Timestamps & {
