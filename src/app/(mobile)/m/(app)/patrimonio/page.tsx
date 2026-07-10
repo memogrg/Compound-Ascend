@@ -3,6 +3,7 @@ import { MobileMenu } from "../../components/mobile-menu";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
+import { PatrimonioManager } from "./patrimonio-manager";
 
 /**
  * /m/patrimonio — "Patrimonio" (nombre canónico de nav.ts). Reutiliza el barrel rich-life (getRichLifeSummary:
@@ -16,7 +17,7 @@ const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--
 
 export default async function MobilePatrimonio() {
   const summary = await getRichLifeSummary();
-  const { snapshot, allAssets, liabilities, currency } = summary;
+  const { snapshot, assets, allAssets, liabilities, currency } = summary;
   const ind = snapshot.indicators;
   const bd = computeWealthBreakdown(allAssets); // invertido / líquido / otros (o undefined)
 
@@ -25,8 +26,6 @@ export default async function MobilePatrimonio() {
     .filter((c) => c.value > 0)
     .slice(0, 5)
     .map((c, i) => ({ label: c.label, value: c.value, color: RING_COLORS[i % RING_COLORS.length]! }));
-
-  const hasDetail = slices.length > 0 || liabilities.length > 0;
 
   return (
     <div className="m-scroll">
@@ -87,56 +86,12 @@ export default async function MobilePatrimonio() {
           </div>
         )}
 
-        {/* Activos y pasivos */}
+        {/* Activos y pasivos manuales — CRUD (FAB alta · SwipeRow editar/eliminar) */}
         <div>
           <div className="sec-title" style={{ marginBottom: 6 }}>
             Activos y pasivos
           </div>
-          <div className="card card-p">
-            {!hasDetail ? (
-              <div className="muted" style={{ padding: "12px 0", fontSize: 13.5, lineHeight: 1.5 }}>
-                Aún no registras activos ni pasivos. Agrégalos para ver tu composición y tu patrimonio real.
-              </div>
-            ) : (
-              <>
-                {slices.map((s) => (
-                  <div className="lrow" key={`a-${s.label}`}>
-                    <span
-                      className="lic"
-                      style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
-                      aria-hidden
-                    >
-                      <Dot color={s.color} />
-                    </span>
-                    <div>
-                      <div className="lname">{s.label}</div>
-                      <div className="lsub">Activo</div>
-                    </div>
-                    <div className="lamt pos">{formatMoney(s.value, currency)}</div>
-                  </div>
-                ))}
-                {liabilities.map((l) => (
-                  <div className="lrow" key={`l-${l.id}`}>
-                    <span
-                      className="lic"
-                      style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
-                      aria-hidden
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                        <rect x="3" y="6" width="18" height="13" rx="2" />
-                        <path d="M3 10h18" strokeLinecap="round" />
-                      </svg>
-                    </span>
-                    <div>
-                      <div className="lname">{l.name}</div>
-                      <div className="lsub">Pasivo</div>
-                    </div>
-                    <div className="lamt neg">−{formatMoney(l.balance, l.currency)}</div>
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
+          <PatrimonioManager assets={assets} liabilities={liabilities} currency={currency} />
         </div>
       </div>
     </div>
@@ -151,6 +106,3 @@ function Arrow({ up }: { up: boolean }) {
   );
 }
 
-function Dot({ color }: { color: string }) {
-  return <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 4, background: color }} />;
-}
