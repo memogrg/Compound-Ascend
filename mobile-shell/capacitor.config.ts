@@ -32,6 +32,23 @@ const config: CapacitorConfig = {
     // Respeta las safe areas (notch / home indicator) junto con viewport-fit=cover del HTML.
     contentInset: 'always',
   },
+  plugins: {
+    SplashScreen: {
+      // Auto-oculta el splash tras un instante corto: como el shell carga contenido
+      // estático (www/) y no hay JS que llame SplashScreen.hide(), launchAutoHide=true
+      // garantiza que el splash NO se quede pegado.
+      launchShowDuration: 1500,
+      launchAutoHide: true,
+      // Fondo del splash = canvas CLARA del diseño (--canvas). El splash OSCURO sale de
+      // los drawables -night generados (#15140F); al coincidir este color con el fondo
+      // de la app, cualquier micro-gap entre splash y webview es imperceptible.
+      backgroundColor: '#F1EFE8',
+      androidScaleType: 'CENTER_CROP',
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: false,
+    },
+  },
 };
 
 export default config;
