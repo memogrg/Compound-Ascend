@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MobileMenu } from "../../components/mobile-menu";
 import { getWealthSummary } from "@/modules/wealth";
 import { formatMoney, formatCompact } from "@/lib/format";
+import { ProteccionManager } from "./proteccion-manager";
 
 /**
  * /m/proteccion — "Protección": score de defensa patrimonial, pólizas activas y
@@ -10,24 +11,6 @@ import { formatMoney, formatCompact } from "@/lib/format";
  * es-MX "tú", tema claro.
  */
 export const dynamic = "force-dynamic"; // datos por sesión
-
-const POLICY_LABEL: Record<string, string> = {
-  medico: "Protección médica",
-  vida: "Protección de vida",
-  incapacidad: "Protección por incapacidad",
-  hogar: "Protección del hogar",
-  vehiculo: "Vehículo",
-  patrimonial: "Patrimonial",
-  empresarial: "Empresarial",
-  familiar: "Familiar",
-  otro: "Otra cobertura",
-};
-const FREQ_SUFFIX: Record<string, string> = {
-  mensual: "mes",
-  trimestral: "trim",
-  semestral: "sem",
-  anual: "año",
-};
 
 function statusOf(score: number): { label: string; color: string } {
   if (score >= 80) return { label: "Protegido", color: "var(--accent)" };
@@ -130,44 +113,12 @@ export default async function MobileProteccion() {
           </div>
         </div>
 
-        {/* Pólizas */}
+        {/* Pólizas — CRUD (FAB alta · SwipeRow editar/eliminar) */}
         <div style={{ marginBottom: 16 }}>
           <div className="sec-title" style={{ marginBottom: 6 }}>
             Tus pólizas
           </div>
-          <div className="card card-p">
-            {policies.length === 0 ? (
-              <div className="muted" style={{ padding: "12px 0", fontSize: 13.5, lineHeight: 1.5 }}>
-                Aún no registras pólizas. Agrégalas para medir tu protección real.
-              </div>
-            ) : (
-              policies.map((pol) => {
-                const label = POLICY_LABEL[pol.policyType] ?? "Cobertura";
-                const suffix = FREQ_SUFFIX[pol.premiumFrequency ?? "anual"] ?? "año";
-                return (
-                  <div className="lrow" key={pol.id}>
-                    <span className="lic" style={{ background: "var(--accent-soft)", color: "var(--accent)" }} aria-hidden>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6Z" />
-                      </svg>
-                    </span>
-                    <div>
-                      <div className="lname">{label}</div>
-                      <div className="lsub">
-                        {pol.provider ?? "—"}
-                        {pol.coverage ? ` · ${formatCompact(pol.coverage, pol.currency)} cobertura` : ""}
-                      </div>
-                    </div>
-                    {pol.premium ? (
-                      <div className="lamt">
-                        {formatMoney(pol.premium, pol.currency)}/{suffix}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })
-            )}
-          </div>
+          <ProteccionManager policies={policies} currency={currency} />
         </div>
 
         {/* Brechas */}
