@@ -74,15 +74,66 @@ function notifyChanged(enabled: boolean): void {
   window.dispatchEvent(new CustomEvent(APP_LOCK_EVENT, { detail: { enabled } }));
 }
 
-/** ¿El dispositivo tiene biometría disponible y enrolada? */
-export async function checkBiometryAvailable(): Promise<{ available: boolean; reason: string }> {
-  if (!isNativeApp()) return { available: false, reason: "No es la app nativa." };
+/**
+ * Diagnóstico de biometría surfaceado a la UI (para ver la razón exacta sin Logcat).
+ * `available` es el gate REAL de seguridad; el resto son señales del plugin para el
+ * mensaje/log (no cambian el comportamiento, solo lo explican).
+ */
+export type BiometryDiagnostic = {
+  available: boolean;
+  reason: string;
+  code: string;
+  biometryType: number;
+  strongBiometryIsAvailable: boolean;
+  deviceIsSecure: boolean;
+};
+
+// Tipo PARCIAL local para leer el resultado de checkBiometry() de forma defensiva
+// (por si en algún dispositivo/versión del plugin falta una prop). Evita `any`.
+type BiometryProbe = {
+  isAvailable?: boolean;
+  reason?: string;
+  code?: string;
+  biometryType?: number;
+  strongBiometryIsAvailable?: boolean;
+  deviceIsSecure?: boolean;
+};
+
+/** ¿El dispositivo tiene biometría disponible y enrolada? Devuelve diagnóstico completo. */
+export async function checkBiometryAvailable(): Promise<BiometryDiagnostic> {
+  if (!isNativeApp()) {
+    return {
+      available: false,
+      reason: "No es la app nativa.",
+      code: "not-native",
+      biometryType: 0,
+      strongBiometryIsAvailable: false,
+      deviceIsSecure: false,
+    };
+  }
   try {
     const BiometricAuth = await biometricAuth();
-    const r = await BiometricAuth.checkBiometry();
-    return { available: r.isAvailable, reason: r.reason || "" };
+    const r: BiometryProbe = await BiometricAuth.checkBiometry();
+    console.warn("[app-lock] checkBiometry", r);
+    return {
+      available: r.isAvailable ?? false,
+      reason: r.reason ?? "",
+      code: r.code ?? "",
+      biometryType: r.biometryType ?? 0,
+      strongBiometryIsAvailable: r.strongBiometryIsAvailable ?? false,
+      deviceIsSecure: r.deviceIsSecure ?? false,
+    };
   } catch (e) {
-    return { available: false, reason: e instanceof Error ? e.message : "?" };
+    console.warn("[app-lock] checkBiometry error", e);
+    const err = e as { code?: string; message?: string };
+    return {
+      available: false,
+      reason: err.message ?? (e instanceof Error ? e.message : "?"),
+      code: err.code ?? "check-failed",
+      biometryType: 0,
+      strongBiometryIsAvailable: false,
+      deviceIsSecure: false,
+    };
   }
 }
 
@@ -124,16 +175,21 @@ function authOptions() {
   };
 }
 
-/** Corre la verificación biométrica. `ok=true` si autenticó; si no, incluye el `code`. */
-export async function verifyIdentity(): Promise<{ ok: boolean; code?: string }> {
+/** Corre la verificación biométrica. `ok=true` si autenticó; si no, incluye code + message. */
+export async function verifyIdentity(): Promise<{ ok: boolean; code?: string; message?: string }> {
   if (!isNativeApp()) return { ok: false, code: "not-native" };
   try {
     const BiometricAuth = await biometricAuth();
     await BiometricAuth.authenticate(authOptions());
     return { ok: true };
   } catch (e) {
-    const code = (e as { code?: string })?.code ?? "unknown";
-    return { ok: false, code };
+    console.warn("[app-lock] authenticate error", e);
+    const err = e as { code?: string; message?: string };
+    return {
+      ok: false,
+      code: err.code ?? "unknown",
+      message: err.message ?? (e instanceof Error ? e.message : undefined),
+    };
   }
 }
 
@@ -147,12 +203,13 @@ export async function enableAppLock(): Promise<{ ok: boolean; message?: string }
   if (!avail.available) {
     return {
       ok: false,
-      message:
-        "Tu dispositivo no tiene biometría configurada. Actívala (Face ID / huella o PIN) en los ajustes del sistema para usar el candado.",
+      message: `Biometría no disponible: ${avail.reason || "sin detalle"} [code=${avail.code}, strong=${avail.strongBiometryIsAvailable}, secure=${avail.deviceIsSecure}]`,
     };
   }
   const v = await verifyIdentity();
-  if (!v.ok) return { ok: false, message: "No se pudo verificar tu identidad. Inténtalo de nuevo." };
+  if (!v.ok) {
+    return { ok: false, message: `No se pudo verificar: ${v.message ?? "sin detalle"} [code=${v.code}]` };
+  }
   await writeFlag(true);
   notifyChanged(true);
   return { ok: true };
