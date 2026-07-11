@@ -5,10 +5,14 @@
  * esto solo tapa la UI ya autenticada con una pantalla de bloqueo hasta que el
  * usuario pase Face ID / huella (o la credencial del dispositivo como fallback).
  *
- * Aísla el acceso a los plugins nativos con imports DINÁMICOS: así el bundle no
- * los evalúa en SSR ni en la web de escritorio, solo dentro del WebView nativo.
- * El candado únicamente aplica cuando `isNativeApp()` es true.
+ * Acceso a los plugins nativos vía `registerPlugin` de @capacitor/core (SSR-safe: solo
+ * crea un proxy en import; no ejecuta nada hasta llamarlo). Se usan los plugins YA
+ * registrados por Capacitor ("BiometricAuthNative" y "Preferences") en lugar de los
+ * wrappers JS: el `await import(...)` dinámico del wrapper @aparajita NO resuelve en el
+ * WebView con remote URL y cuelga el toggle sin logs. Las llamadas siguen guardadas por
+ * `isNativeApp()`, así que el candado solo aplica dentro del contenedor nativo.
  */
+import { registerPlugin } from "@capacitor/core";
 
 /** Clave del flag persistido en @capacitor/preferences. */
 export const APP_LOCK_KEY = "appLock.enabled";
@@ -25,21 +29,60 @@ export function isNativeApp(): boolean {
   return Boolean(cap?.isNativePlatform?.());
 }
 
-async function preferences() {
-  const { Preferences } = await import("@capacitor/preferences");
-  return Preferences;
+// Interfaces locales mínimas de los plugins NATIVOS ya registrados por Capacitor.
+interface BiometricAuthNativePlugin {
+  checkBiometry(): Promise<{
+    isAvailable: boolean;
+    strongBiometryIsAvailable?: boolean;
+    deviceIsSecure?: boolean;
+    biometryType?: number;
+    code?: string;
+    reason?: string;
+  }>;
+  authenticate(options: {
+    reason?: string;
+    cancelTitle?: string;
+    allowDeviceCredential?: boolean;
+    androidTitle?: string;
+    androidSubtitle?: string;
+    iosFallbackTitle?: string;
+  }): Promise<void>;
 }
 
-async function biometricAuth() {
-  const { BiometricAuth } = await import("@aparajita/capacitor-biometric-auth");
-  return BiometricAuth;
+interface PreferencesPlugin {
+  get(options: { key: string }): Promise<{ value: string | null }>;
+  set(options: { key: string; value: string }): Promise<void>;
+  remove(options: { key: string }): Promise<void>;
+}
+
+interface AppLifecyclePlugin {
+  addListener(
+    event: "appStateChange",
+    listener: (state: { isActive: boolean }) => void,
+  ): Promise<{ remove: () => Promise<void> }>;
+}
+
+// Proxies a los plugins nativos por su nombre registrado (probado: el objeto
+// Capacitor.Plugins.BiometricAuthNative funciona de punta a punta en el emulador).
+// registerPlugin solo crea el proxy en import → SSR-safe; el bridge se resuelve al llamar.
+const BiometricAuthNative = registerPlugin<BiometricAuthNativePlugin>("BiometricAuthNative");
+const Preferences = registerPlugin<PreferencesPlugin>("Preferences");
+const AppLifecycle = registerPlugin<AppLifecyclePlugin>("App");
+
+/**
+ * Suscribe el cambio de estado de la app (foreground/background). Centraliza el acceso
+ * al plugin App para que el overlay NO haga su propio dynamic import (que también colgaba).
+ */
+export function onAppStateChange(
+  cb: (isActive: boolean) => void,
+): Promise<{ remove: () => Promise<void> }> {
+  return AppLifecycle.addListener("appStateChange", ({ isActive }) => cb(isActive));
 }
 
 /** Lee el flag persistido nativamente (false si no es la app nativa o falla). */
 export async function isAppLockEnabled(): Promise<boolean> {
   if (!isNativeApp()) return false;
   try {
-    const Preferences = await preferences();
     const { value } = await Preferences.get({ key: APP_LOCK_KEY });
     return value === "true";
   } catch {
@@ -49,7 +92,6 @@ export async function isAppLockEnabled(): Promise<boolean> {
 
 /** Persiste el flag. Uso interno (enable/disable lo hacen tras verificar biometría). */
 async function writeFlag(enabled: boolean): Promise<void> {
-  const Preferences = await preferences();
   if (enabled) await Preferences.set({ key: APP_LOCK_KEY, value: "true" });
   else await Preferences.remove({ key: APP_LOCK_KEY });
 }
@@ -112,8 +154,7 @@ export async function checkBiometryAvailable(): Promise<BiometryDiagnostic> {
     };
   }
   try {
-    const BiometricAuth = await biometricAuth();
-    const r: BiometryProbe = await BiometricAuth.checkBiometry();
+    const r: BiometryProbe = await BiometricAuthNative.checkBiometry();
     console.warn("[app-lock] checkBiometry", r);
     return {
       available: r.isAvailable ?? false,
@@ -179,8 +220,7 @@ function authOptions() {
 export async function verifyIdentity(): Promise<{ ok: boolean; code?: string; message?: string }> {
   if (!isNativeApp()) return { ok: false, code: "not-native" };
   try {
-    const BiometricAuth = await biometricAuth();
-    await BiometricAuth.authenticate(authOptions());
+    await BiometricAuthNative.authenticate(authOptions());
     return { ok: true };
   } catch (e) {
     console.warn("[app-lock] authenticate error", e);

@@ -24,6 +24,7 @@ import {
   isAppLockEnabled,
   verifyIdentity,
   clearAppLockFlagForRecovery,
+  onAppStateChange,
   APP_LOCK_EVENT,
 } from "../lib/app-lock";
 
@@ -92,13 +93,13 @@ export function AppLockOverlay() {
   }, []);
 
   // Ciclo de vida de la app: bloquea al ir a segundo plano; pide biometría al volver.
+  // Usa onAppStateChange de ../lib/app-lock (registerPlugin) — sin dynamic import (colgaba).
   useEffect(() => {
     if (!isNativeApp()) return;
-    let handle: { remove: () => void } | undefined;
+    let handle: { remove: () => Promise<void> } | undefined;
     let removed = false;
     void (async () => {
-      const { App } = await import("@capacitor/app");
-      const h = await App.addListener("appStateChange", ({ isActive }) => {
+      const h = await onAppStateChange((isActive) => {
         if (!enabledRef.current) return;
         if (!isActive) {
           // A segundo plano: bloquea inmediatamente (cubre el snapshot del switcher).
@@ -109,12 +110,12 @@ export function AppLockOverlay() {
           void runUnlock();
         }
       });
-      if (removed) h.remove();
+      if (removed) void h.remove();
       else handle = h;
     })();
     return () => {
       removed = true;
-      handle?.remove();
+      void handle?.remove();
     };
   }, [runUnlock]);
 
