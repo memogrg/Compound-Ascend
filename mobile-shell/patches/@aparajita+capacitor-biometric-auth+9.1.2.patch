@@ -1,0 +1,13 @@
+diff --git a/node_modules/@aparajita/capacitor-biometric-auth/android/build.gradle b/node_modules/@aparajita/capacitor-biometric-auth/android/build.gradle
+index cd3bbd2..06c9dd4 100644
+--- a/node_modules/@aparajita/capacitor-biometric-auth/android/build.gradle
++++ b/node_modules/@aparajita/capacitor-biometric-auth/android/build.gradle
+@@ -29,7 +29,7 @@ android {
+     buildTypes {
+         release {
+             minifyEnabled false
+-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
++            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+         }
+     }
+     lintOptions {
