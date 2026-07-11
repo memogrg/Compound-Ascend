@@ -39,7 +39,10 @@ interface BiometricAuthNativePlugin {
     code?: string;
     reason?: string;
   }>;
-  authenticate(options: {
+  // El método NATIVO real es `internalAuthenticate` (el wrapper @aparajita, que ya no
+  // usamos, exponía `authenticate` como azúcar sobre él). Llamar `authenticate` sobre el
+  // plugin nativo da UNIMPLEMENTED; `internalAuthenticate` sí dispara el diálogo.
+  internalAuthenticate(options: {
     reason?: string;
     cancelTitle?: string;
     allowDeviceCredential?: boolean;
@@ -220,7 +223,7 @@ function authOptions() {
 export async function verifyIdentity(): Promise<{ ok: boolean; code?: string; message?: string }> {
   if (!isNativeApp()) return { ok: false, code: "not-native" };
   try {
-    await BiometricAuthNative.authenticate(authOptions());
+    await BiometricAuthNative.internalAuthenticate(authOptions());
     return { ok: true };
   } catch (e) {
     console.warn("[app-lock] authenticate error", e);
