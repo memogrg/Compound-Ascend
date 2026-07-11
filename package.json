@@ -15,7 +15,7 @@
     "test:eval": "vitest run tests/evals"
   },
   "dependencies": {
-    "@aparajita/capacitor-biometric-auth": "^10.0.0",
+    "@aparajita/capacitor-biometric-auth": "^9.1.2",
     "@capacitor/app": "^7.1.2",
     "@capacitor/core": "^7.6.7",
     "@capacitor/preferences": "^7.0.4",
