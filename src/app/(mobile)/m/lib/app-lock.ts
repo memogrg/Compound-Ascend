@@ -86,23 +86,50 @@ export async function checkBiometryAvailable(): Promise<{ available: boolean; re
   }
 }
 
-// Opciones de la verificación: permite fallback a la credencial del dispositivo
-// (PIN/patrón/passcode) cuando la biometría falla o no está disponible.
-const AUTH_OPTIONS = {
-  reason: "Desbloquea CARTERA+",
-  cancelTitle: "Cancelar",
-  allowDeviceCredential: true,
-  androidTitle: "CARTERA+ bloqueado",
-  androidSubtitle: "Usa tu biometría o el bloqueo del dispositivo",
-  iosFallbackTitle: "Usar código",
-};
+/** Versión mayor de Android desde el user-agent del WebView (null si no es Android). */
+function androidMajorVersion(): number | null {
+  if (typeof navigator === "undefined") return null;
+  const m = /Android (\d+)/.exec(navigator.userAgent);
+  if (!m || !m[1]) return null;
+  return parseInt(m[1], 10);
+}
+
+/**
+ * ¿Permitir el fallback a la credencial del dispositivo (PIN/patrón/passcode)?
+ *
+ * Android 10 y anteriores (API ≤ 29) tienen un bug conocido de BiometricPrompt con
+ * BIOMETRIC_STRONG|DEVICE_CREDENTIAL: la huella aparece pero NO completa la
+ * autenticación (visto en Huawei/EMUI, p. ej. P30 con Android 10). Por eso el fallback
+ * a credencial solo se habilita en Android 11+ (API 30+); en Android ≤ 10 la biometría
+ * va sola (enable y verify). En iOS/web no aplica el bug → fallback permitido. Si aun
+ * así no se puede autenticar, el escape es la recuperación por logout del overlay.
+ */
+function deviceCredentialAllowed(): boolean {
+  const android = androidMajorVersion();
+  return android === null || android >= 11;
+}
+
+// Opciones de la verificación. `allowDeviceCredential` se decide por plataforma/versión.
+function authOptions() {
+  const allowDeviceCredential = deviceCredentialAllowed();
+  return {
+    reason: "Desbloquea CARTERA+",
+    cancelTitle: "Cancelar",
+    allowDeviceCredential,
+    androidTitle: "CARTERA+ bloqueado",
+    androidSubtitle: allowDeviceCredential
+      ? "Usa tu biometría o el bloqueo del dispositivo"
+      : "Usa tu biometría",
+    iosFallbackTitle: "Usar código",
+  };
+}
 
 /** Corre la verificación biométrica. `ok=true` si autenticó; si no, incluye el `code`. */
 export async function verifyIdentity(): Promise<{ ok: boolean; code?: string }> {
   if (!isNativeApp()) return { ok: false, code: "not-native" };
   try {
     const BiometricAuth = await biometricAuth();
-    await BiometricAuth.authenticate(AUTH_OPTIONS);
+    await BiometricAuth.authenticate(authOptions());
     return { ok: true };
   } catch (e) {
     const code = (e as { code?: string })?.code ?? "unknown";
