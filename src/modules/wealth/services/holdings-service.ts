@@ -116,7 +116,7 @@ export async function registerPurchaseExpense(args: {
   verb: "Compra" | "Aporte" | "Prima" | "Adelanto";
 }): Promise<string | null> {
   if (args.amount <= 0) return null;
-  return registerLinkedTransaction(
+  const id = await registerLinkedTransaction(
     holdingPurchaseToTxn({
       holdingId: args.holdingId,
       label: args.label,
@@ -127,6 +127,18 @@ export async function registerPurchaseExpense(args: {
       categoryId: await getSystemCategoryId("inversiones"),
     }),
   );
+  // Defensivo: garantizar el vínculo al holding. Aunque holdingPurchaseToTxn ya lo
+  // setea, blindamos por si createTransaction lo normaliza a 'none' en algún flujo.
+  if (id) {
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+    await supabase
+      .from("transactions")
+      .update({ linked_kind: "holding", linked_id: args.holdingId })
+      .eq("id", id)
+      .eq("user_id", user.id);
+  }
+  return id;
 }
 
 /**
