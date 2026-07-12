@@ -3,6 +3,7 @@ import { getUser } from "@/lib/auth/session";
 import { MobileTabBar } from "../components/mobile-tab-bar";
 import { ToastProvider } from "../components/form-kit/toast";
 import { AppLockOverlay } from "../components/app-lock-overlay";
+import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
 
 /**
  * Layout de las pantallas AUTENTICADAS del móvil. Usa la sesión existente
@@ -25,6 +26,8 @@ export default async function MobileAppLayout({ children }: { children: React.Re
       {/* Candado local con biometría (solo app nativa): se monta primero para tapar
           la UI lo antes posible al reanudar. No afecta a la web. */}
       <AppLockOverlay />
+      {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
+      <WidgetSnapshotWriter />
       {children}
       <MobileTabBar />
     </ToastProvider>

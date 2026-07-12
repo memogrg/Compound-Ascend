@@ -4,4 +4,6 @@
     <string name="title_activity_main">CARTERA+</string>
     <string name="package_name">com.compoundascend.cartera</string>
     <string name="custom_url_scheme">com.compoundascend.cartera</string>
+    <string name="widget_patrimonio_label">Patrimonio neto</string>
+    <string name="widget_patrimonio_desc">Tu patrimonio neto de un vistazo.</string>
 </resources>
