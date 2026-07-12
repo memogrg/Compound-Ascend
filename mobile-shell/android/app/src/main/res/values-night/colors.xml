@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Variante oscura del design system CARTERA+ (widgets). -->
+    <color name="widget_canvas">#15140F</color>
+    <color name="widget_text">#F1EFE8</color>
+    <color name="widget_muted">#9A9484</color>
+    <color name="widget_accent">#5AB07A</color>
+</resources>

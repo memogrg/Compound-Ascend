@@ -9,8 +9,9 @@ import {
   updateLiability,
   deleteAsset,
   deleteLiability,
+  getRichLifeSummary,
 } from "@/modules/rich-life/services/rich-life-service";
-import { isSupabaseConfigured } from "@/lib/auth/session";
+import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
@@ -99,5 +100,45 @@ export async function removeLiabilityAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+// ── Widget de pantalla de inicio (Android) ───────────────────────────────────
+
+/**
+ * Snapshot mínimo que la app escribe para el widget de "Patrimonio neto". REUSA el mismo
+ * valor de patrimonio neto que muestran el dashboard y /m/patrimonio (getRichLifeSummary),
+ * sin recalcular nada. `trendPct` = variación % vs el snapshot de patrimonio anterior.
+ */
+export type WidgetSnapshot = {
+  patrimonioNeto: number;
+  currency: string;
+  trendPct: number | null;
+  updatedAt: string; // ISO
+};
+
+export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    await requireUser();
+    const summary = await getRichLifeSummary();
+    const ind = summary.snapshot.indicators;
+    // `wealthVelocity` es el Δ mensual del patrimonio neto (dato ya calculado). El % vs
+    // mes = Δ / patrimonio del mes anterior (= netWorth − Δ); null si no hay base previa.
+    const vel = ind.wealthVelocity;
+    let trendPct: number | null = null;
+    if (vel !== null) {
+      const prev = ind.netWorth - vel;
+      if (prev !== 0) trendPct = (vel / Math.abs(prev)) * 100;
+    }
+    return {
+      patrimonioNeto: ind.netWorth,
+      currency: summary.currency,
+      trendPct,
+      updatedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    logger.error("getWidgetSnapshot fallido", { message: err instanceof Error ? err.message : "?" });
+    return null;
   }
 }
