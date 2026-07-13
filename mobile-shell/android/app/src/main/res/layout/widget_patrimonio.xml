@@ -54,10 +54,11 @@
             android:adjustViewBounds="true"
             android:contentDescription="@null" />
 
-        <View
+        <ImageView
             android:layout_width="0dp"
             android:layout_height="1dp"
-            android:layout_weight="1" />
+            android:layout_weight="1"
+            android:contentDescription="@null" />
 
         <TextView
             android:id="@+id/tv_trend"
@@ -107,12 +108,13 @@
                 android:textColor="@color/widget_accent" />
         </LinearLayout>
 
-        <View
+        <ImageView
             android:layout_width="1dp"
             android:layout_height="24dp"
             android:layout_gravity="center_vertical"
             android:layout_marginHorizontal="12dp"
-            android:background="@color/widget_border" />
+            android:background="@color/widget_border"
+            android:contentDescription="@null" />
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -139,12 +141,13 @@
                 android:textColor="@color/widget_danger" />
         </LinearLayout>
 
-        <View
+        <ImageView
             android:layout_width="1dp"
             android:layout_height="24dp"
             android:layout_gravity="center_vertical"
             android:layout_marginHorizontal="12dp"
-            android:background="@color/widget_border" />
+            android:background="@color/widget_border"
+            android:contentDescription="@null" />
 
         <LinearLayout
             android:layout_width="wrap_content"
