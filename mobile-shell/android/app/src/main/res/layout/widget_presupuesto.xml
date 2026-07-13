@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget "Presupuesto del mes" — mismo look premium que Patrimonio, robusto para RemoteViews:
+     SIN <View>/<Space>/@font/vector/radial. El monto (gastado / presupuestado) se pinta como
+     Bitmap Space Mono en el provider; barra con ProgressBar horizontal; textos del sistema. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="18dp">
+
+    <!-- Fila 1: etiqueta + logo (PNG) -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/tv_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:text="PRESUPUESTO DEL MES"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="10sp"
+            android:letterSpacing="0.14"
+            android:textColor="@color/widget_muted" />
+
+        <ImageView
+            android:id="@+id/iv_logo"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/logo_cartera"
+            android:contentDescription="CARTERA+" />
+    </RelativeLayout>
+
+    <!-- Fila 2: gastado / presupuestado (bitmap Space Mono) -->
+    <ImageView
+        android:id="@+id/iv_amount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:layout_marginTop="8dp"
+        android:contentDescription="@null" />
+
+    <!-- Fila 3: barra de progreso del % gastado -->
+    <ProgressBar
+        android:id="@+id/pb_budget"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="8dp"
+        android:layout_marginTop="12dp"
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@drawable/pb_budget" />
+
+    <!-- Fila 4: % usado + restante/exceso -->
+    <TextView
+        android:id="@+id/tv_pct"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:text=""
+        android:fontFamily="sans-serif-medium"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:textColor="@color/widget_accent" />
+
+    <!-- Fila 5: actualizado hh:mm -->
+    <TextView
+        android:id="@+id/tv_updated"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text=""
+        android:fontFamily="sans-serif"
+        android:textSize="9.5sp"
+        android:textColor="@color/widget_muted" />
+</LinearLayout>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ProgressDrawable horizontal del widget Presupuesto: track accent-soft + progreso accent,
+     esquinas redondeadas. Sin gradiente (robusto para RemoteViews/EMUI). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="4dp" />
+            <solid android:color="@color/widget_accent_soft" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp" />
+                <solid android:color="@color/widget_accent" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

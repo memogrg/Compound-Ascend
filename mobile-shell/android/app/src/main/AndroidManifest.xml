@@ -52,6 +52,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_patrimonio_info" />
         </receiver>
+
+        <!-- Widget de pantalla de inicio "Presupuesto del mes" (RemoteViews). Mismo puente. -->
+        <receiver
+            android:name=".WidgetPresupuestoProvider"
+            android:label="@string/widget_presupuesto_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_presupuesto_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

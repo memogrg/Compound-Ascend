@@ -31,17 +31,22 @@ public class WidgetBridge extends Plugin {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         prefs.edit().putString(KEY_SNAPSHOT, data).apply();
 
-        // Fuerza el repintado de los widgets ya colocados (si los hay).
+        // Fuerza el repintado de TODOS los widgets ya colocados (Patrimonio y Presupuesto).
+        refresh(ctx, WidgetPatrimonioProvider.class);
+        refresh(ctx, WidgetPresupuestoProvider.class);
+
+        call.resolve();
+    }
+
+    /** Broadcast EXPLÍCITO de APPWIDGET_UPDATE al provider dado, con sus ids colocados. */
+    private static void refresh(Context ctx, Class<?> provider) {
         AppWidgetManager mgr = AppWidgetManager.getInstance(ctx);
-        ComponentName provider = new ComponentName(ctx, WidgetPatrimonioProvider.class);
-        int[] ids = mgr.getAppWidgetIds(provider);
+        int[] ids = mgr.getAppWidgetIds(new ComponentName(ctx, provider));
         if (ids != null && ids.length > 0) {
-            Intent intent = new Intent(ctx, WidgetPatrimonioProvider.class);
+            Intent intent = new Intent(ctx, provider);
             intent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
             intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids);
             ctx.sendBroadcast(intent);
         }
-
-        call.resolve();
     }
 }
