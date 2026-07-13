@@ -1,33 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fondo PREMIUM del widget (variante OSCURA) — tokens .dark de mobile.css.
-     Capa 1: linear ~155° de color-mix(accent 14%, surface)=#253122 a surface=#1E1C16, borde
-     1dp accent 26%=#374E38. Capa 2: glow radial accent(#51AF6F) @22% -> transparente. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="24dp" />
-            <gradient
-                android:type="linear"
-                android:angle="315"
-                android:startColor="#253122"
-                android:endColor="#1E1C16" />
-            <stroke
-                android:width="1dp"
-                android:color="#374E38" />
-        </shape>
-    </item>
-
-    <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="24dp" />
-            <gradient
-                android:type="radial"
-                android:centerX="0.82"
-                android:centerY="0.0"
-                android:gradientRadius="170dp"
-                android:startColor="#3851AF6F"
-                android:endColor="#0051AF6F" />
-        </shape>
-    </item>
-</layer-list>
+<!-- Fondo del widget (OSCURO) — robusto para RemoteViews/EMUI: gradiente LINEAL redondeado +
+     borde acento (sin la capa radial). Tokens .dark del design system. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="24dp" />
+    <gradient
+        android:type="linear"
+        android:angle="315"
+        android:startColor="#253122"
+        android:endColor="#1E1C16" />
+    <stroke
+        android:width="1dp"
+        android:color="#374E38" />
+</shape>

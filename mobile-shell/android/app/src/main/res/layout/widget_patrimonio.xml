@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget "Patrimonio neto" PREMIUM — clon de la tarjeta hero de /m (mobile.css .hero-nw).
-     Solo vistas soportadas por RemoteViews. Marca real (logo_cartera), Space Mono en el monto
-     y Sora SemiBold en la fila de flujo. Layout/estilo reusable por los widgets #2/#3/#4. -->
+<!-- Widget "Patrimonio neto" — versión ROBUSTA para RemoteViews (EMUI/Android 10).
+     SIN fuentes @font ni vector drawables (el launcher de EMUI no los infla): el monto grande
+     se pinta como BITMAP en el provider con Space Mono real; los textos chicos usan fuentes del
+     sistema (sans-serif-medium); el logo es un PNG. El look premium sale del fondo + el bitmap. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -10,7 +11,7 @@
     android:background="@drawable/widget_bg"
     android:padding="18dp">
 
-    <!-- Fila 1: etiqueta + logo -->
+    <!-- Fila 1: etiqueta + logo (PNG) -->
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -22,7 +23,7 @@
             android:layout_alignParentStart="true"
             android:layout_centerVertical="true"
             android:text="PATRIMONIO NETO"
-            android:fontFamily="@font/space_mono_bold"
+            android:fontFamily="sans-serif-medium"
             android:textSize="10sp"
             android:letterSpacing="0.14"
             android:textColor="@color/widget_muted" />
@@ -37,7 +38,7 @@
             android:contentDescription="CARTERA+" />
     </RelativeLayout>
 
-    <!-- Fila 2: monto (símbolo + número) a la izquierda, tendencia a la derecha -->
+    <!-- Fila 2: monto (bitmap Space Mono) a la izquierda, tendencia a la derecha -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -46,37 +47,17 @@
         android:gravity="bottom"
         android:layout_marginTop="8dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <ImageView
+            android:id="@+id/iv_amount"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="horizontal"
-            android:baselineAligned="false"
-            android:gravity="top">
+            android:adjustViewBounds="true"
+            android:contentDescription="@null" />
 
-            <TextView
-                android:id="@+id/tv_cur"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="3dp"
-                android:layout_marginTop="2dp"
-                android:text="₡"
-                android:fontFamily="@font/space_mono_bold"
-                android:textSize="17sp"
-                android:textColor="@color/widget_muted" />
-
-            <TextView
-                android:id="@+id/tv_valor"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="—"
-                android:fontFamily="@font/space_mono_bold"
-                android:textSize="30sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:includeFontPadding="false"
-                android:textColor="@color/widget_text" />
-        </LinearLayout>
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
 
         <TextView
             android:id="@+id/tv_trend"
@@ -85,13 +66,13 @@
             android:layout_marginStart="8dp"
             android:paddingBottom="3dp"
             android:text=""
-            android:fontFamily="@font/space_mono_bold"
+            android:fontFamily="sans-serif-medium"
             android:textSize="12sp"
             android:maxLines="1"
             android:textColor="@color/widget_accent" />
     </LinearLayout>
 
-    <!-- Fila 3: Ingresos · Gastos · Flujo (misma info que el hero del dashboard) -->
+    <!-- Fila 3: Ingresos · Gastos · Flujo (fuentes del sistema) -->
     <LinearLayout
         android:id="@+id/flow_row"
         android:layout_width="match_parent"
@@ -107,11 +88,10 @@
             android:orientation="vertical">
 
             <TextView
-                android:id="@+id/tv_income_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Ingresos"
-                android:fontFamily="@font/space_mono"
+                android:fontFamily="sans-serif"
                 android:textSize="9sp"
                 android:textColor="@color/widget_muted" />
 
@@ -121,7 +101,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text=""
-                android:fontFamily="@font/sora_semibold"
+                android:fontFamily="sans-serif-medium"
                 android:textSize="13sp"
                 android:maxLines="1"
                 android:textColor="@color/widget_accent" />
@@ -143,7 +123,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Gastos"
-                android:fontFamily="@font/space_mono"
+                android:fontFamily="sans-serif"
                 android:textSize="9sp"
                 android:textColor="@color/widget_muted" />
 
@@ -153,7 +133,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text=""
-                android:fontFamily="@font/sora_semibold"
+                android:fontFamily="sans-serif-medium"
                 android:textSize="13sp"
                 android:maxLines="1"
                 android:textColor="@color/widget_danger" />
@@ -175,7 +155,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Flujo"
-                android:fontFamily="@font/space_mono"
+                android:fontFamily="sans-serif"
                 android:textSize="9sp"
                 android:textColor="@color/widget_muted" />
 
@@ -185,7 +165,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text=""
-                android:fontFamily="@font/sora_semibold"
+                android:fontFamily="sans-serif-medium"
                 android:textSize="13sp"
                 android:maxLines="1"
                 android:textColor="@color/widget_accent" />
@@ -199,7 +179,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
         android:text=""
-        android:fontFamily="@font/space_mono"
+        android:fontFamily="sans-serif"
         android:textSize="9.5sp"
         android:textColor="@color/widget_muted" />
 </LinearLayout>
