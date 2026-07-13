@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Variante oscura del design system CARTERA+ (widgets). -->
-    <color name="widget_canvas">#15140F</color>
-    <color name="widget_text">#F1EFE8</color>
-    <color name="widget_muted">#9A9484</color>
-    <color name="widget_accent">#5AB07A</color>
+    <!-- Variante oscura del design system CARTERA+ (widgets) — tokens .dark de mobile.css. -->
+    <color name="widget_canvas">#15140F</color>   <!-- canvas -->
+    <color name="widget_surface">#1E1C16</color>  <!-- surface -->
+    <color name="widget_text">#F4F2EC</color>     <!-- text -->
+    <color name="widget_muted">#A6A199</color>    <!-- text-muted -->
+    <color name="widget_accent">#51AF6F</color>   <!-- accent / success -->
+    <color name="widget_danger">#D46B62</color>   <!-- danger -->
+    <color name="widget_border">#2E2C24</color>   <!-- border (divisores) -->
 </resources>

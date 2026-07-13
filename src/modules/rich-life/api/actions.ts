@@ -10,6 +10,7 @@ import {
   deleteAsset,
   deleteLiability,
   getRichLifeSummary,
+  aggregateNetWorth,
 } from "@/modules/rich-life/services/rich-life-service";
 import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -106,14 +107,19 @@ export async function removeLiabilityAction(id: string): Promise<ActionResult> {
 // ── Widget de pantalla de inicio (Android) ───────────────────────────────────
 
 /**
- * Snapshot mínimo que la app escribe para el widget de "Patrimonio neto". REUSA el mismo
- * valor de patrimonio neto que muestran el dashboard y /m/patrimonio (getRichLifeSummary),
- * sin recalcular nada. `trendPct` = variación % vs el snapshot de patrimonio anterior.
+ * Snapshot mínimo que la app escribe para el widget de "Patrimonio neto". REUSA los mismos
+ * valores que muestra el hero del dashboard/patrimonio, sin recalcular nada:
+ *  - `patrimonioNeto`/`trendPct`: getRichLifeSummary (patrimonio neto + Δ mensual).
+ *  - `incomeMonthly`/`expenseMonthly`/`freeCashflow`: aggregateNetWorth → base.indicators.*
+ *    (idénticos a la fila Ingresos·Gastos·Flujo del dashboard). `null` si no están a mano.
  */
 export type WidgetSnapshot = {
   patrimonioNeto: number;
   currency: string;
   trendPct: number | null;
+  incomeMonthly: number | null;
+  expenseMonthly: number | null;
+  freeCashflow: number | null;
   updatedAt: string; // ISO
 };
 
@@ -131,10 +137,30 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       const prev = ind.netWorth - vel;
       if (prev !== 0) trendPct = (vel / Math.abs(prev)) * 100;
     }
+
+    // Fila Ingresos·Gastos·Flujo: mismos valores (base.indicators.*) que el hero del
+    // dashboard. Best-effort e independiente: si falla, la tarjeta se enfoca en el número.
+    let incomeMonthly: number | null = null;
+    let expenseMonthly: number | null = null;
+    let freeCashflow: number | null = null;
+    try {
+      const agg = await aggregateNetWorth();
+      incomeMonthly = agg.netMonthlyIncome;
+      expenseMonthly = agg.monthlyExpenses;
+      freeCashflow = agg.freeCashflow;
+    } catch (e) {
+      logger.warn("getWidgetSnapshot flujo no disponible", {
+        message: e instanceof Error ? e.message : "?",
+      });
+    }
+
     return {
       patrimonioNeto: ind.netWorth,
       currency: summary.currency,
       trendPct,
+      incomeMonthly,
+      expenseMonthly,
+      freeCashflow,
       updatedAt: new Date().toISOString(),
     };
   } catch (err) {
