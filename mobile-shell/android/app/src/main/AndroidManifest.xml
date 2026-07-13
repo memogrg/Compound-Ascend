@@ -78,6 +78,19 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_proximo_pago_info" />
         </receiver>
+
+        <!-- Widget de pantalla de inicio "Indicador económico" (RemoteViews). Mismo puente. -->
+        <receiver
+            android:name=".WidgetIndicadorProvider"
+            android:label="@string/widget_indicador_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_indicador_info" />
+        </receiver>
     </application>
 
     <!-- Permissions -->

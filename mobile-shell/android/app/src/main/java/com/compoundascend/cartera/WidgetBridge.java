@@ -35,6 +35,7 @@ public class WidgetBridge extends Plugin {
         refresh(ctx, WidgetPatrimonioProvider.class);
         refresh(ctx, WidgetPresupuestoProvider.class);
         refresh(ctx, WidgetProximoPagoProvider.class);
+        refresh(ctx, WidgetIndicadorProvider.class);
 
         call.resolve();
     }

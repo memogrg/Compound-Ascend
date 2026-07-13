@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Refresco: la app (WidgetBridge) escribe el snapshot al abrirse; por eso updatePeriodMillis=0,
+     igual que los otros widgets. NOTA (v2): como el indicador es global (sin sesión), un refresh de
+     fondo podría hacerse con updatePeriodMillis>=1800000 + un onUpdate que consulte el endpoint
+     público de indicadores; en v1 basta el snapshot al abrir la app. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:resizeMode="horizontal|vertical"
+    android:initialLayout="@layout/widget_indicador"
+    android:previewLayout="@layout/widget_indicador"
+    android:widgetCategory="home_screen" />
