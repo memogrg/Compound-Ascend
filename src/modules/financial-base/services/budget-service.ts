@@ -14,6 +14,7 @@ import {
 import {
   getRealTotals,
   createTransaction,
+  listTransactions,
 } from "@/modules/financial-base/services/transaction-service";
 import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
@@ -518,6 +519,32 @@ export async function getBudgetTotals(period: Period): Promise<BudgetTotals> {
   }
 
   return { budgetIncome, budgetExpense, incomeByKey, expenseByKey, nativeByKey, items, currency };
+}
+
+/**
+ * Presupuesto vs gasto REAL por CATEGORÍA del periodo, ambos convertidos a la moneda de
+ * visualización y EXCLUYENDO los movimientos enlazados a entidades (inversiones/deudas/metas/
+ * pólizas/alquileres): el presupuesto usa solo budget_items de categoría MANUALES y el real
+ * solo transacciones `gasto` con linkedKind='none'. Es la comparación "gastado vs presupuestado"
+ * del tab de Gastos (frascos de sobres), sin el doble conteo de compras de inversión / pagos de
+ * deuda / aportes a metas que infla el total crudo. Para el widget de "Presupuesto del mes".
+ */
+export async function getExpenseBudgetVsReal(
+  period: Period,
+): Promise<{ budgetExpense: number; realExpense: number }> {
+  const [items, txns, currency, rates] = await Promise.all([
+    listBudgetItems(period),
+    listTransactions(period),
+    getDisplayCurrency(),
+    getFxRates(),
+  ]);
+  const budgetExpense = items
+    .filter((it) => it.type === "expense" && (it.sourceKind ?? "manual") === "manual")
+    .reduce((sum, it) => sum + convertCurrency(it.amount, it.currency, currency, rates), 0);
+  const realExpense = txns
+    .filter((t) => t.kind === "gasto" && (t.linkedKind ?? "none") === "none")
+    .reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, currency, rates), 0);
+  return { budgetExpense, realExpense };
 }
 
 /**
