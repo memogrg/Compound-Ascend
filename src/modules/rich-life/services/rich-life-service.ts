@@ -373,6 +373,10 @@ export async function aggregateNetWorth(ctx?: AuthContext): Promise<NetWorthAggr
     {
       freeCashflow: base.indicators.freeCashflow,
       hasEmergencyFund: assets.some((a) => a.assetClass === "liquido"),
+      // Vista secundaria (Rich Life): no consulta metas, así que reutiliza el
+      // mismo proxy de liquidez para el fondo de paz. La pantalla autoritativa
+      // de protección (Patrimonio) sí detecta ambos fondos por goal_type.
+      hasPeaceFund: assets.some((a) => a.assetClass === "liquido"),
       hasCriticalDebt,
       dependents: profileRow.data?.dependents_count ?? 0,
       riskClassKnown: true,

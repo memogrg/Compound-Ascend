@@ -223,12 +223,19 @@ export async function getWealthSummary(): Promise<WealthSummary> {
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase.from("risk_profiles").select("risk_class").eq("user_id", user.id).maybeSingle(),
-    supabase.from("savings_goals").select("name,current_amount").eq("user_id", user.id),
+    supabase.from("savings_goals").select("name,current_amount,goal_type").eq("user_id", user.id),
     supabase.from("debts").select("apr,delinquency,balance").eq("user_id", user.id),
   ]);
 
   const hasEmergencyFund = (goals ?? []).some(
-    (g) => /emergencia|paz/i.test(g.name ?? "") && Number(g.current_amount) > 0,
+    (g) =>
+      (g.goal_type === "defensa:fondo_emergencia" || /emergencia/i.test(g.name ?? "")) &&
+      Number(g.current_amount) > 0,
+  );
+  const hasPeaceFund = (goals ?? []).some(
+    (g) =>
+      (g.goal_type === "defensa:fondo_paz" || /\bpaz\b/i.test(g.name ?? "")) &&
+      Number(g.current_amount) > 0,
   );
   const hasCriticalDebt = (debts ?? []).some(
     (d) =>
@@ -239,6 +246,7 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   const ctx = {
     freeCashflow: base.indicators.freeCashflow,
     hasEmergencyFund,
+    hasPeaceFund,
     hasCriticalDebt,
     dependents: profile?.dependents_count ?? 0,
     riskClassKnown: Boolean(risk?.risk_class),
@@ -321,7 +329,7 @@ export function buildDemoWealthSummary(): WealthSummary {
     },
     {
       id: "p2",
-      policyType: "medico",
+      policyType: "gastos_mayores",
       provider: "Aseguradora",
       coverage: 50_000_000,
       premium: 35_000,
@@ -341,6 +349,7 @@ export function buildDemoWealthSummary(): WealthSummary {
   const ctx = {
     freeCashflow: 175_000,
     hasEmergencyFund: true,
+    hasPeaceFund: true,
     hasCriticalDebt: false,
     dependents: 2,
     riskClassKnown: true,

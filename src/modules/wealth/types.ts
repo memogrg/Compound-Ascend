@@ -118,6 +118,7 @@ export type ProtectionDiagnosis = {
 export type WealthContext = {
   freeCashflow: number;
   hasEmergencyFund: boolean;
+  hasPeaceFund: boolean;
   hasCriticalDebt: boolean;
   dependents: number;
   riskClassKnown: boolean;
