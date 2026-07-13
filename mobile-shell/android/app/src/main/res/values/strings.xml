@@ -6,4 +6,6 @@
     <string name="custom_url_scheme">com.compoundascend.cartera</string>
     <string name="widget_patrimonio_label">Patrimonio neto</string>
     <string name="widget_patrimonio_desc">Tu patrimonio neto de un vistazo.</string>
+    <string name="widget_presupuesto_label">Presupuesto del mes</string>
+    <string name="widget_presupuesto_desc">Gastado vs presupuestado del mes.</string>
 </resources>

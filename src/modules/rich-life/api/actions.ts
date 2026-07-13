@@ -12,6 +12,7 @@ import {
   getRichLifeSummary,
   aggregateNetWorth,
 } from "@/modules/rich-life/services/rich-life-service";
+import { getBaseSummary } from "@/modules/financial-base";
 import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -112,6 +113,8 @@ export async function removeLiabilityAction(id: string): Promise<ActionResult> {
  *  - `patrimonioNeto`/`trendPct`: getRichLifeSummary (patrimonio neto + Δ mensual).
  *  - `incomeMonthly`/`expenseMonthly`/`freeCashflow`: aggregateNetWorth → base.indicators.*
  *    (idénticos a la fila Ingresos·Gastos·Flujo del dashboard). `null` si no están a mano.
+ *  - `budgetExpense`/`realExpense`: getBaseSummary V2 (gastado vs presupuestado del mes) para el
+ *    widget "Presupuesto del mes". `null` si no hay presupuesto/transacciones este mes.
  */
 export type WidgetSnapshot = {
   patrimonioNeto: number;
@@ -120,6 +123,8 @@ export type WidgetSnapshot = {
   incomeMonthly: number | null;
   expenseMonthly: number | null;
   freeCashflow: number | null;
+  budgetExpense: number | null;
+  realExpense: number | null;
   updatedAt: string; // ISO
 };
 
@@ -154,6 +159,20 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       });
     }
 
+    // Gastado vs presupuestado del mes (campos V2 de getBaseSummary) para el widget de
+    // Presupuesto. Best-effort e independiente: quedan null si no hay presupuesto este mes.
+    let budgetExpense: number | null = null;
+    let realExpense: number | null = null;
+    try {
+      const base = await getBaseSummary();
+      budgetExpense = base.budgetExpense ?? null;
+      realExpense = base.realExpense ?? null;
+    } catch (e) {
+      logger.warn("getWidgetSnapshot presupuesto no disponible", {
+        message: e instanceof Error ? e.message : "?",
+      });
+    }
+
     return {
       patrimonioNeto: ind.netWorth,
       currency: summary.currency,
@@ -161,6 +180,8 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       incomeMonthly,
       expenseMonthly,
       freeCashflow,
+      budgetExpense,
+      realExpense,
       updatedAt: new Date().toISOString(),
     };
   } catch (err) {

@@ -7,6 +7,7 @@
     <color name="widget_text">#1E1C16</color>     <!-- text (ink) -->
     <color name="widget_muted">#807C72</color>    <!-- text-muted -->
     <color name="widget_accent">#378451</color>   <!-- accent / success -->
+    <color name="widget_accent_soft">#2E378451</color> <!-- accent ~18% (track de progreso) -->
     <color name="widget_danger">#C34F4B</color>   <!-- danger -->
     <color name="widget_border">#E7E4DC</color>   <!-- border (divisores) -->
 </resources>

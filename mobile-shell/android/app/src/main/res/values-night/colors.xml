@@ -6,6 +6,7 @@
     <color name="widget_text">#F4F2EC</color>     <!-- text -->
     <color name="widget_muted">#A6A199</color>    <!-- text-muted -->
     <color name="widget_accent">#51AF6F</color>   <!-- accent / success -->
+    <color name="widget_accent_soft">#3351AF6F</color> <!-- accent ~20% (track de progreso) -->
     <color name="widget_danger">#D46B62</color>   <!-- danger -->
     <color name="widget_border">#2E2C24</color>   <!-- border (divisores) -->
 </resources>
