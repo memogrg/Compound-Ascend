@@ -444,6 +444,16 @@ export async function deleteHolding(id: string): Promise<void> {
   // Fase 3: borrar un stub revierte las fuentes de ingreso vinculadas (la
   // FK ON DELETE SET NULL solo desvincularía; aquí sí queremos eliminarlas).
   await deleteIncomeSourcesByHolding(id);
+  // Limpiar las transacciones de aporte/compra vinculadas al holding: linked_id es
+  // polimórfico (no puede tener FK CASCADE), así que se borran acá para no dejar
+  // gastos huérfanos ("Aporte — X"/"Compra — X") apuntando a una inversión inexistente.
+  const { error: txErr } = await supabase
+    .from("transactions")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("linked_kind", "holding")
+    .eq("linked_id", id);
+  if (txErr) throw new Error(txErr.message);
   const { error } = await supabase
     .from("investment_holdings")
     .delete()
