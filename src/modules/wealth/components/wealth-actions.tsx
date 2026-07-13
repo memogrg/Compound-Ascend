@@ -295,6 +295,7 @@ function PolicyForm({
 }) {
   const action = item ? (raw: unknown) => editPolicyAction(item.id, raw) : addPolicyAction;
   const { pending, message, run } = useSubmit(action);
+  const [cur, setCur] = useState<string>(item?.currency ?? currency);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -306,7 +307,7 @@ function PolicyForm({
         coverage: Number(fd.get("coverage") ?? 0) || undefined,
         premium: Number(fd.get("premium") ?? 0) || undefined,
         premiumFrequency: String(fd.get("premiumFrequency") ?? "mensual"),
-        currency: String(fd.get("currency") ?? currency),
+        currency: cur,
       },
       onDone,
       form,
@@ -345,13 +346,13 @@ function PolicyForm({
           <Money
             label="Suma asegurada"
             name="coverage"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.coverage ?? undefined}
           />
           <Money
             label="Prima"
             name="premium"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.premium ?? undefined}
           />
         </div>
@@ -371,7 +372,12 @@ function PolicyForm({
           </div>
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
+            <select
+              className="sel"
+              name="currency"
+              value={cur}
+              onChange={(e) => setCur(e.target.value)}
+            >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}

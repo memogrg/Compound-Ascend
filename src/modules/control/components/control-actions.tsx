@@ -204,6 +204,7 @@ function GoalForm({
 }) {
   const action = item ? (raw: unknown) => editGoalAction(item.id, raw) : addGoalAction;
   const { pending, errors, message, run } = useFormSubmit(action);
+  const [cur, setCur] = useState<string>(item?.currency ?? currency);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -215,7 +216,7 @@ function GoalForm({
         targetAmount: Number(fd.get("targetAmount") ?? 0),
         currentAmount: Number(fd.get("currentAmount") ?? 0),
         monthlyContribution: Number(fd.get("monthlyContribution") ?? 0),
-        currency: String(fd.get("currency") ?? currency),
+        currency: cur,
         targetDate: String(fd.get("targetDate") ?? "") || undefined,
         priority: String(fd.get("priority") ?? "media"),
       },
@@ -252,14 +253,14 @@ function GoalForm({
           <Money
             label="Monto meta"
             name="targetAmount"
-            currency={currency}
+            currency={cur}
             error={errors.targetAmount}
             defaultValue={item?.targetAmount}
           />
           <Money
             label="Acumulado"
             name="currentAmount"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.currentAmount}
           />
         </div>
@@ -267,7 +268,7 @@ function GoalForm({
           <Money
             label="Aporte mensual"
             name="monthlyContribution"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.monthlyContribution}
           />
           <div className="fld">
@@ -283,7 +284,12 @@ function GoalForm({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
+            <select
+              className="sel"
+              name="currency"
+              value={cur}
+              onChange={(e) => setCur(e.target.value)}
+            >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -330,6 +336,7 @@ function DebtForm({
 }) {
   const action = item ? (raw: unknown) => editDebtAction(item.id, raw) : addDebtAction;
   const { pending, errors, message, run } = useFormSubmit(action);
+  const [cur, setCur] = useState<string>(item?.currency ?? currency);
   const [rateType, setRateType] = useState<"fija" | "variable">(item?.rateType ?? "fija");
 
   const totalTerm = item?.termMonths ?? 0;
@@ -367,7 +374,7 @@ function DebtForm({
   const bal = Number(balance) || 0;
   const suggested =
     bal > 0 && termTotal > 0 && rateForCalc >= 0 ? pmt(bal, rateForCalc / 100 / 12, termTotal) : 0;
-  const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
+  const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[cur] ?? "";
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -381,7 +388,7 @@ function DebtForm({
         bank: String(fd.get("bank") ?? "") || undefined,
         originalAmount: fd.get("originalAmount") ? Number(fd.get("originalAmount")) : undefined,
         balance: Number(balance) || 0,
-        currency: String(fd.get("currency") ?? currency),
+        currency: cur,
         rateType,
         rateIndex: rateType === "variable" ? rateIndex : undefined,
         rateSpread: rateType === "variable" && rateSpread ? Number(rateSpread) : undefined,
@@ -453,7 +460,12 @@ function DebtForm({
           </div>
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
+            <select
+              className="sel"
+              name="currency"
+              value={cur}
+              onChange={(e) => setCur(e.target.value)}
+            >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -467,13 +479,13 @@ function DebtForm({
           <Money
             label="Monto original"
             name="originalAmount"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.originalAmount ?? undefined}
           />
           <Money
             label="Saldo actual"
             name="balance"
-            currency={currency}
+            currency={cur}
             error={errors.balance}
             value={balance}
             onChange={setBalance}
@@ -636,14 +648,14 @@ function DebtForm({
           <Money
             label="Cuota mensual"
             name="currentPayment"
-            currency={currency}
+            currency={cur}
             value={currentPayment}
             onChange={setCurrentPayment}
           />
           <Money
             label="Pago mínimo"
             name="minPayment"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.minPayment}
           />
         </div>
@@ -675,13 +687,13 @@ function DebtForm({
           <Money
             label="Pago extra mensual (opcional)"
             name="extraMonthly"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.extraMonthly ?? undefined}
           />
           <Money
             label="Seguro mensual (opcional)"
             name="insurance"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.insurance ?? undefined}
           />
         </div>
