@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El refresco lo maneja la app (WidgetBridge) + el tap; por eso updatePeriodMillis=0. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:resizeMode="horizontal|vertical"
+    android:initialLayout="@layout/widget_proximo_pago"
+    android:previewLayout="@layout/widget_proximo_pago"
+    android:widgetCategory="home_screen" />

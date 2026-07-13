@@ -8,4 +8,6 @@
     <string name="widget_patrimonio_desc">Tu patrimonio neto de un vistazo.</string>
     <string name="widget_presupuesto_label">Presupuesto del mes</string>
     <string name="widget_presupuesto_desc">Gastado vs presupuestado del mes.</string>
+    <string name="widget_proximo_pago_label">Próximo pago de deuda</string>
+    <string name="widget_proximo_pago_desc">Tu próximo pago de deuda de un vistazo.</string>
 </resources>

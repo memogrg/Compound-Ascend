@@ -31,9 +31,10 @@ public class WidgetBridge extends Plugin {
         SharedPreferences prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         prefs.edit().putString(KEY_SNAPSHOT, data).apply();
 
-        // Fuerza el repintado de TODOS los widgets ya colocados (Patrimonio y Presupuesto).
+        // Fuerza el repintado de TODOS los widgets ya colocados.
         refresh(ctx, WidgetPatrimonioProvider.class);
         refresh(ctx, WidgetPresupuestoProvider.class);
+        refresh(ctx, WidgetProximoPagoProvider.class);
 
         call.resolve();
     }
