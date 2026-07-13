@@ -18,6 +18,8 @@ import { PolicyForm, type PolicyValues } from "./policy-form";
 
 const POLICY_LABEL: Record<string, string> = {
   medico: "Protección médica",
+  gastos_mayores: "Gastos médicos mayores",
+  gastos_menores: "Gastos médicos menores",
   vida: "Protección de vida",
   incapacidad: "Protección por incapacidad",
   hogar: "Protección del hogar",

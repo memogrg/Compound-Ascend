@@ -27,8 +27,9 @@ export type PolicyValues = {
 
 // Mismo listado (y orden) que POLICY_TYPES del modal web.
 const POLICY_TYPE_OPTS: Opt[] = [
-  { value: "medico", label: "Médico" },
+  { value: "gastos_mayores", label: "Seguro de gastos mayores" },
   { value: "vida", label: "Vida" },
+  { value: "gastos_menores", label: "Seguro de gastos menores" },
   { value: "incapacidad", label: "Incapacidad / ingresos" },
   { value: "hogar", label: "Hogar" },
   { value: "vehiculo", label: "Vehículo" },
@@ -59,7 +60,7 @@ export function PolicyForm({
   successMessage: string;
   onSuccess: () => void;
 }) {
-  const [policyType, setPolicyType] = useState(initial?.policyType ?? "medico");
+  const [policyType, setPolicyType] = useState(initial?.policyType ?? "gastos_mayores");
   const [provider, setProvider] = useState(initial?.provider ?? "");
   const [coverage, setCoverage] = useState<number | undefined>(initial?.coverage);
   const [premium, setPremium] = useState<number | undefined>(initial?.premium);

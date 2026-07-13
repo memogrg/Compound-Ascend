@@ -33,8 +33,9 @@ const ASSET_TYPES = [
 ] as const;
 
 const POLICY_TYPES = [
-  ["medico", "Médico"],
+  ["gastos_mayores", "Seguro de gastos mayores"],
   ["vida", "Vida"],
+  ["gastos_menores", "Seguro de gastos menores"],
   ["incapacidad", "Incapacidad / ingresos"],
   ["hogar", "Hogar"],
   ["vehiculo", "Vehículo"],
@@ -302,7 +303,7 @@ function PolicyForm({
     const fd = new FormData(form);
     run(
       {
-        policyType: String(fd.get("policyType") ?? "medico"),
+        policyType: String(fd.get("policyType") ?? "gastos_mayores"),
         provider: String(fd.get("provider") ?? "") || undefined,
         coverage: Number(fd.get("coverage") ?? 0) || undefined,
         premium: Number(fd.get("premium") ?? 0) || undefined,
@@ -324,7 +325,7 @@ function PolicyForm({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Tipo de cobertura</label>
-            <select className="sel" name="policyType" defaultValue={item?.policyType ?? "medico"}>
+            <select className="sel" name="policyType" defaultValue={item?.policyType ?? "gastos_mayores"}>
               {POLICY_TYPES.map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
