@@ -6,6 +6,8 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { focusFirstError } from "@/lib/forms";
+import { convertCurrency, FX_PER_USD } from "@/lib/fx";
+import { formatMoney } from "@/lib/format";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
@@ -27,6 +29,7 @@ export function AddControlButton({
   label,
   variant = "btn-primary",
   indexRates,
+  fxRates,
   deepLinkKey,
 }: {
   kind: Kind;
@@ -34,6 +37,7 @@ export function AddControlButton({
   label?: string;
   variant?: "btn-primary" | "btn-secondary";
   indexRates?: Record<string, number>;
+  fxRates?: Record<string, number>;
   deepLinkKey?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,6 +53,7 @@ export function AddControlButton({
           kind={kind}
           currency={currency}
           indexRates={indexRates}
+          fxRates={fxRates}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -58,14 +63,17 @@ export function AddControlButton({
 
 export function ControlActions({
   currency = "CRC",
+  fxRates,
 }: {
   currency?: string;
   /** Aceptado por compatibilidad con la página; las deudas viven en /deudas. */
   indexRates?: Record<string, number>;
+  /** Tasas en vivo para mostrar el equivalente al capturar en otra moneda. */
+  fxRates?: Record<string, number>;
 }) {
   return (
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-      <AddControlButton kind="goal" currency={currency} variant="btn-primary" />
+      <AddControlButton kind="goal" currency={currency} fxRates={fxRates} variant="btn-primary" />
     </div>
   );
 }
@@ -76,11 +84,13 @@ export function EditControlButton({
   item,
   currency,
   indexRates,
+  fxRates,
 }: {
   kind: Kind;
   item: SavingsGoal | Debt;
   currency: string;
   indexRates?: Record<string, number>;
+  fxRates?: Record<string, number>;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -100,6 +110,7 @@ export function EditControlButton({
           currency={currency}
           item={item}
           indexRates={indexRates}
+          fxRates={fxRates}
           onClose={() => setOpen(false)}
         />
       ) : null}
@@ -112,12 +123,14 @@ export function ControlDialog({
   currency,
   item,
   indexRates,
+  fxRates,
   onClose,
 }: {
   kind: Kind;
   currency: string;
   item?: SavingsGoal | Debt;
   indexRates?: Record<string, number>;
+  fxRates?: Record<string, number>;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -151,6 +164,7 @@ export function ControlDialog({
           onDone={done}
           onCancel={onClose}
           item={item as SavingsGoal | undefined}
+          fxRates={fxRates}
         />
       ) : (
         <DebtForm
@@ -159,6 +173,7 @@ export function ControlDialog({
           onCancel={onClose}
           item={item as Debt | undefined}
           indexRates={indexRates}
+          fxRates={fxRates}
         />
       )}
     </Modal>
@@ -196,15 +211,21 @@ function GoalForm({
   onDone,
   onCancel,
   item,
+  fxRates,
 }: {
   currency: string;
   onDone: () => void;
   onCancel: () => void;
   item?: SavingsGoal;
+  fxRates?: Record<string, number>;
 }) {
   const action = item ? (raw: unknown) => editGoalAction(item.id, raw) : addGoalAction;
   const { pending, errors, message, run } = useFormSubmit(action);
   const [cur, setCur] = useState<string>(item?.currency ?? currency);
+  // Controlado para poder mostrar el equivalente en vivo (Punto FX).
+  const [targetAmount, setTargetAmount] = useState<string>(
+    item?.targetAmount != null ? String(item.targetAmount) : "",
+  );
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -213,7 +234,7 @@ function GoalForm({
     run(
       {
         name: String(fd.get("name") ?? ""),
-        targetAmount: Number(fd.get("targetAmount") ?? 0),
+        targetAmount: Number(targetAmount) || 0,
         currentAmount: Number(fd.get("currentAmount") ?? 0),
         monthlyContribution: Number(fd.get("monthlyContribution") ?? 0),
         currency: cur,
@@ -255,7 +276,8 @@ function GoalForm({
             name="targetAmount"
             currency={cur}
             error={errors.targetAmount}
-            defaultValue={item?.targetAmount}
+            value={targetAmount}
+            onChange={setTargetAmount}
           />
           <Money
             label="Acumulado"
@@ -296,6 +318,12 @@ function GoalForm({
                 </option>
               ))}
             </select>
+            <FxEquivalent
+              amount={Number(targetAmount) || 0}
+              from={cur}
+              to={currency}
+              rates={fxRates}
+            />
           </div>
           <div className="fld">
             <label className="fld-label">Prioridad</label>
@@ -327,12 +355,14 @@ function DebtForm({
   onCancel,
   item,
   indexRates,
+  fxRates,
 }: {
   currency: string;
   onDone: () => void;
   onCancel: () => void;
   item?: Debt;
   indexRates?: Record<string, number>;
+  fxRates?: Record<string, number>;
 }) {
   const action = item ? (raw: unknown) => editDebtAction(item.id, raw) : addDebtAction;
   const { pending, errors, message, run } = useFormSubmit(action);
@@ -472,6 +502,7 @@ function DebtForm({
                 </option>
               ))}
             </select>
+            <FxEquivalent amount={bal} from={cur} to={currency} rates={fxRates} />
           </div>
         </div>
 
@@ -734,6 +765,47 @@ function DebtForm({
       </div>
       <Foot pending={pending} onCancel={onCancel} />
     </form>
+  );
+}
+
+/**
+ * Muestra el equivalente convertido cuando el monto se captura en una moneda
+ * distinta a la base del usuario. Los montos se guardan en su moneda original;
+ * la conversión es solo para agregados. Usa tasas en vivo si el caller las pasa;
+ * si no, el respaldo estático FX_PER_USD.
+ */
+function FxEquivalent({
+  amount,
+  from,
+  to,
+  rates,
+}: {
+  amount: number;
+  from: string;
+  to: string;
+  rates?: Record<string, number>;
+}) {
+  if (from === to || !(amount > 0)) return null;
+  const table = rates ?? FX_PER_USD;
+  const eq = convertCurrency(amount, from, to, table);
+  const perUsd = Math.round(table.CRC ?? FX_PER_USD.CRC ?? 510);
+  return (
+    <div
+      className="muted"
+      style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, marginTop: 6 }}
+    >
+      <span>
+        ≈ {formatMoney(eq, to)} {to}
+      </span>
+      <span
+        className="tip tip-wrap"
+        data-tip={`Tasa aproximada (1 USD = ₡${perUsd}…). Los montos se guardan en su moneda; la conversión es solo para agregados.`}
+        aria-label="Cómo se calcula el equivalente"
+        style={{ display: "inline-flex", cursor: "help" }}
+      >
+        <Icon name="info" />
+      </span>
+    </div>
   );
 }
 
