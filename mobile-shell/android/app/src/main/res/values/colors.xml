@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Design system CARTERA+ (widgets). Variante -night en values-night/. -->
-    <color name="widget_canvas">#F1EFE8</color>
-    <color name="widget_text">#1E1C16</color>
-    <color name="widget_muted">#8C8578</color>
-    <color name="widget_accent">#378451</color>
+    <!-- Design system CARTERA+ (widgets) — tokens EXACTOS del hero /m (mobile.css).
+         Variante oscura en values-night/. Reusables por los widgets #2/#3/#4. -->
+    <color name="widget_canvas">#F1EFE8</color>   <!-- canvas -->
+    <color name="widget_surface">#FFFFFF</color>  <!-- surface -->
+    <color name="widget_text">#1E1C16</color>     <!-- text (ink) -->
+    <color name="widget_muted">#807C72</color>    <!-- text-muted -->
+    <color name="widget_accent">#378451</color>   <!-- accent / success -->
+    <color name="widget_danger">#C34F4B</color>   <!-- danger -->
+    <color name="widget_border">#E7E4DC</color>   <!-- border (divisores) -->
 </resources>
