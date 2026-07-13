@@ -6,6 +6,11 @@ import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Typeface;
+import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.RemoteViews;
 
@@ -18,13 +23,20 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * Widget "Patrimonio neto" PREMIUM (RemoteViews, NO Glance/Compose). Lee el snapshot que la app
- * escribe en SharedPreferences "cartera_widget"/"snapshot" y se repinta como la tarjeta hero de
- * /m: monto grande (símbolo + número), tendencia y fila Ingresos·Gastos·Flujo. Sin snapshot,
- * invita a abrir la app. El tap abre CARTERA+ (extra opcional para navegar a /m/patrimonio).
- * Los colores se resuelven por recurso (context.getColor) para respetar el modo claro/oscuro.
+ * Widget "Patrimonio neto" — versión ROBUSTA para RemoteViews (EMUI/Android 10).
+ *
+ * El launcher de EMUI no infla fuentes @font ni vector drawables dentro de RemoteViews, así que:
+ *  - el MONTO grande se dibuja como Bitmap con Space Mono real (Typeface.createFromAsset) y se
+ *    coloca con setImageViewBitmap en un ImageView (100% fiable, look premium);
+ *  - los textos chicos usan fuentes del sistema (definido en el layout);
+ *  - el logo es un PNG y el fondo un gradiente lineal simple (sin radial).
+ *
+ * Lee el snapshot de SharedPreferences "cartera_widget"/"snapshot". Sin snapshot, invita a abrir
+ * la app. El tap abre CARTERA+. Los colores se resuelven por recurso (claro/oscuro automático).
  */
 public class WidgetPatrimonioProvider extends AppWidgetProvider {
+
+    private static final String AMOUNT_FONT = "fonts/space_mono_bold.ttf";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] appWidgetIds) {
@@ -37,6 +49,8 @@ public class WidgetPatrimonioProvider extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_patrimonio);
 
         // Colores del design system, sensibles a claro/oscuro (el context lleva el uiMode actual).
+        final int ink = context.getColor(R.color.widget_text);
+        final int muted = context.getColor(R.color.widget_muted);
         final int accent = context.getColor(R.color.widget_accent);
         final int danger = context.getColor(R.color.widget_danger);
 
@@ -45,7 +59,7 @@ public class WidgetPatrimonioProvider extends AppWidgetProvider {
         String data = prefs.getString(WidgetBridge.KEY_SNAPSHOT, null);
 
         if (data == null) {
-            renderEmpty(views, accent);
+            renderEmpty(context, views, ink, muted, accent);
         } else {
             try {
                 JSONObject o = new JSONObject(data);
@@ -53,8 +67,9 @@ public class WidgetPatrimonioProvider extends AppWidgetProvider {
                 String currency = o.optString("currency", "CRC");
                 String symbol = currencySymbol(currency);
 
-                views.setTextViewText(R.id.tv_cur, symbol);
-                views.setTextViewText(R.id.tv_valor, formatNumber(neto));
+                views.setImageViewBitmap(
+                        R.id.iv_amount,
+                        renderAmount(context, symbol, formatNumber(neto), ink, muted));
 
                 // Tendencia (% vs mes). Oculta el texto si no hay base previa.
                 if (o.isNull("trendPct")) {
@@ -88,7 +103,7 @@ public class WidgetPatrimonioProvider extends AppWidgetProvider {
                 String hhmm = formatTime(o.optString("updatedAt", ""));
                 views.setTextViewText(R.id.tv_updated, hhmm.isEmpty() ? "" : "Actualizado " + hhmm);
             } catch (Exception e) {
-                renderEmpty(views, accent);
+                renderEmpty(context, views, ink, muted, accent);
             }
         }
 
@@ -106,14 +121,58 @@ public class WidgetPatrimonioProvider extends AppWidgetProvider {
         manager.updateAppWidget(appWidgetId, views);
     }
 
-    /** Estado sin datos: invita a abrir la app y oculta lo que depende del snapshot. */
-    private static void renderEmpty(RemoteViews views, int accent) {
-        views.setTextViewText(R.id.tv_cur, "");
-        views.setTextViewText(R.id.tv_valor, "—");
+    /** Estado sin datos: monto "—" e invitación a abrir la app; oculta la fila de flujo. */
+    private static void renderEmpty(Context context, RemoteViews views, int ink, int muted, int accent) {
+        views.setImageViewBitmap(R.id.iv_amount, renderAmount(context, "", "—", ink, muted));
         views.setTextViewText(R.id.tv_trend, "Abre CARTERA+ para ver tu patrimonio");
         views.setTextColor(R.id.tv_trend, accent);
         views.setTextViewText(R.id.tv_updated, "");
         views.setViewVisibility(R.id.flow_row, View.GONE);
+    }
+
+    /**
+     * Dibuja "símbolo + número" en un Bitmap con Space Mono Bold (símbolo más pequeño y alineado
+     * arriba, número grande). Tamaños en px según la densidad del dispositivo, con antialias.
+     */
+    private static Bitmap renderAmount(Context context, String symbol, String number,
+                                       int inkColor, int mutedColor) {
+        DisplayMetrics m = context.getResources().getDisplayMetrics();
+        float d = m.density;
+
+        Typeface tf;
+        try {
+            tf = Typeface.createFromAsset(context.getAssets(), AMOUNT_FONT);
+        } catch (Exception e) {
+            tf = Typeface.create("monospace", Typeface.BOLD);
+        }
+
+        Paint num = new Paint(Paint.ANTI_ALIAS_FLAG);
+        num.setTypeface(tf);
+        num.setColor(inkColor);
+        num.setTextSize(30f * d);
+
+        Paint sym = new Paint(Paint.ANTI_ALIAS_FLAG);
+        sym.setTypeface(tf);
+        sym.setColor(mutedColor);
+        sym.setTextSize(17f * d);
+
+        float gap = symbol.isEmpty() ? 0f : 3f * d;
+        float symW = symbol.isEmpty() ? 0f : sym.measureText(symbol);
+        float numW = num.measureText(number);
+        Paint.FontMetrics nm = num.getFontMetrics();
+        int pad = (int) Math.ceil(2f * d);
+
+        int w = Math.max(1, (int) Math.ceil(symW + gap + numW) + pad * 2);
+        int h = Math.max(1, (int) Math.ceil(nm.descent - nm.ascent) + pad * 2);
+
+        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+        // Ambos alineados por su TOP: como el símbolo es más chico, queda "levantado".
+        if (!symbol.isEmpty()) {
+            c.drawText(symbol, pad, pad - sym.getFontMetrics().ascent, sym);
+        }
+        c.drawText(number, pad + symW + gap, pad - nm.ascent, num);
+        return bmp;
     }
 
     /** ₡ para CRC, $ para USD (y algunos comunes), €, £. */
@@ -143,9 +202,9 @@ public class WidgetPatrimonioProvider extends AppWidgetProvider {
         double abs = Math.abs(value);
         String sign = value < 0 ? "-" : "";
         if (abs >= 1_000_000) {
-            String m = String.format(Locale.US, "%.1f", abs / 1_000_000);
-            if (m.endsWith(".0")) m = m.substring(0, m.length() - 2);
-            return sign + symbol + m + "M";
+            String mm = String.format(Locale.US, "%.1f", abs / 1_000_000);
+            if (mm.endsWith(".0")) mm = mm.substring(0, mm.length() - 2);
+            return sign + symbol + mm + "M";
         }
         if (abs >= 1_000) {
             return sign + symbol + Math.round(abs / 1_000) + "k";
@@ -159,9 +218,9 @@ public class WidgetPatrimonioProvider extends AppWidgetProvider {
         try {
             SimpleDateFormat in = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
             in.setTimeZone(TimeZone.getTimeZone("UTC"));
-            Date d = in.parse(iso.substring(0, 19));
+            Date dt = in.parse(iso.substring(0, 19));
             SimpleDateFormat out = new SimpleDateFormat("HH:mm", Locale.getDefault());
-            return d != null ? out.format(d) : "";
+            return dt != null ? out.format(dt) : "";
         } catch (Exception e) {
             return "";
         }
