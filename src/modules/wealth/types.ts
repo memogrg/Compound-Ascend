@@ -61,6 +61,8 @@ export type Investment = {
 
 export type PolicyType =
   | "medico"
+  | "gastos_mayores"
+  | "gastos_menores"
   | "vida"
   | "incapacidad"
   | "hogar"

@@ -33,6 +33,8 @@ export const investmentInputSchema = z.object({
 export const policyInputSchema = z.object({
   policyType: z.enum([
     "medico",
+    "gastos_mayores",
+    "gastos_menores",
     "vida",
     "incapacidad",
     "hogar",
