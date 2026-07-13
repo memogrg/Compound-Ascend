@@ -498,6 +498,8 @@ export type ControlSummary = {
   currency: string;
   /** Valores actuales de los índices (prime/tbp/tri) para el form de deuda. */
   indexRates: Record<string, number>;
+  /** Tasas FX en vivo para mostrar el equivalente al capturar en otra moneda. */
+  fxRates: Record<string, number>;
 };
 
 /** Carga todo y calcula el diagnóstico de control. */
@@ -549,6 +551,7 @@ export async function getControlSummary(): Promise<ControlSummary> {
     freeCashflow: base.indicators.freeCashflow,
     currency,
     indexRates,
+    fxRates: rates,
   };
 }
 
@@ -614,7 +617,7 @@ export function buildDemoControlSummary(): ControlSummary {
     { freeCashflow: 175_000, hasEmergencyFund: true, discipline: 6, stress: 6 },
     currency,
   );
-  return { diagnosis, goals, debts, freeCashflow: 175_000, currency, indexRates: {} };
+  return { diagnosis, goals, debts, freeCashflow: 175_000, currency, indexRates: {}, fxRates: {} };
 }
 
 function futureISO(monthsAhead: number): string {
