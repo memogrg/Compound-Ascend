@@ -13,6 +13,7 @@ import {
   aggregateNetWorth,
 } from "@/modules/rich-life/services/rich-life-service";
 import { getBaseSummary } from "@/modules/financial-base";
+import { getDebtsOverview, getIndexRates } from "@/modules/control";
 import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -115,6 +116,8 @@ export async function removeLiabilityAction(id: string): Promise<ActionResult> {
  *    (idénticos a la fila Ingresos·Gastos·Flujo del dashboard). `null` si no están a mano.
  *  - `budgetExpense`/`realExpense`: getBaseSummary V2 (gastado vs presupuestado del mes) para el
  *    widget "Presupuesto del mes". `null` si no hay presupuesto/transacciones este mes.
+ *  - `nextDebt*`: próximo pago de deuda (getDebtsOverview → DebtVM.nextDue), para el widget
+ *    "Próximo pago de deuda". `null` si no hay deudas con fecha de pago.
  */
 export type WidgetSnapshot = {
   patrimonioNeto: number;
@@ -125,6 +128,9 @@ export type WidgetSnapshot = {
   freeCashflow: number | null;
   budgetExpense: number | null;
   realExpense: number | null;
+  nextDebtName: string | null;
+  nextDebtAmount: number | null;
+  nextDebtDue: string | null; // yyyy-mm-dd
   updatedAt: string; // ISO
 };
 
@@ -173,6 +179,33 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       });
     }
 
+    // Próximo pago de deuda (getDebtsOverview → DebtVM con nextDue ya calculado por el motor
+    // due-dates, igual que /m/deudas). Elige la deuda con nextDue más cercano: la primera
+    // pendiente (>= hoy); si todas están vencidas, la más reciente. Best-effort → null si nada.
+    let nextDebtName: string | null = null;
+    let nextDebtAmount: number | null = null;
+    let nextDebtDue: string | null = null;
+    try {
+      const rates = await getIndexRates();
+      const ov = await getDebtsOverview(rates);
+      const today = new Date().toISOString().slice(0, 10);
+      const withDue = ov.debts
+        .filter((d) => d.nextDue)
+        .map((d) => ({ d, due: d.nextDue!.slice(0, 10) }));
+      const upcoming = withDue.filter((x) => x.due >= today).sort((a, b) => a.due.localeCompare(b.due));
+      const overdue = withDue.filter((x) => x.due < today).sort((a, b) => b.due.localeCompare(a.due));
+      const pick = upcoming[0] ?? overdue[0];
+      if (pick) {
+        nextDebtName = pick.d.name;
+        nextDebtAmount = pick.d.monthlyPayment || pick.d.minPayment;
+        nextDebtDue = pick.due;
+      }
+    } catch (e) {
+      logger.warn("getWidgetSnapshot próximo pago no disponible", {
+        message: e instanceof Error ? e.message : "?",
+      });
+    }
+
     return {
       patrimonioNeto: ind.netWorth,
       currency: summary.currency,
@@ -182,6 +215,9 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       freeCashflow,
       budgetExpense,
       realExpense,
+      nextDebtName,
+      nextDebtAmount,
+      nextDebtDue,
       updatedAt: new Date().toISOString(),
     };
   } catch (err) {
