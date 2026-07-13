@@ -10,4 +10,6 @@
     <string name="widget_presupuesto_desc">Gastado vs presupuestado del mes.</string>
     <string name="widget_proximo_pago_label">Próximo pago de deuda</string>
     <string name="widget_proximo_pago_desc">Tu próximo pago de deuda de un vistazo.</string>
+    <string name="widget_indicador_label">Indicador económico</string>
+    <string name="widget_indicador_desc">Un indicador macro destacado de un vistazo.</string>
 </resources>

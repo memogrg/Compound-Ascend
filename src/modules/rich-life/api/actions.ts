@@ -14,6 +14,7 @@ import {
 } from "@/modules/rich-life/services/rich-life-service";
 import { getExpenseRangeView, monthPeriod } from "@/modules/financial-base";
 import { getDebtsOverview, getIndexRates } from "@/modules/control";
+import { getLatest, getChange, findIndicator } from "@/lib/economic-indicators";
 import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -119,6 +120,8 @@ export async function removeLiabilityAction(id: string): Promise<ActionResult> {
  *    si no hay presupuesto/gastos este mes.
  *  - `nextDebt*`: próximo pago de deuda (getDebtsOverview → DebtVM.nextDue), para el widget
  *    "Próximo pago de deuda". `null` si no hay deudas con fecha de pago.
+ *  - `indicator*`: indicador macro destacado (lib economic-indicators; global, sin sesión), para
+ *    el widget "Indicador económico". `indicatorValue` ya viene formateado. `null` si no hay dato.
  */
 export type WidgetSnapshot = {
   patrimonioNeto: number;
@@ -132,6 +135,10 @@ export type WidgetSnapshot = {
   nextDebtName: string | null;
   nextDebtAmount: number | null;
   nextDebtDue: string | null; // yyyy-mm-dd
+  indicatorName: string | null;
+  indicatorValue: string | null; // ya formateado, p.ej. "₡512,30" o "3,80%"
+  indicatorChange: number | null; // variación % (▲/▼ + color)
+  indicatorUnit: string | null;
   updatedAt: string; // ISO
 };
 
@@ -210,6 +217,36 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       });
     }
 
+    // Indicador macro destacado (lib economic-indicators; global, sin user_id). Prioriza el dólar
+    // (venta) y la inflación interanual; cae al primero con dato. Valor ya formateado como en la
+    // vista de indicadores (es-CR, 2 decimales). Best-effort → campos null si no hay dato.
+    let indicatorName: string | null = null;
+    let indicatorValue: string | null = null;
+    let indicatorChange: number | null = null;
+    let indicatorUnit: string | null = null;
+    try {
+      const fmt2 = new Intl.NumberFormat("es-CR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      for (const code of ["USDCRC_VENTA", "IPC", "TPM", "TBP"]) {
+        const latest = await getLatest(code);
+        if (!latest) continue;
+        const num = fmt2.format(latest.value);
+        indicatorName = findIndicator(code)?.label ?? code;
+        indicatorUnit = latest.unit;
+        indicatorValue =
+          latest.unit === "percent" ? `${num}%` : latest.unit === "currency" ? `₡${num}` : num;
+        const change = await getChange(code);
+        indicatorChange = change.pctChange !== null ? change.pctChange * 100 : null;
+        break;
+      }
+    } catch (e) {
+      logger.warn("getWidgetSnapshot indicador no disponible", {
+        message: e instanceof Error ? e.message : "?",
+      });
+    }
+
     return {
       patrimonioNeto: ind.netWorth,
       currency: summary.currency,
@@ -222,6 +259,10 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       nextDebtName,
       nextDebtAmount,
       nextDebtDue,
+      indicatorName,
+      indicatorValue,
+      indicatorChange,
+      indicatorUnit,
       updatedAt: new Date().toISOString(),
     };
   } catch (err) {
