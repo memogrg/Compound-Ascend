@@ -18,7 +18,9 @@ export { syncDerivedBudget } from "./services/derived-budget-service";
 export { monthPeriod } from "./engine/period";
 // Fase 3 · flujo inverso: al borrar un stub de inversión, wealth revierte las
 // fuentes de ingreso vinculadas (dirección wealth → financial-base).
-export { deleteIncomeSourcesByHolding, getExpenseBudgetVsReal } from "./services/budget-service";
+export { deleteIncomeSourcesByHolding } from "./services/budget-service";
+// Headline de Gastos (planificado vs real por rango) — el widget de Presupuesto lo calca.
+export { getExpenseRangeView } from "./services/expense-range-service";
 // Orquestador de transacciones vinculadas: la puerta de entrada para que
 // control/wealth/assistant registren eventos de dinero (CLAUDE.md).
 export {

@@ -12,7 +12,7 @@ import {
   getRichLifeSummary,
   aggregateNetWorth,
 } from "@/modules/rich-life/services/rich-life-service";
-import { getExpenseBudgetVsReal, monthPeriod } from "@/modules/financial-base";
+import { getExpenseRangeView, monthPeriod } from "@/modules/financial-base";
 import { getDebtsOverview, getIndexRates } from "@/modules/control";
 import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -114,8 +114,8 @@ export async function removeLiabilityAction(id: string): Promise<ActionResult> {
  *  - `patrimonioNeto`/`trendPct`: getRichLifeSummary (patrimonio neto + Δ mensual).
  *  - `incomeMonthly`/`expenseMonthly`/`freeCashflow`: aggregateNetWorth → base.indicators.*
  *    (idénticos a la fila Ingresos·Gastos·Flujo del dashboard). `null` si no están a mano.
- *  - `budgetExpense`/`realExpense`: getExpenseBudgetVsReal (gastado vs presupuestado del mes POR
- *    CATEGORÍA, excluyendo movimientos enlazados), para el widget "Presupuesto del mes". `null`
+ *  - `budgetExpense`/`realExpense`: getExpenseRangeView '1m' (calca el headline del tab de Gastos:
+ *    Gasto planificado vs Gasto real, % ejecución), para el widget "Presupuesto del mes". `null`
  *    si no hay presupuesto/gastos este mes.
  *  - `nextDebt*`: próximo pago de deuda (getDebtsOverview → DebtVM.nextDue), para el widget
  *    "Próximo pago de deuda". `null` si no hay deudas con fecha de pago.
@@ -166,17 +166,17 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       });
     }
 
-    // Gastado vs presupuestado del mes por CATEGORÍA (getExpenseBudgetVsReal, mismo criterio
-    // que el tab de Gastos: excluye movimientos enlazados a entidades). Best-effort e
+    // Gastado vs presupuestado del mes: calca EXACTO el headline del tab de Gastos
+    // (getExpenseRangeView '1m' → Gasto planificado / Gasto real / % ejecución). Best-effort e
     // independiente: quedan null si no hay presupuesto/gastos este mes.
     let budgetExpense: number | null = null;
     let realExpense: number | null = null;
     try {
       const now = new Date();
       const period = monthPeriod(now.getFullYear(), now.getMonth() + 1);
-      const bvr = await getExpenseBudgetVsReal(period);
-      budgetExpense = bvr.budgetExpense;
-      realExpense = bvr.realExpense;
+      const view = await getExpenseRangeView("1m", period);
+      budgetExpense = view.budgetExpense;
+      realExpense = view.realExpense;
     } catch (e) {
       logger.warn("getWidgetSnapshot presupuesto no disponible", {
         message: e instanceof Error ? e.message : "?",
