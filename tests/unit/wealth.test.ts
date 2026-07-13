@@ -11,6 +11,7 @@ import type { Investment, InsurancePolicy, WealthContext } from "@/modules/wealt
 const ctx = (p: Partial<WealthContext>): WealthContext => ({
   freeCashflow: 100,
   hasEmergencyFund: true,
+  hasPeaceFund: true,
   hasCriticalDebt: false,
   dependents: 0,
   riskClassKnown: true,

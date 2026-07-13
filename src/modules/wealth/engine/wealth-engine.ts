@@ -13,7 +13,6 @@ import type {
   WealthContext,
   Balance,
   PortfolioStats,
-  PolicyType,
   AssetType,
 } from "@/modules/wealth/types";
 
@@ -76,11 +75,19 @@ export function computeReadiness(
   return { score, state, stateLabel: READINESS_LABEL[state], semaforo, message, checklist };
 }
 
-const REQUIRED_PROTECTIONS: { type: PolicyType; label: string; appliesAlways: boolean }[] = [
-  { type: "medico", label: "Seguro médico", appliesAlways: true },
-  { type: "vida", label: "Seguro de vida", appliesAlways: false }, // si hay dependientes
-  { type: "incapacidad", label: "Protección de ingresos (invalidez)", appliesAlways: true },
-];
+/**
+ * Las 4 protecciones esenciales que definen estar "PROTEGIDO". Cada una pesa
+ * igual en el score; con las 4 cubiertas el score llega a 100. La cobertura de
+ * vida es esencial SIEMPRE (no condicional a dependientes). "gastos_menores" es
+ * opcional y se maneja aparte: sugiere pero no afecta el score.
+ */
+type EssentialProtection = {
+  type: string;
+  covered: boolean;
+  severity: ProtectionGap["severity"];
+  description: string;
+  recommendation: string;
+};
 
 /** Score de Protección Patrimonial + brechas detectadas. */
 export function computeProtection(
@@ -90,49 +97,64 @@ export function computeProtection(
   const have = new Set(policies.map((p) => p.policyType));
   const gaps: ProtectionGap[] = [];
 
-  let covered = 0;
-  let total = 0;
-
-  // Fondo de emergencia
-  total += 1;
-  if (ctx.hasEmergencyFund) covered += 1;
-  else
-    gaps.push({
+  const essentials: EssentialProtection[] = [
+    {
+      type: "Seguro de gastos mayores",
+      covered: have.has("gastos_mayores"),
+      severity: "alto",
+      description:
+        "Una hospitalización o cirugía puede costar años de ahorro; sin gastos mayores tu patrimonio queda expuesto.",
+      recommendation:
+        "Detectamos una brecha; si quieres, revisamos opciones acordes a tu presupuesto.",
+    },
+    {
+      type: "Seguro de vida",
+      covered: have.has("vida"),
+      severity: "alto",
+      description:
+        "Si tu ingreso desapareciera, quienes dependen de ti quedarían sin respaldo económico.",
+      recommendation:
+        "Detectamos una brecha; si quieres, revisamos opciones acordes a tu presupuesto.",
+    },
+    {
       type: "Fondo de emergencia",
+      covered: ctx.hasEmergencyFund,
       severity: "alto",
       description: "Sin reserva para imprevistos, un evento puede devolverte a la deuda.",
       recommendation: "Construye una reserva mínima antes de asumir más riesgo.",
-    });
+    },
+    {
+      type: "Fondo de paz",
+      covered: ctx.hasPeaceFund,
+      severity: "medio",
+      description:
+        "El fondo de paz te da margen para decisiones difíciles sin comprometer tu estabilidad.",
+      recommendation: "Aparta un fondo de paz que te dé tranquilidad ante cambios de vida.",
+    },
+  ];
 
-  for (const req of REQUIRED_PROTECTIONS) {
-    const applies = req.appliesAlways || (req.type === "vida" && ctx.dependents > 0);
-    if (!applies) continue;
-    total += 1;
-    if (have.has(req.type)) covered += 1;
-    else {
+  let covered = 0;
+  const total = essentials.length;
+  for (const e of essentials) {
+    if (e.covered) covered += 1;
+    else
       gaps.push({
-        type: req.label,
-        severity: req.type === "vida" ? "alto" : req.type === "incapacidad" ? "alto" : "medio",
-        description:
-          req.type === "vida"
-            ? "Tienes personas que dependen de tu ingreso y no registras seguro de vida."
-            : req.type === "incapacidad"
-              ? "Si no pudieras trabajar, no hay reemplazo de ingresos."
-              : "Una emergencia médica puede afectar tu estabilidad financiera.",
-        recommendation:
-          "Detectamos una brecha; si quieres, revisamos opciones acordes a tu presupuesto.",
+        type: e.type,
+        severity: e.severity,
+        description: e.description,
+        recommendation: e.recommendation,
       });
-    }
   }
 
-  // Cobertura de deuda si hay deuda crítica
-  if (ctx.hasCriticalDebt) {
-    total += 1;
+  // Opcional: gastos médicos menores NO cuenta en el score; solo se sugiere.
+  if (!have.has("gastos_menores")) {
     gaps.push({
-      type: "Cobertura de deuda",
-      severity: "medio",
-      description: "Tus obligaciones podrían afectar a tu familia si tu ingreso se detiene.",
-      recommendation: "Revisa cobertura de vida o protección de deuda.",
+      type: "Gastos médicos menores (opcional)",
+      severity: "bajo",
+      description:
+        "Cubre consultas y estudios ambulatorios. Es opcional: no afecta tu puntuación de protección.",
+      recommendation:
+        "Si quieres reducir gastos médicos del día a día, considéralo como complemento.",
     });
   }
 
