@@ -11,12 +11,15 @@ export function SwipeRow({
   children,
   onEdit,
   onDelete,
+  onTap,
   editLabel = "Editar",
   deleteLabel = "Eliminar",
 }: {
   children: React.ReactNode;
   onEdit?: () => void;
   onDelete?: () => void;
+  /** Toque simple sobre la fila (no se dispara al deslizar). Opcional: abre un menú, etc. */
+  onTap?: () => void;
   editLabel?: string;
   deleteLabel?: string;
 }) {
@@ -26,12 +29,16 @@ export function SwipeRow({
   const [dragging, setDragging] = useState(false);
   const start = useRef<{ x: number; y: number; base: number } | null>(null);
   const axis = useRef<"h" | "v" | null>(null);
+  // true si el gesto que acaba de terminar fue un deslizamiento horizontal: el click
+  // sintético que lo sigue NO debe contar como toque.
+  const swiped = useRef(false);
 
   if (count === 0) return <>{children}</>;
 
   const onPointerDown = (e: React.PointerEvent) => {
     start.current = { x: e.clientX, y: e.clientY, base: dx };
     axis.current = null;
+    swiped.current = false;
   };
   const onPointerMove = (e: React.PointerEvent) => {
     if (!start.current) return;
@@ -57,10 +64,26 @@ export function SwipeRow({
     if (!start.current) return;
     start.current = null;
     setDragging(false);
-    if (axis.current === "h") setDx((d) => (d < -max * 0.4 ? -max : 0));
+    if (axis.current === "h") {
+      setDx((d) => (d < -max * 0.4 ? -max : 0));
+      swiped.current = true;
+    }
     axis.current = null;
   };
   const close = () => setDx(0);
+
+  /** Toque simple: ignora el click que sigue a un deslizamiento; si la fila está abierta, la cierra. */
+  const onClick = () => {
+    if (swiped.current) {
+      swiped.current = false;
+      return;
+    }
+    if (dx !== 0) {
+      close();
+      return;
+    }
+    onTap?.();
+  };
 
   return (
     <div className="m-swipe">
@@ -99,6 +122,7 @@ export function SwipeRow({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onClick={onClick}
       >
         {children}
       </div>
