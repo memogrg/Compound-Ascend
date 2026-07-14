@@ -15,93 +15,8 @@ import { useToast } from "@/components/ui/toast";
 import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { importTransactionsAction } from "@/modules/financial-base/api/v2-actions";
-
-type Parsed = {
-  kind: "ingreso" | "gasto";
-  amount: number;
-  occurredOn: string;
-  description?: string;
-  currency: string;
-};
-
-function splitLine(line: string): string[] {
-  const out: string[] = [];
-  let cur = "";
-  let q = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i]!;
-    if (q) {
-      if (c === '"') {
-        if (line[i + 1] === '"') {
-          cur += '"';
-          i++;
-        } else q = false;
-      } else cur += c;
-    } else if (c === ",") {
-      out.push(cur);
-      cur = "";
-    } else if (c === '"') q = true;
-    else cur += c;
-  }
-  out.push(cur);
-  return out.map((s) => s.trim());
-}
-
-function norm(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function normalizeDate(s: string): string | null {
-  const t = s.trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
-  const m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); // DD/MM/YYYY
-  if (m) return `${m[3]}-${m[2]!.padStart(2, "0")}-${m[1]!.padStart(2, "0")}`;
-  return null;
-}
-
-function parseCsv(text: string, defaultCurrency: string): { rows: Parsed[]; skipped: number } {
-  const lines = text
-    .trim()
-    .split(/\r?\n/)
-    .filter((l) => l.trim());
-  if (lines.length < 2) return { rows: [], skipped: 0 };
-  const header = splitLine(lines[0]!).map(norm);
-  const idx = (names: string[]) => header.findIndex((h) => names.some((n) => h.includes(n)));
-  const iDate = idx(["fecha", "date"]);
-  const iDesc = idx(["descripcion", "comercio", "concepto", "detalle", "description", "merchant"]);
-  const iAmt = idx(["monto", "amount", "importe", "valor"]);
-  const iKind = idx(["tipo", "kind"]);
-  const iCur = idx(["moneda", "currency"]);
-
-  const rows: Parsed[] = [];
-  let skipped = 0;
-  for (let i = 1; i < lines.length; i++) {
-    const cells = splitLine(lines[i]!);
-    const rawAmt = (iAmt >= 0 ? cells[iAmt] : "") ?? "";
-    const num = Number(rawAmt.replace(/[^0-9.\-]/g, ""));
-    const date = iDate >= 0 ? normalizeDate(cells[iDate] ?? "") : null;
-    if (!Number.isFinite(num) || num === 0 || !date) {
-      skipped++;
-      continue;
-    }
-    let kind: "ingreso" | "gasto";
-    const kindCell = iKind >= 0 ? norm(cells[iKind] ?? "") : "";
-    if (kindCell.includes("ingres") || kindCell.includes("income")) kind = "ingreso";
-    else if (kindCell.includes("gast") || kindCell.includes("expense")) kind = "gasto";
-    else kind = num < 0 ? "gasto" : "ingreso";
-    rows.push({
-      kind,
-      amount: Math.abs(num),
-      occurredOn: date,
-      description: iDesc >= 0 ? cells[iDesc] || undefined : undefined,
-      currency: (iCur >= 0 ? cells[iCur]?.toUpperCase().slice(0, 3) : "") || defaultCurrency,
-    });
-  }
-  return { rows, skipped };
-}
+// Parser puro compartido con la pantalla m\u00f3vil (/m/transacciones): mismas columnas, mismas reglas.
+import { parseCsv, type ParsedCsvRow } from "@/modules/financial-base/engine/csv-parse";
 
 export function CsvImportButton() {
   const [open, setOpen] = useState(false);
@@ -125,7 +40,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
   const toast = useToast();
   const captureCurrency = useCaptureCurrency();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [rows, setRows] = useState<Parsed[]>([]);
+  const [rows, setRows] = useState<ParsedCsvRow[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [fileName, setFileName] = useState("");
   const [rawText, setRawText] = useState("");
