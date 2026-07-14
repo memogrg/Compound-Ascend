@@ -16,6 +16,7 @@ export {
 export { computeRentalRoi } from "./engine/rental-roi";
 export type { RentalRoi, RentalRoiInput } from "./engine/rental-roi";
 export { getWealthSummary, buildDemoWealthSummary } from "./services/wealth-service";
+export { addPolicyAction } from "./api/actions";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";

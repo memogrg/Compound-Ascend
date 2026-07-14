@@ -21,6 +21,7 @@ import {
   addGoalContribution,
   withdrawFromGoal,
 } from "@/modules/control/services/control-service";
+import { addPolicyAction } from "@/modules/wealth";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -47,6 +48,17 @@ export async function addGoalAction(raw: unknown): Promise<ActionResult> {
     logger.error("addGoal fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos guardar el objetivo." };
   }
+}
+
+/**
+ * Alta de una póliza de defensa desde el flujo de ahorro (toggle "Defensa").
+ * Delega en la action de Patrimonio (misma validación/persistencia; sin duplicar
+ * servicio) y además revalida la pantalla de Ahorro desde la que se creó.
+ */
+export async function addDefensePolicyAction(raw: unknown): Promise<ActionResult> {
+  const res = await addPolicyAction(raw);
+  if (res.ok) revalidatePath("/control-financiero");
+  return res;
 }
 
 export async function addDebtAction(raw: unknown): Promise<ActionResult> {
