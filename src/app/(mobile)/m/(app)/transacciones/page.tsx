@@ -111,6 +111,7 @@ export default async function MobileTransacciones() {
         <MobileTxnList
           transactions={transactions}
           categoryNames={categoryNames}
+          categories={selectableCategories}
           currency={currency}
           periodLabel={period.label}
           jars={jars}

@@ -11,21 +11,27 @@ import {
 } from "@/modules/financial-base/api/v2-actions";
 import type { Transaction, Account } from "@/modules/financial-base/types";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
+import type { SelectableCategory } from "@/modules/financial-base/engine/classify";
 import { formatMoney } from "@/lib/format";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
 import { TxnForm, type TxnFormValues } from "./txn-form";
+import { TxnActionsSheet } from "./txn-actions";
 
 /**
  * Gestión de transacciones en /m/transacciones — reutiliza las Server Actions V2 de la web
  * (add/edit/removeTransactionAction). Filtro por tipo + cada movimiento gestionable en un
- * SwipeRow (Editar/Eliminar). FAB → registrar ingreso/gasto manual.
+ * SwipeRow (Editar/Eliminar) y, al tocarlo, un sheet con el resto de acciones de la web
+ * (duplicar, dividir, reasignar sobre, ver recibo, marcar revisada). FAB → registrar
+ * ingreso/gasto manual.
  *
  * Vinculadas (linkedKind≠none: pagos de deuda, aportes, dividendos, renta): NO se editan/
  * borran aquí porque removeTransaction sólo borra la fila de transactions y dejaría huérfano
  * el registro de origen (p.ej. el debt_payment). En su lugar se enlaza a la pantalla de
  * origen, que tiene el flujo correcto (revierte el ledger). Igual criterio para
- * transferencias/ajustes (se crean/editan en su propio flujo).
+ * transferencias/ajustes (se crean/editan en su propio flujo). Por eso el sheet de acciones
+ * solo cuelga de las filas gestionables: así "Dividir" (que reemplaza el movimiento por N
+ * partes nuevas) nunca puede romper el vínculo transacción↔entidad.
  */
 
 const KIND_LABEL: Record<Transaction["kind"], string> = {
@@ -74,6 +80,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 export function MobileTxnList({
   transactions,
   categoryNames,
+  categories,
   currency,
   periodLabel,
   jars,
@@ -81,6 +88,7 @@ export function MobileTxnList({
 }: {
   transactions: Transaction[];
   categoryNames: Record<string, string>;
+  categories: SelectableCategory[];
   currency: string;
   periodLabel: string;
   jars: Jar[];
@@ -93,6 +101,7 @@ export function MobileTxnList({
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [delPending, setDelPending] = useState(false);
+  const [actionsFor, setActionsFor] = useState<Transaction | null>(null);
 
   const list = filter === "all" ? transactions : transactions.filter((t) => t.kind === filter);
 
@@ -148,7 +157,12 @@ export function MobileTxnList({
 
             if (isManageable(t)) {
               return (
-                <SwipeRow key={t.id} onEdit={() => setEditing(t)} onDelete={() => setDeleting(t)}>
+                <SwipeRow
+                  key={t.id}
+                  onEdit={() => setEditing(t)}
+                  onDelete={() => setDeleting(t)}
+                  onTap={() => setActionsFor(t)}
+                >
                   {row}
                 </SwipeRow>
               );
@@ -168,6 +182,16 @@ export function MobileTxnList({
       )}
 
       <Fab onClick={() => setAdding(true)} label="Registrar transacción" />
+
+      {/* Acciones del movimiento (toque en la fila): duplicar, dividir, reasignar, recibo, revisar */}
+      <TxnActionsSheet
+        txn={actionsFor}
+        categories={categories}
+        categoryNames={categoryNames}
+        onClose={() => setActionsFor(null)}
+        onEdit={(t) => setEditing(t)}
+        onDelete={(t) => setDeleting(t)}
+      />
 
       {/* Crear */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Registrar transacción">
