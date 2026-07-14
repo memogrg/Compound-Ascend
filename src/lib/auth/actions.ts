@@ -204,8 +204,11 @@ export async function signInWithGoogleAction(): Promise<void> {
   redirect(data.url);
 }
 
-export async function signOutAction(): Promise<void> {
+export async function signOutAction(next?: string | FormData): Promise<void> {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  // `next` llega como string cuando se hace bind/llamada directa (móvil → "/m/login"); como
+  // FormData cuando es la acción de un <form> web → cae al fallback "/login". safeRelative solo
+  // admite rutas internas (evita open-redirects a URLs absolutas/externas).
+  redirect(safeRelative(typeof next === "string" ? next : null, "/login"));
 }
