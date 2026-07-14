@@ -122,7 +122,7 @@ export function AppLockOverlay() {
   const recover = useCallback(async () => {
     // Escape seguro: borra el flag y cierra sesión (destruye la sesión, no revela datos).
     await clearAppLockFlagForRecovery();
-    await signOutAction();
+    await signOutAction("/m/login");
   }, []);
 
   if (!enabled || !locked) return null;
