@@ -55,17 +55,15 @@ export async function nativeGoogleLogin(): Promise<NativeLoginResult> {
 
   try {
     await attempt(plugin);
+    console.log("[google-native] done");
     return { ok: true };
   } catch (e1) {
     if (isCancel(e1)) return { ok: false, cancelled: true, error: "" };
-    // Reintento: logout limpia el idToken cacheado (iOS) y volvemos a pedir uno fresco.
-    try {
-      await plugin.logout({ provider: "google" });
-    } catch {
-      // logout puede fallar si no había sesión de plugin; se ignora.
-    }
+    console.log("[google-native] retry");
+    // Reintento: attempt() ya hace logout ANTES del login → idToken fresco (evita el caché de iOS).
     try {
       await attempt(plugin);
+      console.log("[google-native] done");
       return { ok: true };
     } catch (e2) {
       if (isCancel(e2)) return { ok: false, cancelled: true, error: "" };
@@ -74,20 +72,39 @@ export async function nativeGoogleLogin(): Promise<NativeLoginResult> {
   }
 }
 
-/** Un intento completo: nonce → login nativo → signInWithIdToken. Lanza si algo falla. */
+/**
+ * Un intento completo: logout → login nativo → signInWithIdToken. Lanza si algo falla.
+ * El logout previo fuerza a iOS a mostrar el selector de cuenta FRESCO y no reusar en silencio
+ * una sesión/idToken viejo cacheado. Los console.log "[google-native]" permiten leer el flujo en
+ * la consola de Xcode / adb logcat.
+ */
 async function attempt(plugin: NonNullable<ReturnType<typeof capacitorSocialLogin>>): Promise<void> {
+  console.log("[google-native] login:start");
+  try {
+    await plugin.logout({ provider: "google" });
+  } catch {
+    // Sin sesión previa del plugin: se ignora.
+  }
   const rawNonce = randomNonce();
   const hashedNonce = await sha256hex(rawNonce);
   const res = await plugin.login({ provider: "google", options: { nonce: hashedNonce } });
   const idToken = res?.result?.idToken;
-  if (!idToken) throw new Error("google: sin idToken");
+  if (!idToken) {
+    console.log("[google-native] idToken:missing");
+    throw new Error("google: sin idToken");
+  }
+  console.log("[google-native] idToken:ok");
   const supabase = createClient();
   const { error } = await supabase.auth.signInWithIdToken({
     provider: "google",
     token: idToken,
     nonce: rawNonce,
   });
-  if (error) throw error;
+  if (error) {
+    console.log("[google-native] signInWithIdToken:error", error.message);
+    throw error;
+  }
+  console.log("[google-native] signInWithIdToken:ok");
 }
 
 /** Nonce raw aleatorio (32 bytes en hex). Web Crypto disponible en la WebView (contexto seguro). */
