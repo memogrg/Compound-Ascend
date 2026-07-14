@@ -2,10 +2,11 @@
 
 /**
  * Gestión de /m/inversiones (paridad con la web /patrimonio): lista de posiciones
- * con SwipeRow (Editar / Eliminar), FAB para alta, y una hoja de movimientos por
- * posición (registrar compra/aporte · vender · dividendo). Reutiliza EXACTAMENTE
- * las Server Actions de wealth (add/edit/removeHoldingAction, sellHoldingAction,
- * addDividendAction) vía los forms; lo atómico lo hace el backend. es-MX, tema claro.
+ * con SwipeRow (Editar / Eliminar), FAB para alta, y el detalle de la inversión al
+ * tocarla (historial de aportes, dividendos, valuaciones + vender/editar/eliminar).
+ * Reutiliza EXACTAMENTE las Server Actions de wealth (add/edit/removeHoldingAction,
+ * sellHoldingAction, addDividendAction) vía los forms; lo atómico lo hace el backend.
+ * es-MX, tema claro.
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,7 +16,8 @@ import { removeHoldingAction } from "@/modules/wealth/api/actions";
 import type { HoldingPerformance } from "@/modules/wealth/types";
 
 import { Fab, BottomSheet, ConfirmDialog, SwipeRow, useToast } from "../../components/form-kit";
-import { HoldingWizardSheet, SellHoldingForm, DividendForm } from "./inversiones-forms";
+import { HoldingWizardSheet, SellHoldingForm } from "./inversiones-forms";
+import { HoldingDetailSheet } from "./holding-detail";
 
 const NATURE_LABEL: Record<string, string> = { cashflow: "Flujo", growth: "Crecimiento" };
 
@@ -32,8 +34,7 @@ export function InversionesManager({
   const [adding, setAdding] = useState(false);
   const [editH, setEditH] = useState<HoldingPerformance | null>(null);
   const [sellH, setSellH] = useState<HoldingPerformance | null>(null);
-  const [divH, setDivH] = useState<HoldingPerformance | null>(null);
-  const [movH, setMovH] = useState<HoldingPerformance | null>(null); // hoja de movimientos
+  const [movH, setMovH] = useState<HoldingPerformance | null>(null); // detalle de la posición
   const [deleteH, setDeleteH] = useState<HoldingPerformance | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -127,66 +128,34 @@ export function InversionesManager({
       ) : null}
 
 
-      {/* Hoja de movimientos de una posición */}
-      <BottomSheet open={!!movH} onClose={() => setMovH(null)} title={movH ? (movH.label || movH.symbol || "Inversión") : ""}>
-        {movH ? (
-          <div style={{ display: "grid", gap: 10 }}>
-            <button
-              type="button"
-              className="m-btn m-btn-block m-btn-primary"
-              onClick={() => {
-                const h = movH;
-                setMovH(null);
-                setDivH(h);
-              }}
-            >
-              Registrar dividendo
-            </button>
-            <button
-              type="button"
-              className="m-btn m-btn-block m-btn-secondary"
-              onClick={() => {
-                const h = movH;
-                setMovH(null);
-                setSellH(h);
-              }}
-            >
-              Vender / retirar
-            </button>
-            <button
-              type="button"
-              className="m-btn m-btn-block m-btn-secondary"
-              onClick={() => {
-                const h = movH;
-                setMovH(null);
-                setEditH(h);
-              }}
-            >
-              Editar posición
-            </button>
-            <button
-              type="button"
-              className="m-btn m-btn-block m-btn-danger"
-              onClick={() => {
-                const h = movH;
-                setMovH(null);
-                setDeleteH(h);
-              }}
-            >
-              Eliminar
-            </button>
-          </div>
-        ) : null}
-      </BottomSheet>
+      {/* Detalle de la inversión (aportes, dividendos, valuaciones + acciones). Se monta solo
+          con la posición elegida: así sus listas se piden al abrir, no en la carga de la página. */}
+      {movH ? (
+        <HoldingDetailSheet
+          holding={movH}
+          currency={currency}
+          onClose={() => setMovH(null)}
+          onEdit={() => {
+            const h = movH;
+            setMovH(null);
+            setEditH(h);
+          }}
+          onSell={() => {
+            const h = movH;
+            setMovH(null);
+            setSellH(h);
+          }}
+          onDelete={() => {
+            const h = movH;
+            setMovH(null);
+            setDeleteH(h);
+          }}
+        />
+      ) : null}
 
       {/* Vender */}
       <BottomSheet open={!!sellH} onClose={() => setSellH(null)} title="Vender / retirar">
         {sellH ? <SellHoldingForm holding={sellH} currency={currency} onSuccess={() => setSellH(null)} /> : null}
-      </BottomSheet>
-
-      {/* Dividendo */}
-      <BottomSheet open={!!divH} onClose={() => setDivH(null)} title="Registrar dividendo">
-        {divH ? <DividendForm holding={divH} currency={currency} onSuccess={() => setDivH(null)} /> : null}
       </BottomSheet>
 
       {/* Eliminar */}
