@@ -4,6 +4,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 /**
+ * LEGACY / FALLBACK: login Google por NAVEGADOR del sistema. Reemplazado por el login NATIVO por
+ * idToken (@capgo/capacitor-social-login; ver src/lib/capacitor/google-native.ts). Se conserva como
+ * fallback para apps sin el plugin y como camino web; pendiente de decidir su borrado.
+ *
  * Inicio de OAuth Google para la app Capacitor (flujo nativo).
  *
  * A diferencia de `signInWithGoogleAction` (que hace redirect() del navegador, lo cual

@@ -28,12 +28,26 @@ type CapacitorBrowserPlugin = {
   close(): Promise<void>;
 };
 
+/** Subconjunto de @capgo/capacitor-social-login que consumimos (login Google nativo por idToken).
+ *  El plugin vive en el shell nativo (mobile-shell); aquí solo tipamos el puente. */
+type SocialLoginPlugin = {
+  initialize(options: {
+    google?: { iOSClientId?: string; webClientId?: string; mode?: "online" | "offline" };
+  }): Promise<void>;
+  login(options: {
+    provider: "google";
+    options: { nonce?: string };
+  }): Promise<{ provider: string; result: { idToken?: string | null } }>;
+  logout(options: { provider: "google" }): Promise<void>;
+};
+
 type CapacitorBridge = {
   isNativePlatform?: () => boolean;
   getPlatform?: () => string;
   Plugins?: {
     App?: CapacitorAppPlugin;
     Browser?: CapacitorBrowserPlugin;
+    SocialLogin?: SocialLoginPlugin;
   };
 };
 
@@ -61,4 +75,9 @@ export function capacitorApp(): CapacitorAppPlugin | null {
 /** Plugin Browser (navegador del sistema: Custom Tabs / SFSafariViewController). null fuera de la app nativa. */
 export function capacitorBrowser(): CapacitorBrowserPlugin | null {
   return bridge()?.Plugins?.Browser ?? null;
+}
+
+/** Plugin SocialLogin (@capgo) para el login Google nativo por idToken. null fuera de la app nativa. */
+export function capacitorSocialLogin(): SocialLoginPlugin | null {
+  return bridge()?.Plugins?.SocialLogin ?? null;
 }

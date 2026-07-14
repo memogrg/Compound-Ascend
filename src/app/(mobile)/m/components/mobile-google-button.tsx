@@ -7,8 +7,10 @@ import {
   isCapacitor,
   capacitorApp,
   capacitorBrowser,
+  capacitorSocialLogin,
   type PluginListenerHandle,
 } from "@/lib/capacitor/native";
+import { initSocialLogin, nativeGoogleLogin } from "@/lib/capacitor/google-native";
 
 /** Cara del botón (SVG G de 4 colores + label), compartida por ambos caminos. */
 function GoogleFace() {
@@ -40,22 +42,26 @@ function GoogleFace() {
 /**
  * Botón "Continuar con Google" del móvil.
  *
- * - En la app Capacitor (isCapacitor): abre Google en el navegador del sistema y espera
- *   el retorno por deep link (appUrlOpen), luego canjea el code en /auth/callback dentro
- *   del WebView (mismo cookie jar → sesión SSR). NO reimplementa signInWithGoogleAction.
- * - En web (o SSR/hidratación inicial): usa la Server Action existente sin cambios.
+ * - En la app Capacitor (isCapacitor): login con Google NATIVO. Abre el selector de cuenta del
+ *   sistema (@capgo/capacitor-social-login), obtiene un idToken y lo canjea con
+ *   supabase.auth.signInWithIdToken; al terminar navega a /m (sesión ya en cookies → SSR).
+ *   Si el plugin no está (app vieja), cae al flujo LEGACY por navegador.
+ * - En web (o SSR/hidratación inicial): usa la Server Action existente SIN CAMBIOS.
  *
- * Por defecto renderiza el <form> web (funciona en todos lados). En useEffect detecta
- * la app y cambia al handler nativo antes de que el usuario pueda tocar el botón.
+ * Por defecto renderiza el <form> web (funciona en todos lados). En useEffect detecta la app,
+ * inicializa el plugin y cambia al handler nativo antes de que el usuario pueda tocar el botón.
  */
 export function MobileGoogleButton() {
   const [native, setNative] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const listenerRef = useRef<PluginListenerHandle | null>(null);
   const nextRef = useRef("/m");
 
   useEffect(() => {
-    setNative(isCapacitor());
+    const isNat = isCapacitor();
+    setNative(isNat);
+    if (isNat) void initSocialLogin(); // inicializa el plugin una sola vez
     return () => {
       listenerRef.current?.remove();
       listenerRef.current = null;
@@ -64,7 +70,29 @@ export function MobileGoogleButton() {
 
   async function handleNative() {
     if (loading) return;
+    setError(null);
     setLoading(true);
+
+    // Camino principal: login nativo por idToken. Si el plugin @capgo no está presente
+    // (build viejo del shell), cae al flujo legacy por navegador para no romper esas apps.
+    if (capacitorSocialLogin()) {
+      const res = await nativeGoogleLogin();
+      if (res.ok) {
+        window.location.href = "/m"; // sesión en cookies → SSR autenticado
+        return;
+      }
+      if (!res.cancelled) setError(res.error || "No pudimos iniciar sesión con Google.");
+      setLoading(false);
+      return;
+    }
+    await handleNativeBrowserLegacy();
+  }
+
+  /**
+   * LEGACY (fallback): flujo por navegador del sistema. Reemplazado por el login nativo por
+   * idToken; se conserva para apps sin el plugin @capgo. Ver /api/auth/native/google-url.
+   */
+  async function handleNativeBrowserLegacy() {
     try {
       const app = capacitorApp();
       const browser = capacitorBrowser();
@@ -72,8 +100,6 @@ export function MobileGoogleButton() {
         setLoading(false);
         return;
       }
-
-      // Registrar el retorno del deep link ANTES de abrir el navegador (una sola vez).
       if (!listenerRef.current) {
         listenerRef.current = await app.addListener("appUrlOpen", (event) => {
           browser.close().catch(() => {});
@@ -84,7 +110,6 @@ export function MobileGoogleButton() {
             code = null;
           }
           if (!code) {
-            // Cancelación / error de Google: reactiva el botón, no navega.
             setLoading(false);
             return;
           }
@@ -94,7 +119,6 @@ export function MobileGoogleButton() {
           window.location.href = cb.toString();
         });
       }
-
       const res = await fetch("/api/auth/native/google-url?next=/m", {
         headers: { accept: "application/json" },
       });
@@ -112,15 +136,25 @@ export function MobileGoogleButton() {
 
   if (native) {
     return (
-      <button
-        type="button"
-        className="m-oauth"
-        onClick={handleNative}
-        disabled={loading}
-        aria-busy={loading}
-      >
-        <GoogleFace />
-      </button>
+      <>
+        <button
+          type="button"
+          className="m-oauth"
+          onClick={handleNative}
+          disabled={loading}
+          aria-busy={loading}
+        >
+          <GoogleFace />
+        </button>
+        {error && (
+          <p
+            role="alert"
+            style={{ marginTop: 8, fontSize: 12.5, color: "var(--danger)", textAlign: "center" }}
+          >
+            {error}
+          </p>
+        )}
+      </>
     );
   }
 
