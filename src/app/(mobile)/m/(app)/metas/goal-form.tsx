@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { addPolicyAction } from "@/modules/wealth/api/actions";
+
 import {
   FormShell,
   TextField,
@@ -17,6 +19,11 @@ import {
  * Income/ExpenseForm. Agnóstico de la action (addGoalAction / editGoalAction ligada a id).
  * IMPORTANTE: arrastra `currentAmount` (no editable) para que editar NO lo resetee a 0
  * (el schema tiene default 0); el saldo se mueve solo con aportes/retiros.
+ *
+ * Toggle "Defensa": convierte el ahorro en una protección. Los dos FONDOS crean un
+ * savings_goal etiquetado (goal_type=defensa:*) vía la `action` recibida; los dos SEGUROS
+ * (gastos mayores / vida) crean una insurance_policy vía addPolicyAction (reutilizada de
+ * Patrimonio, sin duplicar servicio) — el form ramifica a un FormShell de póliza.
  */
 
 export type GoalValues = {
@@ -42,12 +49,20 @@ const MODE_OPTS: Opt[] = [
   { value: "defensa", label: "Defensa" },
 ];
 
-// En móvil solo se ofrecen los dos FONDOS. Los seguros (gastos mayores / vida)
-// se crean desde el flujo web; en móvil quedan como follow-up (no reutilizamos
-// aún el formulario de póliza móvil desde este flujo).
-const DEFENSE_FUND_OPTS: Opt[] = [
+// Las 4 protecciones. Los dos primeros valores (defensa:*) crean un fondo (goal);
+// los dos seguros (seguro:*) crean una póliza.
+const DEFENSE_OPTS: Opt[] = [
   { value: "defensa:fondo_emergencia", label: "Fondo de emergencia" },
   { value: "defensa:fondo_paz", label: "Fondo de paz" },
+  { value: "seguro:gastos_mayores", label: "Seguro de gastos mayores" },
+  { value: "seguro:vida", label: "Seguro de vida" },
+];
+
+const FREQ_OPTS: Opt[] = [
+  { value: "mensual", label: "Mensual" },
+  { value: "trimestral", label: "Trimestral" },
+  { value: "semestral", label: "Semestral" },
+  { value: "anual", label: "Anual" },
 ];
 
 export function GoalForm({
@@ -76,8 +91,75 @@ export function GoalForm({
   const [defenseKind, setDefenseKind] = useState(
     initialDefense ? initial!.goalType! : "defensa:fondo_emergencia",
   );
-  const isDefense = mode === "defensa";
+  // Campos de póliza (solo se usan en modo seguro).
+  const [provider, setProvider] = useState("");
+  const [coverage, setCoverage] = useState<number | undefined>(undefined);
+  const [premium, setPremium] = useState<number | undefined>(undefined);
+  const [premiumFrequency, setPremiumFrequency] = useState("mensual");
 
+  const isDefense = mode === "defensa";
+  const isSeguro = isDefense && defenseKind.startsWith("seguro:");
+
+  // El toggle (Normal/Defensa + selector de protección) va en ambas ramas.
+  const toggle = (
+    <>
+      <Segmented name="mode" label="Tipo de ahorro" value={mode} onChange={setMode} options={MODE_OPTS} />
+      {isDefense ? (
+        <SheetSelect
+          name="defenseKind"
+          label="Protección"
+          value={defenseKind}
+          onChange={setDefenseKind}
+          options={DEFENSE_OPTS}
+          sheetTitle="Protección"
+        />
+      ) : null}
+    </>
+  );
+
+  // ── Modo seguro: crea una póliza (gastos mayores / vida) ──
+  if (isSeguro) {
+    const policyValues = {
+      policyType: defenseKind === "seguro:vida" ? "vida" : "gastos_mayores",
+      provider: provider.trim() || undefined,
+      coverage,
+      premium,
+      premiumFrequency,
+      currency: cur,
+    };
+    return (
+      <FormShell
+        action={addPolicyAction}
+        values={policyValues}
+        submitLabel="Guardar seguro"
+        successMessage="Seguro agregado"
+        onSuccess={onSuccess}
+      >
+        {toggle}
+        <TextField
+          name="provider"
+          label="Aseguradora (opcional)"
+          value={provider}
+          onChange={setProvider}
+          placeholder="Nombre"
+          maxLength={80}
+        />
+        <MoneyField name="coverage" label="Suma asegurada" value={coverage} onChange={setCoverage} currency={cur} />
+        <MoneyField name="premium" label="Prima" value={premium} onChange={setPremium} currency={cur} />
+        <SheetSelect
+          name="premiumFrequency"
+          label="Frecuencia de prima"
+          value={premiumFrequency}
+          onChange={setPremiumFrequency}
+          options={FREQ_OPTS}
+          sheetTitle="Frecuencia de prima"
+        />
+        <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      </FormShell>
+    );
+  }
+
+  // ── Modo fondo (o Defensa OFF): crea/edita un savings_goal ──
   // Fondo de defensa sin nombre → se prefija (sin pisar lo que el usuario puso).
   const effectiveName =
     isDefense && !name.trim()
@@ -105,23 +187,7 @@ export function GoalForm({
       successMessage={successMessage}
       onSuccess={onSuccess}
     >
-      <Segmented
-        name="mode"
-        label="Tipo de ahorro"
-        value={mode}
-        onChange={setMode}
-        options={MODE_OPTS}
-      />
-      {isDefense ? (
-        <SheetSelect
-          name="defenseKind"
-          label="Protección"
-          value={defenseKind}
-          onChange={setDefenseKind}
-          options={DEFENSE_FUND_OPTS}
-          sheetTitle="Protección"
-        />
-      ) : null}
+      {toggle}
       <TextField
         name="name"
         label={isDefense ? "Nombre (opcional)" : "Nombre"}
