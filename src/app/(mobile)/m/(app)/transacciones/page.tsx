@@ -18,6 +18,7 @@ import { formatMoney } from "@/lib/format";
 import { MobileTxnList } from "./mobile-txn-list";
 import { RevisionInbox } from "./revision-inbox";
 import { RulesManager } from "./rules-manager";
+import { AccountsManager } from "./accounts-manager";
 import { MobileMenu } from "../../components/mobile-menu";
 
 /**
@@ -111,6 +112,9 @@ export default async function MobileTransacciones() {
 
         {/* Reglas de auto-categorización (mismo panel que la web, sin backend nuevo). */}
         <RulesManager rules={view.rules} categories={selectableCategories} />
+
+        {/* Cuentas (CRUD) + transferencias entre cuentas, con las Server Actions ya existentes. */}
+        <AccountsManager accounts={accounts} currency={currency} />
 
         <MobileTxnList
           transactions={transactions}
