@@ -20,6 +20,7 @@ import { RevisionInbox } from "./revision-inbox";
 import { RulesManager } from "./rules-manager";
 import { AccountsManager } from "./accounts-manager";
 import { TemplatesManager } from "./templates-manager";
+import { CsvImport } from "./csv-import";
 import { MobileMenu } from "../../components/mobile-menu";
 
 /**
@@ -124,6 +125,9 @@ export default async function MobileTransacciones() {
           accounts={accounts}
           currency={currency}
         />
+
+        {/* Importar CSV: mismo parser (engine/csv-parse) y misma acción que la web. */}
+        <CsvImport currency={currency} />
 
         <MobileTxnList
           transactions={transactions}
