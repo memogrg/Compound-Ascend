@@ -19,6 +19,7 @@ import { MobileTxnList } from "./mobile-txn-list";
 import { RevisionInbox } from "./revision-inbox";
 import { RulesManager } from "./rules-manager";
 import { AccountsManager } from "./accounts-manager";
+import { TemplatesManager } from "./templates-manager";
 import { MobileMenu } from "../../components/mobile-menu";
 
 /**
@@ -47,7 +48,7 @@ export default async function MobileTransacciones() {
     );
   }
 
-  const { real, currency, transactions, categoryNames, period, accounts } = view;
+  const { real, currency, transactions, categoryNames, period, accounts, templates } = view;
   const net = real.freeCashflowReal;
 
   // Frascos para el selector de categoría (sobre) del registro de gastos (misma
@@ -115,6 +116,14 @@ export default async function MobileTransacciones() {
 
         {/* Cuentas (CRUD) + transferencias entre cuentas, con las Server Actions ya existentes. */}
         <AccountsManager accounts={accounts} currency={currency} />
+
+        {/* Plantillas: registrar en un toque lo recurrente (runTemplateAction, sin backend nuevo). */}
+        <TemplatesManager
+          templates={templates}
+          categories={selectableCategories}
+          accounts={accounts}
+          currency={currency}
+        />
 
         <MobileTxnList
           transactions={transactions}
