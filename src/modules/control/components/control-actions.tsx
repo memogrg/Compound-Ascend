@@ -13,6 +13,7 @@ import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addGoalAction,
   addDebtAction,
+  addDefensePolicyAction,
   editGoalAction,
   editDebtAction,
 } from "@/modules/control/api/actions";
@@ -219,7 +220,22 @@ function GoalForm({
   item?: SavingsGoal;
   fxRates?: Record<string, number>;
 }) {
-  const action = item ? (raw: unknown) => editGoalAction(item.id, raw) : addGoalAction;
+  // Modo Defensa: si se activa, el ahorro se convierte en una protección. Los
+  // dos FONDOS crean un savings_goal etiquetado (goal_type=defensa:*); los dos
+  // SEGUROS crean una insurance_policy vía addPolicyAction (reutilizada).
+  const [isDefense, setIsDefense] = useState<boolean>((item?.goalType ?? "").startsWith("defensa:"));
+  const [defenseKind, setDefenseKind] = useState<string>(
+    (item?.goalType ?? "").startsWith("defensa:") ? item!.goalType! : "defensa:fondo_emergencia",
+  );
+  const isSeguro = isDefense && defenseKind.startsWith("seguro:");
+
+  // La acción se elige al vuelo: en modo seguro creamos una póliza, si no un goal.
+  const action = (raw: unknown) =>
+    isSeguro
+      ? addDefensePolicyAction(raw)
+      : item
+        ? editGoalAction(item.id, raw)
+        : addGoalAction(raw);
   const { pending, errors, message, run } = useFormSubmit(action);
   const [cur, setCur] = useState<string>(item?.currency ?? currency);
   // Controlado para poder mostrar el equivalente en vivo (Punto FX).
@@ -231,15 +247,37 @@ function GoalForm({
     e.preventDefault();
     const form = e.currentTarget;
     const fd = new FormData(form);
+    if (isSeguro) {
+      run(
+        {
+          policyType: defenseKind === "seguro:vida" ? "vida" : "gastos_mayores",
+          provider: String(fd.get("provider") ?? "") || undefined,
+          coverage: Number(fd.get("coverage") ?? 0) || undefined,
+          premium: Number(fd.get("premium") ?? 0) || undefined,
+          premiumFrequency: String(fd.get("premiumFrequency") ?? "mensual"),
+          currency: cur,
+        },
+        onDone,
+        form,
+      );
+      return;
+    }
+    // Fondo (o Defensa OFF): si es fondo y el nombre está vacío, lo prefijamos
+    // con el nombre de la protección (sin sobreescribir lo que el usuario puso).
+    let name = String(fd.get("name") ?? "").trim();
+    if (isDefense && !name) {
+      name = defenseKind === "defensa:fondo_paz" ? "Fondo de paz" : "Fondo de emergencia";
+    }
     run(
       {
-        name: String(fd.get("name") ?? ""),
+        name,
         targetAmount: Number(targetAmount) || 0,
         currentAmount: Number(fd.get("currentAmount") ?? 0),
         monthlyContribution: Number(fd.get("monthlyContribution") ?? 0),
         currency: cur,
         targetDate: String(fd.get("targetDate") ?? "") || undefined,
         priority: String(fd.get("priority") ?? "media"),
+        goalType: isDefense ? defenseKind : undefined,
       },
       onDone,
       form,
@@ -254,86 +292,191 @@ function GoalForm({
             {message}
           </div>
         ) : null}
+
+        {/* Toggle Defensa: convierte el ahorro en una protección. */}
         <div className="fld">
-          <label className="fld-label">Nombre del objetivo</label>
-          <input
-            className="inp"
-            name="name"
-            defaultValue={item?.name ?? ""}
-            placeholder="Fondo de emergencia, viaje…"
-            required
-            aria-invalid={errors.name ? true : undefined}
-          />
-          {errors.name ? (
-            <span className="auth-err" role="alert">
-              {errors.name}
+          <label
+            className="fld-label"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            Tipo de ahorro
+            <span
+              className="tip tip-wrap"
+              data-tip="Actívalo si este ahorro es una protección. Los fondos se acumulan; los seguros llevan prima. Aparecerá en tu área de Defensa."
+              aria-label="Qué es un ahorro de defensa"
+              style={{ display: "inline-flex", cursor: "help" }}
+            >
+              <Icon name="info" />
             </span>
-          ) : null}
-        </div>
-        <div className="fld-2">
-          <Money
-            label="Monto meta"
-            name="targetAmount"
-            currency={cur}
-            error={errors.targetAmount}
-            value={targetAmount}
-            onChange={setTargetAmount}
-          />
-          <Money
-            label="Acumulado"
-            name="currentAmount"
-            currency={cur}
-            defaultValue={item?.currentAmount}
-          />
-        </div>
-        <div className="fld-2">
-          <Money
-            label="Aporte mensual"
-            name="monthlyContribution"
-            currency={cur}
-            defaultValue={item?.monthlyContribution}
-          />
-          <div className="fld">
-            <label className="fld-label">Fecha objetivo</label>
-            <input
-              className="inp"
-              name="targetDate"
-              type="date"
-              defaultValue={item?.targetDate ?? ""}
-            />
+          </label>
+          <div className="seg" role="group" aria-label="Tipo de ahorro">
+            <button
+              type="button"
+              className={`seg-btn${!isDefense ? " on" : ""}`}
+              onClick={() => setIsDefense(false)}
+            >
+              Normal
+            </button>
+            <button
+              type="button"
+              className={`seg-btn${isDefense ? " on" : ""}`}
+              onClick={() => setIsDefense(true)}
+            >
+              Defensa
+            </button>
           </div>
         </div>
-        <div className="fld-2">
+
+        {isDefense ? (
           <div className="fld">
-            <label className="fld-label">Moneda</label>
+            <label className="fld-label">Protección</label>
             <select
               className="sel"
-              name="currency"
-              value={cur}
-              onChange={(e) => setCur(e.target.value)}
+              value={defenseKind}
+              onChange={(e) => setDefenseKind(e.target.value)}
             >
-              {CURRENCIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
+              <option value="defensa:fondo_emergencia">Fondo de emergencia</option>
+              <option value="defensa:fondo_paz">Fondo de paz</option>
+              <option value="seguro:gastos_mayores">Seguro de gastos mayores</option>
+              <option value="seguro:vida">Seguro de vida</option>
             </select>
-            <FxEquivalent
-              amount={Number(targetAmount) || 0}
-              from={cur}
-              to={currency}
-              rates={fxRates}
-            />
           </div>
+        ) : null}
+
+        {/* Nombre: obligatorio para un ahorro normal; opcional para un fondo de
+            defensa (se prefija solo); oculto para un seguro (la póliza no lo usa). */}
+        {!isSeguro ? (
           <div className="fld">
-            <label className="fld-label">Prioridad</label>
-            <select className="sel" name="priority" defaultValue={item?.priority ?? "media"}>
-              <option value="alta">Alta</option>
-              <option value="media">Media</option>
-              <option value="baja">Baja</option>
-            </select>
+            <label className="fld-label">
+              {isDefense ? "Nombre del objetivo (opcional)" : "Nombre del objetivo"}
+            </label>
+            <input
+              className="inp"
+              name="name"
+              defaultValue={item?.name ?? ""}
+              placeholder={
+                isDefense
+                  ? defenseKind === "defensa:fondo_paz"
+                    ? "Fondo de paz"
+                    : "Fondo de emergencia"
+                  : "Fondo de emergencia, viaje…"
+              }
+              required={!isDefense}
+              aria-invalid={errors.name ? true : undefined}
+            />
+            {errors.name ? (
+              <span className="auth-err" role="alert">
+                {errors.name}
+              </span>
+            ) : null}
           </div>
-        </div>
+        ) : null}
+
+        {isSeguro ? (
+          <>
+            <div className="fld-2">
+              <div className="fld">
+                <label className="fld-label">Aseguradora (opcional)</label>
+                <input className="inp" name="provider" maxLength={80} placeholder="Nombre" />
+              </div>
+              <div className="fld">
+                <label className="fld-label">Frecuencia de prima</label>
+                <select className="sel" name="premiumFrequency" defaultValue="mensual">
+                  <option value="mensual">Mensual</option>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="semestral">Semestral</option>
+                  <option value="anual">Anual</option>
+                </select>
+              </div>
+            </div>
+            <div className="fld-2">
+              <Money label="Suma asegurada" name="coverage" currency={cur} />
+              <Money label="Prima" name="premium" currency={cur} />
+            </div>
+            <div className="fld">
+              <label className="fld-label">Moneda</label>
+              <select
+                className="sel"
+                name="currency"
+                value={cur}
+                onChange={(e) => setCur(e.target.value)}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="fld-2">
+              <Money
+                label="Monto meta"
+                name="targetAmount"
+                currency={cur}
+                error={errors.targetAmount}
+                value={targetAmount}
+                onChange={setTargetAmount}
+              />
+              <Money
+                label="Acumulado"
+                name="currentAmount"
+                currency={cur}
+                defaultValue={item?.currentAmount}
+              />
+            </div>
+            <div className="fld-2">
+              <Money
+                label="Aporte mensual"
+                name="monthlyContribution"
+                currency={cur}
+                defaultValue={item?.monthlyContribution}
+              />
+              <div className="fld">
+                <label className="fld-label">Fecha objetivo</label>
+                <input
+                  className="inp"
+                  name="targetDate"
+                  type="date"
+                  defaultValue={item?.targetDate ?? ""}
+                />
+              </div>
+            </div>
+            <div className="fld-2">
+              <div className="fld">
+                <label className="fld-label">Moneda</label>
+                <select
+                  className="sel"
+                  name="currency"
+                  value={cur}
+                  onChange={(e) => setCur(e.target.value)}
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <FxEquivalent
+                  amount={Number(targetAmount) || 0}
+                  from={cur}
+                  to={currency}
+                  rates={fxRates}
+                />
+              </div>
+              <div className="fld">
+                <label className="fld-label">Prioridad</label>
+                <select className="sel" name="priority" defaultValue={item?.priority ?? "media"}>
+                  <option value="alta">Alta</option>
+                  <option value="media">Media</option>
+                  <option value="baja">Baja</option>
+                </select>
+              </div>
+            </div>
+          </>
+        )}
       </div>
       <Foot pending={pending} onCancel={onCancel} />
     </form>

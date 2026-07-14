@@ -27,12 +27,27 @@ export type GoalValues = {
   currency: string;
   targetDate: string | undefined;
   priority: string;
+  goalType?: string;
 };
 
 const PRIORITY_OPTS: Opt[] = [
   { value: "alta", label: "Alta" },
   { value: "media", label: "Media" },
   { value: "baja", label: "Baja" },
+];
+
+// Toggle Defensa (Normal / Defensa).
+const MODE_OPTS: Opt[] = [
+  { value: "normal", label: "Normal" },
+  { value: "defensa", label: "Defensa" },
+];
+
+// En móvil solo se ofrecen los dos FONDOS. Los seguros (gastos mayores / vida)
+// se crean desde el flujo web; en móvil quedan como follow-up (no reutilizamos
+// aún el formulario de póliza móvil desde este flujo).
+const DEFENSE_FUND_OPTS: Opt[] = [
+  { value: "defensa:fondo_emergencia", label: "Fondo de emergencia" },
+  { value: "defensa:fondo_paz", label: "Fondo de paz" },
 ];
 
 export function GoalForm({
@@ -56,15 +71,30 @@ export function GoalForm({
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [priority, setPriority] = useState(initial?.priority ?? "media");
   const [cur, setCur] = useState(initial?.currency ?? currency);
+  const initialDefense = (initial?.goalType ?? "").startsWith("defensa:");
+  const [mode, setMode] = useState(initialDefense ? "defensa" : "normal");
+  const [defenseKind, setDefenseKind] = useState(
+    initialDefense ? initial!.goalType! : "defensa:fondo_emergencia",
+  );
+  const isDefense = mode === "defensa";
+
+  // Fondo de defensa sin nombre → se prefija (sin pisar lo que el usuario puso).
+  const effectiveName =
+    isDefense && !name.trim()
+      ? defenseKind === "defensa:fondo_paz"
+        ? "Fondo de paz"
+        : "Fondo de emergencia"
+      : name;
 
   const values: GoalValues = {
-    name,
+    name: effectiveName,
     targetAmount,
     currentAmount: initial?.currentAmount ?? 0, // se preserva en edición; 0 al crear
     monthlyContribution,
     currency: cur,
     targetDate: targetDate === "" ? undefined : targetDate,
     priority,
+    goalType: isDefense ? defenseKind : undefined,
   };
 
   return (
@@ -75,12 +105,35 @@ export function GoalForm({
       successMessage={successMessage}
       onSuccess={onSuccess}
     >
+      <Segmented
+        name="mode"
+        label="Tipo de ahorro"
+        value={mode}
+        onChange={setMode}
+        options={MODE_OPTS}
+      />
+      {isDefense ? (
+        <SheetSelect
+          name="defenseKind"
+          label="Protección"
+          value={defenseKind}
+          onChange={setDefenseKind}
+          options={DEFENSE_FUND_OPTS}
+          sheetTitle="Protección"
+        />
+      ) : null}
       <TextField
         name="name"
-        label="Nombre"
+        label={isDefense ? "Nombre (opcional)" : "Nombre"}
         value={name}
         onChange={setName}
-        placeholder="Fondo de emergencia, viaje…"
+        placeholder={
+          isDefense
+            ? defenseKind === "defensa:fondo_paz"
+              ? "Fondo de paz"
+              : "Fondo de emergencia"
+            : "Fondo de emergencia, viaje…"
+        }
         maxLength={120}
         autoFocus
       />
