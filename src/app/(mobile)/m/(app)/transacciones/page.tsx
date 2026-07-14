@@ -1,16 +1,30 @@
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
+import {
+  listMyPendingProposals,
+  type PendingProposalView,
+} from "@/modules/financial-base/services/ingest-proposals-view";
+import {
+  selectUncategorized,
+  selectableCategoryLeaves,
+} from "@/modules/financial-base/engine/classify";
+import {
+  findUnlinkedCandidates,
+  buildEntityAlerts,
+} from "@/modules/financial-base/engine/reconciliation";
 import { monthPeriod } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
 
 import { MobileTxnList } from "./mobile-txn-list";
+import { RevisionInbox } from "./revision-inbox";
 import { MobileMenu } from "../../components/mobile-menu";
 
 /**
  * /m/transacciones — paridad con la web /transacciones ("Transacciones", nombre exacto
- * de nav.ts) y data-screen="transacciones" del diseño. Franja de resumen + lista con
- * filtro. Reutiliza la MISMA orquestación (loadBaseView: transacciones + totales +
- * nombres de categoría), sin reimplementar consultas. es-MX "tú", tema claro.
+ * de nav.ts) y data-screen="transacciones" del diseño. Bandeja "Por ordenar" (por revisar /
+ * por clasificar / conciliar) + franja de resumen + lista con filtro. Reutiliza la MISMA
+ * orquestación que la web (loadBaseView + selectUncategorized + findUnlinkedCandidates +
+ * listMyPendingProposals), sin reimplementar consultas. es-MX "tú", tema claro.
  */
 export const dynamic = "force-dynamic"; // datos por sesión
 
@@ -45,6 +59,21 @@ export default async function MobileTransacciones() {
     currency,
   });
 
+  // Bandeja "Por ordenar" — mismas fuentes que la web (cero consultas nuevas):
+  //  · propuestas de ingesta (best-effort: si falla la lectura, la página no se rompe);
+  //  · movimientos sin sobre + hojas de categoría seleccionables;
+  //  · candidatos sin vincular + alertas plan-vs-real por entidad.
+  let proposals: PendingProposalView[] = [];
+  try {
+    proposals = await listMyPendingProposals();
+  } catch {
+    proposals = [];
+  }
+  const uncategorized = selectUncategorized(transactions);
+  const selectableCategories = selectableCategoryLeaves(view.categories);
+  const candidates = findUnlinkedCandidates(transactions, view.categories, view.linkables);
+  const alerts = buildEntityAlerts(view.budget.items, transactions, currency, view.rates);
+
   return (
     <div className="m-scroll">
       <div className="m-pad">
@@ -68,6 +97,16 @@ export default async function MobileTransacciones() {
           <Sum label="Ingresos" value={formatMoney(real.realIncome, currency)} cls="pos" sub="este mes" />
           <Sum label="Gastos" value={formatMoney(real.realExpense, currency)} cls="neg" sub="este mes" />
         </div>
+
+        {/* Bandeja de revisión y conciliación (arriba de la lista, sin alterarla). */}
+        <RevisionInbox
+          proposals={proposals}
+          uncategorized={uncategorized}
+          categories={selectableCategories}
+          candidates={candidates}
+          linkables={view.linkables}
+          alerts={alerts}
+        />
 
         <MobileTxnList
           transactions={transactions}
