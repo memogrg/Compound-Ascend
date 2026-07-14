@@ -3,6 +3,7 @@ import {
   debtPaymentToTxn,
   goalContributionToTxn,
   goalWithdrawalToTxn,
+  goalSpendToTxn,
   dividendToTxn,
   rentalPaymentToTxn,
   holdingSaleToTxn,
@@ -219,6 +220,50 @@ describe("builders del orquestador de vínculos (Fase 1)", () => {
       note: "imprevisto médico",
     });
     expect(txn.description).toBe("Retiro — Fondo de emergencia · imprevisto médico");
+  });
+
+  it("gastar del frasco → gasto vinculado a la meta, categorizado y OFF-BUDGET", () => {
+    const txn = goalSpendToTxn({
+      goalId: "33333333-3333-4333-8333-333333333333",
+      goalName: "Ropa",
+      currency: "CRC",
+      spendDate: "2026-07-10",
+      amount: 20000,
+      categoryId: "99999999-9999-4999-8999-999999999999",
+    });
+    expect(txn.kind).toBe("gasto");
+    expect(txn.linkedKind).toBe("goal");
+    expect(txn.linkedId).toBe("33333333-3333-4333-8333-333333333333");
+    expect(txn.categoryId).toBe("99999999-9999-4999-8999-999999999999");
+    expect(txn.description).toBe("Gasto — Ropa");
+    // Off-budget: la clave de todo el Delta A.
+    expect(txn.countsInBudget).toBe(false);
+    // Debe pasar el mismo schema que usa createTransaction.
+    expect(() => txnInputSchema.parse(txn)).not.toThrow();
+  });
+
+  it("gastar del frasco con nota la incluye en la descripción", () => {
+    const txn = goalSpendToTxn({
+      goalId: "33333333-3333-4333-8333-333333333333",
+      goalName: "Ropa",
+      currency: "CRC",
+      spendDate: "2026-07-10",
+      amount: 20000,
+      categoryId: null,
+      note: "camisa",
+    });
+    expect(txn.description).toBe("Gasto — Ropa · camisa");
+    expect(txn.categoryId).toBeNull();
+  });
+
+  it("off-budget es opt-in: una transacción normal lo omite (el insert usa true)", () => {
+    const parsed = txnInputSchema.parse({
+      kind: "gasto",
+      amount: 1000,
+      currency: "CRC",
+      occurredOn: "2026-07-09",
+    });
+    expect(parsed.countsInBudget).toBeUndefined();
   });
 
   it("el vínculo es opt-in: una transacción normal pasa el schema sin él", () => {

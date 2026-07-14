@@ -3,6 +3,8 @@ import { DeleteButton } from "./delete-button";
 // Fase 4.1 (interconexión): botón Retirar — aditivo, coordinar con el owner
 // de esta pantalla. El componente es autocontenido (goal-withdraw-button).
 import { GoalWithdrawButton } from "./goal-withdraw-button";
+import { GoalSpendButton } from "./goal-spend-button";
+import { GoalDetailButton } from "./goal-detail-button";
 import { EditControlButton, AddControlButton } from "./control-actions";
 import { formatMoney } from "@/lib/format";
 import type { ControlSummary } from "@/modules/control/services/control-service";
@@ -235,6 +237,8 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                       {rec?.reason ? <> · {rec.reason}</> : null}
                     </div>
                     <div className="acts">
+                      <GoalDetailButton goal={g} />
+                      <GoalSpendButton goal={g} />
                       <GoalWithdrawButton goal={g} />
                       <EditControlButton kind="goal" item={g} currency={currency} />
                       <DeleteButton id={g.id} kind="goal" />

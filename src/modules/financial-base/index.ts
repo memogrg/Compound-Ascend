@@ -21,6 +21,9 @@ export { monthPeriod } from "./engine/period";
 export { deleteIncomeSourcesByHolding } from "./services/budget-service";
 // Headline de Gastos (planificado vs real por rango) — el widget de Presupuesto lo calca.
 export { getExpenseRangeView } from "./services/expense-range-service";
+// Árbol de categorías (grupo → hojas) para selectores de gasto reutilizables.
+export { listCategoryTree, getCategoryNameMap } from "./services/categories-service";
+export type { CategoryNode } from "./services/categories-service";
 // Orquestador de transacciones vinculadas: la puerta de entrada para que
 // control/wealth/assistant registren eventos de dinero (CLAUDE.md).
 export {
@@ -34,6 +37,7 @@ export {
   debtPaymentToTxn,
   goalContributionToTxn,
   goalWithdrawalToTxn,
+  goalSpendToTxn,
   dividendToTxn,
   rentalPaymentToTxn,
   holdingPurchaseToTxn,

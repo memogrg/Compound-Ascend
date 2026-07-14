@@ -15,6 +15,7 @@ import {
   debtPaymentToTxn,
   goalContributionToTxn,
   goalWithdrawalToTxn,
+  goalSpendToTxn,
 } from "@/modules/financial-base";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { convertCurrency } from "@/lib/fx";
@@ -472,6 +473,62 @@ export async function withdrawFromGoal(input: {
   const { error } = await supabase
     .from("savings_goals")
     .update({ current_amount: Math.max(0, Number(goalRow.current_amount) - input.amount) })
+    .eq("id", input.goalId)
+    .eq("user_id", user.id);
+  if (error) {
+    await deleteLinkedTransaction(txnId);
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Gastar del frasco (Delta A): consumir parte de una meta en una compra real.
+ * Crea un gasto categorizado vinculado (linked_kind='goal') OFF-BUDGET —
+ * `counts_in_budget=false`, así NO cuenta en el gasto del mes ni en el free
+ * cashflow (ya se contó al aportar) — y baja `current_amount` Y `target_amount`
+ * por el mismo monto (la brecha meta−acumulado se conserva). Rollback de la
+ * transacción si el update de la meta falla.
+ */
+export async function spendFromGoal(input: {
+  goalId: string;
+  amount: number;
+  spendDate: string;
+  categoryId: string | null;
+  note?: string;
+}): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: goalRow, error: gErr } = await supabase
+    .from("savings_goals")
+    .select("id,name,currency,current_amount,target_amount,status")
+    .eq("id", input.goalId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (gErr) throw new Error(gErr.message);
+  if (!goalRow) throw new Error("Meta no encontrada");
+  if (input.amount <= 0) throw new Error("El monto debe ser mayor a 0.");
+  if (input.amount > Number(goalRow.current_amount)) {
+    throw new Error("No puedes gastar más de lo acumulado en la meta.");
+  }
+
+  const txnId = await registerLinkedTransaction(
+    goalSpendToTxn({
+      goalId: goalRow.id,
+      goalName: goalRow.name,
+      currency: goalRow.currency,
+      spendDate: input.spendDate,
+      amount: input.amount,
+      categoryId: input.categoryId,
+      note: input.note,
+    }),
+  );
+
+  const nextCurrent = Math.max(0, Number(goalRow.current_amount) - input.amount);
+  const nextTarget = Math.max(0, Number(goalRow.target_amount) - input.amount);
+  const { error } = await supabase
+    .from("savings_goals")
+    .update({ current_amount: nextCurrent, target_amount: nextTarget })
     .eq("id", input.goalId)
     .eq("user_id", user.id);
   if (error) {

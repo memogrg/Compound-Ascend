@@ -20,8 +20,11 @@ import {
   deleteDebtPayment,
   addGoalContribution,
   withdrawFromGoal,
+  spendFromGoal,
 } from "@/modules/control/services/control-service";
 import { addPolicyAction } from "@/modules/wealth";
+import { listCategoryTree } from "@/modules/financial-base";
+import { getGoalDetail, type GoalDetailVM } from "@/modules/control/services/goal-detail-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -217,6 +220,78 @@ export async function withdrawGoalAction(raw: unknown): Promise<ActionResult> {
       err instanceof Error && err.message.startsWith("No puedes retirar")
         ? err.message
         : "No pudimos registrar el retiro.";
+    return { ok: false, message: msg };
+  }
+}
+
+const goalSpendSchema = z.object({
+  goalId: z.string().uuid(),
+  amount: z.number().positive("Debe ser mayor a 0"),
+  spendDate: z.string().min(8).max(10).refine(notFutureDate, { message: NOT_FUTURE_MSG }),
+  categoryId: z.preprocess(
+    (v) => (v === "" || v === undefined ? null : v),
+    z.string().uuid().nullable(),
+  ),
+  note: z.string().max(280).optional(),
+});
+
+/** Detalle de un frasco (Delta C): meta + movimientos con saldo, para el modal/sheet. */
+export async function getGoalDetailAction(goalId: string): Promise<GoalDetailVM | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    return await getGoalDetail(goalId);
+  } catch (err) {
+    logger.error("getGoalDetail fallido", { message: err instanceof Error ? err.message : "?" });
+    return null;
+  }
+}
+
+export type ExpenseCategoryGroup = { groupName: string; options: { id: string; name: string }[] };
+
+/**
+ * Categorías de gasto (grupo → hojas + "general") para el selector de "Gastar
+ * del frasco". Se carga de forma perezosa al abrir el modal para no pesar en el
+ * render del dashboard. Misma fuente (listCategoryTree) que el composer de gasto.
+ */
+export async function listExpenseCategoriesAction(): Promise<ExpenseCategoryGroup[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const tree = await listCategoryTree("expense");
+    return tree.map((g) => ({
+      groupName: g.name,
+      options: [
+        { id: g.id, name: `${g.name} (general)` },
+        ...g.children.map((c) => ({ id: c.id, name: c.name })),
+      ],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Gastar del frasco: consume la meta en una compra real. Crea un gasto
+ * categorizado OFF-BUDGET (no toca el presupuesto del mes) y baja acumulado Y
+ * meta. Distinto de "Retirar" (que devuelve la plata a la cuenta como ingreso).
+ */
+export async function spendFromGoalAction(raw: unknown): Promise<ActionResult> {
+  const parsed = goalSpendSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await spendFromGoal(parsed.data);
+    revalidatePath("/control-financiero");
+    revalidatePath("/ahorro");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("spendFromGoal fallido", { message: err instanceof Error ? err.message : "?" });
+    // La validación de saldo es un mensaje para el usuario, no un error técnico.
+    const msg =
+      err instanceof Error && err.message.startsWith("No puedes gastar")
+        ? err.message
+        : "No pudimos registrar el gasto.";
     return { ok: false, message: msg };
   }
 }
