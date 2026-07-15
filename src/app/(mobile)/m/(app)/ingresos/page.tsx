@@ -107,6 +107,8 @@ export default async function MobileIngresos() {
           received={receivedNative}
           currency={currency}
           incomeTree={incomeTree}
+          periodMonth={view.period.month}
+          periodYear={view.period.year}
         />
 
         {/* Ingresos vinculados a inversiones (renta/dividendos) — read-only, como la web */}

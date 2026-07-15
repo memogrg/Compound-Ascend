@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -8,6 +8,7 @@ import {
   updateIncomeSourceAction,
   deleteIncomeSourceAction,
   receivePartialIncomeAction,
+  copyPreviousMonthIncomeAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
@@ -80,12 +81,17 @@ export function IncomeManager({
   received,
   currency,
   incomeTree,
+  periodMonth,
+  periodYear,
 }: {
   sources: BudgetItem[];
   /** Recibido por fuente en su moneda NATIVA (real.incomeReceivedBySourceNative). */
   received: Record<string, number>;
   currency: string;
   incomeTree: CategoryNode[];
+  /** Período actual (para copiar las fuentes del mes anterior). */
+  periodMonth: number;
+  periodYear: number;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -94,6 +100,27 @@ export function IncomeManager({
   const [deleting, setDeleting] = useState<BudgetItem | null>(null);
   const [delPending, setDelPending] = useState(false);
   const [receiving, setReceiving] = useState<BudgetItem | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyPending, startCopy] = useTransition();
+
+  const confirmCopy = () => {
+    startCopy(async () => {
+      const res = await copyPreviousMonthIncomeAction({ periodMonth, periodYear });
+      setCopyOpen(false);
+      if (res.ok) {
+        const n = res.copied ?? 0;
+        toast.show(
+          n > 0
+            ? `Copiadas ${n} ${n === 1 ? "fuente" : "fuentes"} del mes anterior`
+            : "No había fuentes recurrentes que copiar del mes anterior",
+          n > 0 ? "success" : "info",
+        );
+        router.refresh();
+      } else {
+        toast.show(res.message ?? "No pudimos copiar las fuentes", "error");
+      }
+    });
+  };
 
   const confirmDelete = async () => {
     if (!deleting) return;
@@ -166,6 +193,17 @@ export function IncomeManager({
         </div>
       )}
 
+      {/* Atajo: traer las fuentes recurrentes del mes anterior (idempotente). */}
+      <button
+        type="button"
+        className="m-btn m-btn-block m-btn-secondary"
+        style={{ marginTop: 12 }}
+        disabled={copyPending}
+        onClick={() => setCopyOpen(true)}
+      >
+        {copyPending ? "Copiando…" : "Copiar fuentes del mes anterior"}
+      </button>
+
       <Fab onClick={() => setAdding(true)} label="Nueva fuente de ingreso" />
 
       {/* Alta */}
@@ -177,6 +215,7 @@ export function IncomeManager({
           submitLabel="Guardar ingreso"
           successMessage="Ingreso registrado"
           onSuccess={() => setAdding(false)}
+          allowPassiveStub
         />
       </BottomSheet>
 
@@ -205,6 +244,18 @@ export function IncomeManager({
           />
         ) : null}
       </BottomSheet>
+
+      {/* Copiar mes anterior (crea filas → confirmación breve) */}
+      <ConfirmDialog
+        open={copyOpen}
+        title="Copiar fuentes del mes anterior"
+        message="Traeremos tus fuentes recurrentes del mes pasado a este mes. No se duplican las que ya tengas."
+        confirmLabel="Copiar"
+        variant="warning"
+        pending={copyPending}
+        onConfirm={confirmCopy}
+        onCancel={() => setCopyOpen(false)}
+      />
 
       {/* Eliminación */}
       <ConfirmDialog
