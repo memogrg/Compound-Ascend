@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { MobileBell } from "./mobile-bell";
+
 /**
  * Menú de navegación del móvil (botón ☰ + drawer), presente en el header de cada
  * pantalla /m. Replica el sidebar web (src/lib/constants/nav.ts): mismos grupos, labels
@@ -58,17 +60,21 @@ export function MobileMenu() {
 
   return (
     <>
-      <button
-        type="button"
-        className="icon-btn"
-        aria-label="Abrir menú"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-          <path d="M4 7h16M4 12h16M4 17h16" />
-        </svg>
-      </button>
+      {/* Campana + menú: un solo item del header, presente en toda pantalla /m. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <MobileBell />
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="Abrir menú"
+          aria-expanded={open}
+          onClick={() => setOpen(true)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+      </div>
 
       {open ? (
         <div className="m-menu-overlay" role="dialog" aria-modal="true" aria-label="Navegación">
