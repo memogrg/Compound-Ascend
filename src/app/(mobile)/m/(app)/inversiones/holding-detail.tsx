@@ -11,19 +11,25 @@ import {
   listHoldingValuationsAction,
   recordHoldingValuationAction,
   getHoldingHistoryAction,
+  listRentalPaymentsAction,
+  addRentalIncomeAction,
+  removeRentalPaymentAction,
+  adjustContributionPriceAction,
 } from "@/modules/wealth/api/actions";
-import type { Dividend, HoldingPerformance } from "@/modules/wealth/types";
+import type { Dividend, HoldingPerformance, RentalPayment } from "@/modules/wealth/types";
 import type {
   HistoryPoint,
   HoldingPurchase,
   HoldingValuation,
 } from "@/modules/wealth/services/holding-history-service";
+import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
 import {
   BottomSheet,
   ConfirmDialog,
   DateField,
   MoneyField,
+  SheetSelect,
   useToast,
 } from "../../components/form-kit";
 import { DividendForm } from "./inversiones-forms";
@@ -52,7 +58,19 @@ function isPlan(h: { category?: string | null }): boolean {
   return h.category === "plan_inversion";
 }
 
-type Mode = "detail" | "dividend" | "valuation";
+/** No cotizado (inmueble, bono, negocio, plan…): la web lo llama isRental. */
+function isRental(h: { assetType: string }): boolean {
+  return !isQuoted(h);
+}
+
+/** Frecuencias de renta que acepta el schema (rentalPaymentInputSchema). */
+const RENTAL_FREQ_OPTS = [
+  { value: "mensual", label: "Mensual" },
+  { value: "trimestral", label: "Trimestral" },
+  { value: "anual", label: "Anual" },
+];
+
+type Mode = "detail" | "dividend" | "valuation" | "rental";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -95,6 +113,7 @@ function Sparkline({ points }: { points: { value: number }[] }) {
 export function HoldingDetailSheet({
   holding,
   currency,
+  contribution,
   onClose,
   onEdit,
   onSell,
@@ -102,6 +121,8 @@ export function HoldingDetailSheet({
 }: {
   holding: HoldingPerformance;
   currency: string;
+  /** Aporte del mes pendiente (brecha DCA), o null si no hay. */
+  contribution: OpenContribution | null;
   onClose: () => void;
   onEdit: () => void;
   onSell: () => void;
@@ -114,19 +135,35 @@ export function HoldingDetailSheet({
 
   const quoted = isQuoted(holding);
   const plan = isPlan(holding);
+  const rental = isRental(holding) && !plan; // no cotizado y no plan → sección de renta
   const cur = holding.currency || currency;
   const name = holding.label || holding.symbol || "Inversión";
 
   const [purchases, setPurchases] = useState<HoldingPurchase[]>([]);
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [valuations, setValuations] = useState<HoldingValuation[]>([]);
+  const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [delDiv, setDelDiv] = useState<Dividend | null>(null);
+  const [delRent, setDelRent] = useState<RentalPayment | null>(null);
   const [valDate, setValDate] = useState(todayISO());
   const [valAmount, setValAmount] = useState<number | undefined>(undefined);
   const [valError, setValError] = useState<string | null>(null);
+
+  // Renta.
+  const [rentAmount, setRentAmount] = useState<number | undefined>(
+    holding.rentalIncome ?? undefined,
+  );
+  const [rentDate, setRentDate] = useState(todayISO());
+  const [rentFreq, setRentFreq] = useState<string>(holding.rentalFrequency ?? "mensual");
+  const [rentError, setRentError] = useState<string | null>(null);
+
+  // Ajuste del precio de aporte (brecha DCA).
+  const [contribPrice, setContribPrice] = useState<number | undefined>(
+    contribution?.unitPrice ?? undefined,
+  );
 
   const reloadDividends = useCallback(() => {
     void listDividendsAction(holding.id).then(setDividends);
@@ -134,6 +171,10 @@ export function HoldingDetailSheet({
 
   const reloadValuations = useCallback(() => {
     void listHoldingValuationsAction(holding.id).then(setValuations);
+  }, [holding.id]);
+
+  const reloadRentals = useCallback(() => {
+    void listRentalPaymentsAction(holding.id).then(setRentals);
   }, [holding.id]);
 
   // Carga perezosa: solo al abrir el detalle (este componente se monta con el holding elegido).
@@ -161,13 +202,20 @@ export function HoldingDetailSheet({
         }),
       );
     }
+    if (rental) {
+      jobs.push(
+        listRentalPaymentsAction(holding.id).then((r) => {
+          if (alive) setRentals(r);
+        }),
+      );
+    }
     void Promise.all(jobs).finally(() => {
       if (alive) setLoading(false);
     });
     return () => {
       alive = false;
     };
-  }, [holding, quoted, plan]);
+  }, [holding, quoted, plan, rental]);
 
   // Precio promedio acumulado tras cada compra (mismo cálculo que la web).
   let cumAmount = 0;
@@ -224,8 +272,80 @@ export function HoldingDetailSheet({
     });
   };
 
+  const saveRental = () => {
+    if (!rentAmount || rentAmount <= 0) {
+      setRentError("El monto debe ser mayor a 0");
+      return;
+    }
+    if (!rentDate) {
+      setRentError("Elige la fecha en que la recibiste");
+      return;
+    }
+    setRentError(null);
+    startTransition(async () => {
+      const res = await addRentalIncomeAction({
+        holdingId: holding.id,
+        receivedOn: rentDate,
+        amount: rentAmount,
+        currency: cur,
+        frequency: rentFreq,
+        holdingLabel: holding.label ?? undefined,
+        holdingSymbol: holding.symbol ?? undefined,
+      });
+      if (res.ok) {
+        toast.show("Renta registrada", "success");
+        setMode("detail");
+        reloadRentals();
+        router.refresh();
+      } else {
+        toast.show(res.message ?? "No pudimos registrar la renta", "error");
+      }
+    });
+  };
+
+  const confirmDeleteRental = () => {
+    if (!delRent) return;
+    const r = delRent;
+    startTransition(async () => {
+      const res = await removeRentalPaymentAction(r.id);
+      if (res.ok) {
+        setRentals((prev) => prev.filter((x) => x.id !== r.id));
+        setDelRent(null);
+        toast.show("Renta eliminada", "success");
+        router.refresh();
+      } else {
+        toast.show("No pudimos eliminar la renta", "error");
+      }
+    });
+  };
+
+  const confirmContribution = () => {
+    if (!contribution) return;
+    if (!contribPrice || contribPrice <= 0) {
+      toast.show("Escribe el precio unitario (mayor a 0)", "error");
+      return;
+    }
+    startTransition(async () => {
+      const res = await adjustContributionPriceAction(contribution.id, contribPrice);
+      if (res.ok) {
+        toast.show("Aporte confirmado", "success");
+        router.refresh();
+      } else {
+        toast.show(res.message ?? "No pudimos actualizar el aporte", "error");
+      }
+    });
+  };
+
+  const totalRentals = rentals.reduce((acc, r) => acc + r.amount, 0);
+
   const title =
-    mode === "dividend" ? "Registrar dividendo" : mode === "valuation" ? "Valor del estado de cuenta" : name;
+    mode === "dividend"
+      ? "Registrar dividendo"
+      : mode === "valuation"
+        ? "Valor del estado de cuenta"
+        : mode === "rental"
+          ? "Registrar renta"
+          : name;
 
   return (
     <>
@@ -288,8 +408,88 @@ export function HoldingDetailSheet({
           </div>
         ) : null}
 
+        {mode === "rental" ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div className="muted" style={{ fontSize: 13, lineHeight: 1.45 }}>
+              La renta que registres suma a tu ingreso pasivo (entra como transacción vinculada a
+              este activo).
+            </div>
+            <MoneyField
+              name="rentAmount"
+              label="Monto recibido"
+              value={rentAmount}
+              currency={cur}
+              onChange={setRentAmount}
+            />
+            <SheetSelect
+              name="rentFreq"
+              label="Frecuencia"
+              value={rentFreq}
+              options={RENTAL_FREQ_OPTS}
+              sheetTitle="Frecuencia"
+              onChange={setRentFreq}
+            />
+            <DateField name="receivedOn" label="Fecha" value={rentDate} onChange={setRentDate} />
+            {rentError ? (
+              <div className="neg" style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+                {rentError}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="m-btn m-btn-block m-btn-primary"
+              disabled={pending}
+              onClick={saveRental}
+            >
+              {pending ? "Guardando…" : "Registrar renta"}
+            </button>
+            <button
+              type="button"
+              className="m-btn m-btn-block m-btn-secondary"
+              disabled={pending}
+              onClick={() => setMode("detail")}
+            >
+              Volver
+            </button>
+          </div>
+        ) : null}
+
         {mode === "detail" ? (
           <div style={{ display: "grid", gap: 12 }}>
+            {/* Aporte del mes pendiente (brecha DCA) */}
+            {contribution ? (
+              <div
+                className="card card-p"
+                style={{ padding: 12, borderColor: "var(--warning, #b7791f)" }}
+              >
+                <div className="between" style={{ marginBottom: 6 }}>
+                  <div className="sec-title">Aporte del mes pendiente</div>
+                  <span className="mono" style={{ fontSize: 12, fontWeight: 700 }}>
+                    {formatMoney(contribution.amount, contribution.currency)}
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 8, lineHeight: 1.45 }}>
+                  Confirma el precio de compra de este mes para que tu promedio quede exacto.
+                </div>
+                <MoneyField
+                  name="contribPrice"
+                  label="Precio unitario"
+                  value={contribPrice}
+                  currency={contribution.currency}
+                  onChange={setContribPrice}
+                />
+                <button
+                  type="button"
+                  className="m-btn m-btn-block m-btn-primary"
+                  style={{ marginTop: 8 }}
+                  disabled={pending}
+                  onClick={confirmContribution}
+                >
+                  {pending ? "Confirmando…" : "Confirmar aporte"}
+                </button>
+              </div>
+            ) : null}
+
             {/* Resumen */}
             <div className="card card-p" style={{ padding: 12 }}>
               <div className="between">
@@ -464,16 +664,85 @@ export function HoldingDetailSheet({
               </div>
             ) : null}
 
+            {/* Renta (solo no cotizados que no son plan: inmueble, bono, negocio…) */}
+            {rental ? (
+              <div>
+                <div className="between" style={{ marginBottom: 6 }}>
+                  <div className="sec-title">Renta</div>
+                  {totalRentals > 0 ? (
+                    <span className="mono pos" style={{ fontSize: 11.5, fontWeight: 700 }}>
+                      {formatMoney(totalRentals, cur)}
+                    </span>
+                  ) : null}
+                </div>
+                {loading ? (
+                  <div className="muted" style={{ fontSize: 12.5 }}>
+                    Cargando…
+                  </div>
+                ) : rentals.length === 0 ? (
+                  <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+                    Sin renta registrada aún. La renta que registres suma a tu ingreso pasivo.
+                  </div>
+                ) : (
+                  <div className="card" style={{ padding: 0 }}>
+                    {rentals.map((r) => (
+                      <div
+                        key={r.id}
+                        className="between"
+                        style={{ padding: "9px 12px", gap: 10, alignItems: "center" }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div className="mono pos" style={{ fontSize: 13, fontWeight: 700 }}>
+                            +{formatMoney(r.amount, r.currency)}
+                          </div>
+                          <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                            {r.receivedOn}
+                            {r.frequency ? ` · ${r.frequency}` : ""}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="m-chip"
+                          style={{ flexShrink: 0 }}
+                          disabled={pending}
+                          onClick={() => setDelRent(r)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="m-btn m-btn-block m-btn-secondary"
+                  style={{ marginTop: 8 }}
+                  disabled={pending}
+                  onClick={() => {
+                    setRentAmount(holding.rentalIncome ?? undefined);
+                    setRentDate(todayISO());
+                    setRentFreq(holding.rentalFrequency ?? "mensual");
+                    setRentError(null);
+                    setMode("rental");
+                  }}
+                >
+                  Registrar renta
+                </button>
+              </div>
+            ) : null}
+
             {/* Acciones (las que ya existían) */}
             <div style={{ display: "grid", gap: 8 }}>
-              <button
-                type="button"
-                className="m-btn m-btn-block m-btn-primary"
-                disabled={pending}
-                onClick={() => setMode("dividend")}
-              >
-                Registrar dividendo
-              </button>
+              {rental ? null : (
+                <button
+                  type="button"
+                  className="m-btn m-btn-block m-btn-primary"
+                  disabled={pending}
+                  onClick={() => setMode("dividend")}
+                >
+                  Registrar dividendo
+                </button>
+              )}
               <button
                 type="button"
                 className="m-btn m-btn-block m-btn-secondary"
@@ -516,6 +785,21 @@ export function HoldingDetailSheet({
         pending={pending}
         onConfirm={confirmDeleteDividend}
         onCancel={() => setDelDiv(null)}
+      />
+
+      <ConfirmDialog
+        open={delRent !== null}
+        title="Eliminar renta"
+        message={
+          delRent
+            ? `Se eliminará la renta de ${formatMoney(delRent.amount, delRent.currency)} del ${delRent.receivedOn}.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        variant="danger"
+        pending={pending}
+        onConfirm={confirmDeleteRental}
+        onCancel={() => setDelRent(null)}
       />
     </>
   );

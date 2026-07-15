@@ -1,4 +1,8 @@
 import { getPortfolioReport } from "@/modules/wealth";
+import {
+  ensureMonthlyContributions,
+  listOpenContributions,
+} from "@/modules/wealth/services/contribution-service";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MobileMenu } from "../../components/mobile-menu";
@@ -15,7 +19,14 @@ export const dynamic = "force-dynamic"; // datos por sesión + precios en vivo
 const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
 
 export default async function MobileInversiones() {
-  const report = await getPortfolioReport();
+  // Brecha DCA: registra el aporte del mes de los holdings recurrentes (best-effort,
+  // idempotente). Mismo patrón que la web /patrimonio — sin esto, un usuario solo-móvil
+  // nunca vería el aporte pendiente. Luego se leen los aportes abiertos para el banner.
+  await ensureMonthlyContributions().catch(() => {});
+  const [report, openContributions] = await Promise.all([
+    getPortfolioReport(),
+    listOpenContributions(),
+  ]);
   const a = report.analytics;
   const currency = report.currency;
 
@@ -102,7 +113,11 @@ export default async function MobileInversiones() {
               </span>
             )}
           </div>
-          <InversionesManager holdings={holdings} currency={currency} />
+          <InversionesManager
+            holdings={holdings}
+            currency={currency}
+            openContributions={openContributions}
+          />
         </div>
       </div>
     </div>
