@@ -104,8 +104,9 @@ export default async function MobileHome() {
             </div>
           </Link>
         )}
-        {/* Header: saludo + nombre real */}
-        <header className="between" style={{ marginBottom: 18 }}>
+        {/* Header: saludo + nombre real. Piloto "Cristal Cálido": topbar de cristal que
+            escarcha el contenido al hacer scroll (chrome, con fallback sólido garantizado). */}
+        <header className="between m-topbar m-glass" style={{ marginBottom: 18, padding: "12px 14px" }}>
           <div className="row">
             <span className="iso" aria-hidden>
               <svg viewBox="0 0 64 64" fill="none">
