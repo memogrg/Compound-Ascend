@@ -56,6 +56,39 @@ export function goalContributionToTxn(args: {
   };
 }
 
+/**
+ * Consumo de una meta ("gastar del frasco") → gasto categorizado vinculado a la
+ * meta, OFF-BUDGET (`countsInBudget:false`): no cuenta en el gasto del mes ni en
+ * el free cashflow porque ya se contó al aportar. La categoría se elige por
+ * gasto (el frasco no la fija). Baja `current_amount` y `target_amount` en el
+ * servicio; aquí solo se construye la transacción.
+ */
+export function goalSpendToTxn(args: {
+  goalId: string;
+  goalName: string;
+  currency: string;
+  spendDate: string;
+  amount: number;
+  categoryId?: string | null;
+  note?: string;
+}): LinkedTxnInput {
+  const note = args.note?.trim();
+  return {
+    kind: "gasto",
+    amount: args.amount,
+    currency: args.currency,
+    occurredOn: args.spendDate,
+    categoryId: args.categoryId ?? null,
+    merchantOrSource: args.goalName,
+    description: note ? `Gasto — ${args.goalName} · ${note}` : `Gasto — ${args.goalName}`,
+    status: "confirmed",
+    origin: "manual",
+    linkedKind: "goal",
+    linkedId: args.goalId,
+    countsInBudget: false,
+  };
+}
+
 /** Dividendo recibido → ingreso vinculado al holding. */
 export function dividendToTxn(args: {
   holdingId: string;

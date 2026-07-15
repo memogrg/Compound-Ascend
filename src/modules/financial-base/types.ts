@@ -100,6 +100,8 @@ export type Transaction = {
   recurringItemId?: string | null;
   // Ingresos (Fase 2): fuente de ingreso (budget_items) a la que se atribuye.
   incomeSourceId?: string | null;
+  // Off-budget: false = no cuenta en el gasto del mes / free cashflow / actuals.
+  countsInBudget?: boolean;
 };
 
 /** Ítem de presupuesto, scopeado por mes. */

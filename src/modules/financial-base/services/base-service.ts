@@ -247,7 +247,7 @@ async function computeV2Totals(
       .eq("period_year", p.year),
     supabase
       .from("transactions")
-      .select("kind,amount,currency")
+      .select("kind,amount,currency,counts_in_budget")
       .eq("user_id", user.id)
       .gte("occurred_on", p.from)
       .lte("occurred_on", p.to),
@@ -265,7 +265,8 @@ async function computeV2Totals(
   for (const r of tx.data ?? []) {
     const v = convertCurrency(Number(r.amount), r.currency, displayCurrency, rates);
     if (r.kind === "ingreso") realIncome += v;
-    else realExpense += v;
+    // Off-budget (consumo de frasco): fuera del gasto real en la varianza presup-vs-real.
+    else if (r.counts_in_budget !== false) realExpense += v;
   }
 
   return {

@@ -315,6 +315,9 @@ export type TransactionRow = Timestamps & {
   recurring_item_id: string | null;
   // Ingresos (migración 20260615000002 · Fase 2): vínculo a la fuente de ingreso.
   income_source_id: string | null;
+  // Gasto off-budget (migración 20260717000001): false = no cuenta en el gasto
+  // del mes / free cashflow / actuals (p.ej. consumo de un frasco de ahorro).
+  counts_in_budget: boolean;
 };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------

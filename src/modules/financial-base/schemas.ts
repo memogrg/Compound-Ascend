@@ -129,6 +129,10 @@ export const txnInputSchema = z
     recurringItemId: uuidOrNull.optional(),
     // Ingresos (Fase 2): atribuye la transacción a una fuente (budget_items income).
     incomeSourceId: uuidOrNull.optional(),
+    // Off-budget: false = no cuenta en el gasto del mes / free cashflow / actuals
+    // (p.ej. consumo de un frasco de ahorro, que ya se contó al aportar). Opt-in
+    // como el resto de los campos aditivos; si se omite, el insert usa true.
+    countsInBudget: z.boolean().optional(),
   })
   .refine((d) => !d.linkedKind || d.linkedKind === "none" || !!d.linkedId, {
     message: "Un vínculo necesita la entidad (linkedId).",

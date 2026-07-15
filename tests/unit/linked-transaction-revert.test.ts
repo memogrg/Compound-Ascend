@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Estado del fake del cliente Supabase.
 const h = vi.hoisted(() => ({
   debtPayment: null as { id: string } | null,
-  goalRow: null as { current_amount: number } | null,
+  goalRow: null as { current_amount: number; target_amount?: number } | null,
   rpcSpy: vi.fn(),
   goalUpdateSpy: vi.fn(),
 }));
@@ -108,6 +108,38 @@ describe("reverseLinkedTransaction · goal", () => {
       occurredOn: "2026-07-08",
     });
     expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 130000 });
+  });
+
+  it("consumo del frasco (gasto off-budget) revertido → RESTAURA current_amount Y target_amount", async () => {
+    h.goalRow = { current_amount: 180000, target_amount: 980000 };
+    await reverseLinkedTransaction({
+      transactionId: "txn1",
+      kind: "gasto",
+      linkedKind: "goal",
+      linkedId: "goal1",
+      amount: 20000,
+      occurredOn: "2026-07-10",
+      countsInBudget: false, // consumo off-budget: inverso de spendFromGoal
+    });
+    // 180k → 200k acumulado; 980k → 1M meta (deshace el encogimiento).
+    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({
+      current_amount: 200000,
+      target_amount: 1000000,
+    });
+  });
+
+  it("aporte budget-aware (countsInBudget=true) NO restaura target, solo resta current", async () => {
+    h.goalRow = { current_amount: 100000, target_amount: 500000 };
+    await reverseLinkedTransaction({
+      transactionId: "txn1",
+      kind: "gasto",
+      linkedKind: "goal",
+      linkedId: "goal1",
+      amount: 30000,
+      occurredOn: "2026-07-08",
+      countsInBudget: true,
+    });
+    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 70000 });
   });
 
   it("no baja de 0 al revertir un aporte mayor que el saldo", async () => {

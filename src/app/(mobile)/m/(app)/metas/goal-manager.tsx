@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -9,8 +9,17 @@ import {
   removeGoalAction,
   addGoalContributionAction,
   withdrawGoalAction,
+  spendFromGoalAction,
+  listExpenseCategoriesAction,
+  getGoalDetailAction,
+  revertGoalMovementAction,
+  type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
 import type { SavingsGoal } from "@/modules/control";
+import type {
+  GoalDetailVM,
+  GoalMovementType,
+} from "@/modules/control/services/goal-detail-service";
 import { formatMoney } from "@/lib/format";
 
 import {
@@ -22,6 +31,7 @@ import {
   MoneyField,
   DateField,
   TextField,
+  SheetSelect,
   useToast,
 } from "../../components/form-kit";
 import { GoalForm, type GoalValues } from "./goal-form";
@@ -60,6 +70,8 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
   const [deleting, setDeleting] = useState<SavingsGoal | null>(null);
   const [contributing, setContributing] = useState<SavingsGoal | null>(null);
   const [withdrawing, setWithdrawing] = useState<SavingsGoal | null>(null);
+  const [spending, setSpending] = useState<SavingsGoal | null>(null);
+  const [viewing, setViewing] = useState<SavingsGoal | null>(null);
   const [delPending, setDelPending] = useState(false);
 
   const confirmDelete = async () => {
@@ -136,7 +148,23 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
                     >
                       Retirar
                     </button>
+                    <button
+                      type="button"
+                      className="m-btn m-btn-secondary"
+                      style={{ flex: 1, minHeight: 42, fontSize: 13.5 }}
+                      onClick={() => setSpending(g)}
+                    >
+                      Gastar
+                    </button>
                   </div>
+                  <button
+                    type="button"
+                    className="m-btn m-btn-ghost"
+                    style={{ width: "100%", minHeight: 38, fontSize: 12.5, marginTop: 8 }}
+                    onClick={() => setViewing(g)}
+                  >
+                    Ver movimientos
+                  </button>
                 </div>
               </SwipeRow>
             );
@@ -191,6 +219,18 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
         {withdrawing ? (
           <WithdrawalForm goal={withdrawing} onSuccess={() => setWithdrawing(null)} />
         ) : null}
+      </BottomSheet>
+
+      {/* Gastar del frasco → gasto categorizado off-budget (baja acumulado y meta) */}
+      <BottomSheet open={!!spending} onClose={() => setSpending(null)} title="Gastar del frasco">
+        {spending ? (
+          <SpendForm goal={spending} onSuccess={() => setSpending(null)} />
+        ) : null}
+      </BottomSheet>
+
+      {/* Movimientos del frasco (Delta C): aportes, gastos y retiros con saldo */}
+      <BottomSheet open={!!viewing} onClose={() => setViewing(null)} title="Movimientos del frasco">
+        {viewing ? <MovementsList goal={viewing} /> : null}
       </BottomSheet>
 
       {/* Eliminación (con aviso de dependencias si tiene aportes) */}
@@ -250,5 +290,237 @@ function WithdrawalForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () 
       <DateField name="withdrawalDate" label="Fecha" value={date} onChange={setDate} />
       <TextField name="note" label="Nota (opcional)" value={note} onChange={setNote} placeholder="Motivo del retiro…" maxLength={280} />
     </FormShell>
+  );
+}
+
+/**
+ * Gastar del frasco: monto + fecha + categoría + nota → spendFromGoalAction.
+ * Crea un gasto categorizado OFF-BUDGET (no toca el presupuesto del mes) y baja
+ * el acumulado Y la meta. Distinto de "Retirar" (que devuelve la plata a la
+ * cuenta como ingreso). Las categorías de gasto se cargan al abrir el sheet.
+ */
+function SpendForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => void }) {
+  const [amount, setAmount] = useState<number | undefined>(undefined);
+  const [date, setDate] = useState(todayISO());
+  const [categoryId, setCategoryId] = useState<string>("");
+  const [note, setNote] = useState("");
+  const [catOptions, setCatOptions] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void listExpenseCategoriesAction().then((groups: ExpenseCategoryGroup[]) => {
+      if (!alive) return;
+      // SheetSelect es plano: aplanamos "Grupo · Hoja" para conservar el grupo.
+      const flat = groups.flatMap((g) =>
+        g.options.map((o) => ({ value: o.id, label: `${g.groupName} · ${o.name}` })),
+      );
+      setCatOptions([{ value: "", label: "Sin categoría" }, ...flat]);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const values = {
+    goalId: goal.id,
+    amount,
+    spendDate: date,
+    categoryId: categoryId || null,
+    note: note || undefined,
+  };
+  return (
+    <FormShell
+      action={spendFromGoalAction}
+      values={values}
+      submitLabel="Registrar gasto"
+      successMessage="Gasto del frasco registrado"
+      onSuccess={onSuccess}
+    >
+      <MoneyField name="amount" label="Monto a gastar" value={amount} onChange={setAmount} currency={goal.currency} />
+      <DateField name="spendDate" label="Fecha" value={date} onChange={setDate} />
+      <SheetSelect
+        name="categoryId"
+        label="Categoría"
+        value={categoryId}
+        onChange={setCategoryId}
+        options={catOptions}
+        placeholder="Sin categoría"
+        sheetTitle="Elige la categoría del gasto"
+      />
+      <TextField name="note" label="Nota (opcional)" value={note} onChange={setNote} placeholder="¿En qué lo usaste?" maxLength={280} />
+    </FormShell>
+  );
+}
+
+const MOVE_LABEL: Record<GoalMovementType, string> = {
+  inicial: "Saldo inicial",
+  aporte: "Aporte",
+  gasto: "Gasto",
+  retiro: "Retiro",
+};
+
+function fmtMoveDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", { day: "2-digit", month: "short" });
+}
+
+/**
+ * Lista de movimientos del frasco (Delta C · móvil): resumen acumulado/meta/
+ * brecha + filas de aportes (+), gastos (−) y retiros (−) con saldo corrido.
+ * Carga el detalle al montar (el sheet solo monta este componente al abrir).
+ */
+function MovementsList({ goal }: { goal: SavingsGoal }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [vm, setVm] = useState<GoalDetailVM | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void getGoalDetailAction(goal.id).then((detail) => {
+      if (!alive) return;
+      setVm(detail);
+      setLoaded(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [goal.id]);
+
+  const revert = async (transactionId: string) => {
+    setPendingId(transactionId);
+    const res = await revertGoalMovementAction(transactionId);
+    setPendingId(null);
+    setConfirmingId(null);
+    if (res.ok) {
+      toast.show("Movimiento revertido", "success");
+      const detail = await getGoalDetailAction(goal.id);
+      setVm(detail);
+      router.refresh();
+    } else {
+      toast.show(res.message ?? "No pudimos revertir el movimiento.", "error");
+    }
+  };
+
+  if (!loaded) {
+    return (
+      <div className="muted" style={{ fontSize: 13, padding: "8px 2px" }}>
+        Cargando movimientos…
+      </div>
+    );
+  }
+  if (!vm) {
+    return (
+      <div className="muted" style={{ fontSize: 13, padding: "8px 2px" }}>
+        No pudimos cargar el detalle del frasco.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="between" style={{ marginBottom: 12 }}>
+        <div>
+          <div className="muted" style={{ fontSize: 11 }}>
+            Acumulado
+          </div>
+          <div className="display" style={{ fontSize: 18 }}>
+            {formatMoney(vm.currentAmount, vm.currency)}
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div className="muted" style={{ fontSize: 11 }}>
+            Meta · Brecha
+          </div>
+          <div className="mono" style={{ fontSize: 13 }}>
+            {formatMoney(vm.targetAmount, vm.currency)} · {formatMoney(vm.gap, vm.currency)}
+          </div>
+        </div>
+      </div>
+      {vm.movements.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, padding: "8px 2px" }}>
+          Este frasco aún no tiene movimientos.
+        </div>
+      ) : (
+        <div className="card" style={{ padding: 0 }}>
+          {vm.movements.map((m, i) => (
+            <div
+              key={m.id}
+              style={{
+                padding: "11px 14px",
+                borderTop: i === 0 ? "none" : "1px solid var(--line)",
+              }}
+            >
+              <div className="between" style={{ gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 650, fontSize: 13.5 }}>
+                    {MOVE_LABEL[m.type]}
+                    {m.offBudget ? (
+                      <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
+                        {" "}
+                        · sin presupuesto
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11.5 }}>
+                    {fmtMoveDate(m.date)}
+                    {m.categoryLabel ? ` · ${m.categoryLabel}` : ""}
+                    {m.note ? ` · ${m.note}` : ""}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flex: "none" }}>
+                  <div
+                    className="mono"
+                    style={{ fontSize: 13.5, color: m.amount >= 0 ? "var(--pos)" : "var(--neg)" }}
+                  >
+                    {m.amount >= 0 ? "+" : "−"}
+                    {formatMoney(Math.abs(m.amount), vm.currency)}
+                  </div>
+                  <div className="muted mono" style={{ fontSize: 11 }}>
+                    {formatMoney(m.balance, vm.currency)}
+                  </div>
+                </div>
+              </div>
+              {m.type !== "inicial" ? (
+                <div style={{ marginTop: 8 }}>
+                  {confirmingId === m.id ? (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="m-btn m-btn-secondary"
+                        style={{ flex: 1, minHeight: 36, fontSize: 12.5, color: "var(--neg)" }}
+                        disabled={pendingId === m.id}
+                        onClick={() => void revert(m.id)}
+                      >
+                        {pendingId === m.id ? "Revirtiendo…" : "Confirmar reversión"}
+                      </button>
+                      <button
+                        type="button"
+                        className="m-btn m-btn-ghost"
+                        style={{ flex: "none", minHeight: 36, fontSize: 12.5, paddingInline: 14 }}
+                        onClick={() => setConfirmingId(null)}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="m-btn m-btn-ghost"
+                      style={{ minHeight: 34, fontSize: 12, paddingInline: 12 }}
+                      onClick={() => setConfirmingId(m.id)}
+                    >
+                      Revertir
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

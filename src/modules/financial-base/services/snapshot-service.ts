@@ -94,7 +94,7 @@ async function snapshotUserAdmin(
       .eq("period_year", period.year),
     admin
       .from("transactions")
-      .select("kind,amount,currency")
+      .select("kind,amount,currency,counts_in_budget")
       .eq("user_id", userId)
       .gte("occurred_on", period.from)
       .lte("occurred_on", period.to),
@@ -114,7 +114,8 @@ async function snapshotUserAdmin(
   for (const r of tx.data ?? []) {
     const v = convertCurrency(Number(r.amount), r.currency, currency, rates);
     if (r.kind === "ingreso") rIncome += v;
-    else if (r.kind === "gasto") rExpense += v;
+    // Off-budget (consumo de frasco): fuera del gasto del snapshot mensual.
+    else if (r.kind === "gasto" && r.counts_in_budget !== false) rExpense += v;
   }
 
   await admin.from("monthly_snapshots").upsert(

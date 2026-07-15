@@ -45,6 +45,7 @@ function rowToTransaction(r: TransactionRow): Transaction {
     linkedId: r.linked_id ?? null,
     recurringItemId: r.recurring_item_id ?? null,
     incomeSourceId: r.income_source_id ?? null,
+    countsInBudget: r.counts_in_budget ?? true,
   };
 }
 
@@ -218,6 +219,9 @@ export async function buildTransactionRow(
     linked_id: linkedId,
     recurring_item_id: input.recurringItemId ?? null,
     income_source_id: input.incomeSourceId ?? null,
+    // Off-budget: default true (cuenta en presupuesto); false solo para gastos
+    // que ya se contaron en otro lado (p.ej. consumo de un frasco de ahorro).
+    counts_in_budget: input.countsInBudget ?? true,
   };
   return { row, linkedKind, linkedId };
 }
@@ -344,7 +348,7 @@ export async function deleteTransaction(id: string): Promise<void> {
   // borrar. Import dinámico → evita el ciclo con linked-transaction-service.
   const { data: txn } = await supabase
     .from("transactions")
-    .select("kind, amount, occurred_on, linked_kind, linked_id")
+    .select("kind, amount, occurred_on, linked_kind, linked_id, counts_in_budget")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -359,6 +363,7 @@ export async function deleteTransaction(id: string): Promise<void> {
       linkedId: txn.linked_id,
       amount: Number(txn.amount),
       occurredOn: txn.occurred_on,
+      countsInBudget: txn.counts_in_budget,
     });
   }
 
@@ -571,6 +576,9 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
         }
       }
     } else {
+      // Off-budget (p.ej. consumo de un frasco): no cuenta en el gasto del mes,
+      // free cashflow ni actuals por categoría — ya se contó al aportar.
+      if (t.countsInBudget === false) continue;
       realExpense += value;
       const label = t.categoryId ? (catMap[t.categoryId] ?? "Sin categoría") : "Sin categoría";
       const key = t.categoryId ?? "sin_categoria";
@@ -726,7 +734,7 @@ export async function getRealHistory(period: Period, monthsBack = 6): Promise<Hi
   const [txnRes, budgetRes] = await Promise.all([
     supabase
       .from("transactions")
-      .select("kind,amount,currency,occurred_on")
+      .select("kind,amount,currency,occurred_on,counts_in_budget")
       .eq("user_id", user.id)
       .gte("occurred_on", start.from)
       .lte("occurred_on", period.to),
@@ -743,7 +751,8 @@ export async function getRealHistory(period: Period, monthsBack = 6): Promise<Hi
     if (!b) continue;
     const value = convertCurrency(Number(r.amount), r.currency, currency, rates);
     if (r.kind === "ingreso") b.income += value;
-    else b.expense += value;
+    // Off-budget (consumo de frasco): fuera del gasto real del mes.
+    else if (r.counts_in_budget !== false) b.expense += value;
   }
 
   for (const r of budgetRes.data ?? []) {
