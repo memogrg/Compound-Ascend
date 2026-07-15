@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { removeHoldingAction } from "@/modules/wealth/api/actions";
 import type { HoldingPerformance } from "@/modules/wealth/types";
+import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
 import { Fab, BottomSheet, ConfirmDialog, SwipeRow, useToast } from "../../components/form-kit";
 import { HoldingWizardSheet, SellHoldingForm } from "./inversiones-forms";
@@ -24,12 +25,17 @@ const NATURE_LABEL: Record<string, string> = { cashflow: "Flujo", growth: "Creci
 export function InversionesManager({
   holdings,
   currency,
+  openContributions,
 }: {
   holdings: HoldingPerformance[];
   currency: string;
+  openContributions: OpenContribution[];
 }) {
   const router = useRouter();
   const toast = useToast();
+
+  // Aporte del mes pendiente por holding (brecha DCA), para el banner del detalle.
+  const contribByHolding = new Map(openContributions.map((c) => [c.holdingId, c]));
 
   const [adding, setAdding] = useState(false);
   const [editH, setEditH] = useState<HoldingPerformance | null>(null);
@@ -134,6 +140,7 @@ export function InversionesManager({
         <HoldingDetailSheet
           holding={movH}
           currency={currency}
+          contribution={contribByHolding.get(movH.id) ?? null}
           onClose={() => setMovH(null)}
           onEdit={() => {
             const h = movH;
