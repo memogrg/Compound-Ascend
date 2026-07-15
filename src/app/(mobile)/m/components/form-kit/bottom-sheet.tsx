@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 
+import { MobilePortal } from "../mobile-portal";
+
 /**
  * Hoja modal inferior (form kit). Sin directiva "use client": hereda el límite de cliente
  * del componente que la importa (el quick-add), evitando el chequeo de props serializables
  * de módulos-entrada client. Drag handle para cerrar por gesto, cierre por backdrop,
  * contenido scrolleable y safe-area inferior. Scoped a .m-shell. es-MX, tema claro.
+ *
+ * Se renderiza por portal a <body> (MobilePortal): la hoja es position:fixed y puede
+ * invocarse desde componentes anidados en un `.m-glass` (p. ej. la campana, dentro del
+ * header pegajoso), donde un fixed quedaría atrapado por el transform del ancestro.
  */
 export function BottomSheet({
   open,
@@ -55,6 +61,7 @@ export function BottomSheet({
   };
 
   return (
+    <MobilePortal>
     <div className="m-sheet-overlay" role="dialog" aria-modal="true" aria-label={title ?? "Formulario"}>
       <button className="m-sheet-backdrop" aria-label="Cerrar" onClick={onClose} />
       <div
@@ -83,5 +90,6 @@ export function BottomSheet({
         <div className="m-sheet-body">{children}</div>
       </div>
     </div>
+    </MobilePortal>
   );
 }

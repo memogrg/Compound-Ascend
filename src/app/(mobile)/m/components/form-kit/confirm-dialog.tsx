@@ -1,7 +1,12 @@
+import { MobilePortal } from "../mobile-portal";
+
 /**
  * ConfirmDialog (form kit): confirmación de una acción destructiva. La variante
  * "warning" + `dependencies` avisa que el borrado afecta a otras entidades vinculadas
  * (deudas/metas/pólizas…), antes de ejecutar. Scoped a .m-shell.
+ *
+ * Se renderiza por portal a <body> (MobilePortal), por la misma razón que la hoja: es
+ * position:fixed y podría invocarse desde un componente anidado en un `.m-glass`.
  */
 export function ConfirmDialog({
   open,
@@ -28,6 +33,7 @@ export function ConfirmDialog({
 }) {
   if (!open) return null;
   return (
+    <MobilePortal>
     <div className="m-dialog-overlay" role="alertdialog" aria-modal="true" aria-label={title}>
       <button className="m-sheet-backdrop" aria-label={cancelLabel} onClick={onCancel} />
       <div className="m-dialog">
@@ -63,5 +69,6 @@ export function ConfirmDialog({
         </div>
       </div>
     </div>
+    </MobilePortal>
   );
 }

@@ -104,9 +104,10 @@ export default async function MobileHome() {
             </div>
           </Link>
         )}
-        {/* Header: saludo + nombre real. Piloto "Cristal Cálido": topbar de cristal que
-            escarcha el contenido al hacer scroll (chrome, con fallback sólido garantizado). */}
-        <header className="between m-topbar m-glass" style={{ marginBottom: 18, padding: "12px 14px" }}>
+        {/* Header: saludo + nombre real. Piloto "Cristal Cálido": topbar de cristal que cubre
+            la barra de estado y escarcha el contenido al hacer scroll (el padding/inset lo
+            aporta .m-topbar; no se pone padding inline para no pisar el safe-area). */}
+        <header className="between m-topbar m-glass" style={{ marginBottom: 18 }}>
           <div className="row">
             <span className="iso" aria-hidden>
               <svg viewBox="0 0 64 64" fill="none">
