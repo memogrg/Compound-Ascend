@@ -188,7 +188,9 @@ export async function updatePasswordAction(
     return { ok: false, message: "No pudimos actualizar la contraseña. El enlace pudo expirar." };
   }
 
-  redirect("/dashboard");
+  // `next` (interno) permite que el móvil regrese a /m/perfil en vez de saltar a la web.
+  // Aditivo: sin `next` (flujo web de reset) sigue yendo a /dashboard.
+  redirect(safeRelative(formData.get("next"), "/dashboard"));
 }
 
 export async function signInWithGoogleAction(): Promise<void> {

@@ -33,6 +33,8 @@ export function TextField({
   placeholder,
   maxLength,
   autoFocus,
+  type = "text",
+  autoComplete,
 }: {
   name: string;
   label: string;
@@ -41,16 +43,21 @@ export function TextField({
   placeholder?: string;
   maxLength?: number;
   autoFocus?: boolean;
+  /** Tipo del input (p. ej. "password" para contraseñas). Por defecto "text". */
+  type?: "text" | "password" | "email";
+  autoComplete?: string;
 }) {
   return (
     <Field name={name} label={label}>
       <input
         className="m-inp"
+        type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         maxLength={maxLength}
         autoFocus={autoFocus}
+        autoComplete={autoComplete}
       />
     </Field>
   );

@@ -28,15 +28,24 @@ import {
   clearAllDataAction,
 } from "@/modules/account/api/actions";
 import { inviteHouseholdMembersAction } from "@/modules/personal-profile/api/actions";
+import { testEmailAction, type EmailTestResult } from "@/modules/account/api/actions";
+import { updatePasswordAction } from "@/lib/auth/actions";
 import { INGEST_TARGET } from "@/modules/account/constants";
 import type { NotificationChannel, NotificationPrefs } from "@/lib/notifications/preferences";
 import type { IngestEmailRow } from "@/modules/account/services/ingest-email-service";
 
-import { BottomSheet, ConfirmDialog, useToast } from "../../components/form-kit";
+import {
+  BottomSheet,
+  ConfirmDialog,
+  FormShell,
+  TextField,
+  useToast,
+  type ActionResult,
+} from "../../components/form-kit";
 import { AppLockToggle } from "../../components/app-lock-toggle";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
-type SheetId = "currency" | "whatsapp" | "household" | null;
+type SheetId = "currency" | "whatsapp" | "household" | "password" | null;
 
 const NOTIF_ROWS: { key: NotificationChannel; label: string; hint: string; disabled?: boolean; badge?: string }[] = [
   { key: "inApp", label: "En la app", hint: 'Avisos del día en "Qué noté".' },
@@ -108,6 +117,25 @@ export function ConfiguracionManager({
         />
       </div>
 
+      {/* Cuenta y seguridad: contraseña + diagnóstico de correo */}
+      <div className="card card-p" style={{ marginBottom: 14 }}>
+        <div className="ov" style={{ marginBottom: 6 }}>
+          Cuenta y seguridad
+        </div>
+        <SettingRow
+          title="Cambiar contraseña"
+          sub="Actualiza tu contraseña de acceso"
+          onClick={() => setSheet("password")}
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          }
+        />
+        <EmailTestRow />
+      </div>
+
       {/* Seguridad — candado con biometría (solo visible dentro de la app nativa) */}
       <AppLockToggle />
 
@@ -160,6 +188,11 @@ export function ConfiguracionManager({
       {/* Hoja: hogar */}
       <BottomSheet open={sheet === "household"} onClose={() => setSheet(null)} title="Invitar a tu hogar">
         <HouseholdSheet isEditor={isEditor} />
+      </BottomSheet>
+
+      {/* Hoja: cambiar contraseña */}
+      <BottomSheet open={sheet === "password"} onClose={() => setSheet(null)} title="Cambiar contraseña">
+        <PasswordSheet />
       </BottomSheet>
 
       {/* Borrar datos: paso 1 */}
@@ -216,6 +249,99 @@ function SettingRow({
         <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>
+  );
+}
+
+/**
+ * Cambiar contraseña — reutiliza updatePasswordAction (la misma que el reset web), adaptando
+ * su firma (prevState, FormData) a la de FormShell (values → ActionResult). El campo `next`
+ * hace que al éxito el redirect vuelva a /m/perfil en vez de saltar a la web. FormShell pinta
+ * los fieldErrors del schema ("Las contraseñas no coinciden", reglas de contraseña) inline.
+ */
+function PasswordSheet() {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const action = (v: { password: string; confirm: string }): Promise<ActionResult> => {
+    const fd = new FormData();
+    fd.set("password", v.password);
+    fd.set("confirm", v.confirm);
+    fd.set("next", "/m/perfil"); // interno: al terminar, regresa al perfil móvil
+    // updatePasswordAction: (prevState, FormData) → ActionState (mismo shape que ActionResult).
+    // Al éxito hace redirect(next) y navega; el toast lo cubre ese regreso a /m/perfil.
+    return updatePasswordAction({ ok: false }, fd);
+  };
+
+  return (
+    <FormShell
+      action={action}
+      values={{ password, confirm }}
+      submitLabel="Actualizar contraseña"
+      successMessage="Contraseña actualizada"
+    >
+      <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+        Elige una contraseña de al menos 8 caracteres. La usarás para entrar a tu cuenta.
+      </div>
+      <TextField
+        name="password"
+        label="Nueva contraseña"
+        type="password"
+        value={password}
+        onChange={setPassword}
+        placeholder="Mínimo 8 caracteres"
+        autoComplete="new-password"
+      />
+      <TextField
+        name="confirm"
+        label="Confirmar contraseña"
+        type="password"
+        value={confirm}
+        onChange={setConfirm}
+        placeholder="Repite la contraseña"
+        autoComplete="new-password"
+      />
+    </FormShell>
+  );
+}
+
+/** Probar correo — replica email-tester.tsx: llama testEmailAction y muestra el resultado. */
+function EmailTestRow() {
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<EmailTestResult | null>(null);
+
+  const run = () =>
+    startTransition(async () => {
+      setResult(await testEmailAction());
+    });
+
+  return (
+    <div>
+      <div className="srow">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="st">Probar correo</div>
+          <div className="ss">Enviamos un correo de prueba a tu cuenta.</div>
+        </div>
+        <button
+          type="button"
+          className="m-btn m-btn-secondary"
+          style={{ flex: "none", minHeight: 38, padding: "0 14px", fontSize: 13 }}
+          disabled={pending}
+          onClick={run}
+        >
+          {pending ? "Probando…" : "Probar"}
+        </button>
+      </div>
+      {result ? (
+        <div
+          className={result.ok ? "pos" : "neg"}
+          role="status"
+          style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 4 }}
+        >
+          {result.message}
+          {result.provider ? ` (${result.provider})` : ""}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
