@@ -18,6 +18,7 @@ import {
   goalSpendToTxn,
 } from "@/modules/financial-base";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
+import { deriveRecurrenceFields, type Recurrence } from "@/modules/control/engine/recurrence";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { GoalInput, DebtInputForm, DebtPaymentInput } from "@/modules/control/schemas";
@@ -48,6 +49,9 @@ function rowToGoal(r: SavingsGoalRow): SavingsGoal {
     targetDate: r.target_date,
     priority: r.priority as GoalPriority | null,
     status: (r.status ?? "revisar") as GoalStatus,
+    recurrence: (r.recurrence ?? "ninguna") as Recurrence,
+    periodAmount: r.period_amount === null ? null : Number(r.period_amount),
+    nextResetOn: r.next_reset_on,
   };
 }
 
@@ -108,6 +112,13 @@ export async function createGoal(input: GoalInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const household_id = await getActiveHouseholdId(supabase, user.id);
+  const { periodAmount, nextResetOn } = deriveRecurrenceFields({
+    recurrence: input.recurrence,
+    targetAmount: input.targetAmount,
+    periodAmount: input.periodAmount,
+    targetDate: input.targetDate,
+    todayISO: todayISO(),
+  });
   await supabase.from("savings_goals").insert({
     user_id: user.id,
     household_id,
@@ -120,6 +131,9 @@ export async function createGoal(input: GoalInput): Promise<void> {
     target_date: input.targetDate ?? null,
     priority: input.priority ?? null,
     status: "revisar",
+    recurrence: input.recurrence,
+    period_amount: periodAmount,
+    next_reset_on: nextResetOn,
   });
 }
 
@@ -163,6 +177,28 @@ export async function createDebt(input: DebtInputForm): Promise<void> {
 export async function updateGoal(id: string, input: GoalInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+
+  // Recurrencia: no re-anclar el next_reset_on que ya avanzó el cron en una
+  // edición normal. Solo se re-deriva si la cadencia cambió o aún no había una.
+  const { data: existing } = await supabase
+    .from("savings_goals")
+    .select("recurrence,next_reset_on")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const derived = deriveRecurrenceFields({
+    recurrence: input.recurrence,
+    targetAmount: input.targetAmount,
+    periodAmount: input.periodAmount,
+    targetDate: input.targetDate,
+    todayISO: todayISO(),
+  });
+  const keepSchedule =
+    input.recurrence !== "ninguna" &&
+    existing?.recurrence === input.recurrence &&
+    existing?.next_reset_on != null;
+  const nextResetOn = keepSchedule ? existing!.next_reset_on : derived.nextResetOn;
+
   await supabase
     .from("savings_goals")
     .update({
@@ -174,6 +210,9 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
       currency: input.currency,
       target_date: input.targetDate ?? null,
       priority: input.priority ?? null,
+      recurrence: input.recurrence,
+      period_amount: derived.periodAmount,
+      next_reset_on: nextResetOn,
     })
     .eq("id", id)
     .eq("user_id", user.id);
@@ -627,6 +666,7 @@ export function buildDemoControlSummary(): ControlSummary {
       targetDate: futureISO(18),
       priority: "alta",
       status: "revisar",
+      recurrence: "ninguna",
     },
     {
       id: "g2",
@@ -638,6 +678,7 @@ export function buildDemoControlSummary(): ControlSummary {
       targetDate: futureISO(10),
       priority: "baja",
       status: "revisar",
+      recurrence: "ninguna",
     },
   ];
   const debts: Debt[] = [
@@ -681,4 +722,8 @@ function futureISO(monthsAhead: number): string {
   const d = new Date();
   d.setMonth(d.getMonth() + monthsAhead);
   return d.toISOString().slice(0, 10);
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
 }

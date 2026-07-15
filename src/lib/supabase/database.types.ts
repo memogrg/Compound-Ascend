@@ -415,6 +415,22 @@ export type SavingsGoalRow = Timestamps & {
   stored_in: string | null;
   classification: string | null;
   status: string;
+  // Frascos recurrentes (migración 20260718000001): reinicio por período.
+  recurrence: string; // 'ninguna' | 'mensual' | 'trimestral' | 'semestral' | 'anual'
+  period_amount: number | null;
+  next_reset_on: string | null;
+};
+
+// Historial de reinicios de frascos recurrentes (migración 20260718000001).
+export type GoalPeriodResetRow = {
+  id: string;
+  goal_id: string;
+  user_id: string;
+  household_id: string | null;
+  reset_on: string;
+  restored_target: number;
+  carried_over: number;
+  created_at: string;
 };
 
 export type DebtRow = Timestamps & {
@@ -877,6 +893,7 @@ export interface Database {
       expense_items: UserTable<ExpenseItemRow>;
       monthly_snapshots: UserTable<MonthlySnapshotRow>;
       savings_goals: UserTable<SavingsGoalRow>;
+      goal_period_resets: UserTable<GoalPeriodResetRow>;
       debts: UserTable<DebtRow>;
       debt_payments: UserTable<DebtPaymentRow>;
       investments: UserTable<InvestmentRow>;

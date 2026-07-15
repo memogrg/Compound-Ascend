@@ -11,6 +11,13 @@ export const goalInputSchema = z.object({
   currency: z.string().length(3),
   targetDate: z.string().optional(),
   priority: z.enum(["alta", "media", "baja"]).optional(),
+  // Frascos recurrentes: cadencia de reinicio. 'ninguna' = one-shot (default).
+  recurrence: z
+    .enum(["ninguna", "mensual", "trimestral", "semestral", "anual"])
+    .default("ninguna"),
+  // Monto pleno del período (al que se restaura target_amount). Opcional: si se
+  // omite en un frasco recurrente, se usa targetAmount.
+  periodAmount: z.number().nonnegative().optional(),
 });
 
 export const debtInputSchema = z.object({
