@@ -60,9 +60,15 @@ export default function MobileLogin() {
       {/* Email / contraseña (reutiliza signInAction, next=/m) */}
       <MobileLoginForm />
 
-      <div style={{ textAlign: "center", marginTop: 18, fontSize: 13, color: "var(--text-muted)" }}>
+      <div style={{ textAlign: "center", marginTop: 14, fontSize: 13 }}>
+        <Link href="/m/reset-password" className="m-authlink">
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: "var(--text-muted)" }}>
         ¿No tienes cuenta?{" "}
-        <Link href="/signup" className="m-authlink">
+        <Link href="/m/signup" className="m-authlink">
           Crea una
         </Link>
       </div>
