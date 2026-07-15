@@ -49,6 +49,25 @@
   --e3: 0 20px 50px -18px rgba(20, 18, 14, 0.28);
   --e-raised: 0 1px 2px rgba(20, 18, 14, 0.06), 0 8px 20px -14px rgba(20, 18, 14, 0.3);
 
+  /* ===== "Cristal Cálido": cristal + profundidad (tema CLARO) =====
+     El cristal es una escarcha blanca sobre el fondo ambiental; el tinte de marca
+     lo aporta el fondo, no el vidrio. Valores tomados de rediseno-movil/*.html. */
+  --info: #3a6ea5; /* azul de marca para el halo ambiental (no existía como token) */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-hi: rgba(255, 255, 255, 0.85); /* highlight interior superior */
+  --glass-solid: rgba(255, 255, 255, 0.9); /* fallback sin backdrop-filter */
+  --glass-blur: 20px;
+  --glass-sat: 165%;
+  --shadow-soft: 0 8px 20px -12px rgba(30, 28, 22, 0.35);
+  --radius-card: 16px;
+  --radius-lg: 22px;
+  /* Halos de marca detrás del contenido (derivados de la paleta con color-mix). */
+  --ambient:
+    radial-gradient(46% 30% at 22% 6%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
+    radial-gradient(44% 28% at 88% 16%, color-mix(in srgb, var(--info) 16%, transparent), transparent 60%),
+    radial-gradient(60% 34% at 60% 100%, color-mix(in srgb, var(--warning) 16%, transparent), transparent 62%);
+
   position: relative;
   min-height: 100dvh;
   background: var(--canvas);
@@ -88,6 +107,20 @@
   --e2: 0 8px 24px -10px rgba(0, 0, 0, 0.55);
   --e3: 0 20px 50px -18px rgba(0, 0, 0, 0.7);
   --e-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 24px -16px rgba(0, 0, 0, 0.7);
+
+  /* ===== "Cristal Cálido": cristal + profundidad (tema OSCURO) ===== */
+  --info: #6aa0d8;
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-hi: rgba(255, 255, 255, 0.14);
+  --glass-solid: rgba(38, 36, 30, 0.92);
+  --glass-blur: 22px;
+  --glass-sat: 150%;
+  --shadow-soft: 0 10px 24px -14px rgba(0, 0, 0, 0.6);
+  --ambient:
+    radial-gradient(48% 30% at 20% 6%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 60%),
+    radial-gradient(46% 28% at 88% 18%, color-mix(in srgb, var(--info) 18%, transparent), transparent 60%),
+    radial-gradient(60% 32% at 60% 98%, color-mix(in srgb, var(--warning) 14%, transparent), transparent 62%);
 }
 .m-shell * {
   box-sizing: border-box;
@@ -101,6 +134,75 @@
 }
 .m-pad {
   padding: 0 20px;
+}
+
+/* ============================================================================
+   "Cristal Cálido" — primitivas de cristal (SOLO chrome: barra superior, tab bar,
+   hojas y hero). El contenido de listas/formularios va plano y nítido. Regla de oro:
+   la legibilidad nunca depende del efecto → fallback sólido garantizado.
+   ========================================================================== */
+.m-shell .m-glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    var(--shadow-soft);
+  transform: translateZ(0); /* promueve a capa propia; evita bandas de blur */
+}
+
+/* Fallback 1: navegador sin backdrop-filter → sólido semitransparente. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .m-shell .m-glass {
+    background: var(--glass-solid);
+  }
+}
+/* Fallback 2: preferencia del sistema de reducir transparencia → sólido, sin blur. */
+@media (prefers-reduced-transparency: reduce) {
+  .m-shell .m-glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--glass-solid);
+  }
+}
+
+/* Helpers de chrome que adoptan el cristal (composición con .m-glass o directos). */
+.m-shell .m-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--glass-border);
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+.m-shell .m-hero {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Fondo ambiental: halos de marca detrás de todo el contenido. Se monta UNA vez en
+   el layout /m (elemento .m-ambient, aria-hidden). Fijo y no interactivo: no afecta
+   el scroll ni el hit-testing. */
+.m-shell .m-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--ambient);
+}
+/* El contenido real queda por encima del fondo ambiental (que está en z-index:0).
+   La tab bar NO se incluye aquí: ya es position:fixed; z-index:50 (sobre el ambiente),
+   y sobreescribirla la rompería. */
+.m-shell .m-scroll,
+.m-shell .m-login {
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .m-shell .m-ambient {
+    display: none;
+  }
 }
 
 /* ===== tipografía / helpers ===== */
@@ -373,10 +475,24 @@
   display: flex;
   align-items: center;
   justify-content: space-around;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: saturate(150%) blur(18px);
-  -webkit-backdrop-filter: saturate(150%) blur(18px);
-  border-top: 1px solid var(--border);
+  /* "Cristal Cálido": tab bar como cristal (chrome). Fallbacks vía tokens/@supports. */
+  background: var(--glass-bg);
+  backdrop-filter: saturate(var(--glass-sat)) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(var(--glass-sat)) blur(var(--glass-blur));
+  border-top: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-hi);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .m-tabbar {
+    background: var(--glass-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .m-tabbar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--glass-solid);
+  }
 }
 .m-tab {
   display: flex;
@@ -1674,11 +1790,30 @@
   max-height: 88dvh;
   display: flex;
   flex-direction: column;
-  background: var(--canvas);
+  /* "Cristal Cálido": la hoja es chrome → cristal. El blur es mayor (sheet más opaca). */
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(26px) saturate(var(--glass-sat));
+  backdrop-filter: blur(26px) saturate(var(--glass-sat));
+  border-top: 1px solid var(--glass-border);
   border-top-left-radius: var(--r-xl);
   border-top-right-radius: var(--r-xl);
-  box-shadow: var(--e3);
+  box-shadow:
+    inset 0 1px 0 var(--glass-hi),
+    var(--e3);
+  transform: translateZ(0);
   animation: m-sheet-up 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .m-shell .m-sheet-panel {
+    background: var(--glass-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .m-shell .m-sheet-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--glass-solid);
+  }
 }
 @keyframes m-sheet-up {
   from {

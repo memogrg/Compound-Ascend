@@ -23,6 +23,9 @@ export default async function MobileAppLayout({ children }: { children: React.Re
 
   return (
     <ToastProvider>
+      {/* Fondo ambiental "Cristal Cálido": halos de marca detrás de todo el contenido.
+          Fijo, no interactivo (pointer-events:none) → no afecta scroll ni hit-testing. */}
+      <div className="m-ambient" aria-hidden />
       {/* Candado local con biometría (solo app nativa): se monta primero para tapar
           la UI lo antes posible al reanudar. No afecta a la web. */}
       <AppLockOverlay />
