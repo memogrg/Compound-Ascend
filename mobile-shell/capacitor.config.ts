@@ -29,8 +29,12 @@ const config: CapacitorConfig = {
   },
   ios: {
     backgroundColor: '#F1EFE8',
-    // Respeta las safe areas (notch / home indicator) junto con viewport-fit=cover del HTML.
-    contentInset: 'always',
+    // Edge-to-edge: el WebView NO auto-ajusta insets (contentInset 'never'); los safe-areas
+    // los maneja el CSS con env(safe-area-inset-*) + viewport-fit=cover del HTML — UN solo
+    // criterio, igual que Android. Con 'always' el scrollview insertaba su propio inset y
+    // competía con el CSS (doble/inconsistente). Requiere `npx cap sync ios` + rebuild nativo
+    // (no basta redeploy web) para tomar efecto.
+    contentInset: 'never',
   },
   plugins: {
     SplashScreen: {

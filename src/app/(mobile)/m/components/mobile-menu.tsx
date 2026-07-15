@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { MobileBell } from "./mobile-bell";
+import { MobilePortal } from "./mobile-portal";
 
 /**
  * Menú de navegación del móvil (botón ☰ + drawer), presente en el header de cada
@@ -77,6 +78,9 @@ export function MobileMenu() {
       </div>
 
       {open ? (
+        // Portal a <body>: el drawer es position:fixed y el header contenedor tiene
+        // .m-glass (transform/backdrop-filter). Sin portal quedaría atrapado (cuadro gris).
+        <MobilePortal>
         <div className="m-menu-overlay" role="dialog" aria-modal="true" aria-label="Navegación">
           <button className="m-menu-backdrop" aria-label="Cerrar menú" onClick={close} />
           <nav className="m-menu-panel">
@@ -111,6 +115,7 @@ export function MobileMenu() {
             </div>
           </nav>
         </div>
+        </MobilePortal>
       ) : null}
     </>
   );

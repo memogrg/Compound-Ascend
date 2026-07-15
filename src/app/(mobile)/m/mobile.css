@@ -74,8 +74,9 @@
   color: var(--text);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
-  /* respeta las safe areas del notch / home indicator (viewport-fit=cover) */
-  padding-top: env(safe-area-inset-top);
+  /* Safe-area superior: UNA sola fuente de verdad. NO se aplica aquí para no duplicar el
+     inset; lo aporta el scroller (.m-scroll / .m-login) o el header pegajoso (.m-topbar),
+     que además cubre la barra de estado con su cristal. Ver bloques abajo. */
 }
 
 /* ===== tema OSCURO = opción secundaria (LISTA, no activada) =====
@@ -127,10 +128,33 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* zona scrolleable de contenido: deja aire para la tab bar inferior fija */
+/* Fondo del DOCUMENTO en las rutas /m. mobile.css solo se carga en /m (importado por el
+   layout del grupo (mobile)/m), así que estas reglas globales NO se filtran a la web. Da al
+   rebote de overscroll el color de marca (canvas), no blanco, en iOS y Android; y corta el
+   glow/franja de Chromium con overscroll-behavior. El canvas se hardcodea (claro) porque
+   html/body no heredan los tokens de .m-shell; el override oscuro es progresivo (:has). */
+html,
+body {
+  background-color: #f1efe8;
+  overscroll-behavior: none;
+}
+body:has(.m-shell[data-theme="dark"]) {
+  background-color: #15140f;
+}
+
+/* zona scrolleable de contenido: inset superior (única fuente cuando NO hay topbar pegajoso)
+   + aire inferior para la tab bar fija (alto + home indicator / barra de gestos). */
 .m-scroll {
   min-height: 100dvh;
-  padding: 20px 0 calc(84px + env(safe-area-inset-bottom));
+  padding: calc(env(safe-area-inset-top) + 8px) 0 calc(84px + env(safe-area-inset-bottom));
+  overscroll-behavior: none;
+}
+/* Con topbar pegajoso, el inset superior lo aporta el .m-topbar (que cubre la barra de
+   estado); el scroller no lo duplica. :has() está soportado en WKWebView iOS 15.4+ y
+   Chromium WebView modernos; si no, cae al inset del .m-scroll (peor caso: un poco más de
+   aire arriba, nunca contenido bajo el reloj). */
+.m-scroll:has(.m-topbar) {
+  padding-top: 0;
 }
 .m-pad {
   padding: 0 20px;
@@ -172,6 +196,15 @@
   position: sticky;
   top: 0;
   z-index: 20;
+  /* Cubre la barra de estado: el cristal sube hasta y=0 (bleed horizontal para ocupar todo
+     el ancho, rompiendo el .m-pad de 20px) y el contenido queda DEBAJO del notch por el
+     padding-top con el inset. Así el reloj/batería del sistema van sobre cristal legible y
+     nada de la app se dibuja bajo el reloj. Vale para iPhone (notch/Dynamic Island) y Android
+     (barra de estado) con viewport-fit=cover. */
+  margin-left: calc(-1 * (20px + env(safe-area-inset-left)));
+  margin-right: calc(-1 * (20px + env(safe-area-inset-right)));
+  padding: calc(env(safe-area-inset-top) + 10px) calc(20px + env(safe-area-inset-right)) 12px
+    calc(20px + env(safe-area-inset-left));
   border-bottom: 1px solid var(--glass-border);
   border-bottom-left-radius: var(--radius-lg);
   border-bottom-right-radius: var(--radius-lg);
@@ -189,6 +222,9 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
+  /* Canvas de marca como base + halos encima → cubre TODO el viewport incl. safe areas;
+     el rebote de overscroll nunca muestra blanco. */
+  background-color: var(--canvas);
   background-image: var(--ambient);
 }
 /* El contenido real queda por encima del fondo ambiental (que está en z-index:0).
@@ -325,15 +361,17 @@
 .m-shell .hero-amt {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 42px;
+  /* Fluido: no se corta en pantallas chicas (iPhone SE / 320px) ni se achica en grandes. */
+  font-size: clamp(30px, 11vw, 42px);
   letter-spacing: -0.03em;
   line-height: 1;
   margin-top: 8px;
   display: inline-flex;
   align-items: baseline;
+  max-width: 100%;
 }
 .m-shell .hero-amt .cur {
-  font-size: 22px;
+  font-size: clamp(17px, 6vw, 22px);
   color: var(--text-muted);
   margin-right: 4px;
 }
@@ -531,7 +569,10 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 32px 20px calc(32px + env(safe-area-inset-bottom));
+  /* Safe-area propia (el .m-shell ya no aporta el inset superior): la marca no toca el notch
+     en pantallas chicas, y respeta el home indicator abajo + laterales en landscape. */
+  padding: calc(env(safe-area-inset-top) + 32px) calc(20px + env(safe-area-inset-right))
+    calc(32px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
 }
 .m-shell .m-auth {
   display: flex;
