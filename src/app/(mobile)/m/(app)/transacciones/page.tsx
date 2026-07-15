@@ -21,7 +21,7 @@ import { RulesManager } from "./rules-manager";
 import { AccountsManager } from "./accounts-manager";
 import { TemplatesManager } from "./templates-manager";
 import { CsvImport } from "./csv-import";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 
 /**
  * /m/transacciones — paridad con la web /transacciones ("Transacciones", nombre exacto
@@ -81,17 +81,9 @@ export default async function MobileTransacciones() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div className="between" style={{ marginBottom: 16, alignItems: "flex-start" }}>
-          <div>
-            <div className="ov">Movimientos · {period.label}</div>
-            <div className="h-title" style={{ marginTop: 6 }}>
-              Transacciones
-            </div>
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              Todos tus movimientos del periodo.
-            </div>
-          </div>
-          <MobileMenu />
+        <MobileHeader variant="inner" eyebrow={`Movimientos · ${period.label}`} title="Transacciones" />
+        <div className="muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>
+          Todos tus movimientos del periodo.
         </div>
 
         {/* Franja de resumen (misma que la web: saldo neto, ingresos, gastos, movimientos) */}

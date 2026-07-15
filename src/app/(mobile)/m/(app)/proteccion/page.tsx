@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import { getWealthSummary } from "@/modules/wealth";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { ProteccionManager } from "./proteccion-manager";
@@ -27,20 +26,13 @@ export default async function MobileProteccion() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div className="hdr" style={{ marginBottom: 16 }}>
-          <Link href="/m/inversiones" className="bk" aria-label="Volver a Inversiones">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 6l-6 6 6 6" />
-            </svg>
-          </Link>
-          <div style={{ flex: 1 }}>
-            <div className="ov">Crecimiento</div>
-            <div className="h-title" style={{ marginTop: 2 }}>
-              Defensa Patrimonial
-            </div>
-          </div>
-          <MobileMenu />
-        </div>
+        <MobileHeader
+          variant="inner"
+          eyebrow="Crecimiento"
+          title="Defensa Patrimonial"
+          backHref="/m/inversiones"
+          backLabel="Volver a Inversiones"
+        />
 
         {/* Score de protección */}
         <div className="card card-p" style={{ marginBottom: 16 }}>

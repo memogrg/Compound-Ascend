@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getAccountInfo } from "@/modules/account/services/account-service";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import { getMyLink } from "@/lib/whatsapp/links-service";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { signOutAction } from "@/lib/auth/actions";
@@ -58,15 +58,7 @@ export default async function MobilePerfil() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div className="between" style={{ marginBottom: 16 }}>
-          <div>
-            <div className="ov">Cuenta</div>
-            <div className="h-title" style={{ marginTop: 6 }}>
-              Configuración
-            </div>
-          </div>
-          <MobileMenu />
-        </div>
+        <MobileHeader variant="inner" eyebrow="Cuenta" title="Configuración" />
 
         {/* Identidad */}
         <div className="card card-p" style={{ marginBottom: 14 }}>

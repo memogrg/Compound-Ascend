@@ -213,6 +213,18 @@ body:has(.m-shell[data-theme="dark"]) {
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
+/* Título del header compartido (MobileHeader): fluido para pantallas chicas y con clamp a 2
+   líneas → un título largo ("Portafolio de inversiones") se acomoda sin romper el header ni
+   tapar los botones de la derecha (que son flex:none). */
+.m-shell .m-hd-title {
+  font-size: clamp(19px, 5.4vw, 24px);
+  line-height: 1.12;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 /* Fondo ambiental: halos de marca detrás de todo el contenido. Se monta UNA vez en
    el layout /m (elemento .m-ambient, aria-hidden). Fijo y no interactivo: no afecta
@@ -1739,11 +1751,12 @@ body:has(.m-shell[data-theme="dark"]) {
   position: relative;
   width: min(320px, 86%);
   height: 100%;
-  /* Cristal SUTIL: base más opaca que el hero (0.82) para no perder legibilidad de los
-     ítems. Blur mayor (24px) porque detrás está el scrim oscurecido + el contenido. */
-  background: rgba(244, 242, 236, 0.82);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  /* Cristal PERCEPTIBLE pero legible: base translúcida (0.72) + blur alto (26px). El scrim
+     oscuro detrás (.m-menu-backdrop) ayuda al contraste de los ítems. Si en device bajara la
+     legibilidad, subir a 0.78. */
+  background: rgba(244, 242, 236, 0.72);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  backdrop-filter: blur(26px) saturate(160%);
   border-left: 1px solid var(--glass-border);
   box-shadow: var(--e3);
   display: flex;
@@ -1752,7 +1765,7 @@ body:has(.m-shell[data-theme="dark"]) {
   animation: m-menu-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .m-shell[data-theme="dark"] .m-menu-panel {
-  background: rgba(30, 28, 22, 0.82);
+  background: rgba(30, 28, 22, 0.72);
 }
 /* Fallbacks: sin backdrop-filter o con "reducir transparencia" → panel SÓLIDO (canvas del
    tema), como antes. La legibilidad nunca depende del efecto. */

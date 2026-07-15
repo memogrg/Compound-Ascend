@@ -1,5 +1,5 @@
 import { getRichLifeSummary } from "@/modules/rich-life";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
@@ -30,15 +30,7 @@ export default async function MobilePatrimonio() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div className="between" style={{ marginBottom: 16 }}>
-          <div>
-            <div className="ov">Crecimiento</div>
-            <div className="h-title" style={{ marginTop: 6 }}>
-              Patrimonio
-            </div>
-          </div>
-          <MobileMenu />
-        </div>
+        <MobileHeader variant="inner" eyebrow="Crecimiento" title="Patrimonio" />
 
         {/* Hero: patrimonio neto + cambio del mes */}
         <div className="hero-nw" style={{ marginBottom: 16 }}>
