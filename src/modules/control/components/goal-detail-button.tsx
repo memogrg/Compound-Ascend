@@ -8,9 +8,11 @@
  * más el resumen acumulado / meta / brecha.
  */
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
-import { getGoalDetailAction } from "@/modules/control/api/actions";
+import { getGoalDetailAction, revertGoalMovementAction } from "@/modules/control/api/actions";
 import type { GoalDetailVM, GoalMovementType } from "@/modules/control/services/goal-detail-service";
 import type { SavingsGoal } from "@/modules/control/types";
 
@@ -38,9 +40,13 @@ function fmtDate(iso: string | null): string {
 }
 
 export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
+  const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [vm, setVm] = useState<GoalDetailVM | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   const openModal = async () => {
     setOpen(true);
@@ -48,6 +54,21 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
       const detail = await getGoalDetailAction(goal.id);
       setVm(detail);
       setLoaded(true);
+    }
+  };
+
+  const revert = async (transactionId: string) => {
+    setPendingId(transactionId);
+    const res = await revertGoalMovementAction(transactionId);
+    setPendingId(null);
+    setConfirmingId(null);
+    if (res.ok) {
+      toast("Movimiento revertido");
+      const detail = await getGoalDetailAction(goal.id);
+      setVm(detail);
+      router.refresh();
+    } else {
+      toast(res.message ?? "No pudimos revertir el movimiento.", "error");
     }
   };
 
@@ -102,6 +123,7 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
                           <th>Categoría</th>
                           <th>Monto</th>
                           <th>Saldo</th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -138,6 +160,45 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
                               {formatMoney(Math.abs(m.amount), vm.currency)}
                             </td>
                             <td className="tnum">{formatMoney(m.balance, vm.currency)}</td>
+                            <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                              {m.type === "inicial" ? null : confirmingId === m.id ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    style={{ fontSize: 11, padding: "3px 7px", color: "var(--neg)" }}
+                                    disabled={pendingId === m.id}
+                                    onClick={() => void revert(m.id)}
+                                  >
+                                    {pendingId === m.id ? "…" : "Confirmar"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    style={{ fontSize: 11, padding: "3px 7px" }}
+                                    onClick={() => setConfirmingId(null)}
+                                  >
+                                    Cancelar
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost tip"
+                                  data-tip={
+                                    m.type === "gasto"
+                                      ? "Deshace el consumo: restaura el acumulado Y la meta"
+                                      : m.type === "aporte"
+                                        ? "Deshace el aporte: baja el acumulado"
+                                        : "Deshace el retiro: sube el acumulado"
+                                  }
+                                  style={{ fontSize: 11, padding: "3px 7px" }}
+                                  onClick={() => setConfirmingId(m.id)}
+                                >
+                                  Revertir
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

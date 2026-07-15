@@ -207,9 +207,14 @@ export async function deleteLinkedTransaction(transactionId: string): Promise<vo
  *  - debt  → borra el `debt_payment` ligado (y su transacción) vía la RPC atómica
  *    `delete_debt_payment`. El saldo de la deuda se recalcula desde los pagos
  *    restantes, así que no hay que tocarlo a mano.
- *  - goal  → aplica el delta inverso a `savings_goals.current_amount`: un APORTE
- *    (gasto) lo había subido → se resta; un RETIRO (ingreso) lo había bajado → se
- *    suma. Nunca baja de 0.
+ *  - goal  → aplica el delta inverso a `savings_goals`:
+ *      · APORTE (gasto budget-aware) lo había subido `current_amount` → se resta.
+ *      · RETIRO (ingreso) lo había bajado `current_amount` → se suma.
+ *      · GASTO del frasco (gasto OFF-BUDGET, `countsInBudget=false`) había bajado
+ *        `current_amount` Y `target_amount` → se restauran AMBOS (+amount). Es el
+ *        inverso exacto de spendFromGoal. Sin este caso, borrar un consumo
+ *        restaría del acumulado (como un aporte) y dejaría la meta encogida.
+ *    Nunca baja de 0.
  *  - holding / policy / rental → sin reversión definida aquí: sus ledgers
  *    especializados (dividends, holding_contributions, pólizas, renta) se
  *    gestionan/borran en sus propios módulos; revertirlos parcialmente desde este
@@ -225,6 +230,8 @@ export async function reverseLinkedTransaction(args: {
   linkedId: string | null;
   amount: number;
   occurredOn: string;
+  /** Off-budget: distingue un consumo del frasco de un aporte (ambos son gasto). */
+  countsInBudget?: boolean;
 }): Promise<void> {
   if (!args.linkedId) return;
   const user = await requireUser();
@@ -246,24 +253,40 @@ export async function reverseLinkedTransaction(args: {
   }
 
   if (args.linkedKind === "goal") {
-    // Delta inverso: aporte (gasto) subió → resta; retiro (ingreso) bajó → suma.
-    const delta = args.kind === "gasto" ? -args.amount : args.amount;
+    // Un consumo del frasco es un gasto OFF-BUDGET: bajó current_amount Y
+    // target_amount, así que su reversión restaura AMBOS (inverso de spendFromGoal).
+    const isSpend = args.kind === "gasto" && args.countsInBudget === false;
     const { data: goal, error: gErr } = await supabase
       .from("savings_goals")
-      .select("current_amount")
+      .select("current_amount,target_amount")
       .eq("id", args.linkedId)
       .eq("user_id", user.id)
       .maybeSingle();
     if (gErr) throw new Error(gErr.message);
-    if (goal) {
-      const next = Math.max(0, Number(goal.current_amount) + delta);
+    if (!goal) return;
+
+    if (isSpend) {
       const { error } = await supabase
         .from("savings_goals")
-        .update({ current_amount: next })
+        .update({
+          current_amount: Number(goal.current_amount) + args.amount,
+          target_amount: Number(goal.target_amount) + args.amount,
+        })
         .eq("id", args.linkedId)
         .eq("user_id", user.id);
       if (error) throw new Error(error.message);
+      return;
     }
+
+    // Aporte (gasto budget-aware) subió → resta; retiro (ingreso) bajó → suma.
+    const delta = args.kind === "gasto" ? -args.amount : args.amount;
+    const next = Math.max(0, Number(goal.current_amount) + delta);
+    const { error } = await supabase
+      .from("savings_goals")
+      .update({ current_amount: next })
+      .eq("id", args.linkedId)
+      .eq("user_id", user.id);
+    if (error) throw new Error(error.message);
     return;
   }
 

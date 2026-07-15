@@ -23,7 +23,7 @@ import {
   spendFromGoal,
 } from "@/modules/control/services/control-service";
 import { addPolicyAction } from "@/modules/wealth";
-import { listCategoryTree } from "@/modules/financial-base";
+import { listCategoryTree, deleteTransaction } from "@/modules/financial-base";
 import { getGoalDetail, type GoalDetailVM } from "@/modules/control/services/goal-detail-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -234,6 +234,33 @@ const goalSpendSchema = z.object({
   ),
   note: z.string().max(280).optional(),
 });
+
+/**
+ * Revierte un movimiento del frasco (Delta C · follow-up): borra la transacción
+ * vinculada, lo que a través de reverseLinkedTransaction deshace su efecto en la
+ * meta —un consumo restaura acumulado Y meta; un aporte/retiro ajusta el
+ * acumulado—. RLS acota a las transacciones del usuario. La fila sintética de
+ * "saldo inicial" (id 'opening') no es una transacción: no se puede revertir.
+ */
+export async function revertGoalMovementAction(transactionId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (!transactionId || transactionId === "opening") {
+    return { ok: false, message: "Este movimiento no se puede revertir." };
+  }
+  try {
+    await deleteTransaction(transactionId);
+    revalidatePath("/control-financiero");
+    revalidatePath("/ahorro");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("revertGoalMovement fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos revertir el movimiento." };
+  }
+}
 
 /** Detalle de un frasco (Delta C): meta + movimientos con saldo, para el modal/sheet. */
 export async function getGoalDetailAction(goalId: string): Promise<GoalDetailVM | null> {

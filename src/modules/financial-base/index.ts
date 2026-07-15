@@ -10,7 +10,11 @@ export {
   getPrimaryCurrency,
   DISPLAY_CURRENCY_COOKIE,
 } from "./services/base-service";
-export { createTransaction, listTransactions } from "./services/transaction-service";
+export {
+  createTransaction,
+  listTransactions,
+  deleteTransaction,
+} from "./services/transaction-service";
 export { getLiquidityBalance } from "./services/liquidity-service";
 // Líneas derivadas del presupuesto (renta/dividendos/…): wealth las sincroniza
 // al registrar un pago para conciliarlo contra la barra "Recibido".

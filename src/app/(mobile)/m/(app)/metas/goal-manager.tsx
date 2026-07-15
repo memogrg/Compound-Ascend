@@ -12,6 +12,7 @@ import {
   spendFromGoalAction,
   listExpenseCategoriesAction,
   getGoalDetailAction,
+  revertGoalMovementAction,
   type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
 import type { SavingsGoal } from "@/modules/control";
@@ -369,8 +370,12 @@ function fmtMoveDate(iso: string | null): string {
  * Carga el detalle al montar (el sheet solo monta este componente al abrir).
  */
 function MovementsList({ goal }: { goal: SavingsGoal }) {
+  const router = useRouter();
+  const toast = useToast();
   const [vm, setVm] = useState<GoalDetailVM | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -383,6 +388,21 @@ function MovementsList({ goal }: { goal: SavingsGoal }) {
       alive = false;
     };
   }, [goal.id]);
+
+  const revert = async (transactionId: string) => {
+    setPendingId(transactionId);
+    const res = await revertGoalMovementAction(transactionId);
+    setPendingId(null);
+    setConfirmingId(null);
+    if (res.ok) {
+      toast.show("Movimiento revertido", "success");
+      const detail = await getGoalDetailAction(goal.id);
+      setVm(detail);
+      router.refresh();
+    } else {
+      toast.show(res.message ?? "No pudimos revertir el movimiento.", "error");
+    }
+  };
 
   if (!loaded) {
     return (
@@ -428,41 +448,75 @@ function MovementsList({ goal }: { goal: SavingsGoal }) {
           {vm.movements.map((m, i) => (
             <div
               key={m.id}
-              className="between"
               style={{
                 padding: "11px 14px",
                 borderTop: i === 0 ? "none" : "1px solid var(--line)",
-                gap: 10,
               }}
             >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 650, fontSize: 13.5 }}>
-                  {MOVE_LABEL[m.type]}
-                  {m.offBudget ? (
-                    <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
-                      {" "}
-                      · sin presupuesto
-                    </span>
-                  ) : null}
+              <div className="between" style={{ gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 650, fontSize: 13.5 }}>
+                    {MOVE_LABEL[m.type]}
+                    {m.offBudget ? (
+                      <span className="muted" style={{ fontWeight: 400, fontSize: 11 }}>
+                        {" "}
+                        · sin presupuesto
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11.5 }}>
+                    {fmtMoveDate(m.date)}
+                    {m.categoryLabel ? ` · ${m.categoryLabel}` : ""}
+                    {m.note ? ` · ${m.note}` : ""}
+                  </div>
                 </div>
-                <div className="muted" style={{ fontSize: 11.5 }}>
-                  {fmtMoveDate(m.date)}
-                  {m.categoryLabel ? ` · ${m.categoryLabel}` : ""}
-                  {m.note ? ` · ${m.note}` : ""}
+                <div style={{ textAlign: "right", flex: "none" }}>
+                  <div
+                    className="mono"
+                    style={{ fontSize: 13.5, color: m.amount >= 0 ? "var(--pos)" : "var(--neg)" }}
+                  >
+                    {m.amount >= 0 ? "+" : "−"}
+                    {formatMoney(Math.abs(m.amount), vm.currency)}
+                  </div>
+                  <div className="muted mono" style={{ fontSize: 11 }}>
+                    {formatMoney(m.balance, vm.currency)}
+                  </div>
                 </div>
               </div>
-              <div style={{ textAlign: "right", flex: "none" }}>
-                <div
-                  className="mono"
-                  style={{ fontSize: 13.5, color: m.amount >= 0 ? "var(--pos)" : "var(--neg)" }}
-                >
-                  {m.amount >= 0 ? "+" : "−"}
-                  {formatMoney(Math.abs(m.amount), vm.currency)}
+              {m.type !== "inicial" ? (
+                <div style={{ marginTop: 8 }}>
+                  {confirmingId === m.id ? (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="m-btn m-btn-secondary"
+                        style={{ flex: 1, minHeight: 36, fontSize: 12.5, color: "var(--neg)" }}
+                        disabled={pendingId === m.id}
+                        onClick={() => void revert(m.id)}
+                      >
+                        {pendingId === m.id ? "Revirtiendo…" : "Confirmar reversión"}
+                      </button>
+                      <button
+                        type="button"
+                        className="m-btn m-btn-ghost"
+                        style={{ flex: "none", minHeight: 36, fontSize: 12.5, paddingInline: 14 }}
+                        onClick={() => setConfirmingId(null)}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="m-btn m-btn-ghost"
+                      style={{ minHeight: 34, fontSize: 12, paddingInline: 12 }}
+                      onClick={() => setConfirmingId(m.id)}
+                    >
+                      Revertir
+                    </button>
+                  )}
                 </div>
-                <div className="muted mono" style={{ fontSize: 11 }}>
-                  {formatMoney(m.balance, vm.currency)}
-                </div>
-              </div>
+              ) : null}
             </div>
           ))}
         </div>

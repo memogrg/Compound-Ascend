@@ -348,7 +348,7 @@ export async function deleteTransaction(id: string): Promise<void> {
   // borrar. Import dinámico → evita el ciclo con linked-transaction-service.
   const { data: txn } = await supabase
     .from("transactions")
-    .select("kind, amount, occurred_on, linked_kind, linked_id")
+    .select("kind, amount, occurred_on, linked_kind, linked_id, counts_in_budget")
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -363,6 +363,7 @@ export async function deleteTransaction(id: string): Promise<void> {
       linkedId: txn.linked_id,
       amount: Number(txn.amount),
       occurredOn: txn.occurred_on,
+      countsInBudget: txn.counts_in_budget,
     });
   }
 
