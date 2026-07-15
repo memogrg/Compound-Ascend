@@ -20,7 +20,16 @@ export async function restoreInsightsAction(): Promise<void> {
   revalidatePath("/dashboard");
 }
 
-export type BellInsight = { id: string; severity: string; title: string; body: string };
+export type BellInsight = {
+  id: string;
+  severity: string;
+  title: string;
+  body: string;
+  // Entidad relacionada (aditivo): permite el deep-link de la campana móvil. La
+  // campana web solo lee id/severity/title/body, así que ignora estos campos.
+  relatedKind?: string;
+  relatedId?: string | null;
+};
 export type BellData = { inApp: boolean; insights: BellInsight[] };
 
 /**
@@ -46,6 +55,8 @@ export async function listActiveInsightsAction(): Promise<BellData> {
         severity: i.severity,
         title: i.title,
         body: i.body,
+        relatedKind: i.relatedKind,
+        relatedId: i.relatedId,
       })),
     };
   } catch {
