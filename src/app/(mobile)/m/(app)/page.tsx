@@ -3,7 +3,7 @@ import { getUser } from "@/lib/auth/session";
 import { getDashboardData } from "@/modules/dashboard";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
 import { formatMoney } from "@/lib/format";
-import { MobileMenu } from "../components/mobile-menu";
+import { MobileHeader } from "../components/mobile-header";
 
 /**
  * Pantalla de Inicio del móvil (/m) — "centro de mando" del diseño
@@ -104,42 +104,8 @@ export default async function MobileHome() {
             </div>
           </Link>
         )}
-        {/* Header: saludo + nombre real. Piloto "Cristal Cálido": topbar de cristal que cubre
-            la barra de estado y escarcha el contenido al hacer scroll (el padding/inset lo
-            aporta .m-topbar; no se pone padding inline para no pisar el safe-area). */}
-        <header className="between m-topbar m-glass" style={{ marginBottom: 18 }}>
-          <div className="row">
-            <span className="iso" aria-hidden>
-              <svg viewBox="0 0 64 64" fill="none">
-                <path
-                  d="M44 19 A 18 18 0 1 0 44 45"
-                  stroke="currentColor"
-                  strokeWidth={6.4}
-                  strokeLinecap="round"
-                  fill="none"
-                />
-                <path d="M45 27 V37 M40 32 H50" stroke="#51AF6F" strokeWidth={3.6} strokeLinecap="round" />
-              </svg>
-            </span>
-            <div>
-              <div className="muted" style={{ fontSize: 12 }}>
-                {greeting(now)}
-              </div>
-              <div className="m-greeting">{data.name}</div>
-            </div>
-          </div>
-          <div className="row" style={{ gap: 8 }}>
-            {/* Acceso al Asistente IA (chat + escáner de recibos) */}
-            <Link href="/m/asistente" className="icon-btn" aria-label="Asistente IA" title="Asistente IA">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
-                <path d="M12 8.5v4M10 10.5h4" />
-              </svg>
-            </Link>
-            {/* Menú de navegación (replica el sidebar web) */}
-            <MobileMenu />
-          </div>
-        </header>
+        {/* Header sticky de cristal unificado (variant home): logo + saludo + chat/campana/menú. */}
+        <MobileHeader variant="home" greeting={greeting(now)} name={data.name} />
 
         {/* Hero: patrimonio neto + mini-tendencia del mes */}
         <Link href="/m/patrimonio" className="wgt-nw" style={{ marginBottom: 14 }}>

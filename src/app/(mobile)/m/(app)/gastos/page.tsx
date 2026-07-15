@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
 import { monthPeriod } from "@/modules/financial-base";
@@ -38,7 +37,7 @@ export default async function MobileGastos() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          <Header />
+          <MobileHeader variant="inner" eyebrow="Base" title="Gastos" backHref="/m" backLabel="Volver a Inicio" />
           <div className="card card-p">
             <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
               Aún no puedes ver tus gastos. Captura tu base financiera para empezar.
@@ -83,7 +82,14 @@ export default async function MobileGastos() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <Header pct={headerPct} />
+        <MobileHeader
+          variant="inner"
+          eyebrow="Base"
+          title="Gastos"
+          backHref="/m"
+          backLabel="Volver a Inicio"
+          badge={headerPct != null ? <span className="badge neutral">{headerPct}%</span> : undefined}
+        />
         <GastosManager
           jars={jars}
           currency={currency}
@@ -98,22 +104,3 @@ export default async function MobileGastos() {
   );
 }
 
-function Header({ pct }: { pct?: number | null }) {
-  return (
-    <div className="hdr" style={{ marginBottom: 16 }}>
-      <Link href="/m" className="bk" aria-label="Volver a Inicio">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
-      </Link>
-      <div style={{ flex: 1 }}>
-        <div className="ov">Base</div>
-        <div className="h-title" style={{ marginTop: 2 }}>
-          Gastos
-        </div>
-      </div>
-      {pct != null && <span className="badge neutral">{pct}%</span>}
-      <MobileMenu />
-    </div>
-  );
-}

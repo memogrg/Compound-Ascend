@@ -1,6 +1,6 @@
 import { getControlSummary } from "@/modules/control";
 import { getDisplayCurrency } from "@/modules/financial-base";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import { GoalManager } from "./goal-manager";
 
 /**
@@ -24,15 +24,7 @@ export default async function MobileMetas() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div className="between" style={{ marginBottom: 16 }}>
-          <div>
-            <div className="ov">Control</div>
-            <div className="h-title" style={{ marginTop: 6 }}>
-              Ahorro
-            </div>
-          </div>
-          <MobileMenu />
-        </div>
+        <MobileHeader variant="inner" eyebrow="Control" title="Ahorro" />
 
         {/* Motor de prioridades */}
         <div className="card card-p" style={{ marginBottom: 16, background: "var(--accent-soft)", borderColor: "transparent" }}>

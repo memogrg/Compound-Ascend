@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import {
   getDebtsOverview,
   getDebtDetail,
@@ -51,7 +50,7 @@ export default async function MobileDeudas() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          <Header />
+          <MobileHeader variant="inner" eyebrow="Control" title="Deudas y Préstamos" backHref="/m" backLabel="Volver a Inicio" />
           <div className="ov" style={{ marginBottom: 8 }}>
             Sin deudas registradas 🎉
           </div>
@@ -92,7 +91,7 @@ export default async function MobileDeudas() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <Header />
+        <MobileHeader variant="inner" eyebrow="Control" title="Deudas y Préstamos" backHref="/m" backLabel="Volver a Inicio" />
 
         {/* Hero: deuda total */}
         <div
@@ -172,21 +171,3 @@ export default async function MobileDeudas() {
   );
 }
 
-function Header() {
-  return (
-    <div className="hdr" style={{ marginBottom: 16 }}>
-      <Link href="/m" className="bk" aria-label="Volver a Inicio">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
-      </Link>
-      <div style={{ flex: 1 }}>
-        <div className="ov">Control</div>
-        <div className="h-title" style={{ marginTop: 2 }}>
-          Deudas y Préstamos
-        </div>
-      </div>
-      <MobileMenu />
-    </div>
-  );
-}

@@ -5,7 +5,7 @@ import {
 } from "@/modules/wealth/services/contribution-service";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import { InversionesManager } from "./inversiones-manager";
 
 /**
@@ -40,15 +40,7 @@ export default async function MobileInversiones() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <div className="between" style={{ marginBottom: 16 }}>
-          <div>
-            <div className="ov">Crecimiento</div>
-            <div className="h-title" style={{ marginTop: 6 }}>
-              Portafolio de inversiones
-            </div>
-          </div>
-          <MobileMenu />
-        </div>
+        <MobileHeader variant="inner" eyebrow="Crecimiento" title="Portafolio de inversiones" />
 
         {/* Hero: valor del portafolio + rendimiento */}
         <div className="card card-p" style={{ marginBottom: 16 }}>

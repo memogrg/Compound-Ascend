@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { MobileMenu } from "../../components/mobile-menu";
+import { MobileHeader } from "../../components/mobile-header";
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import type { BudgetItem } from "@/modules/financial-base/types";
 import { convertCurrency } from "@/lib/fx";
@@ -27,7 +26,7 @@ export default async function MobileIngresos() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          <Header />
+          <MobileHeader variant="inner" eyebrow="Presupuesto" title="Ingresos" backHref="/m" backLabel="Volver a Inicio" />
           <div className="card card-p">
             <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
               Conecta Supabase para gestionar tus ingresos.
@@ -63,7 +62,7 @@ export default async function MobileIngresos() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <Header />
+        <MobileHeader variant="inner" eyebrow="Presupuesto" title="Ingresos" backHref="/m" backLabel="Volver a Inicio" />
 
         {/* Hero: recibido vs planificado del mes */}
         <div className="card card-p" style={{ marginBottom: 14 }}>
@@ -159,21 +158,3 @@ function Metric({ label, value, sub, cls }: { label: string; value: string; sub?
   );
 }
 
-function Header() {
-  return (
-    <div className="hdr" style={{ marginBottom: 16 }}>
-      <Link href="/m" className="bk" aria-label="Volver a Inicio">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
-      </Link>
-      <div style={{ flex: 1 }}>
-        <div className="ov">Presupuesto</div>
-        <div className="h-title" style={{ marginTop: 2 }}>
-          Ingresos
-        </div>
-      </div>
-      <MobileMenu />
-    </div>
-  );
-}
