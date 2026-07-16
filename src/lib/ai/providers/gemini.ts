@@ -87,18 +87,72 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function errorBodyExcerpt(res: Response): Promise<string> {
   try {
     if (typeof res.text !== "function") return "";
-    return (await res.text()).slice(0, 200);
+    return (await res.text()).slice(0, 500);
   } catch {
     return "";
   }
 }
 
 /**
+ * Endpoint SIN la query string. La key viaja como `?key=…`, y el logger solo redacta por
+ * NOMBRE de campo (`key`, `token`…), no por contenido: loguear la url entera filtraría el
+ * secreto. Esto deja ver qué endpoint falló (generateContent vs batchEmbedContents) sin él.
+ */
+function safeEndpoint(url: string): string {
+  return url.split("?")[0] ?? "";
+}
+
+/** Causa del fallo ya normalizada: es lo único que necesitan el log y el mensaje. */
+type GeminiFailure =
+  | { reason: "http"; status: number }
+  | { reason: "timeout" }
+  | { reason: "network" };
+
+/**
+ * Mensaje para el usuario según la causa, con un código corto entre paréntesis: es la pista
+ * que se puede leer en una captura sin abrir los logs. Nunca incluye el cuerpo crudo de
+ * Google — ese solo va al log del servidor.
+ */
+function userMessageFor(f: GeminiFailure): string {
+  if (f.reason === "timeout") return "La IA tardó demasiado en responder. Intenta de nuevo. (IA-503)";
+  if (f.reason === "network")
+    return "No se pudo contactar la IA. Revisa tu conexión e intenta de nuevo. (IA-NET)";
+  const s = f.status;
+  if (s === 401 || s === 403)
+    return "La IA no está disponible: su credencial no es válida o expiró. (IA-401)";
+  if (s === 429) return "Alcanzaste el límite de uso de la IA por ahora. Intenta más tarde. (IA-429)";
+  if (s === 400) return "La IA rechazó la solicitud (configuración/modelo). (IA-400)";
+  if (s >= 500) return "La IA tardó demasiado en responder. Intenta de nuevo. (IA-503)";
+  // Sin caso conocido: el genérico de siempre + el status crudo para poder rastrearlo.
+  return `Un servicio externo no respondió. Inténtalo más tarde. (IA-${s})`;
+}
+
+/**
+ * AppError de proveedor con la causa ya resuelta: mensaje específico para el usuario y
+ * `detail` ESTRUCTURADO para que el route (o cualquier caller) pueda decidir sin volver a
+ * llamar ni parsear cadenas. Antes el detail era un string ("gemini 429") y el usuario veía
+ * siempre el genérico de PROVIDER_ERROR.
+ */
+function providerError(f: GeminiFailure, model: string): AppError {
+  return new AppError("PROVIDER_ERROR", userMessageFor(f), {
+    provider: "gemini",
+    model,
+    reason: f.reason,
+    status: f.reason === "http" ? f.status : undefined,
+  });
+}
+
+/**
  * POST JSON con timeout + reintentos transitorios (5xx/429 y red) → AppError. Genérico para
- * cualquier endpoint de Gemini (generateContent, batchEmbedContents). Mismo contrato que antes.
- * `model` es SOLO para el log accionable (nunca la URL con la key). Antes de lanzar el
- * PROVIDER_ERROR genérico, registra la causa real (status/abort/red + modelo + extracto del
- * cuerpo) para distinguir en Vercel cuota (429/RESOURCE_EXHAUSTED) de timeout o 5xx.
+ * cualquier endpoint de Gemini (generateContent, batchEmbedContents).
+ *
+ * SUPERFICIE DE ERROR — cada fallo terminal deja dos rastros:
+ *  1. Una línea `[gemini] non-2xx|timeout|network` en el log del servidor (visible en Vercel)
+ *     con el status real, el endpoint sin la key y un extracto del cuerpo de Google.
+ *  2. Un AppError con mensaje ESPECÍFICO para el usuario y un código corto (IA-401/429/…)
+ *     que se puede leer en una captura, más un `detail` estructurado para el caller.
+ * Los mensajes salen de aquí porque es el único sitio que conoce el status; toSafeResponse ya
+ * propaga `userMessage` tal cual, así que chat y escáner de recibos lo heredan sin tocarlos.
  */
 async function postJsonWithRetry(url: string, body: unknown, model: string): Promise<unknown> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -117,22 +171,26 @@ async function postJsonWithRetry(url: string, body: unknown, model: string): Pro
       } catch (e) {
         // Timeout (AbortError): no reintentar para no apilar esperas.
         if (e instanceof Error && e.name === "AbortError") {
-          logger.error("gemini: llamada abortada por timeout", {
+          logger.error("[gemini] timeout", {
             model,
-            abort: true,
-            timeoutMs: TIMEOUT_MS,
+            endpoint: safeEndpoint(url),
+            ms: TIMEOUT_MS,
             attempt,
           });
-          throw new AppError("PROVIDER_ERROR", undefined, "gemini timeout");
+          throw providerError({ reason: "timeout" }, model);
         }
         // Error de red transitorio (p. ej. TypeError): reintentar.
         if (isLast) {
-          logger.error("gemini: error de red tras agotar reintentos", {
+          // OJO: la causa va en `cause`, NO en `message`. El logger construye la entrada como
+          // { ts, level, message, ...meta }, así que un `message` en el meta PISA el nombre
+          // del log y esta línea saldría en Vercel sin el marcador "[gemini] network".
+          logger.error("[gemini] network", {
             model,
-            network: e instanceof Error ? e.name : "?",
+            endpoint: safeEndpoint(url),
+            cause: e instanceof Error ? `${e.name}: ${e.message}` : String(e),
             attempt,
           });
-          throw new AppError("PROVIDER_ERROR", undefined, "gemini network");
+          throw providerError({ reason: "network" }, model);
         }
         await sleep(backoffMs(attempt));
         continue;
@@ -140,7 +198,7 @@ async function postJsonWithRetry(url: string, body: unknown, model: string): Pro
       if (res.ok) return await res.json();
       // No-ok transitorio (5xx/429) con reintentos disponibles: avisar y reintentar.
       if (isRetryableStatus(res.status) && !isLast) {
-        logger.warn("gemini: status transitorio, reintentando", {
+        logger.warn("[gemini] status transitorio, reintentando", {
           model,
           status: res.status,
           attempt,
@@ -148,22 +206,25 @@ async function postJsonWithRetry(url: string, body: unknown, model: string): Pro
         await sleep(backoffMs(attempt));
         continue;
       }
-      // Terminal (4xx no reintentable, o transitorio ya sin reintentos): log con status + cuerpo.
-      const excerpt = await errorBodyExcerpt(res);
-      logger.error("gemini: respuesta no-2xx", {
+      // Terminal (4xx no reintentable, o transitorio ya sin reintentos): esta línea es la que
+      // hay que buscar en Vercel — lleva el status REAL y el motivo que devolvió Google.
+      const bodySnippet = await errorBodyExcerpt(res);
+      logger.error("[gemini] non-2xx", {
         model,
+        endpoint: safeEndpoint(url),
         status: res.status,
+        statusText: res.statusText,
         retryable: isRetryableStatus(res.status),
         attempt,
-        body: excerpt,
+        bodySnippet,
       });
-      throw new AppError("PROVIDER_ERROR", undefined, `gemini ${res.status}`);
+      throw providerError({ reason: "http", status: res.status }, model);
     } finally {
       clearTimeout(timer);
     }
   }
   // Inalcanzable (el loop siempre retorna o lanza), pero satisface el tipo.
-  throw new AppError("PROVIDER_ERROR", undefined, "gemini");
+  throw new AppError("PROVIDER_ERROR", undefined, { provider: "gemini", model, reason: "unknown" });
 }
 
 async function call(key: string, model: string, body: unknown): Promise<GeminiResponse> {
