@@ -13,6 +13,19 @@ export const viewport: Viewport = {
   // Status bar acorde a la canvas CLARA (tema por defecto) + safe areas (notch/home).
   themeColor: "#F1EFE8",
   viewportFit: "cover",
+  // Escalado BLOQUEADO: el WebView se comporta como una app nativa. Sin esto, iOS hace
+  // zoom al enfocar un campo y al cerrar el teclado se queda agrandado, con scroll
+  // lateral y sin forma de volver (maximumScale es lo que impide ese "zoom pegado").
+  // La causa raíz —campos por debajo de 16px— se corrige aparte en .m-inp; esto es el
+  // cinturón además de los tirantes.
+  // Accesibilidad: el zoom del SISTEMA (Ajustes › Accesibilidad › Zoom en iOS,
+  // Ampliación en Android) es independiente y sigue funcionando. Lo que sí se pierde
+  // es el pellizco DENTRO de la app: WKWebView respeta esta directiva (Safari la
+  // ignora), que es justo el comportamiento nativo que se busca aquí.
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function MobileRootLayout({ children }: { children: React.ReactNode }) {
