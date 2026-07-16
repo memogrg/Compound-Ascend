@@ -27,6 +27,7 @@ import {
   onAppStateChange,
   APP_LOCK_EVENT,
 } from "../lib/app-lock";
+import { isIntroActive, onIntroDone } from "../lib/app-intro";
 
 export function AppLockOverlay() {
   const [enabled, setEnabled] = useState(false); // ¿candado activo?
@@ -62,21 +63,30 @@ export function AppLockOverlay() {
     }
   }, []);
 
-  // Carga inicial (cold start): lee el flag; si está activo → bloquea + pide biometría.
+  // Carga inicial (cold start): lee el flag; si está activo → bloquea. La biometría se pide
+  // apenas termina la intro animada (o de inmediato si no hay intro en curso), para que el
+  // orden sea: intro a pantalla completa → candado → app.
   useEffect(() => {
     if (!isNativeApp()) return;
     let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
     void (async () => {
       const on = await isAppLockEnabled();
       if (cancelled) return;
       setEnabled(on);
-      if (on) {
-        setLocked(true);
+      if (!on) return;
+      setLocked(true); // tapa la UI ya (bajo la intro); el prompt espera a la intro
+      if (isIntroActive()) {
+        unsubscribe = onIntroDone(() => {
+          if (!cancelled) void runUnlock();
+        });
+      } else {
         void runUnlock();
       }
     })();
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
   }, [runUnlock]);
 

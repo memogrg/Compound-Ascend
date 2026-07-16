@@ -4,7 +4,7 @@ import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/
 import { RISK_DISPLAY } from "@/modules/personal-profile/constants";
 import * as O from "@/modules/personal-profile/constants";
 
-import { MobileMenu } from "../components/mobile-menu";
+import { MobileHeader } from "../components/mobile-header";
 
 /**
  * Resultados del ADN financiero en móvil — la vista que la web muestra en
@@ -45,39 +45,27 @@ export function MobileProfileResults({
   return (
     <div className="m-scroll m-scroll-flush">
       <div className="m-pad">
-        {/* Header con volver + editar */}
-        <div className="between" style={{ marginBottom: 16 }}>
-          <Link href="/m" className="icon-btn" aria-label="Volver">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </Link>
-          <div className="row" style={{ gap: 10 }}>
+        {/* Header sticky de cristal unificado: eyebrow + título del ADN, con "Editar" como
+            acción (junto a chat/campana/menú) y Atrás a Inicio. */}
+        <MobileHeader
+          variant="inner"
+          eyebrow="Tu ADN financiero"
+          title={diagnosis.archetypeLabel ? `Eres ${diagnosis.archetypeLabel}` : "Tu perfil financiero"}
+          backHref="/m"
+          backLabel="Volver a Inicio"
+          badge={
             <Link href="/m/perfil-financiero" className="m-authlink" style={{ fontSize: 13.5 }}>
               Editar
             </Link>
-            <MobileMenu />
-          </div>
-        </div>
+          }
+        />
 
-        {/* Hero */}
-        <div style={{ marginBottom: 18 }}>
-          <div className="m-wz-eyebrow">Tu ADN financiero</div>
-          {diagnosis.archetypeLabel ? (
-            <h1 className="m-wz-title" style={{ marginTop: 6 }}>
-              Eres <span className="g">{diagnosis.archetypeLabel}</span>
-            </h1>
-          ) : (
-            <h1 className="m-wz-title" style={{ marginTop: 6 }}>
-              Tu perfil <span className="g">financiero</span>
-            </h1>
-          )}
-          {reading?.heroLine ? (
-            <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.5 }}>
-              {reading.heroLine}
-            </p>
-          ) : null}
-        </div>
+        {/* Frase de apertura del diagnóstico (lo que antes acompañaba al hero). */}
+        {reading?.heroLine ? (
+          <p className="muted" style={{ fontSize: 14, marginTop: -4, marginBottom: 18, lineHeight: 1.5 }}>
+            {reading.heroLine}
+          </p>
+        ) : null}
 
         {/* Completitud + riesgo */}
         <div className="card card-p" style={{ marginBottom: 14 }}>
