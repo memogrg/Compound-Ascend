@@ -639,7 +639,11 @@ body:has(.m-shell[data-theme="dark"]) {
   border-radius: var(--r-md);
   padding: 14px;
   font: inherit;
-  font-size: 15px;
+  /* 16px NO es estético: es el umbral exacto por debajo del cual iOS hace zoom al
+     enfocar el campo. Todos los campos editables del shell pasan por .m-inp (los
+     demás — .m-select, .m-textarea, .m-chat-input, .m-money-inp — lo componen), así
+     que este es el único sitio donde hay que sostenerlo. No lo bajes. */
+  font-size: 16px;
   color: var(--text);
   width: 100%;
 }
