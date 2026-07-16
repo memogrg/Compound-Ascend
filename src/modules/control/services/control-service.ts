@@ -112,7 +112,8 @@ export async function listDebts(): Promise<Debt[]> {
   return (data ?? []).map(rowToDebt);
 }
 
-export async function createGoal(input: GoalInput): Promise<void> {
+/** Crea una meta/sobre y devuelve su id (el id sirve para un aporte inicial). */
+export async function createGoal(input: GoalInput): Promise<string> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const household_id = await getActiveHouseholdId(supabase, user.id);
@@ -127,24 +128,30 @@ export async function createGoal(input: GoalInput): Promise<void> {
     targetDate: input.targetDate,
     todayISO: todayISO(),
   });
-  await supabase.from("savings_goals").insert({
-    user_id: user.id,
-    household_id,
-    name: input.name,
-    goal_type: input.goalType ?? null,
-    kind: input.kind,
-    target_amount: targetAmount,
-    current_amount: input.currentAmount,
-    monthly_contribution: input.monthlyContribution,
-    currency: input.currency,
-    target_date: input.targetDate ?? null,
-    priority: input.priority ?? null,
-    status: "revisar",
-    recurrence,
-    period_amount: periodAmount,
-    next_reset_on: nextResetOn,
-    default_category_id: isSobre ? null : (input.defaultCategoryId ?? null),
-  });
+  const { data, error } = await supabase
+    .from("savings_goals")
+    .insert({
+      user_id: user.id,
+      household_id,
+      name: input.name,
+      goal_type: input.goalType ?? null,
+      kind: input.kind,
+      target_amount: targetAmount,
+      current_amount: input.currentAmount,
+      monthly_contribution: input.monthlyContribution,
+      currency: input.currency,
+      target_date: input.targetDate ?? null,
+      priority: input.priority ?? null,
+      status: "revisar",
+      recurrence,
+      period_amount: periodAmount,
+      next_reset_on: nextResetOn,
+      default_category_id: isSobre ? null : (input.defaultCategoryId ?? null),
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data!.id;
 }
 
 /** Campos de deuda compartidos por insert/update (incluye amortización). */

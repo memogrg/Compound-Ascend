@@ -21,6 +21,7 @@ import { CopyPreviousIncomeButton } from "@/modules/financial-base/components/v2
 import { LinkedIncomeCard } from "@/modules/financial-base/components/v2/linked-income-card";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
 import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
+import type { CreateSavingsSobre } from "@/modules/financial-base/components/v2/expense-jars/new-savings-sobre-modal";
 import { JarDatePicker } from "@/modules/financial-base/components/v2/expense-jars/jar-date-picker";
 import { ExpenseRangeControl } from "@/modules/financial-base/components/v2/expense-range-control";
 import { SummaryStrip, type SumCard } from "@/modules/financial-base/components/v2/summary-strip";
@@ -429,6 +430,7 @@ export function IncomeExpenseSection({
   jarsAsOf,
   jarsPeriod,
   range,
+  createSavingsSobre,
 }: {
   view: V2View;
   kind: "income" | "expense";
@@ -437,6 +439,8 @@ export function IncomeExpenseSection({
   jarsPeriod?: Period;
   /** Solo Gastos: rango activo (1m/3m/6m/ytd/all) de las cards y gráficas. */
   range?: string;
+  /** Solo Gastos: server action para crear un sobre de ahorro desde la toolbar. */
+  createSavingsSobre?: CreateSavingsSobre;
 }) {
   if (kind === "income") return <IncomeSection view={view} />;
 
@@ -511,6 +515,7 @@ export function IncomeExpenseSection({
               tree={view.tree}
               canPersonalize={view.canPersonalize}
               personalization={view.personalization}
+              createSavingsSobre={createSavingsSobre}
             />
           </div>
         </div>
