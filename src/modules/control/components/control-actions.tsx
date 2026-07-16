@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -16,6 +16,8 @@ import {
   addDefensePolicyAction,
   editGoalAction,
   editDebtAction,
+  listExpenseCategoriesAction,
+  type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
 import { pmt } from "@/modules/control/engine/amortization";
 import type { SavingsGoal, Debt } from "@/modules/control/types";
@@ -246,6 +248,19 @@ function GoalForm({
   // etiqueta del monto ("Monto por período") y se envía en onSubmit.
   const [recurrence, setRecurrence] = useState<string>(item?.recurrence ?? "ninguna");
   const isRecurring = recurrence !== "ninguna";
+  // Categoría por defecto del frasco: se precarga al gastar. Se cargan las
+  // categorías de gasto de forma perezosa (mismo action que el modal Gastar).
+  const [defaultCategoryId, setDefaultCategoryId] = useState<string>(item?.defaultCategoryId ?? "");
+  const [catGroups, setCatGroups] = useState<ExpenseCategoryGroup[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void listExpenseCategoriesAction().then((groups) => {
+      if (alive) setCatGroups(groups);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -285,6 +300,7 @@ function GoalForm({
         recurrence,
         // En un frasco recurrente el "Monto por período" ES el plan pleno.
         periodAmount: isRecurring ? Number(targetAmount) || 0 : undefined,
+        defaultCategoryId: defaultCategoryId || null,
       },
       onDone,
       form,
@@ -518,6 +534,38 @@ function GoalForm({
                   </p>
                 </div>
               ) : null}
+            </div>
+            <div className="fld">
+              <label
+                className="fld-label"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                Categoría (opcional)
+                <span
+                  className="tip tip-wrap"
+                  data-tip="Al gastar de este frasco, esta categoría viene precargada (puedes cambiarla en el momento)."
+                  aria-label="Qué es la categoría por defecto del frasco"
+                  style={{ display: "inline-flex", cursor: "help" }}
+                >
+                  <Icon name="info" />
+                </span>
+              </label>
+              <select
+                className="sel"
+                value={defaultCategoryId}
+                onChange={(e) => setDefaultCategoryId(e.target.value)}
+              >
+                <option value="">Sin categoría</option>
+                {catGroups.map((grp) => (
+                  <optgroup key={grp.groupName} label={grp.groupName}>
+                    {grp.options.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
             </div>
           </>
         )}

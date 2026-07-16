@@ -52,6 +52,7 @@ function rowToGoal(r: SavingsGoalRow): SavingsGoal {
     recurrence: (r.recurrence ?? "ninguna") as Recurrence,
     periodAmount: r.period_amount === null ? null : Number(r.period_amount),
     nextResetOn: r.next_reset_on,
+    defaultCategoryId: r.default_category_id,
   };
 }
 
@@ -134,6 +135,7 @@ export async function createGoal(input: GoalInput): Promise<void> {
     recurrence: input.recurrence,
     period_amount: periodAmount,
     next_reset_on: nextResetOn,
+    default_category_id: input.defaultCategoryId ?? null,
   });
 }
 
@@ -213,6 +215,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
       recurrence: input.recurrence,
       period_amount: derived.periodAmount,
       next_reset_on: nextResetOn,
+      default_category_id: input.defaultCategoryId ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);

@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { addPolicyAction } from "@/modules/wealth/api/actions";
+import {
+  listExpenseCategoriesAction,
+  type ExpenseCategoryGroup,
+} from "@/modules/control/api/actions";
 
 import {
   FormShell,
@@ -37,6 +41,7 @@ export type GoalValues = {
   goalType?: string;
   recurrence?: string;
   periodAmount?: number;
+  defaultCategoryId?: string | null;
 };
 
 const PRIORITY_OPTS: Opt[] = [
@@ -98,6 +103,23 @@ export function GoalForm({
   const [recurrence, setRecurrence] = useState(initial?.recurrence ?? "ninguna");
   const [cur, setCur] = useState(initial?.currency ?? currency);
   const isRecurring = recurrence !== "ninguna";
+  // Categoría por defecto del frasco (se precarga al gastar). Opciones planas
+  // "Grupo · Hoja" para el SheetSelect, cargadas al montar.
+  const [defaultCategoryId, setDefaultCategoryId] = useState(initial?.defaultCategoryId ?? "");
+  const [catOptions, setCatOptions] = useState<Opt[]>([]);
+  useEffect(() => {
+    let alive = true;
+    void listExpenseCategoriesAction().then((groups: ExpenseCategoryGroup[]) => {
+      if (!alive) return;
+      const flat = groups.flatMap((g) =>
+        g.options.map((o) => ({ value: o.id, label: `${g.groupName} · ${o.name}` })),
+      );
+      setCatOptions([{ value: "", label: "Sin categoría" }, ...flat]);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const initialDefense = (initial?.goalType ?? "").startsWith("defensa:");
   const [mode, setMode] = useState(initialDefense ? "defensa" : "normal");
   const [defenseKind, setDefenseKind] = useState(
@@ -192,6 +214,7 @@ export function GoalForm({
     // Recurrencia solo en frascos normales (no en fondos de defensa).
     recurrence: isDefense ? "ninguna" : recurrence,
     periodAmount: !isDefense && isRecurring ? targetAmount : undefined,
+    defaultCategoryId: defaultCategoryId || null,
   };
 
   return (
@@ -224,6 +247,15 @@ export function GoalForm({
       {!isDefense ? (
         <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia del frasco" />
       ) : null}
+      <SheetSelect
+        name="defaultCategoryId"
+        label="Categoría (opcional)"
+        value={defaultCategoryId}
+        onChange={setDefaultCategoryId}
+        options={catOptions}
+        placeholder="Sin categoría"
+        sheetTitle="Categoría por defecto del frasco"
+      />
       <Segmented name="priority" label="Prioridad" value={priority} onChange={setPriority} options={PRIORITY_OPTS} />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
     </FormShell>

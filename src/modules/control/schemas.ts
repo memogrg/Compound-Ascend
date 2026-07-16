@@ -18,6 +18,8 @@ export const goalInputSchema = z.object({
   // Monto pleno del período (al que se restaura target_amount). Opcional: si se
   // omite en un frasco recurrente, se usa targetAmount.
   periodAmount: z.number().nonnegative().optional(),
+  // Categoría por defecto del frasco (opcional): se precarga al gastar.
+  defaultCategoryId: z.string().uuid().optional().nullable(),
 });
 
 export const debtInputSchema = z.object({

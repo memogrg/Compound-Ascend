@@ -20,6 +20,8 @@ export type SavingsGoal = {
   recurrence: import("@/modules/control/engine/recurrence").Recurrence;
   periodAmount?: number | null;
   nextResetOn?: string | null;
+  // Categoría por defecto: se precarga (editable) al gastar del frasco.
+  defaultCategoryId?: string | null;
 };
 
 export type DebtClassification = "critica" | "controlada" | "estrategica" | "emocional";
