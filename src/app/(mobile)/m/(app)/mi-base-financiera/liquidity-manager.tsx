@@ -6,9 +6,9 @@ import {
   setOpeningBalanceAction,
   reconcileBalanceAction,
 } from "@/modules/financial-base/api/actions";
-import { formatMoney } from "@/lib/format";
 
 import { BottomSheet, FormShell, MoneyField } from "../../components/form-kit";
+import { MSummaryCard, mAmount } from "../../components/content-kit";
 
 /**
  * Gestión de liquidez en /m/mi-base-financiera, replicando la LiquidityCard web con el
@@ -37,28 +37,30 @@ export function LiquidityManager({
   const action = hasOpening ? reconcileBalanceAction : setOpeningBalanceAction;
 
   return (
-    <div className="card card-p" style={{ marginBottom: 14 }}>
-      <div className="ov" style={{ marginBottom: 6 }}>
-        Tu liquidez
-      </div>
-      <div className="mono" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em" }}>
-        {formatMoney(balance, currency)}
-      </div>
-
-      {hasOpening ? (
-        <button type="button" className="m-btn m-btn-secondary" style={{ marginTop: 12 }} onClick={openSheet}>
-          Ajustar saldo
-        </button>
-      ) : (
-        <>
-          <div className="muted" style={{ fontSize: 12, margin: "6px 0 12px" }}>
-            Define tu saldo inicial para afinar este cálculo.
-          </div>
-          <button type="button" className="m-btn m-btn-block m-btn-primary" onClick={openSheet}>
-            Fijar saldo inicial
-          </button>
-        </>
-      )}
+    <>
+      <MSummaryCard
+        eyebrow="Tu liquidez"
+        // Exacto mientras quepa en una línea a 320px (~11 caracteres); más allá, abreviado.
+        value={mAmount(balance, currency, 11)}
+        tone={balance < 0 ? "danger" : "neutral"}
+        sub={
+          hasOpening
+            ? "Tu saldo inicial más todo lo que ha entrado y salido este mes."
+            : "Define tu saldo inicial para afinar este cálculo."
+        }
+        slot={
+          hasOpening ? (
+            <button type="button" className="m-btn m-btn-secondary" onClick={openSheet}>
+              Ajustar saldo
+            </button>
+          ) : (
+            <button type="button" className="m-btn m-btn-block m-btn-primary" onClick={openSheet}>
+              Fijar saldo inicial
+            </button>
+          )
+        }
+        style={{ marginBottom: 16 }}
+      />
 
       <BottomSheet
         open={open}
@@ -81,6 +83,6 @@ export function LiquidityManager({
           />
         </FormShell>
       </BottomSheet>
-    </div>
+    </>
   );
 }

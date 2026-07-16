@@ -1,8 +1,19 @@
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { computeV2Totals } from "@/modules/financial-base/engine/base-v2";
 import type { FinancialPressure } from "@/modules/financial-base/types";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
 import { MobileHeader } from "../../components/mobile-header";
+import {
+  MContentCard,
+  MSectionHeader,
+  MDataRow,
+  MMetricGrid,
+  MMetricCard,
+  MChip,
+  MEmptyState,
+  mAmount,
+  type MTone,
+} from "../../components/content-kit";
 import { LiquidityManager } from "./liquidity-manager";
 
 /**
@@ -13,19 +24,23 @@ import { LiquidityManager } from "./liquidity-manager";
  */
 export const dynamic = "force-dynamic"; // datos por sesión
 
-const PRESSURE: Record<FinancialPressure, { label: string; cls: string }> = {
-  baja: { label: "Baja", cls: "pos" },
-  media: { label: "Media", cls: "warn" },
-  alta: { label: "Alta", cls: "warn" },
-  critica: { label: "Crítica", cls: "neg" },
+const PRESSURE: Record<FinancialPressure, { label: string; tone: MTone }> = {
+  baja: { label: "Baja", tone: "success" },
+  media: { label: "Media", tone: "warning" },
+  alta: { label: "Alta", tone: "warning" },
+  critica: { label: "Crítica", tone: "danger" },
 };
 
-/** Varianza con signo (+/-) formateada como %. */
-function variance(pct: number): { text: string; cls: string } {
+/**
+ * Varianza con signo (+/-) formateada como %. El tono NO es el signo: gastar de menos
+ * (varianza negativa en gastos) es bueno, ingresar de menos es malo — por eso lo decide
+ * el caller según la fila, no esta función.
+ */
+function variance(pct: number): { text: string; over: boolean; flat: boolean } {
   const abs = formatPercent(Math.abs(pct));
-  if (pct > 0.001) return { text: `+${abs}`, cls: "pos" };
-  if (pct < -0.001) return { text: `−${abs}`, cls: "neg" };
-  return { text: abs, cls: "muted" };
+  if (pct > 0.001) return { text: `+${abs}`, over: true, flat: false };
+  if (pct < -0.001) return { text: `−${abs}`, over: false, flat: false };
+  return { text: abs, over: false, flat: true };
 }
 
 export default async function MobileMiBase() {
@@ -35,12 +50,21 @@ export default async function MobileMiBase() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          <div className="card card-p">
-            <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-              Aún no puedes ver tu Base Financiera. Captura tus ingresos y gastos para ver
-              presupuesto vs real del mes.
-            </div>
-          </div>
+          {/* Era la única pantalla (app) sin header: sin título ni forma de volver. */}
+          <MobileHeader
+            variant="inner"
+            eyebrow="Presupuesto"
+            title="Mi Base Financiera"
+            backHref="/m"
+            backLabel="Volver a Inicio"
+          />
+          <MEmptyState
+            icon="rules"
+            title="Aquí verás tu mes de un vistazo"
+            description="Registra tus ingresos y gastos y esta pantalla te dirá cuánto planeaste, cuánto llevas y cuánto te queda libre."
+            actionLabel="Registrar un gasto"
+            actionHref="/m/gastos"
+          />
         </div>
       </div>
     );
@@ -61,7 +85,7 @@ export default async function MobileMiBase() {
     <div className="m-scroll">
       <div className="m-pad">
         <MobileHeader variant="inner" eyebrow={`Presupuesto · ${period.label}`} title="Mi Base Financiera" />
-        <div className="muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>
+        <div className="muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 16 }}>
           Tu centro operativo: presupuesto vs real del mes.
         </div>
 
@@ -72,135 +96,108 @@ export default async function MobileMiBase() {
           hasOpening={liquidity.hasOpening}
         />
 
-        {/* Presupuesto vs real */}
-        <div className="card card-p" style={{ marginBottom: 14 }}>
-          <BudgetRow
-            label="Ingresos"
-            budget={formatMoney(budget.budgetIncome, currency)}
-            real={formatMoney(real.realIncome, currency)}
-            variance={incVar}
+        {/* Presupuesto vs real: lo planeado (subtítulo) vs lo que llevas (valor), y el
+            desvío como chip. El tono lo decide cada fila, no el signo: ingresar de menos
+            es malo, gastar de menos es bueno.
+            Sin tile de icono y "Plan" en vez de "Planeaste": la fila lleva cuatro datos y
+            a 320px sólo quedan 129px para el subtítulo — medido, el tile no cabe en ningún
+            escenario y "Planeaste ₡350 000" se corta por 14px. "Plan" ya es el vocabulario
+            de esta pantalla. */}
+        {/* El periodo ya lo lleva el eyebrow del header: no lo repetimos aquí. */}
+        <MSectionHeader title="Presupuesto vs real" />
+        <MContentCard style={{ marginBottom: 16 }}>
+          <MDataRow
+            title="Ingresos"
+            subtitle={`Plan ${mAmount(budget.budgetIncome, currency)}`}
+            value={mAmount(real.realIncome, currency)}
+            trailing={
+              incVar.flat ? undefined : (
+                <MChip tone={incVar.over ? "success" : "danger"}>{incVar.text}</MChip>
+              )
+            }
           />
-          <div style={{ height: 1, background: "var(--border)", margin: "12px 0" }} />
-          <BudgetRow
-            label="Gastos"
-            budget={formatMoney(budget.budgetExpense, currency)}
-            real={formatMoney(real.realExpense, currency)}
-            variance={expVar}
+          <MDataRow
+            title="Gastos"
+            subtitle={`Plan ${mAmount(budget.budgetExpense, currency)}`}
+            value={mAmount(real.realExpense, currency)}
+            trailing={
+              expVar.flat ? undefined : (
+                <MChip tone={expVar.over ? "danger" : "success"}>{expVar.text}</MChip>
+              )
+            }
           />
-        </div>
+        </MContentCard>
 
-        {/* Métricas clave */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-          <Metric
+        {/* Métricas clave. La celda mide 106px útiles a 320px: medido, "₡350 000" entra
+            con 14px de holgura pero "₡-420 000" deja 3px y "₡1 234 567" se sale 9px. De ahí
+            el umbral 8 — conserva el número exacto en el caso común y abrevia justo los que
+            no caben, en vez de truncarlos (un número cortado se malinterpreta). */}
+        <MSectionHeader title="Tu mes en números" />
+        <MMetricGrid style={{ marginBottom: 16 }}>
+          <MMetricCard
             label="Flujo libre real"
-            value={formatMoney(t.freeCashflowReal, currency)}
+            value={mAmount(t.freeCashflowReal, currency, 8)}
             sub={`${formatPercent(t.freeCashflowPct)} del ingreso`}
-            cls={t.freeCashflowReal >= 0 ? "pos" : "neg"}
+            tone={t.freeCashflowReal >= 0 ? "success" : "danger"}
           />
-          <Metric label="Gasto / ingreso" value={formatPercent(t.expenseRatio)} sub="ratio del mes" />
-          <Metric label="Presión financiera" value={pressure.label} cls={pressure.cls} sub="del mes" />
-          <Metric label="Movimientos" value={String(real.count)} sub={`${formatMoney(real.avgDaily, currency)}/día`} />
-        </div>
+          <MMetricCard label="Gasto / ingreso" value={formatPercent(t.expenseRatio)} sub="ratio del mes" />
+          <MMetricCard
+            label="Presión financiera"
+            value={<MChip tone={pressure.tone}>{pressure.label}</MChip>}
+            sub="del mes"
+          />
+          <MMetricCard
+            label="Movimientos"
+            value={String(real.count)}
+            sub={`${mAmount(real.avgDaily, currency, 9)}/día`}
+          />
+        </MMetricGrid>
 
-        {/* Lectura (misma que la web: título + diagnóstico + insights + acciones + próximo paso) */}
+        {/* Lectura (misma que la web: título + diagnóstico + insights + acciones + próximo paso).
+            El título del engine es una frase ("Tu base está sana"), así que va como titular,
+            no como eyebrow en versales: el eyebrow es el rótulo fijo de la sección. */}
         {baseReading ? (
-          <div className="card card-p">
-            <div className="ov" style={{ marginBottom: 6 }}>
-              {baseReading.title}
-            </div>
-            <div style={{ fontSize: 14, lineHeight: 1.55 }}>{baseReading.diagnosis}</div>
-            {baseReading.insights.length > 0 ? (
-              <div style={{ marginTop: 12 }}>
-                <div className="ov" style={{ marginBottom: 6 }}>
-                  Insights
+          <>
+            <MSectionHeader title="Lectura de tu base financiera" />
+            <MContentCard>
+              <div className="display" style={{ fontSize: 16 }}>
+                {baseReading.title}
+              </div>
+              <div style={{ fontSize: 14, lineHeight: 1.55, marginTop: 6 }}>{baseReading.diagnosis}</div>
+              {baseReading.insights.length > 0 ? (
+                <div style={{ marginTop: 16 }}>
+                  <div className="ov" style={{ marginBottom: 8 }}>
+                    Insights
+                  </div>
+                  <ReadingList items={baseReading.insights} />
                 </div>
-                <ReadingList items={baseReading.insights} />
-              </div>
-            ) : null}
-            {baseReading.actions.length > 0 ? (
-              <div style={{ marginTop: 12 }}>
-                <div className="ov" style={{ marginBottom: 6 }}>
-                  Acciones
+              ) : null}
+              {baseReading.actions.length > 0 ? (
+                <div style={{ marginTop: 16 }}>
+                  <div className="ov" style={{ marginBottom: 8 }}>
+                    Acciones
+                  </div>
+                  <ReadingList items={baseReading.actions} accent />
                 </div>
-                <ReadingList items={baseReading.actions} accent />
-              </div>
-            ) : null}
-            {baseReading.nextStep ? (
-              <div
-                style={{
-                  marginTop: 14,
-                  paddingTop: 12,
-                  borderTop: "1px solid var(--border)",
-                  fontSize: 13,
-                }}
-              >
-                <span className="muted">Próximo paso: </span>
-                {baseReading.nextStep}
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+              {baseReading.nextStep ? (
+                <div
+                  style={{
+                    marginTop: 16,
+                    paddingTop: 12,
+                    borderTop: "1px solid var(--border)",
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <span className="muted">Próximo paso: </span>
+                  {baseReading.nextStep}
+                </div>
+              ) : null}
+            </MContentCard>
+          </>
         ) : null}
       </div>
-    </div>
-  );
-}
-
-function BudgetRow({
-  label,
-  budget,
-  real,
-  variance,
-}: {
-  label: string;
-  budget: string;
-  real: string;
-  variance: { text: string; cls: string };
-}) {
-  return (
-    <div className="between">
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{label}</div>
-        <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-          Presupuesto {budget}
-        </div>
-      </div>
-      <div style={{ textAlign: "right" }}>
-        <div className="mono" style={{ fontWeight: 700, fontSize: 15 }}>
-          {real}
-        </div>
-        <div className={variance.cls} style={{ fontSize: 11.5, marginTop: 2, fontWeight: 600 }}>
-          {variance.text} vs plan
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  sub,
-  cls,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  cls?: string;
-}) {
-  return (
-    <div className="card card-p" style={{ padding: 14 }}>
-      <div className="ov">{label}</div>
-      <div
-        className={`mono ${cls ?? ""}`}
-        style={{ fontSize: "clamp(14px, 4.6vw, 18px)", fontWeight: 700, marginTop: 6, whiteSpace: "nowrap" }}
-      >
-        {value}
-      </div>
-      {sub ? (
-        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
-          {sub}
-        </div>
-      ) : null}
     </div>
   );
 }
