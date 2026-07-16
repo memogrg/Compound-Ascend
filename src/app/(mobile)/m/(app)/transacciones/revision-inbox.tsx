@@ -21,6 +21,12 @@ import type {
   EntityAlert,
 } from "@/modules/financial-base/engine/reconciliation";
 import type { PendingProposalView } from "@/modules/financial-base/services/ingest-proposals-view";
+import {
+  MContentCard,
+  MSectionHeader,
+  MChip,
+  MEmptyState,
+} from "../../components/content-kit";
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 import type { Transaction } from "@/modules/financial-base/types";
 
@@ -132,24 +138,26 @@ export function RevisionInbox({
     });
   }
 
-  // Nada pendiente y sin alertas → tarjeta compacta "todo al día".
+  // Nada pendiente y sin alertas → estado vacío celebratorio (no una nota seca).
   if (totalPendiente === 0 && visibleAlerts.length === 0) {
     return (
-      <div className="card card-p" style={{ marginBottom: 14 }}>
-        <div className="ov">Por ordenar</div>
-        <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-          Todo al día. No tienes movimientos por revisar, clasificar ni vincular.
-        </div>
+      <div style={{ marginBottom: 16 }}>
+        <MSectionHeader title="Por ordenar" />
+        <MEmptyState
+          icon="goal"
+          title="Todo conciliado"
+          description="No te queda nada por revisar, clasificar ni vincular. Cuando llegue algo, aparecerá aquí."
+        />
       </div>
     );
   }
 
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div className="between" style={{ marginBottom: 8 }}>
-        <div className="ov">Por ordenar</div>
-        {totalPendiente > 0 && <span className="m-chip">{totalPendiente}</span>}
-      </div>
+    <div style={{ marginBottom: 16 }}>
+      <MSectionHeader
+        title="Por ordenar"
+        action={totalPendiente > 0 ? <MChip tone="warning">{totalPendiente}</MChip> : undefined}
+      />
 
       {/* ── Por revisar: propuestas de ingesta ─────────────────────────── */}
       {visibleProposals.length > 0 && (
@@ -436,15 +444,15 @@ function Block({
   children: React.ReactNode;
 }) {
   return (
-    <div className="card card-p" style={{ marginBottom: 10 }}>
+    <MContentCard style={{ marginBottom: 12 }}>
       <div className="between">
         <div style={{ fontWeight: 700, fontSize: 14 }}>{title}</div>
-        {n > 0 && <span className="m-chip">{n}</span>}
+        {n > 0 ? <MChip tone="warning">{n}</MChip> : null}
       </div>
       <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
         {hint}
       </div>
       {children}
-    </div>
+    </MContentCard>
   );
 }

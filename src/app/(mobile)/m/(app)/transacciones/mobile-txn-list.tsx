@@ -15,6 +15,14 @@ import type { SelectableCategory } from "@/modules/financial-base/engine/classif
 import { formatMoney } from "@/lib/format";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
+import type { MIconName } from "../../components/m-icon";
+import {
+  MContentCard,
+  MSectionHeader,
+  MDataRow,
+  MEmptyState,
+  mAmount,
+} from "../../components/content-kit";
 import { TxnForm, type TxnFormValues } from "./txn-form";
 import { TxnActionsSheet } from "./txn-actions";
 
@@ -48,6 +56,23 @@ const LINKED_ORIGIN: Record<string, { href: string; label: string }> = {
   policy: { href: "/m/proteccion", label: "Protección" },
   rental: { href: "/m/patrimonio", label: "Patrimonio" },
 };
+
+/** Glifo por origen de una vinculada: dice de un vistazo de dónde viene el movimiento. */
+const LINKED_ICON: Record<string, MIconName> = {
+  debt: "debt",
+  goal: "goal",
+  holding: "investment",
+  policy: "protection",
+  rental: "rental",
+};
+
+/** Glifo de un movimiento suelto: entra (moneda), sale (carrito) o se mueve (transferencia). */
+function txnIcon(t: Transaction): MIconName {
+  if (t.linkedKind && t.linkedKind !== "none") return LINKED_ICON[t.linkedKind] ?? "transfer";
+  if (t.kind === "ingreso") return "income";
+  if (t.kind === "gasto") return "food";
+  return "transfer";
+}
 
 function isLinked(t: Transaction): boolean {
   return Boolean(t.linkedKind) && t.linkedKind !== "none";
@@ -135,21 +160,31 @@ export function MobileTxnList({
         ))}
       </div>
 
-      <div className="between" style={{ marginBottom: 6 }}>
-        <div className="sec-title">Todas las transacciones</div>
-        <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
-          {list.length} · {periodLabel}
-        </span>
-      </div>
+      <MSectionHeader
+        title={filter === "all" ? "Todas las transacciones" : filter === "ingreso" ? "Ingresos" : "Gastos"}
+        action={
+          <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
+            {list.length} · {periodLabel}
+          </span>
+        }
+      />
 
       {list.length === 0 ? (
-        <div className="card card-p">
-          <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
-            No hay movimientos en este periodo. Toca el botón + para registrar el primero.
-          </div>
-        </div>
+        <MEmptyState
+          icon="transfer"
+          title={filter === "all" ? "Nada este periodo" : "Nada con este filtro"}
+          description={
+            filter === "all"
+              ? "Cuando registres un gasto o un ingreso aparecerá aquí, listo para clasificar."
+              : "Prueba con otro filtro o registra un movimiento nuevo."
+          }
+          actionLabel="Registrar movimiento"
+          onAction={() => setAdding(true)}
+        />
       ) : (
-        <div className="card">
+        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
+        // lateral lo pone la regla puente .m-swipe-content .m-drow.
+        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {list.map((t) => {
             const linked = isLinked(t);
             const origin = linked && t.linkedKind ? LINKED_ORIGIN[t.linkedKind] : undefined;
@@ -170,15 +205,25 @@ export function MobileTxnList({
             // Vinculada → enlaza a su pantalla de origen (flujo correcto de edición/borrado).
             if (origin) {
               return (
-                <Link key={t.id} href={origin.href} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
+                <Link
+                  key={t.id}
+                  href={origin.href}
+                  className="m-row-wrap"
+                  style={{ textDecoration: "none", color: "inherit" }}
+                  aria-label={`${t.merchantOrSource || t.description || KIND_LABEL[t.kind]} · ver en ${origin.label}`}
+                >
                   {row}
                 </Link>
               );
             }
             // Transferencia/ajuste no vinculado → solo lectura.
-            return <div key={t.id}>{row}</div>;
+            return (
+              <div key={t.id} className="m-row-wrap">
+                {row}
+              </div>
+            );
           })}
-        </div>
+        </MContentCard>
       )}
 
       <Fab onClick={() => setAdding(true)} label="Registrar transacción" />
@@ -242,7 +287,15 @@ export function MobileTxnList({
   );
 }
 
-/** Fila de transacción (contenido reutilizado por SwipeRow / Link / read-only). */
+/**
+ * Fila de transacción (contenido reutilizado por SwipeRow / Link / read-only).
+ *
+ * Las VINCULADAS (via ≠ undefined) llevan chevron: es la afordancia de "esto te lleva a su
+ * origen" — no se editan en crudo aquí. El destino lo dice su glifo (tarjeta → Deudas, diana
+ * → Ahorro…) y el aria-label; el "· vía X" que iba en el subtítulo era la tercera vez que se
+ * decía lo mismo y dejaba el subtítulo a 1px de cortarse a 375px. Las gestionables no llevan
+ * chevron: se tocan para abrir sus acciones y se deslizan para editar.
+ */
 function TxnRow({
   t,
   categoryNames,
@@ -259,34 +312,20 @@ function TxnRow({
   const name = t.merchantOrSource || t.description || KIND_LABEL[t.kind];
   const cat = (t.categoryId ? categoryNames[t.categoryId] : "") || KIND_LABEL[t.kind];
   return (
-    <div className="lrow">
-      <span
-        className="lic"
-        style={income ? { background: "var(--accent-soft)", color: "var(--accent)" } : undefined}
-        aria-hidden
-      >
-        {income ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M6 6h15l-1.5 9h-12z" strokeLinejoin="round" />
-            <path d="M6 6 5 3H3M9 20a1 1 0 1 0 0-.01M18 20a1 1 0 1 0 0-.01" strokeLinecap="round" />
-          </svg>
-        )}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <div className="lname">{name}</div>
-        <div className="lsub">
-          {cat} · {relativeDay(t.occurredOn)}
-          {via ? <span className="schip" style={{ marginLeft: 6 }}>vía {via}</span> : null}
-        </div>
-      </div>
-      <div className={`lamt ${income ? "pos" : ""}`}>
-        {sign}
-        {formatMoney(Math.abs(t.amount), t.currency || currency)}
-      </div>
-    </div>
+    <MDataRow
+      icon={txnIcon(t)}
+      iconTone={income ? "success" : "neutral"}
+      title={name}
+      // Fecha PRIMERO, no "categoría · fecha": medido a 375px, las hojas largas del sistema
+      // ("Mantenimiento y reparaciones") desbordan 32px, y con la categoría delante lo que
+      // se come la elipsis es la FECHA. Así solo se pierde la cola del nombre —que el glifo
+      // ya insinúa— y el día siempre se lee. El caso común no cambia de ancho.
+      subtitle={`${relativeDay(t.occurredOn)} · ${cat}`}
+      // Signo delante del símbolo (formatMoney antepone ₡) y abreviado si el importe es
+      // largo: en esta columna un número cortado se malinterpretaría.
+      value={`${sign}${mAmount(Math.abs(t.amount), t.currency || currency, 10)}`}
+      valueTone={income ? "success" : "neutral"}
+      chevron={Boolean(via)}
+    />
   );
 }
