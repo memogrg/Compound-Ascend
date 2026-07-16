@@ -139,7 +139,10 @@ function Sum({ label, value, sub, cls }: { label: string; value: string; sub?: s
   return (
     <div className="card card-p" style={{ padding: 14 }}>
       <div className="ov">{label}</div>
-      <div className={`mono ${cls ?? ""}`} style={{ fontSize: 17, fontWeight: 700, marginTop: 6 }}>
+      <div
+        className={`mono ${cls ?? ""}`}
+        style={{ fontSize: "clamp(13px, 4.4vw, 17px)", fontWeight: 700, marginTop: 6, whiteSpace: "nowrap" }}
+      >
         {value}
       </div>
       {sub ? (

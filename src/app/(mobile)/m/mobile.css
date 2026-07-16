@@ -1758,7 +1758,8 @@ body:has(.m-shell[data-theme="dark"]) {
   inset: 0;
   border: 0;
   padding: 0;
-  background: rgba(20, 18, 14, 0.42);
+  /* Velo CLARO: apenas oscurece, para que el frost del panel lea crema/claro (no gris). */
+  background: rgba(20, 18, 14, 0.18);
   cursor: pointer;
   animation: m-menu-fade 0.18s ease;
 }
@@ -1766,13 +1767,12 @@ body:has(.m-shell[data-theme="dark"]) {
   position: relative;
   width: min(320px, 86%);
   height: 100%;
-  /* Cristal MÁS marcado pero legible: base translúcida (0.60) + blur alto (26px). El scrim
-     oscuro detrás (.m-menu-backdrop) sostiene el contraste AA de los ítems. Si en device
-     bajara la legibilidad, subir 0.04 (a 0.64). */
-  background: rgba(244, 242, 236, 0.6);
-  -webkit-backdrop-filter: blur(26px) saturate(160%);
-  backdrop-filter: blur(26px) saturate(160%);
-  border-left: 1px solid var(--glass-border);
+  /* Vidrio esmerilado CREMA estilo Apple: sin borde/marco, base translúcida (0.50) + blur
+     alto (30px) saturate(180%). El velo claro detrás deja leer crema. Si en device bajara la
+     legibilidad de los ítems, subir 0.04 (a 0.54). */
+  background: rgba(244, 242, 236, 0.5);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
   box-shadow: var(--e3);
   display: flex;
   flex-direction: column;
@@ -1780,7 +1780,7 @@ body:has(.m-shell[data-theme="dark"]) {
   animation: m-menu-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .m-shell[data-theme="dark"] .m-menu-panel {
-  background: rgba(30, 28, 22, 0.6);
+  background: rgba(30, 28, 22, 0.5);
 }
 /* Fallbacks: sin backdrop-filter o con "reducir transparencia" → panel SÓLIDO (canvas del
    tema), como antes. La legibilidad nunca depende del efecto. */

@@ -190,7 +190,10 @@ function Metric({
   return (
     <div className="card card-p" style={{ padding: 14 }}>
       <div className="ov">{label}</div>
-      <div className={`mono ${cls ?? ""}`} style={{ fontSize: 18, fontWeight: 700, marginTop: 6 }}>
+      <div
+        className={`mono ${cls ?? ""}`}
+        style={{ fontSize: "clamp(14px, 4.6vw, 18px)", fontWeight: 700, marginTop: 6, whiteSpace: "nowrap" }}
+      >
         {value}
       </div>
       {sub ? (
