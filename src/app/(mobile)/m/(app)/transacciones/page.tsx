@@ -13,13 +13,7 @@ import {
   buildEntityAlerts,
 } from "@/modules/financial-base/engine/reconciliation";
 import { monthPeriod } from "@/modules/financial-base";
-import {
-  MMetricGrid,
-  MMetricCard,
-  MSectionHeader,
-  MEmptyState,
-  mAmount,
-} from "../../components/content-kit";
+import { formatMoney } from "@/lib/format";
 
 import { MobileTxnList } from "./mobile-txn-list";
 import { RevisionInbox } from "./revision-inbox";
@@ -45,22 +39,11 @@ export default async function MobileTransacciones() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          {/* Le faltaba el header: sin título ni forma de volver (mismo hueco que tenía
-              Mi Base Financiera). */}
-          <MobileHeader
-            variant="inner"
-            eyebrow="Movimientos"
-            title="Transacciones"
-            backHref="/m"
-            backLabel="Volver a Inicio"
-          />
-          <MEmptyState
-            icon="transfer"
-            title="Aquí verás cada movimiento"
-            description="Todo lo que entra y sale aparece en esta lista: podrás filtrarlo, clasificarlo y corregir lo que haga falta."
-            actionLabel="Registrar un gasto"
-            actionHref="/m/gastos"
-          />
+          <div className="card card-p">
+            <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+              Aún no puedes ver tus transacciones. Registra un movimiento para empezar.
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -103,36 +86,13 @@ export default async function MobileTransacciones() {
           Todos tus movimientos del periodo.
         </div>
 
-        {/* Franja de resumen (misma que la web: saldo neto, ingresos, gastos, movimientos).
-            La celda mide ~106px útiles a 320px → mAmount con umbral corto: antes usaba
-            clamp() para encoger la fuente, que a partir de cierto importe ya no salva nada.
-            El signo va delante del símbolo (formatMoney antepone ₡) y en cero no hay signo. */}
-        <MSectionHeader title="Tu periodo en números" />
-        <MMetricGrid style={{ marginBottom: 16 }}>
-          <MMetricCard
-            label="Saldo neto"
-            value={`${net > 0 ? "+" : net < 0 ? "−" : ""}${mAmount(Math.abs(net), currency, 7)}`}
-            sub="del periodo"
-            tone={net > 0 ? "success" : net < 0 ? "danger" : "neutral"}
-          />
-          <MMetricCard
-            label="Movimientos"
-            value={String(real.count)}
-            sub={`${mAmount(real.avgDaily, currency, 9)}/día`}
-          />
-          <MMetricCard
-            label="Ingresos"
-            value={mAmount(real.realIncome, currency, 8)}
-            sub="este mes"
-            tone="success"
-          />
-          <MMetricCard
-            label="Gastos"
-            value={mAmount(real.realExpense, currency, 8)}
-            sub="este mes"
-            tone="danger"
-          />
-        </MMetricGrid>
+        {/* Franja de resumen (misma que la web: saldo neto, ingresos, gastos, movimientos) */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+          <Sum label="Saldo neto" value={`${net >= 0 ? "+" : "−"}${formatMoney(Math.abs(net), currency)}`} cls={net >= 0 ? "pos" : "neg"} sub="del periodo" />
+          <Sum label="Movimientos" value={String(real.count)} sub={`${formatMoney(real.avgDaily, currency)}/día`} />
+          <Sum label="Ingresos" value={formatMoney(real.realIncome, currency)} cls="pos" sub="este mes" />
+          <Sum label="Gastos" value={formatMoney(real.realExpense, currency)} cls="neg" sub="este mes" />
+        </div>
 
         {/* Bandeja de revisión y conciliación (arriba de la lista, sin alterarla). */}
         <RevisionInbox
@@ -171,6 +131,25 @@ export default async function MobileTransacciones() {
           accounts={accounts}
         />
       </div>
+    </div>
+  );
+}
+
+function Sum({ label, value, sub, cls }: { label: string; value: string; sub?: string; cls?: string }) {
+  return (
+    <div className="card card-p" style={{ padding: 14 }}>
+      <div className="ov">{label}</div>
+      <div
+        className={`mono ${cls ?? ""}`}
+        style={{ fontSize: "clamp(13px, 4.4vw, 17px)", fontWeight: 700, marginTop: 6, whiteSpace: "nowrap" }}
+      >
+        {value}
+      </div>
+      {sub ? (
+        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+          {sub}
+        </div>
+      ) : null}
     </div>
   );
 }
