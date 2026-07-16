@@ -111,6 +111,20 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
                     tip="Lo que falta para la meta (meta − acumulado)"
                   />
                 </div>
+                {vm.defaultCategoryLabel ? (
+                  <div
+                    className="tip tip-wrap"
+                    data-tip="Categoría que viene precargada al gastar de este frasco (editable)."
+                    style={{ marginBottom: 12, display: "inline-flex", cursor: "help" }}
+                  >
+                    <span
+                      className="chip"
+                      style={{ background: "var(--info-soft)", color: "var(--info)", fontWeight: 600 }}
+                    >
+                      Categoría: {vm.defaultCategoryLabel}
+                    </span>
+                  </div>
+                ) : null}
                 {vm.movements.length === 0 ? (
                   <p className="muted" style={{ fontSize: 13 }}>
                     Este frasco aún no tiene movimientos. Registra un aporte para empezar.

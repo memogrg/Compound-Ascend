@@ -419,6 +419,8 @@ export type SavingsGoalRow = Timestamps & {
   recurrence: string; // 'ninguna' | 'mensual' | 'trimestral' | 'semestral' | 'anual'
   period_amount: number | null;
   next_reset_on: string | null;
+  // Categoría por defecto del frasco (migración 20260719000001): se precarga al gastar.
+  default_category_id: string | null;
 };
 
 // Historial de reinicios de frascos recurrentes (migración 20260718000001).

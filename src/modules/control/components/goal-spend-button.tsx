@@ -37,7 +37,8 @@ export function GoalSpendButton({ goal }: { goal: SavingsGoal }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayISO());
-  const [categoryId, setCategoryId] = useState("");
+  // Precarga la categoría por defecto del frasco (editable en el momento).
+  const [categoryId, setCategoryId] = useState(goal.defaultCategoryId ?? "");
   const [note, setNote] = useState("");
   const [cats, setCats] = useState<ExpenseCategoryGroup[]>([]);
   const [catsLoaded, setCatsLoaded] = useState(false);
@@ -60,7 +61,7 @@ export function GoalSpendButton({ goal }: { goal: SavingsGoal }) {
     setOpen(false);
     setAmount("");
     setNote("");
-    setCategoryId("");
+    setCategoryId(goal.defaultCategoryId ?? "");
     setError(null);
   };
 

@@ -199,6 +199,7 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
               targetDate: editing.targetDate ?? undefined,
               priority: editing.priority ?? "media",
               recurrence: editing.recurrence ?? "ninguna",
+              defaultCategoryId: editing.defaultCategoryId ?? null,
             }}
             action={(v: GoalValues) => editGoalAction(editing.id, v)}
             submitLabel="Guardar cambios"
@@ -441,6 +442,11 @@ function MovementsList({ goal }: { goal: SavingsGoal }) {
           </div>
         </div>
       </div>
+      {vm.defaultCategoryLabel ? (
+        <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+          Categoría por defecto: <strong>{vm.defaultCategoryLabel}</strong>
+        </div>
+      ) : null}
       {vm.movements.length === 0 ? (
         <div className="muted" style={{ fontSize: 13, padding: "8px 2px" }}>
           Este frasco aún no tiene movimientos.

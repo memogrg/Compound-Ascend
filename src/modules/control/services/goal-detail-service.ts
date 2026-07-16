@@ -53,6 +53,8 @@ export interface GoalDetailVM {
   targetAmount: number;
   /** Brecha meta − acumulado (nunca negativa). */
   gap: number;
+  /** Nombre de la categoría por defecto del frasco (null si no tiene). */
+  defaultCategoryLabel: string | null;
   movements: GoalMovement[];
 }
 
@@ -73,7 +75,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
 
   const { data: goal } = await supabase
     .from("savings_goals")
-    .select("id,name,currency,current_amount,target_amount")
+    .select("id,name,currency,current_amount,target_amount,default_category_id")
     .eq("id", goalId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -178,6 +180,9 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
     currentAmount,
     targetAmount,
     gap: round2(Math.max(0, targetAmount - currentAmount)),
+    defaultCategoryLabel: goal.default_category_id
+      ? (catMap[goal.default_category_id] ?? null)
+      : null,
     movements,
   };
 }
