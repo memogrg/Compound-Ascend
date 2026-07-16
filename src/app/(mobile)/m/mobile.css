@@ -29,8 +29,14 @@
   --surface-3: #f1eee6;
   --border: #e7e4dc;
   --text: #1e1c16;
-  --text-muted: #807c72;
-  --text-dim: #a6a199;
+  /* AA (4.5:1) — mismo valor y misma razón que en globals.css: el par web/móvil de este
+     token se mueve junto. El anterior #807c72 no llegaba en ningún fondo (3.62–4.16). */
+  --text-muted: #625e57;
+  /* AA también. No es "solo placeholder": lo usan las etiquetas de la tab bar, que son
+     navegación, y el "o" del divisor. El anterior #a6a199 daba 2.23–2.57:1 — el peor de
+     toda la app. Se queda más claro que --text-muted para conservar la jerarquía
+     (4.53:1 en canvas · 4.82:1 en el cristal de la tab bar · 4.91:1 en un input). */
+  --text-dim: #706c67;
   --accent: #378451;
   --accent-ink: #ffffff;
   --success: #378451;
@@ -74,12 +80,9 @@
   --ov-scrim: rgba(20, 18, 14, 0.26);
   /* Hairline tonal (NO blanco) para separar piezas dentro de un overlay. */
   --ov-line: rgba(30, 28, 22, 0.1);
-  /* Texto secundario DENTRO de un overlay. --text-muted (#807c72) no da AA sobre el
-     frost (2.94:1) — y de hecho no lo da en NINGÚN fondo: su techo sobre blanco puro es
-     4.16:1, por debajo del 4.5 exigido. Es un problema del token, de toda la app, y se
-     arregla aparte; aquí, donde el frost lo empeora, se usa el mismo gris cálido más
-     oscuro: 4.77:1 sobre el frost y 6.76:1 sobre tarjeta. */
-  --ov-muted: #5f5b52;
+  /* Aquí vivía --ov-muted: un gris más oscuro solo para overlays, porque --text-muted no
+     daba AA sobre el frost. Ya no hace falta: --text-muted se fijó tomando el frost como
+     el fondo más exigente, así que cumple también aquí (4.55:1). Una sola fuente. */
   --radius-card: 16px;
   --radius-lg: 22px;
   /* Halos de marca detrás del contenido (derivados de la paleta con color-mix). */
@@ -114,8 +117,12 @@
   --surface-3: #2e2c22;
   --border: #2e2c24;
   --text: #f4f2ec;
+  /* Ya cumplía AA sobre los fondos oscuros (7.18 … 5.45): sin cambio. */
   --text-muted: #a6a199;
-  --text-dim: #726e64;
+  /* El anterior #726e64 sí fallaba en oscuro (2.75–3.63). Este es el más OSCURO del
+     mismo tono que cumple en los cuatro fondos (4.51:1 en el peor, surface-3), y sigue
+     por debajo de --text-muted: la jerarquía se mantiene. */
+  --text-dim: #979284;
   --accent: #51af6f;
   --accent-ink: #0c2114;
   --success: #51af6f;
@@ -150,8 +157,6 @@
   --ov-solid: #1e1c16;
   --ov-scrim: rgba(0, 0, 0, 0.4);
   --ov-line: rgba(244, 242, 236, 0.12);
-  /* En oscuro el muted del tema ya da AA sobre el frost (7.09:1): no hace falta forzarlo. */
-  --ov-muted: var(--text-muted);
   --ambient:
     radial-gradient(48% 30% at 20% 6%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 60%),
     radial-gradient(46% 28% at 88% 18%, color-mix(in srgb, var(--info) 18%, transparent), transparent 60%),
@@ -243,17 +248,6 @@ body:has(.m-shell[data-theme="dark"]) {
   /* capa propia: evita bandas de blur y el repintado del panel al animar */
   transform: translateZ(0);
 }
-/* El texto secundario de un overlay se apoya sobre el frost, no sobre una tarjeta
-   opaca: necesita más peso para llegar a AA (ver --ov-muted). Cubre .muted y el
-   mensaje del ConfirmDialog, que es justo el texto que dice qué vas a hacer. */
-.m-shell .m-menu-panel .muted,
-.m-shell .m-sheet-panel .muted,
-.m-shell .m-dialog .muted {
-  color: var(--ov-muted);
-}
-/* (.m-dialog-msg lleva --ov-muted en su propia regla, más abajo: allí redefine `color`
-   con la misma especificidad y ganaría por orden.) */
-
 /* Fallbacks (los mismos dos de .m-glass): sin backdrop-filter o con "reducir
    transparencia" → panel SÓLIDO. La legibilidad nunca depende del efecto. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -2216,9 +2210,7 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-dialog-msg {
   font-size: 13.5px;
   line-height: 1.5;
-  /* Este es el texto que dice QUÉ vas a hacer ("Se eliminará el sobre X"): sobre el
-     frost, --text-muted daba 2.94:1. Ver --ov-muted. */
-  color: var(--ov-muted);
+  color: var(--text-muted);
   margin: 8px 0 0;
 }
 .m-shell .m-dialog-warn {
