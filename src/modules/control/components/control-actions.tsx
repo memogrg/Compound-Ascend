@@ -242,6 +242,10 @@ function GoalForm({
   const [targetAmount, setTargetAmount] = useState<string>(
     item?.targetAmount != null ? String(item.targetAmount) : "",
   );
+  // Recurrencia (frascos que se reinician por período). Controlada: cambia la
+  // etiqueta del monto ("Monto por período") y se envía en onSubmit.
+  const [recurrence, setRecurrence] = useState<string>(item?.recurrence ?? "ninguna");
+  const isRecurring = recurrence !== "ninguna";
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -278,6 +282,9 @@ function GoalForm({
         targetDate: String(fd.get("targetDate") ?? "") || undefined,
         priority: String(fd.get("priority") ?? "media"),
         goalType: isDefense ? defenseKind : undefined,
+        recurrence,
+        // En un frasco recurrente el "Monto por período" ES el plan pleno.
+        periodAmount: isRecurring ? Number(targetAmount) || 0 : undefined,
       },
       onDone,
       form,
@@ -413,7 +420,7 @@ function GoalForm({
           <>
             <div className="fld-2">
               <Money
-                label="Monto meta"
+                label={isRecurring ? "Monto por período" : "Monto meta"}
                 name="targetAmount"
                 currency={cur}
                 error={errors.targetAmount}
@@ -474,6 +481,43 @@ function GoalForm({
                   <option value="baja">Baja</option>
                 </select>
               </div>
+            </div>
+            <div className="fld-2">
+              <div className="fld">
+                <label
+                  className="fld-label"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  Recurrencia
+                  <span
+                    className="tip tip-wrap"
+                    data-tip="Para gastos que se repiten (marchamo anual, ropa del año). Al terminar el período, la meta se restaura sola y lo que no gastaste se arrastra."
+                    aria-label="Qué es la recurrencia de un frasco"
+                    style={{ display: "inline-flex", cursor: "help" }}
+                  >
+                    <Icon name="info" />
+                  </span>
+                </label>
+                <select
+                  className="sel"
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value)}
+                >
+                  <option value="ninguna">Ninguna</option>
+                  <option value="mensual">Mensual</option>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="semestral">Semestral</option>
+                  <option value="anual">Anual</option>
+                </select>
+              </div>
+              {isRecurring ? (
+                <div className="fld" style={{ display: "flex", alignItems: "flex-end" }}>
+                  <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                    La <strong>Fecha objetivo</strong> marca el primer reinicio; si la dejas vacía,
+                    se reinicia una cadencia después de hoy.
+                  </p>
+                </div>
+              ) : null}
             </div>
           </>
         )}

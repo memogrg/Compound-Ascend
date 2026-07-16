@@ -22,7 +22,7 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-export type GoalMovementType = "inicial" | "aporte" | "gasto" | "retiro";
+export type GoalMovementType = "inicial" | "aporte" | "gasto" | "retiro" | "reinicio";
 
 export interface GoalMovement {
   id: string;
@@ -33,12 +33,16 @@ export interface GoalMovement {
   categoryLabel: string | null;
   /** Nota/descripción libre si la hay. */
   note: string | null;
-  /** Monto con signo respecto al acumulado (+ aporte, − gasto/retiro). */
+  /** Monto con signo respecto al acumulado (+ aporte, − gasto/retiro; 0 en reinicio). */
   amount: number;
   /** Marca el consumo off-budget (no tocó el presupuesto del mes). */
   offBudget: boolean;
   /** Saldo acumulado del frasco tras este movimiento. */
   balance: number;
+  /** Solo en 'reinicio': monto al que se restauró la meta ese período. */
+  restoredTarget?: number | null;
+  /** true en eventos no reversibles (p.ej. reinicio de período). */
+  locked?: boolean;
 }
 
 export interface GoalDetailVM {
@@ -75,7 +79,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
     .maybeSingle();
   if (!goal) return null;
 
-  const [{ data: txns }, catMap, rates] = await Promise.all([
+  const [{ data: txns }, { data: resets }, catMap, rates] = await Promise.all([
     supabase
       .from("transactions")
       .select("id,kind,amount,currency,occurred_on,category_id,description,counts_in_budget")
@@ -84,6 +88,12 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
       .eq("linked_id", goalId)
       .order("occurred_on", { ascending: true })
       .order("created_at", { ascending: true }),
+    supabase
+      .from("goal_period_resets")
+      .select("id,reset_on,restored_target")
+      .eq("user_id", user.id)
+      .eq("goal_id", goalId)
+      .order("reset_on", { ascending: true }),
     getCategoryNameMap(),
     getFxRates(),
   ]);
@@ -91,7 +101,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
   const conv = (n: number, from: string) => convertCurrency(n, from, goal.currency, rates);
 
   // Clasifica cada transacción vinculada y le asigna signo sobre el acumulado.
-  const classified = (txns ?? []).map((t) => {
+  const classified: Omit<GoalMovement, "balance">[] = (txns ?? []).map((t) => {
     const amt = conv(Number(t.amount), t.currency);
     const offBudget = t.counts_in_budget === false;
     let type: GoalMovementType;
@@ -117,8 +127,28 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
     };
   });
 
+  // Reinicios de período: eventos no reversibles, neutros para el saldo (el
+  // acumulado se arrastra), que marcan la restauración de la meta.
+  const resetEvents: Omit<GoalMovement, "balance">[] = (resets ?? []).map((r) => ({
+    id: r.id,
+    date: r.reset_on,
+    type: "reinicio" as const,
+    categoryLabel: null,
+    note: null,
+    amount: 0,
+    offBudget: false,
+    restoredTarget: Number(r.restored_target),
+    locked: true,
+  }));
+
   const net = classified.reduce((s, m) => s + m.amount, 0);
   const opening = round2(Number(goal.current_amount) - net);
+
+  // Timeline combinado por fecha (orden estable: las transacciones del día
+  // preceden al reinicio del mismo día).
+  const combined = [...classified, ...resetEvents].sort((a, b) =>
+    (a.date ?? "").localeCompare(b.date ?? ""),
+  );
 
   const movements: GoalMovement[] = [];
   let balance = opening;
@@ -134,9 +164,9 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
       balance: round2(opening),
     });
   }
-  for (const m of classified) {
+  for (const m of combined) {
     balance = round2(balance + m.amount);
-    movements.push({ ...m, note: m.note, balance });
+    movements.push({ ...m, balance });
   }
 
   const currentAmount = round2(Number(goal.current_amount));
