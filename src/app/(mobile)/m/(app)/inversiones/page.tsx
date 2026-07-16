@@ -56,8 +56,8 @@ export default async function MobileInversiones() {
           <div className="mini-kpi" style={{ marginTop: 16 }}>
             <div className="kpi" style={{ padding: 12 }}>
               <div className="k">Costo base</div>
-              <div className="kv" style={{ fontSize: 18 }}>
-                {formatMoney(a.totalCostBasis, currency)}
+              <div className="kv" style={{ fontSize: 18, whiteSpace: "nowrap" }}>
+                {formatCompact(a.totalCostBasis, currency)}
               </div>
             </div>
             <div className="kpi" style={{ padding: 12 }}>
@@ -68,8 +68,8 @@ export default async function MobileInversiones() {
             </div>
             <div className="kpi" style={{ padding: 12 }}>
               <div className="k">Dividendos/mes</div>
-              <div className="kv" style={{ fontSize: 18, color: "var(--accent)" }}>
-                {formatMoney(report.dividendAnalytics.monthlyDividends, currency)}
+              <div className="kv" style={{ fontSize: 18, color: "var(--accent)", whiteSpace: "nowrap" }}>
+                {formatCompact(report.dividendAnalytics.monthlyDividends, currency)}
               </div>
             </div>
             <div className="kpi" style={{ padding: 12 }}>

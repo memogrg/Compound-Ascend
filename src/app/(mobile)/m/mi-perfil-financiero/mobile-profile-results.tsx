@@ -45,12 +45,12 @@ export function MobileProfileResults({
   return (
     <div className="m-scroll m-scroll-flush">
       <div className="m-pad">
-        {/* Header sticky de cristal unificado: eyebrow + título del ADN, con "Editar" como
-            acción (junto a chat/campana/menú) y Atrás a Inicio. */}
+        {/* Header sticky con el nombre CORTO y estable de la sección (no se trunca), con
+            "Editar" como acción y Atrás a Inicio. */}
         <MobileHeader
           variant="inner"
           eyebrow="Tu ADN financiero"
-          title={diagnosis.archetypeLabel ? `Eres ${diagnosis.archetypeLabel}` : "Tu perfil financiero"}
+          title="Mi Perfil Financiero"
           backHref="/m"
           backLabel="Volver a Inicio"
           badge={
@@ -60,12 +60,23 @@ export function MobileProfileResults({
           }
         />
 
-        {/* Frase de apertura del diagnóstico (lo que antes acompañaba al hero). */}
-        {reading?.heroLine ? (
-          <p className="muted" style={{ fontSize: 14, marginTop: -4, marginBottom: 18, lineHeight: 1.5 }}>
-            {reading.heroLine}
-          </p>
-        ) : null}
+        {/* Titular dinámico COMPLETO en el contenido (envuelve, se lee entero; no se trunca). */}
+        <div style={{ marginBottom: 18 }}>
+          {diagnosis.archetypeLabel ? (
+            <h1 className="m-wz-title" style={{ marginTop: 2 }}>
+              Eres <span className="g">{diagnosis.archetypeLabel}</span>
+            </h1>
+          ) : (
+            <h1 className="m-wz-title" style={{ marginTop: 2 }}>
+              Tu perfil <span className="g">financiero</span>
+            </h1>
+          )}
+          {reading?.heroLine ? (
+            <p className="muted" style={{ fontSize: 14, marginTop: 8, lineHeight: 1.5 }}>
+              {reading.heroLine}
+            </p>
+          ) : null}
+        </div>
 
         {/* Completitud + riesgo */}
         <div className="card card-p" style={{ marginBottom: 14 }}>

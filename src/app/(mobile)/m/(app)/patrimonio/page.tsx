@@ -50,20 +50,21 @@ export default async function MobilePatrimonio() {
         <div className="mini-kpi" style={{ gridTemplateColumns: "1fr 1fr 1fr", marginBottom: 16 }}>
           <div className="kpi" style={{ padding: 12 }}>
             <div className="k">Invertido</div>
-            <div className="kv pos" style={{ fontSize: "clamp(12.5px, 4.2vw, 17px)" }}>
-              {formatMoney(bd?.invested ?? 0, currency)}
+            {/* Abreviado a millones (₡347,9 M) para una sola línea, como el centro de la dona. */}
+            <div className="kv pos" style={{ fontSize: 17, whiteSpace: "nowrap" }}>
+              {formatCompact(bd?.invested ?? 0, currency)}
             </div>
           </div>
           <div className="kpi" style={{ padding: 12 }}>
             <div className="k">Líquido</div>
-            <div className="kv" style={{ fontSize: "clamp(12.5px, 4.2vw, 17px)" }}>
-              {formatMoney(bd?.liquid ?? 0, currency)}
+            <div className="kv" style={{ fontSize: 17, whiteSpace: "nowrap" }}>
+              {formatCompact(bd?.liquid ?? 0, currency)}
             </div>
           </div>
           <div className="kpi" style={{ padding: 12 }}>
             <div className="k">Deuda</div>
-            <div className="kv neg" style={{ fontSize: "clamp(12.5px, 4.2vw, 17px)" }}>
-              {formatMoney(ind.totalLiabilities, currency)}
+            <div className="kv neg" style={{ fontSize: 17, whiteSpace: "nowrap" }}>
+              {formatCompact(ind.totalLiabilities, currency)}
             </div>
           </div>
         </div>
