@@ -3,6 +3,8 @@
 export type GoalPriority = "alta" | "media" | "baja";
 export type GoalStatus = "saludable" | "atrasado" | "no_viable" | "revisar";
 
+export type { Recurrence } from "@/modules/control/engine/recurrence";
+
 export type SavingsGoal = {
   id: string;
   name: string;
@@ -14,6 +16,10 @@ export type SavingsGoal = {
   targetDate?: string | null;
   priority?: GoalPriority | null;
   status: GoalStatus;
+  // Frascos recurrentes: reinicio por período (arrastre del sobrante).
+  recurrence: import("@/modules/control/engine/recurrence").Recurrence;
+  periodAmount?: number | null;
+  nextResetOn?: string | null;
 };
 
 export type DebtClassification = "critica" | "controlada" | "estrategica" | "emocional";
