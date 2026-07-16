@@ -32,6 +32,7 @@ import {
   SheetSelect,
   useToast,
 } from "../../components/form-kit";
+import { MScrubChart, type MPoint } from "../../components/m-scrub-chart";
 import { DividendForm } from "./inversiones-forms";
 
 /**
@@ -76,38 +77,9 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Sparkline sin librerías (misma técnica que la web para las valuaciones). */
-function Sparkline({ points }: { points: { value: number }[] }) {
-  if (points.length < 2) return null;
-  const vals = points.map((p) => p.value);
-  const min = Math.min(...vals);
-  const max = Math.max(...vals);
-  const span = max - min || 1;
-  const up = (vals[vals.length - 1] ?? 0) >= (vals[0] ?? 0);
-  const d = points
-    .map((p, i) => {
-      const x = (i / (points.length - 1)) * 300;
-      const y = 56 - ((p.value - min) / span) * 52;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  return (
-    <svg
-      viewBox="0 0 300 60"
-      preserveAspectRatio="none"
-      style={{ width: "100%", height: 56 }}
-      aria-hidden
-    >
-      <polyline
-        fill="none"
-        stroke={up ? "var(--pos)" : "var(--neg)"}
-        strokeWidth={2}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        points={d}
-      />
-    </svg>
-  );
+/** Etiqueta de fecha corta (día + mes) para los puntos del gráfico con scrub. */
+function dayLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", { day: "numeric", month: "short" });
 }
 
 export function HoldingDetailSheet({
@@ -509,9 +481,12 @@ export function HoldingDetailSheet({
               </div>
               {quoted && history.length > 1 ? (
                 <div style={{ marginTop: 8 }}>
-                  <Sparkline points={history} />
-                  <div className="muted" style={{ fontSize: 11 }}>
-                    Evolución del valor desde tu primera compra.
+                  <MScrubChart
+                    points={history.map<MPoint>((h) => ({ label: dayLabel(h.date), value: h.value }))}
+                    currency={cur}
+                  />
+                  <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                    Evolución del valor desde tu primera compra · arrastra para ver cada día.
                   </div>
                 </div>
               ) : null}
@@ -632,7 +607,10 @@ export function HoldingDetailSheet({
                   </div>
                 ) : (
                   <>
-                    <Sparkline points={valuations} />
+                    <MScrubChart
+                      points={valuations.map<MPoint>((v) => ({ label: dayLabel(v.asOf), value: v.value }))}
+                      currency={cur}
+                    />
                     <div className="card" style={{ padding: 0 }}>
                       {[...valuations].reverse().map((v) => (
                         <div key={v.id} className="between" style={{ padding: "9px 12px" }}>

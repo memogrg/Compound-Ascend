@@ -91,6 +91,7 @@ export default async function MobileInversiones() {
               slices={slices}
               centerValue={formatCompact(a.totalPortfolioValue, currency)}
               centerLabel="invertido"
+              currency={currency}
             />
           </div>
         )}
