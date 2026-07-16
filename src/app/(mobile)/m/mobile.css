@@ -60,6 +60,26 @@
   --glass-blur: 24px;
   --glass-sat: 165%;
   --shadow-soft: 0 8px 20px -12px rgba(30, 28, 22, 0.35);
+
+  /* ===== OVERLAYS (menú, hojas, diálogos, toasts) =====
+     Todo lo que se despliega encima es el MISMO vidrio esmerilado crema, sin marco:
+     el tinte lo pone la base clara, no un borde. Una sola receta aquí en vez de
+     copiada en cada panel — si hay que subir la opacidad por legibilidad, se sube
+     una vez. El scrim es CLARO a propósito: con un velo oscuro el frost lee gris
+     en vez de crema. */
+  --ov-bg: rgba(244, 242, 236, 0.58);
+  --ov-blur: 30px;
+  --ov-sat: 180%;
+  --ov-solid: #f4f2ec; /* fallback opaco: la legibilidad nunca depende del efecto */
+  --ov-scrim: rgba(20, 18, 14, 0.26);
+  /* Hairline tonal (NO blanco) para separar piezas dentro de un overlay. */
+  --ov-line: rgba(30, 28, 22, 0.1);
+  /* Texto secundario DENTRO de un overlay. --text-muted (#807c72) no da AA sobre el
+     frost (2.94:1) — y de hecho no lo da en NINGÚN fondo: su techo sobre blanco puro es
+     4.16:1, por debajo del 4.5 exigido. Es un problema del token, de toda la app, y se
+     arregla aparte; aquí, donde el frost lo empeora, se usa el mismo gris cálido más
+     oscuro: 4.77:1 sobre el frost y 6.76:1 sobre tarjeta. */
+  --ov-muted: #5f5b52;
   --radius-card: 16px;
   --radius-lg: 22px;
   /* Halos de marca detrás del contenido (derivados de la paleta con color-mix). */
@@ -123,6 +143,15 @@
   --glass-blur: 26px;
   --glass-sat: 150%;
   --shadow-soft: 0 10px 24px -14px rgba(0, 0, 0, 0.6);
+
+  /* Overlays en oscuro: mismo vidrio, tintado por el canvas oscuro en vez del crema.
+     El scrim sube (el contraste bajo un velo claro se pierde sobre fondo oscuro). */
+  --ov-bg: rgba(30, 28, 22, 0.58);
+  --ov-solid: #1e1c16;
+  --ov-scrim: rgba(0, 0, 0, 0.4);
+  --ov-line: rgba(244, 242, 236, 0.12);
+  /* En oscuro el muted del tema ya da AA sobre el frost (7.09:1): no hace falta forzarlo. */
+  --ov-muted: var(--text-muted);
   --ambient:
     radial-gradient(48% 30% at 20% 6%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 60%),
     radial-gradient(46% 28% at 88% 18%, color-mix(in srgb, var(--info) 18%, transparent), transparent 60%),
@@ -193,6 +222,56 @@ body:has(.m-shell[data-theme="dark"]) {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background: var(--glass-solid);
+  }
+}
+
+/* ===== VIDRIO DE OVERLAY (menú · hojas · diálogos · toasts) =====
+   Todo lo que se despliega encima o donde se edita comparte ESTE tratamiento: vidrio
+   esmerilado crema, SIN marco. Antes cada panel repetía su propia receta y divergían
+   (bordes blancos, opacidades distintas); ahora se cambian todos desde los tokens --ov-*.
+   La campana no aparece aquí porque usa BottomSheet: hereda de .m-sheet-panel.
+   El app-lock NO se incluye a propósito: es opaco por seguridad (ver .m-lock). */
+.m-shell .m-menu-panel,
+.m-shell .m-sheet-panel,
+.m-shell .m-dialog,
+.m-shell .m-toast {
+  background: var(--ov-bg);
+  -webkit-backdrop-filter: blur(var(--ov-blur)) saturate(var(--ov-sat));
+  backdrop-filter: blur(var(--ov-blur)) saturate(var(--ov-sat));
+  border: 0;
+  box-shadow: var(--e3);
+  /* capa propia: evita bandas de blur y el repintado del panel al animar */
+  transform: translateZ(0);
+}
+/* El texto secundario de un overlay se apoya sobre el frost, no sobre una tarjeta
+   opaca: necesita más peso para llegar a AA (ver --ov-muted). Cubre .muted y el
+   mensaje del ConfirmDialog, que es justo el texto que dice qué vas a hacer. */
+.m-shell .m-menu-panel .muted,
+.m-shell .m-sheet-panel .muted,
+.m-shell .m-dialog .muted {
+  color: var(--ov-muted);
+}
+/* (.m-dialog-msg lleva --ov-muted en su propia regla, más abajo: allí redefine `color`
+   con la misma especificidad y ganaría por orden.) */
+
+/* Fallbacks (los mismos dos de .m-glass): sin backdrop-filter o con "reducir
+   transparencia" → panel SÓLIDO. La legibilidad nunca depende del efecto. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .m-shell .m-menu-panel,
+  .m-shell .m-sheet-panel,
+  .m-shell .m-dialog,
+  .m-shell .m-toast {
+    background: var(--ov-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .m-shell .m-menu-panel,
+  .m-shell .m-sheet-panel,
+  .m-shell .m-dialog,
+  .m-shell .m-toast {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--ov-solid);
   }
 }
 
@@ -1329,22 +1408,27 @@ body:has(.m-shell[data-theme="dark"]) {
   flex-direction: column;
   gap: 10px;
 }
+/* Opciones del selector: viven DENTRO de una hoja de vidrio, así que una superficie
+   opaca + borde tapaba el frost y devolvía el marco que queremos fuera. Tinte
+   translúcido + hairline tonal (del color del texto, NO blanco) para separarlas. */
 .m-shell .m-opt {
   display: flex;
   width: 100%;
   text-align: left;
   padding: 15px 16px;
   border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 0;
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  box-shadow: inset 0 0 0 1px var(--ov-line);
   color: var(--text);
   cursor: pointer;
-  box-shadow: var(--e1);
 }
+/* Seleccionada: el acento la marca por relleno + aro, sin volver al borde. */
 .m-shell .m-opt.sel {
-  border-color: var(--accent);
   background: var(--accent-soft);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow:
+    inset 0 0 0 1.5px var(--accent),
+    0 0 0 3px var(--accent-soft);
 }
 .m-shell .m-opt-t {
   display: block;
@@ -1556,6 +1640,11 @@ body:has(.m-shell[data-theme="dark"]) {
   flex-direction: column;
   min-height: 100dvh;
 }
+/* Esta ruta está FUERA del grupo (app): no hay .m-topbar ni el inset de .m-scroll, así
+   que el header debe aportar su propia safe-area — sin ella se metía bajo la barra de
+   estado y el botón Atrás quedaba intocable. El inset va en el padding (no en `top`)
+   para que el header siga cubriendo la barra de estado al hacer scroll, como el resto
+   del chrome. Los laterales, por el landscape. */
 .m-shell .m-chat-head {
   position: sticky;
   top: 0;
@@ -1563,8 +1652,10 @@ body:has(.m-shell[data-theme="dark"]) {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 12px
+    calc(16px + env(safe-area-inset-left));
   background: color-mix(in srgb, var(--canvas) 92%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(8px);
   backdrop-filter: saturate(1.4) blur(8px);
   border-bottom: 1px solid var(--border);
 }
@@ -1724,8 +1815,11 @@ body:has(.m-shell[data-theme="dark"]) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  /* El inset inferior ya estaba (home indicator); faltaban los laterales del landscape. */
+  padding: 10px calc(14px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom))
+    calc(14px + env(safe-area-inset-left));
   background: color-mix(in srgb, var(--canvas) 94%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(8px);
   backdrop-filter: saturate(1.4) blur(8px);
   border-top: 1px solid var(--border);
 }
@@ -1762,50 +1856,28 @@ body:has(.m-shell[data-theme="dark"]) {
   inset: 0;
   border: 0;
   padding: 0;
-  /* Velo CLARO: apenas oscurece, para que el frost del panel lea crema/claro (no gris). */
-  background: rgba(20, 18, 14, 0.18);
+  /* Mismo velo que hojas y diálogos (--ov-scrim): tenía el suyo propio (0.18) y el de la
+     hoja era 0.44 — dos overlays hermanos oscurecían el fondo de forma distinta. */
+  background: var(--ov-scrim);
   cursor: pointer;
   animation: m-menu-fade 0.18s ease;
 }
+/* El vidrio y los fallbacks los pone la regla compartida de overlays (--ov-*). */
 .m-shell .m-menu-panel {
   position: relative;
   width: min(320px, 86%);
   height: 100%;
-  /* Vidrio esmerilado CREMA estilo Apple: sin borde/marco, base translúcida (0.50) + blur
-     alto (30px) saturate(180%). El velo claro detrás deja leer crema. Si en device bajara la
-     legibilidad de los ítems, subir 0.04 (a 0.54). */
-  background: rgba(244, 242, 236, 0.5);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  backdrop-filter: blur(30px) saturate(180%);
-  box-shadow: var(--e3);
   display: flex;
   flex-direction: column;
   padding-top: env(safe-area-inset-top);
   animation: m-menu-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.m-shell[data-theme="dark"] .m-menu-panel {
-  background: rgba(30, 28, 22, 0.5);
-}
-/* Fallbacks: sin backdrop-filter o con "reducir transparencia" → panel SÓLIDO (canvas del
-   tema), como antes. La legibilidad nunca depende del efecto. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .m-shell .m-menu-panel {
-    background: var(--canvas);
-  }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .m-shell .m-menu-panel {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background: var(--canvas);
-  }
 }
 .m-shell .m-menu-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border);
+  /* Sin línea: sobre el vidrio, un borde sólido lee como marco pegado. El aire separa. */
 }
 .m-shell .m-menu-brand {
   font-family: var(--font-display);
@@ -1874,40 +1946,24 @@ body:has(.m-shell[data-theme="dark"]) {
   inset: 0;
   border: 0;
   padding: 0;
-  background: rgba(20, 18, 14, 0.44);
+  /* Velo CLARO (antes 0.44): con un velo oscuro detrás, el frost de la hoja leía gris
+     en vez de crema. Lo comparte el ConfirmDialog, que no tenía scrim propio. */
+  background: var(--ov-scrim);
   cursor: pointer;
   animation: m-menu-fade 0.18s ease;
 }
+/* El vidrio y los fallbacks los pone la regla compartida de overlays (--ov-*).
+   Antes esta hoja tenía su propia receta (--glass-*, blanca) + borde superior blanco:
+   por eso el menú y las hojas no se parecían. */
 .m-shell .m-sheet-panel {
   position: relative;
   width: 100%;
   max-height: 88dvh;
   display: flex;
   flex-direction: column;
-  /* "Cristal Cálido": la hoja es chrome → cristal. El blur es mayor (sheet más opaca). */
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(26px) saturate(var(--glass-sat));
-  backdrop-filter: blur(26px) saturate(var(--glass-sat));
-  border-top: 1px solid var(--glass-border);
   border-top-left-radius: var(--r-xl);
   border-top-right-radius: var(--r-xl);
-  box-shadow:
-    inset 0 1px 0 var(--glass-hi),
-    var(--e3);
-  transform: translateZ(0);
   animation: m-sheet-up 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .m-shell .m-sheet-panel {
-    background: var(--glass-solid);
-  }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .m-shell .m-sheet-panel {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background: var(--glass-solid);
-  }
 }
 @keyframes m-sheet-up {
   from {
@@ -1959,6 +2015,7 @@ body:has(.m-shell[data-theme="dark"]) {
   padding: 0 20px;
   pointer-events: none;
 }
+/* El vidrio y los fallbacks los pone la regla compartida de overlays (--ov-*). */
 .m-shell .m-toast {
   pointer-events: auto;
   display: inline-flex;
@@ -1967,12 +2024,9 @@ body:has(.m-shell[data-theme="dark"]) {
   max-width: 100%;
   padding: 12px 16px;
   border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: var(--surface);
   color: var(--text);
   font-size: 13.5px;
   font-weight: 600;
-  box-shadow: var(--e2);
   animation: m-sheet-up 0.2s ease;
   text-align: left;
 }
@@ -2144,14 +2198,12 @@ body:has(.m-shell[data-theme="dark"]) {
   justify-content: center;
   padding: 24px;
 }
+/* El vidrio y los fallbacks los pone la regla compartida de overlays (--ov-*). */
 .m-shell .m-dialog {
   position: relative;
   width: 100%;
   max-width: 360px;
-  background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  box-shadow: var(--e3);
   padding: 20px;
   animation: m-sheet-up 0.2s ease;
 }
@@ -2164,7 +2216,9 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-dialog-msg {
   font-size: 13.5px;
   line-height: 1.5;
-  color: var(--text-muted);
+  /* Este es el texto que dice QUÉ vas a hacer ("Se eliminará el sobre X"): sobre el
+     frost, --text-muted daba 2.94:1. Ver --ov-muted. */
+  color: var(--ov-muted);
   margin: 8px 0 0;
 }
 .m-shell .m-dialog-warn {
@@ -2238,6 +2292,11 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* ── App-lock overlay (candado con biometría; solo dentro de la app nativa) ── */
+/* OPACO A PROPÓSITO — no lleva el vidrio de overlay del resto.
+   Este panel existe para TAPAR los datos financieros cuando la app se bloquea. Hacerlo
+   translúcido dejaría leer saldos y movimientos a través del frost a cualquiera que
+   tenga el teléfono en la mano: sería un fallo de seguridad, no una decisión estética.
+   Si algún día se retoca, que siga siendo opaco. */
 .m-shell .m-lock {
   position: fixed;
   inset: 0;
