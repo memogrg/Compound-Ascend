@@ -23,22 +23,29 @@ export function MMetricGrid({
 }
 
 /**
- * Métrica: etiqueta + número (Space Mono tabular, color semántico) en UNA sola línea.
- * Pasa el valor con mAmount() para que un importe largo se abrevie en vez de cortarse.
+ * Métrica: etiqueta + número (Space Mono tabular, color semántico) en UNA sola línea,
+ * con un `sub` opcional que da la unidad o el contexto del número ("del ingreso",
+ * "₡14 000/día"): sin él la cifra queda sin escala.
+ *
+ * La celda es estrecha (~106px útiles a 320px): pasa SIEMPRE los importes por mAmount()
+ * con un umbral corto, o se truncarán con elipsis — y un número cortado se malinterpreta.
  */
 export function MMetricCard({
   label,
   value,
+  sub,
   tone = "neutral",
 }: {
   label: string;
   value: ReactNode;
+  sub?: ReactNode;
   tone?: MTone;
 }) {
   return (
     <div className="m-met">
       <div className="m-met-k">{label}</div>
       <div className={`mono m-met-v ${TONE_TEXT[tone]}`}>{value}</div>
+      {sub ? <div className="m-met-s">{sub}</div> : null}
     </div>
   );
 }

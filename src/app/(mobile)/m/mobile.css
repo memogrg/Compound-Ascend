@@ -2514,6 +2514,14 @@ body:has(.m-shell[data-theme="dark"]) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Unidad o contexto del número ("del ingreso", "₡14 000/día"): sin esto la cifra
+   queda sin escala. Cabe en dos líneas — es texto, no un importe. */
+.m-shell .m-met-s {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.35;
+}
 
 /* ---- badge en tono ámbar (completa neutral/up/down para MChip) ---- */
 .m-shell .badge.mid {
