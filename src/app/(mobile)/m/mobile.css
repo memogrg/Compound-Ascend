@@ -2291,6 +2291,27 @@ body:has(.m-shell[data-theme="dark"]) {
   border-top: 0;
 }
 
+/* Filas del kit envueltas en algo que NO es un swipe (un <a> a su pantalla de origen, un
+   <div> de solo lectura). Sin esto no llevarían separador: el :first-child de .m-drow mira
+   a su envoltorio —donde siempre es el primero—, no a la lista. Se lo damos al envoltorio,
+   exactamente como .m-swipe hace con las suyas, para que una lista mixta (deslizables +
+   enlaces + solo lectura) tenga los mismos hairlines. */
+.m-shell .m-row-wrap {
+  display: block;
+  border-top: 1px solid var(--border);
+}
+.m-shell .m-row-wrap:first-child {
+  border-top: 0;
+}
+.m-shell .m-row-wrap .m-drow {
+  padding-left: 16px;
+  padding-right: 16px;
+  border-top: 0;
+}
+.m-shell a.m-row-wrap:active {
+  opacity: 0.55;
+}
+
 /* ── App-lock overlay (candado con biometría; solo dentro de la app nativa) ── */
 /* OPACO A PROPÓSITO — no lleva el vidrio de overlay del resto.
    Este panel existe para TAPAR los datos financieros cuando la app se bloquea. Hacerlo
