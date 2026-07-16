@@ -1,5 +1,6 @@
 import type { Viewport } from "next";
 import "./mobile.css";
+import { MobileIntro } from "./components/mobile-intro";
 
 /**
  * Layout raíz del grupo móvil (mobile)/m. NO hereda el shell de escritorio
@@ -19,6 +20,8 @@ export default function MobileRootLayout({ children }: { children: React.ReactNo
   // atributo a data-theme="dark" (mobile.css tiene el scope listo). No se fuerza oscuro.
   return (
     <div className="m-shell" data-mobile data-theme="light">
+      {/* Intro animada del logo al abrir la app (una vez por sesión; portal a body). */}
+      <MobileIntro />
       {children}
     </div>
   );

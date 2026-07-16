@@ -41,6 +41,11 @@ type SocialLoginPlugin = {
   logout(options: { provider: "google" }): Promise<void>;
 };
 
+/** Subconjunto de @capacitor/splash-screen: solo hide() (la intro web toma el relevo). */
+type SplashScreenPlugin = {
+  hide(options?: { fadeOutDuration?: number }): Promise<void>;
+};
+
 type CapacitorBridge = {
   isNativePlatform?: () => boolean;
   getPlatform?: () => string;
@@ -48,6 +53,7 @@ type CapacitorBridge = {
     App?: CapacitorAppPlugin;
     Browser?: CapacitorBrowserPlugin;
     SocialLogin?: SocialLoginPlugin;
+    SplashScreen?: SplashScreenPlugin;
   };
 };
 
@@ -80,4 +86,10 @@ export function capacitorBrowser(): CapacitorBrowserPlugin | null {
 /** Plugin SocialLogin (@capgo) para el login Google nativo por idToken. null fuera de la app nativa. */
 export function capacitorSocialLogin(): SocialLoginPlugin | null {
   return bridge()?.Plugins?.SocialLogin ?? null;
+}
+
+/** Oculta el splash nativo (mejor esfuerzo). No-op fuera de la app nativa. La intro web (MobileIntro)
+ *  toma el relevo del splash sin gap: crema → crema. */
+export function capacitorSplashHide(): void {
+  bridge()?.Plugins?.SplashScreen?.hide?.({ fadeOutDuration: 120 })?.catch?.(() => {});
 }
