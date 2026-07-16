@@ -32,7 +32,8 @@ import {
 
 export type GoalValues = {
   name: string;
-  targetAmount: number | undefined;
+  kind?: string;
+  targetAmount: number | null | undefined;
   currentAmount: number;
   monthlyContribution: number | undefined;
   currency: string;
@@ -58,10 +59,11 @@ const RECUR_OPTS: Opt[] = [
   { value: "anual", label: "Anual" },
 ];
 
-// Toggle Defensa (Normal / Defensa).
+// Tipo de ahorro: Meta / Defensa / Sobre (acumulador).
 const MODE_OPTS: Opt[] = [
-  { value: "normal", label: "Normal" },
+  { value: "meta", label: "Meta" },
   { value: "defensa", label: "Defensa" },
+  { value: "sobre", label: "Sobre" },
 ];
 
 // Las 4 protecciones. Los dos primeros valores (defensa:*) crean un fondo (goal);
@@ -96,7 +98,9 @@ export function GoalForm({
   onSuccess: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [targetAmount, setTargetAmount] = useState<number | undefined>(initial?.targetAmount);
+  const [targetAmount, setTargetAmount] = useState<number | undefined>(
+    initial?.targetAmount ?? undefined,
+  );
   const [monthlyContribution, setMonthly] = useState<number | undefined>(initial?.monthlyContribution);
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [priority, setPriority] = useState(initial?.priority ?? "media");
@@ -121,7 +125,9 @@ export function GoalForm({
     };
   }, []);
   const initialDefense = (initial?.goalType ?? "").startsWith("defensa:");
-  const [mode, setMode] = useState(initialDefense ? "defensa" : "normal");
+  const [mode, setMode] = useState(
+    initialDefense ? "defensa" : initial?.kind === "sobre" ? "sobre" : "meta",
+  );
   const [defenseKind, setDefenseKind] = useState(
     initialDefense ? initial!.goalType! : "defensa:fondo_emergencia",
   );
@@ -132,6 +138,7 @@ export function GoalForm({
   const [premiumFrequency, setPremiumFrequency] = useState("mensual");
 
   const isDefense = mode === "defensa";
+  const isSobre = mode === "sobre";
   const isSeguro = isDefense && defenseKind.startsWith("seguro:");
 
   // El toggle (Normal/Defensa + selector de protección) va en ambas ramas.
@@ -204,17 +211,19 @@ export function GoalForm({
 
   const values: GoalValues = {
     name: effectiveName,
-    targetAmount,
+    // Un sobre es acumulador puro: sin meta, sin recurrencia, sin categoría.
+    kind: isSobre ? "sobre" : "meta",
+    targetAmount: isSobre ? null : targetAmount,
     currentAmount: initial?.currentAmount ?? 0, // se preserva en edición; 0 al crear
     monthlyContribution,
     currency: cur,
-    targetDate: targetDate === "" ? undefined : targetDate,
+    targetDate: isSobre ? undefined : targetDate === "" ? undefined : targetDate,
     priority,
     goalType: isDefense ? defenseKind : undefined,
-    // Recurrencia solo en frascos normales (no en fondos de defensa).
-    recurrence: isDefense ? "ninguna" : recurrence,
-    periodAmount: !isDefense && isRecurring ? targetAmount : undefined,
-    defaultCategoryId: defaultCategoryId || null,
+    // Recurrencia solo en frascos "meta" (no defensa ni sobre).
+    recurrence: isDefense || isSobre ? "ninguna" : recurrence,
+    periodAmount: !isDefense && !isSobre && isRecurring ? targetAmount : undefined,
+    defaultCategoryId: isSobre ? null : defaultCategoryId || null,
   };
 
   return (
@@ -241,21 +250,27 @@ export function GoalForm({
         maxLength={120}
         autoFocus
       />
-      <MoneyField name="targetAmount" label={isRecurring ? "Monto por período" : "Objetivo"} value={targetAmount} onChange={setTargetAmount} currency={cur} />
+      {!isSobre ? (
+        <MoneyField name="targetAmount" label={isRecurring ? "Monto por período" : "Objetivo"} value={targetAmount} onChange={setTargetAmount} currency={cur} />
+      ) : null}
       <MoneyField name="monthlyContribution" label="Aporte mensual" value={monthlyContribution} onChange={setMonthly} currency={cur} />
-      <DateField name="targetDate" label={isRecurring ? "Primer reinicio (opcional)" : "Fecha límite (opcional)"} value={targetDate} onChange={setTargetDate} />
-      {!isDefense ? (
+      {!isSobre ? (
+        <DateField name="targetDate" label={isRecurring ? "Primer reinicio (opcional)" : "Fecha límite (opcional)"} value={targetDate} onChange={setTargetDate} />
+      ) : null}
+      {!isDefense && !isSobre ? (
         <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia del frasco" />
       ) : null}
-      <SheetSelect
-        name="defaultCategoryId"
-        label="Categoría (opcional)"
-        value={defaultCategoryId}
-        onChange={setDefaultCategoryId}
-        options={catOptions}
-        placeholder="Sin categoría"
-        sheetTitle="Categoría por defecto del frasco"
-      />
+      {!isSobre ? (
+        <SheetSelect
+          name="defaultCategoryId"
+          label="Categoría (opcional)"
+          value={defaultCategoryId}
+          onChange={setDefaultCategoryId}
+          options={catOptions}
+          placeholder="Sin categoría"
+          sheetTitle="Categoría por defecto del frasco"
+        />
+      ) : null}
       <Segmented name="priority" label="Prioridad" value={priority} onChange={setPriority} options={PRIORITY_OPTS} />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
     </FormShell>

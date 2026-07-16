@@ -99,6 +99,7 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
       ) : (
         <div className="card">
           {goals.map((g) => {
+            const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
             const pct = g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0;
             const pctInt = Math.round(pct * 100);
             const badgeCls = STATUS_BADGE[g.status] ?? "neutral";
@@ -118,19 +119,21 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
                         {fmtMonth(g.targetDate)}
                       </div>
                     </div>
-                    <span className={`badge ${badgeCls}`}>{pctInt}%</span>
+                    <span className={`badge ${badgeCls}`}>{isSobre ? "Sobre" : `${pctInt}%`}</span>
                   </div>
                   <div className="between" style={{ marginBottom: 8 }}>
                     <div className="display" style={{ fontSize: 20 }}>
                       {formatMoney(g.currentAmount, g.currency)}
                     </div>
                     <div className="muted mono" style={{ fontSize: 12 }}>
-                      de {formatMoney(g.targetAmount, g.currency)}
+                      {isSobre ? "acumulado" : `de ${formatMoney(g.targetAmount, g.currency)}`}
                     </div>
                   </div>
-                  <div className="bar" style={{ height: 8 }}>
-                    <i style={{ width: `${pctInt}%`, background: "linear-gradient(90deg, var(--s1), var(--s5))" }} />
-                  </div>
+                  {isSobre ? null : (
+                    <div className="bar" style={{ height: 8 }}>
+                      <i style={{ width: `${pctInt}%`, background: "linear-gradient(90deg, var(--s1), var(--s5))" }} />
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                     <button
                       type="button"
@@ -198,6 +201,7 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
               currency: editing.currency,
               targetDate: editing.targetDate ?? undefined,
               priority: editing.priority ?? "media",
+              kind: editing.kind ?? "meta",
               recurrence: editing.recurrence ?? "ninguna",
               defaultCategoryId: editing.defaultCategoryId ?? null,
             }}
@@ -435,10 +439,12 @@ function MovementsList({ goal }: { goal: SavingsGoal }) {
         </div>
         <div style={{ textAlign: "right" }}>
           <div className="muted" style={{ fontSize: 11 }}>
-            Meta · Brecha
+            {vm.kind === "sobre" ? "Tipo" : "Meta · Brecha"}
           </div>
           <div className="mono" style={{ fontSize: 13 }}>
-            {formatMoney(vm.targetAmount, vm.currency)} · {formatMoney(vm.gap, vm.currency)}
+            {vm.kind === "sobre"
+              ? "Sobre (acumulador)"
+              : `${formatMoney(vm.targetAmount, vm.currency)} · ${formatMoney(vm.gap, vm.currency)}`}
           </div>
         </div>
       </div>

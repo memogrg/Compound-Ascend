@@ -42,7 +42,10 @@ function rowToGoal(r: SavingsGoalRow): SavingsGoal {
     id: r.id,
     name: r.name,
     goalType: r.goal_type,
-    targetAmount: Number(r.target_amount),
+    kind: (r.kind ?? "meta") as SavingsGoal["kind"],
+    // Un sobre no tiene meta (target null en BD): se expone 0 y el progreso se
+    // guarda con `kind`/`targetAmount > 0`.
+    targetAmount: r.target_amount == null ? 0 : Number(r.target_amount),
     currentAmount: Number(r.current_amount),
     monthlyContribution: Number(r.monthly_contribution),
     currency: r.currency,
@@ -113,9 +116,13 @@ export async function createGoal(input: GoalInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const household_id = await getActiveHouseholdId(supabase, user.id);
+  // Un sobre es acumulador puro: sin meta, sin recurrencia, sin categoría.
+  const isSobre = input.kind === "sobre";
+  const targetAmount = isSobre ? null : (input.targetAmount ?? null);
+  const recurrence = isSobre ? "ninguna" : input.recurrence;
   const { periodAmount, nextResetOn } = deriveRecurrenceFields({
-    recurrence: input.recurrence,
-    targetAmount: input.targetAmount,
+    recurrence,
+    targetAmount: targetAmount ?? 0,
     periodAmount: input.periodAmount,
     targetDate: input.targetDate,
     todayISO: todayISO(),
@@ -125,17 +132,18 @@ export async function createGoal(input: GoalInput): Promise<void> {
     household_id,
     name: input.name,
     goal_type: input.goalType ?? null,
-    target_amount: input.targetAmount,
+    kind: input.kind,
+    target_amount: targetAmount,
     current_amount: input.currentAmount,
     monthly_contribution: input.monthlyContribution,
     currency: input.currency,
     target_date: input.targetDate ?? null,
     priority: input.priority ?? null,
     status: "revisar",
-    recurrence: input.recurrence,
+    recurrence,
     period_amount: periodAmount,
     next_reset_on: nextResetOn,
-    default_category_id: input.defaultCategoryId ?? null,
+    default_category_id: isSobre ? null : (input.defaultCategoryId ?? null),
   });
 }
 
@@ -188,16 +196,20 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
+  // Un sobre no tiene meta ni recurrencia ni categoría.
+  const isSobre = input.kind === "sobre";
+  const targetAmount = isSobre ? null : (input.targetAmount ?? null);
+  const recurrence = isSobre ? "ninguna" : input.recurrence;
   const derived = deriveRecurrenceFields({
-    recurrence: input.recurrence,
-    targetAmount: input.targetAmount,
+    recurrence,
+    targetAmount: targetAmount ?? 0,
     periodAmount: input.periodAmount,
     targetDate: input.targetDate,
     todayISO: todayISO(),
   });
   const keepSchedule =
-    input.recurrence !== "ninguna" &&
-    existing?.recurrence === input.recurrence &&
+    recurrence !== "ninguna" &&
+    existing?.recurrence === recurrence &&
     existing?.next_reset_on != null;
   const nextResetOn = keepSchedule ? existing!.next_reset_on : derived.nextResetOn;
 
@@ -206,16 +218,17 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
     .update({
       name: input.name,
       goal_type: input.goalType ?? null,
-      target_amount: input.targetAmount,
+      kind: input.kind,
+      target_amount: targetAmount,
       current_amount: input.currentAmount,
       monthly_contribution: input.monthlyContribution,
       currency: input.currency,
       target_date: input.targetDate ?? null,
       priority: input.priority ?? null,
-      recurrence: input.recurrence,
+      recurrence,
       period_amount: derived.periodAmount,
       next_reset_on: nextResetOn,
-      default_category_id: input.defaultCategoryId ?? null,
+      default_category_id: isSobre ? null : (input.defaultCategoryId ?? null),
     })
     .eq("id", id)
     .eq("user_id", user.id);
@@ -662,6 +675,7 @@ export function buildDemoControlSummary(): ControlSummary {
       id: "g1",
       name: "Fondo de emergencia",
       goalType: "seguridad",
+      kind: "meta",
       targetAmount: 3_000_000,
       currentAmount: 900_000,
       monthlyContribution: 90_000,
@@ -674,6 +688,7 @@ export function buildDemoControlSummary(): ControlSummary {
     {
       id: "g2",
       name: "Viaje a Europa",
+      kind: "meta",
       targetAmount: 2_400_000,
       currentAmount: 300_000,
       monthlyContribution: 60_000,

@@ -404,7 +404,10 @@ export type SavingsGoalRow = Timestamps & {
   household_id: string | null;
   name: string;
   goal_type: string | null;
-  target_amount: number;
+  // Tipo de ahorro (migración 20260720000001): 'meta' | 'sobre' (acumulador).
+  kind: string;
+  // Nullable desde 20260720000001: null = sin meta (sobre).
+  target_amount: number | null;
   current_amount: number;
   monthly_contribution: number;
   currency: string;

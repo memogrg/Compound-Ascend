@@ -104,12 +104,18 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
               <>
                 <div className="between" style={{ gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
                   <Stat label="Acumulado" value={formatMoney(vm.currentAmount, vm.currency)} />
-                  <Stat label="Meta" value={formatMoney(vm.targetAmount, vm.currency)} />
-                  <Stat
-                    label="Brecha"
-                    value={formatMoney(vm.gap, vm.currency)}
-                    tip="Lo que falta para la meta (meta − acumulado)"
-                  />
+                  {vm.kind === "sobre" ? (
+                    <Stat label="Tipo" value="Sobre" tip="Acumulador sin meta" />
+                  ) : (
+                    <>
+                      <Stat label="Meta" value={formatMoney(vm.targetAmount, vm.currency)} />
+                      <Stat
+                        label="Brecha"
+                        value={formatMoney(vm.gap, vm.currency)}
+                        tip="Lo que falta para la meta (meta − acumulado)"
+                      />
+                    </>
+                  )}
                 </div>
                 {vm.defaultCategoryLabel ? (
                   <div
