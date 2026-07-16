@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const h = vi.hoisted(() => ({
   goalRow: null as Record<string, unknown> | null,
   txns: [] as Record<string, unknown>[],
+  resets: [] as Record<string, unknown>[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -18,14 +19,15 @@ vi.mock("@/modules/financial-base", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
-    from: () => {
+    from: (table: string) => {
+      const rows = table === "goal_period_resets" ? h.resets : h.txns;
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
         order: () => b,
         maybeSingle: () => Promise.resolve({ data: h.goalRow, error: null }),
         then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
-          Promise.resolve({ data: h.txns, error: null }).then(r, j),
+          Promise.resolve({ data: rows, error: null }).then(r, j),
       };
       return b;
     },
@@ -37,6 +39,7 @@ import { getGoalDetail } from "@/modules/control/services/goal-detail-service";
 beforeEach(() => {
   h.goalRow = null;
   h.txns = [];
+  h.resets = [];
 });
 
 describe("getGoalDetail · trazabilidad del frasco", () => {
@@ -153,6 +156,48 @@ describe("getGoalDetail · trazabilidad del frasco", () => {
     expect(vm.movements[0]!.amount).toBe(50000);
     expect(vm.movements[0]!.balance).toBe(50000);
     expect(vm.movements[vm.movements.length - 1]!.balance).toBe(250000);
+  });
+
+  it("intercala los reinicios de período como eventos neutros para el saldo", async () => {
+    h.goalRow = {
+      id: "g1",
+      name: "Marchamo",
+      currency: "CRC",
+      current_amount: 180000,
+      target_amount: 980000,
+    };
+    h.txns = [
+      {
+        id: "t-aporte",
+        kind: "gasto",
+        amount: 200000,
+        currency: "CRC",
+        occurred_on: "2026-07-01",
+        category_id: null,
+        description: "Aporte — Marchamo",
+        counts_in_budget: true,
+      },
+      {
+        id: "t-gasto",
+        kind: "gasto",
+        amount: 20000,
+        currency: "CRC",
+        occurred_on: "2026-07-20",
+        category_id: null,
+        description: "Gasto — Marchamo",
+        counts_in_budget: false,
+      },
+    ];
+    h.resets = [{ id: "r1", reset_on: "2026-07-10", restored_target: 1000000 }];
+
+    const vm = (await getGoalDetail("g1"))!;
+    const reinicio = vm.movements.find((m) => m.type === "reinicio")!;
+    expect(reinicio.amount).toBe(0);
+    expect(reinicio.restoredTarget).toBe(1000000);
+    expect(reinicio.locked).toBe(true);
+    // Orden por fecha: aporte(01) → reinicio(10) → gasto(20); saldo cierra en 180k.
+    expect(vm.movements.map((m) => m.type)).toEqual(["aporte", "reinicio", "gasto"]);
+    expect(vm.movements[vm.movements.length - 1]!.balance).toBe(180000);
   });
 
   it("meta inexistente → null", async () => {

@@ -35,12 +35,22 @@ export type GoalValues = {
   targetDate: string | undefined;
   priority: string;
   goalType?: string;
+  recurrence?: string;
+  periodAmount?: number;
 };
 
 const PRIORITY_OPTS: Opt[] = [
   { value: "alta", label: "Alta" },
   { value: "media", label: "Media" },
   { value: "baja", label: "Baja" },
+];
+
+const RECUR_OPTS: Opt[] = [
+  { value: "ninguna", label: "Ninguna" },
+  { value: "mensual", label: "Mensual" },
+  { value: "trimestral", label: "Trimestral" },
+  { value: "semestral", label: "Semestral" },
+  { value: "anual", label: "Anual" },
 ];
 
 // Toggle Defensa (Normal / Defensa).
@@ -85,7 +95,9 @@ export function GoalForm({
   const [monthlyContribution, setMonthly] = useState<number | undefined>(initial?.monthlyContribution);
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [priority, setPriority] = useState(initial?.priority ?? "media");
+  const [recurrence, setRecurrence] = useState(initial?.recurrence ?? "ninguna");
   const [cur, setCur] = useState(initial?.currency ?? currency);
+  const isRecurring = recurrence !== "ninguna";
   const initialDefense = (initial?.goalType ?? "").startsWith("defensa:");
   const [mode, setMode] = useState(initialDefense ? "defensa" : "normal");
   const [defenseKind, setDefenseKind] = useState(
@@ -177,6 +189,9 @@ export function GoalForm({
     targetDate: targetDate === "" ? undefined : targetDate,
     priority,
     goalType: isDefense ? defenseKind : undefined,
+    // Recurrencia solo en frascos normales (no en fondos de defensa).
+    recurrence: isDefense ? "ninguna" : recurrence,
+    periodAmount: !isDefense && isRecurring ? targetAmount : undefined,
   };
 
   return (
@@ -203,9 +218,12 @@ export function GoalForm({
         maxLength={120}
         autoFocus
       />
-      <MoneyField name="targetAmount" label="Objetivo" value={targetAmount} onChange={setTargetAmount} currency={cur} />
+      <MoneyField name="targetAmount" label={isRecurring ? "Monto por período" : "Objetivo"} value={targetAmount} onChange={setTargetAmount} currency={cur} />
       <MoneyField name="monthlyContribution" label="Aporte mensual" value={monthlyContribution} onChange={setMonthly} currency={cur} />
-      <DateField name="targetDate" label="Fecha límite (opcional)" value={targetDate} onChange={setTargetDate} />
+      <DateField name="targetDate" label={isRecurring ? "Primer reinicio (opcional)" : "Fecha límite (opcional)"} value={targetDate} onChange={setTargetDate} />
+      {!isDefense ? (
+        <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia del frasco" />
+      ) : null}
       <Segmented name="priority" label="Prioridad" value={priority} onChange={setPriority} options={PRIORITY_OPTS} />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
     </FormShell>

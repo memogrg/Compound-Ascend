@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<GoalMovementType, string> = {
   aporte: "Aporte",
   gasto: "Gasto",
   retiro: "Retiro",
+  reinicio: "Reinicio de período",
 };
 
 const TYPE_TIP: Record<GoalMovementType, string> = {
@@ -28,6 +29,7 @@ const TYPE_TIP: Record<GoalMovementType, string> = {
   aporte: "Metiste plata al frasco (cuenta como ahorro del mes)",
   gasto: "Consumiste el frasco en una compra (off-budget: no toca tu presupuesto del mes)",
   retiro: "Devolviste la plata a tu cuenta (ingreso)",
+  reinicio: "El frasco recurrente reinició el período: la meta se restauró y el sobrante se arrastró",
 };
 
 function fmtDate(iso: string | null): string {
@@ -151,17 +153,29 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
                                 </div>
                               ) : null}
                             </td>
-                            <td>{m.categoryLabel ?? "—"}</td>
+                            <td>
+                              {m.type === "reinicio" && m.restoredTarget != null
+                                ? `Meta → ${formatMoney(m.restoredTarget, vm.currency)}`
+                                : (m.categoryLabel ?? "—")}
+                            </td>
                             <td
                               className="tnum"
-                              style={{ color: m.amount >= 0 ? "var(--pos)" : "var(--neg)" }}
+                              style={{
+                                color:
+                                  m.type === "reinicio"
+                                    ? "var(--muted)"
+                                    : m.amount >= 0
+                                      ? "var(--pos)"
+                                      : "var(--neg)",
+                              }}
                             >
-                              {m.amount >= 0 ? "+" : "−"}
-                              {formatMoney(Math.abs(m.amount), vm.currency)}
+                              {m.type === "reinicio"
+                                ? "—"
+                                : `${m.amount >= 0 ? "+" : "−"}${formatMoney(Math.abs(m.amount), vm.currency)}`}
                             </td>
                             <td className="tnum">{formatMoney(m.balance, vm.currency)}</td>
                             <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                              {m.type === "inicial" ? null : confirmingId === m.id ? (
+                              {m.type === "inicial" || m.locked ? null : confirmingId === m.id ? (
                                 <>
                                   <button
                                     type="button"

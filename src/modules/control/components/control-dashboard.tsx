@@ -16,6 +16,21 @@ const SEMAFORO: Record<Semaforo, { label: string; color: string }> = {
   rojo: { label: "Acción urgente", color: "var(--neg)" },
 };
 
+const RECURRENCE_LABEL: Record<string, string> = {
+  mensual: "Mensual",
+  trimestral: "Trimestral",
+  semestral: "Semestral",
+  anual: "Anual",
+};
+
+function fmtResetDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 const ACTION: Record<GoalAction, { label: string; color: string; bg: string }> = {
   mantener: { label: "Mantener", color: "var(--pos)", bg: "var(--pos-soft)" },
   acelerar: { label: "Acelerar", color: "var(--info)", bg: "var(--info-soft)" },
@@ -236,6 +251,23 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                       {formatMoney(g.targetAmount, g.currency)}
                       {rec?.reason ? <> · {rec.reason}</> : null}
                     </div>
+                    {g.recurrence && g.recurrence !== "ninguna" ? (
+                      <div
+                        className="gs tip tip-wrap"
+                        data-tip="Frasco recurrente: al llegar la fecha, la meta se restaura al monto del período y lo no gastado se arrastra."
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "help" }}
+                      >
+                        <span
+                          className="chip"
+                          style={{ background: "var(--info-soft)", color: "var(--info)", fontWeight: 700 }}
+                        >
+                          {RECURRENCE_LABEL[g.recurrence] ?? "Recurrente"}
+                        </span>
+                        {g.nextResetOn ? (
+                          <span className="muted">Próximo reinicio: {fmtResetDate(g.nextResetOn)}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <div className="acts">
                       <GoalDetailButton goal={g} />
                       <GoalSpendButton goal={g} />

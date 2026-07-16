@@ -198,6 +198,7 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
               currency: editing.currency,
               targetDate: editing.targetDate ?? undefined,
               priority: editing.priority ?? "media",
+              recurrence: editing.recurrence ?? "ninguna",
             }}
             action={(v: GoalValues) => editGoalAction(editing.id, v)}
             submitLabel="Guardar cambios"
@@ -357,6 +358,7 @@ const MOVE_LABEL: Record<GoalMovementType, string> = {
   aporte: "Aporte",
   gasto: "Gasto",
   retiro: "Retiro",
+  reinicio: "Reinicio de período",
 };
 
 function fmtMoveDate(iso: string | null): string {
@@ -466,6 +468,9 @@ function MovementsList({ goal }: { goal: SavingsGoal }) {
                   </div>
                   <div className="muted" style={{ fontSize: 11.5 }}>
                     {fmtMoveDate(m.date)}
+                    {m.type === "reinicio" && m.restoredTarget != null
+                      ? ` · Meta → ${formatMoney(m.restoredTarget, vm.currency)}`
+                      : ""}
                     {m.categoryLabel ? ` · ${m.categoryLabel}` : ""}
                     {m.note ? ` · ${m.note}` : ""}
                   </div>
@@ -473,17 +478,26 @@ function MovementsList({ goal }: { goal: SavingsGoal }) {
                 <div style={{ textAlign: "right", flex: "none" }}>
                   <div
                     className="mono"
-                    style={{ fontSize: 13.5, color: m.amount >= 0 ? "var(--pos)" : "var(--neg)" }}
+                    style={{
+                      fontSize: 13.5,
+                      color:
+                        m.type === "reinicio"
+                          ? "var(--muted)"
+                          : m.amount >= 0
+                            ? "var(--pos)"
+                            : "var(--neg)",
+                    }}
                   >
-                    {m.amount >= 0 ? "+" : "−"}
-                    {formatMoney(Math.abs(m.amount), vm.currency)}
+                    {m.type === "reinicio"
+                      ? "—"
+                      : `${m.amount >= 0 ? "+" : "−"}${formatMoney(Math.abs(m.amount), vm.currency)}`}
                   </div>
                   <div className="muted mono" style={{ fontSize: 11 }}>
                     {formatMoney(m.balance, vm.currency)}
                   </div>
                 </div>
               </div>
-              {m.type !== "inicial" ? (
+              {m.type !== "inicial" && !m.locked ? (
                 <div style={{ marginTop: 8 }}>
                   {confirmingId === m.id ? (
                     <div style={{ display: "flex", gap: 8 }}>
