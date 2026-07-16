@@ -1,4 +1,5 @@
 import { MobileHeader } from "../../components/mobile-header";
+import { MEmptyState } from "../../components/content-kit";
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
 import { monthPeriod } from "@/modules/financial-base";
@@ -38,11 +39,13 @@ export default async function MobileGastos() {
       <div className="m-scroll">
         <div className="m-pad">
           <MobileHeader variant="inner" eyebrow="Base" title="Gastos" backHref="/m" backLabel="Volver a Inicio" />
-          <div className="card card-p">
-            <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-              Aún no puedes ver tus gastos. Captura tu base financiera para empezar.
-            </div>
-          </div>
+          <MEmptyState
+            icon="template"
+            title="Empieza por tu base"
+            description="Cuando captures tus ingresos y tu presupuesto, aquí verás en qué se va el mes y cuánto te queda en cada frasco."
+            actionLabel="Capturar mi base financiera"
+            actionHref="/m/mi-base-financiera"
+          />
         </div>
       </div>
     );

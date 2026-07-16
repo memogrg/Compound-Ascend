@@ -2305,3 +2305,252 @@ body:has(.m-shell[data-theme="dark"]) {
   padding: 4px;
   text-decoration: underline;
 }
+
+/* =====================================================================
+   KIT DE CONTENIDO ("Cristal Cálido" · R3)
+   =====================================================================
+   Primitivas de PRESENTACIÓN que consumen los componentes de
+   components/content-kit/*. Reglas del sistema, derivadas de Inicio:
+
+   - El contenido NO usa cristal: el cristal es solo chrome (topbar, tabbar,
+     hojas, menú). Aquí: superficie clara + sombra suave, SIN marcos duros.
+   - Radios: 22 en la tarjeta de resumen (hero de pantalla), 16 en tarjetas
+     de contenido. Ritmo vertical 16 / 12 / 8.
+   - Los números son Space Mono tabular (.mono) con color semántico
+     (.pos / .warn / .neg); el caller abrevia (mAmount) donde el ancho aprieta.
+   - Tokens y escalas existentes: no introduce variables nuevas.
+   ===================================================================== */
+
+/* ---- tarjeta de resumen: eyebrow + número grande + subtexto + slot ---- */
+.m-shell .m-sum {
+  background: var(--surface);
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow: var(--e-raised);
+  min-width: 0;
+}
+.m-shell .m-sum-v {
+  /* Fluido como .hero-amt. A 320px caben ~11 caracteres: el caller pasa el importe por
+     mAmount(n, cur, 11) para abreviarlo antes de que llegue a cortarse. La elipsis es la
+     red de seguridad, no el plan: un número truncado se malinterpreta. */
+  font-size: clamp(25px, 8vw, 31px);
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-shell .m-sum-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  line-height: 1.45;
+}
+.m-shell .m-sum-slot {
+  margin-top: 16px;
+}
+
+/* ---- tarjeta de contenido genérica (frascos, bloques de lista) ---- */
+.m-shell .m-cc {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--e-raised);
+  min-width: 0;
+}
+
+/* ---- encabezado de sección: eyebrow + acción opcional a la derecha ---- */
+.m-shell .m-sec {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.m-shell .m-sec-a {
+  flex: none;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  /* margen negativo = objetivo táctil cómodo sin desalinear el texto */
+  padding: 6px;
+  margin: -6px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+/* ---- fila de datos: tile de icono + título/subtítulo + valor ---- */
+.m-shell .m-drow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px; /* objetivo táctil mínimo */
+  padding: 11px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition: opacity 0.12s ease;
+}
+.m-shell .m-drow:first-child {
+  border-top: 0;
+}
+.m-shell button.m-drow,
+.m-shell a.m-drow {
+  cursor: pointer;
+}
+.m-shell button.m-drow:active,
+.m-shell a.m-drow:active {
+  opacity: 0.55;
+}
+.m-shell .m-dic {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  /* tinte de marca sobre neutro (el tono lo modifica el caller) */
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.m-shell .m-dic-success {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.m-shell .m-dic-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.m-shell .m-dic-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+/* Variante densa: filas de SOLO LECTURA dentro de una tarjeta (una vista previa, no un
+   objetivo táctil), donde el alto normal desperdiciaría media pantalla. Mismo lenguaje,
+   ~25% menos alto. Las filas que se tocan conservan siempre los 44px. */
+.m-shell .m-drow-dense {
+  min-height: 0;
+  padding: 8px 0;
+}
+.m-shell .m-drow-dense .m-dt {
+  font-size: 13.5px;
+}
+.m-shell .m-drow-dense .m-ds {
+  font-size: 11.5px;
+  margin-top: 1px;
+}
+.m-shell .m-drow-dense .m-dv {
+  font-size: 12.5px;
+}
+.m-shell .m-dtx {
+  flex: 1;
+  min-width: 0;
+}
+.m-shell .m-dt {
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-shell .m-ds {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-shell .m-dv {
+  flex: none;
+  margin-left: auto;
+  text-align: right;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.m-shell .m-dch {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--text-dim);
+}
+.m-shell .m-drow-slot {
+  margin-top: 10px;
+}
+
+/* ---- grilla de métricas (2-up por defecto) ---- */
+.m-shell .m-mgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.m-shell .m-met {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: var(--e-raised);
+  min-width: 0;
+}
+.m-shell .m-met-k {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.m-shell .m-met-v {
+  /* Una sola línea siempre: el caller abrevia (mAmount) si el importe es largo. */
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- badge en tono ámbar (completa neutral/up/down para MChip) ---- */
+.m-shell .badge.mid {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+/* ---- estado vacío: icono grande + mensaje + CTA ---- */
+.m-shell .m-empty {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 28px 20px;
+  box-shadow: var(--e-raised);
+  text-align: center;
+}
+.m-shell .m-empty-ic {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  margin: 0 auto 14px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.m-shell .m-empty-t {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.m-shell .m-empty-d {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.m-shell .m-empty-a {
+  margin-top: 16px;
+}
