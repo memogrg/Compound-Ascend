@@ -26,7 +26,13 @@
   --surface-2: #fbfaf6;
   --border: #e7e4dc;
   --text: #1e1c16;
-  --text-muted: #807c72;
+  /* AA (WCAG 1.4.3, 4.5:1). El anterior #807c72 no llegaba en NINGÚN fondo: su techo
+     sobre blanco puro era 4.16:1, y sobre el canvas crema caía a 3.62:1. Este es el gris
+     MÁS CLARO del mismo tono cálido que cumple en todos los fondos donde se pinta —
+     canvas 5.60:1, blanco 6.45:1 — incluido el vidrio de los overlays del móvil (4.55:1),
+     que es el fondo más exigente y por eso fija el valor. Sigue lejísimos del texto
+     primario (17:1) — no se confunden. No lo aclares sin volver a medir. */
+  --text-muted: #625e57;
   --accent: #378451;
   --accent-ink: #ffffff;
   --success: #378451;
@@ -125,6 +131,8 @@
   --surface-2: #26241c;
   --border: #2e2c24;
   --text: #f4f2ec;
+  /* En oscuro este gris ya cumple AA en los cuatro fondos (canvas 7.18:1 … surface-3
+     5.45:1): se deja como está. El problema del contraste era solo del tema claro. */
   --text-muted: #a6a199;
   --accent: #51af6f;
   --accent-ink: #0c2114;
