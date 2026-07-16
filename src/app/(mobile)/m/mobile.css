@@ -2282,6 +2282,14 @@ body:has(.m-shell[data-theme="dark"]) {
   padding-left: 18px;
   padding-right: 18px;
 }
+/* Lo mismo para las filas del kit: el padding horizontal lo pone el swipe (la fila debe
+   poder ir a sangre para que el gesto revele las acciones), y el separador ya lo trae
+   .m-swipe — sin esto se duplicaría con el de .m-drow. */
+.m-shell .m-swipe-content .m-drow {
+  padding-left: 16px;
+  padding-right: 16px;
+  border-top: 0;
+}
 
 /* ── App-lock overlay (candado con biometría; solo dentro de la app nativa) ── */
 /* OPACO A PROPÓSITO — no lleva el vidrio de overlay del resto.

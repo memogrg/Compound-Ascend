@@ -12,7 +12,7 @@ import {
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 
 import {
   Fab,
@@ -24,6 +24,14 @@ import {
   DateField,
   useToast,
 } from "../../components/form-kit";
+import type { MIconName } from "../../components/m-icon";
+import {
+  MContentCard,
+  MDataRow,
+  MProgress,
+  MEmptyState,
+  mAmount,
+} from "../../components/content-kit";
 import { IncomeSourceForm, type IncomeSourceValues } from "./income-form";
 
 /**
@@ -42,6 +50,16 @@ const TYPE_LABEL: Record<IncomeType, string> = {
   activo: "Activo",
   pasivo: "Pasivo",
   extraordinario: "Extraordinario",
+};
+
+/**
+ * Glifo por tipo de ingreso: el activo viene de tu trabajo (nómina), el pasivo llega solo
+ * (moneda). Los vinculados a inversiones no pasan por aquí: los pinta la página.
+ */
+const TYPE_ICON: Record<IncomeType, MIconName> = {
+  activo: "salary",
+  pasivo: "income",
+  extraordinario: "income",
 };
 
 // Fracción sugerida por clic en fuentes recurrentes sub-mensuales (igual que la web).
@@ -139,65 +157,70 @@ export function IncomeManager({
   return (
     <>
       {sources.length === 0 ? (
-        <div className="card card-p">
-          <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-            Aún no tienes fuentes de ingreso este mes. Toca el botón + para registrar la primera.
-          </div>
-        </div>
+        <MEmptyState
+          icon="salary"
+          title="Agrega tu primera fuente"
+          description="Anota de dónde viene tu dinero este mes —tu sueldo, un cliente, una renta— y la app te dirá cuánto llevas cobrado."
+          actionLabel="Agregar fuente"
+          onAction={() => setAdding(true)}
+        />
       ) : (
-        <div className="card">
+        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
+        // lateral lo pone la regla puente .m-swipe-content .m-drow.
+        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {sources.map((it) => {
             const rec = received[it.id] ?? 0;
             const budget = it.amount;
             const pct = budget > 0 ? rec / budget : rec > 0 ? 1 : 0;
             const over = budget > 0 && rec > budget;
-            const pctInt = Math.min(100, Math.round(pct * 100));
             const incomeType = it.incomeType ?? "activo";
             return (
               <SwipeRow key={it.id} onEdit={() => setEditing(it)} onDelete={() => setDeleting(it)}>
-                <div style={{ padding: "14px 18px" }}>
-                  <div className="between" style={{ marginBottom: 8, gap: 10 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {it.name}
-                      </div>
-                      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                        {TYPE_LABEL[incomeType]}
-                        {it.recurringItemId ? ` · ${it.frequency}` : ""}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="m-btn m-btn-secondary"
-                      style={{ flex: "none", minHeight: 38, padding: "0 14px", fontSize: 13 }}
-                      onClick={() => setReceiving(it)}
-                    >
-                      Recibido
-                    </button>
-                  </div>
-                  <div className="between" style={{ marginBottom: 6 }}>
-                    <span className="muted mono" style={{ fontSize: 12 }}>
-                      {budget > 0
-                        ? `${formatPercent(pct)} · ${formatMoney(rec, it.currency)} / ${formatMoney(budget, it.currency)}`
-                        : `${formatMoney(rec, it.currency)} recibido`}
-                      {over ? " · sobre-recibido" : ""}
+                {/* El tipo y el botón NO van en `trailing`: eso estrecha toda la columna de
+                    texto —incluido el subtítulo, que no necesita esquivar el botón— y a 320px
+                    dejaba 36px útiles (el subtítulo se cortaba 130px). Medido: con el tipo como
+                    prefijo del subtítulo y el botón junto a la barra, sobran 41px. El estado
+                    "de más" lo cantan el tile ámbar y la barra, sin necesidad de chip. */}
+                <MDataRow
+                  icon={TYPE_ICON[incomeType]}
+                  iconTone={over ? "warning" : rec > 0 ? "success" : "neutral"}
+                  title={it.name}
+                  subtitle={
+                    budget > 0
+                      ? `${over ? "De más" : TYPE_LABEL[incomeType]} · ${mAmount(rec, it.currency)} de ${mAmount(budget, it.currency)}`
+                      : `${TYPE_LABEL[incomeType]} · ${mAmount(rec, it.currency)} recibido`
+                  }
+                  slot={
+                    <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {budget > 0 ? (
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <MProgress value={pct} tone={over ? "warning" : "success"} height={8} />
+                        </span>
+                      ) : (
+                        <span style={{ flex: 1 }} />
+                      )}
+                      <button
+                        type="button"
+                        className="m-btn m-btn-secondary"
+                        style={{ flex: "none", minHeight: 38, padding: "0 14px", fontSize: 13 }}
+                        onClick={() => setReceiving(it)}
+                      >
+                        Recibido
+                      </button>
                     </span>
-                  </div>
-                  <div className="bar" style={{ height: 8 }}>
-                    <i style={{ width: `${pctInt}%`, background: over ? "var(--warning)" : "var(--accent)" }} />
-                  </div>
-                </div>
+                  }
+                />
               </SwipeRow>
             );
           })}
-        </div>
+        </MContentCard>
       )}
 
       {/* Atajo: traer las fuentes recurrentes del mes anterior (idempotente). */}
       <button
         type="button"
         className="m-btn m-btn-block m-btn-secondary"
-        style={{ marginTop: 12 }}
+        style={{ marginTop: 16 }}
         disabled={copyPending}
         onClick={() => setCopyOpen(true)}
       >

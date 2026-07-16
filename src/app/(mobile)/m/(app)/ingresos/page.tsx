@@ -1,4 +1,16 @@
 import { MobileHeader } from "../../components/mobile-header";
+import {
+  MSummaryCard,
+  MSectionHeader,
+  MContentCard,
+  MDataRow,
+  MMetricGrid,
+  MMetricCard,
+  MChip,
+  MProgress,
+  MEmptyState,
+  mAmount,
+} from "../../components/content-kit";
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import type { BudgetItem } from "@/modules/financial-base/types";
 import { convertCurrency } from "@/lib/fx";
@@ -27,11 +39,15 @@ export default async function MobileIngresos() {
       <div className="m-scroll">
         <div className="m-pad">
           <MobileHeader variant="inner" eyebrow="Presupuesto" title="Ingresos" backHref="/m" backLabel="Volver a Inicio" />
-          <div className="card card-p">
-            <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-              Conecta Supabase para gestionar tus ingresos.
-            </div>
-          </div>
+          {/* Antes decía "Conecta Supabase para gestionar tus ingresos": un mensaje para
+              quien programa, no para quien usa la app. */}
+          <MEmptyState
+            icon="salary"
+            title="Aquí llevarás tus ingresos"
+            description="Registra de dónde viene tu dinero cada mes y podrás ver cuánto has recibido de lo que planeaste."
+            actionLabel="Volver a Inicio"
+            actionHref="/m"
+          />
         </div>
       </div>
     );
@@ -58,49 +74,76 @@ export default async function MobileIngresos() {
   const diff = realIncome - budgetIncome;
   const complPct = budgetIncome > 0 ? realIncome / budgetIncome : 0;
   const totalSources = manualSources.length + linkedSources.length;
+  // Lo que aún no has cobrado de lo que planeaste. Es el dato accionable del mes y no
+  // estaba: se derivaba mentalmente de "Planificado" menos el hero.
+  const pending = Math.max(0, budgetIncome - realIncome);
+  // Ingreso que no depende de tu tiempo: las fuentes marcadas "pasivo" más las vinculadas a
+  // inversiones (renta/dividendos), que lo son por definición. Se muestra como PARTE del
+  // recibido (un %), no como mitad de una partición: "extraordinario" no es ni lo uno ni lo otro.
+  const passiveIncome =
+    manualSources
+      .filter((b) => (b.incomeType ?? "activo") === "pasivo")
+      .reduce((s, b) => s + receivedOf(b), 0) +
+    linkedSources.reduce((s, b) => s + linkedValueOf(b), 0);
+  const passivePct = realIncome > 0 ? passiveIncome / realIncome : 0;
 
   return (
     <div className="m-scroll">
       <div className="m-pad">
         <MobileHeader variant="inner" eyebrow="Presupuesto" title="Ingresos" backHref="/m" backLabel="Volver a Inicio" />
 
-        {/* Hero: recibido vs planificado del mes */}
-        <div className="card card-p" style={{ marginBottom: 14 }}>
-          <span className="ov">Ingresos del mes · {view.period.label}</span>
-          <div className="display" style={{ fontSize: 32, marginTop: 8 }}>
-            {formatMoney(realIncome, currency)}
-          </div>
-          <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            Recibido de {formatMoney(budgetIncome, currency)} planificados · {totalSources}{" "}
-            {totalSources === 1 ? "fuente" : "fuentes"}
-          </div>
-          <div className="bar" style={{ height: 8, marginTop: 10 }}>
-            <i style={{ width: `${Math.min(100, Math.round(complPct * 100))}%`, background: "var(--accent)" }} />
-          </div>
-        </div>
+        {/* Resumen: lo recibido (exacto mientras quepa) sobre lo planificado. */}
+        <MSummaryCard
+          eyebrow={`Ingresos del mes · ${view.period.label}`}
+          value={mAmount(realIncome, currency, 11)}
+          chip={budgetIncome > 0 ? <MChip tone={complPct >= 1 ? "success" : "neutral"}>{formatPercent(complPct)}</MChip> : undefined}
+          sub={
+            budgetIncome > 0
+              ? `Recibido de ${formatMoney(budgetIncome, currency)} planificados este mes.`
+              : "Aún no has planificado ingresos para este mes."
+          }
+          slot={budgetIncome > 0 ? <MProgress value={complPct} tone={complPct >= 1 ? "success" : "warning"} height={8} /> : undefined}
+          style={{ marginBottom: 16 }}
+        />
 
-        {/* Métricas clave (paridad con la web) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-          <Metric label="Planificado" value={formatMoney(budgetIncome, currency)} sub="del mes" />
-          <Metric
-            label="Diferencia"
-            value={`${diff >= 0 ? "+" : ""}${formatMoney(diff, currency)}`}
-            sub="real − planificado"
-            cls={diff >= 0 ? "pos" : "neg"}
+        {/* Métricas. "Planificado" y "% cumplimiento" ya viven en el resumen: aquí van los
+            datos que NO están ahí. La celda es estrecha (~106px a 320px) → mAmount corto. */}
+        <MSectionHeader title="Tu mes en números" />
+        <MMetricGrid style={{ marginBottom: 16 }}>
+          <MMetricCard
+            label="Pendiente por recibir"
+            value={mAmount(pending, currency, 8)}
+            sub={pending > 0 ? "de lo planificado" : "todo cobrado"}
+            tone={pending > 0 ? "warning" : "success"}
           />
-          <Metric label="% cumplimiento" value={formatPercent(complPct)} sub="de lo planificado" />
-          <Metric label="Fuentes" value={String(totalSources)} sub="este mes" />
-        </div>
+          {/* Signo delante y valor absoluto, como los movimientos de Inicio: formatMoney
+              antepone el símbolo, así que un negativo salía "₡-490 k" en vez de "−₡490 k".
+              Y en cero no lleva signo: "+₡0" sugeriría que vas por encima del plan. */}
+          <MMetricCard
+            label="Diferencia"
+            value={`${diff > 0 ? "+" : diff < 0 ? "−" : ""}${mAmount(Math.abs(diff), currency, 7)}`}
+            sub="real − planificado"
+            tone={diff > 0 ? "success" : diff < 0 ? "danger" : "neutral"}
+          />
+          <MMetricCard
+            label="Ingreso pasivo"
+            value={mAmount(passiveIncome, currency, 8)}
+            sub={realIncome > 0 ? `${formatPercent(passivePct)} del recibido` : "sin ingresos aún"}
+          />
+          <MMetricCard label="Fuentes" value={String(totalSources)} sub="este mes" />
+        </MMetricGrid>
 
         {/* Fuentes gestionables (V2: budget_items + movimiento real "Recibido") */}
-        <div className="between" style={{ marginBottom: 6 }}>
-          <div className="sec-title">Tus fuentes</div>
-          {manualSources.length > 0 && (
-            <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>
-              {manualSources.length} {manualSources.length === 1 ? "fuente" : "fuentes"}
-            </span>
-          )}
-        </div>
+        <MSectionHeader
+          title="Tus fuentes"
+          action={
+            manualSources.length > 0 ? (
+              <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
+                {manualSources.length} {manualSources.length === 1 ? "fuente" : "fuentes"}
+              </span>
+            ) : undefined
+          }
+        />
         <IncomeManager
           sources={manualSources}
           received={receivedNative}
@@ -113,51 +156,32 @@ export default async function MobileIngresos() {
         {/* Ingresos vinculados a inversiones (renta/dividendos) — read-only, como la web */}
         {linkedSources.length > 0 ? (
           <div style={{ marginTop: 16 }}>
-            <div className="sec-title" style={{ marginBottom: 6 }}>
-              Vinculados a inversiones
-            </div>
-            <div className="card">
+            <MSectionHeader title="Vinculados a inversiones" />
+            {/* El "gestiónalo en Patrimonio" iba en CADA subtítulo: se cortaba 58px a 320px y
+                además repetía el mismo aviso por fila. Se dice una vez, al pie. */}
+            <MContentCard>
               {linkedSources.map((b) => {
                 const rec = receivedNative[b.id] ?? 0;
                 return (
-                  <div key={b.id} className="between" style={{ padding: "12px 18px", gap: 10 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{b.name}</div>
-                      <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                        {b.sourceKind === "dividend" ? "Dividendos" : b.sourceKind === "rental" ? "Renta" : "Inversión"}
-                        {" · gestiónalo en Patrimonio"}
-                      </div>
-                    </div>
-                    <div className="mono pos" style={{ fontSize: 13.5, fontWeight: 700, flex: "none" }}>
-                      {formatMoney(rec > 0 ? rec : b.amount, b.currency)}
-                    </div>
-                  </div>
+                  <MDataRow
+                    key={b.id}
+                    icon={b.sourceKind === "rental" ? "rental" : "investment"}
+                    title={b.name}
+                    subtitle={
+                      b.sourceKind === "dividend" ? "Dividendos" : b.sourceKind === "rental" ? "Renta" : "Inversión"
+                    }
+                    value={mAmount(rec > 0 ? rec : b.amount, b.currency)}
+                    valueTone="success"
+                  />
                 );
               })}
-            </div>
+              <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.45, marginTop: 12 }}>
+                Estos ingresos los generan tus activos: se editan desde Patrimonio.
+              </div>
+            </MContentCard>
           </div>
         ) : null}
       </div>
     </div>
   );
 }
-
-function Metric({ label, value, sub, cls }: { label: string; value: string; sub?: string; cls?: string }) {
-  return (
-    <div className="card card-p" style={{ padding: 14 }}>
-      <div className="ov">{label}</div>
-      <div
-        className={`mono ${cls ?? ""}`}
-        style={{ fontSize: "clamp(14px, 4.6vw, 18px)", fontWeight: 700, marginTop: 6, whiteSpace: "nowrap" }}
-      >
-        {value}
-      </div>
-      {sub ? (
-        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
-          {sub}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
