@@ -1,8 +1,10 @@
 import { getRichLifeSummary } from "@/modules/rich-life";
+import { getSnapshotHistory } from "@/modules/wealth";
 import { MobileHeader } from "../../components/mobile-header";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
+import { MScrubChart, type MPoint } from "../../components/m-scrub-chart";
 import { PatrimonioManager } from "./patrimonio-manager";
 
 /**
@@ -20,6 +22,14 @@ export default async function MobilePatrimonio() {
   const { snapshot, assets, allAssets, liabilities, currency } = summary;
   const ind = snapshot.indicators;
   const bd = computeWealthBreakdown(allAssets); // invertido / líquido / otros (o undefined)
+
+  // Historia REAL de patrimonio neto (snapshots) para el gráfico con scrub. Sin datos inventados:
+  // si aún no hay ≥2 snapshots, el chart degrada a estático.
+  const snapshots = await getSnapshotHistory("all");
+  const nwPoints: MPoint[] = snapshots.map((s) => ({
+    label: new Date(`${s.date}T00:00:00`).toLocaleDateString("es-CR", { day: "numeric", month: "short" }),
+    value: s.netWorth,
+  }));
 
   // Distribución por clase (ya agrupada por el engine); mapeamos a los colores del móvil.
   const slices: MSlice[] = snapshot.assetsByClass
@@ -44,6 +54,12 @@ export default async function MobilePatrimonio() {
               {formatMoney(ind.wealthVelocity, currency)} este mes
             </div>
           )}
+          {/* Tendencia real del patrimonio neto (arrastra para ver cada punto). */}
+          {nwPoints.length >= 2 ? (
+            <div style={{ marginTop: 14 }}>
+              <MScrubChart points={nwPoints} currency={currency} />
+            </div>
+          ) : null}
         </div>
 
         {/* Desglose invertido / líquido / deuda */}
@@ -75,7 +91,12 @@ export default async function MobilePatrimonio() {
             <div className="sec-title" style={{ marginBottom: 12 }}>
               Composición
             </div>
-            <MDonut slices={slices} centerValue={formatCompact(ind.totalAssets, currency)} centerLabel="activos" />
+            <MDonut
+              slices={slices}
+              centerValue={formatCompact(ind.totalAssets, currency)}
+              centerLabel="activos"
+              currency={currency}
+            />
           </div>
         )}
 
