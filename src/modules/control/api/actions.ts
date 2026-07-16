@@ -53,6 +53,56 @@ export async function addGoalAction(raw: unknown): Promise<ActionResult> {
   }
 }
 
+const savingsSobreSchema = z.object({
+  categoryId: z.string().uuid("Elige un frasco"),
+  name: z.string().trim().min(1, "Ponle un nombre").max(120),
+  currency: z.string().length(3),
+  initialAmount: z.number().nonnegative().optional(),
+});
+
+/**
+ * Crea un "sobre de ahorro" desde la toolbar de Gastos: un savings_goal
+ * kind='sobre' (acumulador, sin meta) colgado del frasco elegido
+ * (default_category_id). Si hay aporte inicial > 0, lo registra como un aporte
+ * normal a la meta (transacción vinculada que sube current_amount) — reutiliza
+ * addGoalContribution, no duplica.
+ */
+export async function createSavingsSobreAction(raw: unknown): Promise<ActionResult> {
+  const parsed = savingsSobreSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const goalId = await createGoal({
+      name: parsed.data.name,
+      kind: "sobre",
+      currency: parsed.data.currency,
+      defaultCategoryId: parsed.data.categoryId,
+      targetAmount: null,
+      currentAmount: 0,
+      monthlyContribution: 0,
+      recurrence: "ninguna",
+    });
+    const initial = parsed.data.initialAmount ?? 0;
+    if (initial > 0) {
+      await addGoalContribution({
+        goalId,
+        amount: initial,
+        contributionDate: new Date().toISOString().slice(0, 10),
+      });
+    }
+    revalidatePath("/control-financiero");
+    revalidatePath("/gastos");
+    revalidatePath("/transacciones");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("createSavingsSobre fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos crear el sobre de ahorro." };
+  }
+}
+
 /**
  * Alta de una póliza de defensa desde el flujo de ahorro (toggle "Defensa").
  * Delega en la action de Patrimonio (misma validación/persistencia; sin duplicar

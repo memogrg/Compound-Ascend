@@ -3,6 +3,7 @@ import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-ja
 import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sections";
+import { createSavingsSobreAction } from "@/modules/control";
 
 /** Fecha de corte de los frascos: ?asOf=YYYY-MM-DD válido, o el día de hoy. */
 function resolveAsOf(raw: string | undefined): string {
@@ -61,6 +62,7 @@ export default async function Page({
         jarsAsOf={asOf}
         jarsPeriod={jarsPeriod}
         range={rangeView.range}
+        createSavingsSobre={createSavingsSobreAction}
       />
     </div>
   );

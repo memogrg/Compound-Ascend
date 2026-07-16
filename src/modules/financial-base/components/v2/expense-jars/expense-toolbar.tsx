@@ -12,6 +12,10 @@ import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { AddSpendModal } from "@/modules/financial-base/components/v2/expense-jars/add-spend-modal";
 import { NewSobreModal } from "@/modules/financial-base/components/v2/expense-jars/new-sobre-modal";
+import {
+  NewSavingsSobreModal,
+  type CreateSavingsSobre,
+} from "@/modules/financial-base/components/v2/expense-jars/new-savings-sobre-modal";
 import { CategoryManagerModal } from "@/modules/financial-base/components/v2/category-manager";
 import { copyPreviousMonthBudgetAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
@@ -21,7 +25,7 @@ import type {
   CategoryPersonalization,
 } from "@/modules/financial-base/services/categories-service";
 
-type Sheet = null | "spend" | "sobre" | "category";
+type Sheet = null | "spend" | "sobre" | "sobre-ahorro" | "category";
 
 export function ExpenseToolbar({
   jars,
@@ -31,6 +35,7 @@ export function ExpenseToolbar({
   tree,
   canPersonalize,
   personalization,
+  createSavingsSobre,
 }: {
   jars: Jar[];
   accounts: Account[];
@@ -39,6 +44,7 @@ export function ExpenseToolbar({
   tree: CategoryNode[];
   canPersonalize: boolean;
   personalization: CategoryPersonalization;
+  createSavingsSobre?: CreateSavingsSobre;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -138,6 +144,16 @@ export function ExpenseToolbar({
               setSheet("sobre");
             }}
           />
+          {createSavingsSobre ? (
+            <MenuItem
+              icon="savings"
+              label="Nuevo sobre de ahorro"
+              onClick={() => {
+                setMenu(false);
+                setSheet("sobre-ahorro");
+              }}
+            />
+          ) : null}
         </div>
       ) : null}
 
@@ -151,6 +167,13 @@ export function ExpenseToolbar({
       ) : null}
       {sheet === "sobre" ? (
         <NewSobreModal jars={jars} period={period} onClose={() => setSheet(null)} />
+      ) : null}
+      {sheet === "sobre-ahorro" && createSavingsSobre ? (
+        <NewSavingsSobreModal
+          jars={jars}
+          createSavingsSobre={createSavingsSobre}
+          onClose={() => setSheet(null)}
+        />
       ) : null}
       {sheet === "category" ? (
         <CategoryManagerModal

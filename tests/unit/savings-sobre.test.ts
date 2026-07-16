@@ -29,7 +29,11 @@ vi.mock("@/lib/supabase/server", () => ({
     from: () => ({
       insert: (payload: Record<string, unknown>) => {
         h.insert = payload;
-        return Promise.resolve({ error: null });
+        return {
+          select: () => ({
+            single: () => Promise.resolve({ data: { id: "g-new" }, error: null }),
+          }),
+        };
       },
     }),
   }),
