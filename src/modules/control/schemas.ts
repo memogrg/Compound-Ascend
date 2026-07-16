@@ -5,7 +5,10 @@ import { notFutureDate, NOT_FUTURE_MSG } from "@/lib/validation";
 export const goalInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
   goalType: z.string().max(40).optional(),
-  targetAmount: z.number().nonnegative("No puede ser negativo"),
+  // Tipo de ahorro: 'meta' (con objetivo) o 'sobre' (acumulador sin meta).
+  kind: z.enum(["meta", "sobre"]).default("meta"),
+  // Nullable/opcional: un sobre no lleva meta.
+  targetAmount: z.number().nonnegative("No puede ser negativo").nullable().optional(),
   currentAmount: z.number().nonnegative().default(0),
   monthlyContribution: z.number().nonnegative().default(0),
   currency: z.string().length(3),

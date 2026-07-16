@@ -225,7 +225,15 @@ function GoalForm({
   // Modo Defensa: si se activa, el ahorro se convierte en una protección. Los
   // dos FONDOS crean un savings_goal etiquetado (goal_type=defensa:*); los dos
   // SEGUROS crean una insurance_policy vía addPolicyAction (reutilizada).
-  const [isDefense, setIsDefense] = useState<boolean>((item?.goalType ?? "").startsWith("defensa:"));
+  // Tipo de ahorro: Meta (con objetivo) / Defensa (protección) / Sobre (acumulador).
+  const initialMode: "meta" | "defensa" | "sobre" = (item?.goalType ?? "").startsWith("defensa:")
+    ? "defensa"
+    : item?.kind === "sobre"
+      ? "sobre"
+      : "meta";
+  const [mode, setMode] = useState<"meta" | "defensa" | "sobre">(initialMode);
+  const isDefense = mode === "defensa";
+  const isSobre = mode === "sobre";
   const [defenseKind, setDefenseKind] = useState<string>(
     (item?.goalType ?? "").startsWith("defensa:") ? item!.goalType! : "defensa:fondo_emergencia",
   );
@@ -290,17 +298,19 @@ function GoalForm({
     run(
       {
         name,
-        targetAmount: Number(targetAmount) || 0,
         currentAmount: Number(fd.get("currentAmount") ?? 0),
         monthlyContribution: Number(fd.get("monthlyContribution") ?? 0),
         currency: cur,
-        targetDate: String(fd.get("targetDate") ?? "") || undefined,
+        targetDate: isSobre ? undefined : String(fd.get("targetDate") ?? "") || undefined,
         priority: String(fd.get("priority") ?? "media"),
         goalType: isDefense ? defenseKind : undefined,
-        recurrence,
+        // Sobre: acumulador puro (sin meta, sin recurrencia, sin categoría).
+        kind: isSobre ? "sobre" : "meta",
+        targetAmount: isSobre ? null : Number(targetAmount) || 0,
+        recurrence: isSobre ? "ninguna" : recurrence,
         // En un frasco recurrente el "Monto por período" ES el plan pleno.
-        periodAmount: isRecurring ? Number(targetAmount) || 0 : undefined,
-        defaultCategoryId: defaultCategoryId || null,
+        periodAmount: !isSobre && isRecurring ? Number(targetAmount) || 0 : undefined,
+        defaultCategoryId: isSobre ? null : defaultCategoryId || null,
       },
       onDone,
       form,
@@ -316,7 +326,7 @@ function GoalForm({
           </div>
         ) : null}
 
-        {/* Toggle Defensa: convierte el ahorro en una protección. */}
+        {/* Toggle tipo de ahorro: Meta / Defensa / Sobre. */}
         <div className="fld">
           <label
             className="fld-label"
@@ -325,8 +335,8 @@ function GoalForm({
             Tipo de ahorro
             <span
               className="tip tip-wrap"
-              data-tip="Actívalo si este ahorro es una protección. Los fondos se acumulan; los seguros llevan prima. Aparecerá en tu área de Defensa."
-              aria-label="Qué es un ahorro de defensa"
+              data-tip="Meta: ahorro con objetivo. Defensa: una protección (fondo o seguro). Sobre: acumulador sin meta (le metés y sacás plata; ideal para gastos periódicos)."
+              aria-label="Qué tipo de ahorro elegir"
               style={{ display: "inline-flex", cursor: "help" }}
             >
               <Icon name="info" />
@@ -335,17 +345,24 @@ function GoalForm({
           <div className="seg" role="group" aria-label="Tipo de ahorro">
             <button
               type="button"
-              className={`seg-btn${!isDefense ? " on" : ""}`}
-              onClick={() => setIsDefense(false)}
+              className={`seg-btn${mode === "meta" ? " on" : ""}`}
+              onClick={() => setMode("meta")}
             >
-              Normal
+              Meta
             </button>
             <button
               type="button"
               className={`seg-btn${isDefense ? " on" : ""}`}
-              onClick={() => setIsDefense(true)}
+              onClick={() => setMode("defensa")}
             >
               Defensa
+            </button>
+            <button
+              type="button"
+              className={`seg-btn${isSobre ? " on" : ""}`}
+              onClick={() => setMode("sobre")}
+            >
+              Sobre
             </button>
           </div>
         </div>
@@ -435,16 +452,18 @@ function GoalForm({
         ) : (
           <>
             <div className="fld-2">
+              {!isSobre ? (
+                <Money
+                  label={isRecurring ? "Monto por período" : "Monto meta"}
+                  name="targetAmount"
+                  currency={cur}
+                  error={errors.targetAmount}
+                  value={targetAmount}
+                  onChange={setTargetAmount}
+                />
+              ) : null}
               <Money
-                label={isRecurring ? "Monto por período" : "Monto meta"}
-                name="targetAmount"
-                currency={cur}
-                error={errors.targetAmount}
-                value={targetAmount}
-                onChange={setTargetAmount}
-              />
-              <Money
-                label="Acumulado"
+                label={isSobre ? "Acumulado (aporte inicial)" : "Acumulado"}
                 name="currentAmount"
                 currency={cur}
                 defaultValue={item?.currentAmount}
@@ -457,15 +476,17 @@ function GoalForm({
                 currency={cur}
                 defaultValue={item?.monthlyContribution}
               />
-              <div className="fld">
-                <label className="fld-label">Fecha objetivo</label>
-                <input
-                  className="inp"
-                  name="targetDate"
-                  type="date"
-                  defaultValue={item?.targetDate ?? ""}
-                />
-              </div>
+              {!isSobre ? (
+                <div className="fld">
+                  <label className="fld-label">Fecha objetivo</label>
+                  <input
+                    className="inp"
+                    name="targetDate"
+                    type="date"
+                    defaultValue={item?.targetDate ?? ""}
+                  />
+                </div>
+              ) : null}
             </div>
             <div className="fld-2">
               <div className="fld">
@@ -498,75 +519,84 @@ function GoalForm({
                 </select>
               </div>
             </div>
-            <div className="fld-2">
-              <div className="fld">
-                <label
-                  className="fld-label"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                >
-                  Recurrencia
-                  <span
-                    className="tip tip-wrap"
-                    data-tip="Para gastos que se repiten (marchamo anual, ropa del año). Al terminar el período, la meta se restaura sola y lo que no gastaste se arrastra."
-                    aria-label="Qué es la recurrencia de un frasco"
-                    style={{ display: "inline-flex", cursor: "help" }}
-                  >
-                    <Icon name="info" />
-                  </span>
-                </label>
-                <select
-                  className="sel"
-                  value={recurrence}
-                  onChange={(e) => setRecurrence(e.target.value)}
-                >
-                  <option value="ninguna">Ninguna</option>
-                  <option value="mensual">Mensual</option>
-                  <option value="trimestral">Trimestral</option>
-                  <option value="semestral">Semestral</option>
-                  <option value="anual">Anual</option>
-                </select>
-              </div>
-              {isRecurring ? (
-                <div className="fld" style={{ display: "flex", alignItems: "flex-end" }}>
-                  <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-                    La <strong>Fecha objetivo</strong> marca el primer reinicio; si la dejas vacía,
-                    se reinicia una cadencia después de hoy.
-                  </p>
+            {isSobre ? (
+              <p className="muted" style={{ fontSize: 12, marginTop: -2 }}>
+                Un <strong>sobre</strong> acumula sin meta: le metés (desde Gastos) y sacás/gastás
+                (desde acá) cuando quieras. Sin objetivo ni recurrencia.
+              </p>
+            ) : (
+              <>
+                <div className="fld-2">
+                  <div className="fld">
+                    <label
+                      className="fld-label"
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      Recurrencia
+                      <span
+                        className="tip tip-wrap"
+                        data-tip="Para gastos que se repiten (marchamo anual, ropa del año). Al terminar el período, la meta se restaura sola y lo que no gastaste se arrastra."
+                        aria-label="Qué es la recurrencia de un frasco"
+                        style={{ display: "inline-flex", cursor: "help" }}
+                      >
+                        <Icon name="info" />
+                      </span>
+                    </label>
+                    <select
+                      className="sel"
+                      value={recurrence}
+                      onChange={(e) => setRecurrence(e.target.value)}
+                    >
+                      <option value="ninguna">Ninguna</option>
+                      <option value="mensual">Mensual</option>
+                      <option value="trimestral">Trimestral</option>
+                      <option value="semestral">Semestral</option>
+                      <option value="anual">Anual</option>
+                    </select>
+                  </div>
+                  {isRecurring ? (
+                    <div className="fld" style={{ display: "flex", alignItems: "flex-end" }}>
+                      <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                        La <strong>Fecha objetivo</strong> marca el primer reinicio; si la dejas
+                        vacía, se reinicia una cadencia después de hoy.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
-            <div className="fld">
-              <label
-                className="fld-label"
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-              >
-                Categoría (opcional)
-                <span
-                  className="tip tip-wrap"
-                  data-tip="Al gastar de este frasco, esta categoría viene precargada (puedes cambiarla en el momento)."
-                  aria-label="Qué es la categoría por defecto del frasco"
-                  style={{ display: "inline-flex", cursor: "help" }}
-                >
-                  <Icon name="info" />
-                </span>
-              </label>
-              <select
-                className="sel"
-                value={defaultCategoryId}
-                onChange={(e) => setDefaultCategoryId(e.target.value)}
-              >
-                <option value="">Sin categoría</option>
-                {catGroups.map((grp) => (
-                  <optgroup key={grp.groupName} label={grp.groupName}>
-                    {grp.options.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name}
-                      </option>
+                <div className="fld">
+                  <label
+                    className="fld-label"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    Categoría (opcional)
+                    <span
+                      className="tip tip-wrap"
+                      data-tip="Al gastar de este frasco, esta categoría viene precargada (puedes cambiarla en el momento)."
+                      aria-label="Qué es la categoría por defecto del frasco"
+                      style={{ display: "inline-flex", cursor: "help" }}
+                    >
+                      <Icon name="info" />
+                    </span>
+                  </label>
+                  <select
+                    className="sel"
+                    value={defaultCategoryId}
+                    onChange={(e) => setDefaultCategoryId(e.target.value)}
+                  >
+                    <option value="">Sin categoría</option>
+                    {catGroups.map((grp) => (
+                      <optgroup key={grp.groupName} label={grp.groupName}>
+                        {grp.options.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
+                  </select>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>

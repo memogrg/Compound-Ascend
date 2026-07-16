@@ -15,6 +15,7 @@ const goal = (g: Partial<SavingsGoal>): SavingsGoal => ({
   monthlyContribution: 0,
   currency: "CRC",
   status: "saludable",
+  kind: "meta",
   recurrence: "ninguna",
   ...g,
 });

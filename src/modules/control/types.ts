@@ -2,6 +2,8 @@
 
 export type GoalPriority = "alta" | "media" | "baja";
 export type GoalStatus = "saludable" | "atrasado" | "no_viable" | "revisar";
+/** Tipo de ahorro: 'meta' (con objetivo) o 'sobre' (acumulador puro, sin meta). */
+export type SavingsKind = "meta" | "sobre";
 
 export type { Recurrence } from "@/modules/control/engine/recurrence";
 
@@ -9,6 +11,8 @@ export type SavingsGoal = {
   id: string;
   name: string;
   goalType?: string | null;
+  kind: SavingsKind;
+  /** 0 cuando es un sobre (sin meta); usar `kind`/`targetAmount > 0` para el progreso. */
   targetAmount: number;
   currentAmount: number;
   monthlyContribution: number;

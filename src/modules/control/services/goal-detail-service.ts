@@ -49,6 +49,8 @@ export interface GoalDetailVM {
   id: string;
   name: string;
   currency: string;
+  /** 'sobre' = acumulador sin meta (no mostrar meta/brecha ni progreso). */
+  kind: "meta" | "sobre";
   currentAmount: number;
   targetAmount: number;
   /** Brecha meta − acumulado (nunca negativa). */
@@ -75,7 +77,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
 
   const { data: goal } = await supabase
     .from("savings_goals")
-    .select("id,name,currency,current_amount,target_amount,default_category_id")
+    .select("id,name,currency,current_amount,target_amount,default_category_id,kind")
     .eq("id", goalId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -177,6 +179,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
     id: goal.id,
     name: goal.name,
     currency: goal.currency,
+    kind: (goal.kind ?? "meta") as GoalDetailVM["kind"],
     currentAmount,
     targetAmount,
     gap: round2(Math.max(0, targetAmount - currentAmount)),

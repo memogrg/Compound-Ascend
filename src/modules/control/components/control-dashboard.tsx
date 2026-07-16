@@ -230,6 +230,8 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
               {goals.map((g) => {
                 const rec = d.goalRecs.find((r) => r.goalId === g.id);
                 const a = rec ? ACTION[rec.action] : ACTION.mantener;
+                // Un sobre acumula sin meta: no hay barra ni % de progreso.
+                const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
                 const progress =
                   g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
                 return (
@@ -243,12 +245,18 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
                         {a.label}
                       </span>
                     </div>
-                    <div className="bar">
-                      <div className="fl" style={{ width: `${progress}%` }} />
-                    </div>
+                    {isSobre ? null : (
+                      <div className="bar">
+                        <div className="fl" style={{ width: `${progress}%` }} />
+                      </div>
+                    )}
                     <div className="gs">
-                      <span className="gnum">{formatMoney(g.currentAmount, g.currency)}</span> /{" "}
-                      {formatMoney(g.targetAmount, g.currency)}
+                      <span className="gnum">{formatMoney(g.currentAmount, g.currency)}</span>
+                      {isSobre ? (
+                        <span className="muted"> · acumulado (sobre)</span>
+                      ) : (
+                        <> / {formatMoney(g.targetAmount, g.currency)}</>
+                      )}
                       {rec?.reason ? <> · {rec.reason}</> : null}
                     </div>
                     {g.recurrence && g.recurrence !== "ninguna" ? (

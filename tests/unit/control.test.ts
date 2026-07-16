@@ -48,6 +48,7 @@ function goal(p: Partial<SavingsGoal>): SavingsGoal {
     monthlyContribution: 0,
     currency: "CRC",
     status: "revisar",
+    kind: "meta",
     recurrence: "ninguna",
     ...p,
   };
