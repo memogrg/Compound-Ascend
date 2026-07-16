@@ -51,9 +51,17 @@ jobs:
       - name: Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
-          # Autentica la consulta a la API de GitHub que resuelve "latest".
-          github-token: ${{ github.token }}
+          # Versión FIJA, nunca "latest". Con "latest" la acción resuelve la release por red
+          # en cada corrida (api.github.com/repos/supabase/cli/releases/latest) y ese único
+          # punto tumbaba el CI entero con "Failed to resolve latest Supabase CLI release:
+          # Service Unavailable" — sin que nada del repo hubiera cambiado. El token de abajo
+          # ya estaba y NO bastó: el problema no era el rate-limit, era el 503.
+          # En src/main.ts de la acción, esa llamada solo ocurre si version == "latest"
+          # (`version.toLowerCase() === "latest" ? await resolveLatestVersion() : ...`), así
+          # que un número la elimina: el binario se baja directo de releases/download/v<ver>.
+          # 2.109.1 es la última ESTABLE (2026-07-07); todas las posteriores son beta.
+          # Para subirla: comprueba que exista una estable nueva y súbela en LOS DOS jobs.
+          version: 2.109.1
         env:
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,12 +96,10 @@ jobs:
       - name: Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
-          # Autentica la consulta a la API de GitHub que resuelve "latest" (5000/h vs 60/h sin token).
-          github-token: ${{ github.token }}
+          # Misma versión fija que el job de migraciones: ver allí el porqué. Si subes una,
+          # sube la otra — que los dos jobs prueben contra el mismo CLI es parte del punto.
+          version: 2.109.1
         env:
-          # Autentica la consulta a la API de GitHub que resuelve el release
-          # "latest"; sin token pega contra el límite de 60/h por IP del runner.
           SUPABASE_CLI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
