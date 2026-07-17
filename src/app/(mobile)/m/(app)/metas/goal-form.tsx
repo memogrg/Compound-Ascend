@@ -2,9 +2,8 @@ import { useEffect, useState } from "react";
 
 import { addPolicyAction } from "@/modules/wealth/api/actions";
 import {
-  listExpenseCategoriesAction,
+  listExpenseJarsAction,
   createSobreCategoryAction,
-  type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
 
 import {
@@ -114,11 +113,10 @@ export function GoalForm({
   const [catOptions, setCatOptions] = useState<Opt[]>([]);
   useEffect(() => {
     let alive = true;
-    void listExpenseCategoriesAction().then((groups: ExpenseCategoryGroup[]) => {
+    // Solo frascos de nivel superior (sin sobres/hijos) para categorizar el ahorro.
+    void listExpenseJarsAction().then((jars) => {
       if (!alive) return;
-      const flat = groups.flatMap((g) =>
-        g.options.map((o) => ({ value: o.id, label: `${g.groupName} · ${o.name}` })),
-      );
+      const flat = jars.map((j) => ({ value: j.id, label: j.name }));
       setCatOptions([{ value: "", label: "Sin categoría" }, ...flat]);
     });
     return () => {

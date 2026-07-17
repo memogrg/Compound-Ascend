@@ -378,6 +378,24 @@ export async function listExpenseCategoriesAction(): Promise<ExpenseCategoryGrou
   }
 }
 
+export type ExpenseJarOption = { id: string; name: string };
+
+/**
+ * Frascos de gasto de nivel superior (Transporte, Alimentación, Estilo de Vida…)
+ * para el selector "Categoría (frasco)" del ahorro: SOLO los grupos, sin sus
+ * sobres/hijos y sin el sufijo "(general)". Distinto de
+ * listExpenseCategoriesAction (que sí lista las hojas, para "Gastar del frasco").
+ */
+export async function listExpenseJarsAction(): Promise<ExpenseJarOption[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const tree = await listCategoryTree("expense");
+    return tree.map((g) => ({ id: g.id, name: g.name }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Gastar del frasco: consume la meta en una compra real. Crea un gasto
  * categorizado OFF-BUDGET (no toca el presupuesto del mes) y baja acumulado Y
