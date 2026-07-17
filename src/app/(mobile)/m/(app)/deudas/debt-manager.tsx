@@ -27,6 +27,13 @@ import {
   type ActionResult,
   type Opt,
 } from "../../components/form-kit";
+import {
+  MContentCard,
+  MDataRow,
+  MProgress,
+  MEmptyState,
+  mAmount,
+} from "../../components/content-kit";
 import { DebtForm, type DebtValues } from "./debt-form";
 
 /**
@@ -55,6 +62,28 @@ const MODE_OPTS: Opt[] = [
   { value: "tiempo", label: "Reducir plazo" },
   { value: "cuota", label: "Reducir cuota" },
 ];
+
+/**
+ * Subtítulo de una deuda. El rank del Priority Engine se dice con PALABRAS ("Págala
+ * primero") en vez del "1" que iba en un círculo: el número no explicaba por qué. El
+ * saldo NO va aquí — es el valor de la fila, a la derecha.
+ *
+ * Medido a 375px (caja de 158px), recortando por orden de menos a más informativo:
+ *   "Préstamo personal · 8.0% APR · ≈36 meses"  → cortado 81px (el tipo ya lo dice el
+ *                                                  nombre: "Préstamo personal BN")
+ *   "8.0% APR · libre en ≈36 meses"             → cortado 7px ("libre en" lo dice ya la
+ *                                                  métrica global)
+ *   "8.0% APR · ≈36 meses"                      → holgura 36px ✓
+ * El peor caso real ("45.9% APR · ≈240 meses") deja 21px. Queda la tasa —que es por lo
+ * que se ordenan— y cuándo se liquida.
+ */
+function debtSubtitle(args: { rank: number; apr: number; months: number | null }): string {
+  const { rank, apr, months } = args;
+  const tasa = `${formatPercent(apr / 100, 1)} APR`;
+  if (rank === 1) return `Págala primero · ${tasa}`;
+  if (months != null) return `${tasa} · ≈${months} ${months === 1 ? "mes" : "meses"}`;
+  return tasa;
+}
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -162,16 +191,26 @@ export function DebtManager({
   return (
     <>
       {items.length === 0 ? (
-        <div className="card card-p">
-          <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-            No tienes deudas cargadas. Toca el botón + para agregar la primera y armar tu plan de pago.
-          </div>
-        </div>
+        <MEmptyState
+          icon="debt"
+          title="Sin deudas registradas"
+          description="Si no debes nada, disfrútalo. Y si tienes una tarjeta o un préstamo, anótalo: la app te arma el plan y te dice cuál atacar primero."
+          actionLabel="Registrar una deuda"
+          onAction={() => setAdding(true)}
+        />
       ) : (
-        items.map(({ vm, rank, months }) => {
-          const pct = vm.originalAmount && vm.originalAmount > 0 ? Math.min(1, vm.balance / vm.originalAmount) : 1;
+        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
+        // lateral lo pone la regla puente .m-swipe-content .m-drow.
+        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
+        {items.map(({ vm, rank, months }) => {
+          // La barra mide lo PAGADO, no lo que debes: antes era balance/originalAmount y se
+          // llenaba cuanto MÁS debías (una deuda recién pedida salía al 100%). Sin
+          // originalAmount no hay forma de saber qué se pagó → no se pinta barra, en vez de
+          // inventar un 100% como hacía el `: 1` de antes.
+          const conOriginal = Boolean(vm.originalAmount && vm.originalAmount > 0);
+          const pagado = conOriginal ? Math.max(0, (vm.originalAmount ?? 0) - vm.balance) : 0;
+          const pct = conOriginal ? Math.min(1, pagado / (vm.originalAmount ?? 1)) : 0;
           const cuota = vm.monthlyPayment || vm.minPayment;
-          const barColor = rank === 1 ? "var(--danger)" : "var(--warning)";
           const nPay = paymentsByDebt[vm.id]?.length ?? 0;
           const debtRaw = rawById.get(vm.id);
           return (
@@ -180,62 +219,56 @@ export function DebtManager({
               onEdit={debtRaw ? () => setEditing(debtRaw) : undefined}
               onDelete={() => setDeleting(vm)}
             >
-              <div className="card card-p" style={{ marginBottom: 12 }}>
-                <div className="between" style={{ marginBottom: 12 }}>
-                  <div className="row" style={{ gap: 11 }}>
-                    <span
-                      className="lic"
-                      style={rank === 1 ? { background: "var(--danger-soft)", color: "var(--danger)" } : undefined}
-                    >
-                      {rank}
-                    </span>
-                    <div>
-                      <div className="lname">{vm.name}</div>
-                      <div className="lsub">
-                        {vm.debtType ?? "Deuda"} · {formatPercent(vm.apr / 100, 1)}
-                      </div>
+              {/* Los botones NO van en `trailing`: estrecharía toda la columna de texto, el
+                  subtítulo incluido (Ingresos/Ahorro). Van en el slot, con el padding
+                  lateral reducido — .m-btn reserva 40px que parten la etiqueta. */}
+              <MDataRow
+                icon="debt"
+                iconTone={rank === 1 ? "danger" : "neutral"}
+                title={vm.name}
+                subtitle={debtSubtitle({ rank, apr: vm.apr, months })}
+                value={mAmount(vm.balance, currency, 10)}
+                valueTone="danger"
+                slot={
+                  <>
+                    {conOriginal ? (
+                      <MProgress value={pct} tone={rank === 1 ? "warning" : "success"} height={7} />
+                    ) : null}
+                    <div className="between" style={{ marginTop: conOriginal ? 9 : 0 }}>
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        Cuota {mAmount(cuota, currency)}/mes
+                      </span>
+                      {conOriginal ? (
+                        <span className="mono muted" style={{ fontSize: 11 }}>
+                          {Math.round(pct * 100)}% pagado
+                        </span>
+                      ) : null}
                     </div>
-                  </div>
-                  <div className="jar-amt">
-                    <div className="a neg">{formatMoney(vm.balance, currency)}</div>
-                    {vm.originalAmount ? <div className="b">de {formatMoney(vm.originalAmount, currency)}</div> : null}
-                  </div>
-                </div>
-                <div className="bar" style={{ height: 7 }}>
-                  <i style={{ width: `${Math.round(pct * 100)}%`, background: barColor }} />
-                </div>
-                <div className="between" style={{ marginTop: 9 }}>
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    Cuota {formatMoney(cuota, currency)}/mes
-                  </span>
-                  {months != null && (
-                    <span className="mono" style={{ fontSize: 11 }}>
-                      ≈ {months} {months === 1 ? "mes" : "meses"}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                  <button
-                    type="button"
-                    className="m-btn m-btn-secondary"
-                    style={{ flex: 1, minHeight: 42, fontSize: 13.5 }}
-                    onClick={() => setReporting(vm)}
-                  >
-                    Reportar pago
-                  </button>
-                  <button
-                    type="button"
-                    className="m-btn m-btn-secondary"
-                    style={{ flex: 1, minHeight: 42, fontSize: 13.5 }}
-                    onClick={() => setHistory(vm)}
-                  >
-                    Historial{nPay > 0 ? ` (${nPay})` : ""}
-                  </button>
-                </div>
-              </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                      <button
+                        type="button"
+                        className="m-btn m-btn-secondary"
+                        style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                        onClick={() => setReporting(vm)}
+                      >
+                        Reportar pago
+                      </button>
+                      <button
+                        type="button"
+                        className="m-btn m-btn-secondary"
+                        style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                        onClick={() => setHistory(vm)}
+                      >
+                        Historial{nPay > 0 ? ` (${nPay})` : ""}
+                      </button>
+                    </div>
+                  </>
+                }
+              />
             </SwipeRow>
           );
-        })
+        })}
+        </MContentCard>
       )}
 
       <Fab onClick={() => setAdding(true)} label="Nueva deuda" />

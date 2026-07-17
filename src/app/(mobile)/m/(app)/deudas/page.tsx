@@ -10,7 +10,17 @@ import {
   type DebtPayment,
 } from "@/modules/control";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, formatPercent } from "@/lib/format";
+import {
+  MSummaryCard,
+  MSectionHeader,
+  MContentCard,
+  MMetricGrid,
+  MMetricCard,
+  MChip,
+  MProgress,
+  mAmount,
+} from "../../components/content-kit";
 import { DebtManager, type DebtItem } from "./debt-manager";
 
 /**
@@ -51,16 +61,30 @@ export default async function MobileDeudas() {
       <div className="m-scroll">
         <div className="m-pad">
           <MobileHeader variant="inner" eyebrow="Control" title="Deudas y Préstamos" backHref="/m" backLabel="Volver a Inicio" />
-          <div className="ov" style={{ marginBottom: 8 }}>
-            Sin deudas registradas 🎉
-          </div>
+          {/* Aquí se veían DOS vacíos seguidos: este ("Sin deudas registradas 🎉", con
+              emoji donde el resto del móvil usa MIcon) y, justo debajo, el del manager
+              con items=[]. Ahora el mensaje vive en un solo sitio: el del manager, que es
+              el que además tiene el FAB para crear la primera. */}
           <DebtManager items={[]} raw={raw} paymentsByDebt={paymentsByDebt} currency={currency} />
         </div>
       </div>
     );
   }
 
+  // getDebtsOverview YA convirtió cada deuda a la moneda de display (balance, minPayment…
+  // salen de conv(...) en debts-service), así que aquí se suma en crudo: convertir otra
+  // vez sería el error. Esto NO es como Ahorro, donde la meta guarda su moneda nativa.
   const total = debts.reduce((s, d) => s + d.balance, 0);
+  // Avance global = lo pagado sobre lo pedido. Solo cuentan las deudas que guardan su
+  // monto original: sin él no se sabe qué se pagó, y meterlas falsearía el porcentaje.
+  const conOriginal = debts.filter((d) => d.originalAmount && d.originalAmount > 0);
+  const totalOriginal = conOriginal.reduce((s, d) => s + (d.originalAmount ?? 0), 0);
+  const totalPendienteDeEsas = conOriginal.reduce((s, d) => s + d.balance, 0);
+  const pagado = Math.max(0, totalOriginal - totalPendienteDeEsas);
+  const pctPagado = totalOriginal > 0 ? Math.min(1, pagado / totalOriginal) : 0;
+  // Lo que hay que pagar este mes (mínimos) y la tasa que más duele.
+  const minMes = debts.reduce((s, d) => s + (d.monthlyPayment || d.minPayment), 0);
+  const peorApr = debts.reduce((worst, d) => (d.apr > (worst?.apr ?? -1) ? d : worst), debts[0]!);
   const inputs: DebtInput[] = debts.map((d) => ({
     id: d.id,
     name: d.name,
@@ -93,29 +117,52 @@ export default async function MobileDeudas() {
       <div className="m-pad">
         <MobileHeader variant="inner" eyebrow="Control" title="Deudas y Préstamos" backHref="/m" backLabel="Volver a Inicio" />
 
-        {/* Hero: deuda total */}
-        <div
-          className="hero-nw"
-          style={{
-            marginBottom: 16,
-            background: "linear-gradient(155deg, color-mix(in srgb, var(--danger) 16%, var(--surface)), var(--surface) 62%)",
-            borderColor: "color-mix(in srgb, var(--danger) 22%, var(--border))",
-          }}
-        >
-          <div className="ov">Deuda total</div>
-          <div className="hero-amt" style={{ color: "var(--danger)", marginTop: 6 }}>
-            {formatMoney(total, currency)}
-          </div>
-          <div className="delta" style={{ marginTop: 8, color: "var(--text-muted)" }}>
-            {debts.length} {debts.length === 1 ? "deuda activa" : "deudas activas"}
-          </div>
-        </div>
+        {/* Resumen: lo que debes (exacto mientras quepa) y cuánto llevas pagado. */}
+        <MSummaryCard
+          eyebrow="Deuda total"
+          value={mAmount(total, currency, 11)}
+          tone="danger"
+          chip={totalOriginal > 0 ? <MChip tone="success">{formatPercent(pctPagado)} pagado</MChip> : undefined}
+          sub={
+            totalOriginal > 0
+              ? `Llevas ${formatMoney(pagado, currency)} pagados de ${formatMoney(totalOriginal, currency)} que pediste.`
+              : `${debts.length} ${debts.length === 1 ? "deuda activa" : "deudas activas"}.`
+          }
+          slot={totalOriginal > 0 ? <MProgress value={pctPagado} tone="success" height={9} /> : undefined}
+          style={{ marginBottom: 16 }}
+        />
+
+        {/* Métricas: lo que no está en el resumen ni en "Próximo pago". */}
+        <MSectionHeader title="Tus deudas en números" />
+        <MMetricGrid style={{ marginBottom: 16 }}>
+          <MMetricCard
+            label="Deudas activas"
+            value={String(debts.length)}
+            sub={sim.feasible ? `libre en ≈${sim.months} meses` : "los mínimos no bastan"}
+            tone={sim.feasible ? "neutral" : "danger"}
+          />
+          <MMetricCard
+            label="A pagar este mes"
+            value={mAmount(minMes, currency, 8)}
+            sub="suma de tus cuotas"
+          />
+          <MMetricCard
+            label="APR más alta"
+            value={formatPercent(peorApr.apr / 100, 1)}
+            sub={peorApr.name}
+            tone="danger"
+          />
+          <MMetricCard
+            label="Intereses del plan"
+            value={mAmount(sim.totalInterest, currency, 8)}
+            sub={`con ${METHOD_LABEL[rec.method]?.toLowerCase() ?? rec.method}`}
+            tone="warning"
+          />
+        </MMetricGrid>
 
         {/* Estrategia de pago */}
+        <MSectionHeader title="Estrategia de pago" />
         <div style={{ marginBottom: 16 }}>
-          <div className="ov" style={{ marginBottom: 10 }}>
-            Estrategia de pago
-          </div>
           <div className="row" style={{ gap: 10, alignItems: "stretch" }}>
             <div className={`mcard${rec.method === "avalancha" ? " sel" : ""}`}>
               <div className="mt">Avalancha</div>
@@ -133,39 +180,41 @@ export default async function MobileDeudas() {
           </div>
         </div>
 
-        {/* Próximo pago */}
+        {/* Próximo pago: conserva su tinte de acento (es su identidad), con el contenedor
+            del kit — igual que el motor de prioridades de Ahorro. */}
         {next && (
-          <div
-            className="card card-p"
-            style={{ marginBottom: 16, background: "var(--accent-soft)", borderColor: "transparent" }}
-          >
+          <MContentCard style={{ marginBottom: 16, background: "var(--accent-soft)" }}>
             <div className="between">
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <div className="ov" style={{ color: "var(--accent)" }}>
                   Próximo pago
                 </div>
-                <div style={{ fontWeight: 700, fontSize: 15, marginTop: 6 }}>{next.name}</div>
+                <div
+                  style={{ fontWeight: 700, fontSize: 15, marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {next.name}
+                </div>
                 <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
                   Vence {fmtDate(next.nextDue)}
                 </div>
               </div>
-              <div className="display" style={{ fontSize: 22 }}>
-                {formatMoney(next.monthlyPayment || next.minPayment, currency)}
+              <div className="display" style={{ fontSize: 22, flex: "none" }}>
+                {mAmount(next.monthlyPayment || next.minPayment, currency, 9)}
               </div>
             </div>
-          </div>
+          </MContentCard>
         )}
 
         {/* Lista de deudas gestionable (SwipeRow editar/eliminar + reportar pago + historial) */}
-        <div>
-          <div className="between" style={{ marginBottom: 6 }}>
-            <div className="sec-title">Tus deudas</div>
-            <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>
+        <MSectionHeader
+          title="Tus deudas"
+          action={
+            <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
               orden · {METHOD_LABEL[rec.method]?.toLowerCase() ?? rec.method}
             </span>
-          </div>
-          <DebtManager items={items} raw={raw} paymentsByDebt={paymentsByDebt} currency={currency} />
-        </div>
+          }
+        />
+        <DebtManager items={items} raw={raw} paymentsByDebt={paymentsByDebt} currency={currency} />
       </div>
     </div>
   );
