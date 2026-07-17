@@ -11,6 +11,9 @@ import { TONE_TEXT, type MTone } from "./tone";
  *
  * `icon` es opcional: las filas que ya viven dentro de una tarjeta con su propio icono
  * (p. ej. los sobres de un frasco) se leen mejor sin repetirlo.
+ * `leading` reemplaza el tile de icono por un elemento propio del mismo tamaño (un badge
+ * de ticker "AAPL", un color de clase…); tiene prioridad sobre `icon`. Es para cuando el
+ * identificador no es un glifo del set — una posición de bolsa se reconoce por su símbolo.
  * `trailing` va después del valor (acciones); no lo combines con `chevron`, y si la fila
  * es <button> no metas botones dentro (HTML inválido) — déjala como <div>.
  * `dense` es para listas de solo lectura dentro de una tarjeta: el alto normal (44px de
@@ -20,6 +23,7 @@ import { TONE_TEXT, type MTone } from "./tone";
 export function MDataRow({
   icon,
   iconTone = "neutral",
+  leading,
   title,
   subtitle,
   value,
@@ -34,6 +38,8 @@ export function MDataRow({
 }: {
   icon?: MIconName;
   iconTone?: MTone;
+  /** Tile propio en lugar del glifo (badge de ticker…). Prioritario sobre `icon`. */
+  leading?: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
   value?: ReactNode;
@@ -51,7 +57,11 @@ export function MDataRow({
 }) {
   const body = (
     <>
-      {icon ? (
+      {leading ? (
+        <span className="m-dic" aria-hidden>
+          {leading}
+        </span>
+      ) : icon ? (
         <span className={`m-dic${iconTone === "neutral" ? "" : ` m-dic-${iconTone}`}`} aria-hidden>
           <MIcon name={icon} size={19} />
         </span>
