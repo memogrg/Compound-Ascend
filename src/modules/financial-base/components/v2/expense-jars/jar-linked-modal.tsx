@@ -7,11 +7,12 @@
  * creación del módulo origen (?new=<kind>, lo atrapa useDeepLinkModal allá).
  * Ahorro suma los fondos fijos (Emergencia/Paz) siempre disponibles.
  */
+import { Fragment } from "react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney } from "@/lib/format";
-import type { Jar } from "@/modules/financial-base/engine/expense-jars";
+import type { Jar, JarItem } from "@/modules/financial-base/engine/expense-jars";
 
 const KIND_TITLE: Record<string, string> = {
   holding: "Inversiones del portafolio",
@@ -125,89 +126,41 @@ export function JarLinkedModal({
                     ?
                   </span>
                 </div>
-                {jar.items.map((it) => {
-                  const budget = it.budget ?? 0;
-                  const spent = it.spent ?? 0;
-                  const remaining = it.remaining ?? budget - spent;
-                  const over = budget > 0 && spent > budget;
-                  const color = over ? "var(--neg)" : jar.color;
-                  const extra = it.extraordinary ?? 0;
-                  return (
-                    <div
-                      key={it.id}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 6,
-                        padding: "10px 0",
-                        borderBottom: "1px solid var(--line)",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 500,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {it.name}
-                          </div>
-                          <div className="muted" style={{ fontSize: 11.5 }}>
-                            {it.sub}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: "right", flex: "none" }}>
-                          <div className="tnum" style={{ fontSize: 13, fontWeight: 600 }}>
-                            {formatMoney(budget, currency)}
-                          </div>
-                          <div className="muted" style={{ fontSize: 10.5 }}>
-                            {L.unit}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="bar-track">
+                {jar.sections && jar.sections.length > 0
+                  ? jar.sections.map((sec) => (
+                      <Fragment key={sec.key}>
                         <div
-                          className="bar-fill"
-                          style={{ width: `${pct(spent, budget)}%`, background: color }}
-                        />
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          fontSize: 11.5,
-                          color: "var(--muted)",
-                        }}
-                      >
-                        <span style={over ? { color: "var(--neg)" } : undefined}>
-                          {formatMoney(spent, currency)} {L.done}
-                        </span>
-                        <span>
-                          {over
-                            ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
-                            : `${formatMoney(remaining, currency)} restante`}
-                        </span>
-                      </div>
-                      {extra > 0 ? (
-                        <span
-                          className="chip"
+                          className="muted"
                           style={{
-                            alignSelf: "flex-start",
-                            fontSize: 10,
-                            background: "var(--warn-soft)",
-                            color: "var(--warn)",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.4,
+                            marginTop: 10,
                           }}
                         >
-                          incluye {formatMoney(extra, currency)} extraordinario
-                        </span>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                          {sec.name}
+                        </div>
+                        {sec.items.map((it) => (
+                          <BudgetItemRow
+                            key={it.id}
+                            it={it}
+                            currency={currency}
+                            jarColor={jar.color}
+                            labels={L}
+                          />
+                        ))}
+                      </Fragment>
+                    ))
+                  : jar.items.map((it) => (
+                      <BudgetItemRow
+                        key={it.id}
+                        it={it}
+                        currency={currency}
+                        jarColor={jar.color}
+                        labels={L}
+                      />
+                    ))}
               </>
             ) : fixed.length === 0 ? (
               <div
@@ -302,5 +255,96 @@ export function JarLinkedModal({
         </Link>
       </div>
     </Modal>
+  );
+}
+
+/** Fila budget-aware de una obligación (cuota|aporte / pagado|aportado / restante). */
+function BudgetItemRow({
+  it,
+  currency,
+  jarColor,
+  labels,
+}: {
+  it: JarItem;
+  currency: string;
+  jarColor: string;
+  labels: { done: string; unit: string };
+}) {
+  const budget = it.budget ?? 0;
+  const spent = it.spent ?? 0;
+  const remaining = it.remaining ?? budget - spent;
+  const over = budget > 0 && spent > budget;
+  const color = over ? "var(--neg)" : jarColor;
+  const extra = it.extraordinary ?? 0;
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        padding: "10px 0",
+        borderBottom: "1px solid var(--line)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {it.name}
+          </div>
+          <div className="muted" style={{ fontSize: 11.5 }}>
+            {it.sub}
+          </div>
+        </div>
+        <div style={{ textAlign: "right", flex: "none" }}>
+          <div className="tnum" style={{ fontSize: 13, fontWeight: 600 }}>
+            {formatMoney(budget, currency)}
+          </div>
+          <div className="muted" style={{ fontSize: 10.5 }}>
+            {labels.unit}
+          </div>
+        </div>
+      </div>
+      <div className="bar-track">
+        <div className="bar-fill" style={{ width: `${pct(spent, budget)}%`, background: color }} />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 11.5,
+          color: "var(--muted)",
+        }}
+      >
+        <span style={over ? { color: "var(--neg)" } : undefined}>
+          {formatMoney(spent, currency)} {labels.done}
+        </span>
+        <span>
+          {over
+            ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
+            : `${formatMoney(remaining, currency)} restante`}
+        </span>
+      </div>
+      {extra > 0 ? (
+        <span
+          className="chip"
+          style={{
+            alignSelf: "flex-start",
+            fontSize: 10,
+            background: "var(--warn-soft)",
+            color: "var(--warn)",
+          }}
+        >
+          incluye {formatMoney(extra, currency)} extraordinario
+        </span>
+      ) : null}
+    </div>
   );
 }

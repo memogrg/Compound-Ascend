@@ -101,7 +101,7 @@ describe("buildExpenseJars (Fase frascos)", () => {
     const jar = buildExpenseJars({ tree: [DEUDAS], budgetByKey: {}, realByKey: {}, entities, fmt })[0]!;
     if (jar.kind !== "linked") throw new Error("linked");
     expect(jar.linkedKind).toBe("debt");
-    expect(jar.items).toEqual([{ id: "d1", name: "Tarjeta BAC", sub: "Cuota mensual", amount: "¢45000", delta: undefined }]);
+    expect(jar.items).toEqual([{ id: "d1", name: "Tarjeta BAC", sub: "Cuota mensual", amount: "¢45000", delta: undefined, categoryId: null }]);
     expect(jar.cta.href).toBe("/deudas?new=debt");
   });
 
@@ -209,6 +209,85 @@ describe("buildExpenseJars (Fase frascos)", () => {
     expect(jar.totals).toEqual({ budget: 150000, spent: 50000, remaining: 100000 });
     // Los fondos fijos siguen presentes (informativos, el modal los pinta sin barra).
     expect(jar.fixedFunds?.map((f) => f.name)).toEqual(["Fondo de emergencia", "Fondo de paz"]);
+  });
+});
+
+describe("buildExpenseJars · Ahorro agrupado por categoría (A2)", () => {
+  // Grupos referenciados por la categoría de los ahorros.
+  const TRANSPORTE: CategoryNode = {
+    ...cat({ id: "g_transporte", key: "g_transporte", name: "Transporte", sortOrder: 1 }),
+    children: [],
+  };
+  const SALUD: CategoryNode = {
+    ...cat({ id: "g_salud", key: "g_salud", name: "Salud y Bienestar", sortOrder: 2 }),
+    children: [cat({ id: "salud_beauty", name: "Belleza", parentId: "g_salud" })],
+  };
+  const COMIDA: CategoryNode = {
+    ...cat({ id: "g_comida", key: "g_comida", name: "Comida", sortOrder: 3 }),
+    children: [],
+  };
+  const tree = [AHORRO, TRANSPORTE, SALUD, COMIDA];
+
+  const goalEntities = (): JarEntities => ({
+    ...NO_ENTITIES,
+    goal: [
+      { id: "g1", name: "Fondo emergencia", sub: "", amount: 50000, categoryId: null },
+      { id: "g2", name: "Seguro auto", sub: "", amount: 30000, categoryId: "g_transporte" },
+      { id: "g3", name: "Belleza Fernanda", sub: "", amount: 20000, categoryId: "salud_beauty" },
+    ],
+  });
+
+  function ahorroJar(withBudget: boolean) {
+    const jar = buildExpenseJars({
+      tree,
+      budgetByKey: {},
+      realByKey: {},
+      entities: goalEntities(),
+      fmt,
+      linkedBudget: withBudget
+        ? { goal: { bySource: {}, spentById: {}, paymentCategoryId: "cat-ahorro" } }
+        : undefined,
+    }).find((j) => j.kind === "linked" && j.linkedKind === "goal");
+    if (!jar || jar.kind !== "linked") throw new Error("ahorro linked jar");
+    return jar;
+  }
+
+  it("agrupa por el grupo PADRE cuando la categoría es una hoja; 'Generales' va primero", () => {
+    const jar = ahorroJar(false);
+    expect(jar.sections?.map((s) => s.name)).toEqual(["Generales", "Transporte", "Salud y Bienestar"]);
+    expect(jar.sections?.find((s) => s.name === "Generales")?.items.map((i) => i.id)).toEqual(["g1"]);
+    expect(jar.sections?.find((s) => s.name === "Transporte")?.items.map((i) => i.id)).toEqual(["g2"]);
+    // g3 cuelga de la hoja salud_beauty → resuelve al grupo padre "Salud y Bienestar".
+    expect(jar.sections?.find((s) => s.name === "Salud y Bienestar")?.items.map((i) => i.id)).toEqual(["g3"]);
+  });
+
+  it("no emite secciones vacías (Comida no tiene ahorros → no aparece)", () => {
+    const jar = ahorroJar(false);
+    expect(jar.sections?.map((s) => s.name)).not.toContain("Comida");
+  });
+
+  it("categoría inexistente en el árbol cae en 'Generales'", () => {
+    const jar = buildExpenseJars({
+      tree,
+      budgetByKey: {},
+      realByKey: {},
+      entities: { ...NO_ENTITIES, goal: [{ id: "gx", name: "Huérfano", sub: "", amount: 1, categoryId: "borrada" }] },
+      fmt,
+    }).find((j) => j.kind === "linked" && j.linkedKind === "goal")!;
+    if (jar.kind !== "linked") throw new Error("linked");
+    expect(jar.sections?.map((s) => s.name)).toEqual(["Generales"]);
+    expect(jar.sections?.[0]!.items.map((i) => i.id)).toEqual(["gx"]);
+  });
+
+  it("agrupación es solo visual: items (plano) y totales NO cambian", () => {
+    const jar = ahorroJar(true);
+    // items plano conserva las 3 metas.
+    expect(jar.items.map((i) => i.id).sort()).toEqual(["g1", "g2", "g3"]);
+    // totales = suma de los aportes (fallback al monto de la entidad), sin doble conteo.
+    expect(jar.totals).toEqual({ budget: 100000, spent: 0, remaining: 100000 });
+    // Cada item aparece exactamente una vez entre todas las secciones.
+    const idsInSections = jar.sections!.flatMap((s) => s.items.map((i) => i.id)).sort();
+    expect(idsInSections).toEqual(["g1", "g2", "g3"]);
   });
 });
 
