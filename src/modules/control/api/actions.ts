@@ -23,7 +23,7 @@ import {
   spendFromGoal,
 } from "@/modules/control/services/control-service";
 import { addPolicyAction } from "@/modules/wealth";
-import { listCategoryTree, deleteTransaction } from "@/modules/financial-base";
+import { listCategoryTree, deleteTransaction, createCategory } from "@/modules/financial-base";
 import { getGoalDetail, type GoalDetailVM } from "@/modules/control/services/goal-detail-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -320,6 +320,38 @@ export async function getGoalDetailAction(goalId: string): Promise<GoalDetailVM 
   } catch (err) {
     logger.error("getGoalDetail fallido", { message: err instanceof Error ? err.message : "?" });
     return null;
+  }
+}
+
+const newSobreCategorySchema = z.object({
+  name: z.string().trim().min(1, "Ponle un nombre").max(60),
+  parentId: z.string().uuid().optional().nullable(),
+});
+
+/**
+ * Crea una categoría (frasco) para asignarla a un sobre de ahorro, desde el
+ * form de Ahorro. Wrapper de control sobre createCategory (dirección
+ * control → financial-base). Devuelve el id para seleccionarla al vuelo.
+ */
+export async function createSobreCategoryAction(
+  raw: unknown,
+): Promise<ActionResult & { id?: string }> {
+  const parsed = newSobreCategorySchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const id = await createCategory({
+      name: parsed.data.name,
+      parentId: parsed.data.parentId ?? null,
+      categoryType: "expense",
+      isFavorite: true,
+    });
+    return { ok: true, id: id ?? undefined };
+  } catch (err) {
+    logger.error("createSobreCategory fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos crear la categoría." };
   }
 }
 

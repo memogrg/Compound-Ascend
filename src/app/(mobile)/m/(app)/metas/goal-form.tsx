@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { addPolicyAction } from "@/modules/wealth/api/actions";
 import {
   listExpenseCategoriesAction,
+  createSobreCategoryAction,
   type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
 
@@ -124,6 +125,21 @@ export function GoalForm({
       alive = false;
     };
   }, []);
+  // Crear un frasco (categoría) nuevo desde el sobre, sin salir del form.
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatPending, setNewCatPending] = useState(false);
+  async function createInlineCategory() {
+    const n = newCatName.trim();
+    if (!n) return;
+    setNewCatPending(true);
+    const res = await createSobreCategoryAction({ name: n });
+    setNewCatPending(false);
+    if (res.ok && res.id) {
+      setCatOptions((prev) => [...prev, { value: res.id!, label: `Nuevo · ${n}` }]);
+      setDefaultCategoryId(res.id);
+      setNewCatName("");
+    }
+  }
   const initialDefense = (initial?.goalType ?? "").startsWith("defensa:");
   const [mode, setMode] = useState(
     initialDefense ? "defensa" : initial?.kind === "sobre" ? "sobre" : "meta",
@@ -211,7 +227,8 @@ export function GoalForm({
 
   const values: GoalValues = {
     name: effectiveName,
-    // Un sobre es acumulador puro: sin meta, sin recurrencia, sin categoría.
+    // Un sobre es acumulador puro: sin meta ni recurrencia. La CATEGORÍA es del
+    // sobre; Meta/Defensa son ahorro puro sin categoría.
     kind: isSobre ? "sobre" : "meta",
     targetAmount: isSobre ? null : targetAmount,
     currentAmount: initial?.currentAmount ?? 0, // se preserva en edición; 0 al crear
@@ -223,7 +240,7 @@ export function GoalForm({
     // Recurrencia solo en frascos "meta" (no defensa ni sobre).
     recurrence: isDefense || isSobre ? "ninguna" : recurrence,
     periodAmount: !isDefense && !isSobre && isRecurring ? targetAmount : undefined,
-    defaultCategoryId: isSobre ? null : defaultCategoryId || null,
+    defaultCategoryId: isSobre ? defaultCategoryId || null : null,
   };
 
   return (
@@ -260,16 +277,39 @@ export function GoalForm({
       {!isDefense && !isSobre ? (
         <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia del frasco" />
       ) : null}
-      {!isSobre ? (
-        <SheetSelect
-          name="defaultCategoryId"
-          label="Categoría (opcional)"
-          value={defaultCategoryId}
-          onChange={setDefaultCategoryId}
-          options={catOptions}
-          placeholder="Sin categoría"
-          sheetTitle="Categoría por defecto del frasco"
-        />
+      {isSobre ? (
+        <>
+          <SheetSelect
+            name="defaultCategoryId"
+            label="Categoría (frasco)"
+            value={defaultCategoryId}
+            onChange={setDefaultCategoryId}
+            options={catOptions}
+            placeholder="Sin categoría"
+            sheetTitle="Frasco al que pertenece el sobre"
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <TextField
+                name="newCat"
+                label="Crear frasco nuevo (opcional)"
+                value={newCatName}
+                onChange={setNewCatName}
+                placeholder="Ej.: Estilo de vida"
+                maxLength={60}
+              />
+            </div>
+            <button
+              type="button"
+              className="m-btn m-btn-secondary"
+              style={{ minHeight: 44, fontSize: 13, paddingInline: 16, marginBottom: 2 }}
+              disabled={newCatPending || !newCatName.trim()}
+              onClick={() => void createInlineCategory()}
+            >
+              {newCatPending ? "…" : "Crear"}
+            </button>
+          </div>
+        </>
       ) : null}
       <Segmented name="priority" label="Prioridad" value={priority} onChange={setPriority} options={PRIORITY_OPTS} />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />

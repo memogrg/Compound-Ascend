@@ -17,6 +17,7 @@ import {
   editGoalAction,
   editDebtAction,
   listExpenseCategoriesAction,
+  createSobreCategoryAction,
   type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
 import { pmt } from "@/modules/control/engine/amortization";
@@ -269,6 +270,26 @@ function GoalForm({
       alive = false;
     };
   }, []);
+  // Crear un frasco (categoría) nuevo desde el sobre, sin salir del form.
+  const [newCatOpen, setNewCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatPending, setNewCatPending] = useState(false);
+  // Categorías creadas al vuelo (optimista, hasta que refresque la lista).
+  const [extraCats, setExtraCats] = useState<{ id: string; name: string }[]>([]);
+
+  async function createInlineCategory() {
+    const n = newCatName.trim();
+    if (!n) return;
+    setNewCatPending(true);
+    const res = await createSobreCategoryAction({ name: n });
+    setNewCatPending(false);
+    if (res.ok && res.id) {
+      setExtraCats((prev) => [...prev, { id: res.id!, name: n }]);
+      setDefaultCategoryId(res.id);
+      setNewCatOpen(false);
+      setNewCatName("");
+    }
+  }
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -304,13 +325,14 @@ function GoalForm({
         targetDate: isSobre ? undefined : String(fd.get("targetDate") ?? "") || undefined,
         priority: String(fd.get("priority") ?? "media"),
         goalType: isDefense ? defenseKind : undefined,
-        // Sobre: acumulador puro (sin meta, sin recurrencia, sin categoría).
+        // Sobre: acumulador puro (sin meta, sin recurrencia). La CATEGORÍA es
+        // cosa del sobre; Meta/Defensa son ahorro puro sin categoría.
         kind: isSobre ? "sobre" : "meta",
         targetAmount: isSobre ? null : Number(targetAmount) || 0,
         recurrence: isSobre ? "ninguna" : recurrence,
         // En un frasco recurrente el "Monto por período" ES el plan pleno.
         periodAmount: !isSobre && isRecurring ? Number(targetAmount) || 0 : undefined,
-        defaultCategoryId: isSobre ? null : defaultCategoryId || null,
+        defaultCategoryId: isSobre ? defaultCategoryId || null : null,
       },
       onDone,
       form,
@@ -520,59 +542,21 @@ function GoalForm({
               </div>
             </div>
             {isSobre ? (
-              <p className="muted" style={{ fontSize: 12, marginTop: -2 }}>
-                Un <strong>sobre</strong> acumula sin meta: le metés (desde Gastos) y sacás/gastás
-                (desde acá) cuando quieras. Sin objetivo ni recurrencia.
-              </p>
-            ) : (
               <>
-                <div className="fld-2">
-                  <div className="fld">
-                    <label
-                      className="fld-label"
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      Recurrencia
-                      <span
-                        className="tip tip-wrap"
-                        data-tip="Para gastos que se repiten (marchamo anual, ropa del año). Al terminar el período, la meta se restaura sola y lo que no gastaste se arrastra."
-                        aria-label="Qué es la recurrencia de un frasco"
-                        style={{ display: "inline-flex", cursor: "help" }}
-                      >
-                        <Icon name="info" />
-                      </span>
-                    </label>
-                    <select
-                      className="sel"
-                      value={recurrence}
-                      onChange={(e) => setRecurrence(e.target.value)}
-                    >
-                      <option value="ninguna">Ninguna</option>
-                      <option value="mensual">Mensual</option>
-                      <option value="trimestral">Trimestral</option>
-                      <option value="semestral">Semestral</option>
-                      <option value="anual">Anual</option>
-                    </select>
-                  </div>
-                  {isRecurring ? (
-                    <div className="fld" style={{ display: "flex", alignItems: "flex-end" }}>
-                      <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-                        La <strong>Fecha objetivo</strong> marca el primer reinicio; si la dejas
-                        vacía, se reinicia una cadencia después de hoy.
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
+                <p className="muted" style={{ fontSize: 12, marginTop: -2 }}>
+                  Un <strong>sobre</strong> acumula sin meta: le metés (desde Gastos) y sacás/gastás
+                  (desde acá) cuando quieras. Sin objetivo ni recurrencia.
+                </p>
                 <div className="fld">
                   <label
                     className="fld-label"
                     style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                   >
-                    Categoría (opcional)
+                    Categoría (frasco)
                     <span
                       className="tip tip-wrap"
-                      data-tip="Al gastar de este frasco, esta categoría viene precargada (puedes cambiarla en el momento)."
-                      aria-label="Qué es la categoría por defecto del frasco"
+                      data-tip="El frasco al que pertenece el sobre (ej.: Maquillaje → Estilo de vida). Al gastar del sobre, esta categoría viene precargada."
+                      aria-label="Qué es la categoría del sobre"
                       style={{ display: "inline-flex", cursor: "help" }}
                     >
                       <Icon name="info" />
@@ -584,6 +568,15 @@ function GoalForm({
                     onChange={(e) => setDefaultCategoryId(e.target.value)}
                   >
                     <option value="">Sin categoría</option>
+                    {extraCats.length > 0 ? (
+                      <optgroup label="Nuevas">
+                        {extraCats.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null}
                     {catGroups.map((grp) => (
                       <optgroup key={grp.groupName} label={grp.groupName}>
                         {grp.options.map((o) => (
@@ -594,8 +587,83 @@ function GoalForm({
                       </optgroup>
                     ))}
                   </select>
+                  {newCatOpen ? (
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <input
+                        className="inp"
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
+                        placeholder="Nombre del frasco nuevo…"
+                        maxLength={60}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void createInlineCategory();
+                          }
+                          if (e.key === "Escape") setNewCatOpen(false);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: 12, padding: "6px 12px" }}
+                        disabled={newCatPending || !newCatName.trim()}
+                        onClick={() => void createInlineCategory()}
+                      >
+                        {newCatPending ? "…" : "Crear"}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ fontSize: 12, padding: "4px 8px", marginTop: 6, color: "var(--muted)" }}
+                      onClick={() => setNewCatOpen(true)}
+                    >
+                      <Icon name="plus" width={2} /> Crear frasco nuevo
+                    </button>
+                  )}
                 </div>
               </>
+            ) : (
+              <div className="fld-2">
+                <div className="fld">
+                  <label
+                    className="fld-label"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  >
+                    Recurrencia
+                    <span
+                      className="tip tip-wrap"
+                      data-tip="Para gastos que se repiten (marchamo anual, ropa del año). Al terminar el período, la meta se restaura sola y lo que no gastaste se arrastra."
+                      aria-label="Qué es la recurrencia de un frasco"
+                      style={{ display: "inline-flex", cursor: "help" }}
+                    >
+                      <Icon name="info" />
+                    </span>
+                  </label>
+                  <select
+                    className="sel"
+                    value={recurrence}
+                    onChange={(e) => setRecurrence(e.target.value)}
+                  >
+                    <option value="ninguna">Ninguna</option>
+                    <option value="mensual">Mensual</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="semestral">Semestral</option>
+                    <option value="anual">Anual</option>
+                  </select>
+                </div>
+                {isRecurring ? (
+                  <div className="fld" style={{ display: "flex", alignItems: "flex-end" }}>
+                    <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                      La <strong>Fecha objetivo</strong> marca el primer reinicio; si la dejas vacía,
+                      se reinicia una cadencia después de hoy.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             )}
           </>
         )}
