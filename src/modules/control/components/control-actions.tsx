@@ -325,14 +325,14 @@ function GoalForm({
         targetDate: isSobre ? undefined : String(fd.get("targetDate") ?? "") || undefined,
         priority: String(fd.get("priority") ?? "media"),
         goalType: isDefense ? defenseKind : undefined,
-        // Sobre: acumulador puro (sin meta, sin recurrencia). La CATEGORÍA es
-        // cosa del sobre; Meta/Defensa son ahorro puro sin categoría.
+        // Sobre: acumulador sin meta ni recurrencia. La CATEGORÍA la llevan
+        // Meta y Sobre (agrupa el ahorro); solo Defensa queda sin categoría.
         kind: isSobre ? "sobre" : "meta",
         targetAmount: isSobre ? null : Number(targetAmount) || 0,
         recurrence: isSobre ? "ninguna" : recurrence,
         // En un frasco recurrente el "Monto por período" ES el plan pleno.
         periodAmount: !isSobre && isRecurring ? Number(targetAmount) || 0 : undefined,
-        defaultCategoryId: isSobre ? defaultCategoryId || null : null,
+        defaultCategoryId: isDefense ? null : defaultCategoryId || null,
       },
       onDone,
       form,
@@ -542,91 +542,13 @@ function GoalForm({
               </div>
             </div>
             {isSobre ? (
-              <>
-                <p className="muted" style={{ fontSize: 12, marginTop: -2 }}>
-                  Un <strong>sobre</strong> acumula sin meta: le metés (desde Gastos) y sacás/gastás
-                  (desde acá) cuando quieras. Sin objetivo ni recurrencia.
-                </p>
-                <div className="fld">
-                  <label
-                    className="fld-label"
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-                  >
-                    Categoría (frasco)
-                    <span
-                      className="tip tip-wrap"
-                      data-tip="El frasco al que pertenece el sobre (ej.: Maquillaje → Estilo de vida). Al gastar del sobre, esta categoría viene precargada."
-                      aria-label="Qué es la categoría del sobre"
-                      style={{ display: "inline-flex", cursor: "help" }}
-                    >
-                      <Icon name="info" />
-                    </span>
-                  </label>
-                  <select
-                    className="sel"
-                    value={defaultCategoryId}
-                    onChange={(e) => setDefaultCategoryId(e.target.value)}
-                  >
-                    <option value="">Sin categoría</option>
-                    {extraCats.length > 0 ? (
-                      <optgroup label="Nuevas">
-                        {extraCats.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ) : null}
-                    {catGroups.map((grp) => (
-                      <optgroup key={grp.groupName} label={grp.groupName}>
-                        {grp.options.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  {newCatOpen ? (
-                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                      <input
-                        className="inp"
-                        value={newCatName}
-                        onChange={(e) => setNewCatName(e.target.value)}
-                        placeholder="Nombre del frasco nuevo…"
-                        maxLength={60}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void createInlineCategory();
-                          }
-                          if (e.key === "Escape") setNewCatOpen(false);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        style={{ fontSize: 12, padding: "6px 12px" }}
-                        disabled={newCatPending || !newCatName.trim()}
-                        onClick={() => void createInlineCategory()}
-                      >
-                        {newCatPending ? "…" : "Crear"}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-ghost"
-                      style={{ fontSize: 12, padding: "4px 8px", marginTop: 6, color: "var(--muted)" }}
-                      onClick={() => setNewCatOpen(true)}
-                    >
-                      <Icon name="plus" width={2} /> Crear frasco nuevo
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : (
+              <p className="muted" style={{ fontSize: 12, marginTop: -2 }}>
+                Un <strong>sobre</strong> acumula sin meta: le metés (desde Gastos) y sacás/gastás
+                (desde acá) cuando quieras. Sin objetivo ni recurrencia.
+              </p>
+            ) : null}
+            {/* Recurrencia: solo en frascos con meta (Meta/Defensa), no en Sobre. */}
+            {!isSobre ? (
               <div className="fld-2">
                 <div className="fld">
                   <label
@@ -664,7 +586,88 @@ function GoalForm({
                   </div>
                 ) : null}
               </div>
-            )}
+            ) : null}
+            {/* Categoría: en Meta y Sobre (agrupa el ahorro por frasco). No en Defensa. */}
+            {!isDefense ? (
+              <div className="fld">
+                <label
+                  className="fld-label"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  Categoría (frasco)
+                  <span
+                    className="tip tip-wrap"
+                    data-tip="El frasco al que pertenece este ahorro (ej.: Seguro de auto → Transporte). Agrupa el ahorro y, en un sobre, precarga la categoría al gastar."
+                    aria-label="Qué es la categoría del ahorro"
+                    style={{ display: "inline-flex", cursor: "help" }}
+                  >
+                    <Icon name="info" />
+                  </span>
+                </label>
+                <select
+                  className="sel"
+                  value={defaultCategoryId}
+                  onChange={(e) => setDefaultCategoryId(e.target.value)}
+                >
+                  <option value="">Sin categoría</option>
+                  {extraCats.length > 0 ? (
+                    <optgroup label="Nuevas">
+                      {extraCats.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : null}
+                  {catGroups.map((grp) => (
+                    <optgroup key={grp.groupName} label={grp.groupName}>
+                      {grp.options.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                {newCatOpen ? (
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <input
+                      className="inp"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      placeholder="Nombre del frasco nuevo…"
+                      maxLength={60}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void createInlineCategory();
+                        }
+                        if (e.key === "Escape") setNewCatOpen(false);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px" }}
+                      disabled={newCatPending || !newCatName.trim()}
+                      onClick={() => void createInlineCategory()}
+                    >
+                      {newCatPending ? "…" : "Crear"}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ fontSize: 12, padding: "4px 8px", marginTop: 6, color: "var(--muted)" }}
+                    onClick={() => setNewCatOpen(true)}
+                  >
+                    <Icon name="plus" width={2} /> Crear frasco nuevo
+                  </button>
+                )}
+              </div>
+            ) : null}
           </>
         )}
       </div>

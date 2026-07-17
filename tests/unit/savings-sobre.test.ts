@@ -65,16 +65,23 @@ describe("createGoal · tipo de ahorro", () => {
       recurrence: "ninguna",
       period_amount: null,
       next_reset_on: null,
-      default_category_id: "c-x", // la categoría es del sobre
+      default_category_id: "c-x", // el sobre lleva categoría
     });
   });
 
-  it("meta con defaultCategoryId → guarda categoría null (ahorro puro)", async () => {
-    await createGoal(base({ name: "Viaje", kind: "meta", targetAmount: 500_000, defaultCategoryId: "c-y" }));
+  it("meta con defaultCategoryId → PERSISTE la categoría (agrupa el ahorro)", async () => {
+    await createGoal(base({ name: "Seguro auto", kind: "meta", targetAmount: 500_000, defaultCategoryId: "c-transporte" }));
     expect(h.insert).toMatchObject({
       kind: "meta",
       target_amount: 500_000,
-      default_category_id: null,
+      default_category_id: "c-transporte",
     });
+  });
+
+  it("defensa (goal_type='defensa:*') → guarda categoría null", async () => {
+    await createGoal(
+      base({ name: "Fondo de paz", kind: "meta", goalType: "defensa:fondo_paz", defaultCategoryId: "c-x" }),
+    );
+    expect(h.insert).toMatchObject({ kind: "meta", default_category_id: null });
   });
 });
