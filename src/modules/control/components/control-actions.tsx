@@ -13,7 +13,7 @@ import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addGoalAction,
   addDebtAction,
-  addDefensePolicyAction,
+  addDefenseSeguroAction,
   editGoalAction,
   editDebtAction,
   listExpenseJarsAction,
@@ -240,10 +240,11 @@ function GoalForm({
   );
   const isSeguro = isDefense && defenseKind.startsWith("seguro:");
 
-  // La acción se elige al vuelo: en modo seguro creamos una póliza, si no un goal.
+  // La acción se elige al vuelo: en modo seguro creamos la meta de ahorro de la
+  // prima (+ póliza si se ingresaron sus datos); si no, un goal normal.
   const action = (raw: unknown) =>
     isSeguro
-      ? addDefensePolicyAction(raw)
+      ? addDefenseSeguroAction(raw)
       : item
         ? editGoalAction(item.id, raw)
         : addGoalAction(raw);
@@ -297,14 +298,24 @@ function GoalForm({
     const form = e.currentTarget;
     const fd = new FormData(form);
     if (isSeguro) {
+      const isVida = defenseKind === "seguro:vida";
+      const seguroName =
+        String(fd.get("name") ?? "").trim() ||
+        (isVida ? "Seguro de vida" : "Seguro de gastos mayores");
       run(
         {
-          policyType: defenseKind === "seguro:vida" ? "vida" : "gastos_mayores",
+          policyType: isVida ? "vida" : "gastos_mayores",
+          // Datos de póliza: opcionales (si van vacíos, solo se crea la meta).
           provider: String(fd.get("provider") ?? "") || undefined,
           coverage: Number(fd.get("coverage") ?? 0) || undefined,
           premium: Number(fd.get("premium") ?? 0) || undefined,
           premiumFrequency: String(fd.get("premiumFrequency") ?? "mensual"),
           currency: cur,
+          // Meta de ahorro de la prima.
+          name: seguroName,
+          targetAmount: Number(targetAmount) || undefined,
+          monthlyContribution: Number(fd.get("monthlyContribution") ?? 0),
+          recurrence,
         },
         onDone,
         form,
@@ -407,43 +418,96 @@ function GoalForm({
         ) : null}
 
         {/* Nombre: obligatorio para un ahorro normal; opcional para un fondo de
-            defensa (se prefija solo); oculto para un seguro (la póliza no lo usa). */}
-        {!isSeguro ? (
-          <div className="fld">
-            <label className="fld-label">
-              {isDefense ? "Nombre del objetivo (opcional)" : "Nombre del objetivo"}
-            </label>
-            <input
-              className="inp"
-              name="name"
-              defaultValue={item?.name ?? ""}
-              placeholder={
-                isDefense
+            defensa o un seguro (se prefija solo). */}
+        <div className="fld">
+          <label className="fld-label">
+            {isDefense || isSeguro ? "Nombre del objetivo (opcional)" : "Nombre del objetivo"}
+          </label>
+          <input
+            className="inp"
+            name="name"
+            defaultValue={item?.name ?? ""}
+            placeholder={
+              isSeguro
+                ? defenseKind === "seguro:vida"
+                  ? "Seguro de vida"
+                  : "Seguro de gastos mayores"
+                : isDefense
                   ? defenseKind === "defensa:fondo_paz"
                     ? "Fondo de paz"
                     : "Fondo de emergencia"
                   : "Fondo de emergencia, viaje…"
-              }
-              required={!isDefense}
-              aria-invalid={errors.name ? true : undefined}
-            />
-            {errors.name ? (
-              <span className="auth-err" role="alert">
-                {errors.name}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
+            }
+            required={!isDefense && !isSeguro}
+            aria-invalid={errors.name ? true : undefined}
+          />
+          {errors.name ? (
+            <span className="auth-err" role="alert">
+              {errors.name}
+            </span>
+          ) : null}
+        </div>
 
         {isSeguro ? (
           <>
+            <p
+              className="muted tip tip-wrap"
+              data-tip="Ahorrás la prima mes a mes; al registrar la póliza tu protección queda cubierta. Los datos de la póliza son opcionales: si aún no la tenés, dejalos vacíos."
+              style={{ fontSize: 12, marginTop: -2, cursor: "help" }}
+            >
+              Creás la <strong>meta de ahorro de la prima</strong>. Si ya tenés la póliza, completá
+              sus datos (opcionales) y quedará vinculada.
+            </p>
+            {/* Ahorro de la prima. */}
+            <div className="fld-2">
+              <Money
+                label="Monto meta"
+                name="targetAmount"
+                currency={cur}
+                value={targetAmount}
+                onChange={setTargetAmount}
+              />
+              <Money label="Aporte mensual" name="monthlyContribution" currency={cur} />
+            </div>
+            <div className="fld-2">
+              <div className="fld">
+                <label className="fld-label">Recurrencia</label>
+                <select
+                  className="sel"
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value)}
+                >
+                  <option value="ninguna">Ninguna</option>
+                  <option value="mensual">Mensual</option>
+                  <option value="trimestral">Trimestral</option>
+                  <option value="semestral">Semestral</option>
+                  <option value="anual">Anual</option>
+                </select>
+              </div>
+              <div className="fld">
+                <label className="fld-label">Moneda</label>
+                <select
+                  className="sel"
+                  name="currency"
+                  value={cur}
+                  onChange={(e) => setCur(e.target.value)}
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {/* Datos de la póliza (OPCIONALES). */}
             <div className="fld-2">
               <div className="fld">
                 <label className="fld-label">Aseguradora (opcional)</label>
                 <input className="inp" name="provider" maxLength={80} placeholder="Nombre" />
               </div>
               <div className="fld">
-                <label className="fld-label">Frecuencia de prima</label>
+                <label className="fld-label">Frecuencia de prima (opcional)</label>
                 <select className="sel" name="premiumFrequency" defaultValue="mensual">
                   <option value="mensual">Mensual</option>
                   <option value="trimestral">Trimestral</option>
@@ -453,23 +517,8 @@ function GoalForm({
               </div>
             </div>
             <div className="fld-2">
-              <Money label="Suma asegurada" name="coverage" currency={cur} />
-              <Money label="Prima" name="premium" currency={cur} />
-            </div>
-            <div className="fld">
-              <label className="fld-label">Moneda</label>
-              <select
-                className="sel"
-                name="currency"
-                value={cur}
-                onChange={(e) => setCur(e.target.value)}
-              >
-                {CURRENCIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+              <Money label="Suma asegurada (opcional)" name="coverage" currency={cur} />
+              <Money label="Prima (opcional)" name="premium" currency={cur} />
             </div>
           </>
         ) : (

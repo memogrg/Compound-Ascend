@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { addPolicyAction } from "@/modules/wealth/api/actions";
 import {
   listExpenseJarsAction,
   createSobreCategoryAction,
+  addDefenseSeguroAction,
 } from "@/modules/control/api/actions";
 
 import {
@@ -172,25 +172,44 @@ export function GoalForm({
     </>
   );
 
-  // ── Modo seguro: crea una póliza (gastos mayores / vida) ──
+  // ── Modo seguro: crea la META DE AHORRO de la prima (+ póliza si se cargan
+  // sus datos, opcionales). Vinculadas por policy_id. ──
   if (isSeguro) {
-    const policyValues = {
-      policyType: defenseKind === "seguro:vida" ? "vida" : "gastos_mayores",
+    const isVida = defenseKind === "seguro:vida";
+    const seguroValues = {
+      policyType: isVida ? "vida" : "gastos_mayores",
+      // Datos de póliza (opcionales): si van vacíos, solo se crea la meta.
       provider: provider.trim() || undefined,
       coverage,
       premium,
       premiumFrequency,
       currency: cur,
+      // Meta de ahorro de la prima.
+      name: name.trim() || (isVida ? "Seguro de vida" : "Seguro de gastos mayores"),
+      targetAmount,
+      monthlyContribution,
+      recurrence,
     };
     return (
       <FormShell
-        action={addPolicyAction}
-        values={policyValues}
+        action={addDefenseSeguroAction}
+        values={seguroValues}
         submitLabel="Guardar seguro"
         successMessage="Seguro agregado"
         onSuccess={onSuccess}
       >
         {toggle}
+        <TextField
+          name="name"
+          label="Nombre (opcional)"
+          value={name}
+          onChange={setName}
+          placeholder={isVida ? "Seguro de vida" : "Seguro de gastos mayores"}
+          maxLength={120}
+        />
+        <MoneyField name="targetAmount" label="Monto meta" value={targetAmount} onChange={setTargetAmount} currency={cur} />
+        <MoneyField name="monthlyContribution" label="Aporte mensual" value={monthlyContribution} onChange={setMonthly} currency={cur} />
+        <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia" />
         <TextField
           name="provider"
           label="Aseguradora (opcional)"
@@ -199,11 +218,11 @@ export function GoalForm({
           placeholder="Nombre"
           maxLength={80}
         />
-        <MoneyField name="coverage" label="Suma asegurada" value={coverage} onChange={setCoverage} currency={cur} />
-        <MoneyField name="premium" label="Prima" value={premium} onChange={setPremium} currency={cur} />
+        <MoneyField name="coverage" label="Suma asegurada (opcional)" value={coverage} onChange={setCoverage} currency={cur} />
+        <MoneyField name="premium" label="Prima (opcional)" value={premium} onChange={setPremium} currency={cur} />
         <SheetSelect
           name="premiumFrequency"
-          label="Frecuencia de prima"
+          label="Frecuencia de prima (opcional)"
           value={premiumFrequency}
           onChange={setPremiumFrequency}
           options={FREQ_OPTS}

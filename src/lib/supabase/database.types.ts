@@ -424,6 +424,8 @@ export type SavingsGoalRow = Timestamps & {
   next_reset_on: string | null;
   // Categoría por defecto del frasco (migración 20260719000001): se precarga al gastar.
   default_category_id: string | null;
+  // Meta de ahorro de la prima de un seguro (migración 20260721000001): póliza vinculada.
+  policy_id: string | null;
 };
 
 // Historial de reinicios de frascos recurrentes (migración 20260718000001).

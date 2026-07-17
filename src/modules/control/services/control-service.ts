@@ -56,6 +56,7 @@ function rowToGoal(r: SavingsGoalRow): SavingsGoal {
     periodAmount: r.period_amount === null ? null : Number(r.period_amount),
     nextResetOn: r.next_reset_on,
     defaultCategoryId: r.default_category_id,
+    policyId: r.policy_id,
   };
 }
 
@@ -149,6 +150,7 @@ export async function createGoal(input: GoalInput): Promise<string> {
       period_amount: periodAmount,
       next_reset_on: nextResetOn,
       default_category_id: isDefensa ? null : (input.defaultCategoryId ?? null),
+      policy_id: input.policyId ?? null,
     })
     .select("id")
     .single();
@@ -240,6 +242,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
       period_amount: derived.periodAmount,
       next_reset_on: nextResetOn,
       default_category_id: isDefensa ? null : (input.defaultCategoryId ?? null),
+      policy_id: input.policyId ?? null,
     })
     .eq("id", id)
     .eq("user_id", user.id);

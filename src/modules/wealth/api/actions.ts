@@ -74,14 +74,14 @@ export async function addInvestmentAction(raw: unknown): Promise<ActionResult> {
   }
 }
 
-export async function addPolicyAction(raw: unknown): Promise<ActionResult> {
+export async function addPolicyAction(raw: unknown): Promise<ActionResult & { id?: string }> {
   const parsed = policyInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    await createPolicy(parsed.data);
+    const id = await createPolicy(parsed.data);
     revalidatePath("/patrimonio/proteccion");
-    return { ok: true };
+    return { ok: true, id };
   } catch (err) {
     logger.error("addPolicy fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos guardar la póliza." };

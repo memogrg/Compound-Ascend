@@ -22,7 +22,7 @@ import {
   withdrawFromGoal,
   spendFromGoal,
 } from "@/modules/control/services/control-service";
-import { addPolicyAction } from "@/modules/wealth";
+import { addPolicyAction, createPolicy, deletePolicy } from "@/modules/wealth";
 import { listCategoryTree, deleteTransaction, createCategory } from "@/modules/financial-base";
 import { getGoalDetail, type GoalDetailVM } from "@/modules/control/services/goal-detail-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
@@ -112,6 +112,79 @@ export async function addDefensePolicyAction(raw: unknown): Promise<ActionResult
   const res = await addPolicyAction(raw);
   if (res.ok) revalidatePath("/control-financiero");
   return res;
+}
+
+const defenseSeguroSchema = z.object({
+  policyType: z.enum(["gastos_mayores", "vida"]),
+  // Datos de póliza (OPCIONALES): si vienen, se crea la póliza (cubierto); si no,
+  // solo la meta de ahorro de la prima (en progreso).
+  provider: z.string().trim().max(80).optional(),
+  coverage: z.number().nonnegative().optional(),
+  premium: z.number().nonnegative().optional(),
+  premiumFrequency: z.enum(["mensual", "trimestral", "semestral", "anual"]).optional(),
+  currency: z.string().length(3),
+  // Meta de ahorro de la prima.
+  name: z.string().trim().min(1, "Ponle un nombre").max(120),
+  targetAmount: z.number().nonnegative().optional().nullable(),
+  monthlyContribution: z.number().nonnegative().default(0),
+  recurrence: z.enum(["ninguna", "mensual", "trimestral", "semestral", "anual"]).default("ninguna"),
+});
+
+/**
+ * Alta conjunta de un seguro de Defensa: crea la META DE AHORRO de la prima y,
+ * si se ingresaron datos de póliza (cobertura/prima/aseguradora), también la
+ * póliza, y las vincula (savings_goals.policy_id). Sin datos de póliza, solo la
+ * meta (estado "en progreso"). Vive en control porque el flujo nace del form de
+ * Ahorro y su producto principal es la meta (savings_goal); la póliza es un
+ * side-effect — control→wealth ya es una dependencia establecida (addDefensePolicy).
+ * Atómico: si falla la creación de la meta tras crear la póliza, se borra la póliza.
+ */
+export async function addDefenseSeguroAction(raw: unknown): Promise<ActionResult> {
+  const parsed = defenseSeguroSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  const d = parsed.data;
+  const goalType = d.policyType === "vida" ? "defensa:seguro_vida" : "defensa:seguro_gastos_mayores";
+  try {
+    // Hay datos de póliza si se ingresó cobertura, prima o aseguradora.
+    const hasPolicyData = d.coverage != null || d.premium != null || Boolean(d.provider?.trim());
+    let policyId: string | null = null;
+    if (hasPolicyData) {
+      policyId = await createPolicy({
+        policyType: d.policyType,
+        provider: d.provider,
+        coverage: d.coverage,
+        premium: d.premium,
+        premiumFrequency: d.premiumFrequency,
+        currency: d.currency,
+      });
+    }
+    try {
+      await createGoal({
+        name: d.name,
+        kind: "meta",
+        goalType,
+        currency: d.currency,
+        targetAmount: d.targetAmount ?? null,
+        currentAmount: 0,
+        monthlyContribution: d.monthlyContribution,
+        recurrence: d.recurrence,
+        policyId,
+      });
+    } catch (goalErr) {
+      // Rollback: la póliza no debe quedar huérfana si la meta falla.
+      if (policyId) await deletePolicy(policyId);
+      throw goalErr;
+    }
+    revalidatePath("/patrimonio/proteccion");
+    revalidatePath("/control-financiero");
+    return { ok: true };
+  } catch (err) {
+    logger.error("addDefenseSeguro fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos guardar el seguro." };
+  }
 }
 
 export async function addDebtAction(raw: unknown): Promise<ActionResult> {

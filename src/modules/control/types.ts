@@ -26,6 +26,8 @@ export type SavingsGoal = {
   nextResetOn?: string | null;
   // Categoría por defecto: se precarga (editable) al gastar del frasco.
   defaultCategoryId?: string | null;
+  // Meta de ahorro de la prima de un seguro (Defensa): póliza vinculada.
+  policyId?: string | null;
 };
 
 export type DebtClassification = "critica" | "controlada" | "estrategica" | "emocional";
