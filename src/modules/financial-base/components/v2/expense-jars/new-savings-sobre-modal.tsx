@@ -14,6 +14,7 @@ import { Icon } from "@/components/ui/icon";
 import { MoneyField } from "@/components/forms/money-field";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
+import { addCategoryAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 
 /** Resultado de la server action (evita importar tipos de control en este módulo). */
@@ -46,6 +47,27 @@ export function NewSavingsSobreModal({
   const [currency, setCurrency] = useState(captureCurrency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Crear un frasco (categoría de nivel 1) nuevo sin salir del modal.
+  const [newFrascos, setNewFrascos] = useState<{ id: string; name: string }[]>([]);
+  const [newCatOpen, setNewCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatPending, setNewCatPending] = useState(false);
+
+  async function createFrasco() {
+    const n = newCatName.trim();
+    if (!n) return;
+    setNewCatPending(true);
+    const res = await addCategoryAction({ name: n, categoryType: "expense", isFavorite: true });
+    setNewCatPending(false);
+    if (res.ok && res.id) {
+      setNewFrascos((prev) => [...prev, { id: res.id!, name: n }]);
+      setGroup(res.id);
+      setNewCatOpen(false);
+      setNewCatName("");
+    } else {
+      setError(res.message ?? "No pudimos crear el frasco.");
+    }
+  }
 
   async function save() {
     const n = name.trim();
@@ -91,7 +113,49 @@ export function NewSavingsSobreModal({
                 {j.name}
               </option>
             ))}
+            {newFrascos.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
           </select>
+          {newCatOpen ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <input
+                className="inp"
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="Nombre del frasco nuevo…"
+                maxLength={60}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void createFrasco();
+                  }
+                  if (e.key === "Escape") setNewCatOpen(false);
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: "6px 12px" }}
+                disabled={newCatPending || !newCatName.trim()}
+                onClick={() => void createFrasco()}
+              >
+                {newCatPending ? "…" : "Crear"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ fontSize: 12, padding: "4px 8px", marginTop: 6, color: "var(--muted)" }}
+              onClick={() => setNewCatOpen(true)}
+            >
+              <Icon name="plus" width={2} /> Crear frasco nuevo
+            </button>
+          )}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
           <div className="fld" style={{ flex: "1 1 160px", minWidth: 0, margin: 0 }}>
