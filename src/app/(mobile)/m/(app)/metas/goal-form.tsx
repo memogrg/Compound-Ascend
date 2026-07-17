@@ -240,7 +240,8 @@ export function GoalForm({
     // Recurrencia solo en frascos "meta" (no defensa ni sobre).
     recurrence: isDefense || isSobre ? "ninguna" : recurrence,
     periodAmount: !isDefense && !isSobre && isRecurring ? targetAmount : undefined,
-    defaultCategoryId: isSobre ? defaultCategoryId || null : null,
+    // Categoría: Meta y Sobre la llevan; solo Defensa queda sin categoría.
+    defaultCategoryId: isDefense ? null : defaultCategoryId || null,
   };
 
   return (
@@ -277,7 +278,7 @@ export function GoalForm({
       {!isDefense && !isSobre ? (
         <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia del frasco" />
       ) : null}
-      {isSobre ? (
+      {!isDefense ? (
         <>
           <SheetSelect
             name="defaultCategoryId"
@@ -286,7 +287,7 @@ export function GoalForm({
             onChange={setDefaultCategoryId}
             options={catOptions}
             placeholder="Sin categoría"
-            sheetTitle="Frasco al que pertenece el sobre"
+            sheetTitle="Frasco al que pertenece el ahorro"
           />
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <div style={{ flex: 1 }}>
