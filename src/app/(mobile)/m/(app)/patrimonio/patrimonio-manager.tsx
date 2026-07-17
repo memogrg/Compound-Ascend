@@ -11,7 +11,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney } from "@/lib/format";
 import {
   addAssetAction,
   editAssetAction,
@@ -23,6 +22,7 @@ import {
 import type { Asset, Liability } from "@/modules/rich-life/types";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
+import { MContentCard, MSectionHeader, MDataRow, MEmptyState, mAmount } from "../../components/content-kit";
 import {
   WealthItemForm,
   type AssetValues,
@@ -98,71 +98,58 @@ export function PatrimonioManager({
   return (
     <>
       {empty ? (
-        <div className="card card-p">
-          <div className="muted" style={{ padding: "12px 0", fontSize: 13.5, lineHeight: 1.5 }}>
-            Aún no registras activos ni pasivos manuales. Toca el botón + para agregar el primero.
-          </div>
-        </div>
+        <MEmptyState
+          icon="household"
+          title="Registra lo que tienes y lo que debes"
+          description="Anota tus activos —una casa, un carro, ahorros— y tus pasivos, y verás tu patrimonio neto crecer mes a mes."
+          actionLabel="Agregar activo o pasivo"
+          onAction={() => setChooser(true)}
+        />
       ) : (
         <>
           {assets.length > 0 && (
-            <div style={{ marginBottom: liabilities.length > 0 ? 14 : 0 }}>
-              <div className="ov" style={{ marginBottom: 6 }}>
-                Activos
-              </div>
-              <div className="card" style={{ padding: 0 }}>
+            <div style={{ marginBottom: liabilities.length > 0 ? 16 : 0 }}>
+              <MSectionHeader title="Activos" />
+              {/* padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar;
+                  el aire lateral lo pone la regla puente .m-swipe-content .m-drow. Los montos
+                  van en la moneda NATIVA de cada activo (a.currency): la lista es por-ítem,
+                  no un agregado — no se convierte ni se suma aquí. */}
+              <MContentCard style={{ padding: 0, overflow: "hidden" }}>
                 {assets.map((a) => (
                   <SwipeRow key={a.id} onEdit={() => setEditAsset(a)} onDelete={() => setDel({ kind: "asset", id: a.id, name: a.name })}>
-                    <div className="lrow" style={{ margin: 0 }}>
-                      <span className="lic" style={{ background: "var(--accent-soft)", color: "var(--accent)" }} aria-hidden>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 21V10l9-6 9 6v11" />
-                          <path d="M9 21v-6h6v6" />
-                        </svg>
-                      </span>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="lname">{a.name}</div>
-                        <div className="lsub">
-                          {ASSET_CLASS_LABEL[a.assetClass] ?? a.assetClass}
-                          {a.generatesIncome ? " · genera ingreso" : ""}
-                        </div>
-                      </div>
-                      <div className="lamt pos" style={{ marginLeft: "auto" }}>
-                        {formatMoney(a.value, a.currency)}
-                      </div>
-                    </div>
+                    {/* icon+iconTone (no leading): casa/tarjeta SON glifos del set, y el tinte
+                        verde/rojo distingue lo que suma de lo que resta antes de leer el monto. */}
+                    <MDataRow
+                      icon="housing"
+                      iconTone="success"
+                      title={a.name}
+                      subtitle={`${ASSET_CLASS_LABEL[a.assetClass] ?? a.assetClass}${a.generatesIncome ? " · genera ingreso" : ""}`}
+                      value={mAmount(a.value, a.currency, 10)}
+                      valueTone="success"
+                    />
                   </SwipeRow>
                 ))}
-              </div>
+              </MContentCard>
             </div>
           )}
 
           {liabilities.length > 0 && (
             <div>
-              <div className="ov" style={{ marginBottom: 6 }}>
-                Pasivos
-              </div>
-              <div className="card" style={{ padding: 0 }}>
+              <MSectionHeader title="Pasivos" />
+              <MContentCard style={{ padding: 0, overflow: "hidden" }}>
                 {liabilities.map((l) => (
                   <SwipeRow key={l.id} onEdit={() => setEditLiab(l)} onDelete={() => setDel({ kind: "liability", id: l.id, name: l.name })}>
-                    <div className="lrow" style={{ margin: 0 }}>
-                      <span className="lic" style={{ background: "var(--danger-soft)", color: "var(--danger)" }} aria-hidden>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <rect x="3" y="6" width="18" height="13" rx="2" />
-                          <path d="M3 10h18" strokeLinecap="round" />
-                        </svg>
-                      </span>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="lname">{l.name}</div>
-                        <div className="lsub">{LIAB_CLASS_LABEL[l.liabilityClass] ?? l.liabilityClass}</div>
-                      </div>
-                      <div className="lamt neg" style={{ marginLeft: "auto" }}>
-                        −{formatMoney(l.balance, l.currency)}
-                      </div>
-                    </div>
+                    <MDataRow
+                      icon="debt"
+                      iconTone="danger"
+                      title={l.name}
+                      subtitle={LIAB_CLASS_LABEL[l.liabilityClass] ?? l.liabilityClass}
+                      value={`−${mAmount(l.balance, l.currency, 10)}`}
+                      valueTone="danger"
+                    />
                   </SwipeRow>
                 ))}
-              </div>
+              </MContentCard>
             </div>
           )}
         </>
