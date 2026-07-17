@@ -291,6 +291,47 @@ describe("buildExpenseJars · Ahorro agrupado por categoría (A2)", () => {
   });
 });
 
+describe("buildExpenseJars · Ahorro dedup de fondos fijos sugeridos", () => {
+  const goalJar = (goals: JarEntities["goal"]) => {
+    const jar = buildExpenseJars({
+      tree: [AHORRO],
+      budgetByKey: {},
+      realByKey: {},
+      entities: { ...NO_ENTITIES, goal: goals },
+      fmt,
+    }).find((j) => j.kind === "linked" && j.linkedKind === "goal");
+    if (!jar || jar.kind !== "linked") throw new Error("ahorro linked jar");
+    return jar;
+  };
+
+  it("sin fondos creados → sugiere los 2 (Emergencia y Paz)", () => {
+    const jar = goalJar([]);
+    expect(jar.fixedFunds?.map((f) => f.name)).toEqual(["Fondo de emergencia", "Fondo de paz"]);
+  });
+
+  it("con 'Fondo de paz' creado (goal_type) → solo sugiere Emergencia", () => {
+    const jar = goalJar([
+      { id: "gp", name: "Mi paz", sub: "", amount: 0, goalType: "defensa:fondo_paz" },
+    ]);
+    expect(jar.fixedFunds?.map((f) => f.name)).toEqual(["Fondo de emergencia"]);
+  });
+
+  it("con ambos creados → fixedFunds vacío (no se renderiza la sección)", () => {
+    const jar = goalJar([
+      { id: "ge", name: "X", sub: "", amount: 0, goalType: "defensa:fondo_emergencia" },
+      { id: "gp", name: "Y", sub: "", amount: 0, goalType: "defensa:fondo_paz" },
+    ]);
+    expect(jar.fixedFunds).toEqual([]);
+  });
+
+  it("fallback por nombre (sin goal_type): 'Fondo de Emergencia' oculta la sugerencia", () => {
+    const jar = goalJar([
+      { id: "gn", name: "  Fondo de Emergencia ", sub: "", amount: 0, goalType: null },
+    ]);
+    expect(jar.fixedFunds?.map((f) => f.name)).toEqual(["Fondo de paz"]);
+  });
+});
+
 describe("mergeSuggestions", () => {
   it("deduplica (case-insensitive) y excluye los sobres existentes", () => {
     const out = mergeSuggestions({

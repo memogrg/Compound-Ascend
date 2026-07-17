@@ -106,6 +106,8 @@ export type JarEntity = {
   delta?: string;
   /** Categoría (frasco) del ahorro; solo se llena para goals. Para agrupar. */
   categoryId?: string | null;
+  /** goal_type del ahorro (p.ej. 'defensa:fondo_paz'); para deduplicar fondos fijos. */
+  goalType?: string | null;
 };
 export type JarEntities = {
   holding: JarEntity[];
@@ -122,7 +124,8 @@ const LINKED_GROUPS: Record<
     linkedKind: "holding" | "debt" | "policy" | "goal";
     emptyText: string;
     cta: { label: string; href: string };
-    fixedFunds?: { name: string; sub: string }[];
+    /** Fondos SUGERIDOS (Ahorro): se ocultan si el usuario ya creó ese fondo. */
+    fixedFunds?: { name: string; sub: string; goalType?: string }[];
   }
 > = {
   g_libertad: {
@@ -144,10 +147,10 @@ const LINKED_GROUPS: Record<
     linkedKind: "goal",
     emptyText: "No existen Objetivos activos mapeados",
     cta: { label: "Ingresar objetivo", href: "/control-financiero?new=goal" },
-    // Fondos fijos siempre sugeridos en el modal de ahorro.
+    // Fondos SUGERIDOS en el modal de ahorro (se ocultan si ya existen).
     fixedFunds: [
-      { name: "Fondo de emergencia", sub: "Siempre disponible" },
-      { name: "Fondo de paz", sub: "Siempre disponible" },
+      { name: "Fondo de emergencia", sub: "Siempre disponible", goalType: "defensa:fondo_emergencia" },
+      { name: "Fondo de paz", sub: "Siempre disponible", goalType: "defensa:fondo_paz" },
     ],
   },
 };
@@ -185,6 +188,34 @@ function groupGoalSections(items: JarItem[], tree: CategoryNode[]): JarSection[]
     if (arr && arr.length > 0) sections.push({ key: g.id, name: g.name, items: arr });
   }
   return sections;
+}
+
+const normalizeName = (s: string): string =>
+  s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+
+/**
+ * Fondos SUGERIDOS que el usuario aún NO tiene: excluye una sugerencia si ya
+ * existe una entidad real con su `goalType`, o (fallback, si la entidad no trae
+ * goal_type) con el mismo nombre normalizado (sin acentos/mayúsculas). Si el
+ * usuario ya tiene todos, devuelve [] (la sección de fijos no se renderiza).
+ */
+function filterFixedFunds<T extends { name: string; goalType?: string }>(
+  fixedFunds: T[] | undefined,
+  entityList: JarEntity[],
+): T[] | undefined {
+  if (!fixedFunds) return fixedFunds;
+  return fixedFunds.filter(
+    (f) =>
+      !entityList.some((e) =>
+        f.goalType && e.goalType
+          ? e.goalType === f.goalType
+          : normalizeName(e.name) === normalizeName(f.name),
+      ),
+  );
 }
 
 export function buildExpenseJars(args: {
@@ -270,7 +301,7 @@ export function buildExpenseJars(args: {
           items,
           emptyText: linked.emptyText,
           cta: linked.cta,
-          fixedFunds: linked.fixedFunds,
+          fixedFunds: filterFixedFunds(linked.fixedFunds, entityList),
           budgetAware: true,
           totals,
           paymentCategoryId: lb.paymentCategoryId,
@@ -298,7 +329,7 @@ export function buildExpenseJars(args: {
         items: plainItems,
         emptyText: linked.emptyText,
         cta: linked.cta,
-        fixedFunds: linked.fixedFunds,
+        fixedFunds: filterFixedFunds(linked.fixedFunds, entityList),
         // Ahorro: agrupación visual por categoría (aditivo; items sigue plano).
         sections: linked.linkedKind === "goal" ? groupGoalSections(plainItems, tree) : undefined,
       });
