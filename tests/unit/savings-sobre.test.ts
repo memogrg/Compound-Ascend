@@ -57,7 +57,7 @@ beforeEach(() => {
 });
 
 describe("createGoal · tipo de ahorro", () => {
-  it("sobre → target_amount null, recurrence 'ninguna', sin categoría", async () => {
+  it("sobre → target_amount null, recurrence 'ninguna', y PERSISTE la categoría", async () => {
     await createGoal(base({ name: "Maquillaje", kind: "sobre", defaultCategoryId: "c-x" }));
     expect(h.insert).toMatchObject({
       kind: "sobre",
@@ -65,12 +65,16 @@ describe("createGoal · tipo de ahorro", () => {
       recurrence: "ninguna",
       period_amount: null,
       next_reset_on: null,
-      default_category_id: null,
+      default_category_id: "c-x", // la categoría es del sobre
     });
   });
 
-  it("meta → target_amount con el objetivo y kind 'meta'", async () => {
-    await createGoal(base({ name: "Viaje", kind: "meta", targetAmount: 500_000 }));
-    expect(h.insert).toMatchObject({ kind: "meta", target_amount: 500_000 });
+  it("meta con defaultCategoryId → guarda categoría null (ahorro puro)", async () => {
+    await createGoal(base({ name: "Viaje", kind: "meta", targetAmount: 500_000, defaultCategoryId: "c-y" }));
+    expect(h.insert).toMatchObject({
+      kind: "meta",
+      target_amount: 500_000,
+      default_category_id: null,
+    });
   });
 });

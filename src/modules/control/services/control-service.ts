@@ -117,7 +117,8 @@ export async function createGoal(input: GoalInput): Promise<string> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const household_id = await getActiveHouseholdId(supabase, user.id);
-  // Un sobre es acumulador puro: sin meta, sin recurrencia, sin categoría.
+  // Un sobre es acumulador: sin meta ni recurrencia, pero SÍ lleva categoría
+  // (el frasco). Meta/Defensa son ahorro puro y no llevan categoría.
   const isSobre = input.kind === "sobre";
   const targetAmount = isSobre ? null : (input.targetAmount ?? null);
   const recurrence = isSobre ? "ninguna" : input.recurrence;
@@ -146,7 +147,7 @@ export async function createGoal(input: GoalInput): Promise<string> {
       recurrence,
       period_amount: periodAmount,
       next_reset_on: nextResetOn,
-      default_category_id: isSobre ? null : (input.defaultCategoryId ?? null),
+      default_category_id: isSobre ? (input.defaultCategoryId ?? null) : null,
     })
     .select("id")
     .single();
@@ -203,7 +204,8 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
-  // Un sobre no tiene meta ni recurrencia ni categoría.
+  // Un sobre no tiene meta ni recurrencia, pero SÍ lleva categoría (el frasco);
+  // Meta/Defensa son ahorro puro sin categoría.
   const isSobre = input.kind === "sobre";
   const targetAmount = isSobre ? null : (input.targetAmount ?? null);
   const recurrence = isSobre ? "ninguna" : input.recurrence;
@@ -235,7 +237,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
       recurrence,
       period_amount: derived.periodAmount,
       next_reset_on: nextResetOn,
-      default_category_id: isSobre ? null : (input.defaultCategoryId ?? null),
+      default_category_id: isSobre ? (input.defaultCategoryId ?? null) : null,
     })
     .eq("id", id)
     .eq("user_id", user.id);
