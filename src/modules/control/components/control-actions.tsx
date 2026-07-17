@@ -16,9 +16,9 @@ import {
   addDefensePolicyAction,
   editGoalAction,
   editDebtAction,
-  listExpenseCategoriesAction,
+  listExpenseJarsAction,
   createSobreCategoryAction,
-  type ExpenseCategoryGroup,
+  type ExpenseJarOption,
 } from "@/modules/control/api/actions";
 import { pmt } from "@/modules/control/engine/amortization";
 import type { SavingsGoal, Debt } from "@/modules/control/types";
@@ -260,17 +260,18 @@ function GoalForm({
   // Categoría por defecto del frasco: se precarga al gastar. Se cargan las
   // categorías de gasto de forma perezosa (mismo action que el modal Gastar).
   const [defaultCategoryId, setDefaultCategoryId] = useState<string>(item?.defaultCategoryId ?? "");
-  const [catGroups, setCatGroups] = useState<ExpenseCategoryGroup[]>([]);
+  // Solo frascos de nivel superior (sin sobres/hijos) para categorizar el ahorro.
+  const [jars, setJars] = useState<ExpenseJarOption[]>([]);
   useEffect(() => {
     let alive = true;
-    void listExpenseCategoriesAction().then((groups) => {
-      if (alive) setCatGroups(groups);
+    void listExpenseJarsAction().then((list) => {
+      if (alive) setJars(list);
     });
     return () => {
       alive = false;
     };
   }, []);
-  // Crear un frasco (categoría) nuevo desde el sobre, sin salir del form.
+  // Crear un frasco (categoría) de nivel superior nuevo, sin salir del form.
   const [newCatOpen, setNewCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [newCatPending, setNewCatPending] = useState(false);
@@ -619,14 +620,10 @@ function GoalForm({
                       ))}
                     </optgroup>
                   ) : null}
-                  {catGroups.map((grp) => (
-                    <optgroup key={grp.groupName} label={grp.groupName}>
-                      {grp.options.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name}
-                        </option>
-                      ))}
-                    </optgroup>
+                  {jars.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.name}
+                    </option>
                   ))}
                 </select>
                 {newCatOpen ? (
