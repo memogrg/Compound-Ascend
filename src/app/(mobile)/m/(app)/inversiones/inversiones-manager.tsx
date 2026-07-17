@@ -11,12 +11,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatPercent } from "@/lib/format";
 import { removeHoldingAction } from "@/modules/wealth/api/actions";
 import type { HoldingPerformance } from "@/modules/wealth/types";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
 import { Fab, BottomSheet, ConfirmDialog, SwipeRow, useToast } from "../../components/form-kit";
+import { MContentCard, MDataRow, MEmptyState, mAmount } from "../../components/content-kit";
 import { HoldingWizardSheet, SellHoldingForm } from "./inversiones-forms";
 import { HoldingDetailSheet } from "./holding-detail";
 
@@ -61,57 +62,68 @@ export function InversionesManager({
   return (
     <>
       {holdings.length === 0 ? (
-        <div className="card card-p">
-          <div className="muted" style={{ padding: "12px 0", fontSize: 13.5, lineHeight: 1.5 }}>
-            Aún no registras inversiones. Agrega tu primer activo para seguir su rendimiento.
-          </div>
-        </div>
+        <MEmptyState
+          icon="investment"
+          title="Registra tu primera inversión"
+          description="Anota una acción, un ETF o un inmueble y la app seguirá su valor, tu rendimiento y los dividendos que te paga."
+          actionLabel="Agregar inversión"
+          onAction={() => setAdding(true)}
+        />
       ) : (
-        <div className="card card-p" style={{ padding: 0 }}>
+        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
+        // lateral lo pone la regla puente .m-swipe-content .m-drow.
+        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {holdings.map((h) => {
             const name = h.label || h.symbol || "Inversión";
-            const sub = h.nature ? (NATURE_LABEL[h.nature] ?? h.assetType) : h.assetType;
+            const nature = h.nature ? (NATURE_LABEL[h.nature] ?? h.assetType) : h.assetType;
             const badge = (h.symbol || name).slice(0, 4).toUpperCase();
+            // 0 no es ni ganancia ni pérdida: sin signo, en neutro (no verde).
+            const dir = h.returnPct > 0 ? 1 : h.returnPct < 0 ? -1 : 0;
+            // El valor ya viene en la moneda primaria (portfolio-service); no se reconvierte.
             return (
               <SwipeRow key={h.id} onEdit={() => setEditH(h)} onDelete={() => setDeleteH(h)}>
-                <button
-                  type="button"
-                  className="lrow"
-                  style={{ width: "100%", background: "transparent", border: "none", textAlign: "left", cursor: "pointer" }}
+                {/* Tocar la fila abre el detalle (con su sparkline R5); el chevron lo indica.
+                    Valor actual arriba + retorno % coloreado debajo (el retorno es la señal
+                    verde/roja, no el valor, que siempre es positivo). El badge de ticker es
+                    el `leading` en vez de un glifo. */}
+                <MDataRow
+                  leading={
+                    <span
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "grid",
+                        placeItems: "center",
+                        borderRadius: "inherit",
+                        background: "linear-gradient(135deg, var(--s1), var(--s5))",
+                        color: "#fff",
+                        fontFamily: "var(--font-mono)",
+                        fontWeight: 700,
+                        fontSize: 11,
+                      }}
+                    >
+                      {badge}
+                    </span>
+                  }
+                  title={name}
+                  subtitle={nature}
+                  value={
+                    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span>{mAmount(h.currentValue, currency, 10)}</span>
+                      <span className={dir > 0 ? "pos" : dir < 0 ? "neg" : "muted"} style={{ fontSize: 11 }}>
+                        {dir > 0 ? "+" : dir < 0 ? "−" : ""}
+                        {formatPercent(Math.abs(h.returnPct), 1)}
+                      </span>
+                    </span>
+                  }
+                  chevron
                   onClick={() => setMovH(h)}
-                  aria-label={`Movimientos de ${name}`}
-                >
-                  <span
-                    className="lic"
-                    style={{
-                      background: "linear-gradient(135deg, var(--s1), var(--s5))",
-                      color: "#fff",
-                      fontFamily: "var(--font-mono)",
-                      fontWeight: 700,
-                      fontSize: 11,
-                    }}
-                    aria-hidden
-                  >
-                    {badge}
-                  </span>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="lname">{name}</div>
-                    <div className="lsub">{sub}</div>
-                  </div>
-                  <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                    <div className="lamt" style={{ margin: 0 }}>
-                      {formatMoney(h.currentValue, currency)}
-                    </div>
-                    <div className={`mono ${h.returnPct >= 0 ? "pos" : "neg"}`} style={{ fontSize: 11 }}>
-                      {h.returnPct >= 0 ? "+" : ""}
-                      {formatPercent(h.returnPct, 1)}
-                    </div>
-                  </div>
-                </button>
+                  ariaLabel={`Movimientos de ${name}`}
+                />
               </SwipeRow>
             );
           })}
-        </div>
+        </MContentCard>
       )}
 
       <Fab onClick={() => setAdding(true)} label="Agregar inversión" />

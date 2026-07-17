@@ -6,6 +6,13 @@ import {
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MobileHeader } from "../../components/mobile-header";
+import {
+  MSummaryCard,
+  MSectionHeader,
+  MMetricGrid,
+  MMetricCard,
+  mAmount,
+} from "../../components/content-kit";
 import { InversionesManager } from "./inversiones-manager";
 
 /**
@@ -36,57 +43,73 @@ export default async function MobileInversiones() {
 
   const holdings = [...a.holdingsWithPerformance].sort((x, y) => y.currentValue - x.currentValue);
   const gain = a.totalProfitLoss;
+  // 0 no es ni ganancia ni pérdida: sin signo y en neutro (como en Ingresos/Ahorro, donde
+  // "+₡0" verde sugería que ibas por encima). >0 gana (verde), <0 pierde (rojo).
+  const gainDir = gain > 0 ? 1 : gain < 0 ? -1 : 0;
+  const gainSign = gainDir > 0 ? "+" : gainDir < 0 ? "−" : "";
+  const gainTone = gainDir > 0 ? "success" : gainDir < 0 ? "danger" : "neutral";
 
   return (
     <div className="m-scroll">
       <div className="m-pad">
         <MobileHeader variant="inner" eyebrow="Crecimiento" title="Portafolio de inversiones" />
 
-        {/* Hero: valor del portafolio + rendimiento */}
-        <div className="card card-p" style={{ marginBottom: 16 }}>
-          <span className="ov">Valor del portafolio</span>
-          <div className="display" style={{ fontSize: 34, marginTop: 8 }}>
-            {formatMoney(a.totalPortfolioValue, currency)}
-          </div>
-          <div className={`delta ${gain >= 0 ? "pos" : "neg"}`} style={{ marginTop: 6 }}>
-            <Arrow up={gain >= 0} />
-            {gain >= 0 ? "+" : "−"}
-            {formatMoney(Math.abs(gain), currency)} · {formatPercent(a.totalReturnPct, 1)} acumulado
-          </div>
-          <div className="mini-kpi" style={{ marginTop: 16 }}>
-            <div className="kpi" style={{ padding: 12 }}>
-              <div className="k">Costo base</div>
-              <div className="kv" style={{ fontSize: 18, whiteSpace: "nowrap" }}>
-                {formatCompact(a.totalCostBasis, currency)}
-              </div>
-            </div>
-            <div className="kpi" style={{ padding: 12 }}>
-              <div className="k">Rendimiento</div>
-              <div className={`kv ${gain >= 0 ? "pos" : "neg"}`} style={{ fontSize: 18 }}>
-                {formatPercent(a.totalReturnPct, 1)}
-              </div>
-            </div>
-            <div className="kpi" style={{ padding: 12 }}>
-              <div className="k">Dividendos/mes</div>
-              <div className="kv" style={{ fontSize: 18, color: "var(--accent)", whiteSpace: "nowrap" }}>
-                {formatCompact(report.dividendAnalytics.monthlyDividends, currency)}
-              </div>
-            </div>
-            <div className="kpi" style={{ padding: 12 }}>
-              <div className="k">Yield</div>
-              <div className="kv" style={{ fontSize: 18 }}>
-                {formatPercent(report.dividendAnalytics.dividendYield, 1)}
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Resumen: valor del portafolio (exacto mientras quepa) + ganancia/pérdida.
+            Los montos YA vienen en la moneda primaria (portfolio-service normaliza con
+            convertCurrency antes de los engines) → se muestran en crudo, sin reconvertir. */}
+        <MSummaryCard
+          eyebrow="Valor del portafolio"
+          value={mAmount(a.totalPortfolioValue, currency, 11)}
+          chip={
+            <span className={`badge ${gainDir > 0 ? "up" : gainDir < 0 ? "down" : "neutral"}`}>
+              {gainSign}
+              {formatPercent(Math.abs(a.totalReturnPct), 1)}
+            </span>
+          }
+          sub={
+            a.totalPortfolioValue > 0
+              ? gainDir === 0
+                ? `Sin cambio sobre ${formatMoney(a.totalCostBasis, currency)} invertidos.`
+                : `${gainDir > 0 ? "Ganas" : "Pierdes"} ${formatMoney(Math.abs(gain), currency)} sobre ${formatMoney(a.totalCostBasis, currency)} invertidos.`
+              : "Registra tu primera inversión para seguir su rendimiento."
+          }
+          style={{ marginBottom: 16 }}
+        />
 
-        {/* Distribución por clase */}
+        {/* Métricas: los 4 KPI que iban sueltos en el hero. Retornos con color semántico. */}
+        {holdings.length > 0 && (
+          <>
+            <MSectionHeader title="Tu portafolio en números" />
+            <MMetricGrid style={{ marginBottom: 16 }}>
+              <MMetricCard label="Invertido" value={mAmount(a.totalCostBasis, currency, 8)} sub="costo base" />
+              <MMetricCard
+                label="Ganancia/pérdida"
+                value={`${gainSign}${mAmount(Math.abs(gain), currency, 7)}`}
+                sub="no realizada"
+                tone={gainTone}
+              />
+              <MMetricCard
+                label="Dividendos/mes"
+                value={mAmount(report.dividendAnalytics.monthlyDividends, currency, 8)}
+                sub={`yield ${formatPercent(report.dividendAnalytics.dividendYield, 1)}`}
+                tone={report.dividendAnalytics.monthlyDividends > 0 ? "success" : "neutral"}
+              />
+              <MMetricCard
+                label="Posiciones"
+                value={String(holdings.length)}
+                sub={slices.length > 0 ? `${slices.length} ${slices.length === 1 ? "clase" : "clases"}` : "de activo"}
+              />
+            </MMetricGrid>
+          </>
+        )}
+
+        {/* Distribución por clase — MDonut INTERACTIVO (R5): su lógica y props no se tocan. */}
         {slices.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <div className="sec-title" style={{ marginBottom: 12 }}>
-              Distribución
-            </div>
+            <MSectionHeader title="Distribución por clase" />
+            {/* centerValue en COMPACTO a propósito: el centro del donut es diminuto y el
+                gráfico R5 se diseñó con formatCompact; mAmount dejaría exacto un número
+                que ahí se desbordaría. No lo cambies a mAmount. */}
             <MDonut
               slices={slices}
               centerValue={formatCompact(a.totalPortfolioValue, currency)}
@@ -97,30 +120,18 @@ export default async function MobileInversiones() {
         )}
 
         {/* Holdings + gestión (alta/edición/eliminar · compra/venta/dividendo) */}
-        <div>
-          <div className="between" style={{ marginBottom: 6 }}>
-            <div className="sec-title">Mis inversiones</div>
-            {holdings.length > 0 && (
-              <span className="muted" style={{ fontSize: 12.5, fontWeight: 600 }}>
+        <MSectionHeader
+          title="Mis inversiones"
+          action={
+            holdings.length > 0 ? (
+              <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>
                 {holdings.length} {holdings.length === 1 ? "activo" : "activos"}
               </span>
-            )}
-          </div>
-          <InversionesManager
-            holdings={holdings}
-            currency={currency}
-            openContributions={openContributions}
-          />
-        </div>
+            ) : undefined
+          }
+        />
+        <InversionesManager holdings={holdings} currency={currency} openContributions={openContributions} />
       </div>
     </div>
-  );
-}
-
-function Arrow({ up }: { up: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} style={{ width: 12, height: 12 }}>
-      <path d={up ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
