@@ -34,6 +34,14 @@ import {
   SheetSelect,
   useToast,
 } from "../../components/form-kit";
+import {
+  MContentCard,
+  MDataRow,
+  MProgress,
+  MEmptyState,
+  mAmount,
+  type MTone,
+} from "../../components/content-kit";
 import { GoalForm, type GoalValues } from "./goal-form";
 
 /**
@@ -46,16 +54,38 @@ import { GoalForm, type GoalValues } from "./goal-form";
  *    ingreso vinculado (el backend valida que no exceda el saldo y devuelve el error).
  */
 
-const STATUS_BADGE: Record<string, string> = {
-  saludable: "up",
-  atrasado: "neutral",
-  no_viable: "down",
+/** Estado de la meta (priority-engine) → tono del kit. */
+const STATUS_TONE: Record<string, MTone> = {
+  saludable: "success",
+  atrasado: "warning",
+  no_viable: "danger",
   revisar: "neutral",
 };
 
+/**
+ * Fecha objetivo en corto ("dic 2026"). El formato largo de es-MX devuelve "diciembre de
+ * 2026" —17 caracteres— y el subtítulo de la fila no tiene sitio para eso.
+ */
 function fmtMonth(iso: string | null | undefined): string {
-  if (!iso) return "Sin fecha límite";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+  if (!iso) return "sin fecha";
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { month: "short", year: "numeric" });
+}
+
+/**
+ * Subtítulo de una meta. El % NO va aquí: la barra justo debajo ya lo dice. Y una meta
+ * cumplida no dice "faltan ₡0" — dice que está cumplida.
+ */
+function goalSubtitle(args: {
+  isSobre: boolean;
+  missing: number;
+  currency: string;
+  targetDate?: string | null;
+}): string {
+  const { isSobre, missing, currency, targetDate } = args;
+  if (isSobre) return `Sobre · se acumula sin tope`;
+  const fecha = fmtMonth(targetDate);
+  if (missing <= 0) return `¡Completada! · ${fecha}`;
+  return `Faltan ${mAmount(missing, currency)} · ${fecha}`;
 }
 
 function todayISO(): string {
@@ -91,88 +121,93 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
   return (
     <>
       {goals.length === 0 ? (
-        <div className="card card-p">
-          <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-            Aún no tienes metas de ahorro. Toca el botón + para crear la primera.
-          </div>
-        </div>
+        <MEmptyState
+          icon="goal"
+          title="Crea tu primera meta"
+          description="Ponle nombre y monto a eso que quieres —un fondo de emergencia, un viaje— y la app te dirá cuánto llevas y cuánto te falta."
+          actionLabel="Crear meta"
+          onAction={() => setAdding(true)}
+        />
       ) : (
-        <div className="card">
+        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
+        // lateral lo pone la regla puente .m-swipe-content .m-drow.
+        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {goals.map((g) => {
             const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
             const pct = g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0;
-            const pctInt = Math.round(pct * 100);
-            const badgeCls = STATUS_BADGE[g.status] ?? "neutral";
+            const tone = STATUS_TONE[g.status] ?? "neutral";
+            const missing = Math.max(0, g.targetAmount - g.currentAmount);
             return (
               <SwipeRow key={g.id} onEdit={() => setEditing(g)} onDelete={() => setDeleting(g)}>
-                <div style={{ padding: "14px 18px" }}>
-                  <div className="gtop" style={{ marginBottom: 8 }}>
-                    <span className="gemoji" style={{ background: "var(--accent-soft)", color: "var(--accent)" }} aria-hidden>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="9" />
-                        <circle cx="12" cy="12" r="4" />
-                      </svg>
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15 }}>{g.name}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {fmtMonth(g.targetDate)}
+                {/* Los cuatro botones NO caben en `trailing`: estrecharía toda la columna de
+                    texto —el subtítulo incluido— como pasó en Ingresos. Van bajo la barra,
+                    en el slot, que además es donde ya vivían. El estado lo cantan el tile
+                    y la barra, sin chip. */}
+                <MDataRow
+                  icon="goal"
+                  iconTone={tone}
+                  title={g.name}
+                  subtitle={goalSubtitle({
+                    isSobre,
+                    missing,
+                    currency: g.currency,
+                    targetDate: g.targetDate,
+                  })}
+                  value={mAmount(g.currentAmount, g.currency, 10)}
+                  valueTone={tone === "danger" ? "danger" : "neutral"}
+                  slot={
+                    <>
+                      {isSobre ? null : <MProgress value={pct} tone={tone} height={8} />}
+                      <div style={{ display: "flex", gap: 8, marginTop: isSobre ? 0 : 10 }}>
+                        <button
+                          type="button"
+                          className="m-btn m-btn-secondary"
+                          // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
+                          // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
+                          // dos líneas (necesita 51px y le quedaban 50).
+                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                          onClick={() => setContributing(g)}
+                        >
+                          + Aporte
+                        </button>
+                        <button
+                          type="button"
+                          className="m-btn m-btn-secondary"
+                          // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
+                          // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
+                          // dos líneas (necesita 51px y le quedaban 50).
+                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                          onClick={() => setWithdrawing(g)}
+                        >
+                          Retirar
+                        </button>
+                        <button
+                          type="button"
+                          className="m-btn m-btn-secondary"
+                          // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
+                          // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
+                          // dos líneas (necesita 51px y le quedaban 50).
+                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                          onClick={() => setSpending(g)}
+                        >
+                          Gastar
+                        </button>
                       </div>
-                    </div>
-                    <span className={`badge ${badgeCls}`}>{isSobre ? "Sobre" : `${pctInt}%`}</span>
-                  </div>
-                  <div className="between" style={{ marginBottom: 8 }}>
-                    <div className="display" style={{ fontSize: 20 }}>
-                      {formatMoney(g.currentAmount, g.currency)}
-                    </div>
-                    <div className="muted mono" style={{ fontSize: 12 }}>
-                      {isSobre ? "acumulado" : `de ${formatMoney(g.targetAmount, g.currency)}`}
-                    </div>
-                  </div>
-                  {isSobre ? null : (
-                    <div className="bar" style={{ height: 8 }}>
-                      <i style={{ width: `${pctInt}%`, background: "linear-gradient(90deg, var(--s1), var(--s5))" }} />
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <button
-                      type="button"
-                      className="m-btn m-btn-secondary"
-                      style={{ flex: 1, minHeight: 42, fontSize: 13.5 }}
-                      onClick={() => setContributing(g)}
-                    >
-                      + Aporte
-                    </button>
-                    <button
-                      type="button"
-                      className="m-btn m-btn-secondary"
-                      style={{ flex: 1, minHeight: 42, fontSize: 13.5 }}
-                      onClick={() => setWithdrawing(g)}
-                    >
-                      Retirar
-                    </button>
-                    <button
-                      type="button"
-                      className="m-btn m-btn-secondary"
-                      style={{ flex: 1, minHeight: 42, fontSize: 13.5 }}
-                      onClick={() => setSpending(g)}
-                    >
-                      Gastar
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="m-btn m-btn-ghost"
-                    style={{ width: "100%", minHeight: 38, fontSize: 12.5, marginTop: 8 }}
-                    onClick={() => setViewing(g)}
-                  >
-                    Ver movimientos
-                  </button>
-                </div>
+                      <button
+                        type="button"
+                        className="m-btn m-btn-ghost"
+                        style={{ width: "100%", minHeight: 38, fontSize: 12.5, marginTop: 8 }}
+                        onClick={() => setViewing(g)}
+                      >
+                        Ver movimientos
+                      </button>
+                    </>
+                  }
+                />
               </SwipeRow>
             );
           })}
-        </div>
+        </MContentCard>
       )}
 
       <Fab onClick={() => setAdding(true)} label="Nueva meta" />
