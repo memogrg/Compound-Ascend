@@ -50,6 +50,7 @@ export async function getExpenseJars(args: {
     currency: string;
     delta?: string;
     categoryId?: string | null;
+    goalType?: string | null;
   }): JarEntity => ({
     id: e.id,
     name: e.name,
@@ -57,6 +58,7 @@ export async function getExpenseJars(args: {
     amount: conv(e.amount, e.currency),
     delta: e.delta,
     categoryId: e.categoryId ?? null,
+    goalType: e.goalType ?? null,
   });
 
   const entities: JarEntities = {
