@@ -96,20 +96,26 @@ export async function createInvestment(input: InvestmentInput): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export async function createPolicy(input: PolicyInput): Promise<void> {
+/** Crea una póliza y devuelve su id (el id permite vincular una meta de ahorro). */
+export async function createPolicy(input: PolicyInput): Promise<string> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("insurance_policies").insert({
-    user_id: user.id,
-    policy_type: input.policyType,
-    provider: input.provider ?? null,
-    coverage: input.coverage ?? null,
-    premium: input.premium ?? null,
-    premium_frequency: input.premiumFrequency ?? null,
-    renewal_date: input.renewalDate ?? null,
-    currency: input.currency,
-  });
+  const { data, error } = await supabase
+    .from("insurance_policies")
+    .insert({
+      user_id: user.id,
+      policy_type: input.policyType,
+      provider: input.provider ?? null,
+      coverage: input.coverage ?? null,
+      premium: input.premium ?? null,
+      premium_frequency: input.premiumFrequency ?? null,
+      renewal_date: input.renewalDate ?? null,
+      currency: input.currency,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+  return data!.id;
 }
 
 export async function updateInvestment(id: string, input: InvestmentInput): Promise<void> {
