@@ -40,7 +40,12 @@ export type JarItem = {
   remaining?: number;
   /** Parte del gastado que fue pago extraordinario (abono a capital). */
   extraordinary?: number;
+  /** Categoría (frasco) del ahorro; se usa para agrupar en secciones. */
+  categoryId?: string | null;
 };
+
+/** Sección de un frasco vinculado: agrupa items por categoría (solo ahorros). */
+export type JarSection = { key: string; name: string; items: JarItem[] };
 
 export type LinkedKind = "holding" | "debt" | "policy" | "goal";
 
@@ -72,6 +77,9 @@ export type Jar =
       totals?: { budget: number; spent: number; remaining: number };
       /** Categoría de sistema a la que se imputa el pago (para Registrar gasto). */
       paymentCategoryId?: string | null;
+      /** Agrupación visual de `items` por categoría (solo ahorros). Aditivo:
+       *  `items` sigue siendo la lista plana. "Generales" va primero. */
+      sections?: JarSection[];
     };
 
 /**
@@ -90,7 +98,15 @@ export type LinkedBudgetData = {
 export type LinkedBudgetConfig = Partial<Record<LinkedKind, LinkedBudgetData>>;
 
 /** Entidad real ya resuelta (id + etiqueta + monto numérico + subtítulo). */
-export type JarEntity = { id: string; name: string; sub: string; amount: number; delta?: string };
+export type JarEntity = {
+  id: string;
+  name: string;
+  sub: string;
+  amount: number;
+  delta?: string;
+  /** Categoría (frasco) del ahorro; solo se llena para goals. Para agrupar. */
+  categoryId?: string | null;
+};
 export type JarEntities = {
   holding: JarEntity[];
   rental: JarEntity[];
@@ -135,6 +151,41 @@ const LINKED_GROUPS: Record<
     ],
   },
 };
+
+/**
+ * Agrupa los items de ahorro por el GRUPO de nivel superior de su `categoryId`
+ * (el grupo mismo o el padre de la hoja, resuelto con el `tree`). "Generales" va
+ * PRIMERO con los items sin categoría (o cuya categoría no resuelve). Las
+ * secciones vacías NO se emiten; el resto sigue el orden del `tree`. Es puro
+ * reagrupamiento visual de los mismos items → no cambia totales ni presupuesto.
+ */
+function groupGoalSections(items: JarItem[], tree: CategoryNode[]): JarSection[] {
+  const groupOf = (catId: string): CategoryNode | undefined =>
+    tree.find((g) => g.id === catId || g.children.some((c) => c.id === catId));
+
+  const generales: JarItem[] = [];
+  const byGroup = new Map<string, JarItem[]>();
+  for (const it of items) {
+    const g = it.categoryId ? groupOf(it.categoryId) : undefined;
+    if (!g) {
+      generales.push(it);
+      continue;
+    }
+    const arr = byGroup.get(g.id) ?? [];
+    arr.push(it);
+    byGroup.set(g.id, arr);
+  }
+
+  const sections: JarSection[] = [];
+  if (generales.length > 0) {
+    sections.push({ key: "generales", name: "Generales", items: generales });
+  }
+  for (const g of tree) {
+    const arr = byGroup.get(g.id);
+    if (arr && arr.length > 0) sections.push({ key: g.id, name: g.name, items: arr });
+  }
+  return sections;
+}
 
 export function buildExpenseJars(args: {
   tree: CategoryNode[];
@@ -198,6 +249,7 @@ export function buildExpenseJars(args: {
             spent,
             remaining: budget - spent,
             extraordinary: lb.extraordinaryById?.[e.id] ?? 0,
+            categoryId: e.categoryId ?? null,
           };
         });
         const totals = items.reduce(
@@ -222,10 +274,20 @@ export function buildExpenseJars(args: {
           budgetAware: true,
           totals,
           paymentCategoryId: lb.paymentCategoryId,
+          // Ahorro: agrupación visual por categoría (no cambia items ni totals).
+          sections: linked.linkedKind === "goal" ? groupGoalSections(items, tree) : undefined,
         });
         continue;
       }
 
+      const plainItems: JarItem[] = entityList.map((e) => ({
+        id: e.id,
+        name: e.name,
+        sub: e.sub,
+        amount: fmt(e.amount),
+        delta: e.delta,
+        categoryId: e.categoryId ?? null,
+      }));
       jars.push({
         kind: "linked",
         group: group.id,
@@ -233,16 +295,12 @@ export function buildExpenseJars(args: {
         color: group.color ?? "var(--muted-2)",
         icon: group.icon ?? "spark",
         linkedKind: linked.linkedKind,
-        items: entityList.map((e) => ({
-          id: e.id,
-          name: e.name,
-          sub: e.sub,
-          amount: fmt(e.amount),
-          delta: e.delta,
-        })),
+        items: plainItems,
         emptyText: linked.emptyText,
         cta: linked.cta,
         fixedFunds: linked.fixedFunds,
+        // Ahorro: agrupación visual por categoría (aditivo; items sigue plano).
+        sections: linked.linkedKind === "goal" ? groupGoalSections(plainItems, tree) : undefined,
       });
       continue;
     }

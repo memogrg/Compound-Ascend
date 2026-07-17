@@ -107,6 +107,8 @@ export type DetailedEntity = {
   amount: number;
   currency: string;
   kind: "debt" | "goal" | "holding" | "policy" | "rental";
+  /** Categoría (frasco) del ahorro; solo se llena para goals. Para agrupar. */
+  categoryId?: string | null;
 };
 export type DetailedEntities = {
   debt: DetailedEntity[];
@@ -133,7 +135,7 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
       .order("created_at"),
     supabase
       .from("savings_goals")
-      .select("id,name,monthly_contribution,current_amount,target_amount,currency")
+      .select("id,name,monthly_contribution,current_amount,target_amount,currency,default_category_id")
       .eq("user_id", user.id)
       .order("created_at"),
     supabase
@@ -171,6 +173,7 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
       amount: Number(g.monthly_contribution ?? 0),
       currency: g.currency,
       kind: "goal",
+      categoryId: g.default_category_id ?? null,
     });
   }
   for (const h of holdings.data ?? []) {
