@@ -32,9 +32,20 @@ export function Modal({
   const subId = useId();
   const [mounted, setMounted] = useState(false);
 
+  // onClose siempre fresco en un ref: el listener de teclado (dep []) no captura
+  // una identidad vieja, y así NO depende de que onClose sea estable.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => setMounted(true), []);
 
+  // Foco inicial + bloqueo de scroll: UNA sola vez, cuando el portal ya montó
+  // (antes dependía de [onClose] y se re-ejecutaba en cada render de un caller
+  // con onClose inestable → robaba el foco al primer campo en cada tecla).
   useEffect(() => {
+    if (!mounted) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
 
@@ -45,12 +56,22 @@ export function Modal({
     const firstField = focusables.find((el) => !el.classList.contains("modal-x"));
     (firstField ?? dialog)?.focus();
 
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      previouslyFocused?.focus?.();
+    };
+  }, [mounted]);
+
+  // Escape + trampa de Tab: listener estable (dep []); usa onCloseRef y lee el
+  // dialog del ref en el momento del evento.
+  useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
+      const dialog = dialogRef.current;
       if (e.key !== "Tab" || !dialog) return;
       const items = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
         (el) => el.offsetParent !== null || el === document.activeElement,
@@ -68,12 +89,8 @@ export function Modal({
     }
 
     document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
-      previouslyFocused?.focus?.();
-    };
-  }, [onClose]);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   if (!mounted) return null;
 

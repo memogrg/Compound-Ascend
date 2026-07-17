@@ -9,7 +9,7 @@
  * El retiro baja current_amount y crea el ingreso vinculado
  * (linked_kind='goal') vía withdrawGoalAction (backend de Fase 4).
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
@@ -35,12 +35,12 @@ export function GoalWithdrawButton({ goal }: { goal: SavingsGoal }) {
   const amt = parseFloat(amount) || 0;
   const exceeds = amt > goal.currentAmount;
 
-  const close = () => {
+  const close = useCallback(() => {
     setOpen(false);
     setAmount("");
     setNote("");
     setError(null);
-  };
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

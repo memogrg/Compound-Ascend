@@ -14,7 +14,7 @@
  * La categoría se elige por gasto (el frasco no la fija). Las categorías se
  * cargan de forma perezosa al abrir el modal (misma fuente que el composer).
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
@@ -57,13 +57,13 @@ export function GoalSpendButton({ goal }: { goal: SavingsGoal }) {
     }
   };
 
-  const close = () => {
+  const close = useCallback(() => {
     setOpen(false);
     setAmount("");
     setNote("");
     setCategoryId(goal.defaultCategoryId ?? "");
     setError(null);
-  };
+  }, [goal.defaultCategoryId]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
