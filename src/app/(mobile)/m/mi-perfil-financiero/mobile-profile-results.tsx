@@ -5,11 +5,25 @@ import { RISK_DISPLAY } from "@/modules/personal-profile/constants";
 import * as O from "@/modules/personal-profile/constants";
 
 import { MobileHeader } from "../components/mobile-header";
+import {
+  MSummaryCard,
+  MSectionHeader,
+  MContentCard,
+  MProgress,
+  MChip,
+} from "../components/content-kit";
 
 /**
  * Resultados del ADN financiero en móvil — la vista que la web muestra en
  * /mi-perfil-financiero cuando el perfil está completo (ProfileDashboard). Se construye
  * con el MISMO buildDiagnosis(draft) del módulo; solo la UI es nueva. es-MX "tú".
+ *
+ * El kit entra PARCIAL a propósito: este perfil es narrativo, no un tablero de cifras. La
+ * ÚNICA métrica numérica real es la completitud → esa sí va como MSummaryCard + MProgress.
+ * El resto (tablero, identidad, objetivos, ruta) tiene valores que son PALABRAS ("Con
+ * familia", "Intermedio", "Salir de deudas") y lecturas que son frases: no caben en
+ * .m-met-v ni en .m-ds (ambos de una línea con elipsis, y en Space Mono aún más anchos),
+ * así que conservan su maquetación y solo adoptan la superficie y los encabezados del kit.
  */
 
 /** Etiqueta de una opción por su valor (reutiliza las listas del módulo). */
@@ -78,147 +92,158 @@ export function MobileProfileResults({
           ) : null}
         </div>
 
-        {/* Completitud + riesgo */}
-        <div className="card card-p" style={{ marginBottom: 14 }}>
-          <div className="between" style={{ marginBottom: 8 }}>
-            <span className="ov">Perfil completado</span>
-            <span className="mono" style={{ fontSize: 12, fontWeight: 700 }}>
-              {diagnosis.completion}%
-            </span>
-          </div>
-          <div className="bar" style={{ height: 8 }}>
-            <i style={{ width: `${diagnosis.completion}%` }} />
-          </div>
-          <div className="between" style={{ marginTop: 12 }}>
-            <span className="muted" style={{ fontSize: 13 }}>
-              Perfil de riesgo
-            </span>
-            <span className="m-confirm-chip">{RISK_DISPLAY[diagnosis.riskClass]}</span>
-          </div>
-        </div>
+        {/* Completitud: el ÚNICO número real de la pantalla ("78%" cabe de sobra en .m-sum-v)
+            → resumen del kit, con el perfil de riesgo como chip y su lectura como subtexto. */}
+        <MSummaryCard
+          eyebrow="Perfil completado"
+          value={`${diagnosis.completion}%`}
+          chip={<MChip>{RISK_DISPLAY[diagnosis.riskClass]}</MChip>}
+          sub={
+            reading?.riskReading
+              ? `Perfil de riesgo: ${reading.riskReading}`
+              : `Tu perfil de riesgo es ${RISK_DISPLAY[diagnosis.riskClass].toLowerCase()}.`
+          }
+          slot={<MProgress value={diagnosis.completion / 100} height={8} />}
+          style={{ marginBottom: 16 }}
+        />
 
-        {/* Narrativa */}
+        {/* Narrativa — prosa que envuelve: encabezado del kit + tarjeta, nunca MDataRow. */}
         {diagnosis.narrative ? (
-          <div className="card card-p" style={{ marginBottom: 14 }}>
-            <div className="ov" style={{ marginBottom: 6 }}>
-              Tu momento
-            </div>
-            <div style={{ fontSize: 14, lineHeight: 1.55 }}>{diagnosis.narrative}</div>
+          <div style={{ marginBottom: 16 }}>
+            <MSectionHeader title="Tu momento" />
+            <MContentCard>
+              <div style={{ fontSize: 14, lineHeight: 1.55 }}>{diagnosis.narrative}</div>
+            </MContentCard>
           </div>
         ) : null}
 
         {/* Lo que esto dice de ti */}
         {reading?.whatThisSays ? (
-          <div className="card card-p" style={{ marginBottom: 14 }}>
-            <div className="ov" style={{ marginBottom: 6 }}>
-              Lo que esto dice de ti
-            </div>
-            <div style={{ fontSize: 14, lineHeight: 1.55 }}>{reading.whatThisSays}</div>
+          <div style={{ marginBottom: 16 }}>
+            <MSectionHeader title="Lo que esto dice de ti" />
+            <MContentCard>
+              <div style={{ fontSize: 14, lineHeight: 1.55 }}>{reading.whatThisSays}</div>
+            </MContentCard>
           </div>
         ) : null}
 
-        {/* Superpoder + riesgo oculto */}
+        {/* Superpoder + riesgo oculto. El superpoder conserva su énfasis con el tinte de
+            acento (el .m-cc no lleva marco, así que el borde de antes se vuelve fondo). */}
         {reading ? (
-          <div style={{ display: "grid", gap: 12, marginBottom: 14 }}>
-            <ReadCard eyebrow="Tu superpoder" title={reading.superpower.title} body={reading.superpower.body} accent />
-            <ReadCard eyebrow="Tu riesgo oculto" title={reading.hiddenRisk.title} body={reading.hiddenRisk.body} />
-          </div>
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <MSectionHeader title="Tu superpoder" />
+              <MContentCard style={{ background: "var(--accent-soft)" }}>
+                <ReadBody title={reading.superpower.title} body={reading.superpower.body} />
+              </MContentCard>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <MSectionHeader title="Tu riesgo oculto" />
+              <MContentCard>
+                <ReadBody title={reading.hiddenRisk.title} body={reading.hiddenRisk.body} />
+              </MContentCard>
+            </div>
+          </>
         ) : null}
 
-        {/* Scorecard */}
+        {/* Tu tablero — NO es MMetricGrid ni MDataRow: sus valores son palabras ("Intermedio",
+            "Salir de deudas") que en .m-met-v (Space Mono 19px, una línea) se truncarían, y
+            cada `reading` es una frase que debe envolver. Conserva su fila + lectura debajo. */}
         {reading && reading.scorecard.length > 0 ? (
-          <div className="card card-p" style={{ marginBottom: 14 }}>
-            <div className="ov" style={{ marginBottom: 10 }}>
-              Tu tablero
-            </div>
-            <div style={{ display: "grid", gap: 12 }}>
-              {reading.scorecard.map((s, i) => (
-                <div key={i}>
-                  <div className="between">
-                    <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.label}</span>
-                    <span className="mono" style={{ fontSize: 13, color: "var(--accent)" }}>
-                      {s.value}
-                    </span>
+          <div style={{ marginBottom: 16 }}>
+            <MSectionHeader title="Tu tablero" />
+            <MContentCard>
+              <div style={{ display: "grid", gap: 12 }}>
+                {reading.scorecard.map((s, i) => (
+                  <div key={i}>
+                    <div className="between" style={{ gap: 10, alignItems: "baseline" }}>
+                      <span style={{ fontSize: 13.5, fontWeight: 600 }}>{s.label}</span>
+                      <span
+                        className="mono"
+                        style={{ fontSize: 13, color: "var(--accent)", textAlign: "right" }}
+                      >
+                        {s.value}
+                      </span>
+                    </div>
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.4 }}>
+                      {s.reading}
+                    </div>
                   </div>
-                  <div className="muted" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.4 }}>
-                    {s.reading}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </MContentCard>
           </div>
         ) : null}
 
-        {/* Identidad */}
+        {/* Identidad — misma razón que el tablero: "Con familia" o "Intermedio" no caben en
+            una celda de métrica (~110px útiles a 320px). Rejilla propia, superficie del kit. */}
         {identity.length > 0 ? (
-          <div className="card card-p" style={{ marginBottom: 14 }}>
-            <div className="ov" style={{ marginBottom: 10 }}>
-              {draft.displayName ? draft.displayName : "Tu identidad"}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {identity.map((it) => (
-                <div key={it.k}>
-                  <div className="muted" style={{ fontSize: 11.5 }}>
-                    {it.k}
+          <div style={{ marginBottom: 16 }}>
+            <MSectionHeader title={draft.displayName ? draft.displayName : "Tu identidad"} />
+            <MContentCard>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {identity.map((it) => (
+                  <div key={it.k} style={{ minWidth: 0 }}>
+                    <div className="muted" style={{ fontSize: 11.5 }}>
+                      {it.k}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{it.v}</div>
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{it.v}</div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </MContentCard>
           </div>
         ) : null}
 
-        {/* Objetivos + prioridades */}
-        {goals.length > 0 || priorities.length > 0 ? (
-          <div className="card card-p" style={{ marginBottom: 14 }}>
-            {goals.length > 0 ? (
-              <div style={{ marginBottom: priorities.length > 0 ? 14 : 0 }}>
-                <div className="ov" style={{ marginBottom: 8 }}>
-                  Tus objetivos
-                </div>
-                <ChipRow items={goals} />
-              </div>
-            ) : null}
-            {priorities.length > 0 ? (
-              <div>
-                <div className="ov" style={{ marginBottom: 8 }}>
-                  Tus prioridades
-                </div>
-                <ChipRow items={priorities} />
-              </div>
-            ) : null}
+        {/* Objetivos y prioridades — cada uno su sección; las etiquetas siguen siendo las
+            píldoras de acento (.m-confirm-chip): MChip es mono y gris, pensado para estados,
+            no para etiquetas de prosa como "Crear fondo de emergencia". */}
+        {goals.length > 0 ? (
+          <div style={{ marginBottom: 16 }}>
+            <MSectionHeader title="Tus objetivos" />
+            <MContentCard>
+              <ChipRow items={goals} />
+            </MContentCard>
+          </div>
+        ) : null}
+        {priorities.length > 0 ? (
+          <div style={{ marginBottom: 16 }}>
+            <MSectionHeader title="Tus prioridades" />
+            <MContentCard>
+              <ChipRow items={priorities} />
+            </MContentCard>
           </div>
         ) : null}
 
-        {/* Ruta sugerida */}
+        {/* Ruta sugerida — pasos que envuelven: lista numerada propia dentro de la tarjeta. */}
         {diagnosis.suggestedPath.length > 0 ? (
-          <div className="card card-p">
-            <div className="ov" style={{ marginBottom: 10 }}>
-              Tu ruta sugerida
-            </div>
-            <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 10 }}>
-              {diagnosis.suggestedPath.map((step, i) => (
-                <li key={i} className="row" style={{ alignItems: "flex-start", gap: 10 }}>
-                  <span
-                    className="mono"
-                    style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: "50%",
-                      background: "var(--accent-soft)",
-                      color: "var(--accent)",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: 11,
-                      flex: "none",
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-                  <span style={{ fontSize: 13.5, lineHeight: 1.45 }}>{step}</span>
-                </li>
-              ))}
-            </ol>
+          <div>
+            <MSectionHeader title="Tu ruta sugerida" />
+            <MContentCard>
+              <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 10 }}>
+                {diagnosis.suggestedPath.map((step, i) => (
+                  <li key={i} className="row" style={{ alignItems: "flex-start", gap: 10 }}>
+                    <span
+                      className="mono"
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "var(--accent-soft)",
+                        color: "var(--accent)",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 11,
+                        flex: "none",
+                      }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span style={{ fontSize: 13.5, lineHeight: 1.45 }}>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </MContentCard>
           </div>
         ) : null}
       </div>
@@ -226,30 +251,16 @@ export function MobileProfileResults({
   );
 }
 
-function ReadCard({
-  eyebrow,
-  title,
-  body,
-  accent,
-}: {
-  eyebrow: string;
-  title: string;
-  body: string;
-  accent?: boolean;
-}) {
+/** Titular + cuerpo de una lectura (superpoder / riesgo oculto). El eyebrow y la tarjeta
+ *  los aporta ahora la sección del kit; aquí solo queda el texto, que envuelve libre. */
+function ReadBody({ title, body }: { title: string; body: string }) {
   return (
-    <div
-      className="card card-p"
-      style={accent ? { borderColor: "color-mix(in srgb, var(--accent) 30%, var(--border))" } : undefined}
-    >
-      <div className="ov" style={{ color: accent ? "var(--accent)" : "var(--text-muted)" }}>
-        {eyebrow}
-      </div>
-      <div style={{ fontSize: 15, fontWeight: 700, marginTop: 6 }}>{title}</div>
+    <>
+      <div style={{ fontSize: 15, fontWeight: 700 }}>{title}</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
         {body}
       </div>
-    </div>
+    </>
   );
 }
 
