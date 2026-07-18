@@ -5,6 +5,14 @@ import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 import { formatMoney, formatCompact } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MScrubChart, type MPoint } from "../../components/m-scrub-chart";
+import {
+  MSummaryCard,
+  MSectionHeader,
+  MMetricGrid,
+  MMetricCard,
+  MChip,
+  mAmount,
+} from "../../components/content-kit";
 import { PatrimonioManager } from "./patrimonio-manager";
 
 /**
@@ -37,60 +45,63 @@ export default async function MobilePatrimonio() {
     .slice(0, 5)
     .map((c, i) => ({ label: c.label, value: c.value, color: RING_COLORS[i % RING_COLORS.length]! }));
 
+  // 0 no es ni positivo ni negativo: sin signo y en neutro. Los agregados (netWorth,
+  // totalAssets…) YA vienen en la moneda de display (getRichLifeSummary los normaliza con
+  // getPortfolioMarketValues + rates) → se muestran en crudo, sin reconvertir.
+  const nw = ind.netWorth;
+  const nwDir = nw > 0 ? 1 : nw < 0 ? -1 : 0;
+  const vel = ind.wealthVelocity;
+  const velDir = vel == null ? 0 : vel > 0 ? 1 : vel < 0 ? -1 : 0;
+  const score = snapshot.score;
+
   return (
     <div className="m-scroll">
       <div className="m-pad">
         <MobileHeader variant="inner" eyebrow="Crecimiento" title="Patrimonio" />
 
-        {/* Hero: patrimonio neto + cambio del mes */}
-        <div className="hero-nw" style={{ marginBottom: 16 }}>
-          <div className="ov">Patrimonio neto total</div>
-          <div className="hero-amt" style={{ marginTop: 6 }}>
-            {formatMoney(ind.netWorth, currency)}
-          </div>
-          {ind.wealthVelocity != null && (
-            <div className={`delta ${ind.wealthVelocity >= 0 ? "pos" : "neg"}`} style={{ marginTop: 8 }}>
-              <Arrow up={ind.wealthVelocity >= 0} />
-              {formatMoney(ind.wealthVelocity, currency)} este mes
-            </div>
-          )}
-          {/* Tendencia real del patrimonio neto (arrastra para ver cada punto). */}
-          {nwPoints.length >= 2 ? (
-            <div style={{ marginTop: 14 }}>
-              <MScrubChart points={nwPoints} currency={currency} />
-            </div>
-          ) : null}
-        </div>
+        {/* Resumen: patrimonio neto (rojo si es negativo) + el gráfico R5 como slot. */}
+        <MSummaryCard
+          eyebrow="Patrimonio neto total"
+          // Signo delante del símbolo (formatMoney antepone ₡, así que un negativo saldría
+          // "₡-2 500 000"). El positivo NO lleva "+": es un saldo, no un cambio. Cero: "₡0".
+          value={`${nwDir < 0 ? "−" : ""}${mAmount(Math.abs(nw), currency, 11)}`}
+          tone={nwDir < 0 ? "danger" : "neutral"}
+          chip={
+            vel != null && velDir !== 0 ? (
+              <MChip tone={velDir > 0 ? "success" : "danger"}>
+                {velDir > 0 ? "+" : "−"}
+                {mAmount(Math.abs(vel), currency, 7)} mes
+              </MChip>
+            ) : undefined
+          }
+          sub={
+            nwDir < 0
+              ? "Debes más de lo que tienes. Reducir pasivos es la prioridad."
+              : `Lo que tienes (${formatMoney(ind.totalAssets, currency)}) menos lo que debes (${formatMoney(ind.totalLiabilities, currency)}).`
+          }
+          slot={
+            nwPoints.length >= 2 ? <MScrubChart points={nwPoints} currency={currency} /> : undefined
+          }
+          style={{ marginBottom: 16 }}
+        />
 
-        {/* Desglose invertido / líquido / deuda */}
-        <div className="mini-kpi" style={{ gridTemplateColumns: "1fr 1fr 1fr", marginBottom: 16 }}>
-          <div className="kpi" style={{ padding: 12 }}>
-            <div className="k">Invertido</div>
-            {/* Abreviado a millones (₡347,9 M) para una sola línea, como el centro de la dona. */}
-            <div className="kv pos" style={{ fontSize: 17, whiteSpace: "nowrap" }}>
-              {formatCompact(bd?.invested ?? 0, currency)}
-            </div>
-          </div>
-          <div className="kpi" style={{ padding: 12 }}>
-            <div className="k">Líquido</div>
-            <div className="kv" style={{ fontSize: 17, whiteSpace: "nowrap" }}>
-              {formatCompact(bd?.liquid ?? 0, currency)}
-            </div>
-          </div>
-          <div className="kpi" style={{ padding: 12 }}>
-            <div className="k">Deuda</div>
-            <div className="kv neg" style={{ fontSize: 17, whiteSpace: "nowrap" }}>
-              {formatCompact(ind.totalLiabilities, currency)}
-            </div>
-          </div>
-        </div>
+        {/* Métricas: balance + Rich Life Score + cuánto trabaja para ti. */}
+        <MSectionHeader title="Tu patrimonio en números" />
+        <MMetricGrid style={{ marginBottom: 16 }}>
+          <MMetricCard label="Activos totales" value={mAmount(ind.totalAssets, currency, 8)} sub="lo que tienes" tone="success" />
+          <MMetricCard label="Pasivos totales" value={mAmount(ind.totalLiabilities, currency, 8)} sub="lo que debes" tone="danger" />
+          <MMetricCard
+            label="Rich Life Score"
+            value={String(Math.round(score.score))}
+            sub={score.state}
+          />
+          <MMetricCard label="Invertido" value={mAmount(bd?.invested ?? 0, currency, 8)} sub="trabaja para ti" tone="success" />
+        </MMetricGrid>
 
-        {/* Distribución (donut + leyenda) */}
+        {/* Composición — MDonut INTERACTIVO (R5): su lógica y props no se tocan. */}
         {slices.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <div className="sec-title" style={{ marginBottom: 12 }}>
-              Composición
-            </div>
+            <MSectionHeader title="Composición de activos" />
             <MDonut
               slices={slices}
               centerValue={formatCompact(ind.totalAssets, currency)}
@@ -101,22 +112,9 @@ export default async function MobilePatrimonio() {
         )}
 
         {/* Activos y pasivos manuales — CRUD (FAB alta · SwipeRow editar/eliminar) */}
-        <div>
-          <div className="sec-title" style={{ marginBottom: 6 }}>
-            Activos y pasivos
-          </div>
-          <PatrimonioManager assets={assets} liabilities={liabilities} currency={currency} />
-        </div>
+        <PatrimonioManager assets={assets} liabilities={liabilities} currency={currency} />
       </div>
     </div>
-  );
-}
-
-function Arrow({ up }: { up: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} style={{ width: 13, height: 13 }}>
-      <path d={up ? "M6 15l6-6 6 6" : "M6 9l6 6 6-6"} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 
