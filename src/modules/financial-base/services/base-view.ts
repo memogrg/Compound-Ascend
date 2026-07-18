@@ -128,6 +128,10 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     realByKey: real.expenseByKey,
     nativeBudgetByKey: budget.nativeByKey,
     currency,
+    // Frasco "Por reasignar": el titular suma TODOS los budget_items, así que el
+    // engine necesita los crudos para detectar los que no se pintan en ningún lado.
+    budgetItems: budget.items,
+    hiddenCategoryIds: personalization.hidden.map((h) => h.id),
   });
 
   // Acumula histórico: persiste el snapshot del mes recién cerrado (best-effort).

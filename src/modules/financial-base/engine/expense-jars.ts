@@ -49,6 +49,42 @@ export type JarSection = { key: string; name: string; items: JarItem[] };
 
 export type LinkedKind = "holding" | "debt" | "policy" | "goal";
 
+/**
+ * Línea de presupuesto cruda del periodo (solo gasto). El engine la usa para
+ * detectar las que NO llegaron a pintarse en ningún frasco.
+ */
+export type BudgetLine = {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string;
+  categoryId: string | null;
+  /** Plan derivado: las líneas vinculadas se pintan por (sourceKind, sourceId), no por categoría. */
+  sourceKind?: string;
+  sourceId?: string | null;
+};
+
+/** Por qué una línea quedó fuera de todo frasco (chip en la UI). */
+export type OrphanReason =
+  | "sin_categoria"
+  | "categoria_oculta"
+  | "categoria_inactiva"
+  | "categoria_inexistente"
+  | "no_renderizada";
+
+export type OrphanLine = {
+  id: string;
+  name: string;
+  /** Monto en la moneda de visualización (el mismo criterio que el titular). */
+  amount: number;
+  /** Monto sin convertir + su moneda. */
+  nativeAmount: number;
+  currency: string;
+  reason: OrphanReason;
+};
+
+export const ORPHAN_GROUP = "__orphans__";
+
 export type Jar =
   | {
       kind: "normal";
@@ -80,6 +116,21 @@ export type Jar =
       /** Agrupación visual de `items` por categoría (solo ahorros). Aditivo:
        *  `items` sigue siendo la lista plana. "Generales" va primero. */
       sections?: JarSection[];
+    }
+  | {
+      /**
+       * Frasco "Por reasignar": líneas de presupuesto que SUMAN en el titular
+       * pero cuya categoría ya no se pinta en ningún frasco (oculta, inactiva,
+       * borrada o sin categoría). Existe para que el total siempre cuadre con
+       * lo visible: nada se descuenta ni se pierde en silencio.
+       */
+      kind: "orphan";
+      group: typeof ORPHAN_GROUP;
+      name: string;
+      color: string;
+      icon: string;
+      items: OrphanLine[];
+      total: number;
     };
 
 /**
@@ -231,9 +282,20 @@ export function buildExpenseJars(args: {
   rates?: Record<string, number>;
   /** Activa el modo budget-aware por linkedKind (esta entrega: solo `debt`). */
   linkedBudget?: LinkedBudgetConfig;
+  /** Líneas de gasto crudas del periodo; de acá salen los huérfanos. */
+  budgetItems?: BudgetLine[];
+  /** Bases ocultas por override (solo para etiquetar el motivo del huérfano). */
+  hiddenCategoryIds?: string[];
 }): Jar[] {
   const { tree, budgetByKey, realByKey, entities, fmt, linkedBudget } = args;
   const jars: Jar[] = [];
+
+  // Lo que REALMENTE se pintó, por las dos claves con las que se pinta:
+  // los frascos normales por categoría, los vinculados por (sourceKind, sourceId).
+  // Derivar los huérfanos de acá — y no re-derivando las reglas de render — es lo
+  // que hace que el bucket se ajuste solo si mañana cambia una regla.
+  const renderedCategoryIds = new Set<string>();
+  const renderedSources = new Set<string>();
 
   // Deriva los campos nativos de un sobre: presupuesto nativo (sin convertir) y
   // gastado convertido a la moneda del sobre (opción A). Si no llega el dato de
@@ -263,6 +325,9 @@ export function buildExpenseJars(args: {
           ? [...entities.holding, ...entities.rental]
           : entities[linked.linkedKind];
       const lb = linkedBudget?.[linked.linkedKind];
+      // Las líneas derivadas se pintan por entidad, no por categoría (las de
+      // metas nacen con categoryId NULL a propósito) → se marcan por source.
+      for (const e of entityList) renderedSources.add(`${linked.linkedKind}:${e.id}`);
 
       if (lb) {
         // Budget-aware: cada obligación trae cuota (línea derivada, fallback al
@@ -349,11 +414,15 @@ export function buildExpenseJars(args: {
         budget: groupBudget,
         ...nativeOf(group.id, groupSpent, groupBudget),
       });
+      renderedCategoryIds.add(group.id);
     }
     for (const c of group.children) {
-      if (!(c.isFavorite || !c.isSystem)) continue;
       const dSpent = realByKey[c.id]?.value ?? 0;
       const dBudget = budgetByKey[c.id]?.value ?? 0;
+      // Las de sistema no favoritas se omiten SOLO si están vacías: si tienen
+      // plata se pintan igual (mismo criterio que "{Grupo} (general)"), en vez
+      // de esconder datos reales o mandarlos a "Por reasignar".
+      if (!(c.isFavorite || !c.isSystem) && dBudget <= 0 && dSpent <= 0) continue;
       envelopes.push({
         id: c.id,
         name: c.name,
@@ -361,6 +430,7 @@ export function buildExpenseJars(args: {
         budget: dBudget,
         ...nativeOf(c.id, dSpent, dBudget),
       });
+      renderedCategoryIds.add(c.id);
     }
 
     const nonFavoriteLeafNames = group.children
@@ -380,6 +450,47 @@ export function buildExpenseJars(args: {
         nonFavoriteLeafNames,
         envelopeNames: envelopes.map((e) => e.name),
       }),
+    });
+  }
+
+  // ── "Por reasignar": lo que suma en el titular pero no se pintó en ningún lado.
+  const budgetItems = args.budgetItems ?? [];
+  const hidden = new Set(args.hiddenCategoryIds ?? []);
+  const orphanLines = budgetItems.filter(
+    (it) =>
+      !(it.sourceKind && it.sourceId && renderedSources.has(`${it.sourceKind}:${it.sourceId}`)) &&
+      (it.categoryId == null || !renderedCategoryIds.has(it.categoryId)),
+  );
+
+  if (orphanLines.length > 0) {
+    const items: OrphanLine[] = orphanLines.map((it) => ({
+      id: it.id,
+      name: it.name,
+      // Mismo criterio de conversión que el titular, si no el invariante
+      // (visible + huérfanos === total) se rompe con montos en otra moneda.
+      amount:
+        it.currency && displayCur && it.currency !== displayCur
+          ? convertCurrency(it.amount, it.currency, displayCur, rates)
+          : it.amount,
+      nativeAmount: it.amount,
+      currency: it.currency,
+      reason:
+        it.categoryId == null
+          ? "sin_categoria"
+          : hidden.has(it.categoryId)
+            ? "categoria_oculta"
+            : // Sin la lista cruda de categorías no se puede distinguir
+              // inactiva de inexistente → no se inventa el motivo.
+              "no_renderizada",
+    }));
+    jars.push({
+      kind: "orphan",
+      group: ORPHAN_GROUP,
+      name: "Por reasignar",
+      color: "var(--warn)",
+      icon: "info",
+      items,
+      total: items.reduce((t, it) => t + it.amount, 0),
     });
   }
 

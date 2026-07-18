@@ -125,6 +125,8 @@ function jarTotals(jar: Jar): { spent: number; budget: number } {
       { spent: 0, budget: 0 },
     );
   }
+  // "Por reasignar": suma en el presupuesto (igual que el titular) y no tiene gasto real.
+  if (jar.kind === "orphan") return { spent: 0, budget: jar.total };
   if (jar.totals) return { spent: jar.totals.spent, budget: jar.totals.budget };
   return jar.items.reduce(
     (acc, it) => ({ spent: acc.spent + (it.spent ?? 0), budget: acc.budget + (it.budget ?? 0) }),
@@ -656,6 +658,8 @@ export function GastosManager({
  * normales abren su detalle al tocarlos; los vinculados llevan al módulo dueño.
  */
 function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen?: () => void }) {
+  // "Por reasignar" aún no tiene tarjeta propia (llega en el delta de UI).
+  if (jar.kind === "orphan") return null;
   const { spent, budget } = jarTotals(jar);
   const tone = levelTone(spent, budget);
   const pct = budget > 0 ? Math.min(1, spent / budget) : 0;
