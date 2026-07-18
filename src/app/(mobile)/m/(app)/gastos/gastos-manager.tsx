@@ -8,13 +8,24 @@ import {
   removeCategoryAction,
   unforkCategoryAction,
   unhideCategoryAction,
+  reassignBudgetItemAction,
+  removeBudgetItemAction,
 } from "@/modules/financial-base/api/v2-actions";
-import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
+import type {
+  Jar,
+  JarEnvelope,
+  OrphanLine,
+  OrphanReason,
+} from "@/modules/financial-base/engine/expense-jars";
+import { buildCategoryOptionGroups } from "@/modules/financial-base/engine/category-options";
 import type { Account, Period } from "@/modules/financial-base/types";
-import type { CategoryPersonalization } from "@/modules/financial-base/services/categories-service";
+import type {
+  Category,
+  CategoryPersonalization,
+} from "@/modules/financial-base/services/categories-service";
 import { formatMoney } from "@/lib/format";
 
-import { Fab, BottomSheet, SheetSelect, ConfirmDialog, useToast } from "../../components/form-kit";
+import { Fab, BottomSheet, SheetSelect, ConfirmDialog, useToast, type Opt } from "../../components/form-kit";
 import { MIcon, type MIconName } from "../../components/m-icon";
 import {
   MSummaryCard,
@@ -140,6 +151,7 @@ export function GastosManager({
   accounts,
   period,
   categoryMeta,
+  categories,
   canPersonalize,
   personalization,
 }: {
@@ -147,6 +159,8 @@ export function GastosManager({
   currency: string;
   accounts: Account[];
   period: Period;
+  /** Árbol completo de categorías: destinos de reasignación de "Por reasignar". */
+  categories: Category[];
   /** Metadatos por categoría (sistema/favorito/icono/color/nombre): decide qué es editable/personalizable. */
   categoryMeta: Record<string, CatMeta>;
   /** Personalización por hogar (Fase 3): puede el usuario editar + estado (ocultas/forks). */
@@ -157,6 +171,8 @@ export function GastosManager({
   const toast = useToast();
   const [addingSpend, setAddingSpend] = useState(false);
   const [detailJar, setDetailJar] = useState<NormalJar | null>(null);
+  // Frasco "Por reasignar": líneas que suman en el titular pero no se pintan.
+  const [orphansOpen, setOrphansOpen] = useState(false);
   const [creatingSobreIn, setCreatingSobreIn] = useState<string | null>(null); // jar.group
   const [editingEnv, setEditingEnv] = useState<JarEnvelope | null>(null);
   // Gestión de sobre del USUARIO: menú de acciones, editar (nombre/favorito), eliminar (con reasignación).
@@ -185,6 +201,13 @@ export function GastosManager({
   });
 
   /** Opciones de reasignación al ocultar: cualquier otro sobre, agrupado por frasco. */
+  // Frasco huérfano + sus destinos de reasignación (mismos que la web: cada
+  // grupo con su "(general)" y sus hojas, desde el árbol completo de categorías).
+  const orphanJar = jars.find((j): j is Extract<Jar, { kind: "orphan" }> => j.kind === "orphan");
+  const orphanReassignOpts: Opt[] = buildCategoryOptionGroups(categories).flatMap((g) =>
+    g.options.map((o) => ({ value: o.id, label: `${g.groupName} · ${o.name}` })),
+  );
+
   const hideReassignOpts = (excludeId: string) => [
     { value: "", label: "Sin reasignar (quedan sin categoría)" },
     ...jars
@@ -291,7 +314,18 @@ export function GastosManager({
         <>
           <MSectionHeader title="Frascos del mes" />
           {jars.map((jar) => (
-            <JarCard key={jar.group} jar={jar} currency={currency} onOpen={jar.kind === "normal" ? () => setDetailJar(jar) : undefined} />
+            <JarCard
+              key={jar.group}
+              jar={jar}
+              currency={currency}
+              onOpen={
+                jar.kind === "normal"
+                  ? () => setDetailJar(jar)
+                  : jar.kind === "orphan"
+                    ? () => setOrphansOpen(true)
+                    : undefined
+              }
+            />
           ))}
         </>
       )}
@@ -584,6 +618,28 @@ export function GastosManager({
         ) : null}
       </BottomSheet>
 
+      {/* "Por reasignar": líneas huérfanas → reasignar a una categoría o borrar */}
+      <BottomSheet open={orphansOpen} onClose={() => setOrphansOpen(false)} title="Por reasignar">
+        {orphanJar ? (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Estas líneas suman en tu presupuesto pero su categoría ya no se muestra (se ocultó o
+              se borró). Reasignalas para que vuelvan a su frasco: el total no cambia, solo se
+              mueve de lugar.
+            </div>
+            {orphanJar.items.map((line) => (
+              <OrphanLineRow
+                key={line.id}
+                line={line}
+                currency={currency}
+                options={orphanReassignOpts}
+                onDone={() => router.refresh()}
+              />
+            ))}
+          </div>
+        ) : null}
+      </BottomSheet>
+
       {/* Personalizar (fork) un frasco/sobre base → forkCategoryAction */}
       <BottomSheet open={!!forkingTarget} onClose={() => setForkingTarget(null)} title="Personalizar categoría">
         {forkingTarget ? (
@@ -657,9 +713,138 @@ export function GastosManager({
  * sobre presupuesto, barra de progreso y sus sobres como filas de datos. Los frascos
  * normales abren su detalle al tocarlos; los vinculados llevan al módulo dueño.
  */
+/** Etiqueta del chip por motivo (el engine solo emite los que puede probar). */
+const ORPHAN_REASON_LABEL: Record<OrphanReason, string> = {
+  sin_categoria: "Sin categoría",
+  categoria_oculta: "Categoría oculta",
+  categoria_inactiva: "Categoría inactiva",
+  categoria_inexistente: "Categoría borrada",
+  no_renderizada: "Fuera de los frascos",
+};
+
+/**
+ * Una línea huérfana en el sheet: monto + motivo, y las dos salidas posibles
+ * (reasignar a una categoría, o eliminarla del presupuesto).
+ */
+function OrphanLineRow({
+  line,
+  currency,
+  options,
+  onDone,
+}: {
+  line: OrphanLine;
+  currency: string;
+  options: Opt[];
+  onDone: () => void;
+}) {
+  const toast = useToast();
+  const [categoryId, setCategoryId] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (fn: () => Promise<{ ok: boolean; message?: string }>, okMsg: string) => {
+    setPending(true);
+    setError(null);
+    const res = await fn();
+    setPending(false);
+    if (res.ok) {
+      toast.show(okMsg);
+      onDone();
+    } else {
+      setError(res.message ?? "No pudimos completar la acción.");
+    }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 8, paddingBottom: 10, borderBottom: "1px solid var(--m-border)" }}>
+      <div className="row" style={{ gap: 8, alignItems: "center" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{line.name}</div>
+          <MChip tone="warning">{ORPHAN_REASON_LABEL[line.reason]}</MChip>
+        </div>
+        <div className="mono" style={{ fontSize: 14, flex: "none" }}>
+          {mAmount(line.amount, currency)}
+        </div>
+      </div>
+      <SheetSelect
+        name={`reassign-${line.id}`}
+        label="Reasignar a"
+        value={categoryId}
+        onChange={setCategoryId}
+        options={options}
+        sheetTitle="Reasignar línea a"
+      />
+      <div className="row" style={{ gap: 8 }}>
+        <button
+          type="button"
+          className="m-btn m-btn-block"
+          disabled={pending || !categoryId}
+          onClick={() =>
+            void run(
+              () => reassignBudgetItemAction({ budgetItemId: line.id, categoryId }),
+              "Línea reasignada · tu presupuesto total no cambia",
+            )
+          }
+        >
+          {pending ? "Guardando…" : "Reasignar"}
+        </button>
+        <button
+          type="button"
+          className="m-btn m-btn-block m-btn-danger"
+          disabled={pending}
+          onClick={() =>
+            void run(() => removeBudgetItemAction(line.id), "Línea eliminada del presupuesto")
+          }
+        >
+          Eliminar
+        </button>
+      </div>
+      {error ? (
+        <div className="muted" style={{ fontSize: 12, color: "var(--m-danger)" }} role="alert">
+          {error}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen?: () => void }) {
-  // "Por reasignar" aún no tiene tarjeta propia (llega en el delta de UI).
-  if (jar.kind === "orphan") return null;
+  // "Por reasignar": suma en el presupuesto pero no tiene gasto real ni barra.
+  // Tono de alerta y CTA a revisar; el detalle vive en su propio BottomSheet.
+  if (jar.kind === "orphan") {
+    const n = jar.items.length;
+    return (
+      <MContentCard
+        onClick={onOpen}
+        ariaLabel={onOpen ? `Revisar ${jar.name}` : undefined}
+        style={{ marginBottom: 12 }}
+      >
+        <div className="row" style={{ gap: 12, alignItems: "center" }}>
+          <span
+            className="m-dic m-dic-warning"
+            style={{ width: 44, height: 44, borderRadius: 13 }}
+            aria-hidden
+          >
+            <MIcon name="bell" size={21} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="row" style={{ gap: 6 }}>
+              <span style={{ fontWeight: 700, fontSize: 15 }}>{jar.name}</span>
+              <MChip tone="warning">{n}</MChip>
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+              {n === 1 ? "línea sin frasco" : "líneas sin frasco"} · toca para revisar
+            </div>
+          </div>
+          <div style={{ flex: "none", textAlign: "right" }}>
+            <div className={`mono ${TONE_TEXT.warning}`} style={{ fontSize: 14 }}>
+              {mAmount(jar.total, currency)}
+            </div>
+          </div>
+        </div>
+      </MContentCard>
+    );
+  }
   const { spent, budget } = jarTotals(jar);
   const tone = levelTone(spent, budget);
   const pct = budget > 0 ? Math.min(1, spent / budget) : 0;

@@ -101,6 +101,7 @@ export default async function MobileGastos() {
           accounts={view.accounts}
           period={period}
           categoryMeta={categoryMeta}
+          categories={view.categories}
           canPersonalize={view.canPersonalize}
           personalization={view.personalization}
         />
