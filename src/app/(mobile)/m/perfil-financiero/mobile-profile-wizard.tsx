@@ -21,6 +21,7 @@ import {
   YesNo,
   type Opt,
 } from "./wizard-fields";
+import { MProgress } from "../components/content-kit";
 
 /**
  * Wizard móvil del ADN financiero (/m/perfil-financiero), con la piel de mobile.css.
@@ -306,15 +307,13 @@ export function MobileProfileWizard({ initialDraft }: { initialDraft: ProfileDra
 
   if (!step) return null; // index siempre acotado; guarda para noUncheckedIndexedAccess
 
-  const pct = Math.round(((index + 1) / TOTAL) * 100);
-
   return (
     <div className="m-wz">
-      {/* Progreso */}
+      {/* Progreso — MProgress pinta el mismo .bar/.bar>i en var(--accent) (idéntico a lo que
+          había) y de paso recorta el valor a 0..1. El encabezado del paso NO se toca: su
+          .m-wz-eyebrow es acento 11px, deliberadamente más presente que el .ov del kit. */}
       <div className="m-wz-head">
-        <div className="bar" style={{ height: 6 }}>
-          <i style={{ width: `${pct}%` }} />
-        </div>
+        <MProgress value={(index + 1) / TOTAL} height={6} />
         <div className="m-wz-progtxt mono">
           Paso {index + 1} de {TOTAL}
         </div>
