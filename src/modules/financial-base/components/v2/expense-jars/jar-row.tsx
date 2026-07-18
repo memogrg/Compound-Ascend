@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { JarNormalModal } from "@/modules/financial-base/components/v2/expense-jars/jar-normal-modal";
 import { JarLinkedModal } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
+import { JarOrphansModal } from "@/modules/financial-base/components/v2/expense-jars/jar-orphans-modal";
 import { CategoryKebab } from "@/modules/financial-base/components/v2/expense-jars/category-kebab";
 import {
   usePersonalize,
@@ -222,10 +223,62 @@ export function JarRow({
     );
   }
 
-  // El frasco "Por reasignar" (kind: "orphan") aún no tiene render propio: llega
-  // en el delta de UI. Hasta entonces no se pinta (el engine ya lo emite y el
-  // invariante del test lo cubre).
-  if (jar.kind !== "normal") return null;
+  // Frasco "Por reasignar": líneas que suman en el titular pero cuya categoría
+  // ya no se pinta. Estilo de alerta; el modal permite reasignarlas o borrarlas.
+  if (jar.kind === "orphan") {
+    const n = jar.items.length;
+    return (
+      <>
+        <button
+          type="button"
+          className="env exp-clickable"
+          style={{
+            width: "100%",
+            textAlign: "left",
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            font: "inherit",
+          }}
+          onClick={() => setOpen(true)}
+          aria-label={`${jar.name} · ${n} ${n === 1 ? "línea" : "líneas"}`}
+        >
+          <div
+            className="env-ic"
+            style={{
+              background: `color-mix(in srgb, ${jar.color} 14%, transparent)`,
+              color: jar.color,
+            }}
+          >
+            <Icon name={icon} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div className="env-name">
+              {jar.name} <span style={{ color: "var(--text-muted)" }}>›</span>
+            </div>
+            <div className="env-sub">
+              {n} {n === 1 ? "línea sin frasco" : "líneas sin frasco"} · suman en tu presupuesto
+            </div>
+          </div>
+          <div className="env-bar-cell" />
+          <div className="env-num" style={{ textAlign: "right" }}>
+            <div className="big" style={{ color: jar.color }}>
+              {formatMoney(jar.total, currency)}
+            </div>
+            <div className="small">Revisar</div>
+          </div>
+        </button>
+        {open ? (
+          <JarOrphansModal
+            jar={jar}
+            currency={currency}
+            categories={categories}
+            onClose={() => setOpen(false)}
+          />
+        ) : null}
+      </>
+    );
+  }
 
   const totalSpent = jar.envelopes.reduce((s, e) => s + e.spent, 0);
   const totalBudget = jar.envelopes.reduce((s, e) => s + e.budget, 0);

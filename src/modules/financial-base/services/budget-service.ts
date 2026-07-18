@@ -148,6 +148,26 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
     .eq("user_id", user.id);
 }
 
+/**
+ * Reasigna SOLO la categoría de una línea de presupuesto. Es la salida del
+ * frasco "Por reasignar": la línea ya suma en el titular, así que moverla de
+ * categoría no cambia el total — solo la hace visible en su frasco.
+ *
+ * A diferencia de updateBudgetItem NO exige que la línea sea manual: una línea
+ * derivada queda huérfana justamente cuando su entidad desapareció, y ésta es
+ * la única forma de recuperarla. No toca source_kind/source_id.
+ */
+export async function reassignBudgetItem(id: string, categoryId: string): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("budget_items")
+    .update({ category_id: categoryId })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteBudgetItem(id: string): Promise<void> {
   await assertManualItem(id);
   const user = await requireUser();
