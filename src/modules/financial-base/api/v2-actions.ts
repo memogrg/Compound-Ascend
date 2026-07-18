@@ -55,6 +55,7 @@ import {
   createBudgetItem,
   updateBudgetItem,
   deleteBudgetItem,
+  reassignBudgetItem,
   setCategoryBudget,
   copyPreviousMonthExpenseBudget,
   registerIncomeSource,
@@ -148,8 +149,33 @@ export async function removeBudgetItemAction(id: string): Promise<ActionResult> 
     await deleteBudgetItem(id);
     revalidate();
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (err) {
+    // Las líneas derivadas quedan bloqueadas por assertManualItem: su mensaje
+    // explica que hay que editarlas desde su módulo (lo muestra "Por reasignar").
+    return { ok: false, message: err instanceof Error ? err.message : undefined };
+  }
+}
+
+/**
+ * Reasigna la categoría de una línea de presupuesto (frasco "Por reasignar").
+ * El titular "Gasto planificado" NO cambia: la línea ya sumaba, solo pasa a
+ * verse en el frasco que le corresponde.
+ */
+export async function reassignBudgetItemAction(raw: unknown): Promise<ActionResult> {
+  const parsed = z
+    .object({ budgetItemId: z.string().uuid(), categoryId: z.string().uuid() })
+    .safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await reassignBudgetItem(parsed.data.budgetItemId, parsed.data.categoryId);
+    revalidate();
+    return { ok: true };
+  } catch (err) {
+    logger.error("reassignBudgetItem fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos reasignar la línea." };
   }
 }
 
