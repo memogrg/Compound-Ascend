@@ -131,6 +131,9 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     // Frasco "Por reasignar": el titular suma TODOS los budget_items, así que el
     // engine necesita los crudos para detectar los que no se pintan en ningún lado.
     budgetItems: budget.items,
+    // Gasto real: sale de la lista SIN capar de getRealTotals (la de la vista
+    // está capada a TRANSACTIONS_LIST_CAP y rompería el invariante).
+    realTxns: real.expenseTxns,
     hiddenCategoryIds: personalization.hidden.map((h) => h.id),
   });
 

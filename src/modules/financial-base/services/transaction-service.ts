@@ -13,6 +13,7 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { getCategoryNameMap } from "@/modules/financial-base/services/categories-service";
 import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
+import type { RealTxnLine } from "@/modules/financial-base/engine/expense-jars";
 import type {
   Transaction,
   TxnKind,
@@ -530,6 +531,13 @@ export type RealTotals = {
    *  Para mostrar la fila/barra de cada fuente en su propia moneda (it.currency). */
   incomeReceivedBySourceNative: Record<string, number>;
   expenseByKey: KeyedTotals;
+  /**
+   * Proyección liviana de las transacciones de GASTO que suman en `realExpense`
+   * (off-budget ya excluidas). Sale de la MISMA lista sin capar con la que se
+   * calcula el titular — no de la lista capada de la vista — para que el frasco
+   * "Por reasignar" pueda reconciliar el gasto real sin fetch adicional.
+   */
+  expenseTxns: RealTxnLine[];
   topExpenseCategory: string | null;
   pendingCount: number;
   currency: string;
@@ -552,6 +560,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
   const incomeReceivedBySource: Record<string, number> = {};
   const incomeReceivedBySourceNative: Record<string, number> = {};
   const expenseByKey: KeyedTotals = {};
+  const expenseTxns: RealTxnLine[] = [];
 
   for (const t of txns) {
     if (t.status === "pending_review") pendingCount += 1;
@@ -583,6 +592,17 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
       const label = t.categoryId ? (catMap[t.categoryId] ?? "Sin categoría") : "Sin categoría";
       const key = t.categoryId ?? "sin_categoria";
       expenseByKey[key] = { label, value: (expenseByKey[key]?.value ?? 0) + value };
+      // Misma pasada que alimenta realExpense → el frasco "Por reasignar"
+      // reconcilia exactamente lo que suma el titular.
+      expenseTxns.push({
+        id: t.id,
+        name: t.merchantOrSource || t.description || "Gasto sin descripción",
+        amount: t.amount,
+        currency: t.currency,
+        categoryId: t.categoryId,
+        linkedKind: t.linkedKind,
+        linkedId: t.linkedId,
+      });
     }
   }
 
@@ -601,6 +621,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
     incomeReceivedBySource,
     incomeReceivedBySourceNative,
     expenseByKey,
+    expenseTxns,
     topExpenseCategory,
     pendingCount,
     currency,

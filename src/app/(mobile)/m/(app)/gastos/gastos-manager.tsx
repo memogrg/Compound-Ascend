@@ -8,6 +8,7 @@ import {
   removeCategoryAction,
   unforkCategoryAction,
   unhideCategoryAction,
+  assignCategoryAction,
   reassignBudgetItemAction,
   removeBudgetItemAction,
 } from "@/modules/financial-base/api/v2-actions";
@@ -136,8 +137,10 @@ function jarTotals(jar: Jar): { spent: number; budget: number } {
       { spent: 0, budget: 0 },
     );
   }
-  // "Por reasignar": suma en el presupuesto (igual que el titular) y no tiene gasto real.
-  if (jar.kind === "orphan") return { spent: 0, budget: jar.total };
+  // "Por reasignar": cada total va a SU columna. `total` es presupuesto sin
+  // frasco y `realTotal` es gasto real sin frasco — cruzarlos reintroduciría
+  // el descuadre que este frasco existe para eliminar.
+  if (jar.kind === "orphan") return { spent: jar.realTotal, budget: jar.total };
   if (jar.totals) return { spent: jar.totals.spent, budget: jar.totals.budget };
   return jar.items.reduce(
     (acc, it) => ({ spent: acc.spent + (it.spent ?? 0), budget: acc.budget + (it.budget ?? 0) }),
@@ -627,15 +630,41 @@ export function GastosManager({
               se borró). Reasignalas para que vuelvan a su frasco: el total no cambia, solo se
               mueve de lugar.
             </div>
-            {orphanJar.items.map((line) => (
-              <OrphanLineRow
-                key={line.id}
-                line={line}
-                currency={currency}
-                options={orphanReassignOpts}
-                onDone={() => router.refresh()}
-              />
-            ))}
+            {orphanJar.items.length > 0 ? (
+              <>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>Presupuesto sin frasco</div>
+                {orphanJar.items.map((line) => (
+                  <OrphanLineRow
+                    key={line.id}
+                    line={line}
+                    currency={currency}
+                    options={orphanReassignOpts}
+                    onDone={() => router.refresh()}
+                  />
+                ))}
+              </>
+            ) : null}
+            {orphanJar.realItems.length > 0 ? (
+              <>
+                <div style={{ fontWeight: 700, fontSize: 13, marginTop: 6 }}>
+                  Gasto real sin frasco
+                </div>
+                <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  Estos gastos ya ocurrieron y suman en «Gastado». Recategorizalos para que
+                  vuelvan a su frasco.
+                </div>
+                {orphanJar.realItems.map((line) => (
+                  <OrphanLineRow
+                    key={line.id}
+                    line={line}
+                    currency={currency}
+                    options={orphanReassignOpts}
+                    onDone={() => router.refresh()}
+                    real
+                  />
+                ))}
+              </>
+            ) : null}
           </div>
         ) : null}
       </BottomSheet>
@@ -731,11 +760,14 @@ function OrphanLineRow({
   currency,
   options,
   onDone,
+  real = false,
 }: {
   line: OrphanLine;
   currency: string;
   options: Opt[];
   onDone: () => void;
+  /** true = transacción de gasto real: se RECATEGORIZA (y no se puede borrar acá). */
+  real?: boolean;
 }) {
   const toast = useToast();
   const [categoryId, setCategoryId] = useState("");
@@ -768,11 +800,11 @@ function OrphanLineRow({
       </div>
       <SheetSelect
         name={`reassign-${line.id}`}
-        label="Reasignar a"
+        label={real ? "Recategorizar a" : "Reasignar a"}
         value={categoryId}
         onChange={setCategoryId}
         options={options}
-        sheetTitle="Reasignar línea a"
+        sheetTitle={real ? "Recategorizar gasto a" : "Reasignar línea a"}
       />
       <div className="row" style={{ gap: 8 }}>
         <button
@@ -781,23 +813,33 @@ function OrphanLineRow({
           disabled={pending || !categoryId}
           onClick={() =>
             void run(
-              () => reassignBudgetItemAction({ budgetItemId: line.id, categoryId }),
-              "Línea reasignada · tu presupuesto total no cambia",
+              () =>
+                real
+                  ? // Misma acción que el tab de Transacciones (no se duplica el flujo).
+                    assignCategoryAction({ transactionId: line.id, categoryId })
+                  : reassignBudgetItemAction({ budgetItemId: line.id, categoryId }),
+              real
+                ? "Gasto recategorizado · tu total gastado no cambia"
+                : "Línea reasignada · tu presupuesto total no cambia",
             )
           }
         >
-          {pending ? "Guardando…" : "Reasignar"}
+          {pending ? "Guardando…" : real ? "Recategorizar" : "Reasignar"}
         </button>
-        <button
-          type="button"
-          className="m-btn m-btn-block m-btn-danger"
-          disabled={pending}
-          onClick={() =>
-            void run(() => removeBudgetItemAction(line.id), "Línea eliminada del presupuesto")
-          }
-        >
-          Eliminar
-        </button>
+        {/* Un gasto real no se borra desde acá: se recategoriza. Borrarlo sería
+            perder un hecho, no reconciliarlo. */}
+        {real ? null : (
+          <button
+            type="button"
+            className="m-btn m-btn-block m-btn-danger"
+            disabled={pending}
+            onClick={() =>
+              void run(() => removeBudgetItemAction(line.id), "Línea eliminada del presupuesto")
+            }
+          >
+            Eliminar
+          </button>
+        )}
       </div>
       {error ? (
         <div className="muted" style={{ fontSize: 12, color: "var(--m-danger)" }} role="alert">
@@ -812,7 +854,15 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
   // "Por reasignar": suma en el presupuesto pero no tiene gasto real ni barra.
   // Tono de alerta y CTA a revisar; el detalle vive en su propio BottomSheet.
   if (jar.kind === "orphan") {
-    const n = jar.items.length;
+    const n = jar.items.length + jar.realItems.length;
+    // Los dos totales por separado: planificado vs gastado son invariantes
+    // distintos y un número sumado no significaría nada.
+    const totalLabel = [
+      jar.items.length > 0 ? mAmount(jar.total, currency) : null,
+      jar.realItems.length > 0 ? mAmount(jar.realTotal, currency) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     return (
       <MContentCard
         onClick={onOpen}
@@ -838,7 +888,7 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
           </div>
           <div style={{ flex: "none", textAlign: "right" }}>
             <div className={`mono ${TONE_TEXT.warning}`} style={{ fontSize: 14 }}>
-              {mAmount(jar.total, currency)}
+              {totalLabel}
             </div>
           </div>
         </div>

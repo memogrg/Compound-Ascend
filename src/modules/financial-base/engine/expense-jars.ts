@@ -64,6 +64,23 @@ export type BudgetLine = {
   sourceId?: string | null;
 };
 
+/**
+ * Transacción de gasto cruda del periodo. El engine la usa para detectar el
+ * gasto real que suma en "Gastado" pero no se pinta en ningún frasco.
+ */
+export type RealTxnLine = {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string;
+  categoryId: string | null;
+  /** Vínculo a una entidad: se pinta en su frasco vinculado por linkedId, no por categoría. */
+  linkedKind?: string;
+  linkedId?: string | null;
+  /** false = off-budget: no suma en "Gastado" ni es huérfana. */
+  countsInBudget?: boolean;
+};
+
 /** Por qué una línea quedó fuera de todo frasco (chip en la UI). */
 export type OrphanReason =
   | "sin_categoria"
@@ -129,8 +146,19 @@ export type Jar =
       name: string;
       color: string;
       icon: string;
+      /** Líneas de PRESUPUESTO sin frasco. `total` es su suma. */
       items: OrphanLine[];
       total: number;
+      /**
+       * Transacciones de GASTO REAL sin frasco. `realTotal` es su suma.
+       *
+       * `total` y `realTotal` se mantienen SEPARADOS a propósito: son dos
+       * invariantes distintos (planificado vs gastado) y sumarlos en un solo
+       * número reintroduciría, en la otra columna, el mismo descuadre que este
+       * frasco existe para eliminar.
+       */
+      realItems: OrphanLine[];
+      realTotal: number;
     };
 
 /**
@@ -284,6 +312,8 @@ export function buildExpenseJars(args: {
   linkedBudget?: LinkedBudgetConfig;
   /** Líneas de gasto crudas del periodo; de acá salen los huérfanos. */
   budgetItems?: BudgetLine[];
+  /** Transacciones de gasto del periodo; de acá salen los huérfanos de gasto real. */
+  realTxns?: RealTxnLine[];
   /** Bases ocultas por override (solo para etiquetar el motivo del huérfano). */
   hiddenCategoryIds?: string[];
 }): Jar[] {
@@ -453,36 +483,62 @@ export function buildExpenseJars(args: {
     });
   }
 
-  // ── "Por reasignar": lo que suma en el titular pero no se pintó en ningún lado.
-  const budgetItems = args.budgetItems ?? [];
+  // ── "Por reasignar": lo que suma en los titulares pero no se pintó en ningún
+  // lado. Presupuesto y gasto real se derivan por separado (dos invariantes
+  // distintos) pero contra los MISMOS Sets: son los mismos frascos.
   const hidden = new Set(args.hiddenCategoryIds ?? []);
-  const orphanLines = budgetItems.filter(
-    (it) =>
-      !(it.sourceKind && it.sourceId && renderedSources.has(`${it.sourceKind}:${it.sourceId}`)) &&
-      (it.categoryId == null || !renderedCategoryIds.has(it.categoryId)),
-  );
 
-  if (orphanLines.length > 0) {
-    const items: OrphanLine[] = orphanLines.map((it) => ({
+  const toDisplay = (amount: number, currency: string): number =>
+    currency && displayCur && currency !== displayCur
+      ? convertCurrency(amount, currency, displayCur, rates)
+      : amount;
+
+  const reasonFor = (categoryId: string | null): OrphanReason =>
+    categoryId == null
+      ? "sin_categoria"
+      : hidden.has(categoryId)
+        ? "categoria_oculta"
+        : // Sin la lista cruda de categorías no se puede distinguir inactiva de
+          // inexistente → no se inventa el motivo.
+          "no_renderizada";
+
+  /** ¿La línea/transacción se pintó? Doble vía: por entidad vinculada o por categoría. */
+  const isRendered = (x: {
+    categoryId: string | null;
+    kind?: string;
+    entityId?: string | null;
+  }): boolean =>
+    (!!x.kind && !!x.entityId && renderedSources.has(`${x.kind}:${x.entityId}`)) ||
+    (x.categoryId != null && renderedCategoryIds.has(x.categoryId));
+
+  const items: OrphanLine[] = (args.budgetItems ?? [])
+    .filter((it) => !isRendered({ categoryId: it.categoryId, kind: it.sourceKind, entityId: it.sourceId }))
+    .map((it) => ({
       id: it.id,
       name: it.name,
       // Mismo criterio de conversión que el titular, si no el invariante
       // (visible + huérfanos === total) se rompe con montos en otra moneda.
-      amount:
-        it.currency && displayCur && it.currency !== displayCur
-          ? convertCurrency(it.amount, it.currency, displayCur, rates)
-          : it.amount,
+      amount: toDisplay(it.amount, it.currency),
       nativeAmount: it.amount,
       currency: it.currency,
-      reason:
-        it.categoryId == null
-          ? "sin_categoria"
-          : hidden.has(it.categoryId)
-            ? "categoria_oculta"
-            : // Sin la lista cruda de categorías no se puede distinguir
-              // inactiva de inexistente → no se inventa el motivo.
-              "no_renderizada",
+      reason: reasonFor(it.categoryId),
     }));
+
+  const realItems: OrphanLine[] = (args.realTxns ?? [])
+    // Off-budget no suma en "Gastado" (mismo corte que getRealTotals) → tampoco
+    // puede ser huérfano: no hay nada que reconciliar.
+    .filter((t) => t.countsInBudget !== false)
+    .filter((t) => !isRendered({ categoryId: t.categoryId, kind: t.linkedKind, entityId: t.linkedId }))
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      amount: toDisplay(t.amount, t.currency),
+      nativeAmount: t.amount,
+      currency: t.currency,
+      reason: reasonFor(t.categoryId),
+    }));
+
+  if (items.length > 0 || realItems.length > 0) {
     jars.push({
       kind: "orphan",
       group: ORPHAN_GROUP,
@@ -491,6 +547,8 @@ export function buildExpenseJars(args: {
       icon: "info",
       items,
       total: items.reduce((t, it) => t + it.amount, 0),
+      realItems,
+      realTotal: realItems.reduce((t, it) => t + it.amount, 0),
     });
   }
 
