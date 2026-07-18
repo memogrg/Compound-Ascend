@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 
 import { Toggle, useToast } from "./form-kit";
+import { MContentCard } from "./content-kit";
 import { isNativeApp, isAppLockEnabled, enableAppLock, disableAppLock } from "../lib/app-lock";
 
 export function AppLockToggle() {
@@ -42,11 +43,10 @@ export function AppLockToggle() {
     }
   };
 
+  // Su propia tarjeta del kit bajo la sección "Seguridad" (el header lo pone la pantalla, ya
+  // no lo duplicamos aquí). El <Toggle> del form-kit y toda la lógica quedan intactos.
   return (
-    <div className="card card-p" style={{ marginBottom: 14 }}>
-      <div className="ov" style={{ marginBottom: 6 }}>
-        Seguridad
-      </div>
+    <MContentCard style={{ marginBottom: 14 }}>
       <Toggle
         name="appLock"
         label="Bloqueo con biometría (Face ID / huella)"
@@ -54,6 +54,6 @@ export function AppLockToggle() {
         onChange={(v) => void toggle(v)}
         hint="Pide tu biometría al abrir o reanudar la app. No cierra tu sesión; solo bloquea la pantalla."
       />
-    </div>
+    </MContentCard>
   );
 }
