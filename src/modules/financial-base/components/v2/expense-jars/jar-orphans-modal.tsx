@@ -18,34 +18,11 @@ import {
   removeBudgetItemAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { Jar, OrphanLine, OrphanReason } from "@/modules/financial-base/engine/expense-jars";
+import {
+  buildCategoryOptionGroups,
+  type CategoryOptionGroup,
+} from "@/modules/financial-base/engine/category-options";
 import type { Category } from "@/modules/financial-base/services/categories-service";
-
-/** Destinos de reasignación: "{Grupo} (general)" + sus hojas, igual que el árbol. */
-type CategoryGroup = { groupName: string; options: { id: string; name: string }[] };
-
-/**
- * Arma los destinos desde las `categories` que la página ya cargó. No se
- * reutiliza listExpenseCategoriesAction (módulo control) a propósito: la
- * dependencia va control → financial-base, nunca al revés (CLAUDE.md).
- */
-function buildCategoryGroups(categories: Category[]): CategoryGroup[] {
-  const usable = categories.filter(
-    (c) => c.isActive && (c.categoryType === "expense" || c.categoryType === "both"),
-  );
-  return usable
-    .filter((c) => c.parentId == null)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((g) => ({
-      groupName: g.name,
-      options: [
-        { id: g.id, name: `${g.name} (general)` },
-        ...usable
-          .filter((c) => c.parentId === g.id)
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((c) => ({ id: c.id, name: c.name })),
-      ],
-    }));
-}
 
 /** Etiqueta del chip por motivo. El engine solo emite los que puede probar. */
 const REASON_LABEL: Record<OrphanReason, string> = {
@@ -68,7 +45,7 @@ function OrphanRow({
 }: {
   line: OrphanLine;
   currency: string;
-  cats: CategoryGroup[];
+  cats: CategoryOptionGroup[];
   onDone: () => void;
 }) {
   const toast = useToast();
@@ -184,7 +161,7 @@ export function JarOrphansModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const cats = useMemo(() => buildCategoryGroups(categories), [categories]);
+  const cats = useMemo(() => buildCategoryOptionGroups(categories), [categories]);
   const onDone = useCallback(() => router.refresh(), [router]);
 
   return (
