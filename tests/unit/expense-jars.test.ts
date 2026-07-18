@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildExpenseJars, type JarEntities, type KeyedTotals } from "@/modules/financial-base/engine/expense-jars";
+import { buildExpenseJars, type BudgetLine, type JarEntities, type KeyedTotals } from "@/modules/financial-base/engine/expense-jars";
 import { mergeSuggestions, GROUP_SUGGESTIONS } from "@/modules/financial-base/engine/expense-suggestions";
 import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
 
@@ -344,5 +344,103 @@ describe("mergeSuggestions", () => {
     // benchmark fusionado, sin duplicar "Café" (está en GROUP_SUGGESTIONS.g_alimentacion)
     expect(out.filter((s) => s.toLowerCase() === "café")).toHaveLength(1);
     expect(GROUP_SUGGESTIONS.g_alimentacion).toContain("Café");
+  });
+});
+
+describe('buildExpenseJars · frasco "Por reasignar" (huérfanos)', () => {
+  const line = (over: Partial<BudgetLine>): BudgetLine => ({
+    id: over.id ?? "b1",
+    name: over.name ?? "Línea",
+    amount: over.amount ?? 0,
+    currency: over.currency ?? "CRC",
+    categoryId: over.categoryId ?? null,
+    sourceKind: over.sourceKind,
+    sourceId: over.sourceId,
+  });
+
+  const orphanJar = (jars: ReturnType<typeof buildExpenseJars>) =>
+    jars.find((j) => j.kind === "orphan");
+
+  it("(a) línea sin categoría → huérfana, motivo 'sin_categoria'", () => {
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA], budgetByKey: {}, realByKey: {}, entities: NO_ENTITIES, fmt,
+      budgetItems: [line({ id: "b1", name: "Suelta", amount: 500, categoryId: null })],
+    });
+    const orphan = orphanJar(jars);
+    if (orphan?.kind !== "orphan") throw new Error("debe haber frasco huérfano");
+    expect(orphan.name).toBe("Por reasignar");
+    expect(orphan.items).toHaveLength(1);
+    expect(orphan.items[0]!.reason).toBe("sin_categoria");
+    expect(orphan.total).toBe(500);
+  });
+
+  it("(b) línea de categoría oculta (fuera del árbol) → huérfana, motivo 'categoria_oculta'", () => {
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA], budgetByKey: {}, realByKey: {}, entities: NO_ENTITIES, fmt,
+      budgetItems: [line({ id: "b2", name: "Netflix", amount: 1840, categoryId: "cat_borrada" })],
+      hiddenCategoryIds: ["cat_borrada"],
+    });
+    const orphan = orphanJar(jars);
+    if (orphan?.kind !== "orphan") throw new Error("debe haber frasco huérfano");
+    expect(orphan.items[0]!.reason).toBe("categoria_oculta");
+    expect(orphan.total).toBe(1840);
+  });
+
+  it("(c) categoría de sistema NO favorita CON presupuesto → se pinta en su frasco, NO es huérfana", () => {
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA],
+      budgetByKey: { viv_old: { label: "Servicios y hogar", value: 700 } },
+      realByKey: {}, entities: NO_ENTITIES, fmt,
+      budgetItems: [line({ id: "b3", name: "Servicios y hogar", amount: 700, categoryId: "viv_old" })],
+    });
+    const viv = jars[0]!;
+    if (viv.kind !== "normal") throw new Error("debe ser normal");
+    expect(viv.envelopes.map((e) => e.id)).toContain("viv_old");
+    expect(orphanJar(jars)).toBeUndefined();
+  });
+
+  it("línea derivada de una meta (categoryId null + sourceKind) NO es huérfana: se pinta por source", () => {
+    const jars = buildExpenseJars({
+      tree: [AHORRO], budgetByKey: {}, realByKey: {}, fmt,
+      entities: { ...NO_ENTITIES, goal: [{ id: "goal_1", name: "Fondo", sub: "", amount: 300 }] },
+      linkedBudget: { goal: { bySource: { goal_1: 300 }, spentById: {}, paymentCategoryId: "g_aho" } },
+      budgetItems: [line({ id: "b4", name: "Fondo", amount: 300, categoryId: null, sourceKind: "goal", sourceId: "goal_1" })],
+    });
+    expect(orphanJar(jars)).toBeUndefined();
+  });
+
+  it("(d) INVARIANTE: suma(visible) + suma(huérfanos) === suma(todos los budget_items de gasto)", () => {
+    const budgetItems: BudgetLine[] = [
+      line({ id: "b1", name: "Alquiler", amount: 3000, categoryId: "viv_alq" }),
+      line({ id: "b2", name: "Servicios general", amount: 1200, categoryId: "viv_serv" }),
+      line({ id: "b3", name: "Servicios y hogar", amount: 700, categoryId: "viv_old" }), // system no-favorita CON plata
+      line({ id: "b4", name: "Suelta", amount: 500, categoryId: null }), // huérfana
+      line({ id: "b5", name: "Netflix", amount: 1840, categoryId: "cat_borrada" }), // huérfana
+      line({ id: "b6", name: "Aporte meta", amount: 300, categoryId: null, sourceKind: "goal", sourceId: "goal_1" }),
+    ];
+    const budgetByKey: KeyedTotals = {
+      viv_alq: { label: "Alquiler", value: 3000 },
+      viv_serv: { label: "Servicios general", value: 1200 },
+      viv_old: { label: "Servicios y hogar", value: 700 },
+    };
+
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA, AHORRO], budgetByKey, realByKey: {}, fmt,
+      entities: { ...NO_ENTITIES, goal: [{ id: "goal_1", name: "Fondo", sub: "", amount: 300 }] },
+      linkedBudget: { goal: { bySource: { goal_1: 300 }, spentById: {}, paymentCategoryId: "g_aho" } },
+      budgetItems,
+      hiddenCategoryIds: ["cat_borrada"],
+    });
+
+    let visible = 0;
+    for (const j of jars) {
+      if (j.kind === "normal") visible += j.envelopes.reduce((t, e) => t + e.budget, 0);
+      else if (j.kind === "linked") visible += j.totals?.budget ?? 0;
+    }
+    const orphans = jars.reduce((t, j) => (j.kind === "orphan" ? t + j.total : t), 0);
+    const total = budgetItems.reduce((t, it) => t + it.amount, 0);
+
+    expect(orphans).toBe(2340); // los $1.840 fantasma + la línea suelta
+    expect(visible + orphans).toBe(total);
   });
 });

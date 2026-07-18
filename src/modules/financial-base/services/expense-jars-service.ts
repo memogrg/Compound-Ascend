@@ -25,8 +25,11 @@ import {
   type KeyedTotals,
   type LinkedBudgetConfig,
 } from "@/modules/financial-base/engine/expense-jars";
-import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
-import type { Period } from "@/modules/financial-base/types";
+import {
+  getCategoryPersonalization,
+  type CategoryNode,
+} from "@/modules/financial-base/services/categories-service";
+import type { BudgetItem, Period } from "@/modules/financial-base/types";
 
 export async function getExpenseJars(args: {
   tree: CategoryNode[];
@@ -37,6 +40,10 @@ export async function getExpenseJars(args: {
   currency: string;
   /** Activa frascos vinculados budget-aware (esta entrega: solo `debt`). */
   linkedBudget?: LinkedBudgetConfig;
+  /** Líneas de gasto crudas del periodo (de getBudgetTotals) → frasco "Por reasignar". */
+  budgetItems?: BudgetItem[];
+  /** Bases ocultas por override (solo para el motivo del huérfano). */
+  hiddenCategoryIds?: string[];
 }): Promise<Jar[]> {
   const [detailed, rates] = await Promise.all([listLinkableEntitiesDetailed(), getFxRates()]);
 
@@ -79,6 +86,19 @@ export async function getExpenseJars(args: {
     nativeBudgetByKey: args.nativeBudgetByKey ?? {},
     rates,
     linkedBudget: args.linkedBudget,
+    // Solo gasto: el titular "Gasto planificado" suma exactamente estas líneas.
+    budgetItems: (args.budgetItems ?? [])
+      .filter((it) => it.type === "expense")
+      .map((it) => ({
+        id: it.id,
+        name: it.name,
+        amount: it.amount,
+        currency: it.currency,
+        categoryId: it.categoryId,
+        sourceKind: it.sourceKind,
+        sourceId: it.sourceId,
+      })),
+    hiddenCategoryIds: args.hiddenCategoryIds,
   });
 }
 
@@ -97,7 +117,7 @@ export async function getExpenseJarsAsOf(args: {
 }): Promise<Jar[]> {
   const cutoff: Period = { ...args.period, to: args.asOf };
   const [budget, real, debtBudget, debtSpent, debtExtra, deudasCatId, goalBudget, goalSpent,
-    holdingSpent, policyBudget, policySpent] =
+    holdingSpent, policyBudget, policySpent, personalization] =
     await Promise.all([
       getBudgetTotals(args.period),
       getRealTotals(cutoff),
@@ -116,6 +136,8 @@ export async function getExpenseJarsAsOf(args: {
       // Defensa (policy): prima derivada por póliza (mes) + pagado al corte.
       getLinkedBudgetBySource(args.period, "policy"),
       getLinkedSpentByEntity(cutoff, "policy"),
+      // Bases ocultas: solo para etiquetar el motivo en "Por reasignar".
+      getCategoryPersonalization(),
     ]);
 
   // La línea derivada de metas nace con categoryId NULL, pero Registrar gasto
@@ -132,6 +154,8 @@ export async function getExpenseJarsAsOf(args: {
     realByKey: real.expenseByKey,
     nativeBudgetByKey: budget.nativeByKey,
     currency: args.currency,
+    budgetItems: budget.items,
+    hiddenCategoryIds: personalization.hidden.map((h) => h.id),
     linkedBudget: {
       debt: {
         bySource: debtBudget,

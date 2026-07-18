@@ -222,6 +222,11 @@ export function JarRow({
     );
   }
 
+  // El frasco "Por reasignar" (kind: "orphan") aún no tiene render propio: llega
+  // en el delta de UI. Hasta entonces no se pinta (el engine ya lo emite y el
+  // invariante del test lo cubre).
+  if (jar.kind !== "normal") return null;
+
   const totalSpent = jar.envelopes.reduce((s, e) => s + e.spent, 0);
   const totalBudget = jar.envelopes.reduce((s, e) => s + e.budget, 0);
   const over = totalBudget > 0 && totalSpent > totalBudget;
