@@ -22,5 +22,5 @@ export { MChip } from "./chip";
 export { MEmptyState } from "./empty-state";
 export { MContentCard } from "./content-card";
 export { MProgress } from "./progress";
-export { mAmount, TONE_BADGE, TONE_FILL, TONE_TEXT } from "./tone";
+export { mAmount, mAmountScale, TONE_BADGE, TONE_FILL, TONE_TEXT } from "./tone";
 export type { MTone } from "./tone";

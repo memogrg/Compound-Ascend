@@ -15,6 +15,7 @@ import {
   type ActionResult,
 } from "@/modules/rich-life/api/actions";
 import type { Asset, Liability } from "@/modules/rich-life/types";
+import { currencySymbol } from "@/lib/format";
 
 type Kind = "asset" | "liability";
 
@@ -147,7 +148,7 @@ function Form({
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
+  const sym = currencySymbol(currency);
 
   const assetItem = kind === "asset" ? (item as Asset | undefined) : undefined;
   const liabItem = kind === "liability" ? (item as Liability | undefined) : undefined;

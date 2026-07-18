@@ -144,7 +144,9 @@ export function PatrimonioManager({
                       iconTone="danger"
                       title={l.name}
                       subtitle={LIAB_CLASS_LABEL[l.liabilityClass] ?? l.liabilityClass}
-                      value={`−${mAmount(l.balance, l.currency, 10)}`}
+                      // Un pasivo resta: se pasa en negativo y el signo lo antepone el
+                      // formateador central (−₡1.500.000), no una plantilla local.
+                      value={mAmount(-l.balance, l.currency, 10)}
                       valueTone="danger"
                     />
                   </SwipeRow>

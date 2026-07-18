@@ -12,7 +12,7 @@
  *
  * No reemplaza la edición existente (QuickAddModal sigue para editar filas).
  */
-import { CURRENCY_SYMBOL } from "@/lib/format";
+import { CURRENCY_SYMBOL, formatMoney } from "@/lib/format";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -410,7 +410,7 @@ export function TransactionComposer({
                     className="cmp-fav-chip tip"
                     data-tip={
                       t.amount
-                        ? `${CURRENCY_SYMBOL[t.currency] ?? ""}${t.amount.toLocaleString("es-CR")} · 1 clic`
+                        ? `${formatMoney(t.amount, t.currency)} · 1 clic`
                         : "Rellenar formulario"
                     }
                     onClick={() => void oneClickTemplate(t)}

@@ -33,6 +33,7 @@ import {
   MProgress,
   MEmptyState,
   mAmount,
+  mAmountScale,
 } from "../../components/content-kit";
 import { DebtForm, type DebtValues } from "./debt-form";
 
@@ -146,6 +147,13 @@ export function DebtManager({
   const router = useRouter();
   const toast = useToast();
   const rawById = new Map(raw.map((d) => [d.id, d]));
+  // Escala compartida de la columna de saldos (ver nota en la fila): se calcula una vez
+  // con TODOS los saldos, así todos se abrevian o ninguno.
+  const balanceFmt = mAmountScale(
+    items.map(({ vm }) => vm.balance),
+    currency,
+    10,
+  );
 
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Debt | null>(null);
@@ -203,6 +211,9 @@ export function DebtManager({
         // lateral lo pone la regla puente .m-swipe-content .m-drow.
         <MContentCard style={{ padding: 0, overflow: "hidden" }}>
         {items.map(({ vm, rank, months }) => {
+          // El saldo se formatea con la escala de TODA la columna, no celda a celda: si
+          // se decide por celda, la lista mezcla "₡18,2 M" con "₡4.540.188" y deja de
+          // poder compararse de un vistazo (era el caso real de esta pantalla).
           // La barra mide lo PAGADO, no lo que debes: antes era balance/originalAmount y se
           // llenaba cuanto MÁS debías (una deuda recién pedida salía al 100%). Sin
           // originalAmount no hay forma de saber qué se pagó → no se pinta barra, en vez de
@@ -227,7 +238,7 @@ export function DebtManager({
                 iconTone={rank === 1 ? "danger" : "neutral"}
                 title={vm.name}
                 subtitle={debtSubtitle({ rank, apr: vm.apr, months })}
-                value={mAmount(vm.balance, currency, 10)}
+                value={balanceFmt(vm.balance)}
                 valueTone="danger"
                 slot={
                   <>

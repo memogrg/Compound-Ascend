@@ -16,6 +16,7 @@ import {
   type ActionResult,
 } from "@/modules/wealth/api/actions";
 import type { Investment, InsurancePolicy } from "@/modules/wealth/types";
+import { currencySymbol } from "@/lib/format";
 
 type Mode = "investment" | "policy";
 
@@ -165,7 +166,7 @@ function useSubmit(action: (raw: unknown) => Promise<ActionResult>) {
 }
 
 function sym(currency: string): string {
-  return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
+  return currencySymbol(currency);
 }
 
 function InvestmentForm({

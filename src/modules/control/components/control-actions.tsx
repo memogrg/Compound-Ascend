@@ -7,7 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { focusFirstError } from "@/lib/forms";
 import { convertCurrency, FX_PER_USD } from "@/lib/fx";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, currencySymbol } from "@/lib/format";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
@@ -786,7 +786,6 @@ function DebtForm({
   const bal = Number(balance) || 0;
   const suggested =
     bal > 0 && termTotal > 0 && rateForCalc >= 0 ? pmt(bal, rateForCalc / 100 / 12, termTotal) : 0;
-  const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[cur] ?? "";
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -1081,8 +1080,7 @@ function DebtForm({
             <span className="muted">
               Cuota sugerida:{" "}
               <strong style={{ color: "var(--ink-2)" }}>
-                {sym}
-                {Math.round(suggested).toLocaleString("es-CR")}
+                {formatMoney(Math.round(suggested), cur)}
               </strong>
             </span>
             <button
@@ -1209,7 +1207,7 @@ function Money({
   value?: string;
   onChange?: (v: string) => void;
 }) {
-  const sym = { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
+  const sym = currencySymbol(currency);
   const controlled = value !== undefined && onChange !== undefined;
   return (
     <div className="fld">

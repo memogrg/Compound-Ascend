@@ -62,9 +62,9 @@ export default async function MobilePatrimonio() {
         {/* Resumen: patrimonio neto (rojo si es negativo) + el gráfico R5 como slot. */}
         <MSummaryCard
           eyebrow="Patrimonio neto total"
-          // Signo delante del símbolo (formatMoney antepone ₡, así que un negativo saldría
-          // "₡-2 500 000"). El positivo NO lleva "+": es un saldo, no un cambio. Cero: "₡0".
-          value={`${nwDir < 0 ? "−" : ""}${mAmount(Math.abs(nw), currency, 11)}`}
+          // El signo lo pone el formateador central (−₡2.500.000, cero neutro). El positivo
+          // no lleva "+": es un saldo, no un cambio.
+          value={mAmount(nw, currency, 11)}
           tone={nwDir < 0 ? "danger" : "neutral"}
           chip={
             vel != null && velDir !== 0 ? (
