@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { MobileHeader } from "../../components/mobile-header";
 import { getMyLink } from "@/lib/whatsapp/links-service";
@@ -12,6 +11,12 @@ import {
   listMyIngestEmails,
   type IngestEmailRow,
 } from "@/modules/account/services/ingest-email-service";
+import {
+  MSectionHeader,
+  MContentCard,
+  MDataRow,
+  MProgress,
+} from "../../components/content-kit";
 import { ConfiguracionManager } from "./configuracion-manager";
 
 /**
@@ -60,8 +65,9 @@ export default async function MobilePerfil() {
       <div className="m-pad">
         <MobileHeader variant="inner" eyebrow="Cuenta" title="Configuración" />
 
-        {/* Identidad */}
-        <div className="card card-p" style={{ marginBottom: 14 }}>
+        {/* Identidad — avatar + nombre + correo. Cabecera honesta de la cuenta (sin métricas
+            inventadas): superficie del kit para igualar el resto del barrido. */}
+        <MContentCard style={{ marginBottom: 14 }}>
           <div className="row" style={{ gap: 14 }}>
             <span
               style={{
@@ -80,49 +86,43 @@ export default async function MobilePerfil() {
             >
               {initials}
             </span>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 16 }}>{acc.name ?? "Tu cuenta"}</div>
-              <div className="muted" style={{ fontSize: 13 }}>
+              <div
+                className="muted"
+                style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
                 {acc.email ?? "Sesión activa"}
               </div>
             </div>
           </div>
-        </div>
+        </MContentCard>
 
-        {/* Acceso a Mi Perfil Financiero: muestra resultados si está completo, o el wizard */}
-        <Link
-          href="/m/mi-perfil-financiero"
-          className="card card-p srow"
-          style={{ marginBottom: 14, textDecoration: "none", color: "inherit" }}
-        >
-          <span className="lic" style={{ background: "var(--accent-soft)", color: "var(--accent)" }} aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
-              <path d="M12 2a7 7 0 0 0-4 12.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3A7 7 0 0 0 12 2Z" />
-              <path d="M9 22h6" />
-            </svg>
-          </span>
-          <div style={{ flex: 1 }}>
-            <div className="st">Tu ADN financiero</div>
-            <div className="ss">Completa o edita tu perfil financiero</div>
-          </div>
-          <Chevron />
-        </Link>
-
-        {/* Plan + uso de IA */}
-        <div className="card card-p" style={{ marginBottom: 14 }}>
-          <div className="between" style={{ marginBottom: 12 }}>
-            <span className="badge neutral">Plan {PLAN_LABEL[acc.plan]}</span>
-            <span className="mono" style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-              {tk(acc.tokensUsed)} / {tk(acc.tokenLimit)} tokens
-            </span>
-          </div>
-          <div className="bar" style={{ height: 8 }}>
-            <i style={{ width: `${Math.round(usePct * 100)}%` }} />
-          </div>
-          <div className="muted" style={{ fontSize: 11, marginTop: 9 }}>
-            Uso de IA este mes. El consumo se calcula en el servidor.
-          </div>
-        </div>
+        {/* Cuenta: acceso al ADN financiero (navegación) + el uso de IA del plan (métrica real). */}
+        <MSectionHeader title="Cuenta" />
+        <MContentCard style={{ marginBottom: 14 }}>
+          {/* Acceso a Mi Perfil Financiero: muestra resultados si está completo, o el wizard.
+              `leading` = el glifo propio (no hay uno equivalente en el set de MIcon). */}
+          <MDataRow
+            href="/m/mi-perfil-financiero"
+            leading={
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 19, height: 19 }}>
+                <path d="M12 2a7 7 0 0 0-4 12.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3A7 7 0 0 0 12 2Z" />
+                <path d="M9 22h6" />
+              </svg>
+            }
+            title="Tu ADN financiero"
+            subtitle="Completa o edita tu perfil"
+            chevron
+          />
+          {/* Uso de IA: es una métrica de verdad → MDataRow + barra MProgress (no una rejilla inventada). */}
+          <MDataRow
+            title={`Plan ${PLAN_LABEL[acc.plan]}`}
+            subtitle="Uso de IA este mes"
+            value={`${tk(acc.tokensUsed)} / ${tk(acc.tokenLimit)}`}
+            slot={<MProgress value={usePct} tone="success" height={8} />}
+          />
+        </MContentCard>
 
         {/* Ajustes gestionables (moneda · WhatsApp · hogar · notificaciones · ingesta · borrar) */}
         <ConfiguracionManager
@@ -145,14 +145,6 @@ export default async function MobilePerfil() {
         </form>
       </div>
     </div>
-  );
-}
-
-function Chevron() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth={2} className="sr" style={{ width: 18, height: 18 }} aria-hidden>
-      <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 

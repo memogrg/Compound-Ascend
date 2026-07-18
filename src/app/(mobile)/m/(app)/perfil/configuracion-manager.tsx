@@ -42,6 +42,7 @@ import {
   useToast,
   type ActionResult,
 } from "../../components/form-kit";
+import { MSectionHeader, MContentCard, MDataRow } from "../../components/content-kit";
 import { AppLockToggle } from "../../components/app-lock-toggle";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
@@ -78,102 +79,108 @@ export function ConfiguracionManager({
 
   return (
     <>
-      {/* Ajustes */}
-      <div className="card card-p" style={{ marginBottom: 14 }}>
-        <SettingRow
-          title="Moneda principal"
-          sub={`${currency} · ${currencySymbol(currency)}`}
-          onClick={() => setSheet("currency")}
-          icon={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} style={{ width: 18, height: 18 }}>
+      {/* Preferencias — moneda principal. Fila del kit: el glifo no está en el set de MIcon,
+          así que va como `leading` (MDataRow ya lo enmarca en su tile .m-dic). */}
+      <MSectionHeader title="Preferencias" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <MDataRow
+          leading={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} style={{ width: 19, height: 19 }}>
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" strokeLinecap="round" />
             </svg>
           }
+          title="Moneda principal"
+          subtitle={`${currency} · ${currencySymbol(currency)}`}
+          chevron
+          onClick={() => setSheet("currency")}
+          ariaLabel="Cambiar moneda principal"
         />
-        <SettingRow
-          title="WhatsApp"
-          sub={waLinked ? `Vinculado · ${wa?.phone ?? ""}` : "No vinculado"}
-          subPos={waLinked}
-          onClick={() => setSheet("whatsapp")}
-          accent
-          icon={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
-              <path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6A8.5 8.5 0 1 1 21 11.5Z" />
-            </svg>
-          }
-        />
-        <SettingRow
-          title="Hogar"
-          sub={isEditor ? "Invita miembros a tu hogar" : "Miembros e invitaciones"}
-          onClick={() => setSheet("household")}
-          icon={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
-              <path d="M4 11l8-6 8 6" />
-              <path d="M6 10v9h12v-9" />
-              <path d="M10 19v-5h4v5" />
-            </svg>
-          }
-        />
-      </div>
+      </MContentCard>
 
-      {/* Cuenta y seguridad: contraseña + diagnóstico de correo */}
-      <div className="card card-p" style={{ marginBottom: 14 }}>
-        <div className="ov" style={{ marginBottom: 6 }}>
-          Cuenta y seguridad
-        </div>
-        <SettingRow
-          title="Cambiar contraseña"
-          sub="Actualiza tu contraseña de acceso"
-          onClick={() => setSheet("password")}
-          icon={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
-              <rect x="5" y="11" width="14" height="9" rx="2" />
-              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-            </svg>
-          }
-        />
-        <EmailTestRow />
-      </div>
-
-      {/* Seguridad — candado con biometría (solo visible dentro de la app nativa) */}
-      <AppLockToggle />
-
-      {/* Notificaciones */}
-      <div className="card card-p" style={{ marginBottom: 14 }}>
-        <div className="ov" style={{ marginBottom: 6 }}>
-          Notificaciones
-        </div>
+      {/* Notificaciones — los toggles conservan su marcado (.srow + hint que envuelve): el
+          subtítulo de MDataRow es de una línea con elipsis y cortaría estas explicaciones. */}
+      <MSectionHeader title="Notificaciones" />
+      <MContentCard style={{ marginBottom: 14 }}>
         {NOTIF_ROWS.map((r) => (
           <NotifToggle key={r.key} row={r} initial={notifications[r.key]} />
         ))}
-      </div>
+      </MContentCard>
 
-      {/* Correos del banco (ingesta) */}
-      <div className="card card-p" style={{ marginBottom: 14 }}>
-        <div className="ov" style={{ marginBottom: 6 }}>
-          Correos del banco
-        </div>
+      {/* Hogar — invitar/gestionar miembros (glifo del set: icon="household"). */}
+      <MSectionHeader title="Hogar" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <MDataRow
+          icon="household"
+          title="Hogar"
+          subtitle={isEditor ? "Invita miembros a tu hogar" : "Miembros e invitaciones"}
+          chevron
+          onClick={() => setSheet("household")}
+          ariaLabel="Gestionar tu hogar"
+        />
+      </MContentCard>
+
+      {/* Conexiones — WhatsApp (glifo propio → leading). El estado vinculado va en verde. */}
+      <MSectionHeader title="Conexiones" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <MDataRow
+          leading={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 19, height: 19 }}>
+              <path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6A8.5 8.5 0 1 1 21 11.5Z" />
+            </svg>
+          }
+          title="WhatsApp"
+          subtitle={
+            waLinked ? <span className="pos">Vinculado · {wa?.phone ?? ""}</span> : "No vinculado"
+          }
+          chevron
+          onClick={() => setSheet("whatsapp")}
+          ariaLabel="Asistente de WhatsApp"
+        />
+      </MContentCard>
+
+      {/* Correos del banco (ingesta) — formulario/lista propios (form-kit): se conservan. */}
+      <MSectionHeader title="Correos del banco" />
+      <MContentCard style={{ marginBottom: 14 }}>
         <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
           Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y registra
           aquí el correo desde el que reenvías.
         </p>
         <IngestSection emails={ingestEmails} />
-      </div>
+      </MContentCard>
 
-      {/* Zona de peligro */}
-      <div className="card card-p" style={{ marginBottom: 14 }}>
-        <div className="ov" style={{ marginBottom: 6 }}>
-          Zona de peligro
-        </div>
-        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
+      {/* Seguridad — contraseña (fila del kit) + probar correo (.srow con botón y resultado) +
+          candado biométrico (su propia tarjeta, solo en la app nativa). */}
+      <MSectionHeader title="Seguridad" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <MDataRow
+          leading={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 19, height: 19 }}>
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          }
+          title="Cambiar contraseña"
+          subtitle="Actualiza tu contraseña"
+          chevron
+          onClick={() => setSheet("password")}
+          ariaLabel="Cambiar contraseña"
+        />
+        <EmailTestRow />
+      </MContentCard>
+      <AppLockToggle />
+
+      {/* Zona de peligro — separada y en tono de peligro; su ConfirmDialog de 2 pasos intacto. */}
+      <MSectionHeader title="Zona de peligro" />
+      <MContentCard style={{ marginBottom: 14, background: "var(--danger-soft)" }}>
+        <p style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px", color: "var(--text-muted)" }}>
           Borra todos tus datos financieros (ingresos, gastos, deudas, inversiones, patrimonio…). Tu
           cuenta y perfil se conservan. No se puede deshacer.
         </p>
         <button type="button" className="m-btn m-btn-block m-btn-danger" onClick={() => setDanger(1)}>
           Borrar todos mis datos
         </button>
-      </div>
+      </MContentCard>
 
       {/* Hoja: moneda */}
       <BottomSheet open={sheet === "currency"} onClose={() => setSheet(null)} title="Moneda principal">
@@ -208,47 +215,6 @@ export function ConfiguracionManager({
       {/* Borrar datos: paso 2 (confirmación final) */}
       <ClearDataStep2 open={danger === 2} onClose={() => setDanger(0)} />
     </>
-  );
-}
-
-/** Fila de ajuste tappable (mismo look que .srow del server, pero como botón). */
-function SettingRow({
-  title,
-  sub,
-  subPos,
-  icon,
-  accent,
-  onClick,
-}: {
-  title: string;
-  sub: string;
-  subPos?: boolean;
-  icon: React.ReactNode;
-  accent?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="srow"
-      onClick={onClick}
-      style={{ width: "100%", background: "transparent", border: "none", textAlign: "left", cursor: "pointer" }}
-    >
-      <span
-        className="lic"
-        style={accent ? { background: "var(--accent-soft)", color: "var(--accent)" } : { background: "var(--surface-2)" }}
-        aria-hidden
-      >
-        {icon}
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="st">{title}</div>
-        <div className={`ss ${subPos ? "pos" : ""}`}>{sub}</div>
-      </div>
-      <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-dim)" strokeWidth={2} style={{ width: 18, height: 18 }} aria-hidden>
-        <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </button>
   );
 }
 
@@ -314,8 +280,10 @@ function EmailTestRow() {
       setResult(await testEmailAction());
     });
 
+  // Fragment (no <div> envolvente): así la .srow es hermana directa de la fila anterior en la
+  // tarjeta y muestra su separador (con un wrapper sería :first-child y perdería la hairline).
   return (
-    <div>
+    <>
       <div className="srow">
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="st">Probar correo</div>
@@ -341,7 +309,7 @@ function EmailTestRow() {
           {result.provider ? ` (${result.provider})` : ""}
         </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
