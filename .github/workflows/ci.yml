@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'
@@ -86,7 +86,7 @@ jobs:
 
       # Node 22: supabase-js >=2.1xx inicializa Realtime en `createClient` y
       # requiere WebSocket nativo (ausente en Node 20). Ver issue #94.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
