@@ -444,3 +444,48 @@ describe('buildExpenseJars · frasco "Por reasignar" (huérfanos)', () => {
     expect(visible + orphans).toBe(total);
   });
 });
+
+describe("ciclo de reasignación (G2)", () => {
+  const base = (categoryId: string | null): BudgetLine[] => [
+    { id: "b1", name: "Alquiler", amount: 3000, currency: "CRC", categoryId: "viv_alq" },
+    { id: "b2", name: "Netflix", amount: 1840, currency: "CRC", categoryId },
+  ];
+  const budgetByKey = (extra?: KeyedTotals): KeyedTotals => ({
+    viv_alq: { label: "Alquiler", value: 3000 },
+    ...extra,
+  });
+
+  it("reasignar saca la línea de 'Por reasignar', la suma a su frasco y NO cambia el titular", () => {
+    // Antes: "Netflix" apunta a una categoría oculta → cae en el bucket.
+    const antes = buildExpenseJars({
+      tree: [VIVIENDA], budgetByKey: budgetByKey(), realByKey: {}, entities: NO_ENTITIES, fmt,
+      budgetItems: base("cat_oculta"), hiddenCategoryIds: ["cat_oculta"],
+    });
+    const orphanAntes = antes.find((j) => j.kind === "orphan");
+    if (orphanAntes?.kind !== "orphan") throw new Error("debía haber huérfano");
+    expect(orphanAntes.total).toBe(1840);
+    const vivAntes = antes[0]!;
+    if (vivAntes.kind !== "normal") throw new Error("normal");
+    const visibleAntes = vivAntes.envelopes.reduce((t, e) => t + e.budget, 0);
+
+    // Después: la acción movió category_id a "viv_serv" (el presupuesto por
+    // categoría se recalcula en el server; acá se simula el mismo resultado).
+    const despues = buildExpenseJars({
+      tree: [VIVIENDA],
+      budgetByKey: budgetByKey({ viv_serv: { label: "Servicios general", value: 1840 } }),
+      realByKey: {}, entities: NO_ENTITIES, fmt,
+      budgetItems: base("viv_serv"), hiddenCategoryIds: ["cat_oculta"],
+    });
+    const vivDespues = despues[0]!;
+    if (vivDespues.kind !== "normal") throw new Error("normal");
+    const visibleDespues = vivDespues.envelopes.reduce((t, e) => t + e.budget, 0);
+
+    // 1. el bucket desaparece
+    expect(despues.find((j) => j.kind === "orphan")).toBeUndefined();
+    // 2. la línea ahora se ve en su frasco
+    expect(vivDespues.envelopes.find((e) => e.id === "viv_serv")?.budget).toBe(1840);
+    // 3. el titular NO cambia: solo se movió de lugar
+    expect(visibleAntes + orphanAntes.total).toBe(visibleDespues);
+    expect(visibleDespues).toBe(4840);
+  });
+});
