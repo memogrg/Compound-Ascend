@@ -3,13 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "Shell de Capacitor (modo BUNDLED) que empaqueta el diseño móvil estático de CARTERA+ como app nativa Android/iOS. Aislado del build de Next.js del repo; no depende de src/.",
+  "_comentario_locale": "Los scripts de iOS fuerzan un locale UTF-8 porque CocoaPods normaliza la ruta del proyecto con String#unicode_normalize, y eso revienta (Encoding::CompatibilityError) si LANG está vacío: Ruby devuelve Dir.pwd en ASCII-8BIT. En macOS, /etc/zprofile solo pone LANG=C.UTF-8 en shells de LOGIN, así que la Terminal funciona pero un shell no-login (CI, un script, una herramienta lanzada desde una GUI) no. ${LANG:-...} respeta el locale que ya tengas y solo pone uno si falta.",
   "scripts": {
-    "sync": "cap sync",
+    "sync": "LANG=${LANG:-C.UTF-8} cap sync",
     "copy": "cap copy",
     "open:android": "cap open android",
     "open:ios": "cap open ios",
     "run:android": "cap run android",
-    "run:ios": "cap run ios",
+    "run:ios": "LANG=${LANG:-C.UTF-8} cap run ios",
+    "pods": "cd ios/App && LANG=${LANG:-C.UTF-8} pod install",
     "postinstall": "patch-package"
   },
   "keywords": [
