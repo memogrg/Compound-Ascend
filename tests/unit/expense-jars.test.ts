@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildExpenseJars, type BudgetLine, type JarEntities, type KeyedTotals } from "@/modules/financial-base/engine/expense-jars";
+import { buildExpenseJars, type BudgetLine, type JarEntities, type KeyedTotals, type RealTxnLine } from "@/modules/financial-base/engine/expense-jars";
 import { mergeSuggestions, GROUP_SUGGESTIONS } from "@/modules/financial-base/engine/expense-suggestions";
 import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
 
@@ -487,5 +487,108 @@ describe("ciclo de reasignación (G2)", () => {
     // 3. el titular NO cambia: solo se movió de lugar
     expect(visibleAntes + orphanAntes.total).toBe(visibleDespues);
     expect(visibleDespues).toBe(4840);
+  });
+});
+
+describe('buildExpenseJars · gasto real sin frasco (G4)', () => {
+  const txn = (over: Partial<RealTxnLine>): RealTxnLine => ({
+    id: over.id ?? "t1",
+    name: over.name ?? "Gasto",
+    amount: over.amount ?? 0,
+    currency: over.currency ?? "CRC",
+    categoryId: over.categoryId ?? null,
+    linkedKind: over.linkedKind,
+    linkedId: over.linkedId,
+    countsInBudget: over.countsInBudget,
+  });
+  const orphanOf = (jars: ReturnType<typeof buildExpenseJars>) =>
+    jars.find((j) => j.kind === "orphan");
+
+  it("(a) transacción de categoría oculta → huérfana de gasto real", () => {
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA], budgetByKey: {}, realByKey: {}, entities: NO_ENTITIES, fmt,
+      realTxns: [txn({ id: "t1", name: "Netflix", amount: 900, categoryId: "cat_oculta" })],
+      hiddenCategoryIds: ["cat_oculta"],
+    });
+    const o = orphanOf(jars);
+    if (o?.kind !== "orphan") throw new Error("debe haber frasco huérfano");
+    expect(o.realItems.map((r) => r.name)).toEqual(["Netflix"]);
+    expect(o.realItems[0]!.reason).toBe("categoria_oculta");
+    expect(o.realTotal).toBe(900);
+    // El presupuesto no se contamina: son invariantes separados.
+    expect(o.total).toBe(0);
+    expect(o.items).toEqual([]);
+  });
+
+  it("(b) transacción vinculada a una meta (categoryId null + linkedId) → NO es huérfana", () => {
+    const jars = buildExpenseJars({
+      tree: [AHORRO], budgetByKey: {}, realByKey: {}, fmt,
+      entities: { ...NO_ENTITIES, goal: [{ id: "goal_1", name: "Fondo", sub: "", amount: 300 }] },
+      linkedBudget: { goal: { bySource: { goal_1: 300 }, spentById: { goal_1: 300 }, paymentCategoryId: "g_aho" } },
+      realTxns: [txn({ id: "t1", name: "Aporte", amount: 300, categoryId: null, linkedKind: "goal", linkedId: "goal_1" })],
+    });
+    expect(orphanOf(jars)).toBeUndefined();
+  });
+
+  it("(c) transacción off-budget (countsInBudget=false) → ni huérfana ni suma", () => {
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA], budgetByKey: {}, realByKey: {}, entities: NO_ENTITIES, fmt,
+      realTxns: [txn({ id: "t1", name: "Compra del frasco", amount: 500, categoryId: "cat_oculta", countsInBudget: false })],
+      hiddenCategoryIds: ["cat_oculta"],
+    });
+    expect(orphanOf(jars)).toBeUndefined();
+  });
+
+  it("(d) DOS INVARIANTES separados: presupuesto y gasto real cuadran cada uno por su lado", () => {
+    // Presupuesto del periodo
+    const budgetItems: BudgetLine[] = [
+      { id: "b1", name: "Alquiler", amount: 3000, currency: "CRC", categoryId: "viv_alq" },
+      { id: "b2", name: "Fantasma", amount: 1840, currency: "CRC", categoryId: "cat_oculta" },
+      { id: "b3", name: "Aporte meta", amount: 300, currency: "CRC", categoryId: null, sourceKind: "goal", sourceId: "goal_1" },
+    ];
+    // Gasto real del periodo (lo que suma realExpense: off-budget excluida)
+    const realTxns: RealTxnLine[] = [
+      txn({ id: "t1", name: "Alquiler", amount: 2900, categoryId: "viv_alq" }),
+      txn({ id: "t2", name: "Netflix", amount: 700, categoryId: "cat_oculta" }),
+      txn({ id: "t3", name: "Suelto", amount: 150, categoryId: null }),
+      txn({ id: "t4", name: "Aporte", amount: 300, categoryId: null, linkedKind: "goal", linkedId: "goal_1" }),
+      txn({ id: "t5", name: "Off-budget", amount: 999, categoryId: "cat_oculta", countsInBudget: false }),
+    ];
+    const budgetExpense = budgetItems.reduce((t, i) => t + i.amount, 0); // 5140
+    const realExpense = realTxns
+      .filter((t) => t.countsInBudget !== false)
+      .reduce((t, i) => t + i.amount, 0); // 4050
+
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA, AHORRO],
+      budgetByKey: { viv_alq: { label: "Alquiler", value: 3000 } },
+      realByKey: { viv_alq: { label: "Alquiler", value: 2900 } },
+      fmt,
+      entities: { ...NO_ENTITIES, goal: [{ id: "goal_1", name: "Fondo", sub: "", amount: 300 }] },
+      linkedBudget: { goal: { bySource: { goal_1: 300 }, spentById: { goal_1: 300 }, paymentCategoryId: "g_aho" } },
+      budgetItems, realTxns, hiddenCategoryIds: ["cat_oculta"],
+    });
+
+    let visibleBudget = 0;
+    let visibleReal = 0;
+    for (const j of jars) {
+      if (j.kind === "normal") {
+        visibleBudget += j.envelopes.reduce((t, e) => t + e.budget, 0);
+        visibleReal += j.envelopes.reduce((t, e) => t + e.spent, 0);
+      } else if (j.kind === "linked") {
+        visibleBudget += j.totals?.budget ?? 0;
+        visibleReal += j.totals?.spent ?? 0;
+      }
+    }
+    const o = orphanOf(jars);
+    const orphanBudget = o?.kind === "orphan" ? o.total : 0;
+    const orphanReal = o?.kind === "orphan" ? o.realTotal : 0;
+
+    // Invariante 1 — presupuesto (NO mezcla gasto real)
+    expect(orphanBudget).toBe(1840);
+    expect(visibleBudget + orphanBudget).toBe(budgetExpense);
+    // Invariante 2 — gasto real (NO mezcla presupuesto); la off-budget queda fuera de ambos
+    expect(orphanReal).toBe(850); // 700 Netflix + 150 suelto
+    expect(visibleReal + orphanReal).toBe(realExpense);
   });
 });

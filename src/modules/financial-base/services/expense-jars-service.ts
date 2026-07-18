@@ -24,6 +24,7 @@ import {
   type JarEntity,
   type KeyedTotals,
   type LinkedBudgetConfig,
+  type RealTxnLine,
 } from "@/modules/financial-base/engine/expense-jars";
 import {
   getCategoryPersonalization,
@@ -42,6 +43,8 @@ export async function getExpenseJars(args: {
   linkedBudget?: LinkedBudgetConfig;
   /** Líneas de gasto crudas del periodo (de getBudgetTotals) → frasco "Por reasignar". */
   budgetItems?: BudgetItem[];
+  /** Transacciones de gasto del periodo (de getRealTotals) → gasto real sin frasco. */
+  realTxns?: RealTxnLine[];
   /** Bases ocultas por override (solo para el motivo del huérfano). */
   hiddenCategoryIds?: string[];
 }): Promise<Jar[]> {
@@ -99,6 +102,7 @@ export async function getExpenseJars(args: {
         sourceId: it.sourceId,
       })),
     hiddenCategoryIds: args.hiddenCategoryIds,
+    realTxns: args.realTxns,
   });
 }
 
@@ -155,6 +159,8 @@ export async function getExpenseJarsAsOf(args: {
     nativeBudgetByKey: budget.nativeByKey,
     currency: args.currency,
     budgetItems: budget.items,
+    // Gasto real al corte: misma fuente sin capar que produce el titular.
+    realTxns: real.expenseTxns,
     hiddenCategoryIds: personalization.hidden.map((h) => h.id),
     linkedBudget: {
       debt: {

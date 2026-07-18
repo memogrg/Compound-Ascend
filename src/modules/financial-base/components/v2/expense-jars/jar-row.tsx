@@ -226,7 +226,21 @@ export function JarRow({
   // Frasco "Por reasignar": líneas que suman en el titular pero cuya categoría
   // ya no se pinta. Estilo de alerta; el modal permite reasignarlas o borrarlas.
   if (jar.kind === "orphan") {
-    const n = jar.items.length;
+    const n = jar.items.length + jar.realItems.length;
+    // Se muestran los dos totales por separado (planificado vs gastado): son
+    // invariantes distintos y un número sumado no significaría nada.
+    const totalLabel = [
+      jar.items.length > 0 ? formatMoney(jar.total, currency) : null,
+      jar.realItems.length > 0 ? formatMoney(jar.realTotal, currency) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const subLabel = [
+      jar.items.length > 0 ? `${jar.items.length} de presupuesto` : null,
+      jar.realItems.length > 0 ? `${jar.realItems.length} de gasto real` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     return (
       <>
         <button
@@ -256,14 +270,12 @@ export function JarRow({
             <div className="env-name">
               {jar.name} <span style={{ color: "var(--text-muted)" }}>›</span>
             </div>
-            <div className="env-sub">
-              {n} {n === 1 ? "línea sin frasco" : "líneas sin frasco"} · suman en tu presupuesto
-            </div>
+            <div className="env-sub">{subLabel} · suman pero no se ven</div>
           </div>
           <div className="env-bar-cell" />
           <div className="env-num" style={{ textAlign: "right" }}>
             <div className="big" style={{ color: jar.color }}>
-              {formatMoney(jar.total, currency)}
+              {totalLabel}
             </div>
             <div className="small">Revisar</div>
           </div>
