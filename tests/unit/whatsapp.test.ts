@@ -33,12 +33,14 @@ describe("verifyTwilioSignature", () => {
 });
 
 describe("formatMoney", () => {
-  it("antepone el símbolo y redondea (separador es-CR)", () => {
-    const n12000 = (12000).toLocaleString("es-CR");
-    const n1235 = (1235).toLocaleString("es-CR");
-    expect(formatMoney(12000, "CRC")).toBe(`₡${n12000}`);
-    expect(formatMoney(1234.6, "USD")).toBe(`$${n1235}`);
-    expect(formatMoney(500, "XYZ")).toBe("500");
+  // Antes esto comparaba contra (12000).toLocaleString("es-CR"), o sea contra el propio
+  // CLDR: no fijaba nada y pasaba igual emitiera punto o espacio duro. Ahora fija la
+  // política explícita (ver tests/unit/format.test.ts para la batería completa).
+  it("antepone el símbolo, agrupa con PUNTO y redondea", () => {
+    expect(formatMoney(12000, "CRC")).toBe("₡12.000");
+    expect(formatMoney(1234.6, "USD")).toBe("$1.235");
+    // Moneda desconocida: su código ISO, nunca un símbolo que no le corresponde.
+    expect(formatMoney(500, "XYZ")).toBe("XYZ 500");
   });
 });
 

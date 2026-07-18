@@ -36,8 +36,32 @@ export const TONE_FILL: Record<MTone, string> = {
  * exacto mientras quepa, abreviado (₡347,9 M) cuando se pasa de `maxChars`. Una sola
  * regla para toda la app en vez de decidir formatMoney/formatCompact caso por caso.
  * Los números grandes (hero de resumen) usan formatMoney directo: .m-sum-v es fluido.
+ *
+ * OJO: decide POR IMPORTE. Para una lista o una tarjeta con varios importes usa
+ * mAmountScale — si no, la columna mezcla "₡18,2 M" con "₡4.540.188" y deja de poder
+ * escanearse (era el caso de Deudas).
  */
 export function mAmount(amount: number, currency: string, maxChars = 9): string {
   const full = formatMoney(amount, currency);
   return full.length > maxChars ? formatCompact(amount, currency) : full;
+}
+
+/**
+ * Formateador COMPARTIDO por un grupo de importes: mira todos, y si alguno no cabe
+ * en `maxChars`, abrevia TODOS. Devuelve la función a aplicar a cada valor.
+ *
+ * La unidad de decisión es la lista (o la tarjeta), no la celda: dentro de una misma
+ * columna todos los valores deben tener el mismo tratamiento para poder compararlos
+ * de un vistazo. Úsalo también cuando el número grande de una tarjeta y los importes
+ * de su subtexto deban ir a la par.
+ */
+export function mAmountScale(
+  amounts: number[],
+  currency: string,
+  maxChars = 9,
+): (amount: number) => string {
+  const anyTooLong = amounts.some((a) => formatMoney(a, currency).length > maxChars);
+  return anyTooLong
+    ? (a: number) => formatCompact(a, currency)
+    : (a: number) => formatMoney(a, currency);
 }

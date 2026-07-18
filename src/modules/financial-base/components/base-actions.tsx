@@ -22,13 +22,10 @@ import {
 } from "@/modules/financial-base/api/actions";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { IncomeSource, ExpenseItem } from "@/modules/financial-base/types";
+import { currencySymbol } from "@/lib/format";
 
 type Kind = "income" | "expense";
 type EditItem = IncomeSource | ExpenseItem;
-
-function currencySymbol(code: string): string {
-  return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[code] ?? "";
-}
 
 /** Botón de alta (ingreso / gasto) que abre su propio diálogo. Reutilizable
  * en la toolbar y en los estados vacíos accionables. */

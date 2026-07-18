@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent, currencySymbol } from "@/lib/format";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   getHoldingHistoryAction,
@@ -45,7 +45,7 @@ const PAYMENTS_PER_YEAR: Record<string, number> = {
 };
 
 function sym(currency: string): string {
-  return { CRC: "₡", USD: "$", EUR: "€", MXN: "$", COP: "$", GBP: "£" }[currency] ?? "";
+  return currencySymbol(currency);
 }
 
 // ── Exported trigger ──────────────────────────────────────────────

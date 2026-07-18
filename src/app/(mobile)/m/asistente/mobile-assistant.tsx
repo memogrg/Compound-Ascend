@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
 import type { AIActionProposal } from "@/lib/ai/types";
+import { formatMoney } from "@/lib/format";
 
 /**
  * Asistente IA en móvil (/m/asistente): chat + escáner de recibos, con la piel de
@@ -329,7 +330,7 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
       <div className="m-confirm-eyebrow">Acción propuesta</div>
       <div className="m-confirm-amt">
         {draft.kind === "ingreso" ? "+" : "−"}
-        {draft.currency} {draft.amount.toLocaleString("es-CR")}
+        {formatMoney(draft.amount, draft.currency)}
       </div>
       <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
         {draft.description} · {draft.occurredOn}
@@ -388,9 +389,9 @@ function MGoalConfirm({ draft }: { draft: DraftGoal }) {
       <div className="m-confirm-eyebrow">Crear meta</div>
       <div className="m-confirm-amt" style={{ fontSize: 16 }}>{draft.name}</div>
       <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
-        Objetivo: {draft.currency} {draft.targetAmount.toLocaleString("es-CR")}
+        Objetivo: {formatMoney(draft.targetAmount, draft.currency)}
         {draft.monthlyContribution > 0
-          ? ` · ${draft.currency} ${draft.monthlyContribution.toLocaleString("es-CR")}/mes`
+          ? ` · ${formatMoney(draft.monthlyContribution, draft.currency)}/mes`
           : ""}
         {draft.targetDate ? ` · para ${draft.targetDate}` : ""}
       </div>
