@@ -1,6 +1,15 @@
 import { MobileHeader } from "../../components/mobile-header";
 import { getWealthSummary } from "@/modules/wealth";
-import { formatMoney, formatCompact } from "@/lib/format";
+import {
+  MSummaryCard,
+  MSectionHeader,
+  MContentCard,
+  MMetricGrid,
+  MMetricCard,
+  MChip,
+  mAmount,
+  type MTone,
+} from "../../components/content-kit";
 import { ProteccionManager } from "./proteccion-manager";
 
 /**
@@ -11,17 +20,32 @@ import { ProteccionManager } from "./proteccion-manager";
  */
 export const dynamic = "force-dynamic"; // datos por sesión
 
-function statusOf(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: "Protegido", color: "var(--accent)" };
-  if (score >= 50) return { label: "Parcial", color: "var(--warning)" };
-  return { label: "Expuesto", color: "var(--danger)" };
+/** Estado de protección por score → etiqueta + tono del kit. */
+function statusOf(score: number): { label: string; tone: MTone } {
+  if (score >= 80) return { label: "Protegido", tone: "success" };
+  if (score >= 50) return { label: "Parcial", tone: "warning" };
+  return { label: "Expuesto", tone: "danger" };
+}
+
+/** Fecha corta ("dic 2026") para celdas estrechas; "—" si no hay. */
+function fmtShort(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { month: "short", year: "numeric" });
 }
 
 export default async function MobileProteccion() {
   const summary = await getWealthSummary();
   const { protection: p, policies, currency } = summary;
   const st = statusOf(p.score);
-  const dash = Math.max(0, Math.min(100, p.score));
+
+  // Prima mensual = anual / 12 (el engine da annualPremium, ya en la moneda de display).
+  const monthlyPremium = p.annualPremium / 12;
+  // Próximo vencimiento: la renovación más CERCANA entre las pólizas que tienen fecha.
+  // Deriva de datos ya cargados, sin consulta nueva (patrón de "meta más próxima" en Ahorro).
+  const nextRenewal = policies
+    .map((pol) => pol.renewalDate)
+    .filter((d): d is string => Boolean(d))
+    .sort()[0];
 
   return (
     <div className="m-scroll">
@@ -34,92 +58,48 @@ export default async function MobileProteccion() {
           backLabel="Volver a Inversiones"
         />
 
-        {/* Score de protección */}
-        <div className="card card-p" style={{ marginBottom: 16 }}>
-          <div className="row" style={{ gap: 20, alignItems: "center" }}>
-            <div className="ring-wrap">
-              <svg width="104" height="104" viewBox="0 0 42 42" aria-hidden>
-                <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" strokeWidth={4.5} />
-                <circle
-                  cx="21"
-                  cy="21"
-                  r="15.915"
-                  fill="none"
-                  stroke={st.color}
-                  strokeWidth={4.5}
-                  strokeLinecap="round"
-                  strokeDasharray={`${dash} ${100 - dash}`}
-                  strokeDashoffset={25}
-                  transform="rotate(-90 21 21)"
-                />
-              </svg>
-              <div className="ring-center">
-                <div>
-                  <div className="display" style={{ fontSize: 22 }}>
-                    {p.score}
-                  </div>
-                  <div className="muted" style={{ fontSize: 9 }}>
-                    / 100
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <span className="badge" style={{ background: "color-mix(in srgb, " + st.color + " 14%, transparent)", color: st.color }}>
-                {st.label}
-              </span>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 10, lineHeight: 1.5 }}>
-                {p.gaps.length === 0
-                  ? "No detectamos brechas de protección. Buen trabajo."
-                  : `Tienes ${p.gaps.length} ${p.gaps.length === 1 ? "brecha" : "brechas"} que dejan tu patrimonio expuesto.`}
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Resumen: cuánto tienes protegido + el estado (Protegido/Parcial/Expuesto) como
+            chip. Los agregados YA vienen en la moneda de display (wealth-service convierte
+            coverage/premium antes del engine) → en crudo, sin reconvertir. */}
+        <MSummaryCard
+          eyebrow="Cobertura total"
+          value={mAmount(p.totalCoverage, currency, 11)}
+          chip={<MChip tone={st.tone}>{st.label}</MChip>}
+          sub={
+            p.activePolicies === 0
+              ? "Aún no proteges nada. Registra tu primera póliza."
+              : p.gaps.length === 0
+                ? `${p.activePolicies} ${p.activePolicies === 1 ? "póliza activa" : "pólizas activas"}. No detectamos brechas: buen trabajo.`
+                : `${p.activePolicies} ${p.activePolicies === 1 ? "póliza activa" : "pólizas activas"}. Tienes ${p.gaps.length} ${p.gaps.length === 1 ? "brecha" : "brechas"} que dejan tu patrimonio expuesto.`
+          }
+          style={{ marginBottom: 16 }}
+        />
 
-        {/* KPIs */}
-        <div className="mini-kpi" style={{ marginBottom: 16 }}>
-          <div className="kpi">
-            <div className="k">Cobertura total</div>
-            <div className="kv" style={{ fontSize: 20 }}>
-              {formatCompact(p.totalCoverage, currency)}
-            </div>
-          </div>
-          <div className="kpi">
-            <div className="k">Primas / año</div>
-            <div className="kv" style={{ fontSize: 20 }}>
-              {formatMoney(p.annualPremium, currency)}
-            </div>
-          </div>
-          <div className="kpi">
-            <div className="k">Pólizas activas</div>
-            <div className="kv" style={{ fontSize: 20 }}>
-              {p.activePolicies}
-            </div>
-          </div>
-          <div className="kpi">
-            <div className="k">Brechas</div>
-            <div className={`kv ${p.gaps.length > 0 ? "neg" : ""}`} style={{ fontSize: 20 }}>
-              {p.gaps.length}
-            </div>
-          </div>
-        </div>
+        {/* Métricas. Brechas NO va aquí: tiene su propia sección abajo. */}
+        <MSectionHeader title="Tu protección en números" />
+        <MMetricGrid style={{ marginBottom: 16 }}>
+          <MMetricCard label="Pólizas activas" value={String(p.activePolicies)} sub="cubriéndote hoy" />
+          <MMetricCard label="Prima mensual" value={mAmount(monthlyPremium, currency, 8)} sub="lo que pagas" />
+          <MMetricCard
+            label="Nivel de protección"
+            value={`${p.score}`}
+            sub={`${st.label} · de 100`}
+            tone={st.tone}
+          />
+          <MMetricCard label="Próximo vencimiento" value={fmtShort(nextRenewal)} sub="renueva a tiempo" />
+        </MMetricGrid>
 
         {/* Pólizas — CRUD (FAB alta · SwipeRow editar/eliminar) */}
-        <div style={{ marginBottom: 16 }}>
-          <div className="sec-title" style={{ marginBottom: 6 }}>
-            Tus pólizas
-          </div>
+        <MSectionHeader title="Tus pólizas" />
+        <div style={{ marginBottom: p.gaps.length > 0 ? 16 : 0 }}>
           <ProteccionManager policies={policies} currency={currency} />
         </div>
 
-        {/* Brechas */}
+        {/* Brechas de protección (diagnóstico del engine; su lógica no se toca). */}
         {p.gaps.length > 0 && (
           <div>
-            <div className="sec-title" style={{ marginBottom: 6 }}>
-              Brechas de protección
-            </div>
-            <div className="card card-p">
+            <MSectionHeader title="Brechas de protección" />
+            <MContentCard>
               {p.gaps.map((g, i) => (
                 <div className="gap-row" key={`${g.type}-${i}`}>
                   <span className={`sev ${g.severity}`}>{g.severity.toUpperCase()}</span>
@@ -128,7 +108,7 @@ export default async function MobileProteccion() {
                   </div>
                 </div>
               ))}
-            </div>
+            </MContentCard>
           </div>
         )}
       </div>

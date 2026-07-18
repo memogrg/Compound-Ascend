@@ -9,11 +9,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney, formatCompact } from "@/lib/format";
 import { addPolicyAction, editPolicyAction, removePolicyAction } from "@/modules/wealth/api/actions";
 import type { InsurancePolicy } from "@/modules/wealth/types";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
+import type { MIconName } from "../../components/m-icon";
+import { MContentCard, MDataRow, MEmptyState, mAmount } from "../../components/content-kit";
 import { PolicyForm, type PolicyValues } from "./policy-form";
 
 const POLICY_LABEL: Record<string, string> = {
@@ -35,6 +36,23 @@ const FREQ_SUFFIX: Record<string, string> = {
   semestral: "sem",
   anual: "año",
 };
+
+/** Glifo por tipo de póliza: salud, vida, hogar, vehículo… El del set más cercano; el
+ *  resto cae al escudo genérico de protección. */
+const POLICY_ICON: Record<string, MIconName> = {
+  medico: "health",
+  gastos_mayores: "health",
+  gastos_menores: "health",
+  vida: "protection",
+  incapacidad: "protection",
+  hogar: "housing",
+  vehiculo: "transport",
+  patrimonial: "protection",
+  empresarial: "protection",
+  familiar: "household",
+  otro: "protection",
+};
+
 
 /** InsurancePolicy → valores del form de edición (mismo shape que el modal web). */
 function toValues(p: InsurancePolicy): PolicyValues {
@@ -79,41 +97,45 @@ export function ProteccionManager({
   return (
     <>
       {policies.length === 0 ? (
-        <div className="card card-p">
-          <div className="muted" style={{ padding: "12px 0", fontSize: 13.5, lineHeight: 1.5 }}>
-            Aún no registras pólizas. Toca el botón + para agregar tu primera cobertura.
-          </div>
-        </div>
+        <MEmptyState
+          icon="protection"
+          title="Protege tu patrimonio"
+          description="Registra tus seguros —salud, vida, auto, hogar— y verás de un vistazo cuánto cubres, cuánto pagas y qué te falta blindar."
+          actionLabel="Registrar una póliza"
+          onAction={() => setAdding(true)}
+        />
       ) : (
-        <div className="card" style={{ padding: 0 }}>
+        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
+        // lateral lo pone la regla puente .m-swipe-content .m-drow. Los montos van en la
+        // moneda NATIVA de cada póliza (pol.currency): la lista es por-ítem, no un agregado.
+        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {policies.map((pol) => {
             const label = POLICY_LABEL[pol.policyType] ?? "Cobertura";
             const suffix = FREQ_SUFFIX[pol.premiumFrequency ?? "anual"] ?? "año";
+            const premStr = pol.premium ? `${mAmount(pol.premium, pol.currency, 8)}/${suffix}` : null;
+            // Valor (derecha) = la SUMA ASEGURADA: en una pantalla de defensa, cuánto estás
+            // protegido es EL número. Si no hay cobertura, cae a la prima.
+            // Subtítulo: prima PRIMERO (así sobrevive a la elipsis), aseguradora después
+            // (un nombre, trunca sin perder info clave). El vencimiento no cabe con tres
+            // piezas a 375px → vive en la métrica "Próximo vencimiento", medido.
+            const value = pol.coverage ? mAmount(pol.coverage, pol.currency, 10) : (premStr ?? undefined);
+            const subParts = pol.coverage
+              ? [premStr, pol.provider || null].filter(Boolean)
+              : [pol.provider || null].filter(Boolean);
             return (
               <SwipeRow key={pol.id} onEdit={() => setEditing(pol)} onDelete={() => setDeleting(pol)}>
-                <div className="lrow" style={{ margin: 0 }}>
-                  <span className="lic" style={{ background: "var(--accent-soft)", color: "var(--accent)" }} aria-hidden>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6Z" />
-                    </svg>
-                  </span>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="lname">{label}</div>
-                    <div className="lsub">
-                      {pol.provider ?? "—"}
-                      {pol.coverage ? ` · ${formatCompact(pol.coverage, pol.currency)} cobertura` : ""}
-                    </div>
-                  </div>
-                  {pol.premium ? (
-                    <div className="lamt" style={{ marginLeft: "auto" }}>
-                      {formatMoney(pol.premium, pol.currency)}/{suffix}
-                    </div>
-                  ) : null}
-                </div>
+                {/* icon (no leading): los tipos de póliza SON glifos del set. Sin tinte
+                    semántico: un seguro no es "bueno/malo", es cobertura → tinte de marca. */}
+                <MDataRow
+                  icon={POLICY_ICON[pol.policyType] ?? "protection"}
+                  title={label}
+                  subtitle={subParts.length > 0 ? subParts.join(" · ") : "Sin datos"}
+                  value={value}
+                />
               </SwipeRow>
             );
           })}
-        </div>
+        </MContentCard>
       )}
 
       <Fab onClick={() => setAdding(true)} label="Añadir póliza" />
