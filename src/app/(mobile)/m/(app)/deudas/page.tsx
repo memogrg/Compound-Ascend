@@ -105,6 +105,10 @@ export default async function MobileDeudas() {
     .map((id) => debts.find((d) => d.id === id))
     .filter((d): d is DebtVM => Boolean(d));
   const next = ordered[0];
+  // ¿La cuota más próxima ya venció? Solo presentación: el cálculo de nextDue no se toca.
+  // Fecha local en ISO ("sv-SE" da YYYY-MM-DD) para comparar cadenas sin líos de zona.
+  const todayIso = new Date().toLocaleDateString("sv-SE");
+  const overdue = Boolean(next?.nextDue && next.nextDue < todayIso);
 
   const items: DebtItem[] = ordered.map((vm, i) => ({
     vm,
@@ -194,8 +198,15 @@ export default async function MobileDeudas() {
                 >
                   {next.name}
                 </div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                  Vence {fmtDate(next.nextDue)}
+                {/* "Vence el 1 de julio" mostrado el 18 de julio se lee como un error de la
+                    app, pero el dato es correcto: la cuota de este mes está VENCIDA (el
+                    engine solo salta al mes siguiente si ya pagaste). Se dice en pasado y en
+                    rojo cuando la fecha ya pasó, en vez de anunciar un futuro que no existe. */}
+                <div
+                  className={overdue ? "neg" : "muted"}
+                  style={{ fontSize: 12, marginTop: 2, fontWeight: overdue ? 600 : undefined }}
+                >
+                  {overdue ? `Venció el ${fmtDate(next.nextDue)}` : `Vence ${fmtDate(next.nextDue)}`}
                 </div>
               </div>
               <div className="display" style={{ fontSize: 22, flex: "none" }}>

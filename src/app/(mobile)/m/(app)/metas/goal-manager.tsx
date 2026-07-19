@@ -181,9 +181,13 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
                         >
                           Retirar
                         </button>
+                        {/* Meta cumplida ⇒ la acción que toca es USAR el dinero, no seguir
+                            aportando: con "+ Aporte" del mismo peso, un "¡Completada!"
+                            seguía empujando a ahorrar para algo que ya está pagado. Se
+                            cambia el énfasis, no las opciones: retirar y aportar siguen ahí. */}
                         <button
                           type="button"
-                          className="m-btn m-btn-secondary"
+                          className={`m-btn ${missing <= 0 ? "m-btn-primary" : "m-btn-secondary"}`}
                           // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
                           // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
                           // dos líneas (necesita 51px y le quedaban 50).

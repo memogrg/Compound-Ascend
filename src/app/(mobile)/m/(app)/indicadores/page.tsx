@@ -11,6 +11,7 @@ import {
   MDataRow,
   MChip,
   MEmptyState,
+  type MTone,
 } from "../../components/content-kit";
 
 /**
@@ -49,6 +50,49 @@ function fmtChange(card: IndicatorCard): { text: string; dir: -1 | 0 | 1 } | nul
   return { text: `${dir > 0 ? "+" : dir < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}% vs 6m`, dir };
 }
 
+/**
+ * QUÉ SIGNIFICA QUE UN INDICADOR SUBA, PARA TU BOLSILLO. No lo reinterpretes.
+ *
+ * El color NO va por dirección, va por IMPACTO. Colorear por dirección —lo que hacía
+ * antes— pintaba la INFLACIÓN SUBIENDO de verde, que es exactamente lo contrario de lo
+ * que le pasa a tu dinero. Verde y rojo aquí no dicen "sube/baja", dicen "te conviene /
+ * te perjudica"; la flecha y el signo ya dicen la dirección.
+ *
+ *  "malo"   → subir te perjudica: inflación (tu dinero compra menos) y tasas (el crédito
+ *             se encarece). Suben ⇒ rojo; bajan ⇒ verde.
+ *  "neutro" → el tipo de cambio es AMBIGUO por diseño: un dólar más caro te conviene si
+ *             cobras o ahorras en dólares, y te perjudica si importas o debes en dólares.
+ *             La app no sabe cuál es tu caso, así que no opina: se muestra sin color.
+ *             Pintarlo de verde o rojo sería inventarle una respuesta al usuario.
+ */
+type Impact = "malo" | "neutro";
+const IMPACT_IF_UP: Record<string, Impact> = {
+  IPC: "malo", // inflación
+  TBP: "malo", // Tasa Básica Pasiva
+  TPM: "malo", // Política Monetaria
+  TRI: "malo", // Interbancaria
+  FED_PRIME: "malo",
+  FED_FUNDS: "malo",
+  SOFR: "malo",
+  US_TREASURY_10Y: "malo",
+  US_CPI: "malo", // índice de precios de EE. UU.
+  USDCRC_COMPRA: "neutro",
+  USDCRC_VENTA: "neutro",
+};
+
+/**
+ * Clase de color de la tendencia: verde si te favorece, rojo si te perjudica, sin color
+ * si es ambiguo o no lo tenemos clasificado (un indicador nuevo sale neutro, que es la
+ * opción honesta hasta que alguien decida su impacto).
+ */
+function trendClass(card: IndicatorCard, dir: -1 | 0 | 1): string {
+  if (dir === 0) return "";
+  const impact = IMPACT_IF_UP[card.code] ?? "neutro";
+  if (impact === "neutro") return "";
+  // impact === "malo": subir perjudica, bajar favorece.
+  return dir > 0 ? "neg" : "pos";
+}
+
 /** Fecha de observación en corto ("12 jul"); vacío si no hay. */
 function fmtObserved(iso: string | null): string {
   if (!iso) return "";
@@ -67,9 +111,8 @@ function bars(card: IndicatorCard): number[] {
 }
 
 /**
- * Subtítulo de una fila de indicador: la tendencia coloreada (sube verde / baja rojo, la
- * misma convención que el resto del barrido) + la fuente y la fecha. Si no hay tendencia,
- * solo fuente + fecha.
+ * Subtítulo de una fila de indicador: la tendencia coloreada POR IMPACTO (ver
+ * IMPACT_IF_UP) + la fuente y la fecha. Si no hay tendencia, solo fuente + fecha.
  */
 function rowSubtitle(card: IndicatorCard): React.ReactNode {
   const ch = fmtChange(card);
@@ -78,7 +121,7 @@ function rowSubtitle(card: IndicatorCard): React.ReactNode {
   if (!ch) return tail;
   return (
     <>
-      <span className={ch.dir > 0 ? "pos" : ch.dir < 0 ? "neg" : ""} style={{ fontWeight: 600 }}>
+      <span className={trendClass(card, ch.dir)} style={{ fontWeight: 600 }}>
         {ch.text}
       </span>
       {` · ${card.source}`}
@@ -103,6 +146,9 @@ export default async function MobileIndicadores() {
     currencyCards.find((c) => /venta/i.test(c.label)) ?? currencyCards[0] ?? null;
   const heroChange = hero ? fmtChange(hero) : null;
   const heroBars = hero ? bars(hero) : [];
+  // Mismo criterio de impacto que las filas, traducido al tono del chip.
+  const heroCls = hero && heroChange ? trendClass(hero, heroChange.dir) : "";
+  const heroTone: MTone = heroCls === "pos" ? "success" : heroCls === "neg" ? "danger" : "neutral";
 
   return (
     <div className="m-scroll">
@@ -133,17 +179,17 @@ export default async function MobileIndicadores() {
           />
         ) : (
           <>
-            {/* Destacado: tipo de cambio del dólar, con su mini-tendencia como slot.
-                Tendencia con la MISMA convención que las filas (sube verde / baja rojo): un
-                chip invertido aquí y filas normales abajo pintaban el mismo evento de dos
-                colores. Sin editorializar si es "bueno o malo" — es solo el dato. */}
+            {/* Destacado: tipo de cambio del dólar, con su mini-tendencia como slot. El chip
+                usa la MISMA regla de impacto que las filas (ver IMPACT_IF_UP), así que al
+                ser el tipo de cambio ambiguo sale sin color: la app no puede saber si te
+                conviene un dólar más caro sin saber si cobras o debes en dólares. */}
             {hero && (
               <MSummaryCard
                 eyebrow={hero.label}
                 value={fmtValue(hero)}
                 chip={
                   heroChange && heroChange.dir !== 0 ? (
-                    <MChip tone={heroChange.dir > 0 ? "success" : "danger"}>{heroChange.text}</MChip>
+                    <MChip tone={heroTone}>{heroChange.text}</MChip>
                   ) : undefined
                 }
                 sub={`Fuente ${hero.source}${hero.observedDate ? ` · al ${fmtObserved(hero.observedDate)}` : ""}. El precio del dólar en colones.`}

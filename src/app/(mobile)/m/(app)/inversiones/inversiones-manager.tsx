@@ -76,7 +76,9 @@ export function InversionesManager({
           {holdings.map((h) => {
             const name = h.label || h.symbol || "Inversión";
             const nature = h.nature ? (NATURE_LABEL[h.nature] ?? h.assetType) : h.assetType;
-            const badge = (h.symbol || name).slice(0, 4).toUpperCase();
+            // Badge SOLO si hay símbolo real. Antes caía al nombre y una cuenta de ahorro
+            // salía como ticker "CUEN", que parece una acción que no existe.
+            const badge = h.symbol ? h.symbol.slice(0, 4).toUpperCase() : null;
             // 0 no es ni ganancia ni pérdida: sin signo, en neutro (no verde).
             const dir = h.returnPct > 0 ? 1 : h.returnPct < 0 ? -1 : 0;
             // El valor ya viene en la moneda primaria (portfolio-service); no se reconvierte.
@@ -84,27 +86,34 @@ export function InversionesManager({
               <SwipeRow key={h.id} onEdit={() => setEditH(h)} onDelete={() => setDeleteH(h)}>
                 {/* Tocar la fila abre el detalle (con su sparkline R5); el chevron lo indica.
                     Valor actual arriba + retorno % coloreado debajo (el retorno es la señal
-                    verde/roja, no el valor, que siempre es positivo). El badge de ticker es
-                    el `leading` en vez de un glifo. */}
+                    verde/roja, no el valor, que siempre es positivo).
+                    El badge de ticker solo se pinta cuando el activo TIENE símbolo: una
+                    cuenta de ahorro o una propiedad no cotizan, y recortarles el nombre a
+                    cuatro letras las disfrazaba de acción ("CUEN"). Sin símbolo va el glifo
+                    de inversión del set, que no afirma nada falso. */}
                 <MDataRow
-                  leading={
-                    <span
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        display: "grid",
-                        placeItems: "center",
-                        borderRadius: "inherit",
-                        background: "linear-gradient(135deg, var(--s1), var(--s5))",
-                        color: "#fff",
-                        fontFamily: "var(--font-mono)",
-                        fontWeight: 700,
-                        fontSize: 11,
-                      }}
-                    >
-                      {badge}
-                    </span>
-                  }
+                  {...(badge
+                    ? {
+                        leading: (
+                          <span
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "grid",
+                              placeItems: "center",
+                              borderRadius: "inherit",
+                              background: "linear-gradient(135deg, var(--s1), var(--s5))",
+                              color: "#fff",
+                              fontFamily: "var(--font-mono)",
+                              fontWeight: 700,
+                              fontSize: 11,
+                            }}
+                          >
+                            {badge}
+                          </span>
+                        ),
+                      }
+                    : { icon: "investment" as const })}
                   title={name}
                   subtitle={nature}
                   value={

@@ -199,14 +199,26 @@ export function IncomeManager({
                       ) : (
                         <span style={{ flex: 1 }} />
                       )}
-                      <button
-                        type="button"
-                        className="m-btn m-btn-secondary"
-                        style={{ flex: "none", minHeight: 38, padding: "0 14px", fontSize: 13 }}
-                        onClick={() => setReceiving(it)}
-                      >
-                        Recibido
-                      </button>
+                      {/* Con la fuente ya cobrada al 100%, "Recibido" invitaba a registrar
+                          otra vez lo mismo y duplicar el ingreso. Se sustituye por el estado:
+                          si hace falta corregir algo, Editar sigue estando en el swipe. */}
+                      {budget > 0 && pct >= 1 ? (
+                        <span
+                          className="pos"
+                          style={{ flex: "none", fontSize: 12.5, fontWeight: 600, padding: "0 6px" }}
+                        >
+                          Cobrado
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="m-btn m-btn-secondary"
+                          style={{ flex: "none", minHeight: 38, padding: "0 14px", fontSize: 13 }}
+                          onClick={() => setReceiving(it)}
+                        >
+                          Recibido
+                        </button>
+                      )}
                     </span>
                   }
                 />

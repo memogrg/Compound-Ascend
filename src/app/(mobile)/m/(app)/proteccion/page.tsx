@@ -86,7 +86,13 @@ export default async function MobileProteccion() {
             sub={`${st.label} · de 100`}
             tone={st.tone}
           />
-          <MMetricCard label="Próximo vencimiento" value={fmtShort(nextRenewal)} sub="renueva a tiempo" />
+          {/* Sin fecha no se puede afirmar que "renueva a tiempo": no se sabe. Se dice que
+              falta el dato, que además es accionable. */}
+          <MMetricCard
+            label="Próximo vencimiento"
+            value={fmtShort(nextRenewal)}
+            sub={nextRenewal ? "renueva a tiempo" : "sin fecha registrada"}
+          />
         </MMetricGrid>
 
         {/* Pólizas — CRUD (FAB alta · SwipeRow editar/eliminar) */}
