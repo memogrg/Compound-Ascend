@@ -44,6 +44,7 @@ import {
 } from "../../components/form-kit";
 import { MSectionHeader, MContentCard, MDataRow } from "../../components/content-kit";
 import { AppLockToggle } from "../../components/app-lock-toggle";
+import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/app-lock";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
 type SheetId = "currency" | "whatsapp" | "household" | "password" | null;
@@ -699,7 +700,15 @@ function IngestSection({ emails }: { emails: IngestEmailRow[] }) {
   );
 }
 
-/** Paso 2 del borrado: confirmación final que ejecuta clearAllDataAction. */
+/**
+ * Paso 2 del borrado: confirmación final que ejecuta clearAllDataAction.
+ *
+ * Antes de borrar exige biometría, ADEMÁS de la confirmación de dos pasos (no en su lugar):
+ * es la única acción de la app que destruye datos de forma irreversible, así que conviene
+ * que un teléfono desbloqueado en manos ajenas no baste. Si el dispositivo no tiene
+ * biometría disponible NO se bloquea la acción —dejar a alguien sin poder borrar sus propios
+ * datos sería peor— y se cae al flujo de confirmación de siempre.
+ */
 function ClearDataStep2({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
@@ -707,6 +716,19 @@ function ClearDataStep2({ open, onClose }: { open: boolean; onClose: () => void 
 
   const doClear = async () => {
     setPending(true);
+
+    if (isNativeApp()) {
+      const avail = await checkBiometryAvailable();
+      if (avail.available) {
+        const id = await verifyIdentity();
+        if (!id.ok) {
+          setPending(false);
+          toast.show("No pudimos verificarte. No se borró nada.", "error");
+          return; // se aborta: fallo o cancelación NO borra
+        }
+      }
+    }
+
     const res = await clearAllDataAction();
     setPending(false);
     if (res.ok) {

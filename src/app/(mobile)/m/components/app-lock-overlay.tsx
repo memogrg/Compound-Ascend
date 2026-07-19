@@ -24,7 +24,11 @@ import {
   isAppLockEnabled,
   verifyIdentity,
   clearAppLockFlagForRecovery,
-  onAppStateChange,
+  onAppPause,
+  onAppResume,
+  isSessionUnlocked,
+  markSessionUnlocked,
+  clearSessionUnlocked,
   APP_LOCK_EVENT,
 } from "../lib/app-lock";
 import { isIntroActive, onIntroDone } from "../lib/app-intro";
@@ -56,6 +60,9 @@ export function AppLockOverlay() {
     const r = await verifyIdentity();
     setPrompting(false);
     if (r.ok) {
+      // La sesión queda desbloqueada: navegar entre pantallas (aunque remonte el layout)
+      // ya no vuelve a pedir biometría. Solo un `pause` real la revoca.
+      markSessionUnlocked();
       setLocked(false);
       setFailed(false);
     } else {
@@ -63,9 +70,14 @@ export function AppLockOverlay() {
     }
   }, []);
 
-  // Carga inicial (cold start): lee el flag; si está activo → bloquea. La biometría se pide
-  // apenas termina la intro animada (o de inmediato si no hay intro en curso), para que el
-  // orden sea: intro a pantalla completa → candado → app.
+  // Montaje: lee el flag; si está activo Y la sesión no está ya desbloqueada → bloquea. La
+  // biometría se pide apenas termina la intro animada (o de inmediato si no hay intro), para
+  // que el orden sea: intro a pantalla completa → candado → app.
+  //
+  // El guard de sesión es lo que distingue ABRIR la app de simplemente MONTAR el componente:
+  // este overlay vive en el layout de /m/(app), y pantallas como el asistente o el perfil
+  // financiero están fuera de ese grupo de rutas, así que ir y volver remonta el layout. Sin
+  // el guard, cada viaje pedía biometría.
   useEffect(() => {
     if (!isNativeApp()) return;
     let cancelled = false;
@@ -75,6 +87,7 @@ export function AppLockOverlay() {
       if (cancelled) return;
       setEnabled(on);
       if (!on) return;
+      if (isSessionUnlocked()) return; // ya se verificó en esta sesión: solo estamos navegando
       setLocked(true); // tapa la UI ya (bajo la intro); el prompt espera a la intro
       if (isIntroActive()) {
         unsubscribe = onIntroDone(() => {
@@ -96,36 +109,62 @@ export function AppLockOverlay() {
     const onChange = (e: Event) => {
       const on = Boolean((e as CustomEvent<{ enabled: boolean }>).detail?.enabled);
       setEnabled(on);
-      if (!on) setLocked(false); // al desactivar, no dejamos el overlay puesto
+      if (!on) {
+        setLocked(false); // al desactivar, no dejamos el overlay puesto
+        clearSessionUnlocked();
+      } else {
+        // Activar el candado ya exigió biometría (enableAppLock la verifica), así que la
+        // sesión cuenta como desbloqueada: sin esto, la siguiente navegación —que remonta
+        // este overlay— pediría Face ID otra vez de inmediato.
+        markSessionUnlocked();
+      }
     };
     window.addEventListener(APP_LOCK_EVENT, onChange);
     return () => window.removeEventListener(APP_LOCK_EVENT, onChange);
   }, []);
 
-  // Ciclo de vida de la app: bloquea al ir a segundo plano; pide biometría al volver.
-  // Usa onAppStateChange de ../lib/app-lock (registerPlugin) — sin dynamic import (colgaba).
+  // Ciclo de vida: bloquea al irse al fondo; pide biometría al volver.
+  //
+  // pause/resume, NO appStateChange. appStateChange sale de willResignActive, que dispara
+  // cualquier cosa que robe el foco un instante —el propio diálogo de Face ID, un banner de
+  // notificación, el Centro de Control, el App Switcher, la cámara del escáner—, así que el
+  // candado saltaba sin que la app se hubiera ido a ningún sitio. pause/resume salen de
+  // didEnterBackground/willEnterForeground: solo la app yéndose de verdad al fondo
+  // (verificado en @capacitor/app/ios/Sources/AppPlugin/AppPlugin.swift).
+  //
+  // Sin periodo de gracia a propósito: con el evento correcto no hace falta, y salir y
+  // volver debe pedir SIEMPRE, aunque hayan pasado dos segundos.
   useEffect(() => {
     if (!isNativeApp()) return;
-    let handle: { remove: () => Promise<void> } | undefined;
+    const handles: { remove: () => Promise<void> }[] = [];
     let removed = false;
+    const keep = (h: { remove: () => Promise<void> }) => {
+      if (removed) void h.remove();
+      else handles.push(h);
+    };
     void (async () => {
-      const h = await onAppStateChange((isActive) => {
-        if (!enabledRef.current) return;
-        if (!isActive) {
-          // A segundo plano: bloquea inmediatamente (cubre el snapshot del switcher).
+      keep(
+        await onAppPause(() => {
+          if (!enabledRef.current) return;
+          // Bloquea YA: así el snapshot del App Switcher sale tapado (privacidad), y la
+          // sesión se revoca para que al volver se exija biometría.
+          clearSessionUnlocked();
           setFailed(false);
           setLocked(true);
-        } else if (lockedRef.current) {
-          // A primer plano y bloqueado: pide biometría.
-          void runUnlock();
-        }
-      });
-      if (removed) void h.remove();
-      else handle = h;
+        }),
+      );
+      keep(
+        await onAppResume(() => {
+          if (!enabledRef.current) return;
+          // La guarda de `prompting` vive dentro de runUnlock: pedir Face ID nunca debe
+          // encadenar otro Face ID.
+          if (lockedRef.current) void runUnlock();
+        }),
+      );
     })();
     return () => {
       removed = true;
-      void handle?.remove();
+      for (const h of handles) void h.remove();
     };
   }, [runUnlock]);
 
