@@ -21,7 +21,7 @@ function cat(over: Partial<Category>): Category {
 }
 
 describe("buildCategoryOptionGroups (destinos de reasignación)", () => {
-  it("cada grupo abre con '(general)' y sigue con sus hojas, en orden", () => {
+  it("cada grupo abre con 'Sin sobre específico' y sigue con sus hojas, en orden", () => {
     const groups = buildCategoryOptionGroups([
       cat({ id: "g2", name: "Transporte", sortOrder: 2 }),
       cat({ id: "g1", name: "Vivienda", sortOrder: 1 }),
@@ -30,11 +30,11 @@ describe("buildCategoryOptionGroups (destinos de reasignación)", () => {
     ]);
     expect(groups.map((g) => g.groupName)).toEqual(["Vivienda", "Transporte"]);
     expect(groups[0]!.options.map((o) => o.name)).toEqual([
-      "Vivienda (general)",
+      "Sin sobre específico",
       "Servicios",
       "Alquiler",
     ]);
-    // Un grupo sin hojas igual ofrece su "(general)".
+    // Un grupo sin hojas igual ofrece su opción de "sin sobre".
     expect(groups[1]!.options.map((o) => o.id)).toEqual(["g2"]);
   });
 
@@ -47,6 +47,24 @@ describe("buildCategoryOptionGroups (destinos de reasignación)", () => {
       cat({ id: "g2", name: "Ingresos", categoryType: "income" }),
     ]);
     expect(groups.map((g) => g.groupName)).toEqual(["Vivienda"]);
-    expect(groups[0]!.options.map((o) => o.name)).toEqual(["Vivienda (general)", "Mixta"]);
+    expect(groups[0]!.options.map((o) => o.name)).toEqual(["Sin sobre específico", "Mixta"]);
+  });
+
+  /**
+   * El motivo del nombre, no solo el nombre. La opción del frasco NO puede llamarse como
+   * el frasco: existen hojas legadas homónimas (key='vivienda' bajo el grupo 'Vivienda',
+   * preservadas de la taxonomía vieja), y repetir el nombre producía pares
+   * indistinguibles — "Vivienda · Vivienda (general)" junto a "Vivienda · Vivienda".
+   */
+  it("la opción del frasco no repite el nombre del frasco (desambigua de una hoja homónima)", () => {
+    const groups = buildCategoryOptionGroups([
+      cat({ id: "g1", name: "Vivienda" }),
+      cat({ id: "legacy", name: "Vivienda", parentId: "g1" }), // hoja legada homónima
+    ]);
+    const names = groups[0]!.options.map((o) => o.name);
+    // La primera opción es el frasco (su id es el del grupo) y se distingue de la hoja.
+    expect(groups[0]!.options[0]!.id).toBe("g1");
+    expect(names[0]).not.toBe("Vivienda");
+    expect(new Set(names).size).toBe(names.length); // sin etiquetas duplicadas
   });
 });

@@ -60,13 +60,26 @@ const ALERT_LABEL: Record<string, string> = {
 };
 
 const SM_BTN: React.CSSProperties = { padding: "7px 11px", fontSize: 12.5 };
+
+/**
+ * Fila APILADA, no en línea. Medido a 375px con los comercios reales más largos, la fila
+ * de una sola línea le dejaba al nombre 51px de los 176-182 que necesita: se leía el 28%
+ * ("OPENAI *CHATGPT SU…", "PEQUENO MUND…"). Los dos botones se comían 173px y el importe
+ * otros 60. Y esta es la acción MÁS frecuente de la app: aprobar algo sin poder leer qué
+ * es no es un problema estético.
+ *
+ * Al apilar, el comercio ocupa el ancho completo (~303px a 375, ~248 a 320) y entra entero.
+ * Las acciones siguen siendo botones visibles de ≥44px —no se esconden tras un gesto—,
+ * solo que en su propia línea.
+ */
 const ROW: React.CSSProperties = {
   display: "flex",
-  alignItems: "center",
-  gap: 10,
-  padding: "9px 0",
+  flexDirection: "column",
+  gap: 6,
+  padding: "11px 0",
   borderTop: "1px solid var(--border)",
 };
+/** Nombre del comercio: ancho completo. La elipsis queda de red para casos absurdos. */
 const TTL: React.CSSProperties = {
   fontWeight: 600,
   fontSize: 13.5,
@@ -74,7 +87,21 @@ const TTL: React.CSSProperties = {
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
 };
-const AMT: React.CSSProperties = { fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap" };
+/** Línea 2: fecha/tarjeta a la izquierda, importe a la derecha. */
+const META: React.CSSProperties = {
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  gap: 10,
+};
+const AMT: React.CSSProperties = {
+  fontSize: 13.5,
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  flex: "none",
+};
+/** Línea 3: acciones. */
+const ACTIONS: React.CSSProperties = { display: "flex", gap: 6, marginTop: 2 };
 
 /** Etiqueta legible de un movimiento (comercio/descripción, con fallback). */
 function txnLabel(t: Transaction): string {
@@ -168,20 +195,20 @@ export function RevisionInbox({
         >
           {visibleProposals.map((p) => (
             <div key={p.id} style={ROW}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={TTL}>{p.merchant || "Movimiento"}</div>
-                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+              <div style={TTL}>{p.merchant || "Movimiento"}</div>
+              <div style={META}>
+                <span className="muted" style={{ fontSize: 11.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {shortDate(p.occurredOn)}
                   {p.cardLabel ? ` · ${p.cardLabel}` : ""}
-                </div>
+                </span>
+                <span className={`mono ${p.kind === "ingreso" ? "pos" : "neg"}`} style={AMT}>
+                  {formatMoney(p.amount, p.currency)}
+                </span>
               </div>
-              <div className={`mono ${p.kind === "ingreso" ? "pos" : "neg"}`} style={AMT}>
-                {formatMoney(p.amount, p.currency)}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={ACTIONS}>
                 <button
                   type="button"
-                  className="m-btn"
+                  className="m-btn m-btn-primary"
                   style={SM_BTN}
                   disabled={pending}
                   onClick={() =>
@@ -214,19 +241,17 @@ export function RevisionInbox({
         >
           {visibleUncat.map((t) => (
             <div key={t.id} style={ROW}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={TTL}>{txnLabel(t)}</div>
-                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                  {shortDate(t.occurredOn)}
-                </div>
+              <div style={TTL}>{txnLabel(t)}</div>
+              <div style={META}>
+                <span className="muted" style={{ fontSize: 11.5 }}>{shortDate(t.occurredOn)}</span>
+                <span className={`mono ${t.kind === "ingreso" ? "pos" : "neg"}`} style={AMT}>
+                  {formatMoney(t.amount, t.currency)}
+                </span>
               </div>
-              <div className={`mono ${t.kind === "ingreso" ? "pos" : "neg"}`} style={AMT}>
-                {formatMoney(t.amount, t.currency)}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={ACTIONS}>
                 <button
                   type="button"
-                  className="m-btn"
+                  className="m-btn m-btn-primary"
                   style={SM_BTN}
                   disabled={pending}
                   onClick={() => setClassify(t)}
@@ -259,23 +284,23 @@ export function RevisionInbox({
         >
           {visibleCandidates.map((c) => (
             <div key={c.transaction.id} style={ROW}>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={TTL}>{txnLabel(c.transaction)}</div>
-                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+              <div style={TTL}>{txnLabel(c.transaction)}</div>
+              <div style={META}>
+                <span className="muted" style={{ fontSize: 11.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {shortDate(c.transaction.occurredOn)} · sugerido:{" "}
                   {KIND_LABEL[c.suggestedKind] ?? c.suggestedKind}
-                </div>
+                </span>
+                <span
+                  className={`mono ${c.transaction.kind === "ingreso" ? "pos" : "neg"}`}
+                  style={AMT}
+                >
+                  {formatMoney(c.transaction.amount, c.transaction.currency)}
+                </span>
               </div>
-              <div
-                className={`mono ${c.transaction.kind === "ingreso" ? "pos" : "neg"}`}
-                style={AMT}
-              >
-                {formatMoney(c.transaction.amount, c.transaction.currency)}
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={ACTIONS}>
                 <button
                   type="button"
-                  className="m-btn"
+                  className="m-btn m-btn-primary"
                   style={SM_BTN}
                   disabled={pending}
                   onClick={() => setLink(c)}
@@ -306,19 +331,19 @@ export function RevisionInbox({
               </div>
               {visibleAlerts.map((a) => (
                 <div key={`${a.sourceKind}:${a.sourceId}`} style={ROW}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={TTL}>{a.name}</div>
-                    <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                  <div style={TTL}>{a.name}</div>
+                  <div style={META}>
+                    <span className="muted" style={{ fontSize: 11.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       Plan {formatMoney(a.planned, a.currency)} · real{" "}
                       {formatMoney(a.real, a.currency)}
-                    </div>
+                    </span>
+                    <span
+                      className={`m-chip ${a.status === "excedido" ? "neg" : ""}`}
+                      style={{ fontSize: 11, whiteSpace: "nowrap", flex: "none" }}
+                    >
+                      {ALERT_LABEL[a.status] ?? a.status}
+                    </span>
                   </div>
-                  <span
-                    className={`m-chip ${a.status === "excedido" ? "neg" : ""}`}
-                    style={{ fontSize: 11, whiteSpace: "nowrap" }}
-                  >
-                    {ALERT_LABEL[a.status] ?? a.status}
-                  </span>
                 </div>
               ))}
             </div>

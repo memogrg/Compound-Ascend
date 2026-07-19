@@ -261,7 +261,7 @@ export function AccountsManager({
                   </button>
                   <button
                     type="button"
-                    className="m-btn m-btn-danger"
+                    className="m-btn m-btn-quiet-danger"
                     disabled={pending}
                     onClick={() => setDeleting(a)}
                   >
