@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /** CRUD de cuentas / métodos de pago (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -20,10 +21,11 @@ function rowToAccount(r: AccountRow): Account {
 export async function listAccounts(): Promise<Account[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("accounts")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("is_default", { ascending: false })
     .order("created_at", { ascending: true });
   return (data ?? []).map(rowToAccount);

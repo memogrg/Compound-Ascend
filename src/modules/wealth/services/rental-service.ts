@@ -19,7 +19,7 @@ import {
   monthPeriod,
 } from "@/modules/financial-base";
 import { rentalPaymentToTxn } from "@/modules/financial-base";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";
 
@@ -46,10 +46,11 @@ function rowToRentalPayment(r: {
 export async function listRentalPayments(holdingId?: string): Promise<RentalPayment[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   let query = supabase
     .from("rental_payments")
     .select("id,holding_id,received_on,amount,currency,frequency,income_id")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("received_on", { ascending: false });
   if (holdingId) query = query.eq("holding_id", holdingId);
   const { data, error } = await query;

@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Agregados de gasto por RANGO para el tab de Gastos (segmented 1m/3m/6m/YTD/All).
@@ -56,10 +57,11 @@ async function monthsBackFor(range: ExpenseRange, period: Period): Promise<numbe
     case "all": {
       const user = await requireUser();
       const supabase = await createSupabaseServerClient();
+      const memberIds = await householdMemberIds(supabase, user.id);
       const { data } = await supabase
         .from("transactions")
         .select("occurred_on")
-        .eq("user_id", user.id)
+        .in("user_id", memberIds)
         .order("occurred_on", { ascending: true })
         .limit(1);
       const first = data?.[0]?.occurred_on;

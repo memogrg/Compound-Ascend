@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /** Servicio del Módulo 4 (respeta RLS). Cruza Base, Control y Perfil. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -59,10 +60,11 @@ function rowToPolicy(r: InsurancePolicyRow): InsurancePolicy {
 export async function listInvestments(): Promise<Investment[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("investments")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToInvestment);
 }
@@ -70,10 +72,11 @@ export async function listInvestments(): Promise<Investment[]> {
 export async function listPolicies(): Promise<InsurancePolicy[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("insurance_policies")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToPolicy);
 }
@@ -213,6 +216,7 @@ export async function getWealthSummary(): Promise<WealthSummary> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [investments, policies, holdings, base, currency, rates] = await Promise.all([
     listInvestments(),
     listPolicies(),
@@ -229,8 +233,10 @@ export async function getWealthSummary(): Promise<WealthSummary> {
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase.from("risk_profiles").select("risk_class").eq("user_id", user.id).maybeSingle(),
-    supabase.from("savings_goals").select("name,current_amount,goal_type").eq("user_id", user.id),
-    supabase.from("debts").select("apr,delinquency,balance").eq("user_id", user.id),
+    // Metas y deudas: datos del HOGAR (display). Los perfiles de arriba siguen
+    // por user_id — son 1 fila por persona y .maybeSingle() reventaría con dos.
+    supabase.from("savings_goals").select("name,current_amount,goal_type").in("user_id", memberIds),
+    supabase.from("debts").select("apr,delinquency,balance").in("user_id", memberIds),
   ]);
 
   const hasEmergencyFund = (goals ?? []).some(

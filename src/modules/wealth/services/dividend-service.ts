@@ -18,7 +18,7 @@ import {
   monthPeriod,
 } from "@/modules/financial-base";
 import { dividendToTxn } from "@/modules/financial-base";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";
 
@@ -47,10 +47,11 @@ function rowToDividend(r: {
 export async function listDividends(holdingId?: string): Promise<Dividend[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   let query = supabase
     .from("dividends")
     .select("id,holding_id,payment_date,amount,currency,yield_pct,frequency,income_id")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("payment_date", { ascending: false });
   if (holdingId) query = query.eq("holding_id", holdingId);
   const { data, error } = await query;

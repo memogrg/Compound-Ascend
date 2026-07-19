@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Snapshots mensuales de la Base Financiera (cache de cálculo en monthly_snapshots).
@@ -150,10 +151,11 @@ export type SnapshotPoint = {
 export async function getSnapshotHistory(monthsBack = 12): Promise<SnapshotPoint[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("monthly_snapshots")
     .select("period,income_monthly,expense_monthly,free_cashflow,breakdown")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("period", { ascending: false })
     .limit(monthsBack);
   return (data ?? [])

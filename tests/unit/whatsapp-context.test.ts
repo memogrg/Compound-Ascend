@@ -8,6 +8,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * devolviendo al menos los 5 campos base.
  */
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/household/active", () => ({
+  // Modo solo: householdMemberIds degrada a [userId], asi estos tests
+  // conservan exactamente la semantica que tenian antes del alcance de hogar.
+  householdMemberIds: async (_c: unknown, uid: string) => [uid],
+  getActiveHouseholdId: async () => null,
+  isActiveHouseholdEditor: async () => true,
+}));
 
 // Cliente service-role fake: chainable + thenable, devuelve filas por tabla.
 type Res = { data: unknown[]; error: null };
@@ -16,6 +23,7 @@ function makeBuilder(rows: unknown[]) {
   const builder = {
     select: () => builder,
     eq: () => builder,
+    in: () => builder,
     order: () => builder,
     or: () => Promise.resolve(res),
     limit: () => Promise.resolve(res),

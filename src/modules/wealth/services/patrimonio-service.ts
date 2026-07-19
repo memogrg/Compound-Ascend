@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Ensamblador del Marco Patrimonial: llena PatrimonioInput con datos reales y
@@ -48,6 +49,7 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   // ctx undefined → sesión, idéntico a hoy; ctx presente → service-role + userId.
   const agg = await aggregateNetWorth(ctx);
   const { db, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(db, userId);
   const rates = await getFxRates();
   const currency = agg.currency;
 
@@ -58,12 +60,12 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     db
       .from("debts")
       .select("classification,apr,min_payment,current_payment,balance,currency")
-      .eq("user_id", userId),
+      .in("user_id", memberIds),
     db
       .from("investments")
       .select("contribution,contribution_frequency")
-      .eq("user_id", userId),
-    db.from("savings_goals").select("monthly_contribution,currency").eq("user_id", userId),
+      .in("user_id", memberIds),
+    db.from("savings_goals").select("monthly_contribution,currency").in("user_id", memberIds),
     db.from("personal_profiles").select("age").eq("user_id", userId).maybeSingle(),
   ]);
 

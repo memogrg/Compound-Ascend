@@ -7,7 +7,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -71,10 +71,11 @@ export async function listTransactions(
 ): Promise<Transaction[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   let q = supabase
     .from("transactions")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .gte("occurred_on", period.from)
     .lte("occurred_on", period.to)
     .order("occurred_on", { ascending: false })
@@ -289,6 +290,12 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
   if (existing && (existing.linked_kind ?? "none") !== "none") {
     throw new Error(LINKED_TXN_EDIT_BLOCKED);
   }
+  // Sin esto el update de abajo afecta 0 filas (lo acota user_id) y la acción
+  // parece haber funcionado. Con el alcance de hogar el miembro VE la fila, así
+  // que el silencio se lee como bug: mejor decir por qué no se puede.
+  if (!existing && (await existsInHousehold(supabase, user.id, "transactions", id))) {
+    throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+  }
 
   const accountLabel = await accountLabelFor(input.accountId);
   await supabase
@@ -382,7 +389,14 @@ export async function duplicateTransaction(id: string): Promise<void> {
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!data) return;
+  if (!data) {
+    // Duplicar la transacción de otro miembro sería crearla a nombre propio;
+    // hasta la edición compartida, se explica en vez de no hacer nada.
+    if (await existsInHousehold(supabase, user.id, "transactions", id)) {
+      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+    }
+    return;
+  }
   await supabase.from("transactions").insert({
     user_id: user.id,
     household_id: data.household_id ?? null,
@@ -425,7 +439,13 @@ export async function splitTransaction(
     .eq("id", id)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!data || parts.length === 0) return;
+  if (!data) {
+    if (await existsInHousehold(supabase, user.id, "transactions", id)) {
+      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+    }
+    return;
+  }
+  if (parts.length === 0) return;
   const base = data;
   const rows = parts.map((p) => ({
     user_id: user.id,
@@ -640,11 +660,12 @@ export async function getLinkedSpentByEntity(
 ): Promise<Record<string, number>> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
   const { data } = await supabase
     .from("transactions")
     .select("amount,currency,linked_id")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("linked_kind", linkedKind)
     .gte("occurred_on", period.from)
     .lte("occurred_on", period.to);
@@ -667,11 +688,12 @@ export async function getExtraordinarySpentByDebt(
 ): Promise<Record<string, number>> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
   const { data: pays } = await supabase
     .from("debt_payments")
     .select("transaction_id")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("kind", "extraordinario")
     .gte("occurred_on", period.from)
     .lte("occurred_on", period.to);
@@ -682,7 +704,7 @@ export async function getExtraordinarySpentByDebt(
   const { data: txns } = await supabase
     .from("transactions")
     .select("amount,currency,linked_id")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .in("id", txnIds);
   const out: Record<string, number> = {};
   for (const t of txns ?? []) {
@@ -698,10 +720,11 @@ export async function getExtraordinarySpentByDebt(
 export async function getEarliestTransactionDate(): Promise<string | null> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("transactions")
     .select("occurred_on")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("occurred_on", { ascending: true })
     .limit(1)
     .maybeSingle();
@@ -725,6 +748,7 @@ export type HistoryPoint = {
 export async function getRealHistory(period: Period, monthsBack = 6): Promise<HistoryPoint[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
 
   // Rango: desde (monthsBack-1) meses atrás hasta el fin del periodo.
@@ -756,13 +780,13 @@ export async function getRealHistory(period: Period, monthsBack = 6): Promise<Hi
     supabase
       .from("transactions")
       .select("kind,amount,currency,occurred_on,counts_in_budget")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .gte("occurred_on", start.from)
       .lte("occurred_on", period.to),
     supabase
       .from("budget_items")
       .select("type,amount,currency,period_month,period_year")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .in("period_year", [...years]),
   ]);
 

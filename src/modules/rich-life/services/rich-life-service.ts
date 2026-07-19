@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Servicio del Módulo 5 (respeta RLS). Consolida activos, pasivos e ingreso
@@ -184,6 +185,7 @@ export async function aggregateNetWorth(ctx?: AuthContext): Promise<NetWorthAggr
   // ctx presente → cliente service-role + userId explícito (cron/push).
   const { db, userId } = await resolveAuth(ctx);
 
+  const memberIds = await householdMemberIds(db, userId);
   const [base, currency, primaryCurrency, rates] = await Promise.all([
     getBaseSummary(ctx),
     getDisplayCurrency(ctx),
@@ -203,17 +205,17 @@ export async function aggregateNetWorth(ctx?: AuthContext): Promise<NetWorthAggr
     liquidityBucket,
     goalRows,
   ] = await Promise.all([
-      db.from("assets").select("*").eq("user_id", userId),
-      db.from("liabilities").select("*").eq("user_id", userId),
+      db.from("assets").select("*").in("user_id", memberIds),
+      db.from("liabilities").select("*").in("user_id", memberIds),
       db
         .from("debts")
         .select("id,name,balance,classification,apr,delinquency,currency")
-        .eq("user_id", userId),
-      db.from("investments").select("*").eq("user_id", userId),
+        .in("user_id", memberIds),
+      db.from("investments").select("*").in("user_id", memberIds),
       db
         .from("insurance_policies")
         .select("policy_type,coverage,premium,premium_frequency")
-        .eq("user_id", userId),
+        .in("user_id", memberIds),
       db
         .from("personal_profiles")
         .select("dependents_count")

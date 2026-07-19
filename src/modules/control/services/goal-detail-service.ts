@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * View-model del detalle de un frasco de ahorro (Delta C · trazabilidad):
@@ -75,11 +76,12 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data: goal } = await supabase
     .from("savings_goals")
     .select("id,name,currency,current_amount,target_amount,default_category_id,kind")
     .eq("id", goalId)
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .maybeSingle();
   if (!goal) return null;
 
@@ -87,7 +89,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
     supabase
       .from("transactions")
       .select("id,kind,amount,currency,occurred_on,category_id,description,counts_in_budget")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .eq("linked_kind", "goal")
       .eq("linked_id", goalId)
       .order("occurred_on", { ascending: true })
@@ -95,7 +97,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
     supabase
       .from("goal_period_resets")
       .select("id,reset_on,restored_target")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .eq("goal_id", goalId)
       .order("reset_on", { ascending: true }),
     getCategoryNameMap(),

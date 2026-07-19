@@ -13,7 +13,7 @@ import { randomInt, createHash } from "node:crypto";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 import { isEmailConfigured, sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
 
@@ -36,10 +36,11 @@ function hashCode(code: string): string {
 export async function listMyIngestEmails(): Promise<IngestEmailRow[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("email_ingest_links")
     .select("id, forwarder_email, verified, created_at")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? [])
     .filter((r): r is typeof r & { forwarder_email: string } => Boolean(r.forwarder_email))

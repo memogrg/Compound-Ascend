@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Autocompletado inteligente DETERMINISTA (sin IA todavía). Construye un índice
@@ -91,13 +92,14 @@ export async function buildSuggestionIndex(): Promise<SuggestionEntry[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [cats, rules, history] = await Promise.all([
     listCategories(),
     listRules(),
     supabase
       .from("transactions")
       .select("merchant_or_source,category_id,occurred_on")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .eq("kind", "gasto")
       .not("merchant_or_source", "is", null)
       .not("category_id", "is", null)

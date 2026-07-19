@@ -3,7 +3,7 @@ import "server-only";
 /** CRUD + agregados de presupuesto por mes (budget_items). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -63,10 +63,11 @@ async function assertManualItem(id: string): Promise<void> {
 export async function listBudgetItems(period: Period): Promise<BudgetItem[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("budget_items")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("period_month", period.month)
     .eq("period_year", period.year)
     .order("amount", { ascending: false });
@@ -552,11 +553,12 @@ export async function getLinkedBudgetBySource(
 ): Promise<Record<string, number>> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [currency, rates] = await Promise.all([getDisplayCurrency(), getFxRates()]);
   const { data } = await supabase
     .from("budget_items")
     .select("amount,currency,source_id")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("period_month", period.month)
     .eq("period_year", period.year)
     .eq("source_kind", sourceKind);
