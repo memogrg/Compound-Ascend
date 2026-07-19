@@ -8,13 +8,26 @@ import { MIcon, type MIconName } from "../m-icon";
  * solo cambian de contenido — igual que el content-kit del barrido R3, donde el
  * sistema existía antes que las instancias.
  *
- * Anatomía (Parte 2 de la especificación):
- *   eyebrow · cifra protagonista + chip · subtexto · visual · mensaje corto
+ * Anatomía, A DOS COLUMNAS:
  *
- * ALTURA FIJA (.m-hcard, 216px). No es un detalle estético: si una tarjeta creciera
- * con su contenido, el carrusel daría un salto al deslizar hasta ella. Por eso el
- * subtexto va a una línea con elipsis y el mensaje a dos como máximo: el contenido
- * se adapta a la caja, no al revés.
+ *   ┌──────────────────────────────────────┐
+ *   │ EYEBROW                    [chip]    │
+ *   │  ₡1.840.697            ◯ 52%         │  ← cifra izquierda · visual derecha
+ *   │  subtexto                            │
+ *   │  mensaje corto                       │
+ *   └──────────────────────────────────────┘
+ *
+ * Apilar el visual entre la cifra y el mensaje dejaba dos bandas vacías y una silueta
+ * cuadrada de 240px. Con el visual a la derecha, alineado con la cifra, la tarjeta
+ * baja a 168 sin perder nada.
+ *
+ * ALTURA FIJA (.m-hcard, 168px). No es un detalle estético: si una tarjeta creciera
+ * con su contenido, el carrusel daría un salto al deslizar hasta ella. Por eso cada
+ * parte tiene altura estable —eyebrow y subtexto a una línea con elipsis, mensaje a
+ * una— y el visual no se encoge: el contenido se adapta a la caja, no al revés.
+ *
+ * TODA tarjeta debe poner algo en `vis`. Si una lo deja vacío deja de parecerse a sus
+ * hermanas, que es justo lo que pasaba con Patrimonio.
  *
  * Toda la tarjeta es un enlace a su módulo. El carrusel cancela el "click" cuando el
  * dedo se ha desplazado (ver home-carousel), así que arrastrar no navega.
@@ -24,7 +37,7 @@ export function MHomeCard({
   value,
   chip,
   sub,
-  slot,
+  vis,
   message,
   href,
   ariaLabel,
@@ -35,9 +48,11 @@ export function MHomeCard({
   /** Estado a la derecha del eyebrow (MChip). */
   chip?: ReactNode;
   sub?: ReactNode;
-  /** Visual del dominio: donut, barra, lo que toque. */
-  slot?: ReactNode;
-  /** Una frase, humana y accionable. */
+  /** Visual del dominio a la derecha: donut, barra, lo que toque. Obligatorio en la
+   *  práctica — una tarjeta sin él rompe la paridad con las demás. */
+  vis?: ReactNode;
+  /** Una frase que aporte lo que la cifra NO dice. Repetir el importe que ya está
+   *  arriba en grande gasta la única línea disponible sin informar de nada. */
   message?: ReactNode;
   href: string;
   ariaLabel?: string;
@@ -48,9 +63,13 @@ export function MHomeCard({
         <span className="ov">{eyebrow}</span>
         {chip ?? null}
       </div>
-      <div className="m-hcard-val">{value}</div>
-      {sub ? <div className="m-hcard-sub">{sub}</div> : null}
-      <div className="m-hcard-slot">{slot ?? null}</div>
+      <div className="m-hcard-body">
+        <div className="m-hcard-figs">
+          <div className="m-hcard-val">{value}</div>
+          {sub ? <div className="m-hcard-sub">{sub}</div> : null}
+        </div>
+        <div className="m-hcard-vis">{vis ?? null}</div>
+      </div>
       {message ? <div className="m-hcard-msg">{message}</div> : null}
     </Link>
   );
@@ -80,7 +99,7 @@ export function MHomeCardEmpty({
       <div className="m-hcard-top">
         <span className="ov">{eyebrow}</span>
       </div>
-      <div className="m-hcard-slot" style={{ flexDirection: "column", gap: 10, margin: 0 }}>
+      <div className="m-hcard-body" style={{ flexDirection: "column", gap: 8, justifyContent: "center" }}>
         <span className="m-dic" aria-hidden>
           <MIcon name={icon} size={20} />
         </span>

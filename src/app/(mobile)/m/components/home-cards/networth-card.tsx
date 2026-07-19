@@ -1,5 +1,3 @@
-import { formatMoney } from "@/lib/format";
-
 import { MChip, mAmount } from "../content-kit";
 import { MHomeCard, MHomeCardEmpty } from "./card-shell";
 
@@ -64,18 +62,16 @@ export function NetWorthCard({
           </MChip>
         ) : undefined
       }
-      slot={
-        // Las tres cifras del mes, tal como estaban en el hero.
-        <span style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 8 }}>
-          <Mini label="Ingresos" value={mAmount(income, currency, 8)} cls="pos" />
-          <Mini label="Gastos" value={mAmount(expense, currency, 8)} cls="neg" />
-          <Mini label="Flujo" value={mAmount(flow, currency, 8)} cls={flow >= 0 ? "pos" : "neg"} />
-        </span>
-      }
+      sub={`Flujo del mes ${flow >= 0 ? "+" : "−"}${mAmount(Math.abs(flow), currency, 8)}`}
+      vis={<FlowBars income={income} expense={expense} />}
       message={
+        // No repite el patrimonio, que ya está arriba en grande: dice de dónde viene el
+        // movimiento del mes, que es lo que la cifra no cuenta.
         dir < 0
-          ? "Debes más de lo que tienes. Reducir pasivos es la prioridad."
-          : `Lo que tienes menos lo que debes, hoy: ${formatMoney(netWorth, currency)}.`
+          ? "Debes más de lo que tienes."
+          : flow >= 0
+            ? "Este mes ingresaste más de lo que gastaste."
+            : "Este mes gastaste más de lo que ingresaste."
       }
       href="/m/patrimonio"
       ariaLabel="Patrimonio neto. Ver patrimonio"
@@ -83,16 +79,38 @@ export function NetWorthCard({
   );
 }
 
-/** Cifra pequeña con su rótulo, para el pie de la tarjeta de patrimonio. */
-function Mini({ label, value, cls }: { label: string; value: string; cls: string }) {
+/**
+ * Visual de la tarjeta: ingresos vs gastos del mes como dos barras proporcionales.
+ *
+ * Existe por PARIDAD. Esta tarjeta no tenía nada en la zona del visual y por eso no se
+ * parecía a su hermana: dos tarjetas con el mismo chasis pero una con donut y otra con
+ * un hueco no se leen como un sistema. Y no cuesta ninguna llamada — son cifras que
+ * Inicio ya tenía.
+ *
+ * La escala es relativa al mayor de los dos, no a una suma: lo que se compara es cuál
+ * pesa más, y con una escala absoluta ambas barras se verían casi iguales.
+ */
+function FlowBars({ income, expense }: { income: number; expense: number }) {
+  const max = Math.max(income, expense, 1);
+  const alto = (v: number) => Math.max(4, Math.round((v / max) * 44));
   return (
-    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-      <span className="muted" style={{ fontSize: 10 }}>
-        {label}
-      </span>
-      <span className={`mono ${cls}`} style={{ fontSize: 12.5, fontWeight: 700 }}>
-        {value}
-      </span>
+    <span style={{ display: "flex", alignItems: "flex-end", gap: 7, height: 44 }} aria-hidden>
+      <span
+        style={{
+          width: 16,
+          height: alto(income),
+          borderRadius: 4,
+          background: "var(--accent)",
+        }}
+      />
+      <span
+        style={{
+          width: 16,
+          height: alto(expense),
+          borderRadius: 4,
+          background: "var(--danger)",
+        }}
+      />
     </span>
   );
 }
