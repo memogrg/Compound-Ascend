@@ -60,8 +60,8 @@ interface PreferencesPlugin {
 
 interface AppLifecyclePlugin {
   addListener(
-    event: "appStateChange",
-    listener: (state: { isActive: boolean }) => void,
+    event: "pause" | "resume",
+    listener: () => void,
   ): Promise<{ remove: () => Promise<void> }>;
 }
 
@@ -73,13 +73,70 @@ const Preferences = registerPlugin<PreferencesPlugin>("Preferences");
 const AppLifecycle = registerPlugin<AppLifecyclePlugin>("App");
 
 /**
- * Suscribe el cambio de estado de la app (foreground/background). Centraliza el acceso
- * al plugin App para que el overlay NO haga su propio dynamic import (que también colgaba).
+ * Ciclo de vida de la app. Centraliza el acceso al plugin App para que nadie haga su propio
+ * dynamic import del wrapper del paquete (eso colgaba el bridge y rompió la biometría).
+ *
+ * Aquí NO hay wrapper de `appStateChange` a propósito: sale de willResignActive, que dispara
+ * cualquier cosa que robe el foco un instante —el propio diálogo de Face ID, un banner, el
+ * Centro de Control, el App Switcher, la cámara—, así que usarlo para el candado hacía saltar
+ * la biometría sin que la app se hubiera ido a ningún lado. Si algún día hace falta observar
+ * el foco para otra cosa, añádelo entonces y con nombre explícito.
+ *
+ * La app se fue REALMENTE al fondo (iOS: didEnterBackground; Android: onPause del Activity).
  */
-export function onAppStateChange(
-  cb: (isActive: boolean) => void,
-): Promise<{ remove: () => Promise<void> }> {
-  return AppLifecycle.addListener("appStateChange", ({ isActive }) => cb(isActive));
+export function onAppPause(cb: () => void): Promise<{ remove: () => Promise<void> }> {
+  return AppLifecycle.addListener("pause", cb);
+}
+
+/** La app VUELVE del fondo de verdad (iOS: willEnterForeground; Android: onResume). */
+export function onAppResume(cb: () => void): Promise<{ remove: () => Promise<void> }> {
+  return AppLifecycle.addListener("resume", cb);
+}
+
+/**
+ * ¿Ya se desbloqueó en ESTA sesión de app?
+ *
+ * "Sesión" = mientras el WebView vive. Existe para separar dos cosas que el overlay
+ * confundía: que el componente se MONTE no significa que la app se ABRA. El overlay vive
+ * en el layout de /m/(app), y varias pantallas (asistente, perfil financiero, login…)
+ * están fuera de ese grupo de rutas: ir y volver desmonta y remonta el layout, y eso
+ * pedía biometría en cada viaje.
+ *
+ * sessionStorage es la primitiva correcta porque muere con el WebView: al matar la app y
+ * reabrirla arranca vacío, que es justo lo que queremos (arranque en frío → sí pide). El
+ * espejo en módulo cubre los WebViews que la tengan restringida; se pierde en una recarga
+ * dura, y ahí sessionStorage toma el relevo.
+ */
+const SESSION_UNLOCKED_KEY = "cartera:app-lock:session-unlocked";
+let sessionUnlockedMirror = false;
+
+export function isSessionUnlocked(): boolean {
+  if (sessionUnlockedMirror) return true;
+  try {
+    return window.sessionStorage.getItem(SESSION_UNLOCKED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Tras un desbloqueo correcto: navegar ya no vuelve a pedir biometría. */
+export function markSessionUnlocked(): void {
+  sessionUnlockedMirror = true;
+  try {
+    window.sessionStorage.setItem(SESSION_UNLOCKED_KEY, "1");
+  } catch {
+    /* el espejo en módulo basta */
+  }
+}
+
+/** La app se fue al fondo: la próxima entrada vuelve a exigir biometría. */
+export function clearSessionUnlocked(): void {
+  sessionUnlockedMirror = false;
+  try {
+    window.sessionStorage.removeItem(SESSION_UNLOCKED_KEY);
+  } catch {
+    /* el espejo en módulo basta */
+  }
 }
 
 /** Lee el flag persistido nativamente (false si no es la app nativa o falla). */
