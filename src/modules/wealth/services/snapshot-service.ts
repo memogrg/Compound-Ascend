@@ -225,3 +225,38 @@ function periodCutoff(period: SnapshotPeriod): string | null {
   }
   return d.toISOString().slice(0, 10);
 }
+
+/**
+ * Asegura el snapshot de HOY para el usuario en sesión. Best-effort e idempotente:
+ * se llama al cargar Patrimonio, igual que ensureMonthlyContributions() en Inversiones.
+ *
+ * Existe porque el gráfico del hero necesita ≥2 puntos y `portfolio_snapshots` estaba
+ * vacía: sin nadie que escribiera, la serie no arrancaba nunca. Con esto el historial
+ * empieza el día que abres la pantalla, no cuando alguien programe un cron.
+ *
+ * Recibe `netWorth` y `currency` en vez de recalcularlos: quien llama ya tiene el
+ * getRichLifeSummary() de la página y ninguno de los dos servicios usa React cache(),
+ * así que pedirlo otra vez duplicaría el trabajo más caro de la carga. Del portafolio
+ * sí se hace fetch, porque la página no lo tiene y escribir portfolio_value = 0 dejaría
+ * basura en la fila que luego lee Portafolio.
+ *
+ * NUNCA lanza: si algo falla la pantalla se pinta igual, solo se queda sin el punto de
+ * hoy. Por eso tampoco vive en refreshInsights() —el trabajo con efectos secundarios va
+ * en la carga de página, regla del repo—.
+ */
+export async function ensureTodaySnapshot(netWorth: number, currency: string): Promise<void> {
+  try {
+    const user = await requireUser();
+    const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
+    const report = await getPortfolioReport();
+    await generateAndSaveSnapshot(
+      user.id,
+      report.analytics.totalPortfolioValue,
+      report.analytics.totalCostBasis,
+      netWorth,
+      currency,
+    );
+  } catch (err) {
+    logger.warn("ensureTodaySnapshot: no se pudo guardar el snapshot de hoy", { err });
+  }
+}

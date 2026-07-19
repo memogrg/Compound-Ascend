@@ -1,5 +1,5 @@
 import { getRichLifeSummary } from "@/modules/rich-life";
-import { getSnapshotHistory } from "@/modules/wealth";
+import { getSnapshotHistory, ensureTodaySnapshot } from "@/modules/wealth";
 import { MobileHeader } from "../../components/mobile-header";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 import { formatMoney, formatCompact } from "@/lib/format";
@@ -31,8 +31,14 @@ export default async function MobilePatrimonio() {
   const ind = snapshot.indicators;
   const bd = computeWealthBreakdown(allAssets); // invertido / líquido / otros (o undefined)
 
+  // Deja registrado el punto de HOY antes de leer la serie (best-effort e idempotente, mismo
+  // patrón que ensureMonthlyContributions en Inversiones). Sin esto la tabla se quedaba vacía
+  // —no había nada que escribiera snapshots— y el gráfico no aparecía nunca. Si falla, la
+  // pantalla se pinta igual: solo se queda sin el punto de hoy.
+  await ensureTodaySnapshot(ind.netWorth, currency).catch(() => {});
+
   // Historia REAL de patrimonio neto (snapshots) para el gráfico con scrub. Sin datos inventados:
-  // si aún no hay ≥2 snapshots, el chart degrada a estático.
+  // si aún no hay ≥2 snapshots, se muestra un estado honesto en vez del gráfico.
   const snapshots = await getSnapshotHistory("all");
   const nwPoints: MPoint[] = snapshots.map((s) => ({
     label: new Date(`${s.date}T00:00:00`).toLocaleDateString("es-CR", { day: "numeric", month: "short" }),
@@ -79,8 +85,20 @@ export default async function MobilePatrimonio() {
               ? "Debes más de lo que tienes. Reducir pasivos es la prioridad."
               : `Lo que tienes (${formatMoney(ind.totalAssets, currency)}) menos lo que debes (${formatMoney(ind.totalLiabilities, currency)}).`
           }
+          // Con menos de 2 puntos no hay línea que dibujar, pero callar deja el hero con un
+          // hueco que parece un fallo de carga. Se dice lo que pasa —y que se arregla solo—
+          // en vez de inventar una serie de ejemplo.
           slot={
-            nwPoints.length >= 2 ? <MScrubChart points={nwPoints} currency={currency} /> : undefined
+            nwPoints.length >= 2 ? (
+              <MScrubChart points={nwPoints} currency={currency} />
+            ) : (
+              <div
+                className="muted"
+                style={{ fontSize: 12, lineHeight: 1.5, textAlign: "center", padding: "10px 0" }}
+              >
+                Tu historial de patrimonio empieza hoy: la línea aparecerá conforme pasen los días.
+              </div>
+            )
           }
           style={{ marginBottom: 16 }}
         />
