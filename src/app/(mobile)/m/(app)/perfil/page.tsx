@@ -18,6 +18,7 @@ import {
   MProgress,
 } from "../../components/content-kit";
 import { ConfiguracionManager } from "./configuracion-manager";
+import { BuildIdentity } from "./build-identity";
 
 /**
  * /m/perfil — identidad + ajustes agrupados (plan, moneda, WhatsApp, hogar, cuenta).
@@ -143,6 +144,9 @@ export default async function MobilePerfil() {
             Cerrar sesión
           </button>
         </form>
+
+        {/* Identidad del build: en dos segundos sabes si esto es producción o un build raro. */}
+        <BuildIdentity />
       </div>
     </div>
   );

@@ -1,28 +1,41 @@
 # CARTERA+ · mobile-shell (Capacitor)
 
-Shell de [Capacitor](https://capacitorjs.com/) que empaqueta el **diseño móvil estático** de
-CARTERA+ como app nativa **Android** e **iOS**, en modo **BUNDLED** (la web viaja dentro del
-binario; no apunta a ningún servidor). Está **aislado** del build de Next.js del repo: tiene su
-propio `package.json` y no depende de `src/`.
+Shell de [Capacitor](https://capacitorjs.com/) que empaqueta CARTERA+ como app nativa
+**Android** e **iOS**. La app **carga la web real desde el servidor**; el shell solo aporta el
+contenedor nativo, los plugins y los assets de marca. Está **aislado** del build de Next.js del
+repo: tiene su propio `package.json` y no depende de `src/`.
 
 - **appId:** `com.compoundascend.cartera` · **appName:** `CARTERA+` · **webDir:** `www/`
-- La app es `www/index.html` (copia de `design-movil/project/CARTERA Movil.html`, autocontenida:
-  CSS/JS/SVG inline + Google Fonts). `www/mobile/` y `www/assets/` son páginas y estilos de apoyo.
 
-## Actualizar el contenido web
+## De dónde carga la app
 
-Editá lo que haya en `www/` y luego propagá a los proyectos nativos:
+Se decide al correr `cap sync`/`cap copy`, que evalúan `capacitor.config.ts`:
+
+| Variables | Carga |
+|---|---|
+| *(ninguna)* | `https://carteraplus.vercel.app/m` — **producción, el default** |
+| `CAP_SERVER_URL=<url>` | esa URL (dev con live-reload contra tu Next.js en la LAN) |
+| `CAP_BUNDLED=1` | el contenido de `www/`, solo si se pide explícitamente |
+
+**El default es producción a propósito.** Antes el default era el modo bundled y `www/`
+contenía el prototipo estático de diseño: quien olvidara exportar `CAP_SERVER_URL` compilaba
+un binario que abría una cuenta ficticia con datos verosímiles, sin ningún aviso. Ahora
+olvidar la variable produce el comportamiento correcto, y `www/` es solo una **página de
+diagnóstico** que dice claramente que la app está mal configurada — imposible de confundir
+con la app real.
+
+El prototipo de diseño se conserva en **`design-prototipo/`** como referencia; ya no viaja
+dentro del binario.
+
+## Propagar cambios a los proyectos nativos
 
 ```bash
-npm run sync          # cap sync  (copia www + actualiza plugins, ambas plataformas)
-# o solo copiar la web, sin tocar dependencias nativas:
-npm run copy
+npm run sync          # cap sync  (copia web + actualiza plugins, ambas plataformas)
+npm run copy          # solo copiar la web, sin tocar dependencias nativas
+npm run pods          # reinstalar Pods de iOS (fuerza locale UTF-8; ver nota en package.json)
 ```
 
 ## Modo HÍBRIDO / remote URL (probar contra el Next.js real)
-
-`capacitor.config.ts` es dual: si defines la variable `CAP_SERVER_URL` al correr `cap sync`,
-la app **carga esa URL** en vez del `www/` empaquetado. Si no la defines, sigue en **bundled**.
 
 **DEV — live-reload contra tu Next.js local (Android, gratis):**
 
@@ -84,6 +97,5 @@ poné un `assets/icon.png` (1024×1024) y `assets/splash.png` (2732×2732) y cor
 
 - **Capacitor 7.6.7** (no 8.x): el CLI de Capacitor 8 exige Node ≥ 22 y este entorno usa Node 20.
   Capacitor 7 empaqueta Android/iOS igual. Al pasar a Node 22 se puede subir a Capacitor 8.
-- Tema: el `<meta name="theme-color">` y el `backgroundColor` de `capacitor.config.ts` usan
-  `#15140F` (canvas oscuro del diseño). El diseño arranca en tema **claro** por defecto
-  (`data-theme="light"`); si preferís que abra en oscuro, cambialo en `www/index.html`.
+- Tema: el `backgroundColor` de `capacitor.config.ts` usa el canvas claro (`#F1EFE8`), que es
+  el fondo detrás del WebView. El tema de la app lo decide la web servida, no el shell.
