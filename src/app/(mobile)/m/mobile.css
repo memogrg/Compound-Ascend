@@ -2707,3 +2707,177 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-empty-a {
   margin-top: 16px;
 }
+
+/* ============================================================================
+   CARRUSEL DE INICIO — tarjetas financieras deslizables
+   Sustituye al hero de patrimonio. La mecánica es scroll nativo con scroll-snap,
+   NO una librería: es lo único que da la inercia y el frenado de iOS sin pelear
+   con el navegador.
+   ========================================================================== */
+
+/* La pista. El padding lateral iguala el de .m-pad para que la tarjeta centrada
+   quede alineada con el resto del contenido, y el scroll-padding hace que el snap
+   respete ese margen (sin él, la primera tarjeta se pega al borde). */
+.m-shell .m-carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 20px;
+  padding-inline: 20px;
+  /* Sitio para la sombra de las tarjetas: sin esto el overflow la recorta. */
+  padding-block: 4px 10px;
+  /* Que arrastrar el carrusel no arrastre la navegación de la página ni dispare
+     el "atrás" por gesto en iOS. */
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.m-shell .m-carousel::-webkit-scrollbar {
+  display: none;
+}
+/* El carrusel se sale del .m-pad para poder sangrar a los bordes de la pantalla:
+   una tarjeta cortada en el borde es la afordancia de que hay más. */
+.m-shell .m-carousel-wrap {
+  margin-inline: -20px;
+}
+
+/* ---- chasis de tarjeta: idéntico en las 7 ---- */
+.m-shell .m-hcard {
+  /* Ancho: deja asomar la siguiente tarjeta ~28px, que es la pista visual de que
+     el carrusel se desliza. A 320px sigue siendo cómoda. */
+  flex: 0 0 calc(100vw - 68px);
+  max-width: 340px;
+  /* ALTURA FIJA, no min-height: ninguna tarjeta puede crecer con su contenido o el
+     carrusel daría saltos al deslizar. Las 7 comparten este número.
+     240 no es arbitrario: es lo que suman las partes con el visual más grande que
+     admitimos (medidor de 84px). Medido, el reparto es
+       top 25 + cifra 28 + subtexto 18 + mensaje 32 + padding 32 = 135
+     y quedan 91 para el slot. Con 216 el slot recibía 56 y el medidor se comía el
+     subtexto: la altura la manda el contenido más alto, no un número redondo. */
+  height: 240px;
+  scroll-snap-align: center;
+  scroll-snap-stop: always; /* nunca se salta una tarjeta de un gesto rápido */
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 16px 18px;
+  border-radius: 24px;
+  text-decoration: none;
+  color: var(--text);
+  /* "Cristal muy sutil": profundidad, no vidrio. Superficie casi opaca sobre el
+     lienzo + luz superior tenue + borde apenas perceptible. NO backdrop-filter: el
+     texto va sobre una superficie sólida para no perder contraste (regla 1.3 del
+     documento: si la translucidez baja de AA, gana la legibilidad). */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, #fff) 0%, var(--surface) 46%);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  box-shadow: var(--e-raised);
+}
+.m-shell a.m-hcard:active {
+  opacity: 0.9;
+}
+.m-shell .m-hcard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* La fila superior NO puede crecer: si el eyebrow envuelve a dos líneas le roba 16px
+   al slot y el visual se sale de la tarjeta (medido a 320px, donde "Presupuesto del
+   mes" + su chip no caben). La altura fija de la tarjeta solo se sostiene si cada
+   parte tiene altura estable, así que el eyebrow trunca y el chip nunca se encoge. */
+.m-shell .m-hcard-top .ov {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-shell .m-hcard-top > :not(.ov) {
+  flex: none;
+}
+.m-shell .m-hcard-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 25px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-shell .m-hcard-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* El visual crece para ocupar lo que sobra, así el mensaje queda siempre pegado
+   abajo y las 7 tarjetas alinean su última línea. */
+.m-shell .m-hcard-slot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 6px;
+}
+.m-shell .m-hcard-msg {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  /* Dos líneas como máximo: una frase más larga rompería la altura fija. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---- indicador: puntos + nombre de la tarjeta ACTIVA (no las 7) ---- */
+.m-shell .m-carousel-ind {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.m-shell .m-carousel-dots {
+  display: flex;
+  gap: 5px;
+}
+.m-shell .m-carousel-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background 0.18s ease, width 0.18s ease;
+}
+.m-shell .m-carousel-dot.on {
+  width: 16px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+/* Solo para lectores de pantalla. Existe en globals.css (web) pero NO estaba en el
+   shell móvil, y el indicador del carrusel necesita anunciar "3 de 7" sin pintarlo. */
+.m-shell .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.m-shell .m-carousel-name {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
