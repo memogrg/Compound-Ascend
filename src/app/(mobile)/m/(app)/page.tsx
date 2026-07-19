@@ -2,6 +2,11 @@ import Link from "next/link";
 import { getUser } from "@/lib/auth/session";
 import { getDashboardData } from "@/modules/dashboard";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
+import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
+import { monthPeriod } from "@/modules/financial-base/engine/period";
+import { MHomeCarousel } from "../components/home-carousel";
+import { BudgetCard } from "../components/home-cards/budget-card";
+import { NetWorthCard } from "../components/home-cards/networth-card";
 import { formatMoney } from "@/lib/format";
 import { MobileHeader } from "../components/mobile-header";
 
@@ -84,6 +89,13 @@ export default async function MobileHome() {
     ? ([] as Transaction[])
     : await listTransactions(recentPeriod(now), {}, 6).catch(() => [] as Transaction[]);
 
+  // Presupuesto del mes para la primera tarjeta. Es el agregador más barato de los
+  // siete (cero llamadas de red) y va en paralelo con los movimientos, así que no
+  // añade latencia a la carga: el arranque sigue costando lo que costaba.
+  const expenseView = preview
+    ? null
+    : await getExpenseRangeView("1m", monthPeriod(now.getFullYear(), now.getMonth() + 1)).catch(() => null);
+
   const { currency, panel, insights } = data;
   const ind = data.summary.indicators;
   const norte = panel.norte;
@@ -115,64 +127,47 @@ export default async function MobileHome() {
         {/* Header sticky de cristal unificado (variant home): logo + saludo + chat/campana/menú. */}
         <MobileHeader variant="home" greeting={greeting(now)} name={data.name} />
 
-        {/* Hero: patrimonio neto + mini-tendencia del mes */}
-        <Link href="/m/patrimonio" className="wgt-nw" style={{ marginBottom: 14 }}>
-          <div className="between">
-            <span className="wlabel">Patrimonio neto</span>
-            {norte.velocity != null && (
-              <span className={`wchip ${norte.velocity >= 0 ? "pos" : "neg"}`}>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={3}
-                  style={{ width: 11, height: 11 }}
-                >
-                  {norte.velocity >= 0 ? (
-                    <path d="M6 15l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-                  ) : (
-                    <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                  )}
-                </svg>
-                {formatMoney(norte.velocity, currency)}
-              </span>
-            )}
-          </div>
-          <div className="hero-amt">
-            {norte.netWorth != null ? formatMoney(norte.netWorth, currency) : "—"}
-          </div>
-          <div className="row" style={{ marginTop: 13, gap: 16 }}>
-            <MiniStat label="Ingresos" value={formatMoney(ind.incomeMonthly, currency)} cls="pos" />
-            <span className="hero-divider" />
-            <MiniStat label="Gastos" value={formatMoney(ind.expenseMonthly, currency)} cls="neg" />
-            <span className="hero-divider" />
-            <MiniStat
-              label="Flujo"
-              value={formatMoney(ind.freeCashflow, currency)}
-              cls={ind.freeCashflow >= 0 ? "pos" : "neg"}
-            />
-          </div>
-          {/* mini-tendencia decorativa (la serie real llega en un delta posterior) */}
-          <svg viewBox="0 0 320 54" preserveAspectRatio="none" className="spark" aria-hidden>
-            <defs>
-              <linearGradient id="m-hg" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0" stopColor="var(--accent)" stopOpacity="0.28" />
-                <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0,44 C40,40 60,36 90,30 C130,22 150,26 190,18 C230,12 260,14 320,4"
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth={2.4}
-              strokeLinecap="round"
-            />
-            <path
-              d="M0,44 C40,40 60,36 90,30 C130,22 150,26 190,18 C230,12 260,14 320,4 L320,54 L0,54 Z"
-              fill="url(#m-hg)"
-            />
-          </svg>
-        </Link>
+        {/* Carrusel de tarjetas financieras (sustituye al hero de patrimonio).
+            El carrusel entero va DENTRO de .m-pad pero su pista sangra a los bordes
+            (.m-carousel-wrap) para que la tarjeta siguiente asome: esa es la
+            afordancia de que se desliza.
+
+            En esta fase hay dos tarjetas, y ninguna añade una llamada: Presupuesto usa
+            getExpenseRangeView (solo BD, el agregador más barato de los siete) y
+            Patrimonio reusa los datos que Inicio ya cargaba para el hero. Las otras
+            cinco entran en la Fase 2 envueltas cada una en su <Suspense>, para que la
+            cara —getPortfolioReport, con precios en vivo y timeout de 3 s por
+            proveedor— degrade SU tarjeta y no el arranque de la app. */}
+        <div style={{ marginBottom: 14 }}>
+          <MHomeCarousel
+            cards={[
+              {
+                name: "Presupuesto",
+                node: (
+                  <BudgetCard
+                    budget={expenseView?.budgetExpense ?? 0}
+                    spent={expenseView?.realExpense ?? 0}
+                    currency={currency}
+                    now={now}
+                  />
+                ),
+              },
+              {
+                name: "Patrimonio",
+                node: (
+                  <NetWorthCard
+                    netWorth={norte.netWorth}
+                    velocity={norte.velocity}
+                    income={ind.incomeMonthly}
+                    expense={ind.expenseMonthly}
+                    flow={ind.freeCashflow}
+                    currency={currency}
+                  />
+                ),
+              },
+            ]}
+          />
+        </div>
 
         {/* Accesos rápidos: los 4 pilares reales, enlazados a su pantalla móvil (/m/*). */}
         <div className="action-strip" style={{ marginBottom: 16 }}>
@@ -250,18 +245,6 @@ export default async function MobileHome() {
   );
 }
 
-function MiniStat({ label, value, cls }: { label: string; value: string; cls?: string }) {
-  return (
-    <div>
-      <div className="muted" style={{ fontSize: 11 }}>
-        {label}
-      </div>
-      <div className={`mono ${cls ?? ""}`} style={{ fontSize: 13.5, marginTop: 2 }}>
-        {value}
-      </div>
-    </div>
-  );
-}
 
 function MovementRow({ t, now }: { t: Transaction; now: Date }) {
   const income = t.kind === "ingreso";
