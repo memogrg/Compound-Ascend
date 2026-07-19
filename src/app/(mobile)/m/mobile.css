@@ -22,6 +22,13 @@
   --r-xl: 26px;
   --r-pill: 999px;
 
+  /* Geometría del botón flotante. Vive aquí, y no dentro de .m-fab, porque el scroller
+     necesita leerla para reservarle sitio (.m-scroll:has(.m-fab)): si el FAB cambia de
+     tamaño o de separación, el hueco lo sigue solo. Definirlas por separado en cada regla
+     es justo cómo el FAB acabó tapando controles. */
+  --fab-size: 56px;
+  --fab-gap: 84px; /* separación al borde inferior: deja libre la tab bar */
+
   /* ===== tema CLARO = DEFAULT (data-theme="light" del diseño) ===== */
   --canvas: #f1efe8;
   --surface: #ffffff;
@@ -194,6 +201,19 @@ body:has(.m-shell[data-theme="dark"]) {
    aire arriba, nunca contenido bajo el reloj). */
 .m-scroll:has(.m-topbar) {
   padding-top: 0;
+}
+/* Pantallas CON botón flotante: el aire de la tab bar (--fab-gap) no basta, porque el FAB
+   se apoya justo encima y ocupa otros 56px. Sin esto, el último elemento de la lista queda
+   debajo del botón —y no solo tapado: intocable— en Ahorro ("Gastar"), Transacciones
+   ("Clasificar"), Deudas ("Próximo pago"), Portafolio, Patrimonio e Ingresos ("Recibido").
+   Se resuelve con :has() y no clase por clase a propósito: así una pantalla nueva que monte
+   un FAB reserva el hueco sola, sin que nadie tenga que acordarse. El +16px es el respiro
+   entre el último control y el botón. Si :has() no estuviera soportado se cae al inset de
+   .m-scroll, que es el comportamiento de hoy: no empeora nada. */
+.m-scroll:has(.m-fab) {
+  padding-bottom: calc(
+    var(--fab-gap) + var(--fab-size) + 16px + env(safe-area-inset-bottom)
+  );
 }
 .m-pad {
   padding: 0 20px;
@@ -882,6 +902,21 @@ body:has(.m-shell[data-theme="dark"]) {
   display: grid;
   place-items: center;
   text-align: center;
+}
+/* El agujero del anillo mide MUY poco: el SVG es de 112px con viewBox 42 (escala 2,667) y
+   el radio interior es (15.915 − trazo/2) × 2,667 → 35,8px con el trazo normal y 33,1px
+   cuando hay un segmento seleccionado (el trazo engorda a 7). A la altura donde cae el
+   texto, el ancho útil es de solo ~63px. Medido con las fuentes reales, "₡347,6 M" a 15px
+   ocupaba 73px: por eso invadía el aro incluso en reposo. Esta caja lo acota al hueco de
+   verdad, y la elipsis es la última red —nunca debería llegar a usarse con los tamaños de
+   abajo—. */
+.m-shell .ring-center > div {
+  max-width: 63px;
+}
+.m-shell .ring-center > div > div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* barras de progreso */
@@ -2247,10 +2282,10 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-fab {
   position: fixed;
   right: 18px;
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: calc(var(--fab-gap) + env(safe-area-inset-bottom));
   z-index: 50;
-  width: 56px;
-  height: 56px;
+  width: var(--fab-size);
+  height: var(--fab-size);
   border-radius: 18px;
   border: 0;
   background: var(--accent);

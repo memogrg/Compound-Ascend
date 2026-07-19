@@ -39,15 +39,23 @@ export function MDonut({
 
   const toggle = (i: number) => setSel((prev) => (prev === i ? null : i));
 
+  // Reparto del texto, decidido midiendo: dentro del aro solo cabe algo muy corto, así que
+  // el centro es el LECTOR DE LA SELECCIÓN (el % del segmento tocado, vacío en reposo) y el
+  // pie de debajo dice siempre cuánto y de qué. "100% · Uso personal" medía 85px contra los
+  // ~62 del hueco: no era cuestión de encoger la fuente, no cabía.
   const selected = sel != null ? slices[sel] : undefined;
   const centerBig = selected ? formatCompact(selected.value, currency) : centerValue;
-  const centerSmall = selected
-    ? `${Math.round((selected.value / total) * 100)}% · ${selected.label}`
-    : centerLabel;
+  const centerSmall = selected ? `${Math.round((selected.value / total) * 100)}%` : "";
 
   return (
     <div className="card card-p">
       <div className="row" style={{ gap: 20 }}>
+        {/* El valor va DEBAJO del anillo, no dentro. El agujero da ~63px de ancho útil y
+            "₡347,6 M" mide 73px a 15px: aun bajándolo hasta que "cupiera", el screenshot
+            mostraba el número pegado al aro. El hueco es sencillamente pequeño para un
+            importe, así que dentro queda solo el dato corto (el %, o la etiqueta en reposo)
+            y la cifra respira aquí abajo, donde además puede leerse a un tamaño decente. */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
         <div className="ring-wrap">
           <svg width="112" height="112" viewBox="0 0 42 42">
             <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" strokeWidth={5} />
@@ -74,16 +82,25 @@ export function MDonut({
               );
             })}
           </svg>
+          {/* Dentro del aro, solo el dato corto: el % del segmento tocado, o la etiqueta
+              del total en reposo ("activos"). Ambos rondan los 25-31px y sobra sitio. */}
           <div className="ring-center" style={{ pointerEvents: "none" }}>
-            <div>
-              <div className="display" style={{ fontSize: 15 }}>
-                {centerBig}
-              </div>
-              <div className="muted" style={{ fontSize: 9 }}>
-                {centerSmall}
-              </div>
+            <div className="display" style={{ fontSize: 13 }}>
+              {centerSmall}
             </div>
           </div>
+        </div>
+
+        {/* Pie del anillo: la cifra y, si hay segmento tocado, de qué es. Aquí no hay
+            restricción de ancho, así que la etiqueta larga ("Uso personal") se lee entera. */}
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>
+            {centerBig}
+          </div>
+          <div className="muted" style={{ fontSize: 10.5, marginTop: 1 }}>
+            {selected ? selected.label : centerLabel}
+          </div>
+        </div>
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
           {slices.map((s, i) => {
