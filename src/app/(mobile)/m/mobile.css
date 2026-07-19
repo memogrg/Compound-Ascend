@@ -54,6 +54,11 @@
   --s3: #c34f4b;
   --s4: #6b8a5f;
   --s5: #43a064;
+  /* Neutro CÁLIDO de series. Existe porque --s3 es byte a byte igual que --danger, y en un
+     anillo de composición de activos eso pintaba una clase entera del color de "pérdida":
+     un carro de uso personal no es un error. Aquí el color solo separa porciones, no juzga.
+     Taupe de la familia de --text-muted, así que convive con los verdes sin competir. */
+  --s-neutral: #8a7d69;
   --accent-soft: rgba(55, 132, 81, 0.12);
   --danger-soft: rgba(195, 79, 75, 0.12);
   --warning-soft: rgba(176, 122, 46, 0.12);
@@ -140,6 +145,7 @@
   --s3: #d46b62;
   --s4: #3c5a3f;
   --s5: #43a064;
+  --s-neutral: #9c9280;
   --accent-soft: rgba(81, 175, 111, 0.14);
   --danger-soft: rgba(212, 107, 98, 0.16);
   --warning-soft: rgba(217, 168, 90, 0.16);

@@ -55,12 +55,20 @@ const M_ROUTE: Record<string, string> = {
   inversiones: "/m/inversiones",
 };
 
-/** Labels canónicos (nav.ts) para los accesos rápidos: el pilar "flujo" es Gastos, etc. */
+/**
+ * Etiquetas de los accesos rápidos. Son CORTAS a propósito, y solo aquí: "Deudas y
+ * Préstamos" y "Portafolio de inversiones" envuelven a dos y tres líneas en una fila de
+ * cuatro, y desequilibran la cuadrícula. El destino es el mismo, y al llegar la pantalla
+ * se presenta con su nombre completo.
+ *
+ * NO toques nav.ts por esto: los títulos de pantalla y el menú siguen con los nombres
+ * canónicos. Lo que se acorta es el atajo, no la sección.
+ */
 const M_LABEL: Record<string, string> = {
   flujo: "Gastos",
   ahorro: "Ahorro",
-  deudas: "Deudas y Préstamos",
-  inversiones: "Portafolio de inversiones",
+  deudas: "Deudas",
+  inversiones: "Portafolio",
 };
 
 export default async function MobileHome() {

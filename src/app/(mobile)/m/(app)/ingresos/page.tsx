@@ -130,7 +130,14 @@ export default async function MobileIngresos() {
             value={mAmount(passiveIncome, currency, 8)}
             sub={realIncome > 0 ? `${formatPercent(passivePct)} del recibido` : "sin ingresos aún"}
           />
-          <MMetricCard label="Fuentes" value={String(totalSources)} sub="este mes" />
+          {/* La métrica cuenta manuales + vinculadas; la lista de abajo solo muestra las
+              manuales, así que sin decirlo parecía que la app se contradecía ("Fuentes 4"
+              sobre "3 fuentes"). El sub explica de qué se compone el número. */}
+          <MMetricCard
+            label="Fuentes"
+            value={String(totalSources)}
+            sub={linkedSources.length > 0 ? `${manualSources.length} manuales + ${linkedSources.length} vinculadas` : "este mes"}
+          />
         </MMetricGrid>
 
         {/* Fuentes gestionables (V2: budget_items + movimiento real "Recibido") */}

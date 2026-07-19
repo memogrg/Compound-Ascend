@@ -627,7 +627,7 @@ export function GastosManager({
           <div style={{ display: "grid", gap: 10 }}>
             <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
               Estas líneas suman en tu presupuesto pero su categoría ya no se muestra (se ocultó o
-              se borró). Reasignalas para que vuelvan a su frasco: el total no cambia, solo se
+              se borró). Reasígnalas para que vuelvan a su frasco: el total no cambia, solo se
               mueve de lugar.
             </div>
             {orphanJar.items.length > 0 ? (
@@ -650,7 +650,7 @@ export function GastosManager({
                   Gasto real sin frasco
                 </div>
                 <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
-                  Estos gastos ya ocurrieron y suman en «Gastado». Recategorizalos para que
+                  Estos gastos ya ocurrieron y suman en «Gastado». Recategorízalos para que
                   vuelvan a su frasco.
                 </div>
                 {orphanJar.realItems.map((line) => (

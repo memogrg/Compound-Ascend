@@ -190,7 +190,10 @@ export function AppLockOverlay() {
           CARTERA<span className="m-lock-plus">+</span>
         </div>
         <div className="m-lock-sub">
-          {prompting ? "Verificando…" : failed ? "No pudimos verificarte." : "Toca para desbloquear"}
+          {/* El botón ya dice "Verificando…" mientras corre; repetirlo aquí llenaba la
+              pantalla de la misma palabra dos veces. El subtítulo dice qué hacer, no en
+              qué estado está. */}
+          {failed ? "No pudimos verificarte." : "Toca para desbloquear"}
         </div>
       </div>
 

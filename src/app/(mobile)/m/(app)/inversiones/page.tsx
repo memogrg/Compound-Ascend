@@ -23,7 +23,9 @@ import { InversionesManager } from "./inversiones-manager";
  */
 export const dynamic = "force-dynamic"; // datos por sesión + precios en vivo
 
-const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
+// El anillo de composición NO usa --s3: es el mismo rojo que --danger, y aquí las
+// porciones son clases de activo, no pérdidas. Va el neutro cálido de series.
+const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s-neutral)", "var(--s4)", "var(--s5)"];
 
 export default async function MobileInversiones() {
   // Brecha DCA: registra el aporte del mes de los holdings recurrentes (best-effort,
