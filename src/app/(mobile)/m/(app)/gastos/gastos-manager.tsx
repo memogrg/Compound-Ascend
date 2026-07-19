@@ -563,7 +563,7 @@ export function GastosManager({
                 </button>
                 <button
                   type="button"
-                  className="m-btn m-btn-block m-btn-danger"
+                  className="m-btn m-btn-block m-btn-quiet-danger"
                   onClick={() => {
                     setReassignTo("");
                     setDeletingSobre(m);
@@ -773,6 +773,7 @@ function OrphanLineRow({
   const [categoryId, setCategoryId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const run = async (fn: () => Promise<{ ok: boolean; message?: string }>, okMsg: string) => {
     setPending(true);
@@ -807,9 +808,11 @@ function OrphanLineRow({
         sheetTitle={real ? "Recategorizar gasto a" : "Reasignar línea a"}
       />
       <div className="row" style={{ gap: 8 }}>
+        {/* La acción SEGURA es la primaria. Antes reasignar era un botón plano y eliminar
+            iba en rojo relleno: la destructiva dominaba en cada línea de la lista. */}
         <button
           type="button"
-          className="m-btn m-btn-block"
+          className="m-btn m-btn-block m-btn-primary"
           disabled={pending || !categoryId}
           onClick={() =>
             void run(
@@ -831,16 +834,30 @@ function OrphanLineRow({
         {real ? null : (
           <button
             type="button"
-            className="m-btn m-btn-block m-btn-danger"
+            className="m-btn m-btn-block m-btn-quiet-danger"
             disabled={pending}
-            onClick={() =>
-              void run(() => removeBudgetItemAction(line.id), "Línea eliminada del presupuesto")
-            }
+            onClick={() => setConfirmingRemove(true)}
           >
             Eliminar
           </button>
         )}
       </div>
+      {/* Eliminar una línea del presupuesto es irreversible y antes se ejecutaba al primer
+          toque, sin red. Ahora pasa por el ConfirmDialog del form-kit, como el resto de
+          borrados de la app. */}
+      <ConfirmDialog
+        open={confirmingRemove}
+        title="¿Eliminar esta línea?"
+        message={`Se quitará "${line.name}" de tu presupuesto. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="danger"
+        pending={pending}
+        onConfirm={() => {
+          setConfirmingRemove(false);
+          void run(() => removeBudgetItemAction(line.id), "Línea eliminada del presupuesto");
+        }}
+        onCancel={() => setConfirmingRemove(false)}
+      />
       {error ? (
         <div className="muted" style={{ fontSize: 12, color: "var(--m-danger)" }} role="alert">
           {error}

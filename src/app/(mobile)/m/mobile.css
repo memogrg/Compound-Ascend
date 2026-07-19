@@ -2269,9 +2269,29 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* botones destructivos/advertencia (reutilizables) */
+/* Destructiva de ALTO énfasis. Reservada para cuando destruir ES la acción principal de
+   su contexto: el botón de confirmar de un ConfirmDialog, una hoja dedicada a borrar, o la
+   zona de peligro. Si convive con una acción constructiva, usa .m-btn-quiet-danger. */
 .m-shell .m-btn-danger {
   background: var(--danger);
   color: #fff;
+}
+/* Destructiva de BAJO énfasis: se lee como peligro pero no compite. Existe porque el
+   tratamiento estaba invertido en 7 sitios —"Eliminar" en rojo relleno junto a un
+   "Editar"/"Reasignar" plano—, de modo que la acción segura parecía deshabilitada y la
+   irreversible dominaba. En una app de dinero eso es justo al revés de lo que conviene. */
+.m-shell .m-btn-quiet-danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--border);
+}
+/* Terciaria neutra, sin relleno ni marco. Estaba EN USO en cuatro sitios pero nunca llegó
+   a definirse, así que caía a .m-btn pelado: de ahí que "Remover frasco" se viera
+   descolorido y sin afordancia de botón. */
+.m-shell .m-btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: transparent;
 }
 .m-shell .m-btn-warning {
   background: var(--warning);

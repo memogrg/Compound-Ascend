@@ -173,7 +173,20 @@ export function SheetSelect({
   sheetTitle?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const selected = options.find((o) => o.value === value);
+
+  // El buscador aparece solo cuando la lista es larga: en un selector de 6 monedas sería
+  // ruido, pero el de categorías pasa de 100 opciones y encontrar "Farmacia" a fuerza de
+  // scroll es la peor parte de esa hoja.
+  const withSearch = options.length >= SEARCH_MIN_OPTIONS;
+  const shown = withSearch && query.trim() ? options.filter((o) => matches(o.label, query)) : options;
+
+  const close = () => {
+    setOpen(false);
+    setQuery(""); // la próxima apertura empieza limpia
+  };
+
   return (
     <Field name={name} label={label}>
       <button type="button" className="m-inp m-sheetselect" onClick={() => setOpen(true)}>
@@ -182,25 +195,67 @@ export function SheetSelect({
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
-      <BottomSheet open={open} onClose={() => setOpen(false)} title={sheetTitle ?? label}>
+      <BottomSheet open={open} onClose={close} title={sheetTitle ?? label}>
+        {withSearch ? (
+          <input
+            className="m-inp"
+            type="search"
+            inputMode="search"
+            value={query}
+            placeholder="Buscar…"
+            aria-label="Buscar en la lista"
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ marginBottom: 10 }}
+          />
+        ) : null}
         <div className="m-optlist">
-          {options.map((o) => (
+          {shown.map((o) => (
             <button
               key={o.value}
               type="button"
               className={`m-opt${value === o.value ? " sel" : ""}`}
               onClick={() => {
                 onChange(o.value);
-                setOpen(false);
+                close();
               }}
             >
               <span className="m-opt-t">{o.label}</span>
             </button>
           ))}
+          {shown.length === 0 ? (
+            <div className="muted" style={{ fontSize: 13.5, padding: "14px 2px" }}>
+              Nada coincide con “{query.trim()}”.
+            </div>
+          ) : null}
         </div>
       </BottomSheet>
     </Field>
   );
+}
+
+/** A partir de cuántas opciones vale la pena ofrecer búsqueda. */
+const SEARCH_MIN_OPTIONS = 12;
+
+/**
+ * Coincidencia sin acentos ni mayúsculas: en español es lo único que sirve. Quien busca
+ * "alimentacion" o "credito" espera encontrar "Alimentación" y "Crédito" — obligar a
+ * teclear la tilde en un móvil es obligar a no usar el buscador. Las etiquetas de
+ * categoría llegan como "Frasco · Sobre", así que escribir el frasco filtra sus sobres.
+ */
+function fold(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+/** Todas las palabras del término deben aparecer (permite "alim super"). */
+function matches(label: string, query: string): boolean {
+  const hay = fold(label);
+  return fold(query)
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((term) => hay.includes(term));
 }
 
 /** Toggle sí/no (switch para booleanos). */

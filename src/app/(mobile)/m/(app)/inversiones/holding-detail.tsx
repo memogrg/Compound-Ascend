@@ -739,7 +739,7 @@ export function HoldingDetailSheet({
               </button>
               <button
                 type="button"
-                className="m-btn m-btn-block m-btn-danger"
+                className="m-btn m-btn-block m-btn-quiet-danger"
                 disabled={pending}
                 onClick={onDelete}
               >

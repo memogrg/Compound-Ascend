@@ -1,6 +1,6 @@
 /**
  * Destinos de categoría para selectores de reasignación: cada grupo de Nivel 1
- * con su opción "{Grupo} (general)" seguida de sus hojas.
+ * con su opción "sin sobre específico" seguida de sus hojas.
  *
  * Vive en el engine (puro, sin `server-only`) porque lo consumen tanto la web
  * como el cliente móvil. Deliberadamente NO se reutiliza
@@ -23,7 +23,15 @@ export function buildCategoryOptionGroups(categories: Category[]): CategoryOptio
     .map((g) => ({
       groupName: g.name,
       options: [
-        { id: g.id, name: `${g.name} (general)` },
+        // "Sin sobre específico", NO "{Grupo} (general)". Esta opción categoriza en el
+        // FRASCO (su id es el del grupo), y llamarla con el nombre del grupo producía
+        // pares indistinguibles cuando existe además una hoja legada homónima:
+        // "Vivienda · Vivienda (general)" junto a "Vivienda · Vivienda" (la hoja real
+        // key='vivienda', preservada de la taxonomía antigua). Colisiona en Vivienda,
+        // Transporte, Alimentación y Educación. Nombrarla por lo que HACE en vez de
+        // repetir el nombre del frasco desambigua sin tocar datos, y además explica la
+        // opción: "(general)" no decía nada.
+        { id: g.id, name: "Sin sobre específico" },
         ...usable
           .filter((c) => c.parentId === g.id)
           .sort((a, b) => a.sortOrder - b.sortOrder)
