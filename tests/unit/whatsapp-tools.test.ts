@@ -22,6 +22,13 @@ const { debtRows, PRIMARY } = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@/lib/household/active", () => ({
+  // Modo solo: householdMemberIds degrada a [userId], asi estos tests
+  // conservan exactamente la semantica que tenian antes del alcance de hogar.
+  householdMemberIds: async (_c: unknown, uid: string) => [uid],
+  getActiveHouseholdId: async () => null,
+  isActiveHouseholdEditor: async () => true,
+}));
 vi.mock("@/lib/market-data/fx-rates", () => ({
   getFxRates: async () => ({ USD: 1, CRC: 500 }), // 1 USD = 500 CRC
 }));
@@ -33,6 +40,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
         const q = {
           select: () => q,
           eq: () => q,
+          in: () => q,
           maybeSingle: async () => ({ data: { primary_currency: PRIMARY }, error: null }),
         };
         return q;
@@ -40,6 +48,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
       const q = {
         select: () => q,
         eq: () => q,
+        in: () => q,
         then: (resolve: (v: { data: DebtRow[]; error: null }) => void) =>
           resolve({ data: debtRows, error: null }),
       };

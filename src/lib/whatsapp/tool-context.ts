@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Arma el ToolContext de la herramienta de deuda para el chat de WhatsApp. El
@@ -34,8 +35,9 @@ export async function buildWhatsAppToolContext(
   _householdId: string | null,
 ): Promise<ToolContext> {
   const supabase = createServiceRoleClient();
+  const memberIds = await householdMemberIds(supabase, userId);
   const [debtsRes, primary] = await Promise.all([
-    supabase.from("debts").select("id, name, balance, apr, min_payment, currency").eq("user_id", userId),
+    supabase.from("debts").select("id, name, balance, apr, min_payment, currency").in("user_id", memberIds),
     getUserCurrency(userId), // service-role: user_settings.primary_currency (default CRC)
   ]);
 
@@ -90,7 +92,7 @@ export async function buildWhatsAppToolContext(
     const goalsRes = await supabase
       .from("savings_goals")
       .select("name, target_amount, current_amount, monthly_contribution, currency, target_date")
-      .eq("user_id", userId);
+      .in("user_id", memberIds);
     const mapped = (goalsRes.data ?? [])
       .map((g) => ({
         name: g.name,

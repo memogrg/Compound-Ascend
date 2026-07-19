@@ -1,6 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/auth/session";
+import { householdMemberIds } from "@/lib/household/active";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -139,11 +140,12 @@ export type OpenContribution = {
 export async function listOpenContributions(): Promise<OpenContribution[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const now = new Date();
   const { data, error } = await supabase
     .from("holding_contributions")
     .select("id, holding_id, amount, unit_price, currency, status")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("period_year", now.getFullYear())
     .eq("period_month", now.getMonth() + 1)
     .in("status", ["auto", "pendiente"]);

@@ -1,3 +1,10 @@
+vi.mock("@/lib/household/active", () => ({
+  // Modo solo: householdMemberIds degrada a [userId], asi estos tests
+  // conservan exactamente la semantica que tenian antes del alcance de hogar.
+  householdMemberIds: async (_c: unknown, uid: string) => [uid],
+  getActiveHouseholdId: async () => null,
+  isActiveHouseholdEditor: async () => true,
+}));
 import { describe, it, expect, vi } from "vitest";
 
 /**
@@ -40,6 +47,7 @@ function fakeDb() {
       const builder = {
         select: () => builder,
         eq: () => builder,
+        in: () => builder,
         maybeSingle: async () => ({ data: (data as unknown[])[0] ?? null }),
         then: (resolve: (v: { data: unknown[] }) => void) => resolve({ data: data as unknown[] }),
       };

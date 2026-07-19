@@ -11,7 +11,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 
 export type WatchKind = "stock" | "etf" | "crypto";
 export type WatchItem = { id: string; symbol: string; kind: WatchKind };
@@ -20,10 +20,11 @@ export async function listWatchlist(): Promise<WatchItem[]> {
   try {
     const user = await requireUser();
     const supabase = await createSupabaseServerClient();
+    const memberIds = await householdMemberIds(supabase, user.id);
     const { data, error } = await supabase
       .from("watchlist_symbols")
       .select("id,symbol,asset_type")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .order("created_at", { ascending: true });
     if (error) return [];
     return (data ?? []).map((r) => ({ id: r.id, symbol: r.symbol, kind: r.asset_type as WatchKind }));

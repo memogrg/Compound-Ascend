@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Construye el FinancialContext AUTORIZADO del usuario/hogar para el bot, con
@@ -42,6 +43,7 @@ export async function buildContextForUser(
   householdId: string | null,
 ): Promise<FinancialContext> {
   const supabase = createServiceRoleClient();
+  const memberIds = await householdMemberIds(supabase, userId);
   const [name, currency] = await Promise.all([getUserDisplayName(userId), getUserCurrency(userId)]);
   const primary = currency; // user_settings.primary_currency (default CRC)
 
@@ -151,7 +153,7 @@ export async function buildContextForUser(
     const { data: goals } = await supabase
       .from("savings_goals")
       .select("current_amount,target_amount")
-      .eq("user_id", userId);
+      .in("user_id", memberIds);
     if (goals && goals.length > 0) {
       const target = goals.reduce((s, g) => s + Number(g.target_amount), 0);
       const current = goals.reduce((s, g) => s + Number(g.current_amount), 0);
@@ -168,7 +170,7 @@ export async function buildContextForUser(
     const { data: debtRows } = await supabase
       .from("debts")
       .select("id, name, balance, apr, min_payment, currency")
-      .eq("user_id", userId);
+      .in("user_id", memberIds);
     const raw = ((debtRows ?? []) as DebtRow[])
       .map((d) => ({
         id: d.id,
@@ -207,13 +209,13 @@ export async function buildContextForUser(
       supabase
         .from("monthly_snapshots")
         .select("period,income_monthly,expense_monthly,free_cashflow")
-        .eq("user_id", userId)
+        .in("user_id", memberIds)
         .order("period", { ascending: false })
         .limit(6),
       supabase
         .from("portfolio_snapshots")
         .select("date,portfolio_value,net_worth")
-        .eq("user_id", userId)
+        .in("user_id", memberIds)
         .order("date", { ascending: false })
         .limit(60),
     ]);

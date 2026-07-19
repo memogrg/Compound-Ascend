@@ -4,7 +4,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
@@ -231,10 +231,11 @@ function taxonomyColumns(input: HoldingInput) {
 
 export async function listHoldings(ctx?: AuthContext): Promise<Holding[]> {
   const { db, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(db, userId);
   const { data } = await db
     .from("investment_holdings")
     .select(HOLDING_COLS)
-    .eq("user_id", userId)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToHolding);
 }
@@ -466,10 +467,11 @@ export async function deleteHolding(id: string): Promise<void> {
 export async function listPendingHoldings(): Promise<Holding[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("investment_holdings")
     .select(HOLDING_COLS)
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("needs_detail", true)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToHolding);
@@ -479,10 +481,11 @@ export async function listPendingHoldings(): Promise<Holding[]> {
 export async function countPendingHoldings(): Promise<number> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { count } = await supabase
     .from("investment_holdings")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("needs_detail", true);
   return count ?? 0;
 }

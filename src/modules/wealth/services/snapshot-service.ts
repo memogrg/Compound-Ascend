@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Servicio de snapshots de portafolio.
@@ -42,11 +43,12 @@ export async function getSnapshotHistory(period: SnapshotPeriod): Promise<Portfo
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
+  const memberIds = await householdMemberIds(supabase, user.id);
   const cutoff = periodCutoff(period);
   let query = supabase
     .from("portfolio_snapshots")
     .select("id,date,portfolio_value,investment_value,net_worth,currency")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("date", { ascending: true });
 
   if (cutoff) query = query.gte("date", cutoff);

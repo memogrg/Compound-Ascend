@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Plantillas / favoritos de transacción: permiten registrar en 1 clic
@@ -45,10 +46,11 @@ function rowToTemplate(r: TransactionTemplateRow): TransactionTemplate {
 export async function listTemplates(): Promise<TransactionTemplate[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("transaction_templates")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("sort_order", { ascending: true })
     .order("use_count", { ascending: false });
   return (data ?? []).map(rowToTemplate);

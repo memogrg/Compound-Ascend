@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 /**
  * Opciones de entidades vinculables para el selector de 1 tap del composer
@@ -67,18 +68,19 @@ export async function listLinkableEntities(): Promise<LinkableEntities> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [debts, goals, holdings, policies] = await Promise.all([
-    supabase.from("debts").select("id,name").eq("user_id", user.id).order("created_at"),
-    supabase.from("savings_goals").select("id,name").eq("user_id", user.id).order("created_at"),
+    supabase.from("debts").select("id,name").in("user_id", memberIds).order("created_at"),
+    supabase.from("savings_goals").select("id,name").in("user_id", memberIds).order("created_at"),
     supabase
       .from("investment_holdings")
       .select("id,label,symbol,rental_subtype")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .order("created_at"),
     supabase
       .from("insurance_policies")
       .select("id,policy_type,provider")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .order("created_at"),
   ]);
 
@@ -130,26 +132,27 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
+  const memberIds = await householdMemberIds(supabase, user.id);
   const [debts, goals, holdings, policies] = await Promise.all([
     supabase
       .from("debts")
       .select("id,name,current_payment,min_payment,currency")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .order("created_at"),
     supabase
       .from("savings_goals")
       .select("id,name,monthly_contribution,current_amount,target_amount,currency,default_category_id,goal_type")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .order("created_at"),
     supabase
       .from("investment_holdings")
       .select("id,label,symbol,quantity,average_cost,current_value_manual,rental_subtype,currency,monthly_contribution,is_recurring")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .order("created_at"),
     supabase
       .from("insurance_policies")
       .select("id,policy_type,provider,premium,premium_frequency,currency")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .order("created_at"),
   ]);
 

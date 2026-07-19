@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
@@ -62,20 +62,22 @@ function rowToExpense(r: ExpenseItemRow): ExpenseItem {
 
 export async function listIncomes(ctx?: AuthContext): Promise<IncomeSource[]> {
   const { db, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(db, userId);
   const { data } = await db
     .from("income_sources")
     .select("*")
-    .eq("user_id", userId)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToIncome);
 }
 
 export async function listExpenses(ctx?: AuthContext): Promise<ExpenseItem[]> {
   const { db, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(db, userId);
   const { data } = await db
     .from("expense_items")
     .select("*")
-    .eq("user_id", userId)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToExpense);
 }
@@ -235,6 +237,7 @@ async function computeV2Totals(
 > {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const now = new Date();
   const p = monthPeriod(now.getFullYear(), now.getMonth() + 1);
 
@@ -242,13 +245,13 @@ async function computeV2Totals(
     supabase
       .from("budget_items")
       .select("type,amount,currency")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .eq("period_month", p.month)
       .eq("period_year", p.year),
     supabase
       .from("transactions")
       .select("kind,amount,currency,counts_in_budget")
-      .eq("user_id", user.id)
+      .in("user_id", memberIds)
       .gte("occurred_on", p.from)
       .lte("occurred_on", p.to),
   ]);

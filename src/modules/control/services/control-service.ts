@@ -3,7 +3,7 @@ import "server-only";
 /** Servicio del Módulo 3 (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE } from "@/lib/household/active";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import {
   registerLinkedTransaction,
@@ -94,10 +94,11 @@ function rowToDebt(r: DebtRow): Debt {
 export async function listGoals(): Promise<SavingsGoal[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("savings_goals")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToGoal);
 }
@@ -105,10 +106,11 @@ export async function listGoals(): Promise<SavingsGoal[]> {
 export async function listDebts(): Promise<Debt[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data } = await supabase
     .from("debts")
     .select("*")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToDebt);
 }
@@ -306,6 +308,7 @@ export async function getDebt(id: string): Promise<Debt | null> {
 export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   // Incluye TODOS los pagos sin importar su origen (Control, composer, chat,
   // conciliación). El embed por transaction_id trae el source de la
   // transacción vinculada para mostrar el origen ("vía Gastos"/"vía Chat").
@@ -313,7 +316,7 @@ export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
     .from("debt_payments")
     .select("*, txn:transactions!debt_payments_transaction_id_fkey(source)")
     .eq("debt_id", debtId)
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .order("occurred_on", { ascending: true });
   if (error) throw new Error(error.message);
   // Cast: los tipos de DB hechos a mano no describen relaciones; el FK
@@ -327,11 +330,12 @@ export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
 export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, string[]>> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const monthStart = `${new Date().toISOString().slice(0, 8)}01`; // yyyy-mm-01
   const { data } = await supabase
     .from("debt_payments")
     .select("debt_id,occurred_on")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .gte("occurred_on", monthStart);
   const out: Record<string, string[]> = {};
   for (const p of data ?? []) (out[p.debt_id] ??= []).push(p.occurred_on);
@@ -348,7 +352,15 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   const supabase = await createSupabaseServerClient();
 
   const debt = await getDebt(input.debtId);
-  if (!debt) throw new Error("Deuda no encontrada");
+  if (!debt) {
+    // Distingue "no existe" de "es de otro miembro del hogar": con el
+    // alcance de hogar la fila SE VE en pantalla, así que un "no
+    // encontrada" pelado parecería un bug.
+    if (await existsInHousehold(supabase, user.id, "debts", input.debtId)) {
+      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+    }
+    throw new Error("Deuda no encontrada");
+  }
   const total = input.amount + input.extraAmount;
 
   // household: cubre el hueco del sub-PR household de main (no tocó este insert).
@@ -478,7 +490,15 @@ export async function addGoalContribution(input: {
     .eq("user_id", user.id)
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
-  if (!goalRow) throw new Error("Meta no encontrada");
+  if (!goalRow) {
+    // Distingue "no existe" de "es de otro miembro del hogar": con el
+    // alcance de hogar la fila SE VE en pantalla, así que un "no
+    // encontrada" pelado parecería un bug.
+    if (await existsInHousehold(supabase, user.id, "savings_goals", input.goalId)) {
+      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+    }
+    throw new Error("Meta no encontrada");
+  }
 
   const txnId = await registerLinkedTransaction(
     goalContributionToTxn({
@@ -523,7 +543,15 @@ export async function withdrawFromGoal(input: {
     .eq("user_id", user.id)
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
-  if (!goalRow) throw new Error("Meta no encontrada");
+  if (!goalRow) {
+    // Distingue "no existe" de "es de otro miembro del hogar": con el
+    // alcance de hogar la fila SE VE en pantalla, así que un "no
+    // encontrada" pelado parecería un bug.
+    if (await existsInHousehold(supabase, user.id, "savings_goals", input.goalId)) {
+      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+    }
+    throw new Error("Meta no encontrada");
+  }
   if (input.amount > Number(goalRow.current_amount)) {
     throw new Error("No puedes retirar más de lo acumulado en la meta.");
   }
@@ -575,7 +603,15 @@ export async function spendFromGoal(input: {
     .eq("user_id", user.id)
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
-  if (!goalRow) throw new Error("Meta no encontrada");
+  if (!goalRow) {
+    // Distingue "no existe" de "es de otro miembro del hogar": con el
+    // alcance de hogar la fila SE VE en pantalla, así que un "no
+    // encontrada" pelado parecería un bug.
+    if (await existsInHousehold(supabase, user.id, "savings_goals", input.goalId)) {
+      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+    }
+    throw new Error("Meta no encontrada");
+  }
   if (input.amount <= 0) throw new Error("El monto debe ser mayor a 0.");
   if (input.amount > Number(goalRow.current_amount)) {
     throw new Error("No puedes gastar más de lo acumulado en la meta.");

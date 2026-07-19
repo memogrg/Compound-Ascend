@@ -48,7 +48,13 @@ const rows = [
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/session", () => ({ requireUser: async () => ({ id: "u1" }) }));
-vi.mock("@/lib/household/active", () => ({ getActiveHouseholdId: async () => null }));
+vi.mock("@/lib/household/active", () => ({
+  // Modo solo: householdMemberIds degrada a [userId], asi estos tests
+  // conservan exactamente la semantica que tenian antes del alcance de hogar.
+  householdMemberIds: async (_c: unknown, uid: string) => [uid],
+  getActiveHouseholdId: async () => null,
+  isActiveHouseholdEditor: async () => true,
+}));
 vi.mock("@/modules/financial-base/services/base-service", () => ({
   getDisplayCurrency: async () => "CRC",
 }));
@@ -62,6 +68,7 @@ vi.mock("@/lib/supabase/server", () => ({
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
+        in: () => b,
         gte: () => b,
         lte: () => b,
         order: () => b,

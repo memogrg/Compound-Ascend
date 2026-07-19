@@ -1,4 +1,5 @@
 import "server-only";
+import { householdMemberIds } from "@/lib/household/active";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
@@ -40,11 +41,12 @@ export async function getHoldingHistory(
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
+  const memberIds = await householdMemberIds(supabase, user.id);
   const since = periodStart(period);
   const { data: snaps } = await supabase
     .from("portfolio_snapshots")
     .select("date, investment_value")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .gte("date", since)
     .order("date", { ascending: true });
 
@@ -94,10 +96,11 @@ export type HoldingPurchase = {
 export async function listHoldingPurchases(holdingId: string): Promise<HoldingPurchase[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data, error } = await supabase
     .from("investment_transactions")
     .select("id, amount, quantity, currency, occurred_on")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("holding_id", holdingId)
     .eq("tx_type", "compra")
     .order("occurred_on", { ascending: true });
@@ -121,10 +124,11 @@ export type HoldingValuation = {
 export async function listHoldingValuations(holdingId: string): Promise<HoldingValuation[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data, error } = await supabase
     .from("holding_valuations")
     .select("id, as_of, value, currency")
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .eq("holding_id", holdingId)
     .order("as_of", { ascending: true });
   if (error || !data) return [];
