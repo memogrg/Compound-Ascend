@@ -55,13 +55,14 @@ function diasRestantes(now: Date): number {
  * te pasaste. Concreto y en segunda persona; nunca un consejo genérico.
  */
 function mensaje(r: Ritmo, disponible: number, currency: string, dias: number): string {
-  // UN mensaje por caso, no dos encadenados: juntar "vas rápido" con "te quedan X para
-  // N días" se salía de las dos líneas a 320px y la frase acababa en "para 13…".
+  // El mensaje aporta lo que la cifra NO dice. La cifra grande ya es el disponible, así
+  // que repetirlo aquí ("Te quedan ₡1.840.697 para 13 días") gastaba la única línea de
+  // la tarjeta en decir dos veces el mismo número. Lo que falta es el PLAZO.
   if (r === "excedido")
-    return `Superaste tu presupuesto por ${formatMoney(Math.abs(disponible), currency)}.`;
-  if (r === "al-limite") return "Agotaste casi todo tu presupuesto del mes.";
-  if (r === "rapido") return "Tu gasto avanza más rápido que el mes.";
-  return `Te quedan ${formatMoney(disponible, currency)} para ${dias} ${dias === 1 ? "día" : "días"}.`;
+    return `Te pasaste por ${formatMoney(Math.abs(disponible), currency)}.`;
+  if (r === "al-limite") return "Agotaste casi todo el presupuesto del mes.";
+  if (r === "rapido") return `Tu gasto avanza más rápido que el mes.`;
+  return `Para los ${dias} ${dias === 1 ? "día" : "días"} que quedan del mes.`;
 }
 
 /** Medidor compacto. El centro lleva el PORCENTAJE, nunca un importe: el agujero
@@ -72,10 +73,10 @@ function Gauge({ pct, tone }: { pct: number; tone: MTone }) {
     tone === "danger" ? "var(--danger)" : tone === "warning" ? "var(--warning)" : "var(--accent)";
   return (
     <span style={{ position: "relative", display: "inline-grid", placeItems: "center" }}>
-      {/* 76px, no 84: el slot de la tarjeta mide 80px medidos (240 de alto menos el
-          resto de las partes con sus márgenes), y a 84 el medidor se comía el
-          subtexto. La caja manda sobre el visual, no al revés. */}
-      <svg width="76" height="76" viewBox="0 0 42 42" aria-hidden>
+      {/* 60px: al pasar a la columna derecha el medidor ya no compite con el texto
+          por el alto, sino por el ANCHO. 60 deja sitio de sobra a la cifra incluso a
+          320px, donde la tarjeta mide 252. */}
+      <svg width="60" height="60" viewBox="0 0 42 42" aria-hidden>
         <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" strokeWidth={5} />
         <circle
           cx="21"
@@ -91,7 +92,7 @@ function Gauge({ pct, tone }: { pct: number; tone: MTone }) {
       </svg>
       <span
         className="mono"
-        style={{ position: "absolute", fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em" }}
+        style={{ position: "absolute", fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}
       >
         {Math.round(pct * 100)}%
       </span>
@@ -140,7 +141,7 @@ export function BudgetCard({
       value={mAmount(disponible, currency, 11)}
       chip={<MChip tone={tone}>{CHIP_OF[ritmo]}</MChip>}
       sub={`${mAmount(spent, currency, 9)} de ${mAmount(budget, currency, 9)}`}
-      slot={<Gauge pct={pctGastado} tone={tone} />}
+      vis={<Gauge pct={pctGastado} tone={tone} />}
       message={mensaje(ritmo, disponible, currency, diasRestantes(now))}
       href="/m/gastos"
       ariaLabel={`Presupuesto del mes: ${CHIP_OF[ritmo]}. Ver gastos`}

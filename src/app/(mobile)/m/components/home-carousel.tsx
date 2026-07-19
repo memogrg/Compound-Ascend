@@ -14,7 +14,7 @@
  * Se registra dónde empezó el gesto y, si el dedo se movió más de UMBRAL_PX, se
  * cancela el click en fase de captura (antes de que el <a> lo reciba).
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 /** Un gesto que mueve más de esto es un arrastre, no un toque. */
 const UMBRAL_PX = 10;
@@ -30,46 +30,57 @@ export function MHomeCarousel({
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const draggedRef = useRef(false);
 
-  // Tarjeta activa = la que tiene su centro más cerca del centro de la pista. Se
-  // calcula por geometría y no por índice de scroll para que sea correcta con
-  // cualquier ancho de tarjeta y en el rebote de los extremos.
-  const syncActive = useCallback(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    const mid = track.scrollLeft + track.clientWidth / 2;
-    let best = 0;
-    let bestDist = Infinity;
-    Array.from(track.children).forEach((child, i) => {
-      const el = child as HTMLElement;
-      const center = el.offsetLeft + el.offsetWidth / 2;
-      const d = Math.abs(center - mid);
-      if (d < bestDist) {
-        bestDist = d;
-        best = i;
-      }
-    });
-    setActive((prev) => (prev === best ? prev : best));
-  }, []);
-
+  /**
+   * Tarjeta activa: la que tiene su centro más cerca del centro de la pista, recalculado
+   * en cada scroll (agrupado por rAF, que es la cadencia a la que el navegador pinta —
+   * medir más veces no cambiaría ni un píxel de lo que se ve).
+   *
+   * POR QUÉ ASÍ Y NO CON IntersectionObserver: el observador necesitaría una franja
+   * central definida con `rootMargin` en porcentaje sobre un root desplazable, y eso
+   * no lo puedo probar en ningún navegador al que tenga acceso — quedaría fiado a que
+   * WKWebView se comporte como espero. Esta versión es aritmética pura sobre
+   * getBoundingClientRect: siempre hay exactamente una respuesta, nunca es ambigua
+   * durante el tránsito entre dos tarjetas, y vale igual para el estado inicial.
+   *
+   * EL BUG QUE ARREGLA: antes se medía con offsetLeft/offsetWidth de los hijos de la
+   * pista, pero esos hijos eran envoltorios con `display: contents` — que NO generan
+   * caja, así que devolvían 0. Todas las tarjetas empataban en "centro 0" y el índice
+   * se quedaba clavado en la primera para siempre. Ahora las tarjetas son hijas
+   * directas y se miden ellas.
+   */
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
-    let raf = 0;
-    const onScroll = () => {
-      // rAF: el scroll dispara muchísimo y recalcular en cada evento tira frames.
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        syncActive();
+
+    let pendiente = 0;
+    const sync = () => {
+      pendiente = 0;
+      const pista = track.getBoundingClientRect();
+      const centro = pista.left + pista.width / 2;
+      let mejor = 0;
+      let menor = Infinity;
+      Array.from(track.children).forEach((c, i) => {
+        const r = c.getBoundingClientRect();
+        const d = Math.abs(r.left + r.width / 2 - centro);
+        if (d < menor) {
+          menor = d;
+          mejor = i;
+        }
       });
+      setActive((prev) => (prev === mejor ? prev : mejor));
     };
+    const onScroll = () => {
+      if (pendiente) return;
+      pendiente = requestAnimationFrame(sync);
+    };
+
+    sync();
     track.addEventListener("scroll", onScroll, { passive: true });
-    syncActive();
     return () => {
       track.removeEventListener("scroll", onScroll);
-      if (raf) cancelAnimationFrame(raf);
+      if (pendiente) cancelAnimationFrame(pendiente);
     };
-  }, [syncActive]);
+  }, [cards.length]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     startRef.current = { x: e.clientX, y: e.clientY };
@@ -92,23 +103,35 @@ export function MHomeCarousel({
   };
 
   /** Teclado (web): flechas para moverse entre tarjetas, como haría un carrusel real. */
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const irA = useCallback((i: number) => {
     const track = trackRef.current;
     if (!track) return;
-    const next = e.key === "ArrowRight" ? active + 1 : active - 1;
-    const target = track.children[Math.max(0, Math.min(cards.length - 1, next))] as
+    const target = track.children[Math.max(0, Math.min(track.children.length - 1, i))] as
       | HTMLElement
       | undefined;
     if (!target) return;
+    track.scrollTo({
+      left: target.offsetLeft - (track.clientWidth - target.offsetWidth) / 2,
+      behavior: "smooth",
+    });
+  }, []);
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     e.preventDefault();
-    track.scrollTo({ left: target.offsetLeft - (track.clientWidth - target.offsetWidth) / 2, behavior: "smooth" });
+    irA(e.key === "ArrowRight" ? active + 1 : active - 1);
   };
 
   const activeName = cards[active]?.name ?? "";
 
   return (
     <div className="m-carousel-wrap">
+      {/* Marca de agua: vive en el FONDO del carrusel, no dentro de la pista, así que
+          no se desplaza con las tarjetas — ellas pasan por delante. Es lo que le da al
+          cristal algo que refractar; sin ella el efecto no se percibiría sobre un
+          lienzo plano. */}
+      <span className="m-carousel-mark" aria-hidden />
+
       <div
         ref={trackRef}
         className="m-carousel"
@@ -121,15 +144,10 @@ export function MHomeCarousel({
         onPointerMove={onPointerMove}
         onClickCapture={onClickCapture}
       >
-        {cards.map((c, i) => (
-          <div
-            key={c.name}
-            style={{ display: "contents" }}
-            aria-roledescription="tarjeta"
-            aria-label={`${i + 1} de ${cards.length}: ${c.name}`}
-          >
-            {c.node}
-          </div>
+        {/* Las tarjetas son hijas DIRECTAS de la pista: cualquier envoltorio intermedio
+            rompe la medición del observador (ver la nota del efecto de arriba). */}
+        {cards.map((c) => (
+          <Fragment key={c.name}>{c.node}</Fragment>
         ))}
       </div>
 
