@@ -53,7 +53,7 @@
   --s2: #b07a2e;
   --s3: #c34f4b;
   --s4: #6b8a5f;
-  --s5: #43a064;
+  --s5: #2b7d6a;
   /* Neutro CÁLIDO de series. Existe porque --s3 es byte a byte igual que --danger, y en un
      anillo de composición de activos eso pintaba una clase entera del color de "pérdida":
      un carro de uso personal no es un error. Aquí el color solo separa porciones, no juzga.
@@ -149,7 +149,7 @@
   --s1: #51af6f;
   --s2: #d9a85a;
   --s3: #d46b62;
-  --s4: #3c5a3f;
+  --s4: #557d5b;
   --s5: #43a064;
   --s-neutral: #9c9280;
   --accent-soft: rgba(81, 175, 111, 0.14);

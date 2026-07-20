@@ -43,6 +43,13 @@ const config: CapacitorConfig = {
     backgroundColor: '#F1EFE8',
   },
   ios: {
+    // Fondo del WEBVIEW (no del splash). Se queda en la canvas clara y NO se toca: es un
+    // string único sin variante por apariencia, y las alternativas están medidas en el
+    // simulador. Ponerlo oscuro invierte el problema en claro; quitarlo deja que asome el
+    // fondo por defecto del WKWebView — NEGRO en oscuro y BLANCO en claro—, que se ve
+    // peor. Queda una rendija breve de crema al abrir en oscuro, entre que el splash se
+    // va y el HTML pinta; cerrarla exige teñir el webview desde código nativo y es su
+    // propio delta.
     backgroundColor: '#F1EFE8',
     // Edge-to-edge: el WebView NO auto-ajusta insets (contentInset 'never'); los safe-areas
     // los maneja el CSS con env(safe-area-inset-*) + viewport-fit=cover del HTML — UN solo
@@ -58,10 +65,23 @@ const config: CapacitorConfig = {
       // garantiza que el splash NO se quede pegado.
       launchShowDuration: 1500,
       launchAutoHide: true,
-      // Fondo del splash = canvas CLARA del diseño (--canvas). El splash OSCURO sale de
-      // los drawables -night generados (#15140F); al coincidir este color con el fondo
-      // de la app, cualquier micro-gap entre splash y webview es imperceptible.
-      backgroundColor: '#F1EFE8',
+      // SIN backgroundColor A PROPÓSITO.
+      //
+      // El comentario que había aquí decía que el splash oscuro salía de los drawables
+      // -night. Eso es cierto en Android y FALSO en iOS, y despistó dos veces: en iOS el
+      // plugin pinta este color SIN mirar la apariencia del sistema
+      // (SplashScreen.swift:43-44, un `if let` incondicional) y su API no admite variante
+      // oscura — definitions.d.ts solo declara `backgroundColor?: string`.
+      // Resultado: al abrir en oscuro quedaba medio segundo de crema a pantalla completa
+      // entre el launch screen oscuro y la intro oscura.
+      //
+      // Al quitarlo, el `if let` no entra y la vista conserva la del storyboard, que el
+      // propio plugin instancia (SplashScreen.swift:91-93). Y esa vista raíz ya usa el
+      // named color SplashBackground, que tiene sus dos variantes. O sea: el color
+      // correcto en cada tema sin una línea de código nativo.
+      //
+      // Android no se ve afectado: allí el fondo sale de los drawables, que sí tienen
+      // variante -night.
       androidScaleType: 'CENTER_CROP',
       showSpinner: false,
       splashFullScreen: true,
