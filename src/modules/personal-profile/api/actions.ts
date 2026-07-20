@@ -183,6 +183,70 @@ export async function inviteHouseholdMembersAction(emails: string[]): Promise<In
   };
 }
 
+/**
+ * Invita a UN miembro desde Configuración, validando el límite del plan EN EL
+ * SERVIDOR (no solo en la UI): si activos + pendientes ya llenan el cupo, rechaza
+ * antes de crear la invitación. Reusa inviteHouseholdMembersAction para el envío.
+ */
+export async function inviteHouseholdMemberAction(email: string): Promise<InviteResult> {
+  const one = z.string().trim().email().max(120).safeParse(email);
+  if (!one.success) {
+    return { ok: false, sent: 0, configured: false, message: "Agrega un correo válido." };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, sent: 0, configured: false, message: "Conecta Supabase para invitar." };
+  }
+  const { hasHouseholdInviteCapacity } = await import(
+    "@/modules/personal-profile/services/household-members-service"
+  );
+  const cap = await hasHouseholdInviteCapacity();
+  if (!cap.ok) {
+    return {
+      ok: false,
+      sent: 0,
+      configured: true,
+      message: `Tu plan permite hasta ${cap.limit} personas en el hogar (incluido vos). No quedan cupos.`,
+    };
+  }
+  return inviteHouseholdMembersAction([one.data]);
+}
+
+export type ManageResult = { ok: boolean; message?: string };
+
+/** Revoca una invitación pendiente (solo owner/adult). */
+export async function revokeInvitationAction(invitationId: string): Promise<ManageResult> {
+  const parsed = z.string().uuid().safeParse(invitationId);
+  if (!parsed.success) return { ok: false, message: "Invitación no válida." };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  try {
+    const { revokeInvitation } = await import(
+      "@/modules/personal-profile/services/household-members-service"
+    );
+    await revokeInvitation(parsed.data);
+    revalidatePath("/configuracion");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "No pudimos revocar." };
+  }
+}
+
+/** Quita a un miembro del hogar (status='removed'; solo el owner). */
+export async function removeHouseholdMemberAction(userId: string): Promise<ManageResult> {
+  const parsed = z.string().uuid().safeParse(userId);
+  if (!parsed.success) return { ok: false, message: "Miembro no válido." };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  try {
+    const { removeHouseholdMember } = await import(
+      "@/modules/personal-profile/services/household-members-service"
+    );
+    await removeHouseholdMember(parsed.data);
+    revalidatePath("/configuracion");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "No pudimos quitar al miembro." };
+  }
+}
+
 export type AcceptResult = { ok: boolean; message?: string };
 
 /**

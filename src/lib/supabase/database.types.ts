@@ -1033,6 +1033,16 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Record<string, unknown> | null;
       };
+      list_household_members: {
+        Args: Record<string, never>;
+        Returns: {
+          user_id: string;
+          email: string;
+          role: HouseholdRole;
+          status: MemberStatus;
+          joined_at: string;
+        }[];
+      };
       // Pago de deuda atómico (migración 0025): transacción + debt_payment en
       // una sola transacción de BD.
       record_debt_payment: {

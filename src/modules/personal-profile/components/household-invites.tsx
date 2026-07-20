@@ -8,17 +8,23 @@
 import { useState, useTransition } from "react";
 import { Icon } from "@/components/ui/icon";
 import { inviteHouseholdMembersAction } from "@/modules/personal-profile/api/actions";
+import { householdMemberLimit, type Plan } from "@/lib/plan";
 
-const MAX = 4;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function HouseholdInvites({
   emails,
   onChange,
+  plan = "free",
 }: {
   emails: string[];
   onChange: (emails: string[]) => void;
+  /** Plan del usuario: fija el límite (mismo que la pantalla de Configuración).
+   *  Onboarding = free por defecto. El límite es TOTAL con el titular → los
+   *  correos agregables son límite − 1 (uno mismo ya cuenta). */
+  plan?: Plan;
 }) {
+  const MAX = Math.max(0, householdMemberLimit(plan) - 1);
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
