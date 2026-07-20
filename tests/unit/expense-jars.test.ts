@@ -634,3 +634,69 @@ describe('buildExpenseJars · gasto real sin frasco (G4)', () => {
     expect(visibleReal + orphanReal).toBe(realExpense);
   });
 });
+
+describe("buildExpenseJars · huérfano de gasto vinculado expone linkedKind/linkedName (delete UI)", () => {
+  const txn = (over: Partial<RealTxnLine>): RealTxnLine => ({
+    id: over.id ?? "t1",
+    name: over.name ?? "Gasto",
+    amount: over.amount ?? 0,
+    currency: over.currency ?? "CRC",
+    categoryId: over.categoryId ?? null,
+    linkedKind: over.linkedKind,
+    linkedId: over.linkedId,
+    countsInBudget: over.countsInBudget,
+  });
+  const orphanOf = (jars: ReturnType<typeof buildExpenseJars>) =>
+    jars.find((j) => j.kind === "orphan");
+
+  it("resuelve linkedName desde entities cuando la entidad sigue listada", () => {
+    // Meta 'goal_x' existe en entities pero NO en un grupo vinculado del tree
+    // (el tree no trae g_ahorro_lp) → su gasto vinculado cae en 'Por reasignar'.
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA],
+      budgetByKey: {},
+      realByKey: {},
+      fmt,
+      entities: {
+        ...NO_ENTITIES,
+        goal: [{ id: "goal_x", name: "Beauty Fernanda", sub: "", amount: 0 }],
+      },
+      realTxns: [
+        txn({ id: "t1", name: "Compra", amount: 115, categoryId: null, linkedKind: "goal", linkedId: "goal_x" }),
+      ],
+    });
+    const o = orphanOf(jars);
+    if (o?.kind !== "orphan") throw new Error("debe haber frasco huérfano");
+    const item = o.realItems[0]!;
+    expect(item.linkedKind).toBe("goal");
+    expect(item.linkedId).toBe("goal_x");
+    expect(item.linkedName).toBe("Beauty Fernanda"); // el aviso puede nombrar la entidad
+  });
+
+  it("linkedName es null cuando la entidad ya no está listada (aviso degrada al tipo)", () => {
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA], budgetByKey: {}, realByKey: {}, fmt, entities: NO_ENTITIES,
+      realTxns: [
+        txn({ id: "t1", name: "Compra", amount: 115, categoryId: null, linkedKind: "goal", linkedId: "goal_muerto" }),
+      ],
+    });
+    const o = orphanOf(jars);
+    if (o?.kind !== "orphan") throw new Error("debe haber frasco huérfano");
+    const item = o.realItems[0]!;
+    expect(item.linkedKind).toBe("goal");
+    expect(item.linkedName).toBeNull();
+  });
+
+  it("gasto NO vinculado → linkedKind ausente/none (confirmación simple)", () => {
+    const jars = buildExpenseJars({
+      tree: [VIVIENDA], budgetByKey: {}, realByKey: {}, fmt, entities: NO_ENTITIES,
+      realTxns: [txn({ id: "t1", name: "Suelto", amount: 50, categoryId: "cat_oculta" })],
+      hiddenCategoryIds: ["cat_oculta"],
+    });
+    const o = orphanOf(jars);
+    if (o?.kind !== "orphan") throw new Error("debe haber frasco huérfano");
+    const item = o.realItems[0]!;
+    expect(item.linkedName).toBeNull();
+    expect(item.linkedKind == null || item.linkedKind === "none").toBe(true);
+  });
+});
