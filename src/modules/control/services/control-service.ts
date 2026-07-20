@@ -374,6 +374,17 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     .in("user_id", scope)
     .maybeSingle();
   if (!writable) throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+
+  // El importe se guarda en la moneda de la DEUDA: `debt_payments` no tiene columna de
+  // moneda, así que su amount es implícitamente la de la deuda, y la transacción se
+  // etiqueta con esa misma. Si quien llama dice venir en otra, es que el número se
+  // calculó contra una referencia distinta y guardarlo corrompería las dos cosas a la
+  // vez (el gasto del mes y la amortización). Mejor fallar que guardar callado.
+  if (input.currency && input.currency !== debt.currency) {
+    throw new Error(
+      `El pago viene en ${input.currency} pero la deuda está en ${debt.currency}.`,
+    );
+  }
   const total = input.amount + input.extraAmount;
 
   // household: cubre el hueco del sub-PR household de main (no tocó este insert).

@@ -17,6 +17,7 @@ import {
   orderDebts,
   type DebtInput,
   type DebtMethod,
+  cuotaPrecargada,
 } from "@/modules/control/engine/debt-strategy";
 import { buildSchedule, type AmortizationInput } from "@/modules/control/engine/amortization";
 import type { DebtsOverview, DebtVM } from "@/modules/control/services/debts-service";
@@ -463,7 +464,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <RegisterPaymentButton debts={debts} currency={currency} />
+            <RegisterPaymentButton debts={debts} raw={overview.raw} currency={currency} />
             <AddControlButton
               kind="debt"
               currency={currency}
@@ -559,7 +560,17 @@ function payoffDateFromMonths(months: number): string {
 }
 
 /** "Registrar pago" desde la lista: elige deuda + tipo (normal/extraordinario). */
-function RegisterPaymentButton({ debts, currency }: { debts: DebtVM[]; currency: string }) {
+function RegisterPaymentButton({
+  debts,
+  raw,
+  currency,
+}: {
+  debts: DebtVM[];
+  /** Deudas sin convertir: el modal guarda con la moneda de la entidad, no con la de
+   *  visualización, así que necesita la fuente cruda. */
+  raw: Debt[];
+  currency: string;
+}) {
   const [open, setOpen] = useState(false);
   if (debts.length === 0) return null;
   return (
@@ -568,27 +579,60 @@ function RegisterPaymentButton({ debts, currency }: { debts: DebtVM[]; currency:
         <Icon name="debt" width={2} /> Registrar pago
       </button>
       {open ? (
-        <RegisterPaymentModal debts={debts} currency={currency} onClose={() => setOpen(false)} />
+        <RegisterPaymentModal
+          debts={debts}
+          raw={raw}
+          currency={currency}
+          onClose={() => setOpen(false)}
+        />
       ) : null}
     </>
   );
 }
 
+/**
+ * El importe y la moneda vienen los DOS de la deuda CRUDA, nunca del VM.
+ *
+ * Aquí estuvo el fallo que corrompió datos: `DebtVM` trae los montos ya convertidos a la
+ * moneda principal (lo dice su propio comentario, "montos ya normalizados"), así que el
+ * modal precargaba la cuota en colones y la rotulaba "Moneda: CRC", pero el guardado
+ * escribía con la moneda de la DEUDA. Un pago de 2.341 USD se guardó como 1.063.076 USD
+ * — el número convertido con la etiqueta sin convertir, multiplicado por el tipo de
+ * cambio.
+ *
+ * Se elige la moneda de la ENTIDAD y no convertir al guardar, por tres razones:
+ *  · `debt_payments` NO tiene columna de moneda: su importe es implícitamente el de la
+ *    deuda, así que el ledger TIENE que recibir la moneda de la deuda. Convertir al
+ *    guardar metería una división por el tipo de cambio en la amortización de una deuda
+ *    real, y el mismo pago amortizaría distinto según el día.
+ *  · Una tarjeta en dólares se paga en dólares: el usuario teclea lo que dice su estado
+ *    de cuenta, no una aproximación.
+ *  · El propio servicio ya distingue los dos mundos — devuelve `raw` "sin conversión
+ *    para precargar el form de edición". Este modal era el único que no lo usaba.
+ *
+ * El equivalente en la moneda principal se muestra como referencia de solo lectura, para
+ * que ver dólares en una app que lleva colones no desoriente.
+ */
 function RegisterPaymentModal({
   debts,
+  raw,
   currency,
   onClose,
 }: {
   debts: DebtVM[];
+  /** Deudas SIN convertir: la única fuente válida para lo que se va a guardar. */
+  raw: Debt[];
+  /** Moneda de visualización. Solo para el equivalente informativo, nunca para guardar. */
   currency: string;
   onClose: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
   const today = new Date().toISOString().slice(0, 10);
+  const rawOf = (id: string) => raw.find((x) => x.id === id) ?? null;
   const cuotaOf = (id: string) => {
-    const d = debts.find((x) => x.id === id);
-    return d ? (d.monthlyPayment > 0 ? d.monthlyPayment : d.minPayment) : 0;
+    const d = rawOf(id);
+    return d ? cuotaPrecargada(d).amount : 0;
   };
   const [debtId, setDebtId] = useState(debts[0]!.id);
   const [kind, setKind] = useState<"ordinario" | "extraordinario">("ordinario");
@@ -598,6 +642,17 @@ function RegisterPaymentModal({
   });
   const [date, setDate] = useState(today);
   const [pending, setPending] = useState(false);
+
+  const monedaDeuda = rawOf(debtId)?.currency ?? currency;
+  // Solo informativo: NUNCA se guarda. Sirve para que el usuario reconozca el importe
+  // en la moneda en la que piensa, sin que eso toque lo que se escribe.
+  const vm = debts.find((d) => d.id === debtId) ?? null;
+  const equivalente =
+    vm && monedaDeuda !== currency
+      ? vm.monthlyPayment > 0
+        ? vm.monthlyPayment
+        : vm.minPayment
+      : null;
 
   const onDebt = (id: string) => {
     setDebtId(id);
@@ -628,6 +683,9 @@ function RegisterPaymentModal({
       amount: amt,
       extraAmount: 0,
       kind,
+      // Viaja junto al importe para que el servidor pueda comprobar que los dos vienen
+      // de la misma fuente. Sin esto, un desajuste se guarda en silencio.
+      currency: monedaDeuda,
     });
     setPending(false);
     if (res.ok) {
@@ -707,7 +765,10 @@ function RegisterPaymentModal({
             </div>
           </div>
           <div className="muted" style={{ fontSize: 11 }}>
-            Moneda: {currency}
+            Moneda: {monedaDeuda}
+            {monedaDeuda !== currency && equivalente != null ? (
+              <> · equivale a {formatMoney(equivalente, currency)}</>
+            ) : null}
           </div>
         </div>
         <div className="modal-foot">

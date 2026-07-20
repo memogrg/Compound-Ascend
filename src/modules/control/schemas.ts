@@ -60,6 +60,15 @@ export const debtPaymentInputSchema = z.object({
   extraAmount: z.number().nonnegative().default(0),
   extraMode: z.enum(["tiempo", "cuota"]).optional(),
   kind: z.enum(["ordinario", "extraordinario"]).default("ordinario"),
+  /**
+   * Moneda en la que viene `amount`. Opcional por compatibilidad con quien no la manda,
+   * pero cuando llega, el servicio comprueba que sea la de la deuda y rechaza si no.
+   *
+   * Existe porque el importe y su etiqueta salían de sitios distintos: el formulario
+   * precargaba la cuota convertida a la moneda principal y el guardado la escribía con la
+   * moneda de la deuda. Ese desajuste no se podía expresar, así que se guardaba callado.
+   */
+  currency: z.string().length(3).optional(),
 });
 
 export type GoalInput = z.infer<typeof goalInputSchema>;

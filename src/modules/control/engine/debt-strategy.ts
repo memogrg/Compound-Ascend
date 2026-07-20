@@ -152,3 +152,28 @@ function median(nums: number[]): number {
   const mid = Math.floor(s.length / 2);
   return s.length % 2 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
 }
+
+/**
+ * Importe a PRECARGAR en el modal de pago, en la moneda de la propia deuda.
+ *
+ * Pura y exportada para poder fijarla con un test. Es el punto exacto donde se corrompió
+ * un dato real: el modal precargaba la cuota tomándola del view-model, que trae los
+ * montos ya convertidos a la moneda principal, y luego el guardado los etiquetaba con la
+ * moneda de la deuda. Un pago de 2.341 USD acabó guardado como 1.063.076 USD.
+ *
+ * Recibe la deuda CRUDA a propósito: si algún día alguien le pasa un VM convertido, el
+ * test de multimoneda falla y lo dice.
+ */
+export function cuotaPrecargada(debt: {
+  currentPayment: number;
+  minPayment: number | null;
+  currency: string;
+}): { amount: number; currency: string } {
+  const cuota = debt.currentPayment > 0 ? debt.currentPayment : (debt.minPayment ?? 0);
+  return {
+    // A los decimales de la moneda: el campo llegó a precargarse con `1063076.114747`,
+    // y ese sobrante de seis decimales era la huella de la conversión.
+    amount: Math.round(cuota * 100) / 100,
+    currency: debt.currency,
+  };
+}
