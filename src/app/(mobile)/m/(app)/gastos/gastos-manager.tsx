@@ -11,7 +11,12 @@ import {
   assignCategoryAction,
   reassignBudgetItemAction,
   removeBudgetItemAction,
+  removeTransactionAction,
 } from "@/modules/financial-base/api/v2-actions";
+import {
+  isLinkedOrphan,
+  orphanDeletionWarning,
+} from "@/modules/financial-base/engine/orphan-delete";
 import type {
   Jar,
   JarEnvelope,
@@ -766,7 +771,8 @@ function OrphanLineRow({
   currency: string;
   options: Opt[];
   onDone: () => void;
-  /** true = transacción de gasto real: se RECATEGORIZA (y no se puede borrar acá). */
+  /** true = transacción de gasto real: se RECATEGORIZA o se ELIMINA (borrar revierte
+   *  el ledger de su entidad vinculada, con aviso). false = línea de presupuesto. */
   real?: boolean;
 }) {
   const toast = useToast();
@@ -794,6 +800,7 @@ function OrphanLineRow({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{line.name}</div>
           <MChip tone="warning">{ORPHAN_REASON_LABEL[line.reason]}</MChip>
+          {real && isLinkedOrphan(line) ? <MChip tone="neutral">vinculado</MChip> : null}
         </div>
         <div className="mono" style={{ fontSize: 14, flex: "none" }}>
           {mAmount(line.amount, currency)}
@@ -829,32 +836,42 @@ function OrphanLineRow({
         >
           {pending ? "Guardando…" : real ? "Recategorizar" : "Reasignar"}
         </button>
-        {/* Un gasto real no se borra desde acá: se recategoriza. Borrarlo sería
-            perder un hecho, no reconciliarlo. */}
-        {real ? null : (
-          <button
-            type="button"
-            className="m-btn m-btn-block m-btn-quiet-danger"
-            disabled={pending}
-            onClick={() => setConfirmingRemove(true)}
-          >
-            Eliminar
-          </button>
-        )}
+        {/* Presupuesto y gasto real se pueden ELIMINAR; el gasto real, además,
+            revierte el ledger de su entidad vinculada (aviso reforzado abajo). */}
+        <button
+          type="button"
+          className="m-btn m-btn-block m-btn-quiet-danger"
+          disabled={pending}
+          onClick={() => setConfirmingRemove(true)}
+        >
+          Eliminar
+        </button>
       </div>
-      {/* Eliminar una línea del presupuesto es irreversible y antes se ejecutaba al primer
-          toque, sin red. Ahora pasa por el ConfirmDialog del form-kit, como el resto de
-          borrados de la app. */}
+      {/* Confirmación (form-kit). Para el gasto real vinculado, el mensaje advierte
+          que borrarlo REVIERTE el efecto en la entidad (mismo copy que la web). */}
       <ConfirmDialog
         open={confirmingRemove}
-        title="¿Eliminar esta línea?"
-        message={`Se quitará "${line.name}" de tu presupuesto. Esta acción no se puede deshacer.`}
+        title={real ? "¿Eliminar este gasto?" : "¿Eliminar esta línea?"}
+        message={
+          real
+            ? orphanDeletionWarning(line, mAmount(line.amount, currency))
+            : `Se quitará "${line.name}" de tu presupuesto. Esta acción no se puede deshacer.`
+        }
         confirmLabel="Eliminar"
         variant="danger"
         pending={pending}
         onConfirm={() => {
           setConfirmingRemove(false);
-          void run(() => removeBudgetItemAction(line.id), "Línea eliminada del presupuesto");
+          if (real) {
+            void run(
+              () => removeTransactionAction(line.id),
+              isLinkedOrphan(line)
+                ? "Gasto eliminado · se revirtió el efecto en la entidad vinculada"
+                : "Gasto eliminado · tu total gastado bajó por ese monto",
+            );
+          } else {
+            void run(() => removeBudgetItemAction(line.id), "Línea eliminada del presupuesto");
+          }
         }}
         onCancel={() => setConfirmingRemove(false)}
       />

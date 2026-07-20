@@ -24,6 +24,10 @@ import {
   buildCategoryOptionGroups,
   type CategoryOptionGroup,
 } from "@/modules/financial-base/engine/category-options";
+import {
+  isLinkedOrphan,
+  orphanDeletionWarning,
+} from "@/modules/financial-base/engine/orphan-delete";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 
 /** Etiqueta del chip por motivo. El engine solo emite los que puede probar. */
@@ -42,36 +46,6 @@ const TIP_BUDGET =
 const TIP_REAL =
   "Estos gastos ya ocurrieron y suman en «Gastado», pero su categoría ya no se " +
   "muestra. Recategorizalos para que vuelvan a su frasco.";
-
-/** Cómo se llama el ledger que revierte un borrado, por tipo de vínculo. */
-const LINKED_NOUN: Record<string, string> = {
-  goal: "el acumulado de tu sobre",
-  debt: "el saldo de tu deuda",
-  holding: "el costo de tu inversión",
-  policy: "tu póliza",
-  rental: "tu renta",
-};
-
-/** ¿La transacción está vinculada a una entidad cuyo ledger se revierte al borrar? */
-function isLinked(line: OrphanLine): boolean {
-  return Boolean(line.linkedKind && line.linkedKind !== "none");
-}
-
-/** Mensaje de confirmación: diferenciado si borrar revierte un ledger vinculado. */
-function deletionWarning(line: OrphanLine, currency: string): string {
-  const amount = formatMoney(line.amount, currency);
-  if (!isLinked(line)) {
-    return `Se eliminará el gasto «${line.name}» (${amount}). Tu total gastado baja por ese monto.`;
-  }
-  const noun = LINKED_NOUN[line.linkedKind!] ?? "la entidad vinculada";
-  const target = line.linkedName ? `${noun} «${line.linkedName}»` : `${noun}`;
-  // El reverso de reverseLinkedTransaction: borrar el gasto le devuelve el monto
-  // a la entidad. Ej. un aporte a un sobre → le RESTA al acumulado del sobre.
-  return (
-    `Este gasto está vinculado: borrarlo REVERTIRÁ su efecto en ${target}. ` +
-    `Se le restará ${amount}. Esta acción no se puede deshacer.`
-  );
-}
 
 /**
  * Transacción de gasto sin frasco. Se puede RECATEGORIZAR (assignCategoryAction,
@@ -118,7 +92,7 @@ function RealOrphanRow({
     setPending(false);
     if (res.ok) {
       toast(
-        isLinked(line)
+        isLinkedOrphan(line)
           ? "Gasto eliminado · se revirtió el efecto en la entidad vinculada"
           : "Gasto eliminado · tu total gastado bajó por ese monto",
       );
@@ -143,7 +117,7 @@ function RealOrphanRow({
         <div style={{ minWidth: 0, flex: 1 }}>
           <div className="env-name">{line.name}</div>
           <span className="chip-linked">{REASON_LABEL[line.reason]}</span>
-          {isLinked(line) ? <span className="chip-linked">vinculado</span> : null}
+          {isLinkedOrphan(line) ? <span className="chip-linked">vinculado</span> : null}
         </div>
         <div className="big" style={{ whiteSpace: "nowrap" }}>
           {formatMoney(line.amount, currency)}
@@ -154,7 +128,7 @@ function RealOrphanRow({
         /* Confirmación OBLIGATORIA: aviso reforzado si es vinculada. */
         <div className="auth-msg warn" role="alertdialog" aria-label="Confirmar eliminación">
           <div style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 8 }}>
-            {deletionWarning(line, currency)}
+            {orphanDeletionWarning(line, formatMoney(line.amount, currency))}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
