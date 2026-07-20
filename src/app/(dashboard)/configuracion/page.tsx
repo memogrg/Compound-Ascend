@@ -12,6 +12,8 @@ import {
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Icon } from "@/components/ui/icon";
+import { HouseholdMembers, listHouseholdMembers, type HouseholdMembersView } from "@/modules/personal-profile";
+import { isEmailConfigured } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getMyLink } from "@/lib/whatsapp/links-service";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
@@ -58,6 +60,17 @@ export default async function Page() {
       ingestEmails = [];
     }
   }
+
+  // Miembros del hogar. Best-effort: si falla, no se muestra la sección.
+  let household: HouseholdMembersView | null = null;
+  if (isSupabaseConfigured()) {
+    try {
+      household = await listHouseholdMembers();
+    } catch {
+      household = null;
+    }
+  }
+  const emailConfigured = isEmailConfigured();
 
   return (
     <div className="set-sheet">
@@ -111,6 +124,15 @@ export default async function Page() {
       >
         <EmailTester />
       </SetRow>
+
+      {household && household.members.length > 0 ? (
+        <SetRow
+          title="Miembros del hogar"
+          desc="Quiénes comparten la cuenta. Invitá o quitá personas; el total (incluido el titular) depende de tu plan."
+        >
+          <HouseholdMembers view={household} emailConfigured={emailConfigured} />
+        </SetRow>
+      ) : null}
 
       <SetRow
         title="Asistente de WhatsApp"

@@ -47,6 +47,20 @@ export function isPremium(plan: Plan): boolean {
   return plan === "premium";
 }
 
+/**
+ * Límite de personas en el hogar por plan (TOTAL, incluido el titular). Es una
+ * tabla para que sumar un tier futuro sea una línea. El "usado" cuenta miembros
+ * ACTIVOS + invitaciones PENDIENTES (si no, se invita de más y al aceptar se pasa).
+ */
+export const HOUSEHOLD_MEMBER_LIMITS: Record<Plan, number> = {
+  free: 2,
+  premium: 3,
+};
+
+export function householdMemberLimit(plan: Plan): number {
+  return HOUSEHOLD_MEMBER_LIMITS[plan];
+}
+
 export function aiTokenLimit(plan: Plan): number {
   return PLAN_TOKEN_LIMITS[plan];
 }
