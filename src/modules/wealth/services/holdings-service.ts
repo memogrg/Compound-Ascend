@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
@@ -469,6 +470,9 @@ export async function deleteHolding(id: string): Promise<void> {
     .eq("id", id)
     .in("user_id", scope);
   if (error) throw new Error(error.message);
+  // Log: la entidad primaria es el holding; sus transacciones/ingresos vinculados
+  // se borraron en cascada como parte de esta misma acción del usuario.
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "investment_holdings", rowId: id });
 }
 
 /** Posiciones stub pendientes de completar (needs_detail=true). */

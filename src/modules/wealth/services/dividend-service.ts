@@ -19,6 +19,7 @@ import {
 } from "@/modules/financial-base";
 import { dividendToTxn } from "@/modules/financial-base";
 import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";
 
@@ -153,11 +154,13 @@ export async function deleteDividend(id: string): Promise<void> {
 
   const { error } = await supabase.from("dividends").delete().eq("id", id).in("user_id", scope);
   if (error) throw new Error(error.message);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "dividends", rowId: id });
 
   if (row?.income_id) {
     await supabase.from("income_sources").delete().eq("id", row.income_id).in("user_id", scope);
   }
   if (row?.transaction_id) {
+    // deleteLinkedTransaction registra por su cuenta el borrado de la transacción.
     await deleteLinkedTransaction(row.transaction_id);
   }
 }

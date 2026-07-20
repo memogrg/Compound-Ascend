@@ -1,5 +1,6 @@
 import "server-only";
 import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 
 /** Servicio del Módulo 4 (respeta RLS). Cruza Base, Control y Perfil. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -168,6 +169,7 @@ export async function deleteInvestment(id: string): Promise<void> {
   const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase.from("investments").delete().eq("id", id).in("user_id", scope);
   if (error) throw new Error(error.message);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "investments", rowId: id });
 }
 
 export async function deletePolicy(id: string): Promise<void> {
@@ -180,6 +182,7 @@ export async function deletePolicy(id: string): Promise<void> {
     .eq("id", id)
     .in("user_id", scope);
   if (error) throw new Error(error.message);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "insurance_policies", rowId: id });
 }
 
 const MARKET_TYPE: Partial<Record<AssetType, MarketAssetType>> = {

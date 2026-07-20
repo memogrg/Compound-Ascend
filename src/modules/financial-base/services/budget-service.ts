@@ -4,6 +4,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -180,6 +181,7 @@ export async function deleteBudgetItem(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("budget_items").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "budget_items", rowId: id });
 }
 
 /**
@@ -360,6 +362,7 @@ export async function deleteIncomeSource(id: string): Promise<void> {
     .eq("user_id", user.id)
     .maybeSingle();
   await supabase.from("budget_items").delete().eq("id", id).eq("user_id", user.id);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "budget_items", rowId: id });
   if (row?.recurring_item_id) {
     await supabase
       .from("recurring_items")

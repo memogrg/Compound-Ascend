@@ -19,6 +19,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import {
   createTransaction,
   buildTransactionRow,
@@ -200,6 +201,7 @@ export async function deleteLinkedTransaction(transactionId: string): Promise<vo
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("transactions").delete().eq("id", transactionId).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "transactions", rowId: transactionId });
 }
 
 /**

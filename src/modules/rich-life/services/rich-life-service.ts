@@ -1,5 +1,6 @@
 import "server-only";
 import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 
 /**
  * Servicio del Módulo 5 (respeta RLS). Consolida activos, pasivos e ingreso
@@ -118,6 +119,7 @@ export async function deleteAsset(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("assets").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "assets", rowId: id });
 }
 
 export async function deleteLiability(id: string): Promise<void> {
@@ -125,6 +127,7 @@ export async function deleteLiability(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("liabilities").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "liabilities", rowId: id });
 }
 
 const INVESTMENT_CLASS: Record<string, AssetClass> = {

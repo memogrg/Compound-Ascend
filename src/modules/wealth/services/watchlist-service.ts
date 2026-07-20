@@ -12,6 +12,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 
 export type WatchKind = "stock" | "etf" | "crypto";
 export type WatchItem = { id: string; symbol: string; kind: WatchKind };
@@ -59,4 +60,5 @@ export async function removeWatchlistSymbol(id: string): Promise<void> {
     .eq("id", id)
     .in("user_id", scope);
   if (error) throw new Error(error.message);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "watchlist_symbols", rowId: id });
 }
