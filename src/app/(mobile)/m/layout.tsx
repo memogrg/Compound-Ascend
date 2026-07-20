@@ -10,8 +10,16 @@ import { MobileIntro } from "./components/mobile-intro";
  * viven en el layout interno (app), para que /m/login quede fuera de la guarda.
  */
 export const viewport: Viewport = {
-  // Status bar acorde a la canvas CLARA (tema por defecto) + safe areas (notch/home).
-  themeColor: "#F1EFE8",
+  // Status bar acorde a la canvas de CADA tema. Con un solo color, al abrir la app en
+  // oscuro la barra de estado se quedaba clara y se veía una franja ajena arriba.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F1EFE8" },
+    { media: "(prefers-color-scheme: dark)", color: "#15140F" },
+  ],
+  // Le dice al WebView de qué color pintar lo que NO es nuestro: el fondo por debajo del
+  // documento y los controles nativos. Sin esto asoma un flash blanco por los bordes al
+  // hacer scroll con rebote, aunque la app ya esté en oscuro.
+  colorScheme: "light dark",
   viewportFit: "cover",
   // Escalado BLOQUEADO: el WebView se comporta como una app nativa. Sin esto, iOS hace
   // zoom al enfocar un campo y al cerrar el teclado se queda agrandado, con scroll
@@ -29,10 +37,11 @@ export const viewport: Viewport = {
 };
 
 export default function MobileRootLayout({ children }: { children: React.ReactNode }) {
-  // Tema CLARO por defecto (como el diseño). Para alternar a oscuro, cambiar este
-  // atributo a data-theme="dark" (mobile.css tiene el scope listo). No se fuerza oscuro.
+  // SIN data-theme propio: la fuente de verdad es <html>, que fija el script
+  // anti-parpadeo del layout raíz antes de pintar, y el shell lo hereda por CSS. Tenerlo
+  // aquí obligaba a sincronizar dos atributos y dejaba el portal desincronizado.
   return (
-    <div className="m-shell" data-mobile data-theme="light">
+    <div className="m-shell" data-mobile>
       {/* Intro animada del logo al abrir la app (una vez por sesión; portal a body). */}
       <MobileIntro />
       {children}

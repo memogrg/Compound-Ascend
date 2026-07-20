@@ -54,7 +54,7 @@ export default async function MobileInversiones() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" eyebrow="Crecimiento" title="Portafolio de inversiones" />
+        <MobileHeader variant="inner" home eyebrow="Crecimiento" title="Portafolio de inversiones" />
 
         {/* Resumen: valor del portafolio (exacto mientras quepa) + ganancia/pérdida.
             Los montos YA vienen en la moneda primaria (portfolio-service normaliza con

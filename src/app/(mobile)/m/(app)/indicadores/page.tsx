@@ -157,8 +157,8 @@ export default async function MobileIndicadores() {
           variant="inner"
           eyebrow="Contexto macro"
           title="Mercado e indicadores"
-          backHref="/m/inversiones"
-          backLabel="Volver a Inversiones"
+          backHref="/m"
+          backLabel="Volver a Inicio"
         />
 
         {/* Lectura de contexto (best-effort). Conserva su tinte de acento. */}

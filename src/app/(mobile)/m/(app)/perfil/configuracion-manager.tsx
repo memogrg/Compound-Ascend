@@ -16,6 +16,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { currencySymbol } from "@/lib/format";
+import type { ThemeMode } from "@/components/layout/theme-provider";
+import { useThemeMode } from "../../components/use-theme-mode";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   updateCurrencyAction,
@@ -47,7 +49,15 @@ import { AppLockToggle } from "../../components/app-lock-toggle";
 import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/app-lock";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
-type SheetId = "currency" | "whatsapp" | "household" | "password" | null;
+type SheetId = "currency" | "theme" | "whatsapp" | "household" | "password" | null;
+
+/** Etiquetas del selector de apariencia. "Sistema" primero: es el valor por defecto y el
+ *  que la mayoría deja puesto. */
+const TEMA_LABEL: Record<ThemeMode, string> = {
+  system: "Sistema",
+  light: "Claro",
+  dark: "Oscuro",
+};
 
 const NOTIF_ROWS: { key: NotificationChannel; label: string; hint: string; disabled?: boolean; badge?: string }[] = [
   { key: "inApp", label: "En la app", hint: 'Avisos del día en "Qué noté".' },
@@ -75,6 +85,7 @@ export function ConfiguracionManager({
   isEditor: boolean;
 }) {
   const [sheet, setSheet] = useState<SheetId>(null);
+  const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
   const [danger, setDanger] = useState<0 | 1 | 2>(0);
   const waLinked = wa?.status === "active";
 
@@ -96,6 +107,19 @@ export function ConfiguracionManager({
           chevron
           onClick={() => setSheet("currency")}
           ariaLabel="Cambiar moneda principal"
+        />
+        <MDataRow
+          leading={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} style={{ width: 19, height: 19 }}>
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" strokeLinecap="round" />
+            </svg>
+          }
+          title="Apariencia"
+          subtitle={TEMA_LABEL[themeMode]}
+          chevron
+          onClick={() => setSheet("theme")}
+          ariaLabel="Cambiar apariencia"
         />
       </MContentCard>
 
@@ -186,6 +210,30 @@ export function ConfiguracionManager({
       {/* Hoja: moneda */}
       <BottomSheet open={sheet === "currency"} onClose={() => setSheet(null)} title="Moneda principal">
         <CurrencySheet current={currency} onDone={() => setSheet(null)} />
+      </BottomSheet>
+
+      {/* Hoja: apariencia */}
+      <BottomSheet open={sheet === "theme"} onClose={() => setSheet(null)} title="Apariencia">
+        {/* Mismo marcado que la hoja de moneda (.m-optlist/.m-opt): dos listas de
+            opciones en la misma pantalla deben verse y tocarse igual. */}
+        <div className="m-optlist">
+          {(["system", "light", "dark"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`m-opt${themeMode === m ? " sel" : ""}`}
+              onClick={() => {
+                setThemeMode(m);
+                setSheet(null);
+              }}
+            >
+              <span className="m-opt-t">{TEMA_LABEL[m]}</span>
+            </button>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12, marginTop: 10, lineHeight: 1.45 }}>
+          Con «Sistema», la app sigue el modo claro u oscuro de tu iPhone.
+        </p>
       </BottomSheet>
 
       {/* Hoja: WhatsApp */}

@@ -119,8 +119,14 @@
      que además cubre la barra de estado con su cristal. Ver bloques abajo. */
 }
 
-/* ===== tema OSCURO = opción secundaria (LISTA, no activada) =====
-   Para alternar: poné data-theme="dark" (o class="dark") en el <div.m-shell>. */
+/* ===== tema OSCURO =====
+   La fuente de verdad es `data-theme` en <html>, que fija el script anti-parpadeo del
+   layout raíz ANTES de pintar. El shell lo HEREDA en vez de llevar el suyo propio, y eso
+   resuelve dos cosas de golpe: no hay que sincronizar dos atributos, y el portal —que
+   clona `.m-shell` dentro de <body>— queda tematizado solo, sin copiar nada a mano.
+   Se conservan los selectores sobre el propio shell para no romper a quien lo fije de
+   forma explícita (el mock de QA lo hace). */
+[data-theme="dark"] .m-shell,
 .m-shell[data-theme="dark"],
 .m-shell.dark {
   --canvas: #15140f;
@@ -190,6 +196,7 @@ body {
   background-color: #f1efe8;
   overscroll-behavior: none;
 }
+[data-theme="dark"] body,
 body:has(.m-shell[data-theme="dark"]) {
   background-color: #15140f;
 }
@@ -410,6 +417,18 @@ body:has(.m-shell[data-theme="dark"]) {
   box-shadow:
     0 6px 18px -8px color-mix(in srgb, var(--accent) 50%, transparent),
     inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+}
+/* El isotipo como ENLACE a Inicio en las raíces de pestaña. Hereda de `.iso`, que ya
+   mide 44×44 —el mínimo de Apple HIG y WCAG 2.5.5—, así que el área táctil sale gratis
+   y el logo se ve idéntico al de Inicio: si cambiara entre pantallas dejaría de anclar
+   la marca. */
+.m-shell .m-iso-home {
+  color: var(--text);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-shell .m-iso-home:active {
+  opacity: 0.75;
 }
 .m-shell .iso svg {
   width: 30px;
@@ -2750,6 +2769,14 @@ body:has(.m-shell[data-theme="dark"]) {
   position: relative;
   z-index: 1; /* las tarjetas pasan POR DELANTE de la marca */
 }
+/* Quien pide menos movimiento no quiere que la pantalla se deslice sola: se conserva el
+   snap (es posición, no animación) pero el desplazamiento pasa a ser instantáneo. Un
+   carrusel con scroll suave es exactamente lo que esta preferencia existe para apagar. */
+@media (prefers-reduced-motion: reduce) {
+  .m-shell .m-carousel {
+    scroll-behavior: auto;
+  }
+}
 
 /* ---- chasis de tarjeta: idéntico en las 7 ---- */
 
@@ -2909,8 +2936,14 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* Botón de reintento de la tarjeta que no cargó. Ocupa la línea del mensaje, así que
-   la altura de la tarjeta no cambia respecto a sus hermanas. */
+   la altura de la tarjeta no cambia respecto a sus hermanas.
+   ÁREA TÁCTIL de 44px sin agrandar la píldora: la zona se estira con un ::after
+   invisible centrado en el botón. La píldora medía 24px de alto —por debajo del mínimo
+   de Apple HIG y de WCAG 2.5.5— y es justo el control que se toca cuando algo ya falló,
+   o sea el peor momento para fallar un toque. Agrandarla de verdad rompería la altura
+   fija de la tarjeta, que costó cuatro rondas. */
 .m-shell .m-hcard-retry {
+  position: relative;
   margin-top: 4px;
   align-self: flex-start;
   border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
@@ -2922,6 +2955,15 @@ body:has(.m-shell[data-theme="dark"]) {
   padding: 3px 10px;
   border-radius: 999px;
   cursor: pointer;
+}
+.m-shell .m-hcard-retry::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: max(100%, 44px);
+  height: 44px;
 }
 .m-shell .m-hcard-retry:disabled {
   opacity: 0.6;
