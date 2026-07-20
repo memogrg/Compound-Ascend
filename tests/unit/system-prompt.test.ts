@@ -406,3 +406,24 @@ describe("buildSystemPrompt · comportamientos de asesor experto (reglas condici
     expect(prompt).toContain("Fuentes de ingreso activas: 1 (una sola fuente).");
   });
 });
+
+describe("buildSystemPrompt · hogar compartido (E4)", () => {
+  it("householdShared=true → el prompt marca las finanzas como de la cuenta común", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC", name: "Dra", householdShared: true });
+    expect(prompt).toContain("HOGAR COMPARTIDO");
+    expect(prompt).toContain("Dra");
+    // La instrucción clave: no atribuir un movimiento a quien pregunta sin saberlo.
+    expect(prompt).toContain("el gasto del hogar");
+  });
+
+  it("sin householdShared → NO menciona hogar compartido (usuario individual intacto)", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC", name: "Dra" });
+    expect(prompt).not.toContain("HOGAR COMPARTIDO");
+  });
+
+  it("householdShared sin nombre → cae a 'un miembro del hogar', no rompe", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC", householdShared: true });
+    expect(prompt).toContain("HOGAR COMPARTIDO");
+    expect(prompt).toContain("un miembro del hogar");
+  });
+});

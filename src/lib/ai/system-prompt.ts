@@ -10,6 +10,12 @@ import type { Trajectory } from "@/lib/ai/trajectory";
 export type FinancialContext = {
   name?: string;
   currency: string;
+  /**
+   * true cuando el usuario pertenece a un hogar con MÁS de un miembro. Las cifras
+   * financieras son de la cuenta común; el perfil sigue siendo el de quien habla.
+   * Sin esto la IA diría "tu gasto" sobre un movimiento que hizo la otra persona.
+   */
+  householdShared?: boolean;
   incomeMonthly?: number;
   /** Cuántas fuentes de ingreso activas tiene (1 = dependencia de una sola fuente). Best-effort. */
   incomeSourceCount?: number;
@@ -125,6 +131,13 @@ export type FinancialContext = {
 export function buildSystemPrompt(ctx: FinancialContext): string {
   const facts: string[] = [`Moneda principal: ${ctx.currency}.`];
   if (ctx.name) facts.push(`El usuario se llama ${ctx.name}.`);
+  if (ctx.householdShared)
+    facts.push(
+      `Las finanzas son de un HOGAR COMPARTIDO: los ingresos, gastos, metas, deudas y patrimonio ` +
+        `de arriba son de la cuenta en común, no solo de quien pregunta. Hablás con ${ctx.name ?? "un miembro del hogar"}; ` +
+        `su perfil (tolerancia al riesgo, hábitos) es suyo, no del hogar. No digas "tu gasto" sobre ` +
+        `un movimiento sin saber quién lo hizo: hablá de "el gasto del hogar" salvo que conste que es de quien pregunta.`,
+    );
   if (ctx.incomeMonthly !== undefined)
     facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}.`);
   if (ctx.incomeSourceCount !== undefined)

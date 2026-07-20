@@ -13,8 +13,18 @@ import "server-only";
  * útil con lo que haya. Todas las lecturas respetan RLS (cliente de sesión).
  */
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
+import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
+
+/**
+ * PRIVACIDAD (cuenta compartida): las lecturas FINANCIERAS de este motor abarcan
+ * a todo el hogar, así que un miembro puede consultar por IA los movimientos,
+ * metas y deudas del otro. Es la intención de la cuenta en común — la plata es
+ * compartida. El PERFIL (riesgo/comportamiento/conocimiento/preferencias/
+ * prioridades) sigue por user_id: la IA aconseja sobre la plata común según a
+ * QUIÉN le habla, sin mezclar perfiles en una "persona promedio" que no existe.
+ */
 
 /** Coacciona un valor jsonb a string[] (las columnas jsonb llegan como unknown). */
 function asStrings(v: unknown): string[] {
@@ -27,6 +37,17 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   if (!isSupabaseConfigured() || !user) return { name, currency: "CRC" };
 
   let ctx: FinancialContext = { name, currency: "CRC" };
+
+  // ¿Hogar compartido? (más de un miembro) → la IA trata las cifras como comunes.
+  // Best-effort: si falla, el chat no se degrada, solo no marca lo compartido.
+  try {
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const supabase = await createSupabaseServerClient();
+    const members = await householdMemberIds(supabase, user.id);
+    if (members.length > 1) ctx.householdShared = true;
+  } catch {
+    // Sin dato de hogar: se asume individual.
+  }
 
   // Base Financiera: indicadores del mes. El asesor usa SIEMPRE la moneda PRINCIPAL
   // (no getDisplayCurrency(), que honra la cookie de visualización). Pasar un
@@ -126,10 +147,12 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   try {
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const supabase = await createSupabaseServerClient();
+    // Financiero → alcance de hogar: las metas de la cuenta común son de todos.
+    const memberIds = await householdMemberIds(supabase, user.id);
     const { data: goals } = await supabase
       .from("savings_goals")
       .select("current_amount,target_amount")
-      .eq("user_id", user.id);
+      .in("user_id", memberIds);
     if (goals && goals.length > 0) {
       const target = goals.reduce((s, g) => s + Number(g.target_amount), 0);
       const current = goals.reduce((s, g) => s + Number(g.current_amount), 0);
