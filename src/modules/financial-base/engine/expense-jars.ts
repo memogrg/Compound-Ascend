@@ -98,6 +98,14 @@ export type OrphanLine = {
   nativeAmount: number;
   currency: string;
   reason: OrphanReason;
+  /**
+   * Vínculo de la transacción (solo huérfanos de GASTO REAL). Si está presente y
+   * != 'none', borrarla REVIERTE el ledger de la entidad — la UI lo advierte.
+   * `linkedName` es el nombre resuelto de la entidad (p.ej. "Beauty Fernanda").
+   */
+  linkedKind?: string;
+  linkedId?: string | null;
+  linkedName?: string | null;
 };
 
 export const ORPHAN_GROUP = "__orphans__";
@@ -524,6 +532,13 @@ export function buildExpenseJars(args: {
       reason: reasonFor(it.categoryId),
     }));
 
+  // Nombre de entidad por id (para avisar qué ledger revierte un borrado
+  // vinculado). Los ids son uuids únicos → un mapa plano cross-kind alcanza.
+  const entityNameById = new Map<string, string>();
+  for (const list of Object.values(entities)) {
+    for (const e of list) entityNameById.set(e.id, e.name);
+  }
+
   const realItems: OrphanLine[] = (args.realTxns ?? [])
     // Off-budget no suma en "Gastado" (mismo corte que getRealTotals) → tampoco
     // puede ser huérfano: no hay nada que reconciliar.
@@ -536,6 +551,9 @@ export function buildExpenseJars(args: {
       nativeAmount: t.amount,
       currency: t.currency,
       reason: reasonFor(t.categoryId),
+      linkedKind: t.linkedKind,
+      linkedId: t.linkedId ?? null,
+      linkedName: t.linkedId ? (entityNameById.get(t.linkedId) ?? null) : null,
     }));
 
   if (items.length > 0 || realItems.length > 0) {

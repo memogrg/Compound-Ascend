@@ -518,11 +518,14 @@ export async function editTransactionAction(id: string, raw: unknown): Promise<A
 export async function removeTransactionAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
+    // deleteTransaction ya revierte el ledger de la entidad vinculada
+    // (reverseLinkedTransaction) y registra el borrado en el log del hogar (E3).
     await deleteTransaction(id);
     revalidate();
     return { ok: true };
-  } catch {
-    return { ok: false };
+  } catch (err) {
+    // Propaga el mensaje (p.ej. el de solo-lectura del hogar) en vez de un fallo mudo.
+    return { ok: false, message: err instanceof Error ? err.message : undefined };
   }
 }
 
