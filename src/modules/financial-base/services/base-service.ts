@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
@@ -89,6 +89,8 @@ export async function createIncome(input: IncomeInput): Promise<void> {
   await supabase.from("income_sources").insert({
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     name: input.name,
     income_type: input.incomeType,
     category: input.category ?? null,
@@ -110,6 +112,8 @@ export async function createExpense(input: ExpenseInput): Promise<void> {
   await supabase.from("expense_items").insert({
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     name: input.name,
     nature: input.nature,
     amount: input.amount,
@@ -126,9 +130,10 @@ export async function createExpense(input: ExpenseInput): Promise<void> {
 export async function updateIncome(id: string, input: IncomeInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("income_sources")
-    .update({
+    .update({ last_edited_by: user.id,
       name: input.name,
       income_type: input.incomeType,
       category: input.category ?? null,
@@ -142,15 +147,16 @@ export async function updateIncome(id: string, input: IncomeInput): Promise<void
       amount_monthly_base: monthlyize(input.amount, input.frequency),
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 export async function updateExpense(id: string, input: ExpenseInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("expense_items")
-    .update({
+    .update({ last_edited_by: user.id,
       name: input.name,
       nature: input.nature,
       amount: input.amount,
@@ -163,19 +169,21 @@ export async function updateExpense(id: string, input: ExpenseInput): Promise<vo
       amount_monthly_base: monthlyize(input.amount, input.frequency),
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 export async function deleteIncome(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("income_sources").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("income_sources").delete().eq("id", id).in("user_id", scope);
 }
 
 export async function deleteExpense(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("expense_items").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("expense_items").delete().eq("id", id).in("user_id", scope);
 }
 
 export type BaseSummary = {

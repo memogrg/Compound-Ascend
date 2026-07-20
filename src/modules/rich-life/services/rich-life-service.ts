@@ -1,5 +1,5 @@
 import "server-only";
-import { householdMemberIds } from "@/lib/household/active";
+import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 
 /**
  * Servicio del Módulo 5 (respeta RLS). Consolida activos, pasivos e ingreso
@@ -81,9 +81,10 @@ export async function createLiability(input: LiabilityInput): Promise<void> {
 export async function updateAsset(id: string, input: AssetInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("assets")
-    .update({
+    .update({ last_edited_by: user.id,
       name: input.name,
       asset_class: input.assetClass,
       value: input.value,
@@ -92,34 +93,37 @@ export async function updateAsset(id: string, input: AssetInput): Promise<void> 
       liquidity: input.liquidity ?? null,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 export async function updateLiability(id: string, input: LiabilityInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("liabilities")
-    .update({
+    .update({ last_edited_by: user.id,
       name: input.name,
       liability_class: input.liabilityClass,
       balance: input.balance,
       currency: input.currency,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 export async function deleteAsset(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("assets").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("assets").delete().eq("id", id).in("user_id", scope);
 }
 
 export async function deleteLiability(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("liabilities").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("liabilities").delete().eq("id", id).in("user_id", scope);
 }
 
 const INVESTMENT_CLASS: Record<string, AssetClass> = {

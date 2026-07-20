@@ -1,5 +1,5 @@
 import "server-only";
-import { householdMemberIds } from "@/lib/household/active";
+import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 
 /** Servicio del Módulo 4 (respeta RLS). Cruza Base, Control y Perfil. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -124,9 +124,10 @@ export async function createPolicy(input: PolicyInput): Promise<string> {
 export async function updateInvestment(id: string, input: InvestmentInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase
     .from("investments")
-    .update({
+    .update({ last_edited_by: user.id,
       asset_type: input.assetType,
       name: input.name,
       symbol: input.symbol ?? null,
@@ -138,16 +139,17 @@ export async function updateInvestment(id: string, input: InvestmentInput): Prom
       dca_broker: input.dcaBroker ?? null,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) throw new Error(error.message);
 }
 
 export async function updatePolicy(id: string, input: PolicyInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase
     .from("insurance_policies")
-    .update({
+    .update({ last_edited_by: user.id,
       policy_type: input.policyType,
       provider: input.provider ?? null,
       coverage: input.coverage ?? null,
@@ -156,25 +158,27 @@ export async function updatePolicy(id: string, input: PolicyInput): Promise<void
       currency: input.currency,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) throw new Error(error.message);
 }
 
 export async function deleteInvestment(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("investments").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  const { error } = await supabase.from("investments").delete().eq("id", id).in("user_id", scope);
   if (error) throw new Error(error.message);
 }
 
 export async function deletePolicy(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase
     .from("insurance_policies")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) throw new Error(error.message);
 }
 

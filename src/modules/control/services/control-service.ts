@@ -3,7 +3,7 @@ import "server-only";
 /** Servicio del Módulo 3 (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import {
   registerLinkedTransaction,
@@ -138,6 +138,8 @@ export async function createGoal(input: GoalInput): Promise<string> {
     .insert({
       user_id: user.id,
       household_id,
+      created_by: user.id,
+      last_edited_by: user.id,
       name: input.name,
       goal_type: input.goalType ?? null,
       kind: input.kind,
@@ -200,6 +202,7 @@ export async function createDebt(input: DebtInputForm): Promise<void> {
 export async function updateGoal(id: string, input: GoalInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   // Recurrencia: no re-anclar el next_reset_on que ya avanzó el cron en una
   // edición normal. Solo se re-deriva si la cadencia cambió o aún no había una.
@@ -207,7 +210,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
     .from("savings_goals")
     .select("recurrence,next_reset_on")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   // Un sobre no tiene meta ni recurrencia.
   const isSobre = input.kind === "sobre";
@@ -230,7 +233,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
 
   await supabase
     .from("savings_goals")
-    .update({
+    .update({ last_edited_by: user.id,
       name: input.name,
       goal_type: input.goalType ?? null,
       kind: input.kind,
@@ -247,30 +250,33 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
       policy_id: input.policyId ?? null,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 export async function updateDebt(id: string, input: DebtInputForm): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase
     .from("debts")
     .update(debtColumns(input))
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) throw new Error(error.message);
 }
 
 export async function deleteGoal(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("savings_goals").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("savings_goals").delete().eq("id", id).in("user_id", scope);
 }
 
 export async function deleteDebt(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("debts").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("debts").delete().eq("id", id).in("user_id", scope);
 }
 
 // ── Deuda individual y pagos (fuente de la verdad: debt_payments) ──
@@ -295,11 +301,15 @@ function rowToDebtPayment(
 export async function getDebt(id: string): Promise<Debt | null> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // Lectura de DISPLAY: alcance de hogar (todos los miembros la ven, igual que
+  // #425). La autorización de ESCRITURA no vive acá — la da householdWriteScope
+  // + RLS en la función que muta (addDebtPayment, updateDebt, deleteDebt).
+  const memberIds = await householdMemberIds(supabase, user.id);
   const { data, error } = await supabase
     .from("debts")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", memberIds)
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? rowToDebt(data) : null;
@@ -350,17 +360,20 @@ export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, st
 export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const debt = await getDebt(input.debtId);
-  if (!debt) {
-    // Distingue "no existe" de "es de otro miembro del hogar": con el
-    // alcance de hogar la fila SE VE en pantalla, así que un "no
-    // encontrada" pelado parecería un bug.
-    if (await existsInHousehold(supabase, user.id, "debts", input.debtId)) {
-      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
-    }
-    throw new Error("Deuda no encontrada");
-  }
+  if (!debt) throw new Error("Deuda no encontrada");
+  // Autorización de escritura: registrar un pago MODIFICA la deuda del hogar.
+  // Un editor puede sobre cualquier deuda del hogar; un no-editor solo sobre la
+  // suya. Si la deuda existe pero no está en mi alcance de escritura → mensaje.
+  const { data: writable } = await supabase
+    .from("debts")
+    .select("id")
+    .eq("id", input.debtId)
+    .in("user_id", scope)
+    .maybeSingle();
+  if (!writable) throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
   const total = input.amount + input.extraAmount;
 
   // household: cubre el hueco del sub-PR household de main (no tocó este insert).
@@ -368,6 +381,8 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   const paymentRow = {
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     debt_id: input.debtId,
     occurred_on: input.paymentDate,
     amount: input.amount,
@@ -420,12 +435,12 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     );
     const { error: upErr } = await supabase
       .from("debts")
-      .update({
+      .update({ last_edited_by: user.id,
         current_payment: decision.monthlyPayment,
         balance: Math.max(0, debt.balance - input.extraAmount),
       })
       .eq("id", input.debtId)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
     if (upErr) throw new Error(upErr.message);
   }
 }
@@ -482,12 +497,13 @@ export async function addGoalContribution(input: {
 }): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const { data: goalRow, error: gErr } = await supabase
     .from("savings_goals")
     .select("id,name,currency,current_amount")
     .eq("id", input.goalId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
   if (!goalRow) {
@@ -514,9 +530,9 @@ export async function addGoalContribution(input: {
 
   const { error } = await supabase
     .from("savings_goals")
-    .update({ current_amount: Number(goalRow.current_amount) + input.amount })
+    .update({ last_edited_by: user.id, current_amount: Number(goalRow.current_amount) + input.amount })
     .eq("id", input.goalId)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) {
     await deleteLinkedTransaction(txnId);
     throw new Error(error.message);
@@ -535,12 +551,13 @@ export async function withdrawFromGoal(input: {
 }): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const { data: goalRow, error: gErr } = await supabase
     .from("savings_goals")
     .select("id,name,currency,current_amount")
     .eq("id", input.goalId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
   if (!goalRow) {
@@ -569,9 +586,9 @@ export async function withdrawFromGoal(input: {
 
   const { error } = await supabase
     .from("savings_goals")
-    .update({ current_amount: Math.max(0, Number(goalRow.current_amount) - input.amount) })
+    .update({ last_edited_by: user.id, current_amount: Math.max(0, Number(goalRow.current_amount) - input.amount) })
     .eq("id", input.goalId)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) {
     await deleteLinkedTransaction(txnId);
     throw new Error(error.message);
@@ -595,12 +612,13 @@ export async function spendFromGoal(input: {
 }): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const { data: goalRow, error: gErr } = await supabase
     .from("savings_goals")
     .select("id,name,currency,current_amount,target_amount,status")
     .eq("id", input.goalId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (gErr) throw new Error(gErr.message);
   if (!goalRow) {
@@ -633,9 +651,9 @@ export async function spendFromGoal(input: {
   const nextTarget = Math.max(0, Number(goalRow.target_amount) - input.amount);
   const { error } = await supabase
     .from("savings_goals")
-    .update({ current_amount: nextCurrent, target_amount: nextTarget })
+    .update({ last_edited_by: user.id, current_amount: nextCurrent, target_amount: nextTarget })
     .eq("id", input.goalId)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) {
     await deleteLinkedTransaction(txnId);
     throw new Error(error.message);

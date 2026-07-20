@@ -18,13 +18,20 @@ const h = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/session", () => ({ requireUser: async () => ({ id: "u1" }) }));
-vi.mock("@/lib/household/active", () => ({ getActiveHouseholdId: async () => "hh1" }));
+vi.mock("@/lib/household/active", () => ({
+  getActiveHouseholdId: async () => "hh1",
+  householdMemberIds: async (_c: unknown, uid: string) => [uid],
+  householdWriteScope: async (_c: unknown, uid: string) => [uid],
+  isActiveHouseholdEditor: async () => true,
+  existsInHousehold: async () => false,
+}));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
     from: (table: string) => {
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
+        in: (..._a: unknown[]) => b,
         maybeSingle: async () => {
           if (table === "debt_payments") return { data: h.debtPayment, error: null };
           if (table === "savings_goals") return { data: h.goalRow, error: null };
@@ -32,7 +39,9 @@ vi.mock("@/lib/supabase/server", () => ({
         },
         update: (payload: Record<string, unknown>) => {
           if (table === "savings_goals") h.goalUpdateSpy(payload);
-          return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) };
+          const done = Promise.resolve({ error: null });
+          const term = { eq: () => done, in: () => done };
+          return { eq: () => term, in: () => done };
         },
       };
       return b;
@@ -94,7 +103,7 @@ describe("reverseLinkedTransaction · goal", () => {
       occurredOn: "2026-07-08",
     });
     expect(h.goalUpdateSpy).toHaveBeenCalledTimes(1);
-    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 70000 });
+    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 70000, last_edited_by: "u1" });
   });
 
   it("retiro (ingreso) revertido → SUMA el monto de vuelta a current_amount", async () => {
@@ -107,7 +116,7 @@ describe("reverseLinkedTransaction · goal", () => {
       amount: 30000,
       occurredOn: "2026-07-08",
     });
-    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 130000 });
+    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 130000, last_edited_by: "u1" });
   });
 
   it("consumo del frasco (gasto off-budget) revertido → RESTAURA current_amount Y target_amount", async () => {
@@ -125,6 +134,7 @@ describe("reverseLinkedTransaction · goal", () => {
     expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({
       current_amount: 200000,
       target_amount: 1000000,
+      last_edited_by: "u1",
     });
   });
 
@@ -139,7 +149,7 @@ describe("reverseLinkedTransaction · goal", () => {
       occurredOn: "2026-07-08",
       countsInBudget: true,
     });
-    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 70000 });
+    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 70000, last_edited_by: "u1" });
   });
 
   it("no baja de 0 al revertir un aporte mayor que el saldo", async () => {
@@ -152,7 +162,7 @@ describe("reverseLinkedTransaction · goal", () => {
       amount: 50000,
       occurredOn: "2026-07-08",
     });
-    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 0 });
+    expect(h.goalUpdateSpy.mock.calls[0]![0]).toEqual({ current_amount: 0, last_edited_by: "u1" });
   });
 
   it("no toca nada si la meta ya no existe", async () => {
