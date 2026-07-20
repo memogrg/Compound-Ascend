@@ -2752,11 +2752,29 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* ---- chasis de tarjeta: idéntico en las 7 ---- */
+
+/* TINTE VERDE de la superficie. Blanco puro sobre lienzo crema se veía pálido y sin
+   carácter. El tinte es un solo mando: cambiar --m-card-tint a 12% basta para subirlo,
+   sin tocar ninguna regla.
+   En claro sale exactamente #eff5f1 (8% de #378451 sobre #ffffff), que es el valor ya
+   medido en el brief; en oscuro se resuelve solo, porque --accent y --surface ya están
+   tematizados. */
+.m-shell {
+  --m-card-tint: 8%;
+  --m-card-surface: color-mix(in srgb, var(--accent) var(--m-card-tint), var(--surface));
+}
+
 .m-shell .m-hcard {
   /* Ancho: deja asomar la siguiente tarjeta ~28px, que es la pista visual de que
      el carrusel se desliza. A 320px sigue siendo cómoda. */
   flex: 0 0 calc(100vw - 68px);
   max-width: 340px;
+  /* min-width: 0 — sin esto el ancho MÍNIMO del contenido puede empujar la tarjeta por
+     encima de su flex-basis: medido a 320px, agrandar el donut la estiraba de 252 a 276
+     porque el visual es flex:none y no encoge. El efecto era peor que un desborde,
+     porque no se nota mirando una sola tarjeta: cada tarjeta acababa con un ancho
+     distinto según su visual y el carrusel dejaba de centrar. */
+  min-width: 0;
   /* ALTURA FIJA, no min-height: ninguna tarjeta puede crecer con su contenido o el
      carrusel daría saltos al deslizar. Las 7 comparten este número.
      168, no 240: al pasar el visual a la derecha desaparecen las dos bandas vacías
@@ -2776,12 +2794,16 @@ body:has(.m-shell[data-theme="dark"]) {
   position: relative;
   isolation: isolate;
 
-  /* CRISTAL. Translucidez cálida sobre la marca de agua + desenfoque: el efecto solo
-     existe porque detrás hay algo que refractar (.m-carousel-mark). El prefijo
-     -webkit- no es opcional: WKWebView lo necesita. */
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  backdrop-filter: blur(16px) saturate(150%);
+  /* CRISTAL. Translucidez sobre la marca de agua + desenfoque: el efecto solo existe
+     porque detrás hay algo que refractar (.m-carousel-mark). El prefijo -webkit- no es
+     opcional: WKWebView lo necesita.
+     62%, no 78%: el criterio de aceptación es que la marca SE INTUYA a través de la
+     tarjeta, y a 78% no atravesaba. El desenfoque también baja de 16 a 10px — pasado
+     cierto punto el desenfoque no "cristaliza", solo borra lo que hay detrás, y aquí lo
+     de detrás es justo lo que se quiere dejar ver. */
+  background: color-mix(in srgb, var(--m-card-surface) 62%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  backdrop-filter: blur(10px) saturate(140%);
   border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   box-shadow:
     0 1px 1px color-mix(in srgb, var(--text) 4%, transparent),
@@ -2792,12 +2814,12 @@ body:has(.m-shell[data-theme="dark"]) {
    transparencia — ahí gana siempre la legibilidad. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .m-shell .m-hcard {
-    background: var(--surface);
+    background: var(--m-card-surface);
   }
 }
 @media (prefers-reduced-transparency: reduce) {
   .m-shell .m-hcard {
-    background: var(--surface);
+    background: var(--m-card-surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -2837,6 +2859,11 @@ body:has(.m-shell[data-theme="dark"]) {
   margin-top: 6px;
 }
 .m-shell .m-hcard-figs {
+  /* flex: 1 — la columna de texto ABSORBE el espacio sobrante. Sin esto se dimensionaba
+     por su contenido y `space-between` empujaba el resto al medio: medido a 375px,
+     128 de texto + 88 de visual dejaban 59px de hueco entre ambos. Ese era el "aire
+     muerto", y no se quitaba agrandando el visual sino repartiendo bien. */
+  flex: 1;
   min-width: 0; /* sin esto la columna de texto no encoge y empuja al visual fuera */
 }
 .m-shell .m-hcard-val {
@@ -2866,6 +2893,44 @@ body:has(.m-shell[data-theme="dark"]) {
   align-items: center;
   justify-content: flex-end;
 }
+/* Medidor del visual de Presupuesto. Escala con la pantalla, igual que la tarjeta.
+   Los dos topes están MEDIDOS: a 320px la cifra necesita 134px de los 220 útiles, así
+   que el medidor no puede pasar de 74 sin truncarla; a 375 ya cabrían 129, de modo que
+   fijarlo al mínimo seguro de 320 encogería el medidor en todas las pantallas por culpa
+   de la más pequeña. 22vw cae dentro del rango en todas las anchuras reales. */
+.m-shell .m-hcard-gauge {
+  width: clamp(72px, 22vw, 88px);
+  height: clamp(72px, 22vw, 88px);
+}
+
+/* Barras etiquetadas del visual de Patrimonio. La etiqueta va PEGADA a su barra y no
+   en una leyenda aparte: una leyenda obliga a mirar dos sitios y emparejar colores, que
+   es justo el paso que hizo falta explicar la vez anterior. */
+.m-shell .m-hcard-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.m-shell .m-hcard-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.m-shell .m-hcard-bar-l {
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.m-shell .m-hcard-bar-v {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
 .m-shell .m-hcard-msg {
   font-size: 11.5px;
   line-height: 1.35;
@@ -2879,25 +2944,39 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* ---- marca de agua C+: el fondo que el cristal refracta ---- */
+/* CENTRADA Y COMPLETA. Antes iba ampliada y sangrada, y de la marca solo asomaba un
+   trozo del arco: un logo que no se reconoce no es marca de agua, es una mancha. Ahora
+   cabe entera en el bloque, así que se lee como marca — y al quedar bajo las tarjetas,
+   es lo que el cristal deja intuir al deslizar.
+   Va A DOS COLORES con los tokens del tema, no con hex fijos: en claro --text es
+   #1e1c16 y --accent es #378451, exactamente la marca; en oscuro cada uno resuelve a su
+   equivalente sin duplicar reglas. Como una máscara CSS es monocroma, la C y el + son
+   dos capas (el elemento y su ::after) sobre el mismo cuadro. */
 .m-shell .m-carousel-mark {
   position: absolute;
-  /* SANGRADA: se sale del encuadre para que se lea como textura de marca y no como un
-     logo pegado en una esquina.
-     El encuadre está elegido MIRANDO cuatro variantes: con el recorte anterior
-     (300px / -34% / -12%) solo asomaba un trozo del arco y se leía como un borrón; con
-     la marca centrada, lo que quedaba entre tarjeta y tarjeta era una barra suelta del
-     "+", que parecía un artefacto. Así, más grande y desplazada abajo-derecha, lo que
-     entra en cuadro es la curva larga de la C barriendo bajo las tarjetas. */
-  top: -18%;
-  right: -18%;
-  width: 340px;
-  height: 340px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 150px;
+  height: 150px;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.08;
+  /* 0.30, elegido mirando cuatro variantes: a 0.16 la marca existía pero no se intuía
+     bajo el cristal, y por encima de 0.45 empieza a competir con el texto. Parece mucho
+     para una marca de agua porque casi nunca se ve directa — vive entera bajo la
+     tarjeta, así que lo que llega al ojo es esto filtrado por un 62% de superficie. */
+  opacity: 0.3;
   background: var(--text);
-  -webkit-mask: url("/marca/logo-watermark.svg") no-repeat center / contain;
-  mask: url("/marca/logo-watermark.svg") no-repeat center / contain;
+  -webkit-mask: url("/marca/logo-mark-c.svg") no-repeat center / contain;
+  mask: url("/marca/logo-mark-c.svg") no-repeat center / contain;
+}
+.m-shell .m-carousel-mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  -webkit-mask: url("/marca/logo-mark-plus.svg") no-repeat center / contain;
+  mask: url("/marca/logo-mark-plus.svg") no-repeat center / contain;
 }
 
 /* ---- indicador: puntos + nombre de la tarjeta ACTIVA (no las 7) ---- */

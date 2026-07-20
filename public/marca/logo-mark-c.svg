@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<!-- Solo la C. Va en fichero aparte del "+" para poder teñir cada pieza con su propio
+     token de color: una máscara CSS es monocroma, así que una marca a dos colores exige
+     dos capas. Se conserva el viewBox completo para que ambas alineen al escalarlas con
+     `contain` en la misma caja.
+     OJO: nada de guiones dobles en este comentario. XML no los admite dentro de un
+     comentario y el SVG entero deja de estar bien formado; el navegador lo descarta sin
+     avisar y la máscara queda transparente, que es exactamente como se ve "no pasa nada". -->
+<g transform="translate(512,512)">
+<path d="M 116 -238 A 265 265 0 1 0 116 238" fill="none" stroke="#000" stroke-width="108" stroke-linecap="round"/>
+</g></svg>
