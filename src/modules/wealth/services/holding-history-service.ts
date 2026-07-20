@@ -1,5 +1,5 @@
 import "server-only";
-import { householdMemberIds } from "@/lib/household/active";
+import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
@@ -143,17 +143,23 @@ export async function recordHoldingValuation(
 ): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // Edición compartida: un editor registra valoraciones sobre holdings del
+  // hogar. Sin el alcance, el pre-read no encontraría el holding de otro miembro
+  // y la valoración nacería con household_id NULL (invisible para el hogar).
+  const scope = await householdWriteScope(supabase, user.id);
   const { data: h } = await supabase
     .from("investment_holdings")
     .select("household_id, currency")
     .eq("id", holdingId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   const { error } = await supabase.from("holding_valuations").upsert(
     {
       holding_id: holdingId,
       user_id: user.id,
       household_id: h?.household_id ?? null,
+      created_by: user.id,
+      last_edited_by: user.id,
       as_of: asOf,
       value,
       currency: h?.currency ?? "USD",
@@ -166,15 +172,15 @@ export async function recordHoldingValuation(
     .from("holding_valuations")
     .select("value")
     .eq("holding_id", holdingId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .order("as_of", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (latest) {
     await supabase
       .from("investment_holdings")
-      .update({ current_value_manual: Number(latest.value) })
+      .update({ last_edited_by: user.id, current_value_manual: Number(latest.value) })
       .eq("id", holdingId)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
   }
 }
