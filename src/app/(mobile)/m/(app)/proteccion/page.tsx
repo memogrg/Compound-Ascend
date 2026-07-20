@@ -54,8 +54,8 @@ export default async function MobileProteccion() {
           variant="inner"
           eyebrow="Crecimiento"
           title="Defensa Patrimonial"
-          backHref="/m/inversiones"
-          backLabel="Volver a Inversiones"
+          backHref="/m"
+          backLabel="Volver a Inicio"
         />
 
         {/* Resumen: cuánto tienes protegido + el estado (Protegido/Parcial/Expuesto) como

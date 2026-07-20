@@ -64,7 +64,7 @@ export default async function MobilePerfil() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" eyebrow="Cuenta" title="Configuración" />
+        <MobileHeader variant="inner" home eyebrow="Cuenta" title="Configuración" />
 
         {/* Identidad — avatar + nombre + correo. Cabecera honesta de la cuenta (sin métricas
             inventadas): superficie del kit para igualar el resto del barrido. */}

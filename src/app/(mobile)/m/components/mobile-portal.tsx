@@ -15,21 +15,21 @@ import { createPortal } from "react-dom";
  * El wrapper reusa la clase `.m-shell` para que resuelvan los tokens (--canvas, --text…) y
  * los selectores scoped (`.m-shell .m-menu-*`, `.m-sheet-*`…), pero con `display:contents`
  * NO genera caja propia (no pinta canvas ni ocupa alto): solo transporta variables/estilos.
- * El tema se copia del `.m-shell` raíz para respetar claro/oscuro.
+ * NO copia el tema: `data-theme` vive en <html> y el shell lo hereda por CSS. Antes se
+ * leía del shell raíz UNA vez al montar, así que al cambiar de tema el portal se quedaba
+ * con el anterior — un menú abierto en claro sobre una app ya en oscuro.
  */
 export function MobilePortal({ children }: { children: ReactNode }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
-  const [theme, setTheme] = useState("light");
 
   useEffect(() => {
-    setTheme(document.querySelector(".m-shell")?.getAttribute("data-theme") ?? "light");
     setHost(document.body);
   }, []);
 
   if (!host) return null; // SSR / primer render: nada hasta montar en cliente
 
   return createPortal(
-    <div className="m-shell" data-mobile data-theme={theme} style={{ display: "contents" }}>
+    <div className="m-shell" data-mobile style={{ display: "contents" }}>
       {children}
     </div>,
     host,

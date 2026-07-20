@@ -65,7 +65,7 @@ export default async function MobilePatrimonio() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" eyebrow="Crecimiento" title="Patrimonio" />
+        <MobileHeader variant="inner" home eyebrow="Crecimiento" title="Patrimonio" />
 
         {/* Resumen: patrimonio neto (rojo si es negativo) + el gráfico R5 como slot. */}
         <MSummaryCard

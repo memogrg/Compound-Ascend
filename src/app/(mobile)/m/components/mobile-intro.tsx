@@ -111,9 +111,21 @@ const CSS = `
 .mi-overlay{
   position:fixed; inset:0; z-index:10050; /* POR ENCIMA del candado (app-lock, z-9999) */
   display:grid; place-items:center;
-  background:#f4f2ec; /* crema: empata el splash nativo (siempre crema) */
+  background:#f4f2ec; /* crema: empata el splash nativo claro */
   animation: mi-out 0.42s ease-in 1.06s forwards;
 }
+/* La intro SIGUE AL TEMA. Antes era crema siempre, así que abrir la app en oscuro
+   mostraba un splash claro y luego el fundido descubría una app oscura: exactamente el
+   salto que el modo oscuro venía a evitar. Se mira data-theme de html porque la intro
+   se portaliza a body, fuera del .m-shell donde viven los tokens.
+   Android ya trae drawable-night/splash.png, así que ahí la cadena queda continua:
+   splash oscuro, intro oscura, app oscura. En iOS no hay variante oscura del splash
+   nativo (Splash.imageset no declara appearances), así que ahí queda un salto crema a
+   oscuro en el traspaso del sistema; generar ese asset es su propio delta.
+   OJO: nada de acentos graves en este comentario. El CSS vive en un template literal y
+   un acento grave cierra la cadena; el error sale como "Expected a semicolon" en una
+   línea de comentario, que no ayuda nada a encontrarlo. */
+[data-theme="dark"] .mi-overlay{ background:#15140f; }
 .mi-stage{ display:flex; flex-direction:column; align-items:center; gap:20px; }
 .mi-icon{
   /* Grande y centrado (~40% del ancho, acotado). */

@@ -110,9 +110,14 @@ export function MHomeCarousel({
       | HTMLElement
       | undefined;
     if (!target) return;
+    // `smooth` solo si el usuario no ha pedido menos movimiento: el CSS ya lo cubre para
+    // el scroll nativo, pero scrollTo con behavior explícito lo ignoraría.
+    const menosMovimiento =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     track.scrollTo({
       left: target.offsetLeft - (track.clientWidth - target.offsetWidth) / 2,
-      behavior: "smooth",
+      behavior: menosMovimiento ? "auto" : "smooth",
     });
   }, []);
 
