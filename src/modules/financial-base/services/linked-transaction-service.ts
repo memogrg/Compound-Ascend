@@ -18,7 +18,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId } from "@/lib/household/active";
+import { getActiveHouseholdId, householdWriteScope } from "@/lib/household/active";
 import {
   createTransaction,
   buildTransactionRow,
@@ -71,6 +71,7 @@ export async function propagateLinkedTransaction(args: {
   if (!args.linkedId || args.kind !== "gasto") return;
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   if (args.linkedKind === "debt") {
     // Desglose cuota vs abono extra (Fase 7): si el pago supera la cuota
@@ -80,7 +81,7 @@ export async function propagateLinkedTransaction(args: {
       .from("debts")
       .select("balance,apr,current_payment,min_payment")
       .eq("id", args.linkedId)
-      .eq("user_id", user.id)
+      .in("user_id", scope)
       .maybeSingle();
     if (dErr) throw new Error(dErr.message);
     if (!debt) throw new Error("La deuda vinculada ya no existe o no te pertenece.");
@@ -102,6 +103,8 @@ export async function propagateLinkedTransaction(args: {
     const { error } = await supabase.from("debt_payments").insert({
       user_id: user.id,
       household_id,
+      created_by: user.id,
+      last_edited_by: user.id,
       debt_id: args.linkedId,
       occurred_on: args.occurredOn,
       amount: split.amount,
@@ -120,15 +123,15 @@ export async function propagateLinkedTransaction(args: {
       .from("savings_goals")
       .select("current_amount")
       .eq("id", args.linkedId)
-      .eq("user_id", user.id)
+      .in("user_id", scope)
       .maybeSingle();
     if (gErr) throw new Error(gErr.message);
     if (!goal) throw new Error("Meta no encontrada");
     const { error } = await supabase
       .from("savings_goals")
-      .update({ current_amount: Number(goal.current_amount) + args.amount })
+      .update({ last_edited_by: user.id, current_amount: Number(goal.current_amount) + args.amount })
       .eq("id", args.linkedId)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
     if (error) throw new Error(error.message);
   }
   // holding / policy / rental: sin propagación desde el composer (por ahora).
@@ -147,12 +150,13 @@ export async function linkExistingTransaction(args: {
 }): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const { data: txn, error: tErr } = await supabase
     .from("transactions")
     .select("id,kind,amount,occurred_on,linked_kind")
     .eq("id", args.transactionId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (tErr) throw new Error(tErr.message);
   if (!txn) throw new Error("Transacción no encontrada");
@@ -165,9 +169,9 @@ export async function linkExistingTransaction(args: {
 
   const { error: upErr } = await supabase
     .from("transactions")
-    .update({ linked_kind: args.linkedKind, linked_id: args.linkedId })
+    .update({ last_edited_by: user.id, linked_kind: args.linkedKind, linked_id: args.linkedId })
     .eq("id", args.transactionId)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (upErr) throw new Error(upErr.message);
 
   try {
@@ -183,9 +187,9 @@ export async function linkExistingTransaction(args: {
     // Compensación: revierte el vínculo; la transacción no se toca más.
     await supabase
       .from("transactions")
-      .update({ linked_kind: "none", linked_id: null })
+      .update({ last_edited_by: user.id, linked_kind: "none", linked_id: null })
       .eq("id", args.transactionId)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
     throw err;
   }
 }
@@ -194,7 +198,8 @@ export async function linkExistingTransaction(args: {
 export async function deleteLinkedTransaction(transactionId: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("transactions").delete().eq("id", transactionId).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("transactions").delete().eq("id", transactionId).in("user_id", scope);
 }
 
 /**
@@ -236,13 +241,14 @@ export async function reverseLinkedTransaction(args: {
   if (!args.linkedId) return;
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   if (args.linkedKind === "debt") {
     const { data: pay, error: pErr } = await supabase
       .from("debt_payments")
       .select("id")
       .eq("transaction_id", args.transactionId)
-      .eq("user_id", user.id)
+      .in("user_id", scope)
       .maybeSingle();
     if (pErr) throw new Error(pErr.message);
     if (pay) {
@@ -260,7 +266,7 @@ export async function reverseLinkedTransaction(args: {
       .from("savings_goals")
       .select("current_amount,target_amount")
       .eq("id", args.linkedId)
-      .eq("user_id", user.id)
+      .in("user_id", scope)
       .maybeSingle();
     if (gErr) throw new Error(gErr.message);
     if (!goal) return;
@@ -268,12 +274,12 @@ export async function reverseLinkedTransaction(args: {
     if (isSpend) {
       const { error } = await supabase
         .from("savings_goals")
-        .update({
+        .update({ last_edited_by: user.id,
           current_amount: Number(goal.current_amount) + args.amount,
           target_amount: Number(goal.target_amount) + args.amount,
         })
         .eq("id", args.linkedId)
-        .eq("user_id", user.id);
+        .in("user_id", scope);
       if (error) throw new Error(error.message);
       return;
     }
@@ -283,9 +289,9 @@ export async function reverseLinkedTransaction(args: {
     const next = Math.max(0, Number(goal.current_amount) + delta);
     const { error } = await supabase
       .from("savings_goals")
-      .update({ current_amount: next })
+      .update({ last_edited_by: user.id, current_amount: next })
       .eq("id", args.linkedId)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
     if (error) throw new Error(error.message);
     return;
   }

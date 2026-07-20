@@ -18,7 +18,7 @@ import {
   monthPeriod,
 } from "@/modules/financial-base";
 import { dividendToTxn } from "@/modules/financial-base";
-import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";
 
@@ -62,6 +62,7 @@ export async function listDividends(holdingId?: string): Promise<Dividend[]> {
 export async function createDividend(input: DividendInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const freq = input.frequency ?? "anual";
   const household_id = await getActiveHouseholdId(supabase, user.id);
@@ -74,6 +75,8 @@ export async function createDividend(input: DividendInput): Promise<void> {
     .insert({
       user_id: user.id,
       household_id,
+      created_by: user.id,
+      last_edited_by: user.id,
       holding_id: input.holdingId,
       payment_date: input.paymentDate,
       amount: input.amount,
@@ -95,7 +98,7 @@ export async function createDividend(input: DividendInput): Promise<void> {
   const { data: line } = await supabase
     .from("budget_items")
     .select("id")
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .eq("source_kind", "dividend")
     .eq("source_id", input.holdingId)
     .eq("period_month", period.month)
@@ -119,18 +122,18 @@ export async function createDividend(input: DividendInput): Promise<void> {
     );
   } catch (err) {
     // Compensación: quita el dividendo si el ledger falla.
-    await supabase.from("dividends").delete().eq("id", divRow!.id).eq("user_id", user.id);
+    await supabase.from("dividends").delete().eq("id", divRow!.id).in("user_id", scope);
     throw err;
   }
 
   const { error: upErr } = await supabase
     .from("dividends")
-    .update({ transaction_id: txnId })
+    .update({ last_edited_by: user.id, transaction_id: txnId })
     .eq("id", divRow!.id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (upErr) {
     await deleteLinkedTransaction(txnId);
-    await supabase.from("dividends").delete().eq("id", divRow!.id).eq("user_id", user.id);
+    await supabase.from("dividends").delete().eq("id", divRow!.id).in("user_id", scope);
     throw new Error(upErr.message);
   }
 }
@@ -138,20 +141,21 @@ export async function createDividend(input: DividendInput): Promise<void> {
 export async function deleteDividend(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   // Lee income_id/transaction_id antes de borrar para limpiar lo vinculado.
   const { data: row } = await supabase
     .from("dividends")
     .select("income_id,transaction_id")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
 
-  const { error } = await supabase.from("dividends").delete().eq("id", id).eq("user_id", user.id);
+  const { error } = await supabase.from("dividends").delete().eq("id", id).in("user_id", scope);
   if (error) throw new Error(error.message);
 
   if (row?.income_id) {
-    await supabase.from("income_sources").delete().eq("id", row.income_id).eq("user_id", user.id);
+    await supabase.from("income_sources").delete().eq("id", row.income_id).in("user_id", scope);
   }
   if (row?.transaction_id) {
     await deleteLinkedTransaction(row.transaction_id);

@@ -1,5 +1,5 @@
 import "server-only";
-import { householdMemberIds } from "@/lib/household/active";
+import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 
 /**
  * Plantillas / favoritos de transacción: permiten registrar en 1 clic
@@ -77,9 +77,10 @@ export async function createTemplate(input: TemplateInput): Promise<void> {
 export async function updateTemplate(id: string, input: TemplateInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("transaction_templates")
-    .update({
+    .update({ last_edited_by: user.id,
       name: input.name,
       kind: input.kind,
       amount: input.amount ?? null,
@@ -92,13 +93,14 @@ export async function updateTemplate(id: string, input: TemplateInput): Promise<
       sort_order: input.sortOrder ?? 0,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("transaction_templates").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("transaction_templates").delete().eq("id", id).in("user_id", scope);
 }
 
 /** Marca uso (telemetría suave para ordenar por frecuencia). */

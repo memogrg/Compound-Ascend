@@ -26,7 +26,13 @@ vi.mock("@/lib/auth/session", () => ({
   requireUser: async () => ({ id: "u1" }),
   isSupabaseConfigured: () => true,
 }));
-vi.mock("@/lib/household/active", () => ({ getActiveHouseholdId: async () => null }));
+vi.mock("@/lib/household/active", () => ({
+  getActiveHouseholdId: async () => null,
+  householdMemberIds: async (_c: unknown, uid: string) => [uid],
+  householdWriteScope: async (_c: unknown, uid: string) => [uid],
+  isActiveHouseholdEditor: async () => true,
+  existsInHousehold: async () => false,
+}));
 vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: async () => ({}) }));
 vi.mock("@/modules/financial-base", async () => {
   const linked = await vi.importActual<typeof import("@/modules/financial-base/engine/linked")>(
@@ -52,6 +58,7 @@ vi.mock("@/lib/supabase/server", () => ({
       const b: Record<string, unknown> = {
         select: () => b,
         eq: () => b,
+        in: (..._a: unknown[]) => b,
         update: (payload: Record<string, unknown>) => {
           h.updatePayload = payload;
           return b;
@@ -85,7 +92,7 @@ describe("spendFromGoal · gastar del frasco", () => {
       categoryId: "c-ropa",
     });
     // 200k → 180k acumulado; 1M → 980k meta. Brecha 800k intacta.
-    expect(h.updatePayload).toEqual({ current_amount: 180000, target_amount: 980000 });
+    expect(h.updatePayload).toEqual({ current_amount: 180000, target_amount: 980000, last_edited_by: "u1" });
     // La transacción vinculada nace OFF-BUDGET y con la categoría elegida.
     const txn = h.register.mock.calls[0]![0] as Record<string, unknown>;
     expect(txn.countsInBudget).toBe(false);
@@ -105,7 +112,7 @@ describe("spendFromGoal · gastar del frasco", () => {
     h.goalRow.current_amount = 50000;
     h.goalRow.target_amount = 30000; // meta ya menor que el acumulado (caso borde)
     await spendFromGoal({ goalId: "g1", amount: 50000, spendDate: "2026-07-10", categoryId: null });
-    expect(h.updatePayload).toEqual({ current_amount: 0, target_amount: 0 });
+    expect(h.updatePayload).toEqual({ current_amount: 0, target_amount: 0, last_edited_by: "u1" });
   });
 
   it("rollback: si el update de la meta falla, borra la transacción creada", async () => {

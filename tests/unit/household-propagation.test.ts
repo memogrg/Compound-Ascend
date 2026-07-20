@@ -19,6 +19,10 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/lib/household/active", () => ({
   getActiveHouseholdId: vi.fn(async () => activeHousehold),
+  householdMemberIds: vi.fn(async (_c: unknown, uid: string) => [uid]),
+  householdWriteScope: vi.fn(async (_c: unknown, uid: string) => [uid]),
+  isActiveHouseholdEditor: vi.fn(async () => true),
+  existsInHousehold: vi.fn(async () => false),
 }));
 
 // Cliente supabase mínimo: from("debts") responde la deuda; from("debt_payments")
@@ -31,6 +35,7 @@ function mockSupabase() {
         const q = {
           select: () => q,
           eq: () => q,
+          in: (..._a: unknown[]) => q,
           maybeSingle: async () => ({
             data: { balance: 1000, apr: 12, current_payment: 100, min_payment: 100 },
             error: null,

@@ -4,7 +4,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
@@ -132,11 +132,12 @@ export async function registerPurchaseExpense(args: {
   if (id) {
     const user = await requireUser();
     const supabase = await createSupabaseServerClient();
+    const scope = await householdWriteScope(supabase, user.id);
     await supabase
       .from("transactions")
-      .update({ linked_kind: "holding", linked_id: args.holdingId })
+      .update({ last_edited_by: user.id, linked_kind: "holding", linked_id: args.holdingId })
       .eq("id", id)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
   }
   return id;
 }
@@ -159,6 +160,8 @@ async function recordPurchaseTx(
   const { error } = await supabase.from("investment_transactions").insert({
     user_id: userId,
     household_id,
+    created_by: userId,
+    last_edited_by: userId,
     holding_id: holdingId,
     tx_type: "compra",
     amount: qty * price,
@@ -243,6 +246,7 @@ export async function listHoldings(ctx?: AuthContext): Promise<Holding[]> {
 export async function createHolding(input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const symbol = resolveSymbol(input);
   const label = input.label?.trim() || null;
 
@@ -251,7 +255,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
   let q = supabase
     .from("investment_holdings")
     .select("id, quantity, average_cost, broker")
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .eq("symbol", symbol)
     .eq("asset_type", input.assetType)
     .eq("currency", input.currency);
@@ -298,7 +302,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         : input.averageCost;
     const { error } = await supabase
       .from("investment_holdings")
-      .update({
+      .update({ last_edited_by: user.id,
         quantity: newQty,
         average_cost: newAvg,
         cost_basis: newQty * newAvg,
@@ -306,7 +310,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         broker: input.broker ?? existing.broker ?? null,
       })
       .eq("id", existing.id)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
     if (error) {
       if (txnId) await deleteLinkedTransaction(txnId);
       throw new Error(error.message);
@@ -322,6 +326,8 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     .insert({
       user_id: user.id,
       household_id,
+      created_by: user.id,
+      last_edited_by: user.id,
       investment_id: input.investmentId ?? null,
       label,
       symbol,
@@ -365,7 +371,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         .from("investment_holdings")
         .delete()
         .eq("id", created.id)
-        .eq("user_id", user.id);
+        .in("user_id", scope);
       throw err;
     }
   }
@@ -374,6 +380,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
 export async function updateHolding(id: string, input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const symbol = resolveSymbol(input);
 
   // Fase 4.1 (opt-in, default OFF en edits porque el flujo no distingue
@@ -385,7 +392,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       .from("investment_holdings")
       .select(HOLDING_COLS)
       .eq("id", id)
-      .eq("user_id", user.id)
+      .in("user_id", scope)
       .maybeSingle();
     if (oldRow) {
       const old = rowToHolding(oldRow);
@@ -413,7 +420,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
 
   const { error } = await supabase
     .from("investment_holdings")
-    .update({
+    .update({ last_edited_by: user.id,
       investment_id: input.investmentId ?? null,
       symbol,
       asset_type: input.assetType,
@@ -432,7 +439,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
       ...taxonomyColumns(input),
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) {
     if (txnId) await deleteLinkedTransaction(txnId);
     throw new Error(error.message);
@@ -442,6 +449,7 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
 export async function deleteHolding(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   // Fase 3: borrar un stub revierte las fuentes de ingreso vinculadas (la
   // FK ON DELETE SET NULL solo desvincularía; aquí sí queremos eliminarlas).
   await deleteIncomeSourcesByHolding(id);
@@ -451,7 +459,7 @@ export async function deleteHolding(id: string): Promise<void> {
   const { error: txErr } = await supabase
     .from("transactions")
     .delete()
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .eq("linked_kind", "holding")
     .eq("linked_id", id);
   if (txErr) throw new Error(txErr.message);
@@ -459,7 +467,7 @@ export async function deleteHolding(id: string): Promise<void> {
     .from("investment_holdings")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) throw new Error(error.message);
 }
 
@@ -500,12 +508,13 @@ export async function countPendingHoldings(): Promise<number> {
 export async function recordHoldingSale(input: HoldingSaleInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const { data: row, error: hErr } = await supabase
     .from("investment_holdings")
     .select(HOLDING_COLS)
     .eq("id", input.holdingId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (hErr) throw new Error(hErr.message);
   if (!row) throw new Error("Posición no encontrada");
@@ -536,7 +545,7 @@ export async function recordHoldingSale(input: HoldingSaleInput): Promise<void> 
       .from("investment_holdings")
       .update(patch)
       .eq("id", input.holdingId)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
     if (error) {
       await deleteLinkedTransaction(txnId);
       throw new Error(error.message);

@@ -3,7 +3,7 @@ import "server-only";
 /** CRUD + agregados de presupuesto por mes (budget_items). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -49,11 +49,12 @@ function rowToBudgetItem(r: BudgetItemRow): BudgetItem {
 async function assertManualItem(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { data } = await supabase
     .from("budget_items")
     .select("source_kind")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (data && data.source_kind !== "manual") {
     throw new Error("Esta línea se deriva de una entidad; edítala desde su módulo.");
@@ -82,6 +83,8 @@ export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
   await supabase.from("budget_items").insert({
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     type: input.type,
     category_id: input.categoryId ?? null,
     name: input.name,
@@ -130,9 +133,10 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
   await assertManualItem(id);
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("budget_items")
-    .update({
+    .update({ last_edited_by: user.id,
       type: input.type,
       category_id: input.categoryId ?? null,
       name: input.name,
@@ -146,7 +150,7 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
       holding_id: input.holdingId ?? null,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 /**
@@ -161,11 +165,12 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
 export async function reassignBudgetItem(id: string, categoryId: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase
     .from("budget_items")
-    .update({ category_id: categoryId })
+    .update({ last_edited_by: user.id, category_id: categoryId })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) throw new Error(error.message);
 }
 
@@ -173,7 +178,8 @@ export async function deleteBudgetItem(id: string): Promise<void> {
   await assertManualItem(id);
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("budget_items").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("budget_items").delete().eq("id", id).in("user_id", scope);
 }
 
 /**
@@ -241,6 +247,8 @@ async function createRecurringTemplate(
     .insert({
       user_id: userId,
       household_id,
+      created_by: userId,
+      last_edited_by: userId,
       kind: "ingreso",
       name: input.name,
       amount: input.amount,
@@ -271,6 +279,8 @@ export async function registerIncomeSource(
     .insert({
       user_id: user.id,
       household_id,
+      created_by: user.id,
+      last_edited_by: user.id,
       type: "income",
       category_id: input.categoryId ?? null,
       name: input.name,
@@ -377,6 +387,8 @@ export async function registerPassiveIncomeWithStub(args: PassiveIncomeStubInput
     .insert({
       user_id: user.id,
       household_id,
+      created_by: user.id,
+      last_edited_by: user.id,
       symbol: isRental ? "INMU" : args.assetName.toUpperCase().slice(0, 12),
       asset_type: isRental ? "inmueble" : "accion",
       label: args.assetName,

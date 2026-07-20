@@ -19,7 +19,7 @@ import {
   monthPeriod,
 } from "@/modules/financial-base";
 import { rentalPaymentToTxn } from "@/modules/financial-base";
-import { getActiveHouseholdId, householdMemberIds } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";
 
@@ -61,6 +61,7 @@ export async function listRentalPayments(holdingId?: string): Promise<RentalPaym
 export async function createRentalPayment(input: RentalPaymentInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const freq = input.frequency ?? "mensual";
   const household_id = await getActiveHouseholdId(supabase, user.id);
@@ -72,14 +73,14 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
     .from("investment_holdings")
     .select("nature,rental_income")
     .eq("id", input.holdingId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (holding?.nature === "cashflow" && !(Number(holding.rental_income) > 0)) {
     await supabase
       .from("investment_holdings")
-      .update({ rental_income: input.amount, rental_frequency: freq })
+      .update({ last_edited_by: user.id, rental_income: input.amount, rental_frequency: freq })
       .eq("id", input.holdingId)
-      .eq("user_id", user.id);
+      .in("user_id", scope);
   }
 
   // Sincroniza el presupuesto del periodo del pago para materializar la línea
@@ -90,7 +91,7 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
   const { data: line } = await supabase
     .from("budget_items")
     .select("id")
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .eq("source_kind", "rental")
     .eq("source_id", input.holdingId)
     .eq("period_month", period.month)
@@ -115,6 +116,8 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
   const { error: rentErr } = await supabase.from("rental_payments").insert({
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     holding_id: input.holdingId,
     received_on: input.receivedOn,
     amount: input.amount,
@@ -133,25 +136,26 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
 export async function deleteRentalPayment(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   const { data: row } = await supabase
     .from("rental_payments")
     .select("income_id,transaction_id")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
 
   const { error } = await supabase
     .from("rental_payments")
     .delete()
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (error) throw new Error(error.message);
 
   // income_id solo existe en pagos LEGADO (pre C-2b); los nuevos lo tienen null
   // y su renta vive en la transacción vinculada.
   if (row?.income_id) {
-    await supabase.from("income_sources").delete().eq("id", row.income_id).eq("user_id", user.id);
+    await supabase.from("income_sources").delete().eq("id", row.income_id).in("user_id", scope);
   }
   // Borrar la transacción descuenta su aporte a la barra "Recibido" del periodo.
   if (row?.transaction_id) {

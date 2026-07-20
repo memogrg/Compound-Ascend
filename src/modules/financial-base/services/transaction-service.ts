@@ -7,7 +7,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE } from "@/lib/household/active";
+import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -200,6 +200,8 @@ export async function buildTransactionRow(
   const row: TransactionInsert = {
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     kind: input.kind,
     description: input.description ?? null,
     merchant_or_source: input.merchantOrSource ?? null,
@@ -276,6 +278,7 @@ export const LINKED_TXN_EDIT_BLOCKED =
 export async function updateTransaction(id: string, input: TxnInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   // Integridad: las transacciones VINCULADAS no se editan en crudo aquí. Cambiar el
   // monto/fecha desincronizaría su ledger de origen (debt_payments, current_amount).
@@ -285,7 +288,7 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
     .from("transactions")
     .select("linked_kind")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (existing && (existing.linked_kind ?? "none") !== "none") {
     throw new Error(LINKED_TXN_EDIT_BLOCKED);
@@ -300,7 +303,7 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
   const accountLabel = await accountLabelFor(input.accountId);
   await supabase
     .from("transactions")
-    .update({
+    .update({ last_edited_by: user.id,
       kind: input.kind,
       description: input.description ?? null,
       merchant_or_source: input.merchantOrSource ?? null,
@@ -315,7 +318,7 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
       confirmed_by_user: input.status === "confirmed",
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 
   // Saco de Liquidez: re-sincroniza el delta con el nuevo kind/amount. Si pasó a
   // un kind sin delta (transferencia/ajuste), recordTransactionDelta borra la fila.
@@ -349,6 +352,7 @@ async function recordLiquidityDelta(args: {
 export async function deleteTransaction(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
 
   // Integridad: si la transacción está VINCULADA (pago de deuda, aporte/retiro de
   // meta, …), revierte primero su ledger de origen para no dejarlo huérfano (un
@@ -358,7 +362,7 @@ export async function deleteTransaction(id: string): Promise<void> {
     .from("transactions")
     .select("kind, amount, occurred_on, linked_kind, linked_id, counts_in_budget")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (txn && (txn.linked_kind ?? "none") !== "none") {
     const { reverseLinkedTransaction } = await import(
@@ -377,17 +381,18 @@ export async function deleteTransaction(id: string): Promise<void> {
 
   // Borra la transacción. Idempotente: en deudas la RPC de reversión ya la borró
   // junto al debt_payment, así que este delete queda como no-op.
-  await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id);
+  await supabase.from("transactions").delete().eq("id", id).in("user_id", scope);
 }
 
 export async function duplicateTransaction(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { data } = await supabase
     .from("transactions")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (!data) {
     // Duplicar la transacción de otro miembro sería crearla a nombre propio;
@@ -419,11 +424,12 @@ export async function duplicateTransaction(id: string): Promise<void> {
 export async function markReviewed(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("transactions")
-    .update({ status: "confirmed", confirmed_by_user: true })
+    .update({ last_edited_by: user.id, status: "confirmed", confirmed_by_user: true })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 /** Divide una transacción en partes (reemplaza el original por las partes). */
@@ -433,11 +439,12 @@ export async function splitTransaction(
 ): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const { data } = await supabase
     .from("transactions")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (!data) {
     if (await existsInHousehold(supabase, user.id, "transactions", id)) {
@@ -465,7 +472,7 @@ export async function splitTransaction(
     confirmed_by_user: base.confirmed_by_user,
   }));
   await supabase.from("transactions").insert(rows);
-  await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id);
+  await supabase.from("transactions").delete().eq("id", id).in("user_id", scope);
 }
 
 /** Transferencia entre cuentas: una fila kind='transferencia' (neutra en agregados). */
@@ -482,6 +489,8 @@ export async function createTransfer(input: TransferInput): Promise<void> {
   await supabase.from("transactions").insert({
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     kind: "transferencia",
     description: input.note ?? null,
     merchant_or_source: `${nameOf(input.fromAccountId)} → ${nameOf(input.toAccountId)}`,
@@ -507,6 +516,8 @@ export async function importTransactions(rows: CsvTxnInput[]): Promise<number> {
   const payload = rows.map((r) => ({
     user_id: user.id,
     household_id,
+    created_by: user.id,
+    last_edited_by: user.id,
     kind: r.kind,
     description: r.description ?? null,
     merchant_or_source: r.description ?? null,

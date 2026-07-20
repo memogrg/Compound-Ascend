@@ -1,5 +1,5 @@
 import "server-only";
-import { householdMemberIds } from "@/lib/household/active";
+import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 
 /** CRUD de cuentas / métodos de pago (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -54,23 +54,25 @@ export async function createAccount(input: AccountInput): Promise<void> {
 export async function updateAccount(id: string, input: AccountInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   if (input.isDefault) {
-    await supabase.from("accounts").update({ is_default: false }).eq("user_id", user.id);
+    await supabase.from("accounts").update({ last_edited_by: user.id, is_default: false }).in("user_id", scope);
   }
   await supabase
     .from("accounts")
-    .update({
+    .update({ last_edited_by: user.id,
       name: input.name,
       kind: input.kind,
       currency: input.currency,
       is_default: input.isDefault,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
 }
 
 export async function deleteAccount(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  await supabase.from("accounts").delete().eq("id", id).eq("user_id", user.id);
+  const scope = await householdWriteScope(supabase, user.id);
+  await supabase.from("accounts").delete().eq("id", id).in("user_id", scope);
 }

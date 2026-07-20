@@ -79,7 +79,30 @@ export const householdMemberIds = cache(_householdMemberIds);
  * en pantalla — parece un bug, no una regla.
  */
 export const HOUSEHOLD_READ_ONLY_MESSAGE =
-  "Por ahora solo quien creó este registro puede editarlo; la edición compartida llega pronto.";
+  "Tu rol en el hogar es de solo lectura; pedile a un adulto del hogar que haga este cambio.";
+
+/**
+ * Alcance de ESCRITURA sobre datos del hogar.
+ *
+ * Un editor (owner/adult) puede modificar cualquier fila del hogar; el resto
+ * (viewer/child) solo las suyas. Espeja `is_household_editor` del RLS, que es el
+ * candado real: esto solo evita que la app corte filas que la base sí permite.
+ *
+ * SOLO para ediciones que inicia el usuario sobre datos financieros compartidos.
+ * NO usar en:
+ *  · sincronizaciones automáticas (syncDerivedBudget, ensureMonthlyContributions,
+ *    …): corren al cargar la pantalla, y ampliarlas convertiría "abrir una
+ *    página" en una escritura sobre los datos del otro;
+ *  · operaciones de "mis datos" (clearAllFinancialData, seedDemoTemplate);
+ *  · perfiles personales ni transaction_rules (automatización de cada quien).
+ */
+export async function householdWriteScope(
+  supabase: ServerClient,
+  userId: string,
+): Promise<string[]> {
+  if (!(await isActiveHouseholdEditor(supabase, userId))) return [userId];
+  return householdMemberIds(supabase, userId);
+}
 
 /**
  * ¿La fila existe en el HOGAR aunque no sea del usuario? Se usa cuando una

@@ -16,7 +16,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, isActiveHouseholdEditor } from "@/lib/household/active";
+import { getActiveHouseholdId, isActiveHouseholdEditor, householdWriteScope } from "@/lib/household/active";
 import {
   resolveCategoryOverrides,
   type OverrideLite,
@@ -330,6 +330,7 @@ export async function updateCategory(
 ): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const patch: Partial<ExpenseCategoryRow> = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.parentId !== undefined) patch.parent_id = input.parentId;
@@ -339,7 +340,7 @@ export async function updateCategory(
   if (input.isFavorite !== undefined) patch.is_favorite = input.isFavorite;
   if (Object.keys(patch).length === 0) return;
   // RLS impide editar las de sistema (user_id distinto); el filtro lo refuerza.
-  await supabase.from("expense_categories").update(patch).eq("id", id).eq("user_id", user.id);
+  await supabase.from("expense_categories").update(patch).eq("id", id).in("user_id", scope);
 }
 
 /**
@@ -351,11 +352,12 @@ export async function updateCategory(
 export async function deleteCategory(id: string, reassignToId?: string | null): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const householdId = await getActiveHouseholdId(supabase, user.id);
   if (reassignToId) {
     await reassignReferences(supabase, id, reassignToId, user.id, householdId);
   }
-  await supabase.from("expense_categories").delete().eq("id", id).eq("user_id", user.id);
+  await supabase.from("expense_categories").delete().eq("id", id).in("user_id", scope);
 }
 
 /**
@@ -367,14 +369,15 @@ export async function mergeCategory(fromId: string, intoId: string): Promise<voi
   if (fromId === intoId) return;
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
   const householdId = await getActiveHouseholdId(supabase, user.id);
   await reassignReferences(supabase, fromId, intoId, user.id, householdId);
   await supabase
     .from("expense_categories")
-    .update({ merged_into_id: intoId, is_active: false })
+    .update({ last_edited_by: user.id, merged_into_id: intoId, is_active: false })
     .eq("id", fromId)
-    .eq("user_id", user.id);
-  await supabase.from("expense_categories").delete().eq("id", fromId).eq("user_id", user.id);
+    .in("user_id", scope);
+  await supabase.from("expense_categories").delete().eq("id", fromId).in("user_id", scope);
 }
 
 // ============================================================
