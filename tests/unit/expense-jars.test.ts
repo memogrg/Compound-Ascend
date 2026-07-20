@@ -145,6 +145,48 @@ describe("buildExpenseJars (Fase frascos)", () => {
     expect(jar.totals).toEqual({ budget: 130000, spent: 20000, remaining: 110000 });
   });
 
+  // Este test existe por un defecto real: la tarjeta de Inicio decía 80% ejecutado y la
+  // pantalla de Gastos 71% el mismo día. Los holdings recurrentes NUNCA escriben
+  // `budget_items` (a diferencia de deudas, metas y pólizas), así que su aporte solo
+  // existe aquí, en el fallback. Cualquier agregado que sume `budget_items` no lo ve —
+  // y como el aporte SÍ nace como transacción de gasto, el mismo dinero acababa en el
+  // numerador y fuera del denominador.
+  //
+  // Por eso `getEntityFallbackBudget` lo suma aparte. Si alguien hace que los holdings
+  // emitan su línea derivada, `bySource` dejará de estar vacío: este test seguirá
+  // pasando (comprueba las dos ramas) y el helper devolverá 0 solo, sin contar doble.
+  it("Libertad: el aporte del holding SIN línea derivada cuenta igual (fallback al monto)", () => {
+    const LIBERTAD: CategoryNode = {
+      ...cat({ id: "g_lib", key: "g_libertad", name: "Libertad Financiera" }),
+      children: [],
+    };
+    const entities: JarEntities = {
+      ...NO_ENTITIES,
+      holding: [
+        { id: "h1", name: "btc", sub: "aporte mensual", amount: 510_000 },
+        { id: "h2", name: "VOO", sub: "aporte mensual", amount: 90_000 },
+      ],
+    };
+    const jar = buildExpenseJars({
+      tree: [LIBERTAD],
+      budgetByKey: {},
+      realByKey: {},
+      entities,
+      fmt,
+      // Como en producción: los holdings no traen líneas derivadas.
+      linkedBudget: {
+        holding: { bySource: {}, spentById: { h1: 100_000 }, paymentCategoryId: "cat-libertad" },
+      },
+    })[0]!;
+    if (jar.kind !== "linked") throw new Error("linked");
+
+    // Sin línea en budget_items, el presupuesto del frasco es el aporte de la entidad.
+    expect(jar.items.find((i) => i.id === "h1")!.budget).toBe(510_000);
+    expect(jar.items.find((i) => i.id === "h2")!.budget).toBe(90_000);
+    // 600.000 que NO están en budget_items: exactamente lo que la tarjeta no veía.
+    expect(jar.totals).toEqual({ budget: 600_000, spent: 100_000, remaining: 500_000 });
+  });
+
   it("frasco vinculado SIN config de presupuesto: sigue plano (sin budget/spent)", () => {
     const entities: JarEntities = {
       ...NO_ENTITIES,

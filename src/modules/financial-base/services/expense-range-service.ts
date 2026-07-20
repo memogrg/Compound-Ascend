@@ -22,6 +22,8 @@ import {
   type HistoryPoint,
   type KeyedTotals,
 } from "@/modules/financial-base/services/transaction-service";
+import { getEntityFallbackBudget } from "@/modules/financial-base/services/expense-jars-service";
+import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import { previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import type { Period } from "@/modules/financial-base/types";
 
@@ -85,12 +87,22 @@ export async function getExpenseRangeView(
   for (let i = 0; i < monthsBack - 1; i++) spanStart = previousMonthPeriod(spanStart);
   const spanPeriod: Period = { ...period, from: spanStart.from };
 
-  const [spanTotals, history] = await Promise.all([
+  const [spanTotals, history, fallback] = await Promise.all([
     getRealTotals(spanPeriod),
     getRealHistory(period, monthsBack),
+    // Presupuesto que no vive en budget_items (aporte de holdings/rentas). Sin esto el
+    // titular no cuadraba con los frascos de su propia pantalla: mismo dinero contado
+    // como gastado pero no como presupuestado.
+    getEntityFallbackBudget(period, await getDisplayCurrency()),
   ]);
 
-  const budgetExpense = history.reduce((s, h) => s + h.budgetExpense, 0);
+  // Se suma UNA vez, al mes de `period`, no a cada bucket del rango. Del aporte solo
+  // conocemos su valor actual; multiplicarlo por los meses del rango inventaría un
+  // historial que no está en ninguna parte, y sobreestimaría a quien empezó a aportar
+  // hace poco. Para "1m" —la tarjeta y el arranque de Gastos— es exacto, que es donde
+  // estaba la contradicción. Los rangos largos quedan como estaban para los meses
+  // pasados; eso lo cierra de verdad el día que los holdings emitan su línea derivada.
+  const budgetExpense = history.reduce((s, h) => s + h.budgetExpense, 0) + fallback;
 
   return {
     range,
