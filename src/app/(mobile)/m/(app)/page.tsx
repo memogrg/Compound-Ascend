@@ -84,17 +84,24 @@ export default async function MobileHome() {
   // datos de ejemplo del dashboard; los movimientos (que exigen sesión) se omiten.
   const user = await getUser();
   const preview = !user && process.env.MOBILE_DEMO_PREVIEW === "1";
-  const data = await getDashboardData({ previewDemo: preview });
-  const recent = preview
-    ? ([] as Transaction[])
-    : await listTransactions(recentPeriod(now), {}, 6).catch(() => [] as Transaction[]);
 
-  // Presupuesto del mes para la primera tarjeta. Es el agregador más barato de los
-  // siete (cero llamadas de red) y va en paralelo con los movimientos, así que no
-  // añade latencia a la carga: el arranque sigue costando lo que costaba.
-  const expenseView = preview
-    ? null
-    : await getExpenseRangeView("1m", monthPeriod(now.getFullYear(), now.getMonth() + 1)).catch(() => null);
+  // Los tres agregados van EN PARALELO. Ninguno usa el resultado de otro, pero estaban
+  // encadenados con tres `await` seguidos, así que la pantalla pagaba la suma de los
+  // tres en vez del más lento. El comentario que había aquí afirmaba que ya iban en
+  // paralelo; no era cierto, y por eso el coste del tercero (que arrastra las consultas
+  // de getEntityFallbackBudget) se sumaba entero al arranque.
+  // Cada uno conserva su propio `.catch`: si uno falla, los otros dos siguen.
+  const [data, recent, expenseView] = await Promise.all([
+    getDashboardData({ previewDemo: preview }),
+    preview
+      ? Promise.resolve([] as Transaction[])
+      : listTransactions(recentPeriod(now), {}, 6).catch(() => [] as Transaction[]),
+    preview
+      ? Promise.resolve(null)
+      : getExpenseRangeView("1m", monthPeriod(now.getFullYear(), now.getMonth() + 1)).catch(
+          () => null,
+        ),
+  ]);
 
   const { currency, panel, insights } = data;
   const norte = panel.norte;

@@ -24,6 +24,30 @@ export type DashboardData = {
   configured: boolean;
 };
 
+/** Techo de tiempo para los resúmenes best-effort del panel (ms). Corto a propósito:
+ *  son consultas a BD, y si una tarda más que esto ya arruinó el arranque. */
+const LIMITE_RESUMEN_MS = 1000;
+
+/**
+ * Presupuesto de tiempo DURO. El `.catch` que había antes acotaba los ERRORES pero no
+ * la LENTITUD: una cadena de proveedores lenta pero exitosa bloqueaba igual, porque
+ * nadie la interrumpía. Esto pone el techo.
+ *
+ * No cancela el trabajo de fondo (una promesa no se puede abortar): simplemente deja de
+ * esperarlo y el panel degrada con el valor de reserva, exactamente igual que cuando la
+ * pieza falla. Para eso las tres son best-effort y admiten `null`.
+ */
+function conLimite<T>(p: Promise<T>, alFallar: T): Promise<T> {
+  return Promise.race([
+    p.catch(() => alFallar),
+    new Promise<T>((resolver) => {
+      const t = setTimeout(() => resolver(alFallar), LIMITE_RESUMEN_MS);
+      // No mantiene vivo el proceso si todo lo demás ya terminó (cron, scripts).
+      (t as unknown as { unref?: () => void }).unref?.();
+    }),
+  ]);
+}
+
 export async function getDashboardData(
   opts: { previewDemo?: boolean } = {},
 ): Promise<DashboardData> {
@@ -81,9 +105,12 @@ export async function getDashboardData(
   let wealth: WealthSummary | null = null;
   if (configured && user) {
     [control, richLife, wealth] = await Promise.all([
-      getControlSummary().catch(() => null),
-      getRichLifeSummary().catch(() => null),
-      getWealthSummary().catch(() => null),
+      conLimite(getControlSummary(), null),
+      // Precios desde la caché persistida: esta pantalla es un RESUMEN, y esperar a un
+      // proveedor externo cuesta más de lo que vale la frescura. Patrimonio y Portafolio
+      // siguen en vivo, y son ellos quienes mantienen la caché al día.
+      conLimite(getRichLifeSummary({ precios: "cache" }), null),
+      conLimite(getWealthSummary(), null),
     ]);
   } else if (!configured) {
     // Demo: previsualiza el panel premium completo sin Supabase.

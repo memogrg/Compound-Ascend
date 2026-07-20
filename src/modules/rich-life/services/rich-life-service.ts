@@ -41,11 +41,12 @@ import type {
 
 async function tryGetPortfolioMarketValues(
   ctx?: AuthContext,
+  opts: { precios?: "vivo" | "cache" } = {},
 ): Promise<Record<string, number>> {
   try {
     const { getPortfolioMarketValues } =
       await import("@/modules/wealth/services/portfolio-service");
-    const result = await getPortfolioMarketValues(ctx);
+    const result = await getPortfolioMarketValues(ctx, opts);
     return result.byInvestmentId;
   } catch {
     return {};
@@ -184,7 +185,12 @@ export type NetWorthAggregate = {
   previousNetWorth: number | null; // último snapshot de patrimonio neto
 };
 
-export async function aggregateNetWorth(ctx?: AuthContext): Promise<NetWorthAggregate> {
+export async function aggregateNetWorth(
+  ctx?: AuthContext,
+  /** Cómo resolver los precios de mercado. `"cache"` evita la red externa; lo usan las
+   *  pantallas de resumen. Patrimonio y Portafolio se quedan en vivo. */
+  opts: { precios?: "vivo" | "cache" } = {},
+): Promise<NetWorthAggregate> {
   // ctx undefined → sesión (requireUser + cliente por cookies), idéntico a hoy.
   // ctx presente → cliente service-role + userId explícito (cron/push).
   const { db, userId } = await resolveAuth(ctx);
@@ -232,7 +238,7 @@ export async function aggregateNetWorth(ctx?: AuthContext): Promise<NetWorthAggr
         .order("period", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      tryGetPortfolioMarketValues(ctx),
+      tryGetPortfolioMarketValues(ctx, opts),
       // Fase 1 · Patrimonio líquido real: saco de liquidez + metas de ahorro.
       getLiquidityBalance(ctx),
       db
@@ -422,8 +428,10 @@ export async function aggregateNetWorth(ctx?: AuthContext): Promise<NetWorthAggr
  * Resumen Rich Life: arma el snapshot a partir de la agregación de patrimonio.
  * Comportamiento idéntico al previo (solo se extrajo aggregateNetWorth).
  */
-export async function getRichLifeSummary(): Promise<RichLifeSummary> {
-  const agg = await aggregateNetWorth();
+export async function getRichLifeSummary(
+  opts: { precios?: "vivo" | "cache" } = {},
+): Promise<RichLifeSummary> {
+  const agg = await aggregateNetWorth(undefined, opts);
   const input: RichLifeInput = {
     assets: agg.assets,
     liabilities: agg.liabilities,
