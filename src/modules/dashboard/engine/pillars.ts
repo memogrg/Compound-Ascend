@@ -21,6 +21,11 @@ export type NorteVM = {
   freedomPct: number; // 0-1 (ingreso pasivo / gastos)
   freedomText: string;
   netWorth: number | null;
+  /** De qué está hecho el patrimonio neto. Ya vienen calculados y normalizados a la
+   *  moneda principal en el mismo indicador que da `netWorth`: exponerlos no añade
+   *  ninguna consulta, solo deja de descartarlos. */
+  totalAssets: number | null;
+  totalLiabilities: number | null;
   nextBestAction: string;
 };
 
@@ -99,6 +104,8 @@ function buildNorte({ ind, currency, control, richLife }: PanelInputs): NorteVM 
     freedomPct,
     freedomText,
     netWorth,
+    totalAssets: rl?.totalAssets ?? null,
+    totalLiabilities: rl?.totalLiabilities ?? null,
     nextBestAction,
   };
 }

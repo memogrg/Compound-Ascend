@@ -97,7 +97,6 @@ export default async function MobileHome() {
     : await getExpenseRangeView("1m", monthPeriod(now.getFullYear(), now.getMonth() + 1)).catch(() => null);
 
   const { currency, panel, insights } = data;
-  const ind = data.summary.indicators;
   const norte = panel.norte;
   const firstInsight = insights.insights[0];
 
@@ -158,9 +157,8 @@ export default async function MobileHome() {
                   <NetWorthCard
                     netWorth={norte.netWorth}
                     velocity={norte.velocity}
-                    income={ind.incomeMonthly}
-                    expense={ind.expenseMonthly}
-                    flow={ind.freeCashflow}
+                    assets={norte.totalAssets}
+                    liabilities={norte.totalLiabilities}
                     currency={currency}
                   />
                 ),

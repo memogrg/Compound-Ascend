@@ -58,11 +58,14 @@ function mensaje(r: Ritmo, disponible: number, currency: string, dias: number): 
   // El mensaje aporta lo que la cifra NO dice. La cifra grande ya es el disponible, así
   // que repetirlo aquí ("Te quedan ₡1.840.697 para 13 días") gastaba la única línea de
   // la tarjeta en decir dos veces el mismo número. Lo que falta es el PLAZO.
+  // Cortos a propósito: el mensaje es UNA línea con elipsis y a 320px solo caben ~218px.
+  // Medidos, los textos largos anteriores ("Para los 13 días que quedan del mes.",
+  // "Agotaste casi todo el presupuesto del mes.") se cortaban justo ahí.
   if (r === "excedido")
     return `Te pasaste por ${formatMoney(Math.abs(disponible), currency)}.`;
-  if (r === "al-limite") return "Agotaste casi todo el presupuesto del mes.";
-  if (r === "rapido") return `Tu gasto avanza más rápido que el mes.`;
-  return `Para los ${dias} ${dias === 1 ? "día" : "días"} que quedan del mes.`;
+  if (r === "al-limite") return "Casi agotaste el presupuesto.";
+  if (r === "rapido") return "Vas más rápido que el mes.";
+  return `Quedan ${dias} ${dias === 1 ? "día" : "días"} del mes.`;
 }
 
 /** Medidor compacto. El centro lleva el PORCENTAJE, nunca un importe: el agujero
@@ -73,10 +76,13 @@ function Gauge({ pct, tone }: { pct: number; tone: MTone }) {
     tone === "danger" ? "var(--danger)" : tone === "warning" ? "var(--warning)" : "var(--accent)";
   return (
     <span style={{ position: "relative", display: "inline-grid", placeItems: "center" }}>
-      {/* 60px: al pasar a la columna derecha el medidor ya no compite con el texto
-          por el alto, sino por el ANCHO. 60 deja sitio de sobra a la cifra incluso a
-          320px, donde la tarjeta mide 252. */}
-      <svg width="60" height="60" viewBox="0 0 42 42" aria-hidden>
+      {/* Tamaño por CSS (.m-hcard-gauge), no fijo: la tarjeta ya escala con la pantalla
+          —calc(100vw - 68px)— así que el medidor debe escalar con ella.
+          Los topes salen de medir: en la columna derecha el medidor compite con la CIFRA
+          por el ancho, y a 320px la cifra necesita 134px, lo que deja 74 como máximo. A
+          375 cabrían 129, así que un valor fijo seguro para 320 desperdiciaría el resto
+          de pantallas. */}
+      <svg className="m-hcard-gauge" viewBox="0 0 42 42" aria-hidden>
         <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" strokeWidth={5} />
         <circle
           cx="21"
@@ -92,7 +98,10 @@ function Gauge({ pct, tone }: { pct: number; tone: MTone }) {
       </svg>
       <span
         className="mono"
-        style={{ position: "absolute", fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}
+        // 16px: crece con el donut. El agujero mide ahora ~51px y "100%" ocupa ~38, así
+        // que sigue habiendo margen — pero el centro lleva SOLO el porcentaje, nunca un
+        // importe: cuatro caracteres es el techo, y un importe no cabe ni de lejos.
+        style={{ position: "absolute", fontSize: 16, fontWeight: 700, letterSpacing: "-0.02em" }}
       >
         {Math.round(pct * 100)}%
       </span>

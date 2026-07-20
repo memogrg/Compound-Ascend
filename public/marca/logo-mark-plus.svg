@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<!-- Solo el "+". Mismo viewBox que logo-mark-c.svg para que las dos capas encajen. -->
+<g transform="translate(512,512)">
+<path d="M 156 -95 L 156 95 M 61 0 L 251 0" fill="none" stroke="#000" stroke-width="68" stroke-linecap="round"/>
+</g></svg>
