@@ -21,6 +21,17 @@ type Timestamps = {
   updated_at: string;
 };
 
+/**
+ * Rastro de la edición compartida del hogar (migración 20260723000001).
+ * `user_id` sigue siendo el DUEÑO de la fila; esto registra quién la creó y
+ * quién la tocó por última vez. Opcionales: las filas viejas y los SELECT que
+ * no piden estas columnas no las traen.
+ */
+type Audited = {
+  created_by?: string | null;
+  last_edited_by?: string | null;
+};
+
 type Json = Record<string, unknown>;
 
 // ---------- Identidad / hogar ----------
@@ -88,7 +99,7 @@ export type HouseholdInvitationRow = Timestamps & {
 };
 
 // ---------- Módulo 1 — Mi Perfil Financiero ----------
-export type PersonalProfileRow = Timestamps & {
+export type PersonalProfileRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -112,7 +123,7 @@ export type PersonalProfileRow = Timestamps & {
   extra: Json;
 };
 
-export type RiskProfileRow = Timestamps & {
+export type RiskProfileRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -125,7 +136,7 @@ export type RiskProfileRow = Timestamps & {
   risk_class: string | null;
 };
 
-export type BehaviorProfileRow = Timestamps & {
+export type BehaviorProfileRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -137,7 +148,7 @@ export type BehaviorProfileRow = Timestamps & {
   hardest: unknown;
 };
 
-export type KnowledgeProfileRow = Timestamps & {
+export type KnowledgeProfileRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -147,7 +158,7 @@ export type KnowledgeProfileRow = Timestamps & {
   learning_format: unknown;
 };
 
-export type UserPriorityRow = Timestamps & {
+export type UserPriorityRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -156,7 +167,7 @@ export type UserPriorityRow = Timestamps & {
   rank: number | null;
 };
 
-export type FinancialGoalProfileRow = Timestamps & {
+export type FinancialGoalProfileRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -171,7 +182,7 @@ export type FinancialGoalProfileRow = Timestamps & {
   importance: number | null;
 };
 
-export type DependentRow = Timestamps & {
+export type DependentRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -181,7 +192,7 @@ export type DependentRow = Timestamps & {
 };
 
 // ---------- Módulo 2 — Mi Base Financiera ----------
-export type IncomeSourceRow = Timestamps & {
+export type IncomeSourceRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -199,7 +210,7 @@ export type IncomeSourceRow = Timestamps & {
   amount_monthly_base: number;
 };
 
-export type RecurringItemRow = Timestamps & {
+export type RecurringItemRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -212,7 +223,7 @@ export type RecurringItemRow = Timestamps & {
   active: boolean;
 };
 
-export type ExpenseItemRow = Timestamps & {
+export type ExpenseItemRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -233,7 +244,7 @@ export type ExpenseItemRow = Timestamps & {
   amount_monthly_base: number;
 };
 
-export type ExpenseCategoryRow = Timestamps & {
+export type ExpenseCategoryRow = Timestamps & Audited & {
   id: string;
   user_id: string | null;
   parent_id: string | null;
@@ -261,7 +272,7 @@ export type ExpenseCategoryRow = Timestamps & {
  * `hidden` la oculta; `fork_id` apunta a la copia del hogar que la reemplaza.
  * (Migración 20260709000001.)
  */
-export type CategoryOverrideRow = Timestamps & {
+export type CategoryOverrideRow = Timestamps & Audited & {
   id: string;
   user_id: string; // autor
   household_id: string | null; // scope; null = modo solo
@@ -270,7 +281,7 @@ export type CategoryOverrideRow = Timestamps & {
   fork_id: string | null;
 };
 
-export type MonthlySnapshotRow = Timestamps & {
+export type MonthlySnapshotRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -287,7 +298,7 @@ export type MonthlySnapshotRow = Timestamps & {
   breakdown: Json;
 };
 
-export type TransactionRow = Timestamps & {
+export type TransactionRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -321,7 +332,7 @@ export type TransactionRow = Timestamps & {
 };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
-export type BudgetItemRow = Timestamps & {
+export type BudgetItemRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -343,7 +354,7 @@ export type BudgetItemRow = Timestamps & {
   holding_id: string | null;
 };
 
-export type AccountRow = Timestamps & {
+export type AccountRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -353,7 +364,7 @@ export type AccountRow = Timestamps & {
   is_default: boolean;
 };
 
-export type TransactionRuleRow = Timestamps & {
+export type TransactionRuleRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -369,7 +380,7 @@ export type TransactionRuleRow = Timestamps & {
 };
 
 // Plantillas / favoritos de transacción (migración 0018 · registro en 1 clic)
-export type TransactionTemplateRow = Timestamps & {
+export type TransactionTemplateRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -398,7 +409,7 @@ export type AiUsageLedgerRow = Timestamps & {
 };
 
 // ---------- Módulo 3 — Control Financiero ----------
-export type SavingsGoalRow = Timestamps & {
+export type SavingsGoalRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -429,7 +440,7 @@ export type SavingsGoalRow = Timestamps & {
 };
 
 // Historial de reinicios de frascos recurrentes (migración 20260718000001).
-export type GoalPeriodResetRow = {
+export type GoalPeriodResetRow = Audited & {
   id: string;
   goal_id: string;
   user_id: string;
@@ -440,7 +451,7 @@ export type GoalPeriodResetRow = {
   created_at: string;
 };
 
-export type DebtRow = Timestamps & {
+export type DebtRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -476,7 +487,7 @@ export type DebtRow = Timestamps & {
   last_reminded_on: string | null;
 };
 
-export type DebtPaymentRow = Timestamps & {
+export type DebtPaymentRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -494,7 +505,7 @@ export type DebtPaymentRow = Timestamps & {
 };
 
 // ---------- Módulo 4 — Patrimonio ----------
-export type InvestmentRow = Timestamps & {
+export type InvestmentRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -514,7 +525,7 @@ export type InvestmentRow = Timestamps & {
   dca_broker: string | null;
 };
 
-export type InvestmentHoldingRow = Timestamps & {
+export type InvestmentHoldingRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -564,7 +575,7 @@ export type InvestmentHoldingRow = Timestamps & {
 };
 
 // Aportes mensuales por holding recurrente (brecha DCA) (migración 20260710000001).
-export type HoldingContributionRow = Timestamps & {
+export type HoldingContributionRow = Timestamps & Audited & {
   id: string;
   holding_id: string;
   user_id: string;
@@ -579,7 +590,7 @@ export type HoldingContributionRow = Timestamps & {
 };
 
 // Historial de valores del estado de cuenta de un plan a plazo (migración 20260712000001).
-export type HoldingValuationRow = {
+export type HoldingValuationRow = Audited & {
   id: string;
   holding_id: string;
   user_id: string;
@@ -590,7 +601,7 @@ export type HoldingValuationRow = {
   created_at: string;
 };
 
-export type RentalPaymentRow = Timestamps & {
+export type RentalPaymentRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -605,7 +616,7 @@ export type RentalPaymentRow = Timestamps & {
 };
 
 // Watchlist del Monitor de Fondos (migración 20260617000002).
-export type WatchlistSymbolRow = Timestamps & {
+export type WatchlistSymbolRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -613,7 +624,7 @@ export type WatchlistSymbolRow = Timestamps & {
   asset_type: string;
 };
 
-export type InvestmentTransactionRow = Timestamps & {
+export type InvestmentTransactionRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -649,7 +660,7 @@ export type EconomicIndicatorRow = {
   fetched_at: string;
 };
 
-export type DividendRow = {
+export type DividendRow = Audited & {
   id: string;
   holding_id: string;
   user_id: string;
@@ -680,7 +691,7 @@ export type PortfolioSnapshotRow = {
   updated_at: string;
 };
 
-export type ProfileSnapshotRow = Timestamps & {
+export type ProfileSnapshotRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -688,7 +699,7 @@ export type ProfileSnapshotRow = Timestamps & {
   metrics: Json;
 };
 
-export type LiquidityLedgerRow = Timestamps & {
+export type LiquidityLedgerRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -699,7 +710,7 @@ export type LiquidityLedgerRow = Timestamps & {
   occurred_on: string;
 };
 
-export type UserInsightRow = Timestamps & {
+export type UserInsightRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -713,7 +724,7 @@ export type UserInsightRow = Timestamps & {
   status: string;
 };
 
-export type InsurancePolicyRow = Timestamps & {
+export type InsurancePolicyRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -729,7 +740,7 @@ export type InsurancePolicyRow = Timestamps & {
 };
 
 // ---------- Módulo 5 — Mi Rich Life ----------
-export type AssetRow = Timestamps & {
+export type AssetRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -743,7 +754,7 @@ export type AssetRow = Timestamps & {
   last_valued_on: string | null;
 };
 
-export type LiabilityRow = Timestamps & {
+export type LiabilityRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -754,7 +765,7 @@ export type LiabilityRow = Timestamps & {
   linked_debt_id: string | null;
 };
 
-export type NetWorthSnapshotRow = Timestamps & {
+export type NetWorthSnapshotRow = Timestamps & Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -803,7 +814,7 @@ export type AiConversationTurnRow = {
 };
 
 /** Ingesta por correo: allowlist alias de destinatario -> usuario (migración 0027). */
-export type EmailIngestLinkRow = {
+export type EmailIngestLinkRow = Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -818,7 +829,7 @@ export type EmailIngestLinkRow = {
 export type IngestProposalStatus = "pending" | "confirmed" | "discarded";
 
 /** Cola de propuestas de ingesta por confirmar (migración 0027). */
-export type IngestProposalRow = {
+export type IngestProposalRow = Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
@@ -839,7 +850,7 @@ export type IngestProposalRow = {
 };
 
 /** Tarjeta por cuenta: el último-4 es etiqueta DENTRO de la cuenta (migración 0029). */
-export type AccountCardRow = {
+export type AccountCardRow = Audited & {
   id: string;
   user_id: string;
   household_id: string | null;
