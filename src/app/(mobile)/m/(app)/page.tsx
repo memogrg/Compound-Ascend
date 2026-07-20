@@ -7,6 +7,12 @@ import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { MHomeCarousel } from "../components/home-carousel";
 import { BudgetCard } from "../components/home-cards/budget-card";
 import { NetWorthCard } from "../components/home-cards/networth-card";
+import { IncomeCard } from "../components/home-cards/income-card";
+import { SavingsCard } from "../components/home-cards/savings-card";
+import { DebtCard } from "../components/home-cards/debt-card";
+import { InvestCard, InvestCardError } from "../components/home-cards/invest-card";
+import { DefenseCard, DefenseCardError } from "../components/home-cards/defense-card";
+import { MHomeCardError } from "../components/home-cards/card-shell";
 import { formatMoney } from "@/lib/format";
 import { MobileHeader } from "../components/mobile-header";
 
@@ -105,6 +111,10 @@ export default async function MobileHome() {
 
   const { currency, panel, insights } = data;
   const norte = panel.norte;
+  const ind = data.summary.indicators;
+  // Las cifras crudas detrás de los pilares. El carrusel no puede reusar PillarVM.value
+  // porque llega formateado para el ancho de la web y aquí se necesita la forma compacta.
+  const cifras = panel.cifras;
   const firstInsight = insights.insights[0];
 
   return (
@@ -138,29 +148,45 @@ export default async function MobileHome() {
             (.m-carousel-wrap) para que la tarjeta siguiente asome: esa es la
             afordancia de que se desliza.
 
-            En esta fase hay dos tarjetas, y ninguna añade una llamada: Presupuesto usa
-            getExpenseRangeView (solo BD, el agregador más barato de los siete) y
-            Patrimonio reusa los datos que Inicio ya cargaba para el hero. Las otras
-            cinco entran en la Fase 2 envueltas cada una en su <Suspense>, para que la
-            cara —getPortfolioReport, con precios en vivo y timeout de 3 s por
-            proveedor— degrade SU tarjeta y no el arranque de la app. */}
+            Las SIETE tarjetas salen de datos que Inicio ya cargaba: ninguna añade una
+            llamada. Presupuesto usa getExpenseRangeView; Ingresos, Ahorro y Deudas salen
+            de los indicadores base; Patrimonio, Inversiones y Protección reusan los
+            resúmenes best-effort que el panel ya pedía y hasta ahora descartaba antes de
+            llegar a la vista. Por eso no hace falta <Suspense> por tarjeta: no hay nada
+            que esperar por separado.
+
+            Patrimonio va en segundo lugar a propósito: era el hero de esta pantalla y es
+            la cifra que el usuario viene a ver. Mandarla al final obligaría a deslizar
+            seis veces para llegar a ella.
+
+            Los destinos son rutas /m/* explícitas y NO los href de pillars.ts, que
+            apuntan a la web y sacarían al usuario de la app. Tampoco se reusa M_ROUTE tal
+            cual: ahí `flujo` va a /m/gastos, que es correcto para el atajo del pilar pero
+            mandaría la tarjeta de INGRESOS a la pantalla de gastos. */}
         <div style={{ marginBottom: 14 }}>
           <MHomeCarousel
             cards={[
               {
                 name: "Presupuesto",
-                node: (
-                  <BudgetCard
-                    budget={expenseView?.budgetExpense ?? 0}
-                    spent={expenseView?.realExpense ?? 0}
-                    currency={currency}
-                    now={now}
-                  />
-                ),
+                node:
+                  // `null` aquí es "no cargó" (getExpenseRangeView tiene su propio catch),
+                  // no "no hay presupuesto": eso lo distingue la tarjeta con budget<=0.
+                  !preview && expenseView === null ? (
+                    <MHomeCardError eyebrow="Presupuesto" icon="rules" />
+                  ) : (
+                    <BudgetCard
+                      budget={expenseView?.budgetExpense ?? 0}
+                      spent={expenseView?.realExpense ?? 0}
+                      currency={currency}
+                      now={now}
+                    />
+                  ),
               },
               {
                 name: "Patrimonio",
-                node: (
+                node: data.degradado.richLife ? (
+                  <MHomeCardError eyebrow="Patrimonio" icon="household" />
+                ) : (
                   <NetWorthCard
                     netWorth={norte.netWorth}
                     velocity={norte.velocity}
@@ -169,6 +195,63 @@ export default async function MobileHome() {
                     currency={currency}
                   />
                 ),
+              },
+              {
+                name: "Ingresos",
+                node: (
+                  <IncomeCard
+                    incomeMonthly={ind.incomeMonthly}
+                    activo={(ind.incomeByType.activo ?? 0) + (ind.incomeByType.extraordinario ?? 0)}
+                    pasivo={ind.incomeByType.pasivo ?? 0}
+                    currency={currency}
+                  />
+                ),
+              },
+              {
+                name: "Ahorro",
+                node: (
+                  <SavingsCard
+                    savingsRate={ind.savingsRate}
+                    monthsOfIndependence={cifras.monthsOfIndependence}
+                  />
+                ),
+              },
+              {
+                name: "Deudas",
+                node: (
+                  <DebtCard
+                    debtWeight={ind.debtWeight}
+                    totalLiabilities={norte.totalLiabilities}
+                    currency={currency}
+                  />
+                ),
+              },
+              {
+                name: "Inversiones",
+                node: data.degradado.wealth ? (
+                  <InvestCardError />
+                ) : (
+                  <InvestCard
+                    totalInvested={cifras.totalInvested}
+                    monthlyContribution={cifras.monthlyContribution}
+                    productivePct={cifras.productiveAssetsPct}
+                    currency={currency}
+                  />
+                ),
+              },
+              {
+                name: "Protección",
+                node:
+                  data.degradado.wealth || cifras.proteccion === null ? (
+                    <DefenseCardError />
+                  ) : (
+                    <DefenseCard
+                      score={cifras.proteccion.score}
+                      activePolicies={cifras.proteccion.activePolicies}
+                      totalCoverage={cifras.proteccion.totalCoverage}
+                      currency={currency}
+                    />
+                  ),
               },
             ]}
           />

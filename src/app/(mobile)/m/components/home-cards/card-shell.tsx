@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { MIcon, type MIconName } from "../m-icon";
+import { MHomeCardRetry } from "./card-retry";
 
 /**
  * CHASIS de las tarjetas del carrusel de Inicio. Las 7 comparten esta estructura y
@@ -72,6 +73,39 @@ export function MHomeCard({
       </div>
       {message ? <div className="m-hcard-msg">{message}</div> : null}
     </Link>
+  );
+}
+
+/**
+ * Estado "NO CARGÓ", distinto del estado vacío.
+ *
+ * El techo de tiempo del panel hace que un resumen lento llegue como `null`, igual que
+ * si el usuario no tuviera nada registrado. Pintar ahí "Registra tu patrimonio" a quien
+ * ya tiene cientos de millones no es una cifra falsa, pero es una mentira igual: colapsa
+ * dos estados que el usuario vive de forma opuesta. Uno se arregla registrando datos; el
+ * otro, reintentando.
+ *
+ * Es un <button>, no un <Link>: el destino no es otra pantalla sino volver a pedir ESTA.
+ */
+export function MHomeCardError({ eyebrow, icon }: { eyebrow: string; icon: MIconName }) {
+  return (
+    <div className="m-hcard">
+      <div className="m-hcard-top">
+        <span className="ov">{eyebrow}</span>
+      </div>
+      <div
+        className="m-hcard-body"
+        style={{ flexDirection: "column", gap: 8, justifyContent: "center" }}
+      >
+        <span className="m-dic" aria-hidden>
+          <MIcon name={icon} size={20} />
+        </span>
+        <span style={{ fontSize: 13, textAlign: "center", lineHeight: 1.4, maxWidth: "88%" }}>
+          No pudimos cargar este dato ahora.
+        </span>
+      </div>
+      <MHomeCardRetry />
+    </div>
   );
 }
 
