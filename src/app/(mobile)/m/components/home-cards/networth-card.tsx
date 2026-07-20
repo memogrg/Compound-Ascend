@@ -114,8 +114,12 @@ function AssetsVsDebts({
   currency: string;
 }) {
   const max = Math.max(assets, liabilities, 1);
-  // Mínimo de 3px: una deuda pequeña pero real no puede desaparecer del gráfico.
-  const alto = (v: number) => Math.max(3, Math.round((v / max) * ALTO_BARRA));
+  // Suelo de 13px: por debajo, una barra de 16 de ancho es más ancha que alta y se lee
+  // como un guion, no como una barra. Con ₡364 M contra ₡88 M la proporción daba 8px y
+  // pasaba justo eso. Distorsiona algo la proporción en los casos muy desiguales, pero
+  // la cifra exacta va impresa bajo cada barra: la barra da la relación, el número da
+  // la precisión, y ninguna de las dos tiene que hacer el trabajo de la otra.
+  const alto = (v: number) => Math.max(13, Math.round((v / max) * ALTO_BARRA));
   return (
     <span className="m-hcard-bars">
       <Barra label="Activos" cifra={mAmount(assets, currency, 6)} alto={alto(assets)} color="var(--accent)" />
@@ -142,7 +146,7 @@ function Barra({
   return (
     <span className="m-hcard-bar">
       <span style={{ height: ALTO_BARRA, display: "flex", alignItems: "flex-end" }} aria-hidden>
-        <span style={{ width: 18, height: alto, borderRadius: 4, background: color }} />
+        <span style={{ width: 16, height: alto, borderRadius: 4, background: color }} />
       </span>
       <span className="m-hcard-bar-l">{label}</span>
       <span className="m-hcard-bar-v">{cifra}</span>

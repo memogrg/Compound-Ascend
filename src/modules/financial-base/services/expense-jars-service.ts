@@ -107,6 +107,44 @@ export async function getExpenseJars(args: {
 }
 
 /**
+ * Presupuesto del mes que NO vive en `budget_items`.
+ *
+ * Los frascos vinculados resuelven la cuota de cada entidad con
+ * `bySource[e.id] ?? e.amount`. Deudas, metas y pólizas SÍ tienen su línea derivada en
+ * `budget_items`, así que el `??` no se dispara y cualquier agregado que lea esa tabla
+ * las ve. Los holdings (y las rentas) no escriben `budget_items` nunca: siempre caen al
+ * aporte mensual de la entidad, y ese importe era invisible para quien sumara solo
+ * `budget_items` — que es justo lo que hace `getExpenseRangeView`.
+ *
+ * El resultado: el aporte se contaba como GASTADO (nace como transacción de gasto que
+ * cuenta en presupuesto) pero no como PRESUPUESTADO. El mismo dinero en el numerador y
+ * fuera del denominador, lo que inflaba el % ejecutado del titular frente a los frascos
+ * de su propia pantalla.
+ *
+ * Reutiliza `listLinkableEntitiesDetailed()` a propósito, en vez de consultar
+ * `investment_holdings` por su cuenta: así los importes son literalmente los mismos que
+ * pintan los frascos y la regla del aporte (`is_recurring ? monthly_contribution : 0`)
+ * sigue definida en un solo sitio.
+ *
+ * Se salta las entidades que sí tengan línea propia en `budget_items`, así que el día
+ * que los holdings emitan su línea derivada esto devolverá 0 solo y nada se contará dos
+ * veces.
+ */
+export async function getEntityFallbackBudget(period: Period, currency: string): Promise<number> {
+  const [detailed, rates, bySource] = await Promise.all([
+    listLinkableEntitiesDetailed(),
+    getFxRates(),
+    getLinkedBudgetBySource(period, "holding"),
+  ]);
+  let total = 0;
+  for (const e of [...detailed.holding, ...detailed.rental]) {
+    if (bySource[e.id] != null) continue; // ya cuenta vía budget_items
+    total += convertCurrency(e.amount, e.currency, currency, rates);
+  }
+  return total;
+}
+
+/**
  * Frascos scopeados a una fecha de corte (filtro propio del tab de Gastos): el
  * presupuesto es el del mes de `period`, y el gasto real se acumula SOLO hasta
  * el día `asOf` (inclusive). Reutiliza getRealTotals con un periodo cuyo `to`

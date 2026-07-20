@@ -2960,20 +2960,33 @@ body:has(.m-shell[data-theme="dark"]) {
   width: 150px;
   height: 150px;
   pointer-events: none;
-  z-index: 0;
-  /* 0.30, elegido mirando cuatro variantes: a 0.16 la marca existía pero no se intuía
-     bajo el cristal, y por encima de 0.45 empieza a competir con el texto. Parece mucho
-     para una marca de agua porque casi nunca se ve directa — vive entera bajo la
-     tarjeta, así que lo que llega al ojo es esto filtrado por un 62% de superficie. */
-  opacity: 0.3;
+  /* POR ENCIMA del cristal, no detrás. Detrás era físicamente incapaz de leerse como
+     marca: `backdrop-filter: blur()` difumina justo lo que hay detrás, así que el logo
+     nunca tenía un borde nítido. Probado a 240px y opacidad 0.60, seguía siendo un
+     manchón gris — solo que más grande y ensuciando la tarjeta.
+     Encima se reconoce con 0.07, o sea que cuesta CUATRO veces menos opacidad y resta
+     mucho menos contraste al texto. Se pierde el efecto de "algo tras el vidrio", pero
+     ese efecto solo se percibía como una mancha. */
+  z-index: 2;
+  opacity: 0.07;
+}
+/* Las dos piezas son HERMANAS (::before y ::after), y el elemento que las contiene no
+   lleva máscara. Antes la C iba en el propio elemento y el "+" en su ::after, y el "+"
+   no aparecía nunca: una `mask` recorta TODO el subárbol del elemento, pseudo-elementos
+   incluidos, así que la máscara de la C borraba el "+" entero por no solaparse con su
+   trazo. Verificado mirando las dos estructuras lado a lado. */
+.m-shell .m-carousel-mark::before,
+.m-shell .m-carousel-mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.m-shell .m-carousel-mark::before {
   background: var(--text);
   -webkit-mask: url("/marca/logo-mark-c.svg") no-repeat center / contain;
   mask: url("/marca/logo-mark-c.svg") no-repeat center / contain;
 }
 .m-shell .m-carousel-mark::after {
-  content: "";
-  position: absolute;
-  inset: 0;
   background: var(--accent);
   -webkit-mask: url("/marca/logo-mark-plus.svg") no-repeat center / contain;
   mask: url("/marca/logo-mark-plus.svg") no-repeat center / contain;
