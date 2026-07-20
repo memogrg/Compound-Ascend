@@ -14,6 +14,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { isEmailConfigured, sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
 
@@ -153,5 +154,6 @@ export async function removeIngestEmail(id: string): Promise<IngestEmailResult> 
     .eq("id", id)
     .in("user_id", scope);
   if (error) return { ok: false, message: "No pudimos eliminar el correo." };
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "email_ingest_links", rowId: id });
   return { ok: true };
 }

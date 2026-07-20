@@ -1,5 +1,6 @@
 import "server-only";
 import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 
 /**
  * Plantillas / favoritos de transacción: permiten registrar en 1 clic
@@ -101,6 +102,7 @@ export async function deleteTemplate(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("transaction_templates").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "transaction_templates", rowId: id });
 }
 
 /** Marca uso (telemetría suave para ordenar por frecuencia). */

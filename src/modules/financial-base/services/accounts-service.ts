@@ -1,5 +1,6 @@
 import "server-only";
 import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 
 /** CRUD de cuentas / métodos de pago (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -75,4 +76,5 @@ export async function deleteAccount(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("accounts").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "accounts", rowId: id });
 }

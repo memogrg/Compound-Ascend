@@ -17,6 +17,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, isActiveHouseholdEditor, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import {
   resolveCategoryOverrides,
   type OverrideLite,
@@ -358,6 +359,7 @@ export async function deleteCategory(id: string, reassignToId?: string | null): 
     await reassignReferences(supabase, id, reassignToId, user.id, householdId);
   }
   await supabase.from("expense_categories").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "expense_categories", rowId: id, householdId });
 }
 
 /**
@@ -378,6 +380,12 @@ export async function mergeCategory(fromId: string, intoId: string): Promise<voi
     .eq("id", fromId)
     .in("user_id", scope);
   await supabase.from("expense_categories").delete().eq("id", fromId).in("user_id", scope);
+  await logHouseholdDeletion(supabase, {
+    userId: user.id,
+    table: "expense_categories",
+    rowId: fromId,
+    householdId,
+  });
 }
 
 // ============================================================
@@ -550,6 +558,15 @@ async function revertOverride(baseId: string): Promise<void> {
   if (ov.fork_id) {
     await reassignMovements(supabase, ov.fork_id, baseId, user.id, householdId);
     await supabase.from("expense_categories").delete().eq("id", ov.fork_id);
+    // Deshacer un fork elimina una categoría VISIBLE del hogar → se registra.
+    // (Unhide, en cambio, solo quita el override y la categoría base REAPARECE:
+    // no se borra nada, por eso no se loguea la baja del override en sí.)
+    await logHouseholdDeletion(supabase, {
+      userId: user.id,
+      table: "expense_categories",
+      rowId: ov.fork_id,
+      householdId,
+    });
   }
   await supabase.from("category_overrides").delete().eq("id", ov.id);
 }

@@ -4,6 +4,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import {
   registerLinkedTransaction,
@@ -270,6 +271,7 @@ export async function deleteGoal(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("savings_goals").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "savings_goals", rowId: id });
 }
 
 export async function deleteDebt(id: string): Promise<void> {
@@ -277,6 +279,7 @@ export async function deleteDebt(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("debts").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "debts", rowId: id });
 }
 
 // ── Deuda individual y pagos (fuente de la verdad: debt_payments) ──
@@ -487,13 +490,18 @@ export async function updateDebtPayment(
  * mes desaparece). El saldo/proyección se recalculan desde los pagos restantes.
  */
 export async function deleteDebtPayment(paymentId: string): Promise<void> {
-  await requireUser();
+  const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
   // Atómico (RPC): elimina el pago y su transacción vinculada en una sola
   // transacción (antes eran 2 borrados secuenciales sin atomicidad).
   const { error } = await supabase.rpc("delete_debt_payment", { p_payment_id: paymentId });
   if (error) throw new Error(error.message);
+  await logHouseholdDeletion(supabase, {
+    userId: user.id,
+    table: "debt_payments",
+    rowId: paymentId,
+  });
 }
 
 /**

@@ -8,6 +8,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
@@ -382,6 +383,7 @@ export async function deleteTransaction(id: string): Promise<void> {
   // Borra la transacción. Idempotente: en deudas la RPC de reversión ya la borró
   // junto al debt_payment, así que este delete queda como no-op.
   await supabase.from("transactions").delete().eq("id", id).in("user_id", scope);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "transactions", rowId: id });
 }
 
 export async function duplicateTransaction(id: string): Promise<void> {
@@ -473,6 +475,8 @@ export async function splitTransaction(
   }));
   await supabase.from("transactions").insert(rows);
   await supabase.from("transactions").delete().eq("id", id).in("user_id", scope);
+  // La transacción original se reemplaza por sus partes → se registra su baja.
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "transactions", rowId: id });
 }
 
 /** Transferencia entre cuentas: una fila kind='transferencia' (neutra en agregados). */

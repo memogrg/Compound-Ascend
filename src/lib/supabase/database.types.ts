@@ -70,6 +70,17 @@ export type HouseholdMemberRow = Timestamps & {
   status: MemberStatus;
 };
 
+/** Log de borrados del hogar (migración 20260724000001). Solo referencia, append-only. */
+export type HouseholdActivityLogRow = {
+  id: string;
+  household_id: string | null;
+  user_id: string | null;
+  table_name: string;
+  row_id: string;
+  action: "delete";
+  created_at: string;
+};
+
 export type WhatsAppLinkStatus = "pending" | "active" | "revoked";
 
 export type WhatsAppLinkRow = Timestamps & {
@@ -888,6 +899,11 @@ export interface Database {
         HouseholdMemberRow,
         Partial<HouseholdMemberRow> & { household_id: string; user_id: string },
         Partial<HouseholdMemberRow>
+      >;
+      household_activity_log: TableShape<
+        HouseholdActivityLogRow,
+        Partial<HouseholdActivityLogRow> & { table_name: string; row_id: string },
+        never
       >;
       household_invitations: TableShape<
         HouseholdInvitationRow,

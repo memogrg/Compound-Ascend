@@ -86,6 +86,9 @@ export async function deleteRule(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   await supabase.from("transaction_rules").delete().eq("id", id).eq("user_id", user.id);
+  // NO se registra en el log del hogar: las reglas son automatización PERSONAL
+  // (siguen por user_id, no se comparten), así que borrar la propia no es una
+  // acción sobre datos del hogar.
 }
 
 /**

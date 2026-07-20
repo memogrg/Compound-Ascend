@@ -20,6 +20,7 @@ import {
 } from "@/modules/financial-base";
 import { rentalPaymentToTxn } from "@/modules/financial-base";
 import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";
 
@@ -151,6 +152,7 @@ export async function deleteRentalPayment(id: string): Promise<void> {
     .eq("id", id)
     .in("user_id", scope);
   if (error) throw new Error(error.message);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "rental_payments", rowId: id });
 
   // income_id solo existe en pagos LEGADO (pre C-2b); los nuevos lo tienen null
   // y su renta vive en la transacción vinculada.
