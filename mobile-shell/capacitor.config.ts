@@ -43,14 +43,11 @@ const config: CapacitorConfig = {
     backgroundColor: '#F1EFE8',
   },
   ios: {
-    // Fondo del WEBVIEW (no del splash). Se queda en la canvas clara y NO se toca: es un
-    // string único sin variante por apariencia, y las alternativas están medidas en el
-    // simulador. Ponerlo oscuro invierte el problema en claro; quitarlo deja que asome el
-    // fondo por defecto del WKWebView — NEGRO en oscuro y BLANCO en claro—, que se ve
-    // peor. Queda una rendija breve de crema al abrir en oscuro, entre que el splash se
-    // va y el HTML pinta; cerrarla exige teñir el webview desde código nativo y es su
-    // propio delta.
-    backgroundColor: '#F1EFE8',
+    // SIN backgroundColor: aquí solo cabe una cadena hexadecimal, o sea un color ESTÁTICO,
+    // y un color estático no puede seguir al tema. Lo fija CarteraBridgeViewController
+    // (AppDelegate.swift) con UIColor(named: "SplashBackground"), que es dinámico.
+    // Comprobado con fotogramas: el subclass gana sobre este valor, así que dejarlo aquí
+    // solo haría creer que manda algo que no manda.
     // Edge-to-edge: el WebView NO auto-ajusta insets (contentInset 'never'); los safe-areas
     // los maneja el CSS con env(safe-area-inset-*) + viewport-fit=cover del HTML — UN solo
     // criterio, igual que Android. Con 'always' el scrollview insertaba su propio inset y
