@@ -1,5 +1,10 @@
 import "server-only";
-import { householdMemberIds } from "@/lib/household/active";
+import {
+  householdMemberIds,
+  householdWriteScope,
+  existsInHousehold,
+  HOUSEHOLD_READ_ONLY_MESSAGE,
+} from "@/lib/household/active";
 
 /**
  * Opciones de entidades vinculables para el selector de 1 tap del composer
@@ -43,10 +48,16 @@ export const LINKED_KIND_MISSING_MSG: Record<keyof typeof LINKED_KIND_TABLE, str
 };
 
 /**
- * Garantiza que la entidad vinculada existe Y pertenece al usuario (Fase 6.1).
- * linked_id es polimórfico sin FK: esta es LA validación. RLS ya filtra por
- * usuario, y además se exige user_id explícito — un id ajeno se comporta
- * igual que uno inexistente. Lanza con mensaje en español si no se encuentra.
+ * Garantiza que la entidad vinculada existe y es escribible por el usuario
+ * (Fase 6.1). linked_id es polimórfico sin FK: esta es LA validación.
+ *
+ * Es un guardia de ESCRITURA: vincular una transacción a la entidad propaga a
+ * su ledger (aporte→current_amount, pago→debt_payment), así que autorizar el
+ * vínculo equivale a autorizar una escritura sobre la entidad. Por eso usa
+ * householdWriteScope (editor → todo el hogar; no-editor → solo lo suyo) y NO
+ * householdMemberIds: si no fuera así, un miembro editor no podría gastar de la
+ * meta o pagar la deuda de otro (el bug de la edición compartida). RLS es el
+ * candado final.
  */
 export async function assertLinkableEntity(
   kind: keyof typeof LINKED_KIND_TABLE,
@@ -54,14 +65,23 @@ export async function assertLinkableEntity(
 ): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const table = LINKED_KIND_TABLE[kind];
+  const scope = await householdWriteScope(supabase, user.id);
   const { data, error } = await supabase
-    .from(LINKED_KIND_TABLE[kind])
+    .from(table)
     .select("id")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data) throw new Error(LINKED_KIND_MISSING_MSG[kind]);
+  if (!data) {
+    // Existe en el hogar pero fuera de mi alcance de escritura → soy no-editor
+    // intentando vincular a una entidad del hogar. Mensaje claro, no genérico.
+    if (await existsInHousehold(supabase, user.id, table, id)) {
+      throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
+    }
+    throw new Error(LINKED_KIND_MISSING_MSG[kind]);
+  }
 }
 
 export async function listLinkableEntities(): Promise<LinkableEntities> {

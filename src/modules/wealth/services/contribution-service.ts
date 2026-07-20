@@ -1,7 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/auth/session";
-import { householdMemberIds } from "@/lib/household/active";
+import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -184,12 +184,15 @@ export async function adjustContributionPrice(
   if (!(newPrice > 0)) throw new Error("El precio debe ser mayor a 0.");
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  // Edición compartida: un editor ajusta el aporte de cualquier holding del
+  // hogar; un no-editor solo el suyo. RLS es el candado final.
+  const scope = await householdWriteScope(supabase, user.id);
 
   const { data: c, error: cErr } = await supabase
     .from("holding_contributions")
     .select("id, holding_id, amount, unit_price")
     .eq("id", contributionId)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (cErr || !c) throw new Error("Aporte no encontrado.");
 
@@ -197,7 +200,7 @@ export async function adjustContributionPrice(
     .from("investment_holdings")
     .select("id, quantity, average_cost")
     .eq("id", c.holding_id)
-    .eq("user_id", user.id)
+    .in("user_id", scope)
     .maybeSingle();
   if (hErr || !h) throw new Error("Holding no encontrado.");
 
@@ -218,16 +221,26 @@ export async function adjustContributionPrice(
 
   const { error: updErr } = await supabase
     .from("investment_holdings")
-    .update({ quantity: finalQty, average_cost: finalAvg, cost_basis: finalQty * finalAvg })
+    .update({
+      last_edited_by: user.id,
+      quantity: finalQty,
+      average_cost: finalAvg,
+      cost_basis: finalQty * finalAvg,
+    })
     .eq("id", h.id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (updErr) throw new Error(updErr.message);
 
   const { error: setErr } = await supabase
     .from("holding_contributions")
-    .update({ unit_price: newPrice, status: "confirmado", updated_at: new Date().toISOString() })
+    .update({
+      last_edited_by: user.id,
+      unit_price: newPrice,
+      status: "confirmado",
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", c.id)
-    .eq("user_id", user.id);
+    .in("user_id", scope);
   if (setErr) throw new Error(setErr.message);
 }
 
