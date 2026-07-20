@@ -2869,7 +2869,12 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-hcard-val {
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 23px;
+  /* Escala con la pantalla en vez de un tamaño fijo. A 320px la columna de la cifra se
+     queda en ~127px y un importe de 10 caracteres pedía 134: se truncaba. Bajar el
+     `maxChars` de mAmount lo habría arreglado abreviando ("₡1,8 M"), pero entonces
+     TAMBIÉN se perdería la cifra exacta a 375px, donde sí cabe. Encoger solo la
+     tipografía conserva el importe completo en las dos anchuras. */
+  font-size: clamp(19px, 6.1vw, 23px);
   letter-spacing: -0.02em;
   line-height: 1.15;
   white-space: nowrap;
@@ -2901,6 +2906,75 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-hcard-gauge {
   width: clamp(72px, 22vw, 88px);
   height: clamp(72px, 22vw, 88px);
+}
+
+/* Botón de reintento de la tarjeta que no cargó. Ocupa la línea del mensaje, así que
+   la altura de la tarjeta no cambia respecto a sus hermanas. */
+.m-shell .m-hcard-retry {
+  margin-top: 4px;
+  align-self: flex-start;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.m-shell .m-hcard-retry:disabled {
+  opacity: 0.6;
+}
+
+/* Visual "un ratio contra su meta": barra con relleno proporcional, marca opcional del
+   umbral y etiqueta debajo. Lo comparten Ahorro, Deudas, Inversiones y Protección porque
+   las cuatro dicen literalmente lo mismo —cuánto de un objetivo llevas—, y darles formas
+   distintas obligaría a reaprender el gráfico en cada tarjeta. El donut se queda solo en
+   Presupuesto, que es la única que habla de "cuánto de una bolsa se consumió". */
+.m-shell .m-hcard-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  width: 78px;
+}
+.m-shell .m-hcard-meter-pct {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.m-shell .m-hcard-meter-track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.m-shell .m-hcard-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+}
+/* Marca del umbral: va DENTRO de la pista y por encima del relleno, para que se lea
+   "hasta aquí" aunque el relleno ya la haya pasado. */
+.m-shell .m-hcard-meter-mark {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--surface);
+  opacity: 0.9;
+}
+.m-shell .m-hcard-meter-l {
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* Barras etiquetadas del visual de Patrimonio. La etiqueta va PEGADA a su barra y no

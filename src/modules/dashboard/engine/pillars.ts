@@ -43,7 +43,35 @@ export type PillarVM = {
   ai: string; // lectura My Agent C+ del pilar
 };
 
-export type PanelVM = { norte: NorteVM; pillars: PillarVM[] };
+/**
+ * Las cifras CRUDAS detrás de los pilares.
+ *
+ * `PillarVM.value`/`meta` vienen ya formateados con `formatMoney`/`formatPercent`, o sea
+ * pensados para el ancho de la web. El carrusel del móvil necesita los números para
+ * elegir su propia representación compacta (`mAmount`, que acorta según los caracteres
+ * que caben): reusar los strings ahí los truncaría.
+ *
+ * Salen de los mismos `richLife`/`wealth` que el panel YA pide, así que exponerlos no
+ * añade ninguna consulta — solo deja de descartarlos, igual que se hizo con
+ * totalAssets/totalLiabilities.
+ */
+export type PanelCifras = {
+  /** Meses de gastos que cubre el respaldo (richLife). */
+  monthsOfIndependence: number | null;
+  /** Parte del patrimonio que produce ingresos, 0-1 (richLife). */
+  productiveAssetsPct: number | null;
+  totalInvested: number | null;
+  monthlyContribution: number | null;
+  /** Diagnóstico de protección; ya viene normalizado a la moneda principal. */
+  proteccion: {
+    score: number; // 0-100
+    activePolicies: number;
+    totalCoverage: number;
+    annualPremium: number;
+  } | null;
+};
+
+export type PanelVM = { norte: NorteVM; pillars: PillarVM[]; cifras: PanelCifras };
 
 export type PanelInputs = {
   ind: BaseIndicators;
@@ -69,7 +97,26 @@ const METHOD_LABEL: Record<string, string> = {
 };
 
 export function buildPanel(inp: PanelInputs): PanelVM {
-  return { norte: buildNorte(inp), pillars: buildPillars(inp) };
+  return { norte: buildNorte(inp), pillars: buildPillars(inp), cifras: buildCifras(inp) };
+}
+
+function buildCifras({ richLife, wealth }: PanelInputs): PanelCifras {
+  const rl = richLife?.snapshot.indicators ?? null;
+  const prot = wealth?.protection ?? null;
+  return {
+    monthsOfIndependence: rl?.monthsOfIndependence ?? null,
+    productiveAssetsPct: rl?.productiveAssetsPct ?? null,
+    totalInvested: wealth?.portfolio.totalInvested ?? null,
+    monthlyContribution: wealth?.portfolio.monthlyContribution ?? null,
+    proteccion: prot
+      ? {
+          score: prot.score,
+          activePolicies: prot.activePolicies,
+          totalCoverage: prot.totalCoverage,
+          annualPremium: prot.annualPremium,
+        }
+      : null,
+  };
 }
 
 function buildNorte({ ind, currency, control, richLife }: PanelInputs): NorteVM {

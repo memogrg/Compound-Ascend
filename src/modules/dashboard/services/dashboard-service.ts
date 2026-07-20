@@ -14,6 +14,10 @@ import { buildPanel, type PanelVM } from "@/modules/dashboard/engine/pillars";
 import type { BaseSummary } from "@/modules/financial-base";
 import type { IncomeSource, ExpenseItem } from "@/modules/financial-base";
 
+/** Qué resúmenes best-effort NO llegaron (fallo o techo de tiempo). Lo consume la UI
+ *  para no confundir "esta vez no cargó" con "no tienes nada registrado". */
+export type Degradado = { control: boolean; richLife: boolean; wealth: boolean };
+
 export type DashboardData = {
   name: string;
   currency: string;
@@ -22,11 +26,17 @@ export type DashboardData = {
   insights: DashboardInsights;
   panel: PanelVM;
   configured: boolean;
+  degradado: Degradado;
 };
 
 /** Techo de tiempo para los resúmenes best-effort del panel (ms). Corto a propósito:
  *  son consultas a BD, y si una tarda más que esto ya arruinó el arranque. */
 const LIMITE_RESUMEN_MS = 1000;
+
+/** Resultado de un resumen best-effort: el valor, y si hubo que degradar.
+ *  `degradado` distingue "no cargó" de "no hay nada registrado", que son cosas
+ *  distintas y la UI las contaba como la misma. */
+type Intento<T> = { valor: T | null; degradado: boolean };
 
 /**
  * Presupuesto de tiempo DURO. El `.catch` que había antes acotaba los ERRORES pero no
@@ -34,14 +44,15 @@ const LIMITE_RESUMEN_MS = 1000;
  * nadie la interrumpía. Esto pone el techo.
  *
  * No cancela el trabajo de fondo (una promesa no se puede abortar): simplemente deja de
- * esperarlo y el panel degrada con el valor de reserva, exactamente igual que cuando la
- * pieza falla. Para eso las tres son best-effort y admiten `null`.
+ * esperarlo y el panel degrada, exactamente igual que cuando la pieza falla. Pero ahora
+ * lo REPORTA: sin ese dato, una pantalla que no cargó y un usuario sin datos se veían
+ * igual, y a alguien con ₡278,9 M registrados se le decía "registra tu patrimonio".
  */
-function conLimite<T>(p: Promise<T>, alFallar: T): Promise<T> {
+function conLimite<T>(p: Promise<T>): Promise<Intento<T>> {
   return Promise.race([
-    p.catch(() => alFallar),
-    new Promise<T>((resolver) => {
-      const t = setTimeout(() => resolver(alFallar), LIMITE_RESUMEN_MS);
+    p.then((valor) => ({ valor, degradado: false })).catch(() => ({ valor: null, degradado: true })),
+    new Promise<Intento<T>>((resolver) => {
+      const t = setTimeout(() => resolver({ valor: null, degradado: true }), LIMITE_RESUMEN_MS);
       // No mantiene vivo el proceso si todo lo demás ya terminó (cron, scripts).
       (t as unknown as { unref?: () => void }).unref?.();
     }),
@@ -103,15 +114,22 @@ export async function getDashboardData(
   let control: ControlSummary | null = null;
   let richLife: RichLifeSummary | null = null;
   let wealth: WealthSummary | null = null;
+  const degradado: Degradado = { control: false, richLife: false, wealth: false };
   if (configured && user) {
-    [control, richLife, wealth] = await Promise.all([
-      conLimite(getControlSummary(), null),
+    const [c, r, w] = await Promise.all([
+      conLimite(getControlSummary()),
       // Precios desde la caché persistida: esta pantalla es un RESUMEN, y esperar a un
       // proveedor externo cuesta más de lo que vale la frescura. Patrimonio y Portafolio
       // siguen en vivo, y son ellos quienes mantienen la caché al día.
-      conLimite(getRichLifeSummary({ precios: "cache" }), null),
-      conLimite(getWealthSummary(), null),
+      conLimite(getRichLifeSummary({ precios: "cache" })),
+      conLimite(getWealthSummary()),
     ]);
+    control = c.valor;
+    richLife = r.valor;
+    wealth = w.valor;
+    degradado.control = c.degradado;
+    degradado.richLife = r.degradado;
+    degradado.wealth = w.degradado;
   } else if (!configured) {
     // Demo: previsualiza el panel premium completo sin Supabase.
     richLife = buildDemoRichLifeSummary();
@@ -119,7 +137,7 @@ export async function getDashboardData(
   }
   const panel = buildPanel({ ind: summary.indicators, currency, control, richLife, wealth });
 
-  return { name, currency, summary, health, insights, panel, configured };
+  return { name, currency, summary, health, insights, panel, configured, degradado };
 }
 
 function demoIncome(name: string, type: IncomeSource["incomeType"], m: number): IncomeSource {
