@@ -10,6 +10,7 @@ const rep = (over: Partial<PatrimonioReport> = {}): PatrimonioReport => ({
   investableWealth: 0,
   productiveWealth: 0,
   protectedWealth: 0,
+  defenseFundsBalance: 0,
   numeroDeSeguridad: 0,
   numeroDeIndependencia: 0,
   numeroDeLibertad: null,

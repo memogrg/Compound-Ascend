@@ -29,8 +29,16 @@ export type EssentialBudgetLine = {
 };
 
 export type EssentialEntity = { monthly: number; currency: string };
-export type EssentialGoal = EssentialEntity & { policyId?: string | null };
-export type EssentialPolicy = EssentialEntity & { id: string };
+export type EssentialGoal = EssentialEntity & { policyId?: string | null; name?: string };
+export type EssentialPolicy = EssentialEntity & { id: string; name?: string };
+
+/** Prima excluida por la regla #2, con nombres para explicar el motivo en la UI. */
+export type EssentialExcludedPolicy = {
+  id: string;
+  monthly: number; // en moneda de visualización
+  policyName: string; // etiqueta de la póliza (X)
+  viaGoalName: string; // el ahorro esencial que la financia (Y)
+};
 
 export type EssentialBreakdown = {
   /** Total mensual esencial, en moneda de visualización. */
@@ -42,7 +50,7 @@ export type EssentialBreakdown = {
     policies: number;
   };
   /** Primas excluidas por la regla #2 (para mostrarlas tachadas con su motivo). */
-  excludedPolicies: { id: string; monthly: number }[];
+  excludedPolicies: EssentialExcludedPolicy[];
 };
 
 /** Solo estas fuentes cuentan como "sobre real"; las derivadas van por su entidad. */
@@ -70,15 +78,25 @@ export function computeEssentialMonthly(args: {
   const goals = args.goals.reduce((s, g) => s + conv(g.monthly, g.currency), 0);
 
   // Regla #2: si una meta esencial financia una póliza esencial (policy_id),
-  // su prima ya se paga vía el aporte → se excluye del cómputo de primas.
-  const financedPolicyIds = new Set(
-    args.goals.map((g) => g.policyId).filter((id): id is string => Boolean(id)),
-  );
-  const excludedPolicies: { id: string; monthly: number }[] = [];
+  // su prima ya se paga vía el aporte → se excluye del cómputo de primas. Guardamos
+  // qué ahorro la financia (nombre) para poder explicar la exclusión en la UI.
+  const financingGoalByPolicy = new Map<string, string>();
+  for (const g of args.goals) {
+    if (g.policyId && !financingGoalByPolicy.has(g.policyId)) {
+      financingGoalByPolicy.set(g.policyId, g.name ?? "un ahorro esencial");
+    }
+  }
+  const excludedPolicies: EssentialExcludedPolicy[] = [];
   let policies = 0;
   for (const p of args.policies) {
-    if (financedPolicyIds.has(p.id)) {
-      excludedPolicies.push({ id: p.id, monthly: conv(p.monthly, p.currency) });
+    const viaGoalName = financingGoalByPolicy.get(p.id);
+    if (viaGoalName !== undefined) {
+      excludedPolicies.push({
+        id: p.id,
+        monthly: conv(p.monthly, p.currency),
+        policyName: p.name ?? "una póliza",
+        viaGoalName,
+      });
       continue;
     }
     policies += conv(p.monthly, p.currency);
