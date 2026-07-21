@@ -13,6 +13,7 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { monthlyize, type Frequency } from "@/modules/financial-base";
 import { aggregateNetWorth } from "@/modules/rich-life";
 import { sumAssetsByClass, isBadDebt } from "@/modules/wealth/engine/patrimonio-mappers";
+import type { EssentialBreakdown } from "@/modules/wealth/engine/essential-expense";
 import {
   computePatrimonio,
   patrimonioLevel,
@@ -30,6 +31,12 @@ export type PatrimonioServiceResult = {
   level: PatrimonioLevel;
   readings: MillonarioReadings;
   diagnosis: DiagnosisFlag[];
+  /**
+   * Desglose del gasto esencial (origen + primas excluidas por dedup #2), para la
+   * transparencia del número de seguridad en la UI. null si la lectura falla o no
+   * hay sesión (ruta service-role): la UI degrada sin romperse.
+   */
+  essentialBreakdown: EssentialBreakdown | null;
   currency: string;
 };
 
@@ -119,15 +126,17 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
 
   // Gasto ESENCIAL mensual (N1) → número de seguridad. Best-effort: la ruta
   // service-role (WhatsApp) no tiene sesión, así que degrada a 0 sin romper.
-  let essentialMonthlyExpenses = 0;
+  // Guardamos el breakdown completo para la transparencia de la UI (fuente única).
+  let essentialBreakdown: EssentialBreakdown | null = null;
   try {
     const { getEssentialMonthlyExpense } = await import(
       "@/modules/wealth/services/essential-expense-service"
     );
-    essentialMonthlyExpenses = (await getEssentialMonthlyExpense()).total;
+    essentialBreakdown = await getEssentialMonthlyExpense();
   } catch {
-    essentialMonthlyExpenses = 0;
+    essentialBreakdown = null;
   }
+  const essentialMonthlyExpenses = essentialBreakdown?.total ?? 0;
 
   // Estilo de vida DESEADO (dato PERSONAL en personal_profiles.extra) → número de
   // libertad. null si no lo definió (nunca se inventa).
@@ -162,6 +171,7 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     level: patrimonioLevel(report.indice),
     readings: millonarioReadings(input),
     diagnosis: buildPatrimonioDiagnosis(report),
+    essentialBreakdown,
     currency,
   };
 }

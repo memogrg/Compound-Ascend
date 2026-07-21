@@ -51,16 +51,16 @@ export async function getEssentialMonthlyExpense(): Promise<EssentialBreakdown> 
       .in("user_id", members)
       .eq("is_essential", true)
       .eq("is_current", true),
-    // Metas esenciales: aporte mensual + policy_id (para la regla #2).
+    // Metas esenciales: aporte mensual + policy_id (regla #2) + nombre (transparencia).
     supabase
       .from("savings_goals")
-      .select("monthly_contribution,currency,policy_id")
+      .select("name,monthly_contribution,currency,policy_id")
       .in("user_id", members)
       .eq("is_essential", true),
-    // Pólizas esenciales: prima + frecuencia (se mensualiza).
+    // Pólizas esenciales: prima + frecuencia (se mensualiza) + tipo/proveedor (etiqueta).
     supabase
       .from("insurance_policies")
-      .select("id,premium,premium_frequency,currency")
+      .select("id,policy_type,provider,premium,premium_frequency,currency")
       .in("user_id", members)
       .eq("is_essential", true),
   ]);
@@ -80,6 +80,7 @@ export async function getEssentialMonthlyExpense(): Promise<EssentialBreakdown> 
     monthly: Number(g.monthly_contribution ?? 0),
     currency: g.currency,
     policyId: g.policy_id ?? null,
+    name: g.name ?? undefined,
   }));
 
   const policies = (policyRows.data ?? [])
@@ -88,6 +89,7 @@ export async function getEssentialMonthlyExpense(): Promise<EssentialBreakdown> 
       id: p.id,
       monthly: monthlyize(Number(p.premium), (p.premium_frequency ?? "mensual") as Frequency),
       currency: p.currency,
+      name: p.policy_type ?? p.provider ?? undefined,
     }));
 
   return computeEssentialMonthly({ displayCurrency, rates, budgetLines, debts, goals, policies });

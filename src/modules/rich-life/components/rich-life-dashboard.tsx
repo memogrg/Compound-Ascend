@@ -3,7 +3,7 @@ import { DeleteButton } from "./delete-button";
 import { EditRichButton, AddRichButton } from "./rich-actions";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
-import type { PatrimonioServiceResult } from "@/modules/wealth";
+import { type PatrimonioServiceResult, MilestoneLadder } from "@/modules/wealth";
 import type { RichTrend, Asset, Liability } from "@/modules/rich-life/types";
 
 const TREND: Record<RichTrend, { label: string; cls: string; delta: string }> = {
@@ -361,55 +361,15 @@ function PatrimonioSections({
   currency: string;
 }) {
   const r = p.report;
-  const libertadPct = Math.min(100, Math.round(r.ratioLibertad * 100));
   const anios = r.añosDeLibertad;
-  // §13 · microcopy aspiracional según qué tan construido está el patrimonio.
-  const heroReading =
-    r.ratioLibertad >= 1
-      ? "¡Lo lograste! Tu patrimonio invertible ya cubre tu Número de Libertad."
-      : r.ratioLibertad >= 0.5
-        ? "Vas a buen ritmo: ya construiste buena parte del capital que te haría libre."
-        : "Tu patrimonio está en etapa de construcción; tu mayor oportunidad ahora es aumentar tu patrimonio invertible y elevar tus meses de libertad.";
 
   return (
     <>
-      {/* Métrica héroe: Tu Número de Libertad */}
-      <div className="card card-pad">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div className="label">
-            Tu Número de Libertad
-            <TipQ text="Es el capital que, invertido, podría sostener tu estilo de vida sin depender de tu trabajo. Lo comparamos con tu patrimonio invertible para saber cuánto camino llevas." />
-          </div>
-          <span className="muted" style={{ fontSize: 12 }}>
-            Te compra <strong style={{ color: "var(--ink-2)" }}>{anios}</strong> años de tu estilo de
-            vida
-          </span>
-        </div>
-        <div className="num-xl" style={{ fontSize: 42, marginTop: 8 }}>
-          {formatMoney(r.numeroDeIndependencia, currency)}
-        </div>
-        <div className="bar-track" style={{ marginTop: 14, height: 12 }}>
-          <div
-            className="bar-fill"
-            style={{
-              width: `${libertadPct}%`,
-              background: "linear-gradient(90deg, var(--gold), var(--teal))",
-            }}
-          />
-        </div>
-        <div className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
-          Llevas <strong style={{ color: "var(--ink-2)" }}>{libertadPct}%</strong> construido. {heroReading}
-        </div>
-      </div>
+      {/* Métrica héroe: la escalera de hitos (Seguridad → Independencia → Libertad). */}
+      <MilestoneLadder report={r} essential={p.essentialBreakdown} currency={currency} />
 
-      {/* Cards §12 */}
+      {/* Cards §12 — el capital que trabaja ya lo muestra la escalera de hitos. */}
       <section className="cols-4">
-        <MetricCard
-          label="Patrimonio invertible"
-          value={formatMoney(r.investableWealth, currency)}
-          note="capital que trabaja para ti"
-          tip="Qué es: tus inversiones + activos productivos. Por qué importa: es la parte que puede generar ingresos y acercarte a la libertad. Qué hago: muévelo desde activos que solo se usan o que están parados."
-        />
         <MetricCard
           label="Años de Libertad"
           value={`${anios}`}

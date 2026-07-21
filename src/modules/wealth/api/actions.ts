@@ -47,6 +47,7 @@ import {
 import type { Holding } from "@/modules/wealth/types";
 import { adjustContributionPrice, advancePremiums } from "@/modules/wealth/services/contribution-service";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
+import { setDesiredMonthlyLifestyle } from "@/modules/wealth/services/lifestyle-service";
 import { logger } from "@/lib/logger";
 
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
@@ -58,6 +59,32 @@ function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
     if (!out[k]) out[k] = i.message;
   }
   return out;
+}
+
+/**
+ * Estilo de vida DESEADO mensual (insumo del número de libertad). Dato PERSONAL:
+ * se guarda en personal_profiles.extra del usuario, no del hogar. `null` lo borra.
+ * Revalida Mi Rich Life para que la escalera repinte con el nuevo número.
+ */
+export async function setDesiredLifestyleAction(amount: number | null): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  let value: number | null = null;
+  if (amount !== null) {
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+      return { ok: false, fieldErrors: { amount: "Ingresa un monto mensual mayor a 0." } };
+    }
+    value = Math.round(amount);
+  }
+  try {
+    await setDesiredMonthlyLifestyle(value);
+    revalidatePath("/mi-rich-life");
+    return { ok: true };
+  } catch (err) {
+    logger.error("setDesiredLifestyle fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos guardar tu estilo de vida deseado." };
+  }
 }
 
 export async function addInvestmentAction(raw: unknown): Promise<ActionResult> {
