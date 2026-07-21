@@ -78,6 +78,8 @@ export async function setDesiredLifestyleAction(amount: number | null): Promise<
   try {
     await setDesiredMonthlyLifestyle(value);
     revalidatePath("/mi-rich-life");
+    revalidatePath("/m/libertad");
+    revalidatePath("/m");
     return { ok: true };
   } catch (err) {
     logger.error("setDesiredLifestyle fallido", {

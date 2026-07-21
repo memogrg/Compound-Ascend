@@ -26,6 +26,8 @@ export { addPolicyAction } from "./api/actions";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
+export type { PatrimonioReport, PatrimonioLevel, Hito } from "./engine/patrimonio-engine";
+export type { EssentialBreakdown } from "./engine/essential-expense";
 export { buildDailyPatrimonioInsight, RITUAL_KIND } from "./engine/daily-insight";
 export { buildWeeklyDigest, type WeeklyDigest } from "./engine/weekly-digest";
 export {

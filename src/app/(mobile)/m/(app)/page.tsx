@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth/session";
 import { getDashboardData } from "@/modules/dashboard";
+import { getPatrimonioReport } from "@/modules/wealth";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
 import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { MHomeCarousel } from "../components/home-carousel";
 import { BudgetCard } from "../components/home-cards/budget-card";
 import { NetWorthCard } from "../components/home-cards/networth-card";
+import { LibertadCard } from "../components/home-cards/libertad-card";
 import { IncomeCard } from "../components/home-cards/income-card";
 import { SavingsCard } from "../components/home-cards/savings-card";
 import { DebtCard } from "../components/home-cards/debt-card";
@@ -97,7 +99,7 @@ export default async function MobileHome() {
   // paralelo; no era cierto, y por eso el coste del tercero (que arrastra las consultas
   // de getEntityFallbackBudget) se sumaba entero al arranque.
   // Cada uno conserva su propio `.catch`: si uno falla, los otros dos siguen.
-  const [data, recent, expenseView] = await Promise.all([
+  const [data, recent, expenseView, patrimonio] = await Promise.all([
     getDashboardData({ previewDemo: preview }),
     preview
       ? Promise.resolve([] as Transaction[])
@@ -107,6 +109,9 @@ export default async function MobileHome() {
       : getExpenseRangeView("1m", monthPeriod(now.getFullYear(), now.getMonth() + 1)).catch(
           () => null,
         ),
+    // Marco Patrimonial (los tres números) para la tarjeta Libertad. Best-effort y en
+    // paralelo: si falla, la tarjeta muestra su estado "no cargó" sin romper el resto.
+    preview ? Promise.resolve(null) : getPatrimonioReport().catch(() => null),
   ]);
 
   const { currency, panel, insights } = data;
@@ -194,6 +199,14 @@ export default async function MobileHome() {
                     liabilities={norte.totalLiabilities}
                     currency={currency}
                   />
+                ),
+              },
+              {
+                name: "Libertad",
+                node: patrimonio ? (
+                  <LibertadCard report={patrimonio.report} currency={patrimonio.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Libertad" icon="goal" />
                 ),
               },
               {
