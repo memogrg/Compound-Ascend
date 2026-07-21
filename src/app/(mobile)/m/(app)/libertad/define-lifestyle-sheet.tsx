@@ -43,7 +43,7 @@ export function DefineLifestyleSheet({
         title={editing ? "Editar estilo de vida" : "Definir tu estilo de vida"}
       >
         <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
-          El gasto mensual de la vida que querés vivir —lo esencial más lo que la hace rica
+          El gasto mensual de la vida que quieres vivir —lo esencial más lo que la hace rica
           (viajes, hobbies, generosidad). Con él calculamos tu Número de Libertad.
         </p>
         <FormShell

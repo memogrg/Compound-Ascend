@@ -611,7 +611,7 @@ function HouseholdSheet({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {m.email}
-                {m.isSelf ? <span className="muted" style={{ fontWeight: 400 }}> (vos)</span> : null}
+                {m.isSelf ? <span className="muted" style={{ fontWeight: 400 }}> (tú)</span> : null}
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
                 <MChip>{HH_ROLE_LABEL[m.role] ?? m.role}</MChip>
@@ -661,7 +661,7 @@ function HouseholdSheet({
       {quota.overLimit ? (
         <div className="m-field-err" role="status" style={{ lineHeight: 1.5 }}>
           Tu hogar tiene {quota.usedActive} personas y tu plan incluye {quota.limit}. Nadie pierde
-          acceso, pero no podés invitar hasta subir de plan.
+          acceso, pero no puedes invitar hasta subir de plan.
         </div>
       ) : null}
 
@@ -703,7 +703,7 @@ function HouseholdSheet({
           ) : null}
           {!emailConfigured ? (
             <div className="m-field-err" role="status" style={{ lineHeight: 1.5 }}>
-              El correo no está configurado: las invitaciones no se envían. Probá el envío en
+              El correo no está configurado: las invitaciones no se envían. Prueba el envío en
               «Correo (invitaciones)» de la web.
             </div>
           ) : null}
