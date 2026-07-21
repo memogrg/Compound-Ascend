@@ -188,9 +188,9 @@ describe("buildSystemPrompt · perfil conductual", () => {
       expenseMonthly: 2575128,
       indicePatrimonial: 39,
       nivelPatrimonial: "Estabilidad inicial",
-      numeroDeLibertad: 772538304,
+      numeroDeIndependencia: 772538304,
       añosDeLibertad: 6,
-      mesesDeLibertad: 34,
+      mesesDeColchon: 34,
       coberturaPasivaPct: 35,
       calidadPatrimonio: 0,
       investableWealth: 199244964,
@@ -198,7 +198,7 @@ describe("buildSystemPrompt · perfil conductual", () => {
     });
     // (i) Los facts patrimoniales aparecen.
     expect(prompt).toContain("Índice Patrimonial: 39/100 (nivel: Estabilidad inicial).");
-    expect(prompt).toContain("Número de Libertad Financiera: 772538304 CRC");
+    expect(prompt).toContain("Número de Independencia: 772538304 CRC");
     expect(prompt).toContain("Años de Libertad: tu patrimonio invertible cubre 6 años");
     // (ii) Las nuevas instrucciones de uso de métricas y estilo directo.
     expect(prompt).toContain("Usa SIEMPRE las métricas que ya vienen en tu contexto");
@@ -380,7 +380,7 @@ describe("buildSystemPrompt · comportamientos de asesor experto (reglas condici
   it("cerca del Número de Libertad (invertible ≥80%) → regla de riesgo de secuencia", () => {
     const cerca = buildSystemPrompt({
       currency: "CRC",
-      numeroDeLibertad: 200_000_000,
+      numeroDeIndependencia: 200_000_000,
       investableWealth: 190_000_000,
     });
     expect(cerca).toContain("RIESGO DE SECUENCIA");
@@ -388,7 +388,7 @@ describe("buildSystemPrompt · comportamientos de asesor experto (reglas condici
     // Lejos del número → no aplica.
     const lejos = buildSystemPrompt({
       currency: "CRC",
-      numeroDeLibertad: 200_000_000,
+      numeroDeIndependencia: 200_000_000,
       investableWealth: 13_000_000,
     });
     expect(lejos).not.toContain("RIESGO DE SECUENCIA");

@@ -8,6 +8,9 @@
  * los datos reales y corre este motor; aquí no se toca BD, UI ni IA.
  */
 
+import { mesesDeColchon } from "@/lib/wealth-math";
+export { mesesDeColchon };
+
 export type AssetClassKey = "liquido" | "inversion" | "productivo" | "uso_personal" | "especial";
 
 export type PatrimonioInput = {
@@ -25,7 +28,17 @@ export type PatrimonioInput = {
   topConcentration: number; // 0-1 (mayor peso de un activo)
   age?: number | null;
   annualNetIncome?: number | null;
-  freedomMultiplier?: 25 | 30 | 33; // default 25
+  freedomMultiplier?: 25 | 30 | 33; // default 25 (legacy; ya no se usa para los números)
+  /** Gasto ESENCIAL mensual (N1) → número de seguridad. */
+  essentialMonthlyExpenses?: number;
+  /** Estilo de vida DESEADO mensual (dato personal) → número de libertad; null = sin definir. */
+  desiredMonthlyLifestyle?: number | null;
+  /**
+   * Saldo de los fondos de defensa (current_amount de metas defensa:fondo_*).
+   * Se RESTA del líquido en el capital que trabaja: está earmarkeado como colchón,
+   * contarlo como capital generador sería usarlo dos veces.
+   */
+  defenseFundsBalance?: number;
   currency: string;
 };
 
@@ -34,12 +47,29 @@ export type PatrimonioReport = {
   netWorth: number;
   adjustedNetWorth: number;
   liquidWealth: number;
+  /**
+   * Capital que TRABAJA (genera renta): inversión + productivo + (líquido −
+   * fondos de defensa). Nunca < 0. Es el numerador del progreso hacia los tres
+   * números. Su definición CAMBIÓ (antes = inversión + productivo): ahora suma el
+   * líquido invertible pero descuenta el colchón earmarkeado.
+   */
   investableWealth: number;
   productiveWealth: number;
   protectedWealth: number;
-  numeroDeLibertad: number;
-  ratioLibertad: number; // 0-1
-  mesesDeLibertad: number;
+  /** Los TRES números (capital que, al 8%, cubre cada nivel de gasto). */
+  numeroDeSeguridad: number;
+  numeroDeIndependencia: number;
+  /** null cuando el usuario no definió su estilo de vida deseado (no se inventa). */
+  numeroDeLibertad: number | null;
+  progresoSeguridad: number; // 0-1
+  progresoIndependencia: number; // 0-1
+  progresoLibertad: number; // 0-1 (0 si numeroDeLibertad es null)
+  hitoAlcanzado: Hito;
+  siguienteHito: Exclude<Hito, "ninguno"> | null;
+  /** Comparación informativa (mismo gasto total) a 4/6/8/10%. */
+  sensibilidadTasa: Record<"0.04" | "0.06" | "0.08" | "0.10", number>;
+  ratioLibertad: number; // 0-1 (= progresoIndependencia; alias legacy)
+  mesesDeColchon: number;
   coberturaPasiva: number; // 0-1+ (ingreso pasivo / gasto)
   tasaInversion: number; // 0-1
   ratioDeudaActivos: number; // 0-1
@@ -132,6 +162,32 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 const round4 = (n: number): number => Math.round(n * 10000) / 10000;
 const safeRatio = (num: number, den: number): number => (den > 0 ? num / den : 0);
 
+/**
+ * TASA_RETIRO — supuesto de retorno anual del capital para los tres números
+ * (seguridad/independencia/libertad). Un solo lugar, nombrada y documentada.
+ * A MENOR rendimiento necesitás MÁS capital para el mismo gasto (número = gasto
+ * anual / tasa). 8% es la decisión de producto; la UI muestra 4/6/10% como
+ * comparación informativa, pero el cálculo usa SIEMPRE esta constante.
+ */
+export const TASA_RETIRO = 0.08;
+
+/** El capital que, a TASA_RETIRO, genera `gastoMensual` para siempre. */
+export function numeroPatrimonial(gastoMensual: number, tasa: number = TASA_RETIRO): number {
+  return tasa > 0 ? (gastoMensual * 12) / tasa : 0;
+}
+
+/** Comparación informativa: qué capital haría falta a cada tasa (mismo gasto). */
+export function sensibilidadTasa(gastoMensual: number): Record<"0.04" | "0.06" | "0.08" | "0.10", number> {
+  return {
+    "0.04": round2(numeroPatrimonial(gastoMensual, 0.04)),
+    "0.06": round2(numeroPatrimonial(gastoMensual, 0.06)),
+    "0.08": round2(numeroPatrimonial(gastoMensual, 0.08)),
+    "0.10": round2(numeroPatrimonial(gastoMensual, 0.1)),
+  };
+}
+
+export type Hito = "ninguno" | "seguridad" | "independencia" | "libertad";
+
 // ── Motor ─────────────────────────────────────────────────────────────────────
 
 export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
@@ -149,18 +205,60 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
   const adjustedNetWorth = adjustedAssets - input.totalLiabilities;
 
   const liquidWealth = a.liquido;
-  // Capital que trabaja: inversión + productivo. El líquido/saco NO es invertible
-  // (es la base de seguridad), por eso se cuenta aparte del número de libertad.
-  const investableWealth = a.inversion + a.productivo;
+  // Capital que TRABAJA: inversión + productivo + (líquido − fondos de defensa).
+  // ⚠️ NO "arreglar" quitando el descuento del colchón: los fondos de defensa
+  // (fondo_emergencia/paz) están earmarkeados como colchón de seguridad; contarlos
+  // acá como capital generador de renta sería usarlos DOS veces (colchón Y renta).
+  // El líquido invertible restante (ahorro de sobra) sí trabaja. Nunca < 0.
+  const defenseFunds = input.defenseFundsBalance ?? 0;
+  const liquidoInvertible = Math.max(0, liquidWealth - defenseFunds);
+  const investableWealth = Math.max(0, a.inversion + a.productivo + liquidoInvertible);
   const productiveWealth = a.productivo;
   const protectedWealth = input.protectedCoverage;
 
-  const multiplier = input.freedomMultiplier ?? 25;
-  const numeroDeLibertad = input.monthlyExpenses * 12 * multiplier;
   const annualExpenses = input.monthlyExpenses * 12;
 
-  const ratioLibertad = numeroDeLibertad > 0 ? clamp01(investableWealth / numeroDeLibertad) : 0;
-  const mesesDeLibertad = safeRatio(liquidWealth, input.monthlyExpenses);
+  // Los TRES números, fórmula única con TASA_RETIRO (8%). Libertad = null si el
+  // usuario no definió su estilo de vida deseado (nunca se inventa un múltiplo).
+  const numeroDeSeguridad = numeroPatrimonial(input.essentialMonthlyExpenses ?? 0);
+  const numeroDeIndependencia = numeroPatrimonial(input.monthlyExpenses);
+  const numeroDeLibertad =
+    input.desiredMonthlyLifestyle != null && input.desiredMonthlyLifestyle > 0
+      ? numeroPatrimonial(input.desiredMonthlyLifestyle)
+      : null;
+
+  const progreso = (n: number | null): number => (n && n > 0 ? clamp01(investableWealth / n) : 0);
+  const progresoSeguridad = progreso(numeroDeSeguridad);
+  const progresoIndependencia = progreso(numeroDeIndependencia);
+  const progresoLibertad = progreso(numeroDeLibertad);
+
+  // Hito alcanzado = el más alto cuyo número ya cubre el capital que trabaja.
+  const hitoAlcanzado: Hito =
+    numeroDeLibertad != null && investableWealth >= numeroDeLibertad
+      ? "libertad"
+      : numeroDeIndependencia > 0 && investableWealth >= numeroDeIndependencia
+        ? "independencia"
+        : numeroDeSeguridad > 0 && investableWealth >= numeroDeSeguridad
+          ? "seguridad"
+          : "ninguno";
+  const siguienteHito: Exclude<Hito, "ninguno"> | null =
+    hitoAlcanzado === "ninguno"
+      ? "seguridad"
+      : hitoAlcanzado === "seguridad"
+        ? "independencia"
+        : hitoAlcanzado === "independencia"
+          ? numeroDeLibertad != null
+            ? "libertad"
+            : null
+          : null;
+
+  // El ÍNDICE usa el número de INDEPENDENCIA (sostener la vida actual) como
+  // denominador — sucesor del viejo numeroDeLibertad (gastos totales). Al 8% el
+  // número es menor, así que los ratios (clamped 0-1) son más generosos: refleja
+  // el supuesto de retorno, coherente con la decisión de producto.
+  const numeroIndiceDenom = numeroDeIndependencia;
+  const ratioLibertad = progresoIndependencia; // alias legacy del progreso de independencia
+  const mesesColchon = mesesDeColchon(liquidWealth, input.monthlyExpenses);
   const coberturaPasiva = safeRatio(input.passiveIncomeMonthly, input.monthlyExpenses);
   const tasaInversion = safeRatio(input.monthlyInvested, input.netMonthlyIncome);
   const ratioDeudaActivos = safeRatio(input.totalLiabilities, totalAssets);
@@ -200,9 +298,9 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
 
   // §7 · Índice Patrimonial 0-100. Dimensiones a 0-1 desde valores crudos.
   const dims = {
-    netoAjustado: numeroDeLibertad > 0 ? clamp01(adjustedNetWorth / numeroDeLibertad) : 0,
+    netoAjustado: numeroIndiceDenom > 0 ? clamp01(adjustedNetWorth / numeroIndiceDenom) : 0,
     invertible: ratioLibertad,
-    mesesLibertad: clamp01(mesesDeLibertad / 12), // 12+ meses = pleno
+    mesesLibertad: clamp01(mesesColchon / 12), // 12+ meses = pleno
     coberturaPasiva: clamp01(coberturaPasiva / 1),
     tasaInversion: clamp01(tasaInversion / 0.2), // 20%+ = pleno
     calidadDeuda: 1 - clamp01(ratioDeudaMala / 0.2), // 20%+ ingreso = presión máx
@@ -228,9 +326,17 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
     investableWealth: round2(investableWealth),
     productiveWealth: round2(productiveWealth),
     protectedWealth: round2(protectedWealth),
-    numeroDeLibertad: round2(numeroDeLibertad),
+    numeroDeSeguridad: round2(numeroDeSeguridad),
+    numeroDeIndependencia: round2(numeroDeIndependencia),
+    numeroDeLibertad: numeroDeLibertad == null ? null : round2(numeroDeLibertad),
+    progresoSeguridad: round4(progresoSeguridad),
+    progresoIndependencia: round4(progresoIndependencia),
+    progresoLibertad: round4(progresoLibertad),
+    hitoAlcanzado,
+    siguienteHito,
+    sensibilidadTasa: sensibilidadTasa(input.monthlyExpenses),
     ratioLibertad: round4(ratioLibertad),
-    mesesDeLibertad: round2(mesesDeLibertad),
+    mesesDeColchon: round2(mesesColchon),
     coberturaPasiva: round4(coberturaPasiva),
     tasaInversion: round4(tasaInversion),
     ratioDeudaActivos: round4(ratioDeudaActivos),
@@ -258,13 +364,16 @@ export function millonarioReadings(input: PatrimonioInput): MillonarioReadings {
   const a = input.assetsByClass;
   const totalAssets = a.liquido + a.inversion + a.productivo + a.uso_personal + a.especial;
   const netWorth = totalAssets - input.totalLiabilities;
-  const investableWealth = a.inversion + a.productivo;
-  const numeroDeLibertad = input.monthlyExpenses * 12 * (input.freedomMultiplier ?? 25);
+  // Mismo capital-que-trabaja que el motor (con el descuento del colchón de defensa).
+  const liquidoInvertible = Math.max(0, a.liquido - (input.defenseFundsBalance ?? 0));
+  const investableWealth = Math.max(0, a.inversion + a.productivo + liquidoInvertible);
+  // "Libertad millonario" = independencia al 8% (sostener la vida actual).
+  const numeroIndependencia = numeroPatrimonial(input.monthlyExpenses);
   return {
     nominal: netWorth > 1_000_000,
     netWorth: netWorth >= 1_000_000,
     invertible: investableWealth >= 1_000_000,
-    libertad: numeroDeLibertad > 0 && investableWealth >= numeroDeLibertad,
+    libertad: numeroIndependencia > 0 && investableWealth >= numeroIndependencia,
     flujo: input.passiveIncomeMonthly >= input.monthlyExpenses && input.monthlyExpenses > 0,
   };
 }
@@ -274,7 +383,7 @@ export function buildPatrimonioDiagnosis(report: PatrimonioReport): DiagnosisFla
   const flags: DiagnosisFlag[] = [];
   // "Patrimonio sustancial": ya construyó al menos la mitad de su número de libertad.
   const substantial =
-    report.numeroDeLibertad > 0 && report.netWorth >= report.numeroDeLibertad * 0.5;
+    report.numeroDeIndependencia > 0 && report.netWorth >= report.numeroDeIndependencia * 0.5;
   const investablePct = safeRatio(report.investableWealth, report.totalAssets);
   const annualExpenses = report.monthlyExpenses * 12;
 
@@ -284,7 +393,7 @@ export function buildPatrimonioDiagnosis(report: PatrimonioReport): DiagnosisFla
       hint: "Tus pasivos superan tus activos: estabilizar la deuda es la prioridad.",
     });
   }
-  if (substantial && report.mesesDeLibertad < 3) {
+  if (substantial && report.mesesDeColchon < 3) {
     flags.push({
       code: "patrimonio_alto_baja_liquidez",
       hint: "Tienes patrimonio pero poca liquidez: refuerza tu colchón disponible.",
