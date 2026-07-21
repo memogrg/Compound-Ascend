@@ -13,6 +13,7 @@ function cat(over: Partial<Category>): Category {
     icon: over.icon ?? null,
     color: over.color ?? null,
     isFavorite: over.isFavorite ?? false,
+    isEssential: over.isEssential ?? false,
     isActive: true,
     isSystem: over.isSystem ?? true,
     categoryType: "expense",

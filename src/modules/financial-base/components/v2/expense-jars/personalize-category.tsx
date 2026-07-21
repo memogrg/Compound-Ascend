@@ -24,6 +24,11 @@ import {
   unforkCategoryAction,
   unhideCategoryAction,
 } from "@/modules/financial-base/api/v2-actions";
+import { EssentialCheck } from "@/components/shared/essential-check";
+import {
+  toggleEssentialAction,
+  essentialToggleLabel,
+} from "@/modules/financial-base/components/v2/expense-jars/essential-toggle";
 
 export type PersonalizeTarget = {
   id: string;
@@ -32,6 +37,8 @@ export type PersonalizeTarget = {
   icon: string | null;
   color: string | null;
   isFavorite: boolean;
+  /** "Gasto esencial" (número de seguridad) del sobre; alimenta el toggle del kebab. */
+  isEssential: boolean;
 };
 
 export type ReassignOption = { id: string; label: string };
@@ -187,6 +194,7 @@ export function ForkCategoryModal({
   const [icon, setIcon] = useState<string | null>(target.icon);
   const [color, setColor] = useState<string | null>(target.color);
   const [favorite, setFavorite] = useState(target.isFavorite);
+  const [essential, setEssential] = useState(target.isEssential);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -201,6 +209,7 @@ export function ForkCategoryModal({
         icon,
         color,
         isFavorite: favorite,
+        isEssential: essential,
       });
       if (res.ok) {
         toast(`"${n}" personalizada para el hogar`);
@@ -292,6 +301,10 @@ export function ForkCategoryModal({
           <input type="checkbox" checked={favorite} onChange={(e) => setFavorite(e.target.checked)} />
           <span style={{ fontSize: 13 }}>Marcar como favorita (visible como sobre)</span>
         </label>
+
+        <div className="fld" style={{ marginTop: 12 }}>
+          <EssentialCheck checked={essential} onChange={setEssential} />
+        </div>
       </div>
       <div className="modal-foot">
         <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -402,6 +415,22 @@ export function PersonalizeKebab({
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const p = usePersonalize({ target, isFork, baseIdIfFork, reassignOptions });
+  const router = useRouter();
+  const toast = useToast();
+  const [essPending, startEss] = useTransition();
+
+  // Marcar/desmarcar esencial como acción DIRECTA (2 taps desde la fila del sobre).
+  // La ramificación propio/base vive en el helper único (toggleEssentialAction).
+  const toggleEssential = () =>
+    startEss(async () => {
+      const res = await toggleEssentialAction(target.id, target.isSystem, !target.isEssential);
+      if (res.ok) {
+        toast(target.isEssential ? "Quitado de esenciales" : "Marcado como esencial");
+        router.refresh();
+      } else {
+        toast(res.message ?? "No pudimos actualizar el sobre.", "error");
+      }
+    });
 
   useEffect(() => {
     if (!open) return;
@@ -441,6 +470,13 @@ export function PersonalizeKebab({
           }}
           onClick={() => setOpen(false)}
         >
+          <MenuButton
+            icon="spark"
+            label={essentialToggleLabel(target.isEssential)}
+            disabled={essPending}
+            onClick={toggleEssential}
+          />
+          <div style={{ borderTop: "1px solid var(--line)", margin: "4px 0" }} />
           <PersonalizeMenuButtons
             isFork={p.isFork}
             pending={p.pending}

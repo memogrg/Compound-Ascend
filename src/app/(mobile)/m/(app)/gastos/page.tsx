@@ -74,12 +74,20 @@ export default async function MobileGastos() {
   // decidir qué es editable/borrable/personalizable, como la web.
   const categoryMeta: Record<
     string,
-    { isSystem: boolean; isFavorite: boolean; icon: string | null; color: string | null; name: string }
+    {
+      isSystem: boolean;
+      isFavorite: boolean;
+      isEssential: boolean;
+      icon: string | null;
+      color: string | null;
+      name: string;
+    }
   > = {};
   for (const c of view.categories) {
     categoryMeta[c.id] = {
       isSystem: c.isSystem,
       isFavorite: c.isFavorite,
+      isEssential: c.isEssential,
       icon: c.icon,
       color: c.color,
       name: c.name,

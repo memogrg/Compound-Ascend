@@ -822,6 +822,7 @@ export async function forkCategoryAction(raw: unknown): Promise<ActionResult & {
       icon: parsed.data.icon,
       color: parsed.data.color,
       isFavorite: parsed.data.isFavorite,
+      isEssential: parsed.data.isEssential,
     });
     revalidate();
     revalidatePath("/gastos");

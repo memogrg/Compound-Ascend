@@ -11,6 +11,7 @@ import {
 } from "@/modules/financial-base/api/v2-actions";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Account, Period } from "@/modules/financial-base/types";
+import { EssentialCheck } from "@/components/shared/essential-check";
 import { formatMoney } from "@/lib/format";
 import { Icon, type IconName } from "@/components/ui/icon";
 // Reutiliza la MISMA paleta que el fork de la web (tokens globales del design system).
@@ -230,15 +231,22 @@ export function CreateSobreForm({
   const [name, setName] = useState("");
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [cur, setCur] = useState(currency);
+  const [essential, setEssential] = useState(false);
 
   // Igual que la web: crea la categoría (sobre favorito) y, si hay monto, su línea
   // de presupuesto del mes. Dos actions encadenadas envueltas como una sola.
-  const action = async (v: { name: string; amount: number | undefined; currency: string }): Promise<ActionResult> => {
+  const action = async (v: {
+    name: string;
+    amount: number | undefined;
+    currency: string;
+    isEssential: boolean;
+  }): Promise<ActionResult> => {
     const cat = await addCategoryAction({
       name: v.name,
       parentId: jarGroup,
       categoryType: "expense",
       isFavorite: true,
+      isEssential: v.isEssential,
     });
     if (!cat.ok || !cat.id) {
       return { ok: false, message: cat.message, fieldErrors: cat.fieldErrors };
@@ -261,7 +269,7 @@ export function CreateSobreForm({
   return (
     <FormShell
       action={action}
-      values={{ name: name.trim(), amount, currency: cur }}
+      values={{ name: name.trim(), amount, currency: cur, isEssential: essential }}
       submitLabel="Crear sobre"
       successMessage="Sobre creado"
       onSuccess={onSuccess}
@@ -277,6 +285,7 @@ export function CreateSobreForm({
       />
       <MoneyField name="amount" label="Presupuesto del mes (opcional)" value={amount} onChange={setAmount} currency={cur} />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <EssentialCheck checked={essential} onChange={setEssential} />
     </FormShell>
   );
 }
@@ -375,6 +384,8 @@ export type PersonalizeTarget = {
   isFavorite: boolean;
   icon: string | null;
   color: string | null;
+  /** "Gasto esencial" de la base; el fork lo preserva/edita. */
+  isEssential: boolean;
 };
 
 /**
@@ -392,9 +403,10 @@ export function ForkCategoryForm({
   const [favorite, setFavorite] = useState(target.isFavorite);
   const [icon, setIcon] = useState<string | null>(target.icon);
   const [color, setColor] = useState<string | null>(target.color);
+  const [essential, setEssential] = useState(target.isEssential);
 
   const action = (v: { name: string }): Promise<ActionResult> =>
-    forkCategoryAction({ baseId: target.id, name: v.name, icon, color, isFavorite: favorite });
+    forkCategoryAction({ baseId: target.id, name: v.name, icon, color, isFavorite: favorite, isEssential: essential });
 
   return (
     <FormShell
@@ -460,6 +472,7 @@ export function ForkCategoryForm({
           ))}
         </div>
       </div>
+      <EssentialCheck checked={essential} onChange={setEssential} />
     </FormShell>
   );
 }
@@ -517,22 +530,25 @@ export function HideCategoryForm({
 export function EditSobreForm({
   envelope,
   initialFavorite,
+  initialEssential,
   onSuccess,
 }: {
   envelope: JarEnvelope;
   initialFavorite: boolean;
+  initialEssential: boolean;
   onSuccess: () => void;
 }) {
   const [name, setName] = useState(envelope.name);
   const [favorite, setFavorite] = useState(initialFavorite);
+  const [essential, setEssential] = useState(initialEssential);
 
-  const action = (v: { name: string; isFavorite: boolean }): Promise<ActionResult> =>
-    editCategoryAction(envelope.id, { name: v.name, isFavorite: v.isFavorite });
+  const action = (v: { name: string; isFavorite: boolean; isEssential: boolean }): Promise<ActionResult> =>
+    editCategoryAction(envelope.id, { name: v.name, isFavorite: v.isFavorite, isEssential: v.isEssential });
 
   return (
     <FormShell
       action={action}
-      values={{ name: name.trim(), isFavorite: favorite }}
+      values={{ name: name.trim(), isFavorite: favorite, isEssential: essential }}
       submitLabel="Guardar cambios"
       successMessage="Sobre actualizado"
       onSuccess={onSuccess}
@@ -545,6 +561,7 @@ export function EditSobreForm({
         onChange={setFavorite}
         hint="Los sobres favoritos aparecen dentro del frasco."
       />
+      <EssentialCheck checked={essential} onChange={setEssential} />
     </FormShell>
   );
 }

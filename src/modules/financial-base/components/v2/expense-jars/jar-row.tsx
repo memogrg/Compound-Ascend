@@ -94,6 +94,9 @@ export function JarRow({
       icon: jar.icon,
       color: jar.color,
       isFavorite: false,
+      // Un frasco (grupo) no es un sobre: "esencial" no aplica. El toggle vive en el
+      // kebab del SOBRE (PersonalizeKebab), no en el menú del frasco.
+      isEssential: false,
     },
     isFork: jarIsFork,
     baseIdIfFork: jarBaseId,

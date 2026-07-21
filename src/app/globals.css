@@ -5246,23 +5246,28 @@ input[type="radio"] {
   z-index: 20;
   max-width: 240px;
 }
-.tip:hover::after,
-.tip:focus-visible::after {
+/* Fallback SOLO sin JS: cuando TooltipLayer monta añade `.tip-js` al <html> y toma
+   el control (burbuja reposicionada dentro del viewport). Sin JS, este ::after sigue
+   funcionando (puede recortarse cerca de un borde — es el modo degradado). */
+:root:not(.tip-js) .tip:hover::after,
+:root:not(.tip-js) .tip:focus-visible::after {
   display: block;
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
 @starting-style {
-  .tip:hover::after,
-  .tip:focus-visible::after {
+  :root:not(.tip-js) .tip:hover::after,
+  :root:not(.tip-js) .tip:focus-visible::after {
     opacity: 0;
     transform: translateX(-50%) translateY(4px);
   }
 }
-/* Variante para tooltips de texto largo (ícono "?" explicativo). */
+/* Variante para tooltips de texto largo (ícono "?" explicativo). Ancho relativo para
+   no desbordar pantallas chicas (antes 240px fijo). */
 .tip.tip-wrap::after {
   white-space: normal;
-  width: 240px;
+  max-width: min(240px, calc(100vw - 24px));
+  width: max-content;
 }
 @media (max-width: 560px) {
   .tip::after {
