@@ -256,6 +256,8 @@ export type ExpenseItemRow = Timestamps & Audited & {
 };
 
 export type ExpenseCategoryRow = Timestamps & Audited & {
+  /** Flag "esencial" para el número de seguridad (migración 20260727000001). */
+  is_essential: boolean;
   id: string;
   user_id: string | null;
   parent_id: string | null;
@@ -421,6 +423,8 @@ export type AiUsageLedgerRow = Timestamps & {
 
 // ---------- Módulo 3 — Control Financiero ----------
 export type SavingsGoalRow = Timestamps & Audited & {
+  /** Flag "esencial" para el número de seguridad (migración 20260727000001). */
+  is_essential: boolean;
   id: string;
   user_id: string;
   household_id: string | null;
@@ -463,6 +467,8 @@ export type GoalPeriodResetRow = Audited & {
 };
 
 export type DebtRow = Timestamps & Audited & {
+  /** Flag "esencial" para el número de seguridad (migración 20260727000001). */
+  is_essential: boolean;
   id: string;
   user_id: string;
   household_id: string | null;
@@ -736,6 +742,8 @@ export type UserInsightRow = Timestamps & Audited & {
 };
 
 export type InsurancePolicyRow = Timestamps & Audited & {
+  /** Flag "esencial" para el número de seguridad (migración 20260727000001). */
+  is_essential: boolean;
   id: string;
   user_id: string;
   household_id: string | null;

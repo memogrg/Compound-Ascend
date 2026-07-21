@@ -188,6 +188,7 @@ export const categoryInputSchema = z.object({
   icon: z.string().max(40).optional().nullable(),
   color: z.string().max(40).optional().nullable(),
   isFavorite: z.boolean().optional(),
+  isEssential: z.boolean().optional(),
 });
 
 export const categoryMergeSchema = z

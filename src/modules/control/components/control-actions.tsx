@@ -1,4 +1,5 @@
 "use client";
+import { EssentialCheck, TIP_SAVINGS_ESSENTIAL } from "@/components/shared/essential-check";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -316,6 +317,7 @@ function GoalForm({
           targetAmount: Number(targetAmount) || undefined,
           monthlyContribution: Number(fd.get("monthlyContribution") ?? 0),
           recurrence,
+          isEssential: fd.get("isEssential") === "on",
         },
         onDone,
         form,
@@ -345,6 +347,7 @@ function GoalForm({
         // En un frasco recurrente el "Monto por período" ES el plan pleno.
         periodAmount: !isSobre && isRecurring ? Number(targetAmount) || 0 : undefined,
         defaultCategoryId: isDefense ? null : defaultCategoryId || null,
+        isEssential: fd.get("isEssential") === "on",
       },
       onDone,
       form,
@@ -716,6 +719,13 @@ function GoalForm({
             ) : null}
           </>
         )}
+        <div className="fld">
+          <EssentialCheck
+            name="isEssential"
+            defaultChecked={item?.isEssential ?? false}
+            tip={TIP_SAVINGS_ESSENTIAL}
+          />
+        </div>
       </div>
       <Foot pending={pending} onCancel={onCancel} />
     </form>
@@ -815,6 +825,7 @@ function DebtForm({
         delinquency: String(fd.get("delinquency") ?? "no"),
         stress: Number(fd.get("stress") ?? 5),
         notes: String(fd.get("notes") ?? "") || undefined,
+        isEssential: fd.get("isEssential") === "on",
       },
       onDone,
       form,
@@ -1141,6 +1152,9 @@ function DebtForm({
             defaultValue={item?.notes ?? ""}
             placeholder="Banco, condiciones, recordatorios…"
           />
+        </div>
+        <div className="fld">
+          <EssentialCheck name="isEssential" defaultChecked={item?.isEssential ?? false} />
         </div>
       </div>
       <Foot pending={pending} onCancel={onCancel} />

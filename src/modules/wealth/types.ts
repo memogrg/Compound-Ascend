@@ -81,6 +81,7 @@ export type InsurancePolicy = {
   premiumFrequency?: string | null;
   renewalDate?: string | null;
   currency: string;
+  isEssential?: boolean;
 };
 
 export type ReadinessState =
