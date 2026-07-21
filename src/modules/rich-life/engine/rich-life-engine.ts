@@ -13,6 +13,7 @@ import type {
   LiabilityClass,
 } from "@/modules/rich-life/types";
 import { formatMoney } from "@/lib/format";
+import { mesesDeColchon } from "@/lib/wealth-math";
 
 const ASSET_COLOR: Record<AssetClass, string> = {
   liquido: "var(--c-savings)",
@@ -55,8 +56,8 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
   const depreciable = input.assets.filter((a) => a.assetClass === "uso_personal");
 
   const passiveIncomeCoverage = ratio(input.passiveIncomeMonthly, input.monthlyExpenses);
-  const monthsOfIndependence =
-    input.monthlyExpenses > 0 ? Math.round((sum(liquid) / input.monthlyExpenses) * 10) / 10 : 0;
+  // Fuente única (mesesDeColchon): mismo cálculo que patrimonio-engine.
+  const monthsOfIndependence = mesesDeColchon(sum(liquid), input.monthlyExpenses);
 
   let trend: RichTrend = "sin_historico";
   let wealthVelocity: number | null = null;

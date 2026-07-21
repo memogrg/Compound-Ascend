@@ -386,7 +386,7 @@ function PatrimonioSections({
           </span>
         </div>
         <div className="num-xl" style={{ fontSize: 42, marginTop: 8 }}>
-          {formatMoney(r.numeroDeLibertad, currency)}
+          {formatMoney(r.numeroDeIndependencia, currency)}
         </div>
         <div className="bar-track" style={{ marginTop: 14, height: 12 }}>
           <div
@@ -417,8 +417,8 @@ function PatrimonioSections({
           tip="Qué es: cuántos años de tu estilo de vida cubre tu patrimonio invertible. Por qué importa: traduce tu capital a tiempo de tranquilidad. Qué hago: súbelo invirtiendo más y conteniendo el gasto."
         />
         <MetricCard
-          label="Meses de Libertad"
-          value={`${r.mesesDeLibertad}`}
+          label="Meses de colchón"
+          value={`${r.mesesDeColchon}`}
           note="liquidez vs. gasto mensual"
           tip="Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. Por qué importa: es tu colchón de seguridad. Qué hago: apunta primero a 3-6 meses de gastos."
         />

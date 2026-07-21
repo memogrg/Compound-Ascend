@@ -83,7 +83,11 @@ export async function POST(req: Request) {
         // PRINCIPAL. Best-effort: si falla, la tool de libertad degrada con un motivo explicable.
         try {
           const pat = await getPatrimonioReport();
-          let numero = pat.report.numeroDeLibertad;
+          // El "freedomNumber" de las tools = capital para sostener la vida ACTUAL
+          // = numeroDeIndependencia (sucesor real del viejo numeroDeLibertad, siempre
+          // presente). El nuevo numeroDeLibertad (estilo de vida deseado) es nullable
+          // y se maneja aparte; nunca se inventa.
+          let numero = pat.report.numeroDeIndependencia;
           let invertible = pat.report.investableWealth;
           if (pat.currency !== primary) {
             if (rates) {

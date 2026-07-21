@@ -71,9 +71,10 @@ const patrimonioReport = {
   level: { name: "Constructor" },
   report: {
     indice: 64,
-    numeroDeLibertad: 290_400_000,
+    numeroDeIndependencia: 290_400_000,
+    numeroDeLibertad: 350_000_000,
     añosDeLibertad: 11,
-    mesesDeLibertad: 8,
+    mesesDeColchon: 8,
     coberturaPasiva: 0.34,
     calidadPatrimonio: 70,
     investableWealth: 13_000_000,
@@ -106,12 +107,13 @@ describe("buildContextForUser · paridad de contexto en WhatsApp", () => {
     const ctx = await buildContextForUser("u1", null);
 
     // Métricas patrimoniales (la brecha que causaba 'no tengo acceso').
-    expect(ctx.numeroDeLibertad).toBe(290_400_000);
+    expect(ctx.numeroDeIndependencia).toBe(290_400_000); // sostener la vida ACTUAL (al 8%)
+    expect(ctx.numeroDeLibertad).toBe(350_000_000); // estilo de vida DESEADO (definido → presente)
     expect(ctx.investableWealth).toBe(13_000_000);
     expect(ctx.netWorth).toBe(60_000_000); // 90M activos − 30M pasivos
     expect(ctx.indicePatrimonial).toBe(64);
     expect(ctx.nivelPatrimonial).toBe("Constructor");
-    expect(ctx.mesesDeLibertad).toBe(8);
+    expect(ctx.mesesDeColchon).toBe(8);
     expect(ctx.coberturaPasivaPct).toBe(34);
     expect(ctx.patrimonioDiagnosis).toEqual(["liquidez_baja"]);
 

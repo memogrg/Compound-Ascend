@@ -69,7 +69,8 @@ export async function buildWhatsAppToolContext(
   // Best-effort: si falla, la tool de libertad degrada con un motivo explicable.
   try {
     const pat = await getPatrimonioReportForUser(userId);
-    let numero = pat.report.numeroDeLibertad;
+    // freedomNumber de las tools = número de independencia (vida actual, siempre presente).
+    let numero = pat.report.numeroDeIndependencia;
     let invertible = pat.report.investableWealth;
     if (pat.currency !== primary) {
       if (rates) {

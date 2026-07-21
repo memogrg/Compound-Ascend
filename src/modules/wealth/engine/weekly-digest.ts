@@ -24,7 +24,7 @@ export type WeeklyDigestInput = {
 export function buildWeeklyDigest(input: WeeklyDigestInput): WeeklyDigest {
   const { report: r, level, diagnosis, currency } = input;
   const anios = Math.round(r.añosDeLibertad);
-  const numero = formatMoney(r.numeroDeLibertad, currency);
+  const numero = formatMoney(r.numeroDeIndependencia, currency);
   // El paso del día (microacción o mensaje aspiracional) se reusa tal cual.
   const step = buildDailyPatrimonioInsight(r, level, diagnosis);
 

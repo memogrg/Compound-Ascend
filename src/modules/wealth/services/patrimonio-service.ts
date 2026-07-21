@@ -65,8 +65,12 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
       .from("investments")
       .select("contribution,contribution_frequency")
       .in("user_id", memberIds),
-    db.from("savings_goals").select("monthly_contribution,currency").in("user_id", memberIds),
-    db.from("personal_profiles").select("age").eq("user_id", userId).maybeSingle(),
+    db
+      .from("savings_goals")
+      .select("monthly_contribution,current_amount,goal_type,currency")
+      .in("user_id", memberIds),
+    // Perfil PERSONAL del usuario (no del hogar): edad + estilo de vida deseado.
+    db.from("personal_profiles").select("age,extra").eq("user_id", userId).maybeSingle(),
   ]);
 
   // Pago mensual de deuda MALA (Fuga #3): cuota actual (o mínima) de las deudas
@@ -101,6 +105,37 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   const age = profileRow.data?.age ?? null;
   const annualNetIncome = agg.netMonthlyIncome * 12;
 
+  // Fondos de DEFENSA (colchón earmarkeado): se restan del líquido en el capital
+  // que trabaja. Son el current_amount de las metas defensa:fondo_emergencia/paz.
+  const defenseFundsBalance = (goalRows.data ?? [])
+    .filter(
+      (g) =>
+        g.goal_type === "defensa:fondo_emergencia" || g.goal_type === "defensa:fondo_paz",
+    )
+    .reduce(
+      (s, g) => s + convertCurrency(Number(g.current_amount ?? 0), g.currency, currency, rates),
+      0,
+    );
+
+  // Gasto ESENCIAL mensual (N1) → número de seguridad. Best-effort: la ruta
+  // service-role (WhatsApp) no tiene sesión, así que degrada a 0 sin romper.
+  let essentialMonthlyExpenses = 0;
+  try {
+    const { getEssentialMonthlyExpense } = await import(
+      "@/modules/wealth/services/essential-expense-service"
+    );
+    essentialMonthlyExpenses = (await getEssentialMonthlyExpense()).total;
+  } catch {
+    essentialMonthlyExpenses = 0;
+  }
+
+  // Estilo de vida DESEADO (dato PERSONAL en personal_profiles.extra) → número de
+  // libertad. null si no lo definió (nunca se inventa).
+  const extra = (profileRow.data?.extra ?? {}) as Record<string, unknown>;
+  const desiredRaw = extra.desiredMonthlyLifestyle;
+  const desiredMonthlyLifestyle =
+    typeof desiredRaw === "number" && desiredRaw > 0 ? desiredRaw : null;
+
   const input: PatrimonioInput = {
     assetsByClass,
     totalLiabilities,
@@ -115,6 +150,9 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     topConcentration: agg.portfolio.topConcentration,
     age,
     annualNetIncome,
+    essentialMonthlyExpenses,
+    desiredMonthlyLifestyle,
+    defenseFundsBalance,
     currency,
   };
 

@@ -167,10 +167,11 @@ describe.skipIf(!RUN_LIVE)("evals COMPORTAMIENTO · asesor experto (RUN_LIVE_EVA
   it("riesgo de secuencia → cerca del Número de Libertad, advierte 'zona roja' + mitigación", { timeout: TIMEOUT }, async () => {
     const ctx: FinancialContext = {
       ...BASE,
+      numeroDeIndependencia: 200_000_000,
       numeroDeLibertad: 200_000_000,
       investableWealth: 190_000_000,
       añosDeLibertad: 33,
-      mesesDeLibertad: 60,
+      mesesDeColchon: 60,
     };
     const { reply } = await chatWith(
       ctx,

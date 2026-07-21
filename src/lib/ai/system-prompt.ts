@@ -36,9 +36,10 @@ export type FinancialContext = {
   // no aparecen y el chat no se degrada.
   indicePatrimonial?: number; // 0-100
   nivelPatrimonial?: string; // level.name
-  numeroDeLibertad?: number; // capital para vivir del patrimonio
+  numeroDeIndependencia?: number; // capital para sostener la vida ACTUAL (al 8%)
+  numeroDeLibertad?: number; // capital para el estilo de vida DESEADO (al 8%); ausente si no lo definió
   añosDeLibertad?: number; // años que cubre el patrimonio invertible
-  mesesDeLibertad?: number; // liquidez / gasto mensual
+  mesesDeColchon?: number; // liquidez / gasto mensual (meses de colchón, no libertad)
   coberturaPasivaPct?: number; // ingreso pasivo / gasto, en %
   calidadPatrimonio?: number; // 0-100
   investableWealth?: number;
@@ -179,9 +180,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(
       `Índice Patrimonial: ${ctx.indicePatrimonial}/100${ctx.nivelPatrimonial ? ` (nivel: ${ctx.nivelPatrimonial})` : ""}.`,
     );
+  if (ctx.numeroDeIndependencia !== undefined)
+    facts.push(
+      `Número de Independencia: ${ctx.numeroDeIndependencia} ${ctx.currency} (capital que, al 8% anual, sostiene tu vida ACTUAL).`,
+    );
   if (ctx.numeroDeLibertad !== undefined)
     facts.push(
-      `Número de Libertad Financiera: ${ctx.numeroDeLibertad} ${ctx.currency} (capital para vivir de tu patrimonio).`,
+      `Número de Libertad: ${ctx.numeroDeLibertad} ${ctx.currency} (capital que, al 8%, sostiene el estilo de vida que DESEÁS). Si no aparece, el usuario aún no lo definió — invitalo a hacerlo, no lo inventes.`,
     );
   if (ctx.añosDeLibertad !== undefined)
     facts.push(
@@ -196,8 +201,8 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       `Distribución de tu patrimonio: invertido ${w.invested} ${ctx.currency}, en ahorros/líquido ${w.liquid} ${ctx.currency}, otros ${w.other} ${ctx.currency}${top ? `; principales clases: ${top}` : ""}.`,
     );
   }
-  if (ctx.mesesDeLibertad !== undefined)
-    facts.push(`Meses de Libertad (liquidez): ${ctx.mesesDeLibertad}.`);
+  if (ctx.mesesDeColchon !== undefined)
+    facts.push(`Meses de colchón (liquidez / gasto): ${ctx.mesesDeColchon}.`);
   if (ctx.coberturaPasivaPct !== undefined)
     facts.push(`Cobertura de ingreso pasivo: ${ctx.coberturaPasivaPct}% del gasto.`);
   if (ctx.calidadPatrimonio !== undefined)
@@ -403,10 +408,10 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
 
   // Riesgo de secuencia: cerca del Número de Libertad (patrimonio invertible ≥ 80% del número).
   if (
-    ctx.numeroDeLibertad !== undefined &&
+    ctx.numeroDeIndependencia !== undefined &&
     ctx.investableWealth !== undefined &&
-    ctx.numeroDeLibertad > 0 &&
-    ctx.investableWealth >= ctx.numeroDeLibertad * 0.8
+    ctx.numeroDeIndependencia > 0 &&
+    ctx.investableWealth >= ctx.numeroDeIndependencia * 0.8
   )
     behaviorRules.push(
       "Está muy cerca de su Número de Libertad. Si pregunta por RETIRAR o vivir de su patrimonio, advertí el RIESGO DE SECUENCIA de retornos (la 'zona roja' de los primeros años de retiro) y ofrecé una mitigación concreta (estrategia de cubetas/buckets o retiros con barandas). Solo si viene al caso; breve.",

@@ -230,9 +230,15 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     const p = await getPatrimonioReport();
     ctx.indicePatrimonial = Math.round(p.report.indice);
     ctx.nivelPatrimonial = p.level.name;
-    ctx.numeroDeLibertad = Math.round(p.report.numeroDeLibertad);
+    // "Número de independencia": capital para sostener la vida actual (siempre presente).
+    ctx.numeroDeIndependencia = Math.round(p.report.numeroDeIndependencia);
+    // "Número de libertad" (estilo deseado): solo si el usuario lo definió; si es
+    // null se OMITE (nada de fallback silencioso).
+    if (p.report.numeroDeLibertad != null) {
+      ctx.numeroDeLibertad = Math.round(p.report.numeroDeLibertad);
+    }
     ctx.añosDeLibertad = Math.round(p.report.añosDeLibertad);
-    ctx.mesesDeLibertad = Math.round(p.report.mesesDeLibertad);
+    ctx.mesesDeColchon = Math.round(p.report.mesesDeColchon);
     ctx.coberturaPasivaPct = Math.round(p.report.coberturaPasiva * 100);
     ctx.calidadPatrimonio = Math.round(p.report.calidadPatrimonio);
     ctx.investableWealth = Math.round(p.report.investableWealth);

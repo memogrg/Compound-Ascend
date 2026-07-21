@@ -96,7 +96,7 @@ export function buildDailyPatrimonioInsight(
   }
 
   // Sin fragilidad: progreso aspiracional hacia el Número de Libertad.
-  if (report.investableWealth <= 0 || report.numeroDeLibertad <= 0) {
+  if (report.investableWealth <= 0 || report.numeroDeIndependencia <= 0) {
     return {
       kind: RITUAL_KIND,
       severity: "info",
@@ -107,7 +107,7 @@ export function buildDailyPatrimonioInsight(
   }
 
   const anios = Math.round(report.añosDeLibertad);
-  const numero = formatMoney(report.numeroDeLibertad, report.currency);
+  const numero = formatMoney(report.numeroDeIndependencia, report.currency);
   return {
     kind: RITUAL_KIND,
     severity: report.ratioLibertad >= 0.5 ? "celebrar" : "info",

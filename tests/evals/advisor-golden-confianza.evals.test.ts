@@ -62,7 +62,7 @@ describe("evals golden · el contexto se traduce al prompt (buildSystemPrompt)",
       currency: "CRC",
       netWorth: 105_040_035,
       portfolioValue: 61_581_512,
-      numeroDeLibertad: 290_400_000,
+      numeroDeIndependencia: 290_400_000,
       investableWealth: 13_000_000,
     };
     const prompt = buildSystemPrompt(ctx);
@@ -70,7 +70,7 @@ describe("evals golden · el contexto se traduce al prompt (buildSystemPrompt)",
     // Cada métrica poblada aparece con su label y su valor.
     expect(prompt).toContain("Patrimonio neto: 105040035 CRC.");
     expect(prompt).toContain("Valor de mercado del portafolio: 61581512 CRC.");
-    expect(prompt).toContain("Número de Libertad Financiera: 290400000 CRC");
+    expect(prompt).toContain("Número de Independencia: 290400000 CRC");
     expect(prompt).toContain("Patrimonio invertible: 13000000 CRC.");
   });
 
@@ -79,7 +79,7 @@ describe("evals golden · el contexto se traduce al prompt (buildSystemPrompt)",
 
     expect(prompt).toContain("Moneda principal: CRC.");
     // Sin campos poblados, las líneas de hechos derivadas no deben aparecer.
-    expect(prompt).not.toContain("Número de Libertad Financiera:");
+    expect(prompt).not.toContain("Número de Independencia:");
     expect(prompt).not.toContain("Patrimonio invertible:");
     expect(prompt).not.toContain("Valor de mercado del portafolio:");
     expect(prompt).not.toContain("Patrimonio neto:");

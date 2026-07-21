@@ -10,9 +10,17 @@ const rep = (over: Partial<PatrimonioReport> = {}): PatrimonioReport => ({
   investableWealth: 0,
   productiveWealth: 0,
   protectedWealth: 0,
-  numeroDeLibertad: 0,
+  numeroDeSeguridad: 0,
+  numeroDeIndependencia: 0,
+  numeroDeLibertad: null,
+  progresoSeguridad: 0,
+  progresoIndependencia: 0,
+  progresoLibertad: 0,
+  hitoAlcanzado: "ninguno",
+  siguienteHito: "seguridad",
+  sensibilidadTasa: { "0.04": 0, "0.06": 0, "0.08": 0, "0.10": 0 },
   ratioLibertad: 0,
-  mesesDeLibertad: 0,
+  mesesDeColchon: 0,
   coberturaPasiva: 0,
   tasaInversion: 0,
   ratioDeudaActivos: 0,
@@ -41,7 +49,7 @@ const SHAMING = ["pobre", "fracaso", "vergüenza", "no eres", "irresponsable", "
 describe("buildWeeklyDigest", () => {
   it("incluye Número de Libertad, años e índice; subject con el índice", () => {
     const d = buildWeeklyDigest({
-      report: rep({ numeroDeLibertad: 772_000_000, añosDeLibertad: 5, indice: 39, investableWealth: 150_000_000, ratioLibertad: 0.6 }),
+      report: rep({ numeroDeIndependencia: 772_000_000, añosDeLibertad: 5, indice: 39, investableWealth: 150_000_000, ratioLibertad: 0.6 }),
       level,
       diagnosis: [],
       currency: "CRC",
@@ -62,7 +70,7 @@ describe("buildWeeklyDigest", () => {
   it("nunca usa lenguaje humillante (con o sin fragilidad)", () => {
     const cases = [
       buildWeeklyDigest({ report: rep({ investableWealth: 0 }), level, diagnosis: [{ code: "deuda_mala_alta", hint: "x" }], currency: "CRC" }),
-      buildWeeklyDigest({ report: rep({ investableWealth: 100, numeroDeLibertad: 1000, añosDeLibertad: 3, ratioLibertad: 0.6 }), level, diagnosis: [], currency: "USD" }),
+      buildWeeklyDigest({ report: rep({ investableWealth: 100, numeroDeIndependencia: 1000, añosDeLibertad: 3, ratioLibertad: 0.6 }), level, diagnosis: [], currency: "USD" }),
     ];
     for (const d of cases) {
       const blob = `${d.subject} ${d.text} ${d.html}`.toLowerCase();

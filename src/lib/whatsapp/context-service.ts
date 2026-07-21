@@ -122,15 +122,21 @@ export async function buildContextForUser(
     ctx.indicePatrimonial = Math.round(pat.report.indice);
     ctx.nivelPatrimonial = pat.level.name;
     ctx.añosDeLibertad = Math.round(pat.report.añosDeLibertad);
-    ctx.mesesDeLibertad = Math.round(pat.report.mesesDeLibertad);
+    ctx.mesesDeColchon = Math.round(pat.report.mesesDeColchon);
     ctx.coberturaPasivaPct = Math.round(pat.report.coberturaPasiva * 100);
     ctx.calidadPatrimonio = Math.round(pat.report.calidadPatrimonio);
     ctx.patrimonioDiagnosis = pat.diagnosis.map((d) => d.code);
 
-    // Montos: solo si la conversión a la principal fue posible.
-    const numero = conv(pat.report.numeroDeLibertad);
+    // Montos: solo si la conversión a la principal fue posible. El número de
+    // INDEPENDENCIA (vida actual) siempre existe; el de libertad (deseado) es
+    // opcional y se omite si el usuario no lo definió.
+    const indep = conv(pat.report.numeroDeIndependencia);
     const invertible = conv(pat.report.investableWealth);
-    if (Number.isFinite(numero)) ctx.numeroDeLibertad = Math.round(numero);
+    if (Number.isFinite(indep)) ctx.numeroDeIndependencia = Math.round(indep);
+    if (pat.report.numeroDeLibertad != null) {
+      const lib = conv(pat.report.numeroDeLibertad);
+      if (Number.isFinite(lib)) ctx.numeroDeLibertad = Math.round(lib);
+    }
     if (Number.isFinite(invertible)) ctx.investableWealth = Math.round(invertible);
   } catch {
     // Marco Patrimonial no disponible.
