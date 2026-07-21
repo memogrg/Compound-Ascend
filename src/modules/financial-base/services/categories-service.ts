@@ -36,6 +36,8 @@ export type Category = {
   icon: string | null;
   color: string | null;
   isFavorite: boolean;
+  /** "Gasto esencial" (número de seguridad). Ortogonal a defaultNature. */
+  isEssential: boolean;
   isActive: boolean;
   isSystem: boolean;
   categoryType: string; // 'expense' | 'income' | 'transfer' | 'both'
@@ -57,6 +59,7 @@ type CategoryRowLite = Pick<
   | "icon"
   | "color"
   | "is_favorite"
+  | "is_essential"
   | "is_active"
   | "is_system"
   | "category_type"
@@ -65,7 +68,7 @@ type CategoryRowLite = Pick<
 >;
 
 const SELECT_COLS =
-  "id,key,name,default_nature,parent_id,icon,color,is_favorite,is_active,is_system,category_type,sort_order,linked_kind";
+  "id,key,name,default_nature,parent_id,icon,color,is_favorite,is_essential,is_active,is_system,category_type,sort_order,linked_kind";
 
 function rowToCategory(r: CategoryRowLite): Category {
   return {
@@ -77,6 +80,7 @@ function rowToCategory(r: CategoryRowLite): Category {
     icon: r.icon,
     color: r.color,
     isFavorite: Boolean(r.is_favorite),
+    isEssential: Boolean(r.is_essential),
     isActive: r.is_active ?? true,
     isSystem: Boolean(r.is_system),
     categoryType: r.category_type ?? "expense",
@@ -500,7 +504,13 @@ export async function hideCategory(baseId: string, reassignToId?: string | null)
  */
 export async function forkCategory(
   baseId: string,
-  patch: { name?: string; icon?: string | null; color?: string | null; isFavorite?: boolean },
+  patch: {
+    name?: string;
+    icon?: string | null;
+    color?: string | null;
+    isFavorite?: boolean;
+    isEssential?: boolean;
+  },
 ): Promise<string | null> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -508,7 +518,7 @@ export async function forkCategory(
 
   const { data: base } = await supabase
     .from("expense_categories")
-    .select("key,parent_id,linked_kind,category_type,name,icon,color,is_favorite")
+    .select("key,parent_id,linked_kind,category_type,name,icon,color,is_favorite,is_essential")
     .eq("id", baseId)
     .maybeSingle();
   if (!base) throw new Error("La categoría base no existe.");
@@ -520,6 +530,10 @@ export async function forkCategory(
     icon: patch.icon !== undefined ? patch.icon : base.icon,
     color: patch.color !== undefined ? patch.color : base.color,
     isFavorite: patch.isFavorite !== undefined ? patch.isFavorite : Boolean(base.is_favorite),
+    // Preserva el "esencial" de la base salvo que el fork lo cambie explícitamente
+    // (así forkear para editar nombre/color no borra el flag, y forkear para marcar
+    // esencial lo setea).
+    isEssential: patch.isEssential !== undefined ? patch.isEssential : Boolean(base.is_essential),
     key: base.key,
     linkedKind: base.linked_kind,
   });

@@ -19,6 +19,7 @@ const cat = (over: Partial<Category>): Category => ({
   icon: null,
   color: null,
   isFavorite: false,
+  isEssential: false,
   isActive: true,
   isSystem: true,
   categoryType: "expense",

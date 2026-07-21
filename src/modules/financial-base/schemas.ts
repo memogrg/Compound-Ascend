@@ -218,6 +218,9 @@ export const categoryForkSchema = z.object({
   icon: z.string().max(40).optional().nullable(),
   color: z.string().max(40).optional().nullable(),
   isFavorite: z.boolean().optional(),
+  // "Gasto esencial": al forkear una base para marcarla esencial (una base de sistema
+  // no se puede editar directo), la copia del hogar nace con este valor.
+  isEssential: z.boolean().optional(),
 });
 
 export const categoryRevertSchema = z.object({

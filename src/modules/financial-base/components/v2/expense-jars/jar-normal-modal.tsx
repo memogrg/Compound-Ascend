@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addCategoryAction, addBudgetItemAction } from "@/modules/financial-base/api/v2-actions";
+import { EssentialCheck } from "@/components/shared/essential-check";
 import { BudgetWarningModal } from "@/modules/financial-base/components/v2/expense-jars/budget-warning-modal";
 import { PersonalizeKebab } from "@/modules/financial-base/components/v2/expense-jars/personalize-category";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
@@ -58,6 +59,7 @@ export function JarNormalModal({
   const [subCur, setSubCur] = useState(captureCurrency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEssential, setIsEssential] = useState(false);
   const [editEnv, setEditEnv] = useState<JarEnvelope | null>(null);
 
   const envelopes = [...jar.envelopes, ...extra];
@@ -90,6 +92,7 @@ export function JarNormalModal({
       parentId: jar.group,
       categoryType: "expense",
       isFavorite: true,
+      isEssential,
     });
     if (!cat.ok || !cat.id) {
       setPending(false);
@@ -114,6 +117,7 @@ export function JarNormalModal({
     ]);
     setName("");
     setAmount("");
+    setIsEssential(false);
     setPending(false);
     toast(`Sobre "${n}" creado`);
     router.refresh();
@@ -214,6 +218,7 @@ export function JarNormalModal({
                           icon: cat?.icon ?? null,
                           color: cat?.color ?? null,
                           isFavorite: cat?.isFavorite ?? false,
+                          isEssential: cat?.isEssential ?? false,
                         }}
                         isFork={sobreIsFork}
                         baseIdIfFork={sobreBaseId}
@@ -400,6 +405,9 @@ export function JarNormalModal({
                 </>
               )}
             </button>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <EssentialCheck checked={isEssential} onChange={setIsEssential} />
           </div>
         </div>
       </div>

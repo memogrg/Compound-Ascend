@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, Sora, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/components/layout/theme-provider";
+import { TooltipLayer } from "@/components/shared/tooltip-layer";
 
 /** Tipografías del design system v2: Sora (display), Manrope (cuerpo), Space Mono (datos). */
 const sora = Sora({
@@ -51,6 +52,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
+        {/* Capa única de tooltips (web + móvil): reposiciona la burbuja dentro del
+            viewport. Ver components/shared/tooltip-layer.tsx y el gate `.tip-js` en CSS. */}
+        <TooltipLayer />
       </body>
     </html>
   );

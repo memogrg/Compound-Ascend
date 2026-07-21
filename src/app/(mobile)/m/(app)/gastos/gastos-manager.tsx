@@ -24,6 +24,10 @@ import type {
   OrphanReason,
 } from "@/modules/financial-base/engine/expense-jars";
 import { buildCategoryOptionGroups } from "@/modules/financial-base/engine/category-options";
+import {
+  toggleEssentialAction,
+  essentialToggleLabel,
+} from "@/modules/financial-base/components/v2/expense-jars/essential-toggle";
 import type { Account, Period } from "@/modules/financial-base/types";
 import type {
   Category,
@@ -59,6 +63,7 @@ import {
 type CatMeta = {
   isSystem: boolean;
   isFavorite: boolean;
+  isEssential: boolean;
   icon: string | null;
   color: string | null;
   name: string;
@@ -195,6 +200,7 @@ export function GastosManager({
   const [revertingTarget, setRevertingTarget] = useState<{ baseId: string; name: string } | null>(null);
   const [revertPending, setRevertPending] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
+  const [essPending, setEssPending] = useState(false);
 
   /** ¿La categoría visible es una copia (fork) del hogar? → su base para revertir. */
   const forkBaseOf = (id: string): string | null => personalization.forkToBase[id] ?? null;
@@ -206,7 +212,24 @@ export function GastosManager({
     isFavorite: categoryMeta[id]?.isFavorite ?? false,
     icon: categoryMeta[id]?.icon ?? null,
     color: categoryMeta[id]?.color ?? null,
+    isEssential: categoryMeta[id]?.isEssential ?? false,
   });
+
+  // Marcar/desmarcar esencial como acción DIRECTA (2 taps: kebab → toggle). La
+  // ramificación propio/base vive en el helper único (toggleEssentialAction).
+  const toggleSobreEssential = async (m: JarEnvelope) => {
+    const current = categoryMeta[m.id]?.isEssential ?? false;
+    setEssPending(true);
+    const res = await toggleEssentialAction(m.id, isSystemCat(m.id), !current);
+    setEssPending(false);
+    if (res.ok) {
+      toast.show(current ? "Quitado de esenciales" : "Marcado como esencial", "success");
+      setManagingSobre(null);
+      router.refresh();
+    } else {
+      toast.show(res.message ?? "No pudimos actualizar el sobre.", "error");
+    }
+  };
 
   /** Opciones de reasignación al ocultar: cualquier otro sobre, agrupado por frasco. */
   // Frasco huérfano + sus destinos de reasignación (mismos que la web: cada
@@ -496,7 +519,19 @@ export function GastosManager({
       {/* Acciones de un sobre: usuario (editar/eliminar) · fork (editar/revertir) · base (personalizar/ocultar) */}
       <BottomSheet open={!!managingSobre} onClose={() => setManagingSobre(null)} title={managingSobre?.name ?? "Sobre"}>
         {managingSobre ? (
-          (() => {
+          <div style={{ display: "grid", gap: 10 }}>
+            {/* Marcar/desmarcar esencial: acción DIRECTA (2 taps desde la fila del sobre),
+                común a las tres ramas. Ramificación propio/base en el helper único. */}
+            <button
+              type="button"
+              className="m-btn m-btn-block m-btn-secondary"
+              disabled={essPending}
+              onClick={() => void toggleSobreEssential(managingSobre)}
+            >
+              {essentialToggleLabel(categoryMeta[managingSobre.id]?.isEssential ?? false)}
+            </button>
+            <div style={{ borderTop: "1px solid var(--border)" }} />
+          {(() => {
             const m = managingSobre;
             const forkBase = forkBaseOf(m.id);
             if (forkBase) {
@@ -579,7 +614,8 @@ export function GastosManager({
                 </button>
               </div>
             );
-          })()
+          })()}
+          </div>
         ) : null}
       </BottomSheet>
 
@@ -589,6 +625,7 @@ export function GastosManager({
           <EditSobreForm
             envelope={editingSobre}
             initialFavorite={categoryMeta[editingSobre.id]?.isFavorite ?? true}
+            initialEssential={categoryMeta[editingSobre.id]?.isEssential ?? false}
             onSuccess={() => setEditingSobre(null)}
           />
         ) : null}
