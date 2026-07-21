@@ -180,4 +180,15 @@ export async function removeHouseholdMember(targetUserId: string): Promise<void>
     .eq("household_id", mine.household_id)
     .eq("user_id", targetUserId);
   if (error) throw new Error(error.message);
+
+  // Revocación TOTAL: reasigna al titular las filas financieras que el removido
+  // creó (si no, las seguiría viendo por `user_id = auth.uid()`). Best-effort:
+  // el miembro YA quedó fuera del hogar; si la reasignación falla, se puede
+  // reintentar, pero no debe revertir la baja. Las tablas PERSONALES no se tocan.
+  const { error: reErr } = await supabase.rpc("reassign_removed_member_rows", {
+    p_removed_user: targetUserId,
+  });
+  if (reErr) {
+    console.warn(`[remove-member] reasignación de filas falló: ${reErr.message}`);
+  }
 }

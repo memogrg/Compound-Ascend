@@ -1043,6 +1043,10 @@ export interface Database {
           joined_at: string;
         }[];
       };
+      reassign_removed_member_rows: {
+        Args: { p_removed_user: string };
+        Returns: { table_name: string; moved_rows: number }[];
+      };
       // Pago de deuda atómico (migración 0025): transacción + debt_payment en
       // una sola transacción de BD.
       record_debt_payment: {

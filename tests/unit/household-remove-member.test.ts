@@ -13,10 +13,16 @@ const h = vi.hoisted(() => ({
   meRows: [] as { household_id: string; role: string }[],
   targetRow: null as { role: string; status: string } | null,
   updated: null as { household_id: string; user_id: string; status: string } | null,
+  reassigned: null as { name: string; user: string } | null,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
+    // Revocación total: reasigna las filas del removido. Registrado para asertar.
+    rpc: async (name: string, args: { p_removed_user: string }) => {
+      h.reassigned = { name, user: args.p_removed_user };
+      return { data: [], error: null };
+    },
     from(table: string) {
       if (table !== "household_members") throw new Error(table);
       const f: Record<string, string> = {};
@@ -48,12 +54,15 @@ beforeEach(() => {
   h.meRows = [{ household_id: "hh1", role: "owner" }];
   h.targetRow = { role: "adult", status: "active" };
   h.updated = null;
+  h.reassigned = null;
 });
 
 describe("removeHouseholdMember", () => {
   it("owner quita a un adult activo → status='removed' (no borra la fila)", async () => {
     await removeHouseholdMember("OTHER");
     expect(h.updated).toEqual({ household_id: "hh1", user_id: "OTHER", status: "removed" });
+    // Revocación total: se disparó la reasignación de sus filas al titular.
+    expect(h.reassigned).toEqual({ name: "reassign_removed_member_rows", user: "OTHER" });
   });
 
   it("no podés removerte a vos mismo", async () => {
