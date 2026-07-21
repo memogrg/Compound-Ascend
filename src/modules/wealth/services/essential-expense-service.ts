@@ -20,17 +20,25 @@ import {
 export type { EssentialBreakdown };
 
 /**
- * Gasto esencial mensual del hogar, en moneda de visualización, con desglose por
- * origen y las primas excluidas por la regla #2 (financiadas vía un ahorro).
+ * Gasto esencial mensual del hogar, con desglose por origen y las primas excluidas
+ * por la regla #2 (financiadas vía un ahorro).
+ *
+ * Moneda: por defecto la de VISUALIZACIÓN (uso en /gastos). El llamador puede
+ * fijar `opts.currency` para forzar otra — patrimonio-service pasa la PRINCIPAL del
+ * reporte para NO meter el override de display en el contexto del asesor (el número
+ * de seguridad queda en la misma moneda que el resto del reporte). Con opts.currency
+ * NO se consulta getDisplayCurrency.
  */
-export async function getEssentialMonthlyExpense(): Promise<EssentialBreakdown> {
+export async function getEssentialMonthlyExpense(
+  opts?: { currency?: string },
+): Promise<EssentialBreakdown> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const [members, displayCurrency, rates] = await Promise.all([
+  const [members, rates] = await Promise.all([
     householdMemberIds(supabase, user.id),
-    getDisplayCurrency(),
     getFxRates(),
   ]);
+  const targetCurrency = opts?.currency ?? (await getDisplayCurrency());
 
   const now = new Date();
   const [budgetRows, debtRows, goalRows, policyRows] = await Promise.all([
@@ -92,5 +100,12 @@ export async function getEssentialMonthlyExpense(): Promise<EssentialBreakdown> 
       name: p.policy_type ?? p.provider ?? undefined,
     }));
 
-  return computeEssentialMonthly({ displayCurrency, rates, budgetLines, debts, goals, policies });
+  return computeEssentialMonthly({
+    displayCurrency: targetCurrency,
+    rates,
+    budgetLines,
+    debts,
+    goals,
+    policies,
+  });
 }

@@ -38,6 +38,20 @@ vi.mock("@/modules/financial-base/services/base-service", () => ({
   getDisplayCurrency: () => getDisplayCurrency(),
 }));
 
+// Enriquecimientos best-effort que buildFinancialContext importa de forma perezosa:
+// pegan a red real (precios en vivo, FX, snapshots) y colgaban el test ~1/4 corridas
+// según el orden/caché entre archivos (timeout). Se mockean para que cada bloque
+// best-effort se salte al instante: el test queda HERMÉTICO y determinista, enfocado
+// en su objetivo (la moneda del contexto es la principal, no el override de display).
+const skip = async () => {
+  throw new Error("mock: bloque best-effort omitido");
+};
+vi.mock("@/modules/rich-life/services/rich-life-service", () => ({ getRichLifeSummary: skip }));
+vi.mock("@/modules/wealth/services/portfolio-service", () => ({ getPortfolioReport: skip }));
+vi.mock("@/modules/financial-base/services/snapshot-service", () => ({ getSnapshotHistory: skip }));
+vi.mock("@/modules/wealth/services/snapshot-service", () => ({ getSnapshotHistory: skip }));
+vi.mock("@/modules/wealth", () => ({ getPatrimonioReport: skip }));
+
 import { buildFinancialContext } from "@/lib/ai/context-engine";
 
 beforeEach(() => {
