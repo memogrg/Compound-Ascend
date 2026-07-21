@@ -30,7 +30,7 @@ type RungState = "alcanzado" | "en_curso" | "pendiente";
 const RUNGS: { key: RungKey; title: string; subtitle: string; icon: "protection" | "income" | "goal" }[] = [
   { key: "seguridad", title: "Seguridad", subtitle: "Tu capital cubre tus gastos esenciales.", icon: "protection" },
   { key: "independencia", title: "Independencia", subtitle: "Tu capital sostiene tu vida actual completa.", icon: "income" },
-  { key: "libertad", title: "Libertad", subtitle: "Tu capital sostiene la vida que querés vivir.", icon: "goal" },
+  { key: "libertad", title: "Libertad", subtitle: "Tu capital sostiene la vida que quieres vivir.", icon: "goal" },
 ];
 
 const STATE_TONE: Record<RungState, MTone> = {

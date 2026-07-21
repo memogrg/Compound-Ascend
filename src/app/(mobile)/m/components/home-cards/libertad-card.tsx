@@ -91,7 +91,7 @@ export function LibertadCard({
       chip={<MChip tone="success">Libertad ✓</MChip>}
       sub="¡Alcanzaste los tres hitos!"
       vis={<MHomeMeter pct={1} label="libertad" color="var(--pos)" />}
-      message="Tu capital sostiene la vida que querés vivir."
+      message="Tu capital sostiene la vida que quieres vivir."
       href="/m/libertad"
       ariaLabel="Escalera de libertad financiera. Ver detalle"
     />
