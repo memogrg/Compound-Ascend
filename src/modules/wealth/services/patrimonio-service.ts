@@ -127,12 +127,15 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   // Gasto ESENCIAL mensual (N1) → número de seguridad. Best-effort: la ruta
   // service-role (WhatsApp) no tiene sesión, así que degrada a 0 sin romper.
   // Guardamos el breakdown completo para la transparencia de la UI (fuente única).
+  // Le pasamos la moneda del reporte (principal) para que NO consulte el override de
+  // display: así el número de seguridad queda en la misma moneda que el resto del
+  // reporte, y el contexto del asesor no depende de la cookie de visualización.
   let essentialBreakdown: EssentialBreakdown | null = null;
   try {
     const { getEssentialMonthlyExpense } = await import(
       "@/modules/wealth/services/essential-expense-service"
     );
-    essentialBreakdown = await getEssentialMonthlyExpense();
+    essentialBreakdown = await getEssentialMonthlyExpense({ currency });
   } catch {
     essentialBreakdown = null;
   }
