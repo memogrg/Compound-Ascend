@@ -2,13 +2,13 @@
 
 /**
  * Ajustes gestionables de /m/perfil ("Configuración"), mismo molde que la web /configuracion:
- * reutiliza EXACTAMENTE las Server Actions del módulo account (+ inviteHouseholdMembersAction
+ * reutiliza EXACTAMENTE las Server Actions del módulo account (+ las de hogar
  * de personal-profile) sin duplicar lógica. Todo con el Form Kit móvil (BottomSheet / Toggle /
  * ConfirmDialog / TextField) + es-MX, tema claro.
  *  - Moneda principal → updateCurrencyAction
  *  - WhatsApp → linkWhatsAppAction (muestra OTP + instrucciones) / revokeWhatsAppAction
  *  - Notificaciones → updateNotificationPrefAction (optimista, revierte si falla)
- *  - Hogar (invitar, gating: solo editor) → inviteHouseholdMembersAction
+ *  - Hogar (ver/invitar/revocar/quitar miembros, cupo por plan) → household actions
  *  - Correos del banco → requestIngestEmailAction / confirmIngestEmailAction / removeIngestEmailAction
  *  - Borrar todos los datos → clearAllDataAction (confirmación de 2 pasos)
  */
@@ -29,7 +29,12 @@ import {
   removeIngestEmailAction,
   clearAllDataAction,
 } from "@/modules/account/api/actions";
-import { inviteHouseholdMembersAction } from "@/modules/personal-profile/api/actions";
+import {
+  inviteHouseholdMemberAction,
+  revokeInvitationAction,
+  removeHouseholdMemberAction,
+} from "@/modules/personal-profile/api/actions";
+import type { HouseholdMembersView } from "@/modules/personal-profile";
 import { testEmailAction, type EmailTestResult } from "@/modules/account/api/actions";
 import { updatePasswordAction } from "@/lib/auth/actions";
 import { INGEST_TARGET } from "@/modules/account/constants";
@@ -44,7 +49,7 @@ import {
   useToast,
   type ActionResult,
 } from "../../components/form-kit";
-import { MSectionHeader, MContentCard, MDataRow } from "../../components/content-kit";
+import { MSectionHeader, MContentCard, MDataRow, MChip } from "../../components/content-kit";
 import { AppLockToggle } from "../../components/app-lock-toggle";
 import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/app-lock";
 
@@ -67,7 +72,6 @@ const NOTIF_ROWS: { key: NotificationChannel; label: string; hint: string; disab
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_INVITES = 4;
 
 export function ConfiguracionManager({
   currency,
@@ -75,14 +79,16 @@ export function ConfiguracionManager({
   wa,
   whatsappConfigured,
   ingestEmails,
-  isEditor,
+  household,
+  emailConfigured,
 }: {
   currency: string;
   notifications: NotificationPrefs;
   wa: WaLink;
   whatsappConfigured: boolean;
   ingestEmails: IngestEmailRow[];
-  isEditor: boolean;
+  household: HouseholdMembersView | null;
+  emailConfigured: boolean;
 }) {
   const [sheet, setSheet] = useState<SheetId>(null);
   const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
@@ -138,7 +144,7 @@ export function ConfiguracionManager({
         <MDataRow
           icon="household"
           title="Hogar"
-          subtitle={isEditor ? "Invita miembros a tu hogar" : "Miembros e invitaciones"}
+          subtitle="Miembros, invitaciones y cupos del plan"
           chevron
           onClick={() => setSheet("household")}
           ariaLabel="Gestionar tu hogar"
@@ -242,8 +248,8 @@ export function ConfiguracionManager({
       </BottomSheet>
 
       {/* Hoja: hogar */}
-      <BottomSheet open={sheet === "household"} onClose={() => setSheet(null)} title="Invitar a tu hogar">
-        <HouseholdSheet isEditor={isEditor} />
+      <BottomSheet open={sheet === "household"} onClose={() => setSheet(null)} title="Miembros del hogar">
+        <HouseholdSheet household={household} emailConfigured={emailConfigured} />
       </BottomSheet>
 
       {/* Hoja: cambiar contraseña */}
@@ -528,101 +534,202 @@ function WhatsAppSheet({ wa, configured, onDone }: { wa: WaLink; configured: boo
   );
 }
 
-/** Invitar miembros al hogar (chips, hasta 4) → inviteHouseholdMembersAction. Gated a editor. */
-function HouseholdSheet({ isEditor }: { isEditor: boolean }) {
-  const [value, setValue] = useState("");
-  const [emails, setEmails] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [sending, start] = useTransition();
+const HH_ROLE_LABEL: Record<string, string> = {
+  owner: "Titular",
+  adult: "Adulto",
+  member: "Miembro",
+  viewer: "Solo lectura",
+};
 
-  if (!isEditor) {
+/**
+ * Gestión de miembros del hogar (paridad con la web): lista con email/rol,
+ * invitaciones pendientes (revocar), invitar con el cupo del plan y quitar
+ * miembros (solo el titular, con confirmación). El límite se valida también en
+ * el servidor; acá solo se refleja.
+ */
+function HouseholdSheet({
+  household,
+  emailConfigured,
+}: {
+  household: HouseholdMembersView | null;
+  emailConfigured: boolean;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
+
+  if (!household) {
     return (
       <div className="muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
-        Solo un adulto (owner) de tu hogar puede enviar invitaciones. Pídele a quien administra el
-        hogar que agregue nuevos miembros.
+        No pudimos cargar los miembros del hogar. Intentá de nuevo más tarde.
       </div>
     );
   }
 
-  const add = () => {
-    const e = value.trim().toLowerCase();
-    if (!e) return;
-    if (!EMAIL_RE.test(e)) return setError("Ese correo no parece válido.");
-    if (emails.includes(e)) return setError("Ya agregaste ese correo.");
-    if (emails.length >= MAX_INVITES) return setError(`Puedes invitar hasta ${MAX_INVITES} miembros.`);
-    setEmails([...emails, e]);
-    setValue("");
-    setError(null);
-  };
+  const { members, pending: pend, quota, canManage, isOwner } = household;
+  const noCupo = quota.remaining <= 0;
 
-  const send = () =>
+  const invite = () =>
     start(async () => {
-      setStatus(null);
-      const res = await inviteHouseholdMembersAction(emails);
-      setStatus(res.message);
-      if (res.ok) setEmails([]);
+      const e = email.trim().toLowerCase();
+      if (!EMAIL_RE.test(e)) return setError("Ese correo no parece válido.");
+      setError(null);
+      const res = await inviteHouseholdMemberAction(e);
+      if (res.ok) {
+        toast.show("Invitación enviada");
+        setEmail("");
+        router.refresh();
+      } else {
+        setError(res.message ?? "No pudimos invitar.");
+      }
+    });
+
+  const revoke = (id: string) =>
+    start(async () => {
+      const res = await revokeInvitationAction(id);
+      toast.show(res.ok ? "Invitación revocada" : res.message ?? "No pudimos revocar");
+      if (res.ok) router.refresh();
+    });
+
+  const remove = (userId: string) =>
+    start(async () => {
+      const res = await removeHouseholdMemberAction(userId);
+      setConfirmRemove(null);
+      toast.show(res.ok ? "Miembro removido del hogar" : res.message ?? "No pudimos quitar");
+      if (res.ok) router.refresh();
     });
 
   return (
-    <div style={{ display: "grid", gap: 10 }}>
-      <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-        Agrega el correo de cada miembro (hasta {MAX_INVITES}). Les enviaremos una invitación para
-        unirse a la gestión compartida.
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <input
-          className="m-inp"
-          type="email"
-          inputMode="email"
-          value={value}
-          placeholder="correo@ejemplo.com"
-          onChange={(e) => {
-            setValue(e.target.value);
-            setError(null);
-          }}
-          disabled={emails.length >= MAX_INVITES}
-          style={{ flex: 1 }}
-        />
-        <button type="button" className="m-btn m-btn-secondary" style={{ flex: "none", padding: "0 16px" }} onClick={add} disabled={emails.length >= MAX_INVITES}>
-          Agregar
-        </button>
-      </div>
-      {error ? (
-        <div className="m-field-err" role="alert">
-          {error}
-        </div>
-      ) : null}
-      {emails.length > 0 ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {emails.map((e) => (
-            <span key={e} className="badge neutral" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              {e}
+    <div style={{ display: "grid", gap: 12 }}>
+      {/* Miembros activos */}
+      <div style={{ display: "grid", gap: 8 }}>
+        {members.map((m) => (
+          <div key={m.userId} className="row" style={{ gap: 8, alignItems: "center" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {m.email}
+                {m.isSelf ? <span className="muted" style={{ fontWeight: 400 }}> (vos)</span> : null}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                <MChip>{HH_ROLE_LABEL[m.role] ?? m.role}</MChip>
+                {m.isOwner ? <MChip tone="neutral">titular</MChip> : null}
+              </div>
+            </div>
+            {isOwner && !m.isOwner && !m.isSelf ? (
               <button
                 type="button"
-                aria-label={`Quitar ${e}`}
-                onClick={() => setEmails(emails.filter((x) => x !== e))}
-                style={{ background: "none", border: 0, color: "inherit", cursor: "pointer", fontSize: 15, lineHeight: 1 }}
+                className="m-btn m-btn-quiet-danger"
+                style={{ flex: "none", padding: "0 12px" }}
+                disabled={pending}
+                onClick={() => setConfirmRemove({ userId: m.userId, email: m.email })}
               >
-                ×
+                Quitar
               </button>
-            </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {/* Invitaciones pendientes */}
+      {canManage && pend.length > 0 ? (
+        <div style={{ display: "grid", gap: 6 }}>
+          <div className="muted" style={{ fontSize: 12 }}>Invitaciones pendientes</div>
+          {pend.map((p) => (
+            <div key={p.id} className="row" style={{ gap: 8, alignItems: "center" }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {p.email}
+              </span>
+              <MChip tone="warning">pendiente</MChip>
+              <button
+                type="button"
+                className="m-btn m-btn-secondary"
+                style={{ flex: "none", padding: "0 12px" }}
+                disabled={pending}
+                onClick={() => revoke(p.id)}
+              >
+                Revocar
+              </button>
+            </div>
           ))}
         </div>
       ) : null}
-      <button
-        type="button"
-        className="m-btn m-btn-block m-btn-primary"
-        onClick={send}
-        disabled={sending || emails.length === 0}
-      >
-        {sending ? "Enviando…" : "Enviar invitaciones"}
-      </button>
-      {status ? (
-        <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }} role="status">
-          {status}
+
+      {/* Sobre-límite: nadie se va, solo se bloquean invitaciones nuevas. */}
+      {quota.overLimit ? (
+        <div className="m-field-err" role="status" style={{ lineHeight: 1.5 }}>
+          Tu hogar tiene {quota.usedActive} personas y tu plan incluye {quota.limit}. Nadie pierde
+          acceso, pero no podés invitar hasta subir de plan.
         </div>
       ) : null}
+
+      {/* Invitar (solo editores) */}
+      {canManage ? (
+        <div style={{ display: "grid", gap: 6 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              className="m-inp"
+              type="email"
+              inputMode="email"
+              value={email}
+              placeholder="correo@ejemplo.com"
+              disabled={noCupo || pending}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError(null);
+              }}
+              style={{ flex: 1 }}
+            />
+            <button
+              type="button"
+              className="m-btn m-btn-primary"
+              style={{ flex: "none", padding: "0 16px" }}
+              disabled={noCupo || pending || !email.trim()}
+              onClick={invite}
+            >
+              {pending ? "…" : "Invitar"}
+            </button>
+          </div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Te {quota.remaining === 1 ? "queda" : "quedan"} {quota.remaining} de {quota.limit} cupos
+            (incluye al titular).
+          </div>
+          {error ? (
+            <div className="m-field-err" role="alert">
+              {error}
+            </div>
+          ) : null}
+          {!emailConfigured ? (
+            <div className="m-field-err" role="status" style={{ lineHeight: 1.5 }}>
+              El correo no está configurado: las invitaciones no se envían. Probá el envío en
+              «Correo (invitaciones)» de la web.
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+          Solo un adulto o el titular del hogar puede invitar o quitar miembros.
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        title="¿Quitar del hogar?"
+        message={
+          confirmRemove
+            ? `${confirmRemove.email} perderá acceso a los datos del hogar. Los registros que creó se reasignan al titular. Esta acción no envía aviso.`
+            : ""
+        }
+        confirmLabel="Quitar del hogar"
+        variant="danger"
+        pending={pending}
+        onConfirm={() => {
+          if (confirmRemove) remove(confirmRemove.userId);
+        }}
+        onCancel={() => setConfirmRemove(null)}
+      />
     </div>
   );
 }

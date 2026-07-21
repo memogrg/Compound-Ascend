@@ -4,9 +4,12 @@ import { getMyLink } from "@/lib/whatsapp/links-service";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { signOutAction } from "@/lib/auth/actions";
 import { PLAN_LABEL } from "@/lib/plan";
-import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isActiveHouseholdEditor } from "@/lib/household/active";
+import { isSupabaseConfigured } from "@/lib/auth/session";
+import { isEmailConfigured } from "@/lib/email/send";
+import {
+  listHouseholdMembers,
+  type HouseholdMembersView,
+} from "@/modules/personal-profile";
 import {
   listMyIngestEmails,
   type IngestEmailRow,
@@ -40,7 +43,7 @@ export default async function MobilePerfil() {
 
   // Datos extra para la gestión (best-effort: si algo falla, degradamos sin romper).
   let ingestEmails: IngestEmailRow[] = [];
-  let isEditor = true; // en modo solo, el usuario es dueño de sus datos → puede invitar (crea hogar)
+  let household: HouseholdMembersView | null = null;
   if (isSupabaseConfigured()) {
     try {
       ingestEmails = await listMyIngestEmails();
@@ -48,15 +51,12 @@ export default async function MobilePerfil() {
       ingestEmails = [];
     }
     try {
-      const user = await getUser();
-      if (user) {
-        const supabase = await createSupabaseServerClient();
-        isEditor = await isActiveHouseholdEditor(supabase, user.id);
-      }
+      household = await listHouseholdMembers();
     } catch {
-      isEditor = true;
+      household = null;
     }
   }
+  const emailConfigured = isEmailConfigured();
 
   const initials = (acc.name || acc.email || "CA").slice(0, 2).toUpperCase();
   const usePct = acc.tokenLimit > 0 ? Math.min(1, acc.tokensUsed / acc.tokenLimit) : 0;
@@ -132,7 +132,8 @@ export default async function MobilePerfil() {
           wa={wa}
           whatsappConfigured={whatsappConfigured}
           ingestEmails={ingestEmails}
-          isEditor={isEditor}
+          household={household}
+          emailConfigured={emailConfigured}
         />
 
         {/* Cerrar sesión (Server Action reutilizada de la web) */}
