@@ -26,8 +26,12 @@
      necesita leerla para reservarle sitio (.m-scroll:has(.m-fab)): si el FAB cambia de
      tamaño o de separación, el hueco lo sigue solo. Definirlas por separado en cada regla
      es justo cómo el FAB acabó tapando controles. */
-  --fab-size: 56px;
-  --fab-gap: 84px; /* separación al borde inferior: deja libre la tab bar */
+  /* 62px: el brief pide 60-64. Por debajo de 60 deja de leerse como el ancla de la
+     pantalla y vuelve a parecer un accesorio; por encima de 64 tapa contenido. */
+  --fab-size: 62px;
+  /* 18px al borde. Antes eran 84 para esquivar la tab bar, que ya no existe: mantenerlos
+     dejaba el botón flotando en mitad de la nada. */
+  --fab-gap: 18px;
 
   /* ===== tema CLARO = DEFAULT (data-theme="light" del diseño) ===== */
   --canvas: #f1efe8;
@@ -39,10 +43,11 @@
   /* AA (4.5:1) — mismo valor y misma razón que en globals.css: el par web/móvil de este
      token se mueve junto. El anterior #807c72 no llegaba en ningún fondo (3.62–4.16). */
   --text-muted: #625e57;
-  /* AA también. No es "solo placeholder": lo usan las etiquetas de la tab bar, que son
-     navegación, y el "o" del divisor. El anterior #a6a199 daba 2.23–2.57:1 — el peor de
-     toda la app. Se queda más claro que --text-muted para conservar la jerarquía
-     (4.53:1 en canvas · 4.82:1 en el cristal de la tab bar · 4.91:1 en un input). */
+  /* AA también. No es "solo placeholder": lo usan las pistas de formulario y el "o" del
+     divisor. El anterior #a6a199 daba 2.23–2.57:1 — el peor de toda la app. Se queda más
+     claro que --text-muted para conservar la jerarquía (4.53:1 en canvas · 4.91:1 en un
+     input). El caso de la tab bar que justificaba este valor ya no existe, pero el resto lo
+     sostiene igual: no lo subas de vuelta. */
   --text-dim: #706c67;
   --accent: #378451;
   --accent-ink: #ffffff;
@@ -202,10 +207,13 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* zona scrolleable de contenido: inset superior (única fuente cuando NO hay topbar pegajoso)
-   + aire inferior para la tab bar fija (alto + home indicator / barra de gestos). */
+   + aire inferior para el home indicator / barra de gestos. */
 .m-scroll {
   min-height: 100dvh;
-  padding: calc(env(safe-area-inset-top) + 8px) 0 calc(84px + env(safe-area-inset-bottom));
+  /* 24px abajo: antes eran 84 para dejar sitio a la tab bar fija. Sin ella ese hueco era
+     una franja muerta al final de TODAS las pantallas. Las que montan un <Fab> reservan lo
+     suyo aparte, justo debajo. */
+  padding: calc(env(safe-area-inset-top) + 8px) 0 calc(24px + env(safe-area-inset-bottom));
   overscroll-behavior: none;
 }
 /* Con topbar pegajoso, el inset superior lo aporta el .m-topbar (que cubre la barra de
@@ -215,10 +223,12 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-scroll:has(.m-topbar) {
   padding-top: 0;
 }
-/* Pantallas CON botón flotante: el aire de la tab bar (--fab-gap) no basta, porque el FAB
-   se apoya justo encima y ocupa otros 56px. Sin esto, el último elemento de la lista queda
-   debajo del botón —y no solo tapado: intocable— en Ahorro ("Gastar"), Transacciones
+/* Pantallas CON botón flotante: el botón se apoya sobre el final de la lista y ocupa 62px.
+   Sin esto, el último elemento queda debajo —y no solo tapado: intocable— en Ahorro
+   ("Gastar"), Transacciones
    ("Clasificar"), Deudas ("Próximo pago"), Portafolio, Patrimonio e Ingresos ("Recibido").
+   Ahora además el botón está CENTRADO, así que ya no basta con que el último control esté a
+   la izquierda: tapa la franja entera.
    Se resuelve con :has() y no clase por clase a propósito: así una pantalla nueva que monte
    un FAB reserva el hueco sola, sin que nadie tenga que acordarse. El +16px es el respiro
    entre el último control y el botón. Si :has() no estuviera soportado se cae al inset de
@@ -233,7 +243,7 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* ============================================================================
-   "Cristal Cálido" — primitivas de cristal (SOLO chrome: barra superior, tab bar,
+   "Cristal Cálido" — primitivas de cristal (SOLO chrome: barra superior, botón de crear,
    hojas y hero). El contenido de listas/formularios va plano y nítido. Regla de oro:
    la legibilidad nunca depende del efecto → fallback sólido garantizado.
    ========================================================================== */
@@ -351,7 +361,7 @@ body:has(.m-shell[data-theme="dark"]) {
   background-image: var(--ambient);
 }
 /* El contenido real queda por encima del fondo ambiental (que está en z-index:0).
-   La tab bar NO se incluye aquí: ya es position:fixed; z-index:50 (sobre el ambiente),
+   El botón de crear NO se incluye aquí: ya es position:fixed; z-index:50 (sobre el ambiente),
    y sobreescribirla la rompería. */
 .m-shell .m-scroll,
 .m-shell .m-login {
@@ -636,37 +646,6 @@ body:has(.m-shell[data-theme="dark"]) {
   white-space: nowrap;
 }
 
-/* ===== tab bar inferior fija ===== */
-.m-tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 50;
-  height: calc(64px + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  /* "Cristal Cálido": tab bar como cristal (chrome). Fallbacks vía tokens/@supports. */
-  background: var(--glass-bg);
-  backdrop-filter: saturate(var(--glass-sat)) blur(var(--glass-blur));
-  -webkit-backdrop-filter: saturate(var(--glass-sat)) blur(var(--glass-blur));
-  border-top: 1px solid var(--glass-border);
-  box-shadow: inset 0 1px 0 var(--glass-hi);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .m-tabbar {
-    background: var(--glass-solid);
-  }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .m-tabbar {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: var(--glass-solid);
-  }
-}
 .m-tab {
   display: flex;
   flex-direction: column;
@@ -1388,7 +1367,7 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .g {
   color: var(--accent);
 }
-/* el wizard no lleva tab bar → menos aire inferior que .m-scroll */
+/* el wizard no monta botón de crear → menos aire inferior que .m-scroll */
 .m-scroll.m-scroll-flush {
   padding-bottom: calc(28px + env(safe-area-inset-bottom));
 }
@@ -1859,7 +1838,7 @@ body:has(.m-shell[data-theme="dark"]) {
   font-weight: 600;
 }
 
-/* barra de entrada fija (abajo, respeta safe area; sin tab bar en esta ruta) */
+/* barra de entrada fija (abajo, respeta safe area; esta ruta no monta botón de crear) */
 .m-shell .m-chat-bar {
   position: fixed;
   left: 0;
@@ -2324,16 +2303,32 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* ---- FAB ---- */
+/* El botón de crear, ahora ANCLA de la pantalla: es lo único que queda abajo desde que se
+   fue la tab bar. Centrado, no en la esquina — sustituye a una barra que ocupaba todo el
+   ancho, y en la esquina se leería como un accesorio en vez de como la acción principal.
+
+   Significa "lo que se registra AQUÍ": en Inicio abre el alta rápida de movimiento; en
+   Deudas, una deuda; en Protección, una póliza. Por eso no hay un "+" global ADEMÁS del de
+   cada pantalla — es el mismo botón, y por eso nunca hay dos en la misma franja. */
 .m-shell .m-fab {
   position: fixed;
-  right: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: calc(var(--fab-gap) + env(safe-area-inset-bottom));
   z-index: 50;
   width: var(--fab-size);
   height: var(--fab-size);
-  border-radius: 18px;
-  border: 0;
-  background: var(--accent);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 22%, transparent);
+  /* SUELO DE OPACIDAD, y no es decoración: por debajo del botón pasa contenido en
+     movimiento, tarjetas blancas incluidas, que es el peor fondo posible para el glifo.
+     Medido sobre el composite con blanco puro detrás, el 88% deja el "+" en 4,65:1 (claro)
+     y 5,42:1 (oscuro) — por encima de AA incluso tratándolo como texto. Bajar este número
+     es bajar el contraste: si se toca, hay que volver a medirlo con algo blanco debajo, no
+     sobre el lienzo. */
+  background: color-mix(in srgb, var(--accent) 88%, transparent);
+  -webkit-backdrop-filter: blur(var(--ov-blur)) saturate(var(--ov-sat));
+  backdrop-filter: blur(var(--ov-blur)) saturate(var(--ov-sat));
   color: var(--accent-ink);
   display: grid;
   place-items: center;
@@ -2342,12 +2337,30 @@ body:has(.m-shell[data-theme="dark"]) {
     0 12px 28px -10px color-mix(in srgb, var(--accent) 60%, transparent),
     var(--e2);
 }
+/* Los dos fallbacks del resto del cristal: sin backdrop-filter, o con "reducir
+   transparencia", el botón pasa a SÓLIDO. La legibilidad del "+" no depende del efecto —
+   sin esto, un iOS con reduce-transparency se quedaría con el 88% y sin blur, que es el
+   único caso donde el contraste sí caería. Medido sólido: 4,58:1 claro, 6,20:1 oscuro. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .m-shell .m-fab {
+    background: var(--accent);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .m-shell .m-fab {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--accent);
+  }
+}
 .m-shell .m-fab svg {
   width: 26px;
   height: 26px;
 }
+/* El :active repite el translateX del centrado: transform SUSTITUYE, no acumula, así que
+   sin repetirlo el botón salta al borde izquierdo justo al tocarlo. */
 .m-shell .m-fab:active {
-  transform: scale(0.95);
+  transform: translateX(-50%) scale(0.95);
 }
 
 /* SwipeRow en lista dentro de .card: divisores entre filas + padding horizontal
@@ -2476,7 +2489,7 @@ body:has(.m-shell[data-theme="dark"]) {
    Primitivas de PRESENTACIÓN que consumen los componentes de
    components/content-kit/*. Reglas del sistema, derivadas de Inicio:
 
-   - El contenido NO usa cristal: el cristal es solo chrome (topbar, tabbar,
+   - El contenido NO usa cristal: el cristal es solo chrome (topbar, botón de crear,
      hojas, menú). Aquí: superficie clara + sombra suave, SIN marcos duros.
    - Radios: 22 en la tarjeta de resumen (hero de pantalla), 16 en tarjetas
      de contenido. Ritmo vertical 16 / 12 / 8.

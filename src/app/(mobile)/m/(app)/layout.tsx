@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
-import { MobileTabBar } from "../components/mobile-tab-bar";
 import { ToastProvider } from "../components/form-kit/toast";
 import { AppLockOverlay } from "../components/app-lock-overlay";
 import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
@@ -11,7 +10,10 @@ import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
  * sesión, redirige a /m/login. /m/login queda fuera de este grupo (app), así
  * que no dispara la guarda (evita el bucle de redirección).
  *
- * Añade la tab bar inferior fija; el contenido deja aire para ella con `.m-scroll`.
+ * Ya NO monta una tab bar. Las cuatro pestañas (Inicio · Portafolio · Patrimonio · Ajustes)
+ * duplicaban cuatro de los trece destinos que el menú ☰ del header ya ofrece en TODAS las
+ * pantallas, a cambio de 64px de alto fijos. Lo que queda abajo es el botón de crear, que
+ * cada pantalla monta con <Fab> y significa "lo que se registra aquí".
  */
 export default async function MobileAppLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
@@ -32,7 +34,6 @@ export default async function MobileAppLayout({ children }: { children: React.Re
       {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
       <WidgetSnapshotWriter />
       {children}
-      <MobileTabBar />
     </ToastProvider>
   );
 }
