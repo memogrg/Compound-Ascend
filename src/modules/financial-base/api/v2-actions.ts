@@ -828,7 +828,10 @@ export async function forkCategoryAction(raw: unknown): Promise<ActionResult & {
     return { ok: true, id: id ?? undefined };
   } catch (err) {
     logger.error("forkCategory fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: personalizationError(err, "No pudimos personalizar la categoría.") };
+    return {
+      ok: false,
+      message: personalizationError(err, "No pudimos personalizar la categoría."),
+    };
   }
 }
 
@@ -860,7 +863,10 @@ export async function unforkCategoryAction(raw: unknown): Promise<ActionResult> 
     return { ok: true };
   } catch (err) {
     logger.error("unforkCategory fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: personalizationError(err, "No pudimos deshacer la personalización.") };
+    return {
+      ok: false,
+      message: personalizationError(err, "No pudimos deshacer la personalización."),
+    };
   }
 }
 
@@ -966,5 +972,70 @@ export async function scanReceiptAction(
         : "No pudimos leer el recibo. Inténtalo de nuevo o regístralo manual.";
     logger.warn("scanReceipt fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: msg };
+  }
+}
+
+/** Margen que se le da a la capa IA antes de seguir sin ella. No exportado: en un fichero
+ *  "use server" solo pueden salir funciones async. */
+const IA_SUGERENCIA_TIMEOUT_MS = 2500;
+
+/**
+ * Sugerencia de sobre a partir del comercio, para el alta rápida del móvil.
+ *
+ * Reproduce la MISMA cascada que ya corre al guardar (`createTransaction` →
+ * `resolveAutoCategory`), y por ese orden exacto. Es deliberado: si la hoja mostrara una
+ * cosa y el guardado asignara otra, el usuario vería su gasto cambiar de sobre solo. Lo
+ * único que hace esta acción es ADELANTAR al usuario lo que va a pasar, para que pueda
+ * corregirlo antes en vez de después.
+ *
+ *  1. `resolveAutoCategory` — historial del hogar y caché. Gratis, determinista, y valida
+ *     que el destino sea HOJA, de la naturaleza correcta y no una categoría que el hogar
+ *     ocultó. Cubre la mayoría de los casos, porque casi siempre se compra donde ya se
+ *     compró.
+ *  2. `suggestSobre` (Gemini) — solo si el paso 1 no dio nada. Sin historial no hay señal
+ *     determinista que gastar, y es el único momento en que la IA aporta algo que no
+ *     teníamos.
+ *
+ * Un `source` de "ia" NO trae las validaciones del paso 1, así que el llamador lo trata
+ * como propuesta a confirmar, no como hecho.
+ *
+ * Lo que esta función NO puede hacer: necesita el COMERCIO, y el flujo rápido lo deja
+ * plegado y opcional. Acelera el camino largo, no el de tres toques — ese lo resuelven los
+ * chips de sobres frecuentes, que no dependen de nada remoto.
+ *
+ * Nunca lanza: cualquier fallo devuelve una sugerencia vacía. Quien llama guarda igual.
+ */
+export async function suggestSobreAction(
+  merchant: string,
+  sobres: { id: string; name: string }[],
+  kind: "gasto" | "ingreso" = "gasto",
+): Promise<{ categoryId: string | null; source: "historial" | "cache" | "ia" | null }> {
+  const limpio = merchant.trim();
+  if (limpio.length < 2 || sobres.length === 0) return { categoryId: null, source: null };
+  try {
+    await requireUser();
+    const supabase = await createSupabaseServerClient();
+    const { resolveAutoCategory, suggestSobre } =
+      await import("@/modules/financial-base/services/ai-categorize");
+
+    const firme = await resolveAutoCategory({ supabase, merchant: limpio, kind });
+    if (firme) return { categoryId: firme.categoryId, source: firme.source };
+
+    // Medido contra Gemini con la config real del provider: 7,1–10,4 s (mediana 7,7 s), y
+    // 1 de cada 5 llamadas devolvió 503. En una hoja que aspira a menos de 15 s, esperar
+    // eso es esperar más que todo el resto del flujo junto. Se le da un margen corto y, si
+    // no llega, se descarta: el usuario guarda sin sobre y el movimiento cae en "Por
+    // clasificar", que es exactamente para esto. La llamada de fondo termina sola y su
+    // resultado alimenta la caché, así que el siguiente intento con ese comercio ya es
+    // instantáneo por el paso 1.
+    const ia = await Promise.race([
+      suggestSobre(limpio, sobres),
+      new Promise<null>((r) => setTimeout(() => r(null), IA_SUGERENCIA_TIMEOUT_MS)),
+    ]);
+    return ia?.categoryId
+      ? { categoryId: ia.categoryId, source: "ia" }
+      : { categoryId: null, source: null };
+  } catch {
+    return { categoryId: null, source: null };
   }
 }

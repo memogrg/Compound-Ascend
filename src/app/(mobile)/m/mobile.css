@@ -3153,3 +3153,131 @@ body:has(.m-shell[data-theme="dark"]) {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* ===== ALTA RÁPIDA (hoja del "+") ===== */
+.m-shell .m-qa {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Esta hoja pide más alto que las demás, y solo ella.
+   El 88dvh general existe para que se vea que hay pantalla detrás. Aquí el teclado está
+   puesto desde el primer instante, así que "detrás" ya no se ve: lo que queda son ~512px,
+   y con 88dvh el botón caía 10px fuera a 375 y 25px fuera a 320. El 96dvh conserva el
+   asomo y devuelve los 40px que faltaban, en lugar de ir recortando espaciados hasta que
+   cuadre por poco — eso vuelve a romperse con el primer nombre de sobre largo. */
+.m-shell .m-sheet-panel:has(.m-qa) {
+  max-height: 96dvh;
+}
+
+/* El importe es el HÉROE de la hoja: si compite en tamaño con lo demás, el usuario duda
+   dónde escribir y se pierde el "cero toques para empezar". */
+.m-shell .m-qa-money {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0 2px;
+}
+.m-shell .m-qa-sym {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.m-shell .m-qa-inp {
+  font-family: var(--font-mono);
+  /* 34px: bien por encima de los 16px que exige iOS para no hacer zoom al enfocar, y
+     además es el tamaño que corresponde al único dato que de verdad se teclea. */
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  width: 100%;
+  max-width: 220px;
+  padding: 0;
+  outline: none;
+}
+.m-shell .m-qa-inp::placeholder {
+  color: var(--text-dim);
+}
+
+.m-shell .m-qa-lbl {
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.m-shell .m-qa-hint {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+/* Chips de sobres frecuentes: el atajo que de verdad resuelve el flujo de tres toques.
+   Envuelven en varias líneas a propósito — recortarlos escondería justo el que el usuario
+   busca, y en una hoja hay alto de sobra. */
+.m-shell .m-qa-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.m-shell .m-qa-chip {
+  /* 44px de alto: es el mínimo táctil, y aquí se toca con prisa y una sola mano. */
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.m-shell .m-qa-chip.on {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+  font-weight: 600;
+}
+.m-shell .m-qa-elegido {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.m-shell .m-qa-mas {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-shell .m-qa-det {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* [hidden] pierde contra cualquier `display` propio: la regla del UA tiene menos
+   especificidad que `.m-shell .m-qa-det`. El componente desmonta el nodo, así que hoy no
+   se nota, pero un `hidden` futuro fallaría en silencio. */
+.m-shell .m-qa-det[hidden] {
+  display: none;
+}
+
+/* "Guardar" va ANTES de "Más detalles", no al final.
+   Con el teclado numérico arriba —el estado por defecto de esta hoja— quedan ~512px útiles
+   de 812. Puesto al final, el botón caía en 876px: había que hacer scroll a ciegas para
+   confirmar, y tres toques se volvían cuatro gestos. Intenté anclarlo con `position: sticky`
+   y quedó peor: la franja tapaba a medias el contenido de debajo.
+   Reordenar lo resuelve sin capas superpuestas — el camino frecuente (importe → sobre →
+   guardar) cabe entero, y lo opcional queda debajo para quien lo busque. */
+.m-shell .m-qa-guardar {
+  margin-top: 2px;
+}
