@@ -194,6 +194,8 @@ describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => 
     );
     // 50k + 20k + (100k − 30k) = 140k
     expect(r.investableWealth).toBe(140_000);
+    // El motor ECHA el saldo de defensa excluido (la UI lo muestra, no lo recalcula).
+    expect(r.defenseFundsBalance).toBe(30_000);
   });
 
   it("los fondos de defensa nunca hacen bajar el capital de 0 (Math.max), ni comen la inversión", () => {

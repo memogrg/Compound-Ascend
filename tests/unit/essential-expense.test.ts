@@ -45,7 +45,24 @@ describe("computeEssentialMonthly", () => {
     expect(r.total).toBe(35_000);
     expect(r.byOrigin.goals).toBe(25_000);
     expect(r.byOrigin.policies).toBe(10_000);
-    expect(r.excludedPolicies).toEqual([{ id: "pol-1", monthly: 25_000 }]);
+    // Sin nombres → etiquetas de respaldo, pero la exclusión y su vínculo se reportan.
+    expect(r.excludedPolicies).toEqual([
+      { id: "pol-1", monthly: 25_000, policyName: "una póliza", viaGoalName: "un ahorro esencial" },
+    ]);
+  });
+
+  it("#2b nombra la póliza excluida y el ahorro que la financia (transparencia)", () => {
+    const r = computeEssentialMonthly({
+      displayCurrency: "CRC",
+      rates: RATES,
+      budgetLines: [],
+      debts: [],
+      goals: [{ monthly: 25_000, currency: "CRC", policyId: "pol-1", name: "Ahorro seguro de vida" }],
+      policies: [{ id: "pol-1", monthly: 25_000, currency: "CRC", name: "Seguro de vida" }],
+    });
+    expect(r.excludedPolicies).toEqual([
+      { id: "pol-1", monthly: 25_000, policyName: "Seguro de vida", viaGoalName: "Ahorro seguro de vida" },
+    ]);
   });
 
   it("#3 una inversión NUNCA entra al cálculo (no hay input para inversiones)", () => {

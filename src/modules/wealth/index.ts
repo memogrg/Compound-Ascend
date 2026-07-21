@@ -38,6 +38,7 @@ export { getMacroInsights, type MacroInsight } from "./services/macro-insights";
 export { GrowthView } from "./components/growth-view";
 export { DefenseView } from "./components/defense-view";
 export { WealthActions } from "./components/wealth-actions";
+export { MilestoneLadder } from "./components/milestone-ladder";
 export type { WealthSummary } from "./services/wealth-service";
 export type {
   Investment,

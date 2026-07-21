@@ -56,6 +56,13 @@ export type PatrimonioReport = {
   investableWealth: number;
   productiveWealth: number;
   protectedWealth: number;
+  /**
+   * Saldo de los fondos de defensa (emergencia/paz) EXCLUIDO del capital que
+   * trabaja. Se expone para que la UI explique por qué el progreso puede verse más
+   * bajo de lo esperado (el colchón no genera renta). No es un recálculo: es el
+   * mismo valor que restó el motor.
+   */
+  defenseFundsBalance: number;
   /** Los TRES números (capital que, al 8%, cubre cada nivel de gasto). */
   numeroDeSeguridad: number;
   numeroDeIndependencia: number;
@@ -326,6 +333,7 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
     investableWealth: round2(investableWealth),
     productiveWealth: round2(productiveWealth),
     protectedWealth: round2(protectedWealth),
+    defenseFundsBalance: round2(defenseFunds),
     numeroDeSeguridad: round2(numeroDeSeguridad),
     numeroDeIndependencia: round2(numeroDeIndependencia),
     numeroDeLibertad: numeroDeLibertad == null ? null : round2(numeroDeLibertad),
