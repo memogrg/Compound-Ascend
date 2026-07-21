@@ -25,6 +25,7 @@ export const goalInputSchema = z.object({
   defaultCategoryId: z.string().uuid().optional().nullable(),
   // Póliza vinculada (meta de ahorro de la prima de un seguro de Defensa).
   policyId: z.string().uuid().optional().nullable(),
+  isEssential: z.boolean().optional(),
 });
 
 export const debtInputSchema = z.object({
@@ -50,6 +51,7 @@ export const debtInputSchema = z.object({
   extraMonthly: z.number().nonnegative().optional(),
   insurance: z.number().nonnegative().optional(),
   notes: z.string().max(500).optional(),
+  isEssential: z.boolean().optional(),
 });
 
 /** Pago reportado sobre una deuda. */

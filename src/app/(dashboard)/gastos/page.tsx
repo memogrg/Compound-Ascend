@@ -1,4 +1,5 @@
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
+import { EssentialExpenseSummary } from "@/modules/wealth/components/essential-summary";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
 import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
@@ -56,6 +57,7 @@ export default async function Page({
 
   return (
     <div className="grid">
+      <EssentialExpenseSummary />
       <IncomeExpenseSection
         view={expenseView}
         kind="expense"

@@ -50,6 +50,7 @@ export const policyInputSchema = z.object({
   premiumFrequency: z.enum(["mensual", "trimestral", "semestral", "anual"]).optional(),
   renewalDate: z.string().optional(),
   currency: z.string().length(3),
+  isEssential: z.boolean().optional(),
 });
 
 export type InvestmentInput = z.infer<typeof investmentInputSchema>;

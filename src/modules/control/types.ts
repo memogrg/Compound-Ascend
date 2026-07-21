@@ -28,6 +28,7 @@ export type SavingsGoal = {
   defaultCategoryId?: string | null;
   // Meta de ahorro de la prima de un seguro (Defensa): póliza vinculada.
   policyId?: string | null;
+  isEssential?: boolean;
 };
 
 export type DebtClassification = "critica" | "controlada" | "estrategica" | "emocional";
@@ -73,6 +74,7 @@ export type Debt = {
   introApr?: number | null;
   /** Último día (ISO) en que se envió recordatorio de pago. */
   lastRemindedOn?: string | null;
+  isEssential?: boolean;
 };
 
 /** Pago reportado de una deuda (fuente de la verdad: tabla debt_payments). */

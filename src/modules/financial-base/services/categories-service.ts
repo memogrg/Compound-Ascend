@@ -292,6 +292,8 @@ export type CategoryWriteInput = {
   icon?: string | null;
   color?: string | null;
   isFavorite?: boolean;
+  /** "Gasto esencial" (número de seguridad). Ortogonal a default_nature. */
+  isEssential?: boolean;
   /** Interno (fork): preserva la key del original; no expuesto en el schema Zod. */
   key?: string | null;
   /** Interno (fork): preserva el vínculo a entidad del original. */
@@ -315,6 +317,7 @@ export async function createCategory(input: CategoryWriteInput): Promise<string 
       icon: input.icon ?? null,
       color: input.color ?? null,
       is_favorite: input.isFavorite ?? false,
+      is_essential: input.isEssential ?? false,
       linked_kind: input.linkedKind ?? null,
       is_system: false,
       is_active: true,
@@ -339,6 +342,7 @@ export async function updateCategory(
   if (input.icon !== undefined) patch.icon = input.icon;
   if (input.color !== undefined) patch.color = input.color;
   if (input.isFavorite !== undefined) patch.is_favorite = input.isFavorite;
+  if (input.isEssential !== undefined) patch.is_essential = input.isEssential;
   if (Object.keys(patch).length === 0) return;
   // RLS impide editar las de sistema (user_id distinto); el filtro lo refuerza.
   await supabase.from("expense_categories").update(patch).eq("id", id).in("user_id", scope);

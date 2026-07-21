@@ -14,6 +14,7 @@ import { MoneyField } from "@/components/forms/money-field";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addCategoryAction, addBudgetItemAction } from "@/modules/financial-base/api/v2-actions";
+import { EssentialCheck } from "@/components/shared/essential-check";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 
@@ -40,6 +41,7 @@ export function NewSobreModal({
   const [currency, setCurrency] = useState(captureCurrency);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEssential, setIsEssential] = useState(false);
 
   async function save() {
     const n = name.trim();
@@ -53,6 +55,7 @@ export function NewSobreModal({
       parentId: group,
       categoryType: "expense",
       isFavorite: true,
+      isEssential,
     });
     if (!cat.ok || !cat.id) {
       setPending(false);
@@ -122,6 +125,9 @@ export function NewSobreModal({
               tip="Moneda del presupuesto de este sobre. Por defecto, tu moneda principal."
             />
           </div>
+        </div>
+        <div className="fld" style={{ marginTop: 10 }}>
+          <EssentialCheck checked={isEssential} onChange={setIsEssential} />
         </div>
       </div>
       <div className="modal-foot">

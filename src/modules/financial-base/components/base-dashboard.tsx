@@ -69,10 +69,11 @@ export function BaseDashboard({ summary, currency }: { summary: BaseSummary; cur
           small
         />
         <Kpi
-          label="Gastos esenciales"
+          label="Esenciales (% ingreso)"
           value={formatPercent(ind.essentialsWeight)}
           accent="var(--c-expense)"
           small
+          tip="Porcentaje de tu ingreso que se va en gastos marcados esenciales en Mi Base. Es una medida de holgura del mes — distinta del «gasto esencial» que alimenta tu número de seguridad (ese es un monto mensual, en Patrimonio)."
         />
       </section>
 
@@ -204,17 +205,27 @@ function Kpi({
   value,
   accent,
   small,
+  tip,
 }: {
   label: string;
   value: string;
   accent: string;
   small?: boolean;
+  tip?: string;
 }) {
   return (
     <div className="card kpi" style={{ padding: "16px 18px" }}>
       <div className="row" style={{ gap: 8 }}>
         <span style={{ width: 8, height: 8, borderRadius: 999, background: accent }} />
         <span className="label">{label}</span>
+        {tip ? (
+          <span className="tip" data-tip={tip} style={{ color: "var(--muted)", cursor: "help", display: "inline-flex" }}>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth={2}>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" strokeLinecap="round" />
+            </svg>
+          </span>
+        ) : null}
       </div>
       <div className="num-xl" style={{ fontSize: small ? 24 : 28, marginTop: 12 }}>
         {value}

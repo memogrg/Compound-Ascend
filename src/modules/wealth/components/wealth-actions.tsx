@@ -1,4 +1,5 @@
 "use client";
+import { EssentialCheck } from "@/components/shared/essential-check";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -310,6 +311,7 @@ function PolicyForm({
         premium: Number(fd.get("premium") ?? 0) || undefined,
         premiumFrequency: String(fd.get("premiumFrequency") ?? "mensual"),
         currency: cur,
+        isEssential: fd.get("isEssential") === "on",
       },
       onDone,
       form,
@@ -387,6 +389,9 @@ function PolicyForm({
               ))}
             </select>
           </div>
+        </div>
+        <div className="fld">
+          <EssentialCheck name="isEssential" defaultChecked={item?.isEssential ?? false} />
         </div>
       </div>
       <Foot pending={pending} onCancel={onDone} />

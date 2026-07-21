@@ -47,6 +47,7 @@ function rowToInvestment(r: InvestmentRow): Investment {
 
 function rowToPolicy(r: InsurancePolicyRow): InsurancePolicy {
   return {
+    isEssential: r.is_essential,
     id: r.id,
     policyType: (r.policy_type ?? "otro") as PolicyType,
     provider: r.provider,
@@ -115,6 +116,7 @@ export async function createPolicy(input: PolicyInput): Promise<string> {
       premium_frequency: input.premiumFrequency ?? null,
       renewal_date: input.renewalDate ?? null,
       currency: input.currency,
+      is_essential: input.isEssential ?? false,
     })
     .select("id")
     .single();
@@ -157,6 +159,7 @@ export async function updatePolicy(id: string, input: PolicyInput): Promise<void
       premium: input.premium ?? null,
       premium_frequency: input.premiumFrequency ?? null,
       currency: input.currency,
+      is_essential: input.isEssential ?? false,
     })
     .eq("id", id)
     .in("user_id", scope);

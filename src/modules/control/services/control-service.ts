@@ -40,6 +40,7 @@ import type { SavingsGoalRow, DebtRow, DebtPaymentRow } from "@/lib/supabase/dat
 
 function rowToGoal(r: SavingsGoalRow): SavingsGoal {
   return {
+    isEssential: r.is_essential,
     id: r.id,
     name: r.name,
     goalType: r.goal_type,
@@ -63,6 +64,7 @@ function rowToGoal(r: SavingsGoalRow): SavingsGoal {
 
 function rowToDebt(r: DebtRow): Debt {
   return {
+    isEssential: r.is_essential,
     id: r.id,
     name: r.name,
     debtType: r.debt_type,
@@ -156,6 +158,7 @@ export async function createGoal(input: GoalInput): Promise<string> {
       next_reset_on: nextResetOn,
       default_category_id: isDefensa ? null : (input.defaultCategoryId ?? null),
       policy_id: input.policyId ?? null,
+      is_essential: input.isEssential ?? false,
     })
     .select("id")
     .single();
@@ -187,6 +190,7 @@ function debtColumns(input: DebtInputForm) {
     extra_monthly: input.extraMonthly ?? null,
     insurance: input.insurance ?? null,
     notes: input.notes ?? null,
+    is_essential: input.isEssential ?? false,
   };
 }
 
@@ -249,6 +253,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
       next_reset_on: nextResetOn,
       default_category_id: isDefensa ? null : (input.defaultCategoryId ?? null),
       policy_id: input.policyId ?? null,
+      is_essential: input.isEssential ?? false,
     })
     .eq("id", id)
     .in("user_id", scope);
