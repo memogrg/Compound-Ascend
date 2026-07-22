@@ -3,7 +3,13 @@ import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/services/wealth-service";
 import { DefenseView } from "@/modules/wealth/components/defense-view";
 import { WealthActions } from "@/modules/wealth/components/wealth-actions";
-import { DefenseFunds, getDefenseFundsReport, detectLongTermObligation } from "@/modules/wealth";
+import {
+  DefenseFunds,
+  getDefenseFundsReport,
+  detectLongTermObligation,
+  SurplusDecision,
+  getSurplusDecision,
+} from "@/modules/wealth";
 import { listDebts } from "@/modules/control";
 import { Icon } from "@/components/ui/icon";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
@@ -34,6 +40,9 @@ export default async function Page() {
         )
         .catch(() => false)
     : false;
+
+  // Decisión del excedente (F3): solo con fondos cubiertos y excedente. best-effort.
+  const surplus = configured ? await getSurplusDecision().catch(() => null) : null;
 
   return (
     <div className="grid">
@@ -69,6 +78,10 @@ export default async function Page() {
       ) : null}
 
       {funds ? <DefenseFunds report={funds} mortgageCase={mortgageCase} /> : null}
+
+      {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
+        <SurplusDecision report={surplus} />
+      ) : null}
 
       <DefenseView summary={summary} />
     </div>

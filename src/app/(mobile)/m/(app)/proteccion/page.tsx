@@ -1,5 +1,11 @@
 import { MobileHeader } from "../../components/mobile-header";
-import { getWealthSummary, getDefenseFundsReport, detectLongTermObligation } from "@/modules/wealth";
+import {
+  getWealthSummary,
+  getDefenseFundsReport,
+  detectLongTermObligation,
+  SurplusDecision,
+  getSurplusDecision,
+} from "@/modules/wealth";
 import { listDebts } from "@/modules/control";
 import { DefenseFundsMobile } from "./defense-funds-mobile";
 import {
@@ -54,6 +60,8 @@ export default async function MobileProteccion() {
       ),
     )
     .catch(() => false);
+  // Decisión del excedente (F3), best-effort.
+  const surplus = await getSurplusDecision().catch(() => null);
 
   // Prima mensual = anual / 12 (el engine da annualPremium, ya en la moneda de display).
   const monthlyPremium = p.annualPremium / 12;
@@ -93,6 +101,10 @@ export default async function MobileProteccion() {
         />
 
         {funds ? <DefenseFundsMobile report={funds} mortgageCase={mortgageCase} /> : null}
+
+        {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
+          <SurplusDecision report={surplus} />
+        ) : null}
 
         {/* Métricas. Brechas NO va aquí: tiene su propia sección abajo. */}
         <MSectionHeader title="Tu protección en números" />
