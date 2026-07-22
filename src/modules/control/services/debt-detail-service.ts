@@ -44,7 +44,18 @@ export interface DebtDetailVM {
   name: string;
   debtType: string | null;
   bank: string | null;
+  /** Moneda de VISUALIZACIÓN. Todos los importes de este VM vienen convertidos a ella.
+   *  NO sirve para capturar: para eso está `nativa`. */
   currency: string;
+  /**
+   * La deuda tal cual está guardada, SIN convertir. Existe porque todo lo demás de este VM
+   * está en moneda de visualización, y precargar un formulario desde ahí es justo lo que
+   * causó el P0 del #437: el número convertido guardado bajo la etiqueta de la deuda.
+   *
+   * `debt_payments` no tiene columna de moneda, así que su `amount` significa siempre la
+   * moneda de la deuda. Cualquier captura de pago debe salir de aquí.
+   */
+  nativa: { currency: string; currentPayment: number; minPayment: number | null };
   rateType: DebtRateType | null;
   rateIndex: DebtRateIndex | null;
   rateSpread: number | null;
@@ -218,6 +229,11 @@ export async function getDebtDetail(
     debtType: debt.debtType ?? null,
     bank: debt.bank ?? null,
     currency,
+    nativa: {
+      currency: debt.currency,
+      currentPayment: debt.currentPayment,
+      minPayment: debt.minPayment ?? null,
+    },
     rateType: debt.rateType ?? null,
     rateIndex: debt.rateIndex ?? null,
     rateSpread: debt.rateSpread ?? null,

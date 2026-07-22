@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cuotaPrecargada } from "@/modules/control/engine/debt-strategy";
+import { cuotaPrecargada, monedaDelPagoEsCoherente } from "@/modules/control/engine/debt-strategy";
 import { debtPaymentToTxn } from "@/modules/financial-base/engine/linked";
 import { convertCurrency } from "@/lib/fx";
 
@@ -81,5 +81,48 @@ describe("la transacción del pago se etiqueta con la moneda de su importe", () 
     });
     expect(txn.currency).toBe("CRC");
     expect(txn.amount).toBe(800000);
+  });
+});
+
+/**
+ * Segunda vuelta (auditoría de moneda, jul 2026). El P0 se corrigió en la LISTA de deudas
+ * y se quedó vivo en otros dos sitios durante meses:
+ *
+ *  · el pago desde el móvil (`m/(app)/deudas/debt-manager.tsx`), que precargaba
+ *    `reporting.monthlyPayment` — un valor del view-model, ya convertido a la moneda de
+ *    visualización — y lo etiquetaba con esa misma moneda de display;
+ *  · el detalle web (`control/components/debt-detail.tsx`), donde TODO el `input` de
+ *    amortización se construye con `conv(...)`, así que la cuota, la tabla y el preset del
+ *    botón "Pagar" venían en display mientras `editing.amount` venía del ledger en moneda
+ *    nativa. El mismo campo se precargaba desde DOS unidades distintas según el camino.
+ *
+ * Los tests de arriba pasaban porque ejercitan `cuotaPrecargada`, y esos dos sitios no la
+ * llamaban. Por eso lo que se prueba aquí es la GUARDA: es lo que convierte una recaída en
+ * un error visible en vez de un dato corrupto silencioso.
+ */
+describe("guarda: el importe de un pago viene en la moneda de la deuda", () => {
+  it("rechaza un importe etiquetado en la moneda de visualización", () => {
+    // Exactamente el escenario del incidente: app en CRC, deuda en USD.
+    expect(monedaDelPagoEsCoherente(PRINCIPAL, "USD")).toBe(false);
+  });
+
+  it("acepta el importe cuando viene en la moneda de la deuda", () => {
+    expect(monedaDelPagoEsCoherente("USD", "USD")).toBe(true);
+  });
+
+  it("deja pasar a quien no manda moneda, que es el estado heredado", () => {
+    // No es un permiso: es la razón por la que la guarda era INERTE. Mientras los
+    // formularios no la manden, esto no protege de nada — por eso el arreglo real fue
+    // que la manden, no solo que exista la comprobación.
+    expect(monedaDelPagoEsCoherente(undefined, "USD")).toBe(true);
+  });
+
+  it("el importe nativo y el convertido difieren por el tipo de cambio", () => {
+    // Ancla numérica del incidente: si alguien vuelve a precargar desde un VM convertido,
+    // el número que entra es este, y es ~510 veces el correcto.
+    const { amount, currency } = cuotaPrecargada(TARJETA_USD);
+    const siSePrecargaraDelVM = convertCurrency(amount, currency, PRINCIPAL, TASAS);
+    expect(siSePrecargaraDelVM / amount).toBeCloseTo(TASAS.CRC, 0);
+    expect(monedaDelPagoEsCoherente(currency, TARJETA_USD.currency)).toBe(true);
   });
 });
