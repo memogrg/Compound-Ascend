@@ -1,4 +1,5 @@
 import "server-only";
+import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfolio-engine";
 
 /** CRUD de posiciones (investment_holdings). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,7 +20,8 @@ import {
   positionIncreaseAmount,
 } from "@/modules/financial-base";
 import type { HoldingInput, HoldingSaleInput } from "@/modules/wealth/schemas";
-import type { Holding, AssetType, InvestmentNature } from "@/modules/wealth/types";
+import type { Holding, HoldingNativo, AssetType, InvestmentNature } from "@/modules/wealth/types";
+import { comoNativo } from "@/modules/wealth/types";
 import { natureOfCategory } from "@/modules/wealth/constants";
 
 // Exportados para el snapshot de cron (sin sesión): mismo mapeo y columnas
@@ -233,7 +235,10 @@ function taxonomyColumns(input: HoldingInput) {
   };
 }
 
-export async function listHoldings(ctx?: AuthContext): Promise<Holding[]> {
+/** Lee los holdings TAL CUAL están guardados: cada importe en la moneda del propio
+ *  holding. Es la única fuente válida para precargar un formulario de captura — lo que
+ *  sale de `normalizeHoldings` viene convertido y no lleva la marca. */
+export async function listHoldings(ctx?: AuthContext): Promise<HoldingNativo[]> {
   const { db, userId } = await resolveAuth(ctx);
   const memberIds = await householdMemberIds(db, userId);
   const { data } = await db
@@ -241,7 +246,7 @@ export async function listHoldings(ctx?: AuthContext): Promise<Holding[]> {
     .select(HOLDING_COLS)
     .in("user_id", memberIds)
     .order("created_at", { ascending: false });
-  return (data ?? []).map(rowToHolding);
+  return (data ?? []).map(rowToHolding).map(comoNativo);
 }
 
 export async function createHolding(input: HoldingInput): Promise<void> {
@@ -524,11 +529,20 @@ export async function recordHoldingSale(input: HoldingSaleInput): Promise<void> 
   if (!row) throw new Error("Posición no encontrada");
   const holding = rowToHolding(row);
 
+  // Lee el holding ENTERO desde hace tiempo y aun así etiquetaba la venta con
+  // `input.currency`. La moneda la impone el holding; una que lo contradiga es señal de que
+  // el importe se calculó contra otra referencia, y se falla en vez de guardar callado.
+  if (!monedaDelMovimientoEsCoherente(input.currency, holding.currency)) {
+    throw new Error(
+      `La venta viene en ${input.currency} pero la inversión está en ${holding.currency}.`,
+    );
+  }
+
   const txnId = await registerLinkedTransaction(
     holdingSaleToTxn({
       holdingId: holding.id,
       label: holding.label ?? holding.symbol,
-      currency: input.currency,
+      currency: holding.currency,
       saleDate: input.saleDate,
       amount: input.amount,
       categoryId: await getSystemCategoryId("inc_venta"),

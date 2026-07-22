@@ -39,6 +39,7 @@ import type {
   HoldingPerformance,
   PortfolioSnapshot,
   AllocationSlice,
+  HoldingNativo,
 } from "@/modules/wealth/types";
 
 const MONTH_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -485,7 +486,9 @@ function InvRow({
   contribution,
 }: {
   h: HoldingPerformance;
-  raw?: Holding;
+  /** El holding CRUDO. Todo lo que capture importes debe salir de aquí: `h` trae los
+   *  montos convertidos a la primaria pero conserva `currency` nativa. */
+  raw?: HoldingNativo;
   currency: string;
   period: Period;
   contribution?: OpenContribution;
@@ -628,8 +631,13 @@ function InvRow({
       {modal === "editar" ? (
         <AddHoldingModal prefill={editHolding} editId={editHolding.id} currency={currency} onClose={close} />
       ) : null}
-      {modal === "dashboard" ? (
-        <HoldingDetailModal holding={h} editHolding={raw} currentPrice={h.currentPrice ?? null} currency={currency} onClose={close} />
+      {/* `holding={raw}` y no `{h}`: dentro del modal se capturan renta y dividendos, y `h`
+          trae los importes ya convertidos a la primaria con la etiqueta nativa. Ese cruce
+          es el que precargaba la renta multiplicada por el tipo de cambio. Aquí se pierde
+          la conversión para MOSTRAR, y es lo correcto: en el detalle de UN holding la
+          moneda que importa es la suya, no la de los agregados. */}
+      {modal === "dashboard" && raw ? (
+        <HoldingDetailModal holding={raw} currentPrice={h.currentPrice ?? null} currency={currency} onClose={close} />
       ) : null}
       {modal === "valoracion" ? <ValuationModal holding={editHolding} onClose={close} /> : null}
       {modal === "eliminar" ? <DeleteModal holding={editHolding} onClose={close} /> : null}

@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 
 import { formatPercent } from "@/lib/format";
 import { removeHoldingAction } from "@/modules/wealth/api/actions";
-import type { HoldingPerformance } from "@/modules/wealth/types";
+import type { HoldingNativo, HoldingPerformance } from "@/modules/wealth/types";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
 import { Fab, BottomSheet, ConfirmDialog, SwipeRow, useToast } from "../../components/form-kit";
@@ -25,10 +25,14 @@ const NATURE_LABEL: Record<string, string> = { cashflow: "Flujo", growth: "Creci
 
 export function InversionesManager({
   holdings,
+  rawHoldings,
   currency,
   openContributions,
 }: {
   holdings: HoldingPerformance[];
+  /** Los mismos holdings SIN convertir. Todo lo que precargue un importe sale de aquí:
+   *  `holdings` trae los montos en la moneda principal con la etiqueta nativa. */
+  rawHoldings: HoldingNativo[];
   currency: string;
   openContributions: OpenContribution[];
 }) {
@@ -37,9 +41,10 @@ export function InversionesManager({
 
   // Aporte del mes pendiente por holding (brecha DCA), para el banner del detalle.
   const contribByHolding = new Map(openContributions.map((c) => [c.holdingId, c]));
+  const rawById = new Map(rawHoldings.map((h) => [h.id, h]));
 
   const [adding, setAdding] = useState(false);
-  const [editH, setEditH] = useState<HoldingPerformance | null>(null);
+  const [editH, setEditH] = useState<HoldingNativo | null>(null);
   const [sellH, setSellH] = useState<HoldingPerformance | null>(null);
   const [movH, setMovH] = useState<HoldingPerformance | null>(null); // detalle de la posición
   const [deleteH, setDeleteH] = useState<HoldingPerformance | null>(null);
@@ -83,7 +88,7 @@ export function InversionesManager({
             const dir = h.returnPct > 0 ? 1 : h.returnPct < 0 ? -1 : 0;
             // El valor ya viene en la moneda primaria (portfolio-service); no se reconvierte.
             return (
-              <SwipeRow key={h.id} onEdit={() => setEditH(h)} onDelete={() => setDeleteH(h)}>
+              <SwipeRow key={h.id} onEdit={() => { const r = rawById.get(h.id); if (r) setEditH(r); }} onDelete={() => setDeleteH(h)}>
                 {/* Tocar la fila abre el detalle (con su sparkline R5); el chevron lo indica.
                     Valor actual arriba + retorno % coloreado debajo (el retorno es la señal
                     verde/roja, no el valor, que siempre es positivo).
@@ -166,16 +171,23 @@ export function InversionesManager({
 
       {/* Detalle de la inversión (aportes, dividendos, valuaciones + acciones). Se monta solo
           con la posición elegida: así sus listas se piden al abrir, no en la carga de la página. */}
-      {movH ? (
+      {/* Sin el crudo no se abre el detalle: dentro se capturan renta y valuaciones, y sin
+          la referencia nativa cualquier importe entraría en la unidad equivocada. Ambos
+          salen del mismo `report`, así que en la práctica siempre está; el guard evita que
+          un futuro desajuste se convierta en dato corrupto en vez de en una pantalla que
+          no abre. */}
+      {movH && rawById.has(movH.id) ? (
         <HoldingDetailSheet
           holding={movH}
+          raw={rawById.get(movH.id) as HoldingNativo}
           currency={currency}
           contribution={contribByHolding.get(movH.id) ?? null}
           onClose={() => setMovH(null)}
           onEdit={() => {
-            const h = movH;
+            // El CRUDO, no `movH`: el detalle trae los importes convertidos.
+            const r = rawById.get(movH.id);
             setMovH(null);
-            setEditH(h);
+            if (r) setEditH(r);
           }}
           onSell={() => {
             const h = movH;

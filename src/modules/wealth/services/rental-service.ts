@@ -1,4 +1,5 @@
 import "server-only";
+import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfolio-engine";
 
 /**
  * Eventos de renta recibida (alquiler/Airbnb/auto/negocio). Cada pago nace como
@@ -72,10 +73,21 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
   // línea derivada de C-2a (y su barra "Recibido") exista en el periodo.
   const { data: holding } = await supabase
     .from("investment_holdings")
-    .select("nature,rental_income")
+    .select("nature,rental_income,currency")
     .eq("id", input.holdingId)
     .in("user_id", scope)
     .maybeSingle();
+  // La moneda la IMPONE el holding. Este servicio ya lo leía —para sembrar la proyección—
+  // pero no miraba su moneda, y aun así ESCRIBE `rental_income` con el importe recibido
+  // (abajo): un pago mal etiquetado contaminaba el campo que luego precarga el formulario,
+  // así que el error se realimentaba en cada renta siguiente.
+  const monedaDelHolding = holding?.currency ?? input.currency;
+  if (!monedaDelMovimientoEsCoherente(input.currency, monedaDelHolding)) {
+    throw new Error(
+      `La renta viene en ${input.currency} pero la inversión está en ${monedaDelHolding}.`,
+    );
+  }
+
   if (holding?.nature === "cashflow" && !(Number(holding.rental_income) > 0)) {
     await supabase
       .from("investment_holdings")
@@ -122,7 +134,7 @@ export async function createRentalPayment(input: RentalPaymentInput): Promise<vo
     holding_id: input.holdingId,
     received_on: input.receivedOn,
     amount: input.amount,
-    currency: input.currency,
+    currency: monedaDelHolding,
     frequency: freq,
     income_id: null,
     transaction_id: txnId,

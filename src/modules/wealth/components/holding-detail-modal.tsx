@@ -24,7 +24,7 @@ import {
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
-import type { Holding, Dividend, RentalPayment } from "@/modules/wealth/types";
+import type { Holding, Dividend, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type { Period, HoldingPurchase, HoldingValuation } from "@/modules/wealth/services/holding-history-service";
 
 const RENTAL_FREQ_PER_YEAR: Record<string, number> = { semanal: 52, mensual: 12, trimestral: 4, semestral: 2, anual: 1 };
@@ -55,7 +55,7 @@ export function HoldingDetailButton({
   currentPrice,
   currency,
 }: {
-  holding: Holding;
+  holding: HoldingNativo;
   currentPrice: number | null;
   currency: string;
 }) {
@@ -91,7 +91,7 @@ export function HoldingDetailModal({
   currency,
   onClose,
 }: {
-  holding: Holding;
+  holding: HoldingNativo;
   /**
    * Holding CRUDO para la edición (averageCost en su moneda real). El `holding`
    * que pinta el detalle puede venir normalizado a la moneda principal para los
@@ -615,7 +615,7 @@ function SaleSection({
   isRental,
   onSold,
 }: {
-  holding: Holding;
+  holding: HoldingNativo;
   isRental: boolean;
   onSold: () => void;
 }) {
@@ -788,7 +788,7 @@ function DividendForm({
   currentValue,
   onAdded,
 }: {
-  holding: Holding;
+  holding: HoldingNativo;
   currentValue: number;
   onAdded: () => void;
 }) {
@@ -965,7 +965,7 @@ function RentalSection({
   rentals,
   onChange,
 }: {
-  holding: Holding;
+  holding: HoldingNativo;
   currency: string;
   currentValue: number;
   rentals: RentalPayment[];

@@ -20,13 +20,13 @@ import { listHoldings } from "@/modules/wealth/services/holdings-service";
 import type {
   Investment,
   InsurancePolicy,
-  Holding,
   InvestmentReadiness,
   ProtectionDiagnosis,
   Balance,
   PortfolioStats,
   AssetType,
   PolicyType,
+  HoldingNativo,
 } from "@/modules/wealth/types";
 import type { InvestmentRow, InsurancePolicyRow } from "@/lib/supabase/database.types";
 
@@ -219,7 +219,9 @@ export type WealthSummary = {
   balance: Balance;
   portfolio: PortfolioStats;
   investments: Investment[];
-  holdings: Holding[];
+  /** CRUDOS: salen de `listHoldings()` sin pasar por `normalizeHoldings`. Aquí solo se
+   *  convierten las pólizas. */
+  holdings: HoldingNativo[];
   policies: InsurancePolicy[];
   prices: Record<string, { price: number; currency: string }>;
   currency: string;
@@ -390,7 +392,7 @@ export function buildDemoWealthSummary(): WealthSummary {
     balance,
     portfolio,
     investments,
-    holdings: [],
+    holdings: [] as HoldingNativo[],
     policies,
     prices: {},
     currency,

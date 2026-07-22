@@ -153,6 +153,36 @@ export type RentalFrequency =
   | "al_vencimiento";
 export type RentalSubtype = "alquiler" | "airbnb" | "auto" | "negocio" | "otro";
 
+/**
+ * Marca que distingue un holding TAL CUAL ESTÁ GUARDADO de uno ya convertido.
+ *
+ * `normalizeHoldings` devuelve un `Holding` con los importes pasados a la moneda principal
+ * y `currency` SIN tocar: un objeto que miente sobre sí mismo. Como tenía el mismo tipo que
+ * el crudo, nada impedía pasarlo a un formulario, y de ahí salieron cuatro rutas de captura
+ * que precargaban el importe en primaria y lo guardaban con la etiqueta nativa — el mismo
+ * desajuste del P0 de deudas (#437, #474).
+ *
+ * La marca va en el CRUDO y no en el convertido, y esa dirección es lo único que funciona:
+ * `Holding & marca` sería asignable a `Holding`, así que marcar el convertido no impediría
+ * nada. Al revés sí: un `Holding` normalizado NO es asignable a `HoldingNativo`, y el
+ * compilador rechaza pasarlo donde se captura.
+ *
+ * Es de solo-tipo: no existe en runtime, no cambia ningún dato.
+ */
+declare const NATIVO: unique symbol;
+
+/**
+ * Holding con sus importes en su PROPIA moneda (`currency`), tal como está en la base.
+ * Es el único que sirve para precargar un formulario de captura.
+ */
+export type HoldingNativo = Holding & { readonly [NATIVO]: true };
+
+/** Marca un holding recién leído de la base como nativo. Solo deben usarlo los servicios
+ *  que leen de `investment_holdings` sin convertir nada. */
+export function comoNativo(h: Holding): HoldingNativo {
+  return h as HoldingNativo;
+}
+
 export type Holding = {
   id: string;
   investmentId?: string | null;

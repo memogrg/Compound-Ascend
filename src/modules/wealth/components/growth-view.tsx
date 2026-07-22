@@ -6,7 +6,7 @@ import { AddHoldingButton, AddPurchaseButton, EditHoldingButton } from "./add-ho
 import { HoldingDetailButton } from "./holding-detail-modal";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
-import type { AssetType, Holding } from "@/modules/wealth/types";
+import type { AssetType, HoldingNativo } from "@/modules/wealth/types";
 
 const SEMAFORO: Record<string, string> = {
   rojo: "var(--neg)",
@@ -370,7 +370,9 @@ function HoldingRow({
   prices,
   currency,
 }: {
-  holding: Holding;
+  /** CRUDO: viene de `getWealthSummary`, que no normaliza los holdings. Los botones de
+   *  esta fila abren formularios de captura, así que tiene que serlo. */
+  holding: HoldingNativo;
   prices: Record<string, { price: number; currency: string }>;
   currency: string;
 }) {
