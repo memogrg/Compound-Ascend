@@ -13,7 +13,7 @@ import type {
   ProfileDraft,
 } from "@/modules/personal-profile/types";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
-import { RANK_WEIGHTS, primaryOf } from "@/modules/personal-profile/engine/ranking";
+import { RANK_WEIGHTS, primaryOf, asRanked } from "@/modules/personal-profile/engine/ranking";
 
 /** Frase del Paso 6 → "money script" (creencia dominante sobre el dinero). */
 const MONEY_SCRIPT_BY_PHRASE: Record<string, MoneyScript> = {
@@ -98,10 +98,11 @@ export function computeArchetype(d: ProfileDraft): ArchetypeResult {
   // Itera un campo RANKEADO aplicando el peso del rango (1 / 0.6 / 0.3): la primaria puntúa
   // igual que cuando era respuesta única (cero regresión); la 2ª y 3ª suman con menos peso.
   const eachRanked = (
-    field: string[] | undefined,
+    field: unknown,
     fn: (value: string, addw: (a: Archetype, n: number) => void) => void,
   ) => {
-    (field ?? []).forEach((value, i) => {
+    // asRanked tolera datos pre-migración (campo single como string) sin romper.
+    asRanked(field).forEach((value, i) => {
       const w = RANK_WEIGHTS[i];
       if (w === undefined) return; // más allá del top-3 no puntúa
       fn(value, (a, n) => add(a, n * w));
@@ -125,7 +126,7 @@ export function computeArchetype(d: ProfileDraft): ArchetypeResult {
   });
 
   // Preocupaciones (ranking; legacy mainConcern como fallback envuelto en array).
-  const concerns = d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : []);
+  const concerns = asRanked(d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : []));
   eachRanked(concerns, (c, addw) => {
     switch (c) {
       case "deudas": addw("liberador", 3); break;
