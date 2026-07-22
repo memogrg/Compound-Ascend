@@ -255,13 +255,14 @@ export function Chips({
   );
 }
 
-/** Colores por rango (tokens del design system), 1ª→3ª. */
-const M_RANK_COLORS = ["var(--accent)", "var(--gold)", "var(--pos)"];
-
 /**
  * Selección múltiple ORDENADA (ranking de prioridad): el orden en que tocas las opciones es
  * la jerarquía (1ª = primaria, 2ª = secundaria, 3ª = terciaria). Cada elegido muestra su
  * número y color por rango. Mínimo 1 (basta 1 para avanzar), máximo `max` (por defecto 3).
+ *
+ * El color por rango vive en CSS (clases `chip-ranked`/`chip-rank-N` + `--rank-c`, compartidas
+ * con la web; ver globals.css y mobile.css): fondo del color con texto/número BLANCOS y
+ * contraste AA. Sin color inline sobre el texto (dejaba el label invisible sobre el relleno).
  */
 export function RankedChips({
   label,
@@ -290,35 +291,20 @@ export function RankedChips({
         {options.map((o) => {
           const rank = sel.indexOf(o.value);
           const on = rank >= 0;
-          const color = on ? M_RANK_COLORS[rank % M_RANK_COLORS.length] : undefined;
+          const cls = ["m-chip", "chip-ranked", on ? "sel" : "", on ? `chip-rank-${Math.min(rank + 1, 3)}` : ""]
+            .filter(Boolean)
+            .join(" ");
           return (
             <button
               key={o.value}
               type="button"
-              className={`m-chip${on ? " sel" : ""}`}
+              className={cls}
               aria-pressed={on}
               aria-label={on ? `${o.label} (prioridad ${rank + 1})` : o.label}
               onClick={() => toggle(o.value)}
-              style={on ? { borderColor: color, color } : undefined}
             >
               {on ? (
-                <span
-                  aria-hidden
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    minWidth: 15,
-                    height: 15,
-                    padding: "0 4px",
-                    marginRight: 5,
-                    borderRadius: 999,
-                    background: color,
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 700,
-                  }}
-                >
+                <span className="rank-badge" aria-hidden>
                   {rank + 1}
                 </span>
               ) : null}
