@@ -4,9 +4,12 @@ import {
   computeDefenseFunds,
   emergencyTargetIn,
   isDefenseFundGoalType,
+  monthsCovered,
+  detectLongTermObligation,
   EMERGENCY_FUND_USD,
   FUND_HORIZON_MONTHS,
 } from "@/modules/wealth/engine/fund-sizing";
+import { detectPeaceFundGap } from "@/lib/insights/detectors";
 
 const RATES = { USD: 1, CRC: 510 };
 
@@ -85,5 +88,51 @@ describe("fund-sizing · engine puro", () => {
     expect(isDefenseFundGoalType("defensa:seguro_vida")).toBe(false);
     expect(isDefenseFundGoalType("casa")).toBe(false);
     expect(isDefenseFundGoalType(null)).toBe(false);
+  });
+
+  it("monthsCovered: acumulado / esencial mensual", () => {
+    expect(monthsCovered(6000, 2000)).toBe(3);
+    expect(monthsCovered(3000, 2000)).toBe(1.5);
+    expect(monthsCovered(1000, 0)).toBe(0); // sin esencial, 0 (no dividir por 0)
+  });
+
+  it("detectLongTermObligation: hipoteca sin deuda crítica → caso clave", () => {
+    // Hipoteca (plazo largo) y ninguna crítica → true.
+    expect(
+      detectLongTermObligation([{ termMonths: 240, classification: "estrategica", balance: 50000 }]),
+    ).toBe(true);
+    // Por debt_type hipoteca.
+    expect(detectLongTermObligation([{ debtType: "hipoteca", balance: 40000 }])).toBe(true);
+    // Con deuda crítica activa → NO (primero la crítica).
+    expect(
+      detectLongTermObligation([
+        { termMonths: 240, balance: 50000 },
+        { classification: "critica", balance: 3000 },
+      ]),
+    ).toBe(false);
+    // Solo deuda corta de consumo → NO.
+    expect(detectLongTermObligation([{ termMonths: 12, balance: 2000 }])).toBe(false);
+    // Deuda saldada (balance 0) no cuenta.
+    expect(detectLongTermObligation([{ termMonths: 240, balance: 0 }])).toBe(false);
+  });
+});
+
+describe("detectPeaceFundGap · notificación del fondo de paz", () => {
+  const base = { peaceMonths: 3, recommendedMonthly: 100, currency: "USD" };
+
+  it("emergencia cubierta + paz incompleta → emite la notificación con meses y monto", () => {
+    const out = detectPeaceFundGap({ ...base, emergencyCovered: true, peaceCovered: false, monthsActual: 1.5 });
+    expect(out).toHaveLength(1);
+    expect(out[0]!.kind).toBe("fondo_paz");
+    expect(out[0]!.body).toContain("1.5 de 3");
+    expect(out[0]!.body).toContain("$100");
+  });
+
+  it("emergencia NO cubierta → no emite (hito activo es emergencia)", () => {
+    expect(detectPeaceFundGap({ ...base, emergencyCovered: false, peaceCovered: false, monthsActual: 0 })).toEqual([]);
+  });
+
+  it("paz ya cubierta → no emite (self-clearing)", () => {
+    expect(detectPeaceFundGap({ ...base, emergencyCovered: true, peaceCovered: true, monthsActual: 3 })).toEqual([]);
   });
 });

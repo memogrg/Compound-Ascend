@@ -59,6 +59,37 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
+/** Cuántos meses de gasto esencial cubre el acumulado actual del fondo de paz. */
+export function monthsCovered(current: number, essentialMonthly: number): number {
+  return essentialMonthly > 0 ? Math.max(0, current) / essentialMonthly : 0;
+}
+
+/** Umbral de "obligación de largo plazo" (hipoteca): plazo ≥ 10 años. */
+export const LONG_TERM_DEBT_MONTHS = 120;
+
+export type DebtSignal = {
+  classification?: string | null;
+  termMonths?: number | null;
+  debtType?: string | null;
+  balance: number;
+};
+
+/**
+ * Detecta el CASO CLAVE del fondo de paz: el usuario NO tiene deuda crítica (salió de deudas
+ * de consumo) PERO sí una obligación FIJA de largo plazo (hipoteca: plazo alto o tipo hipoteca)
+ * que sigue si su ingreso se detiene → por eso necesita la reserva aunque "ya no deba tarjetas".
+ */
+export function detectLongTermObligation(debts: DebtSignal[]): boolean {
+  const active = debts.filter((d) => d.balance > 0);
+  const hasCritical = active.some((d) => d.classification === "critica");
+  const hasLongTerm = active.some(
+    (d) =>
+      (d.termMonths ?? 0) >= LONG_TERM_DEBT_MONTHS ||
+      /hipotec|vivienda|casa|inmueble/i.test(d.debtType ?? ""),
+  );
+  return hasLongTerm && !hasCritical;
+}
+
 /** Dimensiona un fondo: brecha, progreso, cobertura y recomendación mensual. Puro. */
 export function sizeFund(target: number, current: number, horizonMonths: number): FundSizing {
   const t = Math.max(0, Number.isFinite(target) ? target : 0);

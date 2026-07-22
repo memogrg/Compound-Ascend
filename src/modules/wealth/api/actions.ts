@@ -89,6 +89,27 @@ export async function setDesiredLifestyleAction(amount: number | null): Promise<
   }
 }
 
+/**
+ * Meses del fondo de paz (preferencia PERSONAL, acotada 3-6). Revalida Defensa (web + móvil)
+ * para que el objetivo del fondo repinte con el nuevo N.
+ */
+export async function setPeaceMonthsAction(months: number): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (typeof months !== "number" || !Number.isFinite(months)) {
+    return { ok: false, fieldErrors: { months: "Valor no válido." } };
+  }
+  try {
+    const { setPeaceMonths } = await import("@/modules/wealth/services/fund-sizing-service");
+    await setPeaceMonths(months);
+    revalidatePath("/patrimonio/proteccion");
+    revalidatePath("/m/proteccion");
+    return { ok: true };
+  } catch (err) {
+    logger.error("setPeaceMonths fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos guardar los meses del fondo de paz." };
+  }
+}
+
 export async function addInvestmentAction(raw: unknown): Promise<ActionResult> {
   const parsed = investmentInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };

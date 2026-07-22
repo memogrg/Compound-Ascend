@@ -21,6 +21,7 @@ const STYLE: Record<string, { color: string; icon: IconName }> = {
 /** Ruta por TIPO de insight (deep-link de la campana web). */
 const KIND_HREF: Record<string, string> = {
   perfil_revision: "/mi-perfil-financiero",
+  fondo_paz: "/patrimonio/proteccion",
 };
 
 export function BellNotifications() {

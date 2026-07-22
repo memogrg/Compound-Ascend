@@ -14,7 +14,8 @@ export type InsightKind =
   | "racha_positiva"
   | "ritual_patrimonio"
   | "aporte_pendiente"
-  | "perfil_revision";
+  | "perfil_revision"
+  | "fondo_paz";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {

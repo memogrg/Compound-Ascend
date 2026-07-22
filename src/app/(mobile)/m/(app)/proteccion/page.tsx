@@ -1,5 +1,7 @@
 import { MobileHeader } from "../../components/mobile-header";
-import { getWealthSummary } from "@/modules/wealth";
+import { getWealthSummary, getDefenseFundsReport, detectLongTermObligation } from "@/modules/wealth";
+import { listDebts } from "@/modules/control";
+import { DefenseFundsMobile } from "./defense-funds-mobile";
 import {
   MSummaryCard,
   MSectionHeader,
@@ -38,6 +40,21 @@ export default async function MobileProteccion() {
   const { protection: p, policies, currency } = summary;
   const st = statusOf(p.score);
 
+  // Fondos de defensa (F1/F2), best-effort.
+  const funds = await getDefenseFundsReport().catch(() => null);
+  const mortgageCase = await listDebts()
+    .then((debts) =>
+      detectLongTermObligation(
+        debts.map((d) => ({
+          classification: d.classification ?? null,
+          termMonths: d.termMonths ?? null,
+          debtType: d.debtType ?? null,
+          balance: Number(d.balance ?? 0),
+        })),
+      ),
+    )
+    .catch(() => false);
+
   // Prima mensual = anual / 12 (el engine da annualPremium, ya en la moneda de display).
   const monthlyPremium = p.annualPremium / 12;
   // Próximo vencimiento: la renovación más CERCANA entre las pólizas que tienen fecha.
@@ -74,6 +91,8 @@ export default async function MobileProteccion() {
           }
           style={{ marginBottom: 16 }}
         />
+
+        {funds ? <DefenseFundsMobile report={funds} mortgageCase={mortgageCase} /> : null}
 
         {/* Métricas. Brechas NO va aquí: tiene su propia sección abajo. */}
         <MSectionHeader title="Tu protección en números" />
