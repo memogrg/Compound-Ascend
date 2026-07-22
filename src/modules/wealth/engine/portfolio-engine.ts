@@ -30,6 +30,14 @@ const ETF_TYPES = new Set(["etf"]);
 const STOCK_TYPES = new Set(["accion", "bono", "fondo", "certificado", "pension", "negocio"]);
 const CRYPTO_TYPES = new Set(["cripto"]);
 
+/**
+ * Activos que se cotizan por FEED en vivo — MISMO set que `MARKET_TYPE` en
+ * portfolio-service (mantener en sync). Solo estos esperan un precio; si falta →
+ * priceUnavailable. El resto (bono/CDP/pensión/negocio/inmueble/fondo) se valora a
+ * mano o por tasa y NO se marca (bucket "stock" incluye varios NO cotizados por feed).
+ */
+const FEED_QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
+
 type Bucket = "etf" | "stock" | "crypto" | "cash" | "other";
 
 function assetBucket(assetType: string): Bucket {
@@ -59,22 +67,40 @@ const BUCKET_COLOR: Record<Bucket, string> = {
 
 /**
  * Calcula performance de un holding individual.
- * currentPrice en undefined → currentValue = costBasis (sin ganancia/pérdida).
+ *
+ * HONESTIDAD: un activo COTIZABLE (cripto/acción/ETF) sin precio y sin valor manual NO
+ * se valora al costo en silencio (parecería "sin ganancia/pérdida" cuando en realidad no
+ * se pudo cotizar). Se marca `priceUnavailable`; currentValue/profitLoss caen a
+ * costBasis/0 SOLO como placeholder de agregación y la UI muestra "precio no disponible".
+ * Un activo NO cotizado a propósito (inmueble/negocio) usa su `currentValueManual` y NO
+ * se marca.
  */
 export function computeHoldingPerformance(
   holding: Holding,
   currentPrice?: number,
 ): HoldingPerformance {
   const costBasis = holding.quantity * holding.averageCost;
-  // Cotizados: precio×cantidad. No cotizados: valor manual del usuario (si lo
-  // puso) o, en su defecto, el costo base. Nunca precio×cantidad sin precio.
+  const priceUnavailable =
+    currentPrice === undefined &&
+    holding.currentValueManual == null &&
+    FEED_QUOTED_TYPES.has(holding.assetType);
+  // Cotizados: precio×cantidad. No cotizados a propósito: valor manual. En su defecto,
+  // costo base como placeholder (con priceUnavailable si era cotizable). Nunca precio sin precio.
   const currentValue =
     currentPrice !== undefined
       ? holding.quantity * currentPrice
       : (holding.currentValueManual ?? costBasis);
   const profitLoss = currentValue - costBasis;
   const returnPct = costBasis > 0 ? profitLoss / costBasis : 0;
-  return { ...holding, currentPrice, currentValue, costBasis, profitLoss, returnPct };
+  return {
+    ...holding,
+    currentPrice,
+    currentValue,
+    costBasis,
+    profitLoss,
+    returnPct,
+    priceUnavailable,
+  };
 }
 
 // ── Analíticas de portafolio ──────────────────────────────────────

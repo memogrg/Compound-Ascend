@@ -54,6 +54,45 @@ function readiness(state: InvestmentReadiness["state"]): InvestmentReadiness {
   };
 }
 
+describe("computeHoldingPerformance · priceUnavailable (honestidad)", () => {
+  it("cripto cotizable sin precio ni valor manual → priceUnavailable (NO se valora al costo con P&L falso)", () => {
+    const perf = computeHoldingPerformance(
+      holding({ symbol: "ONDO", assetType: "cripto", quantity: 10, averageCost: 1 }),
+      undefined,
+    );
+    expect(perf.priceUnavailable).toBe(true);
+    // currentValue cae a costBasis SOLO como placeholder de agregación; el flag avisa.
+    expect(perf.costBasis).toBe(10);
+  });
+
+  it("cripto con precio → cotizado, no priceUnavailable, P&L real", () => {
+    const perf = computeHoldingPerformance(
+      holding({ symbol: "ONDO", assetType: "cripto", quantity: 10, averageCost: 1 }),
+      2,
+    );
+    expect(perf.priceUnavailable).toBe(false);
+    expect(perf.currentValue).toBe(20);
+    expect(perf.profitLoss).toBe(10);
+  });
+
+  it("activo NO cotizado a propósito (inmueble con valor manual) → no priceUnavailable", () => {
+    const perf = computeHoldingPerformance(
+      holding({ symbol: "CASA", assetType: "inmueble", quantity: 1, averageCost: 100, currentValueManual: 150 }),
+      undefined,
+    );
+    expect(perf.priceUnavailable).toBe(false);
+    expect(perf.currentValue).toBe(150);
+  });
+
+  it("no-feed (bono valorado por tasa) sin precio → NO se marca priceUnavailable", () => {
+    const perf = computeHoldingPerformance(
+      holding({ symbol: "BONO", assetType: "bono", quantity: 1, averageCost: 1000 }),
+      undefined,
+    );
+    expect(perf.priceUnavailable).toBe(false);
+  });
+});
+
 function isoDaysAgo(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);

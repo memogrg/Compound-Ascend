@@ -466,19 +466,35 @@ export function HoldingDetailSheet({
             <div className="card card-p" style={{ padding: 12 }}>
               <div className="between">
                 <div className="ov">Valor actual</div>
-                <div className={`mono ${holding.returnPct >= 0 ? "pos" : "neg"}`} style={{ fontSize: 12, fontWeight: 700 }}>
-                  {holding.returnPct >= 0 ? "+" : ""}
-                  {formatPercent(holding.returnPct, 1)}
-                </div>
+                {holding.priceUnavailable ? null : (
+                  <div className={`mono ${holding.returnPct >= 0 ? "pos" : "neg"}`} style={{ fontSize: 12, fontWeight: 700 }}>
+                    {holding.returnPct >= 0 ? "+" : ""}
+                    {formatPercent(holding.returnPct, 1)}
+                  </div>
+                )}
               </div>
-              <div className="mono" style={{ fontSize: 19, fontWeight: 700, marginTop: 4 }}>
-                {formatMoney(holding.currentValue, currency)}
-              </div>
-              <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                Invertido {formatMoney(holding.costBasis, currency)} ·{" "}
-                {holding.profitLoss >= 0 ? "+" : "−"}
-                {formatMoney(Math.abs(holding.profitLoss), currency)}
-              </div>
+              {holding.priceUnavailable ? (
+                // Cotizable sin precio: no inventamos valor/retorno al costo.
+                <>
+                  <div className="mono muted" style={{ fontSize: 17, fontWeight: 700, fontStyle: "italic", marginTop: 4 }}>
+                    Precio no disponible
+                  </div>
+                  <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                    Invertido {formatMoney(holding.costBasis, currency)} · no pudimos cotizarlo ahora.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mono" style={{ fontSize: 19, fontWeight: 700, marginTop: 4 }}>
+                    {formatMoney(holding.currentValue, currency)}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                    Invertido {formatMoney(holding.costBasis, currency)} ·{" "}
+                    {holding.profitLoss >= 0 ? "+" : "−"}
+                    {formatMoney(Math.abs(holding.profitLoss), currency)}
+                  </div>
+                </>
+              )}
               {quoted && history.length > 1 ? (
                 <div style={{ marginTop: 8 }}>
                   <MScrubChart

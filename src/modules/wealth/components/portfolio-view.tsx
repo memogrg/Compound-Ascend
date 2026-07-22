@@ -571,14 +571,23 @@ function InvRow({
           )}
         </div>
         <div>
-          <div className={`inv-amt ${pos ? "pos" : "neg"}`}>
-            {pos ? "+" : ""}
-            {formatPercent(periodRet)}
-          </div>
-          <div className={`cell-sub ${periodGain >= 0 ? "pos" : "neg"}`}>
-            {periodGain >= 0 ? "+" : "−"}
-            {formatMoney(Math.abs(periodGain), h.currency)}
-          </div>
+          {h.priceUnavailable ? (
+            // Cotizable cuyo feed falló: NO mostramos +0,0% / +₡0 (P&L inventado).
+            <div className="cell-sub muted" style={{ fontStyle: "italic", lineHeight: 1.3 }}>
+              precio no disponible
+            </div>
+          ) : (
+            <>
+              <div className={`inv-amt ${pos ? "pos" : "neg"}`}>
+                {pos ? "+" : ""}
+                {formatPercent(periodRet)}
+              </div>
+              <div className={`cell-sub ${periodGain >= 0 ? "pos" : "neg"}`}>
+                {periodGain >= 0 ? "+" : "−"}
+                {formatMoney(Math.abs(periodGain), h.currency)}
+              </div>
+            </>
+          )}
         </div>
         <div className="kebab-wrap">
           <button
