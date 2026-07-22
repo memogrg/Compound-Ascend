@@ -5,6 +5,7 @@ import {
 } from "@/modules/control/services/control-service";
 import { ControlDashboard } from "@/modules/control/components/control-dashboard";
 import { ControlActions } from "@/modules/control/components/control-actions";
+import { listCategoryTree, type CategoryNode } from "@/modules/financial-base";
 import type { ControlSummary } from "@/modules/control/services/control-service";
 
 /**
@@ -16,6 +17,9 @@ export default async function Page() {
   const summary: ControlSummary = configured
     ? await getControlSummary()
     : buildDemoControlSummary();
+  // Árbol de categorías para agrupar "Objetivos activos" por frasco (reusa la misma
+  // lista resuelta con overrides del hogar que /gastos). Demo → sin tree (Generales).
+  const tree: CategoryNode[] = configured ? await listCategoryTree("expense") : [];
 
   return (
     <div className="grid">
@@ -49,7 +53,7 @@ export default async function Page() {
         </div>
       ) : null}
 
-      <ControlDashboard summary={summary} />
+      <ControlDashboard summary={summary} tree={tree} />
     </div>
   );
 }

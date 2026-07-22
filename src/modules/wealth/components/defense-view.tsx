@@ -194,6 +194,7 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
                     <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
                       {pol.provider ?? "—"}
                       {pol.coverage ? ` · cobertura ${formatMoney(pol.coverage, pol.currency)}` : ""}
+                      {pol.fundingReference ? ` · ${pol.fundingReference}` : ""}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

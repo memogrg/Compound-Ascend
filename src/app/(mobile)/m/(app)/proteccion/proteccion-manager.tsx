@@ -63,6 +63,7 @@ function toValues(p: InsurancePolicy): PolicyValues {
     premium: p.premium ?? undefined,
     premiumFrequency: p.premiumFrequency ?? "mensual",
     currency: p.currency,
+    fundingReference: p.fundingReference ?? undefined,
   };
 }
 
@@ -119,9 +120,11 @@ export function ProteccionManager({
             // (un nombre, trunca sin perder info clave). El vencimiento no cabe con tres
             // piezas a 375px → vive en la métrica "Próximo vencimiento", medido.
             const value = pol.coverage ? mAmount(pol.coverage, pol.currency, 10) : (premStr ?? undefined);
-            const subParts = pol.coverage
-              ? [premStr, pol.provider || null].filter(Boolean)
-              : [pol.provider || null].filter(Boolean);
+            const subParts = (
+              pol.coverage
+                ? [premStr, pol.provider || null, pol.fundingReference || null]
+                : [pol.provider || null, pol.fundingReference || null]
+            ).filter(Boolean);
             return (
               <SwipeRow key={pol.id} onEdit={() => setEditing(pol)} onDelete={() => setDeleting(pol)}>
                 {/* icon (no leading): los tipos de póliza SON glifos del set. Sin tinte

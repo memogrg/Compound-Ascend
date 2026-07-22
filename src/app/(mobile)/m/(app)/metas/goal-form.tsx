@@ -43,6 +43,7 @@ export type GoalValues = {
   recurrence?: string;
   periodAmount?: number;
   defaultCategoryId?: string | null;
+  storedIn?: string | null;
 };
 
 const PRIORITY_OPTS: Opt[] = [
@@ -110,6 +111,7 @@ export function GoalForm({
   // Categoría por defecto del frasco (se precarga al gastar). Opciones planas
   // "Grupo · Hoja" para el SheetSelect, cargadas al montar.
   const [defaultCategoryId, setDefaultCategoryId] = useState(initial?.defaultCategoryId ?? "");
+  const [storedIn, setStoredIn] = useState(initial?.storedIn ?? "");
   const [catOptions, setCatOptions] = useState<Opt[]>([]);
   useEffect(() => {
     let alive = true;
@@ -259,6 +261,7 @@ export function GoalForm({
     periodAmount: !isDefense && !isSobre && isRecurring ? targetAmount : undefined,
     // Categoría: Meta y Sobre la llevan; solo Defensa queda sin categoría.
     defaultCategoryId: isDefense ? null : defaultCategoryId || null,
+    storedIn: storedIn.trim() || null,
   };
 
   return (
@@ -329,6 +332,17 @@ export function GoalForm({
           </div>
         </>
       ) : null}
+      <TextField
+        name="storedIn"
+        label="Referencia (banco / cuenta)"
+        value={storedIn}
+        onChange={setStoredIn}
+        placeholder="Ej.: BAC ahorros ···1234"
+        maxLength={120}
+      />
+      <div className="muted" style={{ fontSize: 12, marginTop: -4, lineHeight: 1.4 }}>
+        Dónde está guardado (solo referencia). También ayuda a estimar qué tan líquido es este ahorro.
+      </div>
       <Segmented name="priority" label="Prioridad" value={priority} onChange={setPriority} options={PRIORITY_OPTS} />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
     </FormShell>

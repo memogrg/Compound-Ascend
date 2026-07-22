@@ -7,8 +7,9 @@ import { GoalSpendButton } from "./goal-spend-button";
 import { GoalDetailButton } from "./goal-detail-button";
 import { EditControlButton, AddControlButton } from "./control-actions";
 import { formatMoney } from "@/lib/format";
+import { groupByJar, type CategoryNode } from "@/modules/financial-base";
 import type { ControlSummary } from "@/modules/control/services/control-service";
-import type { GoalAction, Semaforo } from "@/modules/control/types";
+import type { GoalAction, SavingsGoal, Semaforo } from "@/modules/control/types";
 
 const SEMAFORO: Record<Semaforo, { label: string; color: string }> = {
   verde: { label: "Saludable", color: "var(--pos)" },
@@ -40,9 +41,19 @@ const ACTION: Record<GoalAction, { label: string; color: string; bg: string }> =
   replantear: { label: "Replantear", color: "var(--warn)", bg: "var(--warn-soft)" },
 };
 
-export function ControlDashboard({ summary }: { summary: ControlSummary }) {
+export function ControlDashboard({
+  summary,
+  tree,
+}: {
+  summary: ControlSummary;
+  /** Árbol de categorías para agrupar los objetivos por frasco (reusa groupByJar). */
+  tree: CategoryNode[];
+}) {
   const { diagnosis: d, goals, currency } = summary;
   const sem = SEMAFORO[d.semaforo];
+  // "Objetivos activos" agrupados por frasco (default_category_id → frasco padre),
+  // "Generales" primero. Mismo agrupador que los sobres de /gastos (groupByJar).
+  const goalSections = groupByJar(goals, (g) => g.defaultCategoryId, tree);
 
   return (
     <div className="grid">
@@ -226,66 +237,28 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
           {goals.length === 0 ? (
             <Empty text="Aún no agregas objetivos de ahorro." />
           ) : (
-            <div className="goals-grid">
-              {goals.map((g) => {
-                const rec = d.goalRecs.find((r) => r.goalId === g.id);
-                const a = rec ? ACTION[rec.action] : ACTION.mantener;
-                // Un sobre acumula sin meta: no hay barra ni % de progreso.
-                const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
-                const progress =
-                  g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
-                return (
-                  <div key={g.id} className="goal">
-                    <div className="gt">
-                      <span className="gn">{g.name}</span>
-                      <span
-                        className="chip"
-                        style={{ background: a.bg, color: a.color, fontWeight: 700 }}
-                      >
-                        {a.label}
-                      </span>
-                    </div>
-                    {isSobre ? null : (
-                      <div className="bar">
-                        <div className="fl" style={{ width: `${progress}%` }} />
-                      </div>
-                    )}
-                    <div className="gs">
-                      <span className="gnum">{formatMoney(g.currentAmount, g.currency)}</span>
-                      {isSobre ? (
-                        <span className="muted"> · acumulado (sobre)</span>
-                      ) : (
-                        <> / {formatMoney(g.targetAmount, g.currency)}</>
-                      )}
-                      {rec?.reason ? <> · {rec.reason}</> : null}
-                    </div>
-                    {g.recurrence && g.recurrence !== "ninguna" ? (
-                      <div
-                        className="gs tip tip-wrap"
-                        data-tip="Frasco recurrente: al llegar la fecha, la meta se restaura al monto del período y lo no gastado se arrastra."
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "help" }}
-                      >
-                        <span
-                          className="chip"
-                          style={{ background: "var(--info-soft)", color: "var(--info)", fontWeight: 700 }}
-                        >
-                          {RECURRENCE_LABEL[g.recurrence] ?? "Recurrente"}
-                        </span>
-                        {g.nextResetOn ? (
-                          <span className="muted">Próximo reinicio: {fmtResetDate(g.nextResetOn)}</span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <div className="acts">
-                      <GoalDetailButton goal={g} />
-                      <GoalSpendButton goal={g} />
-                      <GoalWithdrawButton goal={g} />
-                      <EditControlButton kind="goal" item={g} currency={currency} />
-                      <DeleteButton id={g.id} kind="goal" />
-                    </div>
+            <div style={{ display: "grid", gap: 16 }}>
+              {goalSections.map((section) => (
+                <div key={section.key}>
+                  <div
+                    className="muted"
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      letterSpacing: ".05em",
+                      textTransform: "uppercase",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {section.name}
                   </div>
-                );
-              })}
+                  <div className="goals-grid">
+                    {section.items.map((g) => (
+                      <GoalCard key={g.id} g={g} d={d} currency={currency} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -304,6 +277,77 @@ export function ControlDashboard({ summary }: { summary: ControlSummary }) {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Tarjeta de un objetivo (idéntica a antes); extraída para agrupar por frasco. */
+function GoalCard({
+  g,
+  d,
+  currency,
+}: {
+  g: SavingsGoal;
+  d: ControlSummary["diagnosis"];
+  currency: string;
+}) {
+  const rec = d.goalRecs.find((r) => r.goalId === g.id);
+  const a = rec ? ACTION[rec.action] : ACTION.mantener;
+  // Un sobre acumula sin meta: no hay barra ni % de progreso.
+  const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
+  const progress = g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
+  return (
+    <div className="goal">
+      <div className="gt">
+        <span className="gn">{g.name}</span>
+        <span className="chip" style={{ background: a.bg, color: a.color, fontWeight: 700 }}>
+          {a.label}
+        </span>
+      </div>
+      {isSobre ? null : (
+        <div className="bar">
+          <div className="fl" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      <div className="gs">
+        <span className="gnum">{formatMoney(g.currentAmount, g.currency)}</span>
+        {isSobre ? (
+          <span className="muted"> · acumulado (sobre)</span>
+        ) : (
+          <> / {formatMoney(g.targetAmount, g.currency)}</>
+        )}
+        {rec?.reason ? <> · {rec.reason}</> : null}
+      </div>
+      {g.recurrence && g.recurrence !== "ninguna" ? (
+        <div
+          className="gs tip tip-wrap"
+          data-tip="Frasco recurrente: al llegar la fecha, la meta se restaura al monto del período y lo no gastado se arrastra."
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "help" }}
+        >
+          <span
+            className="chip"
+            style={{ background: "var(--info-soft)", color: "var(--info)", fontWeight: 700 }}
+          >
+            {RECURRENCE_LABEL[g.recurrence] ?? "Recurrente"}
+          </span>
+          {g.nextResetOn ? (
+            <span className="muted">Próximo reinicio: {fmtResetDate(g.nextResetOn)}</span>
+          ) : null}
+        </div>
+      ) : null}
+      {/* Referencia "dónde está el dinero" (stored_in), discreta y solo si tiene valor. */}
+      {g.storedIn ? (
+        <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+          {g.storedIn}
+        </div>
+      ) : null}
+      <div className="acts">
+        <GoalDetailButton goal={g} />
+        <GoalSpendButton goal={g} />
+        <GoalWithdrawButton goal={g} />
+        <EditControlButton kind="goal" item={g} currency={currency} />
+        <DeleteButton id={g.id} kind="goal" />
       </div>
     </div>
   );

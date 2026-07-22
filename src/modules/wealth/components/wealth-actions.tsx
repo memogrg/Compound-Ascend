@@ -312,6 +312,7 @@ function PolicyForm({
         premiumFrequency: String(fd.get("premiumFrequency") ?? "mensual"),
         currency: cur,
         isEssential: fd.get("isEssential") === "on",
+        fundingReference: String(fd.get("fundingReference") ?? "").trim() || undefined,
       },
       onDone,
       form,
@@ -389,6 +390,36 @@ function PolicyForm({
               ))}
             </select>
           </div>
+        </div>
+        <div className="fld">
+          <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            Referencia (banco / cuenta)
+            <span
+              className="tip tip-wrap"
+              data-tip="Sólo para tu referencia: dónde está guardada esta plata. No afecta cálculos."
+              style={{
+                width: 15,
+                height: 15,
+                borderRadius: "50%",
+                border: "1px solid var(--line)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 10,
+                color: "var(--muted)",
+                cursor: "help",
+              }}
+            >
+              ?
+            </span>
+          </label>
+          <input
+            className="inp"
+            name="fundingReference"
+            defaultValue={item?.fundingReference ?? ""}
+            placeholder="Ej.: BAC ···1234"
+            maxLength={120}
+          />
         </div>
         <div className="fld">
           <EssentialCheck name="isEssential" defaultChecked={item?.isEssential ?? false} />

@@ -756,6 +756,8 @@ export type InsurancePolicyRow = Timestamps & Audited & {
   beneficiaries: string | null;
   currency: string;
   scope: string | null;
+  /** Referencia de fondeo libre "dónde está el dinero" (migración 20260728000001). */
+  funding_reference: string | null;
 };
 
 // ---------- Módulo 5 — Mi Rich Life ----------

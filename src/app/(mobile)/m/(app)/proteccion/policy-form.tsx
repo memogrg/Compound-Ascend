@@ -23,6 +23,7 @@ export type PolicyValues = {
   premium?: number;
   premiumFrequency: string;
   currency: string;
+  fundingReference?: string;
 };
 
 // Mismo listado (y orden) que POLICY_TYPES del modal web.
@@ -66,6 +67,7 @@ export function PolicyForm({
   const [premium, setPremium] = useState<number | undefined>(initial?.premium);
   const [premiumFrequency, setPremiumFrequency] = useState(initial?.premiumFrequency ?? "mensual");
   const [cur, setCur] = useState(initial?.currency ?? currency);
+  const [fundingReference, setFundingReference] = useState(initial?.fundingReference ?? "");
 
   const values: PolicyValues = {
     policyType,
@@ -74,6 +76,7 @@ export function PolicyForm({
     premium,
     premiumFrequency,
     currency: cur,
+    fundingReference: fundingReference.trim() || undefined,
   };
 
   return (
@@ -117,6 +120,17 @@ export function PolicyForm({
         sheetTitle="Frecuencia de la prima"
       />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <TextField
+        name="fundingReference"
+        label="Referencia (banco / cuenta)"
+        value={fundingReference}
+        onChange={setFundingReference}
+        placeholder="Ej.: BAC ···1234"
+        maxLength={120}
+      />
+      <div className="muted" style={{ fontSize: 12, marginTop: -4, lineHeight: 1.4 }}>
+        Solo para tu referencia: dónde está guardada esta plata. No afecta cálculos.
+      </div>
     </FormShell>
   );
 }

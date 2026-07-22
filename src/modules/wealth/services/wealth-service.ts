@@ -56,6 +56,7 @@ function rowToPolicy(r: InsurancePolicyRow): InsurancePolicy {
     premiumFrequency: r.premium_frequency,
     renewalDate: r.renewal_date,
     currency: r.currency,
+    fundingReference: r.funding_reference,
   };
 }
 
@@ -117,6 +118,7 @@ export async function createPolicy(input: PolicyInput): Promise<string> {
       renewal_date: input.renewalDate ?? null,
       currency: input.currency,
       is_essential: input.isEssential ?? false,
+      funding_reference: input.fundingReference ?? null,
     })
     .select("id")
     .single();
@@ -160,6 +162,7 @@ export async function updatePolicy(id: string, input: PolicyInput): Promise<void
       premium_frequency: input.premiumFrequency ?? null,
       currency: input.currency,
       is_essential: input.isEssential ?? false,
+      funding_reference: input.fundingReference ?? null,
     })
     .eq("id", id)
     .in("user_id", scope);

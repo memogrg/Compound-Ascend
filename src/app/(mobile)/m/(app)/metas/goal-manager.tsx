@@ -147,12 +147,12 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
                   icon="goal"
                   iconTone={tone}
                   title={g.name}
-                  subtitle={goalSubtitle({
+                  subtitle={`${goalSubtitle({
                     isSobre,
                     missing,
                     currency: g.currency,
                     targetDate: g.targetDate,
-                  })}
+                  })}${g.storedIn ? ` · ${g.storedIn}` : ""}`}
                   value={mAmount(g.currentAmount, g.currency, 10)}
                   valueTone={tone === "danger" ? "danger" : "neutral"}
                   slot={
@@ -243,6 +243,7 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
               kind: editing.kind ?? "meta",
               recurrence: editing.recurrence ?? "ninguna",
               defaultCategoryId: editing.defaultCategoryId ?? null,
+              storedIn: editing.storedIn ?? null,
             }}
             action={(v: GoalValues) => editGoalAction(editing.id, v)}
             submitLabel="Guardar cambios"

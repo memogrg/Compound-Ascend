@@ -26,6 +26,9 @@ export const goalInputSchema = z.object({
   // Póliza vinculada (meta de ahorro de la prima de un seguro de Defensa).
   policyId: z.string().uuid().optional().nullable(),
   isEssential: z.boolean().optional(),
+  // Referencia "dónde está el dinero" (columna stored_in reusada): texto libre
+  // informativo que además alimenta la liquidez de Rich Life (savingsLiquidity).
+  storedIn: z.string().trim().max(120).optional().nullable(),
 });
 
 export const debtInputSchema = z.object({

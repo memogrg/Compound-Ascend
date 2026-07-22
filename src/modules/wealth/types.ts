@@ -82,6 +82,8 @@ export type InsurancePolicy = {
   renewalDate?: string | null;
   currency: string;
   isEssential?: boolean;
+  /** Referencia libre "dónde está el dinero" (banco/cuenta). Informativa, sin cálculo. */
+  fundingReference?: string | null;
 };
 
 export type ReadinessState =

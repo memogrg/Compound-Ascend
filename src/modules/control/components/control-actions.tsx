@@ -348,6 +348,7 @@ function GoalForm({
         periodAmount: !isSobre && isRecurring ? Number(targetAmount) || 0 : undefined,
         defaultCategoryId: isDefense ? null : defaultCategoryId || null,
         isEssential: fd.get("isEssential") === "on",
+        storedIn: String(fd.get("storedIn") ?? "").trim() || null,
       },
       onDone,
       form,
@@ -719,6 +720,37 @@ function GoalForm({
             ) : null}
           </>
         )}
+        <div className="fld">
+          <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            Referencia (banco / cuenta)
+            <span
+              className="tip tip-wrap"
+              data-tip="Dónde está guardado este dinero (solo para tu referencia). También nos ayuda a estimar qué tan líquido es este ahorro."
+              style={{
+                width: 15,
+                height: 15,
+                borderRadius: "50%",
+                border: "1px solid var(--line)",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 10,
+                color: "var(--muted)",
+                cursor: "help",
+              }}
+            >
+              ?
+            </span>
+          </label>
+          <input
+            className="inp"
+            name="storedIn"
+            defaultValue={item?.storedIn ?? ""}
+            placeholder="Ej.: BAC ahorros ···1234"
+            maxLength={120}
+            style={{ width: "100%", boxSizing: "border-box" }}
+          />
+        </div>
         <div className="fld">
           <EssentialCheck
             name="isEssential"
