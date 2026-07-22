@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   claveCache,
   seleccionarParaRefresco,
+  pickFreshCachePrice,
 } from "@/modules/wealth/services/portfolio-service";
 import type { Holding } from "@/modules/wealth/types";
 
@@ -69,5 +70,40 @@ describe("selección de precios a refrescar", () => {
     const veinte = new Map([[claveCache("SOL", "crypto"), { fetchedAt: haceMin(20) }]]);
     expect(seleccionarParaRefresco([h("SOL", "cripto")], diez, AHORA, SIN_VUELO)).toEqual([]);
     expect(seleccionarParaRefresco([h("SOL", "cripto")], veinte, AHORA, SIN_VUELO)).toHaveLength(1);
+  });
+});
+
+describe("respaldo en vivo desde cache: pickFreshCachePrice (regla de honestidad)", () => {
+  const DIA = 24 * 60 * 60 * 1000;
+  const fila = (symbol: string, asset_type: string, price: number, fetched_at: string) => ({
+    symbol,
+    asset_type,
+    price,
+    currency: "USD",
+    fetched_at,
+  });
+
+  it("sirve un precio reciente para cubrir un fallo transitorio del proveedor", () => {
+    const m = pickFreshCachePrice([fila("JUP", "crypto", 0.2, haceMin(30))], AHORA, DIA);
+    expect(m.get(claveCache("JUP", "crypto"))).toEqual({ price: 0.2, currency: "USD" });
+  });
+
+  it("DESCARTA un precio más viejo que el límite (no mostrar rancio como vigente)", () => {
+    const viejo = new Date(AHORA - 2 * DIA).toISOString();
+    const m = pickFreshCachePrice([fila("ONDO", "crypto", 0.4, viejo)], AHORA, DIA);
+    expect(m.has(claveCache("ONDO", "crypto"))).toBe(false);
+  });
+
+  it("clavea por par símbolo+tipo (no confunde BTC crypto con BTC etf basura)", () => {
+    const m = pickFreshCachePrice(
+      [
+        fila("BTC", "crypto", 66000, haceMin(5)),
+        fila("BTC", "etf", 27.84, haceMin(5)),
+      ],
+      AHORA,
+      DIA,
+    );
+    expect(m.get(claveCache("BTC", "crypto"))?.price).toBe(66000);
+    expect(m.get(claveCache("BTC", "etf"))?.price).toBe(27.84);
   });
 });
