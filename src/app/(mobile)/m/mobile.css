@@ -1522,6 +1522,13 @@ body:has(.m-shell[data-theme="dark"]) {
   border-color: transparent;
   color: var(--accent-ink);
 }
+/* Ranked chips en móvil: el rango va como FONDO + texto/nº blancos (mismas clases chip-rank-N
+   y --rank-c que la web; el badge .rank-badge se define en globals.css). */
+.m-shell .m-chip.chip-ranked.sel {
+  background: var(--rank-c);
+  border-color: transparent;
+  color: #fff;
+}
 .m-shell .m-chips-hint {
   font-size: 12px;
   color: var(--text-muted);

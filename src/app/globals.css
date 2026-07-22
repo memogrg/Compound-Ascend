@@ -45,6 +45,13 @@
   --warning-soft: rgba(176, 122, 46, 0.12);
   --info-soft: rgba(58, 110, 165, 0.12);
 
+  /* Ranked chips (perfil): 3 rangos DISTINTOS, texto y número SIEMPRE blancos. Fondos fijos y
+     suficientemente oscuros para cumplir AA (>4.5:1) con blanco en tema claro Y oscuro — el
+     contraste es contra el relleno del chip, no contra la página, así que no necesitan flip. */
+  --rank-1: #2c6e43; /* verde  · blanco 5.3:1 */
+  --rank-2: #305c88; /* azul   · blanco 6.9:1 */
+  --rank-3: #855a1d; /* ámbar  · blanco 6.0:1 */
+
   /* ---- Data viz series (--s6 extiende el handoff con el teal legacy) ---- */
   --s1: #378451;
   --s2: #b07a2e;
@@ -2451,6 +2458,41 @@ input[type="radio"] {
   background: var(--accent);
   color: var(--accent-ink);
   border-color: transparent;
+}
+
+/* ── Ranked chips (ranking de prioridad, wizard de perfil) ──
+   El color del rango va como FONDO del chip seleccionado con texto/nº BLANCOS (nunca texto
+   del color del rango sobre fondo del mismo color = invisible). --rank-c lo fija chip-rank-N,
+   y lo consumen tanto el relleno como el número del badge. Web y móvil comparten estas clases. */
+.chip-rank-1 {
+  --rank-c: var(--rank-1);
+}
+.chip-rank-2 {
+  --rank-c: var(--rank-2);
+}
+.chip-rank-3 {
+  --rank-c: var(--rank-3);
+}
+.chip-sel.chip-ranked.on {
+  background: var(--rank-c);
+  color: #fff;
+  border-color: transparent;
+}
+/* Badge del número (1/2/3): pastilla blanca con el número en el color del rango → resalta
+   sobre el relleno de color y el label se sigue leyendo entero. */
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--rank-c);
+  font-size: 10.5px;
+  font-weight: 700;
 }
 
 /* Yes/No */
