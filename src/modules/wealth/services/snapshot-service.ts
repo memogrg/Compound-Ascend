@@ -178,7 +178,8 @@ export async function generateSnapshotForUserCron(
   const normalized = normalizeHoldings(holdings, currency, rates);
   // fetchNormalizedPrices solo usa symbol y assetType — no depende del
   // averageCost normalizado (mismo orden que el camino con sesión).
-  const prices = await fetchNormalizedPrices(holdings, currency, rates);
+  // ctx service-role: habilita el respaldo desde market_price_cache también sin sesión.
+  const prices = await fetchNormalizedPrices(holdings, currency, rates, { db: supabase, userId });
   const analytics = computePortfolioAnalytics(normalized, prices);
 
   const { data: last } = await supabase

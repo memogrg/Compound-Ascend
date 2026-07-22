@@ -53,6 +53,7 @@ export async function fetchNormalizedPrices(
   holdings: Holding[],
   primaryCurrency: string,
   rates: Record<string, number>,
+  ctx?: AuthContext,
 ): Promise<Record<string, number>> {
   const quotable = holdings.filter((h) => MARKET_TYPE[h.assetType]);
   const prices: Record<string, number> = {};
@@ -70,7 +71,88 @@ export async function fetchNormalizedPrices(
       }
     }),
   );
+
+  // Respaldo: los que NINGÚN proveedor cotizó (rate-limit transitorio de CoinGecko, etc.)
+  // se rellenan con el último precio RECIENTE de market_price_cache antes de rendirse a
+  // "precio no disponible". Mata la intermitencia: un fallo puntual del proveedor ya no
+  // tira el holding al costo cuando hay un precio bueno de minutos atrás.
+  const missing = quotable.filter((h) => prices[h.symbol.toUpperCase()] === undefined);
+  if (missing.length > 0) {
+    await fillMissingFromCache(missing, prices, primaryCurrency, rates, ctx);
+  }
   return prices;
+}
+
+/**
+ * Antigüedad máxima de un precio de market_price_cache para servirlo como respaldo en el
+ * camino EN VIVO. Cubre de sobra las ventanas de fallo transitorio de un proveedor sin
+ * presentar como "vigente" un precio de días: pasado esto es más honesto marcar
+ * priceUnavailable que mostrar un valor viejo como actual. (Contrasta con fetchCachedPrices
+ * —Inicio—, que a propósito NO descarta por viejo porque no afirma un precio en vivo.)
+ */
+const FALLBACK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * De las filas de market_price_cache, arma el mapa (símbolo|tipo) → precio DESCARTANDO las
+ * más viejas que `maxAgeMs`. Pura y exportada: es la regla de honestidad del respaldo en
+ * vivo (no servir un precio rancio como vigente), y se fija con tests sin tocar la BD.
+ */
+export function pickFreshCachePrice(
+  rows: { symbol: string; asset_type: string; price: number | string; currency: string; fetched_at: string }[],
+  now: number,
+  maxAgeMs: number,
+): Map<string, { price: number; currency: string }> {
+  const porClave = new Map<string, { price: number; currency: string }>();
+  for (const r of rows) {
+    const age = now - Date.parse(r.fetched_at);
+    if (!Number.isFinite(age) || age > maxAgeMs) continue;
+    porClave.set(claveCache(r.symbol, r.asset_type), {
+      price: Number(r.price),
+      currency: r.currency,
+    });
+  }
+  return porClave;
+}
+
+/**
+ * Rellena `prices` (mutación in-place) para los holdings sin cotización en vivo, usando el
+ * precio reciente de market_price_cache. Best-effort: cualquier fallo de auth/BD omite el
+ * respaldo y se degrada al comportamiento previo (priceUnavailable), sin propagar.
+ */
+async function fillMissingFromCache(
+  missing: Holding[],
+  prices: Record<string, number>,
+  primaryCurrency: string,
+  rates: Record<string, number>,
+  ctx: AuthContext | undefined,
+): Promise<void> {
+  try {
+    const { db } = await resolveAuth(ctx);
+    const symbols = [...new Set(missing.map((h) => h.symbol.toUpperCase()))];
+    const types = [...new Set(missing.map((h) => MARKET_TYPE[h.assetType]!))];
+    const cutoff = new Date(Date.now() - FALLBACK_MAX_AGE_MS).toISOString();
+    const { data } = await db
+      .from("market_price_cache")
+      .select("symbol,asset_type,price,currency,fetched_at")
+      .in("symbol", symbols)
+      .in("asset_type", types)
+      .gte("fetched_at", cutoff);
+
+    const porClave = pickFreshCachePrice(data ?? [], Date.now(), FALLBACK_MAX_AGE_MS);
+    for (const h of missing) {
+      const hit = porClave.get(claveCache(h.symbol, MARKET_TYPE[h.assetType]!));
+      if (hit) {
+        prices[h.symbol.toUpperCase()] = convertCurrency(
+          hit.price,
+          hit.currency,
+          primaryCurrency,
+          rates,
+        );
+      }
+    }
+  } catch {
+    // Sin sesión/BD: se degrada al comportamiento previo. El respaldo es un extra, no un req.
+  }
 }
 
 /**
@@ -335,7 +417,7 @@ export async function getPortfolioMarketValues(
   const prices =
     opts.precios === "cache"
       ? await fetchCachedPrices(holdings, currency, rates, ctx)
-      : await fetchNormalizedPrices(holdings, currency, rates);
+      : await fetchNormalizedPrices(holdings, currency, rates, ctx);
 
   const byInvestmentId: Record<string, number> = {};
   let total = 0;
