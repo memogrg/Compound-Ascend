@@ -1,5 +1,5 @@
 /** Formateo de moneda y porcentajes en español (es-CR por defecto). */
-import { SUPPORTED_CURRENCIES } from "@/lib/fx";
+import { SUPPORTED_CURRENCIES, currencyDecimals, isCryptoCurrency } from "@/lib/fx";
 
 /**
  * Símbolos para selectores/prefijos de moneda en la UI (MX$/COL$ desambiguados).
@@ -13,6 +13,7 @@ export const CURRENCY_SYMBOL: Record<string, string> = {
   MXN: "MX$",
   COP: "COL$",
   GBP: "£",
+  BTC: "₿",
 };
 
 /** Símbolo de una moneda para la UI (fallback al propio código si no se conoce). */
@@ -31,6 +32,16 @@ export const CURRENCY_OPTIONS: readonly CurrencyOption[] = SUPPORTED_CURRENCIES.
   code,
   symbol: currencySymbol(code),
 }));
+
+/**
+ * Monedas ofrecidas para DISPLAY/PRINCIPAL (switch del topbar, moneda principal del perfil):
+ * fiat solamente. Las cripto (BTC) se CAPTURAN (CURRENCY_OPTIONS) pero no se eligen como
+ * moneda en la que se muestran los agregados — evita "todo el patrimonio en ₿0,000…" y no
+ * choca con el enum fiat de la moneda principal (account/actions).
+ */
+export const DISPLAY_CURRENCY_OPTIONS: readonly CurrencyOption[] = CURRENCY_OPTIONS.filter(
+  (o) => !isCryptoCurrency(o.code),
+);
 
 /**
  * Moneda por defecto al capturar un monto. Prioridad: la del ítem en edición →
@@ -97,10 +108,13 @@ function prefixOf(currency: string): string {
  * Importe con separadores de miles (punto) y 0 decimales por defecto.
  * `currency` es OBLIGATORIO — pasa la moneda DEL IMPORTE, no la de visualización.
  */
-export function formatMoney(amount: number, currency: string, decimals = 0): string {
-  const body = `${prefixOf(currency)}${formatAbs(amount, decimals)}`;
+export function formatMoney(amount: number, currency: string, decimals?: number): string {
+  // Decimales por moneda cuando no se pasan: cripto 8 (satoshis), fiat 0. Un override
+  // explícito (p. ej. USD con 2) sigue mandando.
+  const dec = decimals ?? currencyDecimals(currency);
+  const body = `${prefixOf(currency)}${formatAbs(amount, dec)}`;
   // El redondeo manda: −0,4 con 0 decimales es "₡0", no "−₡0".
-  return Number(Math.abs(amount).toFixed(decimals)) === 0 || amount >= 0 ? body : `${MINUS}${body}`;
+  return Number(Math.abs(amount).toFixed(dec)) === 0 || amount >= 0 ? body : `${MINUS}${body}`;
 }
 
 /** Formatea una proporción 0-1 como porcentaje entero. */

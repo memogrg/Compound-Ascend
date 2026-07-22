@@ -12,10 +12,26 @@
  */
 
 /** Monedas soportadas por la app (deben existir en FX_PER_USD). */
-export const SUPPORTED_CURRENCIES = ["USD", "CRC", "EUR", "MXN", "COP", "GBP"] as const;
+export const SUPPORTED_CURRENCIES = ["USD", "CRC", "EUR", "MXN", "COP", "GBP", "BTC"] as const;
 export type CurrencyCode = (typeof SUPPORTED_CURRENCIES)[number];
 
-/** Unidades de cada moneda por 1 USD (aproximado, ~2026). Respaldo estático. */
+/** Monedas cripto: se capturan pero NO se ofrecen como moneda de display/principal
+ *  (ver DISPLAY_CURRENCIES en format.ts), y se formatean con más decimales. */
+export const CRYPTO_CURRENCIES = ["BTC"] as const;
+export function isCryptoCurrency(code: string): boolean {
+  return (CRYPTO_CURRENCIES as readonly string[]).includes(code);
+}
+/** Decimales de presentación por moneda: cripto 8 (satoshis), fiat 0 (default histórico). */
+export function currencyDecimals(code: string): number {
+  return isCryptoCurrency(code) ? 8 : 0;
+}
+
+/**
+ * Unidades de cada moneda por 1 USD (aproximado, ~2026). Respaldo estático.
+ * ⚠️ BTC es SOLO un último recurso si el feed cripto cae: se desactualiza rápido (BTC se
+ * mueve mucho). El valor VIVO manda — getFxRates inyecta 1/precioBTCUSD del feed cripto
+ * (misma fuente que el portafolio) y marca `stale` cuando cae al estático (ver btcPerUsd).
+ */
 export const FX_PER_USD: Record<string, number> = {
   USD: 1,
   CRC: 510,
@@ -23,7 +39,20 @@ export const FX_PER_USD: Record<string, number> = {
   MXN: 18.5,
   COP: 4000,
   GBP: 0.79,
+  BTC: 1 / 60000, // ≈ 0.00001667 BTC/USD · respaldo estático desactualizado
 };
+
+/**
+ * BTC/USD → unidades BTC por 1 USD, con flag de frescura. `liveUsdPrice` es el precio vivo
+ * del feed cripto (getMarketPrice("BTC","crypto")); si es null (feed caído), cae al estático
+ * PERO marcado `stale: true` — el estático NO se presenta como vivo. Puro y testeable.
+ */
+export function btcPerUsd(liveUsdPrice: number | null | undefined): { rate: number; stale: boolean } {
+  if (typeof liveUsdPrice === "number" && Number.isFinite(liveUsdPrice) && liveUsdPrice > 0) {
+    return { rate: 1 / liveUsdPrice, stale: false };
+  }
+  return { rate: FX_PER_USD.BTC!, stale: true };
+}
 
 /**
  * Completa una tabla de tasas (posiblemente parcial, de un proveedor en vivo)
