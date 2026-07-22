@@ -6,6 +6,7 @@
  */
 
 import type { Trajectory } from "@/lib/ai/trajectory";
+import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 
 export type FinancialContext = {
   name?: string;
@@ -247,22 +248,22 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.lossReaction) facts.push(`Reacción ante pérdidas: ${ctx.lossReaction}.`);
   if (ctx.horizon) facts.push(`Horizonte de inversión: ${ctx.horizon}.`);
   if (ctx.volatilityComfort !== undefined)
-    facts.push(`Comodidad con la volatilidad: ${ctx.volatilityComfort}/10.`);
+    facts.push(`Comodidad con la volatilidad: ${ctx.volatilityComfort}/5.`);
   if (ctx.hasInvested !== undefined)
     facts.push(`¿Ha invertido antes?: ${ctx.hasInvested ? "sí" : "no"}.`);
-  if (ctx.discipline !== undefined) facts.push(`Disciplina financiera: ${ctx.discipline}/10.`);
-  if (ctx.impulsivity !== undefined) facts.push(`Impulsividad: ${ctx.impulsivity}/10.`);
+  if (ctx.discipline !== undefined) facts.push(`Disciplina financiera: ${ctx.discipline}/5.`);
+  if (ctx.impulsivity !== undefined) facts.push(`Impulsividad: ${ctx.impulsivity}/5.`);
   if (ctx.reviewHabit) facts.push(`Hábito de revisión: ${ctx.reviewHabit}.`);
-  if (ctx.hardest?.length) facts.push(`Lo que más le cuesta: ${ctx.hardest.join(", ")}.`);
+  if (ctx.hardest?.length) facts.push(`Lo que más le cuesta (por prioridad): ${formatRanking(ctx.hardest)}.`);
   if (ctx.knowledgeLevel) facts.push(`Nivel de conocimiento financiero: ${ctx.knowledgeLevel}.`);
   if (ctx.topicsToLearn?.length) facts.push(`Quiere aprender sobre: ${ctx.topicsToLearn.join(", ")}.`);
-  if (ctx.priorities?.length) facts.push(`Sus prioridades: ${ctx.priorities.join(", ")}.`);
+  if (ctx.priorities?.length) facts.push(`Sus prioridades (por prioridad): ${formatRanking(ctx.priorities)}.`);
   if (ctx.coachingTone) facts.push(`Tono de coaching preferido: ${ctx.coachingTone}.`);
   if (ctx.coachingFrequency) facts.push(`Frecuencia de coaching: ${ctx.coachingFrequency}.`);
   if (ctx.alertIntensity) facts.push(`Intensidad de alertas preferida: ${ctx.alertIntensity}.`);
   if (ctx.urgency) facts.push(`Urgencia financiera percibida: ${ctx.urgency}.`);
   if (ctx.perceivedControl !== undefined)
-    facts.push(`Control percibido sobre sus finanzas: ${ctx.perceivedControl}/10.`);
+    facts.push(`Control percibido sobre sus finanzas: ${ctx.perceivedControl}/5.`);
   if (ctx.dependentsCount !== undefined) facts.push(`Personas que dependen de él/ella: ${ctx.dependentsCount}.`);
   if (ctx.financialNucleus) facts.push(`Núcleo financiero: ${ctx.financialNucleus}.`);
   if (ctx.hasEmergencyFund) facts.push(`Fondo de emergencia: ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`);
@@ -384,7 +385,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     behaviorRules.push("Alertas: sin alarmismo; plantea los riesgos con calma.");
   if (ctx.alertIntensity === "directas")
     behaviorRules.push("Alertas: sé claro y contundente al señalar riesgos.");
-  if (ctx.impulsivity !== undefined && ctx.impulsivity >= 7)
+  if (ctx.impulsivity !== undefined && ctx.impulsivity >= 4)
     behaviorRules.push("Impulsividad alta: anticipa el impulso antes de las compras; ofrece una pausa o una regla simple antes de gastar.");
   if (ctx.urgency === "alta" || ctx.urgency === "critica")
     behaviorRules.push("Urgencia financiera alta: prioriza primero la estabilidad (liquidez), no inversión de riesgo.");

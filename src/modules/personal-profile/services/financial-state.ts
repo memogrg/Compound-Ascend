@@ -16,7 +16,7 @@ export async function getFinancialState(draft: ProfileDraft): Promise<FinancialS
     hasDebts: false,
     hasUrgentDebt: false,
     hasInvestments: false,
-    dominantValue: draft.dineroPrimero?.replace(/_/g, " "),
+    dominantValue: draft.dineroPrimero?.[0]?.replace(/_/g, " "),
   };
 
   try {

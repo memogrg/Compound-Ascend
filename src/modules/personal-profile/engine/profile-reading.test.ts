@@ -4,7 +4,7 @@ import type { ProfileDraft } from "@/modules/personal-profile/types";
 
 describe("buildProfileReading", () => {
   it("disciplina alta produce su fortaleza", () => {
-    const r = buildProfileReading({ discipline: 8 });
+    const r = buildProfileReading({ discipline: 5 }); // escala 1-5: alta = >=4
     expect(r.strengths).toContain("Puedes sostener un plan en el tiempo.");
   });
 
@@ -22,8 +22,8 @@ describe("buildProfileReading", () => {
     // crecimiento + invierto_mas + volatilidad alta → agresivo.
     const d: ProfileDraft = {
       riskPreference: "crecimiento",
-      lossReaction: "invierto_mas",
-      volatilityComfort: 10,
+      lossReaction: ["invierto_mas"],
+      volatilityComfort: 5, // escala 1-5
     };
     expect(buildProfileReading(d).riskDisplay).toBe("Crecimiento alto");
   });
@@ -41,15 +41,15 @@ describe("buildProfileReading", () => {
     expect(buildProfileReading({}).heroLine.length).toBeGreaterThan(0);
   });
 
-  it("disciplina 10 → superpoder de consistencia", () => {
-    expect(buildProfileReading({ discipline: 10 }).superpower.title).toContain("consistencia");
+  it("disciplina máxima → superpoder de consistencia", () => {
+    expect(buildProfileReading({ discipline: 5 }).superpower.title).toContain("consistencia");
   });
 
   it("riskClass agresivo → riesgo oculto 'crecer con base'", () => {
     const d: ProfileDraft = {
       riskPreference: "crecimiento",
-      lossReaction: "invierto_mas",
-      volatilityComfort: 10,
+      lossReaction: ["invierto_mas"],
+      volatilityComfort: 5, // escala 1-5
     };
     expect(buildProfileReading(d).hiddenRisk.title).toBe("Lo que debes cuidar: crecer con base");
   });
@@ -58,8 +58,8 @@ describe("buildProfileReading", () => {
     expect(buildProfileReading({}).nextMove.cta).toBe("Crear mi mapa financiero en 7 minutos");
   });
 
-  it("control 10 + urgencia crítica → whatThisSays resuelve la contradicción", () => {
-    const r = buildProfileReading({ perceivedControl: 10, urgency: "critica" });
+  it("control máximo + urgencia crítica → whatThisSays resuelve la contradicción", () => {
+    const r = buildProfileReading({ perceivedControl: 5, urgency: "critica" });
     expect(r.whatThisSays).toContain("acelerar con estrategia");
   });
 });

@@ -255,21 +255,103 @@ export function Chips({
   );
 }
 
-/** Escala 1–10 con extremos etiquetados. */
+/** Colores por rango (tokens del design system), 1ª→3ª. */
+const M_RANK_COLORS = ["var(--accent)", "var(--gold)", "var(--pos)"];
+
+/**
+ * Selección múltiple ORDENADA (ranking de prioridad): el orden en que tocas las opciones es
+ * la jerarquía (1ª = primaria, 2ª = secundaria, 3ª = terciaria). Cada elegido muestra su
+ * número y color por rango. Mínimo 1 (basta 1 para avanzar), máximo `max` (por defecto 3).
+ */
+export function RankedChips({
+  label,
+  values,
+  onChange,
+  options,
+  max = 3,
+}: {
+  label: string;
+  values: string[] | undefined;
+  onChange: (v: string[]) => void;
+  options: Opt[];
+  max?: number;
+}) {
+  const sel = values ?? [];
+  const toggle = (v: string) => {
+    const i = sel.indexOf(v);
+    if (i >= 0) return onChange(sel.filter((x) => x !== v));
+    if (sel.length >= max) return;
+    onChange([...sel, v]);
+  };
+  return (
+    <div className="m-qfield">
+      <QLabel>{label}</QLabel>
+      <div className="m-chips">
+        {options.map((o) => {
+          const rank = sel.indexOf(o.value);
+          const on = rank >= 0;
+          const color = on ? M_RANK_COLORS[rank % M_RANK_COLORS.length] : undefined;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              className={`m-chip${on ? " sel" : ""}`}
+              aria-pressed={on}
+              aria-label={on ? `${o.label} (prioridad ${rank + 1})` : o.label}
+              onClick={() => toggle(o.value)}
+              style={on ? { borderColor: color, color } : undefined}
+            >
+              {on ? (
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 15,
+                    height: 15,
+                    padding: "0 4px",
+                    marginRight: 5,
+                    borderRadius: 999,
+                    background: color,
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                >
+                  {rank + 1}
+                </span>
+              ) : null}
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="m-chips-hint">
+        Toca en orden de prioridad — 1ª, 2ª y 3ª. Elige al menos 1 (hasta {max}). {sel.length}/{max}
+      </div>
+    </div>
+  );
+}
+
+/** Escala 1–N (por defecto 1–5) con extremos etiquetados. `max` es la fuente única del rango. */
 export function Scale({
   label,
   value,
   onChange,
   lowLabel,
   highLabel,
+  max = 5,
 }: {
   label: string;
   value: number | undefined;
   onChange: (v: number) => void;
   lowLabel: string;
   highLabel: string;
+  max?: number;
 }) {
-  const v = value ?? 5;
+  const mid = Math.ceil(max / 2);
+  const v = value ?? mid;
   return (
     <div className="m-qfield">
       <QLabel>{label}</QLabel>
@@ -278,7 +360,7 @@ export function Scale({
         <input
           type="range"
           min={1}
-          max={10}
+          max={max}
           step={1}
           value={v}
           onChange={(e) => onChange(Number(e.target.value))}

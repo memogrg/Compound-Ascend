@@ -13,6 +13,7 @@ import "server-only";
  * útil con lo que haya. Todas las lecturas respetan RLS (cliente de sesión).
  */
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
+import { applyRankedProfile } from "@/lib/ai/profile-ranking";
 import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
@@ -377,9 +378,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
         if (typeof draft.dependentsCount === "number") ctx.dependentsCount = draft.dependentsCount;
         if (typeof draft.financialNucleus === "string") ctx.financialNucleus = draft.financialNucleus;
         if (typeof draft.hasEmergencyFund === "string") ctx.hasEmergencyFund = draft.hasEmergencyFund;
-        if (typeof draft.dineroPrimero === "string")
-          ctx.dominantValue = draft.dineroPrimero.replaceAll("_", " ");
-        // Personalización (Fase 3c).
+        // Personalización (Fase 3c) — campos que NO son ranking.
         if (typeof draft.explainStyle === "string") ctx.explainStyle = draft.explainStyle;
         if (typeof draft.decisionComfort === "string")
           ctx.decisionComfort = draft.decisionComfort.replaceAll("_", " ");
@@ -387,13 +386,14 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
           ctx.monthsCoverage = draft.incomeStopCoverage.replaceAll("_", " ");
         if (typeof draft.protectionPerceived === "string")
           ctx.protectionPerceived = draft.protectionPerceived.replaceAll("_", " ");
-        if (typeof draft.interventionStyle === "string") ctx.interventionStyle = draft.interventionStyle;
-        if (typeof draft.futureImage === "string")
-          ctx.futureImage = draft.futureImage.replaceAll("_", " ");
         if (Array.isArray(draft.desiredFeeling)) {
           const feelings = draft.desiredFeeling.filter((x): x is string => typeof x === "string");
           if (feelings.length) ctx.desiredFeelings = feelings;
         }
+        // Campos RANKEADOS (lifeStage, preocupación, pérdidas, dinero primero, Rich Life,
+        // futuro, intervención): serializados como "primaria/secundaria/terciaria". Mismo
+        // helper que WhatsApp → sin divergencia. Sobrescribe la primaria de columnas.
+        applyRankedProfile(ctx, draft as Record<string, unknown>);
       }
     } catch {
       // Borrador no disponible.

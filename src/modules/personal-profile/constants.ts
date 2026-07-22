@@ -189,6 +189,7 @@ export const INVEST_HORIZONS: Option[] = [
   { value: "1_3", label: "1 a 3 años" },
   { value: "3_5", label: "3 a 5 años" },
   { value: "mas_5", label: "Más de 5 años" },
+  { value: "mas_10", label: "Más de 10 años" },
   { value: "no_se", label: "No lo sé" },
 ];
 

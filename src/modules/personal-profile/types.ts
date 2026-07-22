@@ -40,42 +40,44 @@ export type ProfileDraft = {
   dependentsCount?: number;
 
   // Etapa financiera
-  lifeStage?: LifeStage;
-  perceivedControl?: number; // 1-10
-  satisfaction?: number; // 1-10
+  // ── Campos de RANKING: array ORDENADO (primero = primaria), hasta 3. Antes eran
+  //    respuesta única; migrados a [valor] (la primaria conserva el arquetipo previo). ──
+  lifeStage?: LifeStage[];
+  perceivedControl?: number; // 1-5 (antes 1-10; rescalado en migración)
+  satisfaction?: number; // 1-5 (no capturado por el wizard; se conserva por compat)
   urgency?: Urgency;
   /** Preocupación principal (primera de mainConcerns; se conserva por compat). */
   mainConcern?: string;
-  /** Preocupaciones seleccionadas (hasta 5) — más contexto para la IA. */
+  /** Preocupaciones rankeadas (hasta 3, ordenadas por prioridad). */
   mainConcerns?: string[];
-  /** Paso 3 · emoción dominante respondida directo (sustituye la inferencia). */
-  dominantEmotionAnswer?: string; // 3.2
-  /** Paso 3 · la única cosa que querría resolver este mes. */
-  singleProblem?: string; // 3.3
+  /** Paso 3 · emoción dominante respondida directo (ranking). */
+  dominantEmotionAnswer?: string[]; // 3.2
+  /** Paso 3 · lo que querría resolver este mes (ranking). */
+  singleProblem?: string[]; // 3.3
 
   // Objetivos y prioridades
-  goals?: string[]; // claves de objetivos seleccionados
+  goals?: string[]; // objetivos rankeados (hasta 3, ordenados)
   goalDetails?: GoalDraft[];
-  priorities?: string[]; // top prioridades ordenadas
+  priorities?: string[]; // prioridades rankeadas (hasta 3, ordenadas)
   willingToSacrifice?: string[];
-  /** Paso 5 · lo que el dinero debería darle primero (narrativa de valor). */
-  dineroPrimero?: string; // 5.2
-  /** Paso 5 · la frase con la que más conecta. */
-  conectaFrase?: string; // 5.3
+  /** Paso 5 · lo que el dinero debería darle primero (ranking). */
+  dineroPrimero?: string[]; // 5.2
+  /** Paso 5 · la frase con la que más conecta (ranking). */
+  conectaFrase?: string[]; // 5.3
 
   // Comportamiento
-  discipline?: number;
-  impulsivity?: number;
-  consistency?: number;
+  discipline?: number; // 1-5
+  impulsivity?: number; // 1-5
+  consistency?: number; // 1-5 (no capturado por el wizard)
   reviewHabit?: string;
-  hardest?: string[];
+  hardest?: string[]; // ranking (hasta 3, ordenado)
 
-  // Paso 6 · psicología del dinero (Fase 3a). Claves de la opción elegida.
-  incomeReaction?: string; // 6.1
-  stressSpending?: string; // 6.2
-  unplannedPurchase?: string; // 6.4
-  socialComparison?: string; // 6.5
-  moneyScriptPhrase?: string; // 6.6 (clave de la frase elegida)
+  // Paso 6 · psicología del dinero (Fase 3a). Ranking de la(s) opción(es) elegida(s).
+  incomeReaction?: string[]; // 6.1
+  stressSpending?: string[]; // 6.2
+  unplannedPurchase?: string[]; // 6.4
+  socialComparison?: string[]; // 6.5
+  moneyScriptPhrase?: string[]; // 6.6 (frases elegidas; la primaria deriva el money script)
 
   // Conocimiento
   knowledgeLevel?: KnowledgeLevel;
@@ -86,11 +88,11 @@ export type ProfileDraft = {
   decisionComfort?: string; // 7.4
 
   // Riesgo
-  lossReaction?: string;
+  lossReaction?: string[]; // ranking (hasta 3, ordenado)
   riskPreference?: "seguridad" | "equilibrio" | "crecimiento";
   investHorizon?: string;
   hasInvested?: boolean;
-  volatilityComfort?: number;
+  volatilityComfort?: number; // 1-5
 
   // Protección
   hasEmergencyFund?: "si" | "no" | "construyendo" | "no_se";
@@ -103,15 +105,15 @@ export type ProfileDraft = {
   coachingTone?: string;
   coachingFrequency?: string;
   alertIntensity?: string;
-  /** Paso 10 · personalización (Fase 3c). */
-  alertStyle?: string; // 10.2
-  interventionStyle?: string; // 10.5
+  /** Paso 10 · personalización (Fase 3c) — ranking. */
+  alertStyle?: string[]; // 10.2
+  interventionStyle?: string[]; // 10.5
 
   // Rich Life
   richLifeVision?: string;
-  richLifePhrase?: string;
-  /** Paso 11 · personalización (Fase 3c). */
-  futureImage?: string; // 11.3
+  richLifePhrase?: string[]; // ranking
+  /** Paso 11 · personalización (Fase 3c) — ranking. */
+  futureImage?: string[]; // 11.3
   desiredFeeling?: string[]; // 11.4 (máx 3)
 };
 

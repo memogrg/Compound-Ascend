@@ -323,7 +323,7 @@ export async function generateProfileMaticesAction(): Promise<MaticesResult> {
 
     const archetypeLabel = ARCHETYPE_PLAYBOOKS[arche.primary].label;
     const archetypeLabel2 = arche.secondary ? ARCHETYPE_PLAYBOOKS[arche.secondary].label : undefined;
-    const dominantValue = draft.dineroPrimero?.replace(/_/g, " ");
+    const dominantValue = draft.dineroPrimero?.[0]?.replace(/_/g, " ");
     const topStrength = reading.strengths[0];
     const topOpportunity = reading.opportunities[0] ?? "";
 

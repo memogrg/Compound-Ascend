@@ -4,7 +4,7 @@ import type { ProfileDraft } from "@/modules/personal-profile/types";
 
 describe("buildDiagnosis · arquetipo en la pantalla de cierre", () => {
   it("draft de constructor expone arquetipo, etiqueta y significado", () => {
-    const d: ProfileDraft = { lifeStage: "hacer_crecer", riskPreference: "crecimiento" };
+    const d: ProfileDraft = { lifeStage: ["hacer_crecer"], riskPreference: "crecimiento" };
     const dx = buildDiagnosis(d);
     expect(dx.archetypePrimary).toBe("constructor");
     expect(dx.archetypeLabel).toBe("Constructor de Futuro");

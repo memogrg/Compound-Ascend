@@ -14,6 +14,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
+import { applyRankedProfile } from "@/lib/ai/profile-ranking";
 
 type Db = SupabaseClient<Database>;
 
@@ -30,7 +31,7 @@ export async function readProfileContext(db: Db, userId: string): Promise<Partia
     db
       .from("personal_profiles")
       .select(
-        "main_concern,life_stage,archetype_primary,archetype_secondary,dominant_emotion,ai_tone_recommended,money_script",
+        "main_concern,life_stage,archetype_primary,archetype_secondary,dominant_emotion,ai_tone_recommended,money_script,extra",
       )
       .eq("user_id", userId)
       .maybeSingle(),
@@ -119,6 +120,12 @@ export async function readProfileContext(db: Db, userId: string): Promise<Partia
     .filter((p): p is string => typeof p === "string" && p.length > 0)
     .map((p) => p.replaceAll("_", " "));
   if (priorities.length) ctx.priorities = priorities;
+
+  // Campos RANKEADOS del borrador (personal_profiles.extra.draft): "primaria/secundaria/
+  // terciaria". Mismo helper que la ruta web → WhatsApp y web no divergen. Sobrescribe la
+  // primaria que dejaron las columnas (life_stage, main_concern, loss_reaction).
+  const draft = (pp?.extra as { draft?: Record<string, unknown> } | null)?.draft;
+  applyRankedProfile(ctx, draft);
 
   return ctx;
 }

@@ -9,18 +9,18 @@ import type { ProfileDraft } from "@/modules/personal-profile/types";
 describe("motor de diagnóstico del perfil", () => {
   it("clasifica perfil conservador", () => {
     const d: ProfileDraft = {
-      lossReaction: "vendo",
+      lossReaction: ["vendo"],
       riskPreference: "seguridad",
-      volatilityComfort: 2,
+      volatilityComfort: 2, // escala 1-5
     };
     expect(computeRiskClass(d)).toBe("conservador");
   });
 
   it("clasifica perfil agresivo", () => {
     const d: ProfileDraft = {
-      lossReaction: "invierto_mas",
+      lossReaction: ["invierto_mas"],
       riskPreference: "crecimiento",
-      volatilityComfort: 10,
+      volatilityComfort: 5, // escala 1-5 (máximo)
       investHorizon: "mas_5",
     };
     expect(computeRiskClass(d)).toBe("agresivo");
@@ -36,7 +36,7 @@ describe("motor de diagnóstico del perfil", () => {
       age: 32,
       country: "Costa Rica",
       primaryCurrency: "CRC",
-      lifeStage: "ordenar",
+      lifeStage: ["ordenar"],
     };
     const c = computeCompletion(partial);
     expect(c).toBeGreaterThan(0);
@@ -46,7 +46,7 @@ describe("motor de diagnóstico del perfil", () => {
   it("genera narrativa y ruta sugerida", () => {
     const d: ProfileDraft = {
       displayName: "Memo",
-      lifeStage: "ordenar",
+      lifeStage: ["ordenar"],
       priorities: ["seguridad"],
       riskPreference: "equilibrio",
     };

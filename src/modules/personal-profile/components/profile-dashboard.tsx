@@ -97,16 +97,16 @@ export function ProfileDashboard({
   const riskDisplay = O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass;
 
   // "Lo que My Agent C+ sabe de ti": líneas en 2ª persona derivadas del perfil.
-  const goalLabel = goals[0] ?? pick(O.DINERO_PRIMERO, draft.dineroPrimero) ?? undefined;
+  const goalLabel = goals[0] ?? pick(O.DINERO_PRIMERO, draft.dineroPrimero?.[0]) ?? undefined;
   const knowledgeLabel = pick(O.KNOWLEDGE_LEVELS, draft.knowledgeLevel) ?? undefined;
   const knows: string[] = [];
   if (goalLabel) knows.push(`Buscas ${lc(goalLabel)}.`);
   knows.push(`Tu tolerancia al riesgo es ${riskDisplay}.`);
   if (knowledgeLabel) knows.push(`Tu conocimiento financiero es ${lc(knowledgeLabel)}.`);
   if (concerns[0]) knows.push(`Te preocupa ${lc(concerns[0])}.`);
-  if (typeof draft.discipline === "number") knows.push(`Tu disciplina es ${draft.discipline}/10.`);
+  if (typeof draft.discipline === "number") knows.push(`Tu disciplina es ${draft.discipline}/5.`);
   if (typeof draft.impulsivity === "number")
-    knows.push(`Tu impulsividad es ${draft.impulsivity}/10.`);
+    knows.push(`Tu impulsividad es ${draft.impulsivity}/5.`);
 
   // Mapa de arquetipos (B2a): top 3 normalizado para sumar exactamente 100%.
   const arche = computeArchetype(draft);
@@ -123,7 +123,7 @@ export function ProfileDashboard({
   if (bars[0]) bars[0].pct += 100 - bars.reduce((acc, b) => acc + b.pct, 0);
 
   // Motor financiero (B2a): manifiesto en 2ª persona + mini-stats (solo lo que exista).
-  const dominantValue = pick(O.DINERO_PRIMERO, draft.dineroPrimero);
+  const dominantValue = pick(O.DINERO_PRIMERO, draft.dineroPrimero?.[0]);
   const topPriority = pick(O.PRIORITIES, draft.priorities?.[0]);
   const topConcern = pick(O.CONCERNS, draft.mainConcerns?.[0] ?? draft.mainConcern);
   const emotion = EMOTION_LABEL[arche.dominantEmotion];
@@ -131,16 +131,16 @@ export function ProfileDashboard({
   // Relación con el dinero (B2b): lectura interpretativa en 2ª persona (solo lo que aplique).
   const relation: { label: string; text: string }[] = [];
   const decide =
-    typeof draft.discipline === "number" && draft.discipline >= 7
+    typeof draft.discipline === "number" && draft.discipline >= 4
       ? "con estructura y visión de largo plazo"
       : draft.reviewHabit === "semanal" || draft.reviewHabit === "diario"
         ? "revisando seguido"
         : null;
   if (decide) relation.push({ label: "Cómo decides", text: decide });
   const spend =
-    typeof draft.impulsivity === "number" && draft.impulsivity <= 3
+    typeof draft.impulsivity === "number" && draft.impulsivity <= 2
       ? "con autocontrol, sin depender de fuerza de voluntad"
-      : typeof draft.impulsivity === "number" && draft.impulsivity >= 7
+      : typeof draft.impulsivity === "number" && draft.impulsivity >= 4
         ? "según tu ánimo: conviene una regla simple antes de comprar"
         : null;
   if (spend) relation.push({ label: "Cómo gastas", text: spend });
@@ -487,7 +487,7 @@ export function ProfileDashboard({
       {/* Etapa y enfoque */}
       <Card title="Tu momento financiero">
         <div className="cols-2" style={{ gap: "14px 28px" }}>
-          <Info label="Etapa" value={pick(O.LIFE_STAGES, draft.lifeStage) ?? undefined} />
+          <Info label="Etapa" value={pick(O.LIFE_STAGES, draft.lifeStage?.[0]) ?? undefined} />
           <Info
             label="Urgencia de mejorar"
             value={draft.urgency ? URGENCY[draft.urgency] : undefined}
@@ -613,7 +613,7 @@ export function ProfileDashboard({
           <div style={{ marginTop: 14 }} />
           <Info
             label="Ante una caída del 15%"
-            value={pick(O.LOSS_REACTIONS, draft.lossReaction) ?? undefined}
+            value={pick(O.LOSS_REACTIONS, draft.lossReaction?.[0]) ?? undefined}
           />
           <Info
             label="Prefiere"
@@ -689,7 +689,7 @@ export function ProfileDashboard({
         <Card title="Tu Rich Life">
           <Info
             label="Tu frase"
-            value={pick(O.RICH_LIFE_PHRASES, draft.richLifePhrase) ?? undefined}
+            value={pick(O.RICH_LIFE_PHRASES, draft.richLifePhrase?.[0]) ?? undefined}
           />
           {draft.richLifeVision ? (
             <p
@@ -817,7 +817,7 @@ function ChipList({ items, accent }: { items: string[]; accent?: boolean }) {
 }
 
 function ScaleBar({ label, value, tone }: { label: string; value: number; tone?: "warn" }) {
-  const pct = Math.round((value / 10) * 100);
+  const pct = Math.round((value / 5) * 100);
   const color = tone === "warn" ? "var(--gold)" : "var(--accent)";
   return (
     <div className="meterline">
@@ -827,7 +827,7 @@ function ScaleBar({ label, value, tone }: { label: string; value: number; tone?:
           <div className="fl" style={{ width: `${pct}%`, background: color }} />
         </div>
       </div>
-      <span className="ml-v">{value}/10</span>
+      <span className="ml-v">{value}/5</span>
     </div>
   );
 }

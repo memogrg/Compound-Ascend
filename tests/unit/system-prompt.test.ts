@@ -224,8 +224,8 @@ describe("buildSystemPrompt · perfil conductual", () => {
       richLifePhrase: "Tiempo con mi familia",
     });
     expect(prompt).toContain("Perfil de riesgo: moderado.");
-    expect(prompt).toContain("Lo que más le cuesta: ahorrar, invertir.");
-    expect(prompt).toContain("Sus prioridades: seguridad, familia.");
+    expect(prompt).toContain("Lo que más le cuesta (por prioridad): primaria: ahorrar · secundaria: invertir.");
+    expect(prompt).toContain("Sus prioridades (por prioridad): primaria: seguridad · secundaria: familia.");
     expect(prompt).toContain('Su vida rica en una frase: "Tiempo con mi familia".');
   });
 

@@ -59,7 +59,7 @@ async function PortfolioSection({ summary }: { summary: WealthSummary }) {
         archetypeLabel: diag.archetypeLabel,
         riskClass: diag.riskClass,
         hasEmergencyFund: draft.hasEmergencyFund,
-        dominantValue: draft.dineroPrimero?.replace(/_/g, " "),
+        dominantValue: draft.dineroPrimero?.[0]?.replace(/_/g, " "),
         value: report.analytics.totalPortfolioValue,
         topLabel: top?.label,
         topPct: top?.pct,

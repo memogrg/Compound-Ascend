@@ -4,7 +4,7 @@ import type { ProfileDraft } from "@/modules/personal-profile/types";
 
 describe("computeArchetype", () => {
   it("salir_deudas + preocupación deudas → liberador", () => {
-    const d: ProfileDraft = { lifeStage: "salir_deudas", mainConcerns: ["deudas"] };
+    const d: ProfileDraft = { lifeStage: ["salir_deudas"], mainConcerns: ["deudas"] };
     expect(computeArchetype(d).primary).toBe("liberador");
   });
 
@@ -14,7 +14,7 @@ describe("computeArchetype", () => {
   });
 
   it("hacer_crecer + preferencia crecimiento → constructor", () => {
-    const d: ProfileDraft = { lifeStage: "hacer_crecer", riskPreference: "crecimiento" };
+    const d: ProfileDraft = { lifeStage: ["hacer_crecer"], riskPreference: "crecimiento" };
     const r = computeArchetype(d);
     expect(r.primary).toBe("constructor");
     expect(r.dominantEmotion).toBe("motivacion");
@@ -38,23 +38,23 @@ describe("computeArchetype", () => {
   });
 
   it("moneyScriptPhrase construya_futuro → script 'crecimiento' y empuja constructor", () => {
-    const r = computeArchetype({ moneyScriptPhrase: "construya_futuro" });
+    const r = computeArchetype({ moneyScriptPhrase: ["construya_futuro"] });
     expect(r.moneyScript).toBe("crecimiento");
     expect(r.primary).toBe("constructor");
   });
 
   it("moneyScriptPhrase merezco_disfrutar → script 'estatus' y empuja disfrutador", () => {
-    const r = computeArchetype({ moneyScriptPhrase: "merezco_disfrutar" });
+    const r = computeArchetype({ moneyScriptPhrase: ["merezco_disfrutar"] });
     expect(r.moneyScript).toBe("estatus");
     expect(r.primary).toBe("disfrutador");
   });
 
   it("stressSpending gusto → dominantEmotion 'culpa'", () => {
-    expect(computeArchetype({ stressSpending: "gusto" }).dominantEmotion).toBe("culpa");
+    expect(computeArchetype({ stressSpending: ["gusto"] }).dominantEmotion).toBe("culpa");
   });
 
   it("socialComparison presiona → dominantEmotion 'frustracion'", () => {
-    expect(computeArchetype({ socialComparison: "presiona" }).dominantEmotion).toBe("frustracion");
+    expect(computeArchetype({ socialComparison: ["presiona"] }).dominantEmotion).toBe("frustracion");
   });
 
   it("sin frase de money script → moneyScript null", () => {
@@ -63,26 +63,46 @@ describe("computeArchetype", () => {
 
   it("dominantEmotionAnswer='culpa' override la inferencia → 'culpa'", () => {
     // Sin la respuesta directa, esta etapa daría "motivacion"; la respuesta gana.
-    const r = computeArchetype({ lifeStage: "hacer_crecer", dominantEmotionAnswer: "culpa" });
+    const r = computeArchetype({ lifeStage: ["hacer_crecer"], dominantEmotionAnswer: ["culpa"] });
     expect(r.dominantEmotion).toBe("culpa");
   });
 
   it("dominantEmotionAnswer='evito' → emoción 'evasion'", () => {
-    expect(computeArchetype({ dominantEmotionAnswer: "evito" }).dominantEmotion).toBe("evasion");
+    expect(computeArchetype({ dominantEmotionAnswer: ["evito"] }).dominantEmotion).toBe("evasion");
   });
 
   it("dineroPrimero='experiencias' empuja creador", () => {
-    expect(computeArchetype({ dineroPrimero: "experiencias" }).primary).toBe("creador");
+    expect(computeArchetype({ dineroPrimero: ["experiencias"] }).primary).toBe("creador");
   });
 
   it("conectaFrase='dinero_trabaje' empuja constructor", () => {
-    expect(computeArchetype({ conectaFrase: "dinero_trabaje" }).primary).toBe("constructor");
+    expect(computeArchetype({ conectaFrase: ["dinero_trabaje"] }).primary).toBe("constructor");
   });
 
   it("secundario solo si está a ≤2 pts del primario y > 0", () => {
     // proteger_familia: guardian+3, protector+1 → guardian 3, protector 1 (dif 2) → secundario protector.
-    const r = computeArchetype({ lifeStage: "proteger_familia" });
+    const r = computeArchetype({ lifeStage: ["proteger_familia"] });
     expect(r.primary).toBe("guardian");
     expect(r.secondary).toBe("protector");
+  });
+
+  // ── Ranking: ponderación por rango (1.0 / 0.6 / 0.3) ──
+  it("ranking: la PRIMARIA pesa 1.0 (cero regresión vs respuesta única)", () => {
+    const r = computeArchetype({ lifeStage: ["salir_deudas"] });
+    expect(r.scores.liberador).toBeCloseTo(4); // igual que cuando era single
+  });
+
+  it("ranking: la SECUNDARIA pondera 0.6", () => {
+    // primaria salir_deudas (liberador+4 ×1); secundaria hacer_crecer (constructor+3 ×0.6 = 1.8).
+    const r = computeArchetype({ lifeStage: ["salir_deudas", "hacer_crecer"] });
+    expect(r.scores.liberador).toBeCloseTo(4);
+    expect(r.scores.constructor).toBeCloseTo(1.8);
+    expect(r.primary).toBe("liberador");
+  });
+
+  it("ranking: la TERCIARIA pondera 0.3", () => {
+    // terciaria proteger_familia (guardian+3 ×0.3 = 0.9).
+    const r = computeArchetype({ lifeStage: ["salir_deudas", "hacer_crecer", "proteger_familia"] });
+    expect(r.scores.guardian).toBeCloseTo(0.9);
   });
 });

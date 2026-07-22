@@ -13,6 +13,7 @@ import type { HouseholdRole } from "@/lib/supabase/database.types";
 import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { computeCompletion, computeRiskClass } from "@/modules/personal-profile/engine/diagnosis";
 import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
+import { primaryOf } from "@/modules/personal-profile/engine/ranking";
 
 export type HouseholdContext = { role: HouseholdRole | null; isInvitedMember: boolean };
 
@@ -115,7 +116,8 @@ export async function completeProfile(
       country: draft.country ?? null,
       financial_nucleus: draft.financialNucleus ?? null,
       dependents_count: draft.dependentsCount ?? 0,
-      life_stage: draft.lifeStage ?? null,
+      // Columnas single: guardan la PRIMARIA del ranking (la jerarquía completa vive en extra.draft).
+      life_stage: primaryOf(draft.lifeStage) ?? null,
       perceived_control: draft.perceivedControl ?? null,
       satisfaction: draft.satisfaction ?? null,
       urgency: draft.urgency ?? null,
@@ -135,7 +137,7 @@ export async function completeProfile(
   await supabase.from("risk_profiles").upsert(
     {
       user_id: user.id,
-      loss_reaction: draft.lossReaction ?? null,
+      loss_reaction: primaryOf(draft.lossReaction) ?? null,
       preference: draft.riskPreference ?? null,
       horizon: draft.investHorizon ?? null,
       has_invested: draft.hasInvested ?? null,
