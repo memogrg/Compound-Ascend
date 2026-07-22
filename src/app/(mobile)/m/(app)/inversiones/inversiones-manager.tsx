@@ -117,13 +117,22 @@ export function InversionesManager({
                   title={name}
                   subtitle={nature}
                   value={
-                    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end" }}>
-                      <span>{mAmount(h.currentValue, currency, 10)}</span>
-                      <span className={dir > 0 ? "pos" : dir < 0 ? "neg" : "muted"} style={{ fontSize: 11 }}>
-                        {dir > 0 ? "+" : dir < 0 ? "−" : ""}
-                        {formatPercent(Math.abs(h.returnPct), 1)}
+                    h.priceUnavailable ? (
+                      // Cotizable sin precio: no mostramos valor/retorno inventados al costo.
+                      <span className="muted" style={{ fontSize: 11, fontStyle: "italic", textAlign: "right", lineHeight: 1.25 }}>
+                        precio no
+                        <br />
+                        disponible
                       </span>
-                    </span>
+                    ) : (
+                      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end" }}>
+                        <span>{mAmount(h.currentValue, currency, 10)}</span>
+                        <span className={dir > 0 ? "pos" : dir < 0 ? "neg" : "muted"} style={{ fontSize: 11 }}>
+                          {dir > 0 ? "+" : dir < 0 ? "−" : ""}
+                          {formatPercent(Math.abs(h.returnPct), 1)}
+                        </span>
+                      </span>
+                    )
                   }
                   chevron
                   onClick={() => setMovH(h)}

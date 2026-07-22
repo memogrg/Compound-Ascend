@@ -223,6 +223,13 @@ export type HoldingPerformance = Holding & {
   costBasis: number;
   profitLoss: number;
   returnPct: number;
+  /**
+   * true = activo COTIZABLE (cripto/acción/ETF) cuyo feed de precio FALLÓ y sin valor
+   * manual → no se pudo cotizar. currentValue/profitLoss caen a costBasis/0 SOLO como
+   * placeholder de agregación; la UI debe mostrar "precio no disponible" y NO ese P&L.
+   * Distinto de un activo no cotizado a propósito (inmueble/negocio, con valor manual).
+   */
+  priceUnavailable: boolean;
 };
 
 export type Dividend = {

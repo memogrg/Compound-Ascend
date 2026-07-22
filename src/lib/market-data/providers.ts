@@ -115,8 +115,15 @@ export async function binance(ticker: string): Promise<Quote | null> {
   return null;
 }
 
-// Ticker → id de CoinGecko para la lista curada (rápido, sin red).
-const COINGECKO_IDS: Record<string, string> = {
+/**
+ * Ticker → id de CoinGecko, lista CURADA (rápido, sin red, sin colisiones de símbolo).
+ *
+ * Para sumar uno: VERIFICÁ el id contra la API real ANTES de hardcodearlo — NO de
+ * memoria. Un id equivocado mapea al precio de OTRA moneda (la misma colisión que esto
+ * arregla). Consultá `https://api.coingecko.com/api/v3/search?query=<TICKER>`, elegí el
+ * coin cuyo `symbol` coincide Y con mejor `market_cap_rank` (el proyecto real), y usá ESE id.
+ */
+export const COINGECKO_IDS: Record<string, string> = {
   BTC: "bitcoin",
   ETH: "ethereum",
   SOL: "solana",
@@ -132,7 +139,30 @@ const COINGECKO_IDS: Record<string, string> = {
   TRX: "tron",
   SUI: "sui",
   APT: "aptos",
+  // Añadidos — verificados vía /search contra la API real (id + market_cap_rank):
+  ONDO: "ondo-finance", // Ondo (Ondo Finance) · rank ~41
+  KMNO: "kamino", // Kamino · rank ~278
+  JUP: "jupiter-exchange-solana", // Jupiter en Solana · rank ~87 (NO "jupiter" = "Jupiter Project" muerto, rank ~4424)
+  AERO: "aerodrome-finance", // Aerodrome Finance (Base) · rank ~109
 };
+
+/**
+ * Elige el mejor coin por símbolo entre los resultados de /search. Puro y testeable.
+ * CRITERIO (anti-colisión): se DESCARTAN los matches con `market_cap_rank` null —
+ * tokens muertos/scam que reusan un símbolo popular no tienen market cap; elegir uno
+ * mapearía el ticker a basura. De los que quedan (con market cap real) se toma el de
+ * mejor rank. Si no queda ninguno válido → null (mejor sin precio que un precio falso).
+ */
+export function pickCoingeckoMatch(
+  coins: { id: string; symbol: string; market_cap_rank: number | null }[],
+  ticker: string,
+): string | null {
+  const key = ticker.toUpperCase();
+  const match = coins
+    .filter((c) => c.symbol?.toUpperCase() === key && c.market_cap_rank != null)
+    .sort((a, b) => (a.market_cap_rank as number) - (b.market_cap_rank as number))[0];
+  return match?.id ?? null;
+}
 
 // Cache en memoria de resoluciones dinámicas (ticker → id) para el resto.
 const resolvedIds = new Map<string, string>();
@@ -145,13 +175,10 @@ async function resolveCoingeckoId(ticker: string): Promise<string | null> {
   const data = (await fetchJson(
     `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(ticker)}`,
   )) as { coins?: { id: string; symbol: string; market_cap_rank: number | null }[] } | null;
-  const coins = data?.coins ?? [];
-  const match = coins
-    .filter((c) => c.symbol?.toUpperCase() === key)
-    .sort((a, b) => (a.market_cap_rank ?? 1e9) - (b.market_cap_rank ?? 1e9))[0];
-  if (!match) return null;
-  resolvedIds.set(key, match.id);
-  return match.id;
+  const id = pickCoingeckoMatch(data?.coins ?? [], ticker);
+  if (!id) return null;
+  resolvedIds.set(key, id);
+  return id;
 }
 
 export async function coingecko(ticker: string): Promise<Quote | null> {
