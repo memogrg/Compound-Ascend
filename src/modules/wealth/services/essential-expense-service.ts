@@ -16,6 +16,7 @@ import {
   computeEssentialMonthly,
   type EssentialBreakdown,
 } from "@/modules/wealth/engine/essential-expense";
+import { isDefenseFundGoalType } from "@/modules/wealth/engine/fund-sizing";
 
 export type { EssentialBreakdown };
 
@@ -30,7 +31,12 @@ export type { EssentialBreakdown };
  * NO se consulta getDisplayCurrency.
  */
 export async function getEssentialMonthlyExpense(
-  opts?: { currency?: string },
+  opts?: {
+    currency?: string;
+    /** Excluye los aportes a los PROPIOS fondos de defensa (emergencia/paz). Se usa al
+     *  DIMENSIONAR el fondo de paz: no dimensionar el fondo con aportes al fondo (circularidad). */
+    excludeDefenseFunds?: boolean;
+  },
 ): Promise<EssentialBreakdown> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -59,10 +65,11 @@ export async function getEssentialMonthlyExpense(
       .in("user_id", members)
       .eq("is_essential", true)
       .eq("is_current", true),
-    // Metas esenciales: aporte mensual + policy_id (regla #2) + nombre (transparencia).
+    // Metas esenciales: aporte mensual + policy_id (regla #2) + nombre + goal_type (para excluir
+    // los aportes a los propios fondos de defensa cuando se dimensiona el fondo de paz).
     supabase
       .from("savings_goals")
-      .select("name,monthly_contribution,currency,policy_id")
+      .select("name,monthly_contribution,currency,policy_id,goal_type")
       .in("user_id", members)
       .eq("is_essential", true),
     // Pólizas esenciales: prima + frecuencia (se mensualiza) + tipo/proveedor (etiqueta).
@@ -84,12 +91,14 @@ export async function getEssentialMonthlyExpense(
     currency: d.currency,
   }));
 
-  const goals = (goalRows.data ?? []).map((g) => ({
-    monthly: Number(g.monthly_contribution ?? 0),
-    currency: g.currency,
-    policyId: g.policy_id ?? null,
-    name: g.name ?? undefined,
-  }));
+  const goals = (goalRows.data ?? [])
+    .filter((g) => !(opts?.excludeDefenseFunds && isDefenseFundGoalType(g.goal_type)))
+    .map((g) => ({
+      monthly: Number(g.monthly_contribution ?? 0),
+      currency: g.currency,
+      policyId: g.policy_id ?? null,
+      name: g.name ?? undefined,
+    }));
 
   const policies = (policyRows.data ?? [])
     .filter((p) => p.premium != null)

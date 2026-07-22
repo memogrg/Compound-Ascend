@@ -53,6 +53,8 @@ export type UserSettingsRow = Timestamps & {
   coaching_frequency: string | null;
   alert_intensity: string | null;
   notifications: Record<string, boolean>;
+  /** Meses de gasto esencial para el fondo de paz (3-6, default 3). Preferencia personal. */
+  peace_fund_months: number;
 };
 
 export type HouseholdRow = Timestamps & {
