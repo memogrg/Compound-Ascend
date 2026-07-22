@@ -10,6 +10,7 @@ import { isDemoData } from "@/modules/account/services/account-service";
 import { DemoBanner } from "@/components/shared/demo-banner";
 import { Observations, type Observation } from "@/modules/dashboard/components/observations";
 import { ensureMonthlyContributions } from "@/modules/wealth/services/contribution-service";
+import { SurplusDecision, getSurplusDecision } from "@/modules/wealth";
 
 /** Datos del panel en streaming: el shell pinta de inmediato con skeletons. */
 async function DashboardContent() {
@@ -55,6 +56,10 @@ async function DashboardContent() {
     // Sin observaciones: el panel sigue.
   }
 
+  // Decisión del excedente (F3): solo con fondos cubiertos y excedente. Best-effort: si falla,
+  // no tumba el Centro de mando. Se ubica DESPUÉS del panel (overview primero, luego el deep-dive).
+  const surplus = await getSurplusDecision().catch(() => null);
+
   return (
     <>
       {showDemoBanner ? (
@@ -72,6 +77,9 @@ async function DashboardContent() {
         panel={data.panel}
         demo={!data.configured}
       />
+      {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
+        <SurplusDecision report={surplus} />
+      ) : null}
     </>
   );
 }

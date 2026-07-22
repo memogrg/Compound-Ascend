@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth/session";
 import { getDashboardData } from "@/modules/dashboard";
-import { getPatrimonioReport } from "@/modules/wealth";
+import { getPatrimonioReport, SurplusDecision, getSurplusDecision } from "@/modules/wealth";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
 import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
@@ -101,7 +101,7 @@ export default async function MobileHome() {
   // paralelo; no era cierto, y por eso el coste del tercero (que arrastra las consultas
   // de getEntityFallbackBudget) se sumaba entero al arranque.
   // Cada uno conserva su propio `.catch`: si uno falla, los otros dos siguen.
-  const [data, recent, expenseView, patrimonio, quickAdd] = await Promise.all([
+  const [data, recent, expenseView, patrimonio, quickAdd, surplus] = await Promise.all([
     getDashboardData({ previewDemo: preview }),
     preview
       ? Promise.resolve([] as Transaction[])
@@ -119,6 +119,8 @@ export default async function MobileHome() {
     preview
       ? Promise.resolve({ sobres: [], frecuentes: [], fuentes: [] })
       : getQuickAddData().catch(() => ({ sobres: [], frecuentes: [], fuentes: [] })),
+    // Decisión del excedente (F3): solo con fondos cubiertos y excedente. Best-effort.
+    preview ? Promise.resolve(null) : getSurplusDecision().catch(() => null),
   ]);
 
   const { currency, panel, insights } = data;
@@ -332,6 +334,14 @@ export default async function MobileHome() {
             <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>{firstInsight.d}</div>
           </div>
         )}
+
+        {/* Decisión del excedente (F3): abonar deuda vs invertir. Solo con fondos cubiertos y
+            excedente > 0; si no, no se muestra. */}
+        {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
+          <div style={{ marginBottom: 16 }}>
+            <SurplusDecision report={surplus} />
+          </div>
+        ) : null}
 
         {/* Movimientos recientes (reales) */}
         <section>
