@@ -144,22 +144,24 @@ export function Chips({
   );
 }
 
-/** Escala 1–10. */
+/** Escala 1–N (por defecto 1–5). `max` es la fuente única del rango. */
 export function Scale({
   value,
   onChange,
   lowLabel,
   highLabel,
+  max = 5,
 }: {
   value?: number;
   onChange: (v: number) => void;
   lowLabel?: string;
   highLabel?: string;
+  max?: number;
 }) {
   return (
     <div>
       <div className="scale">
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+        {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
           <button
             type="button"
             key={n}
@@ -180,6 +182,88 @@ export function Scale({
           <span>{highLabel}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Colores por rango (tokens del design system), 1ª→3ª. */
+const RANK_COLORS = ["var(--accent)", "var(--gold)", "var(--pos)"];
+
+/**
+ * Chips de selección múltiple ORDENADA (ranking de prioridad). El orden en que el usuario
+ * toca las opciones ES la jerarquía: la 1ª = primaria, 2ª = secundaria, 3ª = terciaria.
+ * Cada elegido muestra su número (1/2/3) y un color por rango. Mín 1 (basta 1 para avanzar),
+ * máx `max` (por defecto 3). Al deseleccionar, el resto se recompacta y renumera.
+ */
+export function RankedChips({
+  options,
+  values,
+  onChange,
+  max = 3,
+}: {
+  options: Option[];
+  values: string[];
+  onChange: (next: string[]) => void;
+  max?: number;
+}) {
+  const toggle = (v: string) => {
+    const i = values.indexOf(v);
+    if (i >= 0) onChange(values.filter((x) => x !== v));
+    else if (values.length < max) onChange([...values, v]);
+  };
+  return (
+    <div>
+      <div className="chip-grid">
+        {options.map((o) => {
+          const rank = values.indexOf(o.value); // -1 si no elegido
+          const on = rank >= 0;
+          const full = !on && values.length >= max;
+          const color = on ? RANK_COLORS[rank % RANK_COLORS.length] : undefined;
+          return (
+            <button
+              type="button"
+              key={o.value}
+              className={cn("chip-sel", on && "on")}
+              onClick={() => !full && toggle(o.value)}
+              aria-pressed={on}
+              aria-label={on ? `${o.label} (prioridad ${rank + 1})` : o.label}
+              style={
+                on
+                  ? { borderColor: color, color }
+                  : full
+                    ? { opacity: 0.45, cursor: "not-allowed" }
+                    : undefined
+              }
+            >
+              {on ? (
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    marginRight: 6,
+                    borderRadius: 999,
+                    background: color,
+                    color: "#fff",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                  }}
+                >
+                  {rank + 1}
+                </span>
+              ) : null}
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
+        Tocá en orden de prioridad — 1ª, 2ª y 3ª. Elegí al menos 1 (hasta {max}). {values.length}/{max}
+      </div>
     </div>
   );
 }

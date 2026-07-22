@@ -32,13 +32,13 @@ const URGENCY_LABEL: Record<string, string> = {
   critica: "Crítica",
 };
 
-/** Nivel cualitativo de una escala 1-10 (más = mejor). */
+/** Nivel cualitativo de una escala 1-5 (más = mejor). */
 const level = (n: number): string =>
-  n >= 8 ? "muy alto" : n >= 6 ? "alto" : n >= 4 ? "medio" : "a fortalecer";
+  n >= 5 ? "muy alto" : n >= 4 ? "alto" : n >= 3 ? "medio" : "a fortalecer";
 
-/** Igual pero invertido (menos = mejor), p. ej. impulsividad. */
+/** Igual pero invertido (menos = mejor), p. ej. impulsividad. Escala 1-5. */
 const levelInverted = (n: number): string =>
-  n <= 3 ? "muy baja, a tu favor" : n <= 5 ? "media" : n <= 7 ? "alta, conviene cuidarla" : "muy alta, a vigilar";
+  n <= 2 ? "muy baja, a tu favor" : n === 3 ? "media" : n === 4 ? "alta, conviene cuidarla" : "muy alta, a vigilar";
 
 /** Prioridades de acompañamiento por arquetipo (de qué hablar primero). */
 const COMPANION_PRIORITIES: Record<Archetype, string[]> = {
@@ -122,19 +122,19 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
   if (typeof d.perceivedControl === "number")
     scorecard.push({
       label: "Control percibido",
-      value: `${d.perceivedControl}/10`,
+      value: `${d.perceivedControl}/5`,
       reading: `Nivel ${level(d.perceivedControl)}.`,
     });
   if (typeof d.discipline === "number")
     scorecard.push({
       label: "Disciplina",
-      value: `${d.discipline}/10`,
+      value: `${d.discipline}/5`,
       reading: `Nivel ${level(d.discipline)}.`,
     });
   if (typeof d.impulsivity === "number")
     scorecard.push({
       label: "Impulsividad",
-      value: `${d.impulsivity}/10`,
+      value: `${d.impulsivity}/5`,
       reading: `Impulsividad ${levelInverted(d.impulsivity)}.`,
     });
   const knowledge = labelOf(KNOWLEDGE_LEVELS, d.knowledgeLevel);
@@ -163,15 +163,15 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
 
   // Fortalezas (condicionales, máx 5; fallback si ninguna).
   const strengths: string[] = [];
-  if (typeof d.discipline === "number" && d.discipline >= 7)
+  if (typeof d.discipline === "number" && d.discipline >= 4)
     strengths.push("Puedes sostener un plan en el tiempo.");
-  if (typeof d.impulsivity === "number" && d.impulsivity <= 3)
+  if (typeof d.impulsivity === "number" && d.impulsivity <= 2)
     strengths.push("Tu baja impulsividad te da una base sólida.");
-  if (typeof d.perceivedControl === "number" && d.perceivedControl >= 7)
+  if (typeof d.perceivedControl === "number" && d.perceivedControl >= 4)
     strengths.push("Sientes el control de tus finanzas.");
   if (d.knowledgeLevel === "avanzado" || d.knowledgeLevel === "experto")
     strengths.push("Manejas los conceptos financieros con soltura.");
-  if (d.richLifePhrase || d.futureImage || d.dineroPrimero)
+  if (d.richLifePhrase?.length || d.futureImage?.length || d.dineroPrimero?.length)
     strengths.push("Tienes claridad de hacia dónde quieres ir.");
   if (d.reviewHabit === "semanal" || d.reviewHabit === "diario")
     strengths.push("Revisas tus finanzas con constancia.");
@@ -183,9 +183,9 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
   if (noFund) opportunities.push("Fortalecer tu base de seguridad (fondo de emergencia).");
   if ((riskClass === "crecimiento" || riskClass === "agresivo") && noFund)
     opportunities.push("Balancear tu crecimiento con una base de protección.");
-  if (typeof d.impulsivity === "number" && d.impulsivity >= 7)
+  if (typeof d.impulsivity === "number" && d.impulsivity >= 4)
     opportunities.push("Diseñar reglas simples para tus compras de impulso.");
-  if (typeof d.discipline === "number" && d.discipline <= 4)
+  if (typeof d.discipline === "number" && d.discipline <= 2)
     opportunities.push("Convertir la intención en hábitos pequeños y sostenibles.");
 
   // Acompañamiento.
@@ -210,12 +210,12 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
 
   // Superpoder (primer caso que aplique).
   const superpower =
-    typeof d.discipline === "number" && d.discipline >= 7
+    typeof d.discipline === "number" && d.discipline >= 4
       ? {
           title: "Tu superpoder: consistencia con visión de largo plazo",
           body: "La mayoría falla porque no puede sostener el plan. En ti la disciplina aparece como fortaleza central; conectada a un sistema medible, se vuelve una ventaja enorme.",
         }
-      : typeof d.impulsivity === "number" && d.impulsivity <= 3
+      : typeof d.impulsivity === "number" && d.impulsivity <= 2
         ? {
             title: "Tu superpoder: autocontrol",
             body: "Tu baja impulsividad te protege de las decisiones que descarrilan a la mayoría. Es una base excelente para construir.",
@@ -225,7 +225,7 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
               title: "Tu superpoder: criterio financiero",
               body: "Manejas los conceptos con soltura, así que podemos ir directo a estrategia, sin rodeos.",
             }
-          : typeof d.perceivedControl === "number" && d.perceivedControl >= 7
+          : typeof d.perceivedControl === "number" && d.perceivedControl >= 4
             ? {
                 title: "Tu superpoder: claridad",
                 body: "Sientes el control de tus finanzas; eso te deja decidir con cabeza fría.",
@@ -241,12 +241,12 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
         title: "Lo que debes cuidar: crecer con base",
         body: "Tu ambición es una ventaja, pero necesita reglas. Tu principal cuidado no parece ser gastar de más, sino avanzar rápido sin validar liquidez, diversificación y protección. Crecimiento con estrategia, no por impulso.",
       }
-    : typeof d.impulsivity === "number" && d.impulsivity >= 7
+    : typeof d.impulsivity === "number" && d.impulsivity >= 4
       ? {
           title: "Lo que debes cuidar: el impulso",
           body: "Tu mayor cuidado está en las compras de momento. Con reglas simples —una pausa, un monto libre— tu impulso deja de competir con tus metas.",
         }
-      : typeof d.discipline === "number" && d.discipline <= 4
+      : typeof d.discipline === "number" && d.discipline <= 2
         ? {
             title: "Lo que debes cuidar: sostener el plan",
             body: "Tu reto no es saber qué hacer, sino mantenerlo en el tiempo. Hábitos pequeños y automáticos te cuidan más que la fuerza de voluntad.",
@@ -262,9 +262,9 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
             };
 
   // "Lo que esto dice de ti" (fallback determinista del card de IA).
-  const highControl = typeof d.perceivedControl === "number" && d.perceivedControl >= 8;
+  const highControl = typeof d.perceivedControl === "number" && d.perceivedControl >= 4;
   const urgent = d.urgency === "critica" || d.urgency === "alta";
-  const disciplined = typeof d.discipline === "number" && d.discipline >= 7;
+  const disciplined = typeof d.discipline === "number" && d.discipline >= 4;
   const whatThisSays =
     highControl && urgent
       ? "Tus respuestas muestran algo interesante: tienes control y a la vez urgencia. No estás apagando incendios — estás cerrando brechas de largo plazo. Tu reto no es ordenarte, es acelerar con estrategia."

@@ -28,7 +28,7 @@ export default async function Page() {
         advice = buildDebtAdvice({
           archetypeLabel: diag.archetypeLabel,
           tone: diag.reading?.companionship.tone,
-          dominantValue: draft.dineroPrimero?.replace(/_/g, " "),
+          dominantValue: draft.dineroPrimero?.[0]?.replace(/_/g, " "),
           debts: overview.raw.map((d) => ({
             name: d.name,
             balance: d.balance,

@@ -6,6 +6,7 @@
 import type { ProfileDraft, ProfileDiagnosis, RiskClass } from "@/modules/personal-profile/types";
 import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
 import { buildProfileReading } from "@/modules/personal-profile/engine/profile-reading";
+import { primaryOf } from "@/modules/personal-profile/engine/ranking";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
 import { RISK_DISPLAY } from "@/modules/personal-profile/constants";
 
@@ -26,7 +27,8 @@ const STAGE_LABEL: Record<string, string> = {
 export function computeRiskClass(d: ProfileDraft): RiskClass {
   let score = 0; // -ve conservador, +ve agresivo
 
-  switch (d.lossReaction) {
+  // Reacción ante pérdidas: pesa la PRIMARIA (la de mayor prioridad).
+  switch (primaryOf(d.lossReaction)) {
     case "vendo":
       score -= 2;
       break;
@@ -44,8 +46,9 @@ export function computeRiskClass(d: ProfileDraft): RiskClass {
   if (d.riskPreference === "seguridad") score -= 2;
   if (d.riskPreference === "crecimiento") score += 2;
 
+  // Escala 1-5: centro = 3, rango [-2..+2] (antes centro 5, /2.5 en 1-10).
   if (typeof d.volatilityComfort === "number") {
-    score += Math.round((d.volatilityComfort - 5) / 2.5);
+    score += d.volatilityComfort - 3;
   }
   if (d.investHorizon === "mas_5" || d.investHorizon === "5_10" || d.investHorizon === "mas_10") {
     score += 1;
@@ -66,7 +69,7 @@ const COMPLETION_FIELDS: (keyof ProfileDraft)[] = [
   "primaryCurrency",
   "financialNucleus",
   "lifeStage",
-  "mainConcern",
+  "mainConcerns",
   "goals",
   "priorities",
   "discipline",
@@ -92,7 +95,7 @@ export function computeCompletion(d: ProfileDraft): number {
 /** Construye el diagnóstico inicial al estilo de la Biblia (segunda persona). */
 export function buildDiagnosis(d: ProfileDraft): ProfileDiagnosis {
   const riskClass = computeRiskClass(d);
-  const stageSummary = STAGE_LABEL[d.lifeStage ?? "ordenar"] ?? "ordenamiento";
+  const stageSummary = STAGE_LABEL[primaryOf(d.lifeStage) ?? "ordenar"] ?? "ordenamiento";
 
   const priorityText =
     d.priorities && d.priorities.length > 0

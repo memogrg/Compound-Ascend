@@ -1,7 +1,9 @@
 /** Validación Zod del borrador del perfil (todo opcional: guardado progresivo). */
 import { z } from "zod";
 
-const scale = z.number().int().min(1).max(10);
+const scale = z.number().int().min(1).max(5);
+/** Campo de RANKING: hasta 3 respuestas ORDENADAS por prioridad (primera = primaria). */
+const ranked = z.array(z.string().max(60)).max(3);
 
 export const goalDraftSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -22,36 +24,36 @@ export const profileDraftSchema = z.object({
   householdMemberEmails: z.array(z.string().trim().max(120)).max(4).optional(),
   dependentsCount: z.number().int().min(0).max(30).optional(),
 
-  lifeStage: z.string().max(40).optional(),
+  lifeStage: ranked.optional(),
   perceivedControl: scale.optional(),
   satisfaction: scale.optional(),
   urgency: z.enum(["baja", "media", "alta", "critica"]).optional(),
   mainConcern: z.string().max(60).optional(),
-  mainConcerns: z.array(z.string().max(60)).max(5).optional(),
-  // Paso 3 · emoción directa y problema único (Fase 3b).
-  dominantEmotionAnswer: z.string().max(40).optional(),
-  singleProblem: z.string().max(40).optional(),
+  mainConcerns: ranked.optional(),
+  // Paso 3 · emoción directa y problema único (Fase 3b) — ranking.
+  dominantEmotionAnswer: ranked.optional(),
+  singleProblem: ranked.optional(),
 
-  goals: z.array(z.string().max(60)).max(20).optional(),
+  goals: ranked.optional(),
   goalDetails: z.array(goalDraftSchema).max(20).optional(),
-  priorities: z.array(z.string().max(60)).max(10).optional(),
+  priorities: ranked.optional(),
   willingToSacrifice: z.array(z.string().max(60)).max(20).optional(),
-  // Paso 5 · narrativa de valor (Fase 3b).
-  dineroPrimero: z.string().max(40).optional(),
-  conectaFrase: z.string().max(40).optional(),
+  // Paso 5 · narrativa de valor (Fase 3b) — ranking.
+  dineroPrimero: ranked.optional(),
+  conectaFrase: ranked.optional(),
 
   discipline: scale.optional(),
   impulsivity: scale.optional(),
   consistency: scale.optional(),
   reviewHabit: z.string().max(40).optional(),
-  hardest: z.array(z.string().max(60)).max(20).optional(),
+  hardest: ranked.optional(),
 
-  // Paso 6 · psicología del dinero (Fase 3a).
-  incomeReaction: z.string().max(40).optional(),
-  stressSpending: z.string().max(40).optional(),
-  unplannedPurchase: z.string().max(40).optional(),
-  socialComparison: z.string().max(40).optional(),
-  moneyScriptPhrase: z.string().max(40).optional(),
+  // Paso 6 · psicología del dinero (Fase 3a) — ranking.
+  incomeReaction: ranked.optional(),
+  stressSpending: ranked.optional(),
+  unplannedPurchase: ranked.optional(),
+  socialComparison: ranked.optional(),
+  moneyScriptPhrase: ranked.optional(),
 
   knowledgeLevel: z.enum(["basico", "intermedio", "avanzado", "experto"]).optional(),
   topicsKnown: z.array(z.string().max(60)).max(30).optional(),
@@ -60,7 +62,7 @@ export const profileDraftSchema = z.object({
   explainStyle: z.string().max(40).optional(),
   decisionComfort: z.string().max(40).optional(),
 
-  lossReaction: z.string().max(40).optional(),
+  lossReaction: ranked.optional(),
   riskPreference: z.enum(["seguridad", "equilibrio", "crecimiento"]).optional(),
   investHorizon: z.string().max(40).optional(),
   hasInvested: z.boolean().optional(),
@@ -75,14 +77,14 @@ export const profileDraftSchema = z.object({
   coachingTone: z.string().max(40).optional(),
   coachingFrequency: z.string().max(40).optional(),
   alertIntensity: z.string().max(40).optional(),
-  // Paso 10 · personalización (Fase 3c).
-  alertStyle: z.string().max(40).optional(),
-  interventionStyle: z.string().max(40).optional(),
+  // Paso 10 · personalización (Fase 3c) — ranking.
+  alertStyle: ranked.optional(),
+  interventionStyle: ranked.optional(),
 
   richLifeVision: z.string().max(2000).optional(),
-  richLifePhrase: z.string().max(60).optional(),
-  // Paso 11 · personalización (Fase 3c).
-  futureImage: z.string().max(40).optional(),
+  richLifePhrase: ranked.optional(),
+  // Paso 11 · personalización (Fase 3c) — ranking.
+  futureImage: ranked.optional(),
   desiredFeeling: z.array(z.string().max(40)).max(3).optional(),
 });
 

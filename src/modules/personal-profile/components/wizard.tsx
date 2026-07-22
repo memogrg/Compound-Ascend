@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { OptionCards, Chips, Scale, YesNo, NumStepper, HelpTip, Dropdown } from "./primitives";
+import { OptionCards, Chips, RankedChips, Scale, YesNo, NumStepper, HelpTip, Dropdown } from "./primitives";
 import { HouseholdInvites } from "./household-invites";
 import { ProfileSummary } from "./summary";
 import { StartChoice } from "./start-choice";
@@ -128,9 +128,9 @@ const STEPS: Step[] = [
     celebration: "Perfecto. Ya sabemos desde dónde arrancar sin saltarnos etapas.",
     render: (d, set) => (
       <div className="field-row">
-        <OptionCards
+        <RankedChips
           options={O.LIFE_STAGES}
-          value={d.lifeStage}
+          values={d.lifeStage ?? []}
           onChange={(v) => set({ lifeStage: v as ProfileDraft["lifeStage"] })}
         />
         <div className="fld" style={{ marginTop: 8 }}>
@@ -170,29 +170,25 @@ const STEPS: Step[] = [
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
-          <Chips
+          <RankedChips
             options={O.CONCERNS}
             values={d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : [])}
-            onToggle={(v) => {
-              const next = toggle(d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : []), v);
-              set({ mainConcerns: next, mainConcern: next[0] });
-            }}
-            max={5}
+            onChange={(v) => set({ mainConcerns: v, mainConcern: v[0] })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Cuando piensas en tus finanzas hoy, lo que más sientes es…</label>
-          <OptionCards
+          <RankedChips
             options={O.DOMINANT_EMOTIONS}
-            value={d.dominantEmotionAnswer}
+            values={d.dominantEmotionAnswer ?? []}
             onChange={(v) => set({ dominantEmotionAnswer: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Si resolvieras una sola cosa este mes, ¿cuál sería?</label>
-          <OptionCards
+          <RankedChips
             options={O.SINGLE_PROBLEMS}
-            value={d.singleProblem}
+            values={d.singleProblem ?? []}
             onChange={(v) => set({ singleProblem: v })}
           />
         </div>
@@ -208,10 +204,10 @@ const STEPS: Step[] = [
     help: "Tus objetivos guían las metas de ahorro e inversión y la ruta que te sugerimos. Puedes elegir varios; luego les pondremos montos y fechas.",
     celebration: "Excelente. El dinero ya tiene dirección.",
     render: (d, set) => (
-      <Chips
+      <RankedChips
         options={O.GOALS}
         values={d.goals ?? []}
-        onToggle={(v) => set({ goals: toggle(d.goals, v) })}
+        onChange={(v) => set({ goals: v })}
       />
     ),
   },
@@ -226,26 +222,25 @@ const STEPS: Step[] = [
     render: (d, set) => (
       <div className="field-row">
         <div className="fld">
-          <Chips
+          <RankedChips
             options={O.PRIORITIES}
             values={d.priorities ?? []}
-            onToggle={(v) => set({ priorities: toggle(d.priorities, v) })}
-            max={5}
+            onChange={(v) => set({ priorities: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Si tu dinero tuviera que darte una cosa primero, sería…</label>
-          <OptionCards
+          <RankedChips
             options={O.DINERO_PRIMERO}
-            value={d.dineroPrimero}
+            values={d.dineroPrimero ?? []}
             onChange={(v) => set({ dineroPrimero: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">¿Con cuál frase conectas más?</label>
-          <OptionCards
+          <RankedChips
             options={O.CONECTA_FRASES}
-            value={d.conectaFrase}
+            values={d.conectaFrase ?? []}
             onChange={(v) => set({ conectaFrase: v })}
           />
         </div>
@@ -291,49 +286,49 @@ const STEPS: Step[] = [
         </div>
         <div className="fld">
           <label className="fld-label">¿Qué te cuesta más?</label>
-          <Chips
+          <RankedChips
             options={O.HARDEST}
             values={d.hardest ?? []}
-            onToggle={(v) => set({ hardest: toggle(d.hardest, v) })}
+            onChange={(v) => set({ hardest: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Cuando recibes dinero, normalmente…</label>
-          <OptionCards
+          <RankedChips
             options={O.INCOME_REACTIONS}
-            value={d.incomeReaction}
+            values={d.incomeReaction ?? []}
             onChange={(v) => set({ incomeReaction: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Después de una semana pesada, ¿qué pasa con tus gastos?</label>
-          <OptionCards
+          <RankedChips
             options={O.STRESS_SPENDING}
-            value={d.stressSpending}
+            values={d.stressSpending ?? []}
             onChange={(v) => set({ stressSpending: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Cuando ves algo que quieres pero no estaba planeado…</label>
-          <OptionCards
+          <RankedChips
             options={O.UNPLANNED_PURCHASE}
-            value={d.unplannedPurchase}
+            values={d.unplannedPurchase ?? []}
             onChange={(v) => set({ unplannedPurchase: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Cuando ves que otros avanzan más rápido…</label>
-          <OptionCards
+          <RankedChips
             options={O.SOCIAL_COMPARISON}
-            value={d.socialComparison}
+            values={d.socialComparison ?? []}
             onChange={(v) => set({ socialComparison: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">¿Cuál frase se parece más a lo que a veces piensas sobre el dinero?</label>
-          <OptionCards
+          <RankedChips
             options={O.MONEY_SCRIPT_PHRASES}
-            value={d.moneyScriptPhrase}
+            values={d.moneyScriptPhrase ?? []}
             onChange={(v) => set({ moneyScriptPhrase: v })}
           />
         </div>
@@ -394,9 +389,9 @@ const STEPS: Step[] = [
       <div className="field-row">
         <div className="fld">
           <label className="fld-label">Si una inversión baja un 15% temporalmente…</label>
-          <OptionCards
+          <RankedChips
             options={O.LOSS_REACTIONS}
-            value={d.lossReaction}
+            values={d.lossReaction ?? []}
             onChange={(v) => set({ lossReaction: v })}
           />
         </div>
@@ -522,17 +517,17 @@ const STEPS: Step[] = [
         </div>
         <div className="fld">
           <label className="fld-label">Cuando la app detecte algo importante, prefieres que…</label>
-          <OptionCards
+          <RankedChips
             options={O.ALERT_STYLES}
-            value={d.alertStyle}
+            values={d.alertStyle ?? []}
             onChange={(v) => set({ alertStyle: v })}
           />
         </div>
         <div className="fld">
           <label className="fld-label">Cuando estás por desviarte de una meta, ¿qué te ayuda más?</label>
-          <OptionCards
+          <RankedChips
             options={O.INTERVENTION_STYLES}
-            value={d.interventionStyle}
+            values={d.interventionStyle ?? []}
             onChange={(v) => set({ interventionStyle: v })}
           />
         </div>
@@ -551,9 +546,9 @@ const STEPS: Step[] = [
       <div className="field-row">
         <div className="fld">
           <label className="fld-label">¿Qué frase describe mejor tu Rich Life?</label>
-          <OptionCards
+          <RankedChips
             options={O.RICH_LIFE_PHRASES}
-            value={d.richLifePhrase}
+            values={d.richLifePhrase ?? []}
             onChange={(v) => set({ richLifePhrase: v })}
           />
         </div>
@@ -572,9 +567,9 @@ const STEPS: Step[] = [
         </div>
         <div className="fld">
           <label className="fld-label">Elige una imagen mental de tu futuro financiero</label>
-          <OptionCards
+          <RankedChips
             options={O.FUTURE_IMAGES}
-            value={d.futureImage}
+            values={d.futureImage ?? []}
             onChange={(v) => set({ futureImage: v })}
           />
         </div>
