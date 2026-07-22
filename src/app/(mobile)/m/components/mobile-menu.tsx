@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { MobileBell } from "./mobile-bell";
 import { MobilePortal } from "./mobile-portal";
+import { useEdgeSwipe } from "../lib/use-edge-swipe";
 
 /**
  * Menú de navegación del móvil (botón ☰ + drawer), presente en el header de cada
@@ -58,6 +59,12 @@ export function MobileMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() ?? "/m";
   const close = () => setOpen(false);
+
+  // Segunda vía para abrir, además del ☰: arrastrar desde el borde derecho. El icono vive
+  // en la esquina superior derecha, que es donde peor llega el pulgar en un teléfono
+  // grande — y desde que no hay barra de pestañas, casi toda la navegación pasa por ahí.
+  const abrir = useCallback(() => setOpen(true), []);
+  useEdgeSwipe(abrir, !open);
 
   return (
     <>

@@ -98,7 +98,14 @@ export default async function MobileTransacciones() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" eyebrow={`Movimientos · ${period.label}`} title="Transacciones" />
+        {/* Mismo caso que Mi Base Financiera: sin la barra de pestañas se quedó sin
+            ninguna salida a Inicio. El logo C+ es el destino; una flecha mentiría. */}
+        <MobileHeader
+          variant="inner"
+          home
+          eyebrow={`Movimientos · ${period.label}`}
+          title="Transacciones"
+        />
         <div className="muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>
           Todos tus movimientos del periodo.
         </div>

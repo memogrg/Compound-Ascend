@@ -84,7 +84,16 @@ export default async function MobileMiBase() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" eyebrow={`Presupuesto · ${period.label}`} title="Mi Base Financiera" />
+        {/* `home` (logo C+ → Inicio) y no una flecha: a esta pantalla se llega desde el
+            menú o desde Inicio, no desde un nivel superior, así que una flecha mentiría.
+            Sin esto no había NINGUNA salida a Inicio: lo tapaba la barra de pestañas, y al
+            quitarla se quedó sin ella. */}
+        <MobileHeader
+          variant="inner"
+          home
+          eyebrow={`Presupuesto · ${period.label}`}
+          title="Mi Base Financiera"
+        />
         <div className="muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 16 }}>
           Tu centro operativo: presupuesto vs real del mes.
         </div>
