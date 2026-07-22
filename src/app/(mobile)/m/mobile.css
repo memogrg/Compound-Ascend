@@ -1413,30 +1413,6 @@ body:has(.m-shell[data-theme="dark"]) {
   margin-bottom: 10px;
   line-height: 1.35;
 }
-/* Botón "?" de ayuda junto al label. El tooltip lo sirve el sistema único `.tip` +
-   TooltipLayer (globals.css / root layout): flip vertical, clamp al viewport y wrap. */
-.m-shell .m-help-btn {
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  margin-left: 6px;
-  vertical-align: middle;
-  border-radius: 50%;
-  border: 1.4px solid var(--line-strong);
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  display: inline-grid;
-  place-items: center;
-}
-.m-shell .m-help-btn:focus-visible,
-.m-shell .m-help-btn:hover {
-  border-color: var(--ink);
-  color: var(--ink);
-}
 
 /* select + textarea sobre la base de .m-inp */
 .m-shell .m-select {

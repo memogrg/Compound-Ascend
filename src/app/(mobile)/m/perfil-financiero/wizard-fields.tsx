@@ -8,24 +8,13 @@
  * sin reimplementar lógica de negocio — solo UI.
  */
 
+import { HelpTip } from "@/components/shared/help-tip";
+
 export type Opt = { value: string; label: string; desc?: string };
 
 /** Etiqueta de pregunta (encima de cada campo). */
 function QLabel({ children }: { children: React.ReactNode }) {
   return <div className="m-qlabel">{children}</div>;
-}
-
-/**
- * Ayuda "?" junto a un label. Usa el sistema de tooltip ÚNICO de la app (`.tip` + `data-tip`,
- * servido por TooltipLayer en el root layout, que alcanza también a móvil): burbuja en portal
- * con FLIP vertical, clamp al viewport y wrap — se abre al TOCAR el "?" y nunca se corta.
- */
-function MHelpTip({ text }: { text: string }) {
-  return (
-    <button type="button" className="m-help-btn tip tip-wrap" data-tip={text} aria-label="Más información">
-      ?
-    </button>
-  );
 }
 
 export function TextField({
@@ -358,7 +347,7 @@ export function Scale({
     <div className="m-qfield">
       <QLabel>
         {label}
-        {help ? <MHelpTip text={help} /> : null}
+        {help ? <HelpTip text={help} /> : null}
       </QLabel>
       <div className="m-scale">
         <div className="m-scale-val mono">{v}</div>

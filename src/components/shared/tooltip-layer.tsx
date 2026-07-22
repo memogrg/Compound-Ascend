@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { computePosition, offset, flip, shift, size } from "@floating-ui/dom";
 
 /**
  * Capa de tooltips ÚNICA (singleton) para toda la app — arreglo de raíz del bug de
@@ -93,17 +94,37 @@ export function TooltipLayer() {
     };
   }, []);
 
-  // Posiciona tras medir la burbuja real (flip vertical + clamp horizontal).
+  // Posiciona con @floating-ui: flip (voltea arriba/abajo/lados según el espacio) + shift
+  // (desliza dentro del viewport con padding) + size (acota ancho/alto, scroll interno como
+  // red). Reemplaza el flip ingenuo arriba-o-abajo (sin clamp vertical) que se cortaba.
   useLayoutEffect(() => {
-    if (!tip || !bubbleRef.current) return;
-    const b = bubbleRef.current.getBoundingClientRect();
-    const a = tip.anchor;
-    const m = 8;
-    let left = a.left + a.width / 2 - b.width / 2;
-    left = Math.max(m, Math.min(left, window.innerWidth - b.width - m));
-    let top = a.top - b.height - m; // preferencia: arriba
-    if (top < m) top = a.bottom + m; // sin espacio arriba → abajo
-    setPlaced({ left, top });
+    const ref = currentEl.current;
+    const bubble = bubbleRef.current;
+    if (!tip || !ref || !bubble) return;
+    let cancelled = false;
+    void computePosition(ref, bubble, {
+      strategy: "fixed",
+      placement: "top",
+      middleware: [
+        offset(8),
+        flip({ padding: 8 }),
+        shift({ padding: 8 }),
+        size({
+          padding: 8,
+          apply({ availableWidth, availableHeight, elements }) {
+            Object.assign(elements.floating.style, {
+              maxWidth: `min(280px, ${Math.max(120, availableWidth)}px)`,
+              maxHeight: `${Math.max(60, availableHeight)}px`,
+            });
+          },
+        }),
+      ],
+    }).then(({ x, y }) => {
+      if (!cancelled) setPlaced({ left: x, top: y });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [tip]);
 
   if (!tip || typeof document === "undefined") return null;
@@ -118,6 +139,7 @@ export function TooltipLayer() {
         top: placed?.top ?? -9999,
         visibility: placed ? "visible" : "hidden",
         maxWidth: "min(280px, calc(100vw - 24px))",
+        overflowY: "auto",
         background: "var(--ink, #1f2430)",
         color: "var(--tip-ink, #fff)",
         fontSize: 12,
