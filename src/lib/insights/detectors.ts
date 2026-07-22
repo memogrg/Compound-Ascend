@@ -6,6 +6,34 @@
 import type { SavingsGoal, Debt } from "@/modules/control/types";
 import type { DetectedInsight } from "@/lib/insights/types";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
+import { formatMoney } from "@/lib/format";
+
+/**
+ * Recordatorio del fondo de PAZ (F2): cuando la emergencia YA está cubierta (hito activo = paz)
+ * pero la paz está incompleta, avisa en la campana cuántos meses cubre hoy y cuánto apartar/mes.
+ * Self-clearing: al completarse la paz (o si el hito ya no es paz) el detector deja de emitirlo y
+ * syncInsights lo marca resuelto. related_id estable → una sola tarjeta, sin spam.
+ */
+export function detectPeaceFundGap(input: {
+  emergencyCovered: boolean;
+  peaceCovered: boolean;
+  monthsActual: number;
+  peaceMonths: number;
+  recommendedMonthly: number;
+  currency: string;
+}): DetectedInsight[] {
+  if (!input.emergencyCovered || input.peaceCovered || input.recommendedMonthly <= 0) return [];
+  const months = input.monthsActual.toFixed(1).replace(/[.,]0$/, "");
+  return [
+    {
+      kind: "fondo_paz",
+      severity: "observar",
+      title: "Tu fondo de paz",
+      body: `Hoy cubriría ${months} de ${input.peaceMonths} meses de tus gastos esenciales. Apartá ${formatMoney(input.recommendedMonthly, input.currency)}/mes para completarlo.`,
+      relatedId: "fondo_paz",
+    },
+  ];
+}
 
 /** Meses enteros desde `now` hasta una fecha ISO (puede ser negativo si pasó). */
 function monthsUntil(dateIso: string, now: Date): number {

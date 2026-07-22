@@ -42,6 +42,7 @@ const RELATED_HREF: Record<string, string> = {
 /** Deep-link por TIPO de insight (cuando no hay entidad relacionada). */
 const KIND_HREF: Record<string, string> = {
   perfil_revision: "/m/mi-perfil-financiero",
+  fondo_paz: "/m/proteccion",
 };
 
 /** Ruta del insight: por entidad (relatedKind) o, si no, por tipo (kind). */

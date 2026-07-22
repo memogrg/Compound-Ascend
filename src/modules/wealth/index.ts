@@ -22,7 +22,8 @@ export {
   deletePolicy,
 } from "./services/wealth-service";
 export type { PolicyInput } from "./schemas";
-export { addPolicyAction } from "./api/actions";
+export { addPolicyAction, setPeaceMonthsAction } from "./api/actions";
+export { DefenseFunds } from "./components/defense-funds";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
@@ -34,6 +35,8 @@ export {
   sizeFund,
   emergencyTargetIn,
   isDefenseFundGoalType,
+  monthsCovered,
+  detectLongTermObligation,
   EMERGENCY_FUND_USD,
   PEACE_MONTHS_DEFAULT,
   PEACE_MONTHS_MIN,
@@ -41,6 +44,7 @@ export {
   FUND_HORIZON_MONTHS,
   type DefenseFundsPlan,
   type FundSizing,
+  type DebtSignal,
 } from "./engine/fund-sizing";
 export {
   getDefenseFundsReport,

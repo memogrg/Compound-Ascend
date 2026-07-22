@@ -80,6 +80,25 @@ export async function refreshInsights(): Promise<void> {
     } catch {
       // best-effort: si falla, no bloquea el resto de los insights.
     }
+    try {
+      // Recordatorio del fondo de paz (F2). best-effort.
+      const { getDefenseFundsReport, monthsCovered } = await import("@/modules/wealth");
+      const { detectPeaceFundGap } = await import("@/lib/insights/detectors");
+      const plan = await getDefenseFundsReport();
+      const essentialMonthly = plan.peace.months > 0 ? plan.peace.target / plan.peace.months : 0;
+      detected.push(
+        ...detectPeaceFundGap({
+          emergencyCovered: plan.emergency.covered,
+          peaceCovered: plan.peace.covered,
+          monthsActual: monthsCovered(plan.peace.current, essentialMonthly),
+          peaceMonths: plan.peace.months,
+          recommendedMonthly: plan.peace.recommendedMonthly,
+          currency: plan.currency,
+        }),
+      );
+    } catch {
+      // best-effort.
+    }
     await syncInsights(detected);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
