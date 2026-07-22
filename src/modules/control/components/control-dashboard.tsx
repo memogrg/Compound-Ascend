@@ -237,7 +237,9 @@ export function ControlDashboard({
           {goals.length === 0 ? (
             <Empty text="Aún no agregas objetivos de ahorro." />
           ) : (
-            <div style={{ display: "grid", gap: 16 }}>
+            // La inset (antes en .goals-grid) vive acá: encabezado de sección y tarjetas
+            // comparten el mismo margen, y cada .goals-grid queda sin padding propio.
+            <div style={{ display: "grid", gap: 18, padding: "16px 18px 18px" }}>
               {goalSections.map((section) => (
                 <div key={section.key}>
                   <div

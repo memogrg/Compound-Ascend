@@ -42,6 +42,7 @@ import {
   mAmount,
   type MTone,
 } from "../../components/content-kit";
+import { groupByJar, type CategoryNode } from "@/modules/financial-base";
 import { GoalForm, type GoalValues } from "./goal-form";
 
 /**
@@ -92,9 +93,20 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currency: string }) {
+export function GoalManager({
+  goals,
+  currency,
+  tree,
+}: {
+  goals: SavingsGoal[];
+  currency: string;
+  /** Árbol de categorías para agrupar las metas por frasco (mismo groupByJar que la web). */
+  tree: CategoryNode[];
+}) {
   const router = useRouter();
   const toast = useToast();
+  // Metas agrupadas por frasco (default_category_id → frasco padre), "Generales" primero.
+  const goalSections = groupByJar(goals, (g) => g.defaultCategoryId, tree);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<SavingsGoal | null>(null);
   const [deleting, setDeleting] = useState<SavingsGoal | null>(null);
@@ -129,10 +141,16 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
           onAction={() => setAdding(true)}
         />
       ) : (
-        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
-        // lateral lo pone la regla puente .m-swipe-content .m-drow.
-        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
-          {goals.map((g) => {
+        // Agrupado por frasco (mismo groupByJar que la web); "Generales" primero, orden del
+        // tree, sin secciones vacías. padding 0: la fila va a sangre para el swipe
+        // (regla puente .m-swipe-content .m-drow). Encabezado de frasco discreto (.ov).
+        goalSections.map((section) => (
+          <div key={section.key} style={{ marginBottom: 12 }}>
+            <div className="ov" style={{ marginBottom: 6 }}>
+              {section.name}
+            </div>
+            <MContentCard style={{ padding: 0, overflow: "hidden" }}>
+              {section.items.map((g) => {
             const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
             const pct = g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0;
             const tone = STATUS_TONE[g.status] ?? "neutral";
@@ -210,8 +228,10 @@ export function GoalManager({ goals, currency }: { goals: SavingsGoal[]; currenc
                 />
               </SwipeRow>
             );
-          })}
-        </MContentCard>
+              })}
+            </MContentCard>
+          </div>
+        ))
       )}
 
       <Fab onClick={() => setAdding(true)} label="Nueva meta" />
