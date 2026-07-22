@@ -28,6 +28,26 @@ export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patr
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
 export type { PatrimonioReport, PatrimonioLevel, Hito } from "./engine/patrimonio-engine";
 export type { EssentialBreakdown } from "./engine/essential-expense";
+// Dimensionamiento de los fondos de defensa (F1).
+export {
+  computeDefenseFunds,
+  sizeFund,
+  emergencyTargetIn,
+  isDefenseFundGoalType,
+  EMERGENCY_FUND_USD,
+  PEACE_MONTHS_DEFAULT,
+  PEACE_MONTHS_MIN,
+  PEACE_MONTHS_MAX,
+  FUND_HORIZON_MONTHS,
+  type DefenseFundsPlan,
+  type FundSizing,
+} from "./engine/fund-sizing";
+export {
+  getDefenseFundsReport,
+  getPeaceMonths,
+  setPeaceMonths,
+  type DefenseFundsReport,
+} from "./services/fund-sizing-service";
 export { buildDailyPatrimonioInsight, RITUAL_KIND } from "./engine/daily-insight";
 export { buildWeeklyDigest, type WeeklyDigest } from "./engine/weekly-digest";
 export {
