@@ -1,5 +1,5 @@
 import { getControlSummary } from "@/modules/control";
-import { getDisplayCurrency } from "@/modules/financial-base";
+import { getDisplayCurrency, listCategoryTree } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { MobileHeader } from "../../components/mobile-header";
@@ -29,7 +29,11 @@ const SEMAFORO: Record<string, { label: string; color: string }> = {
   rojo: { label: "En riesgo", color: "var(--danger)" },
 };
 export default async function MobileMetas() {
-  const [summary, currency] = await Promise.all([getControlSummary(), getDisplayCurrency()]);
+  const [summary, currency, tree] = await Promise.all([
+    getControlSummary(),
+    getDisplayCurrency(),
+    listCategoryTree("expense"),
+  ]);
   const { goals, diagnosis, fxRates } = summary;
   const sem = SEMAFORO[diagnosis.semaforo] ?? SEMAFORO.amarillo!;
 
@@ -125,7 +129,7 @@ export default async function MobileMetas() {
             ) : undefined
           }
         />
-        <GoalManager goals={goals} currency={currency} />
+        <GoalManager goals={goals} currency={currency} tree={tree} />
       </div>
     </div>
   );
