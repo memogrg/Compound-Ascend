@@ -8,11 +8,40 @@
  * sin reimplementar lógica de negocio — solo UI.
  */
 
+import { useState } from "react";
+
 export type Opt = { value: string; label: string; desc?: string };
 
 /** Etiqueta de pregunta (encima de cada campo). */
 function QLabel({ children }: { children: React.ReactNode }) {
   return <div className="m-qlabel">{children}</div>;
+}
+
+/**
+ * Ayuda "?" con popover (tap para abrir/cerrar). Espeja el HelpTip web (primitives.tsx) con
+ * la piel móvil (mobile.css: .m-help*). Para explicar términos junto a un label sin ocupar
+ * espacio permanente.
+ */
+function MHelpTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="m-help">
+      <button
+        type="button"
+        className="m-help-btn"
+        aria-label="Más información"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        ?
+      </button>
+      {open ? (
+        <span className="m-help-pop" role="tooltip">
+          {text}
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 export function TextField({
@@ -328,6 +357,7 @@ export function Scale({
   lowLabel,
   highLabel,
   max = 5,
+  help,
 }: {
   label: string;
   value: number | undefined;
@@ -335,12 +365,17 @@ export function Scale({
   lowLabel: string;
   highLabel: string;
   max?: number;
+  /** Texto de ayuda (tooltip "?") junto al label; opcional. */
+  help?: string;
 }) {
   const mid = Math.ceil(max / 2);
   const v = value ?? mid;
   return (
     <div className="m-qfield">
-      <QLabel>{label}</QLabel>
+      <QLabel>
+        {label}
+        {help ? <MHelpTip text={help} /> : null}
+      </QLabel>
       <div className="m-scale">
         <div className="m-scale-val mono">{v}</div>
         <input

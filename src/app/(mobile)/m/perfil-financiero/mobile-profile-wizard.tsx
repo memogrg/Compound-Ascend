@@ -56,7 +56,7 @@ type StepField = (
   | { kind: "grid"; key: keyof ProfileDraft; label: string; options: Opt[] }
   | { kind: "chips"; key: keyof ProfileDraft; label: string; options: Opt[]; max?: number }
   | { kind: "ranked"; key: keyof ProfileDraft; label: string; options: Opt[]; max?: number }
-  | { kind: "scale"; key: keyof ProfileDraft; label: string; low: string; high: string }
+  | { kind: "scale"; key: keyof ProfileDraft; label: string; low: string; high: string; help?: string }
   | { kind: "stepper"; key: keyof ProfileDraft; label: string; min?: number; max?: number }
   | { kind: "yesno"; key: keyof ProfileDraft; label: string }
   | { kind: "textarea"; key: keyof ProfileDraft; label: string; placeholder?: string; maxLength?: number }
@@ -192,7 +192,7 @@ const STEPS: Step[] = [
       { kind: "grid", key: "riskPreference", label: "¿Qué prefieres?", options: O.RISK_PREFERENCES },
       { kind: "grid", key: "investHorizon", label: "¿En cuánto tiempo necesitarías ese dinero?", options: O.INVEST_HORIZONS },
       { kind: "yesno", key: "hasInvested", label: "¿Has invertido antes?" },
-      { kind: "scale", key: "volatilityComfort", label: "¿Qué tan cómodo estás con que tu dinero suba y baje?", low: "Nada", high: "Mucho" },
+      { kind: "scale", key: "volatilityComfort", label: "¿Qué tan cómodo estás con que tu dinero suba y baje?", low: "Nada", high: "Mucho", help: "La volatilidad es cuánto sube y baja el valor de una inversión en el tiempo. Ejemplo: si pones $1,000 en una inversión volátil, en un mes podría valer $1,200 o $800. Más volatilidad = más oscilación (y normalmente más rendimiento posible a largo plazo, pero más nervios en el camino)." },
     ],
   },
   {
@@ -420,6 +420,7 @@ export function MobileProfileWizard({ initialDraft }: { initialDraft: ProfileDra
                   onChange={(v) => set(k, v)}
                   lowLabel={f.low}
                   highLabel={f.high}
+                  help={f.help}
                 />
               );
             case "stepper":
