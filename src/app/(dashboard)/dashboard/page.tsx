@@ -68,6 +68,9 @@ async function DashboardContent() {
         </div>
       ) : null}
       <Observations observations={observations} />
+      {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
+        <SurplusDecision report={surplus} />
+      ) : null}
       <DashboardView
         name={data.name}
         summary={data.summary}
@@ -77,9 +80,6 @@ async function DashboardContent() {
         panel={data.panel}
         demo={!data.configured}
       />
-      {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
-        <SurplusDecision report={surplus} />
-      ) : null}
     </>
   );
 }
