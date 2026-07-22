@@ -545,9 +545,13 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .action-strip::-webkit-scrollbar {
   display: none;
 }
+/* La tira es NAVEGACIÓN PRINCIPAL desde que se fue la barra de pestañas, así que sus
+   destinos tienen que verse ENTEROS: uno cortado es un destino que no se descubre.
+   Con los 76px fijos de antes, a 320 el cuarto ("Portafolio") quedaba al 55% — medido, y
+   ya pasaba antes de este delta. Columnas flexibles lo reparten y caben los cuatro. */
 .m-shell .qact {
-  flex: none;
-  width: 76px;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -557,8 +561,11 @@ body:has(.m-shell[data-theme="dark"]) {
   text-decoration: none;
 }
 .m-shell .qact .qc {
-  width: 60px;
-  height: 60px;
+  /* Fluido con tope: a 375 sigue midiendo los 60px de siempre (16vw = 60), y solo se
+     encoge en pantallas más estrechas, hasta un suelo de 46 que mantiene el objetivo
+     táctil. Fijarlo en 60 es lo que rompía 320; fijarlo en 46 encogía 375 sin motivo. */
+  width: clamp(46px, 16vw, 60px);
+  height: clamp(46px, 16vw, 60px);
   border-radius: 20px;
   display: grid;
   place-items: center;
@@ -567,8 +574,8 @@ body:has(.m-shell[data-theme="dark"]) {
   box-shadow: var(--e1);
 }
 .m-shell .qact .qc svg {
-  width: 24px;
-  height: 24px;
+  width: clamp(20px, 6.4vw, 24px);
+  height: clamp(20px, 6.4vw, 24px);
 }
 .m-shell .qact span {
   font-size: 11px;
@@ -3261,9 +3268,32 @@ body:has(.m-shell[data-theme="dark"]) {
   color: var(--accent);
   font-weight: 600;
 }
-.m-shell .m-qa-elegido {
-  font-size: 12.5px;
-  color: var(--text-muted);
+/* Origen de la sugerencia, DENTRO del chip. No es lo mismo "este sobre lo pones tú
+   siempre" que "esto lo propuso la IA": lo segundo se revisa antes de guardar. Va en menor
+   peso para que no compita con el nombre del sobre, que es lo que se lee. */
+.m-shell .m-qa-orig {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* "Guardar y añadir otro": secundario de verdad. La ráfaga de varios gastos seguidos
+   existe (volver del súper) pero es la minoría, así que no puede competir con "Guardar" —
+   si los dos pesan igual, el usuario se para a decidir en el paso que queríamos acelerar. */
+.m-shell .m-qa-otro {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.m-shell .m-qa-otro:disabled {
+  color: var(--text-dim);
+  cursor: default;
 }
 
 .m-shell .m-qa-mas {

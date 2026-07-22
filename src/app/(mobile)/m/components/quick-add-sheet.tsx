@@ -100,7 +100,14 @@ export function QuickAddSheet({
     }
   };
 
-  const guardar = async () => {
+  /**
+   * `otro` = "Guardar y añadir otro": no cierra la hoja, deja el teclado puesto y limpia
+   * SOLO el importe. Al volver del súper se meten tres o cuatro gastos seguidos, y
+   * obligar a reabrir la hoja cada vez multiplica el trabajo por los toques de abrir,
+   * enfocar y volver a elegir sobre. El sobre y el comercio se conservan justo porque en
+   * esa ráfaga suelen repetirse.
+   */
+  const guardar = async (otro = false) => {
     if (!puedeGuardar) return;
     setGuardando(true);
     const res = await addTransactionAction({
@@ -119,11 +126,18 @@ export function QuickAddSheet({
     setGuardando(false);
 
     if (res.ok) {
-      // Háptica + toast corto y se cierra. Una pantalla de éxito sería un toque más en el
-      // flujo que estamos acortando.
+      // Háptica + toast corto. Una pantalla de éxito sería un toque más en el flujo que
+      // estamos acortando.
       navigator.vibrate?.(12);
       toast.show(esGasto ? "Gasto registrado" : "Ingreso registrado");
-      onClose();
+      if (otro) {
+        setAmount("");
+        // Se vuelve a pedir el foco: guardar lo pierde, y sin esto el siguiente movimiento
+        // costaría un toque solo para volver al teclado.
+        inputRef.current?.focus();
+      } else {
+        onClose();
+      }
       router.refresh();
     } else {
       toast.show(res.message ?? "No se pudo guardar", "error");
@@ -163,13 +177,37 @@ export function QuickAddSheet({
           />
         </div>
 
-        {esGasto && frecuentes.length > 0 ? (
+        {esGasto && (frecuentes.length > 0 || sobreElegido) ? (
           <>
             <div className="m-qa-lbl">
               Sobre
               {sugiriendo ? <span className="m-qa-hint"> · buscando…</span> : null}
             </div>
             <div className="m-qa-chips">
+              {/* La sugerencia va como CHIP, en la misma fila que los frecuentes y ya
+                  marcado, no como una línea de texto aparte. Si vive fuera de la fila, el
+                  usuario tiene que leerla para enterarse; dentro, se cambia de un toque
+                  igual que cualquier otro. Cuando cae fuera de los frecuentes se antepone,
+                  porque es la que está aplicada. */}
+              {sobreElegido && !frecuentes.some((f) => f.id === sobreElegido.id) ? (
+                <button
+                  type="button"
+                  className="m-qa-chip on"
+                  onClick={() => {
+                    setCategoryId(null);
+                    setOrigen(null);
+                  }}
+                  title={origen === "ia" ? "Sugerido por IA — tócalo para quitarlo" : undefined}
+                >
+                  {sobreElegido.name}
+                  {/* El origen se nombra porque no es lo mismo "lo pusiste ahí siempre" que
+                      "lo propuso la IA": lo segundo se revisa. */}
+                  {origen === "ia" ? <span className="m-qa-orig"> sugerido</span> : null}
+                  {origen === "historial" || origen === "cache" ? (
+                    <span className="m-qa-orig"> como siempre</span>
+                  ) : null}
+                </button>
+              ) : null}
               {frecuentes.map((s) => (
                 <button
                   key={s.id}
@@ -187,17 +225,6 @@ export function QuickAddSheet({
           </>
         ) : null}
 
-        {/* La sugerencia puede caer FUERA de los frecuentes; si no se dijera, el usuario
-            guardaría con un sobre que nunca vio. El origen se nombra porque no es lo mismo
-            "lo pusiste ahí siempre" que "lo propuso la IA": lo segundo se revisa. */}
-        {sobreElegido && !frecuentes.some((f) => f.id === sobreElegido.id) ? (
-          <div className="m-qa-elegido">
-            Sobre: <strong>{sobreElegido.name}</strong>
-            {origen === "ia" ? " · sugerido, revísalo" : null}
-            {origen === "historial" || origen === "cache" ? " · como siempre" : null}
-          </div>
-        ) : null}
-
         {/* ANTES de "Más detalles" a propósito: con el teclado puesto solo caben ~512px, y
             el camino frecuente (importe → sobre → guardar) tiene que terminar sin scroll.
             Lo opcional va después. */}
@@ -206,9 +233,19 @@ export function QuickAddSheet({
             type="button"
             className="m-btn m-btn-block m-btn-primary"
             disabled={!puedeGuardar}
-            onClick={guardar}
+            onClick={() => guardar(false)}
           >
             {guardando ? "Guardando…" : "Guardar"}
+          </button>
+          {/* Secundario y discreto: la ráfaga de varios gastos seguidos es real pero es la
+              minoría, así que no puede competir visualmente con "Guardar". */}
+          <button
+            type="button"
+            className="m-qa-otro"
+            disabled={!puedeGuardar}
+            onClick={() => guardar(true)}
+          >
+            Guardar y añadir otro
           </button>
         </div>
 
