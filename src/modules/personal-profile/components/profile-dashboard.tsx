@@ -5,6 +5,7 @@ import * as O from "@/modules/personal-profile/constants";
 import type { Option } from "@/modules/personal-profile/constants";
 import type { Archetype, ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { computeArchetype } from "@/modules/personal-profile/engine/archetype-engine";
+import { primaryOf, asRanked } from "@/modules/personal-profile/engine/ranking";
 import type { NextMove } from "@/modules/personal-profile/engine/next-move";
 import type { Evolution } from "@/modules/personal-profile/engine/evolution";
 import { ARCHETYPE_PLAYBOOKS } from "@/lib/ai/advisor-knowledge";
@@ -38,8 +39,10 @@ function pick(options: Option[], value?: string): string | null {
   if (!value) return null;
   return options.find((o) => o.value === value)?.label ?? value;
 }
-function pickMany(options: Option[], values?: string[]): string[] {
-  return (values ?? []).map((v) => options.find((o) => o.value === v)?.label ?? v);
+/** Coerce SIEMPRE con asRanked: tolera datos pre-migración (campo single como string) sin
+ *  romper — `"x".map` tiraría TypeError. La presentación nunca asume la forma del dato. */
+function pickMany(options: Option[], values?: unknown): string[] {
+  return asRanked(values).map((v) => options.find((o) => o.value === v)?.label ?? v);
 }
 /** Paleta de 3 tonos de verde para el donut de arquetipos (top 3). */
 const ARCH_COLORS = [
@@ -97,7 +100,7 @@ export function ProfileDashboard({
   const riskDisplay = O.RISK_DISPLAY[diagnosis.riskClass] ?? diagnosis.riskClass;
 
   // "Lo que My Agent C+ sabe de ti": líneas en 2ª persona derivadas del perfil.
-  const goalLabel = goals[0] ?? pick(O.DINERO_PRIMERO, draft.dineroPrimero?.[0]) ?? undefined;
+  const goalLabel = goals[0] ?? pick(O.DINERO_PRIMERO, primaryOf(draft.dineroPrimero)) ?? undefined;
   const knowledgeLabel = pick(O.KNOWLEDGE_LEVELS, draft.knowledgeLevel) ?? undefined;
   const knows: string[] = [];
   if (goalLabel) knows.push(`Buscas ${lc(goalLabel)}.`);
@@ -123,9 +126,9 @@ export function ProfileDashboard({
   if (bars[0]) bars[0].pct += 100 - bars.reduce((acc, b) => acc + b.pct, 0);
 
   // Motor financiero (B2a): manifiesto en 2ª persona + mini-stats (solo lo que exista).
-  const dominantValue = pick(O.DINERO_PRIMERO, draft.dineroPrimero?.[0]);
-  const topPriority = pick(O.PRIORITIES, draft.priorities?.[0]);
-  const topConcern = pick(O.CONCERNS, draft.mainConcerns?.[0] ?? draft.mainConcern);
+  const dominantValue = pick(O.DINERO_PRIMERO, primaryOf(draft.dineroPrimero));
+  const topPriority = pick(O.PRIORITIES, primaryOf(draft.priorities));
+  const topConcern = pick(O.CONCERNS, primaryOf(draft.mainConcerns) ?? draft.mainConcern);
   const emotion = EMOTION_LABEL[arche.dominantEmotion];
 
   // Relación con el dinero (B2b): lectura interpretativa en 2ª persona (solo lo que aplique).
@@ -487,7 +490,7 @@ export function ProfileDashboard({
       {/* Etapa y enfoque */}
       <Card title="Tu momento financiero">
         <div className="cols-2" style={{ gap: "14px 28px" }}>
-          <Info label="Etapa" value={pick(O.LIFE_STAGES, draft.lifeStage?.[0]) ?? undefined} />
+          <Info label="Etapa" value={pick(O.LIFE_STAGES, primaryOf(draft.lifeStage)) ?? undefined} />
           <Info
             label="Urgencia de mejorar"
             value={draft.urgency ? URGENCY[draft.urgency] : undefined}
@@ -613,7 +616,7 @@ export function ProfileDashboard({
           <div style={{ marginTop: 14 }} />
           <Info
             label="Ante una caída del 15%"
-            value={pick(O.LOSS_REACTIONS, draft.lossReaction?.[0]) ?? undefined}
+            value={pick(O.LOSS_REACTIONS, primaryOf(draft.lossReaction)) ?? undefined}
           />
           <Info
             label="Prefiere"
@@ -689,7 +692,7 @@ export function ProfileDashboard({
         <Card title="Tu Rich Life">
           <Info
             label="Tu frase"
-            value={pick(O.RICH_LIFE_PHRASES, draft.richLifePhrase?.[0]) ?? undefined}
+            value={pick(O.RICH_LIFE_PHRASES, primaryOf(draft.richLifePhrase)) ?? undefined}
           />
           {draft.richLifeVision ? (
             <p

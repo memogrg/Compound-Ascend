@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ProfileDraft, ProfileDiagnosis } from "@/modules/personal-profile/types";
 import { RISK_DISPLAY } from "@/modules/personal-profile/constants";
 import * as O from "@/modules/personal-profile/constants";
+import { asRanked } from "@/modules/personal-profile/engine/ranking";
 
 import { MobileHeader } from "../components/mobile-header";
 import {
@@ -31,8 +32,9 @@ function label(list: O.Option[], value: string | undefined): string | null {
   if (!value) return null;
   return list.find((o) => o.value === value)?.label ?? value;
 }
-function labels(list: O.Option[], values: string[] | undefined): string[] {
-  return (values ?? []).map((v) => list.find((o) => o.value === v)?.label ?? v);
+/** Coerce con asRanked: tolera datos pre-migración (campo single como string) sin romper. */
+function labels(list: O.Option[], values: unknown): string[] {
+  return asRanked(values).map((v) => list.find((o) => o.value === v)?.label ?? v);
 }
 
 export function MobileProfileResults({
