@@ -1,7 +1,7 @@
 /** Opciones del Setup Wizard (en español), extraídas de la Biblia (Módulo 1). */
 import type { IconName } from "@/components/ui/icon";
 import type { RiskClass } from "@/modules/personal-profile/types";
-import { DISPLAY_CURRENCY_OPTIONS } from "@/lib/format";
+import { PRIMARY_CURRENCY_OPTIONS } from "@/lib/format";
 
 export type Option = { value: string; label: string; desc?: string; icon?: IconName };
 
@@ -15,9 +15,9 @@ const CURRENCY_NAMES: Record<string, string> = {
   GBP: "Libra esterlina",
 };
 
-// Moneda PRINCIPAL del perfil = fiat (DISPLAY_CURRENCY_OPTIONS). BTC se captura en los montos
-// pero no se elige como moneda base de los agregados.
-export const CURRENCIES: Option[] = DISPLAY_CURRENCY_OPTIONS.map(({ code, symbol }) => ({
+// Moneda PRINCIPAL del perfil = fiat (PRIMARY_CURRENCY_OPTIONS). BTC se captura en los montos
+// y se puede ver como display en el topbar, pero no es la moneda base de los agregados.
+export const CURRENCIES: Option[] = PRIMARY_CURRENCY_OPTIONS.map(({ code, symbol }) => ({
   value: code,
   label: `${CURRENCY_NAMES[code] ?? code} (${symbol})`,
 }));

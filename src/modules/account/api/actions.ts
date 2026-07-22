@@ -13,6 +13,7 @@ import {
   type NotificationChannel,
 } from "@/lib/notifications/preferences";
 import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base";
+import { SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import {
   isEmailConfigured,
@@ -64,7 +65,12 @@ export async function revokeWhatsAppAction(): Promise<AccountActionResult> {
   }
 }
 
+// Moneda PRINCIPAL (base de cálculo): fiat solamente — la base no puede ser cripto.
 const currencySchema = z.enum(["CRC", "USD", "EUR", "MXN", "COP", "GBP"]);
+// Moneda de DISPLAY del topbar: cualquiera soportada, incluida BTC (solo convierte la vista).
+const displayCurrencySchema = z
+  .string()
+  .refine((c) => (SUPPORTED_CURRENCIES as readonly string[]).includes(c), "Moneda no válida.");
 
 const PATHS = [
   "/dashboard",
@@ -120,7 +126,7 @@ export async function setDisplayCurrencyAction(code: string): Promise<AccountAct
   if (code === "") {
     store.delete(DISPLAY_CURRENCY_COOKIE);
   } else {
-    const parsed = currencySchema.safeParse(code);
+    const parsed = displayCurrencySchema.safeParse(code);
     if (!parsed.success) return { ok: false, message: "Moneda no válida." };
     store.set(DISPLAY_CURRENCY_COOKIE, parsed.data, {
       path: "/",

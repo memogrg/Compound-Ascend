@@ -34,12 +34,12 @@ export const CURRENCY_OPTIONS: readonly CurrencyOption[] = SUPPORTED_CURRENCIES.
 }));
 
 /**
- * Monedas ofrecidas para DISPLAY/PRINCIPAL (switch del topbar, moneda principal del perfil):
- * fiat solamente. Las cripto (BTC) se CAPTURAN (CURRENCY_OPTIONS) pero no se eligen como
- * moneda en la que se muestran los agregados — evita "todo el patrimonio en ₿0,000…" y no
- * choca con el enum fiat de la moneda principal (account/actions).
+ * Monedas válidas como moneda PRINCIPAL (base de cálculo): fiat solamente. La moneda base no
+ * puede ser cripto (sería el almacén/cálculo de todos los agregados en BTC). Las cripto (BTC)
+ * SÍ se pueden CAPTURAR (CURRENCY_OPTIONS) y elegir como moneda de DISPLAY del topbar (que solo
+ * convierte la vista) — pero no como principal. Usar en onboarding + configuración.
  */
-export const DISPLAY_CURRENCY_OPTIONS: readonly CurrencyOption[] = CURRENCY_OPTIONS.filter(
+export const PRIMARY_CURRENCY_OPTIONS: readonly CurrencyOption[] = CURRENCY_OPTIONS.filter(
   (o) => !isCryptoCurrency(o.code),
 );
 
