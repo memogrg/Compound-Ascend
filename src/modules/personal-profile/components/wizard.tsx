@@ -418,7 +418,10 @@ const STEPS: Step[] = [
           onChange={(v) => set({ hasInvested: v })}
         />
         <div className="fld">
-          <label className="fld-label">¿Qué tan cómodo te sientes con la volatilidad?</label>
+          <label className="fld-label">
+            ¿Qué tan cómodo te sientes con la volatilidad?{" "}
+            <HelpTip text="La volatilidad es cuánto sube y baja el valor de una inversión en el tiempo. Ejemplo: si ponés $1.000 en una inversión volátil, en un mes podría valer $1.200 o $800. Más volatilidad = más oscilación (y normalmente más rendimiento posible a largo plazo, pero más nervios en el camino)." />
+          </label>
           <Scale
             value={d.volatilityComfort}
             onChange={(v) => set({ volatilityComfort: v })}
