@@ -18,6 +18,11 @@ const STYLE: Record<string, { color: string; icon: IconName }> = {
   info: { color: "var(--muted)", icon: "info" },
 };
 
+/** Ruta por TIPO de insight (deep-link de la campana web). */
+const KIND_HREF: Record<string, string> = {
+  perfil_revision: "/mi-perfil-financiero",
+};
+
 export function BellNotifications() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -155,6 +160,17 @@ export function BellNotifications() {
             <div style={{ display: "flex", flexDirection: "column" }}>
               {items.map((o) => {
                 const s = STYLE[o.severity] ?? STYLE.info!;
+                const href = KIND_HREF[o.kind];
+                const content = (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", lineHeight: 1.35 }}>
+                      {o.title}
+                    </div>
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.45 }}>
+                      {o.body}
+                    </div>
+                  </>
+                );
                 return (
                   <div
                     key={o.id}
@@ -171,12 +187,17 @@ export function BellNotifications() {
                       <Icon name={s.icon} width={2.4} />
                     </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", lineHeight: 1.35 }}>
-                        {o.title}
-                      </div>
-                      <div className="muted" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.45 }}>
-                        {o.body}
-                      </div>
+                      {href ? (
+                        <Link
+                          href={href}
+                          onClick={() => setOpen(false)}
+                          style={{ display: "block", textDecoration: "none", color: "inherit" }}
+                        >
+                          {content}
+                        </Link>
+                      ) : (
+                        content
+                      )}
                     </div>
                     <button
                       className="icon-btn"

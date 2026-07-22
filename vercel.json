@@ -5,6 +5,7 @@
     { "path": "/api/debts/reminders", "schedule": "0 13 * * *" },
     { "path": "/api/goals/period-reset", "schedule": "0 7 * * *" },
     { "path": "/api/patrimonio/daily-insight", "schedule": "0 13 * * *" },
-    { "path": "/api/patrimonio/weekly-digest", "schedule": "0 13 * * 1" }
+    { "path": "/api/patrimonio/weekly-digest", "schedule": "0 13 * * 1" },
+    { "path": "/api/profile/review-reminder", "schedule": "0 9 1 * *" }
   ]
 }
