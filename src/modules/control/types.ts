@@ -29,6 +29,9 @@ export type SavingsGoal = {
   // Meta de ahorro de la prima de un seguro (Defensa): póliza vinculada.
   policyId?: string | null;
   isEssential?: boolean;
+  // Referencia "dónde está el dinero" (columna stored_in): texto libre informativo
+  // que también alimenta la liquidez de Rich Life.
+  storedIn?: string | null;
 };
 
 export type DebtClassification = "critica" | "controlada" | "estrategica" | "emocional";

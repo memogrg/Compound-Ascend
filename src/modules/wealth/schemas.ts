@@ -51,6 +51,8 @@ export const policyInputSchema = z.object({
   renewalDate: z.string().optional(),
   currency: z.string().length(3),
   isEssential: z.boolean().optional(),
+  // Referencia libre "dónde está el dinero" (banco/cuenta). Informativa, sin cálculo.
+  fundingReference: z.string().trim().max(120).optional().nullable(),
 });
 
 export type InvestmentInput = z.infer<typeof investmentInputSchema>;

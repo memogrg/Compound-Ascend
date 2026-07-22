@@ -242,21 +242,33 @@ const LINKED_GROUPS: Record<
   },
 };
 
+/** Grupo genérico "frasco → sus items", del agrupador compartido. */
+export type JarGroup<T> = { key: string; name: string; items: T[] };
+
 /**
- * Agrupa los items de ahorro por el GRUPO de nivel superior de su `categoryId`
- * (el grupo mismo o el padre de la hoja, resuelto con el `tree`). "Generales" va
- * PRIMERO con los items sin categoría (o cuya categoría no resuelve). Las
- * secciones vacías NO se emiten; el resto sigue el orden del `tree`. Es puro
- * reagrupamiento visual de los mismos items → no cambia totales ni presupuesto.
+ * Agrupa items por el GRUPO de nivel superior de su categoría (el grupo mismo o el
+ * padre de la hoja, resuelto con el `tree` vía `catIdOf`). "Generales" va PRIMERO con
+ * los items sin categoría (o cuya categoría no resuelve). Las secciones vacías NO se
+ * emiten; el resto sigue el orden del `tree`. Reagrupamiento visual puro — no cambia
+ * totales ni presupuesto.
+ *
+ * Genérico a propósito: es el ÚNICO agrupador frasco↔item del repo. Lo usan los sobres
+ * de ahorro (JarItem, vía groupGoalSections) y los "Objetivos activos" de Control
+ * (SavingsGoal, con catIdOf = defaultCategoryId). No dupliques esta lógica.
  */
-function groupGoalSections(items: JarItem[], tree: CategoryNode[]): JarSection[] {
+export function groupByJar<T>(
+  items: T[],
+  catIdOf: (item: T) => string | null | undefined,
+  tree: CategoryNode[],
+): JarGroup<T>[] {
   const groupOf = (catId: string): CategoryNode | undefined =>
     tree.find((g) => g.id === catId || g.children.some((c) => c.id === catId));
 
-  const generales: JarItem[] = [];
-  const byGroup = new Map<string, JarItem[]>();
+  const generales: T[] = [];
+  const byGroup = new Map<string, T[]>();
   for (const it of items) {
-    const g = it.categoryId ? groupOf(it.categoryId) : undefined;
+    const catId = catIdOf(it);
+    const g = catId ? groupOf(catId) : undefined;
     if (!g) {
       generales.push(it);
       continue;
@@ -266,7 +278,7 @@ function groupGoalSections(items: JarItem[], tree: CategoryNode[]): JarSection[]
     byGroup.set(g.id, arr);
   }
 
-  const sections: JarSection[] = [];
+  const sections: JarGroup<T>[] = [];
   if (generales.length > 0) {
     sections.push({ key: "generales", name: "Generales", items: generales });
   }
@@ -275,6 +287,11 @@ function groupGoalSections(items: JarItem[], tree: CategoryNode[]): JarSection[]
     if (arr && arr.length > 0) sections.push({ key: g.id, name: g.name, items: arr });
   }
   return sections;
+}
+
+/** Secciones de sobres de ahorro (JarItem) por frasco — wrapper del agrupador único. */
+function groupGoalSections(items: JarItem[], tree: CategoryNode[]): JarSection[] {
+  return groupByJar(items, (it) => it.categoryId, tree);
 }
 
 const normalizeName = (s: string): string =>
