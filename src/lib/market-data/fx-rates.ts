@@ -11,7 +11,7 @@
 import "server-only";
 import { cache } from "react";
 import { priceCache } from "@/lib/market-data/cache";
-import { FX_PER_USD, completeRateTable } from "@/lib/fx";
+import { FX_PER_USD, completeRateTable, btcPerUsd } from "@/lib/fx";
 import { logger } from "@/lib/logger";
 
 const CACHE_KEY = "fx:usd";
@@ -53,10 +53,11 @@ async function currencyApi(): Promise<Record<string, number> | null> {
 }
 
 /**
- * Tabla de tasas (por USD) lista para `convertCurrency`. Cacheada 6 h.
- * Nunca lanza: ante fallo total devuelve el respaldo estático.
+ * Tasas FIAT (por USD). Cacheada 6 h (las divisas no se mueven rápido). Nunca lanza: ante
+ * fallo total devuelve el respaldo estático. BTC NO se cachea aquí (se mueve rápido); se
+ * añade fresco en getFxRates.
  */
-async function _getFxRates(): Promise<Record<string, number>> {
+async function _getFiatRates(): Promise<Record<string, number>> {
   const cached = priceCache.get<Record<string, number>>(CACHE_KEY);
   if (cached) return cached;
 
@@ -70,7 +71,34 @@ async function _getFxRates(): Promise<Record<string, number>> {
   }
 
   logger.warn("fx-rates: proveedores sin respuesta; usando tasas estáticas");
-  return FX_PER_USD;
+  return { ...FX_PER_USD };
+}
+
+/**
+ * BTC/USD del FEED CRIPTO (Binance/CoinGecko vía getMarketPrice), la MISMA fuente que valora
+ * los holdings BTC del portafolio → un solo precio de BTC en toda la app. Devuelve la tasa
+ * (unidades BTC por 1 USD) y si es `stale` (feed caído → respaldo estático, no vivo).
+ */
+export async function getBtcUsdInfo(): Promise<{
+  usdPrice: number | null;
+  perUsd: number;
+  stale: boolean;
+}> {
+  const { getMarketPrice } = await import("@/lib/market-data");
+  const quote = await getMarketPrice("BTC", "crypto").catch(() => null);
+  const { rate, stale } = btcPerUsd(quote?.price ?? null);
+  if (stale) logger.warn("fx-rates: BTC sin precio vivo; tasa estática marcada stale");
+  return { usdPrice: quote?.price ?? null, perUsd: rate, stale };
+}
+
+/**
+ * Tabla de tasas (por USD) lista para `convertCurrency`: fiat (cache 6 h) + BTC VIVO del feed
+ * cripto (fresco cada request, no cae en el cache 6 h del fiat). Nunca lanza.
+ */
+async function _getFxRates(): Promise<Record<string, number>> {
+  const fiat = await _getFiatRates();
+  const { perUsd } = await getBtcUsdInfo();
+  return { ...fiat, BTC: perUsd };
 }
 
 /** Dedup por request (React cache): se llamaba getFxRates varias veces por render. */
