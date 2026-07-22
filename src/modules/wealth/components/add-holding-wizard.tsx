@@ -9,6 +9,7 @@
  */
 import { useState, useRef, useCallback, useEffect, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { HelpTip } from "@/components/shared/help-tip";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
@@ -1085,26 +1086,6 @@ function Step2Fields(props: {
 }
 
 // ── Átomos compartidos ─────────────────────────────────────────────
-
-/**
- * Ayuda "?" en el sistema de tooltip ÚNICO de la app (`.tip` + `data-tip`, servido por
- * TooltipLayer en el root layout): burbuja en portal con FLIP vertical, clamp al viewport y
- * wrap — sin clipping por overflow del modal, y funciona en móvil (tap). `tip-wrap` fija el
- * wrap. Reemplaza la implementación JS local (posicionamiento/portal duplicados).
- */
-function HelpTip({ text }: { text: string }) {
-  return (
-    <button
-      type="button"
-      className="help-btn tip tip-wrap"
-      data-tip={text}
-      aria-label="Más información"
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      ?
-    </button>
-  );
-}
 
 function PillButton({
   active,
