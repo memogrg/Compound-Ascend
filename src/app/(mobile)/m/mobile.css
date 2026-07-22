@@ -1413,17 +1413,14 @@ body:has(.m-shell[data-theme="dark"]) {
   margin-bottom: 10px;
   line-height: 1.35;
 }
-/* Ayuda "?" junto al label (espejo del HelpTip web). Tap para abrir/cerrar el popover. */
-.m-shell .m-help {
-  position: relative;
-  display: inline-flex;
-  vertical-align: middle;
-  margin-left: 6px;
-}
+/* Botón "?" de ayuda junto al label. El tooltip lo sirve el sistema único `.tip` +
+   TooltipLayer (globals.css / root layout): flip vertical, clamp al viewport y wrap. */
 .m-shell .m-help-btn {
   width: 20px;
   height: 20px;
   padding: 0;
+  margin-left: 6px;
+  vertical-align: middle;
   border-radius: 50%;
   border: 1.4px solid var(--line-strong);
   background: var(--surface);
@@ -1432,28 +1429,13 @@ body:has(.m-shell[data-theme="dark"]) {
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  display: grid;
+  display: inline-grid;
   place-items: center;
 }
-.m-shell .m-help-btn[aria-expanded="true"] {
+.m-shell .m-help-btn:focus-visible,
+.m-shell .m-help-btn:hover {
   border-color: var(--ink);
   color: var(--ink);
-}
-.m-shell .m-help-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 25;
-  width: max-content;
-  max-width: 260px;
-  background: var(--ink);
-  color: var(--bg);
-  font-size: 12.5px;
-  font-weight: 400;
-  line-height: 1.5;
-  padding: 10px 13px;
-  border-radius: 10px;
-  box-shadow: var(--e3);
 }
 
 /* select + textarea sobre la base de .m-inp */
