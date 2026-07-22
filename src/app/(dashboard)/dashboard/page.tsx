@@ -62,15 +62,22 @@ async function DashboardContent() {
 
   return (
     <>
+      {/* Orden del Centro de mando: ① saludo · ② notificaciones · ③ excedente · ④ el resto. */}
+      <div style={{ marginBottom: 18 }}>
+        <h2 className="greet">
+          Hola, <span className="it">{data.name}</span>
+        </h2>
+        <p className="greet-sub">Esto es lo más importante de tus finanzas hoy.</p>
+      </div>
       {showDemoBanner ? (
         <div style={{ marginBottom: 18 }}>
           <DemoBanner />
         </div>
       ) : null}
+      <Observations observations={observations} />
       {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
         <SurplusDecision report={surplus} />
       ) : null}
-      <Observations observations={observations} />
       <DashboardView
         name={data.name}
         summary={data.summary}
@@ -79,6 +86,7 @@ async function DashboardContent() {
         insights={data.insights}
         panel={data.panel}
         demo={!data.configured}
+        showGreeting={false}
       />
     </>
   );
