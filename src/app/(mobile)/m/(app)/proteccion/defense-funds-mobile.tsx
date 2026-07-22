@@ -8,7 +8,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { HelpTip } from "@/components/shared/help-tip";
-import { setPeaceMonthsAction } from "@/modules/wealth";
+// Import DIRECTO de la server action (no del barrel @/modules/wealth, que arrastra server-only
+// y rompe el build de este client component). Ver memoria: barrel-server-only-en-client.
+import { setPeaceMonthsAction } from "@/modules/wealth/api/actions";
 import {
   PEACE_MONTHS_MIN,
   PEACE_MONTHS_MAX,
