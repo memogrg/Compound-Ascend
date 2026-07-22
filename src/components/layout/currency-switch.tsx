@@ -8,11 +8,11 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setDisplayCurrencyAction } from "@/modules/account/api/actions";
-import { CURRENCY_SYMBOL, DISPLAY_CURRENCY_OPTIONS } from "@/lib/format";
+import { CURRENCY_SYMBOL, CURRENCY_OPTIONS } from "@/lib/format";
 
-// Solo fiat: el switch cambia la moneda de DISPLAY de los agregados; cripto (BTC) se captura
-// pero no se muestran los totales en ₿.
-const CODES = DISPLAY_CURRENCY_OPTIONS.map((o) => o.code);
+// Todas las monedas soportadas, incluida BTC: el switch cambia la moneda de DISPLAY de los
+// agregados (solo convierte la vista; la moneda principal/base sigue siendo fiat).
+const CODES = CURRENCY_OPTIONS.map((o) => o.code);
 
 export function CurrencySwitch({ current, primary }: { current: string; primary: string }) {
   const router = useRouter();

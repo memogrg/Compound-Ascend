@@ -7,7 +7,7 @@ import {
   SUPPORTED_CURRENCIES,
   FX_PER_USD,
 } from "@/lib/fx";
-import { formatMoney, CURRENCY_OPTIONS, DISPLAY_CURRENCY_OPTIONS } from "@/lib/format";
+import { formatMoney, CURRENCY_OPTIONS, PRIMARY_CURRENCY_OPTIONS } from "@/lib/format";
 
 describe("BTC como moneda", () => {
   it("está en SUPPORTED_CURRENCIES y se reconoce como cripto", () => {
@@ -42,8 +42,10 @@ describe("BTC como moneda", () => {
     expect(formatMoney(12.5, "USD")).toBe("$13"); // sin decimales explícitos = 0 (fiat)
   });
 
-  it("selectores: la captura incluye BTC; el display/principal NO", () => {
+  it("selectores: captura y DISPLAY incluyen BTC; la moneda PRINCIPAL (base) NO", () => {
+    // CURRENCY_OPTIONS alimenta captura (money-field) y el switch de display del topbar.
     expect(CURRENCY_OPTIONS.some((o) => o.code === "BTC")).toBe(true);
-    expect(DISPLAY_CURRENCY_OPTIONS.some((o) => o.code === "BTC")).toBe(false);
+    // La moneda base/principal es fiat: BTC no puede ser la base de cálculo de los agregados.
+    expect(PRIMARY_CURRENCY_OPTIONS.some((o) => o.code === "BTC")).toBe(false);
   });
 });
