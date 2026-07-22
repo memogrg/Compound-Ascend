@@ -117,8 +117,8 @@ export default async function MobileHome() {
     // Sobres para el alta rápida. Dos consultas ligeras, en el MISMO lote que el resto:
     // pedirlas al abrir la hoja metería una espera justo donde se quiere quitar.
     preview
-      ? Promise.resolve({ sobres: [], frecuentes: [] })
-      : getQuickAddData().catch(() => ({ sobres: [], frecuentes: [] })),
+      ? Promise.resolve({ sobres: [], frecuentes: [], fuentes: [] })
+      : getQuickAddData().catch(() => ({ sobres: [], frecuentes: [], fuentes: [] })),
   ]);
 
   const { currency, panel, insights } = data;
@@ -355,6 +355,7 @@ export default async function MobileHome() {
         <QuickAddLauncher
           sobres={quickAdd.sobres}
           frecuentes={quickAdd.frecuentes}
+          fuentes={quickAdd.fuentes}
           currency={currency}
         />
       )}

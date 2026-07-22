@@ -3,9 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { currencySymbol } from "@/lib/format";
-import { addTransactionAction, suggestSobreAction } from "@/modules/financial-base/api/v2-actions";
-import type { SobreRapido } from "@/modules/financial-base/services/quick-add-service";
+import {
+  addTransactionAction,
+  getQuickAddJarsAction,
+  suggestSobreAction,
+} from "@/modules/financial-base/api/v2-actions";
+import type {
+  FuenteIngreso,
+  SobreRapido,
+} from "@/modules/financial-base/services/quick-add-service";
+import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import { BottomSheet } from "./form-kit/bottom-sheet";
+import { SheetSelect } from "./form-kit/fields";
+import { CUR_OPTS } from "./form-kit/options";
+import { SobrePicker } from "../(app)/gastos/gastos-forms";
 import { useToast } from "./form-kit/toast";
 
 /**
@@ -27,13 +38,17 @@ export function QuickAddSheet({
   onClose,
   sobres,
   frecuentes,
+  fuentes,
   currency,
 }: {
   open: boolean;
   onClose: () => void;
   sobres: SobreRapido[];
   frecuentes: SobreRapido[];
-  /** Moneda principal del usuario. Se GUARDA explícitamente, no por omisión. */
+  /** Fuentes de ingreso existentes. El "+" registra CONTRA una, no crea ninguna. */
+  fuentes: FuenteIngreso[];
+  /** Moneda principal del usuario. Es el valor INICIAL del selector, no un valor por
+   *  omisión invisible: el usuario ve en qué moneda va a guardar y puede cambiarlo. */
   currency: string;
 }) {
   const router = useRouter();
@@ -50,6 +65,15 @@ export function QuickAddSheet({
   const [sugiriendo, setSugiriendo] = useState(false);
   const [origen, setOrigen] = useState<"historial" | "cache" | "ia" | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // La moneda es ESTADO visible, no una constante. El P0 del #437 nació de guardar con una
+  // moneda que el usuario nunca vio.
+  const [cur, setCur] = useState(currency);
+  const [fuenteId, setFuenteId] = useState<string | null>(null);
+  // Picker completo: los frascos se piden al abrirlo, no al abrir la hoja (ver
+  // getQuickAddJarsAction).
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [jars, setJars] = useState<Extract<Jar, { kind: "normal" }>[] | null>(null);
+  const [cargandoJars, setCargandoJars] = useState(false);
 
   // Teclado numérico ARRIBA al abrir: cero toques para empezar a escribir. El retardo es
   // para que iOS lo levante — pedir el foco antes de que la hoja termine de animar lo
@@ -71,7 +95,25 @@ export function QuickAddSheet({
     setDate(new Date().toISOString().slice(0, 10));
     setDetalles(false);
     setOrigen(null);
-  }, [open]);
+    setCur(currency);
+    setFuenteId(null);
+    setPickerOpen(false);
+  }, [open, currency]);
+
+  /** Los frascos se piden la PRIMERA vez que se abre el picker y se quedan cacheados
+   *  mientras la hoja siga abierta: es el agregado caro, y no debe repetirse por cada
+   *  vistazo. */
+  const abrirPicker = async () => {
+    setPickerOpen(true);
+    if (jars || cargandoJars) return;
+    setCargandoJars(true);
+    try {
+      const r = await getQuickAddJarsAction();
+      setJars(r.jars);
+    } finally {
+      setCargandoJars(false);
+    }
+  };
 
   const esGasto = kind === "gasto";
   const importe = Number(amount.replace(",", ".")) || 0;
@@ -113,11 +155,14 @@ export function QuickAddSheet({
     const res = await addTransactionAction({
       kind,
       amount: importe,
-      // EXPLÍCITA, nunca por omisión: el P0 de moneda nació justo de un importe cuya
-      // etiqueta salía de otro sitio que el número.
-      currency,
+      // La que el usuario TIENE DELANTE en el selector. El P0 de moneda nació justo de un
+      // importe cuya etiqueta salía de otro sitio que el número.
+      currency: cur,
       occurredOn: date,
       categoryId: esGasto ? categoryId : null,
+      // El ingreso se enlaza a la fuente por ID, no por su nombre: así suma en el
+      // "recibido" de esa fuente en la pantalla de Ingresos. Un texto suelto no lo hace.
+      incomeSourceId: !esGasto && fuenteId ? fuenteId : undefined,
       merchantOrSource: merchant.trim() === "" ? undefined : merchant.trim(),
       description: note.trim() === "" ? undefined : note.trim(),
       status: "confirmed",
@@ -163,7 +208,7 @@ export function QuickAddSheet({
         </div>
 
         <div className="m-qa-money">
-          <span className="m-qa-sym">{currencySymbol(currency)}</span>
+          <span className="m-qa-sym">{currencySymbol(cur)}</span>
           <input
             ref={inputRef}
             className="m-qa-inp"
@@ -177,11 +222,19 @@ export function QuickAddSheet({
           />
         </div>
 
-        {esGasto && (frecuentes.length > 0 || sobreElegido) ? (
+        {esGasto ? (
           <>
-            <div className="m-qa-lbl">
-              Sobre
-              {sugiriendo ? <span className="m-qa-hint"> · buscando…</span> : null}
+            <div className="m-qa-lbl m-qa-lbl-row">
+              <span>
+                Sobre
+                {sugiriendo ? <span className="m-qa-hint"> · buscando…</span> : null}
+              </span>
+              {/* Los chips son un ACELERADOR, no el catálogo. Sin esta salida, un gasto en
+                  un sobre que no está entre los frecuentes no se podía registrar desde
+                  aquí — había que ir a Gastos. */}
+              <button type="button" className="m-qa-vertodos" onClick={abrirPicker}>
+                {cargandoJars ? "Abriendo…" : "Ver todos"}
+              </button>
             </div>
             <div className="m-qa-chips">
               {/* La sugerencia va como CHIP, en la misma fila que los frecuentes y ya
@@ -222,6 +275,53 @@ export function QuickAddSheet({
                 </button>
               ))}
             </div>
+          </>
+        ) : null}
+
+        {!esGasto ? (
+          <>
+            <div className="m-qa-lbl">Fuente</div>
+            {fuentes.length === 0 ? (
+              // Sin fuentes NO se ofrece crear una desde aquí: el "+" registra cobros, y
+              // dar de alta una fuente es una decisión de presupuesto con recurrencia,
+              // tipo y categoría. Hacerlo por el camino rápido crearía fuentes basura.
+              <div className="m-qa-hint">
+                Aún no tienes fuentes de ingreso.{" "}
+                <a href="/m/ingresos" className="m-qa-vertodos">
+                  Créala en Ingresos
+                </a>
+              </div>
+            ) : (
+              <>
+                <div className="m-qa-chips">
+                  {fuentes.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`m-qa-chip${fuenteId === f.id ? " on" : ""}`}
+                      onClick={() => {
+                        const sel = fuenteId === f.id ? null : f.id;
+                        setFuenteId(sel);
+                        // La moneda SIGUE a la fuente: si "Salario Caro" está en USD, el
+                        // importe se etiqueta en USD. Es lo que hace receivePartialIncome
+                        // (toma line.currency) y es el invariante del P0: número y moneda
+                        // de la misma fuente. Queda visible en el selector, y cambiable.
+                        if (sel) setCur(f.currency);
+                      }}
+                    >
+                      {f.name}
+                      {f.currency !== cur ? <span className="m-qa-orig"> {f.currency}</span> : null}
+                    </button>
+                  ))}
+                </div>
+                <div className="m-qa-hint">
+                  ¿Falta una?{" "}
+                  <a href="/m/ingresos" className="m-qa-vertodos">
+                    Créala en Ingresos
+                  </a>
+                </div>
+              </>
+            )}
           </>
         ) : null}
 
@@ -287,10 +387,36 @@ export function QuickAddSheet({
               onChange={(e) => setNote(e.target.value)}
               maxLength={200}
             />
-            <div className="m-qa-hint">Se guarda en {currency}, tu moneda principal.</div>
+            {/* SELECTOR, no un texto. Antes decía "Se guarda en CRC, tu moneda principal"
+                y no había forma de cambiarlo: exactamente la omisión que causó el P0 del
+                #437, un importe en colones guardado como dólares. */}
+            <SheetSelect
+              name="currency"
+              label="Moneda"
+              value={cur}
+              onChange={setCur}
+              options={CUR_OPTS}
+              sheetTitle="Moneda"
+            />
           </div>
         ) : null}
       </div>
+
+      {/* El MISMO picker de /m/gastos y /m/transacciones — agrupado por frasco y con el
+          gastado/presupuestado al lado. Importado, no reescrito: un segundo picker se
+          desincronizaría del primero en cuanto uno de los dos cambiara. */}
+      <SobrePicker
+        open={pickerOpen}
+        jars={jars ?? []}
+        currency={cur}
+        selectedId={categoryId}
+        onPick={(env) => {
+          setCategoryId(env.id);
+          setOrigen(null); // elegido a mano: ya no hay origen que explicar
+          setPickerOpen(false);
+        }}
+        onClose={() => setPickerOpen(false)}
+      />
     </BottomSheet>
   );
 }

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { Fab } from "./form-kit/fab";
 import { QuickAddSheet } from "./quick-add-sheet";
-import type { SobreRapido } from "@/modules/financial-base/services/quick-add-service";
+import type {
+  FuenteIngreso,
+  SobreRapido,
+} from "@/modules/financial-base/services/quick-add-service";
 
 /**
  * El "+" de Inicio y su hoja. Existe solo para tener el estado de apertura en cliente sin
@@ -16,10 +19,12 @@ import type { SobreRapido } from "@/modules/financial-base/services/quick-add-se
 export function QuickAddLauncher({
   sobres,
   frecuentes,
+  fuentes,
   currency,
 }: {
   sobres: SobreRapido[];
   frecuentes: SobreRapido[];
+  fuentes: FuenteIngreso[];
   currency: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -31,6 +36,7 @@ export function QuickAddLauncher({
         onClose={() => setOpen(false)}
         sobres={sobres}
         frecuentes={frecuentes}
+        fuentes={fuentes}
         currency={currency}
       />
     </>
