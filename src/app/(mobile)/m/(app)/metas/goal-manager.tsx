@@ -42,7 +42,11 @@ import {
   mAmount,
   type MTone,
 } from "../../components/content-kit";
-import { groupByJar, type CategoryNode } from "@/modules/financial-base";
+// groupByJar se importa del ENGINE (puro), NO del barrel: este es un client component
+// ("use client") y el barrel arrastra servicios server-only. CategoryNode va como
+// import type (se borra en compilación, no arrastra runtime).
+import { groupByJar } from "@/modules/financial-base/engine/expense-jars";
+import type { CategoryNode } from "@/modules/financial-base";
 import { GoalForm, type GoalValues } from "./goal-form";
 
 /**
