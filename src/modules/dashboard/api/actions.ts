@@ -22,6 +22,8 @@ export async function restoreInsightsAction(): Promise<void> {
 
 export type BellInsight = {
   id: string;
+  /** Tipo de insight — permite el deep-link por tipo cuando no hay entidad relacionada. */
+  kind: string;
   severity: string;
   title: string;
   body: string;
@@ -52,6 +54,7 @@ export async function listActiveInsightsAction(): Promise<BellData> {
       inApp: true,
       insights: insights.map((i) => ({
         id: i.id,
+        kind: i.kind,
         severity: i.severity,
         title: i.title,
         body: i.body,

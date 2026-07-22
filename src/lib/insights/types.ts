@@ -13,7 +13,8 @@ export type InsightKind =
   | "deuda_creciendo"
   | "racha_positiva"
   | "ritual_patrimonio"
-  | "aporte_pendiente";
+  | "aporte_pendiente"
+  | "perfil_revision";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {

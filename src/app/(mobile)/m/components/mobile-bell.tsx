@@ -39,6 +39,16 @@ const RELATED_HREF: Record<string, string> = {
   category: "/m/gastos",
 };
 
+/** Deep-link por TIPO de insight (cuando no hay entidad relacionada). */
+const KIND_HREF: Record<string, string> = {
+  perfil_revision: "/m/mi-perfil-financiero",
+};
+
+/** Ruta del insight: por entidad (relatedKind) o, si no, por tipo (kind). */
+function hrefFor(o: { relatedKind?: string; kind: string }): string | undefined {
+  return (o.relatedKind ? RELATED_HREF[o.relatedKind] : undefined) ?? KIND_HREF[o.kind];
+}
+
 export function MobileBell() {
   const router = useRouter();
   const toast = useToast();
@@ -109,7 +119,7 @@ export function MobileBell() {
   };
 
   const openRelated = (o: BellInsight) => {
-    const href = o.relatedKind ? RELATED_HREF[o.relatedKind] : undefined;
+    const href = hrefFor(o);
     if (!href) return;
     setOpen(false);
     router.push(href);
@@ -177,7 +187,7 @@ export function MobileBell() {
           <div style={{ display: "grid", gap: 8 }}>
             {items.map((o) => {
               const s = STYLE[o.severity] ?? STYLE.info!;
-              const href = o.relatedKind ? RELATED_HREF[o.relatedKind] : undefined;
+              const href = hrefFor(o);
               return (
                 <div
                   key={o.id}
