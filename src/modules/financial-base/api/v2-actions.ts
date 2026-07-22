@@ -97,6 +97,9 @@ import {
   proposalToTxnInput,
 } from "@/modules/financial-base/services/ingest-proposals-view";
 import { logger } from "@/lib/logger";
+// `import type` y no runtime: en un fichero "use server" solo pueden EXPORTARSE funciones
+// async, pero importar tipos es libre y desaparece al compilar.
+import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
 
@@ -1038,5 +1041,56 @@ export async function suggestSobreAction(
       : { categoryId: null, source: null };
   } catch {
     return { categoryId: null, source: null };
+  }
+}
+
+/**
+ * Frascos con sobres para el picker completo del alta rápida ("Ver todos").
+ *
+ * Va en una acción aparte, y NO dentro de `getQuickAddData`, porque
+ * `getExpenseJarsAsOf` es el agregado caro de la pantalla de Gastos: arrastra
+ * `loadBaseView` entero. Cargarlo en Inicio haría pagar a TODOS el coste de un picker que
+ * solo abre quien busca un sobre fuera de sus frecuentes — y el camino de tres toques no
+ * lo usa nunca. Aquí lo paga quien lo pide, en el momento en que lo pide.
+ *
+ * Devuelve solo los frascos normales con sobres: es exactamente lo que `SobrePicker`
+ * consume en /m/gastos y /m/transacciones, así que el picker es el mismo, no uno nuevo.
+ */
+export async function getQuickAddJarsAction(): Promise<{
+  jars: Extract<Jar, { kind: "normal" }>[];
+  currency: string;
+}> {
+  try {
+    await requireUser();
+    const [{ loadBaseView }, { getExpenseJarsAsOf }] = await Promise.all([
+      import("@/modules/financial-base/services/base-view"),
+      import("@/modules/financial-base/services/expense-jars-service"),
+    ]);
+    const now = new Date();
+    // loadBaseView toma el periodo como STRING (lo parsea dentro); getExpenseJarsAsOf lo
+    // toma como Period. Son dos formas del mismo mes, no dos periodos distintos.
+    const view = await loadBaseView();
+    if (!view) return { jars: [], currency: "CRC" };
+    const jars = await getExpenseJarsAsOf({
+      tree: view.tree,
+      period: monthPeriod(now.getFullYear(), now.getMonth() + 1),
+      asOf: now.toISOString().slice(0, 10),
+      currency: view.currency,
+    });
+    // Mismo filtro que `normalJarsWithEnvelopes` de gastos-forms.tsx, repetido aquí porque
+    // aquel vive en un fichero "use client" y esto es una server action. Un frasco sin
+    // sobres no se puede elegir, así que no se manda.
+    return {
+      jars: jars.filter(
+        (j): j is Extract<Jar, { kind: "normal" }> => j.kind === "normal" && j.envelopes.length > 0,
+      ),
+      currency: view.currency,
+    };
+  } catch (err) {
+    logger.warn("getQuickAddJars fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    // Nunca lanza: el picker muestra su estado vacío y los chips frecuentes siguen ahí.
+    return { jars: [], currency: "CRC" };
   }
 }

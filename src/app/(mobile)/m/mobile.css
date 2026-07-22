@@ -65,6 +65,10 @@
      Taupe de la familia de --text-muted, así que convive con los verdes sin competir. */
   --s-neutral: #8a7d69;
   --accent-soft: rgba(55, 132, 81, 0.12);
+  /* Texto de acento sobre una superficie TEÑIDA de acento (chip seleccionado). El --accent
+     normal da 3,74:1 ahí; este llega a 5,1:1. Se deriva del acento para que lo siga si la
+     marca cambia. */
+  --accent-on-soft: color-mix(in srgb, var(--accent) 78%, #000);
   --danger-soft: rgba(195, 79, 75, 0.12);
   --warning-soft: rgba(176, 122, 46, 0.12);
   --e1: 0 1px 2px rgba(20, 18, 14, 0.08);
@@ -158,6 +162,8 @@
   --s5: #43a064;
   --s-neutral: #9c9280;
   --accent-soft: rgba(81, 175, 111, 0.14);
+  /* En oscuro el acento ya contrasta sobre su tinte (6,77:1): se usa tal cual. */
+  --accent-on-soft: var(--accent);
   --danger-soft: rgba(212, 107, 98, 0.16);
   --warning-soft: rgba(217, 168, 90, 0.16);
   --e1: 0 1px 2px rgba(0, 0, 0, 0.35);
@@ -3237,6 +3243,30 @@ body:has(.m-shell[data-theme="dark"]) {
   letter-spacing: 0.02em;
   color: var(--text-muted);
 }
+/* Etiqueta con salida a la derecha ("Ver todos"). En la misma línea y no debajo: si baja,
+   empuja los chips y se come el alto que el camino de tres toques necesita para terminar
+   sin scroll con el teclado puesto. */
+.m-shell .m-qa-lbl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+/* Salida al catálogo completo. Es un enlace de texto, no un botón con peso: los chips
+   frecuentes siguen siendo el camino, y esto es la puerta de atrás para el caso raro.
+   Los 44px de alto táctil los da el padding, no el tamaño de letra. */
+.m-shell .m-qa-vertodos {
+  min-height: 44px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
 .m-shell .m-qa-hint {
   font-size: 11.5px;
   color: var(--text-dim);
@@ -3265,7 +3295,7 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-qa-chip.on {
   background: color-mix(in srgb, var(--accent) 16%, var(--surface));
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  color: var(--accent);
+  color: var(--accent-on-soft);
   font-weight: 600;
 }
 /* Origen de la sugerencia, DENTRO del chip. No es lo mismo "este sobre lo pones tú

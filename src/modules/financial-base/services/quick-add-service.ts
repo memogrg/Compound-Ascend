@@ -14,11 +14,28 @@ import { householdMemberIds } from "@/lib/household/active";
 
 export type SobreRapido = { id: string; name: string };
 
+/**
+ * Fuente de ingreso contra la que se registra un cobro.
+ *
+ * OJO con el nombre: la columna se llama `transactions.income_source_id`, pero NO apunta a
+ * la tabla `income_sources` — apunta a un `budget_items` de tipo income. Es lo que hace
+ * `receivePartialIncome` y es lo que la pantalla /m/ingresos lista y suma
+ * (`incomeReceivedBySource[b.id]`). Enlazar la otra tabla dejaría el ingreso fuera del
+ * "recibido" de todas las fuentes, sin error visible.
+ *
+ * `currency` viaja con la fuente a propósito: al elegirla, el importe se etiqueta con SU
+ * moneda, no con la principal por omisión. Es el invariante del P0 de moneda.
+ */
+export type FuenteIngreso = { id: string; name: string; currency: string };
+
 export type QuickAddData = {
   /** Todos los sobres imputables, para el selector completo. */
   sobres: SobreRapido[];
   /** Los que más usa, por número de movimientos recientes. Primer toque del flujo. */
   frecuentes: SobreRapido[];
+  /** Fuentes de ingreso del periodo. El alta rápida registra CONTRA una existente; crear
+   *  una fuente nueva es otra cosa y vive en Ingresos. */
+  fuentes: FuenteIngreso[];
 };
 
 /** Ventana para "frecuente". Tres meses: suficiente para captar el hábito real sin que
@@ -34,7 +51,8 @@ export async function getQuickAddData(): Promise<QuickAddData> {
   const desde = new Date();
   desde.setDate(desde.getDate() - DIAS_VENTANA);
 
-  const [cats, txns] = await Promise.all([
+  const now = new Date();
+  const [cats, txns, fuentes] = await Promise.all([
     // Hojas de gasto activas: son las únicas a las que se puede imputar.
     supabase
       .from("expense_categories")
@@ -49,6 +67,16 @@ export async function getQuickAddData(): Promise<QuickAddData> {
       .eq("kind", "gasto")
       .not("category_id", "is", null)
       .gte("occurred_on", desde.toISOString().slice(0, 10)),
+    // Fuentes del periodo en curso: son las que la pantalla de Ingresos muestra, así que
+    // son las que el usuario reconoce. Una consulta más, del mismo peso que las otras dos.
+    supabase
+      .from("budget_items")
+      .select("id,name,currency")
+      .in("user_id", memberIds)
+      .eq("type", "income")
+      .eq("period_year", now.getFullYear())
+      .eq("period_month", now.getMonth() + 1)
+      .order("name"),
   ]);
 
   // Solo HOJAS: imputar a un grupo de nivel 1 mezclaría el rollup con el detalle.
@@ -73,5 +101,10 @@ export async function getQuickAddData(): Promise<QuickAddData> {
       .map((c) => ({ id: c.id, name: c.name }))
       .sort((a, b) => a.name.localeCompare(b.name, "es")),
     frecuentes,
+    fuentes: (fuentes.data ?? []).map((f) => ({
+      id: f.id,
+      name: f.name,
+      currency: f.currency,
+    })),
   };
 }
