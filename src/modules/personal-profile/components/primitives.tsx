@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import { Icon, type IconName } from "@/components/ui/icon";
 import type { Option } from "@/modules/personal-profile/constants";
 import { cn } from "@/lib/utils";
 
 /**
- * Burbuja accesible con tooltip (hover + clic + foco). Por defecto muestra "?"
- * (ayuda); con `icon` muestra ese ícono del design system, y con `tone="pos"` lo
- * colorea en verde (p. ej. el check de "paso completado"). Misma mecánica de
- * tooltip y a11y en ambos casos.
+ * Burbuja accesible con tooltip (hover + tap + foco). Por defecto muestra "?" (ayuda); con
+ * `icon` muestra ese ícono del design system, y con `tone="pos"` lo colorea en verde.
+ *
+ * Usa el sistema de tooltip ÚNICO de la app (`.tip` + `data-tip`, servido por TooltipLayer
+ * en el root layout): burbuja en portal con FLIP vertical arriba/abajo, clamp al viewport y
+ * texto que envuelve — funciona en móvil (tap) y nunca se corta. `tip-wrap` fija el wrap por
+ * defecto (el texto de ayuda siempre es largo), sin depender de cada llamada.
  */
 export function HelpTip({
   text,
@@ -22,27 +24,16 @@ export function HelpTip({
   icon?: IconName;
   tone?: "pos";
 }) {
-  const [open, setOpen] = useState(false);
   return (
-    <span className="help-tip" onMouseLeave={() => setOpen(false)}>
-      <button
-        type="button"
-        className="help-btn"
-        aria-label={label}
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        onMouseEnter={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        style={tone === "pos" ? { color: "var(--pos)", borderColor: "var(--pos)" } : undefined}
-      >
-        {icon ? <Icon name={icon} width={2.4} /> : "?"}
-      </button>
-      {open ? (
-        <span className="help-pop" role="tooltip">
-          {text}
-        </span>
-      ) : null}
-    </span>
+    <button
+      type="button"
+      className="help-btn tip tip-wrap"
+      data-tip={text}
+      aria-label={label}
+      style={tone === "pos" ? { color: "var(--pos)", borderColor: "var(--pos)" } : undefined}
+    >
+      {icon ? <Icon name={icon} width={2.4} /> : "?"}
+    </button>
   );
 }
 

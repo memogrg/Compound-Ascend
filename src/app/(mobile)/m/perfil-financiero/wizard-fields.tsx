@@ -8,8 +8,6 @@
  * sin reimplementar lógica de negocio — solo UI.
  */
 
-import { useState } from "react";
-
 export type Opt = { value: string; label: string; desc?: string };
 
 /** Etiqueta de pregunta (encima de cada campo). */
@@ -18,29 +16,15 @@ function QLabel({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Ayuda "?" con popover (tap para abrir/cerrar). Espeja el HelpTip web (primitives.tsx) con
- * la piel móvil (mobile.css: .m-help*). Para explicar términos junto a un label sin ocupar
- * espacio permanente.
+ * Ayuda "?" junto a un label. Usa el sistema de tooltip ÚNICO de la app (`.tip` + `data-tip`,
+ * servido por TooltipLayer en el root layout, que alcanza también a móvil): burbuja en portal
+ * con FLIP vertical, clamp al viewport y wrap — se abre al TOCAR el "?" y nunca se corta.
  */
 function MHelpTip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
   return (
-    <span className="m-help">
-      <button
-        type="button"
-        className="m-help-btn"
-        aria-label="Más información"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        ?
-      </button>
-      {open ? (
-        <span className="m-help-pop" role="tooltip">
-          {text}
-        </span>
-      ) : null}
-    </span>
+    <button type="button" className="m-help-btn tip tip-wrap" data-tip={text} aria-label="Más información">
+      ?
+    </button>
   );
 }
 

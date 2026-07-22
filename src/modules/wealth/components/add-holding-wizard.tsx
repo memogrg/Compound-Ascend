@@ -7,8 +7,7 @@
  * crecimiento manual) + región + registrar gasto. SOLO UI: valida con
  * holdingInputSchema (vía addHoldingAction/editHoldingAction); no toca services.
  */
-import { useState, useRef, useCallback, useEffect, useId, type ChangeEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useState, useRef, useCallback, useEffect, type ChangeEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -1087,90 +1086,23 @@ function Step2Fields(props: {
 
 // ── Átomos compartidos ─────────────────────────────────────────────
 
-/** Tooltip en portal para evitar el clipping por overflow del modal. */
+/**
+ * Ayuda "?" en el sistema de tooltip ÚNICO de la app (`.tip` + `data-tip`, servido por
+ * TooltipLayer en el root layout): burbuja en portal con FLIP vertical, clamp al viewport y
+ * wrap — sin clipping por overflow del modal, y funciona en móvil (tap). `tip-wrap` fija el
+ * wrap. Reemplaza la implementación JS local (posicionamiento/portal duplicados).
+ */
 function HelpTip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const id = useId();
-
-  const calcPos = useCallback(() => {
-    if (!btnRef.current) return;
-    const r = btnRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - r.bottom;
-    const top = spaceBelow >= 160 ? r.bottom + 6 : r.top - 140;
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - 296));
-    setPos({ top, left });
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("scroll", close, { capture: true, passive: true });
-    document.addEventListener("mousedown", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      document.removeEventListener("mousedown", close);
-    };
-  }, [open]);
-
   return (
-    <span
-      className="help-tip"
-      onMouseEnter={() => {
-        calcPos();
-        setOpen(true);
-      }}
-      onMouseLeave={() => setOpen(false)}
+    <button
+      type="button"
+      className="help-btn tip tip-wrap"
+      data-tip={text}
+      aria-label="Más información"
+      onMouseDown={(e) => e.stopPropagation()}
     >
-      <button
-        ref={btnRef}
-        type="button"
-        className="help-btn"
-        aria-label="Más información"
-        aria-expanded={open}
-        aria-describedby={open ? id : undefined}
-        onClick={(e) => {
-          e.stopPropagation();
-          calcPos();
-          setOpen((o) => !o);
-        }}
-        onBlur={() => setOpen(false)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false);
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        ?
-      </button>
-      {open &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <span
-            role="tooltip"
-            id={id}
-            style={{
-              position: "fixed",
-              top: pos.top,
-              left: pos.left,
-              width: "min(280px, calc(100vw - 32px))",
-              zIndex: 9999,
-              background: "var(--ink)",
-              color: "var(--bg)",
-              fontSize: 12.5,
-              lineHeight: 1.5,
-              fontWeight: 400,
-              padding: "10px 13px",
-              borderRadius: 10,
-              boxShadow: "var(--shadow-float)",
-              pointerEvents: "none",
-            }}
-          >
-            {text}
-          </span>,
-          document.body,
-        )}
-    </span>
+      ?
+    </button>
   );
 }
 
