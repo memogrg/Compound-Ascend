@@ -24,6 +24,7 @@ import {
 import { getWealthSummary } from "@/modules/wealth/services/wealth-service";
 import type {
   Holding,
+  HoldingNativo,
   PortfolioAnalytics,
   DividendAnalytics,
   CryptoAnalytics,
@@ -36,7 +37,9 @@ const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
 };
 
 export type PortfolioReport = {
-  holdings: Holding[];
+  /** CRUDOS, cada importe en la moneda de su holding. Es lo que deben usar los
+   *  formularios de captura; los agregados de `analytics` van en la primaria. */
+  holdings: HoldingNativo[];
   analytics: PortfolioAnalytics;
   dividendAnalytics: DividendAnalytics;
   cryptoAnalytics: CryptoAnalytics;
@@ -323,6 +326,10 @@ export function normalizeHoldings(
   primaryCurrency: string,
   rates: Record<string, number>,
 ): Holding[] {
+  // Devuelve `Holding` PELADO, sin la marca `HoldingNativo`: estos objetos llevan los
+  // importes en primaria pero conservan `currency` nativa (el spread de abajo no la toca),
+  // así que no valen para capturar. Los formularios piden `HoldingNativo` y el compilador
+  // rechaza lo que salga de aquí.
   return holdings.map((h) => ({
     ...h,
     averageCost: convertCurrency(h.averageCost, h.currency, primaryCurrency, rates),

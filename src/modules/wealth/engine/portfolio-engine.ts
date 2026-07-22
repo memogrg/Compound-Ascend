@@ -557,3 +557,23 @@ export function investmentRate(recurringMonthly: number, incomeMonthly: number):
   if (incomeMonthly <= 0) return 0;
   return recurringMonthly / incomeMonthly;
 }
+
+/**
+ * Comprueba que el importe de un movimiento viene en la moneda de su holding.
+ *
+ * Hermano de `monedaDelPagoEsCoherente()` (deudas, #474) y por la misma razón: el
+ * view-model de portafolio convierte los importes a la moneda principal pero conserva
+ * `currency` nativa, así que un formulario que precargue de ahí manda un número en una
+ * unidad y una etiqueta en otra. Los ledgers (`dividends`, `rental_payments`,
+ * `investment_transactions`) guardan lo que llega, así que el desajuste se persiste sin
+ * dejar rastro.
+ *
+ * `undefined` pasa: hay llamadores que no mandan moneda y el servicio impone la del
+ * holding. Lo que no puede pasar es una moneda que CONTRADIGA al holding.
+ */
+export function monedaDelMovimientoEsCoherente(
+  monedaDelImporte: string | undefined,
+  monedaDelHolding: string,
+): boolean {
+  return !monedaDelImporte || monedaDelImporte === monedaDelHolding;
+}

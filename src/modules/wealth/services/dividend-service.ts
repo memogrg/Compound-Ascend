@@ -1,4 +1,5 @@
 import "server-only";
+import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfolio-engine";
 
 /**
  * CRUD de dividendos. Cada pago nace como transacción vinculada (ingreso,
@@ -69,6 +70,24 @@ export async function createDividend(input: DividendInput): Promise<void> {
   const household_id = await getActiveHouseholdId(supabase, user.id);
   const label = input.holdingLabel ?? input.holdingSymbol ?? "Dividendo";
 
+  // La moneda la IMPONE el holding, no la elige quien llama. Este servicio guardaba
+  // `input.currency` sin mirar la del holding, así que un formulario que precargara desde
+  // el view-model convertido escribía el importe en la moneda principal con la etiqueta
+  // nativa. Si además llega una moneda que contradice, se falla en vez de guardar callado
+  // (mismo criterio que el pago de deuda en #474).
+  const { data: hRow } = await supabase
+    .from("investment_holdings")
+    .select("currency")
+    .eq("id", input.holdingId)
+    .in("user_id", scope)
+    .maybeSingle();
+  const monedaDelHolding = hRow?.currency ?? input.currency;
+  if (!monedaDelMovimientoEsCoherente(input.currency, monedaDelHolding)) {
+    throw new Error(
+      `El dividendo viene en ${input.currency} pero la inversión está en ${monedaDelHolding}.`,
+    );
+  }
+
   // 1) Inserta el dividendo SIN income_id: ya no se duplica en income_sources.
   //    Su renta vive en la transacción vinculada + la línea derivada.
   const { data: divRow, error: divErr } = await supabase
@@ -81,7 +100,7 @@ export async function createDividend(input: DividendInput): Promise<void> {
       holding_id: input.holdingId,
       payment_date: input.paymentDate,
       amount: input.amount,
-      currency: input.currency,
+      currency: monedaDelHolding,
       yield_pct: input.yieldPct ?? null,
       frequency: freq,
       income_id: null,

@@ -16,7 +16,7 @@ import {
   removeRentalPaymentAction,
   adjustContributionPriceAction,
 } from "@/modules/wealth/api/actions";
-import type { Dividend, HoldingPerformance, RentalPayment } from "@/modules/wealth/types";
+import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
   HistoryPoint,
   HoldingPurchase,
@@ -87,11 +87,15 @@ export function HoldingDetailSheet({
   currency,
   contribution,
   onClose,
+  raw,
   onEdit,
   onSell,
   onDelete,
 }: {
   holding: HoldingPerformance;
+  /** El MISMO holding sin convertir. `holding` trae los importes en la moneda principal
+   *  con la etiqueta nativa, así que todo lo que precargue un importe sale de aquí. */
+  raw: HoldingNativo;
   currency: string;
   /** Aporte del mes pendiente (brecha DCA), o null si no hay. */
   contribution: OpenContribution | null;
@@ -124,10 +128,11 @@ export function HoldingDetailSheet({
   const [valAmount, setValAmount] = useState<number | undefined>(undefined);
   const [valError, setValError] = useState<string | null>(null);
 
-  // Renta.
-  const [rentAmount, setRentAmount] = useState<number | undefined>(
-    holding.rentalIncome ?? undefined,
-  );
+  // Renta. Del CRUDO: `holding.rentalIncome` viene convertido a la moneda principal y se
+  // guardaba etiquetado con `cur` (la nativa) — el importe entraba multiplicado por el
+  // tipo de cambio. Y el servicio además reescribe ese mismo campo en el holding, así que
+  // un pago mal etiquetado contaminaba la siguiente precarga.
+  const [rentAmount, setRentAmount] = useState<number | undefined>(raw.rentalIncome ?? undefined);
   const [rentDate, setRentDate] = useState(todayISO());
   const [rentFreq, setRentFreq] = useState<string>(holding.rentalFrequency ?? "mensual");
   const [rentError, setRentError] = useState<string | null>(null);

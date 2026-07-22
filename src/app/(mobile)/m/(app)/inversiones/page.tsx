@@ -44,6 +44,12 @@ export default async function MobileInversiones() {
     .map((s, i) => ({ label: s.label, value: s.value, color: RING_COLORS[i % RING_COLORS.length]! }));
 
   const holdings = [...a.holdingsWithPerformance].sort((x, y) => y.currentValue - x.currentValue);
+  // Los CRUDOS, además de los de rendimiento. `holdingsWithPerformance` trae los importes
+  // convertidos a la moneda principal pero conserva `currency` nativa, así que precargar un
+  // formulario desde ahí guarda el número multiplicado por el tipo de cambio. La web ya
+  // tenía este apaño (`rawById`); el móvil no, y por eso "Editar" —su único camino para
+  // registrar una compra adicional— precargaba mal.
+  const rawHoldings = report.holdings;
   const gain = a.totalProfitLoss;
   // 0 no es ni ganancia ni pérdida: sin signo y en neutro (como en Ingresos/Ahorro, donde
   // "+₡0" verde sugería que ibas por encima). >0 gana (verde), <0 pierde (rojo).
@@ -132,7 +138,12 @@ export default async function MobileInversiones() {
             ) : undefined
           }
         />
-        <InversionesManager holdings={holdings} currency={currency} openContributions={openContributions} />
+        <InversionesManager
+          holdings={holdings}
+          rawHoldings={rawHoldings}
+          currency={currency}
+          openContributions={openContributions}
+        />
       </div>
     </div>
   );
