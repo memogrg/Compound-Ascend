@@ -52,6 +52,19 @@ export {
   setPeaceMonths,
   type DefenseFundsReport,
 } from "./services/fund-sizing-service";
+// Decisión del excedente: abonar deuda vs invertir (F3).
+export {
+  compareSurplus,
+  projectInvestment,
+  DEBT_INVEST_THRESHOLD,
+  ASSET_HISTORY,
+  SURPLUS_ASSETS,
+  type SurplusComparison,
+  type InvestProjection,
+  type AssetClass,
+} from "./engine/surplus-decision";
+export { getSurplusDecision, type SurplusDecisionReport } from "./services/surplus-decision-service";
+export { SurplusDecision } from "./components/surplus-decision";
 export { buildDailyPatrimonioInsight, RITUAL_KIND } from "./engine/daily-insight";
 export { buildWeeklyDigest, type WeeklyDigest } from "./engine/weekly-digest";
 export {
