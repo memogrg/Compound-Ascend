@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
+import { monedaDelPagoEsCoherente } from "@/modules/control/engine/debt-strategy";
 import {
   registerLinkedTransaction,
   buildLinkedTransactionRow,
@@ -391,7 +392,7 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   // etiqueta con esa misma. Si quien llama dice venir en otra, es que el número se
   // calculó contra una referencia distinta y guardarlo corrompería las dos cosas a la
   // vez (el gasto del mes y la amortización). Mejor fallar que guardar callado.
-  if (input.currency && input.currency !== debt.currency) {
+  if (!monedaDelPagoEsCoherente(input.currency, debt.currency)) {
     throw new Error(
       `El pago viene en ${input.currency} pero la deuda está en ${debt.currency}.`,
     );

@@ -177,3 +177,27 @@ export function cuotaPrecargada(debt: {
     currency: debt.currency,
   };
 }
+
+/**
+ * Comprueba que el importe de un pago viene en la moneda de la deuda.
+ *
+ * `debt_payments` no tiene columna de moneda: su `amount` significa SIEMPRE la de la
+ * deuda. Si quien captura dice venir en otra, es que el número se calculó contra una
+ * referencia distinta —típicamente un view-model convertido a la moneda de
+ * visualización— y guardarlo corrompería dos cosas a la vez: el gasto del mes y la
+ * amortización. Mejor fallar que guardar callado.
+ *
+ * Vive aquí, como función pura, y no dentro del servicio, porque el P0 del #437 no se
+ * escapó por falta de guarda sino por falta de PRUEBA de la guarda: era código
+ * inalcanzable desde un test unitario, y encima inerte (el campo es opcional y ningún
+ * formulario lo mandaba). Aquí se puede ejercitar.
+ *
+ * `undefined` pasa a propósito: hay llamadores antiguos que no mandan moneda. Lo que no
+ * puede pasar es una moneda que CONTRADIGA a la deuda.
+ */
+export function monedaDelPagoEsCoherente(
+  monedaDelImporte: string | undefined,
+  monedaDeLaDeuda: string,
+): boolean {
+  return !monedaDelImporte || monedaDelImporte === monedaDeLaDeuda;
+}

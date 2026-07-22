@@ -12,6 +12,9 @@ import {
   deleteDebtPaymentAction,
 } from "@/modules/control/api/actions";
 import type { Debt, DebtVM, DebtPayment } from "@/modules/control";
+// El mismo helper que usa la web. Recibe la deuda CRUDA a propósito: si alguien le pasa un
+// VM convertido, el test de multimoneda lo dice.
+import { cuotaPrecargada } from "@/modules/control/engine/debt-strategy";
 import { formatMoney, formatPercent } from "@/lib/format";
 
 import {
@@ -314,8 +317,16 @@ export function DebtManager({
         {reporting ? (
           <PaymentForm
             debtId={reporting.id}
-            currency={currency}
-            cuota={reporting.monthlyPayment || reporting.minPayment}
+            // NATIVA de la deuda, no la de visualización. `reporting` es el VM y trae los
+            // montos ya convertidos: precargar de ahí con la etiqueta de la deuda es
+            // exactamente el P0 del #437 (2.341 USD guardados como 1.063.076 USD).
+            currency={rawById.get(reporting.id)?.currency ?? currency}
+            cuota={
+              (() => {
+                const d = rawById.get(reporting.id);
+                return d ? cuotaPrecargada(d).amount : undefined;
+              })()
+            }
             action={reportPaymentAction}
             submitLabel="Registrar pago"
             successMessage="Pago registrado"
@@ -380,7 +391,9 @@ export function DebtManager({
         {editingPayment ? (
           <PaymentForm
             debtId={editingPayment.vm.id}
-            currency={currency}
+            // El pago guardado está en la moneda de la deuda (debt_payments no tiene
+            // columna de moneda), así que editarlo bajo otra etiqueta lo reinterpretaría.
+            currency={rawById.get(editingPayment.vm.id)?.currency ?? currency}
             initial={editingPayment.payment}
             action={(v) => updateDebtPaymentAction(editingPayment.payment.id, v)}
             submitLabel="Guardar cambios"
@@ -457,6 +470,7 @@ function PaymentForm({
     extraAmount: number;
     extraMode?: string;
     kind: string;
+    currency: string;
   }) => Promise<ActionResult>;
   submitLabel: string;
   successMessage: string;
@@ -479,6 +493,12 @@ function PaymentForm({
     extraAmount: isExtra ? 0 : extraNum,
     extraMode: !isExtra && extraNum > 0 ? mode : undefined,
     kind,
+    // Viaja JUNTO al importe para que el servidor compruebe que los dos vienen de la misma
+    // fuente. La guarda existe desde el #437 (control-service.ts) pero era inerte por este
+    // camino: el campo es opcional y el móvil no lo mandaba, así que nunca se disparaba.
+    // Mandarlo convierte cualquier recaída futura en un error visible en vez de un dato
+    // corrupto y silencioso.
+    currency,
   };
 
   return (
@@ -492,6 +512,11 @@ function PaymentForm({
       {!isEdit ? (
         <Segmented name="kind" label="Tipo de pago" value={kind} onChange={setKind} options={KIND_OPTS} />
       ) : null}
+      {/* La moneda se NOMBRA, no solo se insinúa con el símbolo: "$" y "₡" se confunden de
+          un vistazo, y aquí equivocarse cuesta un factor 510. No es editable a propósito —
+          el pago va sobre una deuda que ya tiene su moneda, y dejar elegir aquí sería
+          reabrir el P0 por el otro lado. */}
+      <div className="m-qa-lbl">Se registra en {currency}, la moneda de esta deuda</div>
       <MoneyField
         name="amount"
         label={isExtra ? "Monto del abono a capital" : "Monto de la cuota"}

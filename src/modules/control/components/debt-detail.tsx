@@ -7,6 +7,9 @@ import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { PerformanceChart } from "@/components/charts/lazy";
 import { formatMoney, currencySymbol } from "@/lib/format";
+// Recibe la deuda CRUDA a propósito: si alguien le pasa un VM convertido, el test de
+// multimoneda falla y lo dice.
+import { cuotaPrecargada } from "@/modules/control/engine/debt-strategy";
 import {
   reportPaymentAction,
   updateDebtPaymentAction,
@@ -654,7 +657,25 @@ function ReportPaymentModal({
   const today = new Date().toISOString().slice(0, 10);
   // Estado string para permitir vacío (no un "0" pegado imposible de borrar);
   // se coacciona a número solo al enviar (vacío → 0).
-  const initAmount = editing?.amount ?? preset?.amount ?? vm.monthlyPayment ?? 0;
+  /**
+   * TODO lo que se captura aquí va en la moneda NATIVA de la deuda, porque
+   * `debt_payments` no tiene columna de moneda: su `amount` significa siempre la de la
+   * deuda, se mire como se mire la pantalla.
+   *
+   * Antes esto mezclaba dos unidades en el mismo campo sin que se notara:
+   *  · `editing.amount` viene del ledger → ya estaba en NATIVA (correcto)
+   *  · `vm.monthlyPayment` y `preset.amount` salen del VM → venían en DISPLAY
+   * Con la app en colones y una deuda en dólares, entrar por "Reportar pago" precargaba
+   * la cuota multiplicada por el tipo de cambio y la guardaba como dólares. Es el P0 del
+   * #437, que se corrigió en la lista de deudas y no aquí.
+   *
+   * El preset de la tabla de amortización se ignora a propósito para el IMPORTE (sus filas
+   * están en display): se precarga la cuota nativa, que es lo que se va a pagar. Si esa
+   * fila concreta difiere —una última cuota más corta—, el usuario la ajusta viendo la
+   * moneda correcta, que es mejor que teclear sobre un número en otra unidad.
+   */
+  const cuotaNativa = cuotaPrecargada(vm.nativa);
+  const initAmount = editing?.amount ?? cuotaNativa.amount;
   const [amount, setAmount] = useState<string>(initAmount ? String(initAmount) : "");
   const [date, setDate] = useState(editing?.paymentDate ?? preset?.date ?? today);
   const [extra, setExtra] = useState<string>(editing?.extraAmount ? String(editing.extraAmount) : "");
@@ -682,6 +703,9 @@ function ReportPaymentModal({
       extraAmount: extraNum,
       extraMode: extraNum > 0 ? mode : undefined,
       kind: "ordinario" as const,
+      // Viaja junto al importe para que el servidor compruebe que los dos vienen de la
+      // misma fuente (control-service.ts). Sin esto la guarda es inerte.
+      currency: vm.nativa.currency,
     };
     const res = editing
       ? await updateDebtPaymentAction(editing.id, payload)
@@ -707,10 +731,11 @@ function ReportPaymentModal({
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Monto de la cuota</label>
-              {/* La moneda es SIEMPRE la de la deuda (el modelo de pagos es de
-                  una sola moneda por deuda); se muestra explícita como prefijo. */}
+              {/* La moneda es SIEMPRE la de la deuda (el modelo de pagos es de una sola
+                  moneda por deuda). Este comentario ya estaba aquí y era FALSO: el prefijo
+                  usaba `currency`, que es la de visualización. Ahora sí dice la verdad. */}
               <div className="inp-money">
-                <span className="pre">{currencySymbol(currency)}</span>
+                <span className="pre">{currencySymbol(vm.nativa.currency)}</span>
                 <input
                   type="number"
                   step="any"
@@ -736,7 +761,7 @@ function ReportPaymentModal({
           <div className="fld">
             <label className="fld-label">Pago extra (opcional)</label>
             <div className="inp-money">
-              <span className="pre">{currencySymbol(currency)}</span>
+              <span className="pre">{currencySymbol(vm.nativa.currency)}</span>
               <input
                 type="number"
                 step="any"
@@ -823,6 +848,7 @@ function ExtraordinaryPaymentModal({ vm, onClose }: { vm: DebtDetailVM; onClose:
       amount: amt,
       extraAmount: 0,
       kind: "extraordinario",
+      currency: vm.nativa.currency,
     });
     setPending(false);
     if (res.ok) {
@@ -855,7 +881,9 @@ function ExtraordinaryPaymentModal({ vm, onClose }: { vm: DebtDetailVM; onClose:
           <div className="fld-2">
             <div className="fld">
               <label className="fld-label">Monto del abono</label>
+              {/* No tenía prefijo: se tecleaba sin ver en qué moneda. */}
               <div className="inp-money">
+                <span className="pre">{currencySymbol(vm.nativa.currency)}</span>
                 <input
                   type="number"
                   step="any"
