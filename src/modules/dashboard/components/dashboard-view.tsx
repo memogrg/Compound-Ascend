@@ -18,6 +18,7 @@ export function DashboardView({
   insights,
   panel,
   demo = false,
+  showGreeting = true,
 }: {
   name: string;
   summary: BaseSummary;
@@ -26,6 +27,8 @@ export function DashboardView({
   insights: DashboardInsights;
   panel: PanelVM;
   demo?: boolean;
+  /** El saludo "Hola {name}" puede renderizarse fuera (a nivel de página) para reordenar. */
+  showGreeting?: boolean;
 }) {
   const ind = summary.indicators;
   const donutData: DonutDatum[] = (Object.entries(ind.expenseByNature) as [ExpenseNature, number][])
@@ -38,12 +41,14 @@ export function DashboardView({
 
   return (
     <div className="grid">
-      <div>
-        <h2 className="greet">
-          Hola, <span className="it">{name}</span>
-        </h2>
-        <p className="greet-sub">Esto es lo más importante de tus finanzas hoy.</p>
-      </div>
+      {showGreeting ? (
+        <div>
+          <h2 className="greet">
+            Hola, <span className="it">{name}</span>
+          </h2>
+          <p className="greet-sub">Esto es lo más importante de tus finanzas hoy.</p>
+        </div>
+      ) : null}
 
       {demo ? (
         <div className="auth-msg warn" style={{ margin: 0 }}>
