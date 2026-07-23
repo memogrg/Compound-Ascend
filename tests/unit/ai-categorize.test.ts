@@ -347,6 +347,27 @@ describe("selectableSobresByFrasco", () => {
       { id: "s-suelto", sobre: "Suelto", frasco: null, categoryType: "expense" },
     ]);
   });
+
+  it("ordena por frasco y luego por sobre (ignora acentos/mayúsculas); sin-frasco al final", () => {
+    // Entrada desordenada a propósito.
+    const cats = [
+      mk({ id: "f-trans", name: "Transporte" }),
+      mk({ id: "f-alim", name: "Alimentación" }),
+      mk({ id: "s-veh", name: "Vehículo", parentId: "f-trans" }),
+      mk({ id: "s-super", name: "supermercado", parentId: "f-alim" }), // minúscula → va tras "Restaurantes"
+      mk({ id: "s-rest", name: "Restaurantes", parentId: "f-alim" }),
+      mk({ id: "s-suelto", name: "Suelto", parentId: null }), // sin frasco → al final
+      mk({ id: "s-bus", name: "Autobús", parentId: "f-trans" }),
+    ];
+    const out = selectableSobresByFrasco(cats).map((s) => `${s.frasco ?? "—"} › ${s.sobre}`);
+    expect(out).toEqual([
+      "Alimentación › Restaurantes",
+      "Alimentación › supermercado",
+      "Transporte › Autobús",
+      "Transporte › Vehículo",
+      "— › Suelto",
+    ]);
+  });
 });
 
 // ---------------------------------------------------------------------------

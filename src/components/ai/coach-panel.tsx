@@ -14,11 +14,8 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
-import {
-  confirmTransactionAction,
-  confirmGoalAction,
-  listSobresForKindAction,
-} from "@/modules/assistant/api/actions";
+import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
+import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
@@ -26,10 +23,6 @@ import { renderMarkdown } from "@/lib/markdown";
 
 type Msg = { role: "ai" | "me"; html: string; action?: AIActionProposal | null };
 type Mode = "assistant" | "ai";
-
-/** Sobre (hoja) del usuario con su frasco, para el selector "Frasco › Sobre" de la card. */
-type SobreOption = { id: string; sobre: string; frasco: string | null };
-const sobreLabel = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
 
 /** Restante del sobre que devuelve confirmTransactionAction (solo gasto con sobre). */
 type SobreRemaining = {
@@ -47,58 +40,6 @@ function sobreSuccessMessage(s: SobreRemaining | null): string {
   if (s.remaining < 0)
     return `✓ Registrado en ${s.path}. Te pasaste por ${formatMoney(-s.remaining, s.currency)}.`;
   return `✓ Registrado en ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
-}
-
-/**
- * Selector de SOBRE "Frasco › Sobre" compartido por el form manual y la card de confirmación
- * (IA/recibo). ÚNICA fuente del selector para que ambos paths no se desincronicen. Carga los
- * sobres reales del usuario para `kind` (RLS→hogar); "" = Sin sobre. `suggestedPath` mantiene
- * visible un sugerido que aún no esté en la lista (mientras carga o si no fuera seleccionable).
- */
-function SobreSelect({
-  kind,
-  value,
-  onChange,
-  disabled,
-  suggestedPath,
-}: {
-  kind: "ingreso" | "gasto";
-  value: string;
-  onChange: (categoryId: string) => void;
-  disabled?: boolean;
-  suggestedPath?: string | null;
-}) {
-  const [sobres, setSobres] = useState<SobreOption[]>([]);
-  // Best-effort: si falla, queda solo "Sin sobre".
-  useEffect(() => {
-    let alive = true;
-    listSobresForKindAction(kind)
-      .then((list) => alive && setSobres(list))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [kind]);
-
-  return (
-    <select
-      className="sel"
-      aria-label="Sobre"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-    >
-      <option value="">Sin sobre</option>
-      {value && !sobres.some((s) => s.id === value) ? (
-        <option value={value}>{suggestedPath ?? "Sobre sugerido"}</option>
-      ) : null}
-      {sobres.map((s) => (
-        <option key={s.id} value={s.id}>
-          {sobreLabel(s)}
-        </option>
-      ))}
-    </select>
-  );
 }
 
 const CHIPS = [
@@ -461,6 +402,23 @@ function TransactionWizard() {
     source: "manual",
   });
   const [confirming, setConfirming] = useState(false);
+  const descRef = useRef<HTMLInputElement>(null);
+
+  // "Registrar otro gasto": deja el form en blanco (kind Gasto, conserva la moneda) y foco en
+  // Descripción, sin cerrar el chat. Los campos del form están siempre montados → foco inmediato.
+  const registerAnother = () => {
+    setDraft((d) => ({
+      kind: "gasto",
+      description: "",
+      amount: 0,
+      currency: d.currency,
+      occurredOn: todayISO(),
+      source: "manual",
+      categoryId: null,
+    }));
+    setConfirming(false);
+    setTimeout(() => descRef.current?.focus(), 0);
+  };
 
   return (
     <div className="coach-body">
@@ -488,6 +446,7 @@ function TransactionWizard() {
 
       <Field label="Descripción">
         <input
+          ref={descRef}
           className="inp"
           aria-label="Descripción"
           value={draft.description}
@@ -497,7 +456,7 @@ function TransactionWizard() {
       </Field>
 
       <Field label="Sobre">
-        <SobreSelect
+        <SobreCombobox
           kind={draft.kind}
           value={draft.categoryId ?? ""}
           onChange={(categoryId) => setDraft((d) => ({ ...d, categoryId: categoryId || null }))}
@@ -549,6 +508,7 @@ function TransactionWizard() {
           title="Confirma la transacción"
           onCancel={() => setConfirming(false)}
           onConfirmed={() => setConfirming(false)}
+          onRegisterAnother={registerAnother}
         />
       ) : (
         <button
@@ -579,11 +539,14 @@ function TxnConfirmCard({
   title,
   onCancel,
   onConfirmed,
+  onRegisterAnother,
 }: {
   draft: DraftTxn;
   title: string;
   onCancel: () => void;
   onConfirmed: () => void;
+  /** Solo el FORM MANUAL lo pasa: al éxito muestra "Registrar otro"/"Listo" y NO auto-cierra. */
+  onRegisterAnother?: () => void;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -611,8 +574,9 @@ function TxnConfirmCard({
     if (res.ok) {
       setSobre(res.sobre ?? null);
       setOk(true);
-      // Con restante el usuario querrá leerlo → no autocierres la tarjeta.
-      if (!res.sobre) timerRef.current = setTimeout(onConfirmed, 1200);
+      // Manual: nunca auto-cierra (el usuario elige "otro"/"listo"). IA/recibo: auto-cierra salvo
+      // que haya restante para leer.
+      if (!onRegisterAnother && !res.sobre) timerRef.current = setTimeout(onConfirmed, 1200);
     } else {
       setError(res.message ?? "No se pudo guardar.");
     }
@@ -622,6 +586,24 @@ function TxnConfirmCard({
     return (
       <div className="coach-bubble" style={{ borderLeft: "2px solid var(--pos)" }}>
         {sobreSuccessMessage(sobre)}
+        {onRegisterAnother ? (
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button
+              className="btn btn-primary"
+              style={{ flex: 1, justifyContent: "center" }}
+              onClick={onRegisterAnother}
+            >
+              Registrar otro gasto
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ flex: 1, justifyContent: "center" }}
+              onClick={onConfirmed}
+            >
+              Listo
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -638,7 +620,7 @@ function TxnConfirmCard({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
         <span className="fld-label">Sobre</span>
-        <SobreSelect
+        <SobreCombobox
           kind={draft.kind}
           value={categoryId}
           onChange={setCategoryId}

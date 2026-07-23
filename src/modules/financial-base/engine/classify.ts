@@ -46,11 +46,16 @@ export function selectableCategoryLeaves(categories: Category[]): SelectableCate
  * Igual que selectableCategoryLeaves pero acompaña cada sobre (hoja) con el NOMBRE de su
  * frasco (categoría padre) para el selector "Frasco › Sobre". Si la hoja no tiene padre,
  * frasco = null. Puro: el nombre del frasco se resuelve del mismo conjunto de categorías.
+ *
+ * ORDENADO de forma determinista por frasco y luego por sobre (localeCompare es, sensitivity
+ * base → ignora acentos/mayúsculas). Las hojas sin frasco van al final. Este orden es la fuente
+ * ÚNICA para el chat web, la card de la IA y el asistente móvil.
  */
 export function selectableSobresByFrasco(categories: Category[]): SelectableSobre[] {
   const active = categories.filter((c) => c.isActive);
   const parentIds = new Set(active.map((c) => c.parentId).filter(Boolean));
   const nameById = new Map(active.map((c) => [c.id, c.name]));
+  const cmp = (a: string, b: string) => a.localeCompare(b, "es", { sensitivity: "base" });
   return active
     .filter((c) => !parentIds.has(c.id) && c.categoryType !== "transfer")
     .map((c) => ({
@@ -58,7 +63,17 @@ export function selectableSobresByFrasco(categories: Category[]): SelectableSobr
       sobre: c.name,
       frasco: c.parentId ? (nameById.get(c.parentId) ?? null) : null,
       categoryType: c.categoryType,
-    }));
+    }))
+    .sort((a, b) => {
+      // Sin frasco al final; entre frascos, alfabético; dentro del frasco, por sobre.
+      if (a.frasco !== b.frasco) {
+        if (a.frasco === null) return 1;
+        if (b.frasco === null) return -1;
+        const f = cmp(a.frasco, b.frasco);
+        if (f !== 0) return f;
+      }
+      return cmp(a.sobre, b.sobre);
+    });
 }
 
 /** ¿La hoja sirve para esta naturaleza? gasto→expense/both, ingreso→income/both. */
