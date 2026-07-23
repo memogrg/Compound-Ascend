@@ -8,21 +8,33 @@ const h = vi.hoisted(() => ({
   historyRows: [] as Record<string, unknown>[],
   upsertSpy: vi.fn(),
   cats: [] as Record<string, unknown>[],
+  // Filas single para el fallback determinista (validateLeafForKind / cache single).
+  catRow: null as Record<string, unknown> | null,
+  cacheSingle: null as Record<string, unknown> | null,
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/ai/providers/gemini", () => ({ createGeminiProvider: () => h.provider }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: async () => ({ id: "u1" }) }));
+vi.mock("@/lib/household/active", () => ({ getActiveHouseholdId: async () => null }));
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
     from: (table: string) => {
       const data = table === "transactions" ? h.historyRows : h.cacheRows;
       const b: Record<string, unknown> = {
         select: () => b,
+        eq: () => b,
         in: () => b,
         not: () => b,
+        is: () => b,
         order: () => b,
         limit: () => b,
+        // resolveAutoCategory: single de expense_categories (validación de hoja) o de la caché.
+        maybeSingle: () =>
+          Promise.resolve({
+            data: table === "expense_categories" ? h.catRow : h.cacheSingle,
+            error: null,
+          }),
         then: (r: (v: unknown) => unknown, j?: (e: unknown) => unknown) =>
           Promise.resolve({ data, error: null }).then(r, j),
         upsert: (payload: Record<string, unknown>) => {
@@ -44,9 +56,12 @@ import {
   suggestSobre,
   getSuggestionsFor,
   resolveAutoCategory,
+  suggestSobreForChat,
+  listSobresForKind,
   AUTO_ASSIGN_MIN_CONFIDENCE,
   MAX_NEW_SUGGESTION_CALLS,
 } from "@/modules/financial-base/services/ai-categorize";
+import { selectableSobresByFrasco } from "@/modules/financial-base/engine/classify";
 
 const cat = (over: Record<string, unknown>) => ({
   id: "c",
@@ -66,6 +81,8 @@ beforeEach(() => {
   h.aiText = '{"categoryId":null,"confidence":0}';
   h.cacheRows = [];
   h.historyRows = [];
+  h.catRow = null;
+  h.cacheSingle = null;
   h.upsertSpy.mockClear();
   h.cats = [
     cat({ id: "c-comida", name: "Comida", categoryType: "expense" }),
@@ -292,5 +309,109 @@ describe("resolveAutoCategory · auto-asignar sin IA", () => {
 
   it("umbral exportado es 0.9", () => {
     expect(AUTO_ASSIGN_MIN_CONFIDENCE).toBe(0.9);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// selectableSobresByFrasco (puro): hoja + su frasco (padre) para "Frasco › Sobre"
+// ---------------------------------------------------------------------------
+describe("selectableSobresByFrasco", () => {
+  const mk = (over: Record<string, unknown>) => ({
+    id: "x", key: null, name: "X", defaultNature: null, parentId: null, icon: null, color: null,
+    isFavorite: false, isEssential: false, isActive: true, isSystem: true, categoryType: "expense",
+    sortOrder: 0, linkedKind: null, ...over,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) as any;
+
+  it("cada sobre HOJA lleva el nombre de su frasco (padre)", () => {
+    const cats = [
+      mk({ id: "f-alim", name: "Alimentación" }), // frasco (padre) → no es hoja
+      mk({ id: "s-rest", name: "Restaurantes", parentId: "f-alim" }),
+      mk({ id: "s-super", name: "Supermercado", parentId: "f-alim" }),
+    ];
+    const out = selectableSobresByFrasco(cats);
+    expect(out).toEqual([
+      { id: "s-rest", sobre: "Restaurantes", frasco: "Alimentación", categoryType: "expense" },
+      { id: "s-super", sobre: "Supermercado", frasco: "Alimentación", categoryType: "expense" },
+    ]);
+  });
+
+  it("hoja sin padre → frasco null; excluye inactivas y 'transfer'", () => {
+    const cats = [
+      mk({ id: "s-suelto", name: "Suelto", parentId: null }),
+      mk({ id: "s-off", name: "Inactivo", isActive: false }),
+      mk({ id: "s-tx", name: "Transfer", categoryType: "transfer" }),
+    ];
+    const out = selectableSobresByFrasco(cats);
+    expect(out).toEqual([
+      { id: "s-suelto", sobre: "Suelto", frasco: null, categoryType: "expense" },
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listSobresForKind + suggestSobreForChat (chat: sugiere un sobre real del usuario)
+// ---------------------------------------------------------------------------
+describe("listSobresForKind", () => {
+  it("solo sobres de la naturaleza pedida, con su frasco", async () => {
+    h.cats = [
+      cat({ id: "f-alim", name: "Alimentación", categoryType: "expense" }),
+      cat({ id: "s-rest", name: "Restaurantes", parentId: "f-alim", categoryType: "expense" }),
+      cat({ id: "c-salario", name: "Salario", categoryType: "income" }),
+    ];
+    const gasto = await listSobresForKind("gasto");
+    expect(gasto).toEqual([{ id: "s-rest", sobre: "Restaurantes", frasco: "Alimentación" }]);
+    const ingreso = await listSobresForKind("ingreso");
+    expect(ingreso).toEqual([{ id: "c-salario", sobre: "Salario", frasco: null }]);
+  });
+});
+
+describe("suggestSobreForChat", () => {
+  it("la IA elige un sobre REAL del usuario → categoryId + 'Frasco › Sobre'", async () => {
+    h.cats = [
+      cat({ id: "f-alim", name: "Alimentación", categoryType: "expense" }),
+      cat({ id: "s-rest", name: "Restaurantes", parentId: "f-alim", categoryType: "expense" }),
+    ];
+    h.aiText = '{"categoryId":"s-rest","confidence":0.9}';
+    const r = await suggestSobreForChat("Starbucks", "gasto");
+    expect(r).toEqual({ categoryId: "s-rest", categoryPath: "Alimentación › Restaurantes" });
+  });
+
+  it("solo pasa a la IA los sobres de la naturaleza (un ingreso no ve sobres de gasto)", async () => {
+    h.cats = [
+      cat({ id: "s-rest", name: "Restaurantes", categoryType: "expense" }),
+      cat({ id: "c-salario", name: "Salario", categoryType: "income" }),
+    ];
+    await suggestSobreForChat("Nómina ACME", "ingreso");
+    const passed = h.provider!.chat.mock.calls[0]![0] as { messages: { content: string }[] };
+    expect(passed.messages[0]!.content).toContain("Salario");
+    expect(passed.messages[0]!.content).not.toContain("Restaurantes");
+  });
+
+  it("la IA no matchea → FALLBACK por historial del hogar (sin IA)", async () => {
+    h.cats = [
+      cat({ id: "f-alim", name: "Alimentación", categoryType: "expense" }),
+      cat({ id: "s-rest", name: "Restaurantes", parentId: "f-alim", categoryType: "expense" }),
+    ];
+    h.aiText = '{"categoryId":null,"confidence":0}'; // IA no matchea
+    h.historyRows = [
+      { merchant_or_source: "Soda La Esquina", description: null, category_id: "s-rest", kind: "gasto" },
+    ];
+    h.catRow = { category_type: "expense", is_active: true }; // valida como hoja
+    const r = await suggestSobreForChat("Soda La Esquina", "gasto");
+    expect(r).toEqual({ categoryId: "s-rest", categoryPath: "Alimentación › Restaurantes" });
+  });
+
+  it("sin match (ni IA ni historial) → 'Sin sobre' (null), no rompe", async () => {
+    h.cats = [cat({ id: "s-rest", name: "Restaurantes", categoryType: "expense" })];
+    const r = await suggestSobreForChat("Comercio Desconocido", "gasto");
+    expect(r).toEqual({ categoryId: null, categoryPath: null });
+  });
+
+  it("descripción vacía o usuario sin sobres → null", async () => {
+    expect(await suggestSobreForChat("   ", "gasto")).toEqual({ categoryId: null, categoryPath: null });
+    h.cats = [cat({ id: "c-salario", name: "Salario", categoryType: "income" })];
+    // Un gasto no tiene sobres de gasto disponibles → null.
+    expect(await suggestSobreForChat("Algo", "gasto")).toEqual({ categoryId: null, categoryPath: null });
   });
 });

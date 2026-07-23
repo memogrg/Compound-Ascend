@@ -34,6 +34,10 @@ export { listCategoryTree, getCategoryNameMap, createCategory } from "./services
 export type { CategoryNode } from "./services/categories-service";
 export { groupByJar } from "./engine/expense-jars";
 export type { JarGroup } from "./engine/expense-jars";
+// Sugerencia de sobre para el chat (IA acotada a los sobres del usuario + fallback historial)
+// y listado "Frasco › Sobre" para el selector de la card de confirmación.
+export { listSobresForKind, suggestSobreForChat } from "./services/ai-categorize";
+export type { SobreOption } from "./services/ai-categorize";
 // Orquestador de transacciones vinculadas: la puerta de entrada para que
 // control/wealth/assistant registren eventos de dinero (CLAUDE.md).
 export {

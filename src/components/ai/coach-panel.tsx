@@ -14,7 +14,11 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
-import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
+import {
+  confirmTransactionAction,
+  confirmGoalAction,
+  listSobresForKindAction,
+} from "@/modules/assistant/api/actions";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/modules/financial-base/constants";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
@@ -23,6 +27,10 @@ import { renderMarkdown } from "@/lib/markdown";
 
 type Msg = { role: "ai" | "me"; html: string; action?: AIActionProposal | null };
 type Mode = "assistant" | "ai";
+
+/** Sobre (hoja) del usuario con su frasco, para el selector "Frasco › Sobre" de la card. */
+type SobreOption = { id: string; sobre: string; frasco: string | null };
+const sobreLabel = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
 
 const CHIPS = [
   "¿Cómo está mi salud financiera?",
@@ -308,6 +316,9 @@ function ActionCard({ action }: { action: AIActionProposal }) {
       currency: String(p.currency ?? captureCurrency),
       occurredOn: String(p.date ?? p.occurredOn ?? todayISO()),
       source: "chat",
+      // Sobre sugerido por el backend (hoja real del usuario) — preselecciona el selector.
+      categoryId: typeof p.categoryId === "string" ? p.categoryId : null,
+      categoryPath: typeof p.categoryPath === "string" ? p.categoryPath : null,
       linkedKind,
       linkedId: linkedKind && typeof p.linkedId === "string" ? p.linkedId : null,
       linkedName: linkedKind && typeof p.linkedName === "string" ? p.linkedName : null,
@@ -362,6 +373,9 @@ type DraftTxn = {
   currency: string;
   occurredOn: string;
   source: "chat" | "receipt" | "manual";
+  // Sobre (hoja) sugerido por la IA; el usuario lo confirma/corrige. null/undefined = "Sin sobre".
+  categoryId?: string | null;
+  categoryPath?: string | null; // "Frasco › Sobre" del sugerido (solo display inicial)
   // Fase 5: vínculo propuesto por la IA (el usuario lo ve antes de confirmar).
   linkedKind?: "debt" | "goal" | "holding" | "policy" | "rental" | null;
   linkedId?: string | null;
@@ -515,6 +529,9 @@ function TxnConfirmCard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  // Sobre elegido (arranca en el sugerido por la IA); "" = Sin sobre.
+  const [categoryId, setCategoryId] = useState<string>(draft.categoryId ?? "");
+  const [sobres, setSobres] = useState<SobreOption[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Limpia el timeout pendiente si la tarjeta se desmonta antes de los 1200ms
@@ -526,10 +543,21 @@ function TxnConfirmCard({
     [],
   );
 
+  // Sobres del usuario para el selector (editable). Best-effort: si falla, queda "Sin sobre".
+  useEffect(() => {
+    let alive = true;
+    listSobresForKindAction(draft.kind)
+      .then((list) => alive && setSobres(list))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [draft.kind]);
+
   const confirm = async () => {
     setPending(true);
     setError(null);
-    const res = await confirmTransactionAction(draft);
+    const res = await confirmTransactionAction({ ...draft, categoryId: categoryId || null });
     setPending(false);
     if (res.ok) {
       setOk(true);
@@ -556,6 +584,27 @@ function TxnConfirmCard({
       </div>
       <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
         {draft.description} · {draft.occurredOn}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+        <span className="fld-label">Sobre</span>
+        <select
+          className="sel"
+          aria-label="Sobre"
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          disabled={pending}
+        >
+          <option value="">Sin sobre</option>
+          {/* Mantiene visible el sugerido mientras carga la lista (o si no estuviera en ella). */}
+          {categoryId && !sobres.some((s) => s.id === categoryId) ? (
+            <option value={categoryId}>{draft.categoryPath ?? "Sobre sugerido"}</option>
+          ) : null}
+          {sobres.map((s) => (
+            <option key={s.id} value={s.id}>
+              {sobreLabel(s)}
+            </option>
+          ))}
+        </select>
       </div>
       {draft.linkedKind && draft.linkedId ? (
         <div style={{ marginTop: 6 }}>

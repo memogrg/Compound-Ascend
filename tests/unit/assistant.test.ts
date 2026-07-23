@@ -90,6 +90,15 @@ describe("validación de transacción (confirmación)", () => {
     expect(r.success).toBe(false);
   });
 
+  it("acepta el sobre elegido (categoryId uuid o null) y rechaza un id no-uuid", () => {
+    const base = { kind: "gasto", description: "Café", amount: 1500, currency: "CRC", occurredOn: "2026-06-01" };
+    expect(
+      transactionInputSchema.safeParse({ ...base, categoryId: "8126a25b-0873-44a4-8321-53de492cfe4a" }).success,
+    ).toBe(true);
+    expect(transactionInputSchema.safeParse({ ...base, categoryId: null }).success).toBe(true);
+    expect(transactionInputSchema.safeParse({ ...base, categoryId: "frasco-alimentacion" }).success).toBe(false);
+  });
+
   it("acepta el vínculo propuesto por la IA (Fase 5) y rechaza ids inválidos", () => {
     const ok = transactionInputSchema.safeParse({
       kind: "gasto",
