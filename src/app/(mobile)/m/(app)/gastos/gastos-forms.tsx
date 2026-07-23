@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import {
   addTransactionAction,
@@ -90,7 +91,9 @@ export function AddSpendForm({
   const [categoryId, setCategoryId] = useState<string | null>(preset?.id ?? null);
   const [sobreLabel, setSobreLabel] = useState<string>(preset?.name ?? "");
   const [amount, setAmount] = useState<number | undefined>(undefined);
-  const [cur, setCur] = useState(currency);
+  // ALTA de gasto: la PRINCIPAL del contexto (importe libre); el selector la deja cambiar.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(captureCurrency);
   const [date, setDate] = useState(todayISO());
   const [merchant, setMerchant] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -219,18 +222,18 @@ export function SobrePicker({
 // ── Crear sobre (categoría hoja + presupuesto) ─────────────────────────────
 export function CreateSobreForm({
   jarGroup,
-  currency,
   period,
   onSuccess,
 }: {
   jarGroup: string;
-  currency: string;
   period: Period;
   onSuccess: () => void;
 }) {
   const [name, setName] = useState("");
   const [amount, setAmount] = useState<number | undefined>(undefined);
-  const [cur, setCur] = useState(currency);
+  // Presupuesto inicial del sobre nuevo: importe libre → la PRINCIPAL del contexto.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(captureCurrency);
   const [essential, setEssential] = useState(false);
 
   // Igual que la web: crea la categoría (sobre favorito) y, si hay monto, su línea

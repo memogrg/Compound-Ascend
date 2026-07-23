@@ -97,7 +97,6 @@ function toValues(it: BudgetItem): IncomeSourceValues {
 export function IncomeManager({
   sources,
   received,
-  currency,
   incomeTree,
   periodMonth,
   periodYear,
@@ -105,7 +104,6 @@ export function IncomeManager({
   sources: BudgetItem[];
   /** Recibido por fuente en su moneda NATIVA (real.incomeReceivedBySourceNative). */
   received: Record<string, number>;
-  currency: string;
   incomeTree: CategoryNode[];
   /** Período actual (para copiar las fuentes del mes anterior). */
   periodMonth: number;
@@ -244,7 +242,6 @@ export function IncomeManager({
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Registrar ingreso">
         <IncomeSourceForm
-          currency={currency}
           incomeTree={incomeTree}
           action={registerIncomeSourceAction}
           submitLabel="Guardar ingreso"
@@ -258,7 +255,6 @@ export function IncomeManager({
       <BottomSheet open={!!editing} onClose={() => setEditing(null)} title="Editar fuente">
         {editing ? (
           <IncomeSourceForm
-            currency={currency}
             incomeTree={incomeTree}
             initial={toValues(editing)}
             action={(v: IncomeSourceValues) => updateIncomeSourceAction(editing.id, v)}

@@ -121,7 +121,7 @@ export default async function MobileProteccion() {
         {/* Pólizas — CRUD (FAB alta · SwipeRow editar/eliminar) */}
         <MSectionHeader title="Tus pólizas" />
         <div style={{ marginBottom: p.gaps.length > 0 ? 16 : 0 }}>
-          <ProteccionManager policies={policies} currency={currency} />
+          <ProteccionManager policies={policies} />
         </div>
 
         {/* Brechas de protección (diagnóstico del engine; su lógica no se toca). */}

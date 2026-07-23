@@ -20,12 +20,10 @@ export function QuickAddLauncher({
   sobres,
   frecuentes,
   fuentes,
-  currency,
 }: {
   sobres: SobreRapido[];
   frecuentes: SobreRapido[];
   fuentes: FuenteIngreso[];
-  currency: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -37,7 +35,6 @@ export function QuickAddLauncher({
         sobres={sobres}
         frecuentes={frecuentes}
         fuentes={fuentes}
-        currency={currency}
       />
     </>
   );

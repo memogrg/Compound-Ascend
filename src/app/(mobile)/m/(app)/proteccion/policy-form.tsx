@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import {
   FormShell,
@@ -48,14 +49,12 @@ const PREMIUM_FREQ_OPTS: Opt[] = [
 
 export function PolicyForm({
   initial,
-  currency,
   action,
   submitLabel,
   successMessage,
   onSuccess,
 }: {
   initial?: PolicyValues;
-  currency: string;
   action: (raw: PolicyValues) => Promise<ActionResult>;
   submitLabel: string;
   successMessage: string;
@@ -66,7 +65,10 @@ export function PolicyForm({
   const [coverage, setCoverage] = useState<number | undefined>(initial?.coverage);
   const [premium, setPremium] = useState<number | undefined>(initial?.premium);
   const [premiumFrequency, setPremiumFrequency] = useState(initial?.premiumFrequency ?? "mensual");
-  const [cur, setCur] = useState(initial?.currency ?? currency);
+  // ALTA: la PRINCIPAL del contexto (importe libre); edición: la nativa del ítem. Antes
+  // caía a `currency`, la de visualización del topbar — la siembra equivocada.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
   const [fundingReference, setFundingReference] = useState(initial?.fundingReference ?? "");
 
   const values: PolicyValues = {

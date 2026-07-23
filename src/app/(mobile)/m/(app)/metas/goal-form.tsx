@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import {
   listExpenseJarsAction,
@@ -85,14 +86,12 @@ const FREQ_OPTS: Opt[] = [
 
 export function GoalForm({
   initial,
-  currency,
   action,
   submitLabel,
   successMessage,
   onSuccess,
 }: {
   initial?: Partial<GoalValues>;
-  currency: string;
   action: (raw: GoalValues) => Promise<ActionResult>;
   submitLabel: string;
   successMessage: string;
@@ -106,7 +105,10 @@ export function GoalForm({
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [priority, setPriority] = useState(initial?.priority ?? "media");
   const [recurrence, setRecurrence] = useState(initial?.recurrence ?? "ninguna");
-  const [cur, setCur] = useState(initial?.currency ?? currency);
+  // ALTA: la PRINCIPAL del contexto (importe libre); edición: la nativa del ítem. Antes
+  // caía a `currency`, la de visualización del topbar — la siembra equivocada.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
   const isRecurring = recurrence !== "ninguna";
   // Categoría por defecto del frasco (se precarga al gastar). Opciones planas
   // "Grupo · Hoja" para el SheetSelect, cargadas al montar.

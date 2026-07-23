@@ -366,7 +366,6 @@ export default async function MobileHome() {
           sobres={quickAdd.sobres}
           frecuentes={quickAdd.frecuentes}
           fuentes={quickAdd.fuentes}
-          currency={currency}
         />
       )}
     </div>

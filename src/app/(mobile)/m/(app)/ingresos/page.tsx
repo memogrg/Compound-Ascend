@@ -154,7 +154,6 @@ export default async function MobileIngresos() {
         <IncomeManager
           sources={manualSources}
           received={receivedNative}
-          currency={currency}
           incomeTree={incomeTree}
           periodMonth={view.period.month}
           periodYear={view.period.year}

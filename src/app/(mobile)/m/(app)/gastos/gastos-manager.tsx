@@ -497,7 +497,6 @@ export function GastosManager({
         {creatingSobreIn ? (
           <CreateSobreForm
             jarGroup={creatingSobreIn}
-            currency={currency}
             period={period}
             onSuccess={() => setCreatingSobreIn(null)}
           />

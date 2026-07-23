@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import {
   FormShell,
@@ -46,14 +47,12 @@ export type DebtValues = {
 
 export function DebtForm({
   initial,
-  currency,
   action,
   submitLabel,
   successMessage,
   onSuccess,
 }: {
   initial?: DebtValues;
-  currency: string;
   action: (raw: DebtValues) => Promise<ActionResult>;
   submitLabel: string;
   successMessage: string;
@@ -68,7 +67,10 @@ export function DebtForm({
   const [minPayment, setMinPayment] = useState<number | undefined>(initial?.minPayment);
   const [apr, setApr] = useState(initial?.apr != null ? String(initial.apr) : "");
   const [termMonths, setTerm] = useState(initial?.termMonths != null ? String(initial.termMonths) : "");
-  const [cur, setCur] = useState(initial?.currency ?? currency);
+  // ALTA: la PRINCIPAL del contexto (importe libre); edición: la nativa del ítem. Antes
+  // caía a `currency`, la de visualización del topbar — la siembra equivocada.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
 
   // Campos avanzados que NO se editan en móvil pero se preservan (ver nota arriba).
   const carried = initial

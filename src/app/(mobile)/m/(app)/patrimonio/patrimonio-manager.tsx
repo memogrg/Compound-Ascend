@@ -64,11 +64,9 @@ type DelTarget = { kind: "asset" | "liability"; id: string; name: string };
 export function PatrimonioManager({
   assets,
   liabilities,
-  currency,
 }: {
   assets: Asset[];
   liabilities: Liability[];
-  currency: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -194,7 +192,6 @@ export function PatrimonioManager({
         {addKind ? (
           <WealthItemForm
             kind={addKind}
-            currency={currency}
             action={addKind === "asset" ? addAssetAction : addLiabilityAction}
             submitLabel="Guardar"
             successMessage={addKind === "asset" ? "Activo agregado" : "Pasivo agregado"}
@@ -208,7 +205,6 @@ export function PatrimonioManager({
         {editAsset ? (
           <WealthItemForm
             kind="asset"
-            currency={currency}
             initial={assetToInitial(editAsset)}
             action={(v: AssetValues | LiabilityValues) => editAssetAction(editAsset.id, v)}
             submitLabel="Guardar cambios"
@@ -223,7 +219,6 @@ export function PatrimonioManager({
         {editLiab ? (
           <WealthItemForm
             kind="liability"
-            currency={currency}
             initial={liabToInitial(editLiab)}
             action={(v: AssetValues | LiabilityValues) => editLiabilityAction(editLiab.id, v)}
             submitLabel="Guardar cambios"

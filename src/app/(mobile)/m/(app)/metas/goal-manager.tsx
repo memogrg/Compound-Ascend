@@ -99,11 +99,9 @@ function todayISO(): string {
 
 export function GoalManager({
   goals,
-  currency,
   tree,
 }: {
   goals: SavingsGoal[];
-  currency: string;
   /** Árbol de categorías para agrupar las metas por frasco (mismo groupByJar que la web). */
   tree: CategoryNode[];
 }) {
@@ -243,7 +241,6 @@ export function GoalManager({
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Nueva meta">
         <GoalForm
-          currency={currency}
           action={addGoalAction}
           submitLabel="Crear meta"
           successMessage="Meta creada"
@@ -255,7 +252,6 @@ export function GoalManager({
       <BottomSheet open={!!editing} onClose={() => setEditing(null)} title="Editar meta">
         {editing ? (
           <GoalForm
-            currency={currency}
             initial={{
               name: editing.name,
               targetAmount: editing.targetAmount,

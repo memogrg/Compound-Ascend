@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
+import { getPrimaryCurrency, getDisplayCurrency } from "@/modules/financial-base";
+import { CurrencyProvider } from "@/components/layout/currency-context";
 import { ToastProvider } from "../components/form-kit/toast";
 import { AppLockOverlay } from "../components/app-lock-overlay";
 import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
@@ -14,6 +16,12 @@ import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
  * duplicaban cuatro de los trece destinos que el menú ☰ del header ya ofrece en TODAS las
  * pantallas, a cambio de 64px de alto fijos. Lo que queda abajo es el botón de crear, que
  * cada pantalla monta con <Fab> y significa "lo que se registra aquí".
+ *
+ * Monta CurrencyProvider (igual que el shell web), con las DOS monedas: la principal
+ * —estable, la que se usa para CAPTURAR un importe libre— y la de visualización del topbar.
+ * Antes no lo montaba, así que los formularios de alta sembraban su moneda de la de
+ * visualización y `useCaptureCurrency()` caía al fallback "CRC". Con el provider aquí, cada
+ * formulario lee la principal del contexto y deja de heredar la volátil.
  */
 export default async function MobileAppLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
@@ -23,17 +31,30 @@ export default async function MobileAppLayout({ children }: { children: React.Re
   const demoAllowed = process.env.MOBILE_DEMO_PREVIEW === "1";
   if (!user && !demoAllowed) redirect("/m/login");
 
+  // Sin sesión (modo demo) no se consultan monedas del usuario: CRC/CRC de relleno. Con
+  // sesión, las dos reales; best-effort para no tumbar el layout si el fetch falla.
+  let currencies = { primary: "CRC", display: "CRC" };
+  if (user) {
+    const [primary, display] = await Promise.all([
+      getPrimaryCurrency().catch(() => "CRC"),
+      getDisplayCurrency().catch(() => "CRC"),
+    ]);
+    currencies = { primary, display };
+  }
+
   return (
-    <ToastProvider>
-      {/* Fondo ambiental "Cristal Cálido": halos de marca detrás de todo el contenido.
+    <CurrencyProvider value={currencies}>
+      <ToastProvider>
+        {/* Fondo ambiental "Cristal Cálido": halos de marca detrás de todo el contenido.
           Fijo, no interactivo (pointer-events:none) → no afecta scroll ni hit-testing. */}
-      <div className="m-ambient" aria-hidden />
-      {/* Candado local con biometría (solo app nativa): se monta primero para tapar
+        <div className="m-ambient" aria-hidden />
+        {/* Candado local con biometría (solo app nativa): se monta primero para tapar
           la UI lo antes posible al reanudar. No afecta a la web. */}
-      <AppLockOverlay />
-      {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
-      <WidgetSnapshotWriter />
-      {children}
-    </ToastProvider>
+        <AppLockOverlay />
+        {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
+        <WidgetSnapshotWriter />
+        {children}
+      </ToastProvider>
+    </CurrencyProvider>
   );
 }
