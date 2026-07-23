@@ -39,6 +39,24 @@ type DraftTxn = {
 /** Sobre (hoja) del usuario con su frasco, para el selector "Frasco › Sobre". */
 type SobreOption = { id: string; sobre: string; frasco: string | null };
 const sobreLabel = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
+
+/** Restante del sobre que devuelve confirmTransactionAction (solo gasto con sobre). */
+type SobreRemaining = {
+  path: string;
+  currency: string;
+  budget: number;
+  spent: number;
+  remaining: number;
+  hasBudget: boolean;
+};
+/** Mensaje de éxito: con restante del sobre si aplica, o el genérico si no. */
+function sobreSuccessMessage(s: SobreRemaining | null): string {
+  if (!s) return "✓ Transacción registrada.";
+  if (!s.hasBudget) return `✓ Registrado en ${s.path}. (Este sobre no tiene presupuesto asignado)`;
+  if (s.remaining < 0)
+    return `✓ Registrado en ${s.path}. Te pasaste por ${formatMoney(-s.remaining, s.currency)}.`;
+  return `✓ Registrado en ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
+}
 type DraftGoal = {
   name: string;
   targetAmount: number;
@@ -411,6 +429,8 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "ok" | "cancel">("idle");
+  // Restante del sobre tras crear el gasto (para el mensaje de éxito); null = mensaje genérico.
+  const [sobre, setSobre] = useState<SobreRemaining | null>(null);
   // Sobre elegido (arranca en el sugerido por la IA); "" = Sin sobre.
   const [categoryId, setCategoryId] = useState<string>(draft.categoryId ?? "");
   const [sobres, setSobres] = useState<SobreOption[]>([]);
@@ -431,12 +451,14 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
     setError(null);
     const res = await confirmTransactionAction({ ...draft, categoryId: categoryId || null });
     setPending(false);
-    if (res.ok) setPhase("ok");
-    else setError(res.message ?? "No se pudo guardar.");
+    if (res.ok) {
+      setSobre(res.sobre ?? null);
+      setPhase("ok");
+    } else setError(res.message ?? "No se pudo guardar.");
   };
 
   if (phase === "cancel") return null;
-  if (phase === "ok") return <div className="m-confirm-done">✓ Transacción registrada.</div>;
+  if (phase === "ok") return <div className="m-confirm-done">{sobreSuccessMessage(sobre)}</div>;
 
   return (
     <div className="m-confirm">

@@ -38,6 +38,9 @@ export type { JarGroup } from "./engine/expense-jars";
 // y listado "Frasco › Sobre" para el selector de la card de confirmación.
 export { listSobresForKind, suggestSobreForChat } from "./services/ai-categorize";
 export type { SobreOption } from "./services/ai-categorize";
+// Restante de un sobre tras registrar un gasto (mensaje de éxito del chat).
+export { getSobreRemaining } from "./services/sobre-remaining";
+export type { SobreRemaining } from "./services/sobre-remaining";
 // Orquestador de transacciones vinculadas: la puerta de entrada para que
 // control/wealth/assistant registren eventos de dinero (CLAUDE.md).
 export {
