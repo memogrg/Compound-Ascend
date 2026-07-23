@@ -12,6 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
 import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/modules/financial-base/constants";
@@ -33,6 +34,8 @@ function todayISO(): string {
 }
 
 export function CoachPanel() {
+  // PRINCIPAL, no la de visualización: es la moneda con la que se captura.
+  const captureCurrency = useCaptureCurrency();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("assistant");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -59,7 +62,9 @@ export function CoachPanel() {
           kind: "gasto",
           description: data.extract.merchant ?? "Compra",
           amount: data.extract.amount ?? 0,
-          currency: "CRC",
+          // La detectada en el recibo; si no hay, la PRINCIPAL. El "CRC" literal
+          // descartaba la moneda que el extractor sí devuelve (distingue ₡ de $).
+          currency: data.extract.currency ?? captureCurrency,
           occurredOn: data.extract.date ?? todayISO(),
           source: "receipt",
         });
@@ -285,6 +290,7 @@ function FinanceChat() {
 
 /** Tarjeta de acción propuesta por la IA. Solo create_transaction es ejecutable aquí. */
 function ActionCard({ action }: { action: AIActionProposal }) {
+  const captureCurrency = useCaptureCurrency();
   const [done, setDone] = useState(false);
   if (action.type === "create_transaction") {
     const p = action.payload as Record<string, unknown>;
@@ -297,7 +303,7 @@ function ActionCard({ action }: { action: AIActionProposal }) {
       kind: (p.kind as "ingreso" | "gasto") ?? "gasto",
       description: String(p.description ?? action.summary ?? "Transacción"),
       amount: Number(p.amount ?? 0),
-      currency: String(p.currency ?? "CRC"),
+      currency: String(p.currency ?? captureCurrency),
       occurredOn: String(p.date ?? p.occurredOn ?? todayISO()),
       source: "chat",
       linkedKind,
@@ -325,7 +331,7 @@ function ActionCard({ action }: { action: AIActionProposal }) {
       name: String(p.name ?? action.summary ?? "Meta"),
       targetAmount: Number(p.targetAmount ?? 0),
       monthlyContribution: Number(p.monthlyContribution ?? 0),
-      currency: String(p.currency ?? "CRC"),
+      currency: String(p.currency ?? captureCurrency),
       targetDate,
     };
     return (
@@ -431,7 +437,7 @@ function TransactionWizard() {
             min="0"
             step="0.01"
             aria-label="Monto"
-          value={draft.amount || ""}
+            value={draft.amount || ""}
             onChange={(e) => setDraft((d) => ({ ...d, amount: Number(e.target.value) }))}
             placeholder="0"
           />
@@ -440,7 +446,7 @@ function TransactionWizard() {
           <select
             className="sel"
             aria-label="Moneda"
-          value={draft.currency}
+            value={draft.currency}
             onChange={(e) => setDraft((d) => ({ ...d, currency: e.target.value }))}
           >
             {CURRENCIES.map((c) => (

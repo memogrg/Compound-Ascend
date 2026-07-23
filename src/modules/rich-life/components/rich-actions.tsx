@@ -148,7 +148,6 @@ function Form({
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
-  const sym = currencySymbol(currency);
 
   const assetItem = kind === "asset" ? (item as Asset | undefined) : undefined;
   const liabItem = kind === "liability" ? (item as Liability | undefined) : undefined;
@@ -195,7 +194,11 @@ function Form({
   };
 
   const defValue = assetItem?.value ?? liabItem?.balance;
-  const defCurrency = item?.currency ?? currency;
+  // CONTROLADO: el select era `defaultValue` y el símbolo salía del prop `currency`, así
+  // que cambiar la moneda no movía el símbolo — se enseñaba ₡ y se guardaba USD. Los dos
+  // leen ahora el mismo estado.
+  const [cur, setCur] = useState(item?.currency ?? currency);
+  const sym = currencySymbol(cur);
 
   return (
     <form onSubmit={onSubmit}>
@@ -260,7 +263,12 @@ function Form({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={defCurrency}>
+            <select
+              className="sel"
+              name="currency"
+              value={cur}
+              onChange={(e) => setCur(e.target.value)}
+            >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}

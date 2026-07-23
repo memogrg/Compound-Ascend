@@ -48,7 +48,7 @@ function todayISO(): string {
 }
 
 /** Mapea action.payload → borrador de transacción (espeja ActionCard de la web). */
-function txnFromAction(action: AIActionProposal): DraftTxn {
+function txnFromAction(action: AIActionProposal, principal: string): DraftTxn {
   const p = action.payload as Record<string, unknown>;
   const VALID = new Set(["debt", "goal", "holding", "policy", "rental"]);
   const linkedKind =
@@ -59,7 +59,9 @@ function txnFromAction(action: AIActionProposal): DraftTxn {
     kind: (p.kind as "ingreso" | "gasto") ?? "gasto",
     description: String(p.description ?? action.summary ?? "Transacción"),
     amount: Number(p.amount ?? 0),
-    currency: String(p.currency ?? "CRC"),
+    // La que proponga la IA; si no propone, la PRINCIPAL del usuario. El "CRC" literal que
+    // había aquí imponía colones a cualquiera, sin forma de corregirlo.
+    currency: String(p.currency ?? principal),
     occurredOn: String(p.date ?? p.occurredOn ?? todayISO()),
     source: "chat",
     linkedKind,
@@ -69,14 +71,14 @@ function txnFromAction(action: AIActionProposal): DraftTxn {
 }
 
 /** Mapea action.payload → borrador de meta (espeja ActionCard de la web). */
-function goalFromAction(action: AIActionProposal): DraftGoal {
+function goalFromAction(action: AIActionProposal, principal: string): DraftGoal {
   const p = action.payload as Record<string, unknown>;
   const targetDate = typeof p.targetDate === "string" && p.targetDate.trim() ? p.targetDate : null;
   return {
     name: String(p.name ?? action.summary ?? "Meta"),
     targetAmount: Number(p.targetAmount ?? 0),
     monthlyContribution: Number(p.monthlyContribution ?? 0),
-    currency: String(p.currency ?? "CRC"),
+    currency: String(p.currency ?? principal),
     targetDate,
   };
 }
@@ -102,7 +104,7 @@ const LINK_LABEL: Record<string, string> = {
   rental: "alquiler",
 };
 
-export function MobileAssistant() {
+export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }) {
   const [messages, setMessages] = useState<ChatMsg[]>([
     {
       id: 0,
@@ -144,16 +146,28 @@ export function MobileAssistant() {
       if (res.ok) {
         setMessages((m) => [
           ...m,
-          { id: nextId(), role: "assistant", text: String(data.reply ?? ""), action: data.action ?? null },
+          {
+            id: nextId(),
+            role: "assistant",
+            text: String(data.reply ?? ""),
+            action: data.action ?? null,
+          },
         ]);
       } else {
         setMessages((m) => [
           ...m,
-          { id: nextId(), role: "assistant", text: data.error?.message ?? "No pude responder ahora." },
+          {
+            id: nextId(),
+            role: "assistant",
+            text: data.error?.message ?? "No pude responder ahora.",
+          },
         ]);
       }
     } catch {
-      setMessages((m) => [...m, { id: nextId(), role: "assistant", text: "Hubo un problema de conexión." }]);
+      setMessages((m) => [
+        ...m,
+        { id: nextId(), role: "assistant", text: "Hubo un problema de conexión." },
+      ]);
     } finally {
       setSending(false);
     }
@@ -174,27 +188,46 @@ export function MobileAssistant() {
       });
       const data = await res.json();
       if (res.ok && data.extract) {
-        const ext = data.extract as { amount: number | null; merchant: string | null; date: string | null };
+        // `currency` faltaba en este tipo inline, así que se descartaba en silencio la
+        // moneda que el extractor SÍ detecta del recibo (el prompt pide distinguir ₡ de $).
+        const ext = data.extract as {
+          amount: number | null;
+          merchant: string | null;
+          date: string | null;
+          currency: string | null;
+        };
         const txn: DraftTxn = {
           kind: "gasto",
           description: ext.merchant ?? "Compra",
           amount: ext.amount ?? 0,
-          currency: "CRC",
+          currency: ext.currency ?? primaryCurrency,
           occurredOn: ext.date ?? todayISO(),
           source: "receipt",
         };
         setMessages((m) => [
           ...m,
-          { id: nextId(), role: "assistant", text: "Leí tu recibo. Revisa y confirma para registrarlo:", txn },
+          {
+            id: nextId(),
+            role: "assistant",
+            text: "Leí tu recibo. Revisa y confirma para registrarlo:",
+            txn,
+          },
         ]);
       } else {
         setMessages((m) => [
           ...m,
-          { id: nextId(), role: "assistant", text: "No pude leer el recibo. Intenta con otra foto." },
+          {
+            id: nextId(),
+            role: "assistant",
+            text: "No pude leer el recibo. Intenta con otra foto.",
+          },
         ]);
       }
     } catch {
-      setMessages((m) => [...m, { id: nextId(), role: "assistant", text: "No pude procesar la imagen." }]);
+      setMessages((m) => [
+        ...m,
+        { id: nextId(), role: "assistant", text: "No pude procesar la imagen." },
+      ]);
     } finally {
       setScanning(false);
     }
@@ -204,13 +237,22 @@ export function MobileAssistant() {
     <div className="m-chat">
       <header className="m-chat-head">
         <Link href="/m" className="icon-btn" aria-label="Volver">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </Link>
         <div>
           <div className="m-chat-title">Asistente IA</div>
-          <div className="muted" style={{ fontSize: 11.5 }}>Chat + escáner de recibos</div>
+          <div className="muted" style={{ fontSize: 11.5 }}>
+            Chat + escáner de recibos
+          </div>
         </div>
       </header>
 
@@ -220,27 +262,47 @@ export function MobileAssistant() {
             <div className={`m-msg${m.role === "user" ? " me" : ""}`}>
               {m.role === "assistant" ? (
                 <span className="m-ava" aria-hidden>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M12 3l1.6 3.9L17.5 8.5 13.6 10 12 14l-1.6-4L6.5 8.5l3.9-1.6z" />
                   </svg>
                 </span>
               ) : null}
               <div className="m-bubble">{m.text}</div>
             </div>
-            {m.action?.type === "create_transaction" ? <MTxnConfirm draft={txnFromAction(m.action)} /> : null}
-            {m.action?.type === "create_goal" ? <MGoalConfirm draft={goalFromAction(m.action)} /> : null}
+            {m.action?.type === "create_transaction" ? (
+              <MTxnConfirm draft={txnFromAction(m.action, primaryCurrency)} />
+            ) : null}
+            {m.action?.type === "create_goal" ? (
+              <MGoalConfirm draft={goalFromAction(m.action, primaryCurrency)} />
+            ) : null}
             {m.txn ? <MTxnConfirm draft={m.txn} /> : null}
           </div>
         ))}
         {sending ? (
           <div className="m-msg">
             <span className="m-ava" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M12 3l1.6 3.9L17.5 8.5 13.6 10 12 14l-1.6-4L6.5 8.5l3.9-1.6z" />
               </svg>
             </span>
             <div className="m-bubble m-typing" aria-label="Escribiendo">
-              <i /><i /><i />
+              <i />
+              <i />
+              <i />
             </div>
           </div>
         ) : null}
@@ -271,7 +333,14 @@ export function MobileAssistant() {
           aria-label="Escanear recibo"
           title="Escanear recibo"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.9}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
             <circle cx="12" cy="13" r="4" />
           </svg>
@@ -298,7 +367,14 @@ export function MobileAssistant() {
           disabled={sending || !input.trim()}
           aria-label="Enviar"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
           </svg>
         </button>
@@ -349,7 +425,11 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
         </div>
       ) : null}
       <div className="m-confirm-actions">
-        <button className="m-btn m-btn-secondary" onClick={() => setPhase("cancel")} disabled={pending}>
+        <button
+          className="m-btn m-btn-secondary"
+          onClick={() => setPhase("cancel")}
+          disabled={pending}
+        >
           Cancelar
         </button>
         <button className="m-btn m-btn-primary" onClick={confirm} disabled={pending}>
@@ -387,7 +467,9 @@ function MGoalConfirm({ draft }: { draft: DraftGoal }) {
   return (
     <div className="m-confirm">
       <div className="m-confirm-eyebrow">Crear meta</div>
-      <div className="m-confirm-amt" style={{ fontSize: 16 }}>{draft.name}</div>
+      <div className="m-confirm-amt" style={{ fontSize: 16 }}>
+        {draft.name}
+      </div>
       <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
         Objetivo: {formatMoney(draft.targetAmount, draft.currency)}
         {draft.monthlyContribution > 0
@@ -401,7 +483,11 @@ function MGoalConfirm({ draft }: { draft: DraftGoal }) {
         </div>
       ) : null}
       <div className="m-confirm-actions">
-        <button className="m-btn m-btn-secondary" onClick={() => setPhase("cancel")} disabled={pending}>
+        <button
+          className="m-btn m-btn-secondary"
+          onClick={() => setPhase("cancel")}
+          disabled={pending}
+        >
           Cancelar
         </button>
         <button className="m-btn m-btn-primary" onClick={confirm} disabled={pending}>

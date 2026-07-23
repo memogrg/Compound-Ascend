@@ -3219,6 +3219,30 @@ body:has(.m-shell[data-theme="dark"]) {
   font-weight: 700;
   color: var(--text-muted);
 }
+/* El símbolo es un BOTÓN: la moneda se cambia desde el camino principal, sin abrir "Más
+   detalles" ni añadir una fila que empuje "Guardar" fuera del pliegue. El código de la
+   moneda va debajo, pequeño, para que "$" y "₡" —que se confunden— queden desambiguados. */
+.m-shell .m-qa-sym-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 6px;
+  min-height: 44px; /* objetivo táctil, aunque el glifo sea pequeño */
+  border-radius: 10px;
+}
+.m-shell .m-qa-sym-btn:active {
+  background: var(--surface-2);
+}
+.m-shell .m-qa-sym-cur {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
 .m-shell .m-qa-inp {
   font-family: var(--font-mono);
   /* 34px: bien por encima de los 16px que exige iOS para no hacer zoom al enfocar, y

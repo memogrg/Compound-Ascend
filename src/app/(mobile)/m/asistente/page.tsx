@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getUser } from "@/lib/auth/session";
+import { getPrimaryCurrency } from "@/modules/financial-base";
 
 import { MobileAssistant } from "./mobile-assistant";
 
@@ -18,5 +19,9 @@ export default async function MobileAsistente() {
   const user = await getUser();
   if (!user) redirect("/m/login");
 
-  return <MobileAssistant />;
+  // La PRINCIPAL (no la de visualización del topbar): es la moneda con la que se captura.
+  // Va por prop porque el shell móvil no monta CurrencyProvider todavía; cuando lo monte,
+  // esto puede pasar a useCaptureCurrency().
+  const primaryCurrency = await getPrimaryCurrency();
+  return <MobileAssistant primaryCurrency={primaryCurrency} />;
 }

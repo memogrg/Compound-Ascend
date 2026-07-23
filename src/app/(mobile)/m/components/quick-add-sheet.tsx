@@ -72,6 +72,7 @@ export function QuickAddSheet({
   // Picker completo: los frascos se piden al abrirlo, no al abrir la hoja (ver
   // getQuickAddJarsAction).
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [monedaOpen, setMonedaOpen] = useState(false);
   const [jars, setJars] = useState<Extract<Jar, { kind: "normal" }>[] | null>(null);
   const [cargandoJars, setCargandoJars] = useState(false);
 
@@ -208,7 +209,15 @@ export function QuickAddSheet({
         </div>
 
         <div className="m-qa-money">
-          <span className="m-qa-sym">{currencySymbol(cur)}</span>
+          <button
+            type="button"
+            className="m-qa-sym m-qa-sym-btn"
+            onClick={() => setMonedaOpen(true)}
+            aria-label={`Moneda: ${cur}. Tócalo para cambiarla`}
+          >
+            {currencySymbol(cur)}
+            <span className="m-qa-sym-cur">{cur}</span>
+          </button>
           <input
             ref={inputRef}
             className="m-qa-inp"
@@ -417,6 +426,27 @@ export function QuickAddSheet({
         }}
         onClose={() => setPickerOpen(false)}
       />
+
+      {/* Hoja de moneda que abre el símbolo tocable. Reusa BottomSheet y CUR_OPTS: no es un
+          selector nuevo, es el mismo `cur` que ya usa el bloque de "Más detalles". */}
+      <BottomSheet open={monedaOpen} onClose={() => setMonedaOpen(false)} title="Moneda">
+        <div className="m-optlist">
+          {CUR_OPTS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              className={`m-opt${cur === o.value ? " sel" : ""}`}
+              onClick={() => {
+                setCur(o.value);
+                setMonedaOpen(false);
+                inputRef.current?.focus(); // volver al importe: el flujo no pierde el teclado
+              }}
+            >
+              <span className="m-opt-t">{o.label}</span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
     </BottomSheet>
   );
 }
