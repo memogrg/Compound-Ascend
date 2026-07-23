@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import type { IncomeType } from "@/modules/financial-base/types";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
@@ -81,7 +82,6 @@ const SUBTYPE_OPTS: Opt[] = [
 
 export function IncomeSourceForm({
   initial,
-  currency,
   incomeTree,
   action,
   submitLabel,
@@ -90,7 +90,6 @@ export function IncomeSourceForm({
   allowPassiveStub = false,
 }: {
   initial?: IncomeSourceValues;
-  currency: string;
   incomeTree: CategoryNode[];
   action: (raw: IncomeSourceValues) => Promise<ActionResult>;
   submitLabel: string;
@@ -101,7 +100,10 @@ export function IncomeSourceForm({
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [amount, setAmount] = useState<number | undefined>(initial?.amount);
-  const [cur, setCur] = useState(initial?.currency ?? currency);
+  // ALTA: la PRINCIPAL del contexto (importe libre); edición: la nativa del ítem. Antes
+  // caía a `currency`, la de visualización del topbar — la siembra equivocada.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
   const [date, setDate] = useState(initial?.occurredOn ?? todayISO());
   const [incomeType, setIncomeTypeRaw] = useState(initial?.incomeType ?? "activo");
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? NO_SUBCATEGORY);

@@ -129,7 +129,7 @@ export default async function MobileMetas() {
             ) : undefined
           }
         />
-        <GoalManager goals={goals} currency={currency} tree={tree} />
+        <GoalManager goals={goals} tree={tree} />
       </div>
     </div>
   );

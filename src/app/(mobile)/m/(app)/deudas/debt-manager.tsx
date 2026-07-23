@@ -290,7 +290,6 @@ export function DebtManager({
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Nueva deuda">
         <DebtForm
-          currency={currency}
           action={addDebtAction}
           submitLabel="Agregar deuda"
           successMessage="Deuda agregada"
@@ -302,7 +301,6 @@ export function DebtManager({
       <BottomSheet open={!!editing} onClose={() => setEditing(null)} title="Editar deuda">
         {editing ? (
           <DebtForm
-            currency={currency}
             initial={toValues(editing)}
             action={(v: DebtValues) => editDebtAction(editing.id, v)}
             submitLabel="Guardar cambios"

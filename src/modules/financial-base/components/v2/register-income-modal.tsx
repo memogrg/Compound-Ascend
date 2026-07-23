@@ -9,6 +9,7 @@
  * de inversión (camino único; sin el viejo <select> de subtype).
  */
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
 import { CURRENCY_SYMBOL } from "@/lib/format";
 import { Modal } from "@/components/ui/modal";
@@ -60,12 +61,10 @@ function todayISO(): string {
 type Leaf = Pick<Category, "id" | "name" | "parentId" | "isSystem">;
 
 export function RegisterIncomeModal({
-  currency,
   incomeTree,
   item,
   onClose,
 }: {
-  currency: string;
   incomeTree: CategoryNode[];
   item?: BudgetItem;
   onClose: () => void;
@@ -75,7 +74,8 @@ export function RegisterIncomeModal({
   const editing = Boolean(item);
 
   const [name, setName] = useState(item?.name ?? "");
-  const [curr, setCurr] = useState(item?.currency ?? currency);
+  const captureCurrency = useCaptureCurrency();
+  const [curr, setCurr] = useState(item?.currency ?? captureCurrency);
   const [amount, setAmount] = useState(item ? String(item.amount) : "");
   const [date, setDate] = useState(
     item ? `${item.periodYear}-${String(item.periodMonth).padStart(2, "0")}-01` : todayISO(),

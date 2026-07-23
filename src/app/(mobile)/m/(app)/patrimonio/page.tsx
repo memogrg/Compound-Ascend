@@ -132,7 +132,7 @@ export default async function MobilePatrimonio() {
         )}
 
         {/* Activos y pasivos manuales — CRUD (FAB alta · SwipeRow editar/eliminar) */}
-        <PatrimonioManager assets={assets} liabilities={liabilities} currency={currency} />
+        <PatrimonioManager assets={assets} liabilities={liabilities} />
       </div>
     </div>
   );

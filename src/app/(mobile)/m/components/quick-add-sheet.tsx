@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { currencySymbol } from "@/lib/format";
 import {
   addTransactionAction,
@@ -39,7 +40,6 @@ export function QuickAddSheet({
   sobres,
   frecuentes,
   fuentes,
-  currency,
 }: {
   open: boolean;
   onClose: () => void;
@@ -47,9 +47,6 @@ export function QuickAddSheet({
   frecuentes: SobreRapido[];
   /** Fuentes de ingreso existentes. El "+" registra CONTRA una, no crea ninguna. */
   fuentes: FuenteIngreso[];
-  /** Moneda principal del usuario. Es el valor INICIAL del selector, no un valor por
-   *  omisión invisible: el usuario ve en qué moneda va a guardar y puede cambiarlo. */
-  currency: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -65,9 +62,11 @@ export function QuickAddSheet({
   const [sugiriendo, setSugiriendo] = useState(false);
   const [origen, setOrigen] = useState<"historial" | "cache" | "ia" | null>(null);
   const [guardando, setGuardando] = useState(false);
-  // La moneda es ESTADO visible, no una constante. El P0 del #437 nació de guardar con una
-  // moneda que el usuario nunca vio.
-  const [cur, setCur] = useState(currency);
+  // La moneda es ESTADO visible, sembrado de la PRINCIPAL del contexto (importe libre). El
+  // P0 del #437 nació de guardar con una moneda que el usuario nunca vio; antes esto llegaba
+  // por prop desde la página, que la sacaba de la de VISUALIZACIÓN.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(captureCurrency);
   const [fuenteId, setFuenteId] = useState<string | null>(null);
   // Picker completo: los frascos se piden al abrirlo, no al abrir la hoja (ver
   // getQuickAddJarsAction).
@@ -96,10 +95,10 @@ export function QuickAddSheet({
     setDate(new Date().toISOString().slice(0, 10));
     setDetalles(false);
     setOrigen(null);
-    setCur(currency);
+    setCur(captureCurrency);
     setFuenteId(null);
     setPickerOpen(false);
-  }, [open, currency]);
+  }, [open, captureCurrency]);
 
   /** Los frascos se piden la PRIMERA vez que se abre el picker y se quedan cacheados
    *  mientras la hoja siga abierta: es el agregado caro, y no debe repetirse por cada

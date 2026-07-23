@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import {
   FormShell,
@@ -57,7 +58,6 @@ const LIAB_CLASS_OPTS: Opt[] = [
 export function WealthItemForm({
   kind,
   initial,
-  currency,
   action,
   submitLabel,
   successMessage,
@@ -65,7 +65,6 @@ export function WealthItemForm({
 }: {
   kind: "asset" | "liability";
   initial?: WealthItemInitial;
-  currency: string;
   action: (raw: AssetValues | LiabilityValues) => Promise<ActionResult>;
   submitLabel: string;
   successMessage: string;
@@ -77,7 +76,10 @@ export function WealthItemForm({
   const [name, setName] = useState(initial?.name ?? "");
   const [amount, setAmount] = useState<number | undefined>(initial?.amount);
   const [cls, setCls] = useState(initial?.cls ?? defaultCls);
-  const [cur, setCur] = useState(initial?.currency ?? currency);
+  // ALTA: la PRINCIPAL del contexto (importe libre); edición: la nativa del ítem. Antes
+  // caía a `currency`, la de visualización del topbar — la siembra equivocada.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
   const [generatesIncome, setGeneratesIncome] = useState(initial?.generatesIncome ?? false);
 
   const values: AssetValues | LiabilityValues = isAsset

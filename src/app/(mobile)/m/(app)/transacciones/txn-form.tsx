@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Account, Transaction } from "@/modules/financial-base/types";
@@ -85,7 +86,11 @@ export function TxnForm({
 
   const [kind, setKind] = useState<string>(initial?.kind ?? "gasto");
   const [amount, setAmount] = useState<number | undefined>(initial?.amount);
-  const [cur, setCur] = useState(initial?.currency ?? currency);
+  // En ALTA, la PRINCIPAL del contexto (importe libre); en edición, la nativa del ítem.
+  // Antes caía a `currency` (la de visualización del topbar), que es justo lo que sembraba
+  // la moneda equivocada.
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
   const [date, setDate] = useState(initial?.occurredOn ?? todayISO());
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
   const [sobreLabel, setSobreLabel] = useState<string>(envById(initial?.categoryId)?.name ?? "");

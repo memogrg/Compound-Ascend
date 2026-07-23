@@ -69,10 +69,8 @@ function toValues(p: InsurancePolicy): PolicyValues {
 
 export function ProteccionManager({
   policies,
-  currency,
 }: {
   policies: InsurancePolicy[];
-  currency: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -146,7 +144,6 @@ export function ProteccionManager({
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Añadir póliza">
         <PolicyForm
-          currency={currency}
           action={addPolicyAction}
           submitLabel="Guardar póliza"
           successMessage="Póliza agregada"
@@ -158,7 +155,6 @@ export function ProteccionManager({
       <BottomSheet open={!!editing} onClose={() => setEditing(null)} title="Editar póliza">
         {editing ? (
           <PolicyForm
-            currency={currency}
             initial={toValues(editing)}
             action={(v: PolicyValues) => editPolicyAction(editing.id, v)}
             submitLabel="Guardar cambios"

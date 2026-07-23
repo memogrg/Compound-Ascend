@@ -14,6 +14,7 @@
  */
 import { CURRENCY_SYMBOL, formatMoney } from "@/lib/format";
 import { useMemo, useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
@@ -72,7 +73,6 @@ export function TransactionComposer({
   tree,
   incomeTree = [],
   accounts,
-  currency,
   suggestions,
   templates,
   linkables,
@@ -83,7 +83,6 @@ export function TransactionComposer({
   tree: CategoryNode[];
   incomeTree?: CategoryNode[];
   accounts: Account[];
-  currency: string;
   suggestions: SuggestionEntry[];
   templates: TransactionTemplate[];
   linkables?: LinkableEntities;
@@ -95,14 +94,16 @@ export function TransactionComposer({
 
   const [kind, setKind] = useState<TxnKind>(initialKind);
   const [amount, setAmount] = useState("");
-  // Moneda de la transacción: default = moneda de visualización; recuerda la
-  // última usada en la sesión (solo UI: el schema ya guarda currency).
+  // Moneda de la transacción: default = la PRINCIPAL (importe libre); recuerda la última
+  // usada en la sesión (solo UI: el schema ya guarda currency). Antes caía a la de
+  // visualización.
+  const captureCurrency = useCaptureCurrency();
   const [txnCurrency, setTxnCurrency] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const last = window.sessionStorage.getItem("cmp-last-currency");
       if (last && CURRENCIES.some((c) => c.value === last)) return last;
     }
-    return currency;
+    return captureCurrency;
   });
   const [groupId, setGroupId] = useState<string>(tree[0]?.id ?? "");
   const [categoryId, setCategoryId] = useState<string | null>(null);

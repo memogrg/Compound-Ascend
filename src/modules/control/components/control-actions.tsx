@@ -2,6 +2,7 @@
 import { EssentialCheck, TIP_SAVINGS_ESSENTIAL } from "@/components/shared/essential-check";
 
 import { useEffect, useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -250,7 +251,8 @@ function GoalForm({
         ? editGoalAction(item.id, raw)
         : addGoalAction(raw);
   const { pending, errors, message, run } = useFormSubmit(action);
-  const [cur, setCur] = useState<string>(item?.currency ?? currency);
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState<string>(item?.currency ?? captureCurrency);
   // Controlado para poder mostrar el equivalente en vivo (Punto FX).
   const [targetAmount, setTargetAmount] = useState<string>(
     item?.targetAmount != null ? String(item.targetAmount) : "",
@@ -790,7 +792,8 @@ function DebtForm({
 }) {
   const action = item ? (raw: unknown) => editDebtAction(item.id, raw) : addDebtAction;
   const { pending, errors, message, run } = useFormSubmit(action);
-  const [cur, setCur] = useState<string>(item?.currency ?? currency);
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState<string>(item?.currency ?? captureCurrency);
   const [rateType, setRateType] = useState<"fija" | "variable">(item?.rateType ?? "fija");
 
   const totalTerm = item?.termMonths ?? 0;
