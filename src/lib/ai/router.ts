@@ -30,8 +30,32 @@ export type RoutedQuery = {
 /** Modelo chico: mismo adaptador Gemini, solo cambia el string (sin integración nueva). */
 const LITE_MODEL = "gemini-2.5-flash-lite";
 
-type Intent = "numero_libertad" | "metas" | "cuota_deuda";
-const KNOWN_INTENTS: Intent[] = ["numero_libertad", "metas", "cuota_deuda"];
+type Intent =
+  // R1 — datos ya en ToolContext (motor determinista):
+  | "numero_libertad"
+  | "metas"
+  | "cuota_deuda"
+  // R2 — datos ya en FinancialContext (ctx), 0 fetch, ambos canales:
+  | "gasto_mes"
+  | "ingreso_mes"
+  | "gasto_categoria"
+  // R2 — requieren lectura fresca (session-based → web; WhatsApp escala):
+  | "saldo_liquidez"
+  | "ultimos_movimientos";
+
+const KNOWN_INTENTS: Intent[] = [
+  "numero_libertad",
+  "metas",
+  "cuota_deuda",
+  "gasto_mes",
+  "ingreso_mes",
+  "gasto_categoria",
+  "saldo_liquidez",
+  "ultimos_movimientos",
+];
+
+/** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
+const FETCH_INTENTS: ReadonlySet<Intent> = new Set(["saldo_liquidez", "ultimos_movimientos"]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
 // seguridad de "ante duda, escalá": una pregunta de consejo/proyección nunca se atrapa por patrón.
@@ -59,6 +83,22 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   if (/(?:cu[oó]ta|pago mensual|cu[aá]nto pago|pago m[ií]nimo)\b/i.test(t)) {
     return { intent: "cuota_deuda", params: { debtName: extractDebtName(t) } };
   }
+  // R2 — gasto por categoría / dominante ("¿en qué gasto más?"). Antes que gasto_mes (más específico).
+  if (/en qu[eé] (?:gasto|gast[eé])|(?:categor[ií]a|rubro).*(?:m[aá]s gasto|gasto)|(?:mayor|m[aá]s alto|principal) gasto|d[oó]nde se (?:va|van) (?:mi|el)/i.test(t)) {
+    return { intent: "gasto_categoria", params: {} };
+  }
+  if (/(?:cu[aá]nto|qu[eé])\s+(?:gast[eéoó]|llevo gastado)|(?:mi|el)\s+gasto (?:del mes|mensual|este mes)|gast[eé] (?:este mes|en el mes)/i.test(t)) {
+    return { intent: "gasto_mes", params: {} };
+  }
+  if (/(?:cu[aá]nto|qu[eé])\s+(?:gan[eéoó]|ingres[eéoó])|(?:mis|el|los)\s+ingresos?\b|cu[aá]nto (?:me )?entr[oó]/i.test(t)) {
+    return { intent: "ingreso_mes", params: {} };
+  }
+  if (/(?:mi\s+)?(?:saldo|liquidez|efectivo disponible|cu[aá]nto (?:tengo|me queda))\b/i.test(t)) {
+    return { intent: "saldo_liquidez", params: {} };
+  }
+  if (/(?:[uú]ltim[oa]s?|recientes?)\s+(?:movimiento|transacci|gasto|compra)|(?:mis|los)\s+(?:movimientos|transacciones)\b|qu[eé] (?:gast[eé]|compr[eé]) (?:hoy|ayer|[uú]ltim)/i.test(t)) {
+    return { intent: "ultimos_movimientos", params: {} };
+  }
   return null;
 }
 
@@ -70,7 +110,10 @@ async function classifyWithLite(
   const lite = createGeminiProvider(LITE_MODEL);
   if (!lite) return null;
   const system =
-    'Clasificás preguntas de finanzas personales. Devolvé SOLO JSON {"intent": "numero_libertad"|"metas"|"cuota_deuda"|"otro", "complejo": true|false}. ' +
+    "Clasificás preguntas de finanzas personales. Devolvé SOLO JSON " +
+    '{"intent": "numero_libertad"|"metas"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"otro", "complejo": true|false}. ' +
+    "gasto_mes=cuánto gasta al mes; ingreso_mes=cuánto gana; gasto_categoria=en qué gasta más; " +
+    "saldo_liquidez=cuánto tiene disponible; ultimos_movimientos=sus transacciones recientes. " +
     '"complejo": true si pide análisis, proyección, consejo, comparación o cualquier cosa más allá de consultar un dato simple. Ante duda: "otro" o complejo:true.';
   try {
     const r = await lite.chat({ system, messages: [{ role: "user", content: text }], maxTokens: 40 });
@@ -96,11 +139,28 @@ export function answerFromContext(
   intent: Intent,
   params: Record<string, unknown>,
   tc: ToolContext,
+  ctx?: FinancialContext,
 ): AIChatResponse | null {
   const cur = tc.currency;
   const money = (n: number) => formatMoney(n, cur);
   // Las consultas de dato nunca PROPONEN una acción (solo informan) → action: null.
   const say = (reply: string): AIChatResponse => ({ reply, action: null });
+
+  // R2 — cifras que YA vienen en el FinancialContext (0 fetch, ambos canales). Si el dato
+  // best-effort no está → null (escala; no adivina).
+  if (intent === "gasto_mes") {
+    if (typeof ctx?.expenseMonthly !== "number") return null;
+    return say(`Tu gasto mensual ronda ${money(ctx.expenseMonthly)}.`);
+  }
+  if (intent === "ingreso_mes") {
+    if (typeof ctx?.incomeMonthly !== "number") return null;
+    return say(`Tus ingresos mensuales son ${money(ctx.incomeMonthly)}.`);
+  }
+  if (intent === "gasto_categoria") {
+    const top = ctx?.topExpenseCategory;
+    if (!top) return null;
+    return say(`Donde más gastás es ${top.name}: ${money(top.monthly)} al mes (${top.pct}% de tu gasto).`);
+  }
 
   if (intent === "numero_libertad") {
     if (typeof tc.freedomNumber !== "number" || tc.freedomNumber <= 0) return null;
@@ -142,22 +202,65 @@ export function answerFromContext(
 }
 
 /**
+ * Resuelve los intents R2 que requieren LECTURA fresca (no están en ctx). Import dinámico para
+ * no acoplar la DB al camino puro de patrones/plantillas. Session-based (`requireUser`): en web
+ * funciona; en WhatsApp (service-role, sin sesión) el fetch lanza → se captura → null → escala.
+ * Devuelve la cifra REAL del ledger; jamás inventa.
+ */
+async function resolveFetchIntent(intent: Intent, cur: string): Promise<AIChatResponse | null> {
+  const say = (reply: string): AIChatResponse => ({ reply, action: null });
+  try {
+    if (intent === "saldo_liquidez") {
+      const { getLiquidityBalance } = await import("@/modules/financial-base");
+      const { balance } = await getLiquidityBalance();
+      return say(`Tu saldo de liquidez actual es ${formatMoney(balance, cur)}.`);
+    }
+    if (intent === "ultimos_movimientos") {
+      const { listTransactions } = await import("@/modules/financial-base");
+      // Ventana de 60 días para no depender del día del mes; las 5 más recientes.
+      const now = new Date();
+      const to = now.toISOString().slice(0, 10);
+      const fromD = new Date(now);
+      fromD.setDate(fromD.getDate() - 60);
+      const from = fromD.toISOString().slice(0, 10);
+      const period = { month: now.getMonth() + 1, year: now.getFullYear(), from, to, label: "" };
+      const txns = await listTransactions(period, {}, 5);
+      if (txns.length === 0) return say("No registrás movimientos en los últimos 60 días.");
+      const lines = txns.map((t) => {
+        const label = t.merchantOrSource ?? t.description ?? "Movimiento";
+        const sign = t.kind === "ingreso" ? "+" : "−";
+        return `• ${t.occurredOn} · ${label}: ${sign}${formatMoney(t.amount, t.currency)}`;
+      });
+      return say(`Tus últimos movimientos:\n${lines.join("\n")}`);
+    }
+  } catch {
+    return null; // sin sesión / lectura fallida → escala al razonamiento
+  }
+  return null;
+}
+
+/**
  * Intenta resolver la pregunta por el carril barato. Devuelve el resultado (con su carril y
  * tokens) o null si hay que escalar al razonamiento (modelo completo). NUNCA adivina: si el
  * patrón no matchea Y el clasificador no está seguro, o el contexto no alcanza → null.
  */
 export async function tryRouteQuery(
   messages: { role: string; content: string }[],
-  _ctx: FinancialContext,
+  ctx: FinancialContext,
   toolContext: ToolContext,
 ): Promise<RoutedQuery | null> {
   const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content?.trim();
   if (!lastUser) return null;
 
-  // 1) Patrones (0 tokens).
+  // 1) Patrones (0 tokens de clasificación).
   const matched = matchIntent(lastUser);
   if (matched) {
-    const response = answerFromContext(matched.intent, matched.params, toolContext);
+    if (FETCH_INTENTS.has(matched.intent)) {
+      const response = await resolveFetchIntent(matched.intent, toolContext.currency);
+      // La lectura no consume tokens del LLM; su "coste" es una query a la BD.
+      return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
+    }
+    const response = answerFromContext(matched.intent, matched.params, toolContext, ctx);
     if (response) return { response, tokensIn: 0, tokensOut: 0, lane: "template" };
     return null; // el contexto no alcanza → escalar
   }
@@ -165,8 +268,10 @@ export async function tryRouteQuery(
   // 2) Clasificador Flash-Lite (barato). Solo si no matchó patrón.
   const classified = await classifyWithLite(lastUser);
   if (!classified) return null; // ante duda, razonamiento
-  const response = answerFromContext(classified.intent, classified.params, toolContext);
+  const response = FETCH_INTENTS.has(classified.intent)
+    ? await resolveFetchIntent(classified.intent, toolContext.currency)
+    : answerFromContext(classified.intent, classified.params, toolContext, ctx);
   if (!response) return null;
-  // La respuesta es plantilla (0 tokens); solo se pagó la clasificación.
+  // La respuesta es plantilla (0 tokens de generación); solo se pagó la clasificación.
   return { response, tokensIn: classified.tokensIn, tokensOut: classified.tokensOut, lane: "lite" };
 }
