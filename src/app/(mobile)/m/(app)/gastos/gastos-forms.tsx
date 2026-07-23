@@ -36,7 +36,7 @@ import {
  * Formularios V2 de la pantalla Gastos (frascos + sobres), reutilizando EXACTAMENTE las
  * mismas Server Actions que la web /gastos (expense-jars/*):
  *  - AddSpendForm    → addTransactionAction (kind='gasto'; categoryId = sobre). Selector de
- *                      sobre agrupado por frasco (como add-spend-modal.tsx).
+ *                      sobre agrupado por frasco (como el composer de gasto).
  *  - CreateSobreForm → addCategoryAction (parentId=frasco, isFavorite) + addBudgetItemAction
  *                      para el presupuesto del sobre (como new-sobre-modal / jar-normal-modal).
  *  - BudgetEditForm  → setEnvelopeBudgetAction, con el gate de 3 checks de la web
@@ -132,7 +132,7 @@ export function AddSpendForm({
       <DateField name="occurredOn" label="Fecha" value={date} onChange={setDate} />
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
 
-      {/* Selector de sobre agrupado por frasco (como add-spend-modal.tsx) */}
+      {/* Selector de sobre agrupado por frasco (como el composer de gasto) */}
       <SobrePicker
         open={pickerOpen}
         jars={normalJars}

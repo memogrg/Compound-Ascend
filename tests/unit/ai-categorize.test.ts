@@ -11,9 +11,19 @@ const h = vi.hoisted(() => ({
   // Filas single para el fallback determinista (validateLeafForKind / cache single).
   catRow: null as Record<string, unknown> | null,
   cacheSingle: null as Record<string, unknown> | null,
+  // Totales por category_id (mes actual) para el filtro de sobres adoptados en listSobresForKind.
+  budgetByKey: {} as Record<string, { value: number }>,
+  realByKey: {} as Record<string, { value: number }>,
 }));
 
 vi.mock("server-only", () => ({}));
+// listSobresForKind("gasto") une los configurados con los presupuestados/usados del mes.
+vi.mock("@/modules/financial-base/services/budget-service", () => ({
+  getBudgetTotals: async () => ({ expenseByKey: h.budgetByKey }),
+}));
+vi.mock("@/modules/financial-base/services/transaction-service", () => ({
+  getRealTotals: async () => ({ expenseByKey: h.realByKey }),
+}));
 vi.mock("@/lib/ai/providers/gemini", () => ({ createGeminiProvider: () => h.provider }));
 vi.mock("@/lib/auth/session", () => ({ requireUser: async () => ({ id: "u1" }) }));
 vi.mock("@/lib/household/active", () => ({ getActiveHouseholdId: async () => null }));
@@ -61,7 +71,11 @@ import {
   AUTO_ASSIGN_MIN_CONFIDENCE,
   MAX_NEW_SUGGESTION_CALLS,
 } from "@/modules/financial-base/services/ai-categorize";
-import { selectableSobresByFrasco } from "@/modules/financial-base/engine/classify";
+import {
+  selectableSobresByFrasco,
+  isConfiguredSobre,
+  filterConfiguredSobreTree,
+} from "@/modules/financial-base/engine/classify";
 
 const cat = (over: Record<string, unknown>) => ({
   id: "c",
@@ -83,6 +97,8 @@ beforeEach(() => {
   h.historyRows = [];
   h.catRow = null;
   h.cacheSingle = null;
+  h.budgetByKey = {};
+  h.realByKey = {};
   h.upsertSpy.mockClear();
   h.cats = [
     cat({ id: "c-comida", name: "Comida", categoryType: "expense" }),
@@ -371,6 +387,39 @@ describe("selectableSobresByFrasco", () => {
 });
 
 // ---------------------------------------------------------------------------
+// isConfiguredSobre + filterConfiguredSobreTree (predicado puro para el composer)
+// ---------------------------------------------------------------------------
+describe("isConfiguredSobre / filterConfiguredSobreTree", () => {
+  it("configurado = favorito adoptado O creado por el usuario (no-system)", () => {
+    expect(isConfiguredSobre({ isFavorite: true, isSystem: true })).toBe(true); // favorito de fábrica
+    expect(isConfiguredSobre({ isFavorite: false, isSystem: false })).toBe(true); // propio
+    expect(isConfiguredSobre({ isFavorite: false, isSystem: true })).toBe(false); // plantilla sin adoptar
+  });
+
+  it("filtra hojas a configuradas ∪ adoptadas; conserva los grupos (frascos)", () => {
+    const node = (over: Record<string, unknown>) => ({
+      id: "x", key: null, name: "X", defaultNature: null, parentId: null, icon: null, color: null,
+      isFavorite: false, isEssential: false, isActive: true, isSystem: true, categoryType: "expense",
+      sortOrder: 0, linkedKind: null, ...over,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+    const tree = [
+      {
+        ...node({ id: "g", name: "Alimentación" }),
+        children: [
+          node({ id: "s-rest", name: "Restaurantes", parentId: "g", isFavorite: true }),
+          node({ id: "s-deli", name: "Delivery", parentId: "g" }), // system no-fav, no adoptado
+          node({ id: "s-luz", name: "Luz", parentId: "g" }), // system no-fav, PERO adoptado
+        ],
+      },
+    ];
+    const out = filterConfiguredSobreTree(tree, new Set(["s-luz"]));
+    expect(out).toHaveLength(1); // el grupo se conserva
+    expect(out[0]!.children.map((c) => c.id)).toEqual(["s-rest", "s-luz"]); // Delivery excluido
+  });
+});
+
+// ---------------------------------------------------------------------------
 // listSobresForKind + suggestSobreForChat (chat: sugiere un sobre real del usuario)
 // ---------------------------------------------------------------------------
 describe("listSobresForKind", () => {
@@ -384,6 +433,51 @@ describe("listSobresForKind", () => {
     expect(gasto).toEqual([{ id: "s-rest", sobre: "Restaurantes", frasco: "Alimentación" }]);
     const ingreso = await listSobresForKind("ingreso");
     expect(ingreso).toEqual([{ id: "c-salario", sobre: "Salario", frasco: null }]);
+  });
+
+  it("GASTO: excluye plantillas system sin adoptar (delivery/café), incluye favoritas y propias", async () => {
+    h.cats = [
+      cat({ id: "f-alim", name: "Alimentación", categoryType: "expense", isSystem: true }),
+      // Plantilla system sin adoptar (sin favorito, sin budget/gasto) → NO aparece.
+      cat({ id: "s-deli", name: "Delivery", parentId: "f-alim", isSystem: true, isFavorite: false }),
+      // Favorita de fábrica → aparece.
+      cat({ id: "s-rest", name: "Restaurantes", parentId: "f-alim", isSystem: true, isFavorite: true }),
+      // Creada por el usuario (no system) → aparece.
+      cat({ id: "s-mio", name: "Mi sobre", parentId: "f-alim", isSystem: false }),
+    ];
+    const out = await listSobresForKind("gasto");
+    // Orden alfabético por sobre ("Mi sobre" < "Restaurantes"); "Delivery" excluido.
+    expect(out.map((s) => s.id)).toEqual(["s-mio", "s-rest"]);
+  });
+
+  it("GASTO: una plantilla system se ADOPTA si tiene budget o gasto del mes (= vista de frascos)", async () => {
+    h.cats = [
+      cat({ id: "f-serv", name: "Servicios", categoryType: "expense", isSystem: true }),
+      cat({ id: "s-luz", name: "Luz", parentId: "f-serv", isSystem: true, isFavorite: false }),
+      cat({ id: "s-agua", name: "Agua", parentId: "f-serv", isSystem: true, isFavorite: false }),
+    ];
+    // Luz tiene presupuesto; Agua tiene gasto → ambas adoptadas. (value>0, como expense-jars:492)
+    h.budgetByKey = { "s-luz": { value: 30000 } };
+    h.realByKey = { "s-agua": { value: 12000 } };
+    const out = await listSobresForKind("gasto");
+    expect(out.map((s) => s.id).sort()).toEqual(["s-agua", "s-luz"]);
+  });
+
+  it("GASTO: budget/gasto en 0 NO adopta (mismo umbral value>0 que la vista de frascos)", async () => {
+    h.cats = [
+      cat({ id: "f-serv", name: "Servicios", categoryType: "expense", isSystem: true }),
+      cat({ id: "s-luz", name: "Luz", parentId: "f-serv", isSystem: true, isFavorite: false }),
+    ];
+    h.budgetByKey = { "s-luz": { value: 0 } };
+    expect(await listSobresForKind("gasto")).toEqual([]);
+  });
+
+  it("INGRESO: sin filtro de adopción (no hay vista de frascos de ingreso)", async () => {
+    h.cats = [
+      cat({ id: "c-otros", name: "Otros ingresos", categoryType: "income", isSystem: true, isFavorite: false }),
+    ];
+    const out = await listSobresForKind("ingreso");
+    expect(out.map((s) => s.id)).toEqual(["c-otros"]); // aparece pese a system+no-favorito
   });
 });
 

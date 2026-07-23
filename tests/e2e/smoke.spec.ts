@@ -36,13 +36,14 @@ test("login → dashboard → crear gasto → patrimonio", async ({ page }) => {
   // El rediseño (panel pilares Norte) muestra el pilar "Flujo del mes".
   await expect(page.getByText("Flujo del mes")).toBeVisible({ timeout: 20_000 });
 
-  // 3) Crear un gasto desde el tab Gastos (frascos)
+  // 3) Crear un gasto desde el tab Gastos (frascos) — ahora usa el mismo composer
+  //    que Transacciones (bloqueado a gasto). Comercio + monto → Guardar.
   await page.goto("/gastos");
   await page.getByRole("button", { name: "Registrar gasto" }).click();
   const modal = page.getByRole("dialog", { name: "Registrar gasto" });
-  await modal.getByPlaceholder("Ej.: Supermercado, gasolina…").fill("Gasto e2e smoke");
+  await modal.getByPlaceholder("Automercado, Uber, Netflix…").fill("Gasto e2e smoke");
   await modal.getByPlaceholder("0").fill("1234");
-  await modal.getByRole("button", { name: /Registrar gasto/ }).click();
+  await modal.getByRole("button", { name: /Guardar/ }).click();
   await expect(page.getByText("Gasto registrado")).toBeVisible({ timeout: 15_000 });
 
   // 4) Patrimonio renderiza el portafolio (sección en streaming)
