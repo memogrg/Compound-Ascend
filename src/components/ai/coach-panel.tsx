@@ -19,7 +19,6 @@ import {
   confirmGoalAction,
   listSobresForKindAction,
 } from "@/modules/assistant/api/actions";
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/modules/financial-base/constants";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
@@ -31,6 +30,58 @@ type Mode = "assistant" | "ai";
 /** Sobre (hoja) del usuario con su frasco, para el selector "Frasco › Sobre" de la card. */
 type SobreOption = { id: string; sobre: string; frasco: string | null };
 const sobreLabel = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
+
+/**
+ * Selector de SOBRE "Frasco › Sobre" compartido por el form manual y la card de confirmación
+ * (IA/recibo). ÚNICA fuente del selector para que ambos paths no se desincronicen. Carga los
+ * sobres reales del usuario para `kind` (RLS→hogar); "" = Sin sobre. `suggestedPath` mantiene
+ * visible un sugerido que aún no esté en la lista (mientras carga o si no fuera seleccionable).
+ */
+function SobreSelect({
+  kind,
+  value,
+  onChange,
+  disabled,
+  suggestedPath,
+}: {
+  kind: "ingreso" | "gasto";
+  value: string;
+  onChange: (categoryId: string) => void;
+  disabled?: boolean;
+  suggestedPath?: string | null;
+}) {
+  const [sobres, setSobres] = useState<SobreOption[]>([]);
+  // Best-effort: si falla, queda solo "Sin sobre".
+  useEffect(() => {
+    let alive = true;
+    listSobresForKindAction(kind)
+      .then((list) => alive && setSobres(list))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [kind]);
+
+  return (
+    <select
+      className="sel"
+      aria-label="Sobre"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+    >
+      <option value="">Sin sobre</option>
+      {value && !sobres.some((s) => s.id === value) ? (
+        <option value={value}>{suggestedPath ?? "Sobre sugerido"}</option>
+      ) : null}
+      {sobres.map((s) => (
+        <option key={s.id} value={s.id}>
+          {sobreLabel(s)}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 const CHIPS = [
   "¿Cómo está mi salud financiera?",
@@ -392,7 +443,6 @@ function TransactionWizard() {
     source: "manual",
   });
   const [confirming, setConfirming] = useState(false);
-  const cats = draft.kind === "gasto" ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
 
   return (
     <div className="coach-body">
@@ -409,7 +459,8 @@ function TransactionWizard() {
               style={
                 draft.kind === k ? { background: "var(--ink)", color: "var(--bg)" } : undefined
               }
-              onClick={() => setDraft((d) => ({ ...d, kind: k }))}
+              // Al cambiar de naturaleza, el sobre elegido ya no aplica → se limpia.
+              onClick={() => setDraft((d) => ({ ...d, kind: k, categoryId: null }))}
             >
               {k === "gasto" ? "Gasto" : "Ingreso"}
             </button>
@@ -427,22 +478,12 @@ function TransactionWizard() {
         />
       </Field>
 
-      <Field label="Categoría">
-        <select
-          className="sel"
-          aria-label="Categoría"
-          onChange={(e) =>
-            setDraft((d) => ({ ...d, description: d.description || e.target.value }))
-          }
-          defaultValue=""
-        >
-          <option value="">Selecciona…</option>
-          {cats.map((c) => (
-            <option key={c.value} value={c.label}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+      <Field label="Sobre">
+        <SobreSelect
+          kind={draft.kind}
+          value={draft.categoryId ?? ""}
+          onChange={(categoryId) => setDraft((d) => ({ ...d, categoryId: categoryId || null }))}
+        />
       </Field>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -529,9 +570,8 @@ function TxnConfirmCard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
-  // Sobre elegido (arranca en el sugerido por la IA); "" = Sin sobre.
+  // Sobre elegido (arranca en el sugerido por la IA / el elegido en el form manual); "" = Sin sobre.
   const [categoryId, setCategoryId] = useState<string>(draft.categoryId ?? "");
-  const [sobres, setSobres] = useState<SobreOption[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Limpia el timeout pendiente si la tarjeta se desmonta antes de los 1200ms
@@ -542,17 +582,6 @@ function TxnConfirmCard({
     },
     [],
   );
-
-  // Sobres del usuario para el selector (editable). Best-effort: si falla, queda "Sin sobre".
-  useEffect(() => {
-    let alive = true;
-    listSobresForKindAction(draft.kind)
-      .then((list) => alive && setSobres(list))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [draft.kind]);
 
   const confirm = async () => {
     setPending(true);
@@ -587,24 +616,13 @@ function TxnConfirmCard({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
         <span className="fld-label">Sobre</span>
-        <select
-          className="sel"
-          aria-label="Sobre"
+        <SobreSelect
+          kind={draft.kind}
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
+          onChange={setCategoryId}
           disabled={pending}
-        >
-          <option value="">Sin sobre</option>
-          {/* Mantiene visible el sugerido mientras carga la lista (o si no estuviera en ella). */}
-          {categoryId && !sobres.some((s) => s.id === categoryId) ? (
-            <option value={categoryId}>{draft.categoryPath ?? "Sobre sugerido"}</option>
-          ) : null}
-          {sobres.map((s) => (
-            <option key={s.id} value={s.id}>
-              {sobreLabel(s)}
-            </option>
-          ))}
-        </select>
+          suggestedPath={draft.categoryPath}
+        />
       </div>
       {draft.linkedKind && draft.linkedId ? (
         <div style={{ marginTop: 6 }}>
