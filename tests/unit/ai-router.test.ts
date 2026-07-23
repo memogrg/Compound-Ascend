@@ -13,10 +13,25 @@ vi.mock("@/lib/ai/providers/gemini", () => ({
   createGeminiProvider: () => ({ name: "gemini-lite", model: "lite", chat: liteChat }),
 }));
 
-import { matchIntent, answerFromContext, tryRouteQuery } from "@/lib/ai/router";
-import type { ToolContext } from "@/lib/ai/orchestrator";
+// Barrel de financial-base: lo consume el resolver de fetch (saldo / movimientos) vía import
+// dinámico. En WhatsApp (sin sesión) estas fns lanzarían → el router escala.
+const getLiquidityBalance = vi.fn();
+const listTransactions = vi.fn();
+vi.mock("@/modules/financial-base", () => ({
+  getLiquidityBalance: () => getLiquidityBalance(),
+  listTransactions: (...a: unknown[]) => listTransactions(...a),
+}));
 
-const CTX = { currency: "USD" } as never; // FinancialContext no se usa en el carril de consulta.
+import { matchIntent, answerFromContext, tryRouteQuery } from "@/lib/ai/router";
+import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
+
+// FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
+const CTX = {
+  currency: "USD",
+  expenseMonthly: 2500,
+  incomeMonthly: 4000,
+  topExpenseCategory: { name: "Vivienda", monthly: 1200, pct: 48 },
+} as FinancialContext;
 
 const tc: ToolContext = {
   currency: "USD",
@@ -109,6 +124,77 @@ describe("tryRouteQuery · carriles y tokens", () => {
   it("clasificador con parseo dudoso → null (ante duda, escala)", async () => {
     liteChat.mockResolvedValue({ text: "no sé, tal vez metas?", tokensIn: 10, tokensOut: 3 });
     const routed = await tryRouteQuery(ask("blah blah cosa rara"), CTX, tc);
+    expect(routed).toBeNull();
+  });
+});
+
+// ─────────────────────────── R2 ───────────────────────────
+
+describe("R2 · matchIntent (patrones)", () => {
+  it("clasifica los intents de contexto", () => {
+    expect(matchIntent("¿cuánto gasté este mes?")?.intent).toBe("gasto_mes");
+    expect(matchIntent("¿cuánto gano al mes?")?.intent).toBe("ingreso_mes");
+    expect(matchIntent("¿en qué gasto más?")?.intent).toBe("gasto_categoria");
+  });
+
+  it("clasifica los intents de lectura fresca", () => {
+    expect(matchIntent("¿cuál es mi saldo?")?.intent).toBe("saldo_liquidez");
+    expect(matchIntent("mostrame mis últimos movimientos")?.intent).toBe("ultimos_movimientos");
+  });
+
+  it("una proyección de gasto no se atrapa (escala)", () => {
+    expect(matchIntent("¿cuánto gastaría si sumo Netflix por 12 meses?")).toBeNull();
+  });
+});
+
+describe("R2 · answerFromContext (cifra del FinancialContext, 0 fetch)", () => {
+  it("gasto_mes usa ctx.expenseMonthly", () => {
+    expect(answerFromContext("gasto_mes", {}, tc, CTX)?.reply).toContain("2.500");
+  });
+
+  it("ingreso_mes usa ctx.incomeMonthly", () => {
+    expect(answerFromContext("ingreso_mes", {}, tc, CTX)?.reply).toContain("4.000");
+  });
+
+  it("gasto_categoria usa ctx.topExpenseCategory (nombre + monto + %)", () => {
+    const r = answerFromContext("gasto_categoria", {}, tc, CTX);
+    expect(r?.reply).toContain("Vivienda");
+    expect(r?.reply).toContain("1.200");
+    expect(r?.reply).toContain("48%");
+  });
+
+  it("sin la cifra en ctx → null (escala, no adivina)", () => {
+    const bare = { currency: "USD" } as FinancialContext;
+    expect(answerFromContext("gasto_mes", {}, tc, bare)).toBeNull();
+    expect(answerFromContext("gasto_categoria", {}, tc, bare)).toBeNull();
+  });
+});
+
+describe("R2 · carril fetch (lectura fresca, solo web)", () => {
+  it("saldo_liquidez → lee el ledger y responde con el saldo real (0 tokens)", async () => {
+    getLiquidityBalance.mockResolvedValue({ balance: 1875, hasOpening: true });
+    const routed = await tryRouteQuery(ask("¿cuánto tengo disponible?"), CTX, tc);
+    expect(getLiquidityBalance).toHaveBeenCalledTimes(1);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.tokensIn).toBe(0);
+    expect(routed?.response.reply).toContain("1.875");
+  });
+
+  it("ultimos_movimientos → lista las transacciones reales del ledger", async () => {
+    listTransactions.mockResolvedValue([
+      { occurredOn: "2026-07-20", merchantOrSource: "Super", amount: 42, currency: "USD", kind: "gasto", description: null },
+      { occurredOn: "2026-07-18", merchantOrSource: "Sueldo", amount: 4000, currency: "USD", kind: "ingreso", description: null },
+    ]);
+    const routed = await tryRouteQuery(ask("mis últimas transacciones"), CTX, tc);
+    expect(listTransactions).toHaveBeenCalledTimes(1);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.response.reply).toContain("Super");
+    expect(routed?.response.reply).toContain("Sueldo");
+  });
+
+  it("sin sesión (WhatsApp): la lectura lanza → null (escala al razonamiento)", async () => {
+    getLiquidityBalance.mockRejectedValue(new Error("no session"));
+    const routed = await tryRouteQuery(ask("¿cuál es mi saldo?"), CTX, tc);
     expect(routed).toBeNull();
   });
 });
