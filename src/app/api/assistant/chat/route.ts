@@ -23,6 +23,7 @@ import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { assertTrustedOrigin, corsHeaders } from "@/lib/security/cors";
 import { toSafeResponse, AppError } from "@/lib/errors";
 import { alert } from "@/server/observability/alerts";
+import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/ai/provider";
 import { loadRecentTurns, appendTurns } from "@/lib/ai/conversation-store";
 
@@ -131,6 +132,13 @@ export async function POST(req: Request) {
 
     const result = await financeChatWithTools(messages, ctx, toolContext);
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
+    // Carril del router (template/lite/reasoning) para medir el ahorro de tokens antes/después.
+    logger.info("assistant.chat.lane", {
+      lane: result.lane ?? "reasoning",
+      provider: result.provider,
+      tokensIn: result.tokensIn,
+      tokensOut: result.tokensOut,
+    });
 
     // Persistir el turno (best-effort; no bloquea la respuesta si falla).
     await appendTurns(undefined, [

@@ -37,6 +37,9 @@ import {
 } from "@/lib/ai/tools";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { convertCurrency } from "@/lib/fx";
+// Router de complejidad (R1): carril barato para consultas de dato. Solo importa la función
+// (los tipos que el router necesita de aquí son type-only → sin ciclo en runtime).
+import { tryRouteQuery, type RouterLane } from "@/lib/ai/router";
 
 export type { FinancialContext };
 
@@ -234,10 +237,31 @@ export async function financeChatWithTools(
   toolContext?: ToolContext,
   // Seam de inyección (ADITIVO): mismo proveedor para el fallback sin tools.
   provider: AIProvider = getProvider(),
-): Promise<AIChatResponse & { tokensIn: number; tokensOut: number; provider: string }> {
+): Promise<
+  AIChatResponse & { tokensIn: number; tokensOut: number; provider: string; lane?: RouterLane }
+> {
   if (!toolContext || !provider.chatWithTools) {
     return financeChat(messages, ctx, provider);
   }
+
+  // Router de complejidad (R1): intenta el carril BARATO (patrones/Flash-Lite → motor + plantilla,
+  // 0 tokens o clasificación mínima). Ante duda escala al razonamiento (abajo). Como esto vive
+  // dentro de financeChatWithTools, cubre web y WhatsApp por igual. Best-effort: si falla, sigue.
+  try {
+    const routed = await tryRouteQuery(messages, ctx, toolContext);
+    if (routed) {
+      return {
+        ...guardReply(routed.response, ctx, `router:${routed.lane}`),
+        tokensIn: routed.tokensIn,
+        tokensOut: routed.tokensOut,
+        provider: `router:${routed.lane}`,
+        lane: routed.lane,
+      };
+    }
+  } catch {
+    // Router caído → razonamiento completo (nunca degrada la respuesta).
+  }
+
   const knowledge = await buildKnowledge(messages, ctx);
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
@@ -259,6 +283,7 @@ export async function financeChatWithTools(
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
     provider: provider.name,
+    lane: "reasoning",
   };
 }
 
