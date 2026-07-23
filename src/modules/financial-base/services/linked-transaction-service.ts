@@ -1,4 +1,5 @@
 import "server-only";
+import { monedaVinculadaEsCoherente } from "@/modules/financial-base/engine/expense-jars";
 
 /**
  * Orquestador de escritura (Fase 1 · interconexión de bloques).
@@ -43,9 +44,7 @@ export async function registerLinkedTransaction(input: LinkedTxnInput): Promise<
  * resuelve la fila de la transacción. Para flujos atómicos donde una RPC
  * transaccional inserta la transacción y su ledger en una sola operación.
  */
-export async function buildLinkedTransactionRow(
-  input: LinkedTxnInput,
-): Promise<TransactionInsert> {
+export async function buildLinkedTransactionRow(input: LinkedTxnInput): Promise<TransactionInsert> {
   const parsed = txnInputSchema.parse(input);
   const { row } = await buildTransactionRow(parsed);
   return row;
@@ -67,6 +66,10 @@ export async function propagateLinkedTransaction(args: {
   linkedKind: string;
   linkedId: string | null;
   amount: number;
+  /** Moneda de la transacción que se propaga. Se valida contra la de la entidad: el
+   *  ledger vinculado (debt_payments) no tiene columna de moneda, así que capturar en otra
+   *  guardaría un importe multiplicado sin dejar rastro. */
+  currency?: string;
   occurredOn: string;
 }): Promise<void> {
   if (!args.linkedId || args.kind !== "gasto") return;
@@ -80,12 +83,19 @@ export async function propagateLinkedTransaction(args: {
     // se estima con el engine de amortización (null si no hay tasa).
     const { data: debt, error: dErr } = await supabase
       .from("debts")
-      .select("balance,apr,current_payment,min_payment")
+      .select("balance,apr,current_payment,min_payment,currency")
       .eq("id", args.linkedId)
       .in("user_id", scope)
       .maybeSingle();
     if (dErr) throw new Error(dErr.message);
     if (!debt) throw new Error("La deuda vinculada ya no existe o no te pertenece.");
+    // La moneda la impone la deuda. Sin esto, un gasto capturado en la moneda de
+    // visualización sobre el sobre "Tarjeta" (deuda USD) escribía el importe multiplicado
+    // en debt_payments. La guarda del #474 vive en control-service.addDebtPayment y esta
+    // ruta —gasto por sobre vinculado— no pasaba por ahí.
+    if (!monedaVinculadaEsCoherente(args.currency, debt.currency)) {
+      throw new Error(`El pago viene en ${args.currency} pero la deuda está en ${debt.currency}.`);
+    }
 
     const { estimatePaymentSplit } = await import("@/modules/control/engine/amortization");
     const cuota =
@@ -122,15 +132,21 @@ export async function propagateLinkedTransaction(args: {
   if (args.linkedKind === "goal") {
     const { data: goal, error: gErr } = await supabase
       .from("savings_goals")
-      .select("current_amount")
+      .select("current_amount,currency")
       .eq("id", args.linkedId)
       .in("user_id", scope)
       .maybeSingle();
     if (gErr) throw new Error(gErr.message);
     if (!goal) throw new Error("Meta no encontrada");
+    if (!monedaVinculadaEsCoherente(args.currency, goal.currency)) {
+      throw new Error(`El aporte viene en ${args.currency} pero la meta está en ${goal.currency}.`);
+    }
     const { error } = await supabase
       .from("savings_goals")
-      .update({ last_edited_by: user.id, current_amount: Number(goal.current_amount) + args.amount })
+      .update({
+        last_edited_by: user.id,
+        current_amount: Number(goal.current_amount) + args.amount,
+      })
       .eq("id", args.linkedId)
       .in("user_id", scope);
     if (error) throw new Error(error.message);
@@ -201,7 +217,11 @@ export async function deleteLinkedTransaction(transactionId: string): Promise<vo
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("transactions").delete().eq("id", transactionId).in("user_id", scope);
-  await logHouseholdDeletion(supabase, { userId: user.id, table: "transactions", rowId: transactionId });
+  await logHouseholdDeletion(supabase, {
+    userId: user.id,
+    table: "transactions",
+    rowId: transactionId,
+  });
 }
 
 /**
@@ -276,7 +296,8 @@ export async function reverseLinkedTransaction(args: {
     if (isSpend) {
       const { error } = await supabase
         .from("savings_goals")
-        .update({ last_edited_by: user.id,
+        .update({
+          last_edited_by: user.id,
           current_amount: Number(goal.current_amount) + args.amount,
           target_amount: Number(goal.target_amount) + args.amount,
         })

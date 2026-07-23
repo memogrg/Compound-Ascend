@@ -42,6 +42,10 @@ export type JarItem = {
   extraordinary?: number;
   /** Categoría (frasco) del ahorro; se usa para agrupar en secciones. */
   categoryId?: string | null;
+  /** Moneda NATIVA de la entidad vinculada (deuda/meta). El resto de importes de este item
+   *  (budget/spent/remaining) están en display; esta es la única en la unidad real, y es la
+   *  que un gasto sobre este sobre debe mostrar y guardar. */
+  currency?: string;
 };
 
 /** Sección de un frasco vinculado: agrupa items por categoría (solo ahorros). */
@@ -195,6 +199,9 @@ export type JarEntity = {
   categoryId?: string | null;
   /** goal_type del ahorro (p.ej. 'defensa:fondo_paz'); para deduplicar fondos fijos. */
   goalType?: string | null;
+  /** Moneda nativa de la entidad. Necesaria para capturar un gasto vinculado en su moneda,
+   *  no en la de visualización. Se propaga a JarItem. */
+  currency?: string;
 };
 export type JarEntities = {
   holding: JarEntity[];
@@ -236,7 +243,11 @@ const LINKED_GROUPS: Record<
     cta: { label: "Ingresar objetivo", href: "/control-financiero?new=goal" },
     // Fondos SUGERIDOS en el modal de ahorro (se ocultan si ya existen).
     fixedFunds: [
-      { name: "Fondo de emergencia", sub: "Siempre disponible", goalType: "defensa:fondo_emergencia" },
+      {
+        name: "Fondo de emergencia",
+        sub: "Siempre disponible",
+        goalType: "defensa:fondo_emergencia",
+      },
       { name: "Fondo de paz", sub: "Siempre disponible", goalType: "defensa:fondo_paz" },
     ],
   },
@@ -401,6 +412,7 @@ export function buildExpenseJars(args: {
             remaining: budget - spent,
             extraordinary: lb.extraordinaryById?.[e.id] ?? 0,
             categoryId: e.categoryId ?? null,
+            currency: e.currency,
           };
         });
         const totals = items.reduce(
@@ -537,7 +549,10 @@ export function buildExpenseJars(args: {
     (x.categoryId != null && renderedCategoryIds.has(x.categoryId));
 
   const items: OrphanLine[] = (args.budgetItems ?? [])
-    .filter((it) => !isRendered({ categoryId: it.categoryId, kind: it.sourceKind, entityId: it.sourceId }))
+    .filter(
+      (it) =>
+        !isRendered({ categoryId: it.categoryId, kind: it.sourceKind, entityId: it.sourceId }),
+    )
     .map((it) => ({
       id: it.id,
       name: it.name,
@@ -560,7 +575,9 @@ export function buildExpenseJars(args: {
     // Off-budget no suma en "Gastado" (mismo corte que getRealTotals) → tampoco
     // puede ser huérfano: no hay nada que reconciliar.
     .filter((t) => t.countsInBudget !== false)
-    .filter((t) => !isRendered({ categoryId: t.categoryId, kind: t.linkedKind, entityId: t.linkedId }))
+    .filter(
+      (t) => !isRendered({ categoryId: t.categoryId, kind: t.linkedKind, entityId: t.linkedId }),
+    )
     .map((t) => ({
       id: t.id,
       name: t.name,
@@ -588,4 +605,23 @@ export function buildExpenseJars(args: {
   }
 
   return jars;
+}
+
+/**
+ * Comprueba que el importe de un gasto vinculado viene en la moneda de su entidad.
+ *
+ * Hermana de `monedaDelPagoEsCoherente` (deudas, #474) y `monedaDelMovimientoEsCoherente`
+ * (inversiones, #478). Aquí importa por una razón concreta: un gasto sobre el sobre
+ * "Tarjeta" (ligado a una deuda en USD) propaga a `debt_payments`, que NO tiene columna de
+ * moneda — su `amount` es siempre la de la deuda. Si el modal captura en otra, el importe
+ * entra multiplicado por el tipo de cambio y no queda rastro.
+ *
+ * `undefined` pasa: hay llamadores viejos que no mandan moneda. Lo que no puede pasar es
+ * una moneda que CONTRADIGA a la entidad.
+ */
+export function monedaVinculadaEsCoherente(
+  monedaDelImporte: string | undefined,
+  monedaDeLaEntidad: string,
+): boolean {
+  return !monedaDelImporte || monedaDelImporte === monedaDeLaEntidad;
 }

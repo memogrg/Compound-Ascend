@@ -380,6 +380,7 @@ export async function addTransactionAction(raw: unknown): Promise<ActionResult> 
           linkedKind: created.linkedKind,
           linkedId: created.linkedId,
           amount: parsed.data.amount,
+          currency: parsed.data.currency,
           occurredOn: parsed.data.occurredOn,
         });
       } catch (propErr) {
