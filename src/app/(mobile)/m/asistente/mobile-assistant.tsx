@@ -3,11 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import {
-  confirmTransactionAction,
-  confirmGoalAction,
-  listSobresForKindAction,
-} from "@/modules/assistant/api/actions";
+import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
+import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
@@ -36,10 +33,6 @@ type DraftTxn = {
   linkedId?: string | null;
   linkedName?: string | null;
 };
-/** Sobre (hoja) del usuario con su frasco, para el selector "Frasco › Sobre". */
-type SobreOption = { id: string; sobre: string; frasco: string | null };
-const sobreLabel = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
-
 /** Restante del sobre que devuelve confirmTransactionAction (solo gasto con sobre). */
 type SobreRemaining = {
   path: string;
@@ -433,18 +426,6 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
   const [sobre, setSobre] = useState<SobreRemaining | null>(null);
   // Sobre elegido (arranca en el sugerido por la IA); "" = Sin sobre.
   const [categoryId, setCategoryId] = useState<string>(draft.categoryId ?? "");
-  const [sobres, setSobres] = useState<SobreOption[]>([]);
-
-  // Sobres del usuario para el selector. Best-effort: si falla, queda "Sin sobre".
-  useEffect(() => {
-    let alive = true;
-    listSobresForKindAction(draft.kind)
-      .then((list) => alive && setSobres(list))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [draft.kind]);
 
   const confirm = async () => {
     setPending(true);
@@ -474,23 +455,14 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
         <span className="muted" style={{ fontSize: 12 }}>
           Sobre
         </span>
-        <select
-          className="m-inp"
-          aria-label="Sobre"
+        <SobreCombobox
+          kind={draft.kind}
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
+          onChange={setCategoryId}
           disabled={pending}
-        >
-          <option value="">Sin sobre</option>
-          {categoryId && !sobres.some((s) => s.id === categoryId) ? (
-            <option value={categoryId}>{draft.categoryPath ?? "Sobre sugerido"}</option>
-          ) : null}
-          {sobres.map((s) => (
-            <option key={s.id} value={s.id}>
-              {sobreLabel(s)}
-            </option>
-          ))}
-        </select>
+          suggestedPath={draft.categoryPath}
+          inputClassName="m-inp"
+        />
       </label>
       {draft.linkedKind && draft.linkedId ? (
         <div style={{ marginTop: 8 }}>
