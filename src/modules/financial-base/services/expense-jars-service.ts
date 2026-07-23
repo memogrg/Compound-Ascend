@@ -69,6 +69,9 @@ export async function getExpenseJars(args: {
     delta: e.delta,
     categoryId: e.categoryId ?? null,
     goalType: e.goalType ?? null,
+    // La moneda NATIVA sobrevive junto al importe convertido: un gasto sobre este sobre
+    // vinculado tiene que capturarse en la moneda de la entidad, no en la de display.
+    currency: e.currency,
   });
 
   const entities: JarEntities = {

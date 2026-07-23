@@ -68,7 +68,9 @@ export function AddSpendModal({
   const defaultAccount = accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "";
 
   /** Resuelve un valor "<linkedKind>:<id>" al frasco + entidad correspondientes. */
-  function findLinked(value: string): { jar: Extract<Jar, { kind: "linked" }>; item: JarItem } | null {
+  function findLinked(
+    value: string,
+  ): { jar: Extract<Jar, { kind: "linked" }>; item: JarItem } | null {
     const idx = value.indexOf(":");
     if (idx < 0) return null;
     const kind = value.slice(0, idx);
@@ -84,10 +86,14 @@ export function AddSpendModal({
     : [{ code: currency, sym: currency }, ...CURRENCIES];
 
   const captureCurrency = useCaptureCurrency();
+  // Si el sobre por defecto YA es vinculado, el estado inicial arranca en su moneda, no en
+  // la principal: si no, el modal abriría con la moneda equivocada hasta el primer cambio.
+  const inicialVinc = findLinked(firstEnv);
   const [name, setName] = useState("");
   const [date, setDate] = useState(todayISO());
-  // Moneda de captura: default a la principal (estable), no a la de visualización.
-  const [cur, setCur] = useState(captureCurrency);
+  // Moneda de captura: para sobre LIBRE, la principal (estable); para vinculado, la de la
+  // entidad.
+  const [cur, setCur] = useState(inicialVinc?.item.currency ?? captureCurrency);
   const [amount, setAmount] = useState("");
   const [sobre, setSobre] = useState(firstEnv);
   const [pending, setPending] = useState(false);
@@ -96,13 +102,22 @@ export function AddSpendModal({
   const sym = currencyOptions.find((c) => c.code === cur)?.sym ?? cur;
   const linkedSel = findLinked(sobre);
 
-  // Al elegir una entidad vinculada, pre-llena el monto con su restante del mes
-  // (editable). El valor "<linkedKind>:<id>" se desambigua al guardar.
+  // Al elegir una entidad vinculada, la MONEDA pasa a ser la de la entidad (un gasto sobre
+  // el sobre "Tarjeta" es un pago de esa deuda: no se elige moneda, se usa la suya). El
+  // monto se precarga con el restante del mes SOLO si la moneda de la entidad coincide con
+  // la de visualización: `remaining` está convertido a display, así que precargarlo bajo la
+  // etiqueta nativa cuando difieren guardaría el número multiplicado — el P0. Si difieren,
+  // el campo queda vacío y el usuario escribe el importe viendo la moneda correcta.
   function pickSobre(value: string) {
     setSobre(value);
     const sel = findLinked(value);
-    if (sel && typeof sel.item.remaining === "number") {
+    if (!sel) return;
+    const entidadCur = sel.item.currency;
+    if (entidadCur) setCur(entidadCur);
+    if (typeof sel.item.remaining === "number" && (!entidadCur || entidadCur === currency)) {
       setAmount(String(Math.max(0, sel.item.remaining)));
+    } else {
+      setAmount("");
     }
   }
 
@@ -177,11 +192,16 @@ export function AddSpendModal({
           <div className="fld" style={{ flex: "1 1 180px", minWidth: 0, margin: 0 }}>
             <label className="fld-label">Monto</label>
             <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              {/* Sobre vinculado (deuda/meta): la moneda la fija la entidad, no se elige —
+                  elegirla libre reabriría el P0. Deshabilitado y mostrando la suya. Sobre
+                  normal (importe libre): editable. */}
               <select
                 className="inp"
                 value={cur}
                 onChange={(e) => setCur(e.target.value)}
+                disabled={!!linkedSel}
                 aria-label="Moneda"
+                title={linkedSel ? "La moneda la define la deuda o meta vinculada" : undefined}
                 style={{ width: 76, flex: "none", boxSizing: "border-box", paddingInline: 8 }}
               >
                 {currencyOptions.map((c) => (
