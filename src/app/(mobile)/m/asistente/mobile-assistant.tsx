@@ -6,6 +6,7 @@ import Link from "next/link";
 import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
+import { renderMarkdown } from "@/lib/markdown";
 
 /**
  * Asistente IA en móvil (/m/asistente): chat + escáner de recibos, con la piel de
@@ -274,7 +275,16 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
                   </svg>
                 </span>
               ) : null}
-              <div className="m-bubble">{m.text}</div>
+              {/* La IA responde en Markdown → HTML seguro (paridad con la web). El texto del
+                  usuario se renderiza como texto plano (React lo escapa). Ver lib/markdown. */}
+              {m.role === "assistant" ? (
+                <div
+                  className="m-bubble"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }}
+                />
+              ) : (
+                <div className="m-bubble">{m.text}</div>
+              )}
             </div>
             {m.action?.type === "create_transaction" ? (
               <MTxnConfirm draft={txnFromAction(m.action, primaryCurrency)} />

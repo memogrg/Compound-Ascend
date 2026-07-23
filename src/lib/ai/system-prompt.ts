@@ -70,6 +70,17 @@ export type FinancialContext = {
   topDebtApr?: number;
   goalCount?: number;
   goalsProgressPct?: number;
+  /**
+   * Sobres del usuario, en moneda de visualización. "Sobre" abarca DOS tipos:
+   *  - `expense`: sobres de GASTO mensual (hojas favoritas) por frasco, con presupuesto.
+   *  - `goals`: sobres ACUMULABLES (metas de savings_goals) por frasco.
+   * Best-effort: si la lectura falla, no aparecen.
+   */
+  envelopes?: {
+    currency: string;
+    expense: { frasco: string; envelopes: { name: string; budget: number }[] }[];
+    goals: { frasco: string; names: string[] }[];
+  };
   // Perfil conductual (Fase · asesor conductual). Todos opcionales y best-effort:
   // si el wizard no se completó, simplemente no aparecen.
   riskClass?: string;
@@ -240,6 +251,34 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(
       `Metas de ahorro: ${ctx.goalCount}${ctx.goalsProgressPct !== undefined ? ` (avance ${(ctx.goalsProgressPct * 100).toFixed(0)}%)` : ""}.`,
     );
+  }
+
+  // Sobres — DOS tipos distintos (no confundir ni omitir): (a) sobres de GASTO mensual =
+  // subcategorías favoritas dentro de frascos (Limpieza, Restaurantes); (b) sobres
+  // ACUMULABLES = metas (savings_goals). Se enumeran AGRUPADOS POR FRASCO, usando SOLO esta
+  // lista; nunca inventes progreso ni montos (antes se alucinaba "todas al 100%").
+  if (ctx.envelopes) {
+    const e = ctx.envelopes;
+    facts.push(
+      'SOBRES: "sobre" abarca DOS tipos — (a) sobres de GASTO mensual (subcategorías favoritas ' +
+        "dentro de frascos, p. ej. Limpieza, Restaurantes) y (b) sobres ACUMULABLES o metas " +
+        "(savings_goals). No los confundas ni omitas ninguno. Si preguntan cuáles son sus " +
+        "sobres/metas/frascos, enuméralos AGRUPADOS POR FRASCO usando SOLO la lista de abajo; " +
+        "no inventes progreso ni cifras que no estén aquí.",
+    );
+    if (e.expense.length) {
+      facts.push("Sobres de gasto mensual (por frasco):");
+      for (const g of e.expense) {
+        const items = g.envelopes
+          .map((x) => (x.budget > 0 ? `${x.name} (${x.budget} ${e.currency})` : x.name))
+          .join(", ");
+        facts.push(`  Frasco ${g.frasco}: ${items}.`);
+      }
+    }
+    if (e.goals.length) {
+      facts.push("Sobres acumulables / metas (por frasco):");
+      for (const g of e.goals) facts.push(`  Frasco ${g.frasco}: ${g.names.join(", ")}.`);
+    }
   }
 
   // Perfil conductual (omitir los indefinidos, mismo patrón de facts).
