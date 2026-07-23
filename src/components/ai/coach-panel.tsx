@@ -31,6 +31,24 @@ type Mode = "assistant" | "ai";
 type SobreOption = { id: string; sobre: string; frasco: string | null };
 const sobreLabel = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
 
+/** Restante del sobre que devuelve confirmTransactionAction (solo gasto con sobre). */
+type SobreRemaining = {
+  path: string;
+  currency: string;
+  budget: number;
+  spent: number;
+  remaining: number;
+  hasBudget: boolean;
+};
+/** Mensaje de éxito: con restante del sobre si aplica, o el genérico si no. */
+function sobreSuccessMessage(s: SobreRemaining | null): string {
+  if (!s) return "✓ Transacción registrada.";
+  if (!s.hasBudget) return `✓ Registrado en ${s.path}. (Este sobre no tiene presupuesto asignado)`;
+  if (s.remaining < 0)
+    return `✓ Registrado en ${s.path}. Te pasaste por ${formatMoney(-s.remaining, s.currency)}.`;
+  return `✓ Registrado en ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
+}
+
 /**
  * Selector de SOBRE "Frasco › Sobre" compartido por el form manual y la card de confirmación
  * (IA/recibo). ÚNICA fuente del selector para que ambos paths no se desincronicen. Carga los
@@ -570,6 +588,8 @@ function TxnConfirmCard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  // Restante del sobre tras crear el gasto (para el mensaje de éxito); null = mensaje genérico.
+  const [sobre, setSobre] = useState<SobreRemaining | null>(null);
   // Sobre elegido (arranca en el sugerido por la IA / el elegido en el form manual); "" = Sin sobre.
   const [categoryId, setCategoryId] = useState<string>(draft.categoryId ?? "");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -589,8 +609,10 @@ function TxnConfirmCard({
     const res = await confirmTransactionAction({ ...draft, categoryId: categoryId || null });
     setPending(false);
     if (res.ok) {
+      setSobre(res.sobre ?? null);
       setOk(true);
-      timerRef.current = setTimeout(onConfirmed, 1200);
+      // Con restante el usuario querrá leerlo → no autocierres la tarjeta.
+      if (!res.sobre) timerRef.current = setTimeout(onConfirmed, 1200);
     } else {
       setError(res.message ?? "No se pudo guardar.");
     }
@@ -599,7 +621,7 @@ function TxnConfirmCard({
   if (ok) {
     return (
       <div className="coach-bubble" style={{ borderLeft: "2px solid var(--pos)" }}>
-        ✓ Transacción registrada.
+        {sobreSuccessMessage(sobre)}
       </div>
     );
   }

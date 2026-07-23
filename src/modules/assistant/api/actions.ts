@@ -8,12 +8,14 @@
 import { revalidatePath } from "next/cache";
 import { transactionInputSchema } from "@/modules/assistant/schemas";
 import { createTransaction } from "@/modules/assistant/services/transaction-service";
-import { listSobresForKind, type SobreOption } from "@/modules/financial-base";
+import { listSobresForKind, getSobreRemaining } from "@/modules/financial-base";
+import type { SobreOption, SobreRemaining } from "@/modules/financial-base";
 import { createGoal, goalInputSchema } from "@/modules/control";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
-export type ConfirmResult = { ok: boolean; message?: string };
+/** `sobre` viaja solo para un GASTO con sobre → mensaje de restante en el chat. */
+export type ConfirmResult = { ok: boolean; message?: string; sobre?: SobreRemaining };
 
 /**
  * Sobres (hojas) del usuario para el selector de la card de confirmación, con su frasco para
@@ -48,7 +50,15 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
     revalidatePath("/transacciones");
     revalidatePath("/deudas");
     revalidatePath("/ahorro");
-    return { ok: true };
+    // Restante del sobre para el mensaje del chat — SOLO gasto con sobre (ingreso / "Sin sobre"
+    // no aplican). Best-effort: lo lee DESPUÉS de crear, así ya descuenta esta transacción; si
+    // falla, se degrada al éxito genérico sin cifra inventada.
+    let sobre: SobreRemaining | undefined;
+    if (parsed.data.kind === "gasto" && parsed.data.categoryId) {
+      sobre =
+        (await getSobreRemaining(parsed.data.categoryId, parsed.data.occurredOn)) ?? undefined;
+    }
+    return sobre ? { ok: true, sobre } : { ok: true };
   } catch (err) {
     logger.error("confirmTransaction fallido", {
       message: err instanceof Error ? err.message : "?",
