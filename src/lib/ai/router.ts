@@ -31,8 +31,11 @@ export type RoutedQuery = {
 const LITE_MODEL = "gemini-2.5-flash-lite";
 
 type Intent =
-  // R1 — datos ya en ToolContext (motor determinista):
+  // Números patrimoniales — los TRES, distintos (todos "capital al 8% que cubre X gasto"):
+  | "numero_seguridad"
+  | "numero_independencia"
   | "numero_libertad"
+  // R1 — datos ya en ToolContext (motor determinista):
   | "metas"
   | "cuota_deuda"
   // R2 — datos ya en FinancialContext (ctx), 0 fetch, ambos canales:
@@ -46,6 +49,8 @@ type Intent =
   | "listar_sobres";
 
 const KNOWN_INTENTS: Intent[] = [
+  "numero_seguridad",
+  "numero_independencia",
   "numero_libertad",
   "metas",
   "cuota_deuda",
@@ -81,7 +86,14 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   const t = text.trim();
   if (REASONING_CUES.test(t)) return null; // consejo/proyección → razonamiento
 
-  if (/(?:cu[aá]l es\s+)?(?:mi\s+)?n[uú]mero de (?:libertad|independencia)|cu[aá]nto necesito para (?:ser libre|mi libertad)/i.test(t)) {
+  // Los TRES números patrimoniales — distinguidos explícitamente (no se mezclan).
+  if (/n[uú]mero de seguridad|cu[aá]nto necesito para (?:cubrir )?(?:lo esencial|mis? gastos? esenciales?)/i.test(t)) {
+    return { intent: "numero_seguridad", params: {} };
+  }
+  if (/n[uú]mero de independencia|cu[aá]nto necesito para (?:sostener|cubrir) mi vida (?:actual)?/i.test(t)) {
+    return { intent: "numero_independencia", params: {} };
+  }
+  if (/n[uú]mero de libertad|cu[aá]nto necesito para (?:ser libre|mi libertad|mi estilo de vida)/i.test(t)) {
     return { intent: "numero_libertad", params: {} };
   }
   // Mejora 3 — "listá mis sobres/frascos/metas": enumeración agrupada por frasco (determinista).
@@ -126,7 +138,9 @@ async function classifyWithLite(
   if (!lite) return null;
   const system =
     "Clasificás preguntas de finanzas personales. Devolvé SOLO JSON " +
-    '{"intent": "numero_libertad"|"metas"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
+    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
+    "numero_seguridad=capital para sus gastos esenciales; numero_independencia=capital para su vida actual; " +
+    "numero_libertad=capital para su estilo de vida deseado (NO son lo mismo; no los mezcles). " +
     "gasto_mes=cuánto gasta al mes; ingreso_mes=cuánto gana; gasto_categoria=en qué gasta más; " +
     "saldo_liquidez=cuánto tiene disponible; ultimos_movimientos=sus transacciones recientes; " +
     "listar_sobres=enumerar sus sobres/frascos/metas (no su progreso). metas=el progreso de sus metas. " +
@@ -178,15 +192,48 @@ export function answerFromContext(
     return say(`Donde más gastás es ${top.name}: ${money(top.monthly)} al mes (${top.pct}% de tu gasto).`);
   }
 
-  if (intent === "numero_libertad") {
-    if (typeof tc.freedomNumber !== "number" || tc.freedomNumber <= 0) return null;
+  // Los TRES números patrimoniales. Cada cifra sale del motor (patrimonio-engine, al 8% anual);
+  // JAMÁS se inventa ni se usa la regla del 4%/25×. "have" = patrimonio invertible.
+  if (
+    intent === "numero_seguridad" ||
+    intent === "numero_independencia" ||
+    intent === "numero_libertad"
+  ) {
     const have = typeof tc.investableWealth === "number" ? tc.investableWealth : 0;
-    const falta = Math.max(0, tc.freedomNumber - have);
+    const progreso = (target: number): string => {
+      const falta = Math.max(0, target - have);
+      return have > 0
+        ? ` Hoy llevás ${money(have)} invertibles${falta > 0 ? `, te faltan ${money(falta)}.` : " — ¡ya lo alcanzaste!"}`
+        : " Todavía no registrás patrimonio invertible.";
+    };
+
+    if (intent === "numero_seguridad") {
+      const n = tc.securityNumber;
+      if (typeof n !== "number" || n <= 0) return null;
+      return say(
+        `Tu Número de Seguridad es ${money(n)} — el capital que, al 8% anual, cubre tus gastos ESENCIALES.` +
+          progreso(n),
+      );
+    }
+    if (intent === "numero_independencia") {
+      const n = tc.independenceNumber;
+      if (typeof n !== "number" || n <= 0) return null;
+      return say(
+        `Tu Número de Independencia es ${money(n)} — el capital que, al 8% anual, cubre tus gastos TOTALES actuales.` +
+          progreso(n),
+      );
+    }
+    // numero_libertad: estilo de vida DESEADO. Si no lo definió → estado claro, sin inventar.
+    const n = tc.libertyNumber;
+    if (typeof n !== "number" || n <= 0) {
+      return say(
+        "Todavía no definiste tu estilo de vida deseado, así que no tengo tu Número de Libertad. " +
+          "Definilo en tu perfil y te lo calculo (tu gasto deseado mensual, al 8% anual). No lo invento.",
+      );
+    }
     return say(
-      `Tu Número de Independencia es ${money(tc.freedomNumber)} — el patrimonio invertido que cubriría tu estilo de vida. ` +
-        (have > 0
-          ? `Hoy llevás ${money(have)} invertibles${falta > 0 ? `, te faltan ${money(falta)}.` : " — ¡ya lo alcanzaste!"}`
-          : "Todavía no registrás patrimonio invertible."),
+      `Tu Número de Libertad es ${money(n)} — el capital que, al 8% anual, sostiene el estilo de vida que DESEÁS.` +
+        progreso(n),
     );
   }
 

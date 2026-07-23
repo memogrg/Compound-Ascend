@@ -46,15 +46,22 @@ export type { FinancialContext };
 /**
  * Datos de solo lectura que habilitan las herramientas (chat web con sesión). Las
  * deudas vienen YA normalizadas a `currency` (la moneda principal); `fxUnavailable`
- * marca que no se pudieron convertir (cálculo asume una sola moneda). `freedomNumber` e
- * `investableWealth` (Número de Libertad y patrimonio invertible, en moneda PRINCIPAL) son
- * opcionales y best-effort: si no se pudieron leer, la tool de libertad lo aclara.
+ * marca que no se pudieron convertir (cálculo asume una sola moneda).
+ *
+ * LOS TRES NÚMEROS PATRIMONIALES (todos "capital que, al 8% anual, cubre X gasto"; en moneda
+ * PRINCIPAL; best-effort). NUNCA se mezclan ni se inventan:
+ *  - `securityNumber`     → gasto ESENCIAL (Número de Seguridad).
+ *  - `independenceNumber` → gasto TOTAL actual (Número de Independencia; siempre presente).
+ *  - `libertyNumber`      → estilo de vida DESEADO (Número de Libertad; ausente si no lo definió).
+ * `investableWealth` = patrimonio invertible (punto de partida de las proyecciones).
  */
 export type ToolContext = {
   debts: DebtInput[];
   currency: string;
   fxUnavailable?: boolean;
-  freedomNumber?: number;
+  securityNumber?: number;
+  independenceNumber?: number;
+  libertyNumber?: number;
   investableWealth?: number;
   /** Metas de ahorro del usuario en moneda PRINCIPAL (best-effort; vacío/undefined → tool degrada). */
   goals?: GoalForTool[];
@@ -178,9 +185,10 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       return projectInvestment(args, toolContext.currency);
     }
     if (name === "proyectar_libertad_financiera") {
-      // Datos reales del usuario (número + invertible), ya en moneda principal.
+      // Proyecta hacia el Número de LIBERTAD (estilo de vida deseado). Si no lo definió,
+      // el motor devuelve disponible:false pidiendo definirlo — nunca hacia otro número.
       return projectFreedom(args, {
-        freedomNumber: toolContext.freedomNumber,
+        libertyNumber: toolContext.libertyNumber,
         investableWealth: toolContext.investableWealth,
         currency: toolContext.currency,
       });
@@ -190,9 +198,9 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       return projectGoals(args, { goals: toolContext.goals, currency: toolContext.currency });
     }
     if (name === "anios_para_libertad") {
-      // Años hasta la libertad al ritmo actual + sensibilidad (número + invertible reales).
+      // Años hasta el Número de LIBERTAD al ritmo actual + sensibilidad (invertible real).
       return yearsToFreedom(args, {
-        freedomNumber: toolContext.freedomNumber,
+        libertyNumber: toolContext.libertyNumber,
         investableWealth: toolContext.investableWealth,
         currency: toolContext.currency,
       });

@@ -65,25 +65,22 @@ export async function buildWhatsAppToolContext(
     debts: normalizeDebtsForTool(raw, primary, rates),
   };
 
-  // Número de Libertad + patrimonio invertible (service-role, ya en moneda primaria).
-  // Best-effort: si falla, la tool de libertad degrada con un motivo explicable.
+  // Los TRES números patrimoniales + patrimonio invertible (service-role, ya en moneda primaria).
+  // Cada uno es "capital que, al 8% anual, cubre X gasto"; NUNCA se mezclan ni se inventan.
+  // Best-effort: si falla, las tools/intents lo aclaran.
   try {
     const pat = await getPatrimonioReportForUser(userId);
-    // freedomNumber de las tools = número de independencia (vida actual, siempre presente).
-    let numero = pat.report.numeroDeIndependencia;
-    let invertible = pat.report.investableWealth;
-    if (pat.currency !== primary) {
-      if (rates) {
-        numero = convertCurrency(numero, pat.currency, primary, rates);
-        invertible = convertCurrency(invertible, pat.currency, primary, rates);
-      } else {
-        numero = NaN;
-      }
-    }
-    if (Number.isFinite(numero)) {
-      toolContext.freedomNumber = numero;
-      toolContext.investableWealth = invertible;
-    }
+    const toPrimary = (v: number): number =>
+      pat.currency === primary ? v : rates ? convertCurrency(v, pat.currency, primary, rates) : NaN;
+    const seguridad = toPrimary(pat.report.numeroDeSeguridad);
+    const independencia = toPrimary(pat.report.numeroDeIndependencia);
+    const invertible = toPrimary(pat.report.investableWealth);
+    const libertad =
+      pat.report.numeroDeLibertad != null ? toPrimary(pat.report.numeroDeLibertad) : null;
+    if (Number.isFinite(seguridad)) toolContext.securityNumber = seguridad;
+    if (Number.isFinite(independencia)) toolContext.independenceNumber = independencia;
+    if (libertad != null && Number.isFinite(libertad)) toolContext.libertyNumber = libertad;
+    if (Number.isFinite(invertible)) toolContext.investableWealth = invertible;
   } catch {
     // deja los campos undefined
   }

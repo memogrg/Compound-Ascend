@@ -80,30 +80,25 @@ export async function POST(req: Request) {
           fxUnavailable: !rates,
           debts: normalizeDebtsForTool(debts, primary, rates),
         };
-        // Número de Libertad + patrimonio invertible (datos reales), normalizados a la moneda
-        // PRINCIPAL. Best-effort: si falla, la tool de libertad degrada con un motivo explicable.
+        // Los TRES números patrimoniales + patrimonio invertible (datos reales), normalizados a la
+        // moneda PRINCIPAL. Cada uno es "capital que, al 8% anual, cubre X gasto"; NUNCA se mezclan
+        // ni se inventan. Best-effort: si falla, las tools/intents lo aclaran.
         try {
           const pat = await getPatrimonioReport();
-          // El "freedomNumber" de las tools = capital para sostener la vida ACTUAL
-          // = numeroDeIndependencia (sucesor real del viejo numeroDeLibertad, siempre
-          // presente). El nuevo numeroDeLibertad (estilo de vida deseado) es nullable
-          // y se maneja aparte; nunca se inventa.
-          let numero = pat.report.numeroDeIndependencia;
-          let invertible = pat.report.investableWealth;
-          if (pat.currency !== primary) {
-            if (rates) {
-              numero = convertCurrency(numero, pat.currency, primary, rates);
-              invertible = convertCurrency(invertible, pat.currency, primary, rates);
-            } else {
-              numero = NaN; // sin FX no podemos pasar a principal → dejamos los campos fuera
-            }
-          }
-          if (Number.isFinite(numero)) {
-            toolContext.freedomNumber = numero;
-            toolContext.investableWealth = invertible;
-          }
+          const toPrimary = (v: number): number =>
+            pat.currency === primary ? v : rates ? convertCurrency(v, pat.currency, primary, rates) : NaN;
+          const seguridad = toPrimary(pat.report.numeroDeSeguridad);
+          const independencia = toPrimary(pat.report.numeroDeIndependencia);
+          const invertible = toPrimary(pat.report.investableWealth);
+          // Libertad = estilo de vida DESEADO; null si no lo definió (nunca se inventa).
+          const libertad =
+            pat.report.numeroDeLibertad != null ? toPrimary(pat.report.numeroDeLibertad) : null;
+          if (Number.isFinite(seguridad)) toolContext.securityNumber = seguridad;
+          if (Number.isFinite(independencia)) toolContext.independenceNumber = independencia;
+          if (libertad != null && Number.isFinite(libertad)) toolContext.libertyNumber = libertad;
+          if (Number.isFinite(invertible)) toolContext.investableWealth = invertible;
         } catch {
-          // deja freedomNumber/investableWealth undefined
+          // deja los números/investableWealth undefined
         }
         // Metas de ahorro (datos reales) normalizadas a la moneda PRINCIPAL. Best-effort.
         try {

@@ -242,7 +242,9 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     const p = await getPatrimonioReport();
     ctx.indicePatrimonial = Math.round(p.report.indice);
     ctx.nivelPatrimonial = p.level.name;
-    // "Número de independencia": capital para sostener la vida actual (siempre presente).
+    // Los TRES números (al 8%): Seguridad (esencial), Independencia (total actual, siempre
+    // presente) y Libertad (deseado, nullable — se maneja abajo). No se mezclan.
+    ctx.numeroDeSeguridad = Math.round(p.report.numeroDeSeguridad);
     ctx.numeroDeIndependencia = Math.round(p.report.numeroDeIndependencia);
     // "Número de libertad" (estilo deseado): solo si el usuario lo definió; si es
     // null se OMITE (nada de fallback silencioso).

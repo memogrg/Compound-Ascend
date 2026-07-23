@@ -37,7 +37,8 @@ export type FinancialContext = {
   // no aparecen y el chat no se degrada.
   indicePatrimonial?: number; // 0-100
   nivelPatrimonial?: string; // level.name
-  numeroDeIndependencia?: number; // capital para sostener la vida ACTUAL (al 8%)
+  numeroDeSeguridad?: number; // capital para los gastos ESENCIALES (al 8%)
+  numeroDeIndependencia?: number; // capital para sostener la vida ACTUAL / gasto TOTAL (al 8%)
   numeroDeLibertad?: number; // capital para el estilo de vida DESEADO (al 8%); ausente si no lo definió
   añosDeLibertad?: number; // años que cubre el patrimonio invertible
   mesesDeColchon?: number; // liquidez / gasto mensual (meses de colchón, no libertad)
@@ -192,13 +193,25 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(
       `Índice Patrimonial: ${ctx.indicePatrimonial}/100${ctx.nivelPatrimonial ? ` (nivel: ${ctx.nivelPatrimonial})` : ""}.`,
     );
+  // Los TRES números patrimoniales — SIEMPRE al 8% anual (número = gasto anual ÷ 0,08). NUNCA
+  // uses la regla del 4% ni "25×": este producto usa 8%. No los mezcles (seguridad ≠ independencia
+  // ≠ libertad) ni recalcules; usá exactamente estas cifras.
+  if (ctx.numeroDeSeguridad !== undefined)
+    facts.push(
+      `Número de Seguridad: ${ctx.numeroDeSeguridad} ${ctx.currency} (capital que, al 8% anual, cubre tus gastos ESENCIALES).`,
+    );
   if (ctx.numeroDeIndependencia !== undefined)
     facts.push(
-      `Número de Independencia: ${ctx.numeroDeIndependencia} ${ctx.currency} (capital que, al 8% anual, sostiene tu vida ACTUAL).`,
+      `Número de Independencia: ${ctx.numeroDeIndependencia} ${ctx.currency} (capital que, al 8% anual, cubre tu gasto TOTAL actual).`,
     );
   if (ctx.numeroDeLibertad !== undefined)
     facts.push(
-      `Número de Libertad: ${ctx.numeroDeLibertad} ${ctx.currency} (capital que, al 8%, sostiene el estilo de vida que DESEÁS). Si no aparece, el usuario aún no lo definió — invitalo a hacerlo, no lo inventes.`,
+      `Número de Libertad: ${ctx.numeroDeLibertad} ${ctx.currency} (capital que, al 8% anual, sostiene el estilo de vida que DESEÁS).`,
+    );
+  else
+    facts.push(
+      "Número de Libertad: el usuario AÚN NO definió su estilo de vida deseado, así que no existe todavía. " +
+        "Si lo pide, invitalo a definirlo — NUNCA inventes el valor ni una fórmula (nada de 4%/25×).",
     );
   if (ctx.añosDeLibertad !== undefined)
     facts.push(
@@ -446,7 +459,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       "Su respaldo de emergencia es bajo (menos de 3 meses). Si pregunta por invertir (sobre todo agresivo), señalá PRIMERO reforzar la base —fondo de emergencia/liquidez— antes de crecer; recién después hablás de inversión. Con tacto y sin alargar.",
     );
 
-  // Riesgo de secuencia: cerca del Número de Libertad (patrimonio invertible ≥ 80% del número).
+  // Riesgo de secuencia: cerca del Número de Independencia (patrimonio invertible ≥ 80% del número).
   if (
     ctx.numeroDeIndependencia !== undefined &&
     ctx.investableWealth !== undefined &&
@@ -454,7 +467,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     ctx.investableWealth >= ctx.numeroDeIndependencia * 0.8
   )
     behaviorRules.push(
-      "Está muy cerca de su Número de Libertad. Si pregunta por RETIRAR o vivir de su patrimonio, advertí el RIESGO DE SECUENCIA de retornos (la 'zona roja' de los primeros años de retiro) y ofrecé una mitigación concreta (estrategia de cubetas/buckets o retiros con barandas). Solo si viene al caso; breve.",
+      "Está muy cerca de su Número de Independencia. Si pregunta por RETIRAR o vivir de su patrimonio, advertí el RIESGO DE SECUENCIA de retornos (la 'zona roja' de los primeros años de retiro) y ofrecé una mitigación concreta (estrategia de cubetas/buckets o retiros con barandas). Solo si viene al caso; breve.",
     );
 
   // Memoria conductual (Fase 4): cómo usar las observaciones recientes.
@@ -477,8 +490,10 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "Usa solo el contexto financiero proporcionado; no inventes datos del usuario.",
     "",
     "USA TUS MÉTRICAS YA CALCULADAS:",
-    "- Usa SIEMPRE las métricas que ya vienen en tu contexto (Índice Patrimonial, Número/Años/Meses de Libertad, cobertura, calidad). NUNCA las recalcules a partir del patrimonio neto y los gastos.",
-    '- "¿Cuántos años puedo vivir de mi patrimonio?" → usa los Años de Libertad. "¿Cuánto necesito para vivir de mi patrimonio?" → el Número de Libertad. "¿Cuál es mi patrimonio líquido / cuántos meses cubro?" → los Meses de Libertad y la liquidez. "¿Voy bien?" → el Índice Patrimonial y su nivel.',
+    "- Usa SIEMPRE las métricas que ya vienen en tu contexto (Índice Patrimonial, los tres Números, Años/Meses de colchón, cobertura, calidad). NUNCA las recalcules a partir del patrimonio neto y los gastos.",
+    "- LOS TRES NÚMEROS son distintos y NO se mezclan: Número de SEGURIDAD (gastos esenciales), Número de INDEPENDENCIA (gasto total actual), Número de LIBERTAD (estilo de vida DESEADO). TODOS se calculan al 8% anual (capital = gasto anual ÷ 0,08). PROHIBIDO usar la regla del 4% o «25×»: este producto usa 8%. Si te preguntan «cuál es mi número de X», da EXACTAMENTE la cifra de ese número que está en tu contexto; si el de Libertad no está, decí que aún no definió su estilo de vida deseado e invitalo a hacerlo — nunca inventes la cifra ni la fórmula.",
+    '- "¿Cuántos años puedo vivir de mi patrimonio?" → usa los Años de colchón. "¿Cuánto necesito para sostener mi vida actual?" → el Número de Independencia. "¿Cuánto para lo esencial?" → el de Seguridad. "¿Cuánto para mi estilo de vida deseado?" → el de Libertad. "¿Voy bien?" → el Índice Patrimonial y su nivel.',
+    "- NO enumeres las metas ni los sobres del usuario salvo que lo pida explícitamente (p. ej. «cuáles son mis sobres/metas»). Una pregunta sobre un Número NO es pedido de listar metas.",
     '- "¿Cuánto tengo ya invertido / cuánto en ahorros o líquido / cómo está distribuido mi patrimonio?" → usá la "Distribución de tu patrimonio" (invertido / líquido / otros y las clases principales) que viene en tu contexto. Si está disponible, NO digas que no tenés el desglose.',
     "- Si una métrica no está en el contexto, dilo en una frase y ofrece calcularla; no la inventes.",
     "",

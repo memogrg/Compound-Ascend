@@ -40,7 +40,10 @@ const CTX = {
 const tc: ToolContext = {
   currency: "USD",
   debts: [{ id: "d1", name: "Tarjeta Visa", balance: 1000, apr: 30, minPayment: 50 }],
-  freedomNumber: 500_000,
+  // Los TRES números patrimoniales, distintos (todos salen del motor, nunca inventados).
+  securityNumber: 200_000,
+  independenceNumber: 350_000,
+  libertyNumber: 500_000,
   investableWealth: 120_000,
   goals: [
     { nombre: "Fondo de emergencia", objetivo: 10_000, actual: 4_000, aporte_mensual: 200 },
@@ -57,6 +60,9 @@ beforeEach(() => {
 describe("matchIntent · patrones (0 tokens)", () => {
   it("cada intent fase-1 clasifica correctamente", () => {
     expect(matchIntent("¿Cuál es mi número de libertad?")?.intent).toBe("numero_libertad");
+    // Los TRES números son intents distintos y NO se mezclan.
+    expect(matchIntent("¿cuál es mi número de seguridad?")?.intent).toBe("numero_seguridad");
+    expect(matchIntent("¿cuál es mi número de independencia?")?.intent).toBe("numero_independencia");
     // Nota: "cuáles son mis metas" ahora es listar_sobres (Mejora 3); el PROGRESO es `metas`.
     expect(matchIntent("mostrame el progreso de mi ahorro")?.intent).toBe("metas");
     expect(matchIntent("cuánto llevo ahorrado en mis metas")?.intent).toBe("metas");
@@ -71,10 +77,22 @@ describe("matchIntent · patrones (0 tokens)", () => {
 });
 
 describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () => {
-  it("numero_libertad usa freedomNumber del ToolContext", () => {
+  it("numero_libertad usa libertyNumber del ToolContext", () => {
     const r = answerFromContext("numero_libertad", {}, tc);
-    expect(r?.reply).toContain("500.000"); // = tc.freedomNumber, no inventado
+    expect(r?.reply).toContain("500.000"); // = tc.libertyNumber, no inventado
     expect(r?.reply).toContain("120.000"); // = tc.investableWealth
+  });
+
+  it("numero_seguridad usa securityNumber del ToolContext (gasto esencial)", () => {
+    const r = answerFromContext("numero_seguridad", {}, tc);
+    expect(r?.reply).toContain("200.000"); // = tc.securityNumber
+    expect(r?.reply).toContain("ESENCIAL");
+  });
+
+  it("numero_independencia usa independenceNumber del ToolContext (gasto total actual)", () => {
+    const r = answerFromContext("numero_independencia", {}, tc);
+    expect(r?.reply).toContain("350.000"); // = tc.independenceNumber
+    expect(r?.reply).toContain("TOTALES");
   });
 
   it("metas listan cada meta con su progreso real del ToolContext", () => {
@@ -91,9 +109,18 @@ describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () =>
     expect(r?.reply).toContain("30%"); // APR
   });
 
-  it("sin freedomNumber → null (escala, no adivina)", () => {
-    const bare = { ...tc, freedomNumber: undefined };
-    expect(answerFromContext("numero_libertad", {}, bare)).toBeNull();
+  it("sin securityNumber/independenceNumber → null (escala, no adivina)", () => {
+    expect(answerFromContext("numero_seguridad", {}, { ...tc, securityNumber: undefined })).toBeNull();
+    expect(
+      answerFromContext("numero_independencia", {}, { ...tc, independenceNumber: undefined }),
+    ).toBeNull();
+  });
+
+  it("sin libertyNumber → pide definir el estilo de vida, sin inventar la cifra", () => {
+    const bare = { ...tc, libertyNumber: undefined };
+    const r = answerFromContext("numero_libertad", {}, bare);
+    expect(r?.reply).toMatch(/estilo de vida/i);
+    expect(r?.reply).not.toContain("500.000"); // no reutiliza otra cifra
   });
 });
 

@@ -67,7 +67,7 @@ const CTX: FinancialContext = {
 const TOOL_CTX: ToolContext = {
   debts: [],
   currency: "CRC",
-  freedomNumber: CTX.numeroDeLibertad,
+  libertyNumber: CTX.numeroDeLibertad,
   investableWealth: CTX.investableWealth,
   goals: [],
 };
@@ -344,7 +344,7 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
   });
 
   it("años para la libertad → usa la herramienta: da los años al ritmo actual + sensibilidad de ahorrar más", { timeout: LIVE_TIMEOUT }, async () => {
-    // TOOL_CTX trae freedomNumber (290,4M) e investableWealth (13M); con el flujo libre (1,4M/mes)
+    // TOOL_CTX trae libertyNumber (290,4M) e investableWealth (13M); con el flujo libre (1,4M/mes)
     // la herramienta anios_para_libertad da ~11-12 años y muestra cuánto acorta aportar más.
     const { reply } = await chat(ask("¿en cuánto tiempo llego a mi libertad financiera con lo que ahorro hoy?"));
     expect(reply).toBeTypeOf("string");

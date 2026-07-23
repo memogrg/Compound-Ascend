@@ -38,7 +38,7 @@ const DEBTS: DebtInput[] = [
 ];
 const SIM_ARGS = { estrategia: "avalancha", aporte_extra_mensual: 50000 };
 const PROJ_ARGS = { aporte_mensual: 100000, anios: 20, rendimiento_anual_pct: 8 };
-const FREEDOM_CTX = { freedomNumber: 50_000_000, investableWealth: 5_000_000 };
+const FREEDOM_CTX = { libertyNumber: 50_000_000, investableWealth: 5_000_000 };
 const FREEDOM_ARGS = { aporte_mensual: 200000, anios: 25 };
 const GOALS_CTX: GoalForTool[] = [
   { nombre: "Viaje", objetivo: 3_000_000, actual: 1_200_000, aporte_mensual: 150_000, fecha_objetivo: null },

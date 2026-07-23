@@ -179,7 +179,7 @@ describe("tools · projectInvestment (interés compuesto, puro)", () => {
 });
 
 describe("tools · projectFreedom (datos reales, reusa projectInvestment)", () => {
-  const CTX = { freedomNumber: 50_000_000, investableWealth: 5_000_000, currency: "CRC" };
+  const CTX = { libertyNumber: 50_000_000, investableWealth: 5_000_000, currency: "CRC" };
 
   it("sin Número de Libertad → disponible:false con motivo", () => {
     const r = projectFreedom({ aporte_mensual: 100_000, anios: 20 }, { currency: "CRC" });
@@ -232,14 +232,14 @@ describe("tools · yearsToFreedom (años al ritmo actual + sensibilidad, puro)",
     return Math.round((m / 12) * 10) / 10;
   };
 
-  it("sin freedomNumber → disponible:false con motivo", () => {
+  it("sin libertyNumber → disponible:false con motivo", () => {
     const r = yearsToFreedom({ aporte_mensual: 1_400_000 }, { currency: "CRC" });
     expect(r.disponible).toBe(false);
     if (!r.disponible) expect(r.motivo).toMatch(/Número de Libertad/i);
   });
 
   it("años y sensibilidad coinciden con el interés compuesto a mano (5% real por defecto)", () => {
-    const ctx = { freedomNumber: 290_400_000, investableWealth: 13_000_000, currency: "CRC" };
+    const ctx = { libertyNumber: 290_400_000, investableWealth: 13_000_000, currency: "CRC" };
     const aporte = 1_400_000;
     const r = yearsToFreedom({ aporte_mensual: aporte }, ctx); // rendimiento default 5%
     expect(r.disponible).toBe(true);
@@ -267,7 +267,7 @@ describe("tools · yearsToFreedom (años al ritmo actual + sensibilidad, puro)",
   it("patrimonio ya ≥ número → 0 años y sensibilidad sin acortamiento", () => {
     const r = yearsToFreedom(
       { aporte_mensual: 1_000_000 },
-      { freedomNumber: 100_000_000, investableWealth: 120_000_000, currency: "CRC" },
+      { libertyNumber: 100_000_000, investableWealth: 120_000_000, currency: "CRC" },
     );
     expect(r.disponible).toBe(true);
     if (!r.disponible) return;
@@ -276,7 +276,7 @@ describe("tools · yearsToFreedom (años al ritmo actual + sensibilidad, puro)",
   });
 
   it("respeta un rendimiento supuesto explícito (10%) distinto del default", () => {
-    const ctx = { freedomNumber: 200_000_000, investableWealth: 20_000_000, currency: "CRC" };
+    const ctx = { libertyNumber: 200_000_000, investableWealth: 20_000_000, currency: "CRC" };
     const r = yearsToFreedom({ aporte_mensual: 1_000_000, rendimiento_anual_pct: 10 }, ctx);
     expect(r.disponible).toBe(true);
     if (!r.disponible) return;

@@ -188,6 +188,7 @@ describe("buildSystemPrompt · perfil conductual", () => {
       expenseMonthly: 2575128,
       indicePatrimonial: 39,
       nivelPatrimonial: "Estabilidad inicial",
+      numeroDeSeguridad: 300000000,
       numeroDeIndependencia: 772538304,
       añosDeLibertad: 6,
       mesesDeColchon: 34,
@@ -196,14 +197,17 @@ describe("buildSystemPrompt · perfil conductual", () => {
       investableWealth: 199244964,
       patrimonioDiagnosis: ["deuda_mala_alta"],
     });
-    // (i) Los facts patrimoniales aparecen.
+    // (i) Los facts patrimoniales aparecen — los TRES números, distintos.
     expect(prompt).toContain("Índice Patrimonial: 39/100 (nivel: Estabilidad inicial).");
+    expect(prompt).toContain("Número de Seguridad: 300000000 CRC");
     expect(prompt).toContain("Número de Independencia: 772538304 CRC");
+    // Sin numeroDeLibertad → invita a definirlo, no inventa la cifra.
+    expect(prompt).toContain("Número de Libertad: el usuario AÚN NO definió su estilo de vida deseado");
     expect(prompt).toContain("Años de Libertad: tu patrimonio invertible cubre 6 años");
     // (ii) Las nuevas instrucciones de uso de métricas y estilo directo.
     expect(prompt).toContain("Usa SIEMPRE las métricas que ya vienen en tu contexto");
     expect(prompt).toContain("NUNCA las recalcules a partir del patrimonio neto y los gastos");
-    expect(prompt).toContain("usa los Años de Libertad");
+    expect(prompt).toContain("usa los Años de colchón");
     expect(prompt).toContain("Responde primero la respuesta concreta en 1-2 frases");
     expect(prompt).toContain("haz UNA sola pregunta corta y espera la respuesta");
   });
