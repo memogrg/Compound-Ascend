@@ -103,6 +103,8 @@ export type V2View = {
   transactions: Transaction[];
   categories: Category[];
   tree: CategoryNode[];
+  /** `tree` de gasto filtrado a sobres reales (configurados ∪ adoptados) para el composer. */
+  composerTree: CategoryNode[];
   incomeTree: CategoryNode[];
   suggestions: SuggestionEntry[];
   templates: TransactionTemplate[];
@@ -510,9 +512,13 @@ export function IncomeExpenseSection({
             <ExpenseToolbar
               jars={view.jars}
               accounts={view.accounts}
-              currency={currency}
               period={jarPeriod}
               tree={view.tree}
+              composerTree={view.composerTree}
+              incomeTree={view.incomeTree}
+              suggestions={view.suggestions}
+              templates={view.templates}
+              linkables={view.linkables}
               canPersonalize={view.canPersonalize}
               personalization={view.personalization}
               createSavingsSobre={createSavingsSobre}
@@ -704,7 +710,7 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
         <div className="hint">Busca, filtra y gestiona todos tus movimientos del mes.</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <ComposerButton
-            tree={view.tree}
+            tree={view.composerTree}
             incomeTree={view.incomeTree}
             accounts={view.accounts}
             suggestions={view.suggestions}

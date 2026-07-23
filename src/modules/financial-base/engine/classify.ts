@@ -6,7 +6,7 @@
  * helpers los detectan y arman las hojas de categoría seleccionables por naturaleza.
  */
 import type { Transaction } from "@/modules/financial-base/types";
-import type { Category } from "@/modules/financial-base/services/categories-service";
+import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
 
 /** Categoría hoja seleccionable (forma plana para el selector). */
 export type SelectableCategory = { id: string; name: string; categoryType: string };
@@ -80,4 +80,31 @@ export function selectableSobresByFrasco(categories: Category[]): SelectableSobr
 export function categoryMatchesKind(categoryType: string, kind: "gasto" | "ingreso"): boolean {
   if (categoryType === "both") return true;
   return kind === "gasto" ? categoryType === "expense" : categoryType === "income";
+}
+
+/**
+ * "Sobre real configurado" (parte PURA del predicado, sobre la categoría): favorito adoptado o
+ * creado por el usuario. Excluye las plantillas de sistema sin adoptar (delivery/café). La otra
+ * mitad del predicado ("presupuestado/usado por el hogar") NO está en Category — se une aparte con
+ * el set de category_ids que la vista de frascos ya usa (budget/real por período), para que el
+ * selector muestre una hoja SI Y SOLO SI aparece en Gastos (ver expense-jars.ts:492).
+ */
+export function isConfiguredSobre(c: { isFavorite: boolean; isSystem: boolean }): boolean {
+  return c.isFavorite || !c.isSystem;
+}
+
+/**
+ * Filtra las hojas de un árbol de categorías de GASTO a solo los sobres reales: configurados
+ * (isConfiguredSobre) o adoptados por uso/presupuesto del hogar (`adoptedIds`). Los GRUPOS
+ * (frascos) se conservan siempre — así el composer puede crear un sobre nuevo aunque el grupo
+ * quede sin hojas. Puro.
+ */
+export function filterConfiguredSobreTree(
+  tree: CategoryNode[],
+  adoptedIds: ReadonlySet<string>,
+): CategoryNode[] {
+  return tree.map((node) => ({
+    ...node,
+    children: node.children.filter((c) => isConfiguredSobre(c) || adoptedIds.has(c.id)),
+  }));
 }

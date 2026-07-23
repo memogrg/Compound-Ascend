@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
-import { AddSpendModal } from "@/modules/financial-base/components/v2/expense-jars/add-spend-modal";
+import { TransactionComposer } from "@/modules/financial-base/components/v2/transaction-composer";
 import { NewSobreModal } from "@/modules/financial-base/components/v2/expense-jars/new-sobre-modal";
 import {
   NewSavingsSobreModal,
@@ -24,24 +24,37 @@ import type {
   CategoryNode,
   CategoryPersonalization,
 } from "@/modules/financial-base/services/categories-service";
+import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
+import type { TransactionTemplate } from "@/modules/financial-base/services/templates-service";
+import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 
 type Sheet = null | "spend" | "sobre" | "sobre-ahorro" | "category";
 
 export function ExpenseToolbar({
   jars,
   accounts,
-  currency,
   period,
   tree,
+  composerTree,
+  incomeTree,
+  suggestions,
+  templates,
+  linkables,
   canPersonalize,
   personalization,
   createSavingsSobre,
 }: {
   jars: Jar[];
   accounts: Account[];
-  currency: string;
   period: Period;
+  /** Árbol crudo para el gestor de categorías (ve todo). */
   tree: CategoryNode[];
+  /** Árbol de gasto filtrado a sobres reales para el composer (unificado con Transacciones). */
+  composerTree: CategoryNode[];
+  incomeTree: CategoryNode[];
+  suggestions: SuggestionEntry[];
+  templates: TransactionTemplate[];
+  linkables: LinkableEntities;
   canPersonalize: boolean;
   personalization: CategoryPersonalization;
   createSavingsSobre?: CreateSavingsSobre;
@@ -158,10 +171,17 @@ export function ExpenseToolbar({
       ) : null}
 
       {sheet === "spend" ? (
-        <AddSpendModal
-          jars={jars}
+        // MISMO composer que Transacciones, bloqueado a GASTO. La lista de categorías es
+        // `composerTree` (solo sobres reales), unificando Gastos con Transacciones y el chat.
+        <TransactionComposer
+          initialKind="gasto"
+          lockKind
+          tree={composerTree}
+          incomeTree={incomeTree}
           accounts={accounts}
-          currency={currency}
+          suggestions={suggestions}
+          templates={templates}
+          linkables={linkables}
           onClose={() => setSheet(null)}
         />
       ) : null}

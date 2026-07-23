@@ -19,6 +19,7 @@ import {
   selectableCategoryLeaves,
   selectableSobresByFrasco,
   categoryMatchesKind,
+  isConfiguredSobre,
   type SelectableCategory,
 } from "@/modules/financial-base/engine/classify";
 import { normalize } from "@/lib/ai/biblia-knowledge";
@@ -351,14 +352,52 @@ export type SobreOption = { id: string; sobre: string; frasco: string | null };
 
 /**
  * Sobres HOJA del usuario para una naturaleza, cada uno con su frasco (padre) para el selector
- * "Frasco › Sobre". Sesión → RLS acota al hogar; solo sobres REALES del usuario, sin taxonomía
- * global. Reusa selectableSobresByFrasco (puro) sobre listCategories.
+ * "Frasco › Sobre". Sesión → RLS acota al hogar. `selectableSobresByFrasco` queda intacta (todas
+ * las hojas); el filtro de "sobre real" se aplica ACÁ.
+ *
+ * GASTO: solo sobres REALES = configurados (favorito/propio) ∪ presupuestados o usados por el
+ * hogar ESTE mes — el MISMO set (budget/real por período, RLS→hogar) que hace aparecer un envelope
+ * en la vista de frascos (expense-jars.ts:492). Así el selector del chat coincide con Gastos y
+ * Transacciones. INGRESO: sin filtro de adopción (no hay vista de frascos de ingreso).
  */
 export async function listSobresForKind(kind: "gasto" | "ingreso"): Promise<SobreOption[]> {
   const cats = await listCategories();
-  return selectableSobresByFrasco(cats)
-    .filter((s) => categoryMatchesKind(s.categoryType, kind))
+  const leaves = selectableSobresByFrasco(cats).filter((s) =>
+    categoryMatchesKind(s.categoryType, kind),
+  );
+  if (kind !== "gasto") {
+    return leaves.map((s) => ({ id: s.id, sobre: s.sobre, frasco: s.frasco }));
+  }
+  const catById = new Map(cats.map((c) => [c.id, c]));
+  const adopted = await adoptedExpenseIds();
+  return leaves
+    .filter((s) => {
+      const c = catById.get(s.id);
+      return (c ? isConfiguredSobre(c) : false) || adopted.has(s.id);
+    })
     .map((s) => ({ id: s.id, sobre: s.sobre, frasco: s.frasco }));
+}
+
+/**
+ * category_ids de gasto con budget o gasto > 0 en el MES ACTUAL — la mitad "adoptada por uso" del
+ * predicado, del MISMO budget/real (RLS→hogar) que la vista de frascos. Best-effort: si falla,
+ * el selector cae a solo los configurados (favorito/propio).
+ */
+async function adoptedExpenseIds(): Promise<Set<string>> {
+  const set = new Set<string>();
+  try {
+    const { getBudgetTotals } = await import("@/modules/financial-base/services/budget-service");
+    const { getRealTotals } = await import("@/modules/financial-base/services/transaction-service");
+    const { monthPeriod } = await import("@/modules/financial-base/engine/period");
+    const now = new Date();
+    const period = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+    const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
+    for (const [k, v] of Object.entries(budget.expenseByKey)) if (v.value > 0) set.add(k);
+    for (const [k, v] of Object.entries(real.expenseByKey)) if (v.value > 0) set.add(k);
+  } catch (err) {
+    logger.warn("adoptedExpenseIds falló", { message: err instanceof Error ? err.message : "?" });
+  }
+  return set;
 }
 
 /**

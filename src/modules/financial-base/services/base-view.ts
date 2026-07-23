@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from "@/lib/auth/session";
 import { formatMoney } from "@/lib/format";
 import { getBaseSummary } from "@/modules/financial-base/services/base-service";
 import { getLiquidityBalance } from "@/modules/financial-base/services/liquidity-service";
+import { filterConfiguredSobreTree } from "@/modules/financial-base/engine/classify";
 import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
 import {
   getRealTotals,
@@ -121,6 +122,16 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
   const categoryNames: Record<string, string> = {};
   for (const c of categories) categoryNames[c.id] = c.name;
 
+  // Sobres REALES adoptados por el hogar: EXACTAMENTE el set que hace aparecer un envelope en la
+  // vista de frascos (expense-jars.ts:492) — category_ids con budget o gasto > 0 en ESTE período,
+  // del MISMO budget/real (RLS → hogar) con que se arman los jars. `composerTree` filtra las hojas
+  // de gasto a configuradas (favorito/propio) ∪ adoptadas; los grupos se conservan. `tree` crudo
+  // sigue intacto para el gestor de categorías.
+  const expenseAdoptedIds = new Set<string>();
+  for (const [k, v] of Object.entries(budget.expenseByKey)) if (v.value > 0) expenseAdoptedIds.add(k);
+  for (const [k, v] of Object.entries(real.expenseByKey)) if (v.value > 0) expenseAdoptedIds.add(k);
+  const composerTree = filterConfiguredSobreTree(tree, expenseAdoptedIds);
+
   // Frascos del tab de Gastos (reusa tree + budget/real ya cargados).
   const jars = await getExpenseJars({
     tree,
@@ -169,6 +180,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     transactions,
     categories,
     tree,
+    composerTree,
     incomeTree,
     suggestions,
     templates,
