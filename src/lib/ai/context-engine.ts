@@ -164,6 +164,17 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Metas no disponibles.
   }
 
+  // Sobres (bug: la IA no los veía y alucinaba "todas al 100%"). Sobres de GASTO
+  // (hojas favoritas por frasco, con presupuesto) + sobres ACUMULABLES (metas por frasco),
+  // con alcance de hogar y moneda de visualización. Best-effort.
+  try {
+    const { getEnvelopesSummary } = await import("@/modules/financial-base");
+    const summary = await getEnvelopesSummary();
+    if (summary.expense.length > 0 || summary.goals.length > 0) ctx.envelopes = summary;
+  } catch {
+    // Sobres no disponibles: el contexto sigue.
+  }
+
   // Patrimonio neto (Rich Life) — la lectura más cara, best-effort.
   try {
     const { getRichLifeSummary } = await import("@/modules/rich-life/services/rich-life-service");

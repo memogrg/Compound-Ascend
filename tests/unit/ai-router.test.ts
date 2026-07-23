@@ -17,9 +17,13 @@ vi.mock("@/lib/ai/providers/gemini", () => ({
 // dinámico. En WhatsApp (sin sesión) estas fns lanzarían → el router escala.
 const getLiquidityBalance = vi.fn();
 const listTransactions = vi.fn();
+const getEnvelopesSummary = vi.fn();
+const formatEnvelopesReply = vi.fn();
 vi.mock("@/modules/financial-base", () => ({
   getLiquidityBalance: () => getLiquidityBalance(),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
+  getEnvelopesSummary: () => getEnvelopesSummary(),
+  formatEnvelopesReply: (...a: unknown[]) => formatEnvelopesReply(...a),
 }));
 
 import { matchIntent, answerFromContext, tryRouteQuery } from "@/lib/ai/router";
@@ -53,8 +57,9 @@ beforeEach(() => {
 describe("matchIntent · patrones (0 tokens)", () => {
   it("cada intent fase-1 clasifica correctamente", () => {
     expect(matchIntent("¿Cuál es mi número de libertad?")?.intent).toBe("numero_libertad");
-    expect(matchIntent("¿cuáles son mis metas?")?.intent).toBe("metas");
+    // Nota: "cuáles son mis metas" ahora es listar_sobres (Mejora 3); el PROGRESO es `metas`.
     expect(matchIntent("mostrame el progreso de mi ahorro")?.intent).toBe("metas");
+    expect(matchIntent("cuánto llevo ahorrado en mis metas")?.intent).toBe("metas");
     expect(matchIntent("¿cuánto pago de mi Visa?")?.intent).toBe("cuota_deuda");
   });
 
@@ -195,6 +200,41 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
   it("sin sesión (WhatsApp): la lectura lanza → null (escala al razonamiento)", async () => {
     getLiquidityBalance.mockRejectedValue(new Error("no session"));
     const routed = await tryRouteQuery(ask("¿cuál es mi saldo?"), CTX, tc);
+    expect(routed).toBeNull();
+  });
+});
+
+// ─────────────────────── Mejora 3 · listar_sobres ───────────────────────
+
+describe("Mejora 3 · matchIntent (sobres/frascos/metas → listar)", () => {
+  it("sobres, frascos y 'cuáles son mis metas' → listar_sobres", () => {
+    expect(matchIntent("¿cuáles son mis sobres?")?.intent).toBe("listar_sobres");
+    expect(matchIntent("mostrame mis frascos")?.intent).toBe("listar_sobres");
+    expect(matchIntent("listá mis metas")?.intent).toBe("listar_sobres");
+    expect(matchIntent("¿cuáles son mis metas?")?.intent).toBe("listar_sobres");
+  });
+
+  it("el PROGRESO de metas sigue yendo a metas (no a listar)", () => {
+    expect(matchIntent("progreso de mi ahorro")?.intent).toBe("metas");
+    expect(matchIntent("cuánto llevo ahorrado en mis metas")?.intent).toBe("metas");
+  });
+});
+
+describe("Mejora 3 · carril fetch (sobres agrupados por frasco, determinista)", () => {
+  it("listar_sobres → arma el resumen y responde con el formato determinista (0 tokens)", async () => {
+    getEnvelopesSummary.mockResolvedValue({ currency: "USD", expense: [], goals: [] });
+    formatEnvelopesReply.mockReturnValue("**Tus sobres de gasto mensual:**\n- **Frasco Vivienda:** Supermercados");
+    const routed = await tryRouteQuery(ask("¿cuáles son mis sobres?"), CTX, tc);
+    expect(getEnvelopesSummary).toHaveBeenCalledTimes(1);
+    expect(formatEnvelopesReply).toHaveBeenCalledTimes(1);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.tokensIn).toBe(0);
+    expect(routed?.response.reply).toContain("Frasco Vivienda");
+  });
+
+  it("sin sesión (WhatsApp): la lectura lanza → null (escala)", async () => {
+    getEnvelopesSummary.mockRejectedValue(new Error("no session"));
+    const routed = await tryRouteQuery(ask("listá mis frascos"), CTX, tc);
     expect(routed).toBeNull();
   });
 });

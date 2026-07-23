@@ -19,6 +19,7 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "@/modules/financial-base/
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
+import { renderMarkdown } from "@/lib/markdown";
 
 type Msg = { role: "ai" | "me"; html: string; action?: AIActionProposal | null };
 type Mode = "assistant" | "ai";
@@ -228,7 +229,8 @@ function FinanceChat() {
       if (res.ok) {
         setMessages((m) => [
           ...m,
-          { role: "ai", html: escapeHtml(data.reply), action: data.action ?? null },
+          // La IA responde en Markdown → HTML seguro (escape-first + allowlist). Ver lib/markdown.
+        { role: "ai", html: renderMarkdown(String(data.reply ?? "")), action: data.action ?? null },
         ]);
       } else {
         setMessages((m) => [

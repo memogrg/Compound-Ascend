@@ -16,6 +16,10 @@ export {
   deleteTransaction,
 } from "./services/transaction-service";
 export { getLiquidityBalance } from "./services/liquidity-service";
+// Resumen ligero de sobres (gasto favoritos + metas) agrupados por frasco, para la IA
+// (contexto) y el router (intent determinista "listá mis sobres").
+export { getEnvelopesSummary, formatEnvelopesReply } from "./services/envelopes-service";
+export type { EnvelopesSummary } from "./services/envelopes-service";
 // Líneas derivadas del presupuesto (renta/dividendos/…): wealth las sincroniza
 // al registrar un pago para conciliarlo contra la barra "Recibido".
 export { syncDerivedBudget } from "./services/derived-budget-service";

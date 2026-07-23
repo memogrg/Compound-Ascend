@@ -41,7 +41,9 @@ type Intent =
   | "gasto_categoria"
   // R2 — requieren lectura fresca (session-based → web; WhatsApp escala):
   | "saldo_liquidez"
-  | "ultimos_movimientos";
+  | "ultimos_movimientos"
+  // Sobres agrupados por frasco (determinista, sin alucinar) — lectura fresca:
+  | "listar_sobres";
 
 const KNOWN_INTENTS: Intent[] = [
   "numero_libertad",
@@ -52,10 +54,15 @@ const KNOWN_INTENTS: Intent[] = [
   "gasto_categoria",
   "saldo_liquidez",
   "ultimos_movimientos",
+  "listar_sobres",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
-const FETCH_INTENTS: ReadonlySet<Intent> = new Set(["saldo_liquidez", "ultimos_movimientos"]);
+const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
+  "saldo_liquidez",
+  "ultimos_movimientos",
+  "listar_sobres",
+]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
 // seguridad de "ante duda, escalá": una pregunta de consejo/proyección nunca se atrapa por patrón.
@@ -77,7 +84,15 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   if (/(?:cu[aá]l es\s+)?(?:mi\s+)?n[uú]mero de (?:libertad|independencia)|cu[aá]nto necesito para (?:ser libre|mi libertad)/i.test(t)) {
     return { intent: "numero_libertad", params: {} };
   }
-  if (/(?:cu[aá]les|qu[eé]|mis)\s+metas|progreso de (?:mi\s+)?ahorro|c[oó]mo va(?:n)? (?:mi|mis) (?:meta|ahorro)|cu[aá]nto llevo (?:ahorrado|en mis metas)/i.test(t)) {
+  // Mejora 3 — "listá mis sobres/frascos/metas": enumeración agrupada por frasco (determinista).
+  // Antes que `metas` (progreso): "sobres"/"frascos" son inequívocos; "cuáles/listá … metas" también.
+  if (
+    /\b(?:sobres|frascos)\b/i.test(t) ||
+    /(?:cu[aá]les|list[aá]|mostr[aá]|ver|dame|enumer\w*)\s+(?:son\s+)?(?:todas?\s+)?(?:mis\s+)?metas\b/i.test(t)
+  ) {
+    return { intent: "listar_sobres", params: {} };
+  }
+  if (/progreso de (?:mi\s+)?ahorro|c[oó]mo va(?:n)? (?:mi|mis) (?:meta|ahorro)|cu[aá]nto llevo (?:ahorrado|en mis metas)|(?:mis)\s+metas\b/i.test(t)) {
     return { intent: "metas", params: {} };
   }
   if (/(?:cu[oó]ta|pago mensual|cu[aá]nto pago|pago m[ií]nimo)\b/i.test(t)) {
@@ -111,9 +126,10 @@ async function classifyWithLite(
   if (!lite) return null;
   const system =
     "Clasificás preguntas de finanzas personales. Devolvé SOLO JSON " +
-    '{"intent": "numero_libertad"|"metas"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"otro", "complejo": true|false}. ' +
+    '{"intent": "numero_libertad"|"metas"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
     "gasto_mes=cuánto gasta al mes; ingreso_mes=cuánto gana; gasto_categoria=en qué gasta más; " +
-    "saldo_liquidez=cuánto tiene disponible; ultimos_movimientos=sus transacciones recientes. " +
+    "saldo_liquidez=cuánto tiene disponible; ultimos_movimientos=sus transacciones recientes; " +
+    "listar_sobres=enumerar sus sobres/frascos/metas (no su progreso). metas=el progreso de sus metas. " +
     '"complejo": true si pide análisis, proyección, consejo, comparación o cualquier cosa más allá de consultar un dato simple. Ante duda: "otro" o complejo:true.';
   try {
     const r = await lite.chat({ system, messages: [{ role: "user", content: text }], maxTokens: 40 });
@@ -214,6 +230,12 @@ async function resolveFetchIntent(intent: Intent, cur: string): Promise<AIChatRe
       const { getLiquidityBalance } = await import("@/modules/financial-base");
       const { balance } = await getLiquidityBalance();
       return say(`Tu saldo de liquidez actual es ${formatMoney(balance, cur)}.`);
+    }
+    if (intent === "listar_sobres") {
+      const { getEnvelopesSummary, formatEnvelopesReply } = await import("@/modules/financial-base");
+      // Estructura AGRUPADA POR FRASCO (gasto y acumulables por separado) → Markdown determinista.
+      // 0 tokens, exacto, sin alucinar (el cliente lo pasa por renderMarkdown → HTML seguro).
+      return say(formatEnvelopesReply(await getEnvelopesSummary()));
     }
     if (intent === "ultimos_movimientos") {
       const { listTransactions } = await import("@/modules/financial-base");
