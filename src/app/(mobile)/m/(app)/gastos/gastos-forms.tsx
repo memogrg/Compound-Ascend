@@ -299,17 +299,24 @@ const CHECKS = [
 
 export function BudgetEditForm({
   envelope,
-  currency,
   period,
   onSuccess,
 }: {
+  // Ya no recibe `currency`: la moneda del presupuesto sale del propio sobre
+  // (`envelope.currency`), no de la de visualización de la página.
   envelope: JarEnvelope;
-  currency: string;
   period: Period;
   onSuccess: () => void;
 }) {
   const [checks, setChecks] = useState<[boolean, boolean, boolean]>([false, false, false]);
-  const [amount, setAmount] = useState<number | undefined>(envelope.budget || undefined);
+  // NATIVO, no `envelope.budget`: ese está convertido a la moneda de visualización, y
+  // guardarlo bajo la etiqueta de la moneda del sobre metería el número en la unidad
+  // equivocada (el P0). `nativeBudget` está en la moneda propia del sobre.
+  const [amount, setAmount] = useState<number | undefined>(envelope.nativeBudget || undefined);
+  // EDITABLE, sembrada de la del sobre. Editar el presupuesto es DEFINICIÓN, no un
+  // movimiento (decisión de Memo), así que aquí la moneda sí se puede cambiar —a diferencia
+  // de un pago, donde la impone la entidad—. `setCategoryBudget` honra la que llegue.
+  const [cur, setCur] = useState(envelope.currency);
   const allChecked = checks[0] && checks[1] && checks[2];
 
   const setCheck = (i: number, v: boolean) =>
@@ -323,7 +330,7 @@ export function BudgetEditForm({
     categoryId: envelope.id,
     name: envelope.name,
     amount,
-    currency,
+    currency: cur,
     periodMonth: period.month,
     periodYear: period.year,
   };
@@ -353,7 +360,15 @@ export function BudgetEditForm({
             label={`Nuevo presupuesto · ${envelope.name}`}
             value={amount}
             onChange={setAmount}
-            currency={currency}
+            currency={cur}
+          />
+          <SheetSelect
+            name="currency"
+            label="Moneda"
+            value={cur}
+            onChange={setCur}
+            options={CUR_OPTS}
+            sheetTitle="Moneda"
           />
         </FormShell>
       ) : (

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 
-import { BottomSheet, FormShell, MoneyField } from "../../components/form-kit";
+import { BottomSheet, FormShell, MoneyField, SheetSelect } from "../../components/form-kit";
+import { CUR_OPTS } from "../../components/form-kit/options";
 import { setDesiredLifestyleAction } from "@/modules/wealth/api/actions";
 
 /**
@@ -13,19 +14,22 @@ import { setDesiredLifestyleAction } from "@/modules/wealth/api/actions";
  * calculado por el motor. La UI no calcula nada: solo captura el gasto deseado.
  */
 export function DefineLifestyleSheet({
-  currency,
+  primaryCurrency,
   current,
   label,
   variant = "m-btn-primary",
 }: {
-  currency: string;
-  current?: number | null;
+  /** PRINCIPAL, no la de visualización: el gasto deseado es un importe LIBRE, así que su
+   *  moneda por defecto es la del usuario y es editable. */
+  primaryCurrency: string;
+  current?: { amount: number; currency: string } | null;
   label: string;
   variant?: "m-btn-primary" | "m-btn-secondary" | "m-btn-ghost";
 }) {
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState<number | undefined>(current ?? undefined);
-  const editing = current != null && current > 0;
+  const [amount, setAmount] = useState<number | undefined>(current?.amount ?? undefined);
+  const [cur, setCur] = useState(current?.currency ?? primaryCurrency);
+  const editing = current != null && current.amount > 0;
 
   return (
     <>
@@ -48,7 +52,7 @@ export function DefineLifestyleSheet({
         </p>
         <FormShell
           action={(v: { amount: number | undefined }) =>
-            setDesiredLifestyleAction(v.amount != null && v.amount > 0 ? v.amount : null)
+            setDesiredLifestyleAction(v.amount != null && v.amount > 0 ? v.amount : null, cur)
           }
           values={{ amount }}
           submitLabel="Guardar"
@@ -60,7 +64,15 @@ export function DefineLifestyleSheet({
             label="Gasto mensual deseado"
             value={amount}
             onChange={setAmount}
-            currency={currency}
+            currency={cur}
+          />
+          <SheetSelect
+            name="currency"
+            label="Moneda"
+            value={cur}
+            onChange={setCur}
+            options={CUR_OPTS}
+            sheetTitle="Moneda"
           />
         </FormShell>
       </BottomSheet>
