@@ -54,12 +54,10 @@ function suggestedAmount(it: BudgetItem, received: number): number {
 export function IncomeSources({
   items,
   received,
-  currency,
   incomeTree,
 }: {
   items: BudgetItem[];
   received: Record<string, number>;
-  currency: string;
   incomeTree: CategoryNode[];
 }) {
   const router = useRouter();
@@ -130,7 +128,6 @@ export function IncomeSources({
 
       {editing ? (
         <RegisterIncomeModal
-          currency={currency}
           incomeTree={incomeTree}
           item={editing}
           onClose={() => setEditing(null)}

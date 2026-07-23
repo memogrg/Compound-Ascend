@@ -2,6 +2,7 @@
 import { EssentialCheck } from "@/components/shared/essential-check";
 
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -138,7 +139,7 @@ function WealthDialog({
       {mode === "investment" ? (
         <InvestmentForm currency={currency} onDone={done} item={item as Investment | undefined} />
       ) : (
-        <PolicyForm currency={currency} onDone={done} item={item as InsurancePolicy | undefined} />
+        <PolicyForm onDone={done} item={item as InsurancePolicy | undefined} />
       )}
     </Modal>
   );
@@ -184,7 +185,8 @@ function InvestmentForm({
   // CONTROLADO. El select era `defaultValue` y el símbolo de los importes salía del prop
   // `currency`, así que cambiar la moneda no movía el símbolo: se enseñaba ₡ y se guardaba
   // USD. Ahora los dos leen el mismo estado.
-  const [cur, setCur] = useState(item?.currency ?? currency);
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(item?.currency ?? captureCurrency);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -297,17 +299,16 @@ function InvestmentForm({
 }
 
 function PolicyForm({
-  currency,
   onDone,
   item,
 }: {
-  currency: string;
   onDone: () => void;
   item?: InsurancePolicy;
 }) {
   const action = item ? (raw: unknown) => editPolicyAction(item.id, raw) : addPolicyAction;
   const { pending, message, run } = useSubmit(action);
-  const [cur, setCur] = useState<string>(item?.currency ?? currency);
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState<string>(item?.currency ?? captureCurrency);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;

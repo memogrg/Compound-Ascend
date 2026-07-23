@@ -16,7 +16,6 @@ export function ComposerButton({
   tree,
   incomeTree = [],
   accounts,
-  currency,
   suggestions,
   templates,
   linkables = NO_LINKABLES,
@@ -26,7 +25,6 @@ export function ComposerButton({
   tree: CategoryNode[];
   incomeTree?: CategoryNode[];
   accounts: Account[];
-  currency: string;
   suggestions: SuggestionEntry[];
   templates: TransactionTemplate[];
   linkables?: LinkableEntities;
@@ -52,7 +50,6 @@ export function ComposerButton({
           incomeTree={incomeTree}
           accounts={accounts}
           linkables={linkables}
-          currency={currency}
           suggestions={suggestions}
           templates={templates}
           onClose={() => setOpen(false)}

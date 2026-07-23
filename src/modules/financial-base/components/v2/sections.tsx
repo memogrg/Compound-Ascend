@@ -640,14 +640,13 @@ function IncomeSection({ view }: { view: V2View }) {
         <div className="hint">Tus ingresos se registran aquí; confírmalos cuando los recibas.</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <CopyPreviousIncomeButton periodMonth={period.month} periodYear={period.year} />
-          <RegisterIncomeButton currency={currency} incomeTree={view.incomeTree} />
+          <RegisterIncomeButton incomeTree={view.incomeTree} />
         </div>
       </div>
 
       <IncomeSources
         items={manualSources}
         received={real.incomeReceivedBySourceNative}
-        currency={currency}
         incomeTree={view.incomeTree}
       />
 
@@ -708,7 +707,6 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
             tree={view.tree}
             incomeTree={view.incomeTree}
             accounts={view.accounts}
-            currency={currency}
             suggestions={view.suggestions}
             templates={view.templates}
             linkables={view.linkables}

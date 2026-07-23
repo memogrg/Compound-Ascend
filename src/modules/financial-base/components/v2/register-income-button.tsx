@@ -7,10 +7,8 @@ import { RegisterIncomeModal } from "@/modules/financial-base/components/v2/regi
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 
 export function RegisterIncomeButton({
-  currency,
   incomeTree,
 }: {
-  currency: string;
   incomeTree: CategoryNode[];
 }) {
   const [open, setOpen] = useState(false);
@@ -26,7 +24,6 @@ export function RegisterIncomeButton({
       </button>
       {open ? (
         <RegisterIncomeModal
-          currency={currency}
           incomeTree={incomeTree}
           onClose={() => setOpen(false)}
         />

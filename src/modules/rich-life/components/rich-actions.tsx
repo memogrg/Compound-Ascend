@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -197,7 +198,8 @@ function Form({
   // CONTROLADO: el select era `defaultValue` y el símbolo salía del prop `currency`, así
   // que cambiar la moneda no movía el símbolo — se enseñaba ₡ y se guardaba USD. Los dos
   // leen ahora el mismo estado.
-  const [cur, setCur] = useState(item?.currency ?? currency);
+  const captureCurrency = useCaptureCurrency();
+  const [cur, setCur] = useState(item?.currency ?? captureCurrency);
   const sym = currencySymbol(cur);
 
   return (
