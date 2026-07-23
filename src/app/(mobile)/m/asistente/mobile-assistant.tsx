@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
+import {
+  confirmTransactionAction,
+  confirmGoalAction,
+  listSobresForKindAction,
+} from "@/modules/assistant/api/actions";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
@@ -25,10 +29,16 @@ type DraftTxn = {
   currency: string;
   occurredOn: string;
   source: "chat" | "receipt" | "manual";
+  // Sobre (hoja) sugerido por la IA; el usuario confirma/corrige. null/undefined = "Sin sobre".
+  categoryId?: string | null;
+  categoryPath?: string | null;
   linkedKind?: "debt" | "goal" | "holding" | "policy" | "rental" | null;
   linkedId?: string | null;
   linkedName?: string | null;
 };
+/** Sobre (hoja) del usuario con su frasco, para el selector "Frasco › Sobre". */
+type SobreOption = { id: string; sobre: string; frasco: string | null };
+const sobreLabel = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
 type DraftGoal = {
   name: string;
   targetAmount: number;
@@ -65,6 +75,9 @@ function txnFromAction(action: AIActionProposal, principal: string): DraftTxn {
     currency: String(p.currency ?? principal),
     occurredOn: String(p.date ?? p.occurredOn ?? todayISO()),
     source: "chat",
+    // Sobre sugerido por el backend (hoja real del usuario) — preselecciona el selector.
+    categoryId: typeof p.categoryId === "string" ? p.categoryId : null,
+    categoryPath: typeof p.categoryPath === "string" ? p.categoryPath : null,
     linkedKind,
     linkedId: linkedKind && typeof p.linkedId === "string" ? p.linkedId : null,
     linkedName: linkedKind && typeof p.linkedName === "string" ? p.linkedName : null,
@@ -398,11 +411,25 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "ok" | "cancel">("idle");
+  // Sobre elegido (arranca en el sugerido por la IA); "" = Sin sobre.
+  const [categoryId, setCategoryId] = useState<string>(draft.categoryId ?? "");
+  const [sobres, setSobres] = useState<SobreOption[]>([]);
+
+  // Sobres del usuario para el selector. Best-effort: si falla, queda "Sin sobre".
+  useEffect(() => {
+    let alive = true;
+    listSobresForKindAction(draft.kind)
+      .then((list) => alive && setSobres(list))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [draft.kind]);
 
   const confirm = async () => {
     setPending(true);
     setError(null);
-    const res = await confirmTransactionAction(draft);
+    const res = await confirmTransactionAction({ ...draft, categoryId: categoryId || null });
     setPending(false);
     if (res.ok) setPhase("ok");
     else setError(res.message ?? "No se pudo guardar.");
@@ -421,6 +448,28 @@ function MTxnConfirm({ draft }: { draft: DraftTxn }) {
       <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
         {draft.description} · {draft.occurredOn}
       </div>
+      <label style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 10 }}>
+        <span className="muted" style={{ fontSize: 12 }}>
+          Sobre
+        </span>
+        <select
+          className="m-inp"
+          aria-label="Sobre"
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          disabled={pending}
+        >
+          <option value="">Sin sobre</option>
+          {categoryId && !sobres.some((s) => s.id === categoryId) ? (
+            <option value={categoryId}>{draft.categoryPath ?? "Sobre sugerido"}</option>
+          ) : null}
+          {sobres.map((s) => (
+            <option key={s.id} value={s.id}>
+              {sobreLabel(s)}
+            </option>
+          ))}
+        </select>
+      </label>
       {draft.linkedKind && draft.linkedId ? (
         <div style={{ marginTop: 8 }}>
           <span className="m-confirm-chip">

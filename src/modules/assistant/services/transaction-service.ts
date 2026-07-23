@@ -20,7 +20,9 @@ export async function createTransaction(input: TransactionInput): Promise<void> 
     amount: input.amount,
     currency: input.currency,
     occurredOn: input.occurredOn,
-    categoryId: null,
+    // El SOBRE que el usuario confirmó en la card. Si viene null (Sin sobre), el pipeline
+    // central intenta auto-categorizar por reglas/historial; si tampoco, cae a "Por clasificar".
+    categoryId: input.categoryId ?? null,
     accountId: null,
     // La descripción funciona como comercio/fuente: las reglas hacen match
     // sobre ella (igual que el texto del recibo escaneado).

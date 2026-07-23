@@ -17,6 +17,7 @@ import {
 } from "@/modules/financial-base/services/categories-service";
 import {
   selectableCategoryLeaves,
+  selectableSobresByFrasco,
   categoryMatchesKind,
   type SelectableCategory,
 } from "@/modules/financial-base/engine/classify";
@@ -344,4 +345,65 @@ export async function getSuggestionsFor(items: SuggestItem[]): Promise<Map<strin
     out.set(it.id, sug);
   }
   return out;
+}
+
+export type SobreOption = { id: string; sobre: string; frasco: string | null };
+
+/**
+ * Sobres HOJA del usuario para una naturaleza, cada uno con su frasco (padre) para el selector
+ * "Frasco › Sobre". Sesión → RLS acota al hogar; solo sobres REALES del usuario, sin taxonomía
+ * global. Reusa selectableSobresByFrasco (puro) sobre listCategories.
+ */
+export async function listSobresForKind(kind: "gasto" | "ingreso"): Promise<SobreOption[]> {
+  const cats = await listCategories();
+  return selectableSobresByFrasco(cats)
+    .filter((s) => categoryMatchesKind(s.categoryType, kind))
+    .map((s) => ({ id: s.id, sobre: s.sobre, frasco: s.frasco }));
+}
+
+/**
+ * Sugerencia de sobre para un gasto/ingreso propuesto por el chat: la IA (suggestSobre) ACOTADA a
+ * los sobres del usuario y, si no matchea, FALLBACK determinista por historial/caché del hogar
+ * (resolveAutoCategory, sin IA en vivo). Devuelve la hoja + su ruta "Frasco › Sobre" para
+ * preseleccionar en la card. Best-effort: cualquier fallo o id fuera de la lista → "Sin sobre"
+ * (categoryId null); la IA sugiere, el usuario confirma/corrige.
+ */
+export async function suggestSobreForChat(
+  description: string,
+  kind: "gasto" | "ingreso",
+): Promise<{ categoryId: string | null; categoryPath: string | null }> {
+  const NONE = { categoryId: null, categoryPath: null };
+  const merchant = description.trim();
+  if (!merchant) return NONE;
+  try {
+    const sobres = await listSobresForKind(kind);
+    if (sobres.length === 0) return NONE;
+
+    // 1) IA acotada a los sobres del usuario (elige una hoja de la lista o null).
+    const ai = await suggestSobre(
+      merchant,
+      sobres.map((s) => ({ id: s.id, name: s.sobre })),
+    );
+    let categoryId = ai.categoryId;
+
+    // 2) Fallback DETERMINISTA por historial/caché del hogar (0 tokens) si la IA no matcheó.
+    if (!categoryId) {
+      const supabase = await createSupabaseServerClient();
+      const auto = await resolveAutoCategory({ supabase, merchant, kind });
+      categoryId = auto?.categoryId ?? null;
+    }
+
+    // Solo devolvemos algo si es una hoja seleccionable del usuario (la podemos mostrar/editar).
+    const hit = categoryId ? sobres.find((s) => s.id === categoryId) : undefined;
+    if (!hit) return NONE;
+    return {
+      categoryId: hit.id,
+      categoryPath: hit.frasco ? `${hit.frasco} › ${hit.sobre}` : hit.sobre,
+    };
+  } catch (err) {
+    logger.warn("suggestSobreForChat falló", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return NONE;
+  }
 }

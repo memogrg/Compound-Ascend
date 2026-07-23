@@ -8,11 +8,29 @@
 import { revalidatePath } from "next/cache";
 import { transactionInputSchema } from "@/modules/assistant/schemas";
 import { createTransaction } from "@/modules/assistant/services/transaction-service";
+import { listSobresForKind, type SobreOption } from "@/modules/financial-base";
 import { createGoal, goalInputSchema } from "@/modules/control";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
 export type ConfirmResult = { ok: boolean; message?: string };
+
+/**
+ * Sobres (hojas) del usuario para el selector de la card de confirmación, con su frasco para
+ * mostrar "Frasco › Sobre". Reusa el motor de categorización; RLS acota al hogar. Best-effort:
+ * si no hay sesión/Supabase, devuelve vacío y la card muestra solo "Sin sobre".
+ */
+export async function listSobresForKindAction(
+  kind: "gasto" | "ingreso",
+): Promise<SobreOption[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    return await listSobresForKind(kind);
+  } catch (err) {
+    logger.warn("listSobresForKind fallido", { message: err instanceof Error ? err.message : "?" });
+    return [];
+  }
+}
 
 export async function confirmTransactionAction(raw: unknown): Promise<ConfirmResult> {
   const parsed = transactionInputSchema.safeParse(raw);

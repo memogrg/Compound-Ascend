@@ -132,6 +132,26 @@ export async function POST(req: Request) {
 
     const result = await financeChatWithTools(messages, ctx, toolContext);
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
+
+    // Enriquecer una propuesta de gasto/ingreso con el SOBRE sugerido (hoja REAL del usuario),
+    // para que la card lo muestre preseleccionado y editable ("Frasco › Sobre"). La IA sugiere
+    // acotada a los sobres del usuario (fallback historial); el usuario confirma/corrige. La
+    // suma cae en el sobre elegido, no en null. Best-effort: si falla, la card cae a "Sin sobre".
+    if (user && result.action?.type === "create_transaction") {
+      try {
+        const p = result.action.payload as Record<string, unknown>;
+        const kind = p.kind === "ingreso" ? "ingreso" : "gasto";
+        const description = typeof p.description === "string" ? p.description : "";
+        if (description) {
+          const { suggestSobreForChat } = await import("@/modules/financial-base");
+          const sug = await suggestSobreForChat(description, kind);
+          p.categoryId = sug.categoryId;
+          p.categoryPath = sug.categoryPath;
+        }
+      } catch {
+        // deja la acción sin sobre sugerido; la card ofrece el selector igual
+      }
+    }
     // Carril del router (template/lite/reasoning) para medir el ahorro de tokens antes/después.
     logger.info("assistant.chat.lane", {
       lane: result.lane ?? "reasoning",

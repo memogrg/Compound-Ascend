@@ -11,6 +11,14 @@ import type { Category } from "@/modules/financial-base/services/categories-serv
 /** Categoría hoja seleccionable (forma plana para el selector). */
 export type SelectableCategory = { id: string; name: string; categoryType: string };
 
+/** Hoja seleccionable con su frasco (padre) para mostrar "Frasco › Sobre". */
+export type SelectableSobre = {
+  id: string;
+  sobre: string;
+  frasco: string | null;
+  categoryType: string;
+};
+
 /**
  * Transacciones "al aire": gasto/ingreso con categoryId nulo. Ignora las ya
  * categorizadas y los 'ajuste' (no van a un sobre).
@@ -32,6 +40,25 @@ export function selectableCategoryLeaves(categories: Category[]): SelectableCate
   return active
     .filter((c) => !parentIds.has(c.id) && c.categoryType !== "transfer")
     .map((c) => ({ id: c.id, name: c.name, categoryType: c.categoryType }));
+}
+
+/**
+ * Igual que selectableCategoryLeaves pero acompaña cada sobre (hoja) con el NOMBRE de su
+ * frasco (categoría padre) para el selector "Frasco › Sobre". Si la hoja no tiene padre,
+ * frasco = null. Puro: el nombre del frasco se resuelve del mismo conjunto de categorías.
+ */
+export function selectableSobresByFrasco(categories: Category[]): SelectableSobre[] {
+  const active = categories.filter((c) => c.isActive);
+  const parentIds = new Set(active.map((c) => c.parentId).filter(Boolean));
+  const nameById = new Map(active.map((c) => [c.id, c.name]));
+  return active
+    .filter((c) => !parentIds.has(c.id) && c.categoryType !== "transfer")
+    .map((c) => ({
+      id: c.id,
+      sobre: c.name,
+      frasco: c.parentId ? (nameById.get(c.parentId) ?? null) : null,
+      categoryType: c.categoryType,
+    }));
 }
 
 /** ¿La hoja sirve para esta naturaleza? gasto→expense/both, ingreso→income/both. */

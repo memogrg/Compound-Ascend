@@ -10,7 +10,10 @@ export const transactionInputSchema = z
       .positive("El monto debe ser mayor a 0"),
     currency: z.string().length(3),
     occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
-    category: z.string().max(60).optional(),
+    category: z.string().max(60).optional(), // etiqueta legible (display); no persiste
+    // El SOBRE (hoja) elegido/confirmado por el usuario en la card. null = "Sin sobre"
+    // (cae a "Por clasificar"). El display "Frasco › Sobre" no viaja: se deriva del id.
+    categoryId: z.string().uuid().nullable().optional(),
     source: z.enum(["manual", "chat", "receipt"]).default("chat"),
     // Fase 5: la IA puede proponer la transacción ya vinculada a una entidad.
     // El usuario la ve y confirma; nunca se ejecuta sola.
