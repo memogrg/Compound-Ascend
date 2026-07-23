@@ -77,7 +77,7 @@ const CTX: FinancialContext = {
 const TOOL_CTX: ToolContext = {
   debts: [{ id: "d1", name: "Tarjeta de crédito", apr: 45, balance: 2_000_000, minPayment: 100_000 }],
   currency: "CRC",
-  freedomNumber: CTX.numeroDeLibertad,
+  libertyNumber: CTX.numeroDeLibertad,
   investableWealth: CTX.investableWealth,
   goals: [],
 };

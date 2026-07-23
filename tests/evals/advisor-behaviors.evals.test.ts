@@ -54,7 +54,7 @@ function toolCtxFrom(ctx: FinancialContext): ToolContext {
           ]
         : [],
     currency: ctx.currency,
-    freedomNumber: ctx.numeroDeLibertad,
+    libertyNumber: ctx.numeroDeLibertad,
     investableWealth: ctx.investableWealth,
     goals: [],
   };
