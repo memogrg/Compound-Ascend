@@ -181,6 +181,10 @@ function InvestmentForm({
 }) {
   const action = item ? (raw: unknown) => editInvestmentAction(item.id, raw) : addInvestmentAction;
   const { pending, errors, message, run } = useSubmit(action);
+  // CONTROLADO. El select era `defaultValue` y el símbolo de los importes salía del prop
+  // `currency`, así que cambiar la moneda no movía el símbolo: se enseñaba ₡ y se guardaba
+  // USD. Ahora los dos leen el mismo estado.
+  const [cur, setCur] = useState(item?.currency ?? currency);
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
@@ -248,14 +252,14 @@ function InvestmentForm({
           <Money
             label="Monto invertido"
             name="investedAmount"
-            currency={currency}
+            currency={cur}
             error={errors.investedAmount}
             defaultValue={item?.investedAmount}
           />
           <Money
             label="Aporte mensual"
             name="contribution"
-            currency={currency}
+            currency={cur}
             defaultValue={item?.contribution}
           />
         </div>
@@ -272,7 +276,12 @@ function InvestmentForm({
           </div>
           <div className="fld">
             <label className="fld-label">Moneda</label>
-            <select className="sel" name="currency" defaultValue={item?.currency ?? currency}>
+            <select
+              className="sel"
+              name="currency"
+              value={cur}
+              onChange={(e) => setCur(e.target.value)}
+            >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -329,7 +338,11 @@ function PolicyForm({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Tipo de cobertura</label>
-            <select className="sel" name="policyType" defaultValue={item?.policyType ?? "gastos_mayores"}>
+            <select
+              className="sel"
+              name="policyType"
+              defaultValue={item?.policyType ?? "gastos_mayores"}
+            >
               {POLICY_TYPES.map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
