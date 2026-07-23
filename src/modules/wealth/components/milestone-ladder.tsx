@@ -50,8 +50,16 @@ function Tip({ text }: { text: string }) {
 }
 
 const STATE_META: Record<RungState, { label: string; color: string; bg: string }> = {
-  alcanzado: { label: "Alcanzado", color: "var(--pos)", bg: "color-mix(in srgb, var(--pos) 12%, transparent)" },
-  en_curso: { label: "Tu meta actual", color: "var(--gold, #c79a3a)", bg: "color-mix(in srgb, var(--gold, #c79a3a) 14%, transparent)" },
+  alcanzado: {
+    label: "Alcanzado",
+    color: "var(--pos)",
+    bg: "color-mix(in srgb, var(--pos) 12%, transparent)",
+  },
+  en_curso: {
+    label: "Tu meta actual",
+    color: "var(--gold, #c79a3a)",
+    bg: "color-mix(in srgb, var(--gold, #c79a3a) 14%, transparent)",
+  },
   pendiente: { label: "Pendiente", color: "var(--muted)", bg: "transparent" },
 };
 
@@ -72,7 +80,15 @@ export function MilestoneLadder({
 
   return (
     <div className="card card-pad">
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+      <div
+        className="row"
+        style={{
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
         <div>
           <div className="card-title">Tu escalera patrimonial</div>
           <div className="card-sub">
@@ -154,7 +170,7 @@ export function MilestoneLadder({
                 Número de Libertad.
               </span>
               <span style={{ marginTop: 8, display: "inline-block" }}>
-                <DefineLifestyleButton currency={currency} variant="btn-secondary" />
+                <DefineLifestyleButton variant="btn-secondary" />
               </span>
             </EmptyRow>
           }
@@ -171,7 +187,13 @@ export function MilestoneLadder({
           asumas. Usamos 8%; a modo de comparación:
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 6 }}>
             {(["0.04", "0.06", "0.08", "0.10"] as const).map((k) => (
-              <span key={k} style={{ fontWeight: k === "0.08" ? 700 : 400, color: k === "0.08" ? "var(--ink-2)" : undefined }}>
+              <span
+                key={k}
+                style={{
+                  fontWeight: k === "0.08" ? 700 : 400,
+                  color: k === "0.08" ? "var(--ink-2)" : undefined,
+                }}
+              >
                 {Math.round(Number(k) * 100)}%:{" "}
                 <strong className="tnum">{formatMoney(r.sensibilidadTasa[k], currency)}</strong>
                 {k === "0.08" ? " (actual)" : ""}
@@ -234,7 +256,10 @@ function Rung({
         background: highlighted ? meta.bg : "transparent",
       }}
     >
-      <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+      <div
+        className="row"
+        style={{ justifyContent: "space-between", alignItems: "center", gap: 10 }}
+      >
         <div className="label" style={{ margin: 0 }}>
           {title}
           <Tip text={TOOLTIP[rungKey]} />
@@ -265,7 +290,10 @@ function Rung({
               className="bar-fill"
               style={{
                 width: `${pct}%`,
-                background: state === "alcanzado" ? "var(--pos)" : "linear-gradient(90deg, var(--gold, #c79a3a), var(--teal, #2bb6a3))",
+                background:
+                  state === "alcanzado"
+                    ? "var(--pos)"
+                    : "linear-gradient(90deg, var(--gold, #c79a3a), var(--teal, #2bb6a3))",
               }}
             />
           </div>

@@ -6,6 +6,8 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { currencySymbol } from "@/lib/format";
 import { setDesiredLifestyleAction } from "@/modules/wealth/api/actions";
+import { useCaptureCurrency } from "@/components/layout/currency-context";
+import { CURRENCIES } from "@/modules/personal-profile/constants";
 
 /**
  * CTA para definir (o editar) el estilo de vida DESEADO mensual — el insumo del
@@ -14,46 +16,43 @@ import { setDesiredLifestyleAction } from "@/modules/wealth/api/actions";
  * motor. La UI nunca calcula el número: solo captura el gasto mensual deseado.
  */
 export function DefineLifestyleButton({
-  currency,
   current,
   label,
   variant = "btn-primary",
 }: {
-  currency: string;
-  current?: number | null;
+  current?: { amount: number; currency: string } | null;
   label?: string;
   variant?: "btn-primary" | "btn-secondary" | "btn-ghost";
 }) {
   const [open, setOpen] = useState(false);
-  const editing = current != null && current > 0;
+  const editing = current != null && current.amount > 0;
   return (
     <>
       <button className={`btn ${variant}`} onClick={() => setOpen(true)}>
         {label ?? (editing ? "Editar estilo de vida deseado" : "Definir mi estilo de vida")}
       </button>
-      {open ? (
-        <LifestyleDialog currency={currency} current={current} onClose={() => setOpen(false)} />
-      ) : null}
+      {open ? <LifestyleDialog current={current} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
 
 function LifestyleDialog({
-  currency,
   current,
   onClose,
 }: {
-  currency: string;
-  current?: number | null;
+  current?: { amount: number; currency: string } | null;
   onClose: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
+  const captureCurrency = useCaptureCurrency();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const sym = currencySymbol(currency);
-  const editing = current != null && current > 0;
+  // Importe LIBRE: moneda por defecto la PRINCIPAL (o la ya guardada al editar), editable.
+  const [cur, setCur] = useState(current?.currency ?? captureCurrency);
+  const sym = currencySymbol(cur);
+  const editing = current != null && current.amount > 0;
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -62,7 +61,7 @@ function LifestyleDialog({
     setPending(true);
     setError(null);
     setMessage(null);
-    const res = await setDesiredLifestyleAction(Number.isFinite(amount) ? amount : 0);
+    const res = await setDesiredLifestyleAction(Number.isFinite(amount) ? amount : 0, cur);
     setPending(false);
     if (res.ok) {
       toast("Estilo de vida guardado");
@@ -76,7 +75,7 @@ function LifestyleDialog({
 
   const clear = async () => {
     setPending(true);
-    const res = await setDesiredLifestyleAction(null);
+    const res = await setDesiredLifestyleAction(null, cur);
     setPending(false);
     if (res.ok) {
       toast("Estilo de vida borrado");
@@ -102,18 +101,35 @@ function LifestyleDialog({
           ) : null}
           <div className="fld">
             <label className="fld-label">Gasto mensual deseado</label>
-            <div className="inp-money">
-              <span className="pre">{sym}</span>
-              <input
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={editing ? current! : undefined}
-                placeholder="0"
-                autoFocus
-                aria-invalid={error ? true : undefined}
-              />
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              {/* Selector de moneda: importe libre, la elige el usuario. El símbolo sigue al
+                  valor elegido (no a la moneda de visualización). */}
+              <select
+                className="inp"
+                value={cur}
+                onChange={(e) => setCur(e.target.value)}
+                aria-label="Moneda"
+                style={{ width: 80, flex: "none", boxSizing: "border-box", paddingInline: 8 }}
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.value}
+                  </option>
+                ))}
+              </select>
+              <div className="inp-money" style={{ flex: 1, minWidth: 0 }}>
+                <span className="pre">{sym}</span>
+                <input
+                  name="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={editing ? current!.amount : undefined}
+                  placeholder="0"
+                  autoFocus
+                  aria-invalid={error ? true : undefined}
+                />
+              </div>
             </div>
             {error ? (
               <span className="auth-err" role="alert">

@@ -66,7 +66,10 @@ function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
  * se guarda en personal_profiles.extra del usuario, no del hogar. `null` lo borra.
  * Revalida Mi Rich Life para que la escalera repinte con el nuevo número.
  */
-export async function setDesiredLifestyleAction(amount: number | null): Promise<ActionResult> {
+export async function setDesiredLifestyleAction(
+  amount: number | null,
+  currency: string,
+): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   let value: number | null = null;
   if (amount !== null) {
@@ -75,8 +78,11 @@ export async function setDesiredLifestyleAction(amount: number | null): Promise<
     }
     value = Math.round(amount);
   }
+  // La moneda se guarda JUNTO al importe: es un importe LIBRE (defino cuánto quiero gastar),
+  // así que la elijo yo, y el número sin ella no significa nada.
+  const cur = /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : "CRC";
   try {
-    await setDesiredMonthlyLifestyle(value);
+    await setDesiredMonthlyLifestyle(value, cur);
     revalidatePath("/mi-rich-life");
     revalidatePath("/m/libertad");
     revalidatePath("/m");

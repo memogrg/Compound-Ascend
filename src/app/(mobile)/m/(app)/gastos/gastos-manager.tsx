@@ -509,7 +509,6 @@ export function GastosManager({
         {editingEnv ? (
           <BudgetEditForm
             envelope={editingEnv}
-            currency={currency}
             period={period}
             onSuccess={() => setEditingEnv(null)}
           />

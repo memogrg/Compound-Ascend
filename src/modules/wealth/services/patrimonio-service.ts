@@ -9,8 +9,9 @@ import { householdMemberIds } from "@/lib/household/active";
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { convertCurrency } from "@/lib/fx";
+import { parseDesiredLifestyle } from "@/modules/wealth/services/lifestyle-service";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import { monthlyize, type Frequency } from "@/modules/financial-base";
+import { monthlyize, getPrimaryCurrency, type Frequency } from "@/modules/financial-base";
 import { aggregateNetWorth } from "@/modules/rich-life";
 import { sumAssetsByClass, isBadDebt } from "@/modules/wealth/engine/patrimonio-mappers";
 import type { EssentialBreakdown } from "@/modules/wealth/engine/essential-expense";
@@ -57,7 +58,7 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   const agg = await aggregateNetWorth(ctx);
   const { db, userId } = await resolveAuth(ctx);
   const memberIds = await householdMemberIds(db, userId);
-  const rates = await getFxRates();
+  const [rates, primaryCurrency] = await Promise.all([getFxRates(), getPrimaryCurrency()]);
   const currency = agg.currency;
 
   const assetsByClass = sumAssetsByClass(agg.assets);
@@ -142,11 +143,14 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   const essentialMonthlyExpenses = essentialBreakdown?.total ?? 0;
 
   // Estilo de vida DESEADO (dato PERSONAL en personal_profiles.extra) → número de
-  // libertad. null si no lo definió (nunca se inventa).
+  // libertad. null si no lo definió (nunca se inventa). Se guarda con su propia moneda; se
+  // CONVIERTE a la de cálculo, igual que deudas y metas arriba. Los valores viejos (número
+  // suelto) se interpretan en la primaria (ver parseDesiredLifestyle).
   const extra = (profileRow.data?.extra ?? {}) as Record<string, unknown>;
-  const desiredRaw = extra.desiredMonthlyLifestyle;
-  const desiredMonthlyLifestyle =
-    typeof desiredRaw === "number" && desiredRaw > 0 ? desiredRaw : null;
+  const desiredParsed = parseDesiredLifestyle(extra.desiredMonthlyLifestyle, primaryCurrency);
+  const desiredMonthlyLifestyle = desiredParsed
+    ? convertCurrency(desiredParsed.amount, desiredParsed.currency, currency, rates)
+    : null;
 
   const input: PatrimonioInput = {
     assetsByClass,

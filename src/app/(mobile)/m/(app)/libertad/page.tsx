@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { MobileHeader } from "../../components/mobile-header";
 import { getPatrimonioReport, type PatrimonioServiceResult, type Hito } from "@/modules/wealth";
+import { getDesiredMonthlyLifestyle } from "@/modules/wealth/services/lifestyle-service";
+import { getPrimaryCurrency } from "@/modules/financial-base";
 import {
   MSummaryCard,
   MSectionHeader,
@@ -51,6 +53,12 @@ export default async function MobileLibertad() {
   } catch {
     result = null;
   }
+  // Para el CTA de estilo de vida: la PRINCIPAL (importe libre, la elige el usuario) y el
+  // valor ya definido (con su moneda), para precargar la edición. Best-effort.
+  const [primaryCurrency, currentLifestyle] = await Promise.all([
+    getPrimaryCurrency().catch(() => "CRC"),
+    getDesiredMonthlyLifestyle().catch(() => null),
+  ]);
 
   return (
     <div className="m-scroll">
@@ -63,7 +71,13 @@ export default async function MobileLibertad() {
           backLabel="Volver a Inicio"
         />
 
-        {result ? <Escalera result={result} /> : (
+        {result ? (
+          <Escalera
+            result={result}
+            primaryCurrency={primaryCurrency}
+            currentLifestyle={currentLifestyle}
+          />
+        ) : (
           <MEmptyState
             icon="goal"
             title="Aún no podemos calcular tu escalera"
@@ -77,7 +91,15 @@ export default async function MobileLibertad() {
   );
 }
 
-function Escalera({ result }: { result: PatrimonioServiceResult }) {
+function Escalera({
+  result,
+  primaryCurrency,
+  currentLifestyle,
+}: {
+  result: PatrimonioServiceResult;
+  primaryCurrency: string;
+  currentLifestyle: { amount: number; currency: string } | null;
+}) {
   const r = result.report;
   const currency = result.currency;
   const essential = result.essentialBreakdown;
@@ -136,7 +158,14 @@ function Escalera({ result }: { result: PatrimonioServiceResult }) {
                 icon={rung.icon}
                 title={rung.title}
                 subtitle={rung.subtitle}
-                slot={<DefineLifestyleSheet currency={currency} label="Definir mi estilo de vida" variant="m-btn-secondary" />}
+                slot={
+                  <DefineLifestyleSheet
+                    primaryCurrency={primaryCurrency}
+                    current={currentLifestyle}
+                    label="Definir mi estilo de vida"
+                    variant="m-btn-secondary"
+                  />
+                }
               />
             );
           }
