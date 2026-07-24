@@ -548,6 +548,20 @@ export function periodReturn(
 }
 
 /**
+ * Colapsa el historial de valoraciones a solo los CAMBIOS: de cada corrida de valor igual
+ * conserva la fecha MÁS TEMPRANA en que tomó ese valor (13/18/24-jul con el mismo monto → solo
+ * 13-jul). Puro; el input debe venir ordenado por fecha ASCENDENTE. Si todas son iguales, deja
+ * una sola fila (la primera). Solo para la LISTA del historial, no para la curva del chart.
+ */
+export function collapseValuationRuns<T extends { value: number }>(valuationsAsc: T[]): T[] {
+  const out: T[] = [];
+  for (const v of valuationsAsc) {
+    if (out.length === 0 || out[out.length - 1]!.value !== v.value) out.push(v);
+  }
+  return out;
+}
+
+/**
  * Tasa de inversión = aporte mensual recurrente ÷ ingreso mensual (0 si no hay
  * ingreso). NOTA: el monto del aporte recurrente por holding aún no se persiste
  * (Fase 2 solo guardó is_recurring); el llamador usa BaseIndicators.investmentRate

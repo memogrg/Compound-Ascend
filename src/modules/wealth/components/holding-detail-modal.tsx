@@ -24,6 +24,7 @@ import {
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
+import { collapseValuationRuns } from "@/modules/wealth/engine/portfolio-engine";
 import type { Holding, Dividend, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type { Period, HoldingPurchase, HoldingValuation } from "@/modules/wealth/services/holding-history-service";
 
@@ -463,7 +464,8 @@ export function HoldingDetailModal({
               </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {[...valuations].reverse().map((v) => (
+              {/* Solo los CAMBIOS de valoración (corridas iguales colapsan a su fecha más temprana). */}
+              {[...collapseValuationRuns(valuations)].reverse().map((v) => (
                 <div key={v.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "5px 0", borderTop: "1px solid var(--line)" }}>
                   <span style={{ color: "var(--muted)" }}>{v.asOf}</span>
                   <span style={{ fontWeight: 500 }}>{formatMoney(v.value, v.currency)}</span>

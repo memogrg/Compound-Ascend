@@ -19,6 +19,7 @@ import {
   monthlyIncomeByHolding,
   cashflowMonthlyIncome,
   periodReturn,
+  collapseValuationRuns,
   investmentRate,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
@@ -617,3 +618,33 @@ describe("wealth · constants (listas por naturaleza)", () => {
     expect(GROWTH_CATEGORIES).toContain("cripto");
   });
 });
+
+describe("collapseValuationRuns · historial de valoración (solo cambios)", () => {
+  const v = (asOf: string, value: number) => ({ id: asOf, asOf, value });
+
+  it("colapsa corridas de valor igual a la fecha MÁS TEMPRANA", () => {
+    // 13/18/24-jul con el mismo monto → solo 13-jul.
+    const out = collapseValuationRuns([v("2026-07-13", 100), v("2026-07-18", 100), v("2026-07-24", 100)]);
+    expect(out.map((x) => x.asOf)).toEqual(["2026-07-13"]);
+  });
+
+  it("conserva cada cambio, en el primer punto de cada corrida", () => {
+    const out = collapseValuationRuns([
+      v("2026-07-13", 100),
+      v("2026-07-18", 100),
+      v("2026-07-20", 120), // cambia
+      v("2026-07-24", 120),
+      v("2026-07-28", 90), // cambia
+    ]);
+    expect(out.map((x) => [x.asOf, x.value])).toEqual([
+      ["2026-07-13", 100],
+      ["2026-07-20", 120],
+      ["2026-07-28", 90],
+    ]);
+  });
+
+  it("si todas son iguales, deja una sola fila; vacío → vacío", () => {
+    expect(collapseValuationRuns([v("2026-07-01", 50)]).length).toBe(1);
+    expect(collapseValuationRuns([])).toEqual([]);
+  });
+})
