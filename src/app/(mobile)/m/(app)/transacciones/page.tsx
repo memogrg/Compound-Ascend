@@ -92,6 +92,9 @@ export default async function MobileTransacciones() {
   }
   const uncategorized = selectUncategorized(transactions);
   const selectableCategories = selectableCategoryLeaves(view.categories);
+  // Categorías de ingreso (mismas que el composer web) para exigir categoría en el ingreso manual.
+  const incomeCats = view.incomeTree.flatMap((g) => g.children).map((c) => ({ id: c.id, name: c.name }));
+  const incomeGroupId = view.incomeTree[0]?.id ?? null;
   const candidates = findUnlinkedCandidates(transactions, view.categories, view.linkables);
   const alerts = buildEntityAlerts(view.budget.items, transactions, currency, view.rates);
 
@@ -176,6 +179,8 @@ export default async function MobileTransacciones() {
           periodLabel={period.label}
           jars={jars}
           accounts={accounts}
+          incomeCats={incomeCats}
+          incomeGroupId={incomeGroupId}
         />
       </div>
     </div>
