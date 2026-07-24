@@ -23,10 +23,17 @@ function niceNum(x: number, round: boolean): number {
  * - `symmetric`: si hay negativos, centra en 0 (útil para flujo ±).
  * - `zeroBased`: fuerza a incluir el 0 (montos acumulados, %).
  * - `ticks`: nº aproximado de divisiones (para calcular el paso).
+ * - `paddingRatio`: expande el rango una fracción del span antes de redondear, para que la
+ *   línea no toque los bordes (útil en charts chicos). Default 0.
  */
 export function niceDomain(
   values: number[],
-  opts: { symmetric?: boolean; zeroBased?: boolean; ticks?: number } = {},
+  opts: {
+    symmetric?: boolean;
+    zeroBased?: boolean;
+    ticks?: number;
+    paddingRatio?: number;
+  } = {},
 ): [number, number] {
   const nums = values.filter((v) => Number.isFinite(v));
   if (nums.length === 0) return [0, 1];
@@ -36,6 +43,12 @@ export function niceDomain(
   if (opts.zeroBased) {
     min = Math.min(0, min);
     max = Math.max(0, max);
+  }
+  if (opts.paddingRatio && opts.paddingRatio > 0) {
+    const span = max - min || Math.abs(max) || 1;
+    const pad = span * opts.paddingRatio;
+    min -= pad;
+    max += pad;
   }
   if (min === max) {
     // Serie plana: abre un rango simétrico alrededor del valor.

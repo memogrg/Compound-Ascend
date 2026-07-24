@@ -21,7 +21,7 @@ import { convertCurrency } from "@/lib/fx";
 import {
   allocationByNature,
   allocationByCategory,
-  periodReturn,
+  periodReturnFromBaseline,
   cashflowMonthlyIncome,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { CATEGORY_META } from "@/modules/wealth/constants";
@@ -191,7 +191,10 @@ function PortfolioPanel({
   const [indPeriod, setIndPeriod] = useState<Period>("ytd");
   const [tablePeriod, setTablePeriod] = useState<Period>("ytd");
 
-  const retInd = useMemo(() => periodReturnFor(snapshots, indPeriod), [snapshots, indPeriod]);
+  const retInd = useMemo(
+    () => periodReturnFor(snapshots, indPeriod, analytics.totalPortfolioValue),
+    [snapshots, indPeriod, analytics.totalPortfolioValue],
+  );
 
   const investedSeries: AreaPoint[] = useMemo(() => {
     const cutoff = periodCutoff(indPeriod);
@@ -239,11 +242,6 @@ function PortfolioPanel({
             <TipQ text="Base de costo total: cuánto has puesto en tus inversiones." />
           </div>
           <div className="val">{formatMoney(toDisplay(analytics.totalCostBasis), displayCurrency)}</div>
-          {investedSeries.length >= 2 ? (
-            <div className="invline">
-              <PerformanceChart data={investedSeries} currency={displayCurrency} height={88} tone="pos" />
-            </div>
-          ) : null}
         </div>
 
         <div className="card kpi">
@@ -261,24 +259,54 @@ function PortfolioPanel({
         <div className="card kpi">
           <div className="lab">
             Rendimiento del periodo
-            <TipQ text="Cambio de valor del portafolio en el periodo elegido. Aún no descuenta aportes del periodo." />
+            <TipQ text="Valor actual menos el valor al inicio del periodo (snapshot más cercano). Aún no descuenta aportes del periodo." />
           </div>
-          <div className="val" style={{ color: retInd.abs >= 0 ? "var(--pos)" : "var(--neg)" }}>
-            {retInd.abs >= 0 ? "+" : ""}
-            {formatMoney(toDisplay(retInd.abs), displayCurrency)}
-          </div>
-          <div className="sub">
-            <span className={`delta ${retInd.abs >= 0 ? "up" : "down"}`}>
-              {retInd.abs >= 0 ? "+" : ""}
-              {formatPercent(retInd.pct)}
-            </span>
-            ganancia/pérdida
-          </div>
+          {retInd.available ? (
+            <>
+              <div className="val" style={{ color: retInd.abs >= 0 ? "var(--pos)" : "var(--neg)" }}>
+                {retInd.abs >= 0 ? "+" : "−"}
+                {formatMoney(toDisplay(Math.abs(retInd.abs)), displayCurrency)}
+              </div>
+              <div className="sub">
+                <span className={`delta ${retInd.abs >= 0 ? "up" : "down"}`}>
+                  {retInd.abs >= 0 ? "+" : "−"}
+                  {formatPercent(Math.abs(retInd.pct))}
+                </span>
+                ganancia/pérdida
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="val muted">—</div>
+              <div className="sub muted tip tip-wrap" data-tip="No hay snapshot al inicio de este periodo para comparar. Registrá inversiones y volvé más adelante.">
+                sin datos del periodo
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* KPIs fila 2: acumulado · ingreso por flujo de caja */}
-      <div className="ind-grid two">
+      {/* KPIs fila 2: valor total · acumulado · ingreso por flujo de caja */}
+      <div className="ind-grid three">
+        <div className="card kpi">
+          <div className="lab">
+            Valor total de las inversiones
+            <TipQ text="Cuánto valen hoy todas tus inversiones sumadas, con ganancias o pérdidas incluidas." />
+          </div>
+          <div className="val">
+            {formatMoney(
+              toDisplay(analytics.totalCostBasis + analytics.totalProfitLoss),
+              displayCurrency,
+            )}
+          </div>
+          {/* Valor del portafolio en el tiempo: acá una línea que sube/baja es honesta (número y
+              línea son "valor"). El tono lo decide la dirección (último vs primero). */}
+          {investedSeries.length >= 2 ? (
+            <div className="invline">
+              <PerformanceChart data={investedSeries} currency={displayCurrency} height={88} />
+            </div>
+          ) : null}
+        </div>
         <div className="card kpi">
           <div className="lab">Rentabilidad total acumulada</div>
           <div className="val" style={{ color: analytics.totalProfitLoss >= 0 ? "var(--pos)" : "var(--neg)" }}>
@@ -337,6 +365,7 @@ function PortfolioPanel({
           <div>Inversión</div>
           <div>Naturaleza / categoría</div>
           <div>Invertido</div>
+          <div className="c-valor">Valor actual</div>
           <div className="c-aporte">Aporte mensual</div>
           <div>Rendimiento</div>
           <div />
@@ -355,13 +384,18 @@ function PortfolioPanel({
   );
 }
 
-/** Rendimiento del periodo a partir de snapshots filtrados (contributions=0). */
-function periodReturnFor(snapshots: PortfolioSnapshot[], period: Period): { abs: number; pct: number } {
+/**
+ * Rendimiento del periodo: valor ACTUAL − valor al INICIO del periodo (snapshot más cercano ≤
+ * cutoff). Sin baseline del periodo → available:false (la UI muestra "—", no un +$0 engañoso).
+ */
+function periodReturnFor(
+  snapshots: PortfolioSnapshot[],
+  period: Period,
+  currentValue: number,
+) {
   const cutoff = periodCutoff(period);
-  const pts = snapshots
-    .filter((s) => !cutoff || s.date >= cutoff)
-    .map((s) => ({ date: s.date, portfolioValue: s.portfolioValue }));
-  return periodReturn(pts, 0);
+  const pts = snapshots.map((s) => ({ date: s.date, portfolioValue: s.portfolioValue }));
+  return periodReturnFromBaseline(pts, cutoff, currentValue);
 }
 
 // ── Filtro de periodo (seg) ────────────────────────────────────────
@@ -510,6 +544,9 @@ function InvRow({
   // analytics.holdingsWithPerformance viene normalizado a la moneda principal;
   // el dato nativo está en `raw` (averageCost en su moneda real).
   const nativeCostBasis = raw ? raw.quantity * raw.averageCost : h.costBasis;
+  // Valor actual en la moneda NATIVA de la fila: escala el costo nativo por el retorno acumulado
+  // (mismo patrón que la celda Rendimiento; el currentValue del engine está en la primaria).
+  const nativeCurrentValue = nativeCostBasis * (1 + h.returnPct);
   const periodRet = h.returnPct * periodFactor;
   const periodGain = nativeCostBasis * periodRet;
   const pos = periodRet >= 0;
@@ -563,6 +600,13 @@ function InvRow({
           {catLabel ? <div className="cell-sub" style={{ marginTop: 5 }}>{catLabel}</div> : null}
         </div>
         <div className="inv-amt">{formatMoney(nativeCostBasis, h.currency)}</div>
+        <div className="inv-amt c-valor">
+          {h.priceUnavailable ? (
+            <span className="muted">—</span>
+          ) : (
+            formatMoney(nativeCurrentValue, h.currency)
+          )}
+        </div>
         <div className="inv-amt c-aporte">
           {h.isRecurring && h.monthlyContribution ? (
             <>

@@ -19,6 +19,8 @@ import {
   monthlyIncomeByHolding,
   cashflowMonthlyIncome,
   periodReturn,
+  periodReturnFromBaseline,
+  collapseValuationRuns,
   investmentRate,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
@@ -617,3 +619,71 @@ describe("wealth · constants (listas por naturaleza)", () => {
     expect(GROWTH_CATEGORIES).toContain("cripto");
   });
 });
+
+describe("collapseValuationRuns · historial de valoración (solo cambios)", () => {
+  const v = (asOf: string, value: number) => ({ id: asOf, asOf, value });
+
+  it("colapsa corridas de valor igual a la fecha MÁS TEMPRANA", () => {
+    // 13/18/24-jul con el mismo monto → solo 13-jul.
+    const out = collapseValuationRuns([v("2026-07-13", 100), v("2026-07-18", 100), v("2026-07-24", 100)]);
+    expect(out.map((x) => x.asOf)).toEqual(["2026-07-13"]);
+  });
+
+  it("conserva cada cambio, en el primer punto de cada corrida", () => {
+    const out = collapseValuationRuns([
+      v("2026-07-13", 100),
+      v("2026-07-18", 100),
+      v("2026-07-20", 120), // cambia
+      v("2026-07-24", 120),
+      v("2026-07-28", 90), // cambia
+    ]);
+    expect(out.map((x) => [x.asOf, x.value])).toEqual([
+      ["2026-07-13", 100],
+      ["2026-07-20", 120],
+      ["2026-07-28", 90],
+    ]);
+  });
+
+  it("si todas son iguales, deja una sola fila; vacío → vacío", () => {
+    expect(collapseValuationRuns([v("2026-07-01", 50)]).length).toBe(1);
+    expect(collapseValuationRuns([])).toEqual([]);
+  });
+})
+
+describe("periodReturnFromBaseline · rendimiento del periodo honesto", () => {
+  const snap = (date: string, portfolioValue: number) => ({ date, portfolioValue });
+
+  it("usa el snapshot más reciente ≤ cutoff como baseline (valor al inicio del periodo)", () => {
+    // Baseline = 31-dic (10000); valor actual 9310 → −690 (−6,9%). NO +$0.
+    const snaps = [snap("2025-12-31", 10000), snap("2026-07-13", 9310), snap("2026-07-24", 9310)];
+    const r = periodReturnFromBaseline(snaps, "2026-01-01", 9310);
+    expect(r.available).toBe(true);
+    expect(r.abs).toBe(-690);
+    expect(r.pct).toBeCloseTo(-0.069);
+  });
+
+  it("sin snapshot ≤ cutoff (YTD arrancando en julio) → available:false (no finge +$0)", () => {
+    const snaps = [snap("2026-07-13", 9310), snap("2026-07-18", 9310), snap("2026-07-24", 9310)];
+    const r = periodReturnFromBaseline(snaps, "2026-01-01", 9310);
+    expect(r.available).toBe(false);
+    expect(r.abs).toBe(0);
+  });
+
+  it("'todo' (cutoff null): baseline = primer snapshot de la serie", () => {
+    const snaps = [snap("2026-07-13", 8000), snap("2026-07-24", 9310)];
+    const r = periodReturnFromBaseline(snaps, null, 9310);
+    expect(r.available).toBe(true);
+    expect(r.abs).toBe(1310);
+    expect(r.pct).toBeCloseTo(1310 / 8000);
+  });
+
+  it("valor actual = baseline → 0 real (disponible), no 'sin datos'", () => {
+    const r = periodReturnFromBaseline([snap("2025-12-31", 10000)], "2026-01-01", 10000);
+    expect(r.available).toBe(true);
+    expect(r.abs).toBe(0);
+  });
+
+  it("sin snapshots → available:false", () => {
+    expect(periodReturnFromBaseline([], "2026-01-01", 100).available).toBe(false);
+  });
+})

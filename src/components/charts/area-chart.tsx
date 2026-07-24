@@ -72,10 +72,17 @@ export function PerformanceChart({
   const showAxes = axes !== "none";
   const full = axes === "full";
   const yTicks = full ? 5 : 3;
+  // Eje compacto (mini-charts de ~88px): más ancho para no recortar "163,3 mil" y padding de
+  // dominio para que la línea no toque los bordes. El modo `full` queda igual.
+  const yWidth = full ? 46 : 52;
   const values = data.map((d) => d.value);
   if (costBasis !== undefined) values.push(costBasis);
   if (goalValue !== undefined) values.push(goalValue);
-  const domain = niceDomain(values, { symmetric: true, ticks: yTicks });
+  const domain = niceDomain(values, {
+    symmetric: true,
+    ticks: yTicks,
+    paddingRatio: full ? 0 : 0.06,
+  });
   // Etiqueta discreta para una línea de referencia (p. ej. "presupuesto").
   const refLabel = (text: string) => ({
     value: text,
@@ -110,7 +117,7 @@ export function PerformanceChart({
             {showAxes && (
               <YAxis
                 domain={domain}
-                width={full ? 46 : 36}
+                width={yWidth}
                 tickCount={yTicks}
                 tick={{ ...TICK, fill: "var(--muted)", fontSize: full ? 10.5 : 9.5 }}
                 axisLine={false}
