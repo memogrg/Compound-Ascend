@@ -75,6 +75,7 @@ import {
   selectableSobresByFrasco,
   isConfiguredSobre,
   filterConfiguredSobreTree,
+  isManualEntryClassified,
 } from "@/modules/financial-base/engine/classify";
 
 const cat = (over: Record<string, unknown>) => ({
@@ -383,6 +384,29 @@ describe("selectableSobresByFrasco", () => {
       "Transporte › Vehículo",
       "— › Suelto",
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isManualEntryClassified (validación del composer: nada a "Por clasificar" manual)
+// ---------------------------------------------------------------------------
+describe("isManualEntryClassified", () => {
+  it("GASTO: necesita sobre O entidad vinculada", () => {
+    expect(isManualEntryClassified({ kind: "gasto", categoryId: "s1" })).toBe(true); // sobre
+    expect(isManualEntryClassified({ kind: "gasto", linkedId: "d1" })).toBe(true); // entidad vinculada
+    expect(isManualEntryClassified({ kind: "gasto", categoryId: null, linkedId: null })).toBe(false);
+  });
+
+  it("INGRESO: necesita categoría de ingreso", () => {
+    expect(isManualEntryClassified({ kind: "ingreso", incomeCatId: "i1" })).toBe(true);
+    expect(isManualEntryClassified({ kind: "ingreso", incomeCatId: null })).toBe(false);
+    // Un sobre de gasto no clasifica un ingreso.
+    expect(isManualEntryClassified({ kind: "ingreso", categoryId: "s1" })).toBe(false);
+  });
+
+  it("TRANSFERENCIA / AJUSTE: no llevan categoría → siempre clasificados", () => {
+    expect(isManualEntryClassified({ kind: "transferencia" })).toBe(true);
+    expect(isManualEntryClassified({ kind: "ajuste" })).toBe(true);
   });
 });
 

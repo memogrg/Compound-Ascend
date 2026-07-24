@@ -43,6 +43,8 @@ test("login → dashboard → crear gasto → patrimonio", async ({ page }) => {
   const modal = page.getByRole("dialog", { name: "Registrar gasto" });
   await modal.getByPlaceholder("Automercado, Uber, Netflix…").fill("Gasto e2e smoke");
   await modal.getByPlaceholder("0").fill("1234");
+  // La categoría es obligatoria en registro manual: elegí el sobre "(general)" del primer frasco.
+  await modal.getByRole("button", { name: /\(general\)/ }).first().click();
   await modal.getByRole("button", { name: /Guardar/ }).click();
   await expect(page.getByText("Gasto registrado")).toBeVisible({ timeout: 15_000 });
 

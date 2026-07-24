@@ -76,6 +76,25 @@ export function selectableSobresByFrasco(categories: Category[]): SelectableSobr
     });
 }
 
+/**
+ * ¿Un registro MANUAL queda clasificado (no cae en "Por clasificar")?
+ *  - GASTO: tiene un sobre (`categoryId`) o una entidad vinculada (`linkedId`, que aporta su
+ *    categoría de pago).
+ *  - INGRESO: tiene una categoría de ingreso (`incomeCatId`).
+ *  - TRANSFERENCIA / AJUSTE: no llevan categoría → siempre "clasificados" (la regla no aplica).
+ * Puro: es la única fuente de la validación del composer y sirve para los tests.
+ */
+export function isManualEntryClassified(e: {
+  kind: string;
+  categoryId?: string | null;
+  linkedId?: string | null;
+  incomeCatId?: string | null;
+}): boolean {
+  if (e.kind === "gasto") return Boolean(e.categoryId) || Boolean(e.linkedId);
+  if (e.kind === "ingreso") return Boolean(e.incomeCatId);
+  return true; // transferencia / ajuste
+}
+
 /** ¿La hoja sirve para esta naturaleza? gasto→expense/both, ingreso→income/both. */
 export function categoryMatchesKind(categoryType: string, kind: "gasto" | "ingreso"): boolean {
   if (categoryType === "both") return true;

@@ -116,6 +116,10 @@ export function TxnForm({
     origin: "manual",
   };
 
+  // Registro manual de GASTO exige sobre (nada a "Por clasificar"). Solo al CREAR: editar una
+  // transacción vieja (incl. una sin clasificar) no se traba. Ingreso móvil: delta aparte.
+  const missingSobre = !initial && isExpense && !categoryId;
+
   return (
     <FormShell
       action={action}
@@ -123,6 +127,8 @@ export function TxnForm({
       submitLabel={submitLabel}
       successMessage={successMessage}
       onSuccess={onSuccess}
+      disabled={missingSobre}
+      disabledHint="Elegí un sobre para registrar el gasto."
     >
       {lockKind ? null : (
         <Segmented name="kind" label="Tipo" value={kind} onChange={setKind} options={KIND_OPTS} />
