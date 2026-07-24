@@ -24,6 +24,7 @@ import {
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import type { CategoryNode, Category } from "@/modules/financial-base/services/categories-service";
+import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
 
 type PassiveSubtype = "" | "renta" | "dividendos";
 
@@ -139,6 +140,12 @@ export function RegisterIncomeModal({
     categoryId: categoryId || null,
   });
 
+  // Registro manual COMPLETO: un ingreso nuevo exige subcategoría (misma definición que las otras
+  // superficies → isManualEntryClassified). Solo al CREAR (editar una fuente vieja no se traba).
+  // `categoryId` de esta superficie ES la subcategoría de ingreso.
+  const missingSub =
+    !editing && !isManualEntryClassified({ kind: "ingreso", incomeCatId: categoryId || null });
+
   const finish = (res: { ok: boolean; message?: string }, okMsg: string) => {
     setPending(false);
     if (res.ok) {
@@ -186,6 +193,7 @@ export function RegisterIncomeModal({
     const amt = Number(amount);
     if (!name.trim()) return setError("Ponle un nombre a la fuente.");
     if (!Number.isFinite(amt) || amt < 0) return setError("Ingresa un monto válido.");
+    if (missingSub) return setError("Elegí la subcategoría del ingreso.");
     setError(null);
     if (needsStub) {
       setAssetName((v) => v || name.trim());
@@ -508,10 +516,15 @@ export function RegisterIncomeModal({
         </div>
 
         <div className="modal-foot">
+          {missingSub ? (
+            <span className="muted" style={{ fontSize: 12, marginRight: "auto" }}>
+              Elegí la subcategoría del ingreso.
+            </span>
+          ) : null}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={pending}>
+          <button type="submit" className="btn btn-primary" disabled={pending || missingSub}>
             {pending
               ? "Guardando…"
               : needsStub

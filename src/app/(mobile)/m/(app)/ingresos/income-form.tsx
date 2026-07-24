@@ -4,6 +4,7 @@ import { useCaptureCurrency } from "@/components/layout/currency-context";
 import type { IncomeType } from "@/modules/financial-base/types";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import { registerPassiveIncomeWithStubAction } from "@/modules/financial-base/api/v2-actions";
+import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
 
 import {
   FormShell,
@@ -123,10 +124,8 @@ export function IncomeSourceForm({
     if (t !== "pasivo") setFromAsset(false); // el stub solo aplica a pasivo
   };
 
-  const subOpts: Opt[] = [
-    { value: NO_SUBCATEGORY, label: "Sin subcategoría" },
-    ...leavesForType(incomeTree, incomeType),
-  ];
+  // Subcategoría OBLIGATORIA: ya no hay opción "Sin subcategoría" (nada a "Por clasificar").
+  const subOpts: Opt[] = leavesForType(incomeTree, incomeType);
 
   const values: IncomeSourceValues = {
     name,
@@ -138,6 +137,15 @@ export function IncomeSourceForm({
     frequency: recurrent ? frequency : "mensual",
     categoryId: categoryId === NO_SUBCATEGORY ? null : categoryId,
   };
+
+  // Registro manual COMPLETO: un ingreso nuevo exige subcategoría — MISMA fn que las otras
+  // superficies (isManualEntryClassified). Solo al CREAR (editar una fuente vieja no se traba).
+  const missingSub =
+    !initial &&
+    !isManualEntryClassified({
+      kind: "ingreso",
+      incomeCatId: categoryId === NO_SUBCATEGORY ? null : categoryId,
+    });
 
   const stubActive = allowPassiveStub && incomeType === "pasivo" && fromAsset;
   const isRental = subtype === "renta";
@@ -170,6 +178,8 @@ export function IncomeSourceForm({
       submitLabel={submitLabel}
       successMessage={successMessage}
       onSuccess={onSuccess}
+      disabled={missingSub}
+      disabledHint="Elegí la subcategoría del ingreso."
     >
       <TextField
         name="name"
@@ -184,10 +194,10 @@ export function IncomeSourceForm({
       <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
       <DateField name="occurredOn" label="Fecha" value={date} onChange={setDate} />
       <Segmented name="incomeType" label="Tipo de ingreso" value={incomeType} onChange={setIncomeType} options={TYPE_OPTS} />
-      {subOpts.length > 1 ? (
+      {subOpts.length > 0 ? (
         <SheetSelect
           name="categoryId"
-          label="Subcategoría (opcional)"
+          label="Subcategoría"
           value={categoryId}
           onChange={setCategoryId}
           options={subOpts}
