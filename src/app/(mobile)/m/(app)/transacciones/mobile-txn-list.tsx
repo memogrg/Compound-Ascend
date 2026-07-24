@@ -110,6 +110,8 @@ export function MobileTxnList({
   periodLabel,
   jars,
   accounts,
+  incomeCats,
+  incomeGroupId,
 }: {
   transactions: Transaction[];
   categoryNames: Record<string, string>;
@@ -118,6 +120,10 @@ export function MobileTxnList({
   periodLabel: string;
   jars: Jar[];
   accounts: Account[];
+  /** Categorías de ingreso (obligatorias en el registro manual de ingreso). */
+  incomeCats: { id: string; name: string }[];
+  /** Grupo de ingresos para crear una categoría al vuelo. */
+  incomeGroupId: string | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -244,6 +250,8 @@ export function MobileTxnList({
           jars={jars}
           currency={currency}
           accounts={accounts}
+          incomeCats={incomeCats}
+          incomeGroupId={incomeGroupId}
           action={addTransactionAction}
           submitLabel="Registrar"
           successMessage="Transacción registrada"
@@ -260,6 +268,8 @@ export function MobileTxnList({
             jars={jars}
             currency={currency}
             accounts={accounts}
+            incomeCats={incomeCats}
+            incomeGroupId={incomeGroupId}
             action={(v: TxnFormValues) => editTransactionAction(editing.id, v)}
             submitLabel="Guardar cambios"
             successMessage="Transacción actualizada"
