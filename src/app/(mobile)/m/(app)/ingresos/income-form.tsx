@@ -178,8 +178,9 @@ export function IncomeSourceForm({
       submitLabel={submitLabel}
       successMessage={successMessage}
       onSuccess={onSuccess}
-      disabled={missingSub}
-      disabledHint="Elegí la subcategoría del ingreso."
+      validate={() =>
+        missingSub ? { categoryId: "Seleccioná una subcategoría para guardar" } : null
+      }
     >
       <TextField
         name="name"
@@ -197,7 +198,7 @@ export function IncomeSourceForm({
       {subOpts.length > 0 ? (
         <SheetSelect
           name="categoryId"
-          label="Subcategoría"
+          label="Subcategoría *"
           value={categoryId}
           onChange={setCategoryId}
           options={subOpts}

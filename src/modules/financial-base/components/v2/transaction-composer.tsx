@@ -13,7 +13,7 @@
  * No reemplaza la edición existente (QuickAddModal sigue para editar filas).
  */
 import { CURRENCY_SYMBOL, formatMoney } from "@/lib/format";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -189,8 +189,19 @@ export function TransactionComposer({
     incomeCatId,
   });
   const categoryHint = isIngreso
-    ? "Elegí la categoría del ingreso."
-    : "Elegí un sobre o una entidad para clasificar el gasto.";
+    ? "Seleccioná una subcategoría para guardar"
+    : "Seleccioná un sobre para guardar";
+  // Warning "sticky" a nivel de campo: aparece al intentar guardar sin clasificar y se va solo
+  // cuando el usuario elige (showCatWarn = intentó && sigue faltando). El botón NO se deshabilita.
+  const [catAttempted, setCatAttempted] = useState(false);
+  const showCatWarn = catAttempted && missingCategory;
+  const catFieldRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showCatWarn) return;
+    const el = catFieldRef.current;
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    el?.querySelector<HTMLElement>("button")?.focus();
+  }, [showCatWarn]);
 
   function applySuggestion(s: SuggestionEntry) {
     const cat = flatById.get(s.categoryId);
@@ -293,8 +304,12 @@ export function TransactionComposer({
     e.preventDefault();
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) return setError("Ingresa un monto válido.");
-    // Defensa (el botón ya se deshabilita): gasto/ingreso manual necesitan categoría.
-    if (missingCategory) return setError(categoryHint);
+    // Falta la clasificación: NO se guarda, y el warning se muestra a nivel de campo (no banner
+    // mudo). setError se reserva para errores no-categoría (monto/entidad).
+    if (missingCategory) {
+      setCatAttempted(true);
+      return;
+    }
     setPending(true);
     setError(null);
 
@@ -521,7 +536,7 @@ export function TransactionComposer({
                 ) : null}
               </div>
 
-              <div className="fld">
+              <div className="fld" ref={catFieldRef}>
                 <label className="fld-label">
                   Categoría <span style={{ color: "var(--neg, #c0392b)" }}>*</span>{" "}
                   {selectedCat ? <span className="cmp-picked">· {selectedCat.name}</span> : null}
@@ -545,7 +560,18 @@ export function TransactionComposer({
                 </div>
 
                 {activeGroup ? (
-                  <div className="chip-grid cmp-subs">
+                  <div
+                    className="chip-grid cmp-subs"
+                    style={
+                      showCatWarn
+                        ? {
+                            outline: "1.5px solid var(--neg, #c0392b)",
+                            outlineOffset: 4,
+                            borderRadius: 8,
+                          }
+                        : undefined
+                    }
+                  >
                     <button
                       type="button"
                       className={`chip-sel ${categoryId === activeGroup.id ? "on" : ""}`}
@@ -620,6 +646,11 @@ export function TransactionComposer({
                     )}
                   </div>
                 ) : null}
+                {showCatWarn ? (
+                  <div role="alert" style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}>
+                    {categoryHint}
+                  </div>
+                ) : null}
               </div>
 
               {/* Vínculo entidad (Fase 2): 1 tap. Aparece si la categoría lo sugiere. */}
@@ -664,12 +695,19 @@ export function TransactionComposer({
           {/* Ingreso: categoría OBLIGATORIA (la fuente = el nombre de la categoría). Si no hay
               ninguna, se crea al vuelo — exigir no traba a quien no tiene categorías de ingreso. */}
           {isIngreso ? (
-            <div className="fld">
+            <div className="fld" ref={catFieldRef}>
               <label className="fld-label">
                 Categoría del ingreso <span style={{ color: "var(--neg, #c0392b)" }}>*</span>{" "}
                 {incomeCatId ? <span className="cmp-picked">· {source}</span> : null}
               </label>
-              <div className="chip-grid">
+              <div
+                className="chip-grid"
+                style={
+                  showCatWarn
+                    ? { outline: "1.5px solid var(--neg, #c0392b)", outlineOffset: 4, borderRadius: 8 }
+                    : undefined
+                }
+              >
                 {incomeCats.map((c) => (
                   <button
                     key={c.id}
@@ -738,6 +776,11 @@ export function TransactionComposer({
                   </span>
                 )}
               </div>
+              {showCatWarn ? (
+                <div role="alert" style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}>
+                  {categoryHint}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -818,19 +861,13 @@ export function TransactionComposer({
         </div>
 
         <div className="modal-foot">
-          {/* Guía inline: por qué Guardar está deshabilitado (categoría faltante). */}
-          {missingCategory ? (
-            <span className="muted" style={{ fontSize: 12, marginRight: "auto" }}>
-              {categoryHint}
-            </span>
-          ) : null}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancelar
           </button>
           <button
             type="submit"
             className={`btn ${isIngreso ? "btn-secondary" : "btn-primary"}`}
-            disabled={pending || missingCategory}
+            disabled={pending}
           >
             {pending ? (
               "Guardando…"

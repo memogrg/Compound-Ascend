@@ -1,4 +1,12 @@
-import { createContext, startTransition, useActionState, useContext, useEffect, useRef } from "react";
+import {
+  createContext,
+  startTransition,
+  useActionState,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import { useToast } from "./toast";
@@ -27,8 +35,7 @@ export function FormShell<T>({
   successMessage = "Listo",
   onSuccess,
   children,
-  disabled = false,
-  disabledHint,
+  validate,
 }: {
   action: (raw: T) => Promise<ActionResult>;
   values: T;
@@ -37,14 +44,20 @@ export function FormShell<T>({
   successMessage?: string;
   onSuccess?: () => void;
   children: React.ReactNode;
-  /** Bloqueo de guardado del lado del cliente (p.ej. categoría obligatoria en registro manual). */
-  disabled?: boolean;
-  /** Texto que explica por qué no se puede guardar (se muestra cuando `disabled`). */
-  disabledHint?: string;
+  /**
+   * Validación de cliente para el CONTRATO de clasificación (categoría obligatoria en registro
+   * manual). Devuelve un mapa {campo → mensaje} si falta algo, o null si está OK. El botón NUNCA
+   * se deshabilita por esto: al intentar guardar sin cumplir, el error se muestra A NIVEL DE CAMPO
+   * (vía FieldErrorCtx, borde rojo + scroll/foco) y no se despacha. El warning es "sticky": se
+   * recalcula con validate() en cada render, así desaparece solo cuando el usuario elige.
+   */
+  validate?: () => Record<string, string> | null;
 }) {
   const router = useRouter();
   const toast = useToast();
   const submittedRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [attempted, setAttempted] = useState(false);
   // Refs para el efecto: evita re-ejecuciones por identidad de props no memoizadas.
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
@@ -69,12 +82,29 @@ export function FormShell<T>({
     // Los fieldErrors se muestran inline en cada campo vía FieldErrorCtx.
   }, [state, toast, router]);
 
+  // Warning "sticky": tras un intento inválido, mostrá el error de campo hasta que validate() pase.
+  const clientErrors = attempted ? (validate?.() ?? null) : null;
+  const fieldErrors = { ...(state.fieldErrors ?? {}), ...(clientErrors ?? {}) };
+
   return (
-    <FieldErrorCtx.Provider value={state.fieldErrors ?? {}}>
+    <FieldErrorCtx.Provider value={fieldErrors}>
       <form
+        ref={formRef}
         onSubmit={(e) => {
           e.preventDefault();
-          if (disabled) return; // gate de cliente (categoría obligatoria en registro manual)
+          // CONTRATO: no despachar sin clasificación; el error se ve a nivel de campo (no botón mudo).
+          const errs = validate?.() ?? null;
+          if (errs && Object.keys(errs).length > 0) {
+            setAttempted(true);
+            // El campo con error se renderiza en el próximo tick → scroll + foco recién ahí.
+            setTimeout(() => {
+              const el = formRef.current?.querySelector(".m-field-err");
+              const field = el?.closest(".m-qfield");
+              field?.scrollIntoView({ behavior: "smooth", block: "center" });
+              field?.querySelector<HTMLElement>("button, input, select")?.focus();
+            }, 0);
+            return;
+          }
           submittedRef.current = true;
           // startTransition envuelve el dispatch de useActionState → isPending se actualiza
           // bien (evita el warning "called outside of a transition").
@@ -82,15 +112,10 @@ export function FormShell<T>({
         }}
       >
         {children}
-        {disabled && disabledHint && !pending ? (
-          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-            {disabledHint}
-          </p>
-        ) : null}
         <button
           type="submit"
           className="m-btn m-btn-block m-btn-primary"
-          disabled={pending || disabled}
+          disabled={pending}
           style={{ marginTop: 6 }}
         >
           {pending ? pendingLabel : submitLabel}

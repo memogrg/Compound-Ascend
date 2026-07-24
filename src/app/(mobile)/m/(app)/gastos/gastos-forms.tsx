@@ -12,6 +12,7 @@ import {
 } from "@/modules/financial-base/api/v2-actions";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
 import type { Account, Period } from "@/modules/financial-base/types";
+import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
 import { EssentialCheck } from "@/components/shared/essential-check";
 import { formatMoney } from "@/lib/format";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -115,8 +116,11 @@ export function AddSpendForm({
       submitLabel="Registrar gasto"
       successMessage="Gasto registrado"
       onSuccess={onSuccess}
-      disabled={!categoryId}
-      disabledHint="Elegí un sobre para registrar el gasto."
+      validate={() =>
+        isManualEntryClassified({ kind: "gasto", categoryId })
+          ? null
+          : { categoryId: "Seleccioná un sobre para guardar" }
+      }
     >
       <MoneyField name="amount" label="Monto" value={amount} onChange={setAmount} currency={cur} />
       <SobreField
@@ -151,13 +155,19 @@ export function AddSpendForm({
   );
 }
 
-/** Campo "Sobre": botón tipo SheetSelect que abre el picker agrupado. Muestra error de Zod. */
+/** Campo "Sobre": botón tipo SheetSelect que abre el picker agrupado. Muestra el warning de
+ *  clasificación (obligatorio) a nivel de campo: borde rojo + texto rojo debajo. */
 function SobreField({ label, onOpen }: { label: string; onOpen: () => void }) {
   const error = useFormError("categoryId");
   return (
     <div className="m-qfield">
-      <div className="m-qlabel">Sobre</div>
-      <button type="button" className="m-inp m-sheetselect" onClick={onOpen}>
+      <div className="m-qlabel">Sobre *</div>
+      <button
+        type="button"
+        className="m-inp m-sheetselect"
+        style={error ? { borderColor: "var(--neg, #c0392b)" } : undefined}
+        onClick={onOpen}
+      >
         <span className={label ? "" : "m-sheetselect-ph"}>{label || "Selecciona un sobre…"}</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
           <path d="M6 9l6 6 6-6" />

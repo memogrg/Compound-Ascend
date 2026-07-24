@@ -145,8 +145,8 @@ export function TxnForm({
   const missingCategory =
     !initial && !isManualEntryClassified({ kind, categoryId, incomeCatId });
   const categoryHint = isExpense
-    ? "Elegí un sobre para registrar el gasto."
-    : "Elegí la categoría del ingreso.";
+    ? "Seleccioná un sobre para guardar"
+    : "Seleccioná una subcategoría para guardar";
 
   // Crea una categoría de ingreso al vuelo (misma UX que el "+ Nueva" de gasto).
   async function createIncomeCat(name: string): Promise<void> {
@@ -169,8 +169,7 @@ export function TxnForm({
       submitLabel={submitLabel}
       successMessage={successMessage}
       onSuccess={onSuccess}
-      disabled={missingCategory}
-      disabledHint={categoryHint}
+      validate={() => (missingCategory ? { categoryId: categoryHint } : null)}
     >
       {lockKind ? null : (
         <Segmented name="kind" label="Tipo" value={kind} onChange={setKind} options={KIND_OPTS} />
@@ -245,13 +244,18 @@ export function TxnForm({
   );
 }
 
-/** Campo "Categoría del ingreso": botón que abre el picker de categorías de ingreso. */
+/** Campo "Categoría del ingreso": botón que abre el picker; warning de clasificación a nivel campo. */
 function IncomeCatField({ label, onOpen }: { label: string; onOpen: () => void }) {
   const error = useFormError("categoryId");
   return (
     <div className="m-qfield">
-      <div className="m-qlabel">Categoría del ingreso</div>
-      <button type="button" className="m-inp m-sheetselect" onClick={onOpen}>
+      <div className="m-qlabel">Categoría del ingreso *</div>
+      <button
+        type="button"
+        className="m-inp m-sheetselect"
+        style={error ? { borderColor: "var(--neg, #c0392b)" } : undefined}
+        onClick={onOpen}
+      >
         <span className={label ? "" : "m-sheetselect-ph"}>
           {label || "Selecciona la categoría…"}
         </span>
@@ -340,13 +344,18 @@ function IncomeCatPicker({
   );
 }
 
-/** Campo "Categoría (sobre)": botón tipo SheetSelect que abre el picker agrupado. */
+/** Campo "Categoría (sobre)": botón que abre el picker; warning de clasificación a nivel campo. */
 function SobreField({ label, onOpen }: { label: string; onOpen: () => void }) {
   const error = useFormError("categoryId");
   return (
     <div className="m-qfield">
-      <div className="m-qlabel">Categoría</div>
-      <button type="button" className="m-inp m-sheetselect" onClick={onOpen}>
+      <div className="m-qlabel">Categoría *</div>
+      <button
+        type="button"
+        className="m-inp m-sheetselect"
+        style={error ? { borderColor: "var(--neg, #c0392b)" } : undefined}
+        onClick={onOpen}
+      >
         <span className={label ? "" : "m-sheetselect-ph"}>{label || "Selecciona un sobre…"}</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
           <path d="M6 9l6 6 6-6" />
