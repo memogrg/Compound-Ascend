@@ -239,11 +239,6 @@ function PortfolioPanel({
             <TipQ text="Base de costo total: cuánto has puesto en tus inversiones." />
           </div>
           <div className="val">{formatMoney(toDisplay(analytics.totalCostBasis), displayCurrency)}</div>
-          {investedSeries.length >= 2 ? (
-            <div className="invline">
-              <PerformanceChart data={investedSeries} currency={displayCurrency} height={88} tone="pos" />
-            </div>
-          ) : null}
         </div>
 
         <div className="card kpi">
@@ -290,6 +285,13 @@ function PortfolioPanel({
               displayCurrency,
             )}
           </div>
+          {/* Valor del portafolio en el tiempo: acá una línea que sube/baja es honesta (número y
+              línea son "valor"). El tono lo decide la dirección (último vs primero). */}
+          {investedSeries.length >= 2 ? (
+            <div className="invline">
+              <PerformanceChart data={investedSeries} currency={displayCurrency} height={88} />
+            </div>
+          ) : null}
         </div>
         <div className="card kpi">
           <div className="lab">Rentabilidad total acumulada</div>
