@@ -277,8 +277,20 @@ function PortfolioPanel({
         </div>
       </div>
 
-      {/* KPIs fila 2: acumulado · ingreso por flujo de caja */}
-      <div className="ind-grid two">
+      {/* KPIs fila 2: valor total · acumulado · ingreso por flujo de caja */}
+      <div className="ind-grid three">
+        <div className="card kpi">
+          <div className="lab">
+            Valor total de las inversiones
+            <TipQ text="Cuánto valen hoy todas tus inversiones sumadas, con ganancias o pérdidas incluidas." />
+          </div>
+          <div className="val">
+            {formatMoney(
+              toDisplay(analytics.totalCostBasis + analytics.totalProfitLoss),
+              displayCurrency,
+            )}
+          </div>
+        </div>
         <div className="card kpi">
           <div className="lab">Rentabilidad total acumulada</div>
           <div className="val" style={{ color: analytics.totalProfitLoss >= 0 ? "var(--pos)" : "var(--neg)" }}>
