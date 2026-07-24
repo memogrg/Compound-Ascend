@@ -164,7 +164,7 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
   },
   plan_inversion: {
     nature: "growth",
-    label: "Plan de inversión a plazo (unit-linked)",
+    label: "Plan de inversión a plazo",
     icon: "invest",
     defaultAssetType: "fondo",
     quoted: false,
