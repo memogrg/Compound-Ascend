@@ -8,7 +8,7 @@
  * Pasivo se elige "Alquileres" o "Dividendos", se dispara el sub-popup de stub
  * de inversión (camino único; sin el viejo <select> de subtype).
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
 import { CURRENCY_SYMBOL } from "@/lib/format";
@@ -145,6 +145,17 @@ export function RegisterIncomeModal({
   // `categoryId` de esta superficie ES la subcategoría de ingreso.
   const missingSub =
     !editing && !isManualEntryClassified({ kind: "ingreso", incomeCatId: categoryId || null });
+  // Warning "sticky" a nivel de campo (no botón mudo): aparece al intentar guardar y se va solo
+  // cuando el usuario elige la subcategoría.
+  const [subAttempted, setSubAttempted] = useState(false);
+  const showSubWarn = subAttempted && missingSub;
+  const subFieldRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showSubWarn) return;
+    const el = subFieldRef.current;
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    el?.querySelector<HTMLElement>("button")?.focus();
+  }, [showSubWarn]);
 
   const finish = (res: { ok: boolean; message?: string }, okMsg: string) => {
     setPending(false);
@@ -193,7 +204,11 @@ export function RegisterIncomeModal({
     const amt = Number(amount);
     if (!name.trim()) return setError("Ponle un nombre a la fuente.");
     if (!Number.isFinite(amt) || amt < 0) return setError("Ingresa un monto válido.");
-    if (missingSub) return setError("Elegí la subcategoría del ingreso.");
+    // Falta la subcategoría → no se guarda; el warning se ve a nivel de campo (no banner mudo).
+    if (missingSub) {
+      setSubAttempted(true);
+      return;
+    }
     setError(null);
     if (needsStub) {
       setAssetName((v) => v || name.trim());
@@ -364,9 +379,24 @@ export function RegisterIncomeModal({
             </div>
           </div>
 
-          <div className="fld">
-            <label className="fld-label">Subcategoría</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div className="fld" ref={subFieldRef}>
+            <label className="fld-label">
+              Subcategoría <span style={{ color: "var(--neg, #c0392b)" }}>*</span>
+            </label>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                ...(showSubWarn
+                  ? {
+                      outline: "1.5px solid var(--neg, #c0392b)",
+                      outlineOffset: 4,
+                      borderRadius: 8,
+                    }
+                  : {}),
+              }}
+            >
               {leaves.map((l) => (
                 <button
                   key={l.id}
@@ -461,6 +491,11 @@ export function RegisterIncomeModal({
                 Crearás una inversión vinculada que podrás completar luego en Patrimonio.
               </div>
             ) : null}
+            {showSubWarn ? (
+              <div role="alert" style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}>
+                Seleccioná una subcategoría para guardar
+              </div>
+            ) : null}
           </div>
 
           <div className="fld">
@@ -516,15 +551,10 @@ export function RegisterIncomeModal({
         </div>
 
         <div className="modal-foot">
-          {missingSub ? (
-            <span className="muted" style={{ fontSize: 12, marginRight: "auto" }}>
-              Elegí la subcategoría del ingreso.
-            </span>
-          ) : null}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn-primary" disabled={pending || missingSub}>
+          <button type="submit" className="btn btn-primary" disabled={pending}>
             {pending
               ? "Guardando…"
               : needsStub

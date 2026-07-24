@@ -181,6 +181,7 @@ export function SheetSelect({
   // scroll es la peor parte de esa hoja.
   const withSearch = options.length >= SEARCH_MIN_OPTIONS;
   const shown = withSearch && query.trim() ? options.filter((o) => matches(o.label, query)) : options;
+  const error = useFormError(name);
 
   const close = () => {
     setOpen(false);
@@ -189,7 +190,12 @@ export function SheetSelect({
 
   return (
     <Field name={name} label={label}>
-      <button type="button" className="m-inp m-sheetselect" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="m-inp m-sheetselect"
+        style={error ? { borderColor: "var(--neg, #c0392b)" } : undefined}
+        onClick={() => setOpen(true)}
+      >
         <span className={selected ? "" : "m-sheetselect-ph"}>{selected ? selected.label : placeholder}</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
           <path d="M6 9l6 6 6-6" />
