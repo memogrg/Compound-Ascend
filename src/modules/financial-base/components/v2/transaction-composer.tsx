@@ -29,6 +29,7 @@ import {
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { Account, TxnKind, LinkedKind } from "@/modules/financial-base/types";
 import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
+import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
 import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
 import type { TransactionTemplate } from "@/modules/financial-base/services/templates-service";
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
@@ -145,7 +146,7 @@ export function TransactionComposer({
   const activeGroup = tree.find((g) => g.id === groupId) ?? tree[0];
   const selectedCat = categoryId ? (flatById.get(categoryId) ?? null) : null;
 
-  // Categorías de ingreso (opcionales): hojas del árbol de ingresos.
+  // Categorías de ingreso (OBLIGATORIAS en registro manual): hojas del árbol de ingresos.
   const incomeCats = useMemo(() => incomeTree.flatMap((g) => g.children), [incomeTree]);
 
   // Vínculo entidad (Fase 2): la categoría sugiere el tipo; 1 tap elige cuál.
@@ -176,6 +177,21 @@ export function TransactionComposer({
   const effectiveSuggestionApplies =
     suggestion && !touchedCat && suggestion.categoryId !== categoryId;
 
+  // Registro manual COMPLETO: gasto/ingreso NO se guardan sin clasificar (nada cae en "Por
+  // clasificar" por registro manual). GASTO: un sobre (o una entidad vinculada, que ya trae su
+  // categoría de pago). INGRESO: una categoría de ingreso. TRANSFER/AJUSTE no llevan categoría.
+  const effectiveCatId =
+    effectiveSuggestionApplies && suggestion ? suggestion.categoryId : categoryId;
+  const missingCategory = !isManualEntryClassified({
+    kind,
+    categoryId: effectiveCatId,
+    linkedId: linkKind && effectiveLinkedId ? effectiveLinkedId : null,
+    incomeCatId,
+  });
+  const categoryHint = isIngreso
+    ? "Elegí la categoría del ingreso."
+    : "Elegí un sobre o una entidad para clasificar el gasto.";
+
   function applySuggestion(s: SuggestionEntry) {
     const cat = flatById.get(s.categoryId);
     setCategoryId(s.categoryId);
@@ -193,29 +209,47 @@ export function TransactionComposer({
     setTouchedCat(true);
   }
 
+  // Cambiar de tipo cierra el input de "Nueva categoría" (gasto e ingreso lo comparten).
+  function changeKind(k: TxnKind) {
+    setKind(k);
+    setNewCatOpen(false);
+  }
+
   // Chips optimistas de subcategorías recién creadas (hasta que llegue el
   // árbol fresco vía router.refresh).
   const [extraCats, setExtraCats] = useState<{ id: string; name: string; groupId: string }[]>([]);
+  // Categorías de ingreso creadas al vuelo (optimistas, hasta el árbol fresco).
+  const [extraIncomeCats, setExtraIncomeCats] = useState<{ id: string; name: string }[]>([]);
 
+  // Crea una categoría al vuelo (misma UX para gasto e ingreso): GASTO → subcategoría del grupo
+  // activo; INGRESO → categoría bajo el grupo de ingresos. Así exigir categoría nunca deja sin
+  // salida a quien todavía no tiene ninguna.
   async function createInlineCategory() {
     const name = newCatName.trim();
-    if (!name || !activeGroup) return;
+    const parentId = isIngreso ? (incomeTree[0]?.id ?? null) : (activeGroup?.id ?? null);
+    if (!name || !parentId) return;
     setNewCatPending(true);
     const res = await addCategoryAction({
       name,
-      parentId: activeGroup.id,
-      categoryType: "expense",
+      parentId,
+      categoryType: isIngreso ? "income" : "expense",
     });
     setNewCatPending(false);
     if (res.ok && res.id) {
-      setExtraCats((prev) => [...prev, { id: res.id!, name, groupId: activeGroup.id }]);
-      selectCategory(res.id);
+      if (isIngreso) {
+        setExtraIncomeCats((prev) => [...prev, { id: res.id!, name }]);
+        setSource(name);
+        setIncomeCatId(res.id);
+      } else {
+        setExtraCats((prev) => [...prev, { id: res.id!, name, groupId: parentId }]);
+        selectCategory(res.id);
+      }
       setNewCatOpen(false);
       setNewCatName("");
-      toast(`Subcategoría "${name}" creada`);
+      toast(`Categoría "${name}" creada`);
       router.refresh();
     } else {
-      toast(res.message ?? "No pudimos crear la subcategoría", "error");
+      toast(res.message ?? "No pudimos crear la categoría", "error");
     }
   }
 
@@ -259,6 +293,8 @@ export function TransactionComposer({
     e.preventDefault();
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) return setError("Ingresa un monto válido.");
+    // Defensa (el botón ya se deshabilita): gasto/ingreso manual necesitan categoría.
+    if (missingCategory) return setError(categoryHint);
     setPending(true);
     setError(null);
 
@@ -277,13 +313,12 @@ export function TransactionComposer({
         note: note || undefined,
       });
     } else {
-      const catId = effectiveSuggestionApplies && suggestion ? suggestion.categoryId : categoryId;
       res = await addTransactionAction({
         kind,
         amount: amt,
         currency: txnCurrency,
         occurredOn: date,
-        categoryId: isGasto ? catId || null : isIngreso ? incomeCatId : null,
+        categoryId: isGasto ? effectiveCatId || null : isIngreso ? incomeCatId : null,
         // Sin selector de cuenta: el servidor asigna la predeterminada.
         accountId: null,
         merchantOrSource: isGasto
@@ -366,28 +401,28 @@ export function TransactionComposer({
               <button
                 type="button"
                 className={`seg-btn ${isGasto ? "on" : ""}`}
-                onClick={() => setKind("gasto")}
+                onClick={() => changeKind("gasto")}
               >
                 <Icon name="expense" width={2} /> Gasto
               </button>
               <button
                 type="button"
                 className={`seg-btn ${isIngreso ? "on" : ""}`}
-                onClick={() => setKind("ingreso")}
+                onClick={() => changeKind("ingreso")}
               >
                 <Icon name="income" width={2} /> Ingreso
               </button>
               <button
                 type="button"
                 className={`seg-btn ${isTransfer ? "on" : ""}`}
-                onClick={() => setKind("transferencia")}
+                onClick={() => changeKind("transferencia")}
               >
                 <Icon name="repeat" width={2} /> Transferencia
               </button>
               <button
                 type="button"
                 className={`seg-btn ${isAdjust ? "on" : ""}`}
-                onClick={() => setKind("ajuste")}
+                onClick={() => changeKind("ajuste")}
               >
                 <Icon name="edit" width={2} /> Ajuste
               </button>
@@ -487,7 +522,7 @@ export function TransactionComposer({
 
               <div className="fld">
                 <label className="fld-label">
-                  Categoría{" "}
+                  Categoría <span style={{ color: "var(--neg, #c0392b)" }}>*</span>{" "}
                   {selectedCat ? <span className="cmp-picked">· {selectedCat.name}</span> : null}
                 </label>
                 <div className="cmp-groups">
@@ -625,38 +660,82 @@ export function TransactionComposer({
             </>
           ) : null}
 
-          {/* Ingreso: fuente (usa categorías de ingreso si existen) */}
+          {/* Ingreso: categoría OBLIGATORIA (la fuente = el nombre de la categoría). Si no hay
+              ninguna, se crea al vuelo — exigir no traba a quien no tiene categorías de ingreso. */}
           {isIngreso ? (
             <div className="fld">
-              <label className="fld-label">Fuente</label>
+              <label className="fld-label">
+                Categoría del ingreso <span style={{ color: "var(--neg, #c0392b)" }}>*</span>{" "}
+                {incomeCatId ? <span className="cmp-picked">· {source}</span> : null}
+              </label>
               <div className="chip-grid">
-                {incomeCats.length > 0
-                  ? incomeCats.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`chip-sel ${source === c.name ? "on" : ""}`}
-                        onClick={() => {
-                          setSource(c.name);
-                          setIncomeCatId(c.id);
-                        }}
-                      >
-                        {c.name}
-                      </button>
-                    ))
-                  : INCOME_SOURCES.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        className={`chip-sel ${source === s ? "on" : ""}`}
-                        onClick={() => {
-                          setSource(s);
-                          setIncomeCatId(null);
-                        }}
-                      >
-                        {s}
-                      </button>
-                    ))}
+                {incomeCats.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`chip-sel ${incomeCatId === c.id ? "on" : ""}`}
+                    onClick={() => {
+                      setSource(c.name);
+                      setIncomeCatId(c.id);
+                    }}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+                {extraIncomeCats
+                  .filter((e) => !incomeCats.some((c) => c.id === e.id))
+                  .map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      className={`chip-sel ${incomeCatId === e.id ? "on" : ""}`}
+                      onClick={() => {
+                        setSource(e.name);
+                        setIncomeCatId(e.id);
+                      }}
+                    >
+                      {e.name}
+                    </button>
+                  ))}
+                {/* Crear categoría de ingreso al vuelo (misma UX que el "+ Nueva" de gasto). */}
+                {!newCatOpen ? (
+                  <button
+                    type="button"
+                    className="chip-sel tip"
+                    data-tip="Crea una categoría de ingreso sin salir"
+                    style={{ borderStyle: "dashed", color: "var(--muted)" }}
+                    onClick={() => setNewCatOpen(true)}
+                  >
+                    <Icon name="plus" width={2} /> Nueva
+                  </button>
+                ) : (
+                  <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      className="inp"
+                      autoFocus
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      placeholder="Ej.: Salario, Freelance…"
+                      maxLength={60}
+                      style={{ padding: "5px 10px", fontSize: 12.5, width: 150 }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void createInlineCategory();
+                        }
+                        if (e.key === "Escape") setNewCatOpen(false);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="chip-sel"
+                      disabled={newCatPending || !newCatName.trim()}
+                      onClick={() => void createInlineCategory()}
+                    >
+                      {newCatPending ? "…" : "Crear"}
+                    </button>
+                  </span>
+                )}
               </div>
             </div>
           ) : null}
@@ -719,13 +798,19 @@ export function TransactionComposer({
         </div>
 
         <div className="modal-foot">
+          {/* Guía inline: por qué Guardar está deshabilitado (categoría faltante). */}
+          {missingCategory ? (
+            <span className="muted" style={{ fontSize: 12, marginRight: "auto" }}>
+              {categoryHint}
+            </span>
+          ) : null}
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancelar
           </button>
           <button
             type="submit"
             className={`btn ${isIngreso ? "btn-secondary" : "btn-primary"}`}
-            disabled={pending}
+            disabled={pending || missingCategory}
           >
             {pending ? (
               "Guardando…"

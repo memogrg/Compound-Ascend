@@ -115,6 +115,8 @@ export function AddSpendForm({
       submitLabel="Registrar gasto"
       successMessage="Gasto registrado"
       onSuccess={onSuccess}
+      disabled={!categoryId}
+      disabledHint="Elegí un sobre para registrar el gasto."
     >
       <MoneyField name="amount" label="Monto" value={amount} onChange={setAmount} currency={cur} />
       <SobreField

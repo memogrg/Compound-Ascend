@@ -27,6 +27,8 @@ export function FormShell<T>({
   successMessage = "Listo",
   onSuccess,
   children,
+  disabled = false,
+  disabledHint,
 }: {
   action: (raw: T) => Promise<ActionResult>;
   values: T;
@@ -35,6 +37,10 @@ export function FormShell<T>({
   successMessage?: string;
   onSuccess?: () => void;
   children: React.ReactNode;
+  /** Bloqueo de guardado del lado del cliente (p.ej. categoría obligatoria en registro manual). */
+  disabled?: boolean;
+  /** Texto que explica por qué no se puede guardar (se muestra cuando `disabled`). */
+  disabledHint?: string;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -68,6 +74,7 @@ export function FormShell<T>({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (disabled) return; // gate de cliente (categoría obligatoria en registro manual)
           submittedRef.current = true;
           // startTransition envuelve el dispatch de useActionState → isPending se actualiza
           // bien (evita el warning "called outside of a transition").
@@ -75,7 +82,17 @@ export function FormShell<T>({
         }}
       >
         {children}
-        <button type="submit" className="m-btn m-btn-block m-btn-primary" disabled={pending} style={{ marginTop: 6 }}>
+        {disabled && disabledHint && !pending ? (
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+            {disabledHint}
+          </p>
+        ) : null}
+        <button
+          type="submit"
+          className="m-btn m-btn-block m-btn-primary"
+          disabled={pending || disabled}
+          style={{ marginTop: 6 }}
+        >
           {pending ? pendingLabel : submitLabel}
         </button>
       </form>
