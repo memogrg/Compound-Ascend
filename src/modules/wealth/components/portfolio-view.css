@@ -39,8 +39,8 @@
 .invx .leg-row .pc { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
 
 /* ---- Investments table ---- */
-.invx .inv-th { display: grid; grid-template-columns: 2.2fr 1.4fr 1fr 1fr 1.2fr 36px; gap: 14px; padding: 12px 22px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
-.invx .inv-row { display: grid; grid-template-columns: 2.2fr 1.4fr 1fr 1fr 1.2fr 36px; gap: 14px; padding: 14px 22px; border-top: 1px solid var(--line); align-items: center; }
+.invx .inv-th { display: grid; grid-template-columns: 2.2fr 1.4fr 1fr 1fr 1fr 1.2fr 36px; gap: 14px; padding: 12px 22px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.invx .inv-row { display: grid; grid-template-columns: 2.2fr 1.4fr 1fr 1fr 1fr 1.2fr 36px; gap: 14px; padding: 14px 22px; border-top: 1px solid var(--line); align-items: center; }
 .invx .inv-row:first-of-type { border-top: 0; }
 .invx .inv-name { font-size: 13.5px; font-weight: 600; }
 .invx .inv-sub { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
@@ -72,6 +72,7 @@
   .invx .inv-th { display: none; }
   .invx .inv-row { grid-template-columns: 1fr auto auto; grid-auto-rows: auto; row-gap: 8px; }
   .invx .inv-row .c-aporte { display: none; }
+  .invx .inv-row .c-valor { display: none; }
 }
 
 /* ---- Compound calculator ---- */

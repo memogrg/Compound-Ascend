@@ -337,6 +337,7 @@ function PortfolioPanel({
           <div>Inversión</div>
           <div>Naturaleza / categoría</div>
           <div>Invertido</div>
+          <div className="c-valor">Valor actual</div>
           <div className="c-aporte">Aporte mensual</div>
           <div>Rendimiento</div>
           <div />
@@ -510,6 +511,9 @@ function InvRow({
   // analytics.holdingsWithPerformance viene normalizado a la moneda principal;
   // el dato nativo está en `raw` (averageCost en su moneda real).
   const nativeCostBasis = raw ? raw.quantity * raw.averageCost : h.costBasis;
+  // Valor actual en la moneda NATIVA de la fila: escala el costo nativo por el retorno acumulado
+  // (mismo patrón que la celda Rendimiento; el currentValue del engine está en la primaria).
+  const nativeCurrentValue = nativeCostBasis * (1 + h.returnPct);
   const periodRet = h.returnPct * periodFactor;
   const periodGain = nativeCostBasis * periodRet;
   const pos = periodRet >= 0;
@@ -563,6 +567,13 @@ function InvRow({
           {catLabel ? <div className="cell-sub" style={{ marginTop: 5 }}>{catLabel}</div> : null}
         </div>
         <div className="inv-amt">{formatMoney(nativeCostBasis, h.currency)}</div>
+        <div className="inv-amt c-valor">
+          {h.priceUnavailable ? (
+            <span className="muted">—</span>
+          ) : (
+            formatMoney(nativeCurrentValue, h.currency)
+          )}
+        </div>
         <div className="inv-amt c-aporte">
           {h.isRecurring && h.monthlyContribution ? (
             <>
