@@ -547,6 +547,38 @@ export function periodReturn(
   return { abs, pct: base > 0 ? abs / base : 0 };
 }
 
+export type PeriodReturnResult = { available: boolean; abs: number; pct: number };
+
+/**
+ * Rendimiento del periodo HONESTO: cambio de valor entre el INICIO del periodo y el valor ACTUAL.
+ *   baseline = valor al inicio del periodo = el snapshot con fecha más reciente ≤ `cutoff`.
+ *   abs = valorActual − baseline ;  pct = abs / baseline.
+ * Para "todo" (cutoff null) el baseline es el primer snapshot de la serie. Si NO hay baseline
+ * (ningún snapshot ≤ cutoff — p. ej. YTD sin snapshot de diciembre), available:false → la UI
+ * muestra "—/sin datos del periodo", NUNCA un +$0 engañoso. Corrige el bug de tomar como inicio
+ * el PRIMER snapshot DENTRO del periodo (que daba +$0 con snapshots planos o <2).
+ */
+export function periodReturnFromBaseline(
+  snapshots: { date: string; portfolioValue: number }[],
+  cutoff: string | null,
+  currentValue: number,
+): PeriodReturnResult {
+  if (snapshots.length === 0) return { available: false, abs: 0, pct: 0 };
+  const sorted = [...snapshots].sort((a, b) => a.date.localeCompare(b.date));
+  let baseline: number | null = null;
+  if (cutoff === null) {
+    baseline = sorted[0]!.portfolioValue; // "todo": desde el inicio de la serie
+  } else {
+    for (const s of sorted) {
+      if (s.date <= cutoff) baseline = s.portfolioValue; // el más reciente ≤ inicio del periodo
+      else break;
+    }
+  }
+  if (baseline === null) return { available: false, abs: 0, pct: 0 };
+  const abs = currentValue - baseline;
+  return { available: true, abs, pct: baseline > 0 ? abs / baseline : 0 };
+}
+
 /**
  * Colapsa el historial de valoraciones a solo los CAMBIOS: de cada corrida de valor igual
  * conserva la fecha MÁS TEMPRANA en que tomó ese valor (13/18/24-jul con el mismo monto → solo

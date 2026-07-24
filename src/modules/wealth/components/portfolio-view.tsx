@@ -21,7 +21,7 @@ import { convertCurrency } from "@/lib/fx";
 import {
   allocationByNature,
   allocationByCategory,
-  periodReturn,
+  periodReturnFromBaseline,
   cashflowMonthlyIncome,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { CATEGORY_META } from "@/modules/wealth/constants";
@@ -191,7 +191,10 @@ function PortfolioPanel({
   const [indPeriod, setIndPeriod] = useState<Period>("ytd");
   const [tablePeriod, setTablePeriod] = useState<Period>("ytd");
 
-  const retInd = useMemo(() => periodReturnFor(snapshots, indPeriod), [snapshots, indPeriod]);
+  const retInd = useMemo(
+    () => periodReturnFor(snapshots, indPeriod, analytics.totalPortfolioValue),
+    [snapshots, indPeriod, analytics.totalPortfolioValue],
+  );
 
   const investedSeries: AreaPoint[] = useMemo(() => {
     const cutoff = periodCutoff(indPeriod);
@@ -256,19 +259,30 @@ function PortfolioPanel({
         <div className="card kpi">
           <div className="lab">
             Rendimiento del periodo
-            <TipQ text="Cambio de valor del portafolio en el periodo elegido. Aún no descuenta aportes del periodo." />
+            <TipQ text="Valor actual menos el valor al inicio del periodo (snapshot más cercano). Aún no descuenta aportes del periodo." />
           </div>
-          <div className="val" style={{ color: retInd.abs >= 0 ? "var(--pos)" : "var(--neg)" }}>
-            {retInd.abs >= 0 ? "+" : ""}
-            {formatMoney(toDisplay(retInd.abs), displayCurrency)}
-          </div>
-          <div className="sub">
-            <span className={`delta ${retInd.abs >= 0 ? "up" : "down"}`}>
-              {retInd.abs >= 0 ? "+" : ""}
-              {formatPercent(retInd.pct)}
-            </span>
-            ganancia/pérdida
-          </div>
+          {retInd.available ? (
+            <>
+              <div className="val" style={{ color: retInd.abs >= 0 ? "var(--pos)" : "var(--neg)" }}>
+                {retInd.abs >= 0 ? "+" : "−"}
+                {formatMoney(toDisplay(Math.abs(retInd.abs)), displayCurrency)}
+              </div>
+              <div className="sub">
+                <span className={`delta ${retInd.abs >= 0 ? "up" : "down"}`}>
+                  {retInd.abs >= 0 ? "+" : "−"}
+                  {formatPercent(Math.abs(retInd.pct))}
+                </span>
+                ganancia/pérdida
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="val muted">—</div>
+              <div className="sub muted tip tip-wrap" data-tip="No hay snapshot al inicio de este periodo para comparar. Registrá inversiones y volvé más adelante.">
+                sin datos del periodo
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -370,13 +384,18 @@ function PortfolioPanel({
   );
 }
 
-/** Rendimiento del periodo a partir de snapshots filtrados (contributions=0). */
-function periodReturnFor(snapshots: PortfolioSnapshot[], period: Period): { abs: number; pct: number } {
+/**
+ * Rendimiento del periodo: valor ACTUAL − valor al INICIO del periodo (snapshot más cercano ≤
+ * cutoff). Sin baseline del periodo → available:false (la UI muestra "—", no un +$0 engañoso).
+ */
+function periodReturnFor(
+  snapshots: PortfolioSnapshot[],
+  period: Period,
+  currentValue: number,
+) {
   const cutoff = periodCutoff(period);
-  const pts = snapshots
-    .filter((s) => !cutoff || s.date >= cutoff)
-    .map((s) => ({ date: s.date, portfolioValue: s.portfolioValue }));
-  return periodReturn(pts, 0);
+  const pts = snapshots.map((s) => ({ date: s.date, portfolioValue: s.portfolioValue }));
+  return periodReturnFromBaseline(pts, cutoff, currentValue);
 }
 
 // ── Filtro de periodo (seg) ────────────────────────────────────────
