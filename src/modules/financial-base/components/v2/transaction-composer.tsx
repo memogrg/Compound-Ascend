@@ -112,8 +112,8 @@ export function TransactionComposer({
   const [merchant, setMerchant] = useState("");
   const [source, setSource] = useState<string>(INCOME_SOURCES[0]);
   const [incomeCatId, setIncomeCatId] = useState<string | null>(null);
-  // Cuentas: solo las transferencias eligen cuenta en la UI; en el resto el
-  // servidor asigna la predeterminada en silencio (Fase 7 · composer simple).
+  // Cuenta: la eligen las transferencias (Desde) y el ingreso (dónde entró la plata); en gasto/
+  // ajuste el servidor asigna la predeterminada en silencio.
   const [accountId, setAccountId] = useState(
     accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "",
   );
@@ -319,8 +319,9 @@ export function TransactionComposer({
         currency: txnCurrency,
         occurredOn: date,
         categoryId: isGasto ? effectiveCatId || null : isIngreso ? incomeCatId : null,
-        // Sin selector de cuenta: el servidor asigna la predeterminada.
-        accountId: null,
+        // Ingreso: la cuenta elegida (dónde entró la plata). Gasto/ajuste: null → el servidor
+        // asigna la predeterminada en silencio.
+        accountId: isIngreso ? accountId || null : null,
         merchantOrSource: isGasto
           ? merchant || undefined
           : isIngreso
@@ -737,6 +738,25 @@ export function TransactionComposer({
                   </span>
                 )}
               </div>
+            </div>
+          ) : null}
+
+          {/* Ingreso: cuenta donde ENTRÓ la plata (elegible; el resto usa la predeterminada). */}
+          {isIngreso ? (
+            <div className="fld">
+              <label className="fld-label">Cuenta</label>
+              <select
+                className="sel"
+                aria-label="Cuenta del ingreso"
+                value={accountId}
+                onChange={(e) => setAccountId(e.target.value)}
+              >
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
             </div>
           ) : null}
 

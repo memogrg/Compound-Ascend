@@ -116,6 +116,9 @@ export function TxnForm({
   const [note, setNote] = useState(initial?.description ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [incomePickerOpen, setIncomePickerOpen] = useState(false);
+  // Cuenta donde entró la plata (elegible en ingreso); gasto usa la predeterminada en silencio.
+  const [accountId, setAccountId] = useState<string>(initial?.accountId ?? defaultAccountId ?? "");
+  const accountOpts: Opt[] = accounts.map((a) => ({ value: a.id, label: a.name }));
 
   const isExpense = kind === "gasto";
   const allIncomeCats: IncomeCat[] = [
@@ -129,7 +132,7 @@ export function TxnForm({
     currency: cur,
     occurredOn: date,
     categoryId: isExpense ? categoryId : incomeCatId,
-    accountId: defaultAccountId,
+    accountId: accountId || null,
     merchantOrSource: isExpense ? (merchant.trim() === "" ? undefined : merchant.trim()) : source,
     description: note.trim() === "" ? undefined : note.trim(),
     status: "confirmed",
@@ -177,10 +180,22 @@ export function TxnForm({
       {isExpense ? (
         <SobreField label={sobreLabel} onOpen={() => setPickerOpen(true)} />
       ) : (
-        <IncomeCatField
-          label={incomeCatId ? source : ""}
-          onOpen={() => setIncomePickerOpen(true)}
-        />
+        <>
+          <IncomeCatField
+            label={incomeCatId ? source : ""}
+            onOpen={() => setIncomePickerOpen(true)}
+          />
+          {accountOpts.length > 0 ? (
+            <SheetSelect
+              name="accountId"
+              label="Cuenta"
+              value={accountId}
+              onChange={setAccountId}
+              options={accountOpts}
+              sheetTitle="Cuenta del ingreso"
+            />
+          ) : null}
+        </>
       )}
 
       {isExpense ? (
