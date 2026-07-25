@@ -7,6 +7,7 @@ import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { registerPurchaseExpense } from "./holdings-service";
+import { selectPlansToCharge } from "@/modules/wealth/engine/premiums";
 
 const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
   etf: "etf",
@@ -268,7 +269,19 @@ export async function ensureMonthlyPremiums(): Promise<void> {
     .or(`maturity_date.is.null,maturity_date.gte.${periodStart}`); // acota al vencimiento
   if (error || !plans) return;
 
-  for (const p of plans) {
+  // NO RECOBRAR: un mes ya adelantado (fila pre-creada por advancePremiums) o ya cobrado
+  // este periodo no se vuelve a cobrar. Se filtran explícitamente los planes que ya tienen
+  // fila en el periodo; la constraint única (holding_id, period) es el backstop final.
+  const { data: existing } = await supabase
+    .from("holding_contributions")
+    .select("holding_id")
+    .eq("user_id", user.id)
+    .eq("period_year", periodYear)
+    .eq("period_month", periodMonth)
+    .in("holding_id", plans.map((p) => p.id));
+  const alreadyCharged = new Set((existing ?? []).map((r) => r.holding_id));
+
+  for (const p of selectPlansToCharge(plans, alreadyCharged)) {
     try {
       const premium = Number(p.monthly_contribution);
       if (!(premium > 0)) continue;
