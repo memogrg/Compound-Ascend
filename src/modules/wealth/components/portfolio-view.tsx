@@ -16,7 +16,7 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useRouter } from "next/navigation";
-import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
+import { formatMoney, formatCompact, formatPercent, currencySymbol } from "@/lib/format";
 import { convertCurrency } from "@/lib/fx";
 import {
   allocationByNature,
@@ -183,6 +183,12 @@ function PortfolioPanel({
   );
   // Holdings CRUDOS para la edición/valoración (averageCost en su moneda real).
   const rawById = useMemo(() => new Map(report.holdings.map((h) => [h.id, h])), [report.holdings]);
+  // Hay al menos un holding en otra moneda → los agregados (que suman en display) llevan nota.
+  // Las filas se muestran en su moneda nativa, así que sin monedas mixtas la nota sería ruido.
+  const hasForeign = useMemo(
+    () => report.holdings.some((h) => h.currency !== displayCurrency),
+    [report.holdings, displayCurrency],
+  );
   const contribById = useMemo(
     () => new Map(openContributions.map((c) => [c.holdingId, c])),
     [openContributions],
@@ -229,7 +235,10 @@ function PortfolioPanel({
       <div className="bar-row">
         <div>
           <div className="card-title">Indicadores del portafolio</div>
-          <div className="card-sub">Rendimiento por periodo seleccionado</div>
+          <div className="card-sub">
+            Rendimiento por periodo seleccionado
+            {hasForeign ? ` · agregados convertidos a ${currencySymbol(displayCurrency)}` : ""}
+          </div>
         </div>
         <PeriodSeg value={indPeriod} onChange={setIndPeriod} label="Periodo de indicadores" />
       </div>
@@ -681,7 +690,19 @@ function InvRow({
           la conversión para MOSTRAR, y es lo correcto: en el detalle de UN holding la
           moneda que importa es la suya, no la de los agregados. */}
       {modal === "dashboard" && raw ? (
-        <HoldingDetailModal holding={raw} currentPrice={h.currentPrice ?? null} currency={currency} onClose={close} />
+        // Precio y moneda NATIVOS: el precio del engine (h.currentPrice) está en la primaria;
+        // el precio nativo por unidad = averageCost·(1+returnPct) (returnPct es invariante a la
+        // moneda). Para no cotizados va null → el modal usa el valor manual nativo de `raw`.
+        <HoldingDetailModal
+          holding={raw}
+          currentPrice={
+            h.currentPrice != null && !h.priceUnavailable
+              ? raw.averageCost * (1 + h.returnPct)
+              : null
+          }
+          currency={raw.currency}
+          onClose={close}
+        />
       ) : null}
       {modal === "valoracion" ? <ValuationModal holding={editHolding} onClose={close} /> : null}
       {modal === "eliminar" ? <DeleteModal holding={editHolding} onClose={close} /> : null}

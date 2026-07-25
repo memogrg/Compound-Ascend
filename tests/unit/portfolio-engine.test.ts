@@ -20,7 +20,7 @@ import {
   cashflowMonthlyIncome,
   periodReturn,
   periodReturnFromBaseline,
-  collapseValuationRuns,
+  monthlyValuations,
   investmentRate,
 } from "@/modules/wealth/engine/portfolio-engine";
 import { CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
@@ -620,33 +620,38 @@ describe("wealth · constants (listas por naturaleza)", () => {
   });
 });
 
-describe("collapseValuationRuns · historial de valoración (solo cambios)", () => {
+describe("monthlyValuations · historial de valoración (una fila por mes)", () => {
   const v = (asOf: string, value: number) => ({ id: asOf, asOf, value });
 
-  it("colapsa corridas de valor igual a la fecha MÁS TEMPRANA", () => {
-    // 13/18/24-jul con el mismo monto → solo 13-jul.
-    const out = collapseValuationRuns([v("2026-07-13", 100), v("2026-07-18", 100), v("2026-07-24", 100)]);
-    expect(out.map((x) => x.asOf)).toEqual(["2026-07-13"]);
+  it("deja la ÚLTIMA valoración de cada mes", () => {
+    // Tres valoraciones de julio que difieren por unos colones (antes se veían idénticas tras
+    // redondear) → una sola fila, la más reciente (24-jul, 700480).
+    const out = monthlyValuations([
+      v("2026-07-13", 700000),
+      v("2026-07-18", 700150),
+      v("2026-07-24", 700480),
+    ]);
+    expect(out.map((x) => [x.asOf, x.value])).toEqual([["2026-07-24", 700480]]);
   });
 
-  it("conserva cada cambio, en el primer punto de cada corrida", () => {
-    const out = collapseValuationRuns([
-      v("2026-07-13", 100),
-      v("2026-07-18", 100),
-      v("2026-07-20", 120), // cambia
-      v("2026-07-24", 120),
-      v("2026-07-28", 90), // cambia
+  it("una fila por mes calendario, en orden ascendente", () => {
+    const out = monthlyValuations([
+      v("2026-06-05", 90),
+      v("2026-06-28", 95), // último de junio
+      v("2026-07-10", 100),
+      v("2026-07-30", 110), // último de julio
+      v("2026-08-02", 120), // único de agosto
     ]);
     expect(out.map((x) => [x.asOf, x.value])).toEqual([
-      ["2026-07-13", 100],
-      ["2026-07-20", 120],
-      ["2026-07-28", 90],
+      ["2026-06-28", 95],
+      ["2026-07-30", 110],
+      ["2026-08-02", 120],
     ]);
   });
 
-  it("si todas son iguales, deja una sola fila; vacío → vacío", () => {
-    expect(collapseValuationRuns([v("2026-07-01", 50)]).length).toBe(1);
-    expect(collapseValuationRuns([])).toEqual([]);
+  it("una sola valoración → una fila; vacío → vacío", () => {
+    expect(monthlyValuations([v("2026-07-01", 50)]).length).toBe(1);
+    expect(monthlyValuations([])).toEqual([]);
   });
 })
 
