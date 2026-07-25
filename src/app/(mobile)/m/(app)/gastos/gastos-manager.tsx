@@ -1044,7 +1044,14 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
               />
             ))
           : jar.items.map((it) => (
-              <MDataRow key={it.id} dense title={it.name} subtitle={it.sub} value={it.amount} />
+              <MDataRow
+                key={it.id}
+                dense
+                title={it.name}
+                // Aporte del mes ya adelantado (plan a plazo): no se cobra este mes.
+                subtitle={it.advanced ? "Adelantado · no se cobra este mes" : it.sub}
+                value={it.advanced ? "—" : it.amount}
+              />
             ))}
       </div>
 

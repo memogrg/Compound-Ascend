@@ -273,6 +273,7 @@ function BudgetItemRow({
   const budget = it.budget ?? 0;
   const spent = it.spent ?? 0;
   const remaining = it.remaining ?? budget - spent;
+  const advanced = it.advanced ?? false;
   const over = budget > 0 && spent > budget;
   const color = over ? "var(--neg)" : jarColor;
   const extra = it.extraordinary ?? 0;
@@ -304,35 +305,55 @@ function BudgetItemRow({
           </div>
         </div>
         <div style={{ textAlign: "right", flex: "none" }}>
-          <div className="tnum" style={{ fontSize: 13, fontWeight: 600 }}>
-            {formatMoney(budget, currency)}
-          </div>
-          <div className="muted" style={{ fontSize: 10.5 }}>
-            {labels.unit}
-          </div>
+          {advanced ? (
+            <span
+              className="chip"
+              style={{ fontSize: 10, background: "var(--info-soft, var(--chip))", color: "var(--info)" }}
+            >
+              Adelantado
+            </span>
+          ) : (
+            <>
+              <div className="tnum" style={{ fontSize: 13, fontWeight: 600 }}>
+                {formatMoney(budget, currency)}
+              </div>
+              <div className="muted" style={{ fontSize: 10.5 }}>
+                {labels.unit}
+              </div>
+            </>
+          )}
         </div>
       </div>
-      <div className="bar-track">
-        <div className="bar-fill" style={{ width: `${pct(spent, budget)}%`, background: color }} />
-      </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 11.5,
-          color: "var(--muted)",
-        }}
-      >
-        <span style={over ? { color: "var(--neg)" } : undefined}>
-          {formatMoney(spent, currency)} {labels.done}
-        </span>
-        <span>
-          {over
-            ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
-            : `${formatMoney(remaining, currency)} restante`}
-        </span>
-      </div>
-      {extra > 0 ? (
+      {advanced ? (
+        // Aporte del mes ya pagado por adelantado: sin barra ni brecha (no se cobra este mes).
+        <div className="muted" style={{ fontSize: 11.5 }}>
+          Ya pagado por adelantado · no se cobra este mes.
+        </div>
+      ) : (
+        <>
+          <div className="bar-track">
+            <div className="bar-fill" style={{ width: `${pct(spent, budget)}%`, background: color }} />
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 11.5,
+              color: "var(--muted)",
+            }}
+          >
+            <span style={over ? { color: "var(--neg)" } : undefined}>
+              {formatMoney(spent, currency)} {labels.done}
+            </span>
+            <span>
+              {over
+                ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
+                : `${formatMoney(remaining, currency)} restante`}
+            </span>
+          </div>
+        </>
+      )}
+      {!advanced && extra > 0 ? (
         <span
           className="chip"
           style={{
