@@ -8,8 +8,8 @@
  * total del portafolio. El gráfico dual no tiene componente reutilizable (el
  * área chart solo dibuja una serie), por eso se traza inline con tokens.
  */
-import { useMemo, useState } from "react";
-import { formatMoney, formatCompact, CURRENCY_OPTIONS } from "@/lib/format";
+import { useEffect, useMemo, useState } from "react";
+import { formatMoney, formatCompact, currencySymbol, CURRENCY_OPTIONS } from "@/lib/format";
 
 type Projection = {
   finalValue: number;
@@ -77,8 +77,8 @@ export function CompoundCalculator({ defaultCapital, currency }: { defaultCapita
           </div>
         </div>
 
-        <Slider label="Capital inicial" display={formatMoney(capital, curr)} min={0} max={100000} step={1000} value={capital} onChange={setCapital} />
-        <Slider label="Aporte mensual" display={formatMoney(monthly, curr)} min={0} max={5000} step={50} value={monthly} onChange={setMonthly} />
+        <MoneySlider label="Capital inicial" currency={curr} min={0} sliderMax={100000} step={1000} value={capital} onChange={setCapital} />
+        <MoneySlider label="Aporte mensual" currency={curr} min={0} sliderMax={5000} step={50} value={monthly} onChange={setMonthly} />
         <Slider label="Rendimiento anual" display={`${rate}%`} min={1} max={20} step={0.5} value={rate} onChange={setRate} />
         <Slider label="Plazo" display={`${years} años`} min={1} max={40} step={1} value={years} onChange={setYears} />
       </div>
@@ -149,6 +149,67 @@ function Slider({
         <span className="vv">{display}</span>
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} />
+    </div>
+  );
+}
+
+/**
+ * Campo de dinero: input numérico editable (el valor REAL, puede superar el tope del
+ * slider) sincronizado con un slider que queda como ayuda visual. Valida número ≥ 0.
+ */
+function MoneySlider({
+  label,
+  currency,
+  min,
+  sliderMax,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  currency: string;
+  min: number;
+  sliderMax: number;
+  step: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  // Texto editable independiente del número: permite estados intermedios ("", "1.")
+  // mientras se escribe. Se re-sincroniza si el valor cambia por fuera ("Usar mis datos").
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+
+  const commit = (raw: string) => {
+    setText(raw);
+    const n = Number(raw.replace(/[^\d.]/g, ""));
+    if (Number.isFinite(n) && n >= 0) onChange(n); // el input manda: puede pasar sliderMax
+  };
+
+  return (
+    <div className="calc-fld">
+      <span className="calc-fld-label">
+        {label}
+        <span className="calc-money">
+          <span className="pre">{currencySymbol(currency)}</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={text}
+            onChange={(e) => commit(e.target.value)}
+            onBlur={() => setText(String(value))}
+            aria-label={`${label} (monto exacto)`}
+          />
+        </span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={sliderMax}
+        step={step}
+        value={Math.min(value, sliderMax)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label}
+      />
     </div>
   );
 }

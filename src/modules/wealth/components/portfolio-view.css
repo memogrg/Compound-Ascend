@@ -93,6 +93,12 @@
 .invx .calc-stat .k { font-size: 11px; color: var(--muted); }
 .invx .calc-stat .v { font-family: var(--font-display); font-weight: var(--figure-weight); font-size: 22px; letter-spacing: -0.02em; margin-top: 5px; }
 
+/* Input de dinero editable (valor exacto, puede superar el tope del slider) */
+.invx .calc-money { display: inline-flex; align-items: center; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; }
+.invx .calc-money:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.invx .calc-money .pre { color: var(--muted); font-family: var(--font-mono); font-size: 12px; }
+.invx .calc-money input { border: 0; background: transparent; outline: none; width: 84px; text-align: right; color: var(--accent); font-family: var(--font-mono); font-size: 13px; font-weight: 600; padding: 2px 0; }
+
 /* ---- Fund monitor ---- */
 .invx .mon-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 .invx .mon-search { display: flex; align-items: center; gap: 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 9px 13px; flex: 1; min-width: 200px; }
