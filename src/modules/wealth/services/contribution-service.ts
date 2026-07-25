@@ -7,7 +7,7 @@ import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { registerPurchaseExpense } from "./holdings-service";
-import { selectPlansToCharge } from "@/modules/wealth/engine/premiums";
+import { selectPlansToCharge, planPaidUntil, type PlanPeriod } from "@/modules/wealth/engine/premiums";
 
 const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
   etf: "etf",
@@ -125,6 +125,34 @@ export async function ensureMonthlyContributions(): Promise<void> {
       console.error(`[ensureMonthlyContributions] error en holding ${h.id}:`, err);
     }
   }
+}
+
+/**
+ * Mes hasta el que las cuotas de un plan a plazo están al día, derivado de las filas
+ * de holding_contributions (sin columna nueva): el periodo más alto con aporte, topado al
+ * vencimiento. Devuelve null si el plan aún no tiene aportes. Para el detalle del plan.
+ */
+export async function getPlanPaidUntil(holdingId: string): Promise<PlanPeriod | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
+  const [{ data: rows }, { data: plan }] = await Promise.all([
+    supabase
+      .from("holding_contributions")
+      .select("period_year, period_month")
+      .in("user_id", memberIds)
+      .eq("holding_id", holdingId),
+    supabase
+      .from("investment_holdings")
+      .select("maturity_date")
+      .eq("id", holdingId)
+      .maybeSingle(),
+  ]);
+  const periods: PlanPeriod[] = (rows ?? []).map((r) => ({
+    year: r.period_year,
+    month: r.period_month,
+  }));
+  return planPaidUntil(periods, plan?.maturity_date ?? null);
 }
 
 export type OpenContribution = {

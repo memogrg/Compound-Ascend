@@ -45,7 +45,8 @@ import {
   type Period,
 } from "@/modules/wealth/services/holding-history-service";
 import type { Holding } from "@/modules/wealth/types";
-import { adjustContributionPrice, advancePremiums } from "@/modules/wealth/services/contribution-service";
+import { adjustContributionPrice, advancePremiums, getPlanPaidUntil } from "@/modules/wealth/services/contribution-service";
+import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
 import { setDesiredMonthlyLifestyle } from "@/modules/wealth/services/lifestyle-service";
 import { logger } from "@/lib/logger";
@@ -447,6 +448,16 @@ export async function adjustContributionPriceAction(
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos actualizar el precio del aporte." };
+  }
+}
+
+/** Mes hasta el que las cuotas del plan están al día (o null si aún no hay aportes). */
+export async function getPlanPaidUntilAction(holdingId: string): Promise<PlanPeriod | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    return await getPlanPaidUntil(holdingId);
+  } catch {
+    return null;
   }
 }
 
