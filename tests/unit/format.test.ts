@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatMoney, formatCompact, CURRENCY_SYMBOL } from "@/lib/format";
+import { formatMoney, formatCompact, formatAxisCompact, CURRENCY_SYMBOL } from "@/lib/format";
 
 /**
  * Blindaje de la POLÍTICA ÚNICA de formato numérico (ver el bloque de doc en
@@ -65,6 +65,28 @@ describe("abreviación: sufijo único y coherente", () => {
 
   it("no abrevia por debajo de 10.000", () => {
     expect(formatCompact(1950, "CRC")).toBe("₡1.950");
+  });
+});
+
+describe("formatAxisCompact: UN token, sin la palabra 'mil' (eje angosto)", () => {
+  it("usa K/M/B pegados, sin 'mil' ni espacio", () => {
+    expect(formatAxisCompact(607000, "CRC")).toBe("₡607K");
+    expect(formatAxisCompact(1200000, "CRC")).toBe("₡1,2M");
+    expect(formatAxisCompact(163300, "CRC")).toBe("₡163,3K");
+    expect(formatAxisCompact(2e12, "CRC")).toBe("₡2B");
+  });
+
+  it("omite el decimal cuando no aporta y conserva el símbolo de la moneda", () => {
+    expect(formatAxisCompact(5000000, "USD")).toBe("$5M");
+    expect(formatAxisCompact(700000, "CRC")).toBe("₡700K");
+  });
+
+  it("negativos con el signo delante del símbolo", () => {
+    expect(formatAxisCompact(-1200000, "CRC")).toBe("−₡1,2M");
+  });
+
+  it("por debajo de 1.000 no abrevia (cae a formatMoney)", () => {
+    expect(formatAxisCompact(500, "CRC")).toBe("₡500");
   });
 });
 

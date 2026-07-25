@@ -144,3 +144,27 @@ export function formatCompact(amount: number, currency: string): string {
   const body = `${prefixOf(currency)}${formatAbs(scaled, dec)}${step.suffix}`;
   return amount < 0 ? `${MINUS}${body}` : body;
 }
+
+/** Escalones para etiquetas de EJE: sufijo de UN token (K/M/B), sin espacio ni la palabra
+ *  "mil" — que es lo que desborda en un eje angosto. B = billón (10¹²) como en formatCompact. */
+const AXIS_STEPS: { min: number; div: number; suffix: string }[] = [
+  { min: 1e12, div: 1e12, suffix: "B" },
+  { min: 1e6, div: 1e6, suffix: "M" },
+  { min: 1e3, div: 1e3, suffix: "K" },
+];
+
+/**
+ * Etiqueta compacta para EJES de gráficas: "₡607K", "$1,2M". Un solo token (nunca "163,3 mil",
+ * que se parte en un eje de ~46px). Conserva el símbolo de moneda y la gramática es-CR (coma
+ * decimal). Por debajo de 1.000 no abrevia (₡500). Solo presentación de ejes — no toca cálculos.
+ */
+export function formatAxisCompact(amount: number, currency: string): string {
+  const abs = Math.abs(amount);
+  const step = AXIS_STEPS.find((s) => abs >= s.min);
+  if (!step) return formatMoney(amount, currency);
+  const scaled = abs / step.div;
+  // Un decimal solo si aporta: 1,2M pero 607K (no "607,0K").
+  const dec = Math.round(scaled * 10) % 10 === 0 ? 0 : 1;
+  const body = `${prefixOf(currency)}${formatAbs(scaled, dec)}${step.suffix}`;
+  return amount < 0 ? `${MINUS}${body}` : body;
+}

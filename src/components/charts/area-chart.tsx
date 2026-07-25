@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { formatMoney, formatCompact } from "@/lib/format";
+import { formatMoney, formatAxisCompact } from "@/lib/format";
 import { niceDomain } from "./scale";
 import { ChartEmpty } from "./chart-empty";
 
@@ -57,7 +57,7 @@ export function PerformanceChart({
   axes = "compact",
 }: PerformanceChartProps) {
   const fmt = formatValue ?? ((v: number) => formatMoney(v, currency));
-  const fmtTick = formatValue ?? ((v: number) => formatCompact(v, currency));
+  const fmtTick = formatValue ?? ((v: number) => formatAxisCompact(v, currency));
   const reactId = useId();
   if (data.length < 2) {
     return <ChartEmpty message="No hay suficiente historial para mostrar la gráfica." height={height} />;
@@ -72,9 +72,6 @@ export function PerformanceChart({
   const showAxes = axes !== "none";
   const full = axes === "full";
   const yTicks = full ? 5 : 3;
-  // Eje compacto (mini-charts de ~88px): más ancho para no recortar "163,3 mil" y padding de
-  // dominio para que la línea no toque los bordes. El modo `full` queda igual.
-  const yWidth = full ? 46 : 52;
   const values = data.map((d) => d.value);
   if (costBasis !== undefined) values.push(costBasis);
   if (goalValue !== undefined) values.push(goalValue);
@@ -114,16 +111,22 @@ export function PerformanceChart({
                 vertical={false}
               />
             )}
-            {showAxes && (
+            {/* Eje Y con ETIQUETAS solo en gráficas grandes (`full`). Los sparklines compactos
+                llevan el mismo dominio (con padding) pero OCULTO: así la línea no toca los bordes
+                y no se pinta un eje angosto que solo se parte ("163,3 mil"). El número grande de
+                la card ya da la magnitud. */}
+            {full ? (
               <YAxis
                 domain={domain}
-                width={yWidth}
+                width={48}
                 tickCount={yTicks}
-                tick={{ ...TICK, fill: "var(--muted)", fontSize: full ? 10.5 : 9.5 }}
+                tick={{ ...TICK, fill: "var(--muted)", fontSize: 10.5 }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => fmtTick(Number(v))}
               />
+            ) : (
+              <YAxis domain={domain} hide />
             )}
             {showAxes && (
               <XAxis
