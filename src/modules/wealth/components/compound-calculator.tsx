@@ -117,6 +117,8 @@ export function CompoundCalculator({ defaultCapital, currency }: { defaultCapita
             <div className="v">{multiplier.toFixed(1).replace(".", ",")}×</div>
           </div>
         </div>
+        <AnnualTable series={proj.series} contrib={proj.contribSeries} currency={curr} />
+
         <p className="muted" style={{ fontSize: 11, marginTop: 12 }}>
           Proyección informativa · no es una recomendación de inversión. Total estimado en {formatCompact(proj.finalValue, curr)}.
         </p>
@@ -149,6 +151,51 @@ function Slider({
         <span className="vv">{display}</span>
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} />
+    </div>
+  );
+}
+
+/**
+ * Tabla anual: una fila por año reusando proj.series/contribSeries (no recalcula).
+ * Aportado y valor total salen directo; el interés compuesto es su diferencia.
+ */
+function AnnualTable({
+  series,
+  contrib,
+  currency,
+}: {
+  series: number[];
+  contrib: number[];
+  currency: string;
+}) {
+  if (series.length < 2) return null;
+  return (
+    <div className="calc-table-wrap">
+      <table className="calc-table">
+        <thead>
+          <tr>
+            <th>Año</th>
+            <th className="num">Capital aportado</th>
+            <th className="num">Interés compuesto</th>
+            <th className="num">Valor total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {series.map((total, i) => {
+            if (i === 0) return null; // fila 0 = inicio (sin año cumplido)
+            const aportado = contrib[i] ?? 0;
+            const interes = total - aportado;
+            return (
+              <tr key={i}>
+                <td>{i}</td>
+                <td className="num">{formatMoney(aportado, currency)}</td>
+                <td className="num pos">{formatMoney(interes, currency)}</td>
+                <td className="num total">{formatMoney(total, currency)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
