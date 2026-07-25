@@ -21,10 +21,12 @@ import {
   listHoldingValuationsAction,
   recordHoldingValuationAction,
   advancePremiumsAction,
+  getPlanPaidUntilAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
+import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { Holding, Dividend, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type { Period, HoldingPurchase, HoldingValuation } from "@/modules/wealth/services/holding-history-service";
 
@@ -114,6 +116,7 @@ export function HoldingDetailModal({
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [linkedDebt, setLinkedDebt] = useState<LinkableDebt | null>(null);
   const [valuations, setValuations] = useState<HoldingValuation[]>([]);
+  const [paidUntil, setPaidUntil] = useState<PlanPeriod | null>(null);
   const [valDate, setValDate] = useState(new Date().toISOString().slice(0, 10));
   const [valAmount, setValAmount] = useState("");
   const [savingVal, setSavingVal] = useState(false);
@@ -179,7 +182,10 @@ export function HoldingDetailModal({
 
   // Load valores del estado de cuenta (solo planes a plazo)
   useEffect(() => {
-    if (isPlan) void listHoldingValuationsAction(holding.id).then(setValuations);
+    if (isPlan) {
+      void listHoldingValuationsAction(holding.id).then(setValuations);
+      void getPlanPaidUntilAction(holding.id).then(setPaidUntil);
+    }
   }, [holding.id, isPlan]);
 
   // Deuda ligada (C-1b): muestra quién financia el inmueble. Solo si hay debtId.
@@ -385,6 +391,19 @@ export function HoldingDetailModal({
               <span style={{ color: "var(--muted)" }}>Primas</span>
               <span>{primasPagadas} de {termMonths}</span>
             </div>
+            {paidUntil ? (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+                <span
+                  style={{ color: "var(--muted)", cursor: "help" }}
+                  title="El último mes con cuota registrada, incluyendo las que adelantaste. No pasa del vencimiento del plan."
+                >
+                  Cuotas al día hasta ⓘ
+                </span>
+                <span style={{ fontWeight: 600 }}>
+                  {formatMonthYear(`${paidUntil.year}-${String(paidUntil.month).padStart(2, "0")}`)}
+                </span>
+              </div>
+            ) : null}
             <div style={{ marginTop: 10 }}>
               {!advOpen ? (
                 <button className="btn btn-secondary" onClick={() => setAdvOpen(true)}>

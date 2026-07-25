@@ -6,6 +6,7 @@ import "server-only";
  * vinculables con monto; convierte cada monto a la moneda de visualización y
  * delega el armado a la función pura buildExpenseJars (engine, testeable).
  */
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { formatMoney } from "@/lib/format";
@@ -134,17 +135,38 @@ export async function getExpenseJars(args: {
  * veces.
  */
 export async function getEntityFallbackBudget(period: Period, currency: string): Promise<number> {
-  const [detailed, rates, bySource] = await Promise.all([
+  const [detailed, rates, bySource, advancedIds] = await Promise.all([
     listLinkableEntitiesDetailed(),
     getFxRates(),
     getLinkedBudgetBySource(period, "holding"),
+    getAdvancedHoldingIds(period),
   ]);
   let total = 0;
   for (const e of [...detailed.holding, ...detailed.rental]) {
     if (bySource[e.id] != null) continue; // ya cuenta vía budget_items
+    if (advancedIds.has(e.id)) continue; // mes adelantado: no se cobra este mes
     total += convertCurrency(e.amount, e.currency, currency, rates);
   }
   return total;
+}
+
+/**
+ * Holdings cuyo aporte de este periodo ya se pagó por ADELANTADO (planes a plazo): tienen
+ * una fila en holding_contributions del periodo SIN transaction_id (advancePremiums no lo
+ * setea; ensureMonthlyPremiums sí). Se usa para no cobrar/planificar el aporte otra vez y
+ * marcar la fila "adelantado" en Gastos. SELECT ligero con RLS (mismo patrón que
+ * linkable-entities: financial-base no importa wealth para evitar el ciclo).
+ */
+export async function getAdvancedHoldingIds(period: Period): Promise<Set<string>> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from("holding_contributions")
+    .select("holding_id")
+    .eq("period_year", period.year)
+    .eq("period_month", period.month)
+    .eq("status", "confirmado")
+    .is("transaction_id", null);
+  return new Set((data ?? []).map((r) => r.holding_id));
 }
 
 /**
@@ -162,7 +184,7 @@ export async function getExpenseJarsAsOf(args: {
 }): Promise<Jar[]> {
   const cutoff: Period = { ...args.period, to: args.asOf };
   const [budget, real, debtBudget, debtSpent, debtExtra, deudasCatId, goalBudget, goalSpent,
-    holdingSpent, policyBudget, policySpent, personalization] =
+    holdingSpent, policyBudget, policySpent, personalization, advancedHoldingIds] =
     await Promise.all([
       getBudgetTotals(args.period),
       getRealTotals(cutoff),
@@ -183,6 +205,8 @@ export async function getExpenseJarsAsOf(args: {
       getLinkedSpentByEntity(cutoff, "policy"),
       // Bases ocultas: solo para etiquetar el motivo en "Por reasignar".
       getCategoryPersonalization(),
+      // Planes con el aporte del mes ya adelantado → no se cobra este mes.
+      getAdvancedHoldingIds(args.period),
     ]);
 
   // La línea derivada de metas nace con categoryId NULL, pero Registrar gasto
@@ -214,6 +238,8 @@ export async function getExpenseJarsAsOf(args: {
       holding: {
         bySource: {}, // sin budget_items: cae a e.amount (el aporte) en el engine
         spentById: holdingSpent,
+        // Meses adelantados: budget 0 + marca "adelantado" (no se cobra este mes).
+        advancedIds: advancedHoldingIds,
         paymentCategoryId: libertadCatId,
       },
       policy: {

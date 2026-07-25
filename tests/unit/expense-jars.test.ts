@@ -47,6 +47,11 @@ const AHORRO: CategoryNode = {
   children: [],
 };
 
+const LIBERTAD: CategoryNode = {
+  ...cat({ id: "g_lib", key: "g_libertad", name: "Libertad Financiera", color: "var(--c-invest)" }),
+  children: [],
+};
+
 describe("buildExpenseJars (Fase frascos)", () => {
   it("frasco normal: sobres = favoritas + propias del usuario; sugerencias = no-favoritas ∪ benchmark", () => {
     const budget: KeyedTotals = { viv_serv: { label: "Servicios general", value: 100 } };
@@ -144,6 +149,44 @@ describe("buildExpenseJars (Fase frascos)", () => {
     expect(d2.remaining).toBe(80000);
 
     expect(jar.totals).toEqual({ budget: 130000, spent: 20000, remaining: 110000 });
+  });
+
+  it("frasco Libertad: un mes adelantado pone budget 0 y marca 'advanced' (no se cobra)", () => {
+    const entities: JarEntities = {
+      ...NO_ENTITIES,
+      holding: [
+        { id: "h1", name: "Plan A", sub: "aporte mensual", amount: 50000, currency: "CRC" },
+        { id: "h2", name: "ETF B", sub: "aporte mensual", amount: 30000, currency: "CRC" },
+      ],
+    };
+    const jar = buildExpenseJars({
+      tree: [LIBERTAD],
+      budgetByKey: {},
+      realByKey: {},
+      entities,
+      fmt,
+      linkedBudget: {
+        holding: {
+          bySource: {},
+          spentById: {},
+          advancedIds: new Set(["h1"]), // Plan A: aporte del mes ya adelantado
+          paymentCategoryId: "cat-lib",
+        },
+      },
+    })[0]!;
+    if (jar.kind !== "linked") throw new Error("linked");
+
+    const h1 = jar.items.find((i) => i.id === "h1")!;
+    expect(h1.advanced).toBe(true);
+    expect(h1.budget).toBe(0); // adelantado: no se cobra este mes
+    expect(h1.remaining).toBe(0);
+
+    const h2 = jar.items.find((i) => i.id === "h2")!;
+    expect(h2.advanced).toBe(false);
+    expect(h2.budget).toBe(30000); // aporte normal
+
+    // El total del frasco NO incluye el aporte adelantado (no se duplica el gasto del mes).
+    expect(jar.totals!.budget).toBe(30000);
   });
 
   // Este test existe por un defecto real: la tarjeta de Inicio decía 80% ejecutado y la

@@ -15,8 +15,10 @@ import {
   addRentalIncomeAction,
   removeRentalPaymentAction,
   adjustContributionPriceAction,
+  getPlanPaidUntilAction,
 } from "@/modules/wealth/api/actions";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
+import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
   HistoryPoint,
@@ -131,6 +133,7 @@ export function HoldingDetailSheet({
   const [purchases, setPurchases] = useState<HoldingPurchase[]>([]);
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [valuations, setValuations] = useState<HoldingValuation[]>([]);
+  const [paidUntil, setPaidUntil] = useState<PlanPeriod | null>(null);
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,6 +192,9 @@ export function HoldingDetailSheet({
       jobs.push(
         listHoldingValuationsAction(holding.id).then((v) => {
           if (alive) setValuations(v);
+        }),
+        getPlanPaidUntilAction(holding.id).then((p) => {
+          if (alive) setPaidUntil(p);
         }),
       );
     }
@@ -626,6 +632,21 @@ export function HoldingDetailSheet({
             ) : null}
 
             {/* Valuaciones (solo planes a plazo) */}
+            {plan && paidUntil ? (
+              <div
+                className="between"
+                style={{ marginBottom: 12 }}
+                title="El último mes con cuota registrada, incluyendo las que adelantaste. No pasa del vencimiento del plan."
+              >
+                <span className="muted" style={{ fontSize: 12.5 }}>
+                  Cuotas al día hasta
+                </span>
+                <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>
+                  {formatMonthYear(`${paidUntil.year}-${String(paidUntil.month).padStart(2, "0")}`)}
+                </span>
+              </div>
+            ) : null}
+
             {plan ? (
               <div>
                 <div className="sec-title" style={{ marginBottom: 6 }}>

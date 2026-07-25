@@ -40,6 +40,9 @@ export type JarItem = {
   remaining?: number;
   /** Parte del gastado que fue pago extraordinario (abono a capital). */
   extraordinary?: number;
+  /** true = el aporte de este mes ya se pagó por adelantado (plan a plazo): no se cobra
+   *  este mes. El presupuesto de la fila se pone en 0 para no contar el aporte dos veces. */
+  advanced?: boolean;
   /** Categoría (frasco) del ahorro; se usa para agrupar en secciones. */
   categoryId?: string | null;
   /** Moneda NATIVA de la entidad vinculada (deuda/meta). El resto de importes de este item
@@ -183,6 +186,9 @@ export type LinkedBudgetData = {
   spentById: Record<string, number>; // entityId → pagado en el periodo
   /** entityId → pagado extraordinario (subconjunto de spentById). */
   extraordinaryById?: Record<string, number>;
+  /** entityIds cuyo aporte de este mes ya se pagó por adelantado (planes a plazo): su
+   *  presupuesto del mes es 0 (no se cobra) y la UI lo marca "adelantado". */
+  advancedIds?: ReadonlySet<string>;
   paymentCategoryId: string | null;
 };
 /** Config por linkedKind; solo los presentes se vuelven budget-aware. */
@@ -399,7 +405,10 @@ export function buildExpenseJars(args: {
         // Budget-aware: cada obligación trae cuota (línea derivada, fallback al
         // monto de la entidad), pagado del periodo y restante. Totales = suma.
         const items: JarItem[] = entityList.map((e) => {
-          const budget = lb.bySource[e.id] ?? e.amount;
+          // Mes ya adelantado (plan a plazo): no se cobra este mes → presupuesto 0, para no
+          // sumar el aporte al gasto del mes cuando ya se pagó por adelantado.
+          const advanced = lb.advancedIds?.has(e.id) ?? false;
+          const budget = advanced ? 0 : (lb.bySource[e.id] ?? e.amount);
           const spent = lb.spentById[e.id] ?? 0;
           return {
             id: e.id,
@@ -411,6 +420,7 @@ export function buildExpenseJars(args: {
             spent,
             remaining: budget - spent,
             extraordinary: lb.extraordinaryById?.[e.id] ?? 0,
+            advanced,
             categoryId: e.categoryId ?? null,
             currency: e.currency,
           };
