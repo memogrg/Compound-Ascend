@@ -116,6 +116,18 @@ export function HoldingDetailSheet({
   const cur = holding.currency || currency;
   const name = holding.label || holding.symbol || "Inversión";
 
+  // Importes en la moneda NATIVA del holding (de `raw`), derivados del retorno del engine
+  // (invariante a la moneda) — sin reconvertir. `holding.costBasis/currentValue/profitLoss`
+  // vienen en la moneda principal; el detalle de UN holding se muestra en SU moneda.
+  const nativeCostBasis = raw.quantity * raw.averageCost;
+  const nativeCurrentValue = nativeCostBasis * (1 + holding.returnPct);
+  const nativeProfitLoss = nativeCurrentValue - nativeCostBasis;
+  // Precio nativo por unidad = averageCost·(1+returnPct); null en no cotizados (usan valor manual).
+  const nativePrice =
+    holding.currentPrice != null && !holding.priceUnavailable
+      ? raw.averageCost * (1 + holding.returnPct)
+      : null;
+
   const [purchases, setPurchases] = useState<HoldingPurchase[]>([]);
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [valuations, setValuations] = useState<HoldingValuation[]>([]);
@@ -168,7 +180,7 @@ export function HoldingDetailSheet({
         listDividendsAction(holding.id).then((d) => {
           if (alive) setDividends(d);
         }),
-        getHoldingHistoryAction(holding, holding.currentPrice ?? null, "all").then((h) => {
+        getHoldingHistoryAction(holding, nativePrice, "all").then((h) => {
           if (alive) setHistory(h);
         }),
       );
@@ -193,7 +205,7 @@ export function HoldingDetailSheet({
     return () => {
       alive = false;
     };
-  }, [holding, quoted, plan, rental]);
+  }, [holding, quoted, plan, rental, nativePrice]);
 
   // Precio promedio acumulado tras cada compra (mismo cálculo que la web).
   let cumAmount = 0;
@@ -486,18 +498,18 @@ export function HoldingDetailSheet({
                     Precio no disponible
                   </div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                    Invertido {formatMoney(holding.costBasis, currency)} · no pudimos cotizarlo ahora.
+                    Invertido {formatMoney(nativeCostBasis, cur)} · no pudimos cotizarlo ahora.
                   </div>
                 </>
               ) : (
                 <>
                   <div className="mono" style={{ fontSize: 19, fontWeight: 700, marginTop: 4 }}>
-                    {formatMoney(holding.currentValue, currency)}
+                    {formatMoney(nativeCurrentValue, cur)}
                   </div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                    Invertido {formatMoney(holding.costBasis, currency)} ·{" "}
-                    {holding.profitLoss >= 0 ? "+" : "−"}
-                    {formatMoney(Math.abs(holding.profitLoss), currency)}
+                    Invertido {formatMoney(nativeCostBasis, cur)} ·{" "}
+                    {nativeProfitLoss >= 0 ? "+" : "−"}
+                    {formatMoney(Math.abs(nativeProfitLoss), cur)}
                   </div>
                 </>
               )}

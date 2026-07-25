@@ -3,7 +3,7 @@ import {
   ensureMonthlyContributions,
   listOpenContributions,
 } from "@/modules/wealth/services/contribution-service";
-import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
+import { formatMoney, formatCompact, formatPercent, currencySymbol } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MobileHeader } from "../../components/mobile-header";
 import {
@@ -50,6 +50,9 @@ export default async function MobileInversiones() {
   // tenía este apaño (`rawById`); el móvil no, y por eso "Editar" —su único camino para
   // registrar una compra adicional— precargaba mal.
   const rawHoldings = report.holdings;
+  // Algún holding en otra moneda → los totales (que se suman en la primaria) llevan nota.
+  // Las filas y el detalle se muestran en su moneda nativa; sin monedas mixtas la nota sobra.
+  const hasForeign = rawHoldings.some((h) => h.currency !== currency);
   const gain = a.totalProfitLoss;
   // 0 no es ni ganancia ni pérdida: sin signo y en neutro (como en Ingresos/Ahorro, donde
   // "+₡0" verde sugería que ibas por encima). >0 gana (verde), <0 pierde (rojo).
@@ -81,8 +84,13 @@ export default async function MobileInversiones() {
                 : `${gainDir > 0 ? "Ganas" : "Pierdes"} ${formatMoney(Math.abs(gain), currency)} sobre ${formatMoney(a.totalCostBasis, currency)} invertidos.`
               : "Registra tu primera inversión para seguir su rendimiento."
           }
-          style={{ marginBottom: 16 }}
+          style={{ marginBottom: hasForeign ? 6 : 16 }}
         />
+        {hasForeign ? (
+          <div className="muted" style={{ fontSize: 11.5, marginBottom: 16, lineHeight: 1.4 }}>
+            Los totales del portafolio están convertidos a {currencySymbol(currency)}; cada inversión se ve en su moneda.
+          </div>
+        ) : null}
 
         {/* Métricas: los 4 KPI que iban sueltos en el hero. Retornos con color semántico. */}
         {holdings.length > 0 && (

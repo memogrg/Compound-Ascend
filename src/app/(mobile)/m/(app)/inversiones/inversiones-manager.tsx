@@ -86,7 +86,11 @@ export function InversionesManager({
             const badge = h.symbol ? h.symbol.slice(0, 4).toUpperCase() : null;
             // 0 no es ni ganancia ni pérdida: sin signo, en neutro (no verde).
             const dir = h.returnPct > 0 ? 1 : h.returnPct < 0 ? -1 : 0;
-            // El valor ya viene en la moneda primaria (portfolio-service); no se reconvierte.
+            // Valor en la moneda NATIVA del holding (de `raw`): h.currentValue viene en la
+            // primaria; el nativo = costo nativo·(1+returnPct) (returnPct invariante a la moneda).
+            const rw = rawById.get(h.id);
+            const rowCurrency = rw?.currency ?? currency;
+            const rowValue = rw ? rw.quantity * rw.averageCost * (1 + h.returnPct) : h.currentValue;
             return (
               <SwipeRow key={h.id} onEdit={() => { const r = rawById.get(h.id); if (r) setEditH(r); }} onDelete={() => setDeleteH(h)}>
                 {/* Tocar la fila abre el detalle (con su sparkline R5); el chevron lo indica.
@@ -131,7 +135,7 @@ export function InversionesManager({
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end" }}>
-                        <span>{mAmount(h.currentValue, currency, 10)}</span>
+                        <span>{mAmount(rowValue, rowCurrency, 10)}</span>
                         <span className={dir > 0 ? "pos" : dir < 0 ? "neg" : "muted"} style={{ fontSize: 11 }}>
                           {dir > 0 ? "+" : dir < 0 ? "−" : ""}
                           {formatPercent(Math.abs(h.returnPct), 1)}
