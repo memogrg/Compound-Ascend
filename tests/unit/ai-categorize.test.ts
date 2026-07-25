@@ -260,7 +260,7 @@ function fakeClient(cfg: FakeCfg) {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const asClient = (c: ReturnType<typeof fakeClient>) => c as any;
 const EXPENSE_LEAF = { category_type: "expense", is_active: true };
 
@@ -337,7 +337,7 @@ describe("selectableSobresByFrasco", () => {
     id: "x", key: null, name: "X", defaultNature: null, parentId: null, icon: null, color: null,
     isFavorite: false, isEssential: false, isActive: true, isSystem: true, categoryType: "expense",
     sortOrder: 0, linkedKind: null, ...over,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
   }) as any;
 
   it("cada sobre HOJA lleva el nombre de su frasco (padre)", () => {
@@ -425,7 +425,7 @@ describe("isConfiguredSobre / filterConfiguredSobreTree", () => {
       id: "x", key: null, name: "X", defaultNature: null, parentId: null, icon: null, color: null,
       isFavorite: false, isEssential: false, isActive: true, isSystem: true, categoryType: "expense",
       sortOrder: 0, linkedKind: null, ...over,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
     }) as any;
     const tree = [
       {
