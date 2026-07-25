@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatMoney, formatCompact, formatAxisCompact, CURRENCY_SYMBOL } from "@/lib/format";
+import { formatMoney, formatCompact, formatAxisCompact, formatMonthYear, CURRENCY_SYMBOL } from "@/lib/format";
 
 /**
  * Blindaje de la POLÍTICA ÚNICA de formato numérico (ver el bloque de doc en
@@ -87,6 +87,19 @@ describe("formatAxisCompact: UN token, sin la palabra 'mil' (eje angosto)", () =
 
   it("por debajo de 1.000 no abrevia (cae a formatMoney)", () => {
     expect(formatAxisCompact(500, "CRC")).toBe("₡500");
+  });
+});
+
+describe("formatMonthYear: 'Mes Año' determinista desde ISO", () => {
+  it("YYYY-MM-DD → 'Jul 2026'", () => {
+    expect(formatMonthYear("2026-07-13")).toBe("Jul 2026");
+    expect(formatMonthYear("2026-01-31")).toBe("Ene 2026");
+    expect(formatMonthYear("2025-12-01")).toBe("Dic 2025");
+  });
+
+  it("acepta YYYY-MM y deja intacto lo que no matchea", () => {
+    expect(formatMonthYear("2026-03")).toBe("Mar 2026");
+    expect(formatMonthYear("sin fecha")).toBe("sin fecha");
   });
 });
 

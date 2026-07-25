@@ -580,17 +580,21 @@ export function periodReturnFromBaseline(
 }
 
 /**
- * Colapsa el historial de valoraciones a solo los CAMBIOS: de cada corrida de valor igual
- * conserva la fecha MÁS TEMPRANA en que tomó ese valor (13/18/24-jul con el mismo monto → solo
- * 13-jul). Puro; el input debe venir ordenado por fecha ASCENDENTE. Si todas son iguales, deja
- * una sola fila (la primera). Solo para la LISTA del historial, no para la curva del chart.
+ * Agrega el historial de valoraciones a UNA fila por MES: de cada mes calendario conserva la
+ * ÚLTIMA valoración (la más reciente de ese mes). Puro; el input debe venir ordenado por fecha
+ * ASCENDENTE (`asOf` en ISO YYYY-MM-DD). Reemplaza a la vieja "colapsar corridas iguales", que
+ * dejaba filas visualmente idénticas cuando dos valores diferían por unos colones (mismo texto
+ * tras redondear). El resultado sale ASCENDENTE; la lista lo invierte para mostrar lo más nuevo
+ * arriba. Solo para la LISTA del historial, no para la curva del chart.
  */
-export function collapseValuationRuns<T extends { value: number }>(valuationsAsc: T[]): T[] {
-  const out: T[] = [];
+export function monthlyValuations<T extends { asOf: string }>(valuationsAsc: T[]): T[] {
+  // Map preserva el orden de inserción y, como el input es ascendente, la última asignación de
+  // cada clave (YYYY-MM) es la valoración más reciente del mes.
+  const byMonth = new Map<string, T>();
   for (const v of valuationsAsc) {
-    if (out.length === 0 || out[out.length - 1]!.value !== v.value) out.push(v);
+    byMonth.set(v.asOf.slice(0, 7), v);
   }
-  return out;
+  return [...byMonth.values()];
 }
 
 /**

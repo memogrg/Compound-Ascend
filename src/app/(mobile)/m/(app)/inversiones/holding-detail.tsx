@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent, formatMonthYear } from "@/lib/format";
 import {
   listHoldingPurchasesAction,
   listDividendsAction,
@@ -16,7 +16,7 @@ import {
   removeRentalPaymentAction,
   adjustContributionPriceAction,
 } from "@/modules/wealth/api/actions";
-import { collapseValuationRuns } from "@/modules/wealth/engine/portfolio-engine";
+import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
   HistoryPoint,
@@ -634,12 +634,12 @@ export function HoldingDetailSheet({
                       currency={cur}
                     />
                     <div className="card" style={{ padding: 0 }}>
-                      {/* Solo los CAMBIOS de valoración (corridas iguales colapsan a su fecha más
-                          temprana). La curva de arriba conserva todos los puntos. */}
-                      {[...collapseValuationRuns(valuations)].reverse().map((v) => (
+                      {/* Una fila por MES (la última valoración de cada mes). La curva de arriba
+                          conserva todos los puntos. */}
+                      {[...monthlyValuations(valuations)].reverse().map((v) => (
                         <div key={v.id} className="between" style={{ padding: "9px 12px" }}>
                           <span className="muted" style={{ fontSize: 12 }}>
-                            {v.asOf}
+                            {formatMonthYear(v.asOf)}
                           </span>
                           <span className="mono" style={{ fontSize: 13, fontWeight: 600 }}>
                             {formatMoney(v.value, v.currency)}

@@ -122,6 +122,18 @@ export function formatPercent(ratio: number, decimals = 0): string {
   return `${(ratio * 100).toFixed(decimals)}%`;
 }
 
+const MONTHS_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+/**
+ * Etiqueta "Mes Año" a partir de un ISO YYYY-MM-DD (o YYYY-MM): "2026-07-13" → "Jul 2026".
+ * Determinista (no usa Intl ni Date): parsea la cadena, así es idéntica en servidor y cliente.
+ */
+export function formatMonthYear(iso: string): string {
+  const m = /^(\d{4})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${MONTHS_SHORT[Number(m[2]) - 1] ?? ""} ${m[1]}`;
+}
+
 /** Escalones de abreviación. "mil"/"M" es como se lee en voz alta en es-CR. */
 const COMPACT_STEPS: { min: number; div: number; suffix: string }[] = [
   { min: 1e12, div: 1e12, suffix: " B" },
