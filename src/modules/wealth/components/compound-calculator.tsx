@@ -8,8 +8,8 @@
  * total del portafolio. El gráfico dual no tiene componente reutilizable (el
  * área chart solo dibuja una serie), por eso se traza inline con tokens.
  */
-import { useMemo, useState } from "react";
-import { formatMoney, formatCompact } from "@/lib/format";
+import { useEffect, useMemo, useState } from "react";
+import { formatMoney, formatCompact, currencySymbol, CURRENCY_OPTIONS } from "@/lib/format";
 
 type Projection = {
   finalValue: number;
@@ -45,6 +45,9 @@ export function CompoundCalculator({ defaultCapital, currency }: { defaultCapita
   const [monthly, setMonthly] = useState(500);
   const [rate, setRate] = useState(8);
   const [years, setYears] = useState(20);
+  // Moneda de la proyección: default la de visualización. Sin FX — es una proyección
+  // hipotética; los montos se interpretan en la moneda elegida y solo cambia el formato.
+  const [curr, setCurr] = useState(currency);
 
   const proj = useMemo(() => project(capital, monthly, rate, years), [capital, monthly, rate, years]);
   const multiplier = proj.contributed > 0 ? proj.finalValue / proj.contributed : 0;
@@ -54,13 +57,28 @@ export function CompoundCalculator({ defaultCapital, currency }: { defaultCapita
       <div className="card card-pad">
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 18 }}>
           <div className="card-title" style={{ fontSize: 15 }}>Calculadora de interés compuesto</div>
-          <button type="button" className="btn btn-secondary" onClick={() => setCapital(Math.round(defaultCapital))} disabled={defaultCapital <= 0}>
-            Usar mis datos
-          </button>
+          <div className="row" style={{ gap: 8, alignItems: "center" }}>
+            <select
+              className="sel"
+              value={curr}
+              onChange={(e) => setCurr(e.target.value)}
+              aria-label="Moneda de la proyección"
+              style={{ width: 92 }}
+            >
+              {CURRENCY_OPTIONS.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.code}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn btn-secondary" onClick={() => setCapital(Math.round(defaultCapital))} disabled={defaultCapital <= 0}>
+              Usar mis datos
+            </button>
+          </div>
         </div>
 
-        <Slider label="Capital inicial" display={formatMoney(capital, currency)} min={0} max={100000} step={1000} value={capital} onChange={setCapital} />
-        <Slider label="Aporte mensual" display={formatMoney(monthly, currency)} min={0} max={5000} step={50} value={monthly} onChange={setMonthly} />
+        <MoneySlider label="Capital inicial" currency={curr} min={0} sliderMax={100000} step={1000} value={capital} onChange={setCapital} />
+        <MoneySlider label="Aporte mensual" currency={curr} min={0} sliderMax={5000} step={50} value={monthly} onChange={setMonthly} />
         <Slider label="Rendimiento anual" display={`${rate}%`} min={1} max={20} step={0.5} value={rate} onChange={setRate} />
         <Slider label="Plazo" display={`${years} años`} min={1} max={40} step={1} value={years} onChange={setYears} />
       </div>
@@ -69,7 +87,7 @@ export function CompoundCalculator({ defaultCapital, currency }: { defaultCapita
         <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10 }}>
           <div>
             <div className="label" style={{ fontSize: 11.5, color: "var(--muted)" }}>Valor final proyectado</div>
-            <div className="num-xl" style={{ fontSize: 44, marginTop: 8 }}>{formatMoney(proj.finalValue, currency)}</div>
+            <div className="num-xl" style={{ fontSize: 44, marginTop: 8 }}>{formatMoney(proj.finalValue, curr)}</div>
           </div>
           <span className="status-pill live"><span className="d" />Interés compuesto</span>
         </div>
@@ -88,19 +106,21 @@ export function CompoundCalculator({ defaultCapital, currency }: { defaultCapita
         <div className="calc-out">
           <div className="calc-stat">
             <div className="k">Total aportado</div>
-            <div className="v">{formatMoney(proj.contributed, currency)}</div>
+            <div className="v">{formatMoney(proj.contributed, curr)}</div>
           </div>
           <div className="calc-stat">
             <div className="k">Interés ganado</div>
-            <div className="v" style={{ color: "var(--pos)" }}>{formatMoney(proj.interest, currency)}</div>
+            <div className="v" style={{ color: "var(--pos)" }}>{formatMoney(proj.interest, curr)}</div>
           </div>
           <div className="calc-stat">
             <div className="k">Multiplicador</div>
             <div className="v">{multiplier.toFixed(1).replace(".", ",")}×</div>
           </div>
         </div>
+        <AnnualTable series={proj.series} contrib={proj.contribSeries} currency={curr} />
+
         <p className="muted" style={{ fontSize: 11, marginTop: 12 }}>
-          Proyección informativa · no es una recomendación de inversión. Total estimado en {formatCompact(proj.finalValue, currency)}.
+          Proyección informativa · no es una recomendación de inversión. Total estimado en {formatCompact(proj.finalValue, curr)}.
         </p>
       </div>
     </div>
@@ -131,6 +151,112 @@ function Slider({
         <span className="vv">{display}</span>
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} />
+    </div>
+  );
+}
+
+/**
+ * Tabla anual: una fila por año reusando proj.series/contribSeries (no recalcula).
+ * Aportado y valor total salen directo; el interés compuesto es su diferencia.
+ */
+function AnnualTable({
+  series,
+  contrib,
+  currency,
+}: {
+  series: number[];
+  contrib: number[];
+  currency: string;
+}) {
+  if (series.length < 2) return null;
+  return (
+    <div className="calc-table-wrap">
+      <table className="calc-table">
+        <thead>
+          <tr>
+            <th>Año</th>
+            <th className="num">Capital aportado</th>
+            <th className="num">Interés compuesto</th>
+            <th className="num">Valor total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {series.map((total, i) => {
+            if (i === 0) return null; // fila 0 = inicio (sin año cumplido)
+            const aportado = contrib[i] ?? 0;
+            const interes = total - aportado;
+            return (
+              <tr key={i}>
+                <td>{i}</td>
+                <td className="num">{formatMoney(aportado, currency)}</td>
+                <td className="num pos">{formatMoney(interes, currency)}</td>
+                <td className="num total">{formatMoney(total, currency)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * Campo de dinero: input numérico editable (el valor REAL, puede superar el tope del
+ * slider) sincronizado con un slider que queda como ayuda visual. Valida número ≥ 0.
+ */
+function MoneySlider({
+  label,
+  currency,
+  min,
+  sliderMax,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  currency: string;
+  min: number;
+  sliderMax: number;
+  step: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  // Texto editable independiente del número: permite estados intermedios ("", "1.")
+  // mientras se escribe. Se re-sincroniza si el valor cambia por fuera ("Usar mis datos").
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+
+  const commit = (raw: string) => {
+    setText(raw);
+    const n = Number(raw.replace(/[^\d.]/g, ""));
+    if (Number.isFinite(n) && n >= 0) onChange(n); // el input manda: puede pasar sliderMax
+  };
+
+  return (
+    <div className="calc-fld">
+      <span className="calc-fld-label">
+        {label}
+        <span className="calc-money">
+          <span className="pre">{currencySymbol(currency)}</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={text}
+            onChange={(e) => commit(e.target.value)}
+            onBlur={() => setText(String(value))}
+            aria-label={`${label} (monto exacto)`}
+          />
+        </span>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={sliderMax}
+        step={step}
+        value={Math.min(value, sliderMax)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label}
+      />
     </div>
   );
 }

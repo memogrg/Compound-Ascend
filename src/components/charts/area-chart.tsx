@@ -137,6 +137,11 @@ export function PerformanceChart({
                 axisLine={false}
                 tickLine={false}
                 dy={4}
+                // Padding para que las etiquetas de los extremos ("Inicio"/"Hoy") NO se
+                // recorten: en compact no hay eje Y que dé aire a la izquierda, así que la
+                // primera etiqueta se centraba en x≈0 y se cortaba ("nicio"). Insetar los
+                // ticks las deja completas y de paso la línea respira (se ve intencional).
+                padding={{ left: full ? 0 : 16, right: full ? 4 : 14 }}
                 tickFormatter={axisDateLabel}
               />
             )}
