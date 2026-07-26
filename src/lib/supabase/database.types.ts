@@ -608,6 +608,24 @@ export type HoldingContributionRow = Timestamps & Audited & {
   transaction_id: string | null;
 };
 
+// Alertas de precio de inversiones cotizadas (migración 20260725000001).
+export type PriceAlertRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  holding_id: string | null;
+  symbol: string;
+  asset_type: string;
+  target_price: number;
+  currency: string;
+  direction: string;
+  active: boolean;
+  one_shot: boolean;
+  triggered_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // Historial de valores del estado de cuenta de un plan a plazo (migración 20260712000001).
 export type HoldingValuationRow = Audited & {
   id: string;
@@ -945,6 +963,7 @@ export interface Database {
       investments: UserTable<InvestmentRow>;
       investment_holdings: UserTable<InvestmentHoldingRow>;
       holding_contributions: UserTable<HoldingContributionRow>;
+      price_alerts: UserTable<PriceAlertRow>;
       holding_valuations: UserTable<HoldingValuationRow>;
       watchlist_symbols: UserTable<WatchlistSymbolRow>;
       investment_transactions: UserTable<InvestmentTransactionRow>;
