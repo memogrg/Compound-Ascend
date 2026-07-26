@@ -608,7 +608,7 @@ export type HoldingContributionRow = Timestamps & Audited & {
   transaction_id: string | null;
 };
 
-// Alertas de precio de inversiones cotizadas (migración 20260725000001).
+// Alertas de precio de inversiones cotizadas (migración 20260731000001).
 export type PriceAlertRow = {
   id: string;
   user_id: string;
