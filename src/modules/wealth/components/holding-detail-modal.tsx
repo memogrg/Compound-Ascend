@@ -25,6 +25,7 @@ import {
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
+import { PriceAlertSection } from "@/modules/wealth/components/price-alert-section";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { Holding, Dividend, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
@@ -494,6 +495,16 @@ export function HoldingDetailModal({
             </div>
           </div>
         )}
+
+        {/* Alerta de precio (solo cotizados con símbolo) */}
+        {!isRental && holding.symbol ? (
+          <PriceAlertSection
+            holdingId={holding.id}
+            symbol={holding.symbol}
+            assetType={holding.assetType}
+            currency={holding.currency}
+          />
+        ) : null}
 
         {/* Compras: historial + promedio acumulado (solo cotizados) */}
         {!isRental && purchases.length > 0 && (
