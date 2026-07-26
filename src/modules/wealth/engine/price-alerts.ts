@@ -36,3 +36,23 @@ export function distinctSymbolFetches<T extends { symbol: string; assetType: str
   }
   return out;
 }
+
+/** Clave del mapa de precios: símbolo (MAYÚS) + tipo, para no cruzar el mismo ticker de tipos distintos. */
+export function priceKey(symbol: string, assetType: string): string {
+  return `${symbol.toUpperCase()}|${assetType}`;
+}
+
+/**
+ * Alertas que DEBEN dispararse: las que tienen precio y cruzaron su objetivo. Una alerta sin
+ * precio (símbolo malo / proveedor caído) simplemente no dispara — nunca rompe el barrido.
+ * El llamador solo pasa alertas ACTIVAS, así que una one_shot ya disparada (inactiva) no llega
+ * acá → no re-dispara.
+ */
+export function selectTriggeredAlerts<
+  T extends { symbol: string; assetType: string; direction: AlertDirection; targetPrice: number },
+>(alerts: T[], priceByKey: ReadonlyMap<string, { price: number }>): T[] {
+  return alerts.filter((a) => {
+    const quote = priceByKey.get(priceKey(a.symbol, a.assetType));
+    return quote !== undefined && crossed(a.direction, quote.price, a.targetPrice);
+  });
+}

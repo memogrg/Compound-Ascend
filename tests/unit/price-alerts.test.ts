@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { crossed, distinctSymbolFetches } from "@/modules/wealth/engine/price-alerts";
+import {
+  crossed,
+  distinctSymbolFetches,
+  selectTriggeredAlerts,
+  priceKey,
+} from "@/modules/wealth/engine/price-alerts";
 
 describe("crossed · dispara al cruzar el objetivo", () => {
   it("above: dispara cuando el precio alcanza o supera el objetivo", () => {
@@ -45,5 +50,51 @@ describe("distinctSymbolFetches · un fetch por símbolo (dedup)", () => {
 
   it("vacío → vacío", () => {
     expect(distinctSymbolFetches([])).toEqual([]);
+  });
+});
+
+describe("selectTriggeredAlerts · qué alertas dispara el cron", () => {
+  const alert = (symbol: string, assetType: string, direction: "above" | "below", targetPrice: number) => ({
+    id: `${symbol}-${direction}-${targetPrice}`,
+    symbol,
+    assetType,
+    direction,
+    targetPrice,
+  });
+
+  it("dispara la above y la below que cruzaron; deja las que no", () => {
+    const alerts = [
+      alert("BTC", "cripto", "above", 80000), // precio 81000 → dispara
+      alert("BTC", "cripto", "above", 90000), // precio 81000 → NO
+      alert("AAPL", "accion", "below", 200), // precio 195 → dispara
+      alert("AAPL", "accion", "below", 180), // precio 195 → NO
+    ];
+    const prices = new Map([
+      [priceKey("BTC", "cripto"), { price: 81000 }],
+      [priceKey("AAPL", "accion"), { price: 195 }],
+    ]);
+    expect(selectTriggeredAlerts(alerts, prices).map((a) => a.id)).toEqual([
+      "BTC-above-80000",
+      "AAPL-below-200",
+    ]);
+  });
+
+  it("un símbolo SIN precio no dispara y no rompe (best-effort)", () => {
+    const alerts = [
+      alert("BTC", "cripto", "above", 80000), // con precio → dispara
+      alert("XXX", "accion", "above", 10), // sin precio → se salta
+    ];
+    const prices = new Map([[priceKey("BTC", "cripto"), { price: 81000 }]]);
+    const out = selectTriggeredAlerts(alerts, prices);
+    expect(out.map((a) => a.id)).toEqual(["BTC-above-80000"]);
+  });
+
+  it("solo recibe alertas activas → una one_shot ya disparada no está y no re-dispara", () => {
+    // El cron pasa solo activas; simulamos que la ya-disparada no llega a la lista.
+    const soloActivas = [alert("BTC", "cripto", "above", 80000)];
+    const prices = new Map([[priceKey("BTC", "cripto"), { price: 81000 }]]);
+    expect(selectTriggeredAlerts(soloActivas, prices)).toHaveLength(1);
+    // Sin activas (la one_shot ya se desactivó) → nada dispara.
+    expect(selectTriggeredAlerts([], prices)).toEqual([]);
   });
 });
