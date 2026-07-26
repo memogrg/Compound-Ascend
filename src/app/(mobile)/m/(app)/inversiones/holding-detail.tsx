@@ -16,9 +16,14 @@ import {
   removeRentalPaymentAction,
   adjustContributionPriceAction,
   getPlanPaidUntilAction,
+  listPriceAlertsAction,
+  createPriceAlertAction,
+  deletePriceAlertAction,
 } from "@/modules/wealth/api/actions";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
+import type { AlertDirection } from "@/modules/wealth/engine/price-alerts";
+import type { PriceAlert } from "@/modules/wealth/services/price-alerts-service";
 import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
   HistoryPoint,
@@ -134,6 +139,9 @@ export function HoldingDetailSheet({
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [valuations, setValuations] = useState<HoldingValuation[]>([]);
   const [paidUntil, setPaidUntil] = useState<PlanPeriod | null>(null);
+  const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const [alertTarget, setAlertTarget] = useState<number | undefined>(undefined);
+  const [alertDir, setAlertDir] = useState<AlertDirection>("above");
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,6 +178,39 @@ export function HoldingDetailSheet({
     void listRentalPaymentsAction(holding.id).then(setRentals);
   }, [holding.id]);
 
+  const reloadAlerts = useCallback(() => {
+    void listPriceAlertsAction(holding.id).then(setAlerts);
+  }, [holding.id]);
+
+  const createAlert = () => {
+    if (!(alertTarget && alertTarget > 0)) return;
+    startTransition(async () => {
+      const res = await createPriceAlertAction({
+        holdingId: holding.id,
+        symbol: holding.symbol ?? "",
+        assetType: holding.assetType,
+        targetPrice: alertTarget,
+        currency: cur,
+        direction: alertDir,
+      });
+      if (res.ok) {
+        setAlertTarget(undefined);
+        reloadAlerts();
+        toast.show("Alerta creada", "success");
+      } else {
+        toast.show(res.message ?? "No se pudo crear la alerta", "error");
+      }
+    });
+  };
+
+  const removeAlert = (id: string) => {
+    startTransition(async () => {
+      const res = await deletePriceAlertAction(id);
+      if (res.ok) reloadAlerts();
+      else toast.show(res.message ?? "No se pudo borrar", "error");
+    });
+  };
+
   // Carga perezosa: solo al abrir el detalle (este componente se monta con el holding elegido).
   useEffect(() => {
     let alive = true;
@@ -185,6 +226,9 @@ export function HoldingDetailSheet({
         }),
         getHoldingHistoryAction(holding, nativePrice, "all").then((h) => {
           if (alive) setHistory(h);
+        }),
+        listPriceAlertsAction(holding.id).then((a) => {
+          if (alive) setAlerts(a);
         }),
       );
     }
@@ -531,6 +575,70 @@ export function HoldingDetailSheet({
                 </div>
               ) : null}
             </div>
+
+            {/* Alerta de precio (solo cotizados con símbolo) */}
+            {quoted && holding.symbol ? (
+              <div>
+                <div className="sec-title" style={{ marginBottom: 6 }}>
+                  Alerta de precio
+                </div>
+                <div className="muted" style={{ fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>
+                  Te avisamos por correo y en la campana cuando el precio cruce tu objetivo. No es
+                  tiempo real ni una recomendación de inversión.
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  {(["above", "below"] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className="m-chip"
+                      onClick={() => setAlertDir(d)}
+                      style={alertDir === d ? { background: "var(--accent)", color: "#fff" } : undefined}
+                    >
+                      {d === "above" ? "Sube a" : "Baja a"}
+                    </button>
+                  ))}
+                </div>
+                <MoneyField
+                  name="alertTarget"
+                  label={`Precio objetivo (${cur})`}
+                  value={alertTarget}
+                  onChange={setAlertTarget}
+                  currency={cur}
+                />
+                <button
+                  type="button"
+                  className="m-btn m-btn-block m-btn-secondary"
+                  style={{ marginTop: 8 }}
+                  disabled={pending || !(alertTarget && alertTarget > 0)}
+                  onClick={createAlert}
+                >
+                  Crear alerta
+                </button>
+                {alerts.length > 0 ? (
+                  <div className="card" style={{ padding: 0, marginTop: 8 }}>
+                    {alerts.map((a) => (
+                      <div key={a.id} className="between" style={{ padding: "9px 12px" }}>
+                        <span style={{ fontSize: 12.5 }}>
+                          {a.direction === "above" ? "Sube a" : "Baja a"}{" "}
+                          <span className="mono" style={{ fontWeight: 600 }}>
+                            {formatMoney(a.targetPrice, a.currency)}
+                          </span>
+                          {a.triggeredAt ? (
+                            <span className="muted"> · disparada</span>
+                          ) : !a.active ? (
+                            <span className="muted"> · pausada</span>
+                          ) : null}
+                        </span>
+                        <button type="button" className="m-chip" disabled={pending} onClick={() => removeAlert(a.id)}>
+                          Borrar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {/* Compras / aportes (solo cotizados) */}
             {quoted ? (
