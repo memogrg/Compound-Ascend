@@ -8,6 +8,7 @@ import "server-only";
  * Solo SUGIERE (pre-rellena el selector en "Por clasificar"); NO auto-asigna al registrar.
  */
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
+import { withTimeout } from "@/lib/async/with-timeout";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
@@ -443,6 +444,49 @@ export async function suggestSobreForChat(
     logger.warn("suggestSobreForChat falló", {
       message: err instanceof Error ? err.message : "?",
     });
+    return NONE;
+  }
+}
+
+/**
+ * Variante BLINDADA para el chat "¿me puedo comprar X?": mapea el ítem a un sobre priorizando el
+ * método DETERMINISTA (historial/caché del hogar, 0 LLM). Solo si eso no resuelve, consulta la IA
+ * acotada PERO con timeout corto + fallback inmediato — este carril NUNCA debe colgarse en Gemini
+ * ni dar IA-503. A diferencia de suggestSobreForChat (LLM-primero, para la card del composer), acá
+ * la latencia y la robustez mandan sobre el afinado. Best-effort: cualquier fallo → "Sin sobre".
+ */
+export async function suggestSobreForChatFast(
+  description: string,
+  kind: "gasto" | "ingreso",
+  llmTimeoutMs = 3500,
+): Promise<{ categoryId: string | null; categoryPath: string | null }> {
+  const NONE = { categoryId: null, categoryPath: null };
+  const merchant = description.trim();
+  if (!merchant) return NONE;
+  try {
+    const sobres = await listSobresForKind(kind);
+    if (sobres.length === 0) return NONE;
+    const byId = new Map(sobres.map((s) => [s.id, s]));
+    const pathOf = (id: string): { categoryId: string; categoryPath: string | null } => {
+      const hit = byId.get(id)!;
+      return { categoryId: id, categoryPath: hit.frasco ? `${hit.frasco} › ${hit.sobre}` : hit.sobre };
+    };
+
+    // 1) DETERMINISTA primero (historial/caché del hogar) — 0 tokens, no cuelga.
+    const supabase = await createSupabaseServerClient();
+    const auto = await resolveAutoCategory({ supabase, merchant, kind });
+    if (auto && byId.has(auto.categoryId)) return pathOf(auto.categoryId);
+
+    // 2) LLM SOLO para afinar, con timeout corto + fallback inmediato (nunca IA-503).
+    const ai = await withTimeout(
+      suggestSobre(merchant, sobres.map((s) => ({ id: s.id, name: s.sobre }))),
+      llmTimeoutMs,
+      { categoryId: null, confidence: 0 },
+    );
+    if (ai.categoryId && byId.has(ai.categoryId)) return pathOf(ai.categoryId);
+    return NONE;
+  } catch (err) {
+    logger.warn("suggestSobreForChatFast falló", { message: err instanceof Error ? err.message : "?" });
     return NONE;
   }
 }

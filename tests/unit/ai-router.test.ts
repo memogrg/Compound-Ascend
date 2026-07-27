@@ -19,14 +19,14 @@ const getLiquidityBalance = vi.fn();
 const listTransactions = vi.fn();
 const getEnvelopesSummary = vi.fn();
 const formatEnvelopesReply = vi.fn();
-const suggestSobreForChat = vi.fn();
+const suggestSobreForChatFast = vi.fn();
 const getSobreRemaining = vi.fn();
 vi.mock("@/modules/financial-base", () => ({
   getLiquidityBalance: () => getLiquidityBalance(),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
   getEnvelopesSummary: () => getEnvelopesSummary(),
   formatEnvelopesReply: (...a: unknown[]) => formatEnvelopesReply(...a),
-  suggestSobreForChat: (...a: unknown[]) => suggestSobreForChat(...a),
+  suggestSobreForChatFast: (...a: unknown[]) => suggestSobreForChatFast(...a),
   getSobreRemaining: (...a: unknown[]) => getSobreRemaining(...a),
 }));
 
@@ -287,9 +287,28 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
     expect(extractAmount("2 cervezas")).toBeNull(); // número suelto → no lo agarra
   });
 
-  it("extractAffordDesc deja el ítem sin el monto", () => {
-    expect(extractAffordDesc("¿puedo darme un gusto de ₡8.000?")?.toLowerCase()).toBe("un gusto");
+  it("extractAffordDesc deja el ítem sin el monto ni el artículo", () => {
+    expect(extractAffordDesc("¿puedo darme un gusto de ₡8.000?")?.toLowerCase()).toBe("gusto");
     expect(extractAffordDesc("me alcanza para unas zapatillas")?.toLowerCase()).toContain("zapatillas");
+  });
+
+  it("ORDEN NATURAL: las 4 fraseos de «helado» rutean a puedo_gastar con desc=helado", () => {
+    for (const q of [
+      "quiero un helado, me alcanza?",
+      "un helado, ¿me alcanza?",
+      "¿me da para un helado?",
+      "me alcanza para un helado",
+    ]) {
+      const m = matchIntent(q);
+      expect(m?.intent, q).toBe("puedo_gastar");
+      expect((m?.params.desc as string).toLowerCase(), q).toBe("helado");
+    }
+  });
+
+  it("guard: NO rutea afford si no hay ítem de compra (falso positivo)", () => {
+    // "me alcanza el tiempo/la plata para llegar" no es una compra → NO puedo_gastar.
+    expect(matchIntent("¿me alcanza el tiempo para llegar?")?.intent).not.toBe("puedo_gastar");
+    expect(matchIntent("no me alcanza la plata para llegar a fin de mes")?.intent).not.toBe("puedo_gastar");
   });
 
   it("affordReply: la cifra sale del motor (no inventada) en cada rama", () => {
@@ -314,25 +333,28 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
     );
   });
 
-  it("carril determinista: mapea al sobre y responde con el remaining del MOTOR", async () => {
-    suggestSobreForChat.mockResolvedValue({ categoryId: "c-rest", categoryPath: "Ocio › Restaurantes" });
+  it("carril BLINDADO: usa el mapeo determinista-primero y responde con el remaining del MOTOR", async () => {
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-rest", categoryPath: "Ocio › Restaurantes" });
     getSobreRemaining.mockResolvedValue({ path: "Ocio › Restaurantes", currency: "USD", budget: 50000, spent: 30000, remaining: 20000, hasBudget: true });
-    const routed = await tryRouteQuery(ask("¿me puedo comprar una cerveza y hamburguesa?"), CTX, tc);
+    const routed = await tryRouteQuery(ask("quiero un helado, me alcanza?"), CTX, tc);
     expect(routed?.lane).toBe("template");
     expect(routed?.response.reply).toContain("te quedan");
     expect(routed?.response.reply).toContain("20.000"); // = rem.remaining formateado (motor), no inventado
-    expect(suggestSobreForChat).toHaveBeenCalledWith(expect.stringContaining("cerveza"), "gasto");
+    expect(suggestSobreForChatFast).toHaveBeenCalledWith(expect.stringContaining("helado"), "gasto");
   });
 
-  it("sin sobre que matchee → null (escala; el modelo ofrece el más cercano)", async () => {
-    suggestSobreForChat.mockResolvedValue({ categoryId: null, categoryPath: null });
+  it("sin sobre claro → respuesta determinista pidiendo precisión (NO escala al LLM → nunca IA-503)", async () => {
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: null, categoryPath: null });
     const routed = await tryRouteQuery(ask("¿me puedo comprar algo raro?"), CTX, tc);
-    expect(routed).toBeNull();
+    expect(routed?.lane).toBe("template");
+    expect(routed?.response.reply).toMatch(/a cuál lo llevo|no estoy seguro/i);
+    expect(routed).not.toBeNull();
   });
 
-  it("sin sesión (WhatsApp): la lectura del sobre lanza → null (escala)", async () => {
-    suggestSobreForChat.mockRejectedValue(new Error("no session"));
+  it("el carril NO depende del LLM lento: si el mapeo devuelve NONE (best-effort), responde igual", async () => {
+    // suggestSobreForChatFast nunca lanza (timeout interno → NONE); el carril responde determinista.
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: null, categoryPath: null });
     const routed = await tryRouteQuery(ask("¿me alcanza para unas zapatillas?"), CTX, tc);
-    expect(routed).toBeNull();
+    expect(routed?.response.reply).toMatch(/a cuál lo llevo|no estoy seguro/i);
   });
 });
