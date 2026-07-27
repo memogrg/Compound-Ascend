@@ -18,6 +18,7 @@ import {
   getPlanPaidUntilAction,
   listInvestmentAlertsAction,
   createInvestmentAlertAction,
+  updateInvestmentAlertAction,
   deleteInvestmentAlertAction,
 } from "@/modules/wealth/api/actions";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
@@ -275,6 +276,14 @@ export function HoldingDetailSheet({
       const res = await deleteInvestmentAlertAction(id);
       if (res.ok) reloadAlerts();
       else toast.show(res.message ?? "No se pudo borrar", "error");
+    });
+  };
+
+  const toggleAlert = (a: InvestmentAlert) => {
+    startTransition(async () => {
+      const res = await updateInvestmentAlertAction(a.id, { active: !a.active });
+      if (res.ok) reloadAlerts();
+      else toast.show(res.message ?? "No se pudo actualizar", "error");
     });
   };
 
@@ -744,11 +753,20 @@ export function HoldingDetailSheet({
                           <span className="muted"> · disparada</span>
                         ) : !a.active ? (
                           <span className="muted"> · pausada</span>
-                        ) : null}
+                        ) : (
+                          <span className="pos"> · vigilando</span>
+                        )}
                       </span>
-                      <button type="button" className="m-chip" disabled={pending} onClick={() => removeAlert(a.id)}>
-                        Borrar
-                      </button>
+                      <span style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        {!a.triggeredAt ? (
+                          <button type="button" className="m-chip" disabled={pending} onClick={() => toggleAlert(a)}>
+                            {a.active ? "Pausar" : "Reactivar"}
+                          </button>
+                        ) : null}
+                        <button type="button" className="m-chip" disabled={pending} onClick={() => removeAlert(a.id)}>
+                          Borrar
+                        </button>
+                      </span>
                     </div>
                   ))}
                 </div>
