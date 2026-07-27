@@ -85,9 +85,18 @@ function extractDebtName(text: string): string | null {
   return name && name.length >= 2 ? name : null;
 }
 
-/** Verbos de "¿puedo permitírmelo?" — al frente para capturar la descripción del ítem. */
-const AFFORD_RE =
-  /(?:me\s+puedo\s+comprar|me\s+puedo\s+dar|puedo\s+darme|me\s+alcanza\s+para|me\s+da\s+para|puedo\s+gastar(?:\s+(?:en|para))?)\s+(.+?)[\?\.!¿¡]*$/i;
+/** Forma "verbo + ítem": el ítem viene DESPUÉS del verbo ("me alcanza para X", "me puedo comprar X"). */
+const AFFORD_VERB_RE =
+  /(?:me\s+puedo\s+comprar|me\s+puedo\s+dar|puedo\s+darme|me\s+lo\s+puedo\s+dar|me\s+alcanza\s+para|me\s+da\s+para|puedo\s+gastar(?:\s+(?:en|para))?)\s+(.+?)[\?\.!¿¡]*$/i;
+
+/** Señal SUELTA de "¿me alcanza?" que puede venir SIN el ítem detrás ("un helado, me alcanza?"). */
+const AFFORD_LOOSE_RE =
+  /\bme\s+alcanza\b|\bme\s+da\b|\balcanza(?:r[ií]a|r[aá])?\b|\bme\s+lo\s+puedo\s+dar\b|\bpuedo\s+con\b|\bpuedo\s*[?¿]|\bme\s+puedo\s+(?:comprar|dar)\b/i;
+
+/** Ítem de COMPRA en el resto de la frase: "quiero un/una X", "un/una X" (antes de coma/fin). El
+ *  artículo indefinido / verbo de compra es el guard anti-falso-positivo (no agarra "el tiempo"). */
+const AFFORD_ITEM_RE =
+  /(?:quiero|comprar(?:me)?|darme|gustar[ií]a)\s+(?:un|una|unos|unas)\s+([^,.?!¿¡]+)|(?:^|[,\s])(?:un|una|unos|unas)\s+([^,.?!¿¡]+)/i;
 
 /** Monto SOLO si viene con señal de moneda (₡/$/…) o multiplicador (mil/k); si no, null (no
  *  agarra números sueltos como "2 cervezas"). es-CR: "." = miles, "," = decimales. */
@@ -100,15 +109,29 @@ export function extractAmount(text: string): number | null {
   return Number.isFinite(n) && n > 0 ? n * mult : null;
 }
 
-/** Descripción del ítem tras el verbo, quitando la parte del monto (para mapear el sobre). */
+/**
+ * Descripción del ítem de la pregunta de afford, en CUALQUIER orden:
+ *   A) "verbo + ítem" ("me alcanza para un helado") → captura tras el verbo.
+ *   B) señal suelta + ítem en el resto ("quiero un helado, me alcanza?", "un helado, ¿me alcanza?")
+ *      → toma el "un/una X" de compra. El artículo indefinido / verbo de compra evita falsos
+ *      positivos como "me alcanza el tiempo/la plata para llegar" (que no rutean a afford).
+ * Quita monto y artículo inicial → "un helado" ⇒ "helado". null si no hay ítem de compra.
+ */
 export function extractAffordDesc(text: string): string | null {
-  const m = text.match(AFFORD_RE);
-  let desc = m?.[1]?.trim();
+  const t = text.trim();
+  let desc = t.match(AFFORD_VERB_RE)?.[1]?.trim() ?? null;
+  if (!desc) {
+    const mi = t.match(AFFORD_ITEM_RE);
+    desc = (mi?.[1] ?? mi?.[2])?.trim() ?? null;
+  }
   if (!desc) return null;
   desc = desc
+    // corta una pregunta de afford que haya quedado pegada al ítem ("helado, me alcanza?").
+    .replace(/,?\s*¿?\s*(?:me\s+alcanza|me\s+da|puedo|alcanza)\b.*$/i, " ")
     .replace(/\b(?:algo\s+de|de|por|unos?|unas?)\s+(?=(?:₡|\$|col\$|mx\$)|\d)/gi, " ")
     .replace(/(?:₡|\$|col\$|mx\$|crc|usd)\s*[\d.,]+\s*(?:mil|k)?/gi, " ")
     .replace(/\b\d[\d.,]*\s*(?:mil|k)\b/gi, " ")
+    .replace(/^(?:un|una|unos|unas|el|la|los|las)\s+/i, "") // "un helado" ⇒ "helado"
     .replace(/\s+/g, " ")
     .replace(/^[\s,]+|[\s,.?!¿¡]+$/g, "")
     .trim();
@@ -145,8 +168,9 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   const t = text.trim();
   if (REASONING_CUES.test(t)) return null; // consejo/proyección → razonamiento
 
-  // "¿me puedo comprar / me alcanza para X?" — al frente: mapea al sobre y dice el restante.
-  if (AFFORD_RE.test(t)) {
+  // "¿me puedo comprar / me alcanza para X?" en CUALQUIER orden (verbo+ítem o señal suelta + ítem).
+  // El `desc` (ítem de compra) es el guard: sin ítem no rutea (evita "me alcanza el tiempo…").
+  if (AFFORD_VERB_RE.test(t) || AFFORD_LOOSE_RE.test(t)) {
     const desc = extractAffordDesc(t);
     if (desc) return { intent: "puedo_gastar", params: { desc, amount: extractAmount(t) } };
   }
@@ -342,17 +366,26 @@ async function resolveFetchIntent(
 ): Promise<AIChatResponse | null> {
   const say = (reply: string): AIChatResponse => ({ reply, action: null });
   try {
-    // "¿me puedo comprar X?": mapea al sobre (determinista) y responde con el restante del MOTOR.
+    // "¿me puedo comprar X?": mapea al sobre (DETERMINISTA primero, LLM con timeout) y responde con
+    // el restante del MOTOR. Este carril NUNCA escala ni se cuelga en Gemini → nunca IA-503.
     if (intent === "puedo_gastar") {
       const desc = typeof params.desc === "string" ? params.desc : "";
-      if (!desc) return null; // sin ítem → escalar
+      if (!desc) return null; // sin ítem (no debería pasar: matchIntent exige desc)
       const amount = typeof params.amount === "number" ? params.amount : null;
-      const { suggestSobreForChat, getSobreRemaining } = await import("@/modules/financial-base");
-      const sug = await suggestSobreForChat(desc, "gasto");
-      if (!sug.categoryId) return null; // sin sobre que matchee → escalar (el modelo ofrece el más cercano)
-      const today = new Date().toISOString().slice(0, 10);
-      const rem = await getSobreRemaining(sug.categoryId, today);
-      if (!rem) return null; // sin cifras confiables → escalar (no inventa el saldo)
+      const { suggestSobreForChatFast, getSobreRemaining } = await import("@/modules/financial-base");
+      const sug = await suggestSobreForChatFast(desc, "gasto");
+      if (!sug.categoryId) {
+        // Sin sobre claro → pedir precisión (determinista), NO escalar al LLM.
+        return say(
+          `No estoy seguro a qué sobre cargar «${desc}». ¿A cuál lo llevo — Restaurantes, Salidas…? Decímelo y te digo cuánto te queda.`,
+        );
+      }
+      const rem = await getSobreRemaining(sug.categoryId, new Date().toISOString().slice(0, 10));
+      if (!rem) {
+        return say(
+          `Encontré ${sug.categoryPath ?? "tu sobre"} pero no pude leer su presupuesto ahora. Probá de nuevo en un momento.`,
+        );
+      }
       const path = sug.categoryPath ?? rem.path;
       return say(affordReply(path, rem, amount, (n) => formatMoney(n, rem.currency)));
     }

@@ -36,7 +36,7 @@ export { groupByJar } from "./engine/expense-jars";
 export type { JarGroup } from "./engine/expense-jars";
 // Sugerencia de sobre para el chat (IA acotada a los sobres del usuario + fallback historial)
 // y listado "Frasco › Sobre" para el selector de la card de confirmación.
-export { listSobresForKind, suggestSobreForChat } from "./services/ai-categorize";
+export { listSobresForKind, suggestSobreForChat, suggestSobreForChatFast } from "./services/ai-categorize";
 export type { SobreOption } from "./services/ai-categorize";
 // Restante de un sobre tras registrar un gasto (mensaje de éxito del chat).
 export { getSobreRemaining } from "./services/sobre-remaining";
