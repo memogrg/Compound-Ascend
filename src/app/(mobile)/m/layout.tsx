@@ -42,6 +42,13 @@ export default function MobileRootLayout({ children }: { children: React.ReactNo
   // aquí obligaba a sincronizar dos atributos y dejaba el portal desincronizado.
   return (
     <div className="m-shell" data-mobile>
+      {/* Guarda de la barra de estado: franja fija del color del lienzo que cubre el
+          safe-area SUPERIOR en TODAS las rutas /m (incluidas login, asistente y el wizard,
+          fuera del grupo (app)). Es la red que faltaba: el inset de arriba lo aportaba solo
+          el header sticky, y en iOS ese sticky falla al abrir una hoja con scroll-lock,
+          dejando el contenido bajo el reloj (P0 del 27 jul). Invisible en operación normal
+          —el header la tapa—; en Android sin notch tiene alto 0. */}
+      <div className="m-statusbar-guard" aria-hidden />
       {/* Intro animada del logo al abrir la app (una vez por sesión; portal a body). */}
       <MobileIntro />
       {children}
