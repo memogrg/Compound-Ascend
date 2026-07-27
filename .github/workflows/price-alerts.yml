@@ -1,6 +1,6 @@
-# Alertas de PRECIO — barrido HORARIO (gratis, sin Vercel Pro).
+# Alertas de PRECIO — barrido cada 5 minutos (gratis en repo público, sin Vercel Pro).
 #
-# Dispara la corrida de precio del endpoint de alertas cada hora. Las alertas de FECHA
+# Dispara la corrida de precio del endpoint de alertas cada 5 min. Las alertas de FECHA
 # (años invertido, vesting) NO pasan por acá: las corre el cron DIARIO de Vercel
 # (vercel.json, ?kinds=date). Separar cadencias hace que la alerta de precio sirva para
 # salidas sin pagar Vercel Pro.
@@ -12,8 +12,8 @@
 #                       SIN query. Ejemplo: https://TU-APP.vercel.app/api/investments/price-alerts
 #
 # Caveats honestos:
-#   · NO es tiempo real: el cron de GitHub puede retrasarse unos minutos; la alerta es tan
-#     frecuente como el barrido (a lo sumo cada hora).
+#   · NO es tiempo real: el cron de GitHub puede retrasarse (a veces varios minutos); la alerta
+#     es tan frecuente como el barrido (a lo sumo cada 5 minutos).
 #   · GitHub PAUSA los crons programados tras ~60 días SIN actividad en el repo. Un push/commit
 #     los reactiva (o corré el workflow a mano con "Run workflow").
 #   · El free tier de Finnhub/AlphaVantage tiene rate limit → por eso el endpoint deduplica por
@@ -23,11 +23,11 @@
 #   { "path": "/api/investments/price-alerts?kinds=price", "schedule": "0 * * * *" }
 # y BORRÁ este workflow (Vercel correría ambas cadencias nativamente).
 
-name: price-alerts-hourly
+name: price-alerts-sweep
 
 on:
   schedule:
-    - cron: "0 * * * *" # cada hora, minuto 0 (UTC)
+    - cron: "*/5 * * * *" # cada 5 minutos (UTC). Es el mínimo que permite GitHub; puede retrasarse.
   workflow_dispatch: {} # disparo manual para pruebas
 
 # Sin permisos de escritura: solo hace una petición HTTP saliente.
