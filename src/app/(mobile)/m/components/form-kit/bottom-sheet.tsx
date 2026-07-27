@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { MobilePortal } from "../mobile-portal";
+import { lockBodyScroll, unlockBodyScroll } from "../../lib/scroll-lock";
+import { useVisualViewportHeight } from "../../lib/use-visual-viewport";
 
 /**
  * Hoja modal inferior (form kit). Sin directiva "use client": hereda el límite de cliente
@@ -25,15 +27,17 @@ export function BottomSheet({
 }) {
   const [dragY, setDragY] = useState(0);
   const startY = useRef<number | null>(null);
+  // Alto visible (sobre el teclado). null si no hay hoja abierta o no hay visualViewport:
+  // entonces la hoja usa su alto de CSS de siempre.
+  const visibleHeight = useVisualViewportHeight(open);
 
-  // Bloquea el scroll del fondo mientras la hoja está abierta.
+  // Congela el documento mientras la hoja está abierta (scroll-lock endurecido para iOS):
+  // impide que el teclado desplace la página bajo la barra de estado. Cuenta anidamientos
+  // (el alta rápida abre pickers dentro de la hoja).
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
+    lockBodyScroll();
+    return () => unlockBodyScroll();
   }, [open]);
 
   // Reinicia el desplazamiento de arrastre cada vez que se abre.
@@ -62,7 +66,16 @@ export function BottomSheet({
 
   return (
     <MobilePortal>
-    <div className="m-sheet-overlay" role="dialog" aria-modal="true" aria-label={title ?? "Formulario"}>
+    <div
+      className="m-sheet-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title ?? "Formulario"}
+      // Ancla la hoja al área VISIBLE (sobre el teclado): con el documento congelado, sin
+      // esto la hoja quedaría anclada al fondo del layout viewport, bajo el teclado, y el
+      // input tapado. En navegadores sin visualViewport, `null` → alto de CSS de siempre.
+      style={visibleHeight != null ? { height: `${visibleHeight}px` } : undefined}
+    >
       <button className="m-sheet-backdrop" aria-label="Cerrar" onClick={onClose} />
       <div
         className="m-sheet-panel"
