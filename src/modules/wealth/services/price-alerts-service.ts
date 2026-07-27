@@ -273,22 +273,3 @@ export async function markInvestmentAlertTriggered(
     .update({ triggered_at: triggeredAtIso, active: oneShot ? false : true })
     .eq("id", id);
 }
-
-// ── Compat temporal ────────────────────────────────────────────────────────
-// Los nombres `price-*` mapean al servicio general con kind='price'. Existen para no romper la
-// UI de solo-precio mientras se generaliza; se eliminan en el commit de UI multi-tipo.
-export type PriceAlert = InvestmentAlert;
-export type CreatePriceAlertInput = {
-  holdingId?: string | null;
-  symbol: string;
-  assetType: string;
-  targetPrice: number;
-  currency: string;
-  direction: AlertDirection;
-};
-export const listPriceAlerts = listInvestmentAlerts;
-export const updatePriceAlert = updateInvestmentAlert;
-export const deletePriceAlert = deleteInvestmentAlert;
-export function createPriceAlert(input: CreatePriceAlertInput) {
-  return createInvestmentAlert({ kind: "price", ...input });
-}

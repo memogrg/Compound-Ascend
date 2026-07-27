@@ -48,12 +48,12 @@ import type { Holding } from "@/modules/wealth/types";
 import { adjustContributionPrice, advancePremiums, getPlanPaidUntil } from "@/modules/wealth/services/contribution-service";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import {
-  listPriceAlerts,
-  createPriceAlert,
-  updatePriceAlert,
-  deletePriceAlert,
-  type PriceAlert,
-  type CreatePriceAlertInput,
+  listInvestmentAlerts,
+  createInvestmentAlert,
+  updateInvestmentAlert,
+  deleteInvestmentAlert,
+  type InvestmentAlert,
+  type CreateAlertInput,
 } from "@/modules/wealth/services/price-alerts-service";
 import type { AlertDirection } from "@/modules/wealth/engine/price-alerts";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
@@ -460,54 +460,54 @@ export async function adjustContributionPriceAction(
   }
 }
 
-// ── Alertas de precio ───────────────────────────────────────────────────────
+// ── Alertas de inversión (price · time_held · vesting) ──────────────────────
 
-export async function listPriceAlertsAction(holdingId?: string): Promise<PriceAlert[]> {
+export async function listInvestmentAlertsAction(holdingId?: string): Promise<InvestmentAlert[]> {
   if (!isSupabaseConfigured()) return [];
   try {
-    return await listPriceAlerts(holdingId);
+    return await listInvestmentAlerts(holdingId);
   } catch {
     return [];
   }
 }
 
-export async function createPriceAlertAction(
-  input: CreatePriceAlertInput,
+export async function createInvestmentAlertAction(
+  input: CreateAlertInput,
 ): Promise<ActionResult & { id?: string }> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    const res = await createPriceAlert(input);
+    const res = await createInvestmentAlert(input);
     if (res.ok) revalidatePath("/patrimonio");
     return res;
   } catch (err) {
-    logger.error("createPriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("createInvestmentAlert fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos crear la alerta." };
   }
 }
 
-export async function updatePriceAlertAction(
+export async function updateInvestmentAlertAction(
   id: string,
-  patch: { targetPrice?: number; direction?: AlertDirection; active?: boolean },
+  patch: { targetPrice?: number; direction?: AlertDirection; yearsThreshold?: number; triggerDate?: string; active?: boolean },
 ): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    const res = await updatePriceAlert(id, patch);
+    const res = await updateInvestmentAlert(id, patch);
     if (res.ok) revalidatePath("/patrimonio");
     return res;
   } catch (err) {
-    logger.error("updatePriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("updateInvestmentAlert fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos actualizar la alerta." };
   }
 }
 
-export async function deletePriceAlertAction(id: string): Promise<ActionResult> {
+export async function deleteInvestmentAlertAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    const res = await deletePriceAlert(id);
+    const res = await deleteInvestmentAlert(id);
     if (res.ok) revalidatePath("/patrimonio");
     return res;
   } catch (err) {
-    logger.error("deletePriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("deleteInvestmentAlert fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos borrar la alerta." };
   }
 }

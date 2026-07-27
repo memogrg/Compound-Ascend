@@ -16,14 +16,14 @@ import {
   removeRentalPaymentAction,
   adjustContributionPriceAction,
   getPlanPaidUntilAction,
-  listPriceAlertsAction,
-  createPriceAlertAction,
-  deletePriceAlertAction,
+  listInvestmentAlertsAction,
+  createInvestmentAlertAction,
+  deleteInvestmentAlertAction,
 } from "@/modules/wealth/api/actions";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { AlertDirection } from "@/modules/wealth/engine/price-alerts";
-import type { PriceAlert } from "@/modules/wealth/services/price-alerts-service";
+import type { InvestmentAlert } from "@/modules/wealth/services/price-alerts-service";
 import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
   HistoryPoint,
@@ -139,7 +139,7 @@ export function HoldingDetailSheet({
   const [dividends, setDividends] = useState<Dividend[]>([]);
   const [valuations, setValuations] = useState<HoldingValuation[]>([]);
   const [paidUntil, setPaidUntil] = useState<PlanPeriod | null>(null);
-  const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+  const [alerts, setAlerts] = useState<InvestmentAlert[]>([]);
   const [alertTarget, setAlertTarget] = useState<number | undefined>(undefined);
   const [alertDir, setAlertDir] = useState<AlertDirection>("above");
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
@@ -179,13 +179,14 @@ export function HoldingDetailSheet({
   }, [holding.id]);
 
   const reloadAlerts = useCallback(() => {
-    void listPriceAlertsAction(holding.id).then(setAlerts);
+    void listInvestmentAlertsAction(holding.id).then(setAlerts);
   }, [holding.id]);
 
   const createAlert = () => {
     if (!(alertTarget && alertTarget > 0)) return;
     startTransition(async () => {
-      const res = await createPriceAlertAction({
+      const res = await createInvestmentAlertAction({
+        kind: "price",
         holdingId: holding.id,
         symbol: holding.symbol ?? "",
         assetType: holding.assetType,
@@ -205,7 +206,7 @@ export function HoldingDetailSheet({
 
   const removeAlert = (id: string) => {
     startTransition(async () => {
-      const res = await deletePriceAlertAction(id);
+      const res = await deleteInvestmentAlertAction(id);
       if (res.ok) reloadAlerts();
       else toast.show(res.message ?? "No se pudo borrar", "error");
     });
@@ -227,7 +228,7 @@ export function HoldingDetailSheet({
         getHoldingHistoryAction(holding, nativePrice, "all").then((h) => {
           if (alive) setHistory(h);
         }),
-        listPriceAlertsAction(holding.id).then((a) => {
+        listInvestmentAlertsAction(holding.id).then((a) => {
           if (alive) setAlerts(a);
         }),
       );
