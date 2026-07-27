@@ -15,6 +15,7 @@
  */
 import { NextResponse } from "next/server";
 import { corsHeaders } from "@/lib/security/cors";
+import { cronAuthorized } from "@/lib/security/cron-auth";
 import { escapeHtml } from "@/lib/security/escape-html";
 import { toSafeResponse, AppError } from "@/lib/errors";
 import { formatMoney } from "@/lib/format";
@@ -25,10 +26,10 @@ import type { ActiveInvestmentAlert } from "@/modules/wealth/services/price-aler
 export const runtime = "nodejs";
 
 function isCronRequest(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  if (req.headers.get("x-cron-secret") === secret) return true;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  return cronAuthorized(
+    { authorization: req.headers.get("authorization"), xCronSecret: req.headers.get("x-cron-secret") },
+    process.env.CRON_SECRET,
+  );
 }
 
 /** asset_type del holding → tipo de mercado de getMarketPrice. */
@@ -155,15 +156,20 @@ async function handle(req: Request) {
     const { getActiveInvestmentAlerts, markInvestmentAlertTriggered } = await import(
       "@/modules/wealth/services/price-alerts-service"
     );
-    const { distinctSymbolFetches, selectFiringAlerts, priceKey } = await import(
+    const { distinctSymbolFetches, selectFiringAlerts, priceKey, kindsFromParam } = await import(
       "@/modules/wealth/engine/price-alerts"
     );
     const { getMarketPrice } = await import("@/lib/market-data");
     const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
 
-    const alerts = await getActiveInvestmentAlerts();
+    // ?kinds=price → solo precio (única corrida que llama getMarketPrice); ?kinds=date →
+    // time_held+vesting (sin llamadas de mercado); ausente/all → todas (retrocompatible).
+    const kindsParam = new URL(req.url).searchParams.get("kinds");
+    const kindFilter = kindsFromParam(kindsParam);
+
+    const alerts = await getActiveInvestmentAlerts(kindFilter);
     if (alerts.length === 0) {
-      return NextResponse.json({ ok: true, alerts: 0, triggered: 0 }, { headers: cors });
+      return NextResponse.json({ ok: true, kinds: kindsParam ?? "all", alerts: 0, triggered: 0 }, { headers: cors });
     }
 
     // Precios: un fetch por símbolo distinto (solo alertas price). Best-effort por símbolo.
@@ -222,7 +228,7 @@ async function handle(req: Request) {
     }
 
     return NextResponse.json(
-      { ok: true, alerts: alerts.length, symbols: priceByKey.size, triggered },
+      { ok: true, kinds: kindsParam ?? "all", alerts: alerts.length, symbols: priceByKey.size, triggered },
       { headers: cors },
     );
   } catch (err) {
