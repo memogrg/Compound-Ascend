@@ -374,32 +374,6 @@ body:has(.m-shell[data-theme="dark"]) {
   position: relative;
   z-index: 1;
 }
-
-/* Guarda de la barra de estado — red de seguridad del safe-area SUPERIOR.
- *
- * Por qué existe: en las pantallas con header, el inset de arriba lo aporta SOLO el
- * `.m-topbar` sticky (`.m-scroll:has(.m-topbar)` renuncia a su padding-top). Si ese sticky
- * falla —y en el WKWebView de iOS falla al bloquear el scroll del fondo con una hoja
- * abierta (`body{overflow:hidden}` altera el contexto del que depende `position:sticky`)—
- * el contenido queda directamente bajo el reloj. No había ninguna defensa detrás.
- *
- * Esta franja FIJA cubre la zona de la barra de estado pase lo que pase con el sticky o el
- * scroll-lock: es del color del lienzo (por tema), así que en operación normal queda
- * TAPADA por el topbar (z20) y es invisible; cuando el sticky se despega, es lo que impide
- * que el contenido del cuerpo (z1) se solape con el reloj. Va debajo de las hojas y el menú
- * (z60+), que tienen su propio inset, así que no los tapa. En Android sin notch el inset es
- * 0 y la franja tiene alto 0: no molesta.
- */
-.m-shell .m-statusbar-guard {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: env(safe-area-inset-top);
-  z-index: 10;
-  background: var(--canvas);
-  pointer-events: none;
-}
 @media (prefers-reduced-transparency: reduce) {
   .m-shell .m-ambient {
     display: none;
@@ -2021,7 +1995,10 @@ body:has(.m-shell[data-theme="dark"]) {
   align-items: flex-end;
 }
 .m-shell .m-sheet-backdrop {
-  position: absolute;
+  /* FIXED, no absolute: atado al viewport, no al documento. Si el documento se desplazara
+     (teclado), un backdrop absolute se iría con él y dejaría ver el fondo por un borde. El
+     scroll-lock endurecido ya impide ese desplazamiento, y esto es el cinturón. */
+  position: fixed;
   inset: 0;
   border: 0;
   padding: 0;
