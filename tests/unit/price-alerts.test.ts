@@ -7,6 +7,7 @@ import {
   vestingFires,
   alertFires,
   selectFiringAlerts,
+  kindsFromParam,
   type EvaluableAlert,
   type AlertEvalContext,
 } from "@/modules/wealth/engine/price-alerts";
@@ -127,5 +128,26 @@ describe("alertFires / selectFiringAlerts · cada tipo con su condición", () =>
     const out = selectFiringAlerts(alerts, ctx({ priceByKey: prices, purchaseDateByHolding: purchase }));
     expect(out.map((a) => a.id)).toEqual(["p1", "t1", "v1"]);
     expect(selectFiringAlerts([], ctx({ priceByKey: prices }))).toEqual([]);
+  });
+});
+
+describe("kindsFromParam · cadencias separadas por tipo", () => {
+  it("price → solo precio; date → time_held+vesting; all/ausente → todos", () => {
+    expect(kindsFromParam("price")).toEqual(["price"]);
+    expect(kindsFromParam("date")).toEqual(["time_held", "vesting"]);
+    expect(kindsFromParam("all")).toBeUndefined();
+    expect(kindsFromParam(null)).toBeUndefined();
+    expect(kindsFromParam("otro")).toBeUndefined();
+  });
+
+  it("la corrida 'date' NO incluye 'price' → 0 símbolos que cotizar (no llama getMarketPrice)", () => {
+    // La consulta filtra por estos kinds; sin 'price' → distinctSymbolFetches([]) → 0 fetches.
+    expect(kindsFromParam("date")).not.toContain("price");
+  });
+
+  it("la corrida 'price' NO incluye tipos de fecha", () => {
+    const kinds = kindsFromParam("price")!;
+    expect(kinds).not.toContain("time_held");
+    expect(kinds).not.toContain("vesting");
   });
 });

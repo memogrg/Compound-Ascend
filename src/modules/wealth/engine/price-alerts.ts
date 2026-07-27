@@ -9,6 +9,18 @@ export type AlertDirection = "above" | "below";
 export type AlertKind = "price" | "time_held" | "vesting";
 
 /**
+ * Mapea el parámetro `?kinds` del cron a los tipos a evaluar:
+ *   price → solo precio (la única corrida que llama getMarketPrice).
+ *   date  → time_held + vesting (comparado de fechas, sin llamadas de mercado).
+ *   all / vacío / desconocido → undefined = todos (retrocompatible).
+ */
+export function kindsFromParam(param: string | null | undefined): AlertKind[] | undefined {
+  if (param === "price") return ["price"];
+  if (param === "date") return ["time_held", "vesting"];
+  return undefined;
+}
+
+/**
  * ¿El precio cruzó el objetivo en la dirección pedida?
  *   above → el precio subió A o por encima del objetivo (price >= target).
  *   below → el precio bajó A o por debajo del objetivo (price <= target).

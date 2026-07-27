@@ -228,14 +228,20 @@ export type ActiveInvestmentAlert = {
   oneShot: boolean;
 };
 
-/** TODAS las alertas activas (service-role) para el barrido del cron. */
-export async function getActiveInvestmentAlerts(): Promise<ActiveInvestmentAlert[]> {
+/**
+ * Alertas activas (service-role) para el barrido del cron. Si se pasan `kinds`, filtra por
+ * tipo EN LA CONSULTA (así la corrida de fecha no lee alertas de precio y no gasta llamadas
+ * de mercado). Sin `kinds` → todas (retrocompatible).
+ */
+export async function getActiveInvestmentAlerts(kinds?: AlertKind[]): Promise<ActiveInvestmentAlert[]> {
   const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
   const admin = createServiceRoleClient();
-  const { data, error } = await admin
+  let q = admin
     .from("price_alerts")
     .select(`user_id, household_id, one_shot, ${SELECT}`)
     .eq("active", true);
+  if (kinds && kinds.length > 0) q = q.in("kind", kinds);
+  const { data, error } = await q;
   if (error || !data) return [];
   return data.map((r) => {
     const a = rowToAlert(r as AlertRow);
