@@ -14,7 +14,7 @@ import {
 import type { Debt, DebtVM, DebtPayment } from "@/modules/control";
 // El mismo helper que usa la web. Recibe la deuda CRUDA a propósito: si alguien le pasa un
 // VM convertido, el test de multimoneda lo dice.
-import { cuotaPrecargada } from "@/modules/control/engine/debt-strategy";
+import { cuotaPrecargada, montoFilaDeuda } from "@/modules/control/engine/debt-strategy";
 import { formatMoney, formatPercent } from "@/lib/format";
 
 import {
@@ -227,6 +227,24 @@ export function DebtManager({
           const cuota = vm.monthlyPayment || vm.minPayment;
           const nPay = paymentsByDebt[vm.id]?.length ?? 0;
           const debtRaw = rawById.get(vm.id);
+          // Fila = moneda de la deuda. Si está en otra moneda que la de display, se muestra su
+          // importe NATIVO (una tarjeta en USD se ve en $, no como ₡ convertidos); si coinciden
+          // —el 90%—, el convertido con la escala compartida de la columna (idéntico a hoy).
+          // Una escala compartida entre monedas distintas no compara, así que la fila extranjera
+          // se formatea sola en la suya.
+          const saldo = montoFilaDeuda(
+            debtRaw ? { amount: debtRaw.balance, currency: debtRaw.currency } : undefined,
+            vm.balance,
+            currency,
+          );
+          const otraMoneda = saldo.currency !== currency;
+          const saldoStr = otraMoneda ? mAmount(saldo.amount, saldo.currency, 10) : balanceFmt(vm.balance);
+          const cuotaNativa =
+            otraMoneda && debtRaw
+              ? debtRaw.currentPayment > 0
+                ? debtRaw.currentPayment
+                : (debtRaw.minPayment ?? 0)
+              : cuota;
           return (
             <SwipeRow
               key={vm.id}
@@ -241,7 +259,7 @@ export function DebtManager({
                 iconTone={rank === 1 ? "danger" : "neutral"}
                 title={vm.name}
                 subtitle={debtSubtitle({ rank, apr: vm.apr, months })}
-                value={balanceFmt(vm.balance)}
+                value={saldoStr}
                 valueTone="danger"
                 slot={
                   <>
@@ -250,7 +268,7 @@ export function DebtManager({
                     ) : null}
                     <div className="between" style={{ marginTop: conOriginal ? 9 : 0 }}>
                       <span className="muted" style={{ fontSize: 11 }}>
-                        Cuota {mAmount(cuota, currency)}/mes
+                        Cuota {mAmount(cuotaNativa, saldo.currency)}/mes
                       </span>
                       {conOriginal ? (
                         <span className="mono muted" style={{ fontSize: 11 }}>
