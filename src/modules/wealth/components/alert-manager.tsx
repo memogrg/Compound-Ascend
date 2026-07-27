@@ -10,7 +10,10 @@ import {
   deleteInvestmentAlertAction,
 } from "@/modules/wealth/api/actions";
 import type { InvestmentAlert, CreateAlertInput } from "@/modules/wealth/services/price-alerts-service";
-import type { AlertKind, AlertDirection } from "@/modules/wealth/engine/price-alerts";
+import type { AlertKind } from "@/modules/wealth/engine/price-alerts";
+
+/** asset_type del holding → tipo de mercado del endpoint /api/market-price. */
+const MARKET_TYPE: Record<string, string> = { etf: "etf", accion: "stock", cripto: "crypto" };
 
 /** Datos del holding que la alerta necesita. `symbol/assetType` gatean el tipo 'price'. */
 export type AlertHolding = {
@@ -57,15 +60,44 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
   }, [holding.symbol, holding.assetType, holding.purchaseDate]);
 
   const [kind, setKind] = useState<AlertKind>(kinds[0]!);
-  const [direction, setDirection] = useState<AlertDirection>("above");
   const [target, setTarget] = useState("");
   const [years, setYears] = useState("");
   const [date, setDate] = useState("");
+  // Precio actual (live) para el tipo Precio: "loading" | "ok" | "err" | "na" (no aplica).
+  const [live, setLive] = useState<{ price: number; currency: string } | null>(null);
+  const [liveState, setLiveState] = useState<"loading" | "ok" | "err" | "na">("na");
 
   const load = useCallback(() => {
     void listInvestmentAlertsAction(holding.id).then(setAlerts);
   }, [holding.id]);
   useEffect(() => load(), [load]);
+
+  // Trae el precio actual del símbolo al elegir el tipo Precio (reusa /api/market-price).
+  const marketType = holding.symbol ? MARKET_TYPE[holding.assetType] : undefined;
+  useEffect(() => {
+    if (kind !== "price" || !holding.symbol || !marketType) {
+      setLive(null);
+      setLiveState("na");
+      return;
+    }
+    let alive = true;
+    setLive(null);
+    setLiveState("loading");
+    fetch(`/api/market-price?symbol=${encodeURIComponent(holding.symbol)}&type=${marketType}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("no price"))))
+      .then((d: { price: number; currency: string }) => {
+        if (alive) {
+          setLive({ price: Number(d.price), currency: d.currency });
+          setLiveState("ok");
+        }
+      })
+      .catch(() => {
+        if (alive) setLiveState("err");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [kind, holding.symbol, marketType]);
 
   const inputValid =
     kind === "price" ? parseFloat(target) > 0 : kind === "time_held" ? parseFloat(years) > 0 : /^\d{4}-\d{2}-\d{2}$/.test(date);
@@ -81,7 +113,7 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
         assetType: holding.assetType,
         targetPrice: parseFloat(target),
         currency: holding.currency,
-        direction,
+        // La dirección la infiere el servidor con el precio actual.
       };
     } else if (kind === "time_held") {
       input = { kind: "time_held", holdingId: holding.id, yearsThreshold: parseFloat(years) };
@@ -144,39 +176,22 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
         ) : null}
 
         {kind === "price" ? (
-          <>
-            <div>
-              <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-                Avisar cuando
-              </label>
-              <select
-                className="sel"
-                value={direction}
-                onChange={(e) => setDirection(e.target.value as AlertDirection)}
-                aria-label="Dirección"
-                style={{ height: 38 }}
-              >
-                <option value="above">suba a</option>
-                <option value="below">baje a</option>
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: 110 }}>
-              <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-                Precio objetivo ({holding.currency})
-              </label>
-              <input
-                className="inp"
-                type="number"
-                step="any"
-                min="0"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="0"
-                aria-label="Precio objetivo"
-                style={{ width: "100%" }}
-              />
-            </div>
-          </>
+          <div style={{ flex: 1, minWidth: 140 }}>
+            <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
+              Precio objetivo ({holding.currency})
+            </label>
+            <input
+              className="inp"
+              type="number"
+              step="any"
+              min="0"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="0"
+              aria-label="Precio objetivo"
+              style={{ width: "100%" }}
+            />
+          </div>
         ) : kind === "time_held" ? (
           <div style={{ flex: 1, minWidth: 140 }}>
             <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
@@ -214,6 +229,28 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
           {busy ? "…" : "Crear alerta"}
         </button>
       </div>
+
+      {/* Precio actual (live) + hint dinámico. La dirección la infiere el servidor al guardar. */}
+      {kind === "price" ? (
+        <div className="muted" style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.45 }}>
+          {liveState === "loading" ? (
+            "Leyendo el precio actual…"
+          ) : liveState === "err" ? (
+            "No pudimos leer el precio ahora; podés crear la alerta igual."
+          ) : live ? (
+            <>
+              Precio actual: <strong>{formatMoney(live.price, live.currency)}</strong>.
+            </>
+          ) : null}
+          {parseFloat(target) > 0 ? (
+            <>
+              {" "}
+              Te avisaremos cuando {holding.symbol} llegue a{" "}
+              <strong>{formatMoney(parseFloat(target), holding.currency)}</strong>.
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <p className="muted" style={{ fontSize: 11, marginTop: 8, lineHeight: 1.45 }}>
         Te avisamos por correo y en la campana cuando se cumpla la condición. No es tiempo real (se

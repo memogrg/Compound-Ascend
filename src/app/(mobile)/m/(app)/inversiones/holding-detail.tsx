@@ -22,7 +22,7 @@ import {
 } from "@/modules/wealth/api/actions";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
-import type { AlertDirection, AlertKind } from "@/modules/wealth/engine/price-alerts";
+import type { AlertKind } from "@/modules/wealth/engine/price-alerts";
 import type { InvestmentAlert } from "@/modules/wealth/services/price-alerts-service";
 import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
@@ -86,6 +86,8 @@ function todayISO(): string {
 }
 
 const QUOTED_ALERT = new Set(["etf", "accion", "cripto"]);
+/** asset_type del holding → tipo de mercado del endpoint /api/market-price. */
+const MARKET_TYPE_ALERT: Record<string, string> = { etf: "etf", accion: "stock", cripto: "crypto" };
 const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   price: "Precio",
   time_held: "Años invertido",
@@ -148,9 +150,10 @@ export function HoldingDetailSheet({
   const [paidUntil, setPaidUntil] = useState<PlanPeriod | null>(null);
   const [alerts, setAlerts] = useState<InvestmentAlert[]>([]);
   const [alertTarget, setAlertTarget] = useState<number | undefined>(undefined);
-  const [alertDir, setAlertDir] = useState<AlertDirection>("above");
   const [alertYears, setAlertYears] = useState<number | undefined>(undefined);
   const [alertDate, setAlertDate] = useState<string | undefined>(undefined);
+  const [alertLive, setAlertLive] = useState<{ price: number; currency: string } | null>(null);
+  const [alertLiveState, setAlertLiveState] = useState<"loading" | "ok" | "err" | "na">("na");
   // Tipos disponibles según el activo: Precio (cotizable), Años (con fecha de compra), Vesting (siempre).
   const alertKinds: AlertKind[] = [
     ...(holding.symbol && QUOTED_ALERT.has(holding.assetType) ? (["price"] as const) : []),
@@ -158,6 +161,31 @@ export function HoldingDetailSheet({
     "vesting",
   ];
   const [alertKind, setAlertKind] = useState<AlertKind>(alertKinds[0]!);
+  const alertMarketType = holding.symbol ? MARKET_TYPE_ALERT[holding.assetType] : undefined;
+  useEffect(() => {
+    if (alertKind !== "price" || !holding.symbol || !alertMarketType) {
+      setAlertLive(null);
+      setAlertLiveState("na");
+      return;
+    }
+    let ok = true;
+    setAlertLive(null);
+    setAlertLiveState("loading");
+    fetch(`/api/market-price?symbol=${encodeURIComponent(holding.symbol)}&type=${alertMarketType}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("no price"))))
+      .then((d: { price: number; currency: string }) => {
+        if (ok) {
+          setAlertLive({ price: Number(d.price), currency: d.currency });
+          setAlertLiveState("ok");
+        }
+      })
+      .catch(() => {
+        if (ok) setAlertLiveState("err");
+      });
+    return () => {
+      ok = false;
+    };
+  }, [alertKind, holding.symbol, alertMarketType]);
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -217,7 +245,7 @@ export function HoldingDetailSheet({
               assetType: holding.assetType,
               targetPrice: alertTarget!,
               currency: cur,
-              direction: alertDir,
+              // La dirección la infiere el servidor con el precio actual.
             }
           : alertKind === "time_held"
             ? { kind: "time_held" as const, holdingId: holding.id, yearsThreshold: alertYears! }
@@ -647,19 +675,6 @@ export function HoldingDetailSheet({
               {/* Form del tipo elegido */}
               {alertKind === "price" ? (
                 <>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                    {(["above", "below"] as const).map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        className="m-chip"
-                        onClick={() => setAlertDir(d)}
-                        style={alertDir === d ? { background: "var(--accent)", color: "#fff" } : undefined}
-                      >
-                        {d === "above" ? "Sube a" : "Baja a"}
-                      </button>
-                    ))}
-                  </div>
                   <MoneyField
                     name="alertTarget"
                     label={`Precio objetivo (${cur})`}
@@ -667,6 +682,19 @@ export function HoldingDetailSheet({
                     onChange={setAlertTarget}
                     currency={cur}
                   />
+                  {/* Precio actual (live) + hint. La dirección la infiere el servidor al guardar. */}
+                  <div className="muted" style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.4 }}>
+                    {alertLiveState === "loading"
+                      ? "Leyendo el precio actual…"
+                      : alertLiveState === "err"
+                        ? "No pudimos leer el precio ahora; podés crear la alerta igual."
+                        : alertLive
+                          ? `Precio actual: ${formatMoney(alertLive.price, alertLive.currency)}.`
+                          : ""}
+                    {alertTarget && alertTarget > 0
+                      ? ` Te avisaremos cuando ${holding.symbol} llegue a ${formatMoney(alertTarget, cur)}.`
+                      : ""}
+                  </div>
                 </>
               ) : alertKind === "time_held" ? (
                 <div className="m-qfield">
