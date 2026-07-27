@@ -201,3 +201,31 @@ export function monedaDelPagoEsCoherente(
 ): boolean {
   return !monedaDelImporte || monedaDelImporte === monedaDeLaDeuda;
 }
+
+/**
+ * Importe a MOSTRAR en una fila de la lista de deudas, en la moneda de la propia deuda.
+ *
+ * Principio (de Memo, ya asentado en inversiones/metas/pólizas): una fila muestra el
+ * importe en la moneda de la ENTIDAD, igual que su formulario; los TOTALES sí se
+ * convierten a la de display para poder sumar monedas distintas. El view-model de la
+ * deuda trae el saldo YA convertido a la de display (lo necesita el motor de estrategia y
+ * los totales); aquí, si la deuda está en OTRA moneda, se recupera el importe NATIVO del
+ * dato crudo — así una tarjeta en USD se ve como su saldo real en $ y no como ₡18,2 M.
+ *
+ * Cuando la moneda de la deuda coincide con la de display (el 90% de los casos) devuelve
+ * el convertido —idéntico al nativo, porque convertir de una moneda a sí misma no cambia
+ * nada— para no alterar en absoluto esa lista (incluida la escala compartida de la columna).
+ *
+ * Recibe el dato CRUDO a propósito (misma disciplina que cuotaPrecargada): si algún día se
+ * le pasa como "nativo" un importe ya convertido, el test de multimoneda lo delata.
+ */
+export function montoFilaDeuda(
+  nativo: { amount: number; currency: string } | undefined,
+  convertido: number,
+  displayCurrency: string,
+): { amount: number; currency: string } {
+  if (nativo && nativo.currency !== displayCurrency) {
+    return { amount: nativo.amount, currency: nativo.currency };
+  }
+  return { amount: convertido, currency: displayCurrency };
+}

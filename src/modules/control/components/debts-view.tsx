@@ -18,6 +18,7 @@ import {
   type DebtInput,
   type DebtMethod,
   cuotaPrecargada,
+  montoFilaDeuda,
 } from "@/modules/control/engine/debt-strategy";
 import { buildSchedule, type AmortizationInput } from "@/modules/control/engine/amortization";
 import type { DebtsOverview, DebtVM } from "@/modules/control/services/debts-service";
@@ -479,6 +480,19 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           const s = summaries.get(d.id)!;
           const isHighest = d.apr === totals.highestApr && totals.highestApr > 0;
           const raw = rawById.get(d.id);
+          // Fila = moneda de la deuda. El VM trae los montos convertidos a la de display (para
+          // los totales y el motor); si la deuda está en OTRA moneda, la fila muestra sus
+          // importes NATIVOS (saldo, original y cuota), como ya hacen inversiones/metas/pólizas.
+          const saldo = montoFilaDeuda(
+            raw ? { amount: raw.balance, currency: raw.currency } : undefined,
+            d.balance,
+            currency,
+          );
+          const filaCur = saldo.currency;
+          const otraMoneda = filaCur !== currency;
+          const filaOriginal = otraMoneda && raw ? raw.originalAmount : d.originalAmount;
+          const filaMensual = otraMoneda && raw ? raw.currentPayment : d.monthlyPayment;
+          const filaMin = otraMoneda && raw ? raw.minPayment : d.minPayment;
           return (
             <div key={d.id} style={{ position: "relative" }}>
             <Link href={`/deudas/${d.id}`} className="debt-row">
@@ -496,7 +510,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                 {d.dueSoon && d.nextDue ? (
                   <div style={{ fontSize: 11, color: "var(--neg)", marginTop: 3, fontWeight: 500 }}>
                     Vence el {dueLabel(d.nextDue)} —{" "}
-                    {formatMoney(d.monthlyPayment > 0 ? d.monthlyPayment : d.minPayment, currency)}
+                    {formatMoney(filaMensual > 0 ? filaMensual : filaMin, filaCur)}
                   </div>
                 ) : null}
                 {d.rateNote ? (
@@ -517,14 +531,14 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                 </div>
                 <div className="dbar-meta">
                   <span>
-                    {d.originalAmount
-                      ? `${formatMoney(d.balance, currency)} de ${formatMoney(d.originalAmount, currency)}`
-                      : formatMoney(d.balance, currency)}
+                    {filaOriginal
+                      ? `${formatMoney(saldo.amount, filaCur)} de ${formatMoney(filaOriginal, filaCur)}`
+                      : formatMoney(saldo.amount, filaCur)}
                   </span>
                   <span>
-                    {d.monthlyPayment > 0
-                      ? `${formatMoney(d.monthlyPayment, currency)}/mes`
-                      : `mín. ${formatMoney(d.minPayment, currency)}`}
+                    {filaMensual > 0
+                      ? `${formatMoney(filaMensual, filaCur)}/mes`
+                      : `mín. ${formatMoney(filaMin, filaCur)}`}
                   </span>
                 </div>
               </div>
@@ -534,7 +548,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               </div>
               <div className="dbal">
                 <div>
-                  <div className="b">{formatMoney(d.balance, currency)}</div>
+                  <div className="b">{formatMoney(saldo.amount, filaCur)}</div>
                   <div className="m">≈ {monthsToText(s.monthsRemaining)}</div>
                 </div>
                 <span className="chev">
