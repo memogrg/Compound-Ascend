@@ -6,6 +6,7 @@ import {
   policyInputSchema,
   holdingInputSchema,
   holdingSaleInputSchema,
+  holdingContributionSchema,
   dividendInputSchema,
   rentalPaymentInputSchema,
 } from "@/modules/wealth/schemas";
@@ -24,6 +25,7 @@ import {
   updateHolding,
   deleteHolding,
   recordHoldingSale,
+  contributeToHolding,
 } from "@/modules/wealth/services/holdings-service";
 import {
   createDividend,
@@ -242,6 +244,22 @@ export async function removeHoldingAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/** Aporte/compra a una posición existente (el "+" contextual). Reusa la lógica de merge/valor
+ *  de holdings-service; la moneda la valida el servicio contra el holding. */
+export async function contributeToHoldingAction(raw: unknown): Promise<ActionResult> {
+  const parsed = holdingContributionSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await contributeToHolding(parsed.data);
+    revalidatePath("/patrimonio");
+    return { ok: true };
+  } catch (err) {
+    logger.error("contributeToHolding fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: err instanceof Error ? err.message : "No pudimos registrar el aporte." };
   }
 }
 

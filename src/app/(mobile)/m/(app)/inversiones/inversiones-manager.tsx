@@ -16,9 +16,14 @@ import { removeHoldingAction } from "@/modules/wealth/api/actions";
 import type { HoldingNativo, HoldingPerformance } from "@/modules/wealth/types";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
-import { Fab, BottomSheet, ConfirmDialog, SwipeRow, useToast } from "../../components/form-kit";
+import { Fab, BottomSheet, ConfirmDialog, SwipeRow, PlusChoiceSheet, useToast } from "../../components/form-kit";
 import { MContentCard, MDataRow, MEmptyState, mAmount } from "../../components/content-kit";
-import { HoldingWizardSheet, SellHoldingForm } from "./inversiones-forms";
+import {
+  HoldingWizardSheet,
+  SellHoldingForm,
+  HoldingPickerSheet,
+  ContributeHoldingForm,
+} from "./inversiones-forms";
 import { HoldingDetailSheet } from "./holding-detail";
 
 const NATURE_LABEL: Record<string, string> = { cashflow: "Flujo", growth: "Crecimiento" };
@@ -49,6 +54,10 @@ export function InversionesManager({
   const [movH, setMovH] = useState<HoldingPerformance | null>(null); // detalle de la posición
   const [deleteH, setDeleteH] = useState<HoldingPerformance | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // El "+" contextual: elección (aportar/crear) → picker de inversión → hoja de aporte.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [contributeTo, setContributeTo] = useState<HoldingNativo | null>(null);
 
   const confirmDelete = async () => {
     if (!deleteH) return;
@@ -153,7 +162,63 @@ export function InversionesManager({
         </MContentCard>
       )}
 
-      <Fab onClick={() => setAdding(true)} label="Agregar inversión" />
+      {/* Sin inversiones aún no hay a qué aportar → el "+" va directo a crear. Con al menos
+          una, ofrece la elección contextual (aportar a una que ya tienes / crear nueva). */}
+      <Fab
+        onClick={() => (holdings.length === 0 ? setAdding(true) : setPlusOpen(true))}
+        label={holdings.length === 0 ? "Agregar inversión" : "Aportar o crear inversión"}
+      />
+
+      {/* El "+" contextual: elegir entre aportar a una existente o crear una nueva. */}
+      <PlusChoiceSheet
+        open={plusOpen}
+        onClose={() => setPlusOpen(false)}
+        title="Inversiones"
+        options={[
+          {
+            key: "aportar",
+            label: "Aportar a una inversión",
+            desc: "Suma a una posición que ya tienes",
+            onSelect: () => setPicking(true),
+          },
+          {
+            key: "crear",
+            label: "Crear inversión nueva",
+            desc: "Registra una posición nueva",
+            onSelect: () => setAdding(true),
+          },
+        ]}
+      />
+
+      {/* Aportar · paso 1: elegir la inversión (todas, cotizadas y manuales). */}
+      <HoldingPickerSheet
+        open={picking}
+        holdings={holdings}
+        rawById={rawById}
+        onPick={(raw) => {
+          setPicking(false);
+          setContributeTo(raw);
+        }}
+        onClose={() => setPicking(false)}
+      />
+
+      {/* Aportar · paso 2: importe en la moneda de la inversión (+ precio si es cotizada) + fecha. */}
+      <BottomSheet
+        open={!!contributeTo}
+        onClose={() => setContributeTo(null)}
+        title="Aportar a la inversión"
+      >
+        {contributeTo ? (
+          <ContributeHoldingForm
+            holding={contributeTo}
+            currency={currency}
+            onSuccess={() => {
+              setContributeTo(null);
+              router.refresh();
+            }}
+          />
+        ) : null}
+      </BottomSheet>
 
       {/* Cada hoja se monta SOLO cuando su objetivo está activo: así el wizard
           arranca con el estado inicial correcto desde `prefill` (los inicializadores
