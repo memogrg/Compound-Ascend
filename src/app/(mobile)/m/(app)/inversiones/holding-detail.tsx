@@ -22,7 +22,7 @@ import {
 } from "@/modules/wealth/api/actions";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
-import type { AlertDirection } from "@/modules/wealth/engine/price-alerts";
+import type { AlertDirection, AlertKind } from "@/modules/wealth/engine/price-alerts";
 import type { InvestmentAlert } from "@/modules/wealth/services/price-alerts-service";
 import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
 import type {
@@ -85,6 +85,13 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+const QUOTED_ALERT = new Set(["etf", "accion", "cripto"]);
+const ALERT_KIND_LABEL: Record<AlertKind, string> = {
+  price: "Precio",
+  time_held: "Años invertido",
+  vesting: "Vesting",
+};
+
 /** Etiqueta de fecha corta (día + mes) para los puntos del gráfico con scrub. */
 function dayLabel(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", { day: "numeric", month: "short" });
@@ -142,6 +149,15 @@ export function HoldingDetailSheet({
   const [alerts, setAlerts] = useState<InvestmentAlert[]>([]);
   const [alertTarget, setAlertTarget] = useState<number | undefined>(undefined);
   const [alertDir, setAlertDir] = useState<AlertDirection>("above");
+  const [alertYears, setAlertYears] = useState<number | undefined>(undefined);
+  const [alertDate, setAlertDate] = useState<string | undefined>(undefined);
+  // Tipos disponibles según el activo: Precio (cotizable), Años (con fecha de compra), Vesting (siempre).
+  const alertKinds: AlertKind[] = [
+    ...(holding.symbol && QUOTED_ALERT.has(holding.assetType) ? (["price"] as const) : []),
+    ...(raw.purchaseDate ? (["time_held"] as const) : []),
+    "vesting",
+  ];
+  const [alertKind, setAlertKind] = useState<AlertKind>(alertKinds[0]!);
   const [rentals, setRentals] = useState<RentalPayment[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -182,26 +198,48 @@ export function HoldingDetailSheet({
     void listInvestmentAlertsAction(holding.id).then(setAlerts);
   }, [holding.id]);
 
+  const alertValid =
+    alertKind === "price"
+      ? !!(alertTarget && alertTarget > 0)
+      : alertKind === "time_held"
+        ? !!(alertYears && alertYears > 0)
+        : !!(alertDate && /^\d{4}-\d{2}-\d{2}$/.test(alertDate));
+
   const createAlert = () => {
-    if (!(alertTarget && alertTarget > 0)) return;
+    if (!alertValid) return;
     startTransition(async () => {
-      const res = await createInvestmentAlertAction({
-        kind: "price",
-        holdingId: holding.id,
-        symbol: holding.symbol ?? "",
-        assetType: holding.assetType,
-        targetPrice: alertTarget,
-        currency: cur,
-        direction: alertDir,
-      });
+      const input =
+        alertKind === "price"
+          ? {
+              kind: "price" as const,
+              holdingId: holding.id,
+              symbol: holding.symbol ?? "",
+              assetType: holding.assetType,
+              targetPrice: alertTarget!,
+              currency: cur,
+              direction: alertDir,
+            }
+          : alertKind === "time_held"
+            ? { kind: "time_held" as const, holdingId: holding.id, yearsThreshold: alertYears! }
+            : { kind: "vesting" as const, holdingId: holding.id, triggerDate: alertDate! };
+      const res = await createInvestmentAlertAction(input);
       if (res.ok) {
         setAlertTarget(undefined);
+        setAlertYears(undefined);
+        setAlertDate(undefined);
         reloadAlerts();
         toast.show("Alerta creada", "success");
       } else {
         toast.show(res.message ?? "No se pudo crear la alerta", "error");
       }
     });
+  };
+
+  /** Descripción de una alerta existente, por tipo. */
+  const describeAlert = (a: InvestmentAlert): string => {
+    if (a.kind === "time_held") return `A los ${a.yearsThreshold} años invertido`;
+    if (a.kind === "vesting") return `El ${a.triggerDate}`;
+    return `${a.direction === "above" ? "Sube a" : "Baja a"} ${formatMoney(a.targetPrice ?? 0, a.currency ?? "")}`;
   };
 
   const removeAlert = (id: string) => {
@@ -216,7 +254,12 @@ export function HoldingDetailSheet({
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    const jobs: Promise<unknown>[] = [];
+    const jobs: Promise<unknown>[] = [
+      // Las alertas aplican a CUALQUIER holding (vesting/años, no solo cotizados).
+      listInvestmentAlertsAction(holding.id).then((a) => {
+        if (alive) setAlerts(a);
+      }),
+    ];
     if (quoted) {
       jobs.push(
         listHoldingPurchasesAction(holding.id).then((p) => {
@@ -227,9 +270,6 @@ export function HoldingDetailSheet({
         }),
         getHoldingHistoryAction(holding, nativePrice, "all").then((h) => {
           if (alive) setHistory(h);
-        }),
-        listInvestmentAlertsAction(holding.id).then((a) => {
-          if (alive) setAlerts(a);
         }),
       );
     }
@@ -577,69 +617,115 @@ export function HoldingDetailSheet({
               ) : null}
             </div>
 
-            {/* Alerta de precio (solo cotizados con símbolo) */}
-            {quoted && holding.symbol ? (
-              <div>
-                <div className="sec-title" style={{ marginBottom: 6 }}>
-                  Alerta de precio
-                </div>
-                <div className="muted" style={{ fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>
-                  Te avisamos por correo y en la campana cuando el precio cruce tu objetivo. No es
-                  tiempo real ni una recomendación de inversión.
-                </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  {(["above", "below"] as const).map((d) => (
+            {/* Alertas de inversión (precio si cotiza · años invertido · vesting) */}
+            <div>
+              <div className="sec-title" style={{ marginBottom: 6 }}>
+                Alertas
+              </div>
+              <div className="muted" style={{ fontSize: 12, lineHeight: 1.45, marginBottom: 8 }}>
+                Te avisamos por correo y en la campana cuando se cumpla la condición. No es tiempo
+                real ni una recomendación de inversión.
+              </div>
+
+              {/* Selector de tipo (si hay más de uno) */}
+              {alertKinds.length > 1 ? (
+                <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                  {alertKinds.map((k) => (
                     <button
-                      key={d}
+                      key={k}
                       type="button"
                       className="m-chip"
-                      onClick={() => setAlertDir(d)}
-                      style={alertDir === d ? { background: "var(--accent)", color: "#fff" } : undefined}
+                      onClick={() => setAlertKind(k)}
+                      style={alertKind === k ? { background: "var(--accent)", color: "#fff" } : undefined}
                     >
-                      {d === "above" ? "Sube a" : "Baja a"}
+                      {ALERT_KIND_LABEL[k]}
                     </button>
                   ))}
                 </div>
-                <MoneyField
-                  name="alertTarget"
-                  label={`Precio objetivo (${cur})`}
-                  value={alertTarget}
-                  onChange={setAlertTarget}
-                  currency={cur}
-                />
-                <button
-                  type="button"
-                  className="m-btn m-btn-block m-btn-secondary"
-                  style={{ marginTop: 8 }}
-                  disabled={pending || !(alertTarget && alertTarget > 0)}
-                  onClick={createAlert}
-                >
-                  Crear alerta
-                </button>
-                {alerts.length > 0 ? (
-                  <div className="card" style={{ padding: 0, marginTop: 8 }}>
-                    {alerts.map((a) => (
-                      <div key={a.id} className="between" style={{ padding: "9px 12px" }}>
-                        <span style={{ fontSize: 12.5 }}>
-                          {a.direction === "above" ? "Sube a" : "Baja a"}{" "}
-                          <span className="mono" style={{ fontWeight: 600 }}>
-                            {formatMoney(a.targetPrice ?? 0, a.currency ?? "")}
-                          </span>
-                          {a.triggeredAt ? (
-                            <span className="muted"> · disparada</span>
-                          ) : !a.active ? (
-                            <span className="muted"> · pausada</span>
-                          ) : null}
-                        </span>
-                        <button type="button" className="m-chip" disabled={pending} onClick={() => removeAlert(a.id)}>
-                          Borrar
-                        </button>
-                      </div>
+              ) : null}
+
+              {/* Form del tipo elegido */}
+              {alertKind === "price" ? (
+                <>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    {(["above", "below"] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className="m-chip"
+                        onClick={() => setAlertDir(d)}
+                        style={alertDir === d ? { background: "var(--accent)", color: "#fff" } : undefined}
+                      >
+                        {d === "above" ? "Sube a" : "Baja a"}
+                      </button>
                     ))}
                   </div>
-                ) : null}
-              </div>
-            ) : null}
+                  <MoneyField
+                    name="alertTarget"
+                    label={`Precio objetivo (${cur})`}
+                    value={alertTarget}
+                    onChange={setAlertTarget}
+                    currency={cur}
+                  />
+                </>
+              ) : alertKind === "time_held" ? (
+                <div className="m-qfield">
+                  <div className="m-qlabel">Años invertido</div>
+                  <input
+                    className="m-inp"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="any"
+                    value={alertYears ?? ""}
+                    onChange={(e) => setAlertYears(e.target.value ? Number(e.target.value) : undefined)}
+                    placeholder="Ej. 5"
+                  />
+                </div>
+              ) : (
+                <DateField
+                  name="alertDate"
+                  label="Fecha de vesting"
+                  value={alertDate ?? ""}
+                  onChange={(v) => setAlertDate(v || undefined)}
+                />
+              )}
+
+              <button
+                type="button"
+                className="m-btn m-btn-block m-btn-secondary"
+                style={{ marginTop: 8 }}
+                disabled={pending || !alertValid}
+                onClick={createAlert}
+              >
+                Crear alerta
+              </button>
+
+              {alerts.length > 0 ? (
+                <div className="card" style={{ padding: 0, marginTop: 8 }}>
+                  {alerts.map((a) => (
+                    <div key={a.id} className="between" style={{ padding: "9px 12px" }}>
+                      <span style={{ fontSize: 12.5 }}>
+                        <span className="muted" style={{ fontSize: 10.5, textTransform: "uppercase" }}>
+                          {ALERT_KIND_LABEL[a.kind]}
+                        </span>{" "}
+                        <span className="mono" style={{ fontWeight: 600 }}>
+                          {describeAlert(a)}
+                        </span>
+                        {a.triggeredAt ? (
+                          <span className="muted"> · disparada</span>
+                        ) : !a.active ? (
+                          <span className="muted"> · pausada</span>
+                        ) : null}
+                      </span>
+                      <button type="button" className="m-chip" disabled={pending} onClick={() => removeAlert(a.id)}>
+                        Borrar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
             {/* Compras / aportes (solo cotizados) */}
             {quoted ? (
