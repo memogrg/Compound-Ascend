@@ -5,10 +5,11 @@
 # (vercel.json, ?kinds=date). Separar cadencias hace que la alerta de precio sirva para
 # salidas sin pagar Vercel Pro.
 #
-# SECRETS a crear en el repo (Settings → Secrets and variables → Actions → New repository secret):
-#   · CRON_SECRET      — el MISMO valor que el env CRON_SECRET de Vercel.
-#   · ALERTS_CRON_URL  — la URL de PROD del endpoint, SIN query. Ejemplo:
-#                        https://TU-APP.vercel.app/api/investments/price-alerts
+# CONFIG a crear en el repo (Settings → Secrets and variables → Actions):
+#   · CRON_SECRET     — pestaña "Secrets" (es sensible; se enmascara en logs). El MISMO valor
+#                       que el env CRON_SECRET de Vercel.
+#   · ALERTS_CRON_URL — pestaña "Variables" (la URL de prod no es secreto). La URL del endpoint,
+#                       SIN query. Ejemplo: https://TU-APP.vercel.app/api/investments/price-alerts
 #
 # Caveats honestos:
 #   · NO es tiempo real: el cron de GitHub puede retrasarse unos minutos; la alerta es tan
@@ -39,12 +40,16 @@ jobs:
     steps:
       - name: Barrido de alertas de precio (?kinds=price)
         env:
-          ALERTS_CRON_URL: ${{ secrets.ALERTS_CRON_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          ALERTS_CRON_URL: ${{ vars.ALERTS_CRON_URL }} # Actions variable (URL, no secreto)
+          CRON_SECRET: ${{ secrets.CRON_SECRET }} # Actions secret (sensible)
         run: |
           set -euo pipefail
-          if [ -z "${ALERTS_CRON_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::Faltan los secrets ALERTS_CRON_URL y/o CRON_SECRET del repo."
+          if [ -z "${ALERTS_CRON_URL:-}" ]; then
+            echo "::error::Falta la variable ALERTS_CRON_URL (Settings → Variables)."
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Falta el secret CRON_SECRET (Settings → Secrets)."
             exit 1
           fi
           code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
