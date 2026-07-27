@@ -1,5 +1,6 @@
 /// <reference types="@capacitor/cli" />
 import type { CapacitorConfig } from '@capacitor/cli';
+import { KeyboardResize } from '@capacitor/keyboard';
 
 /**
  * De dónde carga la app (se decide al correr `cap sync`/`cap copy`, que evalúan este archivo).
@@ -56,6 +57,24 @@ const config: CapacitorConfig = {
     contentInset: 'never',
   },
   plugins: {
+    Keyboard: {
+      // TECLADO iOS (solo iOS; Android ignora esta opción y usa adjustResize del manifest).
+      //
+      // Por qué existe: al enfocar un input, el WKWebView por defecto (resize:'native')
+      // REDIMENSIONA/DESPLAZA su propio scrollView —capa nativa— para revelar el campo. Ese
+      // desplazamiento mueve TODO lo pintado, incluidos position:fixed y sticky, y el CSS no
+      // puede evitarlo (lo vivimos en #509/#513: el header y el velo de la hoja se iban a
+      // -294/-124 y el contenido quedaba bajo el reloj). El body{position:fixed} del
+      // scroll-lock web no basta porque el scroll es del scrollView nativo, no del documento.
+      //
+      // 'none' = ni la app ni el WebView se redimensionan: el teclado solo se superpone y el
+      // WebView queda QUIETO. Quien mantiene el input visible sobre el teclado es la propia
+      // app: use-visual-viewport.ts (#513) mide `visualViewport.height` (el área visible por
+      // encima del teclado) y ajusta el alto de la hoja para que el campo no quede tapado. Así
+      // no hay doble manejo. 'body' (redimensionar el <body>) reintroduce reflujo del layout y
+      // competiría con ese hook; 'native' es justo el comportamiento que causa el bug.
+      resize: KeyboardResize.None,
+    },
     SplashScreen: {
       // Auto-oculta el splash tras un instante corto: como el shell carga contenido
       // estático (www/) y no hay JS que llame SplashScreen.hide(), launchAutoHide=true
