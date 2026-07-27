@@ -19,14 +19,18 @@ const getLiquidityBalance = vi.fn();
 const listTransactions = vi.fn();
 const getEnvelopesSummary = vi.fn();
 const formatEnvelopesReply = vi.fn();
+const suggestSobreForChat = vi.fn();
+const getSobreRemaining = vi.fn();
 vi.mock("@/modules/financial-base", () => ({
   getLiquidityBalance: () => getLiquidityBalance(),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
   getEnvelopesSummary: () => getEnvelopesSummary(),
   formatEnvelopesReply: (...a: unknown[]) => formatEnvelopesReply(...a),
+  suggestSobreForChat: (...a: unknown[]) => suggestSobreForChat(...a),
+  getSobreRemaining: (...a: unknown[]) => getSobreRemaining(...a),
 }));
 
-import { matchIntent, answerFromContext, tryRouteQuery } from "@/lib/ai/router";
+import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
 // FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
@@ -262,6 +266,73 @@ describe("Mejora 3 · carril fetch (sobres agrupados por frasco, determinista)",
   it("sin sesión (WhatsApp): la lectura lanza → null (escala)", async () => {
     getEnvelopesSummary.mockRejectedValue(new Error("no session"));
     const routed = await tryRouteQuery(ask("listá mis frascos"), CTX, tc);
+    expect(routed).toBeNull();
+  });
+});
+
+describe("puedo_gastar · ¿me puedo comprar X?", () => {
+  const money = (n: number) => `¢${n}`;
+
+  it('rutea "¿me puedo comprar una cerveza y hamburguesa?" a puedo_gastar con la descripción', () => {
+    const m = matchIntent("¿me puedo comprar una cerveza y hamburguesa?");
+    expect(m?.intent).toBe("puedo_gastar");
+    expect((m?.params.desc as string).toLowerCase()).toContain("cerveza");
+    expect((m?.params.desc as string).toLowerCase()).toContain("hamburguesa");
+  });
+
+  it("extractAmount: solo con señal de moneda/multiplicador (no números sueltos)", () => {
+    expect(extractAmount("algo de ₡8.000")).toBe(8000);
+    expect(extractAmount("un gusto de 8 mil")).toBe(8000);
+    expect(extractAmount("$12")).toBe(12);
+    expect(extractAmount("2 cervezas")).toBeNull(); // número suelto → no lo agarra
+  });
+
+  it("extractAffordDesc deja el ítem sin el monto", () => {
+    expect(extractAffordDesc("¿puedo darme un gusto de ₡8.000?")?.toLowerCase()).toBe("un gusto");
+    expect(extractAffordDesc("me alcanza para unas zapatillas")?.toLowerCase()).toContain("zapatillas");
+  });
+
+  it("affordReply: la cifra sale del motor (no inventada) en cada rama", () => {
+    // Con presupuesto y saldo: informa el disponible; con monto, cuánto queda.
+    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 30000, remaining: 20000, hasBudget: true }, null, money)).toBe(
+      "En Ocio › Restaurantes te quedan ¢20000 este mes.",
+    );
+    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 30000, remaining: 20000, hasBudget: true }, 8000, money)).toContain(
+      "te quedarían ¢12000",
+    );
+    // Agotado (≤0): recordatorio sin regaño.
+    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 55000, remaining: -5000, hasBudget: true }, null, money)).toBe(
+      "Ya usaste tu presupuesto de Ocio › Restaurantes (¢55000 de ¢50000). Si te lo das, te estarías pasando.",
+    );
+    // Sin presupuesto asignado: guía a asignarlo.
+    expect(affordReply("Ocio › Restaurantes", { budget: 0, spent: 0, remaining: 0, hasBudget: false }, null, money)).toContain(
+      "No tenés presupuesto en Ocio › Restaurantes",
+    );
+    // Monto que se pasa: aviso claro.
+    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 45000, remaining: 5000, hasBudget: true }, 8000, money)).toContain(
+      "se pasa por ¢3000",
+    );
+  });
+
+  it("carril determinista: mapea al sobre y responde con el remaining del MOTOR", async () => {
+    suggestSobreForChat.mockResolvedValue({ categoryId: "c-rest", categoryPath: "Ocio › Restaurantes" });
+    getSobreRemaining.mockResolvedValue({ path: "Ocio › Restaurantes", currency: "USD", budget: 50000, spent: 30000, remaining: 20000, hasBudget: true });
+    const routed = await tryRouteQuery(ask("¿me puedo comprar una cerveza y hamburguesa?"), CTX, tc);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.response.reply).toContain("te quedan");
+    expect(routed?.response.reply).toContain("20.000"); // = rem.remaining formateado (motor), no inventado
+    expect(suggestSobreForChat).toHaveBeenCalledWith(expect.stringContaining("cerveza"), "gasto");
+  });
+
+  it("sin sobre que matchee → null (escala; el modelo ofrece el más cercano)", async () => {
+    suggestSobreForChat.mockResolvedValue({ categoryId: null, categoryPath: null });
+    const routed = await tryRouteQuery(ask("¿me puedo comprar algo raro?"), CTX, tc);
+    expect(routed).toBeNull();
+  });
+
+  it("sin sesión (WhatsApp): la lectura del sobre lanza → null (escala)", async () => {
+    suggestSobreForChat.mockRejectedValue(new Error("no session"));
+    const routed = await tryRouteQuery(ask("¿me alcanza para unas zapatillas?"), CTX, tc);
     expect(routed).toBeNull();
   });
 });

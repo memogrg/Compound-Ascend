@@ -431,3 +431,18 @@ describe("buildSystemPrompt · hogar compartido (E4)", () => {
     expect(prompt).toContain("un miembro del hogar");
   });
 });
+
+describe("buildSystemPrompt · política de sobrante + tono conciso", () => {
+  it("incluye la regla dura del SOBRANTE (no es gasto libre; nunca ocio) y el tono tipo Claude", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toContain("SOBRANTE DEL PRESUPUESTO");
+    expect(prompt).toContain("NO es dinero libre");
+    expect(prompt).toMatch(/pagar deudas|fondo de emergencia|libertad financiera/);
+    expect(prompt).toMatch(/NUNCA sugieras gastar el sobrante en restaurantes\/ocio/i);
+    // Si quiere un gusto → evaluar su SOBRE discrecional, no el sobrante global.
+    expect(prompt).toMatch(/SOBRE discrecional/i);
+    // Tono directo/conciso tipo Claude.
+    expect(prompt).toMatch(/tipo Claude/i);
+    expect(prompt).toMatch(/una o dos frases/i);
+  });
+});

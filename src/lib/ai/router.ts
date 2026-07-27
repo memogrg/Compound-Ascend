@@ -46,7 +46,9 @@ type Intent =
   | "saldo_liquidez"
   | "ultimos_movimientos"
   // Sobres agrupados por frasco (determinista, sin alucinar) — lectura fresca:
-  | "listar_sobres";
+  | "listar_sobres"
+  // "¿me puedo comprar X?" → mapea al sobre y dice el restante (determinista) — lectura fresca:
+  | "puedo_gastar";
 
 const KNOWN_INTENTS: Intent[] = [
   "numero_seguridad",
@@ -60,6 +62,7 @@ const KNOWN_INTENTS: Intent[] = [
   "saldo_liquidez",
   "ultimos_movimientos",
   "listar_sobres",
+  "puedo_gastar",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -67,6 +70,7 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "saldo_liquidez",
   "ultimos_movimientos",
   "listar_sobres",
+  "puedo_gastar",
 ]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
@@ -81,10 +85,71 @@ function extractDebtName(text: string): string | null {
   return name && name.length >= 2 ? name : null;
 }
 
+/** Verbos de "¿puedo permitírmelo?" — al frente para capturar la descripción del ítem. */
+const AFFORD_RE =
+  /(?:me\s+puedo\s+comprar|me\s+puedo\s+dar|puedo\s+darme|me\s+alcanza\s+para|me\s+da\s+para|puedo\s+gastar(?:\s+(?:en|para))?)\s+(.+?)[\?\.!¿¡]*$/i;
+
+/** Monto SOLO si viene con señal de moneda (₡/$/…) o multiplicador (mil/k); si no, null (no
+ *  agarra números sueltos como "2 cervezas"). es-CR: "." = miles, "," = decimales. */
+export function extractAmount(text: string): number | null {
+  const m = text.match(/(?:₡|\$|col\$|mx\$|crc|usd)\s*([\d.,]+)|(\d[\d.,]*)\s*(mil|k)\b/i);
+  if (!m) return null;
+  const raw = (m[1] ?? m[2] ?? "").trim();
+  const mult = m[3] ? 1000 : 1;
+  const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n * mult : null;
+}
+
+/** Descripción del ítem tras el verbo, quitando la parte del monto (para mapear el sobre). */
+export function extractAffordDesc(text: string): string | null {
+  const m = text.match(AFFORD_RE);
+  let desc = m?.[1]?.trim();
+  if (!desc) return null;
+  desc = desc
+    .replace(/\b(?:algo\s+de|de|por|unos?|unas?)\s+(?=(?:₡|\$|col\$|mx\$)|\d)/gi, " ")
+    .replace(/(?:₡|\$|col\$|mx\$|crc|usd)\s*[\d.,]+\s*(?:mil|k)?/gi, " ")
+    .replace(/\b\d[\d.,]*\s*(?:mil|k)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,]+|[\s,.?!¿¡]+$/g, "")
+    .trim();
+  return desc.length >= 2 ? desc : null;
+}
+
+/**
+ * Respuesta a "¿me puedo comprar X?" a partir de las cifras del MOTOR (getSobreRemaining) — pura y
+ * testeable. La app INFORMA y GUÍA, no ordena; la decisión es del usuario. Nunca inventa el saldo.
+ */
+export function affordReply(
+  path: string,
+  r: { budget: number; spent: number; remaining: number; hasBudget: boolean },
+  amount: number | null,
+  money: (n: number) => string,
+): string {
+  if (!r.hasBudget) {
+    return `No tenés presupuesto en ${path} este mes; asignale uno y te digo cuánto te queda.`;
+  }
+  if (r.remaining <= 0) {
+    return `Ya usaste tu presupuesto de ${path} (${money(r.spent)} de ${money(r.budget)}). Si te lo das, te estarías pasando.`;
+  }
+  if (amount !== null) {
+    if (amount <= r.remaining) {
+      return `En ${path} te quedan ${money(r.remaining)} este mes; con ${money(amount)} te quedarían ${money(r.remaining - amount)}.`;
+    }
+    return `En ${path} te quedan ${money(r.remaining)} este mes, y ${money(amount)} se pasa por ${money(amount - r.remaining)}. Si te lo das, te estarías pasando.`;
+  }
+  return `En ${path} te quedan ${money(r.remaining)} este mes.`;
+}
+
 /** PATRONES: intent + params con CERO tokens. null si no matchea con confianza. */
 export function matchIntent(text: string): { intent: Intent; params: Record<string, unknown> } | null {
   const t = text.trim();
   if (REASONING_CUES.test(t)) return null; // consejo/proyección → razonamiento
+
+  // "¿me puedo comprar / me alcanza para X?" — al frente: mapea al sobre y dice el restante.
+  if (AFFORD_RE.test(t)) {
+    const desc = extractAffordDesc(t);
+    if (desc) return { intent: "puedo_gastar", params: { desc, amount: extractAmount(t) } };
+  }
 
   // Los TRES números patrimoniales — distinguidos explícitamente (no se mezclan).
   if (/n[uú]mero de seguridad|cu[aá]nto necesito para (?:cubrir )?(?:lo esencial|mis? gastos? esenciales?)/i.test(t)) {
@@ -270,9 +335,27 @@ export function answerFromContext(
  * funciona; en WhatsApp (service-role, sin sesión) el fetch lanza → se captura → null → escala.
  * Devuelve la cifra REAL del ledger; jamás inventa.
  */
-async function resolveFetchIntent(intent: Intent, cur: string): Promise<AIChatResponse | null> {
+async function resolveFetchIntent(
+  intent: Intent,
+  cur: string,
+  params: Record<string, unknown> = {},
+): Promise<AIChatResponse | null> {
   const say = (reply: string): AIChatResponse => ({ reply, action: null });
   try {
+    // "¿me puedo comprar X?": mapea al sobre (determinista) y responde con el restante del MOTOR.
+    if (intent === "puedo_gastar") {
+      const desc = typeof params.desc === "string" ? params.desc : "";
+      if (!desc) return null; // sin ítem → escalar
+      const amount = typeof params.amount === "number" ? params.amount : null;
+      const { suggestSobreForChat, getSobreRemaining } = await import("@/modules/financial-base");
+      const sug = await suggestSobreForChat(desc, "gasto");
+      if (!sug.categoryId) return null; // sin sobre que matchee → escalar (el modelo ofrece el más cercano)
+      const today = new Date().toISOString().slice(0, 10);
+      const rem = await getSobreRemaining(sug.categoryId, today);
+      if (!rem) return null; // sin cifras confiables → escalar (no inventa el saldo)
+      const path = sug.categoryPath ?? rem.path;
+      return say(affordReply(path, rem, amount, (n) => formatMoney(n, rem.currency)));
+    }
     if (intent === "saldo_liquidez") {
       const { getLiquidityBalance } = await import("@/modules/financial-base");
       const { balance } = await getLiquidityBalance();
@@ -325,7 +408,7 @@ export async function tryRouteQuery(
   const matched = matchIntent(lastUser);
   if (matched) {
     if (FETCH_INTENTS.has(matched.intent)) {
-      const response = await resolveFetchIntent(matched.intent, toolContext.currency);
+      const response = await resolveFetchIntent(matched.intent, toolContext.currency, matched.params);
       // La lectura no consume tokens del LLM; su "coste" es una query a la BD.
       return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
     }
@@ -338,7 +421,7 @@ export async function tryRouteQuery(
   const classified = await classifyWithLite(lastUser);
   if (!classified) return null; // ante duda, razonamiento
   const response = FETCH_INTENTS.has(classified.intent)
-    ? await resolveFetchIntent(classified.intent, toolContext.currency)
+    ? await resolveFetchIntent(classified.intent, toolContext.currency, classified.params)
     : answerFromContext(classified.intent, classified.params, toolContext, ctx);
   if (!response) return null;
   // La respuesta es plantilla (0 tokens de generación); solo se pagó la clasificación.
