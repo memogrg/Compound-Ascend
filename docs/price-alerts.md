@@ -11,13 +11,14 @@ para que la alerta de **precio** sea útil para salidas sin pagar Vercel Pro:
 Solo la corrida de **precio** llama a `getMarketPrice`; la de **fecha** es puro comparado de
 fechas (no toca proveedores de mercado). Sin query (`?kinds=all`) evalúa todo — retrocompatible.
 
-## Secrets a crear en GitHub
+## Config a crear en GitHub
 
-En **Settings → Secrets and variables → Actions → New repository secret**:
+En **Settings → Secrets and variables → Actions**:
 
-- `CRON_SECRET` — el **mismo valor** que el env `CRON_SECRET` de Vercel (autoriza el endpoint).
-- `ALERTS_CRON_URL` — la URL de **producción** del endpoint, **sin** query. Ejemplo:
-  `https://TU-APP.vercel.app/api/investments/price-alerts`
+- **Secrets** → `CRON_SECRET` — el **mismo valor** que el env `CRON_SECRET` de Vercel (autoriza el
+  endpoint; es sensible, se enmascara en los logs).
+- **Variables** → `ALERTS_CRON_URL` — la URL de **producción** del endpoint, **sin** query (no es
+  secreto). Ejemplo: `https://TU-APP.vercel.app/api/investments/price-alerts`
 
 El Action manda `Authorization: Bearer $CRON_SECRET` a `${ALERTS_CRON_URL}?kinds=price` y falla si
 el HTTP no es 2xx. Podés dispararlo a mano desde la pestaña **Actions → price-alerts-hourly → Run
