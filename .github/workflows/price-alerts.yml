@@ -1,0 +1,59 @@
+# Alertas de PRECIO — barrido HORARIO (gratis, sin Vercel Pro).
+#
+# Dispara la corrida de precio del endpoint de alertas cada hora. Las alertas de FECHA
+# (años invertido, vesting) NO pasan por acá: las corre el cron DIARIO de Vercel
+# (vercel.json, ?kinds=date). Separar cadencias hace que la alerta de precio sirva para
+# salidas sin pagar Vercel Pro.
+#
+# SECRETS a crear en el repo (Settings → Secrets and variables → Actions → New repository secret):
+#   · CRON_SECRET      — el MISMO valor que el env CRON_SECRET de Vercel.
+#   · ALERTS_CRON_URL  — la URL de PROD del endpoint, SIN query. Ejemplo:
+#                        https://TU-APP.vercel.app/api/investments/price-alerts
+#
+# Caveats honestos:
+#   · NO es tiempo real: el cron de GitHub puede retrasarse unos minutos; la alerta es tan
+#     frecuente como el barrido (a lo sumo cada hora).
+#   · GitHub PAUSA los crons programados tras ~60 días SIN actividad en el repo. Un push/commit
+#     los reactiva (o corré el workflow a mano con "Run workflow").
+#   · El free tier de Finnhub/AlphaVantage tiene rate limit → por eso el endpoint deduplica por
+#     símbolo (un getMarketPrice por símbolo, no por alerta).
+#
+# ALTERNATIVA Vercel Pro: si algún día pagan Pro, agregá en vercel.json
+#   { "path": "/api/investments/price-alerts?kinds=price", "schedule": "0 * * * *" }
+# y BORRÁ este workflow (Vercel correría ambas cadencias nativamente).
+
+name: price-alerts-hourly
+
+on:
+  schedule:
+    - cron: "0 * * * *" # cada hora, minuto 0 (UTC)
+  workflow_dispatch: {} # disparo manual para pruebas
+
+# Sin permisos de escritura: solo hace una petición HTTP saliente.
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Barrido de alertas de precio (?kinds=price)
+        env:
+          ALERTS_CRON_URL: ${{ secrets.ALERTS_CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ALERTS_CRON_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Faltan los secrets ALERTS_CRON_URL y/o CRON_SECRET del repo."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${ALERTS_CRON_URL}?kinds=price")
+          echo "HTTP ${code}"
+          cat /tmp/resp.json 2>/dev/null || true
+          echo
+          case "${code}" in
+            2*) echo "OK" ;;
+            *) echo "::error::El endpoint respondió ${code} (esperaba 2xx)."; exit 1 ;;
+          esac
