@@ -134,7 +134,7 @@ export function PriceAlertSection({
               >
                 <span>
                   {a.direction === "above" ? "Sube a" : "Baja a"}{" "}
-                  <strong>{formatMoney(a.targetPrice, a.currency)}</strong>
+                  <strong>{formatMoney(a.targetPrice ?? 0, a.currency ?? "")}</strong>
                   {triggered ? (
                     <span className="muted"> · disparada</span>
                   ) : !a.active ? (

@@ -622,7 +622,7 @@ export function HoldingDetailSheet({
                         <span style={{ fontSize: 12.5 }}>
                           {a.direction === "above" ? "Sube a" : "Baja a"}{" "}
                           <span className="mono" style={{ fontWeight: 600 }}>
-                            {formatMoney(a.targetPrice, a.currency)}
+                            {formatMoney(a.targetPrice ?? 0, a.currency ?? "")}
                           </span>
                           {a.triggeredAt ? (
                             <span className="muted"> · disparada</span>

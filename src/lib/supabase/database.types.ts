@@ -608,17 +608,21 @@ export type HoldingContributionRow = Timestamps & Audited & {
   transaction_id: string | null;
 };
 
-// Alertas de precio de inversiones cotizadas (migración 20260731000001).
+// Alertas de inversión: price + time_held + vesting (migraciones 20260731000001 +
+// 20260801000001). Las columnas propias de 'price' son nullable (los otros kinds no las usan).
 export type PriceAlertRow = {
   id: string;
   user_id: string;
   household_id: string | null;
   holding_id: string | null;
-  symbol: string;
-  asset_type: string;
-  target_price: number;
+  kind: string;
+  symbol: string | null;
+  asset_type: string | null;
+  target_price: number | null;
   currency: string;
-  direction: string;
+  direction: string | null;
+  years_threshold: number | null;
+  trigger_date: string | null;
   active: boolean;
   one_shot: boolean;
   triggered_at: string | null;
