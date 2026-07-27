@@ -1,10 +1,12 @@
 /**
- * Lógica pura de las alertas de precio (sin IO). El servicio/cron hacen los
- * SELECT/UPDATE y el fetch de precios; acá vive lo testeable: si un precio cruzó
- * el objetivo, y cómo agrupar los símbolos a consultar (un fetch por símbolo).
+ * Lógica pura de las alertas de inversión (sin IO). El servicio/cron hacen los
+ * SELECT/UPDATE, el fetch de precios y la lectura de purchaseDate; acá vive lo
+ * testeable: si una alerta (de cualquier tipo) debe dispararse. Extensible: agregar
+ * un tipo nuevo = un `case` en alertFires + su helper puro.
  */
 
 export type AlertDirection = "above" | "below";
+export type AlertKind = "price" | "time_held" | "vesting";
 
 /**
  * ¿El precio cruzó el objetivo en la dirección pedida?
@@ -42,17 +44,75 @@ export function priceKey(symbol: string, assetType: string): string {
   return `${symbol.toUpperCase()}|${assetType}`;
 }
 
+/** Años transcurridos (fraccionarios) desde purchaseDate hasta nowIso. 0 si datos malos o futuro. */
+export function yearsHeld(purchaseDate: string, nowIso: string): number {
+  const start = Date.parse(purchaseDate);
+  const now = Date.parse(nowIso);
+  if (!Number.isFinite(start) || !Number.isFinite(now) || now <= start) return 0;
+  return (now - start) / (365.25 * 24 * 3600 * 1000);
+}
+
+/** time_held: dispara cuando los años invertidos alcanzan el umbral. Sin purchaseDate → no dispara. */
+export function timeHeldFires(
+  purchaseDate: string | null | undefined,
+  yearsThreshold: number,
+  nowIso: string,
+): boolean {
+  if (!purchaseDate || !(yearsThreshold > 0)) return false;
+  return yearsHeld(purchaseDate, nowIso) >= yearsThreshold;
+}
+
+/** vesting: dispara cuando la fecha de hoy alcanzó o pasó la fecha objetivo (comparación ISO). */
+export function vestingFires(triggerDate: string | null | undefined, nowIso: string): boolean {
+  if (!triggerDate) return false;
+  return nowIso.slice(0, 10) >= triggerDate.slice(0, 10);
+}
+
+/** Datos externos que necesitan los evaluadores: precios (por símbolo) y purchaseDate (por holding). */
+export type AlertEvalContext = {
+  nowIso: string;
+  priceByKey: ReadonlyMap<string, { price: number }>;
+  purchaseDateByHolding: ReadonlyMap<string, string | null>;
+};
+
+/** Campos mínimos que una alerta expone para evaluarse (subconjunto del row). */
+export type EvaluableAlert = {
+  kind: AlertKind;
+  symbol: string | null;
+  assetType: string | null;
+  direction: AlertDirection | null;
+  targetPrice: number | null;
+  holdingId: string | null;
+  yearsThreshold: number | null;
+  triggerDate: string | null;
+};
+
 /**
- * Alertas que DEBEN dispararse: las que tienen precio y cruzaron su objetivo. Una alerta sin
- * precio (símbolo malo / proveedor caído) simplemente no dispara — nunca rompe el barrido.
- * El llamador solo pasa alertas ACTIVAS, así que una one_shot ya disparada (inactiva) no llega
- * acá → no re-dispara.
+ * ¿La alerta debe dispararse AHORA? Un `case` por tipo → un tipo nuevo se agrega acá + su helper.
+ * Datos faltantes (sin precio / sin purchaseDate / sin fecha) → false: nunca rompe el barrido.
+ * El llamador solo pasa alertas ACTIVAS, así que una one_shot ya disparada no llega → no re-dispara.
  */
-export function selectTriggeredAlerts<
-  T extends { symbol: string; assetType: string; direction: AlertDirection; targetPrice: number },
->(alerts: T[], priceByKey: ReadonlyMap<string, { price: number }>): T[] {
-  return alerts.filter((a) => {
-    const quote = priceByKey.get(priceKey(a.symbol, a.assetType));
-    return quote !== undefined && crossed(a.direction, quote.price, a.targetPrice);
-  });
+export function alertFires(a: EvaluableAlert, ctx: AlertEvalContext): boolean {
+  switch (a.kind) {
+    case "price": {
+      if (!a.symbol || !a.assetType || a.direction === null || a.targetPrice === null) return false;
+      const quote = ctx.priceByKey.get(priceKey(a.symbol, a.assetType));
+      return quote !== undefined && crossed(a.direction, quote.price, a.targetPrice);
+    }
+    case "time_held":
+      return (
+        a.holdingId !== null &&
+        a.yearsThreshold !== null &&
+        timeHeldFires(ctx.purchaseDateByHolding.get(a.holdingId), a.yearsThreshold, ctx.nowIso)
+      );
+    case "vesting":
+      return vestingFires(a.triggerDate, ctx.nowIso);
+    default:
+      return false;
+  }
+}
+
+/** Alertas que deben dispararse (best-effort: las que no cumplen o no tienen datos se descartan). */
+export function selectFiringAlerts<T extends EvaluableAlert>(alerts: T[], ctx: AlertEvalContext): T[] {
+  return alerts.filter((a) => alertFires(a, ctx));
 }

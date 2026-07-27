@@ -29,6 +29,7 @@ import { editHoldingAction, removeHoldingAction, getHoldingHistoryAction, adjust
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 import { AddHoldingButton, AddHoldingModal } from "./add-holding-wizard";
 import { HoldingDetailModal } from "./holding-detail-modal";
+import { AlertManager, type AlertHolding } from "./alert-manager";
 import { CompoundCalculator } from "./compound-calculator";
 import { FundMonitor } from "./fund-monitor";
 import type { PortfolioReport } from "@/modules/wealth/services/portfolio-service";
@@ -475,7 +476,26 @@ function DonutCard({
 
 // ── Fila de la tabla con menú kebab de 5 acciones ──────────────────
 
-type RowModal = "movimiento" | "valoracion" | "dashboard" | "editar" | "eliminar" | null;
+type RowModal = "movimiento" | "valoracion" | "dashboard" | "editar" | "eliminar" | "alerta" | null;
+
+/** Datos que necesita el gestor de alertas, desde cualquier holding (crudo o de rendimiento). */
+function alertHolding(hh: {
+  id: string;
+  symbol?: string | null;
+  assetType: string;
+  currency: string;
+  purchaseDate?: string | null;
+  label?: string | null;
+}): AlertHolding {
+  return {
+    id: hh.id,
+    symbol: hh.symbol ?? null,
+    assetType: hh.assetType,
+    currency: hh.currency,
+    purchaseDate: hh.purchaseDate ?? null,
+    name: hh.label ?? hh.symbol ?? "Inversión",
+  };
+}
 
 function BrechaBanner({ contribution }: { contribution: OpenContribution }) {
   const router = useRouter();
@@ -665,6 +685,9 @@ function InvRow({
               <button onClick={() => act("dashboard")}>
                 <Icon name="dashboard" /> Ver dashboard
               </button>
+              <button onClick={() => act("alerta")}>
+                <Icon name="spark" /> Crear alerta
+              </button>
               <button onClick={() => act("editar")}>
                 <Icon name="edit" /> Editar inversión
               </button>
@@ -703,6 +726,13 @@ function InvRow({
           currency={raw.currency}
           onClose={close}
         />
+      ) : null}
+      {modal === "alerta" ? (
+        <Modal title={`Alertas · ${raw?.label ?? h.label ?? h.symbol ?? "inversión"}`} onClose={close}>
+          <div style={{ padding: "6px 22px 20px" }}>
+            <AlertManager holding={alertHolding(raw ?? h)} compact />
+          </div>
+        </Modal>
       ) : null}
       {modal === "valoracion" ? <ValuationModal holding={editHolding} onClose={close} /> : null}
       {modal === "eliminar" ? <DeleteModal holding={editHolding} onClose={close} /> : null}
