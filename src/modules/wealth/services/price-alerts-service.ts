@@ -14,9 +14,10 @@ import "server-only";
 import { requireUser } from "@/lib/auth/session";
 import { householdMemberIds, householdWriteScope, getActiveHouseholdId } from "@/lib/household/active";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { AlertDirection, AlertKind } from "@/modules/wealth/engine/price-alerts";
+import { inferDirection, type AlertDirection, type AlertKind } from "@/modules/wealth/engine/price-alerts";
 
-const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
+/** asset_type del holding → tipo de mercado de getMarketPrice (también gatea "cotizable"). */
+const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = { etf: "etf", accion: "stock", cripto: "crypto" };
 
 export type InvestmentAlert = {
   id: string;
@@ -36,13 +37,13 @@ export type InvestmentAlert = {
 
 export type CreateAlertInput =
   | {
+      // La dirección NO viene del cliente: se infiere en el servidor con el precio actual.
       kind: "price";
       holdingId?: string | null;
       symbol: string;
       assetType: string;
       targetPrice: number;
       currency: string;
-      direction: AlertDirection;
     }
   | { kind: "time_held"; holdingId: string; yearsThreshold: number }
   | { kind: "vesting"; holdingId: string; triggerDate: string };
@@ -127,8 +128,22 @@ export async function createInvestmentAlert(
   if (input.kind === "price") {
     const symbol = input.symbol.trim().toUpperCase();
     if (!symbol) return { ok: false, message: "Falta el símbolo." };
-    if (!QUOTED_TYPES.has(input.assetType)) return { ok: false, message: "Este activo no tiene precio de mercado." };
+    const marketType = MARKET_TYPE[input.assetType];
+    if (!marketType) return { ok: false, message: "Este activo no tiene precio de mercado." };
     if (!(input.targetPrice > 0)) return { ok: false, message: "El precio objetivo debe ser mayor a 0." };
+
+    // Dirección AUTORITATIVA: se infiere con el precio actual (no la manda el cliente).
+    const { getMarketPrice } = await import("@/lib/market-data");
+    const quote = await getMarketPrice(symbol, marketType);
+    if (!quote || !(quote.price > 0)) {
+      return { ok: false, message: "No pudimos leer el precio ahora. Probá de nuevo en un momento." };
+    }
+    const direction = inferDirection(input.targetPrice, quote.price);
+    if (direction === null) {
+      const actual = quote.price.toLocaleString("es-CR", { maximumFractionDigits: 8 });
+      return { ok: false, message: `Elegí un precio distinto al actual (${actual}).` };
+    }
+
     row = {
       ...base,
       holding_id: input.holdingId ?? null,
@@ -136,7 +151,7 @@ export async function createInvestmentAlert(
       asset_type: input.assetType,
       target_price: input.targetPrice,
       currency: input.currency,
-      direction: input.direction,
+      direction,
     };
   } else if (input.kind === "time_held") {
     if (!input.holdingId) return { ok: false, message: "Falta la inversión." };

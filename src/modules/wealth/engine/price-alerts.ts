@@ -32,6 +32,22 @@ export function crossed(direction: AlertDirection, price: number, target: number
 }
 
 /**
+ * Infiere la dirección de una alerta de precio a partir del objetivo y el precio ACTUAL:
+ *   target por ENCIMA del actual → 'above' (avisar cuando suba a ese precio).
+ *   target por DEBAJO del actual → 'below' (avisar cuando baje a ese precio).
+ * Si el objetivo cae dentro de un epsilon relativo del actual (o los datos son inválidos),
+ * la dirección es AMBIGUA → devuelve null y el llamador debe rechazar (no guardar ambiguo).
+ * `epsRel` por defecto 0,01% del precio actual.
+ */
+export function inferDirection(target: number, current: number, epsRel = 1e-4): AlertDirection | null {
+  if (!Number.isFinite(target) || !Number.isFinite(current) || target <= 0 || current <= 0) return null;
+  const band = current * epsRel;
+  if (target > current + band) return "above";
+  if (target < current - band) return "below";
+  return null; // target ≈ actual → ambiguo
+}
+
+/**
  * Símbolos distintos a consultar (un getMarketPrice por símbolo, no por alerta).
  * Normaliza a MAYÚSCULAS y guarda el asset_type para el fetch. Si el mismo símbolo
  * aparece con tipos distintos, se consulta cada par (symbol, type) una vez.

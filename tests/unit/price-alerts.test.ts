@@ -8,6 +8,7 @@ import {
   alertFires,
   selectFiringAlerts,
   kindsFromParam,
+  inferDirection,
   type EvaluableAlert,
   type AlertEvalContext,
 } from "@/modules/wealth/engine/price-alerts";
@@ -48,6 +49,29 @@ describe("crossed · dispara al cruzar el objetivo", () => {
   it("precio inválido (≤0 / NaN) nunca dispara", () => {
     expect(crossed("above", 0, 80000)).toBe(false);
     expect(crossed("below", Number.NaN, 50)).toBe(false);
+  });
+
+  it("OVERSHOOT: un precio que sobrepasó el target igual dispara (≥/≤, no ==)", () => {
+    expect(crossed("above", 85000, 80000)).toBe(true); // saltó por encima entre chequeos
+    expect(crossed("below", 40, 50)).toBe(true); // cayó por debajo entre chequeos
+  });
+});
+
+describe("inferDirection · dirección desde el precio actual (sin pedirla al usuario)", () => {
+  it("target por encima del actual → above; por debajo → below", () => {
+    expect(inferDirection(90000, 80000)).toBe("above");
+    expect(inferDirection(70000, 80000)).toBe("below");
+  });
+
+  it("target ≈ actual (dentro del epsilon) o exacto → null (ambiguo, no se guarda)", () => {
+    expect(inferDirection(80000, 80000)).toBeNull();
+    expect(inferDirection(80000 * (1 + 5e-5), 80000)).toBeNull(); // dentro del 0,01%
+  });
+
+  it("datos inválidos (≤0 / NaN) → null", () => {
+    expect(inferDirection(0, 80000)).toBeNull();
+    expect(inferDirection(90000, 0)).toBeNull();
+    expect(inferDirection(Number.NaN, 80000)).toBeNull();
   });
 });
 
