@@ -5,7 +5,7 @@ para que la alerta de **precio** sea útil para salidas sin pagar Vercel Pro:
 
 | Tipo | Query | Cadencia | Quién la dispara |
 |---|---|---|---|
-| **Precio** | `?kinds=price` | cada hora | **GitHub Action** (`.github/workflows/price-alerts.yml`) |
+| **Precio** | `?kinds=price` | cada 5 min | **GitHub Action** (`.github/workflows/price-alerts.yml`) |
 | **Fecha** (años invertido, vesting) | `?kinds=date` | 1×/día | **Cron de Vercel** (`vercel.json`) |
 
 Solo la corrida de **precio** llama a `getMarketPrice`; la de **fecha** es puro comparado de
@@ -26,12 +26,19 @@ workflow** para probar.
 
 ## Caveats honestos
 
-- **No es tiempo real** — ni la corrida horaria. La alerta es tan frecuente como el barrido (a lo
-  sumo cada hora en precio, 1×/día en fecha).
-- El **cron de GitHub puede retrasarse** unos minutos, y **se PAUSA tras ~60 días sin actividad** en
-  el repo. Un push/commit (o un "Run workflow" manual) lo reactiva.
-- El **free tier de Finnhub/AlphaVantage** tiene rate limit → el endpoint **deduplica por símbolo**
-  (un `getMarketPrice` por símbolo, no por alerta).
+- **No es tiempo real** — ni cada 5 min. La alerta es tan frecuente como el barrido (a lo sumo cada
+  5 min en precio, 1×/día en fecha). GitHub no permite `schedule` por debajo de 5 min y **puede
+  retrasar** la corrida bajo carga.
+- El **cron de GitHub se PAUSA tras ~60 días sin actividad** en el repo. Un push/commit (o un "Run
+  workflow" manual) lo reactiva.
+- **Rate limits del proveedor (el cuello de botella real a 5 min):** cada corrida llama
+  `getMarketPrice` **1× por símbolo** (por eso el dedupe). Finnhub (60/min) y Binance aguantan; ojo
+  con el **fallback AlphaVantage (25/DÍA)** y con Yahoo/CoinGecko (límite por IP) si tenés muchos
+  símbolos — a 288 corridas/día se puede agotar el free tier. Si eso pasa, subí la cadencia (10–15
+  min) o reducí símbolos.
+- **Costo:** en repo **público** los minutos de GitHub Actions son **gratis e ilimitados**; las
+  invocaciones en Vercel son livianas y quedan dentro de Hobby. El límite práctico es el proveedor
+  de precios, no la infra.
 
 ## Alternativa si algún día pagan Vercel Pro
 
