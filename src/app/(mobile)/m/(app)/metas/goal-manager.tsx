@@ -25,6 +25,7 @@ import { todayLocalISO } from "@/lib/validation";
 
 import {
   Fab,
+  PlusChoiceSheet,
   BottomSheet,
   SwipeRow,
   ConfirmDialog,
@@ -115,6 +116,9 @@ export function GoalManager({
   const [editing, setEditing] = useState<SavingsGoal | null>(null);
   const [deleting, setDeleting] = useState<SavingsGoal | null>(null);
   const [contributing, setContributing] = useState<SavingsGoal | null>(null);
+  // El "+" contextual: elección (aportar / crear) → picker de meta → reusa el aporte.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [withdrawing, setWithdrawing] = useState<SavingsGoal | null>(null);
   const [spending, setSpending] = useState<SavingsGoal | null>(null);
   const [viewing, setViewing] = useState<SavingsGoal | null>(null);
@@ -238,7 +242,44 @@ export function GoalManager({
         ))
       )}
 
-      <Fab onClick={() => setAdding(true)} label="Nueva meta" />
+      {/* Sin metas aún no hay a cuál aportar → el "+" va directo a crear. Con al menos una,
+          ofrece la elección: aportar a un ahorro o crear uno nuevo. */}
+      <Fab
+        onClick={() => (goals.length === 0 ? setAdding(true) : setPlusOpen(true))}
+        label={goals.length === 0 ? "Nueva meta" : "Aportar o crear ahorro"}
+      />
+
+      {/* El "+" contextual: aportar a un ahorro existente o crear uno nuevo. */}
+      <PlusChoiceSheet
+        open={plusOpen}
+        onClose={() => setPlusOpen(false)}
+        title="Ahorros"
+        options={[
+          {
+            key: "aportar",
+            label: "Aportar a un ahorro",
+            desc: "Suma a una meta que ya tienes",
+            onSelect: () => setPicking(true),
+          },
+          {
+            key: "crear",
+            label: "Crear ahorro nuevo",
+            desc: "Registra una meta nueva",
+            onSelect: () => setAdding(true),
+          },
+        ]}
+      />
+
+      {/* Aportar · paso 1: elegir la meta → abre el aporte existente. */}
+      <GoalPickerSheet
+        open={picking}
+        goals={goals}
+        onPick={(g) => {
+          setPicking(false);
+          setContributing(g);
+        }}
+        onClose={() => setPicking(false)}
+      />
 
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Nueva meta">
@@ -318,6 +359,50 @@ export function GoalManager({
         onCancel={() => setDeleting(null)}
       />
     </>
+  );
+}
+
+// ── Aportar a un ahorro EXISTENTE (el "+" contextual, Fase 3) ───────────────────
+// Paso 1: elegir cuál. Calca los pickers de las fases previas: cada meta con su acumulado en
+// su moneda. Al elegir, abre el aporte existente.
+function GoalPickerSheet({
+  open,
+  goals,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  goals: SavingsGoal[];
+  onPick: (goal: SavingsGoal) => void;
+  onClose: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="¿A cuál ahorro aportas?">
+      {goals.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, lineHeight: 1.5, padding: "4px 2px 8px" }}>
+          No tienes metas de ahorro. Crea una primero.
+        </div>
+      ) : (
+        <div className="m-optlist">
+          {goals.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              className="m-opt"
+              onClick={() => {
+                onClose();
+                onPick(g);
+              }}
+            >
+              <span>
+                <span className="m-opt-t">{g.name}</span>
+                <span className="m-opt-d">{formatMoney(g.currentAmount, g.currency)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </BottomSheet>
   );
 }
 
