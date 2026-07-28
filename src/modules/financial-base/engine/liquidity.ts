@@ -11,6 +11,33 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Regla de signo del cash para UN evento de dinero — el único lugar donde vive
+ * la tabla de verdad de la liquidez. La aplica `recordTransactionDelta` (camino
+ * normal) y la replica la RPC atómica del pago de deuda en SQL:
+ *
+ *   ingreso                         → +amount   (salario, retiro de meta, venta,
+ *                                                dividendo/renta)
+ *   gasto                           → −amount   (gasto normal, aporte a meta,
+ *                                                compra, prima, pago de deuda)
+ *   gasto OFF-BUDGET (frasco)       →  0        (consumir un frasco de meta:
+ *                                                countsInBudget=false; el cash ya
+ *                                                salió al APORTAR, restar otra vez
+ *                                                lo descuadraría → NEUTRO)
+ *   transferencia / ajuste / otro   →  0        (no mueve el cash)
+ */
+export function liquidityDelta(args: {
+  kind: string;
+  amount: number;
+  countsInBudget?: boolean;
+}): number {
+  // Consumo de un frasco de meta: gasto off-budget → neutro (el aporte ya restó).
+  if (args.kind === "gasto" && args.countsInBudget === false) return 0;
+  if (args.kind === "ingreso") return round2(args.amount);
+  if (args.kind === "gasto") return round2(-args.amount);
+  return 0;
+}
+
 /** Saldo actual = suma de todos los deltas del ledger. */
 export function computeLiquidityBalance(rows: LiquidityRow[]): number {
   return round2(rows.reduce((acc, r) => acc + r.delta, 0));
