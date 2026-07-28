@@ -164,8 +164,20 @@ export const holdingContributionSchema = z.object({
   occurredOn: pastDateSchema,
 });
 
+// Pago de la prima de un seguro EXISTENTE (el "+" de Defensa). El importe va SIEMPRE en la
+// moneda de la póliza (el servicio lo valida contra policy.currency). `policyName` es la
+// etiqueta bonita que ya tiene la UI, para la descripción de la transacción vinculada.
+export const policyPremiumInputSchema = z.object({
+  policyId: z.string().uuid(),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  currency: z.string().length(3),
+  paymentDate: pastDateSchema,
+  policyName: z.string().max(120).optional(),
+});
+
 export type HoldingInput = z.infer<typeof holdingInputSchema>;
 export type HoldingSaleInput = z.infer<typeof holdingSaleInputSchema>;
 export type HoldingContributionInput = z.infer<typeof holdingContributionSchema>;
+export type PolicyPremiumInput = z.infer<typeof policyPremiumInputSchema>;
 export type DividendInput = z.infer<typeof dividendInputSchema>;
 export type RentalPaymentInput = z.infer<typeof rentalPaymentInputSchema>;

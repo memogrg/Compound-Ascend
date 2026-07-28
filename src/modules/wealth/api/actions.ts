@@ -7,6 +7,7 @@ import {
   holdingInputSchema,
   holdingSaleInputSchema,
   holdingContributionSchema,
+  policyPremiumInputSchema,
   dividendInputSchema,
   rentalPaymentInputSchema,
 } from "@/modules/wealth/schemas";
@@ -19,6 +20,7 @@ import {
   updatePolicy,
   deleteInvestment,
   deletePolicy,
+  payPolicyPremium,
 } from "@/modules/wealth/services/wealth-service";
 import {
   createHolding,
@@ -203,6 +205,24 @@ export async function removePolicyAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/** Pago de la prima de un seguro existente (el "+" de Defensa). Reusa la infra de
+ *  transacciones vinculadas; la moneda la valida el servicio contra la póliza. */
+export async function payPolicyPremiumAction(raw: unknown): Promise<ActionResult> {
+  const parsed = policyPremiumInputSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await payPolicyPremium(parsed.data);
+    revalidatePath("/patrimonio/proteccion");
+    revalidatePath("/gastos");
+    revalidatePath("/transacciones");
+    return { ok: true };
+  } catch (err) {
+    logger.error("payPolicyPremium fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: err instanceof Error ? err.message : "No pudimos registrar la prima." };
   }
 }
 

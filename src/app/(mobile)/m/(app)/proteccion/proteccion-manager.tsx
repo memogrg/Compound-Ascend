@@ -9,10 +9,28 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { addPolicyAction, editPolicyAction, removePolicyAction } from "@/modules/wealth/api/actions";
+import {
+  addPolicyAction,
+  editPolicyAction,
+  removePolicyAction,
+  payPolicyPremiumAction,
+} from "@/modules/wealth/api/actions";
 import type { InsurancePolicy } from "@/modules/wealth/types";
+import { formatMoney } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 
-import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
+import {
+  Fab,
+  BottomSheet,
+  PlusChoiceSheet,
+  SwipeRow,
+  ConfirmDialog,
+  FormShell,
+  MoneyField,
+  DateField,
+  useToast,
+  type ActionResult,
+} from "../../components/form-kit";
 import type { MIconName } from "../../components/m-icon";
 import { MContentCard, MDataRow, MEmptyState, mAmount } from "../../components/content-kit";
 import { PolicyForm, type PolicyValues } from "./policy-form";
@@ -78,6 +96,10 @@ export function ProteccionManager({
   const [editing, setEditing] = useState<InsurancePolicy | null>(null);
   const [deleting, setDeleting] = useState<InsurancePolicy | null>(null);
   const [delPending, setDelPending] = useState(false);
+  // El "+" contextual: elección (pagar prima / crear) → picker de póliza → PremiumForm.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [paying, setPaying] = useState<InsurancePolicy | null>(null);
 
   const confirmDelete = async () => {
     if (!deleting) return;
@@ -139,7 +161,49 @@ export function ProteccionManager({
         </MContentCard>
       )}
 
-      <Fab onClick={() => setAdding(true)} label="Añadir póliza" />
+      {/* Sin pólizas aún no hay a cuál pagar → el "+" va directo a crear. Con al menos una,
+          ofrece la elección: pagar una prima o crear un seguro nuevo. */}
+      <Fab
+        onClick={() => (policies.length === 0 ? setAdding(true) : setPlusOpen(true))}
+        label={policies.length === 0 ? "Añadir póliza" : "Pagar prima o crear seguro"}
+      />
+
+      {/* El "+" contextual: pagar una prima a un seguro existente o crear uno nuevo. */}
+      <PlusChoiceSheet
+        open={plusOpen}
+        onClose={() => setPlusOpen(false)}
+        title="Defensa patrimonial"
+        options={[
+          {
+            key: "prima",
+            label: "Pagar una prima a un seguro",
+            desc: "Registra el pago de una póliza que ya tienes",
+            onSelect: () => setPicking(true),
+          },
+          {
+            key: "crear",
+            label: "Crear un seguro nuevo",
+            desc: "Registra una póliza nueva",
+            onSelect: () => setAdding(true),
+          },
+        ]}
+      />
+
+      {/* Pagar prima · paso 1: elegir el seguro → abre el PremiumForm en su moneda. */}
+      <PolicyPickerSheet
+        open={picking}
+        policies={policies}
+        onPick={(pol) => {
+          setPicking(false);
+          setPaying(pol);
+        }}
+        onClose={() => setPicking(false)}
+      />
+
+      {/* Pagar prima · paso 2: el importe (en la moneda de la póliza) + fecha. */}
+      <BottomSheet open={!!paying} onClose={() => setPaying(null)} title="Pagar prima">
+        {paying ? <PremiumForm policy={paying} onSuccess={() => setPaying(null)} /> : null}
+      </BottomSheet>
 
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Añadir póliza">
@@ -180,5 +244,94 @@ export function ProteccionManager({
         onCancel={() => setDeleting(null)}
       />
     </>
+  );
+}
+
+// ── Pagar una prima a un seguro EXISTENTE (el "+" contextual, Fase 3b) ──────────
+// Paso 1: elegir cuál. Calca los pickers de las fases previas: cada seguro con su prima en su
+// moneda. Al elegir, abre el PremiumForm.
+function PolicyPickerSheet({
+  open,
+  policies,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  policies: InsurancePolicy[];
+  onPick: (policy: InsurancePolicy) => void;
+  onClose: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="¿A cuál seguro?">
+      {policies.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, lineHeight: 1.5, padding: "4px 2px 8px" }}>
+          No tienes seguros registrados. Crea uno primero.
+        </div>
+      ) : (
+        <div className="m-optlist">
+          {policies.map((pol) => {
+            const label = POLICY_LABEL[pol.policyType] ?? "Cobertura";
+            const name = pol.provider ? `${label} · ${pol.provider}` : label;
+            const suffix = FREQ_SUFFIX[pol.premiumFrequency ?? "anual"] ?? "año";
+            return (
+              <button
+                key={pol.id}
+                type="button"
+                className="m-opt"
+                onClick={() => {
+                  onClose();
+                  onPick(pol);
+                }}
+              >
+                <span>
+                  <span className="m-opt-t">{name}</span>
+                  {pol.premium ? (
+                    <span className="m-opt-d">
+                      {formatMoney(pol.premium, pol.currency)}/{suffix}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
+// Paso 2: el pago, ligero. Importe SIEMPRE en la moneda de la póliza (prefijado con su prima;
+// la moneda no es editable) + fecha. Guarda vía payPolicyPremiumAction (una transacción
+// vinculada; la moneda la valida el servidor contra la póliza).
+function PremiumForm({ policy, onSuccess }: { policy: InsurancePolicy; onSuccess: () => void }) {
+  const label = POLICY_LABEL[policy.policyType] ?? "Cobertura";
+  const name = policy.provider ? `${label} · ${policy.provider}` : label;
+  const cur = policy.currency;
+  const [amount, setAmount] = useState<number | undefined>(policy.premium ?? undefined);
+  const [date, setDate] = useState(todayLocalISO());
+
+  const action = (v: { amount: number | undefined; paymentDate: string }): Promise<ActionResult> =>
+    payPolicyPremiumAction({
+      policyId: policy.id,
+      amount: v.amount,
+      currency: cur,
+      paymentDate: v.paymentDate,
+      policyName: name,
+    });
+
+  return (
+    <FormShell
+      action={action}
+      values={{ amount, paymentDate: date }}
+      submitLabel="Registrar prima"
+      successMessage="Prima registrada"
+      onSuccess={onSuccess}
+    >
+      <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+        Se registra como <strong>gasto vinculado</strong> a {label}, en {cur}.
+      </div>
+      <MoneyField name="amount" label="Monto de la prima" value={amount} onChange={setAmount} currency={cur} />
+      <DateField name="paymentDate" label="Fecha del pago" value={date} onChange={setDate} />
+    </FormShell>
   );
 }

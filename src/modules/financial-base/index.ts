@@ -52,6 +52,7 @@ export {
 } from "./services/linked-transaction-service";
 export {
   debtPaymentToTxn,
+  policyPremiumToTxn,
   goalContributionToTxn,
   goalWithdrawalToTxn,
   goalSpendToTxn,

@@ -32,6 +32,34 @@ export function debtPaymentToTxn(args: {
   };
 }
 
+/**
+ * Pago de la prima de un seguro → gasto vinculado (linked_kind='policy'). Calca
+ * debtPaymentToTxn. Una póliza no tiene saldo ni ledger de pagos: el pago es SOLO esta
+ * transacción, que es de donde el frasco de Defensa lee el gastado del mes.
+ */
+export function policyPremiumToTxn(args: {
+  policyId: string;
+  policyName: string;
+  currency: string;
+  paymentDate: string;
+  amount: number;
+  categoryId?: string | null;
+}): LinkedTxnInput {
+  return {
+    kind: "gasto",
+    amount: args.amount,
+    currency: args.currency,
+    occurredOn: args.paymentDate,
+    categoryId: args.categoryId ?? null,
+    merchantOrSource: args.policyName,
+    description: `Prima — ${args.policyName}`,
+    status: "confirmed",
+    origin: "manual",
+    linkedKind: "policy",
+    linkedId: args.policyId,
+  };
+}
+
 /** Aporte a meta de ahorro → gasto vinculado (sale del flujo del mes). */
 export function goalContributionToTxn(args: {
   goalId: string;
