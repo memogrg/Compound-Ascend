@@ -19,6 +19,10 @@ export type Quote = {
 // 3 s por proveedor: con 3 proveedores en cadena el peor caso por simbolo baja
 // de 18 s a 9 s; los hits reales responden muy por debajo de 3 s.
 const TIMEOUT_MS = 3000;
+// CoinGecko desde serverless (cold start + red + endpoints más pesados como /coins/markets) supera
+// los 3 s legítimamente → daba "timeout/error". Su propio timeout, más holgado: es una sola llamada
+// (no cadena) y cabe de sobra en maxDuration=60. Con la Demo key además responde más rápido/estable.
+const COINGECKO_TIMEOUT_MS = 8000;
 
 async function fetchJson(url: string, init?: RequestInit): Promise<unknown | null> {
   const controller = new AbortController();
@@ -49,16 +53,19 @@ async function coingeckoFetch(url: string): Promise<unknown | null> {
   const key = getServerEnv().COINGECKO_API_KEY;
   const headers: Record<string, string> = key ? { "x-cg-demo-api-key": key } : {};
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), COINGECKO_TIMEOUT_MS);
   const endpoint = url.split("?")[0] ?? url; // sin query (no filtra ids ni la key)
+  // `auth` es un string NO sensible ("demo"/"public") → inequívoco en logs y no lo redacta el
+  // scrubber de secretos (a diferencia de un boolean que a veces se tapaba).
+  const auth = key ? "demo" : "public";
   try {
     const res = await fetch(url, { headers, signal: controller.signal });
-    // Instrumentación: el status por llamada. 429 = rate limit (lo que la key + caché deben matar).
-    logger.info("coingecko.call", { endpoint, status: res.status, keyed: !!key });
+    // Instrumentación: status por llamada. 429 = rate limit; timeout/error = red/latencia.
+    logger.info("coingecko.call", { endpoint, status: res.status, auth });
     if (!res.ok) return null;
     return await res.json();
   } catch {
-    logger.warn("coingecko.call", { endpoint, status: "timeout/error", keyed: !!key });
+    logger.warn("coingecko.call", { endpoint, status: "timeout/error", auth });
     return null;
   } finally {
     clearTimeout(timer);
