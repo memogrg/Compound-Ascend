@@ -17,6 +17,7 @@ import { todayLocalISO } from "@/lib/validation";
 
 import {
   Fab,
+  PlusChoiceSheet,
   BottomSheet,
   SwipeRow,
   ConfirmDialog,
@@ -117,6 +118,9 @@ export function IncomeManager({
   const [deleting, setDeleting] = useState<BudgetItem | null>(null);
   const [delPending, setDelPending] = useState(false);
   const [receiving, setReceiving] = useState<BudgetItem | null>(null);
+  // El "+" contextual: elección (registrar ingreso / crear fuente) → picker → reusa el flujo.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyPending, startCopy] = useTransition();
 
@@ -238,7 +242,44 @@ export function IncomeManager({
         {copyPending ? "Copiando…" : "Copiar fuentes del mes anterior"}
       </button>
 
-      <Fab onClick={() => setAdding(true)} label="Nueva fuente de ingreso" />
+      {/* Sin fuentes aún no hay a cuál registrar → el "+" va directo a crear. Con al menos una,
+          ofrece la elección: registrar un ingreso a una fuente (primero) o crear fuente. */}
+      <Fab
+        onClick={() => (sources.length === 0 ? setAdding(true) : setPlusOpen(true))}
+        label={sources.length === 0 ? "Nueva fuente de ingreso" : "Registrar ingreso o crear fuente"}
+      />
+
+      {/* El "+" contextual: registrar un ingreso a una fuente existente o crear una nueva. */}
+      <PlusChoiceSheet
+        open={plusOpen}
+        onClose={() => setPlusOpen(false)}
+        title="Ingresos"
+        options={[
+          {
+            key: "recibir",
+            label: "Registrar un ingreso a una fuente",
+            desc: "Anota lo que recibiste en una que ya tienes",
+            onSelect: () => setPicking(true),
+          },
+          {
+            key: "crear",
+            label: "Crear fuente nueva",
+            desc: "Registra una fuente de ingreso nueva",
+            onSelect: () => setAdding(true),
+          },
+        ]}
+      />
+
+      {/* Registrar ingreso · paso 1: elegir la fuente → abre el flujo de recibido existente. */}
+      <FuentePickerSheet
+        open={picking}
+        sources={sources}
+        onPick={(src) => {
+          setPicking(false);
+          setReceiving(src);
+        }}
+        onClose={() => setPicking(false)}
+      />
 
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Registrar ingreso">
@@ -307,6 +348,50 @@ export function IncomeManager({
 }
 
 /** "¿Cuánto recibiste?" → receivePartialIncomeAction (movimiento real, moneda nativa). */
+// ── Registrar ingreso a una fuente EXISTENTE (el "+" contextual, Fase 3) ────────
+// Paso 1: elegir cuál. Calca los pickers de Inversiones/Deudas: cada fuente con su monto en su
+// moneda. Al elegir, abre el flujo de "recibido" existente para esa fuente.
+function FuentePickerSheet({
+  open,
+  sources,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  sources: BudgetItem[];
+  onPick: (source: BudgetItem) => void;
+  onClose: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="¿A cuál fuente?">
+      {sources.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, lineHeight: 1.5, padding: "4px 2px 8px" }}>
+          No tienes fuentes registradas. Crea una primero.
+        </div>
+      ) : (
+        <div className="m-optlist">
+          {sources.map((src) => (
+            <button
+              key={src.id}
+              type="button"
+              className="m-opt"
+              onClick={() => {
+                onClose();
+                onPick(src);
+              }}
+            >
+              <span>
+                <span className="m-opt-t">{src.name}</span>
+                <span className="m-opt-d">{formatMoney(src.amount, src.currency)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
 function ReceiveForm({
   source,
   received,

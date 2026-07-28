@@ -35,7 +35,7 @@ import type {
 } from "@/modules/financial-base/services/categories-service";
 import { formatMoney } from "@/lib/format";
 
-import { Fab, BottomSheet, SheetSelect, ConfirmDialog, useToast, type Opt } from "../../components/form-kit";
+import { Fab, BottomSheet, PlusChoiceSheet, SheetSelect, ConfirmDialog, useToast, type Opt } from "../../components/form-kit";
 import { MIcon, type MIconName } from "../../components/m-icon";
 import {
   MSummaryCard,
@@ -158,6 +158,48 @@ function jarTotals(jar: Jar): { spent: number; budget: number } {
   );
 }
 
+// ── Crear un sobre en un frasco (el "+" contextual, Fase 3) ─────────────────────
+// Paso 1: elegir en qué frasco. Solo los frascos NORMALES tienen sobres (los vinculados se
+// alimentan de entidades). Al elegir, abre el form de crear sobre existente.
+function JarPickerSheet({
+  open,
+  jars,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  jars: Jar[];
+  onPick: (group: string) => void;
+  onClose: () => void;
+}) {
+  const normales = jars.filter((j) => j.kind === "normal");
+  return (
+    <BottomSheet open={open} onClose={onClose} title="¿En qué frasco?">
+      {normales.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, lineHeight: 1.5, padding: "4px 2px 8px" }}>
+          No hay frascos donde crear un sobre.
+        </div>
+      ) : (
+        <div className="m-optlist">
+          {normales.map((jar) => (
+            <button
+              key={jar.group}
+              type="button"
+              className="m-opt"
+              onClick={() => {
+                onClose();
+                onPick(jar.group);
+              }}
+            >
+              <span className="m-opt-t">{jar.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
 export function GastosManager({
   jars,
   currency,
@@ -183,6 +225,9 @@ export function GastosManager({
   const router = useRouter();
   const toast = useToast();
   const [addingSpend, setAddingSpend] = useState(false);
+  // El "+" contextual: elección (registrar gasto / crear sobre) → picker de frasco → crea sobre.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [pickingJar, setPickingJar] = useState(false);
   const [detailJar, setDetailJar] = useState<NormalJar | null>(null);
   // Frasco "Por reasignar": líneas que suman en el titular pero no se pintan.
   const [orphansOpen, setOrphansOpen] = useState(false);
@@ -373,7 +418,39 @@ export function GastosManager({
         </button>
       ) : null}
 
-      <Fab onClick={() => setAddingSpend(true)} label="Registrar gasto" />
+      {/* El "+" contextual: registrar un gasto (lo más frecuente) o crear un sobre nuevo. */}
+      <Fab onClick={() => setPlusOpen(true)} label="Registrar gasto o crear sobre" />
+
+      <PlusChoiceSheet
+        open={plusOpen}
+        onClose={() => setPlusOpen(false)}
+        title="Gastos"
+        options={[
+          {
+            key: "gasto",
+            label: "Registrar un gasto",
+            desc: "Anota un gasto en su sobre",
+            onSelect: () => setAddingSpend(true),
+          },
+          {
+            key: "sobre",
+            label: "Crear un sobre nuevo",
+            desc: "Añade un sobre a uno de tus frascos",
+            onSelect: () => setPickingJar(true),
+          },
+        ]}
+      />
+
+      {/* Crear sobre · paso 1: elegir el frasco → abre el form de crear sobre existente. */}
+      <JarPickerSheet
+        open={pickingJar}
+        jars={jars}
+        onPick={(group) => {
+          setPickingJar(false);
+          setCreatingSobreIn(group);
+        }}
+        onClose={() => setPickingJar(false)}
+      />
 
       {/* Registrar gasto (global) */}
       <BottomSheet open={addingSpend} onClose={() => setAddingSpend(false)} title="Registrar gasto">
