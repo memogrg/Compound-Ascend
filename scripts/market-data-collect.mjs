@@ -70,7 +70,18 @@ async function fetchJson(url, init, timeoutMs) {
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
     if (!res.ok) return { ok: false, status: res.status, body: null };
-    return { ok: true, status: res.status, body: await res.json() };
+    // OJO: el upsert con Prefer:return=minimal responde 204 SIN body → res.json() reventaría
+    // (SyntaxError) y quedaría mal clasificado como "network". Leemos texto y parseamos si hay.
+    const text = await res.text();
+    let body = null;
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = null;
+      }
+    }
+    return { ok: true, status: res.status, body };
   } catch (err) {
     return { ok: false, status: err?.name === "AbortError" ? "timeout" : "network", body: null };
   } finally {
