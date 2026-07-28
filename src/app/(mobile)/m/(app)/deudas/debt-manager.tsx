@@ -27,6 +27,7 @@ import {
   MoneyField,
   DateField,
   Segmented,
+  PlusChoiceSheet,
   useToast,
   type ActionResult,
   type Opt,
@@ -165,6 +166,9 @@ export function DebtManager({
   const [deleting, setDeleting] = useState<DebtVM | null>(null);
   const [delPending, setDelPending] = useState(false);
   const [reporting, setReporting] = useState<DebtVM | null>(null);
+  // El "+" contextual: elección (pagar/crear) → picker de deuda → reusa el PaymentForm.
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [history, setHistory] = useState<DebtVM | null>(null);
   const [editingPayment, setEditingPayment] = useState<{ vm: DebtVM; payment: DebtPayment } | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<{ debtId: string; payment: DebtPayment } | null>(null);
@@ -305,7 +309,46 @@ export function DebtManager({
         </MContentCard>
       )}
 
-      <Fab onClick={() => setAdding(true)} label="Nueva deuda" />
+      {/* Sin deudas aún no hay a qué pagar → el "+" va directo a crear. Con al menos una,
+          ofrece la elección contextual (pagar a una que ya tienes / crear nueva). */}
+      <Fab
+        onClick={() => (items.length === 0 ? setAdding(true) : setPlusOpen(true))}
+        label={items.length === 0 ? "Nueva deuda" : "Pagar o crear deuda"}
+      />
+
+      {/* El "+" contextual: pagar/abonar a una deuda existente o crear una nueva. */}
+      <PlusChoiceSheet
+        open={plusOpen}
+        onClose={() => setPlusOpen(false)}
+        title="Deudas"
+        options={[
+          {
+            key: "pagar",
+            label: "Pagar / abonar a una deuda",
+            desc: "Registra un pago en una que ya tienes",
+            onSelect: () => setPicking(true),
+          },
+          {
+            key: "crear",
+            label: "Crear deuda nueva",
+            desc: "Registra una deuda nueva",
+            onSelect: () => setAdding(true),
+          },
+        ]}
+      />
+
+      {/* Pagar · paso 1: elegir la deuda → abre el PaymentForm existente (en su moneda nativa). */}
+      <DebtPickerSheet
+        open={picking}
+        debts={items.map((i) => i.vm)}
+        rawById={rawById}
+        currency={currency}
+        onPick={(vm) => {
+          setPicking(false);
+          setReporting(vm);
+        }}
+        onClose={() => setPicking(false)}
+      />
 
       {/* Alta */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Nueva deuda">
@@ -467,6 +510,64 @@ export function DebtManager({
  * Espejo de la lógica de la web (ordinario: cuota + extra opcional + modo; extraordinario:
  * abono directo a capital, sin extra).
  */
+// ── Pagar/abonar a una deuda EXISTENTE (el "+" contextual, Fase 2) ─────────────
+// Paso 1: elegir cuál. Calca HoldingPickerSheet de inversiones: cada deuda con su saldo en su
+// moneda NATIVA (mismo cálculo que la fila). Al elegir, se abre el PaymentForm existente.
+function DebtPickerSheet({
+  open,
+  debts,
+  rawById,
+  currency,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  debts: DebtVM[];
+  rawById: Map<string, Debt>;
+  currency: string;
+  onPick: (vm: DebtVM) => void;
+  onClose: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="¿Cuál deuda pagas?">
+      {debts.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, lineHeight: 1.5, padding: "4px 2px 8px" }}>
+          No tienes deudas registradas. Crea una primero.
+        </div>
+      ) : (
+        <div className="m-optlist">
+          {debts.map((vm) => {
+            const raw = rawById.get(vm.id);
+            // Saldo en la moneda NATIVA de la deuda (igual que la fila): una tarjeta en USD se
+            // ve en $, y el pago se abrirá en $.
+            const saldo = montoFilaDeuda(
+              raw ? { amount: raw.balance, currency: raw.currency } : undefined,
+              vm.balance,
+              currency,
+            );
+            return (
+              <button
+                key={vm.id}
+                type="button"
+                className="m-opt"
+                onClick={() => {
+                  onClose();
+                  onPick(vm);
+                }}
+              >
+                <span>
+                  <span className="m-opt-t">{vm.name}</span>
+                  <span className="m-opt-d">{formatMoney(saldo.amount, saldo.currency)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
 function PaymentForm({
   debtId,
   currency,
