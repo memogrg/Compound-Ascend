@@ -269,10 +269,55 @@ export async function coingeckoBatch(symbols: string[]): Promise<Record<string, 
   return out;
 }
 
+/** Precio + ATH + high_24h de VARIAS cripto en una fila (para el recolector). */
+export type CryptoMarketRow = {
+  price: number | null;
+  ath: number | null;
+  athDate: string | null; // YYYY-MM-DD
+  high24h: number | null;
+};
+
+/**
+ * Precio + ATH + máximo del día de VARIAS cripto en UNA sola llamada a /coins/markets?ids=coma.
+ * Es lo que usa el RECOLECTOR (cron) para poblar el store: colapsa el enjambre en 1-2 requests.
+ * Mapea por SÍMBOLO (MAYÚS). Best-effort: solo las que respondieron.
+ */
+export async function coingeckoMarketsBatch(symbols: string[]): Promise<Record<string, CryptoMarketRow>> {
+  const out: Record<string, CryptoMarketRow> = {};
+  const idToSymbol = new Map<string, string>();
+  const ids: string[] = [];
+  for (const raw of symbols) {
+    const s = raw.trim().toUpperCase();
+    const id = await resolveCoingeckoId(s);
+    if (id && !idToSymbol.has(id)) {
+      idToSymbol.set(id, s);
+      ids.push(id);
+    }
+  }
+  if (ids.length === 0) return out;
+  const data = (await coingeckoFetch(
+    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.map(encodeURIComponent).join(",")}`,
+  )) as { id?: string; current_price?: number; ath?: number; ath_date?: string; high_24h?: number }[] | null;
+  if (!data) return out;
+  for (const row of data) {
+    const s = row.id ? idToSymbol.get(row.id) : undefined;
+    if (!s) continue;
+    out[s] = {
+      price: num(row.current_price),
+      ath: num(row.ath),
+      athDate: typeof row.ath_date === "string" ? row.ath_date.slice(0, 10) : null,
+      high24h: num(row.high_24h),
+    };
+  }
+  return out;
+}
+
 /** Máximos de un activo (para el asesor). `athKind` distingue ATH real vs máx. 52 semanas. */
 export type Highlights = {
   price: number | null;
   currency: string;
+  /** Cuándo se obtuvo el dato (ISO). Del store cuando viene del recolector; null si es vivo. */
+  asOf?: string | null;
   high: number | null; // ATH (cripto) o máx. 52 semanas (acción/ETF)
   highDate: string | null; // fecha del máximo (YYYY-MM-DD si el proveedor la da)
   highKind: "ath" | "52w" | null; // qué representa `high` (honestidad por clase de activo)

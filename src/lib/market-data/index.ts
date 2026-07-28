@@ -137,11 +137,21 @@ export async function getMarketHighlights(
   const freshKey = `highlights:${assetType}:${symbol}`;
   const staleKey = `highlights:stale:${assetType}:${symbol}`;
 
-  // 1) Fresco (TTL de horas: el máximo se mueve lento) → hit ⇒ ~1 llamada/moneda/día.
+  // 1) Caché en memoria (TTL de horas) → hit ⇒ 0 red.
   const cached = priceCache.get<Highlights>(freshKey);
   if (cached) return cached;
 
-  // 2) Fetch. Con dato bueno, refresca fresco (6 h) + "último bueno" (7 d).
+  // 2) STORE persistente (market_price_cache, poblado por el recolector/cron): la fuente NORMAL.
+  //    Trae precio + ATH con su fecha; `asOf` = fetched_at para que la UI/AI marquen la frescura.
+  //    Esto elimina el fetch en vivo por consulta (que fallaba desde serverless).
+  const fromStore = await readHighlightsFromStore(symbol, assetType);
+  if (fromStore && (fromStore.price !== null || fromStore.high !== null)) {
+    priceCache.set(freshKey, fromStore, TTL.highlights);
+    priceCache.set(staleKey, fromStore, TTL.highlightsStale);
+    return fromStore;
+  }
+
+  // 3) ÚLTIMO RECURSO: fetch en vivo (si el store aún no tiene el símbolo). Con dato bueno cachea.
   const h =
     assetType === "crypto" ? await coingeckoHighlights(symbol) : await finnhubHighlights(symbol);
   if (h && (h.price !== null || h.high !== null)) {
@@ -150,9 +160,41 @@ export async function getMarketHighlights(
     return h;
   }
 
-  // 3) 429/fallo → serví el STALE si existe (mejor un máximo de ayer que nada); si no hay, null
-  //    y el llamador da el mensaje honesto ("no pude leer ahora").
+  // 4) Fallo → el "último bueno" en memoria si existe; si no, null (mensaje honesto).
   return priceCache.get<Highlights>(staleKey) ?? h ?? null;
+}
+
+/**
+ * Lee precio + ATH de una posición desde el STORE (market_price_cache). Devuelve null si no hay fila.
+ * `asOf` = fetched_at (frescura). Best-effort: cualquier fallo de BD → null (se cae al fetch en vivo).
+ */
+async function readHighlightsFromStore(
+  symbol: string,
+  assetType: AssetType,
+): Promise<Highlights | null> {
+  try {
+    const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+    const admin = createServiceRoleClient();
+    const { data } = await admin
+      .from("market_price_cache")
+      .select("price, currency, ath_usd, ath_date, high_kind, fetched_at")
+      .eq("symbol", symbol)
+      .eq("asset_type", assetType)
+      .maybeSingle();
+    if (!data) return null;
+    const high = data.ath_usd != null ? Number(data.ath_usd) : null;
+    const kind = data.high_kind === "ath" ? "ath" : data.high_kind === "52w" ? "52w" : null;
+    return {
+      price: data.price != null ? Number(data.price) : null,
+      currency: data.currency ?? "USD",
+      asOf: data.fetched_at ?? null,
+      high,
+      highDate: data.ath_date ?? null,
+      highKind: high !== null ? kind : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export type SymbolResult = { symbol: string; description: string };

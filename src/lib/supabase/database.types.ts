@@ -687,6 +687,11 @@ export type MarketPriceCacheRow = {
   provider: string | null;
   fetched_at: string;
   ttl_seconds: number;
+  // Máximos guardados por el recolector (migración 20260802000001). Nullable.
+  ath_usd: number | null;
+  ath_date: string | null;
+  high_24h: number | null;
+  high_kind: string | null; // 'ath' (cripto) | '52w' (acción/ETF)
 };
 
 // Indicadores económicos globales (BCCR + FRED). Tabla compartida, sin user_id;
