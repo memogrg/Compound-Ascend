@@ -57,6 +57,31 @@ describe("computeMarketScenario · ganancia REAL con datos del tool + invertido 
     expect(r.ganancia_al_maximo).toBeNull();
   });
 
+  it("precio ≤0 (basura del $0) se trata como NO disponible, pero el escenario al ATH SÍ se calcula", () => {
+    // JUP: precio $0 (id malo / cero viejo), ATH real $2; 1.250 uds, invertido 500.
+    const r = computeMarketScenario({
+      symbol: "JUP",
+      assetType: "crypto",
+      currency: "USD",
+      price: 0,
+      high: 2,
+      highKind: "ath",
+      highDate: "2024-01-31",
+      invertido: 500,
+      cantidad: 1250,
+    });
+    expect(r.precio_actual).toBeNull(); // 0 → null (NUNCA "$0")
+    expect(r.valor_actual).toBeNull(); // sin precio actual no hay valor actual
+    expect(r.ganancia_al_precio_actual).toBeNull();
+    // pero el máximo y su escenario sí:
+    expect(r.maximo).toBe(2);
+    expect(r.maximo_tipo).toBe("ath");
+    expect(r.cantidad).toBe(1250);
+    expect(r.invertido).toBe(500);
+    expect(r.valor_al_maximo).toBe(2500); // 1.250 × 2
+    expect(r.ganancia_al_maximo).toBe(2000); // 2.500 − 500
+  });
+
   it("sin dato de mercado (todo null) → nota ofrece simular con un precio objetivo", () => {
     const r = computeMarketScenario({
       symbol: "XYZ",

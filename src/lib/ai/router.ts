@@ -472,6 +472,34 @@ const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = {
  * computeMarketScenario (cifra real) — NO depende de que el LLM decida llamar el tool. Fallo honesto:
  * si no hay símbolo o el dato vuelve null, dice el motivo real (nunca "no tengo acceso").
  */
+/**
+ * Lee la posición COMPLETA del usuario en un símbolo (cantidad + invertido + moneda), de las
+ * holdings completas con scope de hogar — NO del top-N compacto. Best-effort: sin sesión (WhatsApp)
+ * o ante cualquier fallo → null (el carril sigue sin la posición). Import dinámico (server-only).
+ */
+async function getFullPosition(
+  symbol: string,
+): Promise<{ quantity: number; invested: number; currency: string; assetType: string } | null> {
+  try {
+    const { getPositionForSymbol } = await import("@/modules/wealth");
+    return await getPositionForSymbol(symbol);
+  } catch {
+    return null;
+  }
+}
+
+/** Convierte lo invertido a la moneda del escenario (best-effort: ante fallo, devuelve el original). */
+async function convertInvested(amount: number, from: string, to: string): Promise<number> {
+  try {
+    const { getFxRates } = await import("@/lib/market-data/fx-rates");
+    const { convertCurrency } = await import("@/lib/fx");
+    const rates = await getFxRates();
+    return Math.round(convertCurrency(amount, from, to, rates));
+  } catch {
+    return amount;
+  }
+}
+
 async function resolveMarketQuery(
   params: Record<string, unknown>,
   ctx: FinancialContext,
@@ -487,26 +515,54 @@ async function resolveMarketQuery(
     return null;
   }
   const holding = holdings.find((h) => h.symbol?.toUpperCase() === symbol.toUpperCase());
-  // assetType: del holding si lo tiene; si no, cripto por defecto (los tickers sueltos suelen serlo).
-  const at = MARKET_TYPE[holding?.assetType ?? ""] ?? "crypto";
   try {
     const { getMarketHighlights } = await import("@/lib/market-data");
     const { computeMarketScenario } = await import("@/lib/ai/tools");
     const { logger } = await import("@/lib/logger");
+
+    // La POSICIÓN puede no estar en ctx.holdings (top-N compacto): posiciones chicas o con precio
+    // $0 (bug del $0) quedan fuera y sin ellas no se calcula el escenario. Si el símbolo no está en
+    // el top-N, se lee la posición COMPLETA por símbolo (scope de hogar). Best-effort: sin sesión
+    // (WhatsApp) o sin posición → undefined y el carril sigue mostrando solo el dato de mercado.
+    let cantidad = holding?.quantity;
+    let invertido = holding?.invested;
+    let posCurrency = holding?.currency ?? cur;
+    let assetHint = holding?.assetType;
+    if (!holding) {
+      const full = await getFullPosition(symbol);
+      if (full) {
+        cantidad = full.quantity;
+        invertido = full.invested;
+        posCurrency = full.currency;
+        assetHint = full.assetType;
+      }
+    }
+    // assetType: del holding/posición si lo tiene; si no, cripto por defecto (tickers sueltos).
+    const at = MARKET_TYPE[assetHint ?? ""] ?? "crypto";
+
     const h = await getMarketHighlights(symbol, at);
     logger.info("router.market_lane", { symbol, assetType: at, gotData: !!h, gotHigh: h?.high != null });
+
+    // El máximo (ATH) viene en la moneda de highlights (USD en cripto). Lo invertido sale en la
+    // moneda del holding; si difieren, se convierte para que cantidad×máximo − invertido sea coherente.
+    const scenCurrency = h?.currency ?? cur;
+    if (typeof invertido === "number" && posCurrency !== scenCurrency) {
+      invertido = await convertInvested(invertido, posCurrency, scenCurrency);
+    }
+
+    const hasPosition = typeof cantidad === "number" && cantidad > 0;
     const scenario = computeMarketScenario({
       symbol: symbol.toUpperCase(),
       assetType: at,
-      currency: h?.currency ?? cur,
+      currency: scenCurrency,
       price: h?.price ?? null,
       high: h?.high ?? null,
       highKind: h?.highKind ?? null,
       highDate: h?.highDate ?? null,
-      invertido: holding?.invested,
-      cantidad: holding?.quantity,
+      invertido,
+      cantidad,
     });
-    return say(buildMarketReply(scenario, scenario.currency, wantsAth, !!holding, freshnessNote(h?.asOf, Date.now())));
+    return say(buildMarketReply(scenario, scenario.currency, wantsAth, hasPosition, freshnessNote(h?.asOf, Date.now())));
   } catch (err) {
     const { logger } = await import("@/lib/logger");
     logger.error("router.market_lane falló", { symbol, message: err instanceof Error ? err.message : "?" });
@@ -535,12 +591,27 @@ export function freshnessNote(asOf: string | null | undefined, nowMs: number): s
   return ` (precio guardado del ${dd}/${mm}, no en vivo).`;
 }
 
+/**
+ * Cantidad de unidades (puede ser fraccional en cripto): miles con PUNTO, decimales con coma, hasta
+ * 6 decimales. Determinista (sin Intl) para coincidir con la política de formatMoney (idéntico en
+ * servidor y cliente; es-CR/ICU agrupa distinto según el motor).
+ */
+function formatQuantity(n: number): string {
+  const fixed = Number.isInteger(n) ? String(Math.trunc(n)) : n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  const [int = "0", dec] = fixed.split(".");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return dec ? `${grouped},${dec}` : grouped;
+}
+
 export function buildMarketReply(
   s: {
     symbol: string;
     precio_actual: number | null;
     maximo: number | null;
     maximo_tipo: "ath" | "52_semanas" | null;
+    maximo_fecha?: string | null;
+    cantidad?: number | null;
+    invertido?: number | null;
     valor_actual: number | null;
     ganancia_al_precio_actual: number | null;
     valor_al_maximo: number | null;
@@ -556,21 +627,34 @@ export function buildMarketReply(
     return `No pude leer los datos de ${s.symbol} en la fuente ahora mismo; reintentá en un momento o decime a qué precio querés que simule.`;
   }
   const maxLabel = s.maximo_tipo === "ath" ? "su máximo histórico (ATH)" : "su máximo de 52 semanas";
+  const maxShort = s.maximo_tipo === "ath" ? "ATH" : "máximo de 52 semanas";
+  const fecha = s.maximo_fecha ? ` (${s.maximo_fecha})` : "";
+  const knowsPos = typeof s.cantidad === "number" && typeof s.invertido === "number";
+
+  // Intro: si conocemos la posición, la NOMBRAMOS ("tenés X, invertiste Y"); si no, el dato de
+  // mercado. Precio ≤0 ya llega como null → NUNCA imprimimos "$0"; si falta, lo decimos honesto.
   const parts: string[] = [];
-  if (s.precio_actual !== null) parts.push(`${s.symbol} cotiza hoy a ${money(s.precio_actual)}`);
-  if (s.maximo !== null) parts.push(`${maxLabel} fue ${money(s.maximo)}`);
-  let reply = parts.join("; ") + ".";
+  if (hasPosition && knowsPos) {
+    parts.push(`Tenés ${formatQuantity(s.cantidad!)} ${s.symbol} (invertiste ${money(s.invertido!)})`);
+    if (s.precio_actual === null) parts.push("ahora no tengo el precio actual");
+  } else if (s.precio_actual !== null) {
+    parts.push(`${s.symbol} cotiza hoy a ${money(s.precio_actual)}`);
+  }
+  if (s.maximo !== null && !(hasPosition && wantsAth)) parts.push(`${maxLabel} fue ${money(s.maximo)}`);
+  let reply = parts.length ? parts.join("; ") + "." : "";
 
   if (hasPosition && wantsAth) {
-    if (s.maximo !== null && s.ganancia_al_maximo !== null) {
-      reply += ` Si hubieras vendido tu posición a ese máximo, la ganancia habría sido ${money(s.ganancia_al_maximo)} sobre lo invertido (hoy, al precio actual, sería ${s.ganancia_al_precio_actual !== null ? money(s.ganancia_al_precio_actual) : "—"}). Ojo: el máximo es pasado y no se puede cronometrar el techo — es un escenario, no un plan.`;
+    if (s.maximo !== null && s.valor_al_maximo !== null && s.ganancia_al_maximo !== null) {
+      const hoy =
+        s.ganancia_al_precio_actual !== null ? ` (hoy, al precio actual, sería ${money(s.ganancia_al_precio_actual)})` : "";
+      reply += ` Al ${maxShort} de ${money(s.maximo)}${fecha} tu posición valdría ${money(s.valor_al_maximo)} — ganancia de ${money(s.ganancia_al_maximo)} sobre lo invertido${hoy}. Ojo: el máximo es pasado y no se puede cronometrar el techo — es un escenario, no un plan.`;
     } else {
       reply += ` No tengo el máximo para calcular ese escenario; decime a qué precio simular.`;
     }
   } else if (hasPosition && s.ganancia_al_precio_actual !== null) {
     reply += ` Al precio actual, tu ganancia sobre lo invertido es ${money(s.ganancia_al_precio_actual)}.`;
   }
-  return reply + freshness;
+  return reply.trim() + freshness;
 }
 
 /**
