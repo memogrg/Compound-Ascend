@@ -61,16 +61,17 @@ describe("call · retry/backoff (integrado vía chat, fake timers)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("503 persistente → lanza PROVIDER_ERROR tras 3 intentos", async () => {
+  it("503 persistente → lanza PROVIDER_ERROR tras 2 intentos (1 + 1 reintento)", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503 });
     vi.stubGlobal("fetch", fetchMock);
 
     const promise = new GeminiProvider("k").chat(chatArgs);
     const assertion = expect(promise).rejects.toMatchObject({ code: "PROVIDER_ERROR" });
-    await vi.advanceTimersByTimeAsync(3000); // cubre los dos backoffs
+    await vi.advanceTimersByTimeAsync(3000); // cubre el backoff del único reintento
     await assertion;
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // MAX_ATTEMPTS bajó a 2 (presupuesto de retry < maxDuration 60s con timeout 20s).
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
