@@ -233,16 +233,41 @@ export function QuickAddSheet({
 
         {esGasto ? (
           <>
+            {/* El nombre del gasto, VISIBLE y opcional (antes vivía plegado bajo "Más
+                detalles"). Es lo primero que uno piensa al registrar, y al SALIR dispara la
+                sugerencia de sobre por IA — que por estar enterrado casi nunca se disparaba. */}
+            <input
+              id="qa-name"
+              className="m-inp"
+              style={{ marginTop: 10 }}
+              value={merchant}
+              onChange={(e) => setMerchant(e.target.value)}
+              onBlur={pedirSugerencia}
+              placeholder="¿En qué? · súper, gasolina, pago…"
+              aria-label="¿En qué? Comercio o descripción del gasto"
+              maxLength={160}
+            />
+
             <div className="m-qa-lbl m-qa-lbl-row">
               <span>
                 Sobre
                 {sugiriendo ? <span className="m-qa-hint"> · buscando…</span> : null}
               </span>
-              {/* Los chips son un ACELERADOR, no el catálogo. Sin esta salida, un gasto en
-                  un sobre que no está entre los frecuentes no se podía registrar desde
-                  aquí — había que ir a Gastos. */}
-              <button type="button" className="m-qa-vertodos" onClick={abrirPicker}>
-                {cargandoJars ? "Abriendo…" : "Ver todos"}
+              {/* Selector CLARO de un toque al catálogo completo (SobrePicker agrupado). Antes
+                  era un "Ver todos" discreto; ahora muestra el sobre elegido + ▾ y es, a la
+                  vista, la vía para cualquier sobre que no esté entre los chips frecuentes.
+                  Los chips de abajo siguen siendo el acelerador de cero toques. */}
+              <button
+                type="button"
+                className="m-qa-vertodos"
+                onClick={abrirPicker}
+                aria-label="Elegir sobre del catálogo completo"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, maxWidth: 175 }}
+              >
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {cargandoJars ? "Abriendo…" : sobreElegido ? sobreElegido.name : "Elegir sobre"}
+                </span>
+                <span aria-hidden>▾</span>
               </button>
             </div>
             <div className="m-qa-chips">
@@ -364,18 +389,23 @@ export function QuickAddSheet({
 
         {detalles ? (
           <div className="m-qa-det">
-            <label className="fld-label" htmlFor="qa-com">
-              {esGasto ? "Comercio" : "Fuente"}
-            </label>
-            <input
-              id="qa-com"
-              className="m-inp"
-              value={merchant}
-              onChange={(e) => setMerchant(e.target.value)}
-              onBlur={pedirSugerencia}
-              placeholder={esGasto ? "Súper, gasolina…" : "Salario…"}
-              maxLength={160}
-            />
+            {/* El nombre del GASTO ya está visible arriba (bajo el importe). Aquí solo queda la
+                Fuente opcional del INGRESO (texto libre; el enlace real va por chip de fuente). */}
+            {!esGasto ? (
+              <>
+                <label className="fld-label" htmlFor="qa-fuente">
+                  Fuente (opcional)
+                </label>
+                <input
+                  id="qa-fuente"
+                  className="m-inp"
+                  value={merchant}
+                  onChange={(e) => setMerchant(e.target.value)}
+                  placeholder="Salario…"
+                  maxLength={160}
+                />
+              </>
+            ) : null}
             <label className="fld-label" htmlFor="qa-fecha">
               Fecha
             </label>
