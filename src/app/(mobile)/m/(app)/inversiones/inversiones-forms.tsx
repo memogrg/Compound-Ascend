@@ -19,6 +19,7 @@ import {
   editHoldingAction,
   sellHoldingAction,
   addDividendAction,
+  contributeToHoldingAction,
   listLinkableDebtsAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
@@ -34,7 +35,14 @@ import {
   type HoldingFrequency,
   type RentalCosts,
 } from "@/modules/wealth/engine/holding-payload";
-import type { AssetType, Holding, InvestmentCategory } from "@/modules/wealth/types";
+import type {
+  AssetType,
+  Holding,
+  HoldingNativo,
+  HoldingPerformance,
+  InvestmentCategory,
+} from "@/modules/wealth/types";
+import { isQuotedType } from "@/modules/wealth/engine/holding-contribution";
 
 import {
   BottomSheet,
@@ -925,6 +933,129 @@ export function DividendForm({
         sheetTitle="Frecuencia"
       />
       <DateField name="paymentDate" label="Fecha de pago" value={date} onChange={setDate} />
+    </FormShell>
+  );
+}
+
+// ── Aportar a una inversión EXISTENTE (el "+" contextual) ─────────────────────
+// Paso 1: elegir a cuál. Muestra TODAS (cotizadas y manuales), cada una con su valor en su
+// moneda nativa (mismo cálculo que la lista). Al elegir, adopta la moneda de esa inversión.
+export function HoldingPickerSheet({
+  open,
+  holdings,
+  rawById,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  holdings: HoldingPerformance[];
+  rawById: Map<string, HoldingNativo>;
+  onPick: (raw: HoldingNativo) => void;
+  onClose: () => void;
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="¿A cuál aportas?">
+      {holdings.length === 0 ? (
+        <div className="muted" style={{ fontSize: 13, lineHeight: 1.5, padding: "4px 2px 8px" }}>
+          Aún no tienes inversiones. Crea una primero.
+        </div>
+      ) : (
+        <div className="m-optlist">
+          {holdings.map((h) => {
+            const raw = rawById.get(h.id);
+            if (!raw) return null;
+            const name = h.label || h.symbol || "Inversión";
+            // Valor en la moneda NATIVA del holding (igual que la fila de la lista).
+            const value = raw.quantity * raw.averageCost * (1 + h.returnPct);
+            return (
+              <button
+                key={h.id}
+                type="button"
+                className="m-opt"
+                onClick={() => {
+                  onClose();
+                  onPick(raw);
+                }}
+              >
+                <span>
+                  <span className="m-opt-t">{name}</span>
+                  <span className="m-opt-d">{formatMoney(value, raw.currency)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
+// Paso 2: el aporte, ligero y adaptado por tipo. Importe SIEMPRE en la moneda de la inversión
+// (mostrada, no elegible). Cotizada = + precio por unidad (prefijado con el costo promedio,
+// editable) para promediar el costo; no cotizada = solo importe, el valor sube por él. El
+// guardado va por contributeToHoldingAction (merge/valor + gasto + historial, atómico).
+export function ContributeHoldingForm({
+  holding,
+  currency,
+  onSuccess,
+}: {
+  holding: HoldingNativo;
+  currency: string;
+  onSuccess: () => void;
+}) {
+  const cur = holding.currency || currency;
+  const quoted = isQuotedType(holding.assetType);
+  const [amount, setAmount] = useState<number | undefined>(undefined);
+  const [unitPrice, setUnitPrice] = useState<number | undefined>(
+    quoted ? holding.averageCost : undefined,
+  );
+  const [date, setDate] = useState(todayISO());
+  const name = holding.label || holding.symbol || "esta inversión";
+
+  const action = (v: {
+    amount: number | undefined;
+    unitPrice: number | undefined;
+    occurredOn: string;
+  }): Promise<ActionResult> =>
+    contributeToHoldingAction({
+      holdingId: holding.id,
+      amount: v.amount,
+      unitPrice: quoted ? v.unitPrice : undefined,
+      currency: cur,
+      occurredOn: v.occurredOn,
+    });
+
+  return (
+    <FormShell
+      action={action}
+      values={{ amount, unitPrice, occurredOn: date }}
+      submitLabel="Registrar aporte"
+      successMessage="Aporte registrado"
+      onSuccess={onSuccess}
+    >
+      <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+        {quoted ? (
+          <>
+            Compras más de <strong>{name}</strong>: se promedia tu costo y se registra el aporte
+            en {cur}.
+          </>
+        ) : (
+          <>
+            El valor de <strong>{name}</strong> sube por el importe aportado, en {cur}.
+          </>
+        )}
+      </div>
+      <MoneyField name="amount" label="Importe aportado" value={amount} onChange={setAmount} currency={cur} />
+      {quoted ? (
+        <MoneyField
+          name="unitPrice"
+          label="Precio por unidad"
+          value={unitPrice}
+          onChange={setUnitPrice}
+          currency={cur}
+        />
+      ) : null}
+      <DateField name="occurredOn" label="Fecha del aporte" value={date} onChange={setDate} />
     </FormShell>
   );
 }

@@ -153,7 +153,19 @@ export const holdingSaleInputSchema = z.object({
   quantitySold: z.number().positive().optional(),
 });
 
+// Aporte/compra a una posición EXISTENTE (el "+" contextual de Inversiones). El importe va
+// SIEMPRE en la moneda del holding (el servicio lo valida contra holding.currency). El precio
+// por unidad solo aplica a cotizados: es lo que promedia el costo.
+export const holdingContributionSchema = z.object({
+  holdingId: z.string().uuid(),
+  amount: z.number().positive("El monto debe ser mayor a 0"),
+  currency: z.string().length(3),
+  unitPrice: z.number().positive().optional(),
+  occurredOn: pastDateSchema,
+});
+
 export type HoldingInput = z.infer<typeof holdingInputSchema>;
 export type HoldingSaleInput = z.infer<typeof holdingSaleInputSchema>;
+export type HoldingContributionInput = z.infer<typeof holdingContributionSchema>;
 export type DividendInput = z.infer<typeof dividendInputSchema>;
 export type RentalPaymentInput = z.infer<typeof rentalPaymentInputSchema>;

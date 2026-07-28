@@ -19,7 +19,8 @@ import {
   purchaseExpenseAmount,
   positionIncreaseAmount,
 } from "@/modules/financial-base";
-import type { HoldingInput, HoldingSaleInput } from "@/modules/wealth/schemas";
+import type { HoldingInput, HoldingSaleInput, HoldingContributionInput } from "@/modules/wealth/schemas";
+import { planContribution } from "@/modules/wealth/engine/holding-contribution";
 import type { Holding, HoldingNativo, AssetType, InvestmentNature } from "@/modules/wealth/types";
 import { comoNativo } from "@/modules/wealth/types";
 import { natureOfCategory } from "@/modules/wealth/constants";
@@ -381,6 +382,121 @@ export async function createHolding(input: HoldingInput): Promise<void> {
       throw err;
     }
   }
+}
+
+/**
+ * Aporte/compra a una posición EXISTENTE (el "+" contextual de Inversiones). Unifica los dos
+ * tipos con escritura atómica y rollback compensatorio:
+ *  - COTIZADO: delega en `createHolding`, que encuentra esta posición por su clave, promedia
+ *    el costo, registra el historial (compra) y el gasto vinculado con su propio rollback.
+ *    NO se reescribe la matemática del DCA.
+ *  - NO COTIZADO (certificado, inmueble, bono…): sube el invertido y el valor manual por el
+ *    importe. El gasto vinculado nace primero y se compensa (`deleteLinkedTransaction`) si el
+ *    UPDATE del holding falla; luego una fila de historial da paridad con el cotizado.
+ *
+ * La moneda la impone el holding (misma guarda que la venta): un importe que la contradiga se
+ * rechaza en vez de guardarse contra una referencia equivocada.
+ */
+export async function contributeToHolding(input: HoldingContributionInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
+
+  const { data: row, error: hErr } = await supabase
+    .from("investment_holdings")
+    .select(HOLDING_COLS)
+    .eq("id", input.holdingId)
+    .in("user_id", scope)
+    .maybeSingle();
+  if (hErr) throw new Error(hErr.message);
+  if (!row) throw new Error("Posición no encontrada");
+  const holding = rowToHolding(row);
+
+  if (!monedaDelMovimientoEsCoherente(input.currency, holding.currency)) {
+    throw new Error(
+      `El aporte viene en ${input.currency} pero la inversión está en ${holding.currency}.`,
+    );
+  }
+
+  const plan = planContribution(holding, { amount: input.amount, unitPrice: input.unitPrice });
+  const occurredOn = input.occurredOn;
+
+  if (plan.kind === "quoted") {
+    // Encuentra ESTA posición por su clave (symbol+tipo+moneda+etiqueta), promedia el costo,
+    // registra el historial y el gasto vinculado con su propio rollback compensatorio.
+    await createHolding({
+      assetType: holding.assetType,
+      symbol: holding.symbol ?? undefined,
+      label: holding.label ?? undefined,
+      currency: holding.currency,
+      quantity: plan.quantity,
+      averageCost: plan.unitPrice,
+      purchaseDate: occurredOn,
+      broker: holding.broker ?? undefined,
+      registerExpense: true,
+    });
+    return;
+  }
+
+  // No cotizado: subir invertido + valor manual, atómico con el gasto vinculado.
+  const symbol = holding.symbol ?? holding.label ?? "";
+  const newAvg = holding.quantity > 0 ? plan.newInvested / holding.quantity : plan.newInvested;
+
+  // El gasto nace primero (la entidad ya existe); si el UPDATE falla, se compensa borrándolo.
+  const txnId = await registerPurchaseExpense({
+    holdingId: holding.id,
+    label: holding.label ?? symbol,
+    currency: holding.currency,
+    purchaseDate: occurredOn,
+    amount: plan.addedAmount,
+    verb: "Aporte",
+  });
+  const { error } = await supabase
+    .from("investment_holdings")
+    .update({
+      last_edited_by: user.id,
+      average_cost: newAvg,
+      cost_basis: plan.newInvested,
+      current_value_manual: plan.newValue,
+    })
+    .eq("id", holding.id)
+    .in("user_id", scope);
+  if (error) {
+    if (txnId) await deleteLinkedTransaction(txnId);
+    throw new Error(error.message);
+  }
+  // Historial (best-effort, como recordPurchaseTx): compra del importe, sin cantidad — un
+  // certificado no tiene unidades —, para que el aporte aparezca en el detalle igual que uno
+  // cotizado.
+  await recordManualContributionTx(supabase, user.id, holding.id, {
+    amount: plan.addedAmount,
+    currency: holding.currency,
+    occurredOn,
+  });
+}
+
+/** Historial de un aporte a posición MANUAL (sin cantidad). Best-effort: loguea si falla. */
+async function recordManualContributionTx(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+  holdingId: string,
+  args: { amount: number; currency: string; occurredOn: string },
+) {
+  if (!(args.amount > 0)) return;
+  const household_id = await getActiveHouseholdId(supabase, userId);
+  const { error } = await supabase.from("investment_transactions").insert({
+    user_id: userId,
+    household_id,
+    created_by: userId,
+    last_edited_by: userId,
+    holding_id: holdingId,
+    tx_type: "compra",
+    amount: args.amount,
+    quantity: null,
+    currency: args.currency,
+    occurred_on: args.occurredOn,
+  });
+  if (error) console.error(`[recordManualContributionTx] falló (${holdingId}): ${error.message}`);
 }
 
 export async function updateHolding(id: string, input: HoldingInput): Promise<void> {
