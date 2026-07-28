@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { currencySymbol } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 import {
   addTransactionAction,
   getQuickAddJarsAction,
@@ -57,7 +58,7 @@ export function QuickAddSheet({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [merchant, setMerchant] = useState("");
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => todayLocalISO());
   const [detalles, setDetalles] = useState(false);
   const [sugiriendo, setSugiriendo] = useState(false);
   const [origen, setOrigen] = useState<"historial" | "cache" | "ia" | null>(null);
@@ -92,7 +93,7 @@ export function QuickAddSheet({
     setCategoryId(null);
     setMerchant("");
     setNote("");
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(todayLocalISO());
     setDetalles(false);
     setOrigen(null);
     setCur(captureCurrency);

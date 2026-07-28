@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatMoney, formatPercent, formatMonthYear } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 import {
   listHoldingPurchasesAction,
   listDividendsAction,
@@ -83,7 +84,8 @@ const RENTAL_FREQ_OPTS = [
 type Mode = "detail" | "dividend" | "valuation" | "rental";
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+  return todayLocalISO();
 }
 
 const QUOTED_ALERT = new Set(["etf", "accion", "cripto"]);

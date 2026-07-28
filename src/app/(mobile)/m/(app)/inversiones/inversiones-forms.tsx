@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatMoney, currencySymbol } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addHoldingAction,
@@ -81,7 +82,8 @@ const MONTH_OPTS: Opt[] = MONTHS.map((m, i) => ({ value: String(i + 1), label: m
 
 const API_TYPE_MAP: Partial<Record<AssetType, string>> = { etf: "etf", accion: "stock", cripto: "crypto" };
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+const todayISO = (): string => todayLocalISO();
 
 // ── Wizard alta / edición / compra ───────────────────────────────────────────
 export function HoldingWizardSheet({

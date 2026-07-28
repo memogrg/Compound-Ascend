@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { todayLocalISO } from "@/lib/validation";
 import { useRouter } from "next/navigation";
 
 import {
@@ -52,8 +53,8 @@ const KIND_LABEL: Record<AccountKind, string> = {
 };
 
 function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+  return todayLocalISO();
 }
 
 export function AccountsManager({
