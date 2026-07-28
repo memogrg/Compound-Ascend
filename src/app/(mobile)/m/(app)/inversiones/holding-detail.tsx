@@ -23,6 +23,7 @@ import {
   deleteInvestmentAlertAction,
 } from "@/modules/wealth/api/actions";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
+import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { AlertKind } from "@/modules/wealth/engine/price-alerts";
 import type { InvestmentAlert } from "@/modules/wealth/services/price-alerts-service";
@@ -132,7 +133,9 @@ export function HoldingDetailSheet({
   const quoted = isQuoted(holding);
   const plan = isPlan(holding);
   const rental = isRental(holding) && !plan; // no cotizado y no plan → sección de renta
-  const cur = holding.currency || currency;
+  // Cotizados (etf/accion/cripto) se muestran en USD (cotizan en dólares); el resto en su moneda
+  // registrada. Coherente con la fila de la tabla y la web.
+  const cur = holdingDisplayCurrency(holding.assetType, holding.currency || currency);
   const name = holding.label || holding.symbol || "Inversión";
 
   // Importes en la moneda NATIVA del holding (de `raw`), derivados del retorno del engine
