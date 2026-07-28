@@ -5,7 +5,14 @@ import { logHouseholdDeletion } from "@/lib/household/activity-log";
 /** Servicio del Módulo 4 (respeta RLS). Cruza Base, Control y Perfil. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
+import {
+  getBaseSummary,
+  getDisplayCurrency,
+  registerLinkedTransaction,
+  getSystemCategoryId,
+  policyPremiumToTxn,
+} from "@/modules/financial-base";
+import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfolio-engine";
 import {
   computeReadiness,
   computeProtection,
@@ -15,7 +22,7 @@ import {
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import type { InvestmentInput, PolicyInput } from "@/modules/wealth/schemas";
+import type { InvestmentInput, PolicyInput, PolicyPremiumInput } from "@/modules/wealth/schemas";
 import { listHoldings } from "@/modules/wealth/services/holdings-service";
 import type {
   Investment,
@@ -82,6 +89,49 @@ export async function listPolicies(): Promise<InsurancePolicy[]> {
     .in("user_id", memberIds)
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToPolicy);
+}
+
+/**
+ * Pago manual de la prima de un seguro EXISTENTE (el "+" de Defensa). Una póliza no tiene
+ * saldo ni ledger de pagos: el pago es UNA sola escritura —la transacción vinculada— que es
+ * de donde el frasco de Defensa lee el gastado del mes. No hay flujo AUTOMÁTICO de primas de
+ * póliza (ensureMonthlyPremiums es solo para planes de inversión), así que esto no duplica
+ * nada; es el modelo de las deudas (presupuesto derivado + pago manual).
+ *
+ * La moneda la impone la póliza (misma guarda que la venta de inversión): un importe que la
+ * contradiga se rechaza en vez de guardarse contra una referencia equivocada.
+ */
+export async function payPolicyPremium(input: PolicyPremiumInput): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
+
+  const { data: row, error } = await supabase
+    .from("insurance_policies")
+    .select("*")
+    .eq("id", input.policyId)
+    .in("user_id", memberIds)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("Póliza no encontrada");
+  const policy = rowToPolicy(row);
+
+  if (!monedaDelMovimientoEsCoherente(input.currency, policy.currency)) {
+    throw new Error(
+      `La prima viene en ${input.currency} pero el seguro está en ${policy.currency}.`,
+    );
+  }
+
+  await registerLinkedTransaction(
+    policyPremiumToTxn({
+      policyId: policy.id,
+      policyName: input.policyName?.trim() || policy.provider || "Seguro",
+      currency: policy.currency,
+      paymentDate: input.paymentDate,
+      amount: input.amount,
+      categoryId: await getSystemCategoryId("seguros"),
+    }),
+  );
 }
 
 export async function createInvestment(input: InvestmentInput): Promise<void> {
