@@ -66,4 +66,8 @@ export const TTL = {
   search: 300,
   // El sparkline es una serie diaria: cambia poco intradía, se cachea más tiempo.
   sparkline: 1800,
+  // Máximos (ATH / 52-sem): se mueven lento → caché de horas ⇒ ~1 llamada por moneda por día,
+  // casi sin tocar el rate limit de CoinGecko. `highlightsStale` = "último bueno" para servir ante 429.
+  highlights: 6 * 3600, // 6 h
+  highlightsStale: 7 * 24 * 3600, // 7 días
 } as const;

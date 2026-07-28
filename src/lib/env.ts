@@ -39,6 +39,11 @@ const serverSchema = z.object({
   GEMINI_MODEL: optionalStr,
   FINNHUB_TOKEN: optionalStr,
   ALPHA_VANTAGE_KEY: optionalStr,
+  // CoinGecko Demo API key (plan gratuito con registro). Si está, se manda en el header
+  // x-cg-demo-api-key en TODAS las llamadas → mucho más rate limit que el endpoint público
+  // (IPs compartidas de serverless se rate-limitean rápido). Opcional: sin ella funciona keyless
+  // (como en local/dev). En PROD conviene setearla para que el ATH/precio no falle por 429.
+  COINGECKO_API_KEY: optionalStr,
   // Indicadores económicos — Costa Rica (API SDDE del BCCR, REST/JSON con Bearer).
   // Registro/suscripción en https://www.bccr.fi.cr/indicadores-economicos (token JWT).
   BCCR_SDDE_TOKEN: optionalStr, // token Bearer (JWT) de la suscripción SDDE

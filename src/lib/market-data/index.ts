@@ -89,14 +89,25 @@ export async function getMarketHighlights(
 ): Promise<Highlights | null> {
   const symbol = rawSymbol.trim().toUpperCase();
   if (!isValidSymbol(symbol)) return null;
-  const cacheKey = `highlights:${assetType}:${symbol}`;
-  const cached = priceCache.get<Highlights>(cacheKey);
+  const freshKey = `highlights:${assetType}:${symbol}`;
+  const staleKey = `highlights:stale:${assetType}:${symbol}`;
+
+  // 1) Fresco (TTL de horas: el máximo se mueve lento) → hit ⇒ ~1 llamada/moneda/día.
+  const cached = priceCache.get<Highlights>(freshKey);
   if (cached) return cached;
-  const ttl = assetType === "crypto" ? TTL.crypto : TTL.stock;
+
+  // 2) Fetch. Con dato bueno, refresca fresco (6 h) + "último bueno" (7 d).
   const h =
     assetType === "crypto" ? await coingeckoHighlights(symbol) : await finnhubHighlights(symbol);
-  if (h) priceCache.set(cacheKey, h, ttl);
-  return h;
+  if (h && (h.price !== null || h.high !== null)) {
+    priceCache.set(freshKey, h, TTL.highlights);
+    priceCache.set(staleKey, h, TTL.highlightsStale);
+    return h;
+  }
+
+  // 3) 429/fallo → serví el STALE si existe (mejor un máximo de ayer que nada); si no hay, null
+  //    y el llamador da el mensaje honesto ("no pude leer ahora").
+  return priceCache.get<Highlights>(staleKey) ?? h ?? null;
 }
 
 export type SymbolResult = { symbol: string; description: string };

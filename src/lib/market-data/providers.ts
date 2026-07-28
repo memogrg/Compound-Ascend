@@ -39,6 +39,32 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * Fetch ÚNICO para CoinGecko: inyecta la Demo API key (header x-cg-demo-api-key) si está en el
+ * entorno — mucho más rate limit que keyless en IPs compartidas de serverless — y sin ella funciona
+ * igual (dev/local). LOGUEA el status HTTP de cada llamada (instrumentación: confirmar que el 429
+ * desaparece con la key + caché). Mismo contrato que fetchJson: json o null (con timeout).
+ */
+async function coingeckoFetch(url: string): Promise<unknown | null> {
+  const key = getServerEnv().COINGECKO_API_KEY;
+  const headers: Record<string, string> = key ? { "x-cg-demo-api-key": key } : {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const endpoint = url.split("?")[0] ?? url; // sin query (no filtra ids ni la key)
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    // Instrumentación: el status por llamada. 429 = rate limit (lo que la key + caché deben matar).
+    logger.info("coingecko.call", { endpoint, status: res.status, keyed: !!key });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    logger.warn("coingecko.call", { endpoint, status: "timeout/error", keyed: !!key });
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Como num pero admite 0 y negativos (variación %, que puede caer). */
 function signedNum(v: unknown): number | undefined {
   const raw = typeof v === "string" ? parseFloat(v.replace(/%/g, "")) : v;
@@ -181,7 +207,7 @@ async function resolveCoingeckoId(ticker: string): Promise<string | null> {
   if (COINGECKO_IDS[key]) return COINGECKO_IDS[key]!;
   const cached = resolvedIds.get(key);
   if (cached && Date.now() - cached.at < RESOLVE_TTL_MS) return cached.id;
-  const data = (await fetchJson(
+  const data = (await coingeckoFetch(
     `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(ticker)}`,
   )) as { coins?: { id: string; symbol: string; market_cap_rank: number | null }[] } | null;
   // fetchJson devuelve null ante error de red / 429 / timeout: NO lo cacheamos como miss (reintenta).
@@ -194,7 +220,7 @@ async function resolveCoingeckoId(ticker: string): Promise<string | null> {
 export async function coingecko(ticker: string): Promise<Quote | null> {
   const id = await resolveCoingeckoId(ticker);
   if (!id) return null;
-  const data = (await fetchJson(
+  const data = (await coingeckoFetch(
     `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(id)}&vs_currencies=usd&include_24hr_change=true`,
   )) as Record<string, { usd?: number; usd_24h_change?: number }> | null;
   const row = data?.[id];
@@ -218,7 +244,7 @@ export type Highlights = {
 export async function coingeckoHighlights(ticker: string): Promise<Highlights | null> {
   const id = await resolveCoingeckoId(ticker);
   if (!id) return null;
-  const data = (await fetchJson(
+  const data = (await coingeckoFetch(
     `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(id)}`,
   )) as { current_price?: number; ath?: number; ath_date?: string }[] | null;
   const row = data?.[0];
@@ -285,7 +311,7 @@ export async function yahooHistory(symbol: string): Promise<number[]> {
 export async function coingeckoHistory(ticker: string): Promise<number[]> {
   const id = await resolveCoingeckoId(ticker);
   if (!id) return [];
-  const data = (await fetchJson(
+  const data = (await coingeckoFetch(
     `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=30&interval=daily`,
   )) as { prices?: [number, number][] } | null;
   const series = (data?.prices ?? [])
