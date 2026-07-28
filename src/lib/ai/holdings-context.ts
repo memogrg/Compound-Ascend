@@ -7,6 +7,7 @@
 export type HoldingPerf = {
   symbol?: string | null;
   label?: string | null;
+  assetType: string;
   quantity: number;
   costBasis: number;
   currentValue: number;
@@ -20,6 +21,7 @@ export type HoldingPerf = {
 export type HoldingContext = {
   symbol: string | null;
   name: string;
+  assetType: string; // etf/accion/cripto — para el carril de datos de mercado del asesor
   quantity: number;
   invested: number;
   value: number;
@@ -56,6 +58,7 @@ export function mapHoldingsForContext(
   const holdings: HoldingContext[] = sorted.slice(0, max).map((h) => ({
     symbol: h.symbol || null,
     name: h.label || h.symbol || "inversión",
+    assetType: h.assetType,
     quantity: h.quantity,
     invested: Math.round(h.costBasis),
     value: Math.round(h.currentValue),

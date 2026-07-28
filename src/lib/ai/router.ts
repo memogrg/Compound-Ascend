@@ -48,7 +48,9 @@ type Intent =
   // Sobres agrupados por frasco (determinista, sin alucinar) — lectura fresca:
   | "listar_sobres"
   // "¿me puedo comprar X?" → mapea al sobre y dice el restante (determinista) — lectura fresca:
-  | "puedo_gastar";
+  | "puedo_gastar"
+  // Precio/ATH/"si vendo X en el máximo" → llama datos_de_mercado DETERMINISTA (no a criterio del LLM):
+  | "datos_mercado";
 
 const KNOWN_INTENTS: Intent[] = [
   "numero_seguridad",
@@ -63,6 +65,7 @@ const KNOWN_INTENTS: Intent[] = [
   "ultimos_movimientos",
   "listar_sobres",
   "puedo_gastar",
+  "datos_mercado",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -163,9 +166,41 @@ export function affordReply(
   return `En ${path} te quedan ${money(r.remaining)} este mes.`;
 }
 
+/** Señales de pregunta de MERCADO: precio, ATH/máximo, o "si vendo X en el máximo/ATH". */
+const MARKET_CUE_RE =
+  /\bath\b|m[aá]ximo hist[oó]rico|\bm[aá]ximo\b|precio (?:de|actual|hoy)|(?:cu[aá]nto|a c[oó]mo) (?:vale|est[aá]|cuesta)|si (?:vendo|vendiera)/i;
+/** ATH/máximo específicamente (para saber si el usuario pide el escenario "al máximo"). */
+const MARKET_ATH_RE = /\bath\b|m[aá]ximo/i;
+
+/**
+ * Extrae el símbolo objetivo de una pregunta de mercado: un ticker en MAYÚSCULAS (2-6 letras/
+ * dígitos) o el que matchee un símbolo/nombre de las posiciones del usuario. `known` = símbolos y
+ * nombres de sus holdings (para resolver "kamino"/"bitcoin" además del ticker). Devuelve el TICKER.
+ */
+export function extractMarketSymbol(text: string, known: { symbol: string | null; name: string }[]): string | null {
+  // 1) Ticker explícito en mayúsculas (BTC, KMNO, VOO). Evita palabras comunes en mayúscula.
+  const STOP = new Set(["ATH", "USD", "CRC", "EUR", "IA", "ETF"]);
+  const upper = text.match(/\b[A-Z]{2,6}\d?\b/g)?.filter((w) => !STOP.has(w)) ?? [];
+  const bySymbol = new Set(known.map((k) => k.symbol?.toUpperCase()).filter(Boolean));
+  const hit = upper.find((w) => bySymbol.has(w)) ?? upper[0];
+  if (hit) return hit;
+  // 2) Por nombre de la posición ("si vendo mi bitcoin en el ATH") → su ticker.
+  const lower = text.toLowerCase();
+  const byName = known.find((k) => k.name && lower.includes(k.name.toLowerCase()) && k.symbol);
+  return byName?.symbol ?? null;
+}
+
 /** PATRONES: intent + params con CERO tokens. null si no matchea con confianza. */
 export function matchIntent(text: string): { intent: Intent; params: Record<string, unknown> } | null {
   const t = text.trim();
+
+  // Precio/ATH/"si vendo X en el máximo": carril DETERMINISTA (llama datos_de_mercado, no depende
+  // de que el LLM decida). Antes que REASONING_CUES ("si vendo" no está ahí, pero "máximo" podría
+  // solaparse con otras señales) para garantizar que estas preguntas NO caigan al modelo suelto.
+  if (MARKET_CUE_RE.test(t)) {
+    return { intent: "datos_mercado", params: { text: t, wantsAth: MARKET_ATH_RE.test(t) } };
+  }
+
   if (REASONING_CUES.test(t)) return null; // consejo/proyección → razonamiento
 
   // "¿me puedo comprar / me alcanza para X?" en CUALQUIER orden (verbo+ítem o señal suelta + ítem).
@@ -424,6 +459,104 @@ async function resolveFetchIntent(
   return null;
 }
 
+/** asset_type del holding → tipo de mercado de getMarketHighlights. */
+const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = {
+  etf: "etf",
+  accion: "stock",
+  cripto: "crypto",
+};
+
+/**
+ * Carril DETERMINISTA de datos de mercado: resuelve el símbolo contra las posiciones del usuario
+ * (ctx.holdings), llama al tool (getMarketHighlights, cacheado) y arma la respuesta con
+ * computeMarketScenario (cifra real) — NO depende de que el LLM decida llamar el tool. Fallo honesto:
+ * si no hay símbolo o el dato vuelve null, dice el motivo real (nunca "no tengo acceso").
+ */
+async function resolveMarketQuery(
+  params: Record<string, unknown>,
+  ctx: FinancialContext,
+  cur: string,
+): Promise<AIChatResponse | null> {
+  const say = (reply: string): AIChatResponse => ({ reply, action: null });
+  const text = typeof params.text === "string" ? params.text : "";
+  const wantsAth = params.wantsAth === true;
+  const holdings = ctx.holdings ?? [];
+  const symbol = extractMarketSymbol(text, holdings.map((h) => ({ symbol: h.symbol, name: h.name })));
+  if (!symbol) {
+    // Pregunta de mercado sin símbolo claro → no forzamos; que el razonamiento la tome.
+    return null;
+  }
+  const holding = holdings.find((h) => h.symbol?.toUpperCase() === symbol.toUpperCase());
+  // assetType: del holding si lo tiene; si no, cripto por defecto (los tickers sueltos suelen serlo).
+  const at = MARKET_TYPE[holding?.assetType ?? ""] ?? "crypto";
+  try {
+    const { getMarketHighlights } = await import("@/lib/market-data");
+    const { computeMarketScenario } = await import("@/lib/ai/tools");
+    const { logger } = await import("@/lib/logger");
+    const h = await getMarketHighlights(symbol, at);
+    logger.info("router.market_lane", { symbol, assetType: at, gotData: !!h, gotHigh: h?.high != null });
+    const scenario = computeMarketScenario({
+      symbol: symbol.toUpperCase(),
+      assetType: at,
+      currency: h?.currency ?? cur,
+      price: h?.price ?? null,
+      high: h?.high ?? null,
+      highKind: h?.highKind ?? null,
+      highDate: h?.highDate ?? null,
+      invertido: holding?.invested,
+      cantidad: holding?.quantity,
+    });
+    return say(buildMarketReply(scenario, scenario.currency, wantsAth, !!holding));
+  } catch (err) {
+    const { logger } = await import("@/lib/logger");
+    logger.error("router.market_lane falló", { symbol, message: err instanceof Error ? err.message : "?" });
+    // Fallo real y distinguible (no el genérico "no tengo acceso").
+    return say(`No pude leer los datos de ${symbol.toUpperCase()} ahora mismo; reintentá en un momento o decime a qué precio simular.`);
+  }
+}
+
+/**
+ * Redacta la respuesta de mercado a partir del escenario del motor (computeMarketScenario) — pura y
+ * testeable. La cifra sale del tool; el asesor no la inventa. Fallo HONESTO y distinguible: si no hay
+ * dato dice el motivo real (no encontrado / no se pudo leer), NUNCA "no tengo acceso al ATH".
+ */
+export function buildMarketReply(
+  s: {
+    symbol: string;
+    precio_actual: number | null;
+    maximo: number | null;
+    maximo_tipo: "ath" | "52_semanas" | null;
+    valor_actual: number | null;
+    ganancia_al_precio_actual: number | null;
+    valor_al_maximo: number | null;
+    ganancia_al_maximo: number | null;
+  },
+  currency: string,
+  wantsAth: boolean,
+  hasPosition: boolean,
+): string {
+  const money = (n: number) => formatMoney(n, currency);
+  if (s.precio_actual === null && s.maximo === null) {
+    return `No pude leer los datos de ${s.symbol} en la fuente ahora mismo; reintentá en un momento o decime a qué precio querés que simule.`;
+  }
+  const maxLabel = s.maximo_tipo === "ath" ? "su máximo histórico (ATH)" : "su máximo de 52 semanas";
+  const parts: string[] = [];
+  if (s.precio_actual !== null) parts.push(`${s.symbol} cotiza hoy a ${money(s.precio_actual)}`);
+  if (s.maximo !== null) parts.push(`${maxLabel} fue ${money(s.maximo)}`);
+  let reply = parts.join("; ") + ".";
+
+  if (hasPosition && wantsAth) {
+    if (s.maximo !== null && s.ganancia_al_maximo !== null) {
+      reply += ` Si hubieras vendido tu posición a ese máximo, la ganancia habría sido ${money(s.ganancia_al_maximo)} sobre lo invertido (hoy, al precio actual, sería ${s.ganancia_al_precio_actual !== null ? money(s.ganancia_al_precio_actual) : "—"}). Ojo: el máximo es pasado y no se puede cronometrar el techo — es un escenario, no un plan.`;
+    } else {
+      reply += ` No tengo el máximo para calcular ese escenario; decime a qué precio simular.`;
+    }
+  } else if (hasPosition && s.ganancia_al_precio_actual !== null) {
+    reply += ` Al precio actual, tu ganancia sobre lo invertido es ${money(s.ganancia_al_precio_actual)}.`;
+  }
+  return reply;
+}
+
 /**
  * Intenta resolver la pregunta por el carril barato. Devuelve el resultado (con su carril y
  * tokens) o null si hay que escalar al razonamiento (modelo completo). NUNCA adivina: si el
@@ -440,6 +573,12 @@ export async function tryRouteQuery(
   // 1) Patrones (0 tokens de clasificación).
   const matched = matchIntent(lastUser);
   if (matched) {
+    // Datos de mercado (precio/ATH): carril determinista que usa ctx.holdings + el tool. Si no
+    // resuelve el símbolo o no hay dato, devuelve la respuesta honesta (no escala a repetir negativas).
+    if (matched.intent === "datos_mercado") {
+      const response = await resolveMarketQuery(matched.params, ctx, toolContext.currency);
+      return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
+    }
     if (FETCH_INTENTS.has(matched.intent)) {
       const response = await resolveFetchIntent(matched.intent, toolContext.currency, matched.params);
       // La lectura no consume tokens del LLM; su "coste" es una query a la BD.

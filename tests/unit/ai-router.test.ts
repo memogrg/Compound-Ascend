@@ -30,7 +30,13 @@ vi.mock("@/modules/financial-base", () => ({
   getSobreRemaining: (...a: unknown[]) => getSobreRemaining(...a),
 }));
 
-import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc } from "@/lib/ai/router";
+// Capa market-data: el carril determinista de precio/ATH la usa vía import dinámico.
+const getMarketHighlights = vi.fn();
+vi.mock("@/lib/market-data", () => ({
+  getMarketHighlights: (...a: unknown[]) => getMarketHighlights(...a),
+}));
+
+import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
 // FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
@@ -356,5 +362,63 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
     suggestSobreForChatFast.mockResolvedValue({ categoryId: null, categoryPath: null });
     const routed = await tryRouteQuery(ask("¿me alcanza para unas zapatillas?"), CTX, tc);
     expect(routed?.response.reply).toMatch(/a cuál lo llevo|no estoy seguro/i);
+  });
+});
+
+describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM)", () => {
+  const ctxWithKmno = {
+    ...CTX,
+    currency: "USD",
+    holdings: [
+      { symbol: "KMNO", name: "Kamino", assetType: "cripto", quantity: 100, invested: 500000, value: 560000, price: 5600, pl: 60000, plPct: 0.12, currency: "USD", priceUnavailable: false },
+    ],
+  } as FinancialContext;
+
+  it('"si vendo KMNO en el ATH, ¿cuánto gano?" rutea a datos_mercado (no al modelo suelto)', () => {
+    const m = matchIntent("si vendo KMNO en el ATH, ¿cuánto gano?");
+    expect(m?.intent).toBe("datos_mercado");
+    expect(m?.params.wantsAth).toBe(true);
+  });
+
+  it("extractMarketSymbol resuelve el ticker o el nombre de la posición", () => {
+    const known = [{ symbol: "KMNO", name: "Kamino" }];
+    expect(extractMarketSymbol("si vendo KMNO en el ATH", known)).toBe("KMNO");
+    expect(extractMarketSymbol("cuánto vale mi kamino hoy", known)).toBe("KMNO");
+    // "ATH" suelto no es un símbolo válido.
+    expect(extractMarketSymbol("cuál es el ATH", [])).toBeNull();
+  });
+
+  it("invoca datos_de_mercado, trae ATH real y calcula con lo invertido del contexto + caveat", async () => {
+    getMarketHighlights.mockResolvedValue({ price: 5600, currency: "USD", high: 8000, highDate: "2024-03-14", highKind: "ath" });
+    const routed = await tryRouteQuery(ask("si vendo KMNO en el ATH, ¿cuánto gano?"), ctxWithKmno, tc);
+    expect(routed?.lane).toBe("template"); // determinista, no razonamiento
+    expect(getMarketHighlights).toHaveBeenCalledWith("KMNO", "crypto");
+    // Ganancia al ATH = 100×8000 − 500000 = 300000; caveat de techo no cronometrable.
+    expect(routed?.response.reply).toContain("300.000");
+    expect(routed?.response.reply).toMatch(/no se puede cronometrar|escenario/i);
+    // NUNCA el genérico "no tengo acceso".
+    expect(routed?.response.reply).not.toMatch(/no tengo acceso/i);
+  });
+
+  it("símbolo que no trae dato → motivo REAL (reintentá), no 'no tengo acceso'", () => {
+    const reply = buildMarketReply(
+      { symbol: "XYZ", precio_actual: null, maximo: null, maximo_tipo: null, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: null, ganancia_al_maximo: null },
+      "USD",
+      true,
+      false,
+    );
+    expect(reply).toMatch(/no pude leer|reintent/i);
+    expect(reply).not.toMatch(/no tengo acceso/i);
+  });
+
+  it("acción/ETF: el máximo se presenta como 52 semanas, no como ATH", () => {
+    const reply = buildMarketReply(
+      { symbol: "VOO", precio_actual: 500, maximo: 560, maximo_tipo: "52_semanas", valor_actual: 15000, ganancia_al_precio_actual: 5000, valor_al_maximo: 16800, ganancia_al_maximo: 6800 },
+      "USD",
+      true,
+      true,
+    );
+    expect(reply).toMatch(/52 semanas/i);
+    expect(reply).not.toMatch(/máximo histórico|ATH/i);
   });
 });

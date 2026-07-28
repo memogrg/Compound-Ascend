@@ -39,6 +39,7 @@ export type FinancialContext = {
   holdings?: {
     symbol: string | null;
     name: string;
+    assetType: string;
     quantity: number;
     invested: number; // costo de compra (costBasis) en moneda principal
     value: number; // valor actual (currentValue) en moneda principal

@@ -217,6 +217,8 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       if (!symbol) return { error: "falta el símbolo" };
       try {
         const { getMarketHighlights } = await import("@/lib/market-data");
+        const { logger } = await import("@/lib/logger");
+        logger.info("tool.datos_de_mercado", { symbol: symbol.toUpperCase(), assetType: at });
         const h = await getMarketHighlights(symbol, at);
         return computeMarketScenario({
           symbol: symbol.toUpperCase(),

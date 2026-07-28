@@ -164,20 +164,30 @@ export function pickCoingeckoMatch(
   return match?.id ?? null;
 }
 
-// Cache en memoria de resoluciones dinámicas (ticker → id) para el resto.
-const resolvedIds = new Map<string, string>();
+// Cache en memoria de resoluciones dinámicas (ticker → id | null) para el resto. El valor `null`
+// se CACHEA también: un ticker inexistente no debe re-pegar /search en cada consulta (y quemar el
+// rate limit del free tier). El TTL evita que un miss por 429 transitorio quede pegado para siempre.
+const resolvedIds = new Map<string, { id: string | null; at: number }>();
+const RESOLVE_TTL_MS = 6 * 60 * 60 * 1000; // 6 h: los ids de CoinGecko no cambian; refresco holgado.
 
-/** Resuelve el id de CoinGecko para un ticker no listado, vía /search. */
+/**
+ * Resuelve el id de CoinGecko para un ticker no listado, vía /search. Cachea el resultado
+ * (incluido el miss) con TTL. Un 429/timeout de /search devuelve null desde fetchJson → NO se
+ * cachea como miss permanente (se reintenta en la próxima), para no quedar sin precio por un
+ * rate-limit puntual. Los tickers curados (COINGECKO_IDS) no pasan por acá.
+ */
 async function resolveCoingeckoId(ticker: string): Promise<string | null> {
   const key = ticker.toUpperCase();
   if (COINGECKO_IDS[key]) return COINGECKO_IDS[key]!;
-  if (resolvedIds.has(key)) return resolvedIds.get(key)!;
+  const cached = resolvedIds.get(key);
+  if (cached && Date.now() - cached.at < RESOLVE_TTL_MS) return cached.id;
   const data = (await fetchJson(
     `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(ticker)}`,
   )) as { coins?: { id: string; symbol: string; market_cap_rank: number | null }[] } | null;
-  const id = pickCoingeckoMatch(data?.coins ?? [], ticker);
-  if (!id) return null;
-  resolvedIds.set(key, id);
+  // fetchJson devuelve null ante error de red / 429 / timeout: NO lo cacheamos como miss (reintenta).
+  if (data === null) return null;
+  const id = pickCoingeckoMatch(data.coins ?? [], ticker);
+  resolvedIds.set(key, { id, at: Date.now() }); // cachea id o miss real (búsqueda que sí respondió)
   return id;
 }
 

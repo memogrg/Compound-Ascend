@@ -4,6 +4,7 @@ import { mapHoldingsForContext, type HoldingPerf } from "@/lib/ai/holdings-conte
 const h = (over: Partial<HoldingPerf> & { currentValue: number }): HoldingPerf => ({
   symbol: "KMNO",
   label: "Kimbal",
+  assetType: "cripto",
   quantity: 100,
   costBasis: 500000,
   currentPrice: 5600,
@@ -26,6 +27,7 @@ describe("mapHoldingsForContext · el AI ve las posiciones con su costo de compr
       price: 5600,
       pl: 60000,
     });
+    expect(out.holdings[0]!.assetType).toBe("cripto"); // para el carril de datos de mercado
     // Con esto una pregunta "si vendo KMNO, ¿cuánto gano vs lo invertido?" tiene el número real.
     expect(out.investmentInvested).toBe(500000);
     expect(out.investmentValue).toBe(560000); // costo + P/L
