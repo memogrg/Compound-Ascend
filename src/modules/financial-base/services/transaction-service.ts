@@ -249,6 +249,7 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
     amount: input.amount,
     currency: input.currency,
     occurredOn: input.occurredOn,
+    countsInBudget: row.counts_in_budget ?? true,
   });
 
   return { id: data.id, linkedKind, linkedId };
@@ -322,13 +323,16 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
     .in("user_id", scope);
 
   // Saco de Liquidez: re-sincroniza el delta con el nuevo kind/amount. Si pasó a
-  // un kind sin delta (transferencia/ajuste), recordTransactionDelta borra la fila.
+  // un kind sin delta (transferencia/ajuste) o a un consumo de frasco off-budget,
+  // recordTransactionDelta borra la fila. (Las vinculadas ya se bloquearon arriba,
+  // así que aquí countsInBudget es true; se pasa por coherencia con la regla.)
   await recordLiquidityDelta({
     transactionId: id,
     kind: input.kind,
     amount: input.amount,
     currency: input.currency,
     occurredOn: input.occurredOn,
+    countsInBudget: input.countsInBudget ?? true,
   });
 }
 
@@ -339,6 +343,8 @@ async function recordLiquidityDelta(args: {
   amount: number;
   currency: string;
   occurredOn: string;
+  /** Off-budget: un consumo de frasco (false) no debe restar liquidez. */
+  countsInBudget?: boolean;
 }): Promise<void> {
   try {
     const { recordTransactionDelta } = await import(

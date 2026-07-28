@@ -15,6 +15,7 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
 import {
   computeLiquidityBalance,
+  liquidityDelta,
   periodNetChange,
   type LiquidityRow,
 } from "@/modules/financial-base/engine/liquidity";
@@ -109,9 +110,11 @@ export async function reconcileBalance(realBalance: number): Promise<void> {
 }
 
 /**
- * Upsert del delta de una transacción real. ingreso → +amount; gasto → −amount;
- * cualquier otro kind (transferencia/ajuste) → delta 0: se borra la fila para no
- * dejar un delta huérfano si la transacción cambió de tipo.
+ * Upsert del delta de una transacción real. El signo lo fija `liquidityDelta`
+ * (la tabla de verdad): ingreso → +amount; gasto → −amount; consumo de un frasco
+ * de meta (gasto off-budget, countsInBudget=false) → 0 (el cash ya salió al
+ * aportar); transferencia/ajuste → 0. Delta 0 borra la fila para no dejar un
+ * delta huérfano si la transacción cambió de tipo o dejó de mover cash.
  */
 export async function recordTransactionDelta(args: {
   transactionId: string;
@@ -119,11 +122,12 @@ export async function recordTransactionDelta(args: {
   amount: number;
   currency: string;
   occurredOn: string;
+  /** Off-budget: un consumo de frasco (false) es neutro en liquidez. */
+  countsInBudget?: boolean;
 }): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const delta =
-    args.kind === "ingreso" ? args.amount : args.kind === "gasto" ? -args.amount : 0;
+  const delta = liquidityDelta(args);
 
   if (delta === 0) {
     await supabase
