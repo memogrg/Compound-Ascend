@@ -9,12 +9,26 @@ const env: { FINNHUB_TOKEN: string; ALPHA_VANTAGE_KEY: string; COINGECKO_API_KEY
 };
 vi.mock("@/lib/env", () => ({ getServerEnv: () => env }));
 
+// Store (market_price_cache) vía service-role: null por defecto → los tests live caen al fetch;
+// un test lo setea para probar el camino store-first.
+let storeRow: Record<string, unknown> | null = null;
+vi.mock("@/lib/supabase/service-role", () => ({
+  createServiceRoleClient: () => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: storeRow }) }) }),
+      }),
+    }),
+  }),
+}));
+
 import { getMarketHighlights } from "@/lib/market-data";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   env.COINGECKO_API_KEY = undefined;
+  storeRow = null;
 });
 
 describe("getMarketHighlights · máximo REAL por clase de activo, cacheado (no 503)", () => {
@@ -104,5 +118,27 @@ describe("getMarketHighlights · máximo REAL por clase de activo, cacheado (no 
     const stale = await getMarketHighlights("BTC", "crypto");
     expect(stale?.high).toBe(73000); // servido del "último bueno", no falla
     vi.useRealTimers();
+  });
+});
+
+describe("getMarketHighlights · lee del STORE primero (sin pegarle a CoinGecko en vivo)", () => {
+  it("con fila en el store (poblada por el recolector) → devuelve ATH+precio SIN fetch", async () => {
+    storeRow = {
+      price: 0.018,
+      currency: "USD",
+      ath_usd: 0.2478,
+      ath_date: "2024-12-15",
+      high_kind: "ath",
+      fetched_at: "2026-08-02T10:00:00Z",
+    };
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const h = await getMarketHighlights("KMNOSTORE", "crypto");
+    expect(h?.high).toBe(0.2478);
+    expect(h?.highKind).toBe("ath");
+    expect(h?.price).toBe(0.018);
+    expect(h?.asOf).toBe("2026-08-02T10:00:00Z"); // frescura para la UI/AI
+    expect(fetchMock).not.toHaveBeenCalled(); // NO pegó a CoinGecko en vivo
   });
 });

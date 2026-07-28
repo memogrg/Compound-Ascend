@@ -1,0 +1,59 @@
+# Recolector de datos de mercado — barrido cada hora (gratis en repo público, sin Vercel Pro).
+#
+# Dispara /api/market-data/refresh, que junta los símbolos de holdings + alertas de precio, trae
+# precio + ATH/máximo en 1-2 llamadas batched (cripto: CoinGecko /coins/markets; acciones: Finnhub)
+# y los GUARDA en market_price_cache. La app/AI/valuación/alertas LEEN de ese store — sin pegarle a
+# CoinGecko en vivo por consulta (el fetch en vivo desde serverless fallaba por timeout/rate-limit).
+#
+# SECRET / VARIABLE a crear en el repo (Settings → Secrets and variables → Actions):
+#   · Secret   CRON_SECRET       — el MISMO valor que el env CRON_SECRET de Vercel.
+#   · Variable MARKET_DATA_URL   — la URL de PROD del endpoint, SIN query. Ejemplo:
+#                                  https://TU-APP.vercel.app/api/market-data/refresh
+#
+# Caveats: el cron de GitHub puede retrasarse unos minutos y se PAUSA tras ~60 días sin actividad
+# del repo (un push lo reactiva). El precio es tan fresco como esta corrida; el ATH se mueve lento
+# (basta la corrida diaria de Vercel, pero horario lo mantiene más al día).
+#
+# NOTA DE ARQUITECTURA: el fetch a CoinGecko lo hace el ENDPOINT en Vercel (1-2 llamadas batched, no
+# el enjambre que fallaba). Si el log del endpoint mostrara que hasta UNA llamada batched da
+# timeout desde Vercel (bloqueo de IP CoinGecko↔Vercel), se mueve el fetch a este workflow (Node
+# script + service key). Las lecturas de la app ya salen del store, así que la app no se rompe.
+
+name: market-data-refresh
+
+on:
+  schedule:
+    - cron: "0 * * * *" # cada hora (UTC)
+  workflow_dispatch: {} # disparo manual para pruebas
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recolectar datos de mercado
+        env:
+          MARKET_DATA_URL: ${{ vars.MARKET_DATA_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MARKET_DATA_URL:-}" ]; then
+            echo "::error::Falta la variable MARKET_DATA_URL (Settings → Variables)."
+            exit 1
+          fi
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Falta el secret CRON_SECRET (Settings → Secrets)."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${MARKET_DATA_URL}")
+          echo "HTTP ${code}"
+          cat /tmp/resp.json 2>/dev/null || true
+          echo
+          case "${code}" in
+            2*) echo "OK" ;;
+            *) echo "::error::El endpoint respondió ${code} (esperaba 2xx)."; exit 1 ;;
+          esac

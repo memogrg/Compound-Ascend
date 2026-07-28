@@ -36,7 +36,7 @@ vi.mock("@/lib/market-data", () => ({
   getMarketHighlights: (...a: unknown[]) => getMarketHighlights(...a),
 }));
 
-import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply } from "@/lib/ai/router";
+import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
 // FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
@@ -420,5 +420,29 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     );
     expect(reply).toMatch(/52 semanas/i);
     expect(reply).not.toMatch(/máximo histórico|ATH/i);
+  });
+
+  it("freshnessNote: honestidad de frescura — fresco (<2h) sin nota; viejo → 'precio guardado del DD/MM, no en vivo'", () => {
+    const now = Date.parse("2026-08-02T12:00:00Z");
+    // Sin fecha o fecha inválida → sin nota (no mentir sobre frescura).
+    expect(freshnessNote(null, now)).toBe("");
+    expect(freshnessNote("no-es-fecha", now)).toBe("");
+    // Guardado hace 1h → todavía "fresco" → sin nota.
+    expect(freshnessNote("2026-08-02T11:00:00Z", now)).toBe("");
+    // Guardado hace 30h → viejo → nota con la fecha guardada (nunca finge estar en vivo).
+    const stale = freshnessNote("2026-08-01T06:00:00Z", now);
+    expect(stale).toContain("01/08");
+    expect(stale).toMatch(/no en vivo/i);
+  });
+
+  it("buildMarketReply anexa la nota de frescura cuando el precio es guardado, no en vivo", () => {
+    const reply = buildMarketReply(
+      { symbol: "KMNO", precio_actual: 0.018, maximo: 0.2478, maximo_tipo: "ath", valor_actual: 180, ganancia_al_precio_actual: 80, valor_al_maximo: 2478, ganancia_al_maximo: 2378 },
+      "USD",
+      true,
+      true,
+      " (precio guardado del 01/08, no en vivo).",
+    );
+    expect(reply).toMatch(/no en vivo/i);
   });
 });

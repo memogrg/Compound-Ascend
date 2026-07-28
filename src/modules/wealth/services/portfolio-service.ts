@@ -378,7 +378,11 @@ export async function getPortfolioReport(): Promise<PortfolioReport> {
   ]);
 
   const normalizedHoldings = normalizeHoldings(holdings, currency, rates);
-  const prices = await fetchNormalizedPrices(holdings, currency, rates);
+  // Precios desde el STORE (market_price_cache, poblado por el recolector/cron): una consulta a BD,
+  // CERO red externa por render → mata el enjambre de llamadas a CoinGecko que colgaba desde
+  // serverless. Lo que el store no tenga (símbolo nuevo, cron sin correr) cae a costo dentro del
+  // engine, igual que cuando un proveedor fallaba. La frescura se ve en el store (fetched_at).
+  const prices = await fetchCachedPrices(holdings, currency, rates);
   const normalizedDividends = normalizeDividendAmounts(dividends, currency, rates);
 
   const baseAnalytics = computePortfolioAnalytics(normalizedHoldings, prices);

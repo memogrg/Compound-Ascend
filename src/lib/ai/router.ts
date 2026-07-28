@@ -506,7 +506,7 @@ async function resolveMarketQuery(
       invertido: holding?.invested,
       cantidad: holding?.quantity,
     });
-    return say(buildMarketReply(scenario, scenario.currency, wantsAth, !!holding));
+    return say(buildMarketReply(scenario, scenario.currency, wantsAth, !!holding, freshnessNote(h?.asOf, Date.now())));
   } catch (err) {
     const { logger } = await import("@/lib/logger");
     logger.error("router.market_lane falló", { symbol, message: err instanceof Error ? err.message : "?" });
@@ -520,6 +520,21 @@ async function resolveMarketQuery(
  * testeable. La cifra sale del tool; el asesor no la inventa. Fallo HONESTO y distinguible: si no hay
  * dato dice el motivo real (no encontrado / no se pudo leer), NUNCA "no tengo acceso al ATH".
  */
+/**
+ * Nota de FRESCURA honesta: si el dato del store tiene más de ~2 h (el cron no corrió), lo dice
+ * ("precio guardado del DD/MM, no en vivo"). Fresco o sin fecha → "". Puro (recibe `nowMs`).
+ */
+export function freshnessNote(asOf: string | null | undefined, nowMs: number): string {
+  if (!asOf) return "";
+  const t = Date.parse(asOf);
+  if (!Number.isFinite(t)) return "";
+  if (nowMs - t < 2 * 3600 * 1000) return ""; // fresco
+  const d = new Date(t);
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  return ` (precio guardado del ${dd}/${mm}, no en vivo).`;
+}
+
 export function buildMarketReply(
   s: {
     symbol: string;
@@ -534,6 +549,7 @@ export function buildMarketReply(
   currency: string,
   wantsAth: boolean,
   hasPosition: boolean,
+  freshness = "",
 ): string {
   const money = (n: number) => formatMoney(n, currency);
   if (s.precio_actual === null && s.maximo === null) {
@@ -554,7 +570,7 @@ export function buildMarketReply(
   } else if (hasPosition && s.ganancia_al_precio_actual !== null) {
     reply += ` Al precio actual, tu ganancia sobre lo invertido es ${money(s.ganancia_al_precio_actual)}.`;
   }
-  return reply;
+  return reply + freshness;
 }
 
 /**
