@@ -15,6 +15,7 @@ import type { Account, Period } from "@/modules/financial-base/types";
 import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
 import { EssentialCheck } from "@/components/shared/essential-check";
 import { formatMoney } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 import { Icon, type IconName } from "@/components/ui/icon";
 // Reutiliza la MISMA paleta que el fork de la web (tokens globales del design system).
 import { CAT_COLORS } from "@/modules/financial-base/components/v2/expense-jars/category-kebab";
@@ -48,8 +49,8 @@ import {
 type NormalJar = Extract<Jar, { kind: "normal" }>;
 
 function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+  return todayLocalISO();
 }
 
 /** Solo frascos normales con sobres — los que admiten un gasto directo por categoría. */

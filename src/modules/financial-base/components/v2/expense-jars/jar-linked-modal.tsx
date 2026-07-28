@@ -45,6 +45,23 @@ const BUDGET_LABELS: Record<
     cta: "Agregar o editar objetivo",
     tip: "Solo lectura. Registra el aporte desde «Registrar gasto»; se reflejará aquí.",
   },
+  // Inversiones: aportar a un holding es un APORTE, no un pago de cuota. Sin esta entrada
+  // caía al fallback de deuda ("pagado/cuota"), incoherente con la fila (que dice "aportado").
+  holding: {
+    header: "Aportes de este mes",
+    done: "aportado",
+    unit: "aporte",
+    cta: "Agregar o editar inversión",
+    tip: "Solo lectura. Registra el aporte desde «Registrar gasto»; se reflejará aquí.",
+  },
+  // Pólizas: la prima SÍ se paga, pero la unidad es la prima, no una "cuota" de deuda.
+  policy: {
+    header: "Primas de este mes",
+    done: "pagado",
+    unit: "prima",
+    cta: "Agregar o editar póliza",
+    tip: "Solo lectura. Registra el pago desde «Registrar gasto»; se reflejará aquí.",
+  },
 };
 
 export function JarLinkedModal({

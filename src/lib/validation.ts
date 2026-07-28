@@ -16,6 +16,21 @@ export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/**
+ * "Hoy" en formato YYYY-MM-DD según la zona LOCAL del dispositivo. Para el DEFAULT de fecha
+ * de los formularios de captura (cliente): un movimiento a las 7pm en Costa Rica (UTC-6) debe
+ * fecharse HOY, no mañana. `todayISO()` (UTC) haría lo segundo y lo dejaría fuera del corte
+ * "de hoy" del frasco.
+ *
+ * NO usar en el SERVIDOR (Vercel corre en UTC: ahí "local" es UTC y no aporta nada). Los
+ * validadores (`notFutureDate`/`pastDateSchema`) y los cálculos canónicos siguen con
+ * `todayISO()`. Recibe la fecha por parámetro para poder fijarla en un test.
+ */
+export function todayLocalISO(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 /** Predicado: la fecha YYYY-MM-DD no es futura. */
 export const notFutureDate = (d: string): boolean => d <= todayISO();
 

@@ -7,6 +7,7 @@ import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 import { renderMarkdown } from "@/lib/markdown";
 
 /**
@@ -66,7 +67,8 @@ type ChatMsg = {
 };
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+  return todayLocalISO();
 }
 
 /** Mapea action.payload → borrador de transacción (espeja ActionCard de la web). */

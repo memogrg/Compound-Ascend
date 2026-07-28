@@ -231,6 +231,45 @@ describe("buildExpenseJars (Fase frascos)", () => {
     expect(jar.totals).toEqual({ budget: 600_000, spent: 100_000, remaining: 500_000 });
   });
 
+  // Regla de Memo: si gasté en un frasco sin presupuesto, debe verse el gastado y el 0
+  // presupuestado. Nunca esconder plata real por no tener presupuesto.
+  it("sobre NORMAL sin presupuesto pero con gasto: se pinta con su gastado (no se esconde)", () => {
+    // viv_old es hoja de sistema NO favorita: se omitiría si estuviera vacía, pero con gasto
+    // real y presupuesto 0 debe pintarse igual.
+    const real: KeyedTotals = { viv_old: { label: "Servicios y hogar", value: 40000 } };
+    const jar = buildExpenseJars({ tree: [VIVIENDA], budgetByKey: {}, realByKey: real, entities: NO_ENTITIES, fmt })[0]!;
+    if (jar.kind !== "normal") throw new Error("normal");
+    const env = jar.envelopes.find((e) => e.id === "viv_old");
+    expect(env).toBeDefined();
+    expect(env!.spent).toBe(40000);
+    expect(env!.budget).toBe(0);
+  });
+
+  it("frasco VINCULADO (holding no recurrente) sin presupuesto pero con aporte: muestra el gastado", () => {
+    // El caso Promerica: aporte único (no recurrente → amount 0) con un aporte registrado. El
+    // presupuesto es 0 (no hay aporte mensual planeado), pero el gastado NO se esconde.
+    const entities: JarEntities = {
+      ...NO_ENTITIES,
+      holding: [{ id: "h1", name: "Promerica", sub: "certificado", amount: 0, currency: "CRC" }],
+    };
+    const jar = buildExpenseJars({
+      tree: [LIBERTAD],
+      budgetByKey: {},
+      realByKey: {},
+      entities,
+      fmt,
+      linkedBudget: {
+        holding: { bySource: {}, spentById: { h1: 510_000 }, paymentCategoryId: "cat-lib" },
+      },
+    })[0]!;
+    if (jar.kind !== "linked") throw new Error("linked");
+    expect(jar.budgetAware).toBe(true);
+    const h1 = jar.items.find((i) => i.id === "h1")!;
+    expect(h1.budget).toBe(0); // sin aporte mensual planeado
+    expect(h1.spent).toBe(510_000); // el aporte registrado se ve, no se esconde
+    expect(jar.totals).toEqual({ budget: 0, spent: 510_000, remaining: -510_000 });
+  });
+
   it("frasco vinculado SIN config de presupuesto: sigue plano (sin budget/spent)", () => {
     const entities: JarEntities = {
       ...NO_ENTITIES,

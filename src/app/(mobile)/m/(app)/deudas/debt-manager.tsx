@@ -16,6 +16,7 @@ import type { Debt, DebtVM, DebtPayment } from "@/modules/control";
 // VM convertido, el test de multimoneda lo dice.
 import { cuotaPrecargada, montoFilaDeuda } from "@/modules/control/engine/debt-strategy";
 import { formatMoney, formatPercent } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 
 import {
   Fab,
@@ -90,7 +91,8 @@ function debtSubtitle(args: { rank: number; apr: number; months: number | null }
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+  return todayLocalISO();
 }
 
 function fmtDate(iso: string | null | undefined): string {

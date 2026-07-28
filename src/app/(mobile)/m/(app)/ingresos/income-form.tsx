@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { todayLocalISO } from "@/lib/validation";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import type { IncomeType } from "@/modules/financial-base/types";
@@ -60,8 +61,8 @@ const GROUP_KEY_BY_TYPE: Record<IncomeType, string> = {
 const NO_SUBCATEGORY = "";
 
 function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+  return todayLocalISO();
 }
 
 /** Hojas (subcategorías) del grupo del tipo elegido, tomadas del incomeTree (como la web). */

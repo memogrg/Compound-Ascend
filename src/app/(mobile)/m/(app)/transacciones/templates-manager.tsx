@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatMoney } from "@/lib/format";
+import { todayLocalISO } from "@/lib/validation";
 import {
   addTemplateAction,
   editTemplateAction,
@@ -58,8 +59,8 @@ function isRunnable(t: TransactionTemplate): boolean {
 }
 
 function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
+  return todayLocalISO();
 }
 
 export function TemplatesManager({
