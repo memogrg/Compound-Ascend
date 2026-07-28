@@ -250,6 +250,43 @@ export async function listHoldings(ctx?: AuthContext): Promise<HoldingNativo[]> 
   return (data ?? []).map(rowToHolding).map(comoNativo);
 }
 
+/**
+ * Posición AGREGADA del usuario en un símbolo, leída de las holdings COMPLETAS (scope de hogar) —
+ * NO del top-N compacto del contexto de la IA, que trunca las posiciones chicas o con precio $0.
+ * Devuelve cantidad + invertido (costo = cantidad×costo promedio) en la moneda nativa del holding,
+ * o null si no hay posición. Para el carril de mercado del asesor ("si vendo mi JUP al ATH…").
+ */
+export async function getPositionForSymbol(
+  symbol: string,
+  ctx?: AuthContext,
+): Promise<{ quantity: number; invested: number; currency: string; assetType: AssetType } | null> {
+  const target = symbol.trim().toUpperCase();
+  if (!target) return null;
+  const holdings = await listHoldings(ctx);
+  const matching = holdings.filter((h) => h.symbol?.toUpperCase() === target && h.quantity > 0);
+  if (matching.length === 0) return null;
+  // Agregado por moneda (lo normal es una sola): elegimos la de mayor invertido para no mezclar
+  // monedas al sumar. cantidad e invertido salen de esa moneda; el llamador convierte si hace falta.
+  const porMoneda = new Map<string, { quantity: number; invested: number; assetType: AssetType }>();
+  for (const h of matching) {
+    const acc = porMoneda.get(h.currency) ?? { quantity: 0, invested: 0, assetType: h.assetType };
+    acc.quantity += h.quantity;
+    acc.invested += h.quantity * h.averageCost;
+    porMoneda.set(h.currency, acc);
+  }
+  let currency = "";
+  let best: { quantity: number; invested: number; assetType: AssetType } | null = null;
+  for (const [cur, acc] of porMoneda) {
+    if (!best || acc.invested > best.invested) {
+      best = acc;
+      currency = cur;
+    }
+  }
+  return best
+    ? { quantity: best.quantity, invested: Math.round(best.invested), currency, assetType: best.assetType }
+    : null;
+}
+
 export async function createHolding(input: HoldingInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

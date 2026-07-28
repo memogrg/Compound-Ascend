@@ -10,6 +10,7 @@ import {
   type DebtSimulation,
 } from "@/modules/control/engine/debt-strategy";
 import type { AIChatResult } from "@/lib/ai/provider";
+import { isValidPrice } from "@/lib/market-data/validity";
 
 /** Declaración de una herramienta (los `parameters` son un JSON Schema de los args). */
 export type AiToolDecl = {
@@ -879,6 +880,9 @@ export type MarketDataResult = {
   /** Qué representa `maximo`: 'ath' (cripto, real) o '52_semanas' (acción/ETF). Honestidad. */
   maximo_tipo: "ath" | "52_semanas" | null;
   maximo_fecha: string | null;
+  /** Posición del usuario en este símbolo (si la tiene), para redactar "tenés X (invertiste Y)". */
+  cantidad: number | null;
+  invertido: number | null;
   /** Solo si se pasó `cantidad` y `invertido`: escenarios deterministas (no los calcula el LLM). */
   valor_actual: number | null;
   ganancia_al_precio_actual: number | null;
@@ -903,11 +907,15 @@ export function computeMarketScenario(input: {
   invertido?: number;
   cantidad?: number;
 }): MarketDataResult {
-  const { price, high, invertido, cantidad } = input;
+  const { invertido, cantidad } = input;
+  // Precio/máximo ≤0 (o null/NaN) = NO disponible: el $0 es basura de un id malo/cero viejo. Se trata
+  // como null para no imprimir "cotiza a $0" ni contaminar el escenario (el cálculo al máximo sigue).
+  const price = isValidPrice(input.price) ? input.price : null;
+  const high = isValidPrice(input.high) ? input.high : null;
   const hasPos = typeof invertido === "number" && invertido >= 0 && typeof cantidad === "number" && cantidad > 0;
   const valorActual = hasPos && price !== null ? Math.round(cantidad! * price) : null;
   const valorMaximo = hasPos && high !== null ? Math.round(cantidad! * high) : null;
-  const maximoTipo = input.highKind === "ath" ? "ath" : input.highKind === "52w" ? "52_semanas" : null;
+  const maximoTipo = high === null ? null : input.highKind === "ath" ? "ath" : input.highKind === "52w" ? "52_semanas" : null;
   return {
     symbol: input.symbol,
     assetType: input.assetType,
@@ -915,7 +923,9 @@ export function computeMarketScenario(input: {
     precio_actual: price,
     maximo: high,
     maximo_tipo: maximoTipo,
-    maximo_fecha: input.highDate,
+    maximo_fecha: high === null ? null : input.highDate,
+    cantidad: hasPos ? cantidad! : null,
+    invertido: hasPos ? invertido! : null,
     valor_actual: valorActual,
     ganancia_al_precio_actual: valorActual !== null ? valorActual - invertido! : null,
     valor_al_maximo: valorMaximo,

@@ -36,6 +36,12 @@ vi.mock("@/lib/market-data", () => ({
   getMarketHighlights: (...a: unknown[]) => getMarketHighlights(...a),
 }));
 
+// Posición COMPLETA por símbolo (holdings fuera del top-N): el carril la lee vía import dinámico.
+const getPositionForSymbol = vi.fn();
+vi.mock("@/modules/wealth", () => ({
+  getPositionForSymbol: (...a: unknown[]) => getPositionForSymbol(...a),
+}));
+
 import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
@@ -420,6 +426,45 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     );
     expect(reply).toMatch(/52 semanas/i);
     expect(reply).not.toMatch(/máximo histórico|ATH/i);
+  });
+
+  it("JUP fuera del top-N: igual ENCUENTRA la posición (holdings completas) y calcula al ATH, sin '$0'", async () => {
+    // JUP NO está en ctx.holdings (top-N compacto) — el bug del $0 lo dejaba fuera.
+    const ctxSinJup = {
+      ...CTX,
+      currency: "USD",
+      holdings: [{ symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 40000, value: 64000, price: 64000, pl: 24000, plPct: 0.6, currency: "USD", priceUnavailable: false }],
+    } as FinancialContext;
+    // Precio $0 (basura) + ATH real $2. La posición completa: 1.250 JUP, invertido $500.
+    getMarketHighlights.mockResolvedValue({ price: 0, currency: "USD", high: 2, highDate: "2024-01-31", highKind: "ath" });
+    getPositionForSymbol.mockResolvedValue({ quantity: 1250, invested: 500, currency: "USD", assetType: "cripto" });
+
+    const routed = await tryRouteQuery(ask("si vendo todo mi JUP al ATH, ¿cuánto gano?"), ctxSinJup, tc);
+    const reply = routed?.response.reply ?? "";
+
+    expect(getPositionForSymbol).toHaveBeenCalledWith("JUP"); // buscó la posición COMPLETA
+    expect(routed?.lane).toBe("template");
+    // Nombra la posición y calcula: 1.250 JUP, valor al ATH = 1.250×2 = 2.500, ganancia = 2.000.
+    expect(reply).toContain("1.250");
+    expect(reply).toContain("2.500"); // valor al máximo
+    expect(reply).toContain("2.000"); // ganancia = 2.500 − 500
+    expect(reply).toMatch(/escenario/i);
+    // NUNCA "$0" ni "cotiza … a $0"; y nunca "no tengo acceso".
+    expect(reply).not.toMatch(/\$0\b|a 0\b/);
+    expect(reply).not.toMatch(/no tengo acceso/i);
+  });
+
+  it("precio ≤0 no imprime '$0' ni bloquea el escenario al ATH (buildMarketReply puro)", () => {
+    // precio_actual null (ya saneado aguas arriba desde 0), ATH presente, con posición.
+    const reply = buildMarketReply(
+      { symbol: "JUP", precio_actual: null, maximo: 2, maximo_tipo: "ath", maximo_fecha: "2024-01-31", cantidad: 1250, invertido: 500, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: 2500, ganancia_al_maximo: 2000 },
+      "USD",
+      true,
+      true,
+    );
+    expect(reply).toContain("2.000"); // el escenario al ATH SÍ se calcula
+    expect(reply).toMatch(/no tengo el precio actual/i); // honesto sobre el precio faltante
+    expect(reply).not.toMatch(/\$0\b/); // jamás "$0"
   });
 
   it("freshnessNote: honestidad de frescura — fresco (<2h) sin nota; viejo → 'precio guardado del DD/MM, no en vivo'", () => {
