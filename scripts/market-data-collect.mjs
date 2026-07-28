@@ -182,6 +182,8 @@ async function stockHighlight(symbol) {
   const price = q.ok && typeof q.body?.c === "number" ? q.body.c : null;
   const high = m.ok && typeof m.body?.metric?.["52WeekHigh"] === "number" ? m.body.metric["52WeekHigh"] : null;
   const hd = m.ok ? m.body?.metric?.["52WeekHighDate"] : null;
+  // Diagnóstico: por qué un símbolo entra o no (quote status + c; metric es de pago en el free tier).
+  console.log(`  finnhub ${symbol}: quote=${q.status} c=${q.ok ? q.body?.c : "-"} metricStatus=${m.status} 52wHigh=${high ?? "-"}`);
   return { price, high, highDate: typeof hd === "string" ? hd.slice(0, 10) : null };
 }
 
