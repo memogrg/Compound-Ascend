@@ -8,6 +8,7 @@ import "server-only";
 import { requireUser } from "@/lib/auth/session";
 import { getMarketPrice, getCryptoPricesBatch, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { getFxRates } from "@/lib/market-data/fx-rates";
+import { isValidPrice } from "@/lib/market-data/validity";
 import { convertCurrency } from "@/lib/fx";
 import { getPrimaryCurrency } from "@/modules/financial-base";
 import { listHoldings } from "@/modules/wealth/services/holdings-service";
@@ -298,8 +299,12 @@ export async function fetchCachedPrices(
   // absurdo, así que el filtro por par se aplica igualmente en memoria.
   const porClave = new Map<string, { price: number; currency: string; fetchedAt: string }>();
   for (const r of data ?? []) {
+    // INTEGRIDAD: un precio ≤0/null es basura del feed (el store nunca debió guardarlo). Se IGNORA
+    // → el holding queda sin precio de mercado y cae a su valor base, jamás se valúa en "$0".
+    const price = Number(r.price);
+    if (!isValidPrice(price)) continue;
     porClave.set(claveCache(r.symbol, r.asset_type), {
-      price: Number(r.price),
+      price,
       currency: r.currency,
       fetchedAt: r.fetched_at,
     });
