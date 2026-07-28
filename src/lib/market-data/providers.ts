@@ -60,12 +60,15 @@ async function coingeckoFetch(url: string): Promise<unknown | null> {
   const auth = key ? "demo" : "public";
   try {
     const res = await fetch(url, { headers, signal: controller.signal });
-    // Instrumentación: status por llamada. 429 = rate limit; timeout/error = red/latencia.
+    // Instrumentación: status por llamada. 429 = rate limit; ver `cause` en el catch para red/timeout.
     logger.info("coingecko.call", { endpoint, status: res.status, auth });
     if (!res.ok) return null;
     return await res.json();
-  } catch {
-    logger.warn("coingecko.call", { endpoint, status: "timeout/error", auth });
+  } catch (err) {
+    // Separa la causa REAL: AbortError = timeout (lento); el resto = error de red/bloqueo (hard).
+    const cause =
+      err instanceof Error && err.name === "AbortError" ? `timeout(${COINGECKO_TIMEOUT_MS}ms)` : "network";
+    logger.warn("coingecko.call", { endpoint, status: cause, auth });
     return null;
   } finally {
     clearTimeout(timer);
@@ -233,6 +236,37 @@ export async function coingecko(ticker: string): Promise<Quote | null> {
   const row = data?.[id];
   const price = row ? num(row.usd) : null;
   return price ? { price, currency: "USD", provider: "coingecko", changePct: signedNum(row?.usd_24h_change) } : null;
+}
+
+/**
+ * Precios de VARIAS cripto en UNA sola llamada a CoinGecko (/simple/price?ids=id1,id2,…). Resuelve
+ * cada símbolo a su id (mapa curado; /search solo para no listados, cacheado) y mapea la respuesta
+ * de vuelta por SÍMBOLO. Colapsa la ráfaga de N-por-render a 1-2 requests → la Demo key (100/min)
+ * sobra. Devuelve solo los que respondieron con precio válido (best-effort).
+ */
+export async function coingeckoBatch(symbols: string[]): Promise<Record<string, Quote>> {
+  const out: Record<string, Quote> = {};
+  const idToSymbol = new Map<string, string>();
+  const ids: string[] = [];
+  for (const raw of symbols) {
+    const s = raw.trim().toUpperCase();
+    const id = await resolveCoingeckoId(s);
+    if (id && !idToSymbol.has(id)) {
+      idToSymbol.set(id, s);
+      ids.push(id);
+    }
+  }
+  if (ids.length === 0) return out;
+  const data = (await coingeckoFetch(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${ids.map(encodeURIComponent).join(",")}&vs_currencies=usd&include_24hr_change=true`,
+  )) as Record<string, { usd?: number; usd_24h_change?: number }> | null;
+  if (!data) return out;
+  for (const [id, row] of Object.entries(data)) {
+    const s = idToSymbol.get(id);
+    const price = s ? num(row?.usd) : null;
+    if (s && price) out[s] = { price, currency: "USD", provider: "coingecko", changePct: signedNum(row?.usd_24h_change) };
+  }
+  return out;
 }
 
 /** Máximos de un activo (para el asesor). `athKind` distingue ATH real vs máx. 52 semanas. */

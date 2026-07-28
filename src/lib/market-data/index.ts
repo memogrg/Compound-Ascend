@@ -10,6 +10,7 @@ import {
   yahoo,
   binance,
   coingecko,
+  coingeckoBatch,
   coingeckoHighlights,
   finnhubHighlights,
   yahooHistory,
@@ -27,6 +28,50 @@ import { persistMarketPrice } from "@/lib/market-data/persist";
 
 const STOCK_CHAIN = [finnhub, alphaVantage, yahoo];
 const CRYPTO_CHAIN = [coingecko, binance];
+
+// Single-flight: coalesce ráfagas idénticas (mismo set de símbolos en vuelo) → un render = 1 batch,
+// no N. Clave = set ordenado; el promise se comparte y se limpia al resolver.
+const cryptoBatchInFlight = new Map<string, Promise<Record<string, MarketPrice>>>();
+
+/**
+ * Precios de VARIAS cripto en 1-2 llamadas (batch a CoinGecko) — reemplaza la ráfaga de una-por-
+ * moneda que colgaba a la Demo key. Sirve los cacheados (TTL corto) y batchea solo los que faltan;
+ * cachea + persiste cada resultado. Single-flight: dos renders concurrentes con el mismo set
+ * comparten UNA llamada. Devuelve un mapa SÍMBOLO(MAYÚS) → MarketPrice (solo los que respondieron).
+ */
+export async function getCryptoPricesBatch(rawSymbols: string[]): Promise<Record<string, MarketPrice>> {
+  const symbols = [...new Set(rawSymbols.map((s) => s.trim().toUpperCase()).filter(isValidSymbol))];
+  const out: Record<string, MarketPrice> = {};
+
+  // 1) Cache hits (por símbolo) → no re-piden.
+  const need: string[] = [];
+  for (const s of symbols) {
+    const cached = priceCache.get<Quote>(`price:crypto:${s}`);
+    if (cached) out[s] = { ...cached, symbol: s, assetType: "crypto", cached: true };
+    else need.push(s);
+  }
+  if (need.length === 0) return out;
+
+  // 2) Los que faltan: UNA llamada batch, coalescida por single-flight.
+  const key = [...need].sort().join(",");
+  let flight = cryptoBatchInFlight.get(key);
+  if (!flight) {
+    flight = (async () => {
+      const quotes = await coingeckoBatch(need);
+      const mapped: Record<string, MarketPrice> = {};
+      for (const [s, q] of Object.entries(quotes)) {
+        priceCache.set(`price:crypto:${s}`, q, TTL.crypto);
+        persistMarketPrice(s, "crypto", q.price, q.currency, q.provider);
+        mapped[s] = { ...q, symbol: s, assetType: "crypto", cached: false };
+      }
+      return mapped;
+    })();
+    cryptoBatchInFlight.set(key, flight);
+    void flight.finally(() => cryptoBatchInFlight.delete(key));
+  }
+  Object.assign(out, await flight);
+  return out;
+}
 
 export async function getMarketPrice(
   rawSymbol: string,

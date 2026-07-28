@@ -6,7 +6,7 @@ import "server-only";
  * principal del usuario antes de pasarse al motor.
  */
 import { requireUser } from "@/lib/auth/session";
-import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
+import { getMarketPrice, getCryptoPricesBatch, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { getPrimaryCurrency } from "@/modules/financial-base";
@@ -60,17 +60,27 @@ export async function fetchNormalizedPrices(
 ): Promise<Record<string, number>> {
   const quotable = holdings.filter((h) => MARKET_TYPE[h.assetType]);
   const prices: Record<string, number> = {};
+
+  // CRIPTO en UNA sola llamada batch a CoinGecko (antes: una request por moneda en Promise.all →
+  // ráfaga que colgaba a la Demo key → timeout). Los stocks siguen por-símbolo (Finnhub no batchea
+  // gratis; su volumen es menor). Lo que el batch no traiga cae a fillMissingFromCache (abajo).
+  const cryptoSymbols = quotable
+    .filter((h) => MARKET_TYPE[h.assetType] === "crypto")
+    .map((h) => h.symbol);
+  const cryptoPrices = cryptoSymbols.length
+    ? await getCryptoPricesBatch(cryptoSymbols)
+    : {};
+
   await Promise.all(
     quotable.map(async (h) => {
       const marketType = MARKET_TYPE[h.assetType]!;
-      const quote = await getMarketPrice(h.symbol, marketType);
+      const sym = h.symbol.toUpperCase();
+      const quote =
+        marketType === "crypto"
+          ? (cryptoPrices[sym] ?? null)
+          : await getMarketPrice(h.symbol, marketType);
       if (quote) {
-        prices[h.symbol.toUpperCase()] = convertCurrency(
-          quote.price,
-          quote.currency,
-          primaryCurrency,
-          rates,
-        );
+        prices[sym] = convertCurrency(quote.price, quote.currency, primaryCurrency, rates);
       }
     }),
   );
