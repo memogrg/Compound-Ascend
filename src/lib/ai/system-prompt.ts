@@ -33,6 +33,25 @@ export type FinancialContext = {
   portfolioValue?: number;
   portfolioReturnPct?: number;
   topAssetClass?: string;
+  /** Inversiones POR POSICIÓN (motor de analytics, cifras REALES en moneda principal). Compacto:
+   *  top posiciones por valor. Con esto el asesor responde "si vendo X, ¿cuánto gano vs lo
+   *  invertido?" con el número real — nunca inventado. `holdingsMoreCount` = posiciones no listadas. */
+  holdings?: {
+    symbol: string | null;
+    name: string;
+    quantity: number;
+    invested: number; // costo de compra (costBasis) en moneda principal
+    value: number; // valor actual (currentValue) en moneda principal
+    price: number | null; // precio actual por unidad; null si no se pudo cotizar
+    pl: number; // ganancia/pérdida (profitLoss) en moneda principal
+    plPct: number; // rendimiento (0-1)
+    currency: string; // moneda NATIVA de la posición (referencia; los montos van en principal)
+    priceUnavailable: boolean;
+  }[];
+  holdingsMoreCount?: number;
+  investmentInvested?: number; // total invertido (costo base) en moneda principal
+  investmentValue?: number; // valor total de las inversiones (costo + P/L) en moneda principal
+  investmentPL?: number; // ganancia/pérdida total en moneda principal
   // Marco Patrimonial (motor patrimonio-engine). Best-effort: si la lectura falla,
   // no aparecen y el chat no se degrada.
   indicePatrimonial?: number; // 0-100
@@ -188,6 +207,26 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.portfolioReturnPct !== undefined)
     facts.push(`Rendimiento del portafolio: ${(ctx.portfolioReturnPct * 100).toFixed(1)}%.`);
   if (ctx.topAssetClass) facts.push(`Clase de activo principal: ${ctx.topAssetClass}.`);
+  // Inversiones POR POSICIÓN (cifras reales del motor, en moneda principal). El asesor calcula la
+  // ganancia al vender con estos números — NO los inventa.
+  if (ctx.holdings && ctx.holdings.length > 0) {
+    if (ctx.investmentValue !== undefined)
+      facts.push(
+        `Inversiones: total invertido ${ctx.investmentInvested} ${ctx.currency}, valor actual ${ctx.investmentValue} ${ctx.currency}` +
+          (ctx.investmentPL !== undefined
+            ? `, ganancia/pérdida ${ctx.investmentPL >= 0 ? "+" : ""}${ctx.investmentPL} ${ctx.currency}.`
+            : "."),
+      );
+    const lines = ctx.holdings.map((h) => {
+      const tag = h.symbol ? `${h.symbol}${h.name && h.name !== h.symbol ? ` (${h.name})` : ""}` : h.name;
+      if (h.priceUnavailable || h.price === null) {
+        return `  · ${tag}: ${h.quantity} uds, invertido ${h.invested} ${ctx.currency} (precio actual no disponible).`;
+      }
+      const sign = h.pl >= 0 ? "+" : "";
+      return `  · ${tag}: ${h.quantity} uds · invertido ${h.invested} · vale ${h.value} (precio ${h.price}) · P/L ${sign}${h.pl} (${sign}${(h.plPct * 100).toFixed(1)}%) [${ctx.currency}].`;
+    });
+    facts.push(`Tus posiciones${ctx.holdingsMoreCount ? ` (top ${ctx.holdings.length}; +${ctx.holdingsMoreCount} más)` : ""}:\n${lines.join("\n")}`);
+  }
   // Marco Patrimonial: cada línea solo si el campo existe (best-effort).
   if (ctx.indicePatrimonial !== undefined)
     facts.push(
@@ -488,6 +527,14 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "Responde SIEMPRE en español, con tono humano, claro y sin culpa. Explica el porqué de cada recomendación.",
     "No prometas rendimientos garantizados. No des consejos de inversión específicos como certezas; habla de escenarios, riesgos y horizonte.",
     "Usa solo el contexto financiero proporcionado; no inventes datos del usuario.",
+    "",
+    "CONVERSACIÓN (responder la consulta ACTUAL):",
+    "- Respondé a la ÚLTIMA consulta del usuario. Los turnos anteriores son SOLO contexto para entenderla; NO los vuelvas a responder ni retomes temas viejos salvo que la última consulta lo pida. Si la última es una pregunta nueva, contestá ESA.",
+    "",
+    "INVERSIONES (ves TODO el dinero del usuario):",
+    "- En tu contexto tenés las POSICIONES del usuario (símbolo, cantidad, invertido, valor actual, precio y ganancia/pérdida) y los totales. Úsalos para responder preguntas como «si vendo KMNO, ¿cuánto gano vs lo invertido?»: la ganancia al vender HOY = valor actual − invertido de esa posición (o precio actual × cantidad − invertido). Esas cifras son REALES y salen de tu contexto/motor — NUNCA las inventes ni las estimes de memoria.",
+    "- Precio: solo tenés el precio ACTUAL (no máximos históricos). Para un escenario «si vendo en su máximo/ATH», NO inventes un precio: decí que no trackeamos el máximo histórico y calculá con el precio actual, o pedile a qué precio simular. Si una posición dice «precio no disponible», decilo — no supongas su valor.",
+    "- Si te preguntan «¿cuánto tengo en X?» o «¿cuánto gané en Y?» y X/Y está en tus posiciones, respondé con su cifra; NO digas «no tengo acceso».",
     "",
     "USA TUS MÉTRICAS YA CALCULADAS:",
     "- Usa SIEMPRE las métricas que ya vienen en tu contexto (Índice Patrimonial, los tres Números, Años/Meses de colchón, cobertura, calidad). NUNCA las recalcules a partir del patrimonio neto y los gastos.",

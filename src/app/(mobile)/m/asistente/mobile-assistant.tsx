@@ -154,10 +154,11 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
     const q = input.trim();
     if (!q || sending) return;
     setInput("");
-    // history = conversación previa (sin tarjetas de acción), como la web
+    // history = conversación previa (sin tarjetas de acción), como la web. Solo los últimos turnos
+    // como contexto (acota el prompt y evita re-responder temas viejos; el servidor usa su memoria).
     const history = messages
       .filter((m) => !m.action && !m.txn)
-      .slice(-20)
+      .slice(-12)
       .map((m) => ({ role: m.role, content: m.text.slice(0, 4000) }));
     setMessages((m) => [...m, { id: nextId(), role: "user", text: q }]);
     setSending(true);
