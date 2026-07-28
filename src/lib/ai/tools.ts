@@ -838,6 +838,98 @@ export function projectGoals(
 }
 
 // ---------------------------------------------------------------------------
+// Herramienta: datos de mercado (precio + máximo). SOLO lectura; el fetch vive en el executor
+// (orchestrator, con la capa market-data cacheada). El CÁLCULO del escenario es puro y testeable.
+// ---------------------------------------------------------------------------
+
+export const MARKET_DATA_TOOL: AiToolDecl = {
+  name: "datos_de_mercado",
+  description:
+    "Trae datos REALES de mercado de un activo cotizado (cripto/acción/ETF): precio actual y su " +
+    "MÁXIMO — para cripto el ATH (máximo histórico real), para acciones/ETF el máximo de 52 " +
+    "semanas (NO es un ATH; se etiqueta como tal). Usala cuando el usuario pregunte por el precio, " +
+    "el ATH/máximo, o 'si vendo en el máximo/ATH, cuánto gano'. Pasá `invertido` y `cantidad` de la " +
+    "posición del usuario (de tu contexto) y la herramienta calcula la ganancia al precio actual y " +
+    "al máximo — cifras REALES, no las inventes. El máximo es PASADO: no se puede cronometrar el techo.",
+  parameters: {
+    type: "object",
+    properties: {
+      symbol: { type: "string", description: "Símbolo/ticker del activo (p. ej. BTC, KMNO, VOO)." },
+      assetType: {
+        type: "string",
+        enum: ["crypto", "stock", "etf"],
+        description: "Clase: crypto (cripto), stock (acción) o etf. Para 'accion' usá 'stock'.",
+      },
+      invertido: {
+        type: "number",
+        description: "Lo invertido (costo de compra) en esa posición, de tu contexto. Opcional.",
+      },
+      cantidad: { type: "number", description: "Unidades que tiene el usuario, de tu contexto. Opcional." },
+    },
+    required: ["symbol", "assetType"],
+  },
+};
+
+export type MarketDataResult = {
+  symbol: string;
+  assetType: string;
+  currency: string;
+  precio_actual: number | null;
+  maximo: number | null;
+  /** Qué representa `maximo`: 'ath' (cripto, real) o '52_semanas' (acción/ETF). Honestidad. */
+  maximo_tipo: "ath" | "52_semanas" | null;
+  maximo_fecha: string | null;
+  /** Solo si se pasó `cantidad` y `invertido`: escenarios deterministas (no los calcula el LLM). */
+  valor_actual: number | null;
+  ganancia_al_precio_actual: number | null;
+  valor_al_maximo: number | null;
+  ganancia_al_maximo: number | null;
+  nota: string;
+};
+
+/**
+ * Escenario determinista a partir de los datos de mercado + la posición del usuario. Puro:
+ * valor = cantidad × precio; ganancia = valor − invertido. El "al máximo" es HIPOTÉTICO (escenario),
+ * nunca un plan — el máximo es pasado. Devuelve null en lo que no se pueda calcular (sin inventar).
+ */
+export function computeMarketScenario(input: {
+  symbol: string;
+  assetType: string;
+  currency: string;
+  price: number | null;
+  high: number | null;
+  highKind: "ath" | "52w" | null;
+  highDate: string | null;
+  invertido?: number;
+  cantidad?: number;
+}): MarketDataResult {
+  const { price, high, invertido, cantidad } = input;
+  const hasPos = typeof invertido === "number" && invertido >= 0 && typeof cantidad === "number" && cantidad > 0;
+  const valorActual = hasPos && price !== null ? Math.round(cantidad! * price) : null;
+  const valorMaximo = hasPos && high !== null ? Math.round(cantidad! * high) : null;
+  const maximoTipo = input.highKind === "ath" ? "ath" : input.highKind === "52w" ? "52_semanas" : null;
+  return {
+    symbol: input.symbol,
+    assetType: input.assetType,
+    currency: input.currency,
+    precio_actual: price,
+    maximo: high,
+    maximo_tipo: maximoTipo,
+    maximo_fecha: input.highDate,
+    valor_actual: valorActual,
+    ganancia_al_precio_actual: valorActual !== null ? valorActual - invertido! : null,
+    valor_al_maximo: valorMaximo,
+    ganancia_al_maximo: valorMaximo !== null ? valorMaximo - invertido! : null,
+    nota:
+      maximoTipo === "52_semanas"
+        ? "El máximo es el de 52 semanas (las acciones no exponen un ATH real); es pasado, no un objetivo."
+        : maximoTipo === "ath"
+          ? "El máximo es el ATH (máximo histórico); es pasado y no se puede cronometrar el techo."
+          : "No obtuve el máximo ahora; puedo simular con un precio objetivo que me des.",
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Driver del loop de tool-calling (agnóstico de proveedor)
 // ---------------------------------------------------------------------------
 

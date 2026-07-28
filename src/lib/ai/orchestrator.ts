@@ -25,6 +25,7 @@ import {
   FREEDOM_TOOL,
   GOALS_TOOL,
   YEARS_TO_FREEDOM_TOOL,
+  MARKET_DATA_TOOL,
   simulateDebtPayoff,
   compareDebtStrategies,
   analyzeMinPayment,
@@ -32,6 +33,7 @@ import {
   projectFreedom,
   projectGoals,
   yearsToFreedom,
+  computeMarketScenario,
   type GoalForTool,
   type AiToolExecutor,
 } from "@/lib/ai/tools";
@@ -205,6 +207,43 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
         currency: toolContext.currency,
       });
     }
+    if (name === "datos_de_mercado") {
+      // Trae precio + máximo REAL de la capa market-data (cacheada, timeout corto → no suma 503) y
+      // calcula el escenario de forma determinista. Best-effort: si no hay dato, lo dice sin inventar.
+      const symbol = typeof args.symbol === "string" ? args.symbol : "";
+      const at = args.assetType === "crypto" ? "crypto" : args.assetType === "etf" ? "etf" : "stock";
+      const invertido = typeof args.invertido === "number" ? args.invertido : undefined;
+      const cantidad = typeof args.cantidad === "number" ? args.cantidad : undefined;
+      if (!symbol) return { error: "falta el símbolo" };
+      try {
+        const { getMarketHighlights } = await import("@/lib/market-data");
+        const h = await getMarketHighlights(symbol, at);
+        return computeMarketScenario({
+          symbol: symbol.toUpperCase(),
+          assetType: at,
+          currency: h?.currency ?? "USD",
+          price: h?.price ?? null,
+          high: h?.high ?? null,
+          highKind: h?.highKind ?? null,
+          highDate: h?.highDate ?? null,
+          invertido,
+          cantidad,
+        });
+      } catch {
+        // Sin dato de mercado: devolvemos el escenario vacío (nota pide simular con precio objetivo).
+        return computeMarketScenario({
+          symbol: symbol.toUpperCase(),
+          assetType: at,
+          currency: "USD",
+          price: null,
+          high: null,
+          highKind: null,
+          highDate: null,
+          invertido,
+          cantidad,
+        });
+      }
+    }
     return { error: `herramienta no disponible: ${name}` };
   };
 }
@@ -231,7 +270,14 @@ export const TOOLS_PROMPT_LINE =
   "memoria); el rendimiento es un SUPUESTO. " +
   "Si el usuario pregunta cuánto tardaría pagando solo el mínimo de su tarjeta/deuda, cuánto " +
   "interés le cuesta, o cuál es la tasa efectiva real, USÁ analizar_pago_minimo (no estimes de " +
-  "memoria); recordá que en CR la cifra honesta incluye comisiones (TITA).";
+  "memoria); recordá que en CR la cifra honesta incluye comisiones (TITA). " +
+  "Si el usuario pregunta por el PRECIO, el ATH/MÁXIMO de un activo, o 'si vendo en el máximo/ATH, " +
+  "cuánto gano', USÁ datos_de_mercado con su símbolo y assetType, y pasale `invertido` y `cantidad` " +
+  "de esa posición (de tu contexto de inversiones) para que calcule la ganancia REAL al precio " +
+  "actual y al máximo — NO inventes precio ni máximo. Respetá la honestidad del dato: si " +
+  "maximo_tipo es '52_semanas' aclará que es el máximo de 52 semanas, no un ATH. El máximo es " +
+  "PASADO: presentá la ganancia 'al máximo' como ESCENARIO hipotético, no como plan (no se puede " +
+  "cronometrar el techo). Si no trae el dato, decilo y ofrecé simular con un precio objetivo.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -282,6 +328,7 @@ export async function financeChatWithTools(
       FREEDOM_TOOL,
       GOALS_TOOL,
       YEARS_TO_FREEDOM_TOOL,
+      MARKET_DATA_TOOL,
     ],
     execute: buildToolExecutor(toolContext),
   });

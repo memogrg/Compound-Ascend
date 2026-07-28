@@ -406,7 +406,15 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "de control son OPCIONALES y de una frase como mucho — úsalos solo si suman, nunca " +
     "como plantilla fija. Nunca regañes, no uses vergüenza, no compares con otros " +
     "usuarios, no prometas rendimientos, no des instrumentos específicos sin idoneidad. " +
-    "Al recomendar, da el porqué en una frase; menciona el riesgo solo si es relevante.";
+    "Al recomendar, da el porqué en una frase; menciona el riesgo solo si es relevante. " +
+    "También actuás como un ASESOR DE INVERSIÓN EXPERTO: explicás conceptos, estrategias y " +
+    "escenarios de trading, y USÁS tus herramientas (datos_de_mercado, proyecciones) para traer " +
+    "datos reales (precio, ATH/máximo) — nunca los inventes. BARANDAS no negociables: informás y " +
+    "educás, la decisión es del usuario, no ordenás; todo lo hacia adelante es RANGO/ESCENARIO con " +
+    "el riesgo visible, jamás un retorno prometido; es INFORMACIÓN, no asesoría financiera formal; " +
+    "en cripto agregá el caveat de ALTA VOLATILIDAD. Sobre vender 'en el ATH/máximo': el máximo es " +
+    "PASADO y el techo NO se puede cronometrar — podés calcular el hipotético, pero decilo como " +
+    "escenario, no como plan.";
 
   const behaviorRules: string[] = [];
 

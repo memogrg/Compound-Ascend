@@ -10,10 +10,13 @@ import {
   yahoo,
   binance,
   coingecko,
+  coingeckoHighlights,
+  finnhubHighlights,
   yahooHistory,
   coingeckoHistory,
   logProviderMiss,
   type Quote,
+  type Highlights,
 } from "@/lib/market-data/providers";
 import { isValidSymbol } from "@/lib/market-data/symbol";
 
@@ -70,6 +73,30 @@ export async function getMarketSparkline(
   const series = assetType === "crypto" ? await coingeckoHistory(symbol) : await yahooHistory(symbol);
   if (series.length >= 2) priceCache.set(cacheKey, series, TTL.sparkline);
   return series;
+}
+
+export type { Highlights };
+
+/**
+ * Máximos + precio para el asesor: cripto → ATH real (CoinGecko); acción/ETF → máximo de 52 semanas
+ * (Finnhub), etiquetado como tal (NO como ATH). Cacheado con el mismo TTL que el precio para no
+ * sumar latencia/503, y best-effort: si el proveedor no responde en el timeout, devuelve null y el
+ * llamador lo dice. NUNCA inventa el máximo.
+ */
+export async function getMarketHighlights(
+  rawSymbol: string,
+  assetType: AssetType,
+): Promise<Highlights | null> {
+  const symbol = rawSymbol.trim().toUpperCase();
+  if (!isValidSymbol(symbol)) return null;
+  const cacheKey = `highlights:${assetType}:${symbol}`;
+  const cached = priceCache.get<Highlights>(cacheKey);
+  if (cached) return cached;
+  const ttl = assetType === "crypto" ? TTL.crypto : TTL.stock;
+  const h =
+    assetType === "crypto" ? await coingeckoHighlights(symbol) : await finnhubHighlights(symbol);
+  if (h) priceCache.set(cacheKey, h, ttl);
+  return h;
 }
 
 export type SymbolResult = { symbol: string; description: string };

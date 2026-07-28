@@ -504,3 +504,17 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
     expect(prompt).toMatch(/SOLO contexto|solo contexto/i);
   });
 });
+
+describe("buildSystemPrompt · persona de asesor de inversión experto con barandas", () => {
+  it("actúa como asesor experto que usa herramientas para datos reales, con las barandas", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toMatch(/ASESOR DE INVERSIÓN EXPERTO/i);
+    expect(prompt).toMatch(/datos reales|precio, ATH/i);
+    expect(prompt).toMatch(/nunca los inventes/i);
+    // Barandas.
+    expect(prompt).toMatch(/RANGO\/ESCENARIO|riesgo visible/i);
+    expect(prompt).toMatch(/no asesoría financiera formal|INFORMACIÓN/i);
+    expect(prompt).toMatch(/ALTA VOLATILIDAD/i);
+    expect(prompt).toMatch(/no se puede cronometrar|el máximo es PASADO/i);
+  });
+});
