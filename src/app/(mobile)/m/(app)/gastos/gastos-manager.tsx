@@ -47,8 +47,8 @@ import {
   MEmptyState,
   mAmount,
   TONE_TEXT,
-  type MTone,
 } from "../../components/content-kit";
+import { levelTone, isUnbudgeted } from "./budget-status";
 import {
   AddSpendForm,
   CreateSobreForm,
@@ -125,18 +125,6 @@ function jarIcon(jar: Jar): MIconName {
     return "protection";
   }
   return JAR_ICON[jar.icon] ?? "template";
-}
-
-/**
- * Nivel de ejecución de un presupuesto → tono (verde vas bien · ámbar te acercas ·
- * rojo te pasaste). Es presentación pura: no cambia ningún dato ni ningún cálculo.
- */
-function levelTone(spent: number, budget: number): MTone {
-  if (budget <= 0) return "neutral";
-  const ratio = spent / budget;
-  if (ratio > 1) return "danger";
-  if (ratio >= 0.85) return "warning";
-  return "success";
 }
 
 /** Total gastado/presupuestado de un frasco (normal = suma de sobres; vinculado = totals). */
@@ -371,7 +359,9 @@ export function GastosManager({
             ? available >= 0
               ? `Te quedan ${formatMoney(available, currency)} de ${formatMoney(totals.budget, currency)} presupuestados.`
               : `Vas ${formatMoney(-available, currency)} por encima de los ${formatMoney(totals.budget, currency)} presupuestados.`
-            : "Aún no has presupuestado este mes. Abre un frasco para asignarle un monto."
+            : totals.spent > 0
+              ? `Gastaste ${formatMoney(totals.spent, currency)} sin presupuesto este mes.`
+              : "Aún no has presupuestado este mes. Abre un frasco para asignarle un monto."
         }
         slot={totals.budget > 0 ? <MProgress value={pct} tone={totalTone} height={9} /> : undefined}
         style={{ marginBottom: 16 }}
@@ -1084,6 +1074,11 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
             <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
               de {mAmount(budget, currency)}
             </div>
+          ) : spent > 0 ? (
+            // Gastado sin presupuesto: se marca en ámbar en vez de esconderlo (no hay "de ₡X").
+            <div className={TONE_TEXT.warning} style={{ fontSize: 11, marginTop: 2 }}>
+              sin presupuesto
+            </div>
           ) : null}
         </div>
       </div>
@@ -1120,16 +1115,27 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
                 valueTone={levelTone(e.spent, e.budget)}
               />
             ))
-          : jar.items.map((it) => (
-              <MDataRow
-                key={it.id}
-                dense
-                title={it.name}
-                // Aporte del mes ya adelantado (plan a plazo): no se cobra este mes.
-                subtitle={it.advanced ? "Adelantado · no se cobra este mes" : it.sub}
-                value={it.advanced ? "—" : it.amount}
-              />
-            ))}
+          : jar.items.map((it) => {
+              // Aporte SIN presupuesto (p. ej. un aporte único a una inversión): mostrar el
+              // gastado en ámbar y marcarlo, en vez del "₡0" de su presupuesto inexistente.
+              const unbudgeted = isUnbudgeted(it.spent ?? 0, it.budget ?? 0);
+              return (
+                <MDataRow
+                  key={it.id}
+                  dense
+                  title={it.name}
+                  subtitle={
+                    it.advanced
+                      ? "Adelantado · no se cobra este mes"
+                      : unbudgeted
+                        ? "Sin presupuesto"
+                        : it.sub
+                  }
+                  value={it.advanced ? "—" : unbudgeted ? mAmount(it.spent ?? 0, currency) : it.amount}
+                  valueTone={unbudgeted ? "warning" : undefined}
+                />
+              );
+            })}
       </div>
 
       {jar.kind === "linked" && LINKED_HREF[jar.linkedKind] && (
