@@ -16,19 +16,25 @@ import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
-// Modelo de VISIÓN/recibos (alto volumen, salida estructurada): flash barato, no necesita el
-// modelo de asesoría. También es el fallback del constructor. El modelo de CHAT/asesoría es
-// configurable por env (GEMINI_MODEL, default gemini-3.5-flash) y lo inyecta createGeminiProvider.
+// Modelo de VISIÓN/recibos (alto volumen, salida estructurada): flash barato, fijo — NO usa el
+// modelo de chat. También es el default del constructor de GeminiProvider.
 const VISION_MODEL = "gemini-2.5-flash";
 const MODEL = VISION_MODEL;
+// Modelo de CHAT/asesoría: rápido y barato (menos IA-503, menos costo). Es el default cuando no
+// hay GEMINI_MODEL en el entorno; env sigue pudiendo overridearlo. OJO: antes el env tenía un
+// default de Zod "gemini-3.5-flash" (modelo INEXISTENTE) que ganaba siempre → el chat pegaba a un
+// modelo 404. Ahora GEMINI_MODEL es opcional y el fallback real es esta constante.
+export const CHAT_MODEL = "gemini-3.1-flash-lite";
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-// Timeout por llamada. Subido de 20s a 35s: producción usa gemini-3.5-flash, más lento que el
-// gemini-2.5-flash para el que se calibró 20s → a 20s se abortaban llamadas legítimas. Con
-// maxDuration=60 en las rutas hay margen de sobra, así que 35s da aire sin arriesgar el
-// presupuesto total. La lógica de reintentos no cambia.
-const TIMEOUT_MS = 35000;
-// Reintentos para hipos transitorios del proveedor (5xx/429 y errores de red).
-const MAX_ATTEMPTS = 3; // 1 intento + 2 reintentos
+// Timeout por llamada. Bajado de 35s a 20s: el chat corre gemini-3.1-flash-lite (rápido); 35s se
+// había calibrado para un modelo que en realidad no existía. Presupuesto de retry por llamada:
+// MAX_ATTEMPTS(2) × 20s + 1 backoff(~0,4-0,6s) ≈ 40,6s < maxDuration(60) → la función NUNCA muere
+// a mitad de una secuencia de reintentos (con 3 intentos serían ~61,6s > 60, por eso bajamos a 2).
+const TIMEOUT_MS = 20000;
+// Reintentos para hipos transitorios del proveedor (5xx/429 y errores de red). 2 = 1 intento + 1
+// reintento: cabe holgado en maxDuration=60 (ver cálculo arriba); 3.1-flash-lite es rápido → un
+// 2º reintento rara vez cambia el resultado.
+const MAX_ATTEMPTS = 2; // 1 intento + 1 reintento
 const RETRY_BASE_MS = 400;
 // Desactiva el "thinking" de 2.5 (consume tokens de salida y encarece/retrasa);
 // para asesoría conversacional y extracción de recibos no aporta y sí estabiliza.
@@ -36,9 +42,11 @@ const THINKING_OFF = { thinkingBudget: 0 };
 
 // Solo los modelos flash/lite permiten DESACTIVAR el thinking (thinkingBudget:0). Los de
 // razonamiento (p. ej. *-pro) lo REQUIEREN activo y rechazan el override → para ellos devolvemos
-// undefined (que JSON.stringify descarta) y usan su thinking por defecto. Producción
-// (gemini-2.5-flash) es flash → sin cambios.
-function thinkingConfigFor(model: string): typeof THINKING_OFF | undefined {
+// undefined (que JSON.stringify descarta) y usan su thinking por defecto. Tanto la visión
+// (gemini-2.5-flash) como el chat (gemini-3.1-flash-lite) matchean /flash|lite/ → thinking OFF,
+// que es lo que queremos para ambos (rápido y barato; el thinking no aporta ni a asesoría
+// conversacional ni a extracción de recibos).
+export function thinkingConfigFor(model: string): typeof THINKING_OFF | undefined {
   return /flash|lite/i.test(model) ? THINKING_OFF : undefined;
 }
 
@@ -410,8 +418,23 @@ export class GeminiProvider implements AIProvider {
   }
 }
 
+/** Resuelve el modelo de CHAT efectivo: explícito (evals) → env → CHAT_MODEL. Puro y testeable. */
+export function resolveChatModel(explicit: string | undefined, envModel: string | undefined): string {
+  return explicit ?? envModel ?? CHAT_MODEL;
+}
+
+let loggedChatModel = false;
+
 export function createGeminiProvider(model?: string): GeminiProvider | null {
   const env = getServerEnv();
-  // Chat/asesoría: modelo explícito (evals) o el configurado por env (default gemini-3.5-flash).
-  return env.GEMINI_API_KEY ? new GeminiProvider(env.GEMINI_API_KEY, model ?? env.GEMINI_MODEL) : null;
+  if (!env.GEMINI_API_KEY) return null;
+  // Chat/asesoría: modelo explícito (evals) → GEMINI_MODEL (override por env) → CHAT_MODEL.
+  const resolved = resolveChatModel(model, env.GEMINI_MODEL);
+  // Logueá el modelo efectivo la PRIMERA vez que se crea el provider del chat (para verificar en
+  // logs qué corre en runtime, sin exponer nada sensible).
+  if (!loggedChatModel) {
+    loggedChatModel = true;
+    logger.info("gemini: modelo de chat efectivo", { model: resolved });
+  }
+  return new GeminiProvider(env.GEMINI_API_KEY, resolved);
 }

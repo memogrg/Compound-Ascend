@@ -31,13 +31,12 @@ const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: optionalStr,
   AI_PROVIDER: z.enum(["gemini"]).default("gemini"),
   GEMINI_API_KEY: optionalStr,
-  // Modelo de CHAT/ASESORÍA. Default gemini-3.5-flash (mejor juicio; ver evals de comparación).
-  // La visión/recibos NO usa esta env: queda fija en flash barato (ver gemini.ts). Configurable
-  // para poder revertir o probar otro motor sin tocar código.
-  GEMINI_MODEL: z.preprocess(
-    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-    z.string().min(1).default("gemini-3.5-flash"),
-  ),
+  // Modelo de CHAT/ASESORÍA (override opcional). Cuando NO está seteada, el default lo pone el
+  // código: CHAT_MODEL en gemini.ts (gemini-3.1-flash-lite). NO lleva default de Zod: el viejo
+  // "gemini-3.5-flash" era un modelo inexistente que ganaba siempre y hacía pegar al chat a un 404.
+  // La visión/recibos NO usa esta env (queda fija en flash barato). Seteala solo para revertir o
+  // probar otro motor sin tocar código.
+  GEMINI_MODEL: optionalStr,
   FINNHUB_TOKEN: optionalStr,
   ALPHA_VANTAGE_KEY: optionalStr,
   // Indicadores económicos — Costa Rica (API SDDE del BCCR, REST/JSON con Bearer).
