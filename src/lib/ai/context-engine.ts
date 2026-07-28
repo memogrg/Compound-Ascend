@@ -188,17 +188,33 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Rich Life no disponible.
   }
 
-  // Portafolio (best-effort, igual que antes).
+  // Portafolio: agregados + DETALLE POR POSICIÓN (para que el asesor vea las inversiones y
+  // responda con cifras reales, p. ej. ganancia al vender). Todo del motor de analytics
+  // (holdingsWithPerformance), en moneda principal, scope de hogar. Best-effort.
   try {
     const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
     const report = await getPortfolioReport();
-    if (report.analytics.totalPortfolioValue > 0) {
-      const topSlice = Object.values(report.analytics.allocation).reduce((a, b) =>
-        a.value > b.value ? a : b,
-      );
-      ctx.portfolioValue = Math.round(report.analytics.totalPortfolioValue);
-      ctx.portfolioReturnPct = report.analytics.totalReturnPct;
+    const a = report.analytics;
+    if (a.totalPortfolioValue > 0) {
+      const topSlice = Object.values(a.allocation).reduce((x, y) => (x.value > y.value ? x : y));
+      ctx.portfolioValue = Math.round(a.totalPortfolioValue);
+      ctx.portfolioReturnPct = a.totalReturnPct;
       ctx.topAssetClass = topSlice.label;
+    }
+    // Detalle por posición (COMPACTO: top-N por valor, resto en holdingsMoreCount). Mapeo PURO;
+    // cifras del motor en moneda principal, nunca inventadas.
+    const { mapHoldingsForContext } = await import("@/lib/ai/holdings-context");
+    const mapped = mapHoldingsForContext(
+      a.holdingsWithPerformance ?? [],
+      a.totalCostBasis,
+      a.totalProfitLoss,
+    );
+    if (mapped) {
+      ctx.holdings = mapped.holdings;
+      ctx.holdingsMoreCount = mapped.holdingsMoreCount;
+      ctx.investmentInvested = mapped.investmentInvested;
+      ctx.investmentValue = mapped.investmentValue;
+      ctx.investmentPL = mapped.investmentPL;
     }
   } catch {
     // Portafolio no disponible.

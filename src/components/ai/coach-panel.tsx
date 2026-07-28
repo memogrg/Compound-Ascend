@@ -232,8 +232,11 @@ function FinanceChat() {
     const q = text.trim();
     if (!q || busy) return;
     setValue("");
+    // Solo los últimos turnos como CONTEXTO (no toda la conversación): mantiene el prompt acotado
+    // y evita re-responder temas viejos. El servidor además usa su propia memoria reciente.
     const history = messages
       .filter((m) => !m.action)
+      .slice(-12)
       .map((m) => ({ role: m.role === "me" ? "user" : "assistant", content: stripHtml(m.html) }));
     setMessages((m) => [...m, { role: "me", html: escapeHtml(q) }]);
     setBusy(true);

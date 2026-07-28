@@ -446,3 +446,61 @@ describe("buildSystemPrompt · política de sobrante + tono conciso", () => {
     expect(prompt).toMatch(/una o dos frases/i);
   });
 });
+
+describe("buildSystemPrompt · inversiones por posición + conversación", () => {
+  const withHoldings = {
+    currency: "CRC" as const,
+    investmentInvested: 500000,
+    investmentValue: 620000,
+    investmentPL: 120000,
+    holdings: [
+      {
+        symbol: "KMNO",
+        name: "Kimbal Minero",
+        quantity: 100,
+        invested: 500000,
+        value: 560000,
+        price: 5600,
+        pl: 60000,
+        plPct: 0.12,
+        currency: "USD",
+        priceUnavailable: false,
+      },
+    ],
+  };
+
+  it("inyecta las posiciones con costo de compra, valor, precio y P/L (cifras reales)", () => {
+    const prompt = buildSystemPrompt(withHoldings);
+    expect(prompt).toContain("KMNO");
+    expect(prompt).toContain("invertido 500000");
+    expect(prompt).toContain("vale 560000");
+    expect(prompt).toContain("5600"); // precio actual
+    expect(prompt).toContain("+60000"); // P/L
+    // Totales de inversión.
+    expect(prompt).toContain("valor actual 620000");
+  });
+
+  it("regla: usa las cifras reales para «si vendo X» y NUNCA inventa el ATH", () => {
+    const prompt = buildSystemPrompt(withHoldings);
+    expect(prompt).toMatch(/si vendo/i);
+    expect(prompt).toMatch(/NUNCA las inventes/i);
+    expect(prompt).toMatch(/máximo hist[oó]rico|ATH/i);
+    expect(prompt).toMatch(/no tengo acceso/i); // instrucción de NO decir esto si el dato está
+  });
+
+  it("precio no disponible → lo dice, no supone valor", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      holdings: [
+        { symbol: "XYZ", name: "XYZ", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", priceUnavailable: true },
+      ],
+    });
+    expect(prompt).toContain("precio actual no disponible");
+  });
+
+  it("regla de conversación: responder la ÚLTIMA consulta, turnos previos solo contexto", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toMatch(/ÚLTIMA consulta/i);
+    expect(prompt).toMatch(/SOLO contexto|solo contexto/i);
+  });
+});
