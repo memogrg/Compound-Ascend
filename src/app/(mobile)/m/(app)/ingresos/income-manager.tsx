@@ -351,7 +351,7 @@ export function IncomeManager({
 // ── Registrar ingreso a una fuente EXISTENTE (el "+" contextual, Fase 3) ────────
 // Paso 1: elegir cuál. Calca los pickers de Inversiones/Deudas: cada fuente con su monto en su
 // moneda. Al elegir, abre el flujo de "recibido" existente para esa fuente.
-function FuentePickerSheet({
+export function FuentePickerSheet({
   open,
   sources,
   onPick,
@@ -392,7 +392,7 @@ function FuentePickerSheet({
   );
 }
 
-function ReceiveForm({
+export function ReceiveForm({
   source,
   received,
   onSuccess,

@@ -17,8 +17,7 @@ import { DefenseCard, DefenseCardError } from "../components/home-cards/defense-
 import { MHomeCardError } from "../components/home-cards/card-shell";
 import { formatMoney } from "@/lib/format";
 import { MobileHeader } from "../components/mobile-header";
-import { QuickAddLauncher } from "../components/quick-add-launcher";
-import { getQuickAddData } from "@/modules/financial-base/services/quick-add-service";
+import { HomeAddLauncher } from "../components/home-add-launcher";
 
 /**
  * Pantalla de Inicio del móvil (/m) — "centro de mando" del diseño
@@ -101,7 +100,7 @@ export default async function MobileHome() {
   // paralelo; no era cierto, y por eso el coste del tercero (que arrastra las consultas
   // de getEntityFallbackBudget) se sumaba entero al arranque.
   // Cada uno conserva su propio `.catch`: si uno falla, los otros dos siguen.
-  const [data, recent, expenseView, patrimonio, quickAdd, surplus] = await Promise.all([
+  const [data, recent, expenseView, patrimonio, surplus] = await Promise.all([
     getDashboardData({ previewDemo: preview }),
     preview
       ? Promise.resolve([] as Transaction[])
@@ -114,11 +113,6 @@ export default async function MobileHome() {
     // Marco Patrimonial (los tres números) para la tarjeta Libertad. Best-effort y en
     // paralelo: si falla, la tarjeta muestra su estado "no cargó" sin romper el resto.
     preview ? Promise.resolve(null) : getPatrimonioReport().catch(() => null),
-    // Sobres para el alta rápida. Dos consultas ligeras, en el MISMO lote que el resto:
-    // pedirlas al abrir la hoja metería una espera justo donde se quiere quitar.
-    preview
-      ? Promise.resolve({ sobres: [], frecuentes: [], fuentes: [] })
-      : getQuickAddData().catch(() => ({ sobres: [], frecuentes: [], fuentes: [] })),
     // Decisión del excedente (F3): solo con fondos cubiertos y excedente. Best-effort.
     preview ? Promise.resolve(null) : getSurplusDecision().catch(() => null),
   ]);
@@ -361,13 +355,7 @@ export default async function MobileHome() {
       </div>
       {/* El "+" de Inicio. Va FUERA de .m-pad: se posiciona respecto al scroll, no al
           contenido, para quedarse fijo sobre la barra inferior. */}
-      {preview ? null : (
-        <QuickAddLauncher
-          sobres={quickAdd.sobres}
-          frecuentes={quickAdd.frecuentes}
-          fuentes={quickAdd.fuentes}
-        />
-      )}
+      {preview ? null : <HomeAddLauncher />}
     </div>
   );
 }
