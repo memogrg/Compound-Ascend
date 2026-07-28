@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 
 import { formatPercent } from "@/lib/format";
 import { removeHoldingAction } from "@/modules/wealth/api/actions";
+import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import type { HoldingNativo, HoldingPerformance } from "@/modules/wealth/types";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
@@ -98,7 +99,8 @@ export function InversionesManager({
             // Valor en la moneda NATIVA del holding (de `raw`): h.currentValue viene en la
             // primaria; el nativo = costo nativo·(1+returnPct) (returnPct invariante a la moneda).
             const rw = rawById.get(h.id);
-            const rowCurrency = rw?.currency ?? currency;
+            // Cotizados (etf/accion/cripto) → USD (cotizan en dólares); el resto en su moneda registrada.
+            const rowCurrency = holdingDisplayCurrency(h.assetType, rw?.currency ?? currency);
             const rowValue = rw ? rw.quantity * rw.averageCost * (1 + h.returnPct) : h.currentValue;
             return (
               <SwipeRow key={h.id} onEdit={() => { const r = rawById.get(h.id); if (r) setEditH(r); }} onDelete={() => setDeleteH(h)}>

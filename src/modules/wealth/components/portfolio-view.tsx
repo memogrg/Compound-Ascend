@@ -24,6 +24,7 @@ import {
   periodReturnFromBaseline,
   cashflowMonthlyIncome,
 } from "@/modules/wealth/engine/portfolio-engine";
+import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import { CATEGORY_META } from "@/modules/wealth/constants";
 import { editHoldingAction, removeHoldingAction, getHoldingHistoryAction, adjustContributionPriceAction } from "@/modules/wealth/api/actions";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
@@ -184,10 +185,12 @@ function PortfolioPanel({
   );
   // Holdings CRUDOS para la edición/valoración (averageCost en su moneda real).
   const rawById = useMemo(() => new Map(report.holdings.map((h) => [h.id, h])), [report.holdings]);
-  // Hay al menos un holding en otra moneda → los agregados (que suman en display) llevan nota.
-  // Las filas se muestran en su moneda nativa, así que sin monedas mixtas la nota sería ruido.
+  // Hay al menos un holding cuya fila queda en OTRA moneda que la de visualización → los agregados
+  // (que suman en display) llevan la nota "convertido a X". Se compara contra la moneda REAL de la
+  // fila (USD para cotizados; registrada para el resto), no la registrada — si no, un BTC en USD con
+  // display CRC no marcaría la nota.
   const hasForeign = useMemo(
-    () => report.holdings.some((h) => h.currency !== displayCurrency),
+    () => report.holdings.some((h) => holdingDisplayCurrency(h.assetType, h.currency) !== displayCurrency),
     [report.holdings, displayCurrency],
   );
   const contribById = useMemo(
@@ -579,6 +582,9 @@ function InvRow({
   const periodRet = h.returnPct * periodFactor;
   const periodGain = nativeCostBasis * periodRet;
   const pos = periodRet >= 0;
+  // Moneda de la fila: los cotizados (etf/accion/cripto) van en USD (cotizan en dólares); los no
+  // cotizados en su moneda registrada. Los agregados siguen en la de visualización (con su nota).
+  const rowCurrency = holdingDisplayCurrency(h.assetType, h.currency);
 
   const planYearOf =
     h.category === "plan_inversion" && h.purchaseDate && h.termYears
@@ -620,7 +626,7 @@ function InvRow({
           </div>
           <div className="inv-sub">
             <span className="nat-dot" style={{ background: natureColor }} />
-            {h.currency} · {h.region || "—"}
+            {rowCurrency} · {h.region || "—"}
             {h.assetType && h.assetType !== "otro" ? "" : ""}
           </div>
         </div>
@@ -628,18 +634,18 @@ function InvRow({
           <span className="tag" style={{ color: natureColor }}>{natureLabel}</span>
           {catLabel ? <div className="cell-sub" style={{ marginTop: 5 }}>{catLabel}</div> : null}
         </div>
-        <div className="inv-amt">{formatMoney(nativeCostBasis, h.currency)}</div>
+        <div className="inv-amt">{formatMoney(nativeCostBasis, rowCurrency)}</div>
         <div className="inv-amt c-valor">
           {h.priceUnavailable ? (
             <span className="muted">—</span>
           ) : (
-            formatMoney(nativeCurrentValue, h.currency)
+            formatMoney(nativeCurrentValue, rowCurrency)
           )}
         </div>
         <div className="inv-amt c-aporte">
           {h.isRecurring && h.monthlyContribution ? (
             <>
-              {formatMoney(h.monthlyContribution, h.currency)}
+              {formatMoney(h.monthlyContribution, rowCurrency)}
               <span className="s">/mes</span>
             </>
           ) : (
@@ -660,7 +666,7 @@ function InvRow({
               </div>
               <div className={`cell-sub ${periodGain >= 0 ? "pos" : "neg"}`}>
                 {periodGain >= 0 ? "+" : "−"}
-                {formatMoney(Math.abs(periodGain), h.currency)}
+                {formatMoney(Math.abs(periodGain), rowCurrency)}
               </div>
             </>
           )}
