@@ -192,6 +192,62 @@ export async function coingecko(ticker: string): Promise<Quote | null> {
   return price ? { price, currency: "USD", provider: "coingecko", changePct: signedNum(row?.usd_24h_change) } : null;
 }
 
+/** Máximos de un activo (para el asesor). `athKind` distingue ATH real vs máx. 52 semanas. */
+export type Highlights = {
+  price: number | null;
+  currency: string;
+  high: number | null; // ATH (cripto) o máx. 52 semanas (acción/ETF)
+  highDate: string | null; // fecha del máximo (YYYY-MM-DD si el proveedor la da)
+  highKind: "ath" | "52w" | null; // qué representa `high` (honestidad por clase de activo)
+};
+
+/**
+ * CoinGecko /coins/markets: precio + ATH REAL + fecha del ATH (all-time-high verdadero). Best-effort:
+ * null en los campos que falten. La cripto SÍ tiene ATH real, por eso highKind='ath'.
+ */
+export async function coingeckoHighlights(ticker: string): Promise<Highlights | null> {
+  const id = await resolveCoingeckoId(ticker);
+  if (!id) return null;
+  const data = (await fetchJson(
+    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${encodeURIComponent(id)}`,
+  )) as { current_price?: number; ath?: number; ath_date?: string }[] | null;
+  const row = data?.[0];
+  if (!row) return null;
+  return {
+    price: num(row.current_price),
+    currency: "USD",
+    high: num(row.ath),
+    highDate: typeof row.ath_date === "string" ? row.ath_date.slice(0, 10) : null,
+    highKind: num(row.ath) !== null ? "ath" : null,
+  };
+}
+
+/**
+ * Finnhub: precio (/quote) + MÁXIMO DE 52 SEMANAS (/stock/metric). NO es un ATH: las acciones no
+ * exponen un all-time-high gratis, así que devolvemos el 52-sem ETIQUETADO como tal (highKind='52w')
+ * para no mentir. Best-effort.
+ */
+export async function finnhubHighlights(symbol: string): Promise<Highlights | null> {
+  const token = getServerEnv().FINNHUB_TOKEN;
+  if (!token) return null;
+  const [q, m] = await Promise.all([
+    fetchJson(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`),
+    fetchJson(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`),
+  ]);
+  const price = num((q as { c?: number } | null)?.c);
+  const metric = (m as { metric?: Record<string, unknown> } | null)?.metric ?? {};
+  const high = num(metric["52WeekHigh"]);
+  const hd = metric["52WeekHighDate"];
+  if (price === null && high === null) return null;
+  return {
+    price,
+    currency: "USD",
+    high,
+    highDate: typeof hd === "string" ? hd.slice(0, 10) : null,
+    highKind: high !== null ? "52w" : null,
+  };
+}
+
 // ---------- Historial (serie diaria, para sparkline) ----------
 
 const SPARK_POINTS = 30;
