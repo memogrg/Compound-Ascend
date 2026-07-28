@@ -141,4 +141,25 @@ describe("getMarketHighlights · lee del STORE primero (sin pegarle a CoinGecko 
     expect(h?.asOf).toBe("2026-08-02T10:00:00Z"); // frescura para la UI/AI
     expect(fetchMock).not.toHaveBeenCalled(); // NO pegó a CoinGecko en vivo
   });
+
+  it("INTEGRIDAD: store con precio 0 → precio 'sin dato' (null), JAMÁS $0; cae al fetch en vivo", async () => {
+    storeRow = {
+      price: 0, // basura de una corrida vieja (Vercel no alcanzó CoinGecko)
+      currency: "USD",
+      ath_usd: 0,
+      ath_date: null,
+      high_kind: null,
+      fetched_at: "2026-08-02T10:00:00Z",
+    };
+    // price 0 y high 0 → el store no aporta nada → último recurso: fetch en vivo.
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("/coins/markets")) return { ok: true, json: async () => [{ current_price: 0.02, ath: 0.25, ath_date: "2024-12-15T00:00:00Z" }] };
+      return { ok: true, json: async () => ({ coins: [{ id: "kamino", symbol: "KMNOZERO", market_cap_rank: 300 }] }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const h = await getMarketHighlights("KMNOZERO", "crypto");
+    expect(h?.price).not.toBe(0); // NUNCA devuelve el $0 guardado
+    expect(h?.price).toBe(0.02); // el 0 del store se ignora → sirve el vivo
+  });
 });

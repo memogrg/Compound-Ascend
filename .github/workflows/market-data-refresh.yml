@@ -1,59 +1,51 @@
-# Recolector de datos de mercado — barrido cada hora (gratis en repo público, sin Vercel Pro).
+# Recolector de datos de mercado — corre EN EL RUNNER de GitHub (no en Vercel).
 #
-# Dispara /api/market-data/refresh, que junta los símbolos de holdings + alertas de precio, trae
-# precio + ATH/máximo en 1-2 llamadas batched (cripto: CoinGecko /coins/markets; acciones: Finnhub)
-# y los GUARDA en market_price_cache. La app/AI/valuación/alertas LEEN de ese store — sin pegarle a
-# CoinGecko en vivo por consulta (el fetch en vivo desde serverless fallaba por timeout/rate-limit).
+# POR QUÉ ACÁ (no en Vercel): los logs probaron que Vercel NO alcanza CoinGecko (timeout hasta para
+# BTC), y el store terminaba con "$0". Los runners de GitHub SÍ alcanzan CoinGecko. Este workflow
+# corre scripts/market-data-collect.mjs: lee los símbolos de holdings + alertas de precio, hace UNA
+# llamada batched /coins/markets (precio + ATH + fecha) + Finnhub por acción, y UPSERTEA al store
+# vía Supabase service key — RECHAZANDO precios ≤0 (nunca guarda "$0"; preserva el último bueno).
+# La app/AI/valuación/alertas LEEN de ese store.
 #
-# SECRET / VARIABLE a crear en el repo (Settings → Secrets and variables → Actions):
-#   · Secret   CRON_SECRET       — el MISMO valor que el env CRON_SECRET de Vercel.
-#   · Variable MARKET_DATA_URL   — la URL de PROD del endpoint, SIN query. Ejemplo:
-#                                  https://TU-APP.vercel.app/api/market-data/refresh
+# CADENCIA: cada hora. Una sola /coins/markets trae precio Y ATH juntos, así que el barrido horario
+# refresca ambos (el precio queda "de esta hora"; el ATH, que se mueve lento, al menos diario).
 #
-# Caveats: el cron de GitHub puede retrasarse unos minutos y se PAUSA tras ~60 días sin actividad
-# del repo (un push lo reactiva). El precio es tan fresco como esta corrida; el ATH se mueve lento
-# (basta la corrida diaria de Vercel, pero horario lo mantiene más al día).
+# CONFIG a crear (Settings → Secrets and variables → Actions):
+#   Variables (no secretas):
+#     · SUPABASE_URL                — https://<ref>.supabase.co
+#   Secrets:
+#     · SUPABASE_SERVICE_ROLE_KEY   — service role (bypassa RLS; recorre todos los usuarios)
+#     · COINGECKO_API_KEY           — Demo key opcional (sube el rate limit; sin ella igual corre)
+#     · FINNHUB_TOKEN               — opcional (sin él NO se recolectan acciones/ETF, solo cripto)
 #
-# NOTA DE ARQUITECTURA: el fetch a CoinGecko lo hace el ENDPOINT en Vercel (1-2 llamadas batched, no
-# el enjambre que fallaba). Si el log del endpoint mostrara que hasta UNA llamada batched da
-# timeout desde Vercel (bloqueo de IP CoinGecko↔Vercel), se mueve el fetch a este workflow (Node
-# script + service key). Las lecturas de la app ya salen del store, así que la app no se rompe.
+# Caveats: el cron de GitHub puede retrasarse unos minutos y se PAUSA tras ~60 días sin actividad del
+# repo (un push lo reactiva, o corré "Run workflow"). El script se AUTOVERIFICA: si había cripto
+# objetivo y ninguna trajo precio válido, falla ruidosamente (prueba que el runner alcanza CoinGecko).
 
 name: market-data-refresh
 
 on:
   schedule:
     - cron: "0 * * * *" # cada hora (UTC)
-  workflow_dispatch: {} # disparo manual para pruebas
+  workflow_dispatch: {} # disparo manual para pruebas / verificación real
 
 permissions:
   contents: read
 
 jobs:
-  refresh:
+  collect:
     runs-on: ubuntu-latest
     steps:
-      - name: Recolectar datos de mercado
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Recolectar datos de mercado (fetch en el runner → store)
         env:
-          MARKET_DATA_URL: ${{ vars.MARKET_DATA_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        run: |
-          set -euo pipefail
-          if [ -z "${MARKET_DATA_URL:-}" ]; then
-            echo "::error::Falta la variable MARKET_DATA_URL (Settings → Variables)."
-            exit 1
-          fi
-          if [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::Falta el secret CRON_SECRET (Settings → Secrets)."
-            exit 1
-          fi
-          code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
-            -H "Authorization: Bearer ${CRON_SECRET}" \
-            "${MARKET_DATA_URL}")
-          echo "HTTP ${code}"
-          cat /tmp/resp.json 2>/dev/null || true
-          echo
-          case "${code}" in
-            2*) echo "OK" ;;
-            *) echo "::error::El endpoint respondió ${code} (esperaba 2xx)."; exit 1 ;;
-          esac
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: node scripts/market-data-collect.mjs

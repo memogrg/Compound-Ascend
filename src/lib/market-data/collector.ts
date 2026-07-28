@@ -10,6 +10,7 @@ import "server-only";
  * los usuarios. Loguea el status de cada llamada (instrumentación) para saber si el fetch responde.
  */
 import { logger } from "@/lib/logger";
+import { isValidPrice } from "@/lib/market-data/validity";
 
 /** asset_type del holding → tipo de mercado del feed. */
 const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = {
@@ -59,9 +60,19 @@ async function upsertStore(row: {
 }): Promise<void> {
   const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
   const admin = createServiceRoleClient();
-  // El upsert exige NOT NULL en price (columna original). Si no hubo precio, no escribimos la fila
-  // (dejamos el último bueno del store); el máximo sin precio no aporta al store de precios.
-  if (row.price === null) return;
+  // INTEGRIDAD: un precio inválido (≤0, null, NaN) es basura del proveedor (timeout/vacío). NO
+  // sobreescribimos la fila → se PRESERVA el último valor bueno y su fecha (nunca guardamos "$0").
+  if (!isValidPrice(row.price)) return;
+  // El ATH sigue la misma regla: si vino inválido, se OMITE del payload (no se manda la clave) para
+  // que el upsert conserve el ATH previo en vez de pisarlo con null.
+  const athFields = isValidPrice(row.athUsd)
+    ? {
+        ath_usd: row.athUsd,
+        ath_date: row.athDate,
+        high_24h: isValidPrice(row.high24h) ? row.high24h : null,
+        high_kind: row.highKind,
+      }
+    : {};
   await admin.from("market_price_cache").upsert(
     {
       symbol: row.symbol,
@@ -71,10 +82,7 @@ async function upsertStore(row: {
       provider: row.provider,
       fetched_at: new Date().toISOString(),
       ttl_seconds: row.assetType === "crypto" ? 300 : 60,
-      ath_usd: row.athUsd,
-      ath_date: row.athDate,
-      high_24h: row.high24h,
-      high_kind: row.highKind,
+      ...athFields,
     },
     { onConflict: "symbol,asset_type" },
   );
@@ -108,9 +116,9 @@ export async function runCollection(): Promise<CollectResult> {
           athUsd: r.ath,
           athDate: r.athDate,
           high24h: r.high24h,
-          highKind: r.ath !== null ? "ath" : null,
+          highKind: isValidPrice(r.ath) ? "ath" : null,
         });
-        if (r.price !== null) written += 1;
+        if (isValidPrice(r.price)) written += 1;
       } catch (err) {
         logger.error("collector: upsert cripto falló", { symbol, message: err instanceof Error ? err.message : "?" });
       }
@@ -134,7 +142,7 @@ export async function runCollection(): Promise<CollectResult> {
         high24h: null,
         highKind: h.highKind, // '52w'
       });
-      if (h.price !== null) written += 1;
+      if (isValidPrice(h.price)) written += 1;
     } catch (err) {
       logger.error("collector: upsert acción falló", { symbol: t.symbol, message: err instanceof Error ? err.message : "?" });
     }

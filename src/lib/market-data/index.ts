@@ -20,6 +20,7 @@ import {
   type Highlights,
 } from "@/lib/market-data/providers";
 import { isValidSymbol } from "@/lib/market-data/symbol";
+import { sanitizePrice } from "@/lib/market-data/validity";
 
 export { isValidSymbol };
 export type AssetType = "stock" | "etf" | "crypto";
@@ -182,14 +183,17 @@ async function readHighlightsFromStore(
       .eq("asset_type", assetType)
       .maybeSingle();
     if (!data) return null;
-    const high = data.ath_usd != null ? Number(data.ath_usd) : null;
+    // INTEGRIDAD: un precio/máximo guardado que no sea >0 es basura (nunca debió entrar, pero si
+    // quedó de antes NO lo propagamos): se lee como null → el AI/UI dicen "sin dato", jamás "$0".
+    const price = sanitizePrice(data.price != null ? Number(data.price) : null);
+    const high = sanitizePrice(data.ath_usd != null ? Number(data.ath_usd) : null);
     const kind = data.high_kind === "ath" ? "ath" : data.high_kind === "52w" ? "52w" : null;
     return {
-      price: data.price != null ? Number(data.price) : null,
+      price,
       currency: data.currency ?? "USD",
       asOf: data.fetched_at ?? null,
       high,
-      highDate: data.ath_date ?? null,
+      highDate: high !== null ? (data.ath_date ?? null) : null,
       highKind: high !== null ? kind : null,
     };
   } catch {
