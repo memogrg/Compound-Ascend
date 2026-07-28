@@ -457,6 +457,7 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
       {
         symbol: "KMNO",
         name: "Kimbal Minero",
+        assetType: "cripto",
         quantity: 100,
         invested: 500000,
         value: 560000,
@@ -492,7 +493,7 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
     const prompt = buildSystemPrompt({
       currency: "CRC",
       holdings: [
-        { symbol: "XYZ", name: "XYZ", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", priceUnavailable: true },
+        { symbol: "XYZ", name: "XYZ", assetType: "cripto", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", priceUnavailable: true },
       ],
     });
     expect(prompt).toContain("precio actual no disponible");
