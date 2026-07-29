@@ -16,7 +16,10 @@ import { monthPeriod } from "@/modules/financial-base";
 import {
   getLiquidityBalance,
   getLiquidityAfterByTxn,
+  getClosingLiquidity,
 } from "@/modules/financial-base/services/liquidity-service";
+import { buildMonthMarker, type MonthMarker } from "@/modules/financial-base/engine/period";
+import { todayLocalISO } from "@/lib/validation";
 import {
   MMetricGrid,
   MMetricCard,
@@ -107,10 +110,22 @@ export default async function MobileTransacciones() {
   // si falla la lectura, la lista funciona igual (sin readout / sin saldo corrido).
   let liquidity: { balance: number; currency: string } | null = null;
   let balanceAfter: Record<string, number> = {};
+  // Fase C: marcador de cierre de mes (DERIVADO, no una transacción — no duplica liquidez).
+  let monthMarker: MonthMarker | null = null;
   try {
-    const [bal, series] = await Promise.all([getLiquidityBalance(), getLiquidityAfterByTxn()]);
+    const [bal, series, closing] = await Promise.all([
+      getLiquidityBalance(),
+      getLiquidityAfterByTxn(),
+      getClosingLiquidity(period),
+    ]);
     liquidity = { balance: bal.balance, currency: bal.currency };
     balanceAfter = series.afterByTxn;
+    monthMarker = buildMonthMarker({
+      period,
+      flow: real.freeCashflowReal, // el "Saldo neto" ya calculado; no se recalcula
+      liquidity: closing.balance,
+      todayIso: todayLocalISO(),
+    });
   } catch {
     liquidity = null;
   }
@@ -211,6 +226,7 @@ export default async function MobileTransacciones() {
           incomeCats={incomeCats}
           incomeGroupId={incomeGroupId}
           balanceAfter={balanceAfter}
+          monthMarker={monthMarker}
         />
       </div>
     </div>

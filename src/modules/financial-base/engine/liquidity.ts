@@ -3,12 +3,39 @@
  * el ledger de movimientos reales: el saldo es SUM(delta). No se recalcula desde
  * el presupuesto (eso es plan, no dinero real).
  */
+import { convertCurrency } from "@/lib/fx";
 
 export type LiquidityRow = { delta: number; reason: string; occurredOn: string };
 
 /** Redondea a 2 decimales evitando ruido de coma flotante. */
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/**
+ * Liquidez "al cierre" de un periodo (saldo hasta `to`, inclusive), normalizando
+ * cada delta a la moneda de display. Puro: el servicio pasa TODAS las filas del
+ * ledger y esta función decide cuáles cuentan.
+ *
+ * Regla clave: la fila de **apertura** es la BASE del saldo y cuenta SIEMPRE, sin
+ * importar su fecha — el saldo inicial se fija con `occurred_on = hoy`, así que
+ * filtrarlo por fecha borraría la base al cerrar un mes pasado (saldo roto). El
+ * resto (`transaccion`/`ajuste`) sólo cuenta si ocurrió en/antes de `to`.
+ */
+export function sumClosingBalance(
+  rows: { delta: number | string; currency: string; reason: string; occurredOn: string }[],
+  to: string,
+  displayCurrency: string,
+  rates: Record<string, number>,
+): number {
+  return round2(
+    rows.reduce((acc, r) => {
+      const included = r.reason === "apertura" || r.occurredOn <= to;
+      return included
+        ? acc + convertCurrency(Number(r.delta), r.currency, displayCurrency, rates)
+        : acc;
+    }, 0),
+  );
 }
 
 /**
