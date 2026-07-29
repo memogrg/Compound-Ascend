@@ -16,6 +16,15 @@ import { formatMoney } from "@/lib/format";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
 import { detectCreateAction } from "@/lib/ai/action-lane";
+import {
+  parseMultiScope,
+  parsePriceModifier,
+  filterByScope,
+  computeMultiScenario,
+  buildMultiReply,
+  type ScopeKind,
+  type HoldingScenarioInput,
+} from "@/lib/ai/market-scope";
 import type { FinancialContext, ToolContext } from "@/lib/ai/orchestrator";
 
 /** Carril que resolvió la respuesta (para medir el ahorro de tokens). */
@@ -501,6 +510,67 @@ async function convertInvested(amount: number, from: string, to: string): Promis
   }
 }
 
+const SCOPE_LABEL: Record<ScopeKind, string> = {
+  altcoins: "tus altcoins",
+  crypto: "toda tu cripto",
+  all: "todas tus inversiones",
+};
+
+/**
+ * Carril MULTI-POSICIÓN determinista: "vender todos mis altcoins a 90% de su ATH, ¿cuánto generan?".
+ * Itera los holdings del alcance, lee precio/ATH del STORE por cada uno (getMarketHighlights =
+ * store-first, sin enjambre en vivo), computa por posición y SUMA (desglose por moneda). Una
+ * posición sin el dato necesario NO bloquea el total. SIEMPRE responde algo. null si no hay alcance
+ * múltiple (→ carril de una posición). El invertido de ctx.holdings está en moneda PRINCIPAL: se
+ * convierte a la moneda del escenario (la del ATH/precio) por posición.
+ */
+async function resolveMultiMarketQuery(
+  text: string,
+  ctx: FinancialContext,
+  cur: string,
+): Promise<AIChatResponse | null> {
+  const scope = parseMultiScope(text);
+  if (!scope) return null;
+  const say = (reply: string): AIChatResponse => ({ reply, action: null });
+  const inScope = filterByScope(ctx.holdings ?? [], scope);
+  if (inScope.length === 0) {
+    return say(`No encontré ${SCOPE_LABEL[scope]} en tus posiciones. Si las agregaste hace poco, dales un momento para cotizar.`);
+  }
+  // Alcance con modificador; sin modificador explícito asumimos el PRECIO ACTUAL.
+  const mod = parsePriceModifier(text) ?? { kind: "current" as const };
+  try {
+    const { getMarketHighlights } = await import("@/lib/market-data");
+    const { getFxRates } = await import("@/lib/market-data/fx-rates");
+    const { convertCurrency } = await import("@/lib/fx");
+    const { logger } = await import("@/lib/logger");
+    const rates = await getFxRates();
+
+    const rows: HoldingScenarioInput[] = [];
+    for (const h of inScope) {
+      const at = MARKET_TYPE[h.assetType] ?? "crypto";
+      const hi = await getMarketHighlights(h.symbol ?? "", at); // STORE-first (best-effort)
+      const scenCurrency = hi?.currency ?? cur;
+      // ctx.holdings.invested está en moneda PRINCIPAL (cur) → convertir a la del escenario.
+      const investedScen = Math.round(convertCurrency(h.invested, cur, scenCurrency, rates));
+      rows.push({
+        symbol: (h.symbol ?? "").toUpperCase(),
+        quantity: h.quantity,
+        investedScen,
+        scenCurrency,
+        high: hi?.high ?? null,
+        price: hi?.price ?? null,
+      });
+    }
+    const scenario = computeMultiScenario(rows, mod);
+    logger.info("router.market_multi", { scope, mod: mod.kind, count: rows.length, missing: scenario.missing.length });
+    return say(buildMultiReply(scenario, mod, SCOPE_LABEL[scope]));
+  } catch (err) {
+    const { logger } = await import("@/lib/logger");
+    logger.error("router.market_multi falló", { scope, message: err instanceof Error ? err.message : "?" });
+    return say("No pude calcular ese escenario ahora mismo; reintentá en un momento.");
+  }
+}
+
 async function resolveMarketQuery(
   params: Record<string, unknown>,
   ctx: FinancialContext,
@@ -509,6 +579,9 @@ async function resolveMarketQuery(
   const say = (reply: string): AIChatResponse => ({ reply, action: null });
   const text = typeof params.text === "string" ? params.text : "";
   const wantsAth = params.wantsAth === true;
+  // Alcance MÚLTIPLE ("todos mis altcoins / toda mi cripto / mis inversiones") → carril multi.
+  const multi = await resolveMultiMarketQuery(text, ctx, cur);
+  if (multi) return multi;
   const holdings = ctx.holdings ?? [];
   const symbol = extractMarketSymbol(text, holdings.map((h) => ({ symbol: h.symbol, name: h.name })));
   if (!symbol) {

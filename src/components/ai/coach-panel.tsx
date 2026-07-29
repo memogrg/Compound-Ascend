@@ -15,6 +15,7 @@ import { Icon } from "@/components/ui/icon";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
 import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction, loadTodayChatAction, emailTranscriptAction } from "@/modules/assistant/api/actions";
+import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
@@ -213,6 +214,9 @@ function Tab({
 // ----------------------------------------------------------------------------
 // Modo 2 — Finanzas AI (chat)
 // ----------------------------------------------------------------------------
+/** Timeout del cliente para el chat (~40s), por debajo del maxDuration=60 del endpoint. */
+const CHAT_TIMEOUT_MS = 40_000;
+
 const GREETING: Msg = {
   role: "ai",
   html: "Hola, soy <strong>My Agent C+</strong>. Pregúntame sobre tu dinero. Si propongo registrar algo, te pediré confirmación.",
@@ -282,11 +286,13 @@ function FinanceChat() {
     setMessages((m) => [...m, { role: "me", html: escapeHtml(q) }]);
     setBusy(true);
     try {
-      const res = await fetch("/api/assistant/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: q, history }),
-      });
+      // Timeout del cliente (~40s, bajo el maxDuration=60 del server): si tarda, cortamos con un
+      // mensaje claro en vez de dejar el spinner girando para siempre.
+      const res = await fetchWithTimeout(
+        "/api/assistant/chat",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history }) },
+        CHAT_TIMEOUT_MS,
+      );
       const data = await res.json();
       if (res.ok) {
         setMessages((m) => [
@@ -300,8 +306,11 @@ function FinanceChat() {
           { role: "ai", html: escapeHtml(data.error?.message ?? "No pude responder ahora.") },
         ]);
       }
-    } catch {
-      setMessages((m) => [...m, { role: "ai", html: "Hubo un problema de conexión." }]);
+    } catch (err) {
+      const html = isTimeoutError(err)
+        ? "Se está tardando más de lo normal, probá de nuevo."
+        : "Hubo un problema de conexión.";
+      setMessages((m) => [...m, { role: "ai", html }]);
     } finally {
       setBusy(false);
     }
