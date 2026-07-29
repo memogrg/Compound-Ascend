@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -12,6 +12,13 @@ import {
 import type { Transaction, Account } from "@/modules/financial-base/types";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { SelectableCategory } from "@/modules/financial-base/engine/classify";
+import {
+  describeMoneyFlow,
+  FLOW_VERB_LABEL,
+  LIQUIDITY_LABEL,
+  type MoneyFlow,
+  type MoneyFlowEffect,
+} from "@/modules/financial-base/engine/money-flow";
 import { formatMoney } from "@/lib/format";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
@@ -83,24 +90,43 @@ function isManageable(t: Transaction): boolean {
   return !isLinked(t) && (t.kind === "ingreso" || t.kind === "gasto");
 }
 
-/** Fecha relativa (Hoy / Ayer / día / d mes), como en el Inicio. */
-function relativeDay(iso: string): string {
-  const now = new Date();
-  const d = new Date(`${iso}T00:00:00`);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
-  if (diff <= 0) return "Hoy";
-  if (diff === 1) return "Ayer";
-  if (diff < 7) return d.toLocaleDateString("es-MX", { weekday: "short" });
-  return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
-}
-
 type Filter = "all" | "ingreso" | "gasto";
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "Todas" },
   { key: "ingreso", label: "Ingresos" },
   { key: "gasto", label: "Gastos" },
 ];
+
+/** Tono del importe por efecto en liquidez: sale rojo, entra verde, neutro gris. */
+function effectTone(effect: MoneyFlowEffect): "success" | "danger" | "neutral" {
+  return effect === "in" ? "success" : effect === "out" ? "danger" : "neutral";
+}
+/** Color CSS (tema-aware) del efecto para la línea de viaje y el detalle. */
+function effectColorVar(effect: MoneyFlowEffect): string {
+  return effect === "out" ? "var(--danger)" : effect === "in" ? "var(--accent)" : "var(--text-dim)";
+}
+function effectSign(effect: MoneyFlowEffect): string {
+  return effect === "in" ? "+" : effect === "out" ? "−" : "";
+}
+
+/** Línea de viaje "origen → destino": colorea "Tu liquidez" según el efecto. */
+function MobileTravelLine({ flow }: { flow: MoneyFlow }) {
+  if (flow.isJarSpend) return <>Sale del frasco · no toca tu liquidez</>;
+  const color = effectColorVar(flow.effect);
+  const token = (label: string) =>
+    label === LIQUIDITY_LABEL ? (
+      <strong style={{ color, fontWeight: 600 }}>{label}</strong>
+    ) : (
+      <span>{label}</span>
+    );
+  return (
+    <>
+      {token(flow.fromLabel)}
+      <span style={{ color: "var(--text-dim)" }}> → </span>
+      {token(flow.toLabel)}
+    </>
+  );
+}
 
 export function MobileTxnList({
   transactions,
@@ -112,6 +138,7 @@ export function MobileTxnList({
   accounts,
   incomeCats,
   incomeGroupId,
+  balanceAfter,
 }: {
   transactions: Transaction[];
   categoryNames: Record<string, string>;
@@ -124,6 +151,8 @@ export function MobileTxnList({
   incomeCats: { id: string; name: string }[];
   /** Grupo de ingresos para crear una categoría al vuelo. */
   incomeGroupId: string | null;
+  /** Saldo de liquidez tras cada txn que movió el saco (por id). Fase B. */
+  balanceAfter?: Record<string, number>;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -133,6 +162,9 @@ export function MobileTxnList({
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [delPending, setDelPending] = useState(false);
   const [actionsFor, setActionsFor] = useState<Transaction | null>(null);
+  // Fase B: una fila abierta a la vez (tocar la fila despliega su detalle del viaje).
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const toggleExpand = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
 
   const list = filter === "all" ? transactions : transactions.filter((t) => t.kind === filter);
 
@@ -194,38 +226,61 @@ export function MobileTxnList({
           {list.map((t) => {
             const linked = isLinked(t);
             const origin = linked && t.linkedKind ? LINKED_ORIGIN[t.linkedKind] : undefined;
-            const row = <TxnRow t={t} categoryNames={categoryNames} currency={currency} via={origin?.label} />;
+            // El viaje del dinero (Fase B): efecto en liquidez, origen y destino. Puro.
+            const flow = describeMoneyFlow(t);
+            const expanded = expandedId === t.id;
+            const row = <TxnRow t={t} flow={flow} currency={currency} />;
+            const detail = expanded ? (
+              <TxnDetail
+                t={t}
+                flow={flow}
+                currency={currency}
+                categoryNames={categoryNames}
+                balanceAfter={balanceAfter?.[t.id]}
+                origin={origin}
+                // El sheet de acciones (duplicar/dividir/…) sólo cuelga de las gestionables.
+                onMore={isManageable(t) ? () => setActionsFor(t) : undefined}
+              />
+            ) : null;
 
+            // Gestionable (ingreso/gasto suelto): swipe editar/eliminar + tap→detalle.
             if (isManageable(t)) {
               return (
-                <SwipeRow
-                  key={t.id}
-                  onEdit={() => setEditing(t)}
-                  onDelete={() => setDeleting(t)}
-                  onTap={() => setActionsFor(t)}
-                >
-                  {row}
-                </SwipeRow>
+                <div key={t.id}>
+                  <SwipeRow
+                    onEdit={() => setEditing(t)}
+                    onDelete={() => setDeleting(t)}
+                    onTap={() => toggleExpand(t.id)}
+                  >
+                    {row}
+                  </SwipeRow>
+                  {detail}
+                </div>
               );
             }
-            // Vinculada → enlaza a su pantalla de origen (flujo correcto de edición/borrado).
-            if (origin) {
-              return (
-                <Link
-                  key={t.id}
-                  href={origin.href}
-                  className="m-row-wrap"
-                  style={{ textDecoration: "none", color: "inherit" }}
-                  aria-label={`${t.merchantOrSource || t.description || KIND_LABEL[t.kind]} · ver en ${origin.label}`}
-                >
-                  {row}
-                </Link>
-              );
-            }
-            // Transferencia/ajuste no vinculado → solo lectura.
+            // Vinculada / transferencia / ajuste: tap→detalle (el "Ver en X" del detalle navega).
             return (
-              <div key={t.id} className="m-row-wrap">
-                {row}
+              <div key={t.id}>
+                <button
+                  type="button"
+                  className="m-row-wrap"
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    background: "none",
+                    border: 0,
+                    padding: 0,
+                    color: "inherit",
+                    font: "inherit",
+                    cursor: "pointer",
+                  }}
+                  aria-expanded={expanded}
+                  onClick={() => toggleExpand(t.id)}
+                >
+                  {row}
+                </button>
+                {detail}
               </div>
             );
           })}
@@ -308,34 +363,143 @@ export function MobileTxnList({
  */
 function TxnRow({
   t,
-  categoryNames,
+  flow,
   currency,
-  via,
 }: {
   t: Transaction;
-  categoryNames: Record<string, string>;
+  flow: MoneyFlow;
   currency: string;
-  via?: string;
 }) {
-  const income = t.kind === "ingreso";
-  const sign = income ? "+" : t.kind === "gasto" ? "−" : "";
   const name = t.merchantOrSource || t.description || KIND_LABEL[t.kind];
-  const cat = (t.categoryId ? categoryNames[t.categoryId] : "") || KIND_LABEL[t.kind];
+  const amount = `${effectSign(flow.effect)}${mAmount(Math.abs(t.amount), t.currency || currency, 10)}`;
   return (
     <MDataRow
       icon={txnIcon(t)}
-      iconTone={income ? "success" : "neutral"}
+      iconTone={flow.effect === "in" ? "success" : "neutral"}
       title={name}
-      // Fecha PRIMERO, no "categoría · fecha": medido a 375px, las hojas largas del sistema
-      // ("Mantenimiento y reparaciones") desbordan 32px, y con la categoría delante lo que
-      // se come la elipsis es la FECHA. Así solo se pierde la cola del nombre —que el glifo
-      // ya insinúa— y el día siempre se lee. El caso común no cambia de ancho.
-      subtitle={`${relativeDay(t.occurredOn)} · ${cat}`}
-      // Signo delante del símbolo (formatMoney antepone ₡) y abreviado si el importe es
-      // largo: en esta columna un número cortado se malinterpretaría.
-      value={`${sign}${mAmount(Math.abs(t.amount), t.currency || currency, 10)}`}
-      valueTone={income ? "success" : "neutral"}
-      chevron={Boolean(via)}
+      // La línea de viaje "origen → destino" reemplaza "día · categoría" (Fase B): la
+      // historia del dinero manda; la fecha vive en el detalle expandible.
+      subtitle={<MobileTravelLine flow={flow} />}
+      // Color del monto por efecto en liquidez. El neutro (frasco/transferencia) va gris
+      // explícito: el tono neutral hereda el color del texto, no gris, y aquí sí queremos
+      // leer "no toca tu cash". Signo delante del símbolo (formatMoney antepone ₡).
+      value={
+        flow.effect === "neutral" ? (
+          <span style={{ color: "var(--text-dim)" }}>{amount}</span>
+        ) : (
+          amount
+        )
+      }
+      valueTone={effectTone(flow.effect)}
     />
+  );
+}
+
+/** Una fila etiqueta/valor del detalle expandido. */
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0" }}>
+      <span style={{ color: "var(--text-muted)" }}>{label}</span>
+      <span style={{ textAlign: "right", fontWeight: 500 }}>{value}</span>
+    </div>
+  );
+}
+
+/**
+ * Detalle del viaje del dinero al expandir una fila (Fase B): de dónde salió, a dónde
+ * llega/se almacena, su efecto en liquidez y el saldo tras el movimiento. El "Ver en X"
+ * navega a la pantalla de origen; "Más acciones" abre el sheet (sólo gestionables).
+ */
+function TxnDetail({
+  t,
+  flow,
+  currency,
+  categoryNames,
+  balanceAfter,
+  origin,
+  onMore,
+}: {
+  t: Transaction;
+  flow: MoneyFlow;
+  currency: string;
+  categoryNames: Record<string, string>;
+  balanceAfter?: number;
+  origin?: { href: string; label: string };
+  onMore?: () => void;
+}) {
+  const color = effectColorVar(flow.effect);
+  const money = formatMoney(Math.abs(t.amount), t.currency || currency);
+  const cat = (t.categoryId ? categoryNames[t.categoryId] : "") || KIND_LABEL[t.kind];
+  const efecto =
+    flow.effect === "out"
+      ? `− ${money} · sale de tu liquidez`
+      : flow.effect === "in"
+        ? `+ ${money} · entra a tu liquidez`
+        : "No toca tu liquidez";
+  const fullDate = new Date(`${t.occurredOn}T00:00:00`).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  return (
+    <div
+      style={{
+        padding: "10px 16px 14px",
+        borderTop: "1px solid var(--border)",
+        background: "var(--surface)",
+        fontSize: 12.5,
+      }}
+    >
+      <DetailRow label="Fecha" value={fullDate} />
+      {flow.isJarSpend ? (
+        <>
+          <DetailRow label="Salió del frasco" value={<span style={{ color }}>{flow.fromLabel}</span>} />
+          <DetailRow label="Pagado con" value={cat} />
+        </>
+      ) : (
+        <>
+          <DetailRow
+            label="Salió de"
+            value={
+              <span style={flow.fromLabel === LIQUIDITY_LABEL ? { color } : undefined}>
+                {flow.fromLabel}
+              </span>
+            }
+          />
+          <DetailRow
+            label={FLOW_VERB_LABEL[flow.verb]}
+            value={
+              <span style={flow.toLabel === LIQUIDITY_LABEL ? { color } : undefined}>
+                {flow.toLabel || "—"}
+              </span>
+            }
+          />
+        </>
+      )}
+      <DetailRow label="Efecto en tu liquidez" value={<span style={{ color }}>{efecto}</span>} />
+      <DetailRow
+        label="Liquidez después"
+        value={balanceAfter != null ? formatMoney(balanceAfter, currency) : "No cambia"}
+      />
+      {origin || onMore ? (
+        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          {origin ? (
+            <Link href={origin.href} className="m-btn m-btn-secondary" style={{ fontSize: 12.5 }}>
+              Ver en {origin.label} →
+            </Link>
+          ) : null}
+          {onMore ? (
+            <button
+              type="button"
+              className="m-btn m-btn-secondary"
+              style={{ fontSize: 12.5 }}
+              onClick={onMore}
+            >
+              Más acciones
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }

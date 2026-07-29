@@ -60,6 +60,40 @@ export async function getLiquidityBalance(ctx?: AuthContext): Promise<{
   };
 }
 
+/**
+ * Saldo de liquidez ACUMULADO tras cada transacción que movió el saco ("liquidez
+ * después"), para la hoja de Transacciones. UNA consulta del ledger del usuario +
+ * UNA pasada: normaliza a la moneda de display, ordena cronológicamente y acumula.
+ * Los movimientos neutros (consumo de frasco / transferencia / ajuste) no tienen
+ * fila en el ledger → no entran al mapa (la UI muestra "no cambia tu liquidez").
+ */
+export async function getLiquidityAfterByTxn(
+  ctx?: AuthContext,
+): Promise<{ afterByTxn: Record<string, number>; currency: string }> {
+  const { db, userId } = await resolveAuth(ctx);
+  const [{ data }, currency, rates] = await Promise.all([
+    db
+      .from("liquidity_ledger")
+      .select("delta, currency, occurred_on, created_at, transaction_id")
+      .eq("user_id", userId)
+      .order("occurred_on", { ascending: true })
+      .order("created_at", { ascending: true }),
+    getDisplayCurrency(ctx),
+    getFxRates(),
+  ]);
+  const rows = (data ?? []) as Pick<
+    LiquidityLedgerRow,
+    "delta" | "currency" | "occurred_on" | "created_at" | "transaction_id"
+  >[];
+  const afterByTxn: Record<string, number> = {};
+  let running = 0;
+  for (const r of rows) {
+    running += convertCurrency(Number(r.delta), r.currency, currency, rates);
+    if (r.transaction_id) afterByTxn[r.transaction_id] = Math.round(running * 100) / 100;
+  }
+  return { afterByTxn, currency };
+}
+
 /** Fija (o reescribe) el saldo inicial. Idempotente: una sola fila 'apertura'. */
 export async function setOpeningBalance(amount: number): Promise<void> {
   const user = await requireUser();

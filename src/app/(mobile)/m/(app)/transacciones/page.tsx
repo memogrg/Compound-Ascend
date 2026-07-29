@@ -14,8 +14,13 @@ import {
 } from "@/modules/financial-base/engine/reconciliation";
 import { monthPeriod } from "@/modules/financial-base";
 import {
+  getLiquidityBalance,
+  getLiquidityAfterByTxn,
+} from "@/modules/financial-base/services/liquidity-service";
+import {
   MMetricGrid,
   MMetricCard,
+  MSummaryCard,
   MSectionHeader,
   MEmptyState,
   mAmount,
@@ -98,6 +103,18 @@ export default async function MobileTransacciones() {
   const candidates = findUnlinkedCandidates(transactions, view.categories, view.linkables);
   const alerts = buildEntityAlerts(view.budget.items, transactions, currency, view.rates);
 
+  // Fase B: liquidez como eje (readout arriba + saldo corrido en cada fila). Best-effort:
+  // si falla la lectura, la lista funciona igual (sin readout / sin saldo corrido).
+  let liquidity: { balance: number; currency: string } | null = null;
+  let balanceAfter: Record<string, number> = {};
+  try {
+    const [bal, series] = await Promise.all([getLiquidityBalance(), getLiquidityAfterByTxn()]);
+    liquidity = { balance: bal.balance, currency: bal.currency };
+    balanceAfter = series.afterByTxn;
+  } catch {
+    liquidity = null;
+  }
+
   return (
     <div className="m-scroll">
       <div className="m-pad">
@@ -117,6 +134,18 @@ export default async function MobileTransacciones() {
             La celda mide ~106px útiles a 320px → mAmount con umbral corto: antes usaba
             clamp() para encoger la fuente, que a partir de cierto importe ya no salva nada.
             El signo va delante del símbolo (formatMoney antepone ₡) y en cero no hay signo. */}
+        {/* Fase B · liquidez como eje: el saldo real arriba, con la nota de que sube
+            y baja con los movimientos de abajo. */}
+        {liquidity ? (
+          <MSummaryCard
+            eyebrow="Tu liquidez"
+            value={mAmount(liquidity.balance, liquidity.currency, 11)}
+            tone={liquidity.balance < 0 ? "danger" : "neutral"}
+            sub="Sube y baja con los movimientos de abajo."
+            style={{ marginBottom: 16 }}
+          />
+        ) : null}
+
         <MSectionHeader title="Tu periodo en números" />
         <MMetricGrid style={{ marginBottom: 16 }}>
           <MMetricCard
@@ -181,6 +210,7 @@ export default async function MobileTransacciones() {
           accounts={accounts}
           incomeCats={incomeCats}
           incomeGroupId={incomeGroupId}
+          balanceAfter={balanceAfter}
         />
       </div>
     </div>
