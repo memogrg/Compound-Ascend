@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
+import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction } from "@/modules/assistant/api/actions";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
@@ -107,6 +107,20 @@ function goalFromAction(action: AIActionProposal, principal: string): DraftGoal 
     monthlyContribution: Number(p.monthlyContribution ?? 0),
     currency: String(p.currency ?? principal),
     targetDate,
+  };
+}
+
+type DraftAlert = { symbol: string; targetPrice: number; assetType: "etf" | "accion" | "cripto"; currency: string };
+
+/** Mapea action.payload → borrador de alerta de precio (espeja ActionCard de la web). */
+function alertFromAction(action: AIActionProposal, principal: string): DraftAlert {
+  const p = action.payload as Record<string, unknown>;
+  const at = p.assetType === "etf" || p.assetType === "accion" ? p.assetType : "cripto";
+  return {
+    symbol: String(p.symbol ?? "").toUpperCase(),
+    targetPrice: Number(p.targetPrice ?? 0),
+    assetType: at,
+    currency: String(p.currency ?? (at === "cripto" ? "USD" : principal)),
   };
 }
 
@@ -318,6 +332,9 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
             ) : null}
             {m.action?.type === "create_goal" ? (
               <MGoalConfirm draft={goalFromAction(m.action, primaryCurrency)} />
+            ) : null}
+            {m.action?.type === "create_price_alert" ? (
+              <MAlertConfirm draft={alertFromAction(m.action, primaryCurrency)} />
             ) : null}
             {m.txn ? <MTxnConfirm draft={m.txn} /> : null}
           </div>
@@ -532,6 +549,60 @@ function MGoalConfirm({ draft }: { draft: DraftGoal }) {
           ? ` · ${formatMoney(draft.monthlyContribution, draft.currency)}/mes`
           : ""}
         {draft.targetDate ? ` · para ${draft.targetDate}` : ""}
+      </div>
+      {error ? (
+        <div className="m-auth-msg" style={{ marginTop: 8 }}>
+          {error}
+        </div>
+      ) : null}
+      <div className="m-confirm-actions">
+        <button
+          className="m-btn m-btn-secondary"
+          onClick={() => setPhase("cancel")}
+          disabled={pending}
+        >
+          Cancelar
+        </button>
+        <button className="m-btn m-btn-primary" onClick={confirm} disabled={pending}>
+          {pending ? "Creando…" : "Confirmar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Confirmación de alerta de precio propuesta por la IA (espeja MGoalConfirm). */
+function MAlertConfirm({ draft }: { draft: DraftAlert }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"idle" | "ok" | "cancel">("idle");
+
+  const confirm = async () => {
+    setPending(true);
+    setError(null);
+    const res = await confirmPriceAlertAction({
+      symbol: draft.symbol,
+      targetPrice: draft.targetPrice,
+      assetType: draft.assetType,
+      currency: draft.currency,
+    });
+    setPending(false);
+    if (res.ok) setPhase("ok");
+    else setError(res.message ?? "No se pudo crear la alerta.");
+  };
+
+  if (phase === "cancel") return null;
+  if (phase === "ok") return <div className="m-confirm-done">✓ Alerta creada.</div>;
+
+  return (
+    <div className="m-confirm">
+      <div className="m-confirm-eyebrow">Crear alerta de precio</div>
+      <div className="m-confirm-amt" style={{ fontSize: 16 }}>
+        {draft.symbol}
+      </div>
+      <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
+        Te avisamos cuando llegue a {formatMoney(draft.targetPrice, draft.currency)} (la dirección se
+        calcula con el precio actual).
       </div>
       {error ? (
         <div className="m-auth-msg" style={{ marginTop: 8 }}>

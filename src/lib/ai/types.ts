@@ -5,7 +5,7 @@
 
 // Solo acciones EJECUTABLES (propuesta → confirmación → creación). Las "sugerencias" no
 // ejecutables (estrategia de deuda, ajuste de presupuesto) van como texto normal, no como acción.
-export type AIActionType = "create_transaction" | "create_goal";
+export type AIActionType = "create_transaction" | "create_goal" | "create_price_alert";
 
 export type AIActionProposal = {
   type: AIActionType;
@@ -47,5 +47,5 @@ export function parseAction(text: string): AIChatResponse {
 }
 
 function isValidType(t: string): t is AIActionType {
-  return t === "create_transaction" || t === "create_goal";
+  return t === "create_transaction" || t === "create_goal" || t === "create_price_alert";
 }

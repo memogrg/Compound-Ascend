@@ -15,6 +15,7 @@ import "server-only";
 import { formatMoney } from "@/lib/format";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
+import { detectCreateAction } from "@/lib/ai/action-lane";
 import type { FinancialContext, ToolContext } from "@/lib/ai/orchestrator";
 
 /** Carril que resolvió la respuesta (para medir el ahorro de tokens). */
@@ -688,6 +689,16 @@ export async function tryRouteQuery(
     if (response) return { response, tokensIn: 0, tokensOut: 0, lane: "template" };
     return null; // el contexto no alcanza → escalar
   }
+
+  // 1b) Carril de ACCIÓN determinista: intents de CREAR (alerta, meta, sobre, gasto). Va DESPUÉS de
+  //     los intents de lectura (que ganan) y ANTES del LLM: el parseo/propuesta salen del router,
+  //     0 tokens. La acción propuesta va a la tarjeta de confirmación (nada se ejecuta sin confirmar).
+  const created = detectCreateAction(lastUser, {
+    currency: toolContext.currency,
+    holdings: (ctx.holdings ?? []).map((h) => ({ symbol: h.symbol, name: h.name, assetType: h.assetType })),
+    today: new Date().toISOString().slice(0, 10),
+  });
+  if (created) return { response: created, tokensIn: 0, tokensOut: 0, lane: "template" };
 
   // 2) Clasificador Flash-Lite (barato). Solo si no matchó patrón.
   const classified = await classifyWithLite(lastUser);

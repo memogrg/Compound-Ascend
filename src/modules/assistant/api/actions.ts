@@ -6,11 +6,12 @@
  * tarjeta de acción de IA o el receipt scanner). El endpoint de chat nunca crea.
  */
 import { revalidatePath } from "next/cache";
-import { transactionInputSchema } from "@/modules/assistant/schemas";
+import { transactionInputSchema, priceAlertInputSchema } from "@/modules/assistant/schemas";
 import { createTransaction } from "@/modules/assistant/services/transaction-service";
 import { listSobresForKind, getSobreRemaining } from "@/modules/financial-base";
 import type { SobreOption, SobreRemaining } from "@/modules/financial-base";
 import { createGoal, goalInputSchema } from "@/modules/control";
+import { createInvestmentAlert } from "@/modules/wealth";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
 
@@ -95,5 +96,32 @@ export async function confirmGoalAction(raw: unknown): Promise<ConfirmResult> {
   } catch (err) {
     logger.error("confirmGoal fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos crear la meta." };
+  }
+}
+
+/**
+ * Confirma y crea una ALERTA DE PRECIO propuesta por el asistente. Mismo patrón: valida con
+ * priceAlertInputSchema y crea recién tras la confirmación. La DIRECCIÓN (above/below) y las
+ * validaciones (símbolo cotizable, precio ≠ actual, alcance de hogar) las resuelve
+ * createInvestmentAlert con el precio vivo — el endpoint de chat nunca crea.
+ */
+export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResult> {
+  const parsed = priceAlertInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, message: "Conecta Supabase para crear la alerta." };
+  }
+  try {
+    const res = await createInvestmentAlert({ kind: "price", ...parsed.data });
+    if (!res.ok) return { ok: false, message: res.message ?? "No se pudo crear la alerta." };
+    revalidatePath("/patrimonio");
+    revalidatePath("/patrimonio/indicadores");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    logger.error("confirmPriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos crear la alerta." };
   }
 }

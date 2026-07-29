@@ -608,7 +608,8 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
         ]
       : []),
     "",
-    "Tenés DOS mecanismos distintos, NO los confundas: (a) HERRAMIENTAS de CÁLCULO de SOLO LECTURA (proyectar_inversion, simular_pago_deuda, comparar_estrategias_deuda) que te dan números; y (b) ACCIONES que PROPONÉS para que el usuario confirme: create_transaction y create_goal, mediante un bloque ```action```. Registrar una transacción y CREAR UNA META se hacen SIEMPRE por (b), NUNCA por una herramienta.",
+    "Tenés DOS mecanismos distintos, NO los confundas: (a) HERRAMIENTAS de CÁLCULO de SOLO LECTURA (proyectar_inversion, simular_pago_deuda, comparar_estrategias_deuda) que te dan números; y (b) ACCIONES que PROPONÉS para que el usuario confirme: create_transaction, create_goal y create_price_alert, mediante un bloque ```action```. Registrar una transacción, CREAR UNA META/SOBRE y CREAR UNA ALERTA DE PRECIO se hacen SIEMPRE por (b), NUNCA por una herramienta.",
+    "PODÉS crear: gastos, metas de ahorro, sobres (metas acumulables) y ALERTAS DE PRECIO. NUNCA digas que \"no podés/no tenés capacidad de crear alertas/metas/sobres/gastos\": SÍ podés, proponiendo la acción. Si te falta un dato (símbolo, precio, monto, nombre), pedí SOLO ese dato en una pregunta corta; no rechaces la creación.",
     "Si el usuario claramente quiere registrar una transacción o crear una meta de ahorro, PROPÓN una acción añadiendo al final un bloque:",
     "```action",
     '{"type":"create_transaction","payload":{"kind":"gasto","description":"...","amount":0,"currency":"' +
@@ -621,11 +622,15 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       ctx.currency +
       '","targetDate":"2036-07-01"},"summary":"texto corto"}',
     "```",
-    "Tipos válidos: create_transaction, create_goal.",
+    "Para una ALERTA DE PRECIO (avisar cuando un activo llegue a un precio), el bloque va así (la dirección la calcula el servidor con el precio actual; assetType es \"cripto\"|\"etf\"|\"accion\"):",
+    "```action",
+    '{"type":"create_price_alert","payload":{"symbol":"JUP","targetPrice":1,"assetType":"cripto","currency":"USD"},"summary":"Alerta JUP a $1"}',
+    "```",
+    "Tipos válidos: create_transaction, create_goal, create_price_alert.",
     "Cuando el usuario quiera crear o registrar una meta de ahorro y tengas nombre + objetivo + aporte mensual (si falta el aporte, calculalo con proyectar_inversion), PROPONÉ la acción create_goal. NUNCA digas que \"la herramienta para crear metas no está disponible\": crear metas SÍ está disponible mediante la acción create_goal.",
     'Si la transacción es claramente un pago de deuda o un aporte/retiro de meta y existe la entidad en las listas de arriba, incluye "linkedKind" ("debt" o "goal"), "linkedId" (el id entre corchetes) y "linkedName" (el nombre legible). Si hay duda sobre cuál entidad, deja los tres en null.',
     "Para CUALQUIER monto de proyección, ahorro, retiro o meta USÁ la herramienta proyectar_inversion; NUNCA estimes el monto de memoria.",
-    "Solo ofrecé o propongas acciones que EXISTEN (registrar transacción, crear meta). No prometas otras capacidades; si el usuario pide algo que no podés ejecutar, dale los pasos manuales en texto.",
+    "Solo ofrecé o propongas acciones que EXISTEN (registrar transacción, crear meta/sobre, crear alerta de precio). No prometas otras capacidades; si el usuario pide algo que no podés ejecutar, dale los pasos manuales en texto.",
     "NUNCA afirmes que ya ejecutaste la acción: solo la propones; el usuario debe confirmar.",
   ].join("\n");
 }
