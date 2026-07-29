@@ -36,6 +36,10 @@ import {
 } from "@/modules/financial-base/engine/classify";
 import { getSuggestionsFor } from "@/modules/financial-base/services/ai-categorize";
 import {
+  getLiquidityBalance,
+  getLiquidityAfterByTxn,
+} from "@/modules/financial-base/services/liquidity-service";
+import {
   findUnlinkedCandidates,
   buildEntityAlerts,
 } from "@/modules/financial-base/engine/reconciliation";
@@ -669,6 +673,19 @@ function IncomeSection({ view }: { view: V2View }) {
 export async function TransaccionesSection({ view }: { view: V2View }) {
   const { real, currency } = view;
 
+  // Trazabilidad Fase B: liquidez como EJE. El saldo actual (readout arriba) y el
+  // saldo corrido tras cada movimiento ("liquidez después"). Best-effort: si falla
+  // la lectura, la lista funciona igual (sin readout / sin saldo corrido).
+  let liquidity: { balance: number; hasOpening: boolean } | null = null;
+  let balanceAfter: Record<string, number> = {};
+  try {
+    const [bal, series] = await Promise.all([getLiquidityBalance(), getLiquidityAfterByTxn()]);
+    liquidity = { balance: bal.balance, hasOpening: bal.hasOpening };
+    balanceAfter = series.afterByTxn;
+  } catch {
+    liquidity = null;
+  }
+
   // Sugerencia de sobre por IA para los movimientos sin clasificar (best-effort, cacheada).
   const uncategorized = selectUncategorized(view.transactions);
   let suggested: Record<string, string> = {};
@@ -704,6 +721,21 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
 
   return (
     <div className="grid">
+      {/* Fase B · liquidez como eje: el saldo real arriba, con la nota de que sube
+          y baja con los movimientos de abajo. */}
+      {liquidity ? (
+        <div>
+          <LiquidityCard
+            balance={liquidity.balance}
+            currency={currency}
+            hasOpening={liquidity.hasOpening}
+          />
+          <div className="hint" style={{ marginTop: 6 }}>
+            Sube y baja con los movimientos de abajo.
+          </div>
+        </div>
+      ) : null}
+
       <SummaryStrip cards={summary} />
 
       <div className="tab-toolbar">
@@ -740,6 +772,7 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
         accounts={view.accounts}
         currency={currency}
         period={view.period.label}
+        balanceAfter={balanceAfter}
       />
 
       {/* Por clasificar: movimientos sin sobre (WhatsApp/ingesta sin regla). */}
