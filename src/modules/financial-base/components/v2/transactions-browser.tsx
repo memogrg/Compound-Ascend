@@ -22,6 +22,7 @@ import {
 } from "@/modules/financial-base/api/v2-actions";
 import {
   describeMoneyFlow,
+  liquidityAfterDisplay,
   FLOW_VERB_LABEL,
   LIQUIDITY_LABEL,
   type MoneyFlow,
@@ -494,6 +495,7 @@ function MoneyFlowDetail({
       : flow.effect === "in"
         ? `+ ${money} · entra a tu liquidez`
         : "No toca tu liquidez";
+  const after = liquidityAfterDisplay({ effect: flow.effect, balanceAfter });
   return (
     <div
       style={{
@@ -527,9 +529,13 @@ function MoneyFlowDetail({
       <DetailField label="Efecto en tu liquidez">
         <span style={{ color: amtColor }}>{efecto}</span>
       </DetailField>
-      <DetailField label="Liquidez después">
-        {balanceAfter != null ? formatMoney(balanceAfter, currency) : "No cambia"}
-      </DetailField>
+      {/* "Liquidez después" se decide por el EFECTO, no por la ausencia del saldo: los
+          legados out/in sin fila en el ledger omiten la línea (no dicen "No cambia"). */}
+      {after.mode === "hidden" ? null : (
+        <DetailField label="Liquidez después">
+          {after.mode === "amount" ? formatMoney(after.value, currency) : "No cambia"}
+        </DetailField>
+      )}
       {origin ? (
         <div style={{ marginTop: 10 }}>
           <Link
