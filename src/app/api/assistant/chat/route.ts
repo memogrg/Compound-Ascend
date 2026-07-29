@@ -25,7 +25,7 @@ import { toSafeResponse, AppError } from "@/lib/errors";
 import { alert } from "@/server/observability/alerts";
 import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/ai/provider";
-import { loadRecentTurns, appendTurns } from "@/lib/ai/conversation-store";
+import { loadTodayChat, appendChatMessages } from "@/lib/ai/chat-store";
 
 export const runtime = "nodejs";
 // El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
@@ -52,10 +52,14 @@ export async function POST(req: Request) {
     if (user) await assertTokenBudget(user.id);
 
     const ctx = await buildFinancialContext();
-    // Memoria persistente (fuente de verdad): historial reciente del usuario. `history` del cliente
-    // se sigue aceptando por compat en el schema, pero NO se usa para el contexto.
-    const recent = await loadRecentTurns();
-    const messages: ChatMessage[] = [...recent, { role: "user", content: parsed.data.message }];
+    // Memoria persistente (fuente de verdad): el chat del DÍA del usuario (chat_messages). El
+    // `history` del cliente se acepta por compat en el schema, pero NO se usa. El LLM ve solo los
+    // últimos N (capHistory en el orquestador), aunque se persista todo el día.
+    const today = await loadTodayChat();
+    const messages: ChatMessage[] = [
+      ...today.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
+      { role: "user", content: parsed.data.message },
+    ];
 
     // Habilita las herramientas (function-calling) sólo con sesión: lee las deudas del
     // usuario como datos de SOLO lectura y las normaliza a la moneda principal con FX
@@ -155,10 +159,10 @@ export async function POST(req: Request) {
       tokensOut: result.tokensOut,
     });
 
-    // Persistir el turno (best-effort; no bloquea la respuesta si falla).
-    await appendTurns(undefined, [
-      { role: "user", content: parsed.data.message, channel: "web" },
-      { role: "assistant", content: result.reply, channel: "web" },
+    // Persistir el turno en el chat del usuario (best-effort; no bloquea la respuesta si falla).
+    await appendChatMessages(undefined, [
+      { role: "user", content: parsed.data.message },
+      { role: "assistant", content: result.reply },
     ]);
 
     return NextResponse.json({ reply: result.reply, action: result.action }, { headers: corsHeaders(req.headers.get("origin")) });

@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
-import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction } from "@/modules/assistant/api/actions";
+import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction, loadTodayChatAction, emailTranscriptAction } from "@/modules/assistant/api/actions";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
@@ -213,20 +213,61 @@ function Tab({
 // ----------------------------------------------------------------------------
 // Modo 2 — Finanzas AI (chat)
 // ----------------------------------------------------------------------------
+const GREETING: Msg = {
+  role: "ai",
+  html: "Hola, soy <strong>My Agent C+</strong>. Pregúntame sobre tu dinero. Si propongo registrar algo, te pediré confirmación.",
+};
+
 function FinanceChat() {
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "ai",
-      html: "Hola, soy <strong>My Agent C+</strong>. Pregúntame sobre tu dinero. Si propongo registrar algo, te pediré confirmación.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [transcriptMsg, setTranscriptMsg] = useState<string | null>(null);
+  const [sendingTranscript, setSendingTranscript] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Al abrir: cargar la conversación de HOY (persistida por usuario) para que el hilo sobreviva a
+  // minimizar/refrescar/cambio de dispositivo. Si no hay nada del día, queda solo el saludo.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const hoy = await loadTodayChatAction();
+        if (!alive || hoy.length === 0) return;
+        setMessages([
+          GREETING,
+          ...hoy.map((m): Msg =>
+            m.role === "assistant"
+              ? { role: "ai", html: renderMarkdown(m.content) }
+              : { role: "me", html: escapeHtml(m.content) },
+          ),
+        ]);
+      } catch {
+        // best-effort: si falla la carga, se queda el saludo
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [messages, busy]);
+
+  const sendTranscript = async () => {
+    if (sendingTranscript) return;
+    setSendingTranscript(true);
+    setTranscriptMsg(null);
+    try {
+      const res = await emailTranscriptAction();
+      setTranscriptMsg(res.message ?? (res.ok ? "Transcript enviado." : "No se pudo enviar."));
+    } catch {
+      setTranscriptMsg("No se pudo enviar el transcript.");
+    } finally {
+      setSendingTranscript(false);
+    }
+  };
 
   const send = async (text: string) => {
     const q = text.trim();
@@ -268,6 +309,22 @@ function FinanceChat() {
 
   return (
     <>
+      <div className="coach-toolbar" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", justifyContent: "flex-end" }}>
+        {transcriptMsg ? (
+          <span className="muted" style={{ fontSize: 11.5, marginRight: "auto" }}>
+            {transcriptMsg}
+          </span>
+        ) : null}
+        <button
+          className="btn btn-secondary"
+          style={{ fontSize: 12, padding: "4px 10px" }}
+          onClick={sendTranscript}
+          disabled={sendingTranscript}
+          title="Recibí por correo la conversación de hoy"
+        >
+          {sendingTranscript ? "Enviando…" : "✉︎ Enviarme el transcript"}
+        </button>
+      </div>
       <div className="coach-body" ref={bodyRef}>
         {messages.map((m, i) => (
           <div key={i}>

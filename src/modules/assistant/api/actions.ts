@@ -12,7 +12,9 @@ import { listSobresForKind, getSobreRemaining } from "@/modules/financial-base";
 import type { SobreOption, SobreRemaining } from "@/modules/financial-base";
 import { createGoal, goalInputSchema } from "@/modules/control";
 import { createInvestmentAlert } from "@/modules/wealth";
-import { isSupabaseConfigured } from "@/lib/auth/session";
+import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
+import { loadTodayChat, buildTranscriptText, startOfCostaRicaDayISO, type StoredChatMessage } from "@/lib/ai/chat-store";
+import { sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
 
 /** `sobre` viaja solo para un GASTO con sobre → mensaje de restante en el chat. */
@@ -123,5 +125,48 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
   } catch (err) {
     logger.error("confirmPriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos crear la alerta." };
+  }
+}
+
+/** Mensajes del chat de HOY del usuario (para que la UI cargue el hilo al abrir, no arranque vacía). */
+export async function loadTodayChatAction(): Promise<StoredChatMessage[]> {
+  if (!isSupabaseConfigured()) return [];
+  return loadTodayChat();
+}
+
+/** Etiqueta DD/MM/YYYY del día actual en hora de Costa Rica (deriva del corte del día). */
+function costaRicaDateLabel(): string {
+  const [y, m, d] = startOfCostaRicaDayISO(Date.now()).slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Escapa texto para incrustarlo seguro en el HTML del correo. */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Envía por correo al PROPIO usuario el transcript en texto limpio de la conversación de hoy.
+ * Acción iniciada por el usuario (botón); destinatario = su propio email de sesión.
+ */
+export async function emailTranscriptAction(): Promise<ConfirmResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para usar el transcript." };
+  const user = await getUser();
+  const to = user?.email;
+  if (!to) return { ok: false, message: "No encontramos tu correo para enviarte el transcript." };
+  try {
+    const msgs = await loadTodayChat();
+    if (msgs.length === 0) return { ok: false, message: "No hay conversación de hoy para enviar." };
+    const dateLabel = costaRicaDateLabel();
+    const text = buildTranscriptText(msgs, { dateLabel });
+    const html = `<pre style="font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;font-size:14px;line-height:1.5">${escapeHtml(text)}</pre>`;
+    const res = await sendEmail({ to, subject: `Tu conversación con My Agent C+ — ${dateLabel}`, html });
+    if (!res.ok) {
+      return { ok: false, message: res.skipped ? "El correo no está configurado ahora." : "No pudimos enviar el correo." };
+    }
+    return { ok: true, message: `Te enviamos el transcript a ${to}.` };
+  } catch (err) {
+    logger.error("emailTranscript fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos enviar el transcript." };
   }
 }
