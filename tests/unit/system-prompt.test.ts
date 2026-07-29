@@ -518,4 +518,44 @@ describe("buildSystemPrompt · persona de asesor de inversión experto con baran
     expect(prompt).toMatch(/ALTA VOLATILIDAD/i);
     expect(prompt).toMatch(/no se puede cronometrar|el máximo es PASADO/i);
   });
+
+  it("conoce las 3 referencias fuertes y la estrategia de ROTAR capital, con barandas", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toMatch(/S&P 500/);
+    expect(prompt).toMatch(/Nasdaq/i);
+    expect(prompt).toMatch(/\bBTC\b/);
+    expect(prompt).toMatch(/ROTAR capital|mover\/rotar capital/i);
+    // Con barandas: riesgo visible, sin promesas, defensa/fondo antes de arriesgar.
+    expect(prompt).toMatch(/riesgo visible/i);
+    expect(prompt).toMatch(/fondo de emergencia\/paz|prioridad al fondo/i);
+    expect(prompt).toMatch(/no ordenás|la decisión es del usuario/i);
+  });
+
+  it("tono cálido y proactivo en el mejor interés del usuario (inversión y defensa)", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toMatch(/cálido/i);
+    expect(prompt).toMatch(/proactiv/i);
+    expect(prompt).toMatch(/mejor interés/i);
+  });
+});
+
+describe("buildSystemPrompt · encuadre/disclaimer UNA vez (firstTurn)", () => {
+  it("primer turno → invita a dar el encuadre una vez", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC", firstTurn: true });
+    expect(prompt).toMatch(/ENCUADRE \(una sola vez/i);
+    expect(prompt).toMatch(/información, no asesoría/i);
+  });
+
+  it("turno posterior → NO repetir el encuadre; solo 'es un escenario, no un plan' breve", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC", firstTurn: false });
+    expect(prompt).toMatch(/ENCUADRE \(ya dado\)/i);
+    expect(prompt).toMatch(/NO los repitas/i);
+    expect(prompt).toMatch(/es un escenario, no un plan/i);
+  });
+
+  it("acota el historial: instruye responder SOLO la última consulta, sin recalcular lo previo", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toMatch(/SOLO la ÚLTIMA consulta/i);
+    expect(prompt).toMatch(/NO los recalcules/i);
+  });
 });

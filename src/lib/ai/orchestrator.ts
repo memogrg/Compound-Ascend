@@ -42,6 +42,7 @@ import { convertCurrency } from "@/lib/fx";
 // Router de complejidad (R1): carril barato para consultas de dato. Solo importa la función
 // (los tipos que el router necesita de aquí son type-only → sin ciclo en runtime).
 import { tryRouteQuery, type RouterLane } from "@/lib/ai/router";
+import { capHistory, isFirstTurn, priorAssistantReplies } from "@/lib/ai/history";
 
 export type { FinancialContext };
 
@@ -122,12 +123,12 @@ export async function financeChat(
     ...selectPatrimonioGuidance(ctx.patrimonioDiagnosis ?? []),
   ].slice(0, 5);
   const result = await provider.chat({
-    system: buildSystemPrompt({ ...ctx, knowledge }),
-    messages,
+    system: buildSystemPrompt({ ...ctx, knowledge, firstTurn: isFirstTurn(messages) }),
+    messages: capHistory(messages),
   });
   const parsed = parseAction(result.text);
   return {
-    ...guardReply(parsed, ctx, provider.name),
+    ...guardReply(parsed, ctx, provider.name, priorAssistantReplies(messages)),
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
     provider: provider.name,
@@ -142,13 +143,18 @@ function guardReply(
   parsed: AIChatResponse,
   ctx: FinancialContext,
   provider: string,
+  priorReplies: string[] = [],
 ): AIChatResponse {
-  const guarded = applyGuardrail(parsed.reply, {
-    hasEmergencyFund: ctx.hasEmergencyFund,
-    urgency: ctx.urgency,
-    dependentsCount: ctx.dependentsCount,
-    emergencyMonths: ctx.emergencyMonths,
-  });
+  const guarded = applyGuardrail(
+    parsed.reply,
+    {
+      hasEmergencyFund: ctx.hasEmergencyFund,
+      urgency: ctx.urgency,
+      dependentsCount: ctx.dependentsCount,
+      emergencyMonths: ctx.emergencyMonths,
+    },
+    priorReplies,
+  );
   if (guarded.flags.length) {
     logger.info("ai-guardrail aplicado", { flags: guarded.flags, provider });
   }
@@ -307,7 +313,7 @@ export async function financeChatWithTools(
     const routed = await tryRouteQuery(messages, ctx, toolContext);
     if (routed) {
       return {
-        ...guardReply(routed.response, ctx, `router:${routed.lane}`),
+        ...guardReply(routed.response, ctx, `router:${routed.lane}`, priorAssistantReplies(messages)),
         tokensIn: routed.tokensIn,
         tokensOut: routed.tokensOut,
         provider: `router:${routed.lane}`,
@@ -320,8 +326,8 @@ export async function financeChatWithTools(
 
   const knowledge = await buildKnowledge(messages, ctx);
   const result = await provider.chatWithTools({
-    system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
-    messages,
+    system: `${buildSystemPrompt({ ...ctx, knowledge, firstTurn: isFirstTurn(messages) })}\n\n${TOOLS_PROMPT_LINE}`,
+    messages: capHistory(messages),
     tools: [
       SIMULATE_DEBT_TOOL,
       COMPARE_DEBT_TOOL,
@@ -336,7 +342,7 @@ export async function financeChatWithTools(
   });
   const parsed = parseAction(result.text);
   return {
-    ...guardReply(parsed, ctx, provider.name),
+    ...guardReply(parsed, ctx, provider.name, priorAssistantReplies(messages)),
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
     provider: provider.name,

@@ -160,6 +160,11 @@ export type FinancialContext = {
   insights?: { severity: string; title: string; body: string }[];
   /** Guía conductual recuperada de la Biblia para esta conversación (Fase 5c). */
   knowledge?: string[];
+  /**
+   * true en el PRIMER turno de la conversación (sin turno previo del asistente). Controla que el
+   * ENCUADRE largo (información-no-asesoría, recordatorio del fondo) se dé UNA vez, no en cada mensaje.
+   */
+  firstTurn?: boolean;
 };
 
 export function buildSystemPrompt(ctx: FinancialContext): string {
@@ -415,7 +420,15 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "el riesgo visible, jamás un retorno prometido; es INFORMACIÓN, no asesoría financiera formal; " +
     "en cripto agregá el caveat de ALTA VOLATILIDAD. Sobre vender 'en el ATH/máximo': el máximo es " +
     "PASADO y el techo NO se puede cronometrar — podés calcular el hipotético, pero decilo como " +
-    "escenario, no como plan.";
+    "escenario, no como plan. " +
+    "TONO: cálido, cercano y PROACTIVO, siempre en el mejor interés del usuario — tanto para hacer " +
+    "crecer su inversión como para proteger su defensa (fondo de paz, liquidez). Ayudás y guiás, no " +
+    "trabás; conciso y al punto. " +
+    "ESTRATEGIA (lo sabés como asesor): las tres referencias fuertes del mercado son el S&P 500, el " +
+    "Nasdaq y BTC. Una estrategia válida es ROTAR capital: tomar ganancias de una posición y moverlas " +
+    "a otra oportunidad o a la defensa. PODÉS sugerir mover/rotar capital como estrategia, SIEMPRE con " +
+    "las barandas: rangos con el riesgo visible, sin promesas, y prioridad al fondo de emergencia/paz " +
+    "antes de arriesgar. Informás y guiás, la decisión es del usuario — no ordenás.";
 
   const behaviorRules: string[] = [];
 
@@ -538,7 +551,10 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "Usa solo el contexto financiero proporcionado; no inventes datos del usuario.",
     "",
     "CONVERSACIÓN (responder la consulta ACTUAL):",
-    "- Respondé a la ÚLTIMA consulta del usuario. Los turnos anteriores son SOLO contexto para entenderla; NO los vuelvas a responder ni retomes temas viejos salvo que la última consulta lo pida. Si la última es una pregunta nueva, contestá ESA.",
+    "- Respondé SOLO la ÚLTIMA consulta del usuario. Los turnos anteriores son SOLO contexto para entenderla: NO los repitas, NO los recalcules, NO retomes temas viejos ni vuelvas a listar cifras ya dadas, salvo que la última consulta lo pida explícitamente. Si la última es una pregunta nueva, contestá ESA y nada más.",
+    ctx.firstTurn
+      ? "- ENCUADRE (una sola vez, ahora): al ser el inicio de la conversación (o la primera consulta de inversión), podés dar UNA vez el marco 'esto es información, no asesoría; escenarios, no predicciones' y, si aplica, el recordatorio del fondo de emergencia. Breve."
+      : "- ENCUADRE (ya dado): el marco 'información, no asesoría; escenarios, no predicciones' y el recordatorio del fondo YA se dieron antes en esta conversación. NO los repitas. En proyecciones/escenarios hacia adelante alcanza un 'es un escenario, no un plan' breve — nada de párrafos de disclaimer en cada respuesta.",
     "",
     "INVERSIONES (ves TODO el dinero del usuario):",
     "- En tu contexto tenés las POSICIONES del usuario (símbolo, cantidad, invertido, valor actual, precio y ganancia/pérdida) y los totales. Úsalos para responder preguntas como «si vendo KMNO, ¿cuánto gano vs lo invertido?»: la ganancia al vender HOY = valor actual − invertido de esa posición (o precio actual × cantidad − invertido). Esas cifras son REALES y salen de tu contexto/motor — NUNCA las inventes ni las estimes de memoria.",
