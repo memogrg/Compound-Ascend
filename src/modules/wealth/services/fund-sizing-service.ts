@@ -23,7 +23,12 @@ import {
   type DefenseFundsPlan,
 } from "@/modules/wealth/engine/fund-sizing";
 
-export type DefenseFundsReport = DefenseFundsPlan & { currency: string };
+export type DefenseFundsReport = DefenseFundsPlan & {
+  currency: string;
+  /** ¿Existe una meta de defensa registrada por fondo? (registrado ≠ acumulado>0: puede estar en 0). */
+  emergencyRegistered: boolean;
+  peaceRegistered: boolean;
+};
 
 /** Meses del fondo de paz del usuario (preferencia PERSONAL). Default 3 si no hay valor. */
 export async function getPeaceMonths(): Promise<number> {
@@ -80,6 +85,9 @@ export async function getDefenseFundsReport(): Promise<DefenseFundsReport> {
         0,
       );
 
+  // Registrado = existe la meta (aunque su acumulado sea 0). Distingue "no lo tenés" de "en 0".
+  const hasType = (type: string) => (goals ?? []).some((g) => g.goal_type === type);
+
   const plan = computeDefenseFunds({
     emergencyTarget: emergencyTargetIn(currency, rates),
     emergencyCurrent: sumBy("defensa:fondo_emergencia"),
@@ -87,5 +95,10 @@ export async function getDefenseFundsReport(): Promise<DefenseFundsReport> {
     essentialMonthly,
     peaceCurrent: sumBy("defensa:fondo_paz"),
   });
-  return { ...plan, currency };
+  return {
+    ...plan,
+    currency,
+    emergencyRegistered: hasType("defensa:fondo_emergencia"),
+    peaceRegistered: hasType("defensa:fondo_paz"),
+  };
 }

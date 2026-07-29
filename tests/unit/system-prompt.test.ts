@@ -86,7 +86,8 @@ describe("buildSystemPrompt · perfil conductual", () => {
     // hasEmergencyFund 'no' + urgency alta → debe disparar.
     const byUrgency = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "no", urgency: "alta" });
     expect(byUrgency).toContain("construir el fondo de emergencia antes que cualquier inversión de riesgo");
-    expect(byUrgency).toContain("Fondo de emergencia: no.");
+    // Sin estado real de fondos → cae al auto-reporte del onboarding.
+    expect(byUrgency).toContain("Fondo de emergencia (auto-reporte del onboarding): no.");
 
     // hasEmergencyFund 'no_se' + lifeStage de deuda → también dispara (sin urgencia).
     const byStage = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "no_se", lifeStage: "salir deudas" });
@@ -536,6 +537,45 @@ describe("buildSystemPrompt · persona de asesor de inversión experto con baran
     expect(prompt).toMatch(/cálido/i);
     expect(prompt).toMatch(/proactiv/i);
     expect(prompt).toMatch(/mejor interés/i);
+  });
+});
+
+describe("buildSystemPrompt · fondos de defensa (estado REAL supersede el auto-reporte)", () => {
+  const df = (over?: Partial<NonNullable<FinancialContext["defenseFunds"]>>): FinancialContext =>
+    ({
+      currency: "CRC",
+      defenseFunds: {
+        currency: "CRC",
+        activeFund: "peace",
+        emergency: { registrado: true, actual: 800_000, objetivo: 1_000_000, progresoPct: 80, aporteRecomendado: 50_000, cubierto: false },
+        paz: { registrado: false, actual: 0, objetivo: 3_000_000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+        ...over,
+      },
+    }) as FinancialContext;
+
+  it("fondo REGISTRADO → reporta acumulado/objetivo/progreso y prohíbe decir 'no lo tenés'", () => {
+    const prompt = buildSystemPrompt(df());
+    expect(prompt).toMatch(/Fondo de emergencia: REGISTRADO — 800000 de 1000000/);
+    expect(prompt).toMatch(/80%/);
+    expect(prompt).toMatch(/faltan 200000.*aporte sugerido 50000/i); // brecha + aporte
+    expect(prompt).toMatch(/NUNCA digas que el usuario "no tiene"/i);
+  });
+
+  it("fondo NO registrado → dice que falta (no lo inventa como existente)", () => {
+    const prompt = buildSystemPrompt(df());
+    expect(prompt).toMatch(/Fondo de paz: NO registrado/);
+  });
+
+  it("con estado real presente NO emite la línea de auto-reporte del onboarding", () => {
+    const prompt = buildSystemPrompt({ ...df(), hasEmergencyFund: "no" } as FinancialContext);
+    expect(prompt).not.toMatch(/auto-reporte del onboarding/i);
+    // Y aún así reporta el fondo REGISTRADO (el real manda sobre el "no" viejo).
+    expect(prompt).toMatch(/Fondo de emergencia: REGISTRADO/);
+  });
+
+  it("sin estado real → cae al auto-reporte del onboarding", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "no" } as FinancialContext);
+    expect(prompt).toMatch(/auto-reporte del onboarding/i);
   });
 });
 

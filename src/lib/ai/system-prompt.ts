@@ -133,6 +133,17 @@ export type FinancialContext = {
   hasEmergencyFund?: string;
   /** Respaldo REAL computado (meses de independencia, Rich Life); señal dura del fondo de paz. */
   emergencyMonths?: number;
+  /**
+   * Estado REAL de los fondos de defensa (metas savings_goals defensa:fondo_*, scope de hogar), del
+   * fund-sizing. SUPERSEDE a hasEmergencyFund (auto-reporte viejo del onboarding): si un fondo está
+   * `registrado`, el asesor NUNCA debe decir "no lo tenés". Ausente si no hay sesión/lectura falla.
+   */
+  defenseFunds?: {
+    currency: string;
+    activeFund: "emergency" | "peace" | "done";
+    emergency: { registrado: boolean; actual: number; objetivo: number; progresoPct: number; aporteRecomendado: number; cubierto: boolean };
+    paz: { registrado: boolean; actual: number; objetivo: number; progresoPct: number; aporteRecomendado: number; cubierto: boolean };
+  };
   // Arquetipo conductual (Fase 2). Best-effort: si el perfil no se completó, no aparecen.
   archetypePrimary?: string;
   archetypeSecondary?: string;
@@ -376,7 +387,23 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(`Control percibido sobre sus finanzas: ${ctx.perceivedControl}/5.`);
   if (ctx.dependentsCount !== undefined) facts.push(`Personas que dependen de él/ella: ${ctx.dependentsCount}.`);
   if (ctx.financialNucleus) facts.push(`Núcleo financiero: ${ctx.financialNucleus}.`);
-  if (ctx.hasEmergencyFund) facts.push(`Fondo de emergencia: ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`);
+  // Fondos de defensa — estado REAL (fund-sizing) tiene prioridad sobre el auto-reporte del wizard.
+  if (ctx.defenseFunds) {
+    const df = ctx.defenseFunds;
+    const cur = df.currency;
+    const linea = (nombre: string, f: (typeof df)["emergency"]) =>
+      f.registrado
+        ? `Fondo de ${nombre}: REGISTRADO — ${f.actual} de ${f.objetivo} ${cur} (${f.progresoPct}%${f.cubierto ? ", COMPLETO" : `, faltan ${Math.max(0, f.objetivo - f.actual)} ${cur}; aporte sugerido ${f.aporteRecomendado} ${cur}/mes`}).`
+        : `Fondo de ${nombre}: NO registrado (objetivo sugerido ${f.objetivo} ${cur}).`;
+    facts.push(linea("emergencia", df.emergency));
+    facts.push(linea("paz", df.paz));
+    facts.push(
+      `REGLA de los fondos de defensa: usá el estado REAL de arriba. Si un fondo dice REGISTRADO, NUNCA digas que el usuario "no tiene" ese fondo — reportá su acumulado/objetivo/progreso. Si está incompleto, decilo con la brecha y el aporte sugerido (no que "no existe"). Fondo activo ahora: ${df.activeFund === "emergency" ? "emergencia" : df.activeFund === "peace" ? "paz" : "ambos completos"}.`,
+    );
+  } else if (ctx.hasEmergencyFund) {
+    // Sin datos reales (WhatsApp/sin sesión) → cae al auto-reporte del onboarding.
+    facts.push(`Fondo de emergencia (auto-reporte del onboarding): ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`);
+  }
   if (ctx.richLifePhrase) facts.push(`Su vida rica en una frase: "${ctx.richLifePhrase}".`);
   if (ctx.richLifeVision) facts.push(`Su visión de vida rica: "${ctx.richLifeVision}".`);
   if (ctx.archetypeLabel) {

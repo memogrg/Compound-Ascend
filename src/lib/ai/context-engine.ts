@@ -444,6 +444,37 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Sin cliente de sesión: el contexto sigue con lo que ya tiene.
   }
 
+  // Estado REAL de los fondos de defensa (metas defensa:fondo_*, scope de hogar). SUPERSEDE al
+  // hasEmergencyFund auto-reportado del onboarding: si hay un fondo registrado, esos datos MANDAN
+  // (el chat decía "no tenés fondo" pese a estar registrado). Va DESPUÉS del bloque de perfil para
+  // pisar el auto-reporte. Best-effort: sin sesión/lectura falla → se queda el auto-reporte.
+  try {
+    const { getDefenseFundsReport } = await import("@/modules/wealth");
+    const d = await getDefenseFundsReport();
+    const fund = (f: { current: number; target: number; progressPct: number; recommendedMonthly: number; covered: boolean }, registrado: boolean) => ({
+      registrado,
+      actual: Math.round(f.current),
+      objetivo: Math.round(f.target),
+      progresoPct: Math.round(f.progressPct * 100),
+      aporteRecomendado: Math.round(f.recommendedMonthly),
+      cubierto: f.covered,
+    });
+    ctx.defenseFunds = {
+      currency: d.currency,
+      activeFund: d.activeFund,
+      emergency: fund(d.emergency, d.emergencyRegistered),
+      paz: fund(d.peace, d.peaceRegistered),
+    };
+    // Supersede: si el fondo de emergencia está registrado, hasEmergencyFund refleja lo REAL
+    // (cubierto → "si"; parcial → "construyendo"), no el auto-reporte viejo. Así el guardrail y las
+    // reglas dejan de tratar al usuario como "sin fondo".
+    if (d.emergencyRegistered) {
+      ctx.hasEmergencyFund = d.emergency.covered ? "si" : "construyendo";
+    }
+  } catch {
+    // Sin fondos de defensa disponibles: se queda el auto-reporte del perfil.
+  }
+
   // Entidades vinculables: la IA puede proponer transacciones ya vinculadas.
   try {
     const { listLinkableEntities } =
