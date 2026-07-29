@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction, loadTodayChatAction, emailTranscriptAction } from "@/modules/assistant/api/actions";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
+import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
 import { todayLocalISO } from "@/lib/validation";
@@ -145,6 +146,9 @@ const LINK_LABEL: Record<string, string> = {
   rental: "alquiler",
 };
 
+/** Timeout del cliente para el chat (~40s), por debajo del maxDuration=60 del endpoint. */
+const CHAT_TIMEOUT_MS = 40_000;
+
 export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }) {
   const [messages, setMessages] = useState<ChatMsg[]>([
     {
@@ -216,11 +220,13 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
     setMessages((m) => [...m, { id: nextId(), role: "user", text: q }]);
     setSending(true);
     try {
-      const res = await fetch("/api/assistant/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: q, history }),
-      });
+      // Timeout del cliente (~40s, bajo el maxDuration=60 del server): si tarda, cortamos con mensaje
+      // claro en vez de dejar el spinner eterno (paridad con la web).
+      const res = await fetchWithTimeout(
+        "/api/assistant/chat",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history }) },
+        CHAT_TIMEOUT_MS,
+      );
       const data = await res.json();
       if (res.ok) {
         setMessages((m) => [
@@ -242,11 +248,11 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
           },
         ]);
       }
-    } catch {
-      setMessages((m) => [
-        ...m,
-        { id: nextId(), role: "assistant", text: "Hubo un problema de conexión." },
-      ]);
+    } catch (err) {
+      const text = isTimeoutError(err)
+        ? "Se está tardando más de lo normal, probá de nuevo."
+        : "Hubo un problema de conexión.";
+      setMessages((m) => [...m, { id: nextId(), role: "assistant", text }]);
     } finally {
       setSending(false);
     }

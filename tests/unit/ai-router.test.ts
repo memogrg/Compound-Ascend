@@ -42,6 +42,9 @@ vi.mock("@/modules/wealth", () => ({
   getPositionForSymbol: (...a: unknown[]) => getPositionForSymbol(...a),
 }));
 
+// FX del carril multi-posición (import dinámico): tasas fijas para no pegarle a la red.
+vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: async () => ({ USD: 1, CRC: 530 }) }));
+
 import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
@@ -442,6 +445,58 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     );
     expect(reply).toMatch(/no pude leer|reintent/i);
     expect(reply).not.toMatch(/no tengo acceso/i);
+  });
+
+  it('MULTI: "vender todos los altcoins a 90% de su ATH" computa por altcoin y SUMA, sin tocar el LLM', async () => {
+    const ctxAlt = {
+      ...CTX,
+      currency: "USD",
+      holdings: [
+        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 40000, value: 64000, price: 64000, pl: 24000, plPct: 0.6, currency: "USD", priceUnavailable: false },
+        { symbol: "JUP", name: "Jupiter", assetType: "cripto", quantity: 1000, invested: 500, value: 500, price: 0.5, pl: 0, plPct: 0, currency: "USD", priceUnavailable: false },
+        { symbol: "ETH", name: "Ethereum", assetType: "cripto", quantity: 2, invested: 3000, value: 6000, price: 3000, pl: 3000, plPct: 1, currency: "USD", priceUnavailable: false },
+      ],
+    } as FinancialContext;
+    const highs: Record<string, number> = { BTC: 126000, JUP: 2, ETH: 4800 };
+    getMarketHighlights.mockImplementation(async (symbol: string) => ({
+      price: 1, currency: "USD", high: highs[symbol] ?? null, highDate: "2024-01-31", highKind: "ath",
+    }));
+
+    const routed = await tryRouteQuery(ask("cuánto genero si vendo todos los altcoins a 90% de su ATH"), ctxAlt, tc);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.tokensIn).toBe(0);
+    expect(liteChat).not.toHaveBeenCalled(); // NO pasó por el LLM
+    const reply = routed?.response.reply ?? "";
+    // Altcoins = JUP + ETH (BTC excluido). JUP: 1000×(2×0.9=1.8)=1800. ETH: 2×(4800×0.9=4320)=8640. Total 10.440.
+    expect(reply).toMatch(/JUP/);
+    expect(reply).toMatch(/ETH/);
+    expect(reply).not.toMatch(/\bBTC\b/); // Bitcoin NO es altcoin
+    expect(reply).toContain("10.440");
+    expect(reply).toMatch(/90% de su ATH/);
+    expect(reply).toMatch(/escenario a un precio hipotético/i);
+    // Se consultó el store (getMarketHighlights) por cada altcoin, no en vivo por burbuja.
+    expect(getMarketHighlights).toHaveBeenCalledWith("JUP", "crypto");
+    expect(getMarketHighlights).toHaveBeenCalledWith("ETH", "crypto");
+  });
+
+  it("MULTI: una posición SIN ATH no rompe el total (las demás suman)", async () => {
+    const ctxAlt = {
+      ...CTX,
+      currency: "USD",
+      holdings: [
+        { symbol: "JUP", name: "Jupiter", assetType: "cripto", quantity: 1000, invested: 500, value: 500, price: 0.5, pl: 0, plPct: 0, currency: "USD", priceUnavailable: false },
+        { symbol: "ZZZ", name: "Zzz", assetType: "cripto", quantity: 10, invested: 100, value: 100, price: 5, pl: 0, plPct: 0, currency: "USD", priceUnavailable: false },
+      ],
+    } as FinancialContext;
+    getMarketHighlights.mockImplementation(async (symbol: string) => ({
+      price: 1, currency: "USD", high: symbol === "JUP" ? 2 : null, highDate: "2024-01-31", highKind: "ath",
+    }));
+
+    const routed = await tryRouteQuery(ask("vender todos mis altcoins al 90% del ATH"), ctxAlt, tc);
+    const reply = routed?.response.reply ?? "";
+    expect(reply).toContain("1.800"); // JUP sí computa
+    expect(reply).toMatch(/ZZZ/); // se reporta que quedó fuera
+    expect(reply).toMatch(/quedaron fuera|me faltó/i);
   });
 
   it("acción/ETF: el máximo se presenta como 52 semanas, no como ATH", () => {
