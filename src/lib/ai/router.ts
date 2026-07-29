@@ -16,6 +16,7 @@ import { formatMoney } from "@/lib/format";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
 import { detectCreateAction } from "@/lib/ai/action-lane";
+import { projectInvestment } from "@/lib/ai/tools";
 import {
   parseMultiScope,
   parsePriceModifier,
@@ -60,7 +61,10 @@ type Intent =
   // "¿me puedo comprar X?" → mapea al sobre y dice el restante (determinista) — lectura fresca:
   | "puedo_gastar"
   // Precio/ATH/"si vendo X en el máximo" → llama datos_de_mercado DETERMINISTA (no a criterio del LLM):
-  | "datos_mercado";
+  | "datos_mercado"
+  // "¿cómo llego a mi independencia? / cuánto invertir para llegar" → proyección determinista hacia
+  // el número de INDEPENDENCIA (sin pedir estilo de vida deseado):
+  | "plan_independencia";
 
 const KNOWN_INTENTS: Intent[] = [
   "numero_seguridad",
@@ -76,6 +80,7 @@ const KNOWN_INTENTS: Intent[] = [
   "listar_sobres",
   "puedo_gastar",
   "datos_mercado",
+  "plan_independencia",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -209,6 +214,17 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   // solaparse con otras señales) para garantizar que estas preguntas NO caigan al modelo suelto.
   if (MARKET_CUE_RE.test(t)) {
     return { intent: "datos_mercado", params: { text: t, wantsAth: MARKET_ATH_RE.test(t) } };
+  }
+
+  // PLAN de independencia (proyección determinista hacia el número de INDEPENDENCIA). ANTES de
+  // REASONING_CUES (que atrapa "cómo/plan/proyec") para no caer al LLM. "libertad financiera" acá =
+  // la vida ACTUAL del usuario (independencia), como la usa coloquialmente. NO pide vida deseada.
+  if (
+    /(?:c[oó]mo|cu[aá]ndo|en cu[aá]nto)\b[^?]*\b(?:llego|llegar|alcanz\w+)\b[^?]*\b(independencia|independiente|libertad financiera|mi n[uú]mero)\b/i.test(t) ||
+    /cu[aá]nto\s+(?:debo|tengo que|necesito|deber[ií]a|puedo)\b[^?]*\b(?:invertir|aportar|ahorrar)\b[^?]*\b(?:para|llegar|independencia|independiente|mi n[uú]mero|libertad)\b/i.test(t) ||
+    /\b(?:c[oó]mo|plan|hoja de ruta)\b[^?]*\b(?:para\s+)?(?:mi\s+)?(?:independencia (?:financiera)?|libertad financiera)\b/i.test(t)
+  ) {
+    return { intent: "plan_independencia", params: {} };
   }
 
   if (REASONING_CUES.test(t)) return null; // consejo/proyección → razonamiento
@@ -357,17 +373,58 @@ export function answerFromContext(
           progreso(n),
       );
     }
-    // numero_libertad: estilo de vida DESEADO. Si no lo definió → estado claro, sin inventar.
+    // numero_libertad: estilo de vida DESEADO. Si NO lo definió, NO respondas solo "no lo tengo":
+    // el usuario suele decir "libertad" por su vida ACTUAL → dale el Número de Independencia + una
+    // oferta de UNA línea para definir Libertad como un objetivo mayor.
     const n = tc.libertyNumber;
     if (typeof n !== "number" || n <= 0) {
+      const indep = tc.independenceNumber;
+      if (typeof indep === "number" && indep > 0) {
+        return say(
+          `Todavía no definiste un estilo de vida DESEADO aparte, así que tu número hoy es el de INDEPENDENCIA: ${money(indep)} — el capital que, al 8% anual, cubre tu vida actual.` +
+            progreso(indep) +
+            ` Si querés, definimos tu Número de Libertad como un objetivo mayor (tu estilo de vida deseado). ¿Lo hacemos?`,
+        );
+      }
       return say(
-        "Todavía no definiste tu estilo de vida deseado, así que no tengo tu Número de Libertad. " +
-          "Definilo en tu perfil y te lo calculo (tu gasto deseado mensual, al 8% anual). No lo invento.",
+        "Todavía no tengo tu Número de Libertad ni el de Independencia. Registrá tu compromiso mensual (gastos + metas + inversión) y te los calculo — no los invento.",
       );
     }
     return say(
       `Tu Número de Libertad es ${money(n)} — el capital que, al 8% anual, sostiene el estilo de vida que DESEÁS.` +
         progreso(n),
+    );
+  }
+
+  // PLAN de independencia: proyección determinista hacia el Número de INDEPENDENCIA (ya calculado),
+  // SIN pedir estilo de vida deseado. Meta = independencia; capital inicial = invertible; aporte =
+  // flujo libre; al 8%. Respuesta corta con la cifra real (ver ejemplo del producto).
+  if (intent === "plan_independencia") {
+    const target = tc.independenceNumber;
+    if (typeof target !== "number" || target <= 0) return null; // sin número → escala
+    const have = typeof tc.investableWealth === "number" ? tc.investableWealth : 0;
+    const aporte = typeof ctx?.freeCashflow === "number" ? ctx.freeCashflow : 0;
+    const compromiso = typeof ctx?.compromisoMensual === "number" ? ctx.compromisoMensual : null;
+    const cubre = compromiso ? ` (cubre tus ${money(compromiso)}/mes)` : "";
+    if (have >= target) {
+      return say(
+        `Tu número de independencia es ${money(target)}${cubre}. Con ${money(have)} invertibles ya lo cubrís — ¡ya sos financieramente independiente! ¿Definimos tu número de Libertad, un objetivo mayor?`,
+      );
+    }
+    if (aporte <= 0) {
+      return say(
+        `Tu número de independencia es ${money(target)}${cubre}. Hoy llevás ${money(have)} invertibles. Decime cuánto podés aportar al mes y te digo en ~cuántos años llegás (al 8%).`,
+      );
+    }
+    const proj = projectInvestment(
+      { aporte_mensual: aporte, rendimiento_anual_pct: 8, monto_inicial: have, objetivo: target },
+      cur,
+    );
+    const meses = proj.meses_para_objetivo;
+    if (meses == null) return null; // (no debería con aporte>0; ante duda, escala)
+    const anios = Math.max(0.1, Math.round((meses / 12) * 10) / 10);
+    return say(
+      `Tu número de independencia es ${money(target)}${cubre}. Con tu patrimonio invertible ${money(have)} aportando ${money(aporte)}/mes al 8%, llegás en ~${anios} años. ¿Ajustamos el aporte?`,
     );
   }
 

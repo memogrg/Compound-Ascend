@@ -529,11 +529,23 @@ export const FREEDOM_TOOL: AiToolDecl = {
 
 export type FreedomContext = {
   /** Número de LIBERTAD (capital que, al 8% anual, sostiene el estilo de vida DESEADO).
-   *  Ausente si el usuario no lo definió → las proyecciones devuelven disponible:false. */
+   *  Ausente si el usuario no lo definió → se proyecta hacia el de INDEPENDENCIA. */
   libertyNumber?: number;
+  /** Número de INDEPENDENCIA (vida ACTUAL). Meta por defecto cuando no hay Libertad definida:
+   *  el usuario no necesita definir su "estilo de vida deseado" para proyectar hacia su independencia. */
+  independenceNumber?: number;
   investableWealth?: number;
   currency: string;
 };
+
+/** Meta de la proyección: el de Libertad si lo definió; si no, el de Independencia (vida actual). */
+function freedomTarget(ctx: FreedomContext): number {
+  const liberty = typeof ctx.libertyNumber === "number" ? ctx.libertyNumber : 0;
+  if (liberty > 0) return liberty;
+  return typeof ctx.independenceNumber === "number" && ctx.independenceNumber > 0
+    ? ctx.independenceNumber
+    : 0;
+}
 
 export type FreedomProjection =
   | { disponible: false; motivo: string }
@@ -560,13 +572,13 @@ export function projectFreedom(
   args: { aporte_mensual?: unknown; anios?: unknown; rendimiento_anual_pct?: unknown },
   ctx: FreedomContext,
 ): FreedomProjection {
-  const freedom = typeof ctx.libertyNumber === "number" ? ctx.libertyNumber : 0;
+  const freedom = freedomTarget(ctx);
   if (!(freedom > 0)) {
     return {
       disponible: false,
       motivo:
-        "Aún no definiste tu estilo de vida deseado, así que no tengo tu Número de Libertad. " +
-        "Definilo en tu perfil y lo calculo (tu gasto deseado mensual, al 8% anual).",
+        "No tengo todavía tu Número de Independencia ni el de Libertad para proyectar. " +
+        "Necesito tu compromiso mensual (gastos + metas + inversión) o tu estilo de vida deseado.",
     };
   }
   const inicial = Math.max(0, typeof ctx.investableWealth === "number" ? ctx.investableWealth : 0);
@@ -685,13 +697,13 @@ export function yearsToFreedom(
   args: { aporte_mensual?: unknown; rendimiento_anual_pct?: unknown },
   ctx: FreedomContext,
 ): YearsToFreedomProjection {
-  const freedom = typeof ctx.libertyNumber === "number" ? ctx.libertyNumber : 0;
+  const freedom = freedomTarget(ctx);
   if (!(freedom > 0)) {
     return {
       disponible: false,
       motivo:
-        "Aún no definiste tu estilo de vida deseado, así que no tengo tu Número de Libertad. " +
-        "Definilo en tu perfil y lo calculo (tu gasto deseado mensual, al 8% anual).",
+        "No tengo todavía tu Número de Independencia ni el de Libertad para proyectar. " +
+        "Necesito tu compromiso mensual (gastos + metas + inversión) o tu estilo de vida deseado.",
     };
   }
   const inicial = Math.max(0, typeof ctx.investableWealth === "number" ? ctx.investableWealth : 0);
