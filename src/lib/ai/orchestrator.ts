@@ -197,6 +197,7 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       // el motor devuelve disponible:false pidiendo definirlo — nunca hacia otro número.
       return projectFreedom(args, {
         libertyNumber: toolContext.libertyNumber,
+        independenceNumber: toolContext.independenceNumber,
         investableWealth: toolContext.investableWealth,
         currency: toolContext.currency,
       });
@@ -209,6 +210,7 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       // Años hasta el Número de LIBERTAD al ritmo actual + sensibilidad (invertible real).
       return yearsToFreedom(args, {
         libertyNumber: toolContext.libertyNumber,
+        independenceNumber: toolContext.independenceNumber,
         investableWealth: toolContext.investableWealth,
         currency: toolContext.currency,
       });

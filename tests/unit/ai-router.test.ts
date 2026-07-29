@@ -88,10 +88,17 @@ describe("matchIntent · patrones (0 tokens)", () => {
     expect(matchIntent("¿cuánto pago de mi Visa?")?.intent).toBe("cuota_deuda");
   });
 
-  it("una PROYECCIÓN nunca se atrapa por patrón → null (escala al razonamiento)", () => {
+  it("una PROYECCIÓN genérica se escala al razonamiento (null), pero NO la de independencia", () => {
     expect(matchIntent("si invierto $300 en el Nasdaq durante 5 años, ¿cuánto tendría?")).toBeNull();
-    expect(matchIntent("¿cómo alcanzo mi libertad financiera más rápido?")).toBeNull();
     expect(matchIntent("¿me conviene pagar la deuda o invertir?")).toBeNull();
+  });
+
+  it("plan de independencia → intent determinista (no cae al LLM); 'libertad financiera' = vida actual", () => {
+    expect(matchIntent("¿cómo llego a mi independencia?")?.intent).toBe("plan_independencia");
+    expect(matchIntent("cuánto debo invertir al mes para llegar a mi independencia")?.intent).toBe("plan_independencia");
+    expect(matchIntent("¿cómo alcanzo mi libertad financiera más rápido?")?.intent).toBe("plan_independencia");
+    // "cuál es mi número de libertad" sigue siendo la CONSULTA de dato (no el plan).
+    expect(matchIntent("¿Cuál es mi número de libertad?")?.intent).toBe("numero_libertad");
   });
 });
 
@@ -135,11 +142,36 @@ describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () =>
     ).toBeNull();
   });
 
-  it("sin libertyNumber → pide definir el estilo de vida, sin inventar la cifra", () => {
+  it("sin libertyNumber pero CON independencia → devuelve el de INDEPENDENCIA + oferta de definir Libertad", () => {
     const bare = { ...tc, libertyNumber: undefined };
     const r = answerFromContext("numero_libertad", {}, bare);
-    expect(r?.reply).toMatch(/estilo de vida/i);
-    expect(r?.reply).not.toContain("500.000"); // no reutiliza otra cifra
+    // Usa el número de INDEPENDENCIA real (350.000), NUNCA responde solo "no lo tengo".
+    expect(r?.reply).toContain("350.000");
+    expect(r?.reply).toMatch(/INDEPENDENCIA/i);
+    expect(r?.reply).toMatch(/definimos tu Número de Libertad|objetivo mayor/i); // oferta en 1 línea
+    expect(r?.reply).not.toMatch(/no lo (tengo|invento)\b/i);
+  });
+
+  it("sin libertyNumber NI independencia → estado honesto (no inventa)", () => {
+    const bare = { ...tc, libertyNumber: undefined, independenceNumber: undefined };
+    const r = answerFromContext("numero_libertad", {}, bare);
+    expect(r?.reply).toMatch(/no invento|no los invento|registrá tu compromiso/i);
+  });
+
+  it("plan_independencia proyecta hacia el número de INDEPENDENCIA sin pedir vida deseada", () => {
+    const ctxPlan = { ...CTX, freeCashflow: 1_000, compromisoMensual: 2_333 } as FinancialContext;
+    const r = answerFromContext("plan_independencia", {}, { ...tc, independenceNumber: 350_000, investableWealth: 120_000 }, ctxPlan);
+    expect(r?.reply).toContain("350.000"); // el número de independencia como meta
+    expect(r?.reply).toMatch(/patrimonio invertible/i);
+    expect(r?.reply).toMatch(/al 8%/);
+    expect(r?.reply).toMatch(/~\d/); // años estimados
+    expect(r?.reply).not.toMatch(/estilo de vida deseado|definí.*deseado/i); // NO pide vida deseada
+  });
+
+  it("plan_independencia sin aporte conocido → da el número y pide el aporte (no se traba)", () => {
+    const r = answerFromContext("plan_independencia", {}, { ...tc, independenceNumber: 350_000 }, CTX);
+    expect(r?.reply).toContain("350.000");
+    expect(r?.reply).toMatch(/cuánto podés aportar/i);
   });
 });
 

@@ -181,10 +181,19 @@ describe("tools · projectInvestment (interés compuesto, puro)", () => {
 describe("tools · projectFreedom (datos reales, reusa projectInvestment)", () => {
   const CTX = { libertyNumber: 50_000_000, investableWealth: 5_000_000, currency: "CRC" };
 
-  it("sin Número de Libertad → disponible:false con motivo", () => {
+  it("sin Número de Libertad NI de Independencia → disponible:false con motivo", () => {
     const r = projectFreedom({ aporte_mensual: 100_000, anios: 20 }, { currency: "CRC" });
     expect(r.disponible).toBe(false);
-    if (!r.disponible) expect(r.motivo).toMatch(/Número de Libertad/i);
+    if (!r.disponible) expect(r.motivo).toMatch(/Independencia|Libertad|compromiso mensual/i);
+  });
+
+  it("sin Libertad pero CON Independencia → proyecta hacia INDEPENDENCIA (no pide vida deseada)", () => {
+    const r = projectFreedom(
+      { aporte_mensual: 200_000, anios: 20 },
+      { independenceNumber: 42_000_000, investableWealth: 5_000_000, currency: "CRC" },
+    );
+    expect(r.disponible).toBe(true);
+    if (r.disponible) expect(r.numero_de_libertad).toBe(42_000_000); // meta = independencia (fallback)
   });
 
   it("con aporte + años: alcanza/faltante coherentes y números == projectInvestment directo", () => {
@@ -232,10 +241,19 @@ describe("tools · yearsToFreedom (años al ritmo actual + sensibilidad, puro)",
     return Math.round((m / 12) * 10) / 10;
   };
 
-  it("sin libertyNumber → disponible:false con motivo", () => {
+  it("sin libertyNumber NI independenceNumber → disponible:false con motivo", () => {
     const r = yearsToFreedom({ aporte_mensual: 1_400_000 }, { currency: "CRC" });
     expect(r.disponible).toBe(false);
-    if (!r.disponible) expect(r.motivo).toMatch(/Número de Libertad/i);
+    if (!r.disponible) expect(r.motivo).toMatch(/Independencia|Libertad|compromiso mensual/i);
+  });
+
+  it("sin libertyNumber pero CON independenceNumber → proyecta hacia INDEPENDENCIA", () => {
+    const r = yearsToFreedom(
+      { aporte_mensual: 1_000_000 },
+      { independenceNumber: 200_000_000, investableWealth: 20_000_000, currency: "CRC" },
+    );
+    expect(r.disponible).toBe(true);
+    if (r.disponible) expect(r.numero_de_libertad).toBe(200_000_000);
   });
 
   it("años y sensibilidad coinciden con el interés compuesto a mano (5% real por defecto)", () => {
