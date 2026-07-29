@@ -31,6 +31,11 @@ export type PatrimonioInput = {
   freedomMultiplier?: 25 | 30 | 33; // default 25 (legacy; ya no se usa para los números)
   /** Gasto ESENCIAL mensual (N1) → número de seguridad. */
   essentialMonthlyExpenses?: number;
+  /**
+   * Compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas) → número de INDEPENDENCIA.
+   * Es el "estilo de vida actual". Si falta/0, se cae a monthlyExpenses (lista base "expenses").
+   */
+  monthlyCommitment?: number;
   /** Estilo de vida DESEADO mensual (dato personal) → número de libertad; null = sin definir. */
   desiredMonthlyLifestyle?: number | null;
   /**
@@ -227,8 +232,15 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
 
   // Los TRES números, fórmula única con TASA_RETIRO (8%). Libertad = null si el
   // usuario no definió su estilo de vida deseado (nunca se inventa un múltiplo).
+  // Base de INDEPENDENCIA = compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas), el
+  // "estilo de vida actual" del usuario. Antes usaba monthlyExpenses (lista base "expenses"), que
+  // NO incluye sobres/metas/DCA → daba 0 para quien tiene todo eso. Fallback a monthlyExpenses.
+  const independenceBase =
+    input.monthlyCommitment != null && input.monthlyCommitment > 0
+      ? input.monthlyCommitment
+      : input.monthlyExpenses;
   const numeroDeSeguridad = numeroPatrimonial(input.essentialMonthlyExpenses ?? 0);
-  const numeroDeIndependencia = numeroPatrimonial(input.monthlyExpenses);
+  const numeroDeIndependencia = numeroPatrimonial(independenceBase);
   const numeroDeLibertad =
     input.desiredMonthlyLifestyle != null && input.desiredMonthlyLifestyle > 0
       ? numeroPatrimonial(input.desiredMonthlyLifestyle)
@@ -375,8 +387,11 @@ export function millonarioReadings(input: PatrimonioInput): MillonarioReadings {
   // Mismo capital-que-trabaja que el motor (con el descuento del colchón de defensa).
   const liquidoInvertible = Math.max(0, a.liquido - (input.defenseFundsBalance ?? 0));
   const investableWealth = Math.max(0, a.inversion + a.productivo + liquidoInvertible);
-  // "Libertad millonario" = independencia al 8% (sostener la vida actual).
-  const numeroIndependencia = numeroPatrimonial(input.monthlyExpenses);
+  // "Libertad millonario" = independencia al 8% (sostener la vida actual). Misma base que el número
+  // de independencia del reporte: compromiso total (fallback a monthlyExpenses).
+  const independenceBase =
+    input.monthlyCommitment != null && input.monthlyCommitment > 0 ? input.monthlyCommitment : input.monthlyExpenses;
+  const numeroIndependencia = numeroPatrimonial(independenceBase);
   return {
     nominal: netWorth > 1_000_000,
     netWorth: netWorth >= 1_000_000,
