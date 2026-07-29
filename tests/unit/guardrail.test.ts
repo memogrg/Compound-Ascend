@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyGuardrail } from "@/lib/ai/guardrail";
+import { applyGuardrail, NOTE_RETURNS, NOTE_RISK_BASE } from "@/lib/ai/guardrail";
 
 describe("applyGuardrail · R1 rendimientos garantizados", () => {
   it("'te garantizo un 12% sin riesgo' → nota + flag promised_returns", () => {
@@ -83,5 +83,30 @@ describe("applyGuardrail · sin falsos positivos e idempotencia", () => {
     const twice = applyGuardrail(once.reply);
     const count = (twice.reply.match(/ninguna inversión garantiza rendimientos/g) ?? []).length;
     expect(count).toBe(1);
+  });
+});
+
+describe("applyGuardrail · el disclaimer va UNA vez por conversación (no en cada turno)", () => {
+  const REPLY = "Te garantizo un 12% sin riesgo.";
+
+  it("si la nota YA se dijo en un turno previo → NO se re-anexa (pero la flag sí marca)", () => {
+    const priorReply = `Cualquier cosa.\n\n${NOTE_RETURNS}`; // el asistente ya la dijo antes
+    const r = applyGuardrail(REPLY, {}, [priorReply]);
+    expect(r.flags).toContain("promised_returns"); // la regla aplicó (observabilidad)
+    expect(r.reply).not.toContain(NOTE_RETURNS); // pero NO repite el disclaimer
+    expect(r.reply).toBe(REPLY);
+  });
+
+  it("primer turno (sin previos) → sí anexa la nota", () => {
+    const r = applyGuardrail(REPLY, {}, []);
+    expect(r.reply).toContain(NOTE_RETURNS);
+  });
+
+  it("nota del fondo de emergencia tampoco se repite si ya se dio antes", () => {
+    const invertir = "Te recomiendo invertir en un ETF para que crezca tu dinero.";
+    const prior = `Antes dije: ${NOTE_RISK_BASE}`;
+    const r = applyGuardrail(invertir, { hasEmergencyFund: "no" }, [prior]);
+    expect(r.flags).toContain("risk_without_base");
+    expect(r.reply).not.toContain(NOTE_RISK_BASE);
   });
 });

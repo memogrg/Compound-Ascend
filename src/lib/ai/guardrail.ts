@@ -48,16 +48,25 @@ const RECOMMEND = /recomiend|deber[ií]as|convien|sugier|te conviene|empez/;
 /**
  * Revisa `reply` y, según ctx, anexa correcciones de seguridad. Devuelve el texto
  * (posiblemente con notas) y las flags de las reglas que dispararon.
+ *
+ * `priorReplies` = respuestas ANTERIORES del asistente en la conversación. Una nota (disclaimer)
+ * ya dicha en un turno previo NO se re-anexa: el encuadre va UNA vez, no en cada mensaje. La flag
+ * sí se marca (la regla aplicó) para observabilidad; solo se omite el texto repetido.
  */
-export function applyGuardrail(reply: string, ctx: GuardrailContext = {}): GuardrailResult {
+export function applyGuardrail(
+  reply: string,
+  ctx: GuardrailContext = {},
+  priorReplies: string[] = [],
+): GuardrailResult {
   const t = normalize(reply);
   const flags: string[] = [];
   let out = reply;
 
-  /** Marca la flag y anexa la nota una sola vez (idempotente). */
+  /** Marca la flag y anexa la nota una sola vez (idempotente en el turno Y en la conversación). */
   const fire = (note: string, flag: string): void => {
     flags.push(flag);
-    if (!out.includes(note)) out = `${out.trimEnd()}\n\n${note}`;
+    const yaDichaAntes = priorReplies.some((r) => r.includes(note));
+    if (!out.includes(note) && !yaDichaAntes) out = `${out.trimEnd()}\n\n${note}`;
   };
 
   // R1 — rendimientos garantizados.
