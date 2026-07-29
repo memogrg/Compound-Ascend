@@ -4,6 +4,7 @@ import {
   patrimonioLevel,
   millonarioReadings,
   buildPatrimonioDiagnosis,
+  numeroPatrimonial,
   type PatrimonioInput,
 } from "@/modules/wealth/engine/patrimonio-engine";
 
@@ -26,6 +27,31 @@ const inp = (o: Partial<PatrimonioInput>): PatrimonioInput => ({
 
 const codes = (r: ReturnType<typeof computePatrimonio>) =>
   buildPatrimonioDiagnosis(r).map((f) => f.code);
+
+describe("computePatrimonio · base de la Independencia = compromiso mensual total", () => {
+  it("con monthlyCommitment, la Independencia sale de ESE total (no de monthlyExpenses)", () => {
+    // Usuario con sobres+metas+DCA (compromiso 3.000) pero lista base "expenses" vacía (0).
+    const r = computePatrimonio(inp({ monthlyExpenses: 0, monthlyCommitment: 3_000, essentialMonthlyExpenses: 1_000 }));
+    expect(r.numeroDeIndependencia).toBe(numeroPatrimonial(3_000)); // 3.000×12÷0,08
+    expect(r.numeroDeIndependencia).toBeGreaterThan(0); // ya NO da 0
+    // Seguridad sigue siendo SOLO el esencial (1.000), distinto de la Independencia.
+    expect(r.numeroDeSeguridad).toBe(numeroPatrimonial(1_000));
+    expect(r.numeroDeSeguridad).toBeLessThan(r.numeroDeIndependencia);
+  });
+
+  it("sin monthlyCommitment (o 0) → cae a monthlyExpenses (compat)", () => {
+    const r = computePatrimonio(inp({ monthlyExpenses: 2_000 }));
+    expect(r.numeroDeIndependencia).toBe(numeroPatrimonial(2_000));
+    const r0 = computePatrimonio(inp({ monthlyExpenses: 2_000, monthlyCommitment: 0 }));
+    expect(r0.numeroDeIndependencia).toBe(numeroPatrimonial(2_000));
+  });
+
+  it("Libertad sigue con el estilo de vida DESEADO, mayor que la Independencia", () => {
+    const r = computePatrimonio(inp({ monthlyCommitment: 3_000, desiredMonthlyLifestyle: 5_000 }));
+    expect(r.numeroDeLibertad).toBe(numeroPatrimonial(5_000));
+    expect(r.numeroDeLibertad!).toBeGreaterThan(r.numeroDeIndependencia);
+  });
+});
 
 describe("computePatrimonio · totales y ajustado", () => {
   it("totalAssets, netWorth y adjustedNetWorth", () => {

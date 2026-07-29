@@ -59,6 +59,9 @@ export type FinancialContext = {
   nivelPatrimonial?: string; // level.name
   numeroDeSeguridad?: number; // capital para los gastos ESENCIALES (al 8%)
   numeroDeIndependencia?: number; // capital para sostener la vida ACTUAL / gasto TOTAL (al 8%)
+  /** Compromiso mensual TOTAL (base de la Independencia): sobres + metas + DCA + deudas + primas. */
+  compromisoMensual?: number;
+  compromisoDesglose?: { sobres: number; metas: number; dca: number; deudas: number; seguros: number };
   numeroDeLibertad?: number; // capital para el estilo de vida DESEADO (al 8%); ausente si no lo definió
   añosDeLibertad?: number; // años que cubre el patrimonio invertible
   mesesDeColchon?: number; // liquidez / gasto mensual (meses de colchón, no libertad)
@@ -249,6 +252,16 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(
       `Número de Independencia: ${ctx.numeroDeIndependencia} ${ctx.currency} (capital que, al 8% anual, cubre tu gasto TOTAL actual).`,
     );
+  if (ctx.compromisoMensual !== undefined) {
+    const d = ctx.compromisoDesglose;
+    const partes = d
+      ? ` (sobres ${d.sobres} + metas ${d.metas} + DCA ${d.dca} + deudas ${d.deudas} + seguros ${d.seguros})`
+      : "";
+    facts.push(
+      `Compromiso mensual TOTAL (base de la Independencia, "tu estilo de vida actual"): ${ctx.compromisoMensual} ${ctx.currency}${partes}. ` +
+        `Esto YA incluye el presupuesto de sobres, los aportes a metas y el DCA de inversiones: NO le pidas al usuario "registrar su gasto mensual" ni digas que no tenés su gasto — usá esta cifra. El Número de Independencia sale de acá (× 12 ÷ 0,08).`,
+    );
+  }
   if (ctx.numeroDeLibertad !== undefined)
     facts.push(
       `Número de Libertad: ${ctx.numeroDeLibertad} ${ctx.currency} (capital que, al 8% anual, sostiene el estilo de vida que DESEÁS).`,

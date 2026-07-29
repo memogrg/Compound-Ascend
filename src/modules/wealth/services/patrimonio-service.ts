@@ -15,6 +15,7 @@ import { monthlyize, getPrimaryCurrency, type Frequency } from "@/modules/financ
 import { aggregateNetWorth } from "@/modules/rich-life";
 import { sumAssetsByClass, isBadDebt } from "@/modules/wealth/engine/patrimonio-mappers";
 import type { EssentialBreakdown } from "@/modules/wealth/engine/essential-expense";
+import type { CommitmentBreakdown } from "@/modules/wealth/engine/total-commitment";
 import {
   computePatrimonio,
   patrimonioLevel,
@@ -38,6 +39,12 @@ export type PatrimonioServiceResult = {
    * hay sesión (ruta service-role): la UI degrada sin romperse.
    */
   essentialBreakdown: EssentialBreakdown | null;
+  /**
+   * Desglose del COMPROMISO mensual total (sobres + metas + DCA + deudas + primas), base del número
+   * de INDEPENDENCIA. Lo consume el contexto del asesor para reportar el número real (no "0"). null
+   * si la lectura falla o no hay sesión.
+   */
+  commitmentBreakdown: CommitmentBreakdown | null;
   currency: string;
 };
 
@@ -142,6 +149,19 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   }
   const essentialMonthlyExpenses = essentialBreakdown?.total ?? 0;
 
+  // Compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas) → número de INDEPENDENCIA.
+  // Base del "estilo de vida actual"; reemplaza a monthlyExpenses (lista base) que no incluye
+  // sobres/metas/DCA. Best-effort: sin sesión (service-role) degrada a null → cae a monthlyExpenses.
+  let commitmentBreakdown: CommitmentBreakdown | null = null;
+  try {
+    const { getTotalMonthlyCommitment } = await import(
+      "@/modules/wealth/services/total-commitment-service"
+    );
+    commitmentBreakdown = await getTotalMonthlyCommitment({ currency });
+  } catch {
+    commitmentBreakdown = null;
+  }
+
   // Estilo de vida DESEADO (dato PERSONAL en personal_profiles.extra) → número de
   // libertad. null si no lo definió (nunca se inventa). Se guarda con su propia moneda; se
   // CONVIERTE a la de cálculo, igual que deudas y metas arriba. Los valores viejos (número
@@ -158,6 +178,8 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     protectedCoverage: agg.protection.totalCoverage,
     protectionScore: agg.protection.score,
     monthlyExpenses: agg.monthlyExpenses,
+    // Independencia usa el compromiso total; si no se pudo leer, cae a monthlyExpenses en el motor.
+    monthlyCommitment: commitmentBreakdown?.total ?? undefined,
     passiveIncomeMonthly: agg.passiveIncomeMonthly,
     netMonthlyIncome: agg.netMonthlyIncome,
     monthlyInvested,
@@ -179,6 +201,7 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     readings: millonarioReadings(input),
     diagnosis: buildPatrimonioDiagnosis(report),
     essentialBreakdown,
+    commitmentBreakdown,
     currency,
   };
 }

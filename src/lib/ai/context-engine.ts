@@ -262,6 +262,19 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // presente) y Libertad (deseado, nullable — se maneja abajo). No se mezclan.
     ctx.numeroDeSeguridad = Math.round(p.report.numeroDeSeguridad);
     ctx.numeroDeIndependencia = Math.round(p.report.numeroDeIndependencia);
+    // Compromiso mensual TOTAL (base de la Independencia) + desglose: para que el asesor reporte el
+    // número REAL y sepa que ya incluye sobres+metas+DCA (no pedir "registrá tu gasto" si ya está).
+    if (p.commitmentBreakdown && p.commitmentBreakdown.total > 0) {
+      const b = p.commitmentBreakdown;
+      ctx.compromisoMensual = Math.round(b.total);
+      ctx.compromisoDesglose = {
+        sobres: Math.round(b.byOrigin.sobres),
+        metas: Math.round(b.byOrigin.goals),
+        dca: Math.round(b.byOrigin.dca),
+        deudas: Math.round(b.byOrigin.debts),
+        seguros: Math.round(b.byOrigin.policies),
+      };
+    }
     // "Número de libertad" (estilo deseado): solo si el usuario lo definió; si es
     // null se OMITE (nada de fallback silencioso).
     if (p.report.numeroDeLibertad != null) {

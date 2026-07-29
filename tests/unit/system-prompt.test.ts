@@ -539,6 +539,26 @@ describe("buildSystemPrompt · persona de asesor de inversión experto con baran
   });
 });
 
+describe("buildSystemPrompt · compromiso mensual (base de la Independencia)", () => {
+  it("con compromisoMensual → lo reporta con desglose y prohíbe pedir 'registrar el gasto'", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      numeroDeIndependencia: 450_000,
+      compromisoMensual: 3_000,
+      compromisoDesglose: { sobres: 1_500, metas: 800, dca: 400, deudas: 200, seguros: 100 },
+    });
+    expect(prompt).toMatch(/Compromiso mensual TOTAL/i);
+    expect(prompt).toMatch(/sobres 1500/); // desglose
+    expect(prompt).toMatch(/DCA 400/);
+    expect(prompt).toMatch(/NO le pidas.*registrar su gasto|NO.*registrar/i);
+  });
+
+  it("sin compromisoMensual → no aparece la línea (no inventa)", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).not.toMatch(/Compromiso mensual TOTAL/i);
+  });
+});
+
 describe("buildSystemPrompt · encuadre/disclaimer UNA vez (firstTurn)", () => {
   it("primer turno → invita a dar el encuadre una vez", () => {
     const prompt = buildSystemPrompt({ currency: "CRC", firstTurn: true });
