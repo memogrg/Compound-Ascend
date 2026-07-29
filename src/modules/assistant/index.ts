@@ -1,5 +1,5 @@
 /** Barrel público del módulo Asistente IA. */
-export { confirmTransactionAction } from "./api/actions";
+export { confirmTransactionAction, confirmPriceAlertAction } from "./api/actions";
 export type { ConfirmResult } from "./api/actions";
-export { transactionInputSchema } from "./schemas";
-export type { TransactionInput } from "./schemas";
+export { transactionInputSchema, priceAlertInputSchema } from "./schemas";
+export type { TransactionInput, PriceAlertInput } from "./schemas";

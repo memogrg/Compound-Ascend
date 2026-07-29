@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
-import { confirmTransactionAction, confirmGoalAction } from "@/modules/assistant/api/actions";
+import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction } from "@/modules/assistant/api/actions";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { AIActionProposal } from "@/lib/ai/types";
@@ -364,6 +364,27 @@ function ActionCard({ action }: { action: AIActionProposal }) {
       <div style={{ padding: "4px 0 0 36px" }}>
         {done ? null : (
           <GoalConfirmCard
+            draft={draft}
+            onCancel={() => setDone(true)}
+            onConfirmed={() => setDone(true)}
+          />
+        )}
+      </div>
+    );
+  }
+  if (action.type === "create_price_alert") {
+    const p = action.payload as Record<string, unknown>;
+    const at = p.assetType === "etf" || p.assetType === "accion" ? p.assetType : "cripto";
+    const draft: DraftAlert = {
+      symbol: String(p.symbol ?? "").toUpperCase(),
+      targetPrice: Number(p.targetPrice ?? 0),
+      assetType: at,
+      currency: String(p.currency ?? (at === "cripto" ? "USD" : captureCurrency)),
+    };
+    return (
+      <div style={{ padding: "4px 0 0 36px" }}>
+        {done ? null : (
+          <PriceAlertConfirmCard
             draft={draft}
             onCancel={() => setDone(true)}
             onConfirmed={() => setDone(true)}
@@ -740,6 +761,98 @@ function GoalConfirmCard({
           ? ` · ${formatMoney(draft.monthlyContribution, draft.currency)}/mes`
           : ""}
         {draft.targetDate ? ` · para ${draft.targetDate}` : ""}
+      </div>
+      {error ? (
+        <div className="auth-err" style={{ marginTop: 6 }}>
+          {error}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button
+          className="btn btn-secondary"
+          style={{ flex: 1, justifyContent: "center" }}
+          onClick={onCancel}
+          disabled={pending}
+        >
+          Cancelar
+        </button>
+        <button
+          className="btn btn-primary"
+          style={{ flex: 1, justifyContent: "center" }}
+          onClick={confirm}
+          disabled={pending}
+        >
+          {pending ? "Creando…" : "Confirmar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Confirmación de alerta de precio propuesta por la IA (create_price_alert)
+// ----------------------------------------------------------------------------
+type DraftAlert = {
+  symbol: string;
+  targetPrice: number;
+  assetType: "etf" | "accion" | "cripto";
+  currency: string;
+};
+
+function PriceAlertConfirmCard({
+  draft,
+  onCancel,
+  onConfirmed,
+}: {
+  draft: DraftAlert;
+  onCancel: () => void;
+  onConfirmed: () => void;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
+
+  const confirm = async () => {
+    setPending(true);
+    setError(null);
+    const res = await confirmPriceAlertAction({
+      symbol: draft.symbol,
+      targetPrice: draft.targetPrice,
+      assetType: draft.assetType,
+      currency: draft.currency,
+    });
+    setPending(false);
+    if (res.ok) {
+      setOk(true);
+      timerRef.current = setTimeout(onConfirmed, 1200);
+    } else {
+      setError(res.message ?? "No se pudo crear la alerta.");
+    }
+  };
+
+  if (ok) {
+    return (
+      <div className="coach-bubble" style={{ borderLeft: "2px solid var(--pos)" }}>
+        ✓ Alerta creada.
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <div className="eyebrow">Crear alerta de precio</div>
+      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 6 }}>{draft.symbol}</div>
+      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+        Te avisamos cuando llegue a {formatMoney(draft.targetPrice, draft.currency)} (la dirección se
+        calcula con el precio actual).
       </div>
       {error ? (
         <div className="auth-err" style={{ marginTop: 6 }}>

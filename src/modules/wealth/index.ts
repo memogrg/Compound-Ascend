@@ -26,6 +26,7 @@ export { addPolicyAction, setPeaceMonthsAction } from "./api/actions";
 export { DefenseFunds } from "./components/defense-funds";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getPositionForSymbol } from "./services/holdings-service";
+export { createInvestmentAlert, type CreateAlertInput } from "./services/price-alerts-service";
 export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
 export type { PatrimonioReport, PatrimonioLevel, Hito } from "./engine/patrimonio-engine";

@@ -371,6 +371,33 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
   });
 });
 
+describe("carril de ACCIÓN · el router PROPONE crear (0 tokens de LLM), no dice 'no puedo'", () => {
+  it('"generame una alerta en JUP a $1" → propone create_price_alert, lane template, 0 tokens', async () => {
+    const routed = await tryRouteQuery(ask("generame una alerta en JUP a $1"), CTX, tc);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.tokensIn).toBe(0);
+    expect(routed?.tokensOut).toBe(0);
+    expect(routed?.response.action?.type).toBe("create_price_alert");
+    expect(routed?.response.action?.payload).toMatchObject({ symbol: "JUP", targetPrice: 1 });
+    expect(liteChat).not.toHaveBeenCalled(); // NO pasó por el clasificador/LLM
+    expect(routed?.response.reply).not.toMatch(/no (puedo|tengo)/i);
+  });
+
+  it('"creá una meta de ahorro de 500000 para viaje" → propone create_goal', async () => {
+    const routed = await tryRouteQuery(ask("creá una meta de ahorro de 500000 para viaje"), CTX, tc);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.response.action?.type).toBe("create_goal");
+    expect(liteChat).not.toHaveBeenCalled();
+  });
+
+  it('"registrá un gasto de 5000 en super" → propone create_transaction', async () => {
+    const routed = await tryRouteQuery(ask("registrá un gasto de 5000 en super"), CTX, tc);
+    expect(routed?.response.action?.type).toBe("create_transaction");
+    expect(routed?.response.action?.payload).toMatchObject({ kind: "gasto", amount: 5000 });
+    expect(liteChat).not.toHaveBeenCalled();
+  });
+});
+
 describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM)", () => {
   const ctxWithKmno = {
     ...CTX,

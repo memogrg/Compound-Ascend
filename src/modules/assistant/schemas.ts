@@ -27,6 +27,19 @@ export const transactionInputSchema = z
 
 export type TransactionInput = z.infer<typeof transactionInputSchema>;
 
+/**
+ * Alerta de PRECIO propuesta por el asistente (símbolo + objetivo). La DIRECCIÓN no viaja: la
+ * infiere el servidor con el precio actual (createInvestmentAlert). assetType gatea "cotizable".
+ */
+export const priceAlertInputSchema = z.object({
+  symbol: z.string().trim().min(1, "Falta el símbolo").max(12),
+  targetPrice: z.number({ error: "Precio inválido" }).positive("El precio objetivo debe ser mayor a 0"),
+  assetType: z.enum(["etf", "accion", "cripto"]),
+  currency: z.string().length(3),
+});
+
+export type PriceAlertInput = z.infer<typeof priceAlertInputSchema>;
+
 export const chatRequestSchema = z.object({
   message: z.string().trim().min(1).max(2000),
   history: z
