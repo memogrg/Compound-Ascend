@@ -8,9 +8,10 @@
  * Solo presentación + filtrado en cliente. Todas las mutaciones reutilizan las
  * MISMAS server actions de V2 (editar/duplicar/eliminar/marcar revisada).
  */
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Icon } from "@/components/ui/icon";
+import Link from "next/link";
+import { Icon, type IconName } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { QuickAddModal } from "@/modules/financial-base/components/v2/quick-add-modal";
@@ -19,11 +20,78 @@ import {
   duplicateTransactionAction,
   markReviewedAction,
 } from "@/modules/financial-base/api/v2-actions";
+import {
+  describeMoneyFlow,
+  FLOW_VERB_LABEL,
+  LIQUIDITY_LABEL,
+  type MoneyFlow,
+  type MoneyFlowEffect,
+} from "@/modules/financial-base/engine/money-flow";
 import { TRANSACTIONS_LIST_CAP } from "@/modules/financial-base/constants";
 import type { Account, Transaction } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
 
 type Filter = { id: string; label: string };
+
+/** Glifo de origen por vínculo; los sueltos usan su glifo por tipo. */
+const ORIGIN_ICON: Record<string, IconName> = {
+  debt: "debt",
+  goal: "savings",
+  holding: "invest",
+  policy: "defense",
+  rental: "portfolio",
+};
+/** Pantalla de origen de una transacción vinculada (para "Ver en X"). */
+const ORIGIN_LINK: Record<string, { href: string; label: string }> = {
+  debt: { href: "/deudas", label: "Deudas" },
+  goal: { href: "/control-financiero", label: "Ahorro" },
+  holding: { href: "/patrimonio", label: "Patrimonio" },
+  policy: { href: "/patrimonio/proteccion", label: "Protección" },
+  rental: { href: "/patrimonio", label: "Patrimonio" },
+};
+
+function originIcon(t: Transaction): IconName {
+  if (t.linkedKind && t.linkedKind !== "none") return ORIGIN_ICON[t.linkedKind] ?? "txn";
+  if (t.kind === "ingreso") return "income";
+  if (t.kind === "gasto") return "expense";
+  return "txn";
+}
+
+/** Color del efecto en liquidez: sale rojo, entra verde, neutro gris. */
+function effectColor(effect: MoneyFlowEffect): string {
+  return effect === "out" ? "var(--neg)" : effect === "in" ? "var(--pos)" : "var(--ink-2)";
+}
+
+function fullDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Línea de viaje "origen → destino": colorea "Tu liquidez" según el efecto. */
+function TravelLine({ flow }: { flow: MoneyFlow }) {
+  if (flow.isJarSpend) {
+    return (
+      <span style={{ color: "var(--ink-2)" }}>Sale del frasco · no toca tu liquidez</span>
+    );
+  }
+  const color = effectColor(flow.effect);
+  const token = (label: string) =>
+    label === LIQUIDITY_LABEL ? (
+      <strong style={{ color, fontWeight: 600 }}>{label}</strong>
+    ) : (
+      <span>{label}</span>
+    );
+  return (
+    <span>
+      {token(flow.fromLabel)}
+      <span style={{ color: "var(--muted)" }}> → </span>
+      {token(flow.toLabel)}
+    </span>
+  );
+}
 
 function relativeDate(iso: string): string {
   const today = new Date();
@@ -46,6 +114,7 @@ export function TransactionsBrowser({
   accounts,
   currency,
   period,
+  balanceAfter,
 }: {
   transactions: Transaction[];
   categoryNames: Record<string, string>;
@@ -53,6 +122,8 @@ export function TransactionsBrowser({
   accounts: Account[];
   currency: string;
   period: string;
+  /** Saldo de liquidez tras cada txn que movió el saco (por id). Fase B. */
+  balanceAfter?: Record<string, number>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -214,6 +285,7 @@ export function TransactionsBrowser({
                     : "Sin categoría"
               }
               currency={currency}
+              balanceAfter={balanceAfter?.[t.id]}
               onEdit={() => setEditing(t)}
               onDelete={() => requestDelete(t)}
               onDuplicate={() => run(() => duplicateTransactionAction(t.id), "Duplicada")}
@@ -241,6 +313,7 @@ function Row({
   t,
   categoryName,
   currency,
+  balanceAfter,
   onEdit,
   onDelete,
   onDuplicate,
@@ -249,101 +322,226 @@ function Row({
   t: Transaction;
   categoryName: string;
   currency: string;
+  balanceAfter?: number;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onMarkReviewed: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const isIncome = t.kind === "ingreso";
-  const amountStr = `${isIncome ? "+" : "−"}${formatMoney(t.amount, t.currency || currency)}`;
+  // El viaje del dinero (Fase B): efecto en liquidez, origen y destino. Puro.
+  const flow = describeMoneyFlow(t);
+  const amtColor = effectColor(flow.effect);
+  const sign = flow.effect === "in" ? "+" : flow.effect === "out" ? "−" : "";
+  const amountStr = `${sign}${formatMoney(t.amount, t.currency || currency)}`;
+  const linked = t.linkedKind && t.linkedKind !== "none" ? t.linkedKind : null;
+  const origin = linked ? ORIGIN_LINK[linked] : undefined;
   const iconStyle = isIncome
     ? { width: 34, height: 34, background: "var(--pos-soft)", color: "var(--pos)" }
     : { width: 34, height: 34 };
 
   return (
-    <div className="list-row" style={{ gridTemplateColumns: "34px 1fr auto auto auto" }}>
-      <div className="env-ic" style={iconStyle}>
-        <Icon name={isIncome ? "income" : "expense"} width={2} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div
-          className="env-name"
-          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-        >
-          {t.merchantOrSource || t.description || (isIncome ? "Ingreso" : "Gasto")}
+    <div>
+      <div
+        className="list-row"
+        style={{ gridTemplateColumns: "34px 1fr auto auto auto", cursor: "pointer" }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={() => setExpanded((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
+      >
+        <div className="env-ic" style={iconStyle}>
+          <Icon name={originIcon(t)} width={2} />
         </div>
-        <div className="env-sub">
-          {categoryName}
-          {t.accountLabel ? ` · ${t.accountLabel}` : ""}
-        </div>
-      </div>
-      <span className="inc-tag" style={{ marginRight: 8 }}>
-        {isIncome ? "Ingreso" : categoryName}
-      </span>
-      <div className="env-num">
-        <div className="big" style={{ color: isIncome ? "var(--pos)" : undefined }}>
-          {amountStr}
-        </div>
-        <div className="small">{relativeDate(t.occurredOn)}</div>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}>
-        {t.status === "pending_review" ? (
-          <span
-            className="chip"
-            style={{ background: "var(--warn-soft)", color: "var(--warn)", fontSize: 11 }}
+        <div style={{ minWidth: 0 }}>
+          <div
+            className="env-name"
+            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
           >
-            Pendiente
-          </span>
-        ) : null}
-        <button
-          className="icon-btn"
-          style={{ width: 30, height: 30 }}
-          aria-label="Acciones"
-          onClick={() => setOpen((o) => !o)}
+            {t.merchantOrSource || t.description || (isIncome ? "Ingreso" : "Gasto")}
+          </div>
+          <div
+            className="env-sub"
+            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            <TravelLine flow={flow} />
+          </div>
+        </div>
+        <span className="inc-tag" style={{ marginRight: 8 }}>
+          {isIncome ? "Ingreso" : categoryName}
+        </span>
+        <div className="env-num">
+          <div className="big" style={{ color: amtColor }}>
+            {amountStr}
+          </div>
+          <div className="small">{relativeDate(t.occurredOn)}</div>
+        </div>
+        {/* Acciones: no deben disparar el expand de la fila. */}
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <Icon name="dots" />
-        </button>
-        {open ? (
-          <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
-            <button
-              onClick={() => {
-                setOpen(false);
-                onEdit();
-              }}
+          {t.status === "pending_review" ? (
+            <span
+              className="chip"
+              style={{ background: "var(--warn-soft)", color: "var(--warn)", fontSize: 11 }}
             >
-              Editar
-            </button>
-            <button
-              onClick={() => {
-                setOpen(false);
-                onDuplicate();
-              }}
-            >
-              Duplicar
-            </button>
-            {t.status === "pending_review" ? (
+              Pendiente
+            </span>
+          ) : null}
+          <button
+            className="icon-btn"
+            style={{ width: 30, height: 30 }}
+            aria-label="Acciones"
+            onClick={() => setOpen((o) => !o)}
+          >
+            <Icon name="dots" />
+          </button>
+          {open ? (
+            <div className="txn-menu" onMouseLeave={() => setOpen(false)}>
               <button
                 onClick={() => {
                   setOpen(false);
-                  onMarkReviewed();
+                  onEdit();
                 }}
               >
-                Marcar revisada
+                Editar
               </button>
-            ) : null}
-            <button
-              className="danger"
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-            >
-              Eliminar
-            </button>
-          </div>
-        ) : null}
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onDuplicate();
+                }}
+              >
+                Duplicar
+              </button>
+              {t.status === "pending_review" ? (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onMarkReviewed();
+                  }}
+                >
+                  Marcar revisada
+                </button>
+              ) : null}
+              <button
+                className="danger"
+                onClick={() => {
+                  setOpen(false);
+                  onDelete();
+                }}
+              >
+                Eliminar
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
+      {expanded ? (
+        <MoneyFlowDetail
+          t={t}
+          flow={flow}
+          currency={currency}
+          categoryName={categoryName}
+          balanceAfter={balanceAfter}
+          origin={origin}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Una fila etiqueta/valor del detalle expandido. */
+function DetailField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0" }}>
+      <span style={{ color: "var(--muted)", fontSize: 12 }}>{label}</span>
+      <span style={{ fontSize: 12.5, textAlign: "right", fontWeight: 500 }}>{children}</span>
+    </div>
+  );
+}
+
+/** Detalle del viaje del dinero al expandir una fila (Fase B). */
+function MoneyFlowDetail({
+  t,
+  flow,
+  currency,
+  categoryName,
+  balanceAfter,
+  origin,
+}: {
+  t: Transaction;
+  flow: MoneyFlow;
+  currency: string;
+  categoryName: string;
+  balanceAfter?: number;
+  origin?: { href: string; label: string };
+}) {
+  const amtColor = effectColor(flow.effect);
+  const money = formatMoney(t.amount, t.currency || currency);
+  const efecto =
+    flow.effect === "out"
+      ? `− ${money} · sale de tu liquidez`
+      : flow.effect === "in"
+        ? `+ ${money} · entra a tu liquidez`
+        : "No toca tu liquidez";
+  return (
+    <div
+      style={{
+        padding: "10px 16px 14px 52px",
+        borderTop: "1px solid var(--line)",
+        background: "var(--surface-2, transparent)",
+      }}
+    >
+      <DetailField label="Fecha">{fullDate(t.occurredOn)}</DetailField>
+      {flow.isJarSpend ? (
+        <>
+          <DetailField label="Salió del frasco">
+            <span style={{ color: amtColor }}>{flow.fromLabel}</span>
+          </DetailField>
+          <DetailField label="Pagado con">{categoryName}</DetailField>
+        </>
+      ) : (
+        <>
+          <DetailField label="Salió de">
+            <span style={flow.fromLabel === LIQUIDITY_LABEL ? { color: amtColor } : undefined}>
+              {flow.fromLabel}
+            </span>
+          </DetailField>
+          <DetailField label={FLOW_VERB_LABEL[flow.verb]}>
+            <span style={flow.toLabel === LIQUIDITY_LABEL ? { color: amtColor } : undefined}>
+              {flow.toLabel || "—"}
+            </span>
+          </DetailField>
+        </>
+      )}
+      <DetailField label="Efecto en tu liquidez">
+        <span style={{ color: amtColor }}>{efecto}</span>
+      </DetailField>
+      <DetailField label="Liquidez después">
+        {balanceAfter != null ? formatMoney(balanceAfter, currency) : "No cambia"}
+      </DetailField>
+      {origin ? (
+        <div style={{ marginTop: 10 }}>
+          <Link
+            href={origin.href}
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: "4px 12px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            Ver en {origin.label} →
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
