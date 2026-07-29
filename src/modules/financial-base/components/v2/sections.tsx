@@ -38,7 +38,10 @@ import { getSuggestionsFor } from "@/modules/financial-base/services/ai-categori
 import {
   getLiquidityBalance,
   getLiquidityAfterByTxn,
+  getClosingLiquidity,
 } from "@/modules/financial-base/services/liquidity-service";
+import { buildMonthMarker, type MonthMarker } from "@/modules/financial-base/engine/period";
+import { todayLocalISO } from "@/lib/validation";
 import {
   findUnlinkedCandidates,
   buildEntityAlerts,
@@ -678,10 +681,22 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
   // la lectura, la lista funciona igual (sin readout / sin saldo corrido).
   let liquidity: { balance: number; hasOpening: boolean } | null = null;
   let balanceAfter: Record<string, number> = {};
+  // Fase C: marcador de cierre de mes (DERIVADO, no una transacción — no duplica liquidez).
+  let monthMarker: MonthMarker | null = null;
   try {
-    const [bal, series] = await Promise.all([getLiquidityBalance(), getLiquidityAfterByTxn()]);
+    const [bal, series, closing] = await Promise.all([
+      getLiquidityBalance(),
+      getLiquidityAfterByTxn(),
+      getClosingLiquidity(view.period),
+    ]);
     liquidity = { balance: bal.balance, hasOpening: bal.hasOpening };
     balanceAfter = series.afterByTxn;
+    monthMarker = buildMonthMarker({
+      period: view.period,
+      flow: real.freeCashflowReal, // el "Saldo neto" ya calculado; no se recalcula
+      liquidity: closing.balance,
+      todayIso: todayLocalISO(),
+    });
   } catch {
     liquidity = null;
   }
@@ -773,6 +788,7 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
         currency={currency}
         period={view.period.label}
         balanceAfter={balanceAfter}
+        monthMarker={monthMarker}
       />
 
       {/* Por clasificar: movimientos sin sobre (WhatsApp/ingesta sin regla). */}

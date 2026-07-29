@@ -17,6 +17,7 @@ import {
   computeLiquidityBalance,
   liquidityDelta,
   periodNetChange,
+  sumClosingBalance,
   type LiquidityRow,
 } from "@/modules/financial-base/engine/liquidity";
 import type { TxnKind, Period } from "@/modules/financial-base/types";
@@ -92,6 +93,38 @@ export async function getLiquidityAfterByTxn(
     if (r.transaction_id) afterByTxn[r.transaction_id] = Math.round(running * 100) / 100;
   }
   return { afterByTxn, currency };
+}
+
+/**
+ * Liquidez al CIERRE de un periodo (Trazabilidad Fase C): el saldo hasta
+ * `period.to` (inclusive), normalizado a la moneda de display. La apertura cuenta
+ * SIEMPRE como base; el resto (transaccion/ajuste) sólo si ocurrió en/antes de
+ * `period.to` (la regla vive en `sumClosingBalance`). Por eso se cargan TODAS las
+ * filas (sin filtrar por fecha en la query): la apertura está fechada "hoy" y
+ * quedaría fuera al cerrar un mes pasado. UNA query + una suma. NO escribe nada.
+ * Para el mes en curso, `period.to` (fin de mes) incluye todo hasta hoy → coincide
+ * con getLiquidityBalance; para un mes pasado, da la liquidez a fin de ese mes.
+ */
+export async function getClosingLiquidity(
+  period: { to: string },
+  ctx?: AuthContext,
+): Promise<{ balance: number; currency: string }> {
+  const { db, userId } = await resolveAuth(ctx);
+  const [{ data }, currency, rates] = await Promise.all([
+    db.from("liquidity_ledger").select("delta, currency, reason, occurred_on").eq("user_id", userId),
+    getDisplayCurrency(ctx),
+    getFxRates(),
+  ]);
+  const rows = ((data ?? []) as Pick<
+    LiquidityLedgerRow,
+    "delta" | "currency" | "reason" | "occurred_on"
+  >[]).map((r) => ({
+    delta: r.delta,
+    currency: r.currency,
+    reason: r.reason,
+    occurredOn: r.occurred_on,
+  }));
+  return { balance: sumClosingBalance(rows, period.to, currency, rates), currency };
 }
 
 /** Fija (o reescribe) el saldo inicial. Idempotente: una sola fila 'apertura'. */

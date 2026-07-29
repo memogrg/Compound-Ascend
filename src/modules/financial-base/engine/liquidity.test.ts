@@ -3,6 +3,7 @@ import {
   computeLiquidityBalance,
   liquidityDelta,
   periodNetChange,
+  sumClosingBalance,
   type LiquidityRow,
 } from "@/modules/financial-base/engine/liquidity";
 
@@ -98,5 +99,74 @@ describe("periodNetChange", () => {
 
   it("mes sin movimientos → 0", () => {
     expect(periodNetChange(rows, { year: 2026, month: 8 })).toBe(0);
+  });
+});
+
+describe("sumClosingBalance · liquidez al cierre (base apertura + multi-moneda)", () => {
+  // rates "por USD": convertCurrency(amount, from, to) = amount / rates[from] * rates[to].
+  const rates = { USD: 1, CRC: 520 };
+  const r = (delta: number | string, currency: string, reason: string, occurredOn: string) => ({
+    delta,
+    currency,
+    reason,
+    occurredOn,
+  });
+
+  it("normaliza distinta moneda a la moneda de display (USD)", () => {
+    const rows = [
+      r(100, "USD", "transaccion", "2026-06-10"), // 100 USD
+      r(52000, "CRC", "transaccion", "2026-06-20"), // 52000/520 = 100 USD
+    ];
+    expect(sumClosingBalance(rows, "2026-06-30", "USD", rates)).toBe(200);
+  });
+
+  it("normaliza a la moneda de display (CRC)", () => {
+    const rows = [
+      r(100, "USD", "transaccion", "2026-06-10"), // 100*520 = 52000 CRC
+      r(52000, "CRC", "transaccion", "2026-06-20"), // 52000 CRC
+    ];
+    expect(sumClosingBalance(rows, "2026-06-30", "CRC", rates)).toBe(104000);
+  });
+
+  it("la APERTURA es la base: cuenta aunque su fecha sea POSTERIOR al cierre del periodo", () => {
+    // Apertura fijada HOY (28-jul) pero cerramos JUNIO: la base igual entra; el gasto
+    // de julio queda fuera del cierre de junio.
+    const rows = [
+      r(1000, "USD", "apertura", "2026-07-28"), // fechada después → SIEMPRE base
+      r(-200, "USD", "transaccion", "2026-06-15"), // gasto de junio
+      r(-50, "USD", "transaccion", "2026-07-05"), // gasto de JULIO → fuera de junio
+    ];
+    expect(sumClosingBalance(rows, "2026-06-30", "USD", rates)).toBe(800); // 1000 − 200
+  });
+
+  it("transaccion/ajuste posteriores al cierre se excluyen (sólo la apertura ignora la fecha)", () => {
+    const rows = [
+      r(500, "USD", "transaccion", "2026-06-10"),
+      r(300, "USD", "ajuste", "2026-07-01"), // ajuste de julio → fuera del cierre de junio
+    ];
+    expect(sumClosingBalance(rows, "2026-06-30", "USD", rates)).toBe(500);
+  });
+
+  it("mes en curso (todo ocurrió en/antes del cierre) → suma total (= getLiquidityBalance)", () => {
+    // period.to = fin del mes actual; apertura + todos los movimientos caen dentro.
+    const rows = [
+      r(1000, "USD", "apertura", "2026-07-02"),
+      r(500, "USD", "transaccion", "2026-07-10"),
+      r(-300, "USD", "transaccion", "2026-07-15"),
+    ];
+    expect(sumClosingBalance(rows, "2026-07-31", "USD", rates)).toBe(1200);
+  });
+
+  it("misma moneda → suma directa; acepta delta string; redondea a 2 decimales", () => {
+    const rows = [
+      r("0.1", "USD", "transaccion", "2026-06-01"),
+      r(0.2, "USD", "transaccion", "2026-06-02"),
+      r(-0.3, "USD", "transaccion", "2026-06-03"),
+    ];
+    expect(sumClosingBalance(rows, "2026-06-30", "USD", rates)).toBe(0);
+  });
+
+  it("ledger vacío → 0", () => {
+    expect(sumClosingBalance([], "2026-06-30", "USD", rates)).toBe(0);
   });
 });

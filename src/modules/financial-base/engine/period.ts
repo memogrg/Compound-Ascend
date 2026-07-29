@@ -20,6 +20,21 @@ const MONTHS_SHORT = [
   "dic",
 ];
 
+const MONTHS_LONG = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -89,4 +104,50 @@ export function parseRangeParam(param: string | undefined | null): RangeKey {
 /** Meses hacia atrás (incluyendo el periodo actual) que cubre un rango. */
 export function rangeToMonths(range: RangeKey): number {
   return RANGE_MONTHS[range];
+}
+
+/** ¿El periodo es el mes natural en curso? `todayIso` = "YYYY-MM-DD" local
+ *  (usa todayLocalISO() en el llamador para evitar el desfase UTC). */
+export function isCurrentMonth(
+  period: { year: number; month: number },
+  todayIso: string,
+): boolean {
+  return period.year === Number(todayIso.slice(0, 4)) && period.month === Number(todayIso.slice(5, 7));
+}
+
+/** Modelo del marcador de cierre de mes (Trazabilidad Fase C). */
+export type MonthMarker = {
+  /** true = mes en curso (tono acento); false = mes cerrado (tono neutro). */
+  isCurrent: boolean;
+  /** "Julio en curso" | "Cierre de julio 2026". */
+  title: string;
+  /** Flujo del mes (freeCashflowReal): la superficie lo formatea y colorea por signo. */
+  flow: number;
+  /** Liquidez del periodo (hoy si en curso; al cierre si cerrado). */
+  liquidity: number;
+  /** "liquidez hoy" | "liquidez al cierre". */
+  liquidityLabel: string;
+};
+
+/**
+ * Construye el marcador de cierre de mes (puro). La superficie formatea importes
+ * (moneda), colorea el flujo (verde ≥ 0 / rojo < 0) y elige el tono por `isCurrent`.
+ * Compartido por web y móvil para no duplicar la lógica.
+ */
+export function buildMonthMarker(args: {
+  period: { year: number; month: number };
+  flow: number;
+  liquidity: number;
+  todayIso: string;
+}): MonthMarker {
+  const isCurrent = isCurrentMonth(args.period, args.todayIso);
+  const mes = MONTHS_LONG[args.period.month - 1] ?? "";
+  const mesCap = mes.charAt(0).toUpperCase() + mes.slice(1);
+  return {
+    isCurrent,
+    title: isCurrent ? `${mesCap} en curso` : `Cierre de ${mes} ${args.period.year}`,
+    flow: args.flow,
+    liquidity: args.liquidity,
+    liquidityLabel: isCurrent ? "liquidez hoy" : "liquidez al cierre",
+  };
 }

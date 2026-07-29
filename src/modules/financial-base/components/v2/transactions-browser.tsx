@@ -28,6 +28,7 @@ import {
   type MoneyFlow,
   type MoneyFlowEffect,
 } from "@/modules/financial-base/engine/money-flow";
+import type { MonthMarker } from "@/modules/financial-base/engine/period";
 import { TRANSACTIONS_LIST_CAP } from "@/modules/financial-base/constants";
 import type { Account, Transaction } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
@@ -116,6 +117,7 @@ export function TransactionsBrowser({
   currency,
   period,
   balanceAfter,
+  monthMarker,
 }: {
   transactions: Transaction[];
   categoryNames: Record<string, string>;
@@ -125,6 +127,8 @@ export function TransactionsBrowser({
   period: string;
   /** Saldo de liquidez tras cada txn que movió el saco (por id). Fase B. */
   balanceAfter?: Record<string, number>;
+  /** Marcador de cierre de mes (derivado). Fase C. */
+  monthMarker?: MonthMarker | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -262,6 +266,8 @@ export function TransactionsBrowser({
             </div>
           </div>
         </div>
+        {/* Fase C: marcador de cierre de mes (derivado; bajo el header, sobre la 1ª fila). */}
+        {monthMarker ? <MonthMarkerBand marker={monthMarker} currency={currency} /> : null}
         {visible.length === 0 ? (
           <div
             style={{
@@ -306,6 +312,43 @@ export function TransactionsBrowser({
           onClose={() => setEditing(null)}
         />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Banda de cierre de mes (Trazabilidad Fase C): DERIVADA, no es una transacción.
+ * Ata el flujo del periodo (freeCashflowReal) con la liquidez. En curso → tono
+ * acento + "liquidez hoy"; cerrado → tono neutro + "liquidez al cierre". El flujo
+ * va verde (≥0) o rojo (<0); la liquidez sin color.
+ */
+function MonthMarkerBand({ marker, currency }: { marker: MonthMarker; currency: string }) {
+  const flowColor = marker.flow >= 0 ? "var(--pos)" : "var(--neg)";
+  const flowStr = `${marker.flow >= 0 ? "+" : "−"}${formatMoney(Math.abs(marker.flow), currency)}`;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        padding: "10px 16px",
+        borderBottom: "1px solid var(--line)",
+        background: marker.isCurrent ? "var(--accent-soft)" : "var(--surface-2, transparent)",
+        fontSize: 12.5,
+      }}
+    >
+      <strong style={{ color: marker.isCurrent ? "var(--accent)" : "var(--ink)" }}>
+        {marker.title}
+      </strong>
+      <span style={{ color: "var(--muted)" }}>·</span>
+      <span>
+        Flujo del mes <strong style={{ color: flowColor }}>{flowStr}</strong>
+      </span>
+      <span style={{ color: "var(--muted)" }}>·</span>
+      <span style={{ color: "var(--ink-2)" }}>
+        {marker.liquidityLabel} {formatMoney(marker.liquidity, currency)}
+      </span>
     </div>
   );
 }

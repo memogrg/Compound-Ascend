@@ -20,6 +20,7 @@ import {
   type MoneyFlow,
   type MoneyFlowEffect,
 } from "@/modules/financial-base/engine/money-flow";
+import type { MonthMarker } from "@/modules/financial-base/engine/period";
 import { formatMoney } from "@/lib/format";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
@@ -129,6 +130,44 @@ function MobileTravelLine({ flow }: { flow: MoneyFlow }) {
   );
 }
 
+/**
+ * Banda de cierre de mes (Trazabilidad Fase C): DERIVADA, no es una transacción.
+ * Ata el flujo del periodo con la liquidez. En curso → tono acento + "liquidez hoy";
+ * cerrado → tono neutro + "liquidez al cierre". Flujo verde (≥0) / rojo (<0).
+ */
+function MMonthMarkerBand({ marker, currency }: { marker: MonthMarker; currency: string }) {
+  const flowColor = marker.flow >= 0 ? "var(--accent)" : "var(--danger)";
+  const flowStr = `${marker.flow >= 0 ? "+" : "−"}${mAmount(Math.abs(marker.flow), currency, 9)}`;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        flexWrap: "wrap",
+        padding: "10px 12px",
+        marginBottom: 10,
+        borderRadius: 12,
+        border: "1px solid var(--border)",
+        background: marker.isCurrent ? "var(--accent-soft)" : "var(--surface)",
+        fontSize: 12,
+      }}
+    >
+      <strong style={{ color: marker.isCurrent ? "var(--accent)" : undefined }}>
+        {marker.title}
+      </strong>
+      <span style={{ color: "var(--text-dim)" }}>·</span>
+      <span>
+        Flujo del mes <strong style={{ color: flowColor }}>{flowStr}</strong>
+      </span>
+      <span style={{ color: "var(--text-dim)" }}>·</span>
+      <span style={{ color: "var(--text-muted)" }}>
+        {marker.liquidityLabel} {mAmount(marker.liquidity, currency, 11)}
+      </span>
+    </div>
+  );
+}
+
 export function MobileTxnList({
   transactions,
   categoryNames,
@@ -140,6 +179,7 @@ export function MobileTxnList({
   incomeCats,
   incomeGroupId,
   balanceAfter,
+  monthMarker,
 }: {
   transactions: Transaction[];
   categoryNames: Record<string, string>;
@@ -154,6 +194,8 @@ export function MobileTxnList({
   incomeGroupId: string | null;
   /** Saldo de liquidez tras cada txn que movió el saco (por id). Fase B. */
   balanceAfter?: Record<string, number>;
+  /** Marcador de cierre de mes (derivado). Fase C. */
+  monthMarker?: MonthMarker | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -207,6 +249,9 @@ export function MobileTxnList({
           </span>
         }
       />
+
+      {/* Fase C: marcador de cierre de mes (derivado; arriba de la lista). */}
+      {monthMarker ? <MMonthMarkerBand marker={monthMarker} currency={currency} /> : null}
 
       {list.length === 0 ? (
         <MEmptyState
