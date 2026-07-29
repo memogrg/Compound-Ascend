@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
-import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction } from "@/modules/assistant/api/actions";
+import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction, loadTodayChatAction, emailTranscriptAction } from "@/modules/assistant/api/actions";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
@@ -156,15 +156,52 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [transcriptMsg, setTranscriptMsg] = useState<string | null>(null);
+  const [sendingTranscript, setSendingTranscript] = useState(false);
   const idRef = useRef(1);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const nextId = () => idRef.current++;
 
+  // Al abrir: cargar la conversación de HOY (persistida por usuario) para que el hilo sobreviva a
+  // minimizar/refrescar/cambio de dispositivo (paridad con la web). Sin nada del día → solo el saludo.
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const hoy = await loadTodayChatAction();
+        if (!alive || hoy.length === 0) return;
+        setMessages((prev) => [
+          prev[0]!, // saludo
+          ...hoy.map((m): ChatMsg => ({ id: nextId(), role: m.role, text: m.content })),
+        ]);
+      } catch {
+        // best-effort: si falla la carga, se queda el saludo
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, sending, scanning]);
+
+  const sendTranscript = async () => {
+    if (sendingTranscript) return;
+    setSendingTranscript(true);
+    setTranscriptMsg(null);
+    try {
+      const res = await emailTranscriptAction();
+      setTranscriptMsg(res.message ?? (res.ok ? "Transcript enviado." : "No se pudo enviar."));
+    } catch {
+      setTranscriptMsg("No se pudo enviar el transcript.");
+    } finally {
+      setSendingTranscript(false);
+    }
+  };
 
   async function send() {
     const q = input.trim();
@@ -293,9 +330,18 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
         <div>
           <div className="m-chat-title">Asistente IA</div>
           <div className="muted" style={{ fontSize: 11.5 }}>
-            Chat + escáner de recibos
+            {transcriptMsg ?? "Chat + escáner de recibos"}
           </div>
         </div>
+        <button
+          className="m-btn m-btn-secondary"
+          style={{ marginLeft: "auto", fontSize: 12, padding: "6px 10px" }}
+          onClick={sendTranscript}
+          disabled={sendingTranscript}
+          aria-label="Enviarme el transcript por correo"
+        >
+          {sendingTranscript ? "Enviando…" : "✉︎ Transcript"}
+        </button>
       </header>
 
       <div className="m-chat-scroll">
