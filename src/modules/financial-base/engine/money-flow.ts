@@ -109,3 +109,28 @@ export function describeMoneyFlow(t: MoneyFlowInput): MoneyFlow {
         : "pagado_a";
   return { effect: "out", fromLabel: LIQUIDITY_LABEL, toLabel: counterparty, verb, isJarSpend: false };
 }
+
+/** Cómo presentar la línea "Liquidez después" del detalle. */
+export type LiquidityAfterDisplay =
+  | { mode: "amount"; value: number }
+  | { mode: "unchanged" }
+  | { mode: "hidden" };
+
+/**
+ * Decide "Liquidez después" por el EFECTO real del movimiento, no por la mera
+ * ausencia del saldo corrido:
+ *  · neutral (consumo de frasco / transferencia / ajuste) → "No cambia" (`unchanged`).
+ *  · out/in CON saldo corrido → el número (`amount`).
+ *  · out/in SIN saldo (movimiento legado sin fila en el ledger, p. ej. pagos de deuda
+ *    anteriores al back-fill de Fase A) → se OMITE la línea (`hidden`): la línea
+ *    "Efecto: sale/entra de tu liquidez" ya lo cuenta; decir "No cambia" ahí se
+ *    contradeciría.
+ */
+export function liquidityAfterDisplay(args: {
+  effect: MoneyFlowEffect;
+  balanceAfter?: number | null;
+}): LiquidityAfterDisplay {
+  if (args.effect === "neutral") return { mode: "unchanged" };
+  if (args.balanceAfter != null) return { mode: "amount", value: args.balanceAfter };
+  return { mode: "hidden" };
+}

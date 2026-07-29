@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   describeMoneyFlow,
+  liquidityAfterDisplay,
   LIQUIDITY_LABEL,
   type MoneyFlowInput,
 } from "@/modules/financial-base/engine/money-flow";
@@ -127,5 +128,34 @@ describe("describeMoneyFlow · tabla de verdad del viaje", () => {
   it("sin merchantOrSource → fallback legible por tipo", () => {
     expect(describeMoneyFlow(txn({ kind: "ingreso", merchantOrSource: null })).fromLabel).toBe("Ingreso");
     expect(describeMoneyFlow(txn({ kind: "gasto", merchantOrSource: null })).toLabel).toBe("Gasto");
+  });
+});
+
+describe("liquidityAfterDisplay · cómo mostrar 'Liquidez después'", () => {
+  it("neutral → 'unchanged' (No cambia), con o sin saldo", () => {
+    expect(liquidityAfterDisplay({ effect: "neutral" })).toEqual({ mode: "unchanged" });
+    // neutral gana aunque llegara un saldo (defensivo: no debería pasar).
+    expect(liquidityAfterDisplay({ effect: "neutral", balanceAfter: 500 })).toEqual({
+      mode: "unchanged",
+    });
+  });
+
+  it("out/in CON saldo → 'amount' con el valor", () => {
+    expect(liquidityAfterDisplay({ effect: "out", balanceAfter: 1200 })).toEqual({
+      mode: "amount",
+      value: 1200,
+    });
+    expect(liquidityAfterDisplay({ effect: "in", balanceAfter: 0 })).toEqual({
+      mode: "amount",
+      value: 0,
+    });
+  });
+
+  it("out/in SIN saldo (legado sin fila en el ledger) → 'hidden' (omitir la línea)", () => {
+    expect(liquidityAfterDisplay({ effect: "out" })).toEqual({ mode: "hidden" });
+    expect(liquidityAfterDisplay({ effect: "in", balanceAfter: null })).toEqual({ mode: "hidden" });
+    expect(liquidityAfterDisplay({ effect: "out", balanceAfter: undefined })).toEqual({
+      mode: "hidden",
+    });
   });
 });

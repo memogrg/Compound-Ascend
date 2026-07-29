@@ -14,6 +14,7 @@ import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { SelectableCategory } from "@/modules/financial-base/engine/classify";
 import {
   describeMoneyFlow,
+  liquidityAfterDisplay,
   FLOW_VERB_LABEL,
   LIQUIDITY_LABEL,
   type MoneyFlow,
@@ -441,6 +442,7 @@ function TxnDetail({
     month: "long",
     year: "numeric",
   });
+  const after = liquidityAfterDisplay({ effect: flow.effect, balanceAfter });
   return (
     <div
       style={{
@@ -477,10 +479,14 @@ function TxnDetail({
         </>
       )}
       <DetailRow label="Efecto en tu liquidez" value={<span style={{ color }}>{efecto}</span>} />
-      <DetailRow
-        label="Liquidez después"
-        value={balanceAfter != null ? formatMoney(balanceAfter, currency) : "No cambia"}
-      />
+      {/* "Liquidez después" se decide por el EFECTO, no por la ausencia del saldo: los
+          legados out/in sin fila en el ledger omiten la línea (no dicen "No cambia"). */}
+      {after.mode === "hidden" ? null : (
+        <DetailRow
+          label="Liquidez después"
+          value={after.mode === "amount" ? formatMoney(after.value, currency) : "No cambia"}
+        />
+      )}
       {origin || onMore ? (
         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
           {origin ? (
