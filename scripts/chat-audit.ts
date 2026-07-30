@@ -48,6 +48,10 @@ const GEMINI_KEY = env("GEMINI_API_KEY");
 const JUDGE_MODEL = env("AUDIT_JUDGE_MODEL", "gemini-2.5-flash-lite");
 const REQ_TIMEOUT_MS = 60_000;
 const MAX_SENTENCES = 6; // umbral de "flooding"
+// El endpoint limita a 20 req/min por usuario (RATE_LIMITS.aiChat). Paceamos a ≤1 cada PACE_MS
+// para no dispararlo (default 3.3s → ~18/min). Ajustable con AUDIT_PACE_MS.
+const PACE_MS = Number(env("AUDIT_PACE_MS", "3300")) || 3300;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // ── Tipos ──
 type Category = { name: string; questions: string[] };
@@ -110,7 +114,7 @@ const SYMBOL: Record<string, string> = { CRC: "₡", USD: "$", MXN: "$", COP: "$
 
 // ── 1) Parseo del banco ──
 function parseBank(): Category[] {
-  const md = readFileSync(join(ROOT, "chat-audit-preguntas.md"), "utf8").split("Criterios de auditoría")[0]!;
+  const md = readFileSync(join(HERE, "chat-audit-preguntas.md"), "utf8").split("Criterios de auditoría")[0]!;
   const cats: Category[] = [];
   let cur: Category | null = null;
   for (const line of md.split(/\r?\n/)) {
@@ -369,7 +373,13 @@ async function main(): Promise<void> {
     let last: ChatResult = { reply: "", action: null, status: 0, latencyMs: 0 };
     const replies: string[] = [];
     for (const turn of item.turns) {
+      await sleep(PACE_MS); // respeta el rate-limit del endpoint (20/min)
       last = await callChat(turn, auth.cookie);
+      // Si igual pegamos el rate-limit, esperá la ventana y reintentá una vez.
+      if (last.status === 429) {
+        await sleep(60_000);
+        last = await callChat(turn, auth.cookie);
+      }
       replies.push(last.reply);
     }
     const flags = heuristics(item, last, fx);
