@@ -263,6 +263,13 @@ describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", ()
     expect(matchIntent("¿cuánto aporto de DCA al mes?")?.intent).toBe("dca_mensual");
   });
 
+  it("pregunta COMPUESTA ('cuánto gasto y cuánto ahorro') → escala (no responde media pregunta)", () => {
+    // Regresión de la auditoría: ahorro_mensual agarraba esta y respondía solo el ahorro.
+    expect(matchIntent("¿Cuánto gasto y cuánto ahorro al mes?")).toBeNull();
+    // Pero un arrastre "¿y cuánto tengo en ahorros?" (un solo 'cuánto') NO se marca compuesta.
+    expect(matchIntent("¿y cuánto ahorro al mes?")?.intent).toBe("ahorro_mensual");
+  });
+
   it("AHORRO/METAS: ahorro mensual, meta más cercana y falta pa {meta}", () => {
     expect(matchIntent("¿cuánto ahorro al mes en total?")?.intent).toBe("ahorro_mensual");
     expect(matchIntent("¿cuál es mi meta más cercana a completarse?")?.intent).toBe("meta_cercana");
