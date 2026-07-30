@@ -23,6 +23,7 @@ import {
   filterByScope,
   computeMultiScenario,
   buildMultiReply,
+  formatMarketMoney,
   type ScopeKind,
   type HoldingScenarioInput,
 } from "@/lib/ai/market-scope";
@@ -864,7 +865,8 @@ export function buildMarketReply(
   hasPosition: boolean,
   freshness = "",
 ): string {
-  const money = (n: number) => formatMoney(n, currency);
+  // Cripto-aware: un precio/ATH < $1 con formatMoney (fiat, 0 dec) salía "$0" — parecía "sin dato".
+  const money = (n: number) => formatMarketMoney(n, currency);
   if (s.precio_actual === null && s.maximo === null) {
     return `No pude leer los datos de ${s.symbol} en la fuente ahora mismo; reintentá en un momento o decime a qué precio querés que simule.`;
   }
