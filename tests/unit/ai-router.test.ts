@@ -281,6 +281,13 @@ describe("R2 · matchIntent (patrones)", () => {
     expect(matchIntent("mostrame mis últimos movimientos")?.intent).toBe("ultimos_movimientos");
   });
 
+  it("flujo_libre: 'libre pa gastar' / 'cuánto me sobra' → flujo_libre (NO saldo_liquidez ₡0)", () => {
+    expect(matchIntent("¿cuánto tengo libre pa gastar este mes?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuánto me queda libre?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuánto me sobra después de gastos?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuál es mi flujo libre?")?.intent).toBe("flujo_libre");
+  });
+
   it("saldo_sobre: 'cuánto me queda en/de {sobre}' → saldo_sobre (NO liquidez), soporta varios", () => {
     const one = matchIntent("¿cuánto me queda de supermercados?");
     expect(one?.intent).toBe("saldo_sobre");
@@ -318,6 +325,16 @@ describe("R2 · answerFromContext (cifra del FinancialContext, 0 fetch)", () => 
 
   it("ingreso_mes usa ctx.incomeMonthly", () => {
     expect(answerFromContext("ingreso_mes", {}, tc, CTX)?.reply).toContain("4.000");
+  });
+
+  it("flujo_libre usa ctx.freeCashflow (no el saldo de liquidez)", () => {
+    const r = answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: 1_500 } as FinancialContext);
+    expect(r?.reply).toContain("1.500");
+    expect(r?.reply).toMatch(/libre este mes/i);
+  });
+
+  it("flujo_libre sin dato → null (escala, no adivina ₡0)", () => {
+    expect(answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: undefined } as FinancialContext)).toBeNull();
   });
 
   it("gasto_categoria usa ctx.topExpenseCategory (nombre + monto + %)", () => {
@@ -646,6 +663,15 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     expect(reply).toMatch(/1\.000/); // ganancia sensata (6000 − 5000)
   });
 
+  it("BUG sin-dato: moneda que NO tenés (DOGE) → 'no veo DOGE', sin precio y sin consultar el mercado", async () => {
+    getPositionForSymbol.mockResolvedValue(null); // no la tiene ni fuera del top-N
+    const routed = await tryRouteQuery(ask("¿cuánto vale DOGE?"), CTX, tc); // CTX no tiene DOGE
+    expect(routed?.lane).toBe("template");
+    expect(routed?.response.reply).toMatch(/no veo DOGE/i);
+    expect(routed?.response.reply).not.toMatch(/cotiza|\$\s?0\b/i); // no da precio ni "$0"
+    expect(getMarketHighlights).not.toHaveBeenCalled(); // no le pega al mercado por algo no-tenido
+  });
+
   it("símbolo que no trae dato → motivo REAL (reintentá), no 'no tengo acceso'", () => {
     const reply = buildMarketReply(
       { symbol: "XYZ", precio_actual: null, maximo: null, maximo_tipo: null, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: null, ganancia_al_maximo: null },
@@ -718,6 +744,21 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     );
     expect(reply).toMatch(/52 semanas/i);
     expect(reply).not.toMatch(/máximo histórico|ATH/i);
+  });
+
+  it("posición SIN invertido (FX falló): muestra valor al ATH en UNA moneda, sin 'invertiste' ni ganancia", () => {
+    // 0,15 BTC, ATH $126.080 → valor al ATH 0,15×126.080. Sin invertido (undefined) no debe aparecer
+    // "invertiste" ni "ganancia" (el bug era CRC-como-$ con ganancia absurda −$2,7M).
+    const reply = buildMarketReply(
+      { symbol: "BTC", precio_actual: 126080, maximo: 126080, maximo_tipo: "ath", cantidad: 0.15, invertido: null, valor_actual: 18912, ganancia_al_precio_actual: null, valor_al_maximo: 18912, ganancia_al_maximo: null },
+      "USD",
+      true,
+      true,
+    );
+    expect(reply).toMatch(/valdr[íi]a \$18\.912/); // valor al ATH, una sola moneda
+    expect(reply).not.toMatch(/invertiste/i); // no arrastra el invertido mal convertido
+    expect(reply).not.toMatch(/ganancia/i); // sin invertido no se inventa ganancia
+    expect(reply).not.toMatch(/-\$|−\$/); // nada de pérdidas absurdas
   });
 
   it("cripto sub-$1: el ATH/precio NO se muestra como '$0' (bug del formatMoney fiat 0 dec)", () => {
