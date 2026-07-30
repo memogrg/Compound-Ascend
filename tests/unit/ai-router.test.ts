@@ -281,6 +281,13 @@ describe("R2 · matchIntent (patrones)", () => {
     expect(matchIntent("mostrame mis últimos movimientos")?.intent).toBe("ultimos_movimientos");
   });
 
+  it("flujo_libre: 'libre pa gastar' / 'cuánto me sobra' → flujo_libre (NO saldo_liquidez ₡0)", () => {
+    expect(matchIntent("¿cuánto tengo libre pa gastar este mes?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuánto me queda libre?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuánto me sobra después de gastos?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuál es mi flujo libre?")?.intent).toBe("flujo_libre");
+  });
+
   it("saldo_sobre: 'cuánto me queda en/de {sobre}' → saldo_sobre (NO liquidez), soporta varios", () => {
     const one = matchIntent("¿cuánto me queda de supermercados?");
     expect(one?.intent).toBe("saldo_sobre");
@@ -318,6 +325,16 @@ describe("R2 · answerFromContext (cifra del FinancialContext, 0 fetch)", () => 
 
   it("ingreso_mes usa ctx.incomeMonthly", () => {
     expect(answerFromContext("ingreso_mes", {}, tc, CTX)?.reply).toContain("4.000");
+  });
+
+  it("flujo_libre usa ctx.freeCashflow (no el saldo de liquidez)", () => {
+    const r = answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: 1_500 } as FinancialContext);
+    expect(r?.reply).toContain("1.500");
+    expect(r?.reply).toMatch(/libre este mes/i);
+  });
+
+  it("flujo_libre sin dato → null (escala, no adivina ₡0)", () => {
+    expect(answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: undefined } as FinancialContext)).toBeNull();
   });
 
   it("gasto_categoria usa ctx.topExpenseCategory (nombre + monto + %)", () => {

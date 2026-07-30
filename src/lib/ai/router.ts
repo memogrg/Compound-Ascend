@@ -56,6 +56,9 @@ type Intent =
   | "gasto_mes"
   | "ingreso_mes"
   | "gasto_categoria"
+  // "cuánto (me queda) libre pa gastar / cuánto me sobra / flujo libre" → flujo libre (ctx.freeCashflow),
+  // NO el saldo de liquidez (que daba ₡0):
+  | "flujo_libre"
   // R2 — requieren lectura fresca (session-based → web; WhatsApp escala):
   | "saldo_liquidez"
   // "cuánto me queda en/de {sobre(s)}" → restante por sobre (getSobreRemaining), soporta varios:
@@ -81,6 +84,7 @@ const KNOWN_INTENTS: Intent[] = [
   "gasto_mes",
   "ingreso_mes",
   "gasto_categoria",
+  "flujo_libre",
   "saldo_liquidez",
   "saldo_sobre",
   "ultimos_movimientos",
@@ -327,6 +331,13 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   if (/(?:cu[aá]nto|qu[eé])\s+(?:gan[eéoó]|ingres[eéoó])|(?:mis|el|los)\s+ingresos?\b|cu[aá]nto (?:me )?entr[oó]/i.test(t)) {
     return { intent: "ingreso_mes", params: {} };
   }
+  // Flujo libre ("¿cuánto tengo libre pa gastar?", "¿cuánto me sobra?", "¿cuál es mi flujo libre?") →
+  // ctx.freeCashflow, NO el saldo de liquidez (que devolvía ₡0). Antes de saldo_sobre/saldo_liquidez.
+  if (
+    /\bflujo\s+libre\b|cu[aá]nto\s+(?:me\s+)?(?:queda|tengo|hay)\s+libre\b|\blibre\s+(?:pa'?|para)\s+gastar\b|cu[aá]nto\s+(?:me\s+)?sobra\b/i.test(t)
+  ) {
+    return { intent: "flujo_libre", params: {} };
+  }
   // Restante de SOBRE(s): "cuánto me queda en/de {sobre}" con un nombre de sobre (NO liquidez). ANTES
   // de saldo_liquidez, que era demasiado goloso ("cuánto me queda" caía en liquidez y daba ₡0).
   const sobreNames = extractSobreNames(t);
@@ -353,11 +364,13 @@ async function classifyWithLite(
   if (!lite) return null;
   const system =
     "Clasificás preguntas de finanzas personales. Devolvé SOLO JSON " +
-    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"metas_a_aportar"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
+    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"metas_a_aportar"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"flujo_libre"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
     "numero_seguridad=capital para sus gastos esenciales; numero_independencia=capital para su vida actual; " +
     "numero_libertad=capital para su estilo de vida deseado (NO son lo mismo; no los mezcles). " +
     "gasto_mes=cuánto gasta al mes; ingreso_mes=cuánto gana; gasto_categoria=en qué gasta más; " +
-    "saldo_liquidez=cuánto tiene disponible; ultimos_movimientos=sus transacciones recientes; " +
+    "flujo_libre=cuánto le queda LIBRE para gastar al mes / cuánto le sobra (ingreso menos compromisos); " +
+    "saldo_liquidez=cuánto tiene disponible AHORA en cuentas/efectivo (distinto de flujo_libre); " +
+    "ultimos_movimientos=sus transacciones recientes; " +
     "listar_sobres=enumerar sus sobres/frascos/metas (no su progreso). metas=el progreso de sus metas. " +
     "metas_a_aportar=a cuáles metas de ahorro RECURRENTES le toca aportar este mes (con su monto); NO son los sobres de gasto. " +
     '"complejo": true si pide análisis, proyección, consejo, comparación o cualquier cosa más allá de consultar un dato simple. Ante duda: "otro" o complejo:true.';
@@ -410,6 +423,15 @@ export function answerFromContext(
   if (intent === "ingreso_mes") {
     if (typeof ctx?.incomeMonthly !== "number") return null;
     return say(`Tus ingresos mensuales son ${money(ctx.incomeMonthly)}.`);
+  }
+  if (intent === "flujo_libre") {
+    // Flujo libre = ingreso − compromisos (ya calculado por el motor). NUNCA es el saldo de liquidez.
+    const f = ctx?.freeCashflow;
+    if (typeof f !== "number") return null; // sin dato → escala (no adivina)
+    if (f <= 0) {
+      return say("Este mes no te queda flujo libre: tus compromisos ya igualan o superan tu ingreso. Si querés, revisamos los sobres para liberar margen.");
+    }
+    return say(`Te queda ~${money(f)} libre este mes, después de tus compromisos (ingresos menos gastos y aportes).`);
   }
   if (intent === "gasto_categoria") {
     // Sobre de MAYOR gasto (presupuesto YA convertido por el motor a ctx.currency). Determinista.
@@ -623,7 +645,7 @@ async function resolveFetchIntent(
           if (sug.categoryId) hit = { id: sug.categoryId, path: sug.categoryPath ?? name };
         }
         if (!hit) {
-          parts.push(`no encontré un sobre para «${name}»`);
+          parts.push(`no tenés un sobre de «${name}»`);
           continue;
         }
         const rem = await getSobreRemaining(hit.id, today);
