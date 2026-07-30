@@ -280,9 +280,11 @@ function heuristics(item: RunItem, res: ChatResult, fx: Fixture | null): Flag[] 
   if (MONEY_Q.test(item.question) && (!fx || fx.hasSobres) && /(?:^|\s)[₡$]?0(?:[.,]0+)?(?:\s|$|\.)/.test(r) && /gast|presupuest|sobre/i.test(item.question)) {
     flags.push({ type: "cero", detail: "reporta 0 en una pregunta de gasto/presupuesto" });
   }
-  // "no puedo/no sé/definilo" en preguntas cuyo dato SÍ existe (datos/acciones). Excluye la aclaración
-  // de frescura del mercado ("no en vivo"/"precio guardado"/"no tengo el precio"), que es honesta, no un "no sé".
-  if (NO_CAPACITY.test(r) && !MARKET_FRESHNESS.test(r) && !/qu[eé] hora|dolar|doge|casino/i.test(item.question)) {
+  // "no puedo/no sé/definilo" en preguntas cuyo dato SÍ existe (datos/acciones). Excluye: (1) la
+  // aclaración de frescura del mercado ("no en vivo"/"precio guardado"/"no tengo el precio"), honesta;
+  // (2) el contexto de mercado, donde el guardaraíl "el techo NO SE cronometra" (pronombre reflexivo
+  // "no se", no "no sé") disparaba el flag en un escenario correcto.
+  if (NO_CAPACITY.test(r) && !MARKET_FRESHNESS.test(r) && !marketCtx && !/qu[eé] hora|dolar|doge|casino/i.test(item.question)) {
     flags.push({ type: "no_se_con_dato", detail: "dice que no puede/no sabe ante un dato disponible" });
   }
   // Flooding.
@@ -292,8 +294,14 @@ function heuristics(item: RunItem, res: ChatResult, fx: Fixture | null): Flag[] 
   if (item.kind === "carryover" && /portafolio|inversi[oó]n|holding|acci[oó]n|cripto|rendimiento/i.test(r)) {
     flags.push({ type: "arrastre", detail: "trae el tema del turno anterior (inversión)" });
   }
-  // Alucinación de moneda no poseída (DOGE) con precio/ATH.
-  if (/doge/i.test(item.question) && /[₡$]\s?[\d.,]{2,}|ath|m[aá]ximo/i.test(r) && !NO_CAPACITY.test(r)) {
+  // Alucinación de moneda no poseída (DOGE): SOLO si INVENTA el dato. Un precio real del store con
+  // aviso de frescura ("precio guardado …, no en vivo") NO es alucinación — es dato público honesto.
+  if (
+    /doge/i.test(item.question) &&
+    /[₡$]\s?[\d.,]{2,}|ath|m[aá]ximo/i.test(r) &&
+    !NO_CAPACITY.test(r) &&
+    !MARKET_FRESHNESS.test(r)
+  ) {
     flags.push({ type: "alucinacion", detail: "da precio/ATH de una moneda que el usuario no tiene" });
   }
   // Fuera de tema: "qué hora es" no debe inventar finanzas.
