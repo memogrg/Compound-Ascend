@@ -47,7 +47,7 @@ vi.mock("@/modules/wealth", () => ({
 // FX del carril multi-posición (import dinámico): tasas fijas para no pegarle a la red.
 vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: async () => ({ USD: 1, CRC: 530 }) }));
 
-import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote } from "@/lib/ai/router";
+import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote, normalizeSlang } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
 // FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
@@ -231,6 +231,100 @@ describe("terminología · 'listá mis metas' enumera; 'cuáles son mis sobres' 
   });
 });
 
+describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", () => {
+  it("normalizeSlang mapea el slang de dinero a un token canónico", () => {
+    expect(normalizeSlang("¿en qué se me va la guita?")).toMatch(/dinero/i);
+    expect(normalizeSlang("¿en qué se me va la lana?")).toMatch(/dinero/i);
+    expect(normalizeSlang("me alcanza pa unos tacos")).toMatch(/para/i);
+  });
+
+  it("SLANG de gasto: 'en qué se me va la {plata/lana/guita/pisto}' → gasto_categoria", () => {
+    for (const w of ["la plata", "la lana", "la guita", "el pisto", "el billete"]) {
+      expect(matchIntent(`¿en qué se me va ${w}?`)?.intent).toBe("gasto_categoria");
+    }
+    expect(matchIntent("¿cuál es el sobre más caro que tengo?")?.intent).toBe("gasto_categoria");
+  });
+
+  it("DEFENSA: fondo emergencia/paz, colchón y 'si me botan' → defensa_fondo con su foco", () => {
+    expect(matchIntent("¿tengo fondo de emergencia?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "emergencia" } });
+    expect(matchIntent("¿cuánto llevo en el fondo de paz?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "paz" } });
+    expect(matchIntent("¿cuántos meses de colchón tengo?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "colchon" } });
+    expect(matchIntent("si me botan del trabajo, ¿cuánto aguanto?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "colchon" } });
+    expect(matchIntent("¿ya estoy blindado?")?.intent).toBe("defensa_fondo");
+  });
+
+  it("INVERSIONES resumen vs símbolo puntual", () => {
+    expect(matchIntent("¿cuánto tengo invertido en total?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cómo va mi portafolio?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cuánto he ganado o perdido en inversiones?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cuál es el valor actual de mis inversiones?")?.intent).toBe("resumen_inversiones");
+    // un símbolo puntual sigue yendo al carril de mercado, no a resumen.
+    expect(matchIntent("¿cuánto vale mi ETH ahorita?")?.intent).toBe("datos_mercado");
+    expect(matchIntent("¿cuánto aporto de DCA al mes?")?.intent).toBe("dca_mensual");
+  });
+
+  it("AHORRO/METAS: ahorro mensual, meta más cercana y falta pa {meta}", () => {
+    expect(matchIntent("¿cuánto ahorro al mes en total?")?.intent).toBe("ahorro_mensual");
+    expect(matchIntent("¿cuál es mi meta más cercana a completarse?")?.intent).toBe("meta_cercana");
+    const fm = matchIntent("¿cuánto me falta pa la casa?");
+    expect(fm?.intent).toBe("falta_meta");
+    expect(fm?.params.metaName).toBe("casa");
+  });
+
+  // ── answerFromContext (cifra del motor) ──
+  const ctxDef = {
+    ...CTX,
+    mesesDeColchon: 4,
+    defenseFunds: {
+      currency: "CRC",
+      activeFund: "emergency",
+      emergency: { registrado: true, actual: 300000, objetivo: 900000, progresoPct: 33, aporteRecomendado: 50000, cubierto: false },
+      paz: { registrado: false, actual: 0, objetivo: 1800000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+    },
+  } as FinancialContext;
+
+  it("defensa_fondo emergencia usa defenseFunds (registrado → acumulado/objetivo/brecha)", () => {
+    const r = answerFromContext("defensa_fondo", { focus: "emergencia" }, tc, ctxDef);
+    expect(r?.reply).toMatch(/de emergencia/i);
+    expect(r?.reply).toContain("300.000");
+    expect(r?.reply).toContain("900.000");
+    expect(r?.reply).toMatch(/faltan/i);
+  });
+
+  it("defensa_fondo colchón usa mesesDeColchon (no inventa)", () => {
+    const r = answerFromContext("defensa_fondo", { focus: "colchon" }, tc, ctxDef);
+    expect(r?.reply).toMatch(/4 meses de colch/i);
+    expect(answerFromContext("defensa_fondo", { focus: "colchon" }, tc, CTX)).toBeNull(); // sin dato → escala
+  });
+
+  it("ahorro_mensual / dca_mensual / resumen_inversiones salen del contexto (0 fetch)", () => {
+    const ctxInv = {
+      ...CTX,
+      compromisoDesglose: { sobres: 0, metas: 90000, dca: 45000, deudas: 0, seguros: 0 },
+      investmentInvested: 1_000_000,
+      investmentValue: 1_250_000,
+      investmentPL: 250_000,
+    } as FinancialContext;
+    expect(answerFromContext("ahorro_mensual", {}, tc, ctxInv)?.reply).toContain("90.000");
+    expect(answerFromContext("dca_mensual", {}, tc, ctxInv)?.reply).toContain("45.000");
+    const r = answerFromContext("resumen_inversiones", {}, tc, ctxInv);
+    expect(r?.reply).toContain("1.250.000"); // valor
+    expect(r?.reply).toContain("1.000.000"); // invertido
+    expect(r?.reply).toMatch(/gan[aá]s/i); // P/L positivo
+    expect(answerFromContext("dca_mensual", {}, tc, CTX)).toBeNull(); // sin dato → escala
+  });
+
+  it("falta_meta y meta_cercana usan tc.goals (Fondo emergencia 40% > Viaje 15%)", () => {
+    const fm = answerFromContext("falta_meta", { metaName: "viaje" }, tc);
+    expect(fm?.reply).toMatch(/Viaje Jap[oó]n/i);
+    expect(fm?.reply).toMatch(/faltan/i);
+    const mc = answerFromContext("meta_cercana", {}, tc);
+    expect(mc?.reply).toMatch(/Fondo de emergencia/i); // 40% es la más cercana
+    // meta inexistente → null (escala, no adivina)
+    expect(answerFromContext("falta_meta", { metaName: "yate" }, tc)).toBeNull();
+  });
+});
+
 describe("tryRouteQuery · carriles y tokens", () => {
   it("consulta que matchea patrón → carril template, 0 tokens, cifra del motor", async () => {
     const routed = await tryRouteQuery(ask("¿cuál es mi número de libertad?"), CTX, tc);
@@ -281,6 +375,13 @@ describe("R2 · matchIntent (patrones)", () => {
     expect(matchIntent("mostrame mis últimos movimientos")?.intent).toBe("ultimos_movimientos");
   });
 
+  it("flujo_libre: 'libre pa gastar' / 'cuánto me sobra' → flujo_libre (NO saldo_liquidez ₡0)", () => {
+    expect(matchIntent("¿cuánto tengo libre pa gastar este mes?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuánto me queda libre?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuánto me sobra después de gastos?")?.intent).toBe("flujo_libre");
+    expect(matchIntent("¿cuál es mi flujo libre?")?.intent).toBe("flujo_libre");
+  });
+
   it("saldo_sobre: 'cuánto me queda en/de {sobre}' → saldo_sobre (NO liquidez), soporta varios", () => {
     const one = matchIntent("¿cuánto me queda de supermercados?");
     expect(one?.intent).toBe("saldo_sobre");
@@ -318,6 +419,16 @@ describe("R2 · answerFromContext (cifra del FinancialContext, 0 fetch)", () => 
 
   it("ingreso_mes usa ctx.incomeMonthly", () => {
     expect(answerFromContext("ingreso_mes", {}, tc, CTX)?.reply).toContain("4.000");
+  });
+
+  it("flujo_libre usa ctx.freeCashflow (no el saldo de liquidez)", () => {
+    const r = answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: 1_500 } as FinancialContext);
+    expect(r?.reply).toContain("1.500");
+    expect(r?.reply).toMatch(/libre este mes/i);
+  });
+
+  it("flujo_libre sin dato → null (escala, no adivina ₡0)", () => {
+    expect(answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: undefined } as FinancialContext)).toBeNull();
   });
 
   it("gasto_categoria usa ctx.topExpenseCategory (nombre + monto + %)", () => {
@@ -646,6 +757,15 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     expect(reply).toMatch(/1\.000/); // ganancia sensata (6000 − 5000)
   });
 
+  it("BUG sin-dato: moneda que NO tenés (DOGE) → 'no veo DOGE', sin precio y sin consultar el mercado", async () => {
+    getPositionForSymbol.mockResolvedValue(null); // no la tiene ni fuera del top-N
+    const routed = await tryRouteQuery(ask("¿cuánto vale DOGE?"), CTX, tc); // CTX no tiene DOGE
+    expect(routed?.lane).toBe("template");
+    expect(routed?.response.reply).toMatch(/no veo DOGE/i);
+    expect(routed?.response.reply).not.toMatch(/cotiza|\$\s?0\b/i); // no da precio ni "$0"
+    expect(getMarketHighlights).not.toHaveBeenCalled(); // no le pega al mercado por algo no-tenido
+  });
+
   it("símbolo que no trae dato → motivo REAL (reintentá), no 'no tengo acceso'", () => {
     const reply = buildMarketReply(
       { symbol: "XYZ", precio_actual: null, maximo: null, maximo_tipo: null, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: null, ganancia_al_maximo: null },
@@ -718,6 +838,21 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     );
     expect(reply).toMatch(/52 semanas/i);
     expect(reply).not.toMatch(/máximo histórico|ATH/i);
+  });
+
+  it("posición SIN invertido (FX falló): muestra valor al ATH en UNA moneda, sin 'invertiste' ni ganancia", () => {
+    // 0,15 BTC, ATH $126.080 → valor al ATH 0,15×126.080. Sin invertido (undefined) no debe aparecer
+    // "invertiste" ni "ganancia" (el bug era CRC-como-$ con ganancia absurda −$2,7M).
+    const reply = buildMarketReply(
+      { symbol: "BTC", precio_actual: 126080, maximo: 126080, maximo_tipo: "ath", cantidad: 0.15, invertido: null, valor_actual: 18912, ganancia_al_precio_actual: null, valor_al_maximo: 18912, ganancia_al_maximo: null },
+      "USD",
+      true,
+      true,
+    );
+    expect(reply).toMatch(/valdr[íi]a \$18\.912/); // valor al ATH, una sola moneda
+    expect(reply).not.toMatch(/invertiste/i); // no arrastra el invertido mal convertido
+    expect(reply).not.toMatch(/ganancia/i); // sin invertido no se inventa ganancia
+    expect(reply).not.toMatch(/-\$|−\$/); // nada de pérdidas absurdas
   });
 
   it("cripto sub-$1: el ATH/precio NO se muestra como '$0' (bug del formatMoney fiat 0 dec)", () => {
