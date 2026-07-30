@@ -701,15 +701,18 @@ async function getFullPosition(
   }
 }
 
-/** Convierte lo invertido a la moneda del escenario (best-effort: ante fallo, devuelve el original). */
-async function convertInvested(amount: number, from: string, to: string): Promise<number> {
+/** Convierte lo invertido a la moneda del escenario. Ante fallo del FX devuelve NULL (no el original):
+ *  dejar el monto en su moneda de origen con la etiqueta de otra (CRC como $) es el bug de moneda
+ *  mezclada. El caller, ante null, OMITE lo invertido/ganancia y deja el resto en una sola moneda. */
+async function convertInvested(amount: number, from: string, to: string): Promise<number | null> {
   try {
     const { getFxRates } = await import("@/lib/market-data/fx-rates");
     const { convertCurrency } = await import("@/lib/fx");
     const rates = await getFxRates();
-    return Math.round(convertCurrency(amount, from, to, rates));
+    const out = Math.round(convertCurrency(amount, from, to, rates));
+    return Number.isFinite(out) && out >= 0 ? out : null;
   } catch {
-    return amount;
+    return null;
   }
 }
 
@@ -828,7 +831,11 @@ async function resolveMarketQuery(
     // moneda del holding; si difieren, se convierte para que cantidad×máximo − invertido sea coherente.
     const scenCurrency = h?.currency ?? cur;
     if (typeof invertido === "number" && posCurrency !== scenCurrency) {
-      invertido = await convertInvested(invertido, posCurrency, scenCurrency);
+      // Si el FX falla, convertInvested → null: se DESCARTA lo invertido (queda undefined) para no
+      // mostrar CRC con símbolo $. El escenario sigue con valor/valor-al-máximo (cantidad × precio),
+      // todo en scenCurrency; solo se omite la ganancia. Nunca moneda mezclada.
+      const conv = await convertInvested(invertido, posCurrency, scenCurrency);
+      invertido = conv ?? undefined;
     }
 
     const hasPosition = typeof cantidad === "number" && cantidad > 0;
@@ -911,13 +918,15 @@ export function buildMarketReply(
   const maxLabel = s.maximo_tipo === "ath" ? "su máximo histórico (ATH)" : "su máximo de 52 semanas";
   const maxShort = s.maximo_tipo === "ath" ? "ATH" : "máximo de 52 semanas";
   const fecha = s.maximo_fecha ? ` (${s.maximo_fecha})` : "";
-  const knowsPos = typeof s.cantidad === "number" && typeof s.invertido === "number";
+  const knowsQty = typeof s.cantidad === "number";
 
-  // Intro: si conocemos la posición, la NOMBRAMOS ("tenés X, invertiste Y"); si no, el dato de
-  // mercado. Precio ≤0 ya llega como null → NUNCA imprimimos "$0"; si falta, lo decimos honesto.
+  // Intro: si conocemos la posición, la NOMBRAMOS ("tenés X"); "invertiste Y" SOLO si el invertido
+  // está en la moneda del escenario (si el FX falló, llega undefined y se omite — nunca CRC-como-$).
+  // Precio ≤0 ya llega como null → NUNCA imprimimos "$0"; si falta, lo decimos honesto.
   const parts: string[] = [];
-  if (hasPosition && knowsPos) {
-    parts.push(`Tenés ${formatQuantity(s.cantidad!)} ${s.symbol} (invertiste ${money(s.invertido!)})`);
+  if (hasPosition && knowsQty) {
+    const inv = typeof s.invertido === "number" ? ` (invertiste ${money(s.invertido)})` : "";
+    parts.push(`Tenés ${formatQuantity(s.cantidad!)} ${s.symbol}${inv}`);
     if (s.precio_actual === null) parts.push("ahora no tengo el precio actual");
   } else if (s.precio_actual !== null) {
     parts.push(`${s.symbol} cotiza hoy a ${money(s.precio_actual)}`);
@@ -926,10 +935,14 @@ export function buildMarketReply(
   let reply = parts.length ? parts.join("; ") + "." : "";
 
   if (hasPosition && wantsAth) {
-    if (s.maximo !== null && s.valor_al_maximo !== null && s.ganancia_al_maximo !== null) {
+    // El VALOR al máximo (cantidad × máximo) se muestra aunque no sepamos lo invertido; la GANANCIA
+    // se agrega solo si el invertido está disponible en la misma moneda (si no, se omite, no se inventa).
+    if (s.maximo !== null && s.valor_al_maximo !== null) {
+      const gain =
+        s.ganancia_al_maximo !== null ? ` — ganancia de ${money(s.ganancia_al_maximo)} sobre lo invertido` : "";
       const hoy =
-        s.ganancia_al_precio_actual !== null ? ` (hoy, al precio actual, sería ${money(s.ganancia_al_precio_actual)})` : "";
-      reply += ` Al ${maxShort} de ${money(s.maximo)}${fecha} tu posición valdría ${money(s.valor_al_maximo)} — ganancia de ${money(s.ganancia_al_maximo)} sobre lo invertido${hoy}. Ojo: el máximo es pasado y no se puede cronometrar el techo — es un escenario, no un plan.`;
+        gain && s.ganancia_al_precio_actual !== null ? ` (hoy, al precio actual, sería ${money(s.ganancia_al_precio_actual)})` : "";
+      reply += ` Al ${maxShort} de ${money(s.maximo)}${fecha} tu posición valdría ${money(s.valor_al_maximo)}${gain}${hoy}. Ojo: el máximo es pasado y no se puede cronometrar el techo — es un escenario, no un plan.`;
     } else {
       reply += ` No tengo el máximo para calcular ese escenario; decime a qué precio simular.`;
     }

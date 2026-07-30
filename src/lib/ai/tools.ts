@@ -927,9 +927,14 @@ export function computeMarketScenario(input: {
   // como null para no imprimir "cotiza a $0" ni contaminar el escenario (el cálculo al máximo sigue).
   const price = isValidPrice(input.price) ? input.price : null;
   const high = isValidPrice(input.high) ? input.high : null;
-  const hasPos = typeof invertido === "number" && invertido >= 0 && typeof cantidad === "number" && cantidad > 0;
-  const valorActual = hasPos && price !== null ? Math.round(cantidad! * price) : null;
-  const valorMaximo = hasPos && high !== null ? Math.round(cantidad! * high) : null;
+  // VALOR (cantidad × precio) necesita SOLO la cantidad; la GANANCIA necesita además lo invertido.
+  // Se desacoplan: si no sabemos/no pudimos convertir lo invertido a la moneda del escenario, igual
+  // damos el valor y el valor-al-máximo (una sola moneda), y omitimos la ganancia — NUNCA mezclamos
+  // CRC-como-$ con USD (el bug de "invertiste $2.731.089" con ganancia absurda).
+  const hasQty = typeof cantidad === "number" && cantidad > 0;
+  const hasInv = typeof invertido === "number" && invertido >= 0;
+  const valorActual = hasQty && price !== null ? Math.round(cantidad! * price) : null;
+  const valorMaximo = hasQty && high !== null ? Math.round(cantidad! * high) : null;
   const maximoTipo = high === null ? null : input.highKind === "ath" ? "ath" : input.highKind === "52w" ? "52_semanas" : null;
   return {
     symbol: input.symbol,
@@ -939,12 +944,12 @@ export function computeMarketScenario(input: {
     maximo: high,
     maximo_tipo: maximoTipo,
     maximo_fecha: high === null ? null : input.highDate,
-    cantidad: hasPos ? cantidad! : null,
-    invertido: hasPos ? invertido! : null,
+    cantidad: hasQty ? cantidad! : null,
+    invertido: hasInv ? invertido! : null,
     valor_actual: valorActual,
-    ganancia_al_precio_actual: valorActual !== null ? valorActual - invertido! : null,
+    ganancia_al_precio_actual: valorActual !== null && hasInv ? valorActual - invertido! : null,
     valor_al_maximo: valorMaximo,
-    ganancia_al_maximo: valorMaximo !== null ? valorMaximo - invertido! : null,
+    ganancia_al_maximo: valorMaximo !== null && hasInv ? valorMaximo - invertido! : null,
     nota:
       maximoTipo === "52_semanas"
         ? "El máximo es el de 52 semanas (las acciones no exponen un ATH real); es pasado, no un objetivo."

@@ -40,6 +40,27 @@ describe("computeMarketScenario · ganancia REAL con datos del tool + invertido 
     expect(r.ganancia_al_maximo).toBe(30 * 560 - 10000);
   });
 
+  it("cantidad SIN invertido (FX no pudo convertir) → valor y valor-al-máximo, ganancia null (nunca moneda mezclada)", () => {
+    // 0,15 BTC, precio $126.080, ATH $126.080; invertido NO disponible en USD (el conversor falló).
+    const r = computeMarketScenario({
+      symbol: "BTC",
+      assetType: "crypto",
+      currency: "USD",
+      price: 126080,
+      high: 126080,
+      highKind: "ath",
+      highDate: "2024-03-14",
+      cantidad: 0.15,
+      // invertido omitido a propósito
+    });
+    expect(r.cantidad).toBe(0.15);
+    expect(r.invertido).toBeNull(); // no se arrastra un CRC mal etiquetado
+    expect(r.valor_actual).toBe(Math.round(0.15 * 126080)); // valor SÍ (solo necesita cantidad)
+    expect(r.valor_al_maximo).toBe(Math.round(0.15 * 126080));
+    expect(r.ganancia_al_precio_actual).toBeNull(); // sin invertido → sin ganancia (no se inventa)
+    expect(r.ganancia_al_maximo).toBeNull();
+  });
+
   it("sin posición (falta invertido/cantidad) → devuelve precio y máximo, sin inventar la ganancia", () => {
     const r = computeMarketScenario({
       symbol: "BTC",

@@ -720,6 +720,21 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     expect(reply).not.toMatch(/máximo histórico|ATH/i);
   });
 
+  it("posición SIN invertido (FX falló): muestra valor al ATH en UNA moneda, sin 'invertiste' ni ganancia", () => {
+    // 0,15 BTC, ATH $126.080 → valor al ATH 0,15×126.080. Sin invertido (undefined) no debe aparecer
+    // "invertiste" ni "ganancia" (el bug era CRC-como-$ con ganancia absurda −$2,7M).
+    const reply = buildMarketReply(
+      { symbol: "BTC", precio_actual: 126080, maximo: 126080, maximo_tipo: "ath", cantidad: 0.15, invertido: null, valor_actual: 18912, ganancia_al_precio_actual: null, valor_al_maximo: 18912, ganancia_al_maximo: null },
+      "USD",
+      true,
+      true,
+    );
+    expect(reply).toMatch(/valdr[íi]a \$18\.912/); // valor al ATH, una sola moneda
+    expect(reply).not.toMatch(/invertiste/i); // no arrastra el invertido mal convertido
+    expect(reply).not.toMatch(/ganancia/i); // sin invertido no se inventa ganancia
+    expect(reply).not.toMatch(/-\$|−\$/); // nada de pérdidas absurdas
+  });
+
   it("cripto sub-$1: el ATH/precio NO se muestra como '$0' (bug del formatMoney fiat 0 dec)", () => {
     // KMNO ~ $0,2478: con formatMoney(USD) salía "$0" y parecía "sin dato".
     const reply = buildMarketReply(
