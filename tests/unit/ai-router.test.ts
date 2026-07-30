@@ -21,7 +21,7 @@ const getEnvelopesSummary = vi.fn();
 const formatEnvelopesReply = vi.fn();
 const suggestSobreForChatFast = vi.fn();
 const getSobreRemaining = vi.fn();
-const listSobresForKind = vi.fn(async () => [] as { id: string; sobre: string; frasco: string | null }[]);
+const listSobresForKind = vi.fn(async (..._a: unknown[]) => [] as { id: string; sobre: string; frasco: string | null }[]);
 vi.mock("@/modules/financial-base", () => ({
   getLiquidityBalance: () => getLiquidityBalance(),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
