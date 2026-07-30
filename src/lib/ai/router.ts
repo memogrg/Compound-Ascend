@@ -764,14 +764,18 @@ async function resolveMarketQuery(
     // (WhatsApp) o sin posición → undefined y el carril sigue mostrando solo el dato de mercado.
     let cantidad = holding?.quantity;
     let invertido = holding?.invested;
-    let posCurrency = holding?.currency ?? cur;
+    // OJO: ctx.holdings.invested (top-N del context-engine) ya está en la moneda PRINCIPAL (cur), NO
+    // en la nativa del holding. Antes se usaba holding.currency (nativa): para un holding en USD y
+    // display CRC, posCurrency=USD == scenCurrency=USD → NO convertía y mostraba el monto CRC con
+    // símbolo $ (p. ej. "invertiste $2.731.089" para 0,15 BTC). La moneda de invertido acá es cur.
+    let posCurrency = cur;
     let assetHint = holding?.assetType;
     if (!holding) {
       const full = await getFullPosition(symbol);
       if (full) {
         cantidad = full.quantity;
         invertido = full.invested;
-        posCurrency = full.currency;
+        posCurrency = full.currency; // getPositionForSymbol devuelve invertido en moneda NATIVA
         assetHint = full.assetType;
       }
     }
