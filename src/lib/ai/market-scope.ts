@@ -6,6 +6,21 @@
  */
 import { formatMoney } from "@/lib/format";
 
+/**
+ * Formato de dinero CRIPTO-AWARE para el carril de mercado: en USD (fiat) formatMoney usa 0 decimales,
+ * así que un precio/ATH < $1 (DOGE ~$0,24, KMNO ATH ~$0,2478) se mostraba como "$0" — parecía "sin
+ * dato". Acá se dan decimales por MAGNITUD: valores ≥ 1 quedan limpios (0 dec, como antes); los < 1
+ * muestran decimales para no colapsar a "$0". Puro.
+ */
+export function formatMarketMoney(n: number, currency: string): string {
+  const a = Math.abs(n);
+  const dec = a === 0 || a >= 1 ? 0 : a >= 0.01 ? 4 : 6;
+  const s = formatMoney(n, currency, dec);
+  // Los decimales fijos padean ceros ("$0,2400"): en un precio sobran. Si hay parte decimal
+  // (separador ","), quito los ceros finales y una coma huérfana. Los enteros (miles con ".") no se tocan.
+  return s.includes(",") ? s.replace(/0+$/, "").replace(/,$/, "") : s;
+}
+
 /** Alcance de la pregunta: altcoins (cripto EXCEPTO BTC), toda la cripto, o todas las inversiones. */
 export type ScopeKind = "altcoins" | "crypto" | "all";
 
@@ -144,7 +159,7 @@ export function buildMultiReply(scenario: MultiScenario, mod: PriceModifier, sco
   if (computed.length === 0) {
     return `No pude calcular el escenario de ${scopeLabel}: me falta el precio/ATH de ${scenario.missing.length ? scenario.missing.join(", ") : "esas posiciones"} en la fuente ahora. Reintentá en un momento o decime un precio objetivo.`;
   }
-  const money = (n: number, c: string) => formatMoney(n, c);
+  const money = (n: number, c: string) => formatMarketMoney(n, c);
   const totalLines = scenario.totalsByCurrency.map((t) => {
     const signo = t.gain >= 0 ? "+" : "";
     return `${money(t.value, t.currency)} (ganancia ${signo}${money(t.gain, t.currency)} sobre lo invertido)`;

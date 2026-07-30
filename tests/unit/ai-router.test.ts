@@ -666,6 +666,18 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     expect(reply).not.toMatch(/máximo histórico|ATH/i);
   });
 
+  it("cripto sub-$1: el ATH/precio NO se muestra como '$0' (bug del formatMoney fiat 0 dec)", () => {
+    // KMNO ~ $0,2478: con formatMoney(USD) salía "$0" y parecía "sin dato".
+    const reply = buildMarketReply(
+      { symbol: "KMNO", precio_actual: 0.24, maximo: 0.2478, maximo_tipo: "ath", valor_actual: 2400, ganancia_al_precio_actual: 400, valor_al_maximo: 2478, ganancia_al_maximo: 478 },
+      "USD",
+      true,
+      true,
+    );
+    expect(reply).toMatch(/0,2478/); // el ATH se ve con decimales
+    expect(reply).not.toMatch(/\$0(?![.,]\d)/); // nunca colapsa a "$0" (pero "$0,2478" sí es válido)
+  });
+
   it("JUP fuera del top-N: igual ENCUENTRA la posición (holdings completas) y calcula al ATH, sin '$0'", async () => {
     // JUP NO está en ctx.holdings (top-N compacto) — el bug del $0 lo dejaba fuera.
     const ctxSinJup = {
