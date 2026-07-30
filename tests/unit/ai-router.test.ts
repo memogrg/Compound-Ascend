@@ -47,7 +47,7 @@ vi.mock("@/modules/wealth", () => ({
 // FX del carril multi-posición (import dinámico): tasas fijas para no pegarle a la red.
 vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: async () => ({ USD: 1, CRC: 530 }) }));
 
-import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote } from "@/lib/ai/router";
+import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote, normalizeSlang } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
 // FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
@@ -228,6 +228,100 @@ describe("terminología · 'listá mis metas' enumera; 'cuáles son mis sobres' 
   it("'cuáles son mis sobres' → listar_sobres", () => {
     expect(matchIntent("¿cuáles son mis sobres?")?.intent).toBe("listar_sobres");
     expect(matchIntent("mostrame mis frascos")?.intent).toBe("listar_sobres");
+  });
+});
+
+describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", () => {
+  it("normalizeSlang mapea el slang de dinero a un token canónico", () => {
+    expect(normalizeSlang("¿en qué se me va la guita?")).toMatch(/dinero/i);
+    expect(normalizeSlang("¿en qué se me va la lana?")).toMatch(/dinero/i);
+    expect(normalizeSlang("me alcanza pa unos tacos")).toMatch(/para/i);
+  });
+
+  it("SLANG de gasto: 'en qué se me va la {plata/lana/guita/pisto}' → gasto_categoria", () => {
+    for (const w of ["la plata", "la lana", "la guita", "el pisto", "el billete"]) {
+      expect(matchIntent(`¿en qué se me va ${w}?`)?.intent).toBe("gasto_categoria");
+    }
+    expect(matchIntent("¿cuál es el sobre más caro que tengo?")?.intent).toBe("gasto_categoria");
+  });
+
+  it("DEFENSA: fondo emergencia/paz, colchón y 'si me botan' → defensa_fondo con su foco", () => {
+    expect(matchIntent("¿tengo fondo de emergencia?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "emergencia" } });
+    expect(matchIntent("¿cuánto llevo en el fondo de paz?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "paz" } });
+    expect(matchIntent("¿cuántos meses de colchón tengo?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "colchon" } });
+    expect(matchIntent("si me botan del trabajo, ¿cuánto aguanto?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "colchon" } });
+    expect(matchIntent("¿ya estoy blindado?")?.intent).toBe("defensa_fondo");
+  });
+
+  it("INVERSIONES resumen vs símbolo puntual", () => {
+    expect(matchIntent("¿cuánto tengo invertido en total?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cómo va mi portafolio?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cuánto he ganado o perdido en inversiones?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cuál es el valor actual de mis inversiones?")?.intent).toBe("resumen_inversiones");
+    // un símbolo puntual sigue yendo al carril de mercado, no a resumen.
+    expect(matchIntent("¿cuánto vale mi ETH ahorita?")?.intent).toBe("datos_mercado");
+    expect(matchIntent("¿cuánto aporto de DCA al mes?")?.intent).toBe("dca_mensual");
+  });
+
+  it("AHORRO/METAS: ahorro mensual, meta más cercana y falta pa {meta}", () => {
+    expect(matchIntent("¿cuánto ahorro al mes en total?")?.intent).toBe("ahorro_mensual");
+    expect(matchIntent("¿cuál es mi meta más cercana a completarse?")?.intent).toBe("meta_cercana");
+    const fm = matchIntent("¿cuánto me falta pa la casa?");
+    expect(fm?.intent).toBe("falta_meta");
+    expect(fm?.params.metaName).toBe("casa");
+  });
+
+  // ── answerFromContext (cifra del motor) ──
+  const ctxDef = {
+    ...CTX,
+    mesesDeColchon: 4,
+    defenseFunds: {
+      currency: "CRC",
+      activeFund: "emergency",
+      emergency: { registrado: true, actual: 300000, objetivo: 900000, progresoPct: 33, aporteRecomendado: 50000, cubierto: false },
+      paz: { registrado: false, actual: 0, objetivo: 1800000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+    },
+  } as FinancialContext;
+
+  it("defensa_fondo emergencia usa defenseFunds (registrado → acumulado/objetivo/brecha)", () => {
+    const r = answerFromContext("defensa_fondo", { focus: "emergencia" }, tc, ctxDef);
+    expect(r?.reply).toMatch(/de emergencia/i);
+    expect(r?.reply).toContain("300.000");
+    expect(r?.reply).toContain("900.000");
+    expect(r?.reply).toMatch(/faltan/i);
+  });
+
+  it("defensa_fondo colchón usa mesesDeColchon (no inventa)", () => {
+    const r = answerFromContext("defensa_fondo", { focus: "colchon" }, tc, ctxDef);
+    expect(r?.reply).toMatch(/4 meses de colch/i);
+    expect(answerFromContext("defensa_fondo", { focus: "colchon" }, tc, CTX)).toBeNull(); // sin dato → escala
+  });
+
+  it("ahorro_mensual / dca_mensual / resumen_inversiones salen del contexto (0 fetch)", () => {
+    const ctxInv = {
+      ...CTX,
+      compromisoDesglose: { sobres: 0, metas: 90000, dca: 45000, deudas: 0, seguros: 0 },
+      investmentInvested: 1_000_000,
+      investmentValue: 1_250_000,
+      investmentPL: 250_000,
+    } as FinancialContext;
+    expect(answerFromContext("ahorro_mensual", {}, tc, ctxInv)?.reply).toContain("90.000");
+    expect(answerFromContext("dca_mensual", {}, tc, ctxInv)?.reply).toContain("45.000");
+    const r = answerFromContext("resumen_inversiones", {}, tc, ctxInv);
+    expect(r?.reply).toContain("1.250.000"); // valor
+    expect(r?.reply).toContain("1.000.000"); // invertido
+    expect(r?.reply).toMatch(/gan[aá]s/i); // P/L positivo
+    expect(answerFromContext("dca_mensual", {}, tc, CTX)).toBeNull(); // sin dato → escala
+  });
+
+  it("falta_meta y meta_cercana usan tc.goals (Fondo emergencia 40% > Viaje 15%)", () => {
+    const fm = answerFromContext("falta_meta", { metaName: "viaje" }, tc);
+    expect(fm?.reply).toMatch(/Viaje Jap[oó]n/i);
+    expect(fm?.reply).toMatch(/faltan/i);
+    const mc = answerFromContext("meta_cercana", {}, tc);
+    expect(mc?.reply).toMatch(/Fondo de emergencia/i); // 40% es la más cercana
+    // meta inexistente → null (escala, no adivina)
+    expect(answerFromContext("falta_meta", { metaName: "yate" }, tc)).toBeNull();
   });
 });
 

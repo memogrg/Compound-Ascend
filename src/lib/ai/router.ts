@@ -51,7 +51,19 @@ type Intent =
   | "metas"
   // "cuáles metas debo aportar este mes" → SOLO metas de ahorro recurrentes con su aporte (no sobres):
   | "metas_a_aportar"
+  // "cuánto me falta pa {meta}" → brecha de una meta por nombre (tc.goals):
+  | "falta_meta"
+  // "¿cuál es mi meta más cercana a completarse?" → meta con mayor progreso (tc.goals):
+  | "meta_cercana"
   | "cuota_deuda"
+  // DEFENSA (fondo de emergencia/paz, meses de colchón, "si me botan") → ctx.defenseFunds/mesesDeColchon:
+  | "defensa_fondo"
+  // "¿cuánto ahorro al mes?" → aportes a metas (compromisoDesglose.metas):
+  | "ahorro_mensual"
+  // Inversiones: "cuánto invertido / cómo va el portafolio / ganancia o pérdida" → ctx.investment*:
+  | "resumen_inversiones"
+  // "¿cuánto aporto de DCA al mes?" → compromisoDesglose.dca:
+  | "dca_mensual"
   // R2 — datos ya en FinancialContext (ctx), 0 fetch, ambos canales:
   | "gasto_mes"
   | "ingreso_mes"
@@ -80,6 +92,12 @@ const KNOWN_INTENTS: Intent[] = [
   "numero_libertad",
   "metas",
   "metas_a_aportar",
+  "falta_meta",
+  "meta_cercana",
+  "defensa_fondo",
+  "ahorro_mensual",
+  "resumen_inversiones",
+  "dca_mensual",
   "cuota_deuda",
   "gasto_mes",
   "ingreso_mes",
@@ -256,9 +274,72 @@ export function isMultiPart(text: string): boolean {
   return twoQ || secondTopic;
 }
 
+/**
+ * Diccionario de SLANG latino (CR/MX/CO/AR/VE/PE/CL): normaliza sinónimos a un token canónico ANTES
+ * de matchear, para que "¿en qué se me va la lana/guita/pisto?" caiga en el mismo carril que "la plata".
+ * Solo toca palabras coloquiales inequívocas (no altera montos, símbolos ni nombres de sobre).
+ */
+const SLANG_MAP: [RegExp, string][] = [
+  [/\b(?:lana|guita|pisto|billete|biyuyo|varo|feria|plata|luca|luka|money|pasta|mosca|billullo)\b/gi, "dinero"],
+  [/\bpa'?\b/gi, "para"], // "pa" / "pa'" → "para"
+];
+export function normalizeSlang(text: string): string {
+  let t = text;
+  for (const [re, rep] of SLANG_MAP) t = t.replace(re, rep);
+  return t;
+}
+
 /** PATRONES: intent + params con CERO tokens. null si no matchea con confianza. */
 export function matchIntent(text: string): { intent: Intent; params: Record<string, unknown> } | null {
-  const t = text.trim();
+  // Normalizamos el slang de dinero ("lana/guita/pisto…" → "dinero") antes de matchear. No afecta la
+  // extracción de montos (usa ₡/$ y dígitos) ni de nombres de sobre (no son palabras de slang).
+  const t = normalizeSlang(text.trim());
+
+  // ── Carriles nuevos (van ANTES de datos_mercado y del guard de REASONING_CUES, que atraparían
+  //    "cuánto vale" / "cómo va" / "debería" y los mandaría al LLM). Todos deterministas, cifra del motor. ──
+
+  // DEFENSA (fondo de emergencia/paz, meses de colchón, "si me botan cuánto aguanto", "¿estoy blindado?").
+  if (
+    /fondo de emergencia|fondo de paz|de emergencia\b|\bcolch[oó]n\b|si me (?:botan|despiden|corren|echan|largan)|me quedo sin (?:trabajo|empleo|chamba|pega)|blindad|protegid|(?:cu[aá]ntos?\s+)?meses (?:de colch|aguant|de respaldo)|si (?:viene|cae) una (?:vara|situaci)/i.test(t)
+  ) {
+    const focus =
+      /\bpaz\b/i.test(t)
+        ? "paz"
+        : /\bcolch[oó]n\b|si me (?:botan|despiden|corren|echan|largan)|aguant|(?:cu[aá]ntos?\s+)?meses|me quedo sin/i.test(t)
+          ? "colchon"
+          : "emergencia";
+    return { intent: "defensa_fondo", params: { focus } };
+  }
+
+  // INVERSIONES — resumen del portafolio (NO un símbolo puntual como "mi ETH", que va a datos_mercado).
+  // Se excluye la frase de restante-de-sobre ("me queda en/de {sobre}"): esa es saldo_sobre aunque
+  // mencione "inversión" en otra parte ("…¿y hay aporte de inversión pendiente?").
+  if (
+    /\b(?:portafolio|portfolio|cartera|inversi[oó]n(?:es)?|invertid[oa]s?)\b/i.test(t) &&
+    /cu[aá]nto|c[oó]mo va|valor|gan[aeáéoó]|p[eé]rd|rinde|rendimiento|\bvoy\b|total/i.test(t) &&
+    !/\bsi\s+vend/i.test(t) &&
+    !/\bme queda\s+(?:en|de|del)\b/i.test(t)
+  ) {
+    return { intent: "resumen_inversiones", params: {} };
+  }
+  // DCA mensual ("¿cuánto aporto de DCA al mes?").
+  if (/\bdca\b|cu[aá]nto\s+aporto\s+(?:de\s+dca\s+)?(?:al mes|mensual|por mes|cada mes)/i.test(t)) {
+    return { intent: "dca_mensual", params: {} };
+  }
+
+  // AHORRO — "¿cuánto ahorro al mes?" (presente, cifra actual; NO "cuánto debo guardar para…", que proyecta).
+  if (/cu[aá]nto\s+(?:ahorro|guardo|aparto)\s+(?:al mes|mensual(?:mente)?|por mes|en total)/i.test(t)) {
+    return { intent: "ahorro_mensual", params: {} };
+  }
+  // META más cercana a completarse.
+  if (/meta\s+m[aá]s\s+(?:cercana|pr[oó]xima)|(?:cu[aá]l|qu[eé]).*meta.*(?:m[aá]s cerca|por completar|casi)/i.test(t)) {
+    return { intent: "meta_cercana", params: {} };
+  }
+  // "¿Cuánto me falta pa {meta}?" (por nombre). Defensa/independencia ya se atraparon arriba.
+  const faltaMeta = t.match(/cu[aá]nto\s+(?:me\s+)?falta\s+(?:para|pa)\s+(.+?)[\?\.!¿¡]*$/i);
+  if (faltaMeta?.[1]) {
+    return { intent: "falta_meta", params: { metaName: faltaMeta[1].replace(/^(?:el|la|los|las|mi|mis|un|una)\s+/i, "").trim() } };
+  }
 
   // Precio/ATH/"si vendo X en el máximo": carril DETERMINISTA (llama datos_de_mercado, no depende
   // de que el LLM decida). Antes que REASONING_CUES ("si vendo" no está ahí, pero "máximo" podría
@@ -322,13 +403,17 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
     return { intent: "cuota_deuda", params: { debtName: extractDebtName(t) } };
   }
   // R2 — gasto por categoría / dominante ("¿en qué gasto más?"). Antes que gasto_mes (más específico).
-  if (/en qu[eé] (?:gasto|gast[eé])|(?:categor[ií]a|rubro).*(?:m[aá]s gasto|gasto)|(?:mayor|m[aá]s alto|principal) gasto|d[oó]nde se (?:va|van) (?:mi|el)/i.test(t)) {
+  // Gasto dominante / sobre más caro. Incluye slang ya normalizado ("en qué se me va el dinero") y el
+  // sinónimo "sobre más caro" (= sobre de mayor gasto). "dónde se va" / "en qué se me va".
+  if (
+    /en qu[eé] (?:gasto|gast[eé])|(?:categor[ií]a|rubro).*(?:m[aá]s gasto|gasto)|(?:mayor|m[aá]s alto|principal) gasto|sobre (?:m[aá]s caro|de mayor gasto)|d[oó]nde se (?:va|van) (?:mi|el|la)|en qu[eé] se (?:me )?va\b/i.test(t)
+  ) {
     return { intent: "gasto_categoria", params: {} };
   }
   if (/(?:cu[aá]nto|qu[eé])\s+(?:gast[eéoó]|llevo gastado)|(?:mi|el)\s+gasto (?:del mes|mensual|este mes)|gast[eé] (?:este mes|en el mes)/i.test(t)) {
     return { intent: "gasto_mes", params: {} };
   }
-  if (/(?:cu[aá]nto|qu[eé])\s+(?:gan[eéoó]|ingres[eéoó])|(?:mis|el|los)\s+ingresos?\b|cu[aá]nto (?:me )?entr[oó]/i.test(t)) {
+  if (/(?:cu[aá]nto|qu[eé])\s+(?:gan[eéoó]|ingres[eéoó])|(?:mis|el|los)\s+ingresos?\b|cu[aá]nto (?:me )?(?:entr[oó]|cae|llega|cae al mes)/i.test(t)) {
     return { intent: "ingreso_mes", params: {} };
   }
   // Flujo libre ("¿cuánto tengo libre pa gastar?", "¿cuánto me sobra?", "¿cuál es mi flujo libre?") →
@@ -364,7 +449,7 @@ async function classifyWithLite(
   if (!lite) return null;
   const system =
     "Clasificás preguntas de finanzas personales. Devolvé SOLO JSON " +
-    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"metas_a_aportar"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"flujo_libre"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
+    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"metas_a_aportar"|"meta_cercana"|"defensa_fondo"|"ahorro_mensual"|"resumen_inversiones"|"dca_mensual"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"flujo_libre"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
     "numero_seguridad=capital para sus gastos esenciales; numero_independencia=capital para su vida actual; " +
     "numero_libertad=capital para su estilo de vida deseado (NO son lo mismo; no los mezcles). " +
     "gasto_mes=cuánto gasta al mes; ingreso_mes=cuánto gana; gasto_categoria=en qué gasta más; " +
@@ -373,6 +458,9 @@ async function classifyWithLite(
     "ultimos_movimientos=sus transacciones recientes; " +
     "listar_sobres=enumerar sus sobres/frascos/metas (no su progreso). metas=el progreso de sus metas. " +
     "metas_a_aportar=a cuáles metas de ahorro RECURRENTES le toca aportar este mes (con su monto); NO son los sobres de gasto. " +
+    "meta_cercana=cuál meta está más cerca de completarse. defensa_fondo=estado de su fondo de emergencia/paz o meses de colchón. " +
+    "ahorro_mensual=cuánto ahorra al mes (aportes a metas). resumen_inversiones=cuánto tiene invertido / cómo va el portafolio / ganancia. " +
+    "dca_mensual=cuánto aporta de DCA al mes. " +
     '"complejo": true si pide análisis, proyección, consejo, comparación o cualquier cosa más allá de consultar un dato simple. Ante duda: "otro" o complejo:true.';
   try {
     const r = await lite.chat({ system, messages: [{ role: "user", content: text }], maxTokens: 40 });
@@ -561,6 +649,90 @@ export function answerFromContext(
       .slice(0, 6)
       .map((g) => `• ${g.nombre}: ${money(g.actual)} de ${money(g.objetivo)} (${pct(g.actual, g.objetivo)}%)`);
     return say(`Tenés ${goals.length} ${goals.length === 1 ? "meta" : "metas"}:\n${lines.join("\n")}`);
+  }
+
+  // DEFENSA — estado REAL de los fondos (ctx.defenseFunds del fund-sizing) o meses de colchón.
+  if (intent === "defensa_fondo") {
+    const focus = params.focus === "paz" ? "paz" : params.focus === "colchon" ? "colchon" : "emergencia";
+    if (focus === "colchon") {
+      const m = ctx?.mesesDeColchon;
+      if (typeof m !== "number") return null;
+      return say(
+        `Tenés ~${m} ${m === 1 ? "mes" : "meses"} de colchón (tu liquidez ÷ tu gasto mensual). Si perdés el ingreso, es lo que aguantás cubriendo tu gasto actual.`,
+      );
+    }
+    const df = ctx?.defenseFunds;
+    if (!df) {
+      const m = ctx?.mesesDeColchon;
+      if (typeof m === "number")
+        return say(`Todavía no tengo tus fondos de defensa registrados, pero tenés ~${m} ${m === 1 ? "mes" : "meses"} de colchón (liquidez ÷ gasto).`);
+      return null; // sin dato → escala
+    }
+    const f = focus === "paz" ? df.paz : df.emergency;
+    const label = focus === "paz" ? "de paz" : "de emergencia";
+    const m2 = (n: number) => formatMoney(n, df.currency);
+    if (!f.registrado) {
+      return say(`Todavía no tenés registrado tu fondo ${label}. El objetivo sugerido es ${m2(f.objetivo)}; si querés lo creamos y te digo cuánto apartar al mes.`);
+    }
+    if (f.cubierto) {
+      return say(`Tu fondo ${label} está COMPLETO: ${m2(f.actual)} de ${m2(f.objetivo)} (100%). ¡Blindado por ese lado!`);
+    }
+    const falta = Math.max(0, f.objetivo - f.actual);
+    return say(
+      `Tu fondo ${label} va en ${m2(f.actual)} de ${m2(f.objetivo)} (${f.progresoPct}%); te faltan ${m2(falta)}. Aporte sugerido: ${m2(f.aporteRecomendado)}/mes.`,
+    );
+  }
+
+  // AHORRO mensual = suma de aportes a metas (compromisoDesglose.metas).
+  if (intent === "ahorro_mensual") {
+    const metas = ctx?.compromisoDesglose?.metas;
+    if (typeof metas !== "number" || metas <= 0) return null; // sin dato → escala
+    return say(`Aportás ~${money(metas)} al mes a tus metas de ahorro.`);
+  }
+
+  // INVERSIONES — resumen: invertido, valor actual y ganancia/pérdida (todo en moneda principal).
+  if (intent === "resumen_inversiones") {
+    const inv = ctx?.investmentInvested;
+    const val = ctx?.investmentValue;
+    const pl = ctx?.investmentPL;
+    if (typeof val !== "number" && typeof inv !== "number") return null;
+    const parts: string[] = [];
+    if (typeof val === "number") parts.push(`Tu portafolio vale ${money(val)}`);
+    if (typeof inv === "number") parts.push(`invertiste ${money(inv)}`);
+    if (typeof pl === "number") {
+      parts.push(`${pl >= 0 ? "ganás" : "perdés"} ${money(Math.abs(pl))} sobre lo invertido`);
+    }
+    return say(parts.join("; ") + ".");
+  }
+
+  // DCA mensual (aporte recurrente): compromisoDesglose.dca.
+  if (intent === "dca_mensual") {
+    const dca = ctx?.compromisoDesglose?.dca;
+    if (typeof dca !== "number" || dca <= 0) return null; // sin dato → escala
+    return say(`Tu aporte recurrente (DCA) es ~${money(dca)} al mes.`);
+  }
+
+  // "¿Cuánto me falta pa {meta}?" — brecha de una meta por nombre (tc.goals).
+  if (intent === "falta_meta") {
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
+    const name = typeof params.metaName === "string" ? norm(params.metaName) : "";
+    const goals = (tc.goals ?? []).filter((g) => (g.objetivo ?? 0) > 0);
+    const g = name ? goals.find((x) => norm(x.nombre).includes(name) || name.includes(norm(x.nombre))) : null;
+    if (!g) return null; // sin meta que matchee → escala (no adivina)
+    const falta = Math.max(0, g.objetivo - g.actual);
+    if (falta <= 0) return say(`Tu meta ${g.nombre} ya está completa: ${money(g.actual)} de ${money(g.objetivo)}. ¡Listo!`);
+    return say(`Para ${g.nombre} te faltan ${money(falta)} (llevás ${money(g.actual)} de ${money(g.objetivo)}, ${pct(g.actual, g.objetivo)}%).`);
+  }
+
+  // Meta más cercana a completarse (mayor % de progreso, aún en curso).
+  if (intent === "meta_cercana") {
+    const goals = (tc.goals ?? []).filter((g) => (g.objetivo ?? 0) > 0 && g.actual < g.objetivo);
+    if (goals.length === 0) return say("No tenés metas de ahorro en curso ahora mismo.");
+    const closest = goals.reduce((a, b) => (pct(b.actual, b.objetivo) > pct(a.actual, a.objetivo) ? b : a));
+    const falta = Math.max(0, closest.objetivo - closest.actual);
+    return say(
+      `Tu meta más cercana a completarse es ${closest.nombre}: ${pct(closest.actual, closest.objetivo)}% (${money(closest.actual)} de ${money(closest.objetivo)}), te faltan ${money(falta)}.`,
+    );
   }
 
   if (intent === "cuota_deuda") {
