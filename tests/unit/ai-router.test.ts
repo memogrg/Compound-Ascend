@@ -177,6 +177,60 @@ describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () =>
   });
 });
 
+describe("metas_a_aportar · SOLO metas de ahorro recurrentes con su aporte (no sobres)", () => {
+  // Metas de ahorro: 2 recurrentes (con aporte), 1 one-shot (recurrence 'ninguna') que NO debe salir.
+  const tcMetas: ToolContext = {
+    ...tc,
+    goals: [
+      { nombre: "Fondo de emergencia", objetivo: 12_000, actual: 3_000, aporte_mensual: 200, recurrence: "mensual" },
+      { nombre: "Seguro anual", objetivo: 1_200, actual: 300, aporte_mensual: 100, recurrence: "anual" },
+      { nombre: "Carro", objetivo: 8_000, actual: 1_000, aporte_mensual: 300, recurrence: "ninguna" },
+    ],
+  };
+
+  it("clasifica 'cuáles metas debo aportar este mes' → metas_a_aportar (no listar_sobres)", () => {
+    expect(matchIntent("¿cuáles metas debo aportar este mes?")?.intent).toBe("metas_a_aportar");
+    expect(matchIntent("qué metas toca aportar")?.intent).toBe("metas_a_aportar");
+    expect(matchIntent("aportes pendientes de mis metas")?.intent).toBe("metas_a_aportar");
+  });
+
+  it("un consejo ('¿debería aportar más a mis metas?') NO cae acá → escala (null)", () => {
+    expect(matchIntent("¿debería aportar más a mis metas?")).toBeNull();
+  });
+
+  it("lista SOLO las recurrentes con aporte + el total; NADA de la meta one-shot ni de sobres", () => {
+    const r = answerFromContext("metas_a_aportar", {}, tcMetas);
+    expect(r?.reply).toContain("Fondo de emergencia");
+    expect(r?.reply).toContain("Seguro anual");
+    expect(r?.reply).not.toContain("Carro"); // one-shot (recurrence 'ninguna') → excluida
+    expect(r?.reply).not.toMatch(/sobre/i); // metas ≠ sobres de gasto
+    expect(r?.reply).toMatch(/Total a apartar:/);
+    expect(r?.reply).toContain("300"); // total = 200 + 100
+    expect(r?.reply).toMatch(/anual/); // aclara la cadencia no-mensual
+  });
+
+  it("sin metas recurrentes → mensaje honesto que las separa de los sobres de gasto", () => {
+    const sinRec: ToolContext = {
+      ...tc,
+      goals: [{ nombre: "Carro", objetivo: 8_000, actual: 1_000, aporte_mensual: 300, recurrence: "ninguna" }],
+    };
+    const r = answerFromContext("metas_a_aportar", {}, sinRec);
+    expect(r?.reply).toMatch(/recurrentes/i);
+    expect(r?.reply).toMatch(/sobres de gasto/i);
+  });
+});
+
+describe("terminología · 'listá mis metas' enumera; 'cuáles son mis sobres' → sobres", () => {
+  it("'listá mis metas' (sin señal de aporte) → listar_sobres (enumeración)", () => {
+    expect(matchIntent("listá mis metas")?.intent).toBe("listar_sobres");
+    expect(matchIntent("¿cuáles son mis metas?")?.intent).toBe("listar_sobres");
+  });
+  it("'cuáles son mis sobres' → listar_sobres", () => {
+    expect(matchIntent("¿cuáles son mis sobres?")?.intent).toBe("listar_sobres");
+    expect(matchIntent("mostrame mis frascos")?.intent).toBe("listar_sobres");
+  });
+});
+
 describe("tryRouteQuery · carriles y tokens", () => {
   it("consulta que matchea patrón → carril template, 0 tokens, cifra del motor", async () => {
     const routed = await tryRouteQuery(ask("¿cuál es mi número de libertad?"), CTX, tc);
