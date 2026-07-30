@@ -21,6 +21,7 @@ const getEnvelopesSummary = vi.fn();
 const formatEnvelopesReply = vi.fn();
 const suggestSobreForChatFast = vi.fn();
 const getSobreRemaining = vi.fn();
+const listSobresForKind = vi.fn(async (..._a: unknown[]) => [] as { id: string; sobre: string; frasco: string | null }[]);
 vi.mock("@/modules/financial-base", () => ({
   getLiquidityBalance: () => getLiquidityBalance(),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
@@ -28,6 +29,7 @@ vi.mock("@/modules/financial-base", () => ({
   formatEnvelopesReply: (...a: unknown[]) => formatEnvelopesReply(...a),
   suggestSobreForChatFast: (...a: unknown[]) => suggestSobreForChatFast(...a),
   getSobreRemaining: (...a: unknown[]) => getSobreRemaining(...a),
+  listSobresForKind: (...a: unknown[]) => listSobresForKind(...a),
 }));
 
 // Capa market-data: el carril determinista de precio/ATH la usa vía import dinámico.
@@ -225,6 +227,31 @@ describe("R2 · matchIntent (patrones)", () => {
     expect(matchIntent("mostrame mis últimos movimientos")?.intent).toBe("ultimos_movimientos");
   });
 
+  it("saldo_sobre: 'cuánto me queda en/de {sobre}' → saldo_sobre (NO liquidez), soporta varios", () => {
+    const one = matchIntent("¿cuánto me queda de supermercados?");
+    expect(one?.intent).toBe("saldo_sobre");
+    expect(one?.params.names).toEqual(["supermercados"]);
+    const multi = matchIntent("¿cuánto me queda en transporte, restaurantes?");
+    expect(multi?.intent).toBe("saldo_sobre");
+    expect(multi?.params.names).toEqual(["transporte", "restaurantes"]);
+    // "el sobre de mercado este mes" → nombre limpio.
+    expect(matchIntent("¿cuánto me queda en el sobre de mercado este mes?")?.params.names).toEqual(["mercado"]);
+  });
+
+  it("saldo_liquidez SOLO ante términos explícitos (no secuestra 'me queda de {sobre}')", () => {
+    expect(matchIntent("¿cuánto tengo líquido?")?.intent).toBe("saldo_liquidez");
+    expect(matchIntent("¿cuánto tengo disponible?")?.intent).toBe("saldo_liquidez");
+    expect(matchIntent("¿cuánto tengo en mis cuentas?")?.intent).toBe("saldo_liquidez");
+    // "cuánto me queda de super" NO es liquidez.
+    expect(matchIntent("¿cuánto me queda de super?")?.intent).toBe("saldo_sobre");
+  });
+
+  it("multi-parte: pregunta con otra parte no cubierta → marca multiPart (para escalar)", () => {
+    const r = matchIntent("¿cuánto me queda en transporte? ¿y hay aporte de inversión pendiente?");
+    expect(r?.intent).toBe("saldo_sobre");
+    expect(r?.params.multiPart).toBe(true);
+  });
+
   it("una proyección de gasto no se atrapa (escala)", () => {
     expect(matchIntent("¿cuánto gastaría si sumo Netflix por 12 meses?")).toBeNull();
   });
@@ -288,6 +315,56 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
     expect(routed?.lane).toBe("template");
     expect(routed?.tokensIn).toBe(0);
     expect(routed?.response.reply).toContain("1.875");
+  });
+
+  it("saldo_sobre → restante del sobre nombrado (getSobreRemaining), NO liquidez", async () => {
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-super", categoryPath: "Necesidades › Super" });
+    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Super", currency: "CRC", budget: 320000, spent: 120000, remaining: 200000, hasBudget: true });
+    const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.tokensIn).toBe(0);
+    expect(getLiquidityBalance).not.toHaveBeenCalled(); // NO cae en liquidez
+    expect(suggestSobreForChatFast).toHaveBeenCalledWith("supermercados", "gasto");
+    expect(routed?.response.reply).toMatch(/Super te quedan/i);
+    expect(routed?.response.reply).toContain("200.000");
+    expect(routed?.response.reply).toContain("320.000");
+  });
+
+  it("saldo_sobre multi: 'transporte, restaurantes' → los DOS sobres", async () => {
+    suggestSobreForChatFast.mockImplementation((desc: string) =>
+      /transporte/i.test(desc)
+        ? Promise.resolve({ categoryId: "c-tra", categoryPath: "Necesidades › Transporte" })
+        : Promise.resolve({ categoryId: "c-res", categoryPath: "Estilo › Restaurantes" }),
+    );
+    getSobreRemaining.mockImplementation((id: string) =>
+      id === "c-tra"
+        ? Promise.resolve({ path: "Transporte", currency: "CRC", budget: 140000, spent: 40000, remaining: 100000, hasBudget: true })
+        : Promise.resolve({ path: "Restaurantes", currency: "CRC", budget: 120000, spent: 90000, remaining: 30000, hasBudget: true }),
+    );
+    const routed = await tryRouteQuery(ask("¿cuánto me queda en transporte, restaurantes?"), CTX, tc);
+    expect(routed?.response.reply).toMatch(/Transporte/);
+    expect(routed?.response.reply).toMatch(/Restaurantes/);
+    expect(routed?.response.reply).toContain("100.000");
+    expect(routed?.response.reply).toContain("30.000");
+  });
+
+  it("saldo_sobre matchea por NOMBRE contra los sobres reales (no el clasificador)", async () => {
+    listSobresForKind.mockResolvedValue([
+      { id: "c-mer", sobre: "Mercado", frasco: "Necesidades" },
+      { id: "c-tra", sobre: "Transporte", frasco: "Necesidades" },
+    ]);
+    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Mercado", currency: "CRC", budget: 320000, spent: 120000, remaining: 200000, hasBudget: true });
+    // "supermercados" matchea "Mercado" (fuzzy: 'mercado' ⊂ 'supermercados').
+    const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
+    expect(getSobreRemaining).toHaveBeenCalledWith("c-mer", expect.any(String));
+    expect(suggestSobreForChatFast).not.toHaveBeenCalled(); // no cae al clasificador
+    expect(routed?.response.reply).toContain("200.000");
+  });
+
+  it("saldo_sobre multi-parte → escala (null), no responde una sola cosa mal", async () => {
+    const routed = await tryRouteQuery(ask("¿cuánto me queda en transporte? ¿y hay aporte de inversión pendiente?"), CTX, tc);
+    expect(routed).toBeNull();
+    expect(getSobreRemaining).not.toHaveBeenCalled();
   });
 
   it("ultimos_movimientos → lista las transacciones reales del ledger", async () => {
