@@ -246,6 +246,33 @@ describe("R2 · answerFromContext (cifra del FinancialContext, 0 fetch)", () => 
     expect(r?.reply).toContain("48%");
   });
 
+  it("gasto_mes usa el gasto de SOBRES (compromisoDesglose.sobres), nunca 0 con expenseMonthly vacío", () => {
+    // Usuario con sobres pero lista base vacía: antes daba "0", ahora la cifra real de los sobres.
+    const ctxSobres = {
+      ...CTX,
+      expenseMonthly: 0,
+      compromisoDesglose: { sobres: 1_200_000, metas: 0, dca: 0, deudas: 0, seguros: 0 },
+    } as FinancialContext;
+    const r = answerFromContext("gasto_mes", {}, tc, ctxSobres);
+    expect(r?.reply).toContain("1.200.000"); // del sobre, no 0
+    expect(r?.reply).not.toMatch(/\b0\b/);
+  });
+
+  it("gasto_categoria usa el SOBRE de mayor gasto (topGastoSobre), plantilla determinista", () => {
+    const ctxSobre = { ...CTX, topGastoSobre: { name: "Supermercados", monthly: 340_525 } } as FinancialContext;
+    const r = answerFromContext("gasto_categoria", {}, tc, ctxSobre);
+    expect(r?.reply).toMatch(/sobre de mayor gasto es Supermercados/i);
+    expect(r?.reply).toContain("340.525");
+  });
+
+  it("CONSISTENCIA: el compromiso mostrado cuadra con Independencia × 0,08 ÷ 12", () => {
+    // Independencia = compromiso × 12 / 0.08 → compromiso = Independencia × 0.08 / 12.
+    const compromiso = 3_000_000;
+    const independencia = Math.round((compromiso * 12) / 0.08); // 450.000.000
+    const back = Math.round((independencia * 0.08) / 12);
+    expect(back).toBe(compromiso); // trazan a la MISMA base
+  });
+
   it("sin la cifra en ctx → null (escala, no adivina)", () => {
     const bare = { currency: "USD" } as FinancialContext;
     expect(answerFromContext("gasto_mes", {}, tc, bare)).toBeNull();

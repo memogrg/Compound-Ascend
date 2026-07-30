@@ -16,6 +16,8 @@ import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { applyRankedProfile } from "@/lib/ai/profile-ranking";
 import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
+import type { AuthContext } from "@/lib/auth/auth-context";
+import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 
 /**
@@ -38,6 +40,11 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   if (!isSupabaseConfigured() || !user) return { name, currency: "CRC" };
 
   let ctx: FinancialContext = { name, currency: "CRC" };
+  // AuthContext de sesión compartido: al pasarlo a los servicios, TODAS las cifras se normalizan a
+  // la moneda PRINCIPAL (= ctx.currency), no a la de display (cookie). Evita que el AI reciba montos
+  // en una moneda y una etiqueta en otra. `rates` para convertir lo que no acepte authCtx.
+  let authCtx: AuthContext | undefined;
+  let rates: Record<string, number> | undefined;
 
   // ¿Hogar compartido? (más de un miembro) → la IA trata las cifras como comunes.
   // Best-effort: si falla, el chat no se degrada, solo no marca lo compartido.
@@ -60,11 +67,14 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
       "@/modules/financial-base/services/base-service"
     );
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
-    const authCtx = { db: await createSupabaseServerClient(), userId: user.id };
-    const [base, currency] = await Promise.all([
+    const { getFxRates } = await import("@/lib/market-data/fx-rates");
+    authCtx = { db: await createSupabaseServerClient(), userId: user.id };
+    const [base, currency, fx] = await Promise.all([
       getBaseSummary(authCtx),
       getPrimaryCurrency(authCtx),
+      getFxRates().catch(() => ({}) as Record<string, number>),
     ]);
+    rates = fx;
     ctx = {
       ...ctx,
       currency,
@@ -170,7 +180,14 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   try {
     const { getEnvelopesSummary } = await import("@/modules/financial-base");
     const summary = await getEnvelopesSummary();
-    if (summary.expense.length > 0 || summary.goals.length > 0) ctx.envelopes = summary;
+    if (summary.expense.length > 0 || summary.goals.length > 0) {
+      // getEnvelopesSummary viene en moneda de DISPLAY; el AI usa la PRINCIPAL (ctx.currency). El
+      // helper puro CONVIERTE los presupuestos y calcula el sobre de mayor gasto → nunca "$X como ₡X".
+      const { normalizeEnvelopes } = await import("@/lib/ai/envelopes-currency");
+      const norm = normalizeEnvelopes(summary, ctx.currency, rates ?? {});
+      ctx.envelopes = norm.envelopes;
+      if (norm.topGastoSobre) ctx.topGastoSobre = norm.topGastoSobre;
+    }
   } catch {
     // Sobres no disponibles: el contexto sigue.
   }
@@ -256,35 +273,42 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   try {
     const { getPatrimonioReport } = await import("@/modules/wealth");
     const p = await getPatrimonioReport();
+    // El reporte viene en SU moneda (p.currency, la de display); el AI usa ctx.currency (principal).
+    // Convertimos CADA monto acá (con rates) para que todo llegue en ctx.currency y CUADRE
+    // (compromiso ≈ Independencia×0,08÷12, ambos convertidos por el mismo factor). El LLM no convierte.
+    const pconv = (n: number): number =>
+      p.currency && p.currency !== ctx.currency && rates
+        ? Math.round(convertCurrency(n, p.currency, ctx.currency, rates))
+        : Math.round(n);
     ctx.indicePatrimonial = Math.round(p.report.indice);
     ctx.nivelPatrimonial = p.level.name;
     // Los TRES números (al 8%): Seguridad (esencial), Independencia (total actual, siempre
     // presente) y Libertad (deseado, nullable — se maneja abajo). No se mezclan.
-    ctx.numeroDeSeguridad = Math.round(p.report.numeroDeSeguridad);
-    ctx.numeroDeIndependencia = Math.round(p.report.numeroDeIndependencia);
+    ctx.numeroDeSeguridad = pconv(p.report.numeroDeSeguridad);
+    ctx.numeroDeIndependencia = pconv(p.report.numeroDeIndependencia);
     // Compromiso mensual TOTAL (base de la Independencia) + desglose: para que el asesor reporte el
     // número REAL y sepa que ya incluye sobres+metas+DCA (no pedir "registrá tu gasto" si ya está).
     if (p.commitmentBreakdown && p.commitmentBreakdown.total > 0) {
       const b = p.commitmentBreakdown;
-      ctx.compromisoMensual = Math.round(b.total);
+      ctx.compromisoMensual = pconv(b.total);
       ctx.compromisoDesglose = {
-        sobres: Math.round(b.byOrigin.sobres),
-        metas: Math.round(b.byOrigin.goals),
-        dca: Math.round(b.byOrigin.dca),
-        deudas: Math.round(b.byOrigin.debts),
-        seguros: Math.round(b.byOrigin.policies),
+        sobres: pconv(b.byOrigin.sobres),
+        metas: pconv(b.byOrigin.goals),
+        dca: pconv(b.byOrigin.dca),
+        deudas: pconv(b.byOrigin.debts),
+        seguros: pconv(b.byOrigin.policies),
       };
     }
     // "Número de libertad" (estilo deseado): solo si el usuario lo definió; si es
     // null se OMITE (nada de fallback silencioso).
     if (p.report.numeroDeLibertad != null) {
-      ctx.numeroDeLibertad = Math.round(p.report.numeroDeLibertad);
+      ctx.numeroDeLibertad = pconv(p.report.numeroDeLibertad);
     }
     ctx.añosDeLibertad = Math.round(p.report.añosDeLibertad);
-    ctx.mesesDeColchon = Math.round(p.report.mesesDeColchon);
-    ctx.coberturaPasivaPct = Math.round(p.report.coberturaPasiva * 100);
-    ctx.calidadPatrimonio = Math.round(p.report.calidadPatrimonio);
-    ctx.investableWealth = Math.round(p.report.investableWealth);
+    ctx.mesesDeColchon = Math.round(p.report.mesesDeColchon); // ratio (meses), no es monto
+    ctx.coberturaPasivaPct = Math.round(p.report.coberturaPasiva * 100); // %
+    ctx.calidadPatrimonio = Math.round(p.report.calidadPatrimonio); // score 0-100
+    ctx.investableWealth = pconv(p.report.investableWealth); // monto → convertir
     ctx.patrimonioDiagnosis = p.diagnosis.map((d) => d.code);
   } catch {
     // Marco Patrimonial no disponible.

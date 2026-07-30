@@ -329,14 +329,28 @@ export function answerFromContext(
   // R2 — cifras que YA vienen en el FinancialContext (0 fetch, ambos canales). Si el dato
   // best-effort no está → null (escala; no adivina).
   if (intent === "gasto_mes") {
-    if (typeof ctx?.expenseMonthly !== "number") return null;
-    return say(`Tu gasto mensual ronda ${money(ctx.expenseMonthly)}.`);
+    // Fuente REAL: el gasto de los SOBRES (compromisoDesglose.sobres, ya convertido a ctx.currency
+    // por el motor y trazable a la misma fuente que compromiso/Independencia). expenseMonthly (lista
+    // base) suele venir en 0 → no lo usamos como primaria. Nunca ₡0 si hay sobres.
+    const sobres = ctx?.compromisoDesglose?.sobres;
+    if (typeof sobres === "number" && sobres > 0) {
+      return say(`Tu gasto mensual en sobres ronda ${money(sobres)}.`);
+    }
+    if (typeof ctx?.expenseMonthly === "number" && ctx.expenseMonthly > 0) {
+      return say(`Tu gasto mensual ronda ${money(ctx.expenseMonthly)}.`);
+    }
+    return null; // sin dato real → escala (no inventamos ni decimos 0)
   }
   if (intent === "ingreso_mes") {
     if (typeof ctx?.incomeMonthly !== "number") return null;
     return say(`Tus ingresos mensuales son ${money(ctx.incomeMonthly)}.`);
   }
   if (intent === "gasto_categoria") {
+    // Sobre de MAYOR gasto (presupuesto YA convertido por el motor a ctx.currency). Determinista.
+    const sobre = ctx?.topGastoSobre;
+    if (sobre) {
+      return say(`Tu sobre de mayor gasto es ${sobre.name}: ${money(sobre.monthly)} al mes.`);
+    }
     const top = ctx?.topExpenseCategory;
     if (!top) return null;
     return say(`Donde más gastás es ${top.name}: ${money(top.monthly)} al mes (${top.pct}% de tu gasto).`);

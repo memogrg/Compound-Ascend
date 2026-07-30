@@ -24,6 +24,8 @@ export type FinancialContext = {
   freeCashflow?: number;
   /** Categoría (naturaleza) de gasto más pesada, ya en moneda principal. Best-effort. */
   topExpenseCategory?: { name: string; monthly: number; pct: number };
+  /** Sobre (hoja) de MAYOR presupuesto de gasto, YA en moneda de visualización (ctx.currency). */
+  topGastoSobre?: { name: string; monthly: number };
   /** Trayectoria mes a mes (memoria longitudinal). Best-effort; undefined si es usuario nuevo. */
   trajectory?: Trajectory;
   /** Tasa de ahorro (ahorro/ingreso) en %, 0-100. Best-effort. */
@@ -182,7 +184,10 @@ export type FinancialContext = {
 };
 
 export function buildSystemPrompt(ctx: FinancialContext): string {
-  const facts: string[] = [`Moneda principal: ${ctx.currency}.`];
+  const facts: string[] = [
+    `Moneda principal: ${ctx.currency}.`,
+    `TODOS los montos de tu contexto YA vienen en ${ctx.currency}, convertidos por el sistema. NUNCA los conviertas a otra moneda, NUNCA cambies el símbolo ni agregues equivalencias "(~…)": reportá la cifra tal cual, en ${ctx.currency}.`,
+  ];
   if (ctx.name) facts.push(`El usuario se llama ${ctx.name}.`);
   if (ctx.householdShared)
     facts.push(
