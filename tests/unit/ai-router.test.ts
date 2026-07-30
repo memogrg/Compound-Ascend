@@ -572,6 +572,26 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     expect(routed?.response.reply).not.toMatch(/no tengo acceso/i);
   });
 
+  it("REGRESIÓN #2: holding USD-nativo con display CRC → invertido se convierte a USD (no magnitud CRC con $)", async () => {
+    // ctx.holdings.invested viene en moneda PRINCIPAL (CRC). BTC: 0,1 uds, invertido ₡2.650.000
+    // (= ~$5.000 a 530). El escenario es en USD (cripto) → el invertido DEBE convertirse a $5.000,
+    // no mostrarse "$2.650.000" (el bug de la auditoría).
+    const ctxCRC = {
+      ...CTX,
+      currency: "CRC",
+      holdings: [
+        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 0.1, invested: 2_650_000, value: 3_180_000, price: 31_800_000, pl: 530_000, plPct: 0.2, currency: "USD", priceUnavailable: false },
+      ],
+    } as FinancialContext;
+    getMarketHighlights.mockResolvedValue({ price: 60000, currency: "USD", high: 126000, highDate: "2025-10-06", highKind: "ath" });
+    const routed = await tryRouteQuery(ask("si vendo mi BTC hoy, ¿cuánto saco?"), ctxCRC, { ...tc, currency: "CRC" });
+    const reply = routed?.response.reply ?? "";
+    // invertido convertido: ₡2.650.000 / 530 = $5.000. Valor 0,1×60000 = $6.000. Ganancia $1.000.
+    expect(reply).toContain("5.000");
+    expect(reply).not.toContain("2.650.000"); // NUNCA la magnitud CRC con símbolo $
+    expect(reply).toMatch(/1\.000/); // ganancia sensata (6000 − 5000)
+  });
+
   it("símbolo que no trae dato → motivo REAL (reintentá), no 'no tengo acceso'", () => {
     const reply = buildMarketReply(
       { symbol: "XYZ", precio_actual: null, maximo: null, maximo_tipo: null, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: null, ganancia_al_maximo: null },
