@@ -748,6 +748,9 @@ export type GoalForTool = {
   actual: number;
   aporte_mensual: number;
   fecha_objetivo?: string | null; // YYYY-MM-DD
+  // Recurrencia del frasco de ahorro ('ninguna' = meta one-shot). Permite distinguir a cuáles metas
+  // toca APORTAR cada período (metas_a_aportar) sin confundirlas con los sobres de gasto.
+  recurrence?: import("@/modules/control/engine/recurrence").Recurrence;
 };
 
 export const GOALS_TOOL: AiToolDecl = {

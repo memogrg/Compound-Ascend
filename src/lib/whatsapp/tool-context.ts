@@ -89,7 +89,7 @@ export async function buildWhatsAppToolContext(
   try {
     const goalsRes = await supabase
       .from("savings_goals")
-      .select("name, target_amount, current_amount, monthly_contribution, currency, target_date")
+      .select("name, target_amount, current_amount, monthly_contribution, currency, target_date, recurrence")
       .in("user_id", memberIds);
     const mapped = (goalsRes.data ?? [])
       .map((g) => ({
@@ -99,6 +99,7 @@ export async function buildWhatsAppToolContext(
         monthly: Number(g.monthly_contribution),
         currency: g.currency,
         targetDate: g.target_date,
+        recurrence: g.recurrence,
       }))
       .filter((g) => g.target > 0 && (g.currency === primary || !!rates))
       .map((g) => {
@@ -110,6 +111,7 @@ export async function buildWhatsAppToolContext(
           actual: conv(g.current),
           aporte_mensual: conv(g.monthly),
           fecha_objetivo: g.targetDate ?? null,
+          recurrence: (g.recurrence ?? "ninguna") as import("@/modules/control/engine/recurrence").Recurrence,
         };
       });
     if (mapped.length) toolContext.goals = mapped;

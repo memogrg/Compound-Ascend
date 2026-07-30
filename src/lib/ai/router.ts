@@ -23,6 +23,7 @@ import {
   filterByScope,
   computeMultiScenario,
   buildMultiReply,
+  formatMarketMoney,
   type ScopeKind,
   type HoldingScenarioInput,
 } from "@/lib/ai/market-scope";
@@ -48,6 +49,8 @@ type Intent =
   | "numero_libertad"
   // R1 — datos ya en ToolContext (motor determinista):
   | "metas"
+  // "cuáles metas debo aportar este mes" → SOLO metas de ahorro recurrentes con su aporte (no sobres):
+  | "metas_a_aportar"
   | "cuota_deuda"
   // R2 — datos ya en FinancialContext (ctx), 0 fetch, ambos canales:
   | "gasto_mes"
@@ -55,6 +58,8 @@ type Intent =
   | "gasto_categoria"
   // R2 — requieren lectura fresca (session-based → web; WhatsApp escala):
   | "saldo_liquidez"
+  // "cuánto me queda en/de {sobre(s)}" → restante por sobre (getSobreRemaining), soporta varios:
+  | "saldo_sobre"
   | "ultimos_movimientos"
   // Sobres agrupados por frasco (determinista, sin alucinar) — lectura fresca:
   | "listar_sobres"
@@ -71,11 +76,13 @@ const KNOWN_INTENTS: Intent[] = [
   "numero_independencia",
   "numero_libertad",
   "metas",
+  "metas_a_aportar",
   "cuota_deuda",
   "gasto_mes",
   "ingreso_mes",
   "gasto_categoria",
   "saldo_liquidez",
+  "saldo_sobre",
   "ultimos_movimientos",
   "listar_sobres",
   "puedo_gastar",
@@ -86,6 +93,7 @@ const KNOWN_INTENTS: Intent[] = [
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
 const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "saldo_liquidez",
+  "saldo_sobre",
   "ultimos_movimientos",
   "listar_sobres",
   "puedo_gastar",
@@ -205,6 +213,45 @@ export function extractMarketSymbol(text: string, known: { symbol: string | null
   return byName?.symbol ?? null;
 }
 
+/** Términos que denotan LIQUIDEZ (no un sobre): un nombre así NO es un sobre nombrado. */
+const LIQUIDITY_TERM = /\bl[ií]quido\b|liquidez|efectivo|disponible|\bcuentas?\b|\bbanco\b/i;
+
+/**
+ * Nombres de SOBRE tras "cuánto me queda/tengo/llevo … en/de {X, Y}". Soporta varios (coma / "y"),
+ * limpia coletillas ("este mes", "el sobre de") y descarta términos de liquidez u otros tópicos.
+ * [] si no hay un nombre de sobre claro (→ el router NO rutea a saldo_sobre).
+ */
+export function extractSobreNames(text: string): string[] {
+  const m = text.match(/cu[aá]nto\s+(?:me\s+queda|tengo|llevo(?:\s+gastado)?)\b[\s\S]*?\b(?:en|de|del)\b\s+(.+)/i);
+  if (!m || !m[1]) return [];
+  const tail = m[1]
+    .replace(/\b(?:este mes|del mes|hasta fin de mes|ahora mismo|ahora|hoy)\b/gi, " ")
+    .replace(/[?¿.!]+/g, " ");
+  const stopArticle = /^(?:el sobre de|del sobre de|sobre de|sobre|mi|mis|la|el|los|las|un|una|de)\s+/i;
+  const names = tail
+    .split(/\s*(?:,|\by\b|\be\b)\s*/i)
+    .map((p) => {
+      let s = p.trim();
+      while (stopArticle.test(s)) s = s.replace(stopArticle, "").trim();
+      return s;
+    })
+    .filter(
+      (p) => p.length >= 3 && !LIQUIDITY_TERM.test(p) && !/\b(?:pendiente|aporte|inversi|ahorro|deuda|meta|libertad|independencia|ingres|gan[eéoó])\b/i.test(p),
+    );
+  return [...new Set(names.map((n) => n.toLowerCase()))].slice(0, 4);
+}
+
+/**
+ * true si la pregunta tiene OTRA parte/pregunta que el carril de sobre no cubre (dos signos de
+ * pregunta, o un "y … {aporte/inversión/ahorro/deuda/pendiente}"). El router debe ESCALAR, no
+ * responder una sola cosa mal.
+ */
+export function isMultiPart(text: string): boolean {
+  const twoQ = (text.match(/\?/g) ?? []).length >= 2;
+  const secondTopic = /\by\s+(?:hay|tengo|ten[eé]s|cu[aá]nto|qu[eé]|est[aá]|falta|el|un)\b[\s\S]*?(?:aporte|inversi|pendiente|ahorro|deuda|meta|ingres|libertad|independencia)/i.test(text);
+  return twoQ || secondTopic;
+}
+
 /** PATRONES: intent + params con CERO tokens. null si no matchea con confianza. */
 export function matchIntent(text: string): { intent: Intent; params: Record<string, unknown> } | null {
   const t = text.trim();
@@ -246,11 +293,21 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   if (/n[uú]mero de libertad|cu[aá]nto necesito para (?:ser libre|mi libertad|mi estilo de vida)/i.test(t)) {
     return { intent: "numero_libertad", params: {} };
   }
+  // "cuáles metas debo aportar este mes / qué metas toca aportar / aportes pendientes de metas":
+  // metas de AHORRO recurrentes a las que toca apartar su aporte — NO enumerar todos los sobres.
+  // ANTES de listar_sobres/metas (que confundían "cuáles … metas" con "listá todo"). El consejo
+  // ("¿debería aportar más?") ya se fue por REASONING_CUES arriba; acá solo la consulta factual.
+  if (/\bmetas?\b/i.test(t) && (/\bapor\w+/i.test(t) || /\bpendientes?\b/i.test(t))) {
+    return { intent: "metas_a_aportar", params: {} };
+  }
   // Mejora 3 — "listá mis sobres/frascos/metas": enumeración agrupada por frasco (determinista).
   // Antes que `metas` (progreso): "sobres"/"frascos" son inequívocos; "cuáles/listá … metas" también.
+  // La rama de METAS NO matchea si hay señal de aporte/período (eso es metas_a_aportar, no "listá todo").
+  const METAS_APORTE_CUE = /\bapor\w+|\bdebo\b|\btoca\b|\beste mes\b|\bpendientes?\b/i;
   if (
     /\b(?:sobres|frascos)\b/i.test(t) ||
-    /(?:cu[aá]les|list[aá]|mostr[aá]|ver|dame|enumer\w*)\s+(?:son\s+)?(?:todas?\s+)?(?:mis\s+)?metas\b/i.test(t)
+    (/(?:cu[aá]les|list[aá]|mostr[aá]|ver|dame|enumer\w*)\s+(?:son\s+)?(?:todas?\s+)?(?:mis\s+)?metas\b/i.test(t) &&
+      !METAS_APORTE_CUE.test(t))
   ) {
     return { intent: "listar_sobres", params: {} };
   }
@@ -270,7 +327,15 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   if (/(?:cu[aá]nto|qu[eé])\s+(?:gan[eéoó]|ingres[eéoó])|(?:mis|el|los)\s+ingresos?\b|cu[aá]nto (?:me )?entr[oó]/i.test(t)) {
     return { intent: "ingreso_mes", params: {} };
   }
-  if (/(?:mi\s+)?(?:saldo|liquidez|efectivo disponible|cu[aá]nto (?:tengo|me queda))\b/i.test(t)) {
+  // Restante de SOBRE(s): "cuánto me queda en/de {sobre}" con un nombre de sobre (NO liquidez). ANTES
+  // de saldo_liquidez, que era demasiado goloso ("cuánto me queda" caía en liquidez y daba ₡0).
+  const sobreNames = extractSobreNames(t);
+  if (sobreNames.length > 0) {
+    return { intent: "saldo_sobre", params: { names: sobreNames, multiPart: isMultiPart(t) } };
+  }
+  // Liquidez SOLO ante términos explícitos (líquido/efectivo/disponible/en cuentas/saldo), no un
+  // "cuánto me queda de {algo}" (eso ya lo tomó saldo_sobre). Bare/ambiguo → cae al LLM (no ₡0 malo).
+  if (/(?:mi\s+)?(?:saldo|liquidez|dinero l[ií]quido|efectivo)\b|\bl[ií]quido\b|\ben (?:mis |la |las )?cuentas?\b|cu[aá]nto (?:tengo|me queda|hay) (?:disponible|l[ií]quido|en (?:la |las |mis )?cuentas?|en efectivo|en el banco)\b/i.test(t)) {
     return { intent: "saldo_liquidez", params: {} };
   }
   if (/(?:[uú]ltim[oa]s?|recientes?)\s+(?:movimiento|transacci|gasto|compra)|(?:mis|los)\s+(?:movimientos|transacciones)\b|qu[eé] (?:gast[eé]|compr[eé]) (?:hoy|ayer|[uú]ltim)/i.test(t)) {
@@ -288,12 +353,13 @@ async function classifyWithLite(
   if (!lite) return null;
   const system =
     "Clasificás preguntas de finanzas personales. Devolvé SOLO JSON " +
-    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
+    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"metas_a_aportar"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
     "numero_seguridad=capital para sus gastos esenciales; numero_independencia=capital para su vida actual; " +
     "numero_libertad=capital para su estilo de vida deseado (NO son lo mismo; no los mezcles). " +
     "gasto_mes=cuánto gasta al mes; ingreso_mes=cuánto gana; gasto_categoria=en qué gasta más; " +
     "saldo_liquidez=cuánto tiene disponible; ultimos_movimientos=sus transacciones recientes; " +
     "listar_sobres=enumerar sus sobres/frascos/metas (no su progreso). metas=el progreso de sus metas. " +
+    "metas_a_aportar=a cuáles metas de ahorro RECURRENTES le toca aportar este mes (con su monto); NO son los sobres de gasto. " +
     '"complejo": true si pide análisis, proyección, consejo, comparación o cualquier cosa más allá de consultar un dato simple. Ante duda: "otro" o complejo:true.';
   try {
     const r = await lite.chat({ system, messages: [{ role: "user", content: text }], maxTokens: 40 });
@@ -442,6 +508,30 @@ export function answerFromContext(
     );
   }
 
+  // "cuáles metas debo aportar este mes": SOLO metas de ahorro RECURRENTES (recurrence != 'ninguna')
+  // con aporte mensual > 0, cada una con su monto a apartar + el total. NADA de sobres de gasto:
+  // "metas" = savings_goals (tab Ahorro). El aporte_mensual ES el monto mensual (prorrateado) para
+  // todas las cadencias; en no-mensuales se aclara que es el apartado de cada mes hacia el período.
+  if (intent === "metas_a_aportar") {
+    const recurring = (tc.goals ?? []).filter(
+      (g) => g.recurrence != null && g.recurrence !== "ninguna" && (g.aporte_mensual ?? 0) > 0,
+    );
+    if (recurring.length === 0) {
+      return say(
+        "No tenés metas de ahorro recurrentes con aporte mensual configurado. (Son las metas del tab Ahorro, no los sobres de gasto.) Creá una con su recurrencia y aporte, y te digo cuánto apartar cada mes.",
+      );
+    }
+    const lines = recurring.slice(0, 8).map((g) => {
+      const nota =
+        g.recurrence === "mensual" ? "" : ` · ${g.recurrence}: es tu apartado mensual hacia el aporte del período`;
+      return `• ${g.nombre}: ${money(g.aporte_mensual)}${nota}`;
+    });
+    const total = recurring.reduce((s, g) => s + (g.aporte_mensual ?? 0), 0);
+    return say(
+      `Este mes te toca apartar en ${recurring.length} ${recurring.length === 1 ? "meta de ahorro" : "metas de ahorro"}:\n${lines.join("\n")}\nTotal a apartar: ${money(total)}.`,
+    );
+  }
+
   if (intent === "metas") {
     const goals = (tc.goals ?? []).filter((g) => (g.objetivo ?? 0) > 0);
     if (goals.length === 0) return say("Todavía no tenés metas de ahorro con objetivo registradas.");
@@ -504,6 +594,48 @@ async function resolveFetchIntent(
       }
       const path = sug.categoryPath ?? rem.path;
       return say(affordReply(path, rem, amount, (n) => formatMoney(n, rem.currency)));
+    }
+    // "cuánto me queda en/de {sobre(s)}": restante por sobre (getSobreRemaining, reusa el mapeo de
+    // puedo_gastar). Soporta VARIOS. Multi-parte → null (escala; nunca una respuesta enlatada mala).
+    if (intent === "saldo_sobre") {
+      if (params.multiPart === true) return null;
+      const names = Array.isArray(params.names) ? (params.names as string[]) : [];
+      if (names.length === 0) return null;
+      const { listSobresForKind, suggestSobreForChatFast, getSobreRemaining } = await import("@/modules/financial-base");
+      const today = new Date().toISOString().slice(0, 10);
+      // El usuario NOMBRA el sobre → match por NOMBRE contra sus sobres reales (no el clasificador
+      // comercio→sobre de puedo_gastar, que es para "¿me alcanza para X?"). Fallback: el clasificador.
+      const sobres = await listSobresForKind("gasto").catch(() => [] as { id: string; sobre: string; frasco: string | null }[]);
+      const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
+      const byName = (name: string) => {
+        const n = norm(name);
+        const hit = sobres.find((s) => {
+          const so = norm(s.sobre);
+          return so === n || so.includes(n) || n.includes(so);
+        });
+        return hit ? { id: hit.id, path: hit.frasco ? `${hit.frasco} › ${hit.sobre}` : hit.sobre } : null;
+      };
+      const parts: string[] = [];
+      for (const name of names) {
+        let hit = byName(name);
+        if (!hit) {
+          const sug = await suggestSobreForChatFast(name, "gasto"); // fallback: clasificador
+          if (sug.categoryId) hit = { id: sug.categoryId, path: sug.categoryPath ?? name };
+        }
+        if (!hit) {
+          parts.push(`no encontré un sobre para «${name}»`);
+          continue;
+        }
+        const rem = await getSobreRemaining(hit.id, today);
+        const path = hit.path || rem?.path || name;
+        const money = (n: number) => formatMoney(n, rem?.currency ?? cur);
+        if (!rem || !rem.hasBudget) parts.push(`en ${path} no tenés presupuesto asignado`);
+        else if (rem.remaining <= 0) parts.push(`en ${path} ya te pasaste (gastaste ${money(rem.spent)} de ${money(rem.budget)})`);
+        else parts.push(`en ${path} te quedan ${money(rem.remaining)} de ${money(rem.budget)}`);
+      }
+      if (parts.length === 0) return null;
+      const joined = parts.join("; ");
+      return say(`${joined.charAt(0).toUpperCase()}${joined.slice(1)} este mes.`);
     }
     if (intent === "saldo_liquidez") {
       const { getLiquidityBalance } = await import("@/modules/financial-base");
@@ -671,14 +803,18 @@ async function resolveMarketQuery(
     // (WhatsApp) o sin posición → undefined y el carril sigue mostrando solo el dato de mercado.
     let cantidad = holding?.quantity;
     let invertido = holding?.invested;
-    let posCurrency = holding?.currency ?? cur;
+    // OJO: ctx.holdings.invested (top-N del context-engine) ya está en la moneda PRINCIPAL (cur), NO
+    // en la nativa del holding. Antes se usaba holding.currency (nativa): para un holding en USD y
+    // display CRC, posCurrency=USD == scenCurrency=USD → NO convertía y mostraba el monto CRC con
+    // símbolo $ (p. ej. "invertiste $2.731.089" para 0,15 BTC). La moneda de invertido acá es cur.
+    let posCurrency = cur;
     let assetHint = holding?.assetType;
     if (!holding) {
       const full = await getFullPosition(symbol);
       if (full) {
         cantidad = full.quantity;
         invertido = full.invested;
-        posCurrency = full.currency;
+        posCurrency = full.currency; // getPositionForSymbol devuelve invertido en moneda NATIVA
         assetHint = full.assetType;
       }
     }
@@ -767,7 +903,8 @@ export function buildMarketReply(
   hasPosition: boolean,
   freshness = "",
 ): string {
-  const money = (n: number) => formatMoney(n, currency);
+  // Cripto-aware: un precio/ATH < $1 con formatMoney (fiat, 0 dec) salía "$0" — parecía "sin dato".
+  const money = (n: number) => formatMarketMoney(n, currency);
   if (s.precio_actual === null && s.maximo === null) {
     return `No pude leer los datos de ${s.symbol} en la fuente ahora mismo; reintentá en un momento o decime a qué precio querés que simule.`;
   }

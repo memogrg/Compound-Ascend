@@ -6,8 +6,20 @@ import {
   filterByScope,
   computeMultiScenario,
   buildMultiReply,
+  formatMarketMoney,
   type HoldingScenarioInput,
 } from "@/lib/ai/market-scope";
+
+describe("formatMarketMoney · cripto sub-$1 no colapsa a '$0'", () => {
+  it("valores ≥ 1 quedan limpios (0 decimales); < 1 muestran decimales", () => {
+    expect(formatMarketMoney(126080, "USD")).toBe("$126.080"); // grande, 0 dec
+    expect(formatMarketMoney(6000, "USD")).toBe("$6.000");
+    expect(formatMarketMoney(0.2478, "USD")).toBe("$0,2478"); // ATH de KMNO → NO "$0"
+    expect(formatMarketMoney(0.2478, "USD")).not.toBe("$0");
+    expect(formatMarketMoney(0.24, "USD")).toBe("$0,24"); // DOGE → NO "$0"
+    expect(formatMarketMoney(0, "USD")).toBe("$0"); // cero real sí es $0
+  });
+});
 
 describe("parseMultiScope · alcance múltiple", () => {
   it("altcoins / cripto / inversiones", () => {

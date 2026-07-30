@@ -21,6 +21,7 @@ const getEnvelopesSummary = vi.fn();
 const formatEnvelopesReply = vi.fn();
 const suggestSobreForChatFast = vi.fn();
 const getSobreRemaining = vi.fn();
+const listSobresForKind = vi.fn(async (..._a: unknown[]) => [] as { id: string; sobre: string; frasco: string | null }[]);
 vi.mock("@/modules/financial-base", () => ({
   getLiquidityBalance: () => getLiquidityBalance(),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
@@ -28,6 +29,7 @@ vi.mock("@/modules/financial-base", () => ({
   formatEnvelopesReply: (...a: unknown[]) => formatEnvelopesReply(...a),
   suggestSobreForChatFast: (...a: unknown[]) => suggestSobreForChatFast(...a),
   getSobreRemaining: (...a: unknown[]) => getSobreRemaining(...a),
+  listSobresForKind: (...a: unknown[]) => listSobresForKind(...a),
 }));
 
 // Capa market-data: el carril determinista de precio/ATH la usa vía import dinámico.
@@ -175,6 +177,60 @@ describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () =>
   });
 });
 
+describe("metas_a_aportar · SOLO metas de ahorro recurrentes con su aporte (no sobres)", () => {
+  // Metas de ahorro: 2 recurrentes (con aporte), 1 one-shot (recurrence 'ninguna') que NO debe salir.
+  const tcMetas: ToolContext = {
+    ...tc,
+    goals: [
+      { nombre: "Fondo de emergencia", objetivo: 12_000, actual: 3_000, aporte_mensual: 200, recurrence: "mensual" },
+      { nombre: "Seguro anual", objetivo: 1_200, actual: 300, aporte_mensual: 100, recurrence: "anual" },
+      { nombre: "Carro", objetivo: 8_000, actual: 1_000, aporte_mensual: 300, recurrence: "ninguna" },
+    ],
+  };
+
+  it("clasifica 'cuáles metas debo aportar este mes' → metas_a_aportar (no listar_sobres)", () => {
+    expect(matchIntent("¿cuáles metas debo aportar este mes?")?.intent).toBe("metas_a_aportar");
+    expect(matchIntent("qué metas toca aportar")?.intent).toBe("metas_a_aportar");
+    expect(matchIntent("aportes pendientes de mis metas")?.intent).toBe("metas_a_aportar");
+  });
+
+  it("un consejo ('¿debería aportar más a mis metas?') NO cae acá → escala (null)", () => {
+    expect(matchIntent("¿debería aportar más a mis metas?")).toBeNull();
+  });
+
+  it("lista SOLO las recurrentes con aporte + el total; NADA de la meta one-shot ni de sobres", () => {
+    const r = answerFromContext("metas_a_aportar", {}, tcMetas);
+    expect(r?.reply).toContain("Fondo de emergencia");
+    expect(r?.reply).toContain("Seguro anual");
+    expect(r?.reply).not.toContain("Carro"); // one-shot (recurrence 'ninguna') → excluida
+    expect(r?.reply).not.toMatch(/sobre/i); // metas ≠ sobres de gasto
+    expect(r?.reply).toMatch(/Total a apartar:/);
+    expect(r?.reply).toContain("300"); // total = 200 + 100
+    expect(r?.reply).toMatch(/anual/); // aclara la cadencia no-mensual
+  });
+
+  it("sin metas recurrentes → mensaje honesto que las separa de los sobres de gasto", () => {
+    const sinRec: ToolContext = {
+      ...tc,
+      goals: [{ nombre: "Carro", objetivo: 8_000, actual: 1_000, aporte_mensual: 300, recurrence: "ninguna" }],
+    };
+    const r = answerFromContext("metas_a_aportar", {}, sinRec);
+    expect(r?.reply).toMatch(/recurrentes/i);
+    expect(r?.reply).toMatch(/sobres de gasto/i);
+  });
+});
+
+describe("terminología · 'listá mis metas' enumera; 'cuáles son mis sobres' → sobres", () => {
+  it("'listá mis metas' (sin señal de aporte) → listar_sobres (enumeración)", () => {
+    expect(matchIntent("listá mis metas")?.intent).toBe("listar_sobres");
+    expect(matchIntent("¿cuáles son mis metas?")?.intent).toBe("listar_sobres");
+  });
+  it("'cuáles son mis sobres' → listar_sobres", () => {
+    expect(matchIntent("¿cuáles son mis sobres?")?.intent).toBe("listar_sobres");
+    expect(matchIntent("mostrame mis frascos")?.intent).toBe("listar_sobres");
+  });
+});
+
 describe("tryRouteQuery · carriles y tokens", () => {
   it("consulta que matchea patrón → carril template, 0 tokens, cifra del motor", async () => {
     const routed = await tryRouteQuery(ask("¿cuál es mi número de libertad?"), CTX, tc);
@@ -223,6 +279,31 @@ describe("R2 · matchIntent (patrones)", () => {
   it("clasifica los intents de lectura fresca", () => {
     expect(matchIntent("¿cuál es mi saldo?")?.intent).toBe("saldo_liquidez");
     expect(matchIntent("mostrame mis últimos movimientos")?.intent).toBe("ultimos_movimientos");
+  });
+
+  it("saldo_sobre: 'cuánto me queda en/de {sobre}' → saldo_sobre (NO liquidez), soporta varios", () => {
+    const one = matchIntent("¿cuánto me queda de supermercados?");
+    expect(one?.intent).toBe("saldo_sobre");
+    expect(one?.params.names).toEqual(["supermercados"]);
+    const multi = matchIntent("¿cuánto me queda en transporte, restaurantes?");
+    expect(multi?.intent).toBe("saldo_sobre");
+    expect(multi?.params.names).toEqual(["transporte", "restaurantes"]);
+    // "el sobre de mercado este mes" → nombre limpio.
+    expect(matchIntent("¿cuánto me queda en el sobre de mercado este mes?")?.params.names).toEqual(["mercado"]);
+  });
+
+  it("saldo_liquidez SOLO ante términos explícitos (no secuestra 'me queda de {sobre}')", () => {
+    expect(matchIntent("¿cuánto tengo líquido?")?.intent).toBe("saldo_liquidez");
+    expect(matchIntent("¿cuánto tengo disponible?")?.intent).toBe("saldo_liquidez");
+    expect(matchIntent("¿cuánto tengo en mis cuentas?")?.intent).toBe("saldo_liquidez");
+    // "cuánto me queda de super" NO es liquidez.
+    expect(matchIntent("¿cuánto me queda de super?")?.intent).toBe("saldo_sobre");
+  });
+
+  it("multi-parte: pregunta con otra parte no cubierta → marca multiPart (para escalar)", () => {
+    const r = matchIntent("¿cuánto me queda en transporte? ¿y hay aporte de inversión pendiente?");
+    expect(r?.intent).toBe("saldo_sobre");
+    expect(r?.params.multiPart).toBe(true);
   });
 
   it("una proyección de gasto no se atrapa (escala)", () => {
@@ -288,6 +369,56 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
     expect(routed?.lane).toBe("template");
     expect(routed?.tokensIn).toBe(0);
     expect(routed?.response.reply).toContain("1.875");
+  });
+
+  it("saldo_sobre → restante del sobre nombrado (getSobreRemaining), NO liquidez", async () => {
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-super", categoryPath: "Necesidades › Super" });
+    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Super", currency: "CRC", budget: 320000, spent: 120000, remaining: 200000, hasBudget: true });
+    const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
+    expect(routed?.lane).toBe("template");
+    expect(routed?.tokensIn).toBe(0);
+    expect(getLiquidityBalance).not.toHaveBeenCalled(); // NO cae en liquidez
+    expect(suggestSobreForChatFast).toHaveBeenCalledWith("supermercados", "gasto");
+    expect(routed?.response.reply).toMatch(/Super te quedan/i);
+    expect(routed?.response.reply).toContain("200.000");
+    expect(routed?.response.reply).toContain("320.000");
+  });
+
+  it("saldo_sobre multi: 'transporte, restaurantes' → los DOS sobres", async () => {
+    suggestSobreForChatFast.mockImplementation((desc: string) =>
+      /transporte/i.test(desc)
+        ? Promise.resolve({ categoryId: "c-tra", categoryPath: "Necesidades › Transporte" })
+        : Promise.resolve({ categoryId: "c-res", categoryPath: "Estilo › Restaurantes" }),
+    );
+    getSobreRemaining.mockImplementation((id: string) =>
+      id === "c-tra"
+        ? Promise.resolve({ path: "Transporte", currency: "CRC", budget: 140000, spent: 40000, remaining: 100000, hasBudget: true })
+        : Promise.resolve({ path: "Restaurantes", currency: "CRC", budget: 120000, spent: 90000, remaining: 30000, hasBudget: true }),
+    );
+    const routed = await tryRouteQuery(ask("¿cuánto me queda en transporte, restaurantes?"), CTX, tc);
+    expect(routed?.response.reply).toMatch(/Transporte/);
+    expect(routed?.response.reply).toMatch(/Restaurantes/);
+    expect(routed?.response.reply).toContain("100.000");
+    expect(routed?.response.reply).toContain("30.000");
+  });
+
+  it("saldo_sobre matchea por NOMBRE contra los sobres reales (no el clasificador)", async () => {
+    listSobresForKind.mockResolvedValue([
+      { id: "c-mer", sobre: "Mercado", frasco: "Necesidades" },
+      { id: "c-tra", sobre: "Transporte", frasco: "Necesidades" },
+    ]);
+    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Mercado", currency: "CRC", budget: 320000, spent: 120000, remaining: 200000, hasBudget: true });
+    // "supermercados" matchea "Mercado" (fuzzy: 'mercado' ⊂ 'supermercados').
+    const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
+    expect(getSobreRemaining).toHaveBeenCalledWith("c-mer", expect.any(String));
+    expect(suggestSobreForChatFast).not.toHaveBeenCalled(); // no cae al clasificador
+    expect(routed?.response.reply).toContain("200.000");
+  });
+
+  it("saldo_sobre multi-parte → escala (null), no responde una sola cosa mal", async () => {
+    const routed = await tryRouteQuery(ask("¿cuánto me queda en transporte? ¿y hay aporte de inversión pendiente?"), CTX, tc);
+    expect(routed).toBeNull();
+    expect(getSobreRemaining).not.toHaveBeenCalled();
   });
 
   it("ultimos_movimientos → lista las transacciones reales del ledger", async () => {
@@ -495,6 +626,26 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     expect(routed?.response.reply).not.toMatch(/no tengo acceso/i);
   });
 
+  it("REGRESIÓN #2: holding USD-nativo con display CRC → invertido se convierte a USD (no magnitud CRC con $)", async () => {
+    // ctx.holdings.invested viene en moneda PRINCIPAL (CRC). BTC: 0,1 uds, invertido ₡2.650.000
+    // (= ~$5.000 a 530). El escenario es en USD (cripto) → el invertido DEBE convertirse a $5.000,
+    // no mostrarse "$2.650.000" (el bug de la auditoría).
+    const ctxCRC = {
+      ...CTX,
+      currency: "CRC",
+      holdings: [
+        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 0.1, invested: 2_650_000, value: 3_180_000, price: 31_800_000, pl: 530_000, plPct: 0.2, currency: "USD", priceUnavailable: false },
+      ],
+    } as FinancialContext;
+    getMarketHighlights.mockResolvedValue({ price: 60000, currency: "USD", high: 126000, highDate: "2025-10-06", highKind: "ath" });
+    const routed = await tryRouteQuery(ask("si vendo mi BTC hoy, ¿cuánto saco?"), ctxCRC, { ...tc, currency: "CRC" });
+    const reply = routed?.response.reply ?? "";
+    // invertido convertido: ₡2.650.000 / 530 = $5.000. Valor 0,1×60000 = $6.000. Ganancia $1.000.
+    expect(reply).toContain("5.000");
+    expect(reply).not.toContain("2.650.000"); // NUNCA la magnitud CRC con símbolo $
+    expect(reply).toMatch(/1\.000/); // ganancia sensata (6000 − 5000)
+  });
+
   it("símbolo que no trae dato → motivo REAL (reintentá), no 'no tengo acceso'", () => {
     const reply = buildMarketReply(
       { symbol: "XYZ", precio_actual: null, maximo: null, maximo_tipo: null, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: null, ganancia_al_maximo: null },
@@ -567,6 +718,18 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     );
     expect(reply).toMatch(/52 semanas/i);
     expect(reply).not.toMatch(/máximo histórico|ATH/i);
+  });
+
+  it("cripto sub-$1: el ATH/precio NO se muestra como '$0' (bug del formatMoney fiat 0 dec)", () => {
+    // KMNO ~ $0,2478: con formatMoney(USD) salía "$0" y parecía "sin dato".
+    const reply = buildMarketReply(
+      { symbol: "KMNO", precio_actual: 0.24, maximo: 0.2478, maximo_tipo: "ath", valor_actual: 2400, ganancia_al_precio_actual: 400, valor_al_maximo: 2478, ganancia_al_maximo: 478 },
+      "USD",
+      true,
+      true,
+    );
+    expect(reply).toMatch(/0,2478/); // el ATH se ve con decimales
+    expect(reply).not.toMatch(/\$0(?![.,]\d)/); // nunca colapsa a "$0" (pero "$0,2478" sí es válido)
   });
 
   it("JUP fuera del top-N: igual ENCUENTRA la posición (holdings completas) y calcula al ATH, sin '$0'", async () => {
