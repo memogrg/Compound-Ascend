@@ -118,6 +118,7 @@ export async function POST(req: Request) {
                 actual: conv(g.currentAmount),
                 aporte_mensual: conv(g.monthlyContribution),
                 fecha_objetivo: g.targetDate ?? null,
+                recurrence: g.recurrence,
               };
             });
           if (mapped.length) toolContext.goals = mapped;

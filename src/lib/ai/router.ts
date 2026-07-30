@@ -49,6 +49,8 @@ type Intent =
   | "numero_libertad"
   // R1 — datos ya en ToolContext (motor determinista):
   | "metas"
+  // "cuáles metas debo aportar este mes" → SOLO metas de ahorro recurrentes con su aporte (no sobres):
+  | "metas_a_aportar"
   | "cuota_deuda"
   // R2 — datos ya en FinancialContext (ctx), 0 fetch, ambos canales:
   | "gasto_mes"
@@ -74,6 +76,7 @@ const KNOWN_INTENTS: Intent[] = [
   "numero_independencia",
   "numero_libertad",
   "metas",
+  "metas_a_aportar",
   "cuota_deuda",
   "gasto_mes",
   "ingreso_mes",
@@ -290,11 +293,21 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   if (/n[uú]mero de libertad|cu[aá]nto necesito para (?:ser libre|mi libertad|mi estilo de vida)/i.test(t)) {
     return { intent: "numero_libertad", params: {} };
   }
+  // "cuáles metas debo aportar este mes / qué metas toca aportar / aportes pendientes de metas":
+  // metas de AHORRO recurrentes a las que toca apartar su aporte — NO enumerar todos los sobres.
+  // ANTES de listar_sobres/metas (que confundían "cuáles … metas" con "listá todo"). El consejo
+  // ("¿debería aportar más?") ya se fue por REASONING_CUES arriba; acá solo la consulta factual.
+  if (/\bmetas?\b/i.test(t) && (/\bapor\w+/i.test(t) || /\bpendientes?\b/i.test(t))) {
+    return { intent: "metas_a_aportar", params: {} };
+  }
   // Mejora 3 — "listá mis sobres/frascos/metas": enumeración agrupada por frasco (determinista).
   // Antes que `metas` (progreso): "sobres"/"frascos" son inequívocos; "cuáles/listá … metas" también.
+  // La rama de METAS NO matchea si hay señal de aporte/período (eso es metas_a_aportar, no "listá todo").
+  const METAS_APORTE_CUE = /\bapor\w+|\bdebo\b|\btoca\b|\beste mes\b|\bpendientes?\b/i;
   if (
     /\b(?:sobres|frascos)\b/i.test(t) ||
-    /(?:cu[aá]les|list[aá]|mostr[aá]|ver|dame|enumer\w*)\s+(?:son\s+)?(?:todas?\s+)?(?:mis\s+)?metas\b/i.test(t)
+    (/(?:cu[aá]les|list[aá]|mostr[aá]|ver|dame|enumer\w*)\s+(?:son\s+)?(?:todas?\s+)?(?:mis\s+)?metas\b/i.test(t) &&
+      !METAS_APORTE_CUE.test(t))
   ) {
     return { intent: "listar_sobres", params: {} };
   }
@@ -340,12 +353,13 @@ async function classifyWithLite(
   if (!lite) return null;
   const system =
     "Clasificás preguntas de finanzas personales. Devolvé SOLO JSON " +
-    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
+    '{"intent": "numero_seguridad"|"numero_independencia"|"numero_libertad"|"metas"|"metas_a_aportar"|"cuota_deuda"|"gasto_mes"|"ingreso_mes"|"gasto_categoria"|"saldo_liquidez"|"ultimos_movimientos"|"listar_sobres"|"otro", "complejo": true|false}. ' +
     "numero_seguridad=capital para sus gastos esenciales; numero_independencia=capital para su vida actual; " +
     "numero_libertad=capital para su estilo de vida deseado (NO son lo mismo; no los mezcles). " +
     "gasto_mes=cuánto gasta al mes; ingreso_mes=cuánto gana; gasto_categoria=en qué gasta más; " +
     "saldo_liquidez=cuánto tiene disponible; ultimos_movimientos=sus transacciones recientes; " +
     "listar_sobres=enumerar sus sobres/frascos/metas (no su progreso). metas=el progreso de sus metas. " +
+    "metas_a_aportar=a cuáles metas de ahorro RECURRENTES le toca aportar este mes (con su monto); NO son los sobres de gasto. " +
     '"complejo": true si pide análisis, proyección, consejo, comparación o cualquier cosa más allá de consultar un dato simple. Ante duda: "otro" o complejo:true.';
   try {
     const r = await lite.chat({ system, messages: [{ role: "user", content: text }], maxTokens: 40 });
@@ -491,6 +505,30 @@ export function answerFromContext(
     const anios = Math.max(0.1, Math.round((meses / 12) * 10) / 10);
     return say(
       `Tu número de independencia es ${money(target)}${cubre}. Con tu patrimonio invertible ${money(have)} aportando ${money(aporte)}/mes al 8%, llegás en ~${anios} años. ¿Ajustamos el aporte?`,
+    );
+  }
+
+  // "cuáles metas debo aportar este mes": SOLO metas de ahorro RECURRENTES (recurrence != 'ninguna')
+  // con aporte mensual > 0, cada una con su monto a apartar + el total. NADA de sobres de gasto:
+  // "metas" = savings_goals (tab Ahorro). El aporte_mensual ES el monto mensual (prorrateado) para
+  // todas las cadencias; en no-mensuales se aclara que es el apartado de cada mes hacia el período.
+  if (intent === "metas_a_aportar") {
+    const recurring = (tc.goals ?? []).filter(
+      (g) => g.recurrence != null && g.recurrence !== "ninguna" && (g.aporte_mensual ?? 0) > 0,
+    );
+    if (recurring.length === 0) {
+      return say(
+        "No tenés metas de ahorro recurrentes con aporte mensual configurado. (Son las metas del tab Ahorro, no los sobres de gasto.) Creá una con su recurrencia y aporte, y te digo cuánto apartar cada mes.",
+      );
+    }
+    const lines = recurring.slice(0, 8).map((g) => {
+      const nota =
+        g.recurrence === "mensual" ? "" : ` · ${g.recurrence}: es tu apartado mensual hacia el aporte del período`;
+      return `• ${g.nombre}: ${money(g.aporte_mensual)}${nota}`;
+    });
+    const total = recurring.reduce((s, g) => s + (g.aporte_mensual ?? 0), 0);
+    return say(
+      `Este mes te toca apartar en ${recurring.length} ${recurring.length === 1 ? "meta de ahorro" : "metas de ahorro"}:\n${lines.join("\n")}\nTotal a apartar: ${money(total)}.`,
     );
   }
 
