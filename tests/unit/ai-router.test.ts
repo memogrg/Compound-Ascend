@@ -646,6 +646,15 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     expect(reply).toMatch(/1\.000/); // ganancia sensata (6000 − 5000)
   });
 
+  it("BUG sin-dato: moneda que NO tenés (DOGE) → 'no veo DOGE', sin precio y sin consultar el mercado", async () => {
+    getPositionForSymbol.mockResolvedValue(null); // no la tiene ni fuera del top-N
+    const routed = await tryRouteQuery(ask("¿cuánto vale DOGE?"), CTX, tc); // CTX no tiene DOGE
+    expect(routed?.lane).toBe("template");
+    expect(routed?.response.reply).toMatch(/no veo DOGE/i);
+    expect(routed?.response.reply).not.toMatch(/cotiza|\$\s?0\b/i); // no da precio ni "$0"
+    expect(getMarketHighlights).not.toHaveBeenCalled(); // no le pega al mercado por algo no-tenido
+  });
+
   it("símbolo que no trae dato → motivo REAL (reintentá), no 'no tengo acceso'", () => {
     const reply = buildMarketReply(
       { symbol: "XYZ", precio_actual: null, maximo: null, maximo_tipo: null, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: null, ganancia_al_maximo: null },

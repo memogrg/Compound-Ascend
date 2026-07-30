@@ -821,6 +821,14 @@ async function resolveMarketQuery(
         assetHint = full.assetType;
       }
     }
+    // Moneda que el usuario NO tiene (DOGE en el fixture): no le damos su precio/ATH como si fuera
+    // info suya (la auditoría lo marcaba como alucinación). Sin posición (ni top-N ni completa) →
+    // lo decimos honesto y NO consultamos el mercado. No inventar precio de posiciones no-tenidas.
+    if (!(typeof cantidad === "number" && cantidad > 0)) {
+      return say(
+        `No veo ${symbol.toUpperCase()} entre tus inversiones, así que no te doy su precio como si fuera tuyo. Si la agregás a tu portafolio, te sigo el valor y te calculo escenarios.`,
+      );
+    }
     // assetType: del holding/posición si lo tiene; si no, cripto por defecto (tickers sueltos).
     const at = MARKET_TYPE[assetHint ?? ""] ?? "crypto";
 
