@@ -10,8 +10,14 @@
  *   AUDIT_BASE_URL           URL del server corriendo (default http://localhost:3000)
  *   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
  *   AUDIT_EMAIL + AUDIT_PASSWORD   (usuario de prueba)  — O BIEN  AUDIT_COOKIE (cookie cruda del navegador)
- *   GEMINI_API_KEY           (opcional; sin él corre solo heurísticas, sin juez LLM)
+ *   GEMINI_API_KEY           (opcional PARA EL JUEZ; sin él corre solo heurísticas, sin juez LLM)
  *   AUDIT_FIXTURE            (opcional; ruta a un JSON con cifras esperadas del motor, ver más abajo)
+ *
+ * IMPORTANTE (auditar el carril LLM): el SERVIDOR que corre el endpoint DEBE tener su propia
+ * GEMINI_API_KEY. Sin ella, toda pregunta que cae al LLM (lo que el router no cubre) devuelve el stub
+ * "La IA aún no está configurada…" y la corrida es CIEGA a ese carril. El harness marca ese stub como
+ * NO-RESPUESTA (categoría "sin_ia" = fail), nunca pass. Para una auditoría real: corré el dev server
+ * con GEMINI_API_KEY seteada, o apuntá AUDIT_BASE_URL a staging con el proveedor activo.
  *
  * Autenticación: el endpoint lee la sesión por COOKIE (@supabase/ssr). El harness inicia sesión con
  * email/password vía supabase-js y arma la cookie `sb-<ref>-auth-token` (base64url + chunking) que el
@@ -226,6 +232,17 @@ async function callChat(turn: Turn, cookie: string): Promise<ChatResult> {
 // ── 4) Heurísticas (0 costo) ──
 const MONEY_Q = /cu[aá]nto|gast|ingres|entra|sobra|libre|presupuest|queda|ahorr|fondo|compromiso|patrimonio|n[uú]mero/i;
 const NO_CAPACITY = /\bno (puedo|s[eé]|tengo|pude)\b|no lo (tengo|invento|s[eé])|defin[íi]lo|registr[aá] tu gasto|no tengo acceso/i;
+// El StubProvider (proveedor de IA sin configurar) devuelve SIEMPRE este texto: NO es una respuesta
+// real, es el carril LLM ciego. Se marca como no-respuesta (categoría "sin_ia" = fail), nunca pass.
+const STUB_RE = /La IA a[uú]n no est[aá] configurada/i;
+const isStub = (r: string): boolean => STUB_RE.test(r);
+// Contexto de MERCADO/cripto: acá mostrar el precio en su moneda de cotización (USD/$) es
+// INTENCIONAL aunque la moneda de visualización sea otra (₡) — no es un bug de moneda.
+const MARKET_CTX =
+  /\b(btc|eth|doge|jup|kmno|voo|sol|ada|bitcoin|ether|cripto|criptos?|altcoins?|moneda[s]?|acci[oó]n|etf|s&p|nasdaq|d[oó]lar(?:es)?|portafolio|invertid|inversi[oó]n(?:es)?|holding|ath|m[aá]ximo hist|precio|cotiza|vend[eo]|vender)\b/i;
+// Frescura del store del mercado ("precio guardado …, no en vivo" / "ahora no tengo el precio"): es
+// una aclaración honesta de frescura, NO un "no sé/no puedo". No debe disparar no_se_con_dato.
+const MARKET_FRESHNESS = /no en vivo|precio guardado|no tengo el precio|sin (?:dato|precio) (?:ahora|en vivo)/i;
 const OWNED_HINT: string[] = []; // se llena con símbolos del fixture si se conocen
 
 function sentenceCount(s: string): number {
@@ -238,6 +255,12 @@ function heuristics(item: RunItem, res: ChatResult, fx: Fixture | null): Flag[] 
   if (res.error) flags.push({ type: "error", detail: res.error });
   if (res.status >= 500) flags.push({ type: "error", detail: `HTTP ${res.status}` });
   if (!r.trim()) return flags;
+  // El carril LLM devolvió el stub "La IA aún no está configurada" → no-respuesta. Se corta acá: no
+  // tiene sentido auditar moneda/cifras de un texto placeholder. Es un fail de infraestructura, no del chat.
+  if (isStub(r)) {
+    flags.push({ type: "sin_ia", detail: "el carril LLM devolvió el stub (proveedor de IA no configurado)" });
+    return flags;
+  }
 
   const displaySym = fx ? SYMBOL[fx.currency] ?? fx.currency : null;
   // Moneda: símbolo ₡ junto a "USD"/"dólares", o $ junto a "colones/₡"; o símbolo ≠ display.
@@ -247,15 +270,19 @@ function heuristics(item: RunItem, res: ChatResult, fx: Fixture | null): Flag[] 
   if (/\(\s*[~≈]\s*[₡$][\d.,]/.test(r) || /equivale/i.test(r)) {
     flags.push({ type: "moneda", detail: "convierte a mano / agrega equivalencia" });
   }
-  if (displaySym && new RegExp(`\\$\\s?\\d`).test(r) && displaySym !== "$") {
+  // $ cuando la moneda de visualización NO es $: bug… SALVO en contexto de mercado/cripto, donde
+  // mostrar el precio en su moneda de cotización (USD) es intencional (no se convierte una cotización).
+  const marketCtx = MARKET_CTX.test(item.question) || MARKET_FRESHNESS.test(r) || /\bath\b|m[aá]ximo/i.test(r);
+  if (displaySym && new RegExp(`\\$\\s?\\d`).test(r) && displaySym !== "$" && !marketCtx) {
     flags.push({ type: "moneda", detail: `usa $ pero la moneda de visualización es ${fx!.currency}` });
   }
   // "₡0"/"0" en pregunta de dinero cuando hay sobres.
   if (MONEY_Q.test(item.question) && (!fx || fx.hasSobres) && /(?:^|\s)[₡$]?0(?:[.,]0+)?(?:\s|$|\.)/.test(r) && /gast|presupuest|sobre/i.test(item.question)) {
     flags.push({ type: "cero", detail: "reporta 0 en una pregunta de gasto/presupuesto" });
   }
-  // "no puedo/no sé/definilo" en preguntas cuyo dato SÍ existe (datos/acciones).
-  if (NO_CAPACITY.test(r) && !/qu[eé] hora|dolar|doge|casino/i.test(item.question)) {
+  // "no puedo/no sé/definilo" en preguntas cuyo dato SÍ existe (datos/acciones). Excluye la aclaración
+  // de frescura del mercado ("no en vivo"/"precio guardado"/"no tengo el precio"), que es honesta, no un "no sé".
+  if (NO_CAPACITY.test(r) && !MARKET_FRESHNESS.test(r) && !/qu[eé] hora|dolar|doge|casino/i.test(item.question)) {
     flags.push({ type: "no_se_con_dato", detail: "dice que no puede/no sabe ante un dato disponible" });
   }
   // Flooding.
@@ -349,7 +376,7 @@ function guessLane(res: ChatResult): "determinista" | "llm" | "?" {
 
 function isFail(a: { flags: Flag[]; judge: Judge; result: ChatResult }): boolean {
   if (a.result.error || a.result.status >= 500) return true;
-  const severe = a.flags.some((f) => ["moneda", "cero", "no_se_con_dato", "alucinacion", "arrastre", "cifra", "fuera_tema", "error"].includes(f.type));
+  const severe = a.flags.some((f) => ["sin_ia", "moneda", "cero", "no_se_con_dato", "alucinacion", "arrastre", "cifra", "fuera_tema", "error"].includes(f.type));
   if (severe) return true;
   if (a.judge?.fail) return true;
   return false;
@@ -388,7 +415,8 @@ async function main(): Promise<void> {
     if (item.kind === "repeat" && replies.length === 2 && norm(replies[0]!) !== norm(replies[1]!)) {
       flags.push({ type: "inconsistencia", detail: "la misma pregunta 2× dio respuestas distintas" });
     }
-    const jd = await judge(item, last, fx?.currency ?? "CRC");
+    // No gastamos el juez en el stub: ya es fail por infraestructura (sin_ia).
+    const jd = isStub(last.reply) ? null : await judge(item, last, fx?.currency ?? "CRC");
     const laneGuess = guessLane(last);
     const pass = !isFail({ flags, judge: jd, result: last });
     audited.push({ item, result: last, laneGuess, flags, judge: jd, pass });
@@ -459,6 +487,7 @@ function writeReport(rows: Audited[], cats: Category[], who: string): void {
     th{background:#f3f3f3} table.q td.reply{max-width:520px;font-size:12.5px;color:#333} tr.bad td:last-child{color:#c0392b;font-weight:600} tr.ok td:last-child{color:#1e8449}
     .flag{display:inline-block;background:#eee;border-radius:6px;padding:1px 6px;font-size:11px;margin:1px}
     .flag.moneda,.flag.cero,.flag.alucinacion,.flag.arrastre,.flag.cifra,.flag.no_se_con_dato,.flag.error,.flag.fuera_tema{background:#fdecea;color:#c0392b}
+    .flag.sin_ia{background:#4a4a4a;color:#fff}
     .flag.flooding,.flag.inconsistencia{background:#fef5e7;color:#b9770e}
     small{color:#888;font-weight:400}
   </style>
