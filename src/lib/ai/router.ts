@@ -295,6 +295,11 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   // extracción de montos (usa ₡/$ y dígitos) ni de nombres de sobre (no son palabras de slang).
   const t = normalizeSlang(text.trim());
 
+  // Pregunta COMPUESTA ("¿cuánto gasto y cuánto ahorro al mes?"): dos consultas distintas en una. Un
+  // carril determinista respondería SOLO una mitad (la auditoría lo cazó) → ESCALAR al LLM, que las
+  // cubre juntas. Requiere DOS "cuánto" unidos por "y" (no atrapa un "¿y cuánto…?" de arrastre solo).
+  if (/cu[aá]nto\b[\s\S]*?\by\s+cu[aá]nto\b/i.test(t)) return null;
+
   // ── Carriles nuevos (van ANTES de datos_mercado y del guard de REASONING_CUES, que atraparían
   //    "cuánto vale" / "cómo va" / "debería" y los mandaría al LLM). Todos deterministas, cifra del motor. ──
 
