@@ -34,6 +34,22 @@ const holding = (over: Partial<Holding> = {}): Holding => ({
 
 const montos = (...pares: [number, string][]) => pares.map(([monto, moneda]) => ({ monto, moneda }));
 
+type Conc = NonNullable<FinancialContext["concentracion"]>;
+/** La concentración CANÓNICA que hoy arma el context-engine desde el motor. El pack la consume. */
+const conc = (over: Partial<Conc> = {}): Conc => ({
+  moneda: "CRC",
+  porPosicion: [],
+  porMoneda: [],
+  porRegion: [],
+  porTipo: [],
+  top1Pct: 0,
+  top3Pct: 0,
+  hhi: 0,
+  slicesOmitidas: 0,
+  ...over,
+});
+
+
 const ctx = (over: Partial<FinancialContext> = {}): FinancialContext => ({ currency: "CRC", ...over });
 
 const tool = (over: Partial<ToolContext> = {}): ToolContext => ({ currency: "CRC", debts: [], ...over });
@@ -81,6 +97,14 @@ describe("buildEvidencePack · posición única → concentración = 1", () => {
       investmentInvested: montos([1000, "USD"]),
       investmentPL: montos([500, "USD"]),
       investmentValueBase: { monto: 1_500_000, moneda: "CRC" },
+      concentracion: conc({
+        porPosicion: [{ label: "BTC", valor: 1_500_000, pct: 1 }],
+        porTipo: [{ label: "cripto", valor: 1_500_000, pct: 1 }],
+        porMoneda: [{ label: "USD", valor: 1_500_000, pct: 1 }],
+        top1Pct: 1,
+        top3Pct: 1,
+        hhi: 1,
+      }),
     }),
     tool(),
   );
@@ -89,7 +113,8 @@ describe("buildEvidencePack · posición única → concentración = 1", () => {
     const c = pack.concentracion;
     expect(c.disponible).toBe(true);
     if (!c.disponible) return;
-    expect(c.top1).toEqual({ etiqueta: "BTC", valor: { monto: 1_500_000, moneda: "USD" }, pct: 1 });
+    // El monto va en la moneda BASE del motor, la misma en que se calcula el %.
+    expect(c.top1).toEqual({ etiqueta: "BTC", valor: { monto: 1_500_000, moneda: "CRC" }, pct: 1 });
     expect(c.top3Pct).toBe(1);
     expect(c.hhi).toBe(1);
     expect(c.alta).toBe(true);
@@ -113,7 +138,20 @@ describe("buildEvidencePack · priceUnavailable en la posición más grande", ()
     holding({ symbol: "VOO", assetType: "etf", value: 1_000_000, invested: 800_000, pl: 200_000, plPct: 0.25 }),
   ];
   const pack = buildEvidencePack(
-    ctx({ holdings, investmentValue: montos([4000, "USD"]), investmentValueBase: { monto: 4_000_000, moneda: "CRC" } }),
+    ctx({
+      holdings,
+      investmentValue: montos([4000, "USD"]),
+      investmentValueBase: { monto: 4_000_000, moneda: "CRC" },
+      concentracion: conc({
+        porPosicion: [
+          { label: "KMNO", valor: 3_000_000, pct: 0.75 },
+          { label: "VOO", valor: 1_000_000, pct: 0.25 },
+        ],
+        top1Pct: 0.75,
+        top3Pct: 1,
+        hhi: 0.625,
+      }),
+    }),
     tool(),
   );
 
@@ -214,7 +252,19 @@ describe("buildEvidencePack · descalce de moneda (colones vs. dólares)", () =>
       holding({ symbol: "BTC", currency: "CRC", monedaFila: "USD", value: 5660, valorPrimario: 3_000_000 }),
       holding({ symbol: "CERT", assetType: "otro", currency: "CRC", monedaFila: "CRC", value: 1_000_000, valorPrimario: 1_000_000 }),
     ];
-    const m = buildEvidencePack(ctx({ holdings, currency: "CRC" }), tool({ currency: "CRC" })).moneda;
+    const m = buildEvidencePack(
+      ctx({
+        holdings,
+        currency: "CRC",
+        concentracion: conc({
+          porMoneda: [
+            { label: "USD", valor: 3_000_000, pct: 0.75 },
+            { label: "CRC", valor: 1_000_000, pct: 0.25 },
+          ],
+        }),
+      }),
+      tool({ currency: "CRC" }),
+    ).moneda;
     expect(m.disponible).toBe(true);
     if (!m.disponible) return;
     expect(m.visualizacion).toBe("CRC");
@@ -231,7 +281,18 @@ describe("buildEvidencePack · descalce de moneda (colones vs. dólares)", () =>
       holding({ monedaFila: "CRC", value: 3_000_000, valorPrimario: 3_000_000 }),
       holding({ symbol: "VOO", monedaFila: "USD", value: 940, valorPrimario: 500_000 }),
     ];
-    const m = buildEvidencePack(ctx({ holdings }), tool({ currency: "CRC" })).moneda;
+    const m = buildEvidencePack(
+      ctx({
+        holdings,
+        concentracion: conc({
+          porMoneda: [
+            { label: "CRC", valor: 3_000_000, pct: 0.857 },
+            { label: "USD", valor: 500_000, pct: 0.143 },
+          ],
+        }),
+      }),
+      tool({ currency: "CRC" }),
+    ).moneda;
     if (!m.disponible) throw new Error("esperaba sección de moneda");
     expect(m.descalce).toBe(false);
   });
@@ -242,7 +303,19 @@ describe("buildEvidencePack · descalce de moneda (colones vs. dólares)", () =>
       holding({ symbol: "A", monedaFila: "CRC", valorPrimario: 800_000 }),
       holding({ symbol: "B", monedaFila: "EUR", valorPrimario: 700_000 }),
     ];
-    const m = buildEvidencePack(ctx({ holdings }), tool({ currency: "CRC" })).moneda;
+    const m = buildEvidencePack(
+      ctx({
+        holdings,
+        concentracion: conc({
+          porMoneda: [
+            { label: "USD", valor: 1_000_000, pct: 0.4 },
+            { label: "CRC", valor: 800_000, pct: 0.32 },
+            { label: "EUR", valor: 700_000, pct: 0.28 },
+          ],
+        }),
+      }),
+      tool({ currency: "CRC" }),
+    ).moneda;
     if (!m.disponible) throw new Error("esperaba sección de moneda");
     expect(m.dominante.currency).toBe("USD");
     expect(m.descalce).toBe(false);

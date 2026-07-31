@@ -29,6 +29,21 @@ const holding = (over: Partial<Holding> = {}): Holding => ({
 
 const montos = (...pares: [number, string][]) => pares.map(([monto, moneda]) => ({ monto, moneda }));
 
+type Conc = NonNullable<FinancialContext["concentracion"]>;
+/** La concentración CANÓNICA del contexto (motor). El pack la consume, no la recalcula. */
+const conc = (over: Partial<Conc> = {}): Conc => ({
+  moneda: "CRC",
+  porPosicion: [],
+  porMoneda: [],
+  porRegion: [],
+  porTipo: [],
+  top1Pct: 0,
+  top3Pct: 0,
+  hhi: 0,
+  slicesOmitidas: 0,
+  ...over,
+});
+
 const ctx = (over: Partial<FinancialContext> = {}): FinancialContext => ({ currency: "CRC", ...over });
 const tool = (over: Partial<ToolContext> = {}): ToolContext => ({ currency: "CRC", debts: [], ...over });
 
@@ -57,6 +72,14 @@ describe("renderEvidenceReport · posición única", () => {
       investmentInvested: montos([2_000, "USD"]),
       investmentPL: montos([1_000, "USD"]),
       investmentValueBase: { monto: 1_500_000, moneda: "CRC" },
+      concentracion: conc({
+        porPosicion: [{ label: "BTC", valor: 1_500_000, pct: 1 }],
+        porTipo: [{ label: "cripto", valor: 1_500_000, pct: 1 }],
+        porMoneda: [{ label: "USD", valor: 1_500_000, pct: 1 }],
+        top1Pct: 1,
+        top3Pct: 1,
+        hhi: 1,
+      }),
     }),
     tool({ currency: "CRC" }),
   );
@@ -99,6 +122,23 @@ describe("renderEvidenceReport · portafolio MIXTO (dólares + colones)", () => 
     investmentInvested: montos([40_000_000, "CRC"], [2_000, "USD"]),
     investmentPL: montos([5_000_000, "CRC"], [1_000, "USD"]),
     investmentValueBase: { monto: 46_500_000, moneda: "CRC" },
+    concentracion: conc({
+      porPosicion: [
+        { label: "Casa", valor: 45_000_000, pct: 0.968 },
+        { label: "BTC", valor: 1_500_000, pct: 0.032 },
+      ],
+      porTipo: [
+        { label: "inmueble", valor: 45_000_000, pct: 0.968 },
+        { label: "cripto", valor: 1_500_000, pct: 0.032 },
+      ],
+      porMoneda: [
+        { label: "CRC", valor: 45_000_000, pct: 0.968 },
+        { label: "USD", valor: 1_500_000, pct: 0.032 },
+      ],
+      top1Pct: 0.968,
+      top3Pct: 1,
+      hhi: 0.938,
+    }),
   });
 
   it("da un subtotal por moneda, sin sumarlos entre sí", () => {
@@ -129,6 +169,15 @@ describe("renderEvidenceReport · precio no disponible en la posición más gran
       ],
       investmentValue: montos([4_000, "USD"]),
       investmentValueBase: { monto: 4_000_000, moneda: "CRC" },
+      concentracion: conc({
+        porPosicion: [
+          { label: "KMNO", valor: 3_000_000, pct: 0.75 },
+          { label: "VOO", valor: 1_000_000, pct: 0.25 },
+        ],
+        top1Pct: 0.75,
+        top3Pct: 1,
+        hhi: 0.625,
+      }),
     }),
   );
 
@@ -184,6 +233,12 @@ describe("renderEvidenceReport · descalce de moneda", () => {
           holding({ monedaFila: "USD", value: 5_660, valorPrimario: 3_000_000 }),
           holding({ symbol: "CERT", assetType: "otro", currency: "CRC", monedaFila: "CRC", value: 1_000_000, valorPrimario: 1_000_000 }),
         ],
+        concentracion: conc({
+          porMoneda: [
+            { label: "USD", valor: 3_000_000, pct: 0.75 },
+            { label: "CRC", valor: 1_000_000, pct: 0.25 },
+          ],
+        }),
       }),
       tool({ currency: "CRC" }),
     );
