@@ -781,3 +781,30 @@ describe("buildSystemPrompt · agregados convertidos", () => {
     expect(prompt).not.toMatch(/CONVERTIDOS/);
   });
 });
+
+// ── El asesor NO puede negar el ATH que la herramienta sí devuelve (delta 3) ──
+describe("buildSystemPrompt · precio y máximo", () => {
+  const prompt = buildSystemPrompt({ currency: "CRC" });
+
+  it("ya no dice que no trackeamos el máximo histórico (era falso y contradecía al TOOLS_PROMPT_LINE)", () => {
+    expect(prompt).not.toMatch(/no trackeamos/i);
+    expect(prompt).not.toMatch(/no máximos históricos/i);
+    expect(prompt).not.toMatch(/solo tenés el precio ACTUAL/i);
+  });
+
+  it("manda a usar datos_de_mercado para el máximo", () => {
+    expect(prompt).toMatch(/USÁ la herramienta datos_de_mercado/);
+    expect(prompt).toMatch(/S[ÍI] trackeamos el máximo/i);
+  });
+
+  it("respeta maximo_tipo: 52 semanas no es un ATH", () => {
+    expect(prompt).toMatch(/52_semanas/);
+    expect(prompt).toMatch(/NUNCA ATH|NUNCA lo llames ATH/i);
+  });
+
+  it("conserva las barandas: no inventar precio, y el máximo es pasado (escenario, no plan)", () => {
+    expect(prompt).toMatch(/NUNCA inventes un precio ni un máximo/i);
+    expect(prompt).toMatch(/no se puede cronometrar/i);
+    expect(prompt).toMatch(/precio no disponible/i);
+  });
+});
