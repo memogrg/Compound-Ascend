@@ -374,12 +374,16 @@ async function judge(item: RunItem, res: ChatResult, currency: string): Promise<
 }
 
 // ── Orquestación ──
+// Firmas de las respuestas DETERMINISTAS (plantillas de answerFromContext/resolveFetchIntent/
+// buildMarketReply). Si el texto matchea una, salió del router (0 tokens de generación); si no, del
+// LLM. Por CONTENIDO (no latencia): en un dev server lento hasta las plantillas tardan, y la latencia
+// mentía marcando todo "llm". Cubre los carriles de #552–#558.
+const TEMPLATE_SIG =
+  /Tu Número de (?:Seguridad|Independencia|Libertad)|Tu número de independencia es|Todavía no (?:definiste|tengo tu Número)|Tenés \d+ metas?:|Todavía no tenés metas de ahorro|Este mes te toca apartar|No tenés metas de ahorro recurrentes|Tu gasto mensual|Tus ingresos mensuales son|Tu sobre de mayor gasto es|Donde más gastás es|libre este mes|no te queda flujo libre|meses de colch|Tu fondo (?:de emergencia|de paz)|Todavía no ten[ée]s registrado tu fondo|Todavía no tengo tus fondos de defensa|Aportás ~.* a tus metas|Tu portafolio vale|Tu aporte recurrente \(DCA\)|Tu meta más cercana a completarse es|No tenés metas de ahorro en curso|Para .+ te faltan|ya está completa|La cuota mensual de|Ten[ée]s varias deudas|No tenés deudas registradas|te quedan .+ (?:de .+ )?este mes|no tenés un sobre de|ya te pasaste \(gastaste|no tenés presupuesto asignado|Tu saldo de liquidez actual es|Tus últimos movimientos:|No registrás movimientos|No tenés presupuesto en|Ya usaste tu presupuesto de|No estoy seguro a qué sobre|cotiza hoy a|tu posición valdr[íi]a|No veo \w+ entre tus inversiones|No pude leer los datos de|No tengo el máximo para calcular|No pude calcular el escenario|Vendiendo (?:tus|todas)|precio guardado del|Te propongo (?:crear|registrar|anotar)/i;
 function guessLane(res: ChatResult): "determinista" | "llm" | "?" {
   if (res.error || !res.reply) return "?";
-  // Heurística: el carril determinista es rápido y su texto sigue plantillas conocidas.
-  const templated = /Tu (Número|gasto mensual|sobre de mayor|saldo)|Tenés [\d.,]|Te propongo (crear|registrar)|Vendiendo tus|llegás en ~/i.test(res.reply);
-  if (templated && res.latencyMs < 2500) return "determinista";
-  return "llm";
+  if (isStub(res.reply)) return "?"; // stub = sin proveedor, no es una respuesta real
+  return TEMPLATE_SIG.test(res.reply) ? "determinista" : "llm";
 }
 
 function isFail(a: { flags: Flag[]; judge: Judge; result: ChatResult }): boolean {
