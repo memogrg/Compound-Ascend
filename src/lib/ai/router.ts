@@ -1164,6 +1164,34 @@ export function buildMarketReply(
  * tokens) o null si hay que escalar al razonamiento (modelo completo). NUNCA adivina: si el
  * patrón no matchea Y el clasificador no está seguro, o el contexto no alcanza → null.
  */
+/** Resultado de matchIntent (patrón), ya sin null. Público para el CONTEXTO PEREZOSO de la ruta. */
+export type MatchedIntent = NonNullable<ReturnType<typeof matchIntent>>;
+
+/**
+ * Resuelve un intent YA matcheado por patrón (0 tokens): mercado / lectura fresca / cifra del ctx.
+ * Extraído de tryRouteQuery para que la ruta pueda correrlo tras construir SOLO el contexto que ese
+ * carril necesita (contexto perezoso). Devuelve null si el dato no alcanza → el llamador escala al LLM.
+ */
+export async function resolveMatchedIntent(
+  matched: MatchedIntent,
+  ctx: FinancialContext,
+  toolContext: ToolContext,
+): Promise<RoutedQuery | null> {
+  // Datos de mercado (precio/ATH): usa ctx.holdings + el tool. Si no resuelve el símbolo o no hay
+  // dato, devuelve la respuesta honesta (no escala a repetir negativas).
+  if (matched.intent === "datos_mercado") {
+    const response = await resolveMarketQuery(matched.params, ctx, toolContext.currency);
+    return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
+  }
+  if (FETCH_INTENTS.has(matched.intent)) {
+    const response = await resolveFetchIntent(matched.intent, toolContext.currency, matched.params);
+    return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
+  }
+  const response = answerFromContext(matched.intent, matched.params, toolContext, ctx);
+  if (response) return { response, tokensIn: 0, tokensOut: 0, lane: "template" };
+  return null; // el contexto no alcanza → escalar
+}
+
 export async function tryRouteQuery(
   messages: { role: string; content: string }[],
   ctx: FinancialContext,
@@ -1174,22 +1202,7 @@ export async function tryRouteQuery(
 
   // 1) Patrones (0 tokens de clasificación).
   const matched = matchIntent(lastUser);
-  if (matched) {
-    // Datos de mercado (precio/ATH): carril determinista que usa ctx.holdings + el tool. Si no
-    // resuelve el símbolo o no hay dato, devuelve la respuesta honesta (no escala a repetir negativas).
-    if (matched.intent === "datos_mercado") {
-      const response = await resolveMarketQuery(matched.params, ctx, toolContext.currency);
-      return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
-    }
-    if (FETCH_INTENTS.has(matched.intent)) {
-      const response = await resolveFetchIntent(matched.intent, toolContext.currency, matched.params);
-      // La lectura no consume tokens del LLM; su "coste" es una query a la BD.
-      return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
-    }
-    const response = answerFromContext(matched.intent, matched.params, toolContext, ctx);
-    if (response) return { response, tokensIn: 0, tokensOut: 0, lane: "template" };
-    return null; // el contexto no alcanza → escalar
-  }
+  if (matched) return await resolveMatchedIntent(matched, ctx, toolContext);
 
   // 1b) Carril de ACCIÓN determinista: intents de CREAR (alerta, meta, sobre, gasto). Va DESPUÉS de
   //     los intents de lectura (que ganan) y ANTES del LLM: el parseo/propuesta salen del router,

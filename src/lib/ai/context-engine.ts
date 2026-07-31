@@ -34,7 +34,22 @@ function asStrings(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
-export async function buildFinancialContext(): Promise<FinancialContext> {
+/**
+ * Alcance del contexto: qué bloques CAROS construir. Los bloques baratos (base, perfil, deudas,
+ * metas, sobres) SIEMPRE corren (definen currency/rates y son lecturas rápidas). Los caros se gatean
+ * para el CONTEXTO PEREZOSO: una consulta que el router resuelve determinista no debe pagar el
+ * portafolio (precios de mercado en vivo — el costo dominante) ni el patrimonio ni los bloques
+ * "flavor" (solo para el LLM). Default = todo (backward-compat: WhatsApp y el fallback LLM no cambian).
+ */
+export type ContextScope = {
+  patrimonio?: boolean; // getPatrimonioReport: números, compromiso*, mesesDeColchon, investableWealth
+  portfolio?: boolean; // getPortfolioReport: holdings, investment* (precios en vivo — CARO)
+  defense?: boolean; // getDefenseFundsReport: defenseFunds
+  flavor?: boolean; // richlife, trayectoria, perfil conductual, vinculables, insights, macro (solo LLM)
+};
+export const FULL_CONTEXT_SCOPE: ContextScope = { patrimonio: true, portfolio: true, defense: true, flavor: true };
+
+export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_SCOPE): Promise<FinancialContext> {
   const user = await getUser();
   const name = (user?.user_metadata?.display_name as string | undefined) ?? undefined;
   if (!isSupabaseConfigured() || !user) return { name, currency: "CRC" };
@@ -192,8 +207,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Sobres no disponibles: el contexto sigue.
   }
 
-  // Patrimonio neto (Rich Life) — la lectura más cara, best-effort.
-  try {
+  // Patrimonio neto (Rich Life) — best-effort. Bloque "flavor" (solo lo usa el system prompt del LLM).
+  if (scope.flavor) try {
     const { getRichLifeSummary } = await import("@/modules/rich-life/services/rich-life-service");
     const summary = await getRichLifeSummary();
     ctx.netWorth = Math.round(summary.snapshot.indicators.netWorth);
@@ -208,7 +223,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   // Portafolio: agregados + DETALLE POR POSICIÓN (para que el asesor vea las inversiones y
   // responda con cifras reales, p. ej. ganancia al vender). Todo del motor de analytics
   // (holdingsWithPerformance), en moneda principal, scope de hogar. Best-effort.
-  try {
+  if (scope.portfolio) try {
     const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
     const report = await getPortfolioReport();
     const a = report.analytics;
@@ -239,7 +254,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Trayectoria (memoria longitudinal): tendencias mes a mes vía el motor puro. Best-effort;
   // si hay <3 meses de historia el motor devuelve undefined (no inventamos tendencias).
-  try {
+  if (scope.flavor) try {
     const { getSnapshotHistory } = await import(
       "@/modules/financial-base/services/snapshot-service"
     );
@@ -270,7 +285,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Marco Patrimonial (motor patrimonio-engine) — best-effort: consume el reporte
   // tal cual, sin recalcular. Si falla, el chat sigue sin estas métricas.
-  try {
+  if (scope.patrimonio) try {
     const { getPatrimonioReport } = await import("@/modules/wealth");
     const p = await getPatrimonioReport();
     // El reporte viene en SU moneda (p.currency, la de display); el AI usa ctx.currency (principal).
@@ -314,10 +329,9 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Marco Patrimonial no disponible.
   }
 
-  // Perfil conductual (Fase · asesor conductual). Lectura best-effort con el
-  // cliente de sesión (respeta RLS); cada tabla en su try/catch para que un fallo
-  // aislado no degrade el resto del contexto.
-  try {
+  // Perfil conductual (Fase · asesor conductual). Bloque "flavor" (tono/coaching para el LLM).
+  // Lectura best-effort con el cliente de sesión (respeta RLS); cada tabla en su try/catch.
+  if (scope.flavor) try {
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const supabase = await createSupabaseServerClient();
 
@@ -472,7 +486,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   // hasEmergencyFund auto-reportado del onboarding: si hay un fondo registrado, esos datos MANDAN
   // (el chat decía "no tenés fondo" pese a estar registrado). Va DESPUÉS del bloque de perfil para
   // pisar el auto-reporte. Best-effort: sin sesión/lectura falla → se queda el auto-reporte.
-  try {
+  if (scope.defense) try {
     const { getDefenseFundsReport } = await import("@/modules/wealth");
     const d = await getDefenseFundsReport();
     const fund = (f: { current: number; target: number; progressPct: number; recommendedMonthly: number; covered: boolean }, registrado: boolean) => ({
@@ -500,7 +514,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   }
 
   // Entidades vinculables: la IA puede proponer transacciones ya vinculadas.
-  try {
+  if (scope.flavor) try {
     const { listLinkableEntities } =
       await import("@/modules/financial-base/services/linkable-entities-service");
     const linkables = await listLinkableEntities();
@@ -514,7 +528,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Memoria conductual (Fase 4c): observaciones recientes para que el asesor las
   // mencione con tacto. getActiveInsights dispara refreshInsights (auto-activación).
-  try {
+  if (scope.flavor) try {
     const { getActiveInsights } = await import("@/lib/insights");
     const items = await getActiveInsights(4);
     if (items.length)
@@ -526,7 +540,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   // Entorno macro/micro: indicadores económicos del entorno (no del usuario).
   // Best-effort; cada lectura en su propio try/catch para que un fallo aislado no
   // degrade el resto. Si un indicador no tiene datos (value null), no se inyecta.
-  try {
+  if (scope.flavor) try {
     const { getLatest, getChange } = await import("@/lib/economic-indicators");
 
     // Helper: lee el último valor de un código y, si existe, lo asigna.
