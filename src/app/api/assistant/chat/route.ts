@@ -8,10 +8,13 @@ import { NextResponse } from "next/server";
 import { chatRequestSchema } from "@/modules/assistant/schemas";
 import {
   financeChatWithTools,
+  resolveDeterministic,
   normalizeDebtsForTool,
   type ToolContext,
 } from "@/lib/ai/orchestrator";
+import { matchIntent } from "@/lib/ai/router";
 import { buildFinancialContext } from "@/lib/ai/context-engine";
+import { scopeForIntent, type ToolNeed } from "@/lib/ai/lazy-context";
 import { listDebts, listGoals } from "@/modules/control";
 import { getPrimaryCurrency } from "@/modules/financial-base";
 import { getPatrimonioReport } from "@/modules/wealth/services/patrimonio-service";
@@ -32,6 +35,72 @@ export const runtime = "nodejs";
 // tardar; sin maxDuration Vercel lo mataría en el default. 60s da margen (Fluid Compute).
 export const maxDuration = 60;
 
+/**
+ * Arma el toolContext leyendo SOLO lo que el carril pide. `numbers` (los tres números patrimoniales)
+ * es la lectura cara (getPatrimonioReport) — se salta salvo que el intent los use. Best-effort en cada
+ * parte, igual que antes. `currency` (moneda principal) siempre; deudas/metas/números según `need`.
+ */
+async function buildToolContext(need: ToolNeed): Promise<ToolContext | undefined> {
+  try {
+    const primary = await getPrimaryCurrency();
+    let rates: Record<string, number> | null = null;
+    try {
+      rates = await getFxRates();
+    } catch {
+      rates = null;
+    }
+    const toolContext: ToolContext = { currency: primary, fxUnavailable: !rates, debts: [] };
+    if (need.debts) {
+      try {
+        toolContext.debts = normalizeDebtsForTool(await listDebts(), primary, rates);
+      } catch {
+        toolContext.debts = [];
+      }
+    }
+    if (need.numbers) {
+      try {
+        const pat = await getPatrimonioReport();
+        const toPrimary = (v: number): number =>
+          pat.currency === primary ? v : rates ? convertCurrency(v, pat.currency, primary, rates) : NaN;
+        const seguridad = toPrimary(pat.report.numeroDeSeguridad);
+        const independencia = toPrimary(pat.report.numeroDeIndependencia);
+        const invertible = toPrimary(pat.report.investableWealth);
+        const libertad = pat.report.numeroDeLibertad != null ? toPrimary(pat.report.numeroDeLibertad) : null;
+        if (Number.isFinite(seguridad)) toolContext.securityNumber = seguridad;
+        if (Number.isFinite(independencia)) toolContext.independenceNumber = independencia;
+        if (libertad != null && Number.isFinite(libertad)) toolContext.libertyNumber = libertad;
+        if (Number.isFinite(invertible)) toolContext.investableWealth = invertible;
+      } catch {
+        // números undefined
+      }
+    }
+    if (need.goals) {
+      try {
+        const goals = await listGoals();
+        const mapped = goals
+          .filter((g) => g.targetAmount > 0 && (g.currency === primary || !!rates))
+          .map((g) => {
+            const conv = (n: number) => (g.currency === primary ? n : convertCurrency(n, g.currency, primary, rates!));
+            return {
+              nombre: g.name,
+              objetivo: conv(g.targetAmount),
+              actual: conv(g.currentAmount),
+              aporte_mensual: conv(g.monthlyContribution),
+              fecha_objetivo: g.targetDate ?? null,
+              recurrence: g.recurrence,
+            };
+          });
+        if (mapped.length) toolContext.goals = mapped;
+      } catch {
+        // goals undefined
+      }
+    }
+    return toolContext;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     if (!assertTrustedOrigin(req)) throw new AppError("FORBIDDEN", "Origen no permitido.");
@@ -51,86 +120,43 @@ export async function POST(req: Request) {
 
     if (user) await assertTokenBudget(user.id);
 
-    const ctx = await buildFinancialContext();
-    // Memoria persistente (fuente de verdad): el chat del DÍA del usuario (chat_messages). El
-    // `history` del cliente se acepta por compat en el schema, pero NO se usa. El LLM ve solo los
-    // últimos N (capHistory en el orquestador), aunque se persista todo el día.
-    const today = await loadTodayChat();
-    const messages: ChatMessage[] = [
-      ...today.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
-      { role: "user", content: parsed.data.message },
-    ];
+    const userMessage = parsed.data.message;
 
-    // Habilita las herramientas (function-calling) sólo con sesión: lee las deudas del
-    // usuario como datos de SOLO lectura y las normaliza a la moneda principal con FX
-    // antes de pasarlas (deudas en USD+CRC no se pueden sumar crudas). Best-effort: si
-    // la lectura falla, se sigue sin herramientas; si falla FX, no convierte y marca
-    // fxUnavailable para que la IA aclare que el cálculo asume una sola moneda.
-    let toolContext: ToolContext | undefined;
-    if (user) {
-      try {
-        // Para CÁLCULO usamos la moneda PRINCIPAL (user_settings.primary_currency),
-        // no getDisplayCurrency(): esta honra la cookie de visualización y haría que el
-        // toolContext use la moneda con la que el usuario mira el dashboard, no la suya.
-        const [debts, primary] = await Promise.all([listDebts(), getPrimaryCurrency()]);
-        let rates: Record<string, number> | null = null;
-        try {
-          rates = await getFxRates();
-        } catch {
-          rates = null;
-        }
-        toolContext = {
-          currency: primary,
-          fxUnavailable: !rates,
-          debts: normalizeDebtsForTool(debts, primary, rates),
-        };
-        // Los TRES números patrimoniales + patrimonio invertible (datos reales), normalizados a la
-        // moneda PRINCIPAL. Cada uno es "capital que, al 8% anual, cubre X gasto"; NUNCA se mezclan
-        // ni se inventan. Best-effort: si falla, las tools/intents lo aclaran.
-        try {
-          const pat = await getPatrimonioReport();
-          const toPrimary = (v: number): number =>
-            pat.currency === primary ? v : rates ? convertCurrency(v, pat.currency, primary, rates) : NaN;
-          const seguridad = toPrimary(pat.report.numeroDeSeguridad);
-          const independencia = toPrimary(pat.report.numeroDeIndependencia);
-          const invertible = toPrimary(pat.report.investableWealth);
-          // Libertad = estilo de vida DESEADO; null si no lo definió (nunca se inventa).
-          const libertad =
-            pat.report.numeroDeLibertad != null ? toPrimary(pat.report.numeroDeLibertad) : null;
-          if (Number.isFinite(seguridad)) toolContext.securityNumber = seguridad;
-          if (Number.isFinite(independencia)) toolContext.independenceNumber = independencia;
-          if (libertad != null && Number.isFinite(libertad)) toolContext.libertyNumber = libertad;
-          if (Number.isFinite(invertible)) toolContext.investableWealth = invertible;
-        } catch {
-          // deja los números/investableWealth undefined
-        }
-        // Metas de ahorro (datos reales) normalizadas a la moneda PRINCIPAL. Best-effort.
-        try {
-          const goals = await listGoals();
-          const mapped = goals
-            .filter((g) => g.targetAmount > 0 && (g.currency === primary || !!rates))
-            .map((g) => {
-              const conv = (n: number) =>
-                g.currency === primary ? n : convertCurrency(n, g.currency, primary, rates!);
-              return {
-                nombre: g.name,
-                objetivo: conv(g.targetAmount),
-                actual: conv(g.currentAmount),
-                aporte_mensual: conv(g.monthlyContribution),
-                fecha_objetivo: g.targetDate ?? null,
-                recurrence: g.recurrence,
-              };
-            });
-          if (mapped.length) toolContext.goals = mapped;
-        } catch {
-          // deja goals undefined
-        }
-      } catch {
-        toolContext = undefined;
+    // ── CONTEXTO PEREZOSO: rutear PRIMERO (matchIntent es texto puro, 0 IO), y construir SOLO lo que
+    //    ese carril usa. Una consulta que el router resuelve determinista NO paga el contexto completo
+    //    (portafolio con precios en vivo, patrimonio, bloques flavor). Solo si escala → contexto full. ──
+    let result: Awaited<ReturnType<typeof financeChatWithTools>> | null = null;
+    const matched = user ? matchIntent(userMessage) : null;
+    if (matched) {
+      const scope = scopeForIntent(matched.intent, matched.params);
+      const liteCtx =
+        scope.context === null
+          ? { currency: await getPrimaryCurrency().catch(() => "CRC") }
+          : await buildFinancialContext(scope.context);
+      const liteTool = await buildToolContext(scope.tool);
+      if (liteTool) {
+        // Turno único: los intents deterministas resuelven con el mensaje actual (no necesitan historial).
+        const det = await resolveDeterministic(matched, [{ role: "user", content: userMessage }], liteCtx, liteTool);
+        if (det) result = det;
       }
     }
 
-    const result = await financeChatWithTools(messages, ctx, toolContext);
+    if (!result) {
+      // Fallback: sin patrón (o el determinista escaló). AHÍ sí se arma el contexto COMPLETO + tools.
+      const ctx = await buildFinancialContext();
+      // Memoria persistente (fuente de verdad): el chat del DÍA del usuario (chat_messages). El
+      // `history` del cliente se acepta por compat en el schema, pero NO se usa. El LLM ve solo los
+      // últimos N (capHistory en el orquestador), aunque se persista todo el día.
+      const today = await loadTodayChat();
+      const messages: ChatMessage[] = [
+        ...today.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
+        { role: "user", content: userMessage },
+      ];
+      // Herramientas (function-calling) sólo con sesión; deudas/metas/números normalizados a la moneda
+      // PRINCIPAL. Best-effort: si falla, se sigue sin herramientas.
+      const toolContext = user ? await buildToolContext({ debts: true, goals: true, numbers: true }) : undefined;
+      result = await financeChatWithTools(messages, ctx, toolContext);
+    }
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
 
     // Enriquecer una propuesta de gasto/ingreso con el SOBRE sugerido (hoja REAL del usuario),
