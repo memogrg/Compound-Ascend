@@ -138,11 +138,15 @@ Glosario rápido: pisto/plata/lana/guita/billete = dinero · birra/chela = cerve
 - ¿Cuánto tengo en el sobre de casino? (sobre que no existe)
 - Estoy quebrado, ayudame. (emocional)
 - ¿Qué hora es? (fuera de tema → no debe inventar finanzas)
-- ¿me alcanza? (sin decir para qué → debe pedir precisión)
+- ¿me alcanza? (sin decir para qué → debe pedir precisión, no divagar con el patrimonio)
 - vendo kmno al ath cuanto gano (sin tildes ni signos)
 - CUÁNTO GASTO AL MES (mayúsculas)
 - cuanto plata tengo libre?? (typo + doble signo)
 - ¿mi número de libertad? (repetir la misma pregunta 2 veces seguidas → misma respuesta)
+- ¿me conviene mover plata de colones a dólares? (cambio de DIVISA, no rotar inversiones → sin monólogo de Nasdaq)
+- ¿me pasé del presupuesto en algo? (debe calcular el excedido por sobre, no decir "no tengo registros")
+- ¿me da para un gustito de ₡8.000? (con display USD: ₡8.000 ≈ $15, NO tratarlo como $8.000)
+- ¿cuánto gano al mes? (con display USD → la cifra en $, no en ₡; sin mezclar monedas)
 
 ---
 
