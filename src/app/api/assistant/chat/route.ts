@@ -186,6 +186,9 @@ export async function POST(req: Request) {
       provider: result.provider,
       tokensIn: result.tokensIn,
       tokensOut: result.tokensOut,
+      // Largo del reply final: contra el `resumenLen` de assistant.tool dice si el modelo pasó
+      // entero un bloque ya redactado (comparador, informe) o lo recortó.
+      replyLen: result.reply?.length ?? 0,
     });
 
     // Persistir el turno en el chat del usuario (best-effort; no bloquea la respuesta si falla).

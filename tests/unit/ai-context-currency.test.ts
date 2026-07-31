@@ -46,6 +46,9 @@ vi.mock("@/modules/financial-base/services/base-service", () => ({
 const skip = async () => {
   throw new Error("mock: bloque best-effort omitido");
 };
+// El FX es la excepción: no se saltaba, y getFxRates() pegaba a la red REAL. De ahí venía el
+// timeout de 5 s intermitente (pasaba o fallaba según lo que tardara la fuente). Tasas fijas.
+vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: async () => ({ USD: 1, CRC: 500 }) }));
 vi.mock("@/modules/rich-life/services/rich-life-service", () => ({ getRichLifeSummary: skip }));
 vi.mock("@/modules/wealth/services/portfolio-service", () => ({ getPortfolioReport: skip }));
 vi.mock("@/modules/financial-base/services/snapshot-service", () => ({ getSnapshotHistory: skip }));
