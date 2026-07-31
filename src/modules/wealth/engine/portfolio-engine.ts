@@ -19,6 +19,7 @@ import type {
   InvestmentCategory,
 } from "@/modules/wealth/types";
 import { CATEGORY_META } from "@/modules/wealth/constants";
+import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -474,8 +475,15 @@ export function concentrationBy(
 export function concentrationByAsset(holds: HoldingPerformance[]): AllocationSlice[] {
   return concentrationBy(holds, (h) => h.label?.trim() || h.symbol);
 }
+/**
+ * Concentración por moneda de EXPOSICIÓN, no por la moneda en que se registró la compra. Un activo
+ * cotizado (etf/acción/cripto) cotiza en USD: un BTC comprado en colones está expuesto a dólares,
+ * porque su valor se mueve con el dólar. Agrupar por `h.currency` respondía "en qué moneda pagué",
+ * que no es la pregunta. Misma política que la fila del portafolio y que el contexto del asesor
+ * (holdingDisplayCurrency).
+ */
 export function concentrationByCurrency(holds: HoldingPerformance[]): AllocationSlice[] {
-  return concentrationBy(holds, (h) => h.currency);
+  return concentrationBy(holds, (h) => holdingDisplayCurrency(h.assetType, h.currency));
 }
 export function concentrationByRegion(holds: HoldingPerformance[]): AllocationSlice[] {
   return concentrationBy(holds, (h) => h.region?.trim() || "Sin definir");

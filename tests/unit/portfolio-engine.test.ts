@@ -546,13 +546,31 @@ describe("portfolio-engine · taxonomía", () => {
     const a = computeHoldingPerformance(
       holding({ symbol: "A", assetType: "accion", currency: "USD", region: "us", currentValueManual: 80 }),
     );
+    // No cotizado (inmueble): se queda en la moneda en que se registró.
     const b = computeHoldingPerformance(
-      holding({ symbol: "B", assetType: "accion", currency: "CRC", currentValueManual: 20 }),
+      holding({ symbol: "B", assetType: "inmueble", currency: "CRC", currentValueManual: 20 }),
     );
     const byCur = concentrationByCurrency([a, b]);
     expect(byCur[0]).toMatchObject({ label: "USD", value: 80 });
+    expect(byCur[1]).toMatchObject({ label: "CRC", value: 20 });
     const byReg = concentrationByRegion([a, b]);
     expect(byReg.map((s) => s.label).sort()).toEqual(["Sin definir", "us"]);
+  });
+
+  it("por moneda mide EXPOSICIÓN, no en qué moneda se pagó", () => {
+    // BTC comprado en colones: su valor cotiza en dólares → exposición USD, no CRC.
+    const btc = computeHoldingPerformance(
+      holding({ symbol: "BTC", assetType: "cripto", currency: "CRC", currentValueManual: 70 }),
+    );
+    const casa = computeHoldingPerformance(
+      holding({ symbol: "CASA", assetType: "inmueble", currency: "CRC", currentValueManual: 30 }),
+    );
+    const byCur = concentrationByCurrency([btc, casa]);
+
+    // Antes los DOS caían en CRC (100%) y el desglose decía que no había exposición al dólar.
+    expect(byCur.map((s) => s.label)).toEqual(["USD", "CRC"]);
+    expect(byCur[0]).toMatchObject({ label: "USD", value: 70 });
+    expect(byCur[1]).toMatchObject({ label: "CRC", value: 30 });
   });
 
   it("periodReturn: valor final − inicial − aportes", () => {
@@ -578,7 +596,7 @@ describe("portfolio-engine · taxonomía", () => {
       holding({ symbol: "A", assetType: "accion", currency: "USD", region: "us", currentValueManual: 80 }),
     );
     const b = computeHoldingPerformance(
-      holding({ symbol: "B", assetType: "accion", currency: "CRC", currentValueManual: 20 }),
+      holding({ symbol: "B", assetType: "inmueble", currency: "CRC", currentValueManual: 20 }),
     );
     const c = concentrations([a, b]);
     expect(c.byAsset.map((s) => s.label)).toEqual(["A", "B"]); // desc por valor

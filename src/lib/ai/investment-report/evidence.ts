@@ -195,79 +195,55 @@ function buildPosiciones(ctx: FinancialContext): SeccionPosiciones {
   };
 }
 
+/**
+ * CONSUME la concentración canónica del contexto (la del motor, sobre TODAS las posiciones). Antes
+ * la calculaba acá sobre ctx.holdings (top-12): mismo concepto, dos números distintos según a quién
+ * le preguntaras. Ahora hay una sola definición; si el contexto no la trae, la sección se declara
+ * no disponible en vez de reinventarla.
+ */
 function buildConcentracion(ctx: FinancialContext): SeccionConcentracion {
-  const holdings = ctx.holdings ?? [];
-  if (holdings.length === 0) {
+  const c = ctx.concentracion;
+  if (!c || c.porPosicion.length === 0) {
     return {
       disponible: false,
-      motivo: "no puedo calcular la concentración porque no hay posiciones registradas",
+      motivo: (ctx.holdings ?? []).length === 0
+        ? "no puedo calcular la concentración porque no hay posiciones registradas"
+        : "no puedo calcular la concentración porque no llegó el desglose del portafolio",
       desbloquea: "registrá tus posiciones en Patrimonio",
     };
   }
-  // Las participaciones se calculan SIEMPRE sobre `valorPrimario` (moneda base del motor, homogénea
-  // entre posiciones). Los montos de fila están en monedas distintas: sumarlos sería el bug de
-  // moneda mezclada. Denominador: el total del motor si vino (incluye las no listadas); si no, la
-  // suma de lo listado — nunca se estima el faltante.
-  const sumaListada = holdings.reduce((a, h) => a + h.valorPrimario, 0);
-  const totalBase = ctx.investmentValueBase;
-  const baseMonto = totalBase && totalBase.monto > 0 ? totalBase.monto : sumaListada;
-  if (!(baseMonto > 0)) {
-    return {
-      disponible: false,
-      motivo: "no puedo calcular la concentración porque el valor del portafolio es 0",
-      desbloquea: "revisá que tus posiciones tengan cantidad y costo cargados",
-    };
-  }
-  const base: Monto | null = totalBase
-    ? { monto: round(baseMonto), moneda: totalBase.moneda }
-    : null; // sin etiqueta de moneda no se publica el monto; los % siguen siendo válidos
-
-  const orden = [...holdings].sort((a, b) => b.valorPrimario - a.valorPrimario);
-  const primera = orden[0]!;
-  const top3 = orden.slice(0, 3).reduce((a, h) => a + h.valorPrimario, 0);
-  const hhi = orden.reduce((a, h) => a + (h.valorPrimario / baseMonto) ** 2, 0);
-
-  const porTipo = new Map<string, number>();
-  for (const h of orden) porTipo.set(h.assetType, (porTipo.get(h.assetType) ?? 0) + h.valorPrimario);
-  const mezcla = [...porTipo.entries()]
-    .map(([assetType, valor]) => ({ assetType, pct: valor / baseMonto }))
-    .sort((a, b) => b.pct - a.pct);
+  const mayor = c.porPosicion[0]!;
+  const base: Monto | null = ctx.investmentValueBase ?? null;
 
   return {
     disponible: true,
     base,
-    // El MONTO de la posición más grande va en SU moneda; el % sale de la base homogénea.
-    top1: {
-      etiqueta: etiquetaDe(primera),
-      valor: { monto: primera.value, moneda: primera.monedaFila },
-      pct: primera.valorPrimario / baseMonto,
-    },
-    top3Pct: top3 / baseMonto,
-    hhi,
-    mezcla,
-    alta: primera.valorPrimario / baseMonto > UMBRAL_CONCENTRACION,
-    parcial: (ctx.holdingsMoreCount ?? 0) > 0,
-    preciosIncompletos: holdings.some((h) => h.priceUnavailable),
+    // Monto y % vienen de la MISMA base (la del motor): comparables entre sí.
+    top1: { etiqueta: mayor.label, valor: { monto: round(mayor.valor), moneda: c.moneda }, pct: mayor.pct },
+    top3Pct: c.top3Pct,
+    hhi: c.hhi,
+    mezcla: c.porTipo.map((s) => ({ assetType: s.label, pct: s.pct })),
+    alta: c.top1Pct > UMBRAL_CONCENTRACION,
+    // Ahora marca que el DETALLE por posición se recortó (el HHI y los % sí incluyen todas).
+    parcial: c.slicesOmitidas > 0,
+    preciosIncompletos: (ctx.holdings ?? []).some((h) => h.priceUnavailable),
   };
 }
 
+/**
+ * Exposición por moneda: también del contexto canónico (concentracion.porMoneda, agrupada por la
+ * moneda en que cada activo COTIZA). Antes se recalculaba acá sobre el top-12 — era la MISMA
+ * pregunta con otro denominador.
+ */
 function buildMoneda(ctx: FinancialContext, visualizacion: string): SeccionMoneda {
-  const holdings = ctx.holdings ?? [];
-  // Pesos sobre `valorPrimario` (base homogénea), agrupados por la moneda en que cada posición
-  // COTIZA — que es la exposición real. Una cripto registrada en colones es exposición a dólares.
-  const base = holdings.reduce((a, h) => a + h.valorPrimario, 0);
-  if (holdings.length === 0 || !(base > 0)) {
+  const porMoneda = (ctx.concentracion?.porMoneda ?? []).map((s) => ({ currency: s.label, pct: s.pct }));
+  if (porMoneda.length === 0) {
     return {
       disponible: false,
       motivo: "no puedo calcular la exposición por moneda porque no hay posiciones con valor",
       desbloquea: "registrá tus posiciones con su moneda en Patrimonio",
     };
   }
-  const porMonedaMap = new Map<string, number>();
-  for (const h of holdings) porMonedaMap.set(h.monedaFila, (porMonedaMap.get(h.monedaFila) ?? 0) + h.valorPrimario);
-  const porMoneda = [...porMonedaMap.entries()]
-    .map(([currency, valor]) => ({ currency, pct: valor / base }))
-    .sort((a, b) => b.pct - a.pct);
   const dom = porMoneda[0]!;
   return {
     disponible: true,
