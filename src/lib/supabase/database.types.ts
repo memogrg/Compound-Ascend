@@ -872,6 +872,21 @@ export type ChatMessageRow = {
   created_at: string;
 };
 
+/** Informe de portafolio del carril "deep" (migración 20260805000001). Personal: RLS por dueño. */
+export type InvestmentReportRow = {
+  id: string;
+  user_id: string;
+  household_id: string | null; // reservada; el informe es personal → siempre null
+  evidence: unknown; // EvidencePack crudo (jsonb): la fuente auditable de cada cifra
+  report_md: string;
+  analysis: string | null; // Etapa B (futura)
+  risk: string | null; // Etapa C (futura)
+  model: string | null;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  created_at: string;
+};
+
 /** Ingesta por correo: allowlist alias de destinatario -> usuario (migración 0027). */
 export type EmailIngestLinkRow = Audited & {
   id: string;
@@ -1047,6 +1062,8 @@ export interface Database {
       ai_conversation_turns: UserTable<AiConversationTurnRow>;
       // Chat del asesor persistido por usuario para la UI (web + móvil). RLS PERSONAL (dueño).
       chat_messages: UserTable<ChatMessageRow>;
+      // Informes de portafolio (carril "deep", deterministas). RLS PERSONAL (dueño).
+      investment_reports: UserTable<InvestmentReportRow>;
       // Corpus semántico de la Biblia (migración 0033). Dato de entorno (sin user_id);
       // lectura para autenticados, escritura solo service-role.
       biblia_chunks: TableShape<
