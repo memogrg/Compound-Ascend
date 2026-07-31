@@ -188,14 +188,25 @@ export async function buildContextForUser(
       }))
       .filter((d) => d.balance > 0);
     if (raw.length > 0) {
-      const normalized = normalizeDebtsForTool(raw, primary, rates);
+      const { subtotales } = await import("@/lib/ai/money");
       ctx.debtCount = raw.length;
-      ctx.debtTotal = Math.round(normalized.reduce((s, d) => s + d.balance, 0));
+      // Subtotales por la moneda NATIVA de cada deuda (nunca una suma cruda de monedas distintas).
+      ctx.debtTotals = subtotales(raw.map((d) => ({ monto: Math.round(d.balance), moneda: d.currency })));
+      // El total convertido sale de normalizeDebtsForTool (misma FX que las herramientas). Sin
+      // tasas quedaría sin convertir y etiquetado con otra moneda → en ese caso no se publica.
+      if (rates || ctx.debtTotals.every((m) => m.moneda === primary)) {
+        const normalized = normalizeDebtsForTool(raw, primary, rates);
+        ctx.debtTotalConvertido = {
+          monto: Math.round(normalized.reduce((s, d) => s + d.balance, 0)),
+          moneda: primary,
+        };
+      }
       // La más cara por TAE (unitless): se elige sobre las crudas para preservar
       // apr null → topDebtApr undefined (misma semántica que la web).
       const top = raw.reduce((a, b) => ((a.apr ?? 0) >= (b.apr ?? 0) ? a : b));
       ctx.topDebtName = top.name;
       ctx.topDebtApr = top.apr ?? undefined;
+      ctx.topDebtCurrency = top.currency;
     }
   } catch {
     // Deudas no disponibles.

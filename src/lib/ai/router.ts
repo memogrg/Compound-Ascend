@@ -801,13 +801,20 @@ export function answerFromContext(
     const name = typeof params.debtName === "string" ? params.debtName.toLowerCase() : null;
     const match = name ? debts.find((d) => d.name.toLowerCase().includes(name)) : null;
     const debt = match ?? (debts.length === 1 ? debts[0] : null);
+    // tc.debts YA viene normalizado a `cur` por normalizeDebtsForTool, así que formatear con `cur`
+    // es correcto. Lo que NO es correcto es callar cuando la normalización no pudo convertir: ahí
+    // las cifras asumen una sola moneda. La moneda nativa no se puede recuperar del dato
+    // normalizado, así que se avisa en vez de inventarla.
+    const asumeUnaMoneda = tc.fxUnavailable
+      ? " Ojo: no pude obtener el tipo de cambio, así que esta cifra asume que todas tus deudas están en una sola moneda."
+      : "";
     if (!debt) {
       // Varias deudas y no se identificó cuál → listar (sin adivinar).
       const list = debts.slice(0, 6).map((d) => `• ${d.name}: ${money(d.minPayment)}/mes`).join("\n");
-      return say(`Tenés varias deudas. Sus cuotas mensuales:\n${list}`);
+      return say(`Tenés varias deudas. Sus cuotas mensuales:\n${list}${asumeUnaMoneda}`);
     }
     const apr = debt.apr > 0 ? ` (APR ${debt.apr}%)` : "";
-    return say(`La cuota mensual de ${debt.name} es ${money(debt.minPayment)}${apr}.`);
+    return say(`La cuota mensual de ${debt.name} es ${money(debt.minPayment)}${apr}.${asumeUnaMoneda}`);
   }
 
   return null;

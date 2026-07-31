@@ -48,7 +48,7 @@ function toolCtxFrom(ctx: FinancialContext): ToolContext {
               id: "d1",
               name: ctx.topDebtName,
               apr: ctx.topDebtApr ?? 0,
-              balance: ctx.debtTotal ?? 0,
+              balance: ctx.debtTotals?.[0]?.monto ?? 0,
               minPayment: 0,
             },
           ]
@@ -142,7 +142,7 @@ describe.skipIf(!RUN_LIVE)("evals COMPORTAMIENTO · asesor experto (RUN_LIVE_EVA
       ...BASE,
       topDebtName: "Tarjeta de crédito",
       topDebtApr: 45,
-      debtTotal: 2_000_000,
+      debtTotals: [{ monto: 2_000_000, moneda: "CRC" }],
       debtCount: 1,
       investableWealth: 13_000_000,
       inflacionYoYPct: 4,
