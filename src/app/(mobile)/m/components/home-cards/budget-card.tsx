@@ -146,14 +146,14 @@ export function BudgetCard({
 
   return (
     <MHomeCard
-      eyebrow="Presupuesto"
+      eyebrow="Adherencia"
       value={mAmount(disponible, currency, 11)}
       chip={<MChip tone={tone}>{CHIP_OF[ritmo]}</MChip>}
       sub={`${mAmount(spent, currency, 9)} de ${mAmount(budget, currency, 9)}`}
       vis={<Gauge pct={pctGastado} tone={tone} />}
       message={mensaje(ritmo, disponible, currency, diasRestantes(now))}
       href="/m/gastos"
-      ariaLabel={`Presupuesto del mes: ${CHIP_OF[ritmo]}. Ver gastos`}
+      ariaLabel={`Adherencia al presupuesto: ${CHIP_OF[ritmo]}. Ver gastos`}
     />
   );
 }

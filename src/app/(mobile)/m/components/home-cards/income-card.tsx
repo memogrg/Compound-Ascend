@@ -42,7 +42,7 @@ export function IncomeCard({
 
   return (
     <MHomeCard
-      eyebrow="Ingresos"
+      eyebrow="Ingresos (plan)"
       value={mAmount(incomeMonthly, currency, 11)}
       chip={
         pasivo > 0 ? (
@@ -59,7 +59,7 @@ export function IncomeCard({
             : "Los ingresos pasivos te acercan."
       }
       href="/m/ingresos"
-      ariaLabel="Ingresos del mes. Ver ingresos"
+      ariaLabel="Ingresos planificados del mes. Ver ingresos"
     />
   );
 }

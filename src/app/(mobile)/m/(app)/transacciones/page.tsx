@@ -74,8 +74,10 @@ export default async function MobileTransacciones() {
     );
   }
 
-  const { real, currency, transactions, categoryNames, period, accounts, templates } = view;
-  const net = real.freeCashflowReal;
+  const { real, currency, transactions, categoryNames, period, accounts, templates, monthFlow } =
+    view;
+  // A-01: el titular es el FLUJO OPERATIVO canónico (confirmadas, sin capital ni transferencias).
+  const net = monthFlow.real.operatingFlow;
 
   // Frascos para el selector de categoría (sobre) del registro de gastos (misma
   // orquestación que /m/gastos; excluye los frascos vinculados).
@@ -122,7 +124,7 @@ export default async function MobileTransacciones() {
     balanceAfter = series.afterByTxn;
     monthMarker = buildMonthMarker({
       period,
-      flow: real.freeCashflowReal, // el "Saldo neto" ya calculado; no se recalcula
+      flow: monthFlow.real.operatingFlow, // A-01: flujo operativo canónico
       liquidity: closing.balance,
       todayIso: todayLocalISO(),
     });
@@ -164,9 +166,9 @@ export default async function MobileTransacciones() {
         <MSectionHeader title="Tu periodo en números" />
         <MMetricGrid style={{ marginBottom: 16 }}>
           <MMetricCard
-            label="Saldo neto"
+            label="Flujo del mes"
             value={`${net > 0 ? "+" : net < 0 ? "−" : ""}${mAmount(Math.abs(net), currency, 7)}`}
-            sub="del periodo"
+            sub="operativo · real"
             tone={net > 0 ? "success" : net < 0 ? "danger" : "neutral"}
           />
           <MMetricCard
@@ -176,17 +178,27 @@ export default async function MobileTransacciones() {
           />
           <MMetricCard
             label="Ingresos"
-            value={mAmount(real.realIncome, currency, 8)}
-            sub="este mes"
+            value={mAmount(monthFlow.real.operatingIncome, currency, 8)}
+            sub="operativo"
             tone="success"
           />
           <MMetricCard
             label="Gastos"
-            value={mAmount(real.realExpense, currency, 8)}
-            sub="este mes"
+            value={mAmount(monthFlow.real.operatingExpense, currency, 8)}
+            sub="operativo"
             tone="danger"
           />
         </MMetricGrid>
+        {(monthFlow.capital.out > 0 || monthFlow.capital.in > 0 || monthFlow.pending.count > 0) ? (
+          <div className="muted" style={{ fontSize: 12, marginTop: -8, marginBottom: 14 }}>
+            {monthFlow.capital.out > 0 || monthFlow.capital.in > 0
+              ? `Capital: moviste ${mAmount(monthFlow.capital.out, currency, 9)} a inversiones/metas${monthFlow.capital.in > 0 ? ` · recuperaste ${mAmount(monthFlow.capital.in, currency, 9)}` : ""}. `
+              : ""}
+            {monthFlow.pending.count > 0
+              ? `Por revisar: ${monthFlow.pending.count} mov.`
+              : ""}
+          </div>
+        ) : null}
 
         {/* Bandeja de revisión y conciliación (arriba de la lista, sin alterarla). */}
         <RevisionInbox

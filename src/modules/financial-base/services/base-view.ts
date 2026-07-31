@@ -12,6 +12,7 @@ import { getBaseSummary } from "@/modules/financial-base/services/base-service";
 import { getLiquidityBalance } from "@/modules/financial-base/services/liquidity-service";
 import { filterConfiguredSobreTree } from "@/modules/financial-base/engine/classify";
 import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
+import { getMonthFlow } from "@/modules/financial-base/services/month-flow-service";
 import {
   getRealTotals,
   getRealHistory,
@@ -98,6 +99,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     liquidity,
     canPersonalize,
     personalization,
+    monthFlow,
   ] = await Promise.all([
     getBudgetTotals(period),
     getRealTotals(period),
@@ -116,6 +118,7 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     getLiquidityBalance(),
     canPersonalizeCategories(),
     getCategoryPersonalization(),
+    getMonthFlow(period), // A-01: titular de flujo canónico
   ]);
 
   const currency = real.currency;
@@ -195,5 +198,6 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
     baseReading: buildBaseReading(readingInput),
     incomeCapsule: buildCapsule("income", readingInput),
     expenseCapsule: buildCapsule("expense", readingInput),
+    monthFlow,
   };
 }

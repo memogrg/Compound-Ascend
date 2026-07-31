@@ -5,7 +5,7 @@
  * datos ya calculados por los módulos. No hace fetch ni cálculos pesados.
  */
 import type { IconName } from "@/components/ui/icon";
-import type { BaseIndicators } from "@/modules/financial-base";
+import type { BaseIndicators, MonthFlow } from "@/modules/financial-base";
 import type { ControlSummary } from "@/modules/control";
 import type { RichLifeSummary } from "@/modules/rich-life";
 import type { WealthSummary } from "@/modules/wealth";
@@ -79,6 +79,8 @@ export type PanelInputs = {
   control: ControlSummary | null;
   richLife: RichLifeSummary | null;
   wealth: WealthSummary | null;
+  /** A-01: flujo del mes canónico (real operativo). Si falta (demo), cae al plan. */
+  monthFlow?: MonthFlow | null;
 };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
@@ -167,23 +169,29 @@ function baseNextAction(ind: BaseIndicators, currency: string): string {
   return "Vas bien: considera convertir parte de tu ahorro en inversión de largo plazo.";
 }
 
-function buildPillars({ ind, currency, control, richLife, wealth }: PanelInputs): PillarVM[] {
-  // 1 · Flujo del mes (Base Financiera)
+function buildPillars({ ind, currency, control, richLife, wealth, monthFlow }: PanelInputs): PillarVM[] {
+  // 1 · Flujo del mes (Base Financiera). A-01: el valor es el REAL operativo (lo que de
+  // verdad te quedó); el PLAN (presupuesto) va en la meta, con el gap. Antes mostraba el
+  // plan como si fuera el flujo — de ahí la contradicción con Mi Base/Transacciones.
+  const planFree = ind.freeCashflow;
+  const realFlow = monthFlow ? monthFlow.real.operatingFlow : planFree;
+  const opIncome = monthFlow ? monthFlow.real.operatingIncome : ind.incomeMonthly;
+  const gap = Math.round((realFlow - planFree) * 100) / 100;
   const flujo: PillarVM = {
     key: "flujo",
     label: "Flujo del mes",
     icon: "income",
     accent: "var(--pos)",
     soft: "var(--pos-soft)",
-    value: formatMoney(ind.freeCashflow, currency),
-    meta: `Ingreso ${formatMoney(ind.incomeMonthly, currency)} · Gasto ${formatMoney(ind.expenseMonthly, currency)}`,
-    ratio: ind.incomeMonthly > 0 ? clamp01(ind.freeCashflow / ind.incomeMonthly) : 0,
-    barColor: ind.freeCashflow >= 0 ? "var(--pos)" : "var(--neg)",
+    value: formatMoney(realFlow, currency),
+    meta: `Plan ${formatMoney(planFree, currency)} · Real ${formatMoney(realFlow, currency)} (${gap >= 0 ? "+" : ""}${formatMoney(gap, currency)})`,
+    ratio: opIncome > 0 ? clamp01(realFlow / opIncome) : 0,
+    barColor: realFlow >= 0 ? "var(--pos)" : "var(--neg)",
     href: "/mi-base-financiera",
     ai:
-      ind.freeCashflow >= 0
-        ? `Te quedan ${formatMoney(ind.freeCashflow, currency)} libres al mes para acercarte a tu meta.`
-        : `Gastas ${formatMoney(Math.abs(ind.freeCashflow), currency)} más de lo que entra. Pausar gastos flexibles te devuelve el control.`,
+      realFlow >= 0
+        ? `Te quedan ${formatMoney(realFlow, currency)} libres este mes (flujo operativo real).`
+        : `Gastas ${formatMoney(Math.abs(realFlow), currency)} más de lo que entra. Pausar gastos flexibles te devuelve el control.`,
   };
 
   // 2 · Ahorro y emergencia (Control)

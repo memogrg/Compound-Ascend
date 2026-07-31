@@ -117,7 +117,7 @@ export default async function MobileHome() {
     preview ? Promise.resolve(null) : getSurplusDecision().catch(() => null),
   ]);
 
-  const { currency, panel, insights } = data;
+  const { currency, panel, insights, monthFlow } = data;
   const norte = panel.norte;
   const ind = data.summary.indicators;
   // Las cifras crudas detrás de los pilares. El carrusel no puede reusar PillarVM.value
@@ -151,6 +151,25 @@ export default async function MobileHome() {
         {/* Header sticky de cristal unificado (variant home): logo + saludo + chat/campana/menú. */}
         <MobileHeader variant="home" greeting={greeting(now)} name={data.name} />
 
+        {/* A-01: el Flujo del mes REAL (operativo) como línea de contexto — para que el home
+            deje de mezclar plan (Ingresos) y adherencia (Presupuesto) sin decir lo que de
+            verdad te quedó. La tarjeta "Presupuesto" es adherencia; esto es el flujo. */}
+        {monthFlow ? (
+          <div className="muted" style={{ fontSize: 12.5, marginTop: -4, marginBottom: 12 }}>
+            Flujo del mes:{" "}
+            <strong
+              style={{
+                color:
+                  monthFlow.real.operatingFlow >= 0 ? "var(--accent)" : "var(--danger)",
+              }}
+            >
+              {monthFlow.real.operatingFlow >= 0 ? "+" : "−"}
+              {formatMoney(Math.abs(monthFlow.real.operatingFlow), currency)}
+            </strong>{" "}
+            libres · operativo real
+          </div>
+        ) : null}
+
         {/* Carrusel de tarjetas financieras (sustituye al hero de patrimonio).
             El carrusel entero va DENTRO de .m-pad pero su pista sangra a los bordes
             (.m-carousel-wrap) para que la tarjeta siguiente asome: esa es la
@@ -175,7 +194,7 @@ export default async function MobileHome() {
           <MHomeCarousel
             cards={[
               {
-                name: "Presupuesto",
+                name: "Adherencia",
                 node:
                   // `null` aquí es "no cargó" (getExpenseRangeView tiene su propio catch),
                   // no "no hay presupuesto": eso lo distingue la tarjeta con budget<=0.
