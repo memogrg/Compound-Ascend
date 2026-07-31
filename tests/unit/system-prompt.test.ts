@@ -468,21 +468,23 @@ describe("buildSystemPrompt · política de sobrante + tono conciso", () => {
 describe("buildSystemPrompt · inversiones por posición + conversación", () => {
   const withHoldings = {
     currency: "CRC" as const,
-    investmentInvested: 500000,
-    investmentValue: 620000,
-    investmentPL: 120000,
+    investmentInvested: [{ monto: 1000, moneda: "USD" }],
+    investmentValue: [{ monto: 1240, moneda: "USD" }],
+    investmentPL: [{ monto: 240, moneda: "USD" }],
     holdings: [
       {
         symbol: "KMNO",
         name: "Kimbal Minero",
         assetType: "cripto",
         quantity: 100,
-        invested: 500000,
-        value: 560000,
-        price: 5600,
-        pl: 60000,
+        invested: 1000,
+        value: 1120,
+        price: 11,
+        pl: 120,
         plPct: 0.12,
-        currency: "USD",
+        currency: "CRC", // registrada en colones…
+        monedaFila: "USD", // …pero cotiza (y se reporta) en dólares
+        valorPrimario: 560000,
         priceUnavailable: false,
       },
     ],
@@ -491,12 +493,49 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
   it("inyecta las posiciones con costo de compra, valor, precio y P/L (cifras reales)", () => {
     const prompt = buildSystemPrompt(withHoldings);
     expect(prompt).toContain("KMNO");
-    expect(prompt).toContain("invertido 500000");
-    expect(prompt).toContain("vale 560000");
-    expect(prompt).toContain("5600"); // precio actual
-    expect(prompt).toContain("+60000"); // P/L
-    // Totales de inversión.
-    expect(prompt).toContain("valor actual 620000");
+    expect(prompt).toContain("invertido 1000");
+    expect(prompt).toContain("vale 1120");
+    expect(prompt).toContain("11"); // precio actual
+    expect(prompt).toContain("+120"); // P/L
+    // Totales de inversión, con su moneda.
+    expect(prompt).toContain("valor actual 1240 USD");
+  });
+
+  it("la posición se etiqueta con la moneda en que COTIZA, no con la de visualización", () => {
+    const prompt = buildSystemPrompt(withHoldings);
+    expect(prompt).toContain("[USD]"); // la fila va en dólares…
+    expect(prompt).toContain("Moneda de VISUALIZACIÓN (la que el usuario ve en la app): CRC");
+    // …y la vieja regla de "todo viene en una sola moneda" ya no existe.
+    expect(prompt).not.toContain("TODOS los montos");
+    expect(prompt).toMatch(/Cada monto de tu contexto viene con SU moneda/);
+    expect(prompt).toMatch(/NO inventes un total/);
+  });
+
+  it("portafolio MIXTO: subtotales por moneda, y el total convertido marcado como conversión", () => {
+    const prompt = buildSystemPrompt({
+      ...withHoldings,
+      portfolioValue: [
+        { monto: 45_000_000, moneda: "CRC" },
+        { monto: 1240, moneda: "USD" },
+      ],
+      portfolioValueConvertido: { monto: 45_620_000, moneda: "CRC" },
+    });
+    // Las dos monedas aparecen, cada una con su código; no hay una suma cruzada.
+    expect(prompt).toContain("45000000 CRC");
+    expect(prompt).toContain("1240 USD");
+    expect(prompt).toMatch(/45620000 CRC convertido/);
+  });
+
+  it("sin tipo de cambio no hay total único: lo dice en vez de inventarlo", () => {
+    const prompt = buildSystemPrompt({
+      ...withHoldings,
+      portfolioValue: [
+        { monto: 45_000_000, moneda: "CRC" },
+        { monto: 1240, moneda: "USD" },
+      ],
+    });
+    expect(prompt).toMatch(/No hay tipo de cambio disponible/i);
+    expect(prompt).not.toMatch(/convertido\)/);
   });
 
   it("regla: usa las cifras reales para «si vendo X» y NUNCA inventa el ATH", () => {
@@ -511,7 +550,7 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
     const prompt = buildSystemPrompt({
       currency: "CRC",
       holdings: [
-        { symbol: "XYZ", name: "XYZ", assetType: "cripto", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", priceUnavailable: true },
+        { symbol: "XYZ", name: "XYZ", assetType: "cripto", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", monedaFila: "USD", valorPrimario: 500_000, priceUnavailable: true },
       ],
     });
     expect(prompt).toContain("precio actual no disponible");

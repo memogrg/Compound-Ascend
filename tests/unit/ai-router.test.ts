@@ -308,17 +308,40 @@ describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", ()
     const ctxInv = {
       ...CTX,
       compromisoDesglose: { sobres: 0, metas: 90000, dca: 45000, deudas: 0, seguros: 0 },
-      investmentInvested: 1_000_000,
-      investmentValue: 1_250_000,
-      investmentPL: 250_000,
+      investmentInvested: [{ monto: 1_000_000, moneda: "CRC" }],
+      investmentValue: [{ monto: 1_250_000, moneda: "CRC" }],
+      investmentPL: [{ monto: 250_000, moneda: "CRC" }],
     } as FinancialContext;
     expect(answerFromContext("ahorro_mensual", {}, tc, ctxInv)?.reply).toContain("90.000");
     expect(answerFromContext("dca_mensual", {}, tc, ctxInv)?.reply).toContain("45.000");
     const r = answerFromContext("resumen_inversiones", {}, tc, ctxInv);
     expect(r?.reply).toContain("1.250.000"); // valor
     expect(r?.reply).toContain("1.000.000"); // invertido
-    expect(r?.reply).toMatch(/gan[aá]s/i); // P/L positivo
+    expect(r?.reply).toContain("+"); // P/L positivo, con su signo
     expect(answerFromContext("dca_mensual", {}, tc, CTX)).toBeNull(); // sin dato → escala
+  });
+
+  it("resumen_inversiones MIXTO: un subtotal por moneda y el convertido aparte (nunca una suma cruzada)", () => {
+    const ctxMix = {
+      ...CTX,
+      investmentInvested: [
+        { monto: 40_000_000, moneda: "CRC" },
+        { monto: 1_000, moneda: "USD" },
+      ],
+      investmentValue: [
+        { monto: 45_000_000, moneda: "CRC" },
+        { monto: 1_240, moneda: "USD" },
+      ],
+      investmentPL: [
+        { monto: 5_000_000, moneda: "CRC" },
+        { monto: 240, moneda: "USD" },
+      ],
+      portfolioValueConvertido: { monto: 45_620_000, moneda: "CRC" },
+    } as FinancialContext;
+    const r = answerFromContext("resumen_inversiones", {}, tc, ctxMix);
+    expect(r?.reply).toContain("₡45.000.000");
+    expect(r?.reply).toContain("$1.240"); // la parte que cotiza en dólares se REPORTA en dólares
+    expect(r?.reply).toMatch(/equivale a ₡45\.620\.000/); // el total convertido, marcado como tal
   });
 
   it("falta_meta y meta_cercana usan tc.goals (Fondo emergencia 40% > Viaje 15%)", () => {
@@ -981,11 +1004,11 @@ describe("informe_inversion · carril deep", () => {
     const ctx = {
       currency: "USD",
       holdings: [
-        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 20_000, value: 30_000, price: 30_000, pl: 10_000, plPct: 0.5, currency: "USD", priceUnavailable: false },
+        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 20_000, value: 30_000, price: 30_000, pl: 10_000, plPct: 0.5, currency: "USD", monedaFila: "USD", valorPrimario: 30_000, priceUnavailable: false },
       ],
-      investmentValue: 30_000,
-      investmentInvested: 20_000,
-      investmentPL: 10_000,
+      investmentValue: [{ monto: 30_000, moneda: "USD" }],
+      investmentInvested: [{ monto: 20_000, moneda: "USD" }],
+      investmentPL: [{ monto: 10_000, moneda: "USD" }],
       mesesDeColchon: 4,
     } as FinancialContext;
     const routed = await resolveMatchedIntent({ intent: "informe_inversion", params: {} }, ctx, tc);

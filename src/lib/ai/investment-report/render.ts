@@ -6,6 +6,7 @@
  * línea honesta ("no puedo calcular X porque falta Y"), nunca se rellena ni se omite en silencio.
  */
 import { formatMoney } from "@/lib/format";
+import type { Monto } from "@/lib/ai/money";
 import type { EvidencePack, SeccionFaltante } from "@/lib/ai/investment-report/evidence";
 import {
   RENDIMIENTO_SUPUESTO,
@@ -31,7 +32,12 @@ function falta(s: SeccionFaltante): string {
 }
 
 export function renderEvidenceReport(pack: EvidencePack, currency: string): string {
-  const money = (n: number) => formatMoney(n, currency);
+  // Cada monto se imprime con SU moneda: los activos cotizados van en USD aunque la app esté en
+  // colones. `currency` (la de visualización) solo se usa para lo que ya viene en esa moneda.
+  const money = (n: number, c: string = currency) => formatMoney(n, c);
+  const mstr = (m: Monto) => formatMoney(m.monto, m.moneda);
+  // Subtotales por moneda: se listan separados, NUNCA se suman entre sí.
+  const subs = (ms: Monto[]) => ms.map(mstr).join(" + ");
   const out: string[] = ["# Informe de tu portafolio"];
 
   // ── Posiciones ──
@@ -41,16 +47,22 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
   } else {
     const p = pack.posiciones;
     const totales: string[] = [];
-    if (p.valorTotal !== undefined) totales.push(`vale ${money(p.valorTotal)}`);
-    if (p.invertidoTotal !== undefined) totales.push(`invertiste ${money(p.invertidoTotal)}`);
-    if (p.plTotal !== undefined)
-      totales.push(`${p.plTotal >= 0 ? "ganás" : "perdés"} ${money(Math.abs(p.plTotal))} sobre lo invertido`);
+    if (p.valorTotal.length) totales.push(`vale ${subs(p.valorTotal)}`);
+    if (p.invertidoTotal.length) totales.push(`invertiste ${subs(p.invertidoTotal)}`);
+    if (p.plTotal.length) {
+      const signos = p.plTotal.map((m) => `${signo(m.monto)}${money(Math.abs(m.monto), m.moneda)}`).join(" ");
+      totales.push(`tu resultado sobre lo invertido es ${signos}`);
+    }
     if (totales.length) out.push(`Tu portafolio ${totales.join("; ")}.`);
+    if (p.valorConvertido)
+      out.push(`Convertido a tu moneda de visualización, el valor total equivale a ${mstr(p.valorConvertido)}.`);
+    if (p.valorTotal.length > 1 && !p.valorConvertido)
+      out.push("_No hay tipo de cambio disponible ahora, así que no puedo darte un total único: quedan los subtotales por moneda._");
     for (const h of p.items) {
       const cierre = h.priceUnavailable
         ? "sin precio de mercado ahora (el valor mostrado es lo invertido)"
-        : `vale ${money(h.valor)} · P/L ${signo(h.pl)}${money(Math.abs(h.pl))} (${signo(h.plPct)}${pct(Math.abs(h.plPct), 1)})`;
-      out.push(`- **${h.etiqueta}** (${h.assetType}): invertido ${money(h.invertido)} · ${cierre}`);
+        : `vale ${money(h.valor, h.moneda)} · P/L ${signo(h.pl)}${money(Math.abs(h.pl), h.moneda)} (${signo(h.plPct)}${pct(Math.abs(h.plPct), 1)})`;
+      out.push(`- **${h.etiqueta}** (${h.assetType}): invertido ${money(h.invertido, h.moneda)} · ${cierre}`);
     }
     if (p.masCount > 0) {
       out.push(`_Hay ${p.masCount} ${p.masCount === 1 ? "posición más" : "posiciones más"} que no entraron en este detalle._`);
@@ -64,7 +76,7 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
   } else {
     const c = pack.concentracion;
     out.push(
-      `Tu posición más grande es **${c.top1.etiqueta}**: ${money(c.top1.valor)}, ${pct(c.top1.pct)} del portafolio. ` +
+      `Tu posición más grande es **${c.top1.etiqueta}**: ${mstr(c.top1.valor)}, ${pct(c.top1.pct)} del portafolio. ` +
         `Las tres más grandes suman ${pct(c.top3Pct)}. Índice de concentración (HHI): ${dec(c.hhi)} (1,00 = una sola posición).`,
     );
     out.push(`Mezcla por tipo: ${c.mezcla.map((m) => `${m.assetType} ${pct(m.pct)}`).join(" · ")}.`);
@@ -84,13 +96,13 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
   } else {
     const m = pack.moneda;
     out.push(
-      `Tu moneda de referencia es ${m.principal}. Por moneda nativa de cada posición: ` +
+      `Ves la app en ${m.visualizacion}. Por la moneda en que cotiza cada posición: ` +
         `${m.porMoneda.map((x) => `${x.currency} ${pct(x.pct)}`).join(" · ")}.`,
     );
     if (m.descalce) {
       out.push(
-        `Dato: ${pct(m.dominante.pct)} de tu portafolio está en ${m.dominante.currency} y tu referencia es ${m.principal}. ` +
-          `El valor en ${m.principal} se mueve con el tipo de cambio, además del precio del activo.`,
+        `Dato: ${pct(m.dominante.pct)} de tu portafolio cotiza en ${m.dominante.currency} y vos ves la app en ${m.visualizacion}. ` +
+          `Leído en ${m.visualizacion}, ese valor se mueve con el tipo de cambio, además del precio del activo.`,
       );
     }
   }

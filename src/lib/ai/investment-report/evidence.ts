@@ -8,6 +8,7 @@
  */
 import type { FinancialContext } from "@/lib/ai/system-prompt";
 import type { ToolContext } from "@/lib/ai/orchestrator";
+import { subtotales, type Monto } from "@/lib/ai/money";
 
 /**
  * Rendimiento SUPUESTO (8% anual): el mismo que usan los Números patrimoniales (capital que, al 8%,
@@ -29,11 +30,13 @@ export type SeccionFaltante = { disponible: false; motivo: string; desbloquea: s
 export type Posicion = {
   etiqueta: string; // símbolo si lo hay; si no, el nombre de la posición
   assetType: string;
+  /** Montos de la posición, TODOS en `moneda` (la moneda en que ese activo cotiza). */
   invertido: number;
   valor: number;
   pl: number;
   plPct: number; // 0-1
-  currency: string; // moneda NATIVA de la posición (los montos van en la de visualización)
+  moneda: string; // moneda de la fila (USD si cotiza en mercado; si no, la registrada)
+  monedaRegistrada: string; // en la que el usuario la cargó (puede diferir de `moneda`)
   priceUnavailable: boolean;
 };
 
@@ -44,20 +47,28 @@ export type SeccionPosiciones =
       items: Posicion[];
       /** Posiciones que existen pero no vienen listadas en el contexto (top-N). */
       masCount: number;
-      invertidoTotal?: number;
-      valorTotal?: number;
-      plTotal?: number;
+      // Subtotales por moneda: nunca un total que sume monedas distintas.
+      invertidoTotal: Monto[];
+      valorTotal: Monto[];
+      plTotal: Monto[];
+      /** El valor total convertido a la moneda de visualización, si había tasas. */
+      valorConvertido?: Monto;
     };
 
 export type SeccionConcentracion =
   | SeccionFaltante
   | {
       disponible: true;
-      base: number; // denominador usado (valor total del portafolio)
-      top1: { etiqueta: string; valor: number; pct: number };
+      /**
+       * Denominador: el valor del portafolio en la moneda BASE del motor (homogénea). Las
+       * participaciones se calculan ahí, nunca sumando montos de monedas distintas. null si no se
+       * pudo etiquetar la base (los porcentajes siguen siendo válidos; el monto no se imprime).
+       */
+      base: Monto | null;
+      top1: { etiqueta: string; valor: Monto; pct: number };
       top3Pct: number;
       hhi: number; // Herfindahl-Hirschman sobre las posiciones listadas (0-1)
-      mezcla: { assetType: string; valor: number; pct: number }[];
+      mezcla: { assetType: string; pct: number }[];
       alta: boolean; // top-1 por encima de UMBRAL_CONCENTRACION
       /** El contexto trae solo el top-N: los % y el HHI son sobre lo listado. */
       parcial: boolean;
@@ -69,10 +80,11 @@ export type SeccionMoneda =
   | SeccionFaltante
   | {
       disponible: true;
-      principal: string; // ctx.currency (la de visualización)
-      porMoneda: { currency: string; valor: number; pct: number }[];
+      visualizacion: string; // ctx.currency (la moneda en que el usuario ve la app)
+      /** Peso por moneda en la que cada posición COTIZA (no en la que se registró). */
+      porMoneda: { currency: string; pct: number }[];
       dominante: { currency: string; pct: number };
-      descalce: boolean; // dominante ≠ principal y pesa más que UMBRAL_DESCALCE
+      descalce: boolean; // dominante ≠ visualización y pesa más que UMBRAL_DESCALCE
     };
 
 export type SeccionPlan =
@@ -130,8 +142,7 @@ const round = (n: number): number => Math.round(n);
 export function buildEvidencePack(ctx: FinancialContext, tc: ToolContext): EvidencePack {
   const currency = tc.currency || ctx.currency;
   const holdings = ctx.holdings ?? [];
-  const valorTotalCtx = num(ctx.investmentValue);
-  const tieneInversiones = holdings.length > 0 || (valorTotalCtx !== undefined && valorTotalCtx > 0);
+  const tieneInversiones = holdings.length > 0 || (ctx.investmentValue ?? []).some((m) => m.monto > 0);
 
   return {
     currency,
@@ -171,13 +182,16 @@ function buildPosiciones(ctx: FinancialContext): SeccionPosiciones {
       valor: h.value,
       pl: h.pl,
       plPct: h.plPct,
-      currency: h.currency,
+      moneda: h.monedaFila,
+      monedaRegistrada: h.currency,
       priceUnavailable: h.priceUnavailable,
     })),
     masCount: ctx.holdingsMoreCount ?? 0,
-    ...(num(ctx.investmentInvested) !== undefined ? { invertidoTotal: ctx.investmentInvested } : {}),
-    ...(num(ctx.investmentValue) !== undefined ? { valorTotal: ctx.investmentValue } : {}),
-    ...(num(ctx.investmentPL) !== undefined ? { plTotal: ctx.investmentPL } : {}),
+    // Del contexto si vienen; si no, subtotales de lo listado (cada monto con su moneda).
+    invertidoTotal: ctx.investmentInvested ?? subtotales(holdings.map((h) => ({ monto: h.invested, moneda: h.monedaFila }))),
+    valorTotal: ctx.investmentValue ?? subtotales(holdings.map((h) => ({ monto: h.value, moneda: h.monedaFila }))),
+    plTotal: ctx.investmentPL ?? subtotales(holdings.map((h) => ({ monto: h.pl, moneda: h.monedaFila }))),
+    ...(ctx.portfolioValueConvertido ? { valorConvertido: ctx.portfolioValueConvertido } : {}),
   };
 }
 
@@ -190,46 +204,58 @@ function buildConcentracion(ctx: FinancialContext): SeccionConcentracion {
       desbloquea: "registrá tus posiciones en Patrimonio",
     };
   }
-  const sumaListada = holdings.reduce((a, h) => a + h.value, 0);
-  // Denominador: el valor TOTAL del motor si está (incluye las posiciones no listadas); si no, la
-  // suma de lo listado. Nunca se estima el faltante.
-  const totalCtx = num(ctx.investmentValue);
-  const base = totalCtx !== undefined && totalCtx > 0 ? totalCtx : sumaListada;
-  if (!(base > 0)) {
+  // Las participaciones se calculan SIEMPRE sobre `valorPrimario` (moneda base del motor, homogénea
+  // entre posiciones). Los montos de fila están en monedas distintas: sumarlos sería el bug de
+  // moneda mezclada. Denominador: el total del motor si vino (incluye las no listadas); si no, la
+  // suma de lo listado — nunca se estima el faltante.
+  const sumaListada = holdings.reduce((a, h) => a + h.valorPrimario, 0);
+  const totalBase = ctx.investmentValueBase;
+  const baseMonto = totalBase && totalBase.monto > 0 ? totalBase.monto : sumaListada;
+  if (!(baseMonto > 0)) {
     return {
       disponible: false,
       motivo: "no puedo calcular la concentración porque el valor del portafolio es 0",
       desbloquea: "revisá que tus posiciones tengan cantidad y costo cargados",
     };
   }
+  const base: Monto | null = totalBase
+    ? { monto: round(baseMonto), moneda: totalBase.moneda }
+    : null; // sin etiqueta de moneda no se publica el monto; los % siguen siendo válidos
 
-  const orden = [...holdings].sort((a, b) => b.value - a.value);
+  const orden = [...holdings].sort((a, b) => b.valorPrimario - a.valorPrimario);
   const primera = orden[0]!;
-  const top3 = orden.slice(0, 3).reduce((a, h) => a + h.value, 0);
-  const hhi = orden.reduce((a, h) => a + (h.value / base) ** 2, 0);
+  const top3 = orden.slice(0, 3).reduce((a, h) => a + h.valorPrimario, 0);
+  const hhi = orden.reduce((a, h) => a + (h.valorPrimario / baseMonto) ** 2, 0);
 
   const porTipo = new Map<string, number>();
-  for (const h of orden) porTipo.set(h.assetType, (porTipo.get(h.assetType) ?? 0) + h.value);
+  for (const h of orden) porTipo.set(h.assetType, (porTipo.get(h.assetType) ?? 0) + h.valorPrimario);
   const mezcla = [...porTipo.entries()]
-    .map(([assetType, valor]) => ({ assetType, valor: round(valor), pct: valor / base }))
-    .sort((a, b) => b.valor - a.valor);
+    .map(([assetType, valor]) => ({ assetType, pct: valor / baseMonto }))
+    .sort((a, b) => b.pct - a.pct);
 
   return {
     disponible: true,
-    base: round(base),
-    top1: { etiqueta: etiquetaDe(primera), valor: primera.value, pct: primera.value / base },
-    top3Pct: top3 / base,
+    base,
+    // El MONTO de la posición más grande va en SU moneda; el % sale de la base homogénea.
+    top1: {
+      etiqueta: etiquetaDe(primera),
+      valor: { monto: primera.value, moneda: primera.monedaFila },
+      pct: primera.valorPrimario / baseMonto,
+    },
+    top3Pct: top3 / baseMonto,
     hhi,
     mezcla,
-    alta: primera.value / base > UMBRAL_CONCENTRACION,
+    alta: primera.valorPrimario / baseMonto > UMBRAL_CONCENTRACION,
     parcial: (ctx.holdingsMoreCount ?? 0) > 0,
     preciosIncompletos: holdings.some((h) => h.priceUnavailable),
   };
 }
 
-function buildMoneda(ctx: FinancialContext, principal: string): SeccionMoneda {
+function buildMoneda(ctx: FinancialContext, visualizacion: string): SeccionMoneda {
   const holdings = ctx.holdings ?? [];
-  const base = holdings.reduce((a, h) => a + h.value, 0);
+  // Pesos sobre `valorPrimario` (base homogénea), agrupados por la moneda en que cada posición
+  // COTIZA — que es la exposición real. Una cripto registrada en colones es exposición a dólares.
+  const base = holdings.reduce((a, h) => a + h.valorPrimario, 0);
   if (holdings.length === 0 || !(base > 0)) {
     return {
       disponible: false,
@@ -238,17 +264,17 @@ function buildMoneda(ctx: FinancialContext, principal: string): SeccionMoneda {
     };
   }
   const porMonedaMap = new Map<string, number>();
-  for (const h of holdings) porMonedaMap.set(h.currency, (porMonedaMap.get(h.currency) ?? 0) + h.value);
+  for (const h of holdings) porMonedaMap.set(h.monedaFila, (porMonedaMap.get(h.monedaFila) ?? 0) + h.valorPrimario);
   const porMoneda = [...porMonedaMap.entries()]
-    .map(([currency, valor]) => ({ currency, valor: round(valor), pct: valor / base }))
-    .sort((a, b) => b.valor - a.valor);
+    .map(([currency, valor]) => ({ currency, pct: valor / base }))
+    .sort((a, b) => b.pct - a.pct);
   const dom = porMoneda[0]!;
   return {
     disponible: true,
-    principal,
+    visualizacion,
     porMoneda,
     dominante: { currency: dom.currency, pct: dom.pct },
-    descalce: dom.currency !== principal && dom.pct > UMBRAL_DESCALCE,
+    descalce: dom.currency !== visualizacion && dom.pct > UMBRAL_DESCALCE,
   };
 }
 
@@ -313,7 +339,7 @@ function buildDefensa(ctx: FinancialContext): SeccionDefensa {
       desbloquea: "registrá tus cuentas líquidas y tus gastos del mes",
     };
   }
-  const invierte = (ctx.holdings ?? []).length > 0 || (num(ctx.investmentValue) ?? 0) > 0;
+  const invierte = (ctx.holdings ?? []).length > 0 || (ctx.investmentValue ?? []).some((m) => m.monto > 0);
   return { disponible: true, meses, invierteConColchonCorto: invierte && meses < MESES_COLCHON_MINIMO };
 }
 

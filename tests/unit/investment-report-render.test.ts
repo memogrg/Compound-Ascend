@@ -9,20 +9,25 @@ import type { ToolContext } from "@/lib/ai/orchestrator";
 
 type Holding = NonNullable<FinancialContext["holdings"]>[number];
 
+// La cripto cotiza en USD: la fila viene en dólares aunque el usuario vea la app en colones.
 const holding = (over: Partial<Holding> = {}): Holding => ({
   symbol: "BTC",
   name: "Bitcoin",
   assetType: "cripto",
   quantity: 1,
-  invested: 1_000_000,
-  value: 1_500_000,
-  price: 1_500_000,
-  pl: 500_000,
+  invested: 2_000,
+  value: 3_000,
+  price: 3_000,
+  pl: 1_000,
   plPct: 0.5,
-  currency: "USD",
+  currency: "CRC",
+  monedaFila: "USD",
+  valorPrimario: over.valorPrimario ?? 1_500_000,
   priceUnavailable: false,
   ...over,
 });
+
+const montos = (...pares: [number, string][]) => pares.map(([monto, moneda]) => ({ monto, moneda }));
 
 const ctx = (over: Partial<FinancialContext> = {}): FinancialContext => ({ currency: "CRC", ...over });
 const tool = (over: Partial<ToolContext> = {}): ToolContext => ({ currency: "CRC", debts: [], ...over });
@@ -46,25 +51,72 @@ describe("renderEvidenceReport · portafolio vacío", () => {
 
 describe("renderEvidenceReport · posición única", () => {
   const md = render(
-    ctx({ holdings: [holding()], investmentValue: 1_500_000, investmentInvested: 1_000_000, investmentPL: 500_000 }),
+    ctx({
+      holdings: [holding()],
+      investmentValue: montos([3_000, "USD"]),
+      investmentInvested: montos([2_000, "USD"]),
+      investmentPL: montos([1_000, "USD"]),
+      investmentValueBase: { monto: 1_500_000, moneda: "CRC" },
+    }),
     tool({ currency: "CRC" }),
   );
 
   it("imprime la posición, el total y la concentración alta con el umbral explícito", () => {
     expect(md).toContain("**BTC** (cripto)");
-    expect(md).toContain("₡1.500.000");
     expect(md).toContain("100% del portafolio");
     expect(md).toContain("concentración **alta**");
     expect(md).toContain("35%");
   });
 
-  it("usa la moneda que se le pasa (visualización), sin equivalencias inventadas", () => {
-    const usd = render(
-      ctx({ holdings: [holding()], investmentValue: 1_500_000 }),
-      tool({ currency: "USD" }),
+  it("la posición se REPORTA en la moneda en que cotiza, no en la de visualización", () => {
+    // El usuario ve la app en colones, pero una cripto cotiza en dólares: nada de "₡3.000".
+    expect(md).toContain("$3.000");
+    expect(md).not.toContain("₡3.000");
+  });
+
+  it("con tipo de cambio, el total convertido aparece marcado como conversión", () => {
+    const conv = render(
+      ctx({
+        holdings: [holding()],
+        investmentValue: montos([3_000, "USD"]),
+        investmentInvested: montos([2_000, "USD"]),
+        investmentPL: montos([1_000, "USD"]),
+        portfolioValueConvertido: { monto: 1_590_000, moneda: "CRC" },
+      }),
+      tool({ currency: "CRC" }),
     );
-    expect(usd).toContain("$1.500.000");
-    expect(usd).not.toContain("₡");
+    expect(conv).toMatch(/Convertido a tu moneda de visualización.*₡1\.590\.000/);
+  });
+});
+
+describe("renderEvidenceReport · portafolio MIXTO (dólares + colones)", () => {
+  const mixto = ctx({
+    holdings: [
+      holding({ symbol: "BTC", monedaFila: "USD", value: 3_000, invested: 2_000, pl: 1_000, valorPrimario: 1_500_000 }),
+      holding({ symbol: null, name: "Casa", assetType: "inmueble", currency: "CRC", monedaFila: "CRC", value: 45_000_000, invested: 40_000_000, pl: 5_000_000, plPct: 0.125, price: null, priceUnavailable: true, valorPrimario: 45_000_000 }),
+    ],
+    investmentValue: montos([45_000_000, "CRC"], [3_000, "USD"]),
+    investmentInvested: montos([40_000_000, "CRC"], [2_000, "USD"]),
+    investmentPL: montos([5_000_000, "CRC"], [1_000, "USD"]),
+    investmentValueBase: { monto: 46_500_000, moneda: "CRC" },
+  });
+
+  it("da un subtotal por moneda, sin sumarlos entre sí", () => {
+    const md = render(mixto, tool({ currency: "CRC" }));
+    expect(md).toContain("₡45.000.000 + $3.000");
+    expect(md).toContain("₡40.000.000 + $2.000");
+  });
+
+  it("sin tipo de cambio lo DICE en vez de inventar un total único", () => {
+    const md = render(mixto, tool({ currency: "CRC" }));
+    expect(md).toMatch(/No hay tipo de cambio disponible/i);
+  });
+
+  it("la exposición por moneda sale de dónde cotiza cada posición", () => {
+    const md = render(mixto, tool({ currency: "CRC" }));
+    expect(md).toContain("Por la moneda en que cotiza cada posición:");
+    expect(md).toContain("CRC 97%");
+    expect(md).toContain("USD 3%");
   });
 });
 
@@ -72,10 +124,11 @@ describe("renderEvidenceReport · precio no disponible en la posición más gran
   const md = render(
     ctx({
       holdings: [
-        holding({ symbol: "KMNO", value: 3_000_000, invested: 3_000_000, pl: 0, plPct: 0, price: null, priceUnavailable: true }),
-        holding({ symbol: "VOO", assetType: "etf", value: 1_000_000, invested: 800_000, pl: 200_000, plPct: 0.25 }),
+        holding({ symbol: "KMNO", value: 3_000, invested: 3_000, pl: 0, plPct: 0, price: null, priceUnavailable: true, valorPrimario: 3_000_000 }),
+        holding({ symbol: "VOO", assetType: "etf", value: 1_000, invested: 800, pl: 200, plPct: 0.25, valorPrimario: 1_000_000 }),
       ],
-      investmentValue: 4_000_000,
+      investmentValue: montos([4_000, "USD"]),
+      investmentValueBase: { monto: 4_000_000, moneda: "CRC" },
     }),
   );
 
@@ -128,8 +181,8 @@ describe("renderEvidenceReport · descalce de moneda", () => {
     const md = render(
       ctx({
         holdings: [
-          holding({ currency: "USD", value: 3_000_000 }),
-          holding({ symbol: "CERT", assetType: "otro", currency: "CRC", value: 1_000_000 }),
+          holding({ monedaFila: "USD", value: 5_660, valorPrimario: 3_000_000 }),
+          holding({ symbol: "CERT", assetType: "otro", currency: "CRC", monedaFila: "CRC", value: 1_000_000, valorPrimario: 1_000_000 }),
         ],
       }),
       tool({ currency: "CRC" }),

@@ -232,32 +232,45 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
     const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
     const report = await getPortfolioReport();
     const a = report.analytics;
+    // Moneda en la que el motor entrega: la PRINCIPAL. Si no se pudo leer, se asume la de
+    // visualización (es lo que toDisplay hacía de hecho al no tener con qué convertir).
+    const monedaPrimaria = primaryCurrency ?? ctx.currency;
+    const { mapHoldingsForContext } = await import("@/lib/ai/holdings-context");
+    const { subtotales, convertirTotal } = await import("@/lib/ai/money");
+    // Conversor real primaria → moneda de la fila. Sin tasas devuelve null y la fila se queda en
+    // primaria BIEN etiquetada (nunca un monto sin convertir con la etiqueta de otra moneda).
+    const convertir = (monto: number, desde: string, hacia: string): number | null => {
+      if (desde === hacia) return monto;
+      if (!rates || !rates[desde] || !rates[hacia]) return null;
+      const out = convertCurrency(monto, desde, hacia, rates);
+      return Number.isFinite(out) ? out : null;
+    };
+
     if (a.totalPortfolioValue > 0) {
       const topSlice = Object.values(a.allocation).reduce((x, y) => (x.value > y.value ? x : y));
-      ctx.portfolioValue = toDisplay(a.totalPortfolioValue);
       ctx.portfolioReturnPct = a.totalReturnPct; // % no se convierte
       ctx.topAssetClass = topSlice.label;
     }
-    // Detalle por posición (COMPACTO: top-N por valor, resto en holdingsMoreCount). Mapeo PURO; el
-    // motor da las cifras en la principal → se CONVIERTEN a la de visualización (montos, no % ni cantidad).
-    const { mapHoldingsForContext } = await import("@/lib/ai/holdings-context");
+    // Detalle por posición (COMPACTO: top-N por valor, resto en holdingsMoreCount). Mapeo PURO: cada
+    // fila queda en la moneda en que ese activo COTIZA (USD los cotizados), no aplanada a display.
     const mapped = mapHoldingsForContext(
       a.holdingsWithPerformance ?? [],
       a.totalCostBasis,
       a.totalProfitLoss,
+      { monedaPrimaria, convertir },
     );
     if (mapped) {
-      ctx.holdings = mapped.holdings.map((h) => ({
-        ...h,
-        invested: toDisplay(h.invested),
-        value: toDisplay(h.value),
-        price: h.price === null ? null : toDisplay(h.price),
-        pl: toDisplay(h.pl),
-      }));
+      ctx.holdings = mapped.holdings;
       ctx.holdingsMoreCount = mapped.holdingsMoreCount;
-      ctx.investmentInvested = toDisplay(mapped.investmentInvested);
-      ctx.investmentValue = toDisplay(mapped.investmentValue);
-      ctx.investmentPL = toDisplay(mapped.investmentPL);
+      ctx.investmentInvested = mapped.investmentInvested;
+      ctx.investmentValue = mapped.investmentValue;
+      ctx.investmentPL = mapped.investmentPL;
+      ctx.investmentValueBase = mapped.totalPrimario.valor;
+      // Valor del portafolio: subtotales por moneda + el total convertido a la de visualización,
+      // que solo existe si hay tasas para todas las monedas involucradas (si no, undefined).
+      ctx.portfolioValue = subtotales(mapped.investmentValue);
+      const convertido = convertirTotal(mapped.investmentValue, ctx.currency, rates);
+      if (convertido) ctx.portfolioValueConvertido = convertido;
     }
   } catch {
     // Portafolio no disponible.
