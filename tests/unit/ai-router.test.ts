@@ -1026,3 +1026,44 @@ describe("informe_inversion · carril deep", () => {
     expect(routed).toBeNull();
   });
 });
+
+// ── Blindaje (delta 2C): los carriles que YA respetan la moneda nativa no deben perderla ──
+// Si alguno de estos falla, es una REGRESIÓN de 2A/2B, no un test que haya que ajustar.
+describe("carriles con moneda nativa · blindaje", () => {
+  it("ultimos_movimientos: cada transacción con SU moneda, CRC y USD en la misma respuesta", async () => {
+    listTransactions.mockResolvedValue([
+      { id: "t1", occurredOn: "2026-07-20", merchantOrSource: "Automercado", description: null, kind: "gasto", amount: 45_000, currency: "CRC" },
+      { id: "t2", occurredOn: "2026-07-19", merchantOrSource: "Netflix", description: null, kind: "gasto", amount: 12, currency: "USD" },
+      { id: "t3", occurredOn: "2026-07-18", merchantOrSource: "Salario", description: null, kind: "ingreso", amount: 1_200_000, currency: "CRC" },
+    ]);
+    const routed = await tryRouteQuery(ask("mostrame mis últimos movimientos"), CTX, tc);
+    const reply = routed?.response.reply ?? "";
+
+    expect(reply).toContain("₡45.000"); // el gasto en colones, en colones
+    expect(reply).toContain("$12"); // el de dólares NO se convierte ni se rotula como colones
+    expect(reply).toContain("₡1.200.000");
+    // Nada de un total: son montos de monedas distintas.
+    expect(reply).not.toMatch(/total/i);
+  });
+
+  it("saldo_sobre usa la moneda del SOBRE, no la de display del toolContext", async () => {
+    // tc.currency es USD en este archivo; el sobre viene en CRC → manda el sobre.
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-super", categoryPath: "Necesidades › Super" });
+    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Super", currency: "CRC", budget: 320_000, spent: 120_000, remaining: 200_000, hasBudget: true });
+    const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
+    const reply = routed?.response.reply ?? "";
+
+    expect(reply).toContain("₡200.000");
+    expect(reply).not.toContain("$200.000"); // el bug de moneda mezclada, si volviera
+  });
+
+  it("puedo_gastar compara contra el restante en la moneda del sobre", async () => {
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-res", categoryPath: "Estilo › Restaurantes" });
+    getSobreRemaining.mockResolvedValue({ path: "Estilo › Restaurantes", currency: "CRC", budget: 120_000, spent: 90_000, remaining: 30_000, hasBudget: true });
+    const routed = await tryRouteQuery(ask("¿me puedo comprar un almuerzo de ₡8.000?"), CTX, tc);
+    const reply = routed?.response.reply ?? "";
+
+    expect(reply).toContain("₡30.000"); // restante en la moneda del sobre
+    expect(reply).not.toContain("$30.000");
+  });
+});

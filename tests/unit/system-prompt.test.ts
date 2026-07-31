@@ -730,3 +730,54 @@ describe("buildSystemPrompt · deudas con su moneda", () => {
     expect(prompt).not.toMatch(/No hay tipo de cambio disponible/i);
   });
 });
+
+// ── Agregados convertidos: decir que lo son, sin ruido cuando no lo son (delta 2C) ──
+describe("buildSystemPrompt · agregados convertidos", () => {
+  const base = { currency: "CRC" as const, incomeMonthly: 1_200_000, expenseMonthly: 800_000, freeCashflow: 400_000 };
+
+  it("baseConvertido true → ingreso/gasto/flujo se declaran convertidos", () => {
+    const prompt = buildSystemPrompt({ ...base, baseConvertido: true });
+    expect(prompt).toContain("Ingreso mensual: 1200000 CRC (convertido a CRC).");
+    expect(prompt).toContain("Gasto mensual: 800000 CRC (convertido a CRC).");
+    expect(prompt).toContain("Flujo libre: 400000 CRC (convertido a CRC).");
+  });
+
+  it("baseConvertido false → la línea queda EXACTA como siempre (sin ruido de una sola moneda)", () => {
+    const prompt = buildSystemPrompt({ ...base, baseConvertido: false });
+    expect(prompt).toContain("Ingreso mensual: 1200000 CRC.");
+    expect(prompt).not.toMatch(/Ingreso mensual.*convertido/);
+  });
+
+  it("sin el flag (undefined) tampoco se inventa nada", () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toContain("Gasto mensual: 800000 CRC.");
+    // La regla general de moneda menciona "convertido"; lo que NO debe pasar es que estas tres
+    // líneas lo digan cuando no hubo conversión.
+    expect(prompt).not.toMatch(/(?:Ingreso mensual|Gasto mensual|Flujo libre)[^\n]*convertido/);
+  });
+
+  it("fondos de defensa convertidos → dice de qué moneda vienen", () => {
+    const df = {
+      currency: "USD",
+      convertido: true,
+      monedaOrigen: "CRC",
+      activeFund: "emergency" as const,
+      emergency: { registrado: true, actual: 1_000, objetivo: 3_000, progresoPct: 33, aporteRecomendado: 200, cubierto: false },
+      paz: { registrado: false, actual: 0, objetivo: 6_000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+    };
+    const prompt = buildSystemPrompt({ currency: "USD", defenseFunds: df });
+    expect(prompt).toContain("Esos montos de defensa están CONVERTIDOS de CRC a USD.");
+  });
+
+  it("fondos de defensa SIN conversión → ni una palabra de más", () => {
+    const df = {
+      currency: "CRC",
+      convertido: false,
+      activeFund: "emergency" as const,
+      emergency: { registrado: true, actual: 500_000, objetivo: 1_500_000, progresoPct: 33, aporteRecomendado: 100_000, cubierto: false },
+      paz: { registrado: false, actual: 0, objetivo: 3_000_000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+    };
+    const prompt = buildSystemPrompt({ currency: "CRC", defenseFunds: df });
+    expect(prompt).not.toMatch(/CONVERTIDOS/);
+  });
+});

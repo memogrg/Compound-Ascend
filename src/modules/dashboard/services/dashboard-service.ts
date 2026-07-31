@@ -194,5 +194,6 @@ function buildDemoSummary(): BaseSummary {
     demoExpense("Fondo de emergencia", "ahorro", 90_000),
     demoExpense("Seguro médico", "proteccion", 60_000),
   ];
-  return { indicators: computeBaseIndicators(incomes, expenses), incomes, expenses };
+  // Demo: todo en una sola moneda, así que no hubo conversión que declarar.
+  return { indicators: computeBaseIndicators(incomes, expenses), incomes, expenses, monedasVistas: ["CRC"] };
 }

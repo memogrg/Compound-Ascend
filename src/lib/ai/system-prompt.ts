@@ -24,6 +24,12 @@ export type FinancialContext = {
   incomeSourceCount?: number;
   expenseMonthly?: number;
   freeCashflow?: number;
+  /**
+   * true cuando ingreso/gasto/flujo son cifras CONVERTIDAS a ctx.currency (hubo más de una moneda
+   * de origen, o la única no era esa). undefined = no se sabe → la línea se deja tal cual, sin
+   * agregarle ruido a un usuario de una sola moneda.
+   */
+  baseConvertido?: boolean;
   /** Categoría (naturaleza) de gasto más pesada, ya en moneda principal. Best-effort. */
   topExpenseCategory?: { name: string; monthly: number; pct: number };
   /** Sobre (hoja) de MAYOR presupuesto de gasto, YA en moneda de visualización (ctx.currency). */
@@ -145,6 +151,9 @@ export type FinancialContext = {
    */
   defenseFunds?: {
     currency: string;
+    /** true si los montos se convirtieron a `currency` desde `monedaOrigen`. */
+    convertido?: boolean;
+    monedaOrigen?: string;
     activeFund: "emergency" | "peace" | "done";
     emergency: { registrado: boolean; actual: number; objetivo: number; progresoPct: number; aporteRecomendado: number; cubierto: boolean };
     paz: { registrado: boolean; actual: number; objetivo: number; progresoPct: number; aporteRecomendado: number; cubierto: boolean };
@@ -199,16 +208,19 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
         `su perfil (tolerancia al riesgo, hábitos) es suyo, no del hogar. No digas "tu gasto" sobre ` +
         `un movimiento sin saber quién lo hizo: hablá de "el gasto del hogar" salvo que conste que es de quien pregunta.`,
     );
+  // Los agregados de la base se convierten a UNA moneda a propósito (son ollas: partirlas por
+  // moneda no ayuda). Lo que faltaba era DECIR que son conversiones — pero solo cuando lo son.
+  const convertidoNota = ctx.baseConvertido ? ` (convertido a ${ctx.currency})` : "";
   if (ctx.incomeMonthly !== undefined)
-    facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}.`);
+    facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}${convertidoNota}.`);
   if (ctx.incomeSourceCount !== undefined)
     facts.push(
       `Fuentes de ingreso activas: ${ctx.incomeSourceCount}${ctx.incomeSourceCount === 1 ? " (una sola fuente)" : ""}.`,
     );
   if (ctx.expenseMonthly !== undefined)
-    facts.push(`Gasto mensual: ${ctx.expenseMonthly} ${ctx.currency}.`);
+    facts.push(`Gasto mensual: ${ctx.expenseMonthly} ${ctx.currency}${convertidoNota}.`);
   if (ctx.freeCashflow !== undefined)
-    facts.push(`Flujo libre: ${ctx.freeCashflow} ${ctx.currency}.`);
+    facts.push(`Flujo libre: ${ctx.freeCashflow} ${ctx.currency}${convertidoNota}.`);
   if (ctx.topExpenseCategory)
     facts.push(
       `Gasto más pesado: ${ctx.topExpenseCategory.name} (${ctx.topExpenseCategory.monthly} ${ctx.currency}, ${ctx.topExpenseCategory.pct}% del gasto total).`,
@@ -436,6 +448,8 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
         : `Fondo de ${nombre}: NO registrado (objetivo sugerido ${f.objetivo} ${cur}).`;
     facts.push(linea("emergencia", df.emergency));
     facts.push(linea("paz", df.paz));
+    if (df.convertido && df.monedaOrigen)
+      facts.push(`Esos montos de defensa están CONVERTIDOS de ${df.monedaOrigen} a ${cur}.`);
     facts.push(
       `REGLA de los fondos de defensa: usá el estado REAL de arriba. Si un fondo dice REGISTRADO, NUNCA digas que el usuario "no tiene" ese fondo — reportá su acumulado/objetivo/progreso. Si está incompleto, decilo con la brecha y el aporte sugerido (no que "no existe"). Fondo activo ahora: ${df.activeFund === "emergency" ? "emergencia" : df.activeFund === "peace" ? "paz" : "ambos completos"}.`,
     );

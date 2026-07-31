@@ -582,6 +582,13 @@ export type RealTotals = {
   topExpenseCategory: string | null;
   pendingCount: number;
   currency: string;
+  /**
+   * Monedas DISTINTAS encontradas en las transacciones del periodo (ordenadas, sin duplicados).
+   * Los totales de arriba están convertidos a `currency`: esto dice de dónde vienen. Con una sola
+   * moneda igual a `currency` no hubo conversión; con más de una, sí la hubo. Lo consume el
+   * contexto del asesor para decir "convertido" en vez de presentar el total como cifra nativa.
+   */
+  monedasVistas: string[];
 };
 
 /** Totales reales del periodo (desde transactions), normalizados a la moneda de visualización. */
@@ -602,9 +609,12 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
   const incomeReceivedBySourceNative: Record<string, number> = {};
   const expenseByKey: KeyedTotals = {};
   const expenseTxns: RealTxnLine[] = [];
+  // Monedas vistas: misma pasada, sin query ni loop extra (patrón de incomeReceivedBySourceNative).
+  const monedas = new Set<string>();
 
   for (const t of txns) {
     if (t.status === "pending_review") pendingCount += 1;
+    if (t.currency) monedas.add(t.currency);
     const value = convertCurrency(t.amount, t.currency, currency, rates);
     if (t.kind === "ingreso") {
       realIncome += value;
@@ -666,6 +676,7 @@ export async function getRealTotals(period: Period): Promise<RealTotals> {
     topExpenseCategory,
     pendingCount,
     currency,
+    monedasVistas: [...monedas].sort(),
   };
 }
 
