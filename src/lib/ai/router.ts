@@ -27,10 +27,16 @@ import {
   type ScopeKind,
   type HoldingScenarioInput,
 } from "@/lib/ai/market-scope";
+import { buildEvidencePack } from "@/lib/ai/investment-report/evidence";
+import { renderEvidenceReport } from "@/lib/ai/investment-report/render";
 import type { FinancialContext, ToolContext } from "@/lib/ai/orchestrator";
 
-/** Carril que resolvió la respuesta (para medir el ahorro de tokens). */
-export type RouterLane = "template" | "lite" | "reasoning";
+/**
+ * Carril que resolvió la respuesta (para medir el ahorro de tokens). "deep" = informe largo armado
+ * por plantilla sobre el paquete de evidencia (determinista, 0 tokens); se mide aparte de "template"
+ * porque su costo es de LECTURAS, no de modelo.
+ */
+export type RouterLane = "template" | "lite" | "reasoning" | "deep";
 
 export type RoutedQuery = {
   response: AIChatResponse; // reply crudo (el orchestrator le aplica el guardrail)
@@ -62,6 +68,9 @@ type Intent =
   | "ahorro_mensual"
   // Inversiones: "cuánto invertido / cómo va el portafolio / ganancia o pérdida" → ctx.investment*:
   | "resumen_inversiones"
+  // "analizame el portafolio / informe de mis inversiones" → INFORME determinista (carril deep):
+  // paquete de evidencia (posiciones, concentración, moneda, brecha, deuda, defensa) + plantilla:
+  | "informe_inversion"
   // "¿cuánto aporto de DCA al mes?" → compromisoDesglose.dca:
   | "dca_mensual"
   // R2 — datos ya en FinancialContext (ctx), 0 fetch, ambos canales:
@@ -97,6 +106,7 @@ const KNOWN_INTENTS: Intent[] = [
   "defensa_fondo",
   "ahorro_mensual",
   "resumen_inversiones",
+  "informe_inversion",
   "dca_mensual",
   "cuota_deuda",
   "gasto_mes",
@@ -228,6 +238,21 @@ const MARKET_CUE_RE =
 const MARKET_ATH_RE = /\bath\b|m[aá]ximo/i;
 
 /**
+ * Señales del carril DEEP (informe de inversiones), en DOS ejes que deben coincidir ambos:
+ *  - INFORME_CUE_RE: el pedido ("informe", "reporte", "análisis/analizame", "revisión/revisá",
+ *    "diagnóstico", "radiografía", "auditoría").
+ *  - PORTAFOLIO_OBJ_RE: el objeto ("portafolio/portfolio", "cartera", "inversiones", "posiciones").
+ * Con una sola señal NO alcanza: "análisis de BTC" no es un informe de portafolio, y "cuánto tengo
+ * invertido" es un dato puntual (resumen_inversiones). El orden entre ambas es libre.
+ *
+ * Ojo con los acentos: `\w` es ASCII, así que un sufijo acentuado ("revisá", "auditoría") rompería
+ * el \b final. Los stems se cortan antes de la tilde (revis\w* cubre revisá/revisión/revisame).
+ */
+const INFORME_CUE_RE =
+  /\b(?:informe|reporte|an[aá]lisis|analiz\w*|revis\w*|diagn[oó]stic\w*|radiograf[ií]a|audit\w*)\b/i;
+const PORTAFOLIO_OBJ_RE = /\b(?:portafolios?|portfolios?|cartera|inversi[oó]n(?:es)?|posiciones)\b/i;
+
+/**
  * Extrae el símbolo objetivo de una pregunta de mercado: un ticker en MAYÚSCULAS (2-6 letras/
  * dígitos) o el que matchee un símbolo/nombre de las posiciones del usuario. `known` = símbolos y
  * nombres de sus holdings (para resolver "kamino"/"bitcoin" además del ticker). Devuelve el TICKER.
@@ -324,6 +349,16 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
           ? "colchon"
           : "emergencia";
     return { intent: "defensa_fondo", params: { focus } };
+  }
+
+  // INFORME de inversiones (carril DEEP, determinista): "analizame el portafolio", "revisión de mis
+  // inversiones", "hacé un informe de mi cartera". Va ANTES de resumen_inversiones (que matchea
+  // "cuánto/cómo va/valor" y se lo comería) y antes del guard de REASONING_CUES ("análisis"/"cómo"
+  // lo mandarían al LLM). Exige AMBAS señales — pedido de informe + objeto portafolio — en cualquier
+  // orden; "cuánto tengo invertido" (sin señal de informe) sigue siendo resumen_inversiones, y un
+  // escenario de venta ("si vendo…") no es un informe.
+  if (INFORME_CUE_RE.test(t) && PORTAFOLIO_OBJ_RE.test(t) && !/\bsi\s+vend/i.test(t)) {
+    return { intent: "informe_inversion", params: {} };
   }
 
   // INVERSIONES — resumen del portafolio (NO un símbolo puntual como "mi ETH", que va a datos_mercado).
@@ -1205,6 +1240,20 @@ export async function resolveMatchedIntent(
   ctx: FinancialContext,
   toolContext: ToolContext,
 ): Promise<RoutedQuery | null> {
+  // INFORME de inversiones (carril DEEP): paquete de evidencia + plantilla. CERO tokens y cero
+  // llamadas nuevas — todo sale del ctx/toolContext que la ruta ya construyó. Sin posiciones ni valor
+  // de inversión NO se emite un informe vacío: devuelve null y el llamador escala al LLM.
+  if (matched.intent === "informe_inversion") {
+    const pack = buildEvidencePack(ctx, toolContext);
+    if (!pack.tieneInversiones) return null;
+    return {
+      response: { reply: renderEvidenceReport(pack, pack.currency), action: null },
+      tokensIn: 0,
+      tokensOut: 0,
+      lane: "deep",
+    };
+  }
+
   // Datos de mercado (precio/ATH): usa ctx.holdings + el tool. Si no resuelve el símbolo o no hay
   // dato, devuelve la respuesta honesta (no escala a repetir negativas).
   if (matched.intent === "datos_mercado") {

@@ -30,6 +30,12 @@ export function scopeForIntent(intent: string, params: Record<string, unknown> =
     case "datos_mercado":
     case "resumen_inversiones":
       return { context: { portfolio: true }, tool: NONE }; // holdings / investment* (precios en vivo)
+    case "informe_inversion":
+      // Carril DEEP: el informe determinista lee posiciones (portfolio), brecha/DCA (patrimonio),
+      // colchón (defense) y deudas/números del toolContext. Fuera a propósito: `flavor` (solo lo usa
+      // el LLM y acá no hay LLM) y `goals` (el paquete de evidencia NO consume metas; si la Etapa B
+      // las necesita, se prende ahí).
+      return { context: { portfolio: true, patrimonio: true, defense: true }, tool: { debts: true, goals: false, numbers: true } };
     case "numero_seguridad":
     case "numero_independencia":
     case "numero_libertad":
