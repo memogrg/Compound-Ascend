@@ -70,12 +70,14 @@ export default async function MobileMiBase() {
     );
   }
 
-  const { currency, budget, real, liquidity, baseReading, financialPressure, period } = view;
+  const { currency, budget, real, liquidity, baseReading, financialPressure, period, monthFlow } =
+    view;
+  // A-01: titular = flujo OPERATIVO canónico (confirmadas, sin capital ni transferencias).
   const t = computeV2Totals({
     budgetIncome: budget.budgetIncome,
-    realIncome: real.realIncome,
+    realIncome: monthFlow.real.operatingIncome,
     budgetExpense: budget.budgetExpense,
-    realExpense: real.realExpense,
+    realExpense: monthFlow.real.operatingExpense,
   });
   const incVar = variance(t.incomeVariancePct);
   const expVar = variance(t.expenseVariancePct);
@@ -118,7 +120,7 @@ export default async function MobileMiBase() {
           <MDataRow
             title="Ingresos"
             subtitle={`Plan ${mAmount(budget.budgetIncome, currency)}`}
-            value={mAmount(real.realIncome, currency)}
+            value={mAmount(monthFlow.real.operatingIncome, currency)}
             trailing={
               incVar.flat ? undefined : (
                 <MChip tone={incVar.over ? "success" : "danger"}>{incVar.text}</MChip>
@@ -128,7 +130,7 @@ export default async function MobileMiBase() {
           <MDataRow
             title="Gastos"
             subtitle={`Plan ${mAmount(budget.budgetExpense, currency)}`}
-            value={mAmount(real.realExpense, currency)}
+            value={mAmount(monthFlow.real.operatingExpense, currency)}
             trailing={
               expVar.flat ? undefined : (
                 <MChip tone={expVar.over ? "danger" : "success"}>{expVar.text}</MChip>
@@ -144,10 +146,10 @@ export default async function MobileMiBase() {
         <MSectionHeader title="Tu mes en números" />
         <MMetricGrid style={{ marginBottom: 16 }}>
           <MMetricCard
-            label="Flujo libre real"
-            value={mAmount(t.freeCashflowReal, currency, 8)}
-            sub={`${formatPercent(t.freeCashflowPct)} del ingreso`}
-            tone={t.freeCashflowReal >= 0 ? "success" : "danger"}
+            label="Flujo del mes"
+            value={mAmount(monthFlow.real.operatingFlow, currency, 8)}
+            sub="operativo · real"
+            tone={monthFlow.real.operatingFlow >= 0 ? "success" : "danger"}
           />
           <MMetricCard label="Gasto / ingreso" value={formatPercent(t.expenseRatio)} sub="ratio del mes" />
           <MMetricCard
@@ -161,6 +163,14 @@ export default async function MobileMiBase() {
             sub={`${mAmount(real.avgDaily, currency, 9)}/día`}
           />
         </MMetricGrid>
+        {(monthFlow.capital.out > 0 || monthFlow.capital.in > 0 || monthFlow.pending.count > 0) ? (
+          <div className="muted" style={{ fontSize: 12, marginTop: -8, marginBottom: 16 }}>
+            {monthFlow.capital.out > 0 || monthFlow.capital.in > 0
+              ? `Capital: moviste ${mAmount(monthFlow.capital.out, currency, 9)} a inversiones/metas${monthFlow.capital.in > 0 ? ` · recuperaste ${mAmount(monthFlow.capital.in, currency, 9)}` : ""}. `
+              : ""}
+            {monthFlow.pending.count > 0 ? `Por revisar: ${monthFlow.pending.count} mov.` : ""}
+          </div>
+        ) : null}
 
         {/* Lectura (misma que la web: título + diagnóstico + insights + acciones + próximo paso).
             El título del engine es una frase ("Tu base está sana"), así que va como titular,

@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { computeBaseIndicators } from "@/modules/financial-base";
+import { getMonthFlow, monthPeriod, type MonthFlow } from "@/modules/financial-base";
 import { computeHealthScore, type HealthScore } from "@/modules/financial-base";
 import { buildInsights, type DashboardInsights } from "@/modules/dashboard/engine/insights";
 import { getControlSummary, type ControlSummary } from "@/modules/control";
@@ -27,6 +28,8 @@ export type DashboardData = {
   panel: PanelVM;
   configured: boolean;
   degradado: Degradado;
+  /** A-01: flujo del mes canónico (real operativo). null en demo/degradado. */
+  monthFlow: MonthFlow | null;
 };
 
 /** Techo de tiempo para los resúmenes best-effort del panel (ms). Corto a propósito:
@@ -135,9 +138,18 @@ export async function getDashboardData(
     richLife = buildDemoRichLifeSummary();
     wealth = buildDemoWealthSummary();
   }
-  const panel = buildPanel({ ind: summary.indicators, currency, control, richLife, wealth });
+  // A-01: flujo del mes canónico (real operativo) para el pilar "Flujo del mes".
+  // Best-effort: si falla, el pilar cae al plan (comportamiento anterior).
+  let monthFlow: MonthFlow | null = null;
+  if (configured && user) {
+    const now = new Date();
+    monthFlow = (await conLimite(getMonthFlow(monthPeriod(now.getFullYear(), now.getMonth() + 1))))
+      .valor;
+  }
 
-  return { name, currency, summary, health, insights, panel, configured, degradado };
+  const panel = buildPanel({ ind: summary.indicators, currency, control, richLife, wealth, monthFlow });
+
+  return { name, currency, summary, health, insights, panel, configured, degradado, monthFlow };
 }
 
 function demoIncome(name: string, type: IncomeSource["incomeType"], m: number): IncomeSource {

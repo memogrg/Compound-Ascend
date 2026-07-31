@@ -40,6 +40,7 @@ import {
   getLiquidityAfterByTxn,
   getClosingLiquidity,
 } from "@/modules/financial-base/services/liquidity-service";
+import type { MonthFlow } from "@/modules/financial-base/engine/month-flow";
 import { buildMonthMarker, type MonthMarker } from "@/modules/financial-base/engine/period";
 import { todayLocalISO } from "@/lib/validation";
 import {
@@ -128,7 +129,30 @@ export type V2View = {
   baseReading: FinancialReading;
   incomeCapsule: FinancialReading;
   expenseCapsule: FinancialReading;
+  /** A-01: Flujo del mes canónico (plan/real operativo/capital/adherencia/pendientes). */
+  monthFlow: MonthFlow;
 };
+
+/** A-01: línea de capital + pendientes bajo el titular de flujo (Mi Base / Transacciones). */
+function CapitalPendingLine({ mf }: { mf: MonthFlow }) {
+  const parts: string[] = [];
+  if (mf.capital.out > 0 || mf.capital.in > 0) {
+    const out = `moviste ${formatMoney(mf.capital.out, mf.currency)} a inversiones/metas`;
+    const inc = mf.capital.in > 0 ? ` · recuperaste ${formatMoney(mf.capital.in, mf.currency)}` : "";
+    parts.push(`Capital: ${out}${inc}`);
+  }
+  if (mf.pending.count > 0) {
+    parts.push(
+      `Por revisar: ${mf.pending.count} ${mf.pending.count === 1 ? "movimiento" : "movimientos"} (${formatMoney(mf.pending.expense, mf.currency)} en gastos)`,
+    );
+  }
+  if (parts.length === 0) return null;
+  return (
+    <div className="hint" style={{ marginTop: -6 }}>
+      {parts.join("  ·  ")}
+    </div>
+  );
+}
 
 function donutData(map: Record<string, { label: string; value: number }>): DonutDatum[] {
   return composition(map).map((s, i) => ({
@@ -236,12 +260,14 @@ function tone(v: number, goodWhenPositive = true): MetricTone {
 
 // ============================== MI BASE ==============================
 export function MiBaseSection({ view }: { view: V2View }) {
-  const { budget, real, currency, history } = view;
+  const { budget, real, currency, history, monthFlow } = view;
+  // A-01: el titular real es el FLUJO OPERATIVO canónico (confirmadas, sin capital
+  // ni transferencias/ajustes). El capital y los pendientes van en su propia línea.
   const t = computeV2Totals({
     budgetIncome: budget.budgetIncome,
-    realIncome: real.realIncome,
+    realIncome: monthFlow.real.operatingIncome,
     budgetExpense: budget.budgetExpense,
-    realExpense: real.realExpense,
+    realExpense: monthFlow.real.operatingExpense,
   });
   const flujoLine = history.map((h) => ({
     label: h.label,
@@ -266,7 +292,7 @@ export function MiBaseSection({ view }: { view: V2View }) {
         />
         <MetricCard
           label="Ingresos reales"
-          value={formatMoney(real.realIncome, currency)}
+          value={formatMoney(monthFlow.real.operatingIncome, currency)}
           delta={`${t.incomeVariancePct >= 0 ? "+" : ""}${formatPercent(t.incomeVariancePct)} vs presup.`}
           deltaTone={tone(t.incomeVariancePct)}
           valueTone="pos"
@@ -278,7 +304,7 @@ export function MiBaseSection({ view }: { view: V2View }) {
         />
         <MetricCard
           label="Gastos reales"
-          value={formatMoney(real.realExpense, currency)}
+          value={formatMoney(monthFlow.real.operatingExpense, currency)}
           delta={`${t.expenseVariancePct >= 0 ? "+" : ""}${formatPercent(t.expenseVariancePct)} vs presup.`}
           deltaTone={tone(t.expenseVariancePct, false)}
           valueTone="neg"
@@ -286,10 +312,10 @@ export function MiBaseSection({ view }: { view: V2View }) {
       </section>
       <section className="cols-4">
         <MetricCard
-          label="Flujo libre real"
-          value={formatMoney(t.freeCashflowReal, currency)}
-          sub="ingresos − gastos"
-          valueTone={t.freeCashflowReal >= 0 ? "pos" : "neg"}
+          label="Flujo del mes (real)"
+          value={formatMoney(monthFlow.real.operatingFlow, currency)}
+          sub="operativo · sin capital ni transferencias"
+          valueTone={monthFlow.real.operatingFlow >= 0 ? "pos" : "neg"}
         />
         <MetricCard
           label="% flujo libre"
@@ -304,6 +330,8 @@ export function MiBaseSection({ view }: { view: V2View }) {
         />
         <MetricCard label="Presión financiera" value={press.label} valueTone={press.tone} />
       </section>
+
+      <CapitalPendingLine mf={monthFlow} />
 
       <section className="cols-2">
         <ChartCard title="A · Ingresos reales vs presupuestados" hint="por mes">
@@ -674,7 +702,7 @@ function IncomeSection({ view }: { view: V2View }) {
 
 // ============================== TRANSACCIONES ==============================
 export async function TransaccionesSection({ view }: { view: V2View }) {
-  const { real, currency } = view;
+  const { real, currency, monthFlow } = view;
 
   // Trazabilidad Fase B: liquidez como EJE. El saldo actual (readout arriba) y el
   // saldo corrido tras cada movimiento ("liquidez después"). Best-effort: si falla
@@ -693,7 +721,7 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
     balanceAfter = series.afterByTxn;
     monthMarker = buildMonthMarker({
       period: view.period,
-      flow: real.freeCashflowReal, // el "Saldo neto" ya calculado; no se recalcula
+      flow: monthFlow.real.operatingFlow, // A-01: flujo operativo canónico
       liquidity: closing.balance,
       todayIso: todayLocalISO(),
     });
@@ -720,13 +748,13 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
   }
   const summary: SumCard[] = [
     {
-      ttl: "Saldo neto",
-      val: formatMoney(real.freeCashflowReal, currency),
-      sub: "del periodo",
-      tone: real.freeCashflowReal >= 0 ? "pos" : "neg",
+      ttl: "Flujo del mes",
+      val: formatMoney(monthFlow.real.operatingFlow, currency),
+      sub: "operativo · real",
+      tone: monthFlow.real.operatingFlow >= 0 ? "pos" : "neg",
     },
-    { ttl: "Ingresos", val: formatMoney(real.realIncome, currency), sub: "este mes", tone: "pos" },
-    { ttl: "Gastos", val: formatMoney(real.realExpense, currency), sub: "este mes", tone: "neg" },
+    { ttl: "Ingresos", val: formatMoney(monthFlow.real.operatingIncome, currency), sub: "operativo", tone: "pos" },
+    { ttl: "Gastos", val: formatMoney(monthFlow.real.operatingExpense, currency), sub: "operativo", tone: "neg" },
     {
       ttl: "Movimientos",
       val: String(real.count),
@@ -752,6 +780,7 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
       ) : null}
 
       <SummaryStrip cards={summary} />
+      <CapitalPendingLine mf={monthFlow} />
 
       <div className="tab-toolbar">
         <div className="hint">Busca, filtra y gestiona todos tus movimientos del mes.</div>

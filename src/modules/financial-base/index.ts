@@ -3,6 +3,10 @@ export { monthlyize } from "./engine/monthlyize";
 export type { Frequency } from "./engine/monthlyize";
 export { computeBaseIndicators } from "./engine/base-engine";
 export { computeHealthScore } from "./engine/health";
+// A-01: Flujo del mes canónico
+export { classifyTxnFlow, aggregateMonthFlow } from "./engine/month-flow";
+export type { MonthFlow, FlowClass, MonthFlowRow } from "./engine/month-flow";
+export { getMonthFlow } from "./services/month-flow-service";
 export type { HealthScore } from "./engine/health";
 export {
   getBaseSummary,
