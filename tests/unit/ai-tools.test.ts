@@ -1,4 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
+
+// Telemetría durable: el executor la invoca cuando el toolContext trae userId. Se espía acá para
+// probar el CABLEADO (que se emite el evento con los números reales); el módulo tiene su propio test.
+const recordAiEvent = vi.fn(async (_userId: string, _e: Record<string, unknown>) => {});
+vi.mock("@/lib/ai/events", () => ({
+  recordAiEvent: (userId: string, e: Record<string, unknown>) => recordAiEvent(userId, e),
+}));
 import {
   simulateDebtPayoff,
   compareDebtStrategies,
@@ -484,6 +491,34 @@ describe("orchestrator · buildToolExecutor / financeChatWithTools", () => {
     expect(r.currency).toBe("CRC");
     expect(r.fx_no_disponible).toBe(false);
     expect(await exec("borrar_todo", {})).toEqual({ error: "herramienta no disponible: borrar_todo" });
+  });
+
+  it("con userId, cada invocación emite su evento durable (nombre, duración, ok)", async () => {
+    recordAiEvent.mockClear();
+    const exec = buildToolExecutor({ debts: DEBTS, currency: "CRC", userId: "u1" });
+    await exec("simular_pago_deuda", { aporte_extra_mensual: 100_000 });
+
+    expect(recordAiEvent).toHaveBeenCalledTimes(1);
+    const [userId, evento] = recordAiEvent.mock.calls[0]! as unknown as [string, Record<string, unknown>];
+    expect(userId).toBe("u1");
+    expect(evento).toMatchObject({ kind: "tool", name: "simular_pago_deuda", ok: true });
+    expect(typeof evento.ms).toBe("number");
+    // El evento NO lleva ni los args ni el resultado: solo métricas.
+    expect(Object.keys(evento).sort()).toEqual(["kind", "ms", "name", "ok", "resumenLen"]);
+  });
+
+  it("una herramienta que falla se registra con ok:false (no se pierde el intento)", async () => {
+    recordAiEvent.mockClear();
+    const exec = buildToolExecutor({ debts: DEBTS, currency: "CRC", userId: "u1" });
+    await exec("borrar_todo", {});
+    expect(recordAiEvent).toHaveBeenCalledWith("u1", expect.objectContaining({ ok: false }));
+  });
+
+  it("sin userId (WhatsApp/cron) NO se persiste: el carril sigue igual", async () => {
+    recordAiEvent.mockClear();
+    const exec = buildToolExecutor({ debts: DEBTS, currency: "CRC" });
+    await exec("simular_pago_deuda", { aporte_extra_mensual: 100_000 });
+    expect(recordAiEvent).not.toHaveBeenCalled();
   });
 
   it("fxUnavailable se propaga al resultado (la IA puede aclarar)", async () => {

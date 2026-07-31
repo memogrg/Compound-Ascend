@@ -86,6 +86,8 @@ export async function resolveDeterministic(
 export type ToolContext = {
   debts: DebtInput[];
   currency: string;
+  /** Para la telemetría de herramientas (ai_events). Sin él, la invocación solo se loguea. */
+  userId?: string;
   fxUnavailable?: boolean;
   securityNumber?: number;
   independenceNumber?: number;
@@ -318,20 +320,30 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
   /**
    * OBSERVABILIDAD: qué herramienta se invocó, cuánto tardó y si devolvió error. Sin esto no hay
    * forma de saber si una tool nueva se usa ni cuánto cuesta — se estaba decidiendo a ojo. Cuando
-   * la tool devuelve un bloque ya redactado (`resumen_md`), se loguea su LARGO: comparado con el
-   * largo del reply final (assistant.chat.lane) dice si el modelo lo pasó entero o lo recortó.
+   * la tool devuelve un bloque ya redactado (`resumen_md`), se registra su LARGO: comparado con el
+   * largo del reply final (evento 'lane') dice si el modelo lo pasó entero o lo recortó.
+   *
+   * Van los DOS: el log para debug en vivo, la tabla para la pregunta de dentro de un mes (los
+   * runtime logs de Vercel duran horas). El insert es best-effort y no puede romper la respuesta.
    */
   return async (name, args) => {
     const inicio = Date.now();
     const result = await run(name, args);
     const obj = typeof result === "object" && result !== null ? (result as Record<string, unknown>) : null;
     const resumen = obj?.resumen_md;
+    const ms = Date.now() - inicio;
+    const ok = !obj || !("error" in obj);
+    const resumenLen = typeof resumen === "string" ? resumen.length : undefined;
     logger.info("assistant.tool", {
       tool: name,
-      ms: Date.now() - inicio,
-      ok: !obj || !("error" in obj),
-      ...(typeof resumen === "string" ? { resumenLen: resumen.length } : {}),
+      ms,
+      ok,
+      ...(resumenLen !== undefined ? { resumenLen } : {}),
     });
+    if (toolContext.userId) {
+      const { recordAiEvent } = await import("@/lib/ai/events");
+      await recordAiEvent(toolContext.userId, { kind: "tool", name, ms, ok, resumenLen });
+    }
     return result;
   };
 }
