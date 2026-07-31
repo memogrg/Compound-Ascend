@@ -159,16 +159,23 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
     // Perfil no disponible.
   }
 
-  // Deudas activas: total, cuántas y la más cara.
+  // Deudas activas: total POR MONEDA, cuántas y la más cara. Cada deuda tiene su propia moneda
+  // (Debt.currency): sumar los saldos crudos daba un número que no existe — una tarjeta de $2.000
+  // más un préstamo de ₡3.000.000 salían como "3.002.000". Ahora son subtotales, más el total
+  // convertido SOLO si hay tasas para todas las monedas.
   try {
     const { listDebts } = await import("@/modules/control/services/control-service");
+    const { subtotales, convertirTotal } = await import("@/lib/ai/money");
     const debts = (await listDebts()).filter((d) => d.balance > 0);
     if (debts.length > 0) {
       ctx.debtCount = debts.length;
-      ctx.debtTotal = Math.round(debts.reduce((s, d) => s + d.balance, 0));
+      ctx.debtTotals = subtotales(debts.map((d) => ({ monto: Math.round(d.balance), moneda: d.currency })));
+      const convertido = convertirTotal(ctx.debtTotals, ctx.currency, rates);
+      if (convertido) ctx.debtTotalConvertido = convertido;
       const top = debts.reduce((a, b) => ((a.apr ?? 0) >= (b.apr ?? 0) ? a : b));
       ctx.topDebtName = top.name;
       ctx.topDebtApr = top.apr ?? undefined;
+      ctx.topDebtCurrency = top.currency;
     }
   } catch {
     // Control no disponible.

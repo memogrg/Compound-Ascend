@@ -89,9 +89,14 @@ export type FinancialContext = {
   // Fase 5 · context engine: perfil, deudas, metas y vinculables.
   lifeStage?: string;
   debtCount?: number;
-  debtTotal?: number;
+  /** Saldo de las deudas como SUBTOTALES por moneda: cada deuda tiene la suya (Debt.currency). */
+  debtTotals?: Monto[];
+  /** Ese saldo convertido a ctx.currency. Ausente si faltan tasas — entonces no hay total que dar. */
+  debtTotalConvertido?: Monto;
   topDebtName?: string;
   topDebtApr?: number;
+  /** Moneda de la deuda más cara: sin ella, comparar APR entre monedas engaña. */
+  topDebtCurrency?: string;
   goalCount?: number;
   goalsProgressPct?: number;
   /**
@@ -332,14 +337,29 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     for (const m of ctx.macroInsights) facts.push(`Entorno (${m.tone}): ${m.title} — ${m.body}`);
   }
   if (ctx.lifeStage) facts.push(`Etapa de vida: ${ctx.lifeStage}.`);
-  if (ctx.debtCount !== undefined && ctx.debtTotal !== undefined) {
+  if (ctx.debtCount !== undefined && ctx.debtTotals && ctx.debtTotals.length > 0) {
     facts.push(
-      `Deudas activas: ${ctx.debtCount} por un total de ${ctx.debtTotal} ${ctx.currency}.`,
+      `Deudas activas: ${ctx.debtCount} por un total de ${subtotalesStr(ctx.debtTotals)}` +
+        (ctx.debtTotalConvertido
+          ? ` (equivale a ${montoStr(ctx.debtTotalConvertido)} convertido).`
+          : ctx.debtTotals.length > 1
+            ? ". No hay tipo de cambio disponible ahora, así que no hay un total único: son esos subtotales."
+            : "."),
     );
   }
   if (ctx.topDebtName) {
     facts.push(
-      `Deuda más cara: ${ctx.topDebtName}${ctx.topDebtApr !== undefined ? ` (APR ${ctx.topDebtApr}%)` : ""}.`,
+      `Deuda con el APR más alto: ${ctx.topDebtName}${ctx.topDebtApr !== undefined ? ` (APR ${ctx.topDebtApr}%${ctx.topDebtCurrency ? `, en ${ctx.topDebtCurrency}` : ""})` : ""}.`,
+    );
+  }
+  // Caveat SOLO con deudas en más de una moneda: un 20% en colones y un 20% en dólares no cuestan
+  // lo mismo (inflación y tipo de cambio entran en la cuenta), así que "la más cara" por APR
+  // nominal puede engañar. Una frase, no un párrafo (manda la concisión dura).
+  if (ctx.debtTotals && ctx.debtTotals.length > 1) {
+    facts.push(
+      "Tus deudas están en monedas distintas: comparar APR nominales entre monedas NO dice cuál te " +
+        "cuesta más en términos reales (la inflación de cada moneda y el tipo de cambio entran en la " +
+        "cuenta). Si te preguntan cuál atacar primero, decilo en una frase en vez de afirmar de más.",
     );
   }
   if (ctx.goalCount !== undefined) {

@@ -119,7 +119,9 @@ describe("buildContextForUser · paridad de contexto en WhatsApp", () => {
 
     // Deudas y metas normalizadas.
     expect(ctx.debtCount).toBe(2);
-    expect(ctx.debtTotal).toBe(1_500_000);
+    // Las dos deudas están en CRC → un solo subtotal (nunca una suma cruda de monedas distintas).
+    expect(ctx.debtTotals).toEqual([{ monto: 1_500_000, moneda: "CRC" }]);
+    expect(ctx.debtTotalConvertido).toEqual({ monto: 1_500_000, moneda: "CRC" });
     expect(ctx.topDebtName).toBe("Tarjeta"); // la de mayor TAE (45%)
     expect(ctx.topDebtApr).toBe(45);
     expect(ctx.goalCount).toBe(1);

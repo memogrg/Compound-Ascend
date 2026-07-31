@@ -129,7 +129,7 @@ describe("system prompt con vinculables (Fase 5 · context engine)", () => {
     const prompt = buildSystemPrompt({
       currency: "CRC",
       debtCount: 1,
-      debtTotal: 850000,
+      debtTotals: [{ monto: 850000, moneda: "CRC" }],
       topDebtName: "Tarjeta BAC",
       topDebtApr: 38.5,
       goalCount: 1,

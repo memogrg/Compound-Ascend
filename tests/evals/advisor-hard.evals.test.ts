@@ -67,7 +67,7 @@ const CTX: FinancialContext = {
   savingsRatePct: 40,
   // Deuda cara + entorno macro + fondo de emergencia (para el caso deuda vs inversión).
   debtCount: 1,
-  debtTotal: 2_000_000,
+  debtTotals: [{ monto: 2_000_000, moneda: "CRC" }],
   topDebtName: "Tarjeta de crédito",
   topDebtApr: 45,
   inflacionYoYPct: 4.0,

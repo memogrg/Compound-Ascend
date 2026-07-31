@@ -675,3 +675,58 @@ describe("buildSystemPrompt · encuadre/disclaimer UNA vez (firstTurn)", () => {
     expect(prompt).toMatch(/NO los recalcules/i);
   });
 });
+
+// ── Deudas en la moneda de cada deuda (delta 2B) ──
+describe("buildSystemPrompt · deudas con su moneda", () => {
+  const dosMonedas = {
+    currency: "CRC" as const,
+    debtCount: 2,
+    debtTotals: [
+      { monto: 3_000_000, moneda: "CRC" },
+      { monto: 2_000, moneda: "USD" },
+    ],
+    topDebtName: "Tarjeta",
+    topDebtApr: 45,
+    topDebtCurrency: "USD",
+  };
+
+  it("el total va como subtotal por moneda; NUNCA la suma cruda que no existe", () => {
+    const prompt = buildSystemPrompt(dosMonedas);
+    expect(prompt).toContain("3000000 CRC");
+    expect(prompt).toContain("2000 USD");
+    expect(prompt).not.toContain("3002000"); // el número que salía antes
+  });
+
+  it("con tipo de cambio, el total convertido aparece marcado como conversión", () => {
+    const prompt = buildSystemPrompt({ ...dosMonedas, debtTotalConvertido: { monto: 4_000_000, moneda: "CRC" } });
+    expect(prompt).toMatch(/equivale a 4000000 CRC convertido/);
+  });
+
+  it("sin tipo de cambio lo dice, en vez de inventar un total único", () => {
+    expect(buildSystemPrompt(dosMonedas)).toMatch(/No hay tipo de cambio disponible/i);
+  });
+
+  it("la deuda de mayor APR se nombra con su moneda", () => {
+    expect(buildSystemPrompt(dosMonedas)).toContain("APR 45%, en USD");
+  });
+
+  it("con DOS monedas advierte que comparar APR nominales no dice cuál cuesta más", () => {
+    const prompt = buildSystemPrompt(dosMonedas);
+    expect(prompt).toMatch(/comparar APR nominales entre monedas NO dice cuál/i);
+    expect(prompt).toMatch(/inflación de cada moneda y el tipo de cambio/i);
+  });
+
+  it("con UNA sola moneda no aparece ese caveat (no se agrega ruido)", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      debtCount: 1,
+      debtTotals: [{ monto: 850_000, moneda: "CRC" }],
+      topDebtName: "Tarjeta BAC",
+      topDebtApr: 38.5,
+      topDebtCurrency: "CRC",
+    });
+    expect(prompt).toContain("850000 CRC");
+    expect(prompt).not.toMatch(/comparar APR nominales/i);
+    expect(prompt).not.toMatch(/No hay tipo de cambio disponible/i);
+  });
+});
