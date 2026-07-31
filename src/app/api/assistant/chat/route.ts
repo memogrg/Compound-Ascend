@@ -16,7 +16,7 @@ import { matchIntent } from "@/lib/ai/router";
 import { buildFinancialContext } from "@/lib/ai/context-engine";
 import { scopeForIntent, type ToolNeed } from "@/lib/ai/lazy-context";
 import { listDebts, listGoals } from "@/modules/control";
-import { getPrimaryCurrency } from "@/modules/financial-base";
+import { getDisplayCurrency } from "@/modules/financial-base";
 import { getPatrimonioReport } from "@/modules/wealth/services/patrimonio-service";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
@@ -42,17 +42,19 @@ export const maxDuration = 60;
  */
 async function buildToolContext(need: ToolNeed): Promise<ToolContext | undefined> {
   try {
-    const primary = await getPrimaryCurrency();
+    // Moneda de VISUALIZACIÓN (la que ve en la app; cookie). Todo el toolContext se normaliza a ella,
+    // igual que el FinancialContext → el asesor nunca mezcla monedas.
+    const display = await getDisplayCurrency();
     let rates: Record<string, number> | null = null;
     try {
       rates = await getFxRates();
     } catch {
       rates = null;
     }
-    const toolContext: ToolContext = { currency: primary, fxUnavailable: !rates, debts: [] };
+    const toolContext: ToolContext = { currency: display, fxUnavailable: !rates, debts: [] };
     if (need.debts) {
       try {
-        toolContext.debts = normalizeDebtsForTool(await listDebts(), primary, rates);
+        toolContext.debts = normalizeDebtsForTool(await listDebts(), display, rates);
       } catch {
         toolContext.debts = [];
       }
@@ -60,12 +62,12 @@ async function buildToolContext(need: ToolNeed): Promise<ToolContext | undefined
     if (need.numbers) {
       try {
         const pat = await getPatrimonioReport();
-        const toPrimary = (v: number): number =>
-          pat.currency === primary ? v : rates ? convertCurrency(v, pat.currency, primary, rates) : NaN;
-        const seguridad = toPrimary(pat.report.numeroDeSeguridad);
-        const independencia = toPrimary(pat.report.numeroDeIndependencia);
-        const invertible = toPrimary(pat.report.investableWealth);
-        const libertad = pat.report.numeroDeLibertad != null ? toPrimary(pat.report.numeroDeLibertad) : null;
+        const toDisplay = (v: number): number =>
+          pat.currency === display ? v : rates ? convertCurrency(v, pat.currency, display, rates) : NaN;
+        const seguridad = toDisplay(pat.report.numeroDeSeguridad);
+        const independencia = toDisplay(pat.report.numeroDeIndependencia);
+        const invertible = toDisplay(pat.report.investableWealth);
+        const libertad = pat.report.numeroDeLibertad != null ? toDisplay(pat.report.numeroDeLibertad) : null;
         if (Number.isFinite(seguridad)) toolContext.securityNumber = seguridad;
         if (Number.isFinite(independencia)) toolContext.independenceNumber = independencia;
         if (libertad != null && Number.isFinite(libertad)) toolContext.libertyNumber = libertad;
@@ -78,9 +80,9 @@ async function buildToolContext(need: ToolNeed): Promise<ToolContext | undefined
       try {
         const goals = await listGoals();
         const mapped = goals
-          .filter((g) => g.targetAmount > 0 && (g.currency === primary || !!rates))
+          .filter((g) => g.targetAmount > 0 && (g.currency === display || !!rates))
           .map((g) => {
-            const conv = (n: number) => (g.currency === primary ? n : convertCurrency(n, g.currency, primary, rates!));
+            const conv = (n: number) => (g.currency === display ? n : convertCurrency(n, g.currency, display, rates!));
             return {
               nombre: g.name,
               objetivo: conv(g.targetAmount),
@@ -131,7 +133,7 @@ export async function POST(req: Request) {
       const scope = scopeForIntent(matched.intent, matched.params);
       const liteCtx =
         scope.context === null
-          ? { currency: await getPrimaryCurrency().catch(() => "CRC") }
+          ? { currency: await getDisplayCurrency().catch(() => "CRC") }
           : await buildFinancialContext(scope.context);
       const liteTool = await buildToolContext(scope.tool);
       if (liteTool) {
@@ -153,7 +155,7 @@ export async function POST(req: Request) {
         { role: "user", content: userMessage },
       ];
       // Herramientas (function-calling) sólo con sesión; deudas/metas/números normalizados a la moneda
-      // PRINCIPAL. Best-effort: si falla, se sigue sin herramientas.
+      // de VISUALIZACIÓN. Best-effort: si falla, se sigue sin herramientas.
       const toolContext = user ? await buildToolContext({ debts: true, goals: true, numbers: true }) : undefined;
       result = await financeChatWithTools(messages, ctx, toolContext);
     }

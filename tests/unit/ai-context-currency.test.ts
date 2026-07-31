@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// El contexto del asesor debe usar la moneda PRINCIPAL del usuario, NO el override
-// de visualización (cookie ca_display_currency). Con primary=CRC y display=USD,
-// buildFinancialContext debe dar ctx.currency='CRC' y los montos en CRC.
+// El contexto del asesor usa la moneda de VISUALIZACIÓN del usuario (cookie ca_display_currency;
+// fallback a la principal sin sesión). Con primary=CRC y display=USD, buildFinancialContext debe dar
+// ctx.currency='USD' y los montos en USD (getBaseSummary sin AuthContext → indicadores ya en display).
 
 vi.mock("server-only", () => ({}));
 
@@ -58,20 +58,20 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("buildFinancialContext · moneda principal (no display)", () => {
-  it("primary=CRC + display=USD → ctx.currency='CRC' y montos en CRC", async () => {
+describe("buildFinancialContext · moneda de visualización (no principal)", () => {
+  it("primary=CRC + display=USD → ctx.currency='USD' y montos en USD (getBaseSummary sin AuthContext)", async () => {
     const ctx = await buildFinancialContext();
 
-    expect(ctx.currency).toBe("CRC"); // principal, NO el override USD
-    expect(ctx.incomeMonthly).toBe(1_000_000);
+    expect(ctx.currency).toBe("USD"); // la de VISUALIZACIÓN, no la principal
+    expect(ctx.incomeMonthly).toBe(1_000_000); // getBaseSummary sin ctx → ya viene en display
     expect(ctx.expenseMonthly).toBe(600_000);
     expect(ctx.freeCashflow).toBe(400_000);
 
-    // El asesor NO consultó la moneda de visualización.
-    expect(getDisplayCurrency).not.toHaveBeenCalled();
-    // getBaseSummary recibió un AuthContext (con userId) → normaliza a la primaria.
+    // Consultó la moneda de VISUALIZACIÓN para ctx.currency.
+    expect(getDisplayCurrency).toHaveBeenCalled();
+    // getBaseSummary se llamó SIN AuthContext → sus indicadores ya salen en la moneda de display.
     expect(getBaseSummary).toHaveBeenCalledTimes(1);
     const arg = getBaseSummary.mock.calls[0]![0] as { userId?: string } | undefined;
-    expect(arg?.userId).toBe("u1");
+    expect(arg).toBeUndefined();
   });
 });
