@@ -140,3 +140,49 @@ describe("buildFinancialContext · el IPC sigue la moneda PRINCIPAL, no la de vi
     expect(ctx.inflacionYoYPct).toBeUndefined();
   });
 });
+
+describe("buildFinancialContext · los agregados convertidos se marcan como tales", () => {
+  it("dos monedas de origen → baseConvertido true", async () => {
+    monedasVistas = ["CRC", "USD"];
+    expect((await buildFinancialContext()).baseConvertido).toBe(true);
+  });
+
+  it("una sola moneda DISTINTA de la de visualización → también es una conversión", async () => {
+    monedasVistas = ["CRC"]; // display es USD
+    expect((await buildFinancialContext()).baseConvertido).toBe(true);
+  });
+
+  it("una sola moneda IGUAL a la de visualización → false (no hubo conversión, no se agrega ruido)", async () => {
+    display = "CRC";
+    monedasVistas = ["CRC"];
+    expect((await buildFinancialContext()).baseConvertido).toBe(false);
+  });
+
+  it("sin el dato → undefined (no se asume)", async () => {
+    monedasVistas = [];
+    expect((await buildFinancialContext()).baseConvertido).toBeUndefined();
+  });
+
+  it("defensa con primary≠display y tasas → convertido, con la moneda de origen", async () => {
+    const ctx = await buildFinancialContext();
+    expect(ctx.defenseFunds?.convertido).toBe(true);
+    expect(ctx.defenseFunds?.monedaOrigen).toBe("CRC");
+    expect(ctx.defenseFunds?.currency).toBe("USD");
+  });
+
+  it("defensa SIN tasas → no se marca convertido y los montos quedan en su moneda de origen", async () => {
+    hayTasas = false;
+    const ctx = await buildFinancialContext();
+    expect(ctx.defenseFunds?.convertido).toBe(false);
+    // toDisplay no pudo convertir: los montos siguen en CRC, así que se rotulan CRC (no USD).
+    expect(ctx.defenseFunds?.currency).toBe("CRC");
+    expect(ctx.defenseFunds?.emergency.actual).toBe(500_000);
+  });
+
+  it("primary = display → defensa sin conversión que declarar", async () => {
+    display = "CRC";
+    const ctx = await buildFinancialContext();
+    expect(ctx.defenseFunds?.convertido).toBe(false);
+    expect(ctx.defenseFunds?.monedaOrigen).toBeUndefined();
+  });
+});

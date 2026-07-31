@@ -108,6 +108,12 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
     ctx.savingsRatePct = Math.round(base.indicators.savingsRate * 100);
     // Fuentes de ingreso activas (para señalar concentración si es una sola).
     ctx.incomeSourceCount = base.incomes.filter((i) => i.amountMonthly > 0).length;
+    // ¿Ingreso/gasto/flujo son cifras CONVERTIDAS? Sí si hubo más de una moneda de origen, o si la
+    // única no es la de visualización. Sin el dato → undefined (no se asume nada).
+    const vistas = base.monedasVistas;
+    if (vistas && vistas.length > 0) {
+      ctx.baseConvertido = vistas.length > 1 || vistas[0] !== display;
+    }
   } catch {
     // Sin base: contexto mínimo.
   }
@@ -534,11 +540,22 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
       aporteRecomendado: toDisplay(f.recommendedMonthly),
       cubierto: f.covered,
     });
+    // ¿toDisplay convirtió de verdad? Ojo: cuando el FX falla, `rates` queda como {} (el catch del
+    // bloque base), truthy pero inservible — y convertCurrency devuelve el monto SIN convertir. Así
+    // que no alcanza con "hay rates": tiene que existir la tasa de AMBAS monedas. Si no, los montos
+    // siguen en la principal → no se marcan como convertidos y se rotulan con SU moneda, no con la
+    // de display.
+    const distinta = !!primaryCurrency && primaryCurrency !== ctx.currency;
+    const puedeConvertir = !!primaryCurrency && !!rates?.[primaryCurrency] && !!rates?.[ctx.currency];
+    const huboConversion = distinta && puedeConvertir;
+    const sinConvertir = distinta && !puedeConvertir;
     ctx.defenseFunds = {
-      currency: ctx.currency,
+      currency: sinConvertir && primaryCurrency ? primaryCurrency : ctx.currency,
       activeFund: d.activeFund,
       emergency: fund(d.emergency, d.emergencyRegistered),
       paz: fund(d.peace, d.peaceRegistered),
+      convertido: huboConversion,
+      ...(huboConversion ? { monedaOrigen: primaryCurrency } : {}),
     };
     // Supersede: si el fondo de emergencia está registrado, hasEmergencyFund refleja lo REAL
     // (cubierto → "si"; parcial → "construyendo"), no el auto-reporte viejo. Así el guardrail y las

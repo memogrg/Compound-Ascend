@@ -200,6 +200,14 @@ export type BaseSummary = {
   budgetExpense?: number;
   realExpense?: number;
   variances?: { income: number; expense: number };
+  /**
+   * Monedas DISTINTAS que alimentaron estos indicadores (ítems de ingreso/gasto y, si el bloque V2
+   * corrió, las transacciones del mes). Ordenadas, sin duplicados. Los totales de arriba están
+   * CONVERTIDOS a la moneda de visualización: esto dice de dónde vienen. Una sola moneda igual a
+   * esa = no hubo conversión. Lo consume el contexto del asesor para decir "convertido" en vez de
+   * presentar el agregado como una cifra nativa.
+   */
+  monedasVistas: string[];
 };
 
 /** Carga ítems y calcula los indicadores de la base financiera. */
@@ -222,16 +230,24 @@ async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
     amountMonthly: convertCurrency(e.amountMonthly, e.currency, primary, rates),
   }));
 
+  // Monedas de origen de los ítems que alimentan los indicadores (antes de convertir).
+  const monedas = new Set<string>();
+  for (const i of incomes) if (i.currency) monedas.add(i.currency);
+  for (const e of expenses) if (e.currency) monedas.add(e.currency);
+
   const summary: BaseSummary = {
     indicators: computeBaseIndicators(incForEngine, expForEngine),
     incomes,
     expenses,
+    monedasVistas: [...monedas].sort(),
   };
 
   // V2 (best-effort, no bloquea ni rompe a los 5 consumidores si falla).
   try {
     const v2 = await computeV2Totals(primary, rates);
     Object.assign(summary, v2);
+    // Las monedas de las transacciones del mes también entraron en realIncome/realExpense.
+    summary.monedasVistas = [...new Set([...summary.monedasVistas, ...v2.monedasVistas])].sort();
   } catch {
     // Sin presupuesto/transacciones aún: los campos V2 quedan undefined.
   }
@@ -244,7 +260,7 @@ async function computeV2Totals(
   displayCurrency: string,
   rates: Record<string, number>,
 ): Promise<
-  Pick<BaseSummary, "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances">
+  Pick<BaseSummary, "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances" | "monedasVistas">
 > {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -271,13 +287,17 @@ async function computeV2Totals(
   let budgetExpense = 0;
   let realIncome = 0;
   let realExpense = 0;
+  // Misma pasada que ya recorre presupuesto y transacciones: sin query ni loop extra.
+  const monedas = new Set<string>();
   for (const r of bi.data ?? []) {
     const v = convertCurrency(Number(r.amount), r.currency, displayCurrency, rates);
+    if (r.currency) monedas.add(r.currency);
     if (r.type === "income") budgetIncome += v;
     else budgetExpense += v;
   }
   for (const r of tx.data ?? []) {
     const v = convertCurrency(Number(r.amount), r.currency, displayCurrency, rates);
+    if (r.currency) monedas.add(r.currency);
     if (r.kind === "ingreso") realIncome += v;
     // Off-budget (consumo de frasco): fuera del gasto real en la varianza presup-vs-real.
     else if (r.counts_in_budget !== false) realExpense += v;
@@ -288,6 +308,7 @@ async function computeV2Totals(
     realIncome,
     budgetExpense,
     realExpense,
+    monedasVistas: [...monedas].sort(),
     variances: {
       income: budgetIncome > 0 ? (realIncome - budgetIncome) / budgetIncome : 0,
       expense: budgetExpense > 0 ? (realExpense - budgetExpense) / budgetExpense : 0,
