@@ -45,7 +45,7 @@ const CTX: FinancialContext = {
   currency: "CRC",
   name: "Memo",
   netWorth: 105_040_035,
-  portfolioValue: 61_581_512,
+  portfolioValue: [{ monto: 61_581_512, moneda: "CRC" }],
   investableWealth: 13_000_000,
   numeroDeLibertad: 290_400_000,
   incomeMonthly: 3_500_000,
@@ -190,7 +190,7 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
     expect(reply).toBeTypeOf("string");
 
     const noAccess = norm(reply).includes("no tengo acceso");
-    const citesPortfolio = citesAmount(reply, CTX.portfolioValue!);
+    const citesPortfolio = citesAmount(reply, CTX.portfolioValue![0]!.monto);
     const passed = !noAccess && citesPortfolio;
     record("valor en inversiones", passed, reply);
     expect(passed).toBe(true);
@@ -205,7 +205,7 @@ describe.skipIf(!RUN_LIVE)("evals VIVOS · asesor real (RUN_LIVE_EVALS=1)", () =
     // Debe anclar el arranque en una cifra del contexto: "lo que tengo invertido" es el
     // portafolio; aceptamos también invertible o patrimonio neto. Lo que NO vale es inventar.
     const startsFromContext =
-      citesAmount(reply, CTX.portfolioValue!) ||
+      citesAmount(reply, CTX.portfolioValue![0]!.monto) ||
       citesAmount(reply, CTX.investableWealth!) ||
       citesAmount(reply, CTX.netWorth!);
     const passed = startsFromContext;

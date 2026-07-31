@@ -46,7 +46,7 @@ const CTX: FinancialContext = {
   currency: "CRC",
   name: "Memo",
   netWorth: 105_040_035,
-  portfolioValue: 61_581_512,
+  portfolioValue: [{ monto: 61_581_512, moneda: "CRC" }],
   investableWealth: 13_000_000,
   numeroDeLibertad: 290_400_000,
   // Desglose del patrimonio (invertido / líquido / otros) para el caso "cuánto invertido / ahorros".

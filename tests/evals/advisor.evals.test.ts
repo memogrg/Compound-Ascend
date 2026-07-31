@@ -72,11 +72,13 @@ const ask = (content: string): ChatMessage[] => [{ role: "user", content }];
 const SCENARIOS: Scenario[] = [
   // 1) Moneda principal en el system prompt.
   {
-    name: "moneda principal: ctx.currency='CRC' → system incluye 'Moneda principal: CRC.'",
+    name: "moneda de visualización: ctx.currency='CRC' → el system la nombra como la que el usuario VE",
     messages: ask("¿cómo voy este mes?"),
     script: { reply: "Vas bien." },
     assert: ({ provider }) => {
-      expect(provider.lastSystem).toContain("Moneda principal: CRC.");
+      expect(provider.lastSystem).toContain("Moneda de VISUALIZACIÓN (la que el usuario ve en la app): CRC");
+      // Cada monto viaja con SU moneda: ya no se promete que todo venga en una sola.
+      expect(provider.lastSystem).toContain("Cada monto de tu contexto viene con SU moneda");
     },
   },
 

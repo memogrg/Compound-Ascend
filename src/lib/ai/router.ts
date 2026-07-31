@@ -740,19 +740,29 @@ export function answerFromContext(
     return say(`Aportás ~${money(metas)} al mes a tus metas de ahorro.`);
   }
 
-  // INVERSIONES — resumen: invertido, valor actual y ganancia/pérdida (todo en moneda principal).
+  // INVERSIONES — resumen: invertido, valor actual y ganancia/pérdida. Cada cifra va con SU moneda
+  // (los activos cotizados se leen en USD aunque la app esté en colones): son SUBTOTALES por moneda,
+  // nunca un total que sume monedas distintas. El total convertido solo si el contexto lo trae.
   if (intent === "resumen_inversiones") {
-    const inv = ctx?.investmentInvested;
-    const val = ctx?.investmentValue;
-    const pl = ctx?.investmentPL;
-    if (typeof val !== "number" && typeof inv !== "number") return null;
+    const inv = ctx?.investmentInvested ?? [];
+    const val = ctx?.investmentValue ?? [];
+    const pl = ctx?.investmentPL ?? [];
+    if (val.length === 0 && inv.length === 0) return null;
+    const subs = (ms: { monto: number; moneda: string }[]) =>
+      ms.map((m) => formatMoney(m.monto, m.moneda)).join(" + ");
     const parts: string[] = [];
-    if (typeof val === "number") parts.push(`Tu portafolio vale ${money(val)}`);
-    if (typeof inv === "number") parts.push(`invertiste ${money(inv)}`);
-    if (typeof pl === "number") {
-      parts.push(`${pl >= 0 ? "ganás" : "perdés"} ${money(Math.abs(pl))} sobre lo invertido`);
+    if (val.length) parts.push(`Tu portafolio vale ${subs(val)}`);
+    if (inv.length) parts.push(`invertiste ${subs(inv)}`);
+    if (pl.length) {
+      const detalle = pl
+        .map((m) => `${m.monto >= 0 ? "+" : "−"}${formatMoney(Math.abs(m.monto), m.moneda)}`)
+        .join(" ");
+      parts.push(`tu resultado sobre lo invertido es ${detalle}`);
     }
-    return say(parts.join("; ") + ".");
+    const conv = ctx?.portfolioValueConvertido;
+    const extra =
+      conv && val.length > 1 ? ` En ${conv.moneda}, el valor total equivale a ${formatMoney(conv.monto, conv.moneda)}.` : "";
+    return say(parts.join("; ") + "." + extra);
   }
 
   // DCA mensual (aporte recurrente): compromisoDesglose.dca.

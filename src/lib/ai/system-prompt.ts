@@ -7,6 +7,8 @@
 
 import type { Trajectory } from "@/lib/ai/trajectory";
 import { formatRanking } from "@/modules/personal-profile/engine/ranking";
+import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
+import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
 
 export type FinancialContext = {
   name?: string;
@@ -32,29 +34,25 @@ export type FinancialContext = {
   savingsRatePct?: number;
   netWorth?: number;
   topConcern?: string;
-  portfolioValue?: number;
+  /** Valor del portafolio como SUBTOTALES por moneda (los cotizados en USD, el resto en la suya). */
+  portfolioValue?: Monto[];
+  /** Ese valor convertido a ctx.currency. Ausente si faltan tasas — entonces no hay total que dar. */
+  portfolioValueConvertido?: Monto;
   portfolioReturnPct?: number;
   topAssetClass?: string;
-  /** Inversiones POR POSICIÓN (motor de analytics, cifras REALES en moneda principal). Compacto:
-   *  top posiciones por valor. Con esto el asesor responde "si vendo X, ¿cuánto gano vs lo
-   *  invertido?" con el número real — nunca inventado. `holdingsMoreCount` = posiciones no listadas. */
-  holdings?: {
-    symbol: string | null;
-    name: string;
-    assetType: string;
-    quantity: number;
-    invested: number; // costo de compra (costBasis) en moneda principal
-    value: number; // valor actual (currentValue) en moneda principal
-    price: number | null; // precio actual por unidad; null si no se pudo cotizar
-    pl: number; // ganancia/pérdida (profitLoss) en moneda principal
-    plPct: number; // rendimiento (0-1)
-    currency: string; // moneda NATIVA de la posición (referencia; los montos van en principal)
-    priceUnavailable: boolean;
-  }[];
+  /** Inversiones POR POSICIÓN (motor de analytics, cifras REALES). Compacto: top posiciones por
+   *  valor. Con esto el asesor responde "si vendo X, ¿cuánto gano vs lo invertido?" con el número
+   *  real — nunca inventado. `holdingsMoreCount` = posiciones no listadas.
+   *  CADA FILA VA EN SU MONEDA (`monedaFila`): los activos cotizados se leen en USD aunque la app
+   *  esté en colones; los no cotizados, en la moneda en que se registraron. */
+  holdings?: HoldingRow[];
   holdingsMoreCount?: number;
-  investmentInvested?: number; // total invertido (costo base) en moneda principal
-  investmentValue?: number; // valor total de las inversiones (costo + P/L) en moneda principal
-  investmentPL?: number; // ganancia/pérdida total en moneda principal
+  // Agregados de inversiones: SUBTOTALES por moneda (no un total aplanado que mezclaría monedas).
+  investmentInvested?: Monto[];
+  investmentValue?: Monto[];
+  investmentPL?: Monto[];
+  /** Valor total en la moneda PRIMARIA del motor: base homogénea para porcentajes/participaciones. */
+  investmentValueBase?: Monto;
   // Marco Patrimonial (motor patrimonio-engine). Best-effort: si la lectura falla,
   // no aparecen y el chat no se degrada.
   indicePatrimonial?: number; // 0-100
@@ -185,8 +183,8 @@ export type FinancialContext = {
 
 export function buildSystemPrompt(ctx: FinancialContext): string {
   const facts: string[] = [
-    `Moneda principal: ${ctx.currency}.`,
-    `TODOS los montos de tu contexto YA vienen en ${ctx.currency}, convertidos por el sistema. NUNCA los conviertas a otra moneda, NUNCA cambies el símbolo ni agregues equivalencias "(~…)": reportá la cifra tal cual, en ${ctx.currency}.`,
+    `Moneda de VISUALIZACIÓN (la que el usuario ve en la app): ${ctx.currency}. Es la moneda por defecto para hablar de su día a día, no la moneda de todo su contexto.`,
+    `Cada monto de tu contexto viene con SU moneda escrita al lado. Usá esa moneda, tal cual. NUNCA conviertas un monto a otra moneda, NUNCA cambies su código ni agregues equivalencias "(~…)". Si tenés que sumar montos de monedas distintas, NO inventes un total: dá el subtotal de cada moneda por separado. Cuando el contexto ya trae un total convertido, viene marcado como convertido — podés usarlo diciendo que es una conversión.`,
   ];
   if (ctx.name) facts.push(`El usuario se llama ${ctx.name}.`);
   if (ctx.householdShared)
@@ -227,30 +225,40 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       facts.push(`Trayectoria: tu patrimonio neto ${trend(t.netWorth.dir, `~${Math.abs(t.netWorth.pct)}%`)}.`);
   }
   if (ctx.topConcern) facts.push(`Principal preocupación: ${ctx.topConcern}.`);
-  if (ctx.portfolioValue !== undefined)
-    facts.push(`Valor de mercado del portafolio: ${ctx.portfolioValue} ${ctx.currency}.`);
+  if (ctx.portfolioValue && ctx.portfolioValue.length > 0)
+    facts.push(
+      `Valor de mercado del portafolio: ${subtotalesStr(ctx.portfolioValue)}` +
+        (ctx.portfolioValueConvertido
+          ? ` (equivale a ${montoStr(ctx.portfolioValueConvertido)} convertido).`
+          : ". No hay tipo de cambio disponible ahora, así que no hay un total único: son esos subtotales."),
+    );
   if (ctx.portfolioReturnPct !== undefined)
     facts.push(`Rendimiento del portafolio: ${(ctx.portfolioReturnPct * 100).toFixed(1)}%.`);
   if (ctx.topAssetClass) facts.push(`Clase de activo principal: ${ctx.topAssetClass}.`);
-  // Inversiones POR POSICIÓN (cifras reales del motor, en moneda principal). El asesor calcula la
-  // ganancia al vender con estos números — NO los inventa.
+  // Inversiones POR POSICIÓN (cifras reales del motor). El asesor calcula la ganancia al vender con
+  // estos números — NO los inventa. Cada fila en la moneda en que ese activo COTIZA.
   if (ctx.holdings && ctx.holdings.length > 0) {
-    if (ctx.investmentValue !== undefined)
+    if (ctx.investmentValue && ctx.investmentValue.length > 0)
       facts.push(
-        `Inversiones: total invertido ${ctx.investmentInvested} ${ctx.currency}, valor actual ${ctx.investmentValue} ${ctx.currency}` +
-          (ctx.investmentPL !== undefined
-            ? `, ganancia/pérdida ${ctx.investmentPL >= 0 ? "+" : ""}${ctx.investmentPL} ${ctx.currency}.`
-            : "."),
+        `Inversiones: total invertido ${subtotalesStr(ctx.investmentInvested ?? [])}, valor actual ${subtotalesStr(ctx.investmentValue)}` +
+          (ctx.investmentPL && ctx.investmentPL.length > 0
+            ? `, ganancia/pérdida ${subtotalesStr(ctx.investmentPL)}.`
+            : ".") +
+          (ctx.portfolioValueConvertido
+            ? ` El valor actual equivale a ${montoStr(ctx.portfolioValueConvertido)} convertido.`
+            : ""),
       );
     const lines = ctx.holdings.map((h) => {
       const tag = h.symbol ? `${h.symbol}${h.name && h.name !== h.symbol ? ` (${h.name})` : ""}` : h.name;
       if (h.priceUnavailable || h.price === null) {
-        return `  · ${tag}: ${h.quantity} uds, invertido ${h.invested} ${ctx.currency} (precio actual no disponible).`;
+        return `  · ${tag}: ${h.quantity} uds, invertido ${h.invested} ${h.monedaFila} (precio actual no disponible).`;
       }
       const sign = h.pl >= 0 ? "+" : "";
-      return `  · ${tag}: ${h.quantity} uds · invertido ${h.invested} · vale ${h.value} (precio ${h.price}) · P/L ${sign}${h.pl} (${sign}${(h.plPct * 100).toFixed(1)}%) [${ctx.currency}].`;
+      return `  · ${tag}: ${h.quantity} uds · invertido ${h.invested} · vale ${h.value} (precio ${h.price}) · P/L ${sign}${h.pl} (${sign}${(h.plPct * 100).toFixed(1)}%) [${h.monedaFila}].`;
     });
-    facts.push(`Tus posiciones${ctx.holdingsMoreCount ? ` (top ${ctx.holdings.length}; +${ctx.holdingsMoreCount} más)` : ""}:\n${lines.join("\n")}`);
+    facts.push(
+      `Tus posiciones${ctx.holdingsMoreCount ? ` (top ${ctx.holdings.length}; +${ctx.holdingsMoreCount} más)` : ""} — cada una en la moneda en que cotiza:\n${lines.join("\n")}`,
+    );
   }
   // Marco Patrimonial: cada línea solo si el campo existe (best-effort).
   if (ctx.indicePatrimonial !== undefined)
