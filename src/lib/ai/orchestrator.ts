@@ -208,7 +208,7 @@ const SURPLUS_TIMEOUT_MS = 6_000;
  */
 export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
   const meta = { currency: toolContext.currency, fxUnavailable: toolContext.fxUnavailable };
-  return async (name, args) => {
+  const run: AiToolExecutor = async (name, args) => {
     if (name === "simular_pago_deuda") {
       return simulateDebtPayoff(toolContext.debts, args, new Date(), meta);
     }
@@ -313,6 +313,26 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       }
     }
     return { error: `herramienta no disponible: ${name}` };
+  };
+
+  /**
+   * OBSERVABILIDAD: qué herramienta se invocó, cuánto tardó y si devolvió error. Sin esto no hay
+   * forma de saber si una tool nueva se usa ni cuánto cuesta — se estaba decidiendo a ojo. Cuando
+   * la tool devuelve un bloque ya redactado (`resumen_md`), se loguea su LARGO: comparado con el
+   * largo del reply final (assistant.chat.lane) dice si el modelo lo pasó entero o lo recortó.
+   */
+  return async (name, args) => {
+    const inicio = Date.now();
+    const result = await run(name, args);
+    const obj = typeof result === "object" && result !== null ? (result as Record<string, unknown>) : null;
+    const resumen = obj?.resumen_md;
+    logger.info("assistant.tool", {
+      tool: name,
+      ms: Date.now() - inicio,
+      ok: !obj || !("error" in obj),
+      ...(typeof resumen === "string" ? { resumenLen: resumen.length } : {}),
+    });
+    return result;
   };
 }
 
