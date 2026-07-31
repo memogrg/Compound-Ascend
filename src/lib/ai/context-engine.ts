@@ -48,6 +48,9 @@ export type ContextScope = {
 };
 export const FULL_CONTEXT_SCOPE: ContextScope = { patrimonio: true, portfolio: true, defense: true, flavor: true };
 
+/** Tope de porciones de concentración listadas en el prompt (el HHI y los % son sobre todas). */
+const MAX_CONCENTRATION_SLICES = 8;
+
 export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_SCOPE): Promise<FinancialContext> {
   const user = await getUser();
   const name = (user?.user_metadata?.display_name as string | undefined) ?? undefined;
@@ -268,6 +271,32 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
       const topSlice = Object.values(a.allocation).reduce((x, y) => (x.value > y.value ? x : y));
       ctx.portfolioReturnPct = a.totalReturnPct; // % no se convierte
       ctx.topAssetClass = topSlice.label;
+      // CONCENTRACIÓN CANÓNICA: la del motor, sobre TODAS las posiciones y en la moneda del motor
+      // (los % no se convierten; los montos van etiquetados con esa base). El informe la CONSUME,
+      // no la recalcula — una sola definición en el repo. Va como hecho, no como tool.
+      const { concentrations } = await import("@/modules/wealth/engine/portfolio-engine");
+      const conc = concentrations(a.holdingsWithPerformance ?? []);
+      const slice = (s: { label: string; value: number; pct: number }) => ({
+        label: s.label,
+        valor: Math.round(s.value),
+        pct: s.pct,
+      });
+      // El detalle por posición se acota (como mapHoldingsForContext) para no inflar el prompt; el
+      // HHI y los porcentajes se calculan sobre TODAS, así que no pierden nada.
+      const todas = conc.byAsset;
+      const listadas = todas.slice(0, MAX_CONCENTRATION_SLICES);
+      ctx.concentracion = {
+        moneda: monedaPrimaria,
+        porPosicion: listadas.map(slice),
+        porMoneda: conc.byCurrency.map(slice),
+        porRegion: conc.byRegion.map(slice),
+        porTipo: Object.values(a.allocation).filter((s) => s.value > 0).map(slice),
+        top1Pct: todas[0]?.pct ?? 0,
+        top3Pct: todas.slice(0, 3).reduce((acc, s) => acc + s.pct, 0),
+        hhi: todas.reduce((acc, s) => acc + s.pct ** 2, 0),
+        slicesOmitidas: Math.max(0, todas.length - listadas.length),
+      };
+      if (typeof a.growthScore === "number") ctx.growthScore = a.growthScore;
     }
     // Detalle por posición (COMPACTO: top-N por valor, resto en holdingsMoreCount). Mapeo PURO: cada
     // fila queda en la moneda en que ese activo COTIZA (USD los cotizados), no aplanada a display.

@@ -10,6 +10,9 @@ import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
 import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
 
+/** Una porción de concentración: etiqueta, monto en la moneda base y peso (0-1). */
+export type ConcentracionSlice = { label: string; valor: number; pct: number };
+
 export type FinancialContext = {
   name?: string;
   currency: string;
@@ -59,6 +62,28 @@ export type FinancialContext = {
   investmentPL?: Monto[];
   /** Valor total en la moneda PRIMARIA del motor: base homogénea para porcentajes/participaciones. */
   investmentValueBase?: Monto;
+  /**
+   * CONCENTRACIÓN del portafolio — la definición CANÓNICA, del motor (concentrations()), sobre
+   * TODAS las posiciones y en la moneda base. Es la única del repo: el informe la consume, no la
+   * recalcula. Va como HECHO del contexto y no como herramienta a propósito: el asesor la necesita
+   * cada vez que se habla de inversiones, y un hecho cuesta tokens de entrada mientras que una tool
+   * cuesta una iteración entera del tool-loop.
+   */
+  concentracion?: {
+    /** Moneda de los montos de las slices (la base del motor). Los % no tienen moneda. */
+    moneda: string;
+    porPosicion: ConcentracionSlice[];
+    porMoneda: ConcentracionSlice[]; // moneda de EXPOSICIÓN (donde cotiza), no la registrada
+    porRegion: ConcentracionSlice[];
+    porTipo: ConcentracionSlice[]; // buckets del motor (ETF / acciones / cripto / efectivo / otros)
+    top1Pct: number; // 0-1
+    top3Pct: number; // 0-1
+    hhi: number; // Herfindahl-Hirschman sobre TODAS las posiciones (0-1)
+    /** Slices que no entraron en el top-N listado (el HHI y los % igual son sobre todas). */
+    slicesOmitidas: number;
+  };
+  /** Score de crecimiento del portafolio (0-100, del motor). */
+  growthScore?: number;
   // Marco Patrimonial (motor patrimonio-engine). Best-effort: si la lectura falla,
   // no aparecen y el chat no se degrada.
   indicePatrimonial?: number; // 0-100
@@ -277,6 +302,27 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       `Tus posiciones${ctx.holdingsMoreCount ? ` (top ${ctx.holdings.length}; +${ctx.holdingsMoreCount} más)` : ""} — cada una en la moneda en que cotiza:\n${lines.join("\n")}`,
     );
   }
+  // CONCENTRACIÓN (definición canónica del motor, sobre TODAS las posiciones). Una línea por
+  // dimensión: son hechos para responder "¿estoy concentrado?", no un párrafo de análisis.
+  if (ctx.concentracion) {
+    const c = ctx.concentracion;
+    const slices = (xs: ConcentracionSlice[]) =>
+      xs.map((s) => `${s.label} ${(s.pct * 100).toFixed(0)}%`).join(" · ");
+    facts.push(
+      `Concentración (sobre TODAS tus posiciones, base ${c.moneda}): la mayor pesa ${(c.top1Pct * 100).toFixed(0)}%, ` +
+        `las tres mayores ${(c.top3Pct * 100).toFixed(0)}%, HHI ${c.hhi.toFixed(2)} (1,00 = una sola posición).`,
+    );
+    if (c.porPosicion.length)
+      facts.push(
+        `  Por posición: ${slices(c.porPosicion)}${c.slicesOmitidas > 0 ? ` (+${c.slicesOmitidas} más no listadas; los % y el HHI SÍ las incluyen)` : ""}.`,
+      );
+    if (c.porTipo.length) facts.push(`  Por tipo de activo: ${slices(c.porTipo)}.`);
+    if (c.porMoneda.length)
+      facts.push(`  Por moneda de EXPOSICIÓN (donde cotiza, no donde se compró): ${slices(c.porMoneda)}.`);
+    if (c.porRegion.length) facts.push(`  Por región: ${slices(c.porRegion)}.`);
+  }
+  if (ctx.growthScore !== undefined)
+    facts.push(`Score de crecimiento del portafolio: ${ctx.growthScore}/100 (rendimiento + diversificación + preparación).`);
   // Marco Patrimonial: cada línea solo si el campo existe (best-effort).
   if (ctx.indicePatrimonial !== undefined)
     facts.push(
