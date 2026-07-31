@@ -21,6 +21,7 @@ import { getPatrimonioReport } from "@/modules/wealth/services/patrimonio-servic
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
+import { recordAiEvent } from "@/lib/ai/events";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { rateLimit, clientIp, RATE_LIMITS } from "@/lib/rate-limit";
 import { assertTrustedOrigin, corsHeaders } from "@/lib/security/cors";
@@ -40,7 +41,7 @@ export const maxDuration = 60;
  * es la lectura cara (getPatrimonioReport) — se salta salvo que el intent los use. Best-effort en cada
  * parte, igual que antes. `currency` (moneda principal) siempre; deudas/metas/números según `need`.
  */
-async function buildToolContext(need: ToolNeed): Promise<ToolContext | undefined> {
+async function buildToolContext(need: ToolNeed, userId?: string): Promise<ToolContext | undefined> {
   try {
     // Moneda de VISUALIZACIÓN (la que ve en la app; cookie). Todo el toolContext se normaliza a ella,
     // igual que el FinancialContext → el asesor nunca mezcla monedas.
@@ -51,7 +52,7 @@ async function buildToolContext(need: ToolNeed): Promise<ToolContext | undefined
     } catch {
       rates = null;
     }
-    const toolContext: ToolContext = { currency: display, fxUnavailable: !rates, debts: [] };
+    const toolContext: ToolContext = { currency: display, fxUnavailable: !rates, debts: [], userId };
     if (need.debts) {
       try {
         toolContext.debts = normalizeDebtsForTool(await listDebts(), display, rates);
@@ -135,7 +136,7 @@ export async function POST(req: Request) {
         scope.context === null
           ? { currency: await getDisplayCurrency().catch(() => "CRC") }
           : await buildFinancialContext(scope.context);
-      const liteTool = await buildToolContext(scope.tool);
+      const liteTool = await buildToolContext(scope.tool, user?.id);
       if (liteTool) {
         // Turno único: los intents deterministas resuelven con el mensaje actual (no necesitan historial).
         const det = await resolveDeterministic(matched, [{ role: "user", content: userMessage }], liteCtx, liteTool);
@@ -156,7 +157,7 @@ export async function POST(req: Request) {
       ];
       // Herramientas (function-calling) sólo con sesión; deudas/metas/números normalizados a la moneda
       // de VISUALIZACIÓN. Best-effort: si falla, se sigue sin herramientas.
-      const toolContext = user ? await buildToolContext({ debts: true, goals: true, numbers: true }) : undefined;
+      const toolContext = user ? await buildToolContext({ debts: true, goals: true, numbers: true }, user.id) : undefined;
       result = await financeChatWithTools(messages, ctx, toolContext);
     }
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
@@ -190,6 +191,17 @@ export async function POST(req: Request) {
       // entero un bloque ya redactado (comparador, informe) o lo recortó.
       replyLen: result.reply?.length ?? 0,
     });
+    // Y persistido: el log dura horas en Vercel, y la pregunta ("¿se usa? ¿cuánto tarda? ¿el
+    // modelo pasa el bloque entero?") se contesta dentro de semanas. Best-effort.
+    if (user) {
+      await recordAiEvent(user.id, {
+        kind: "lane",
+        lane: result.lane ?? "reasoning",
+        tokensIn: result.tokensIn,
+        tokensOut: result.tokensOut,
+        replyLen: result.reply?.length ?? 0,
+      });
+    }
 
     // Persistir el turno en el chat del usuario (best-effort; no bloquea la respuesta si falla).
     await appendChatMessages(undefined, [
