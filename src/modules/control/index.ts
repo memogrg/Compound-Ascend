@@ -1,6 +1,7 @@
 /** Barrel público del Módulo 3 — Control Financiero. */
 export { buildControlDiagnosis } from "./engine/priority-engine";
 export { simulateStrategy, recommendMethod, orderDebts } from "./engine/debt-strategy";
+export type { DebtMethod, DebtSimulation, DebtInput } from "./engine/debt-strategy";
 export {
   buildSchedule,
   compareExtra,
@@ -41,3 +42,7 @@ export type {
   DebtRateIndex,
   ExtraMode,
 } from "./types";
+
+// Piloto Inicio · Delta 1: helpers de datos
+export { rankSavingsGoalsByLag } from "./engine/goal-lag";
+export type { GoalLag, GoalLagInput } from "./engine/goal-lag";

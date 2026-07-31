@@ -96,3 +96,13 @@ export type {
   PortfolioSnapshot,
   InvestmentInsights,
 } from "./types";
+
+// Piloto Inicio · Delta 1: helpers de datos
+export { aggregateHoldingsByNature } from "./engine/holding-nature";
+export type { NatureBreakdown, NatureSlice, NatureInput } from "./engine/holding-nature";
+export { buildBaseProtectionChecklist } from "./engine/protection-checklist";
+export type {
+  ProtectionChecklistItem,
+  ProtectionChecklistInput,
+  ProtectionKey,
+} from "./engine/protection-checklist";
