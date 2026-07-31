@@ -16,7 +16,6 @@ import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { applyRankedProfile } from "@/lib/ai/profile-ranking";
 import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
-import type { AuthContext } from "@/lib/auth/auth-context";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
 
@@ -34,17 +33,33 @@ function asStrings(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
-export async function buildFinancialContext(): Promise<FinancialContext> {
+/**
+ * Alcance del contexto: qué bloques CAROS construir. Los bloques baratos (base, perfil, deudas,
+ * metas, sobres) SIEMPRE corren (definen currency/rates y son lecturas rápidas). Los caros se gatean
+ * para el CONTEXTO PEREZOSO: una consulta que el router resuelve determinista no debe pagar el
+ * portafolio (precios de mercado en vivo — el costo dominante) ni el patrimonio ni los bloques
+ * "flavor" (solo para el LLM). Default = todo (backward-compat: WhatsApp y el fallback LLM no cambian).
+ */
+export type ContextScope = {
+  patrimonio?: boolean; // getPatrimonioReport: números, compromiso*, mesesDeColchon, investableWealth
+  portfolio?: boolean; // getPortfolioReport: holdings, investment* (precios en vivo — CARO)
+  defense?: boolean; // getDefenseFundsReport: defenseFunds
+  flavor?: boolean; // richlife, trayectoria, perfil conductual, vinculables, insights, macro (solo LLM)
+};
+export const FULL_CONTEXT_SCOPE: ContextScope = { patrimonio: true, portfolio: true, defense: true, flavor: true };
+
+export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_SCOPE): Promise<FinancialContext> {
   const user = await getUser();
   const name = (user?.user_metadata?.display_name as string | undefined) ?? undefined;
   if (!isSupabaseConfigured() || !user) return { name, currency: "CRC" };
 
   let ctx: FinancialContext = { name, currency: "CRC" };
-  // AuthContext de sesión compartido: al pasarlo a los servicios, TODAS las cifras se normalizan a
-  // la moneda PRINCIPAL (= ctx.currency), no a la de display (cookie). Evita que el AI reciba montos
-  // en una moneda y una etiqueta en otra. `rates` para convertir lo que no acepte authCtx.
-  let authCtx: AuthContext | undefined;
+  // El chat usa la moneda de VISUALIZACIÓN del usuario (la que ve en toda la app; cookie
+  // ca_display_currency, con fallback a la principal cuando no hay sesión — p. ej. WhatsApp/cron). TODO
+  // el contexto queda en ESA moneda: los servicios que devuelven en la principal se convierten con
+  // `rates` a `ctx.currency`. Así el asesor nunca mezcla "ingreso ₡X" con "te quedan $Y".
   let rates: Record<string, number> | undefined;
+  let primaryCurrency: string | undefined; // para convertir lo que un servicio devuelve en la principal
 
   // ¿Hogar compartido? (más de un miembro) → la IA trata las cifras como comunes.
   // Best-effort: si falla, el chat no se degrada, solo no marca lo compartido.
@@ -57,32 +72,30 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Sin dato de hogar: se asume individual.
   }
 
-  // Base Financiera: indicadores del mes. El asesor usa SIEMPRE la moneda PRINCIPAL
-  // (no getDisplayCurrency(), que honra la cookie de visualización). Pasar un
-  // AuthContext explícito hace que getBaseSummary normalice los indicadores a la
-  // primaria (su getDisplayCurrency interno, con ctx, resuelve a primaria), de modo
-  // que ctx.currency y todos los montos quedan consistentes en la moneda principal.
+  // Base Financiera: indicadores del mes, EN LA MONEDA DE VISUALIZACIÓN. Sin AuthContext explícito,
+  // getBaseSummary usa getDisplayCurrency() (cookie) internamente → los indicadores llegan en display.
+  // También leemos la principal para convertir después lo que otros servicios devuelvan en principal.
   try {
-    const { getBaseSummary, getPrimaryCurrency } = await import(
+    const { getBaseSummary, getPrimaryCurrency, getDisplayCurrency } = await import(
       "@/modules/financial-base/services/base-service"
     );
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const { getFxRates } = await import("@/lib/market-data/fx-rates");
-    authCtx = { db: await createSupabaseServerClient(), userId: user.id };
-    const [base, currency, fx] = await Promise.all([
-      getBaseSummary(authCtx),
-      getPrimaryCurrency(authCtx),
+    const [base, display, primary, fx] = await Promise.all([
+      getBaseSummary(),
+      getDisplayCurrency(),
+      getPrimaryCurrency(),
       getFxRates().catch(() => ({}) as Record<string, number>),
     ]);
     rates = fx;
+    primaryCurrency = primary;
     ctx = {
       ...ctx,
-      currency,
+      currency: display,
       incomeMonthly: base.indicators.incomeMonthly,
       expenseMonthly: base.indicators.expenseMonthly,
       freeCashflow: base.indicators.freeCashflow,
     };
-    // Gasto más pesado por naturaleza (ya normalizado a la principal) + tasa de ahorro.
+    // Gasto más pesado por naturaleza (ya en la moneda de visualización) + tasa de ahorro.
     const natureEntries = Object.entries(base.indicators.expenseByNature).filter(([, v]) => v > 0);
     if (natureEntries.length > 0 && base.indicators.expenseMonthly > 0) {
       const top = natureEntries.reduce((a, b) => (b[1] > a[1] ? b : a));
@@ -98,6 +111,13 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   } catch {
     // Sin base: contexto mínimo.
   }
+
+  // Convierte un monto que un servicio devolvió en la moneda PRINCIPAL a la de VISUALIZACIÓN
+  // (ctx.currency). Usado por portfolio/defensa, que leen en principal. Sin rates → deja el monto igual.
+  const toDisplay = (n: number): number =>
+    primaryCurrency && primaryCurrency !== ctx.currency && rates
+      ? Math.round(convertCurrency(n, primaryCurrency, ctx.currency, rates))
+      : Math.round(n);
 
   // Perfil: preocupación principal, etapa de vida y arquetipo conductual (Fase 2).
   try {
@@ -192,8 +212,8 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Sobres no disponibles: el contexto sigue.
   }
 
-  // Patrimonio neto (Rich Life) — la lectura más cara, best-effort.
-  try {
+  // Patrimonio neto (Rich Life) — best-effort. Bloque "flavor" (solo lo usa el system prompt del LLM).
+  if (scope.flavor) try {
     const { getRichLifeSummary } = await import("@/modules/rich-life/services/rich-life-service");
     const summary = await getRichLifeSummary();
     ctx.netWorth = Math.round(summary.snapshot.indicators.netWorth);
@@ -208,18 +228,18 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   // Portafolio: agregados + DETALLE POR POSICIÓN (para que el asesor vea las inversiones y
   // responda con cifras reales, p. ej. ganancia al vender). Todo del motor de analytics
   // (holdingsWithPerformance), en moneda principal, scope de hogar. Best-effort.
-  try {
+  if (scope.portfolio) try {
     const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
     const report = await getPortfolioReport();
     const a = report.analytics;
     if (a.totalPortfolioValue > 0) {
       const topSlice = Object.values(a.allocation).reduce((x, y) => (x.value > y.value ? x : y));
-      ctx.portfolioValue = Math.round(a.totalPortfolioValue);
-      ctx.portfolioReturnPct = a.totalReturnPct;
+      ctx.portfolioValue = toDisplay(a.totalPortfolioValue);
+      ctx.portfolioReturnPct = a.totalReturnPct; // % no se convierte
       ctx.topAssetClass = topSlice.label;
     }
-    // Detalle por posición (COMPACTO: top-N por valor, resto en holdingsMoreCount). Mapeo PURO;
-    // cifras del motor en moneda principal, nunca inventadas.
+    // Detalle por posición (COMPACTO: top-N por valor, resto en holdingsMoreCount). Mapeo PURO; el
+    // motor da las cifras en la principal → se CONVIERTEN a la de visualización (montos, no % ni cantidad).
     const { mapHoldingsForContext } = await import("@/lib/ai/holdings-context");
     const mapped = mapHoldingsForContext(
       a.holdingsWithPerformance ?? [],
@@ -227,11 +247,17 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
       a.totalProfitLoss,
     );
     if (mapped) {
-      ctx.holdings = mapped.holdings;
+      ctx.holdings = mapped.holdings.map((h) => ({
+        ...h,
+        invested: toDisplay(h.invested),
+        value: toDisplay(h.value),
+        price: h.price === null ? null : toDisplay(h.price),
+        pl: toDisplay(h.pl),
+      }));
       ctx.holdingsMoreCount = mapped.holdingsMoreCount;
-      ctx.investmentInvested = mapped.investmentInvested;
-      ctx.investmentValue = mapped.investmentValue;
-      ctx.investmentPL = mapped.investmentPL;
+      ctx.investmentInvested = toDisplay(mapped.investmentInvested);
+      ctx.investmentValue = toDisplay(mapped.investmentValue);
+      ctx.investmentPL = toDisplay(mapped.investmentPL);
     }
   } catch {
     // Portafolio no disponible.
@@ -239,7 +265,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Trayectoria (memoria longitudinal): tendencias mes a mes vía el motor puro. Best-effort;
   // si hay <3 meses de historia el motor devuelve undefined (no inventamos tendencias).
-  try {
+  if (scope.flavor) try {
     const { getSnapshotHistory } = await import(
       "@/modules/financial-base/services/snapshot-service"
     );
@@ -270,7 +296,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Marco Patrimonial (motor patrimonio-engine) — best-effort: consume el reporte
   // tal cual, sin recalcular. Si falla, el chat sigue sin estas métricas.
-  try {
+  if (scope.patrimonio) try {
     const { getPatrimonioReport } = await import("@/modules/wealth");
     const p = await getPatrimonioReport();
     // El reporte viene en SU moneda (p.currency, la de display); el AI usa ctx.currency (principal).
@@ -314,10 +340,9 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
     // Marco Patrimonial no disponible.
   }
 
-  // Perfil conductual (Fase · asesor conductual). Lectura best-effort con el
-  // cliente de sesión (respeta RLS); cada tabla en su try/catch para que un fallo
-  // aislado no degrade el resto del contexto.
-  try {
+  // Perfil conductual (Fase · asesor conductual). Bloque "flavor" (tono/coaching para el LLM).
+  // Lectura best-effort con el cliente de sesión (respeta RLS); cada tabla en su try/catch.
+  if (scope.flavor) try {
     const { createSupabaseServerClient } = await import("@/lib/supabase/server");
     const supabase = await createSupabaseServerClient();
 
@@ -472,19 +497,20 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   // hasEmergencyFund auto-reportado del onboarding: si hay un fondo registrado, esos datos MANDAN
   // (el chat decía "no tenés fondo" pese a estar registrado). Va DESPUÉS del bloque de perfil para
   // pisar el auto-reporte. Best-effort: sin sesión/lectura falla → se queda el auto-reporte.
-  try {
+  if (scope.defense) try {
     const { getDefenseFundsReport } = await import("@/modules/wealth");
     const d = await getDefenseFundsReport();
+    // El reporte viene en la principal (d.currency) → se CONVIERTE a la de visualización (montos; el % no).
     const fund = (f: { current: number; target: number; progressPct: number; recommendedMonthly: number; covered: boolean }, registrado: boolean) => ({
       registrado,
-      actual: Math.round(f.current),
-      objetivo: Math.round(f.target),
+      actual: toDisplay(f.current),
+      objetivo: toDisplay(f.target),
       progresoPct: Math.round(f.progressPct * 100),
-      aporteRecomendado: Math.round(f.recommendedMonthly),
+      aporteRecomendado: toDisplay(f.recommendedMonthly),
       cubierto: f.covered,
     });
     ctx.defenseFunds = {
-      currency: d.currency,
+      currency: ctx.currency,
       activeFund: d.activeFund,
       emergency: fund(d.emergency, d.emergencyRegistered),
       paz: fund(d.peace, d.peaceRegistered),
@@ -500,7 +526,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   }
 
   // Entidades vinculables: la IA puede proponer transacciones ya vinculadas.
-  try {
+  if (scope.flavor) try {
     const { listLinkableEntities } =
       await import("@/modules/financial-base/services/linkable-entities-service");
     const linkables = await listLinkableEntities();
@@ -514,7 +540,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
 
   // Memoria conductual (Fase 4c): observaciones recientes para que el asesor las
   // mencione con tacto. getActiveInsights dispara refreshInsights (auto-activación).
-  try {
+  if (scope.flavor) try {
     const { getActiveInsights } = await import("@/lib/insights");
     const items = await getActiveInsights(4);
     if (items.length)
@@ -526,7 +552,7 @@ export async function buildFinancialContext(): Promise<FinancialContext> {
   // Entorno macro/micro: indicadores económicos del entorno (no del usuario).
   // Best-effort; cada lectura en su propio try/catch para que un fallo aislado no
   // degrade el resto. Si un indicador no tiene datos (value null), no se inyecta.
-  try {
+  if (scope.flavor) try {
     const { getLatest, getChange } = await import("@/lib/economic-indicators");
 
     // Helper: lee el último valor de un código y, si existe, lo asigna.

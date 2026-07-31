@@ -41,10 +41,34 @@ import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { convertCurrency } from "@/lib/fx";
 // Router de complejidad (R1): carril barato para consultas de dato. Solo importa la función
 // (los tipos que el router necesita de aquí son type-only → sin ciclo en runtime).
-import { tryRouteQuery, type RouterLane } from "@/lib/ai/router";
+import { tryRouteQuery, resolveMatchedIntent, type RouterLane, type MatchedIntent } from "@/lib/ai/router";
 import { capHistory, isFirstTurn, priorAssistantReplies } from "@/lib/ai/history";
 
 export type { FinancialContext };
+export type { MatchedIntent };
+
+/**
+ * CONTEXTO PEREZOSO: resuelve un intent YA matcheado por patrón con el contexto MÍNIMO que la ruta
+ * le construyó (0 tokens). Devuelve el resultado listo (con guardrail) o null si el dato no alcanza →
+ * la ruta escala al carril LLM (ahí sí arma el contexto completo). Comparte el guardrail y el shape
+ * con financeChatWithTools. No corre el clasificador Lite ni el LLM (eso es el fallback de la ruta).
+ */
+export async function resolveDeterministic(
+  matched: MatchedIntent,
+  messages: ChatMessage[],
+  ctx: FinancialContext,
+  toolContext: ToolContext,
+): Promise<(AIChatResponse & { tokensIn: number; tokensOut: number; provider: string; lane: RouterLane }) | null> {
+  const routed = await resolveMatchedIntent(matched, ctx, toolContext).catch(() => null);
+  if (!routed) return null;
+  return {
+    ...guardReply(routed.response, ctx, `router:${routed.lane}`, priorAssistantReplies(messages)),
+    tokensIn: routed.tokensIn,
+    tokensOut: routed.tokensOut,
+    provider: `router:${routed.lane}`,
+    lane: routed.lane,
+  };
+}
 
 /**
  * Datos de solo lectura que habilitan las herramientas (chat web con sesión). Las

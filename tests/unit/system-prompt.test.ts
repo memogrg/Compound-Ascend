@@ -15,6 +15,23 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).toContain("create_transaction");
   });
 
+  it("tono/concisión: distingue cambio de divisa de rotar inversiones, ahorros≠inversiones, fuera de tema y no alarmar", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    // Mover plata de una MONEDA a otra = cambio de divisa, NO rotar inversiones (nada de monólogo Nasdaq).
+    expect(prompt).toMatch(/CAMBIO DE DIVISA/i);
+    expect(prompt).toMatch(/rotar capital aplica SOLO/i);
+    // Ahorros ≠ inversiones.
+    expect(prompt).toMatch(/AHORROS ≠ INVERSIONES/i);
+    // Concisión dura + no alarmar/upsell.
+    expect(prompt).toMatch(/CONCISI[ÓO]N DURA/i);
+    expect(prompt).toMatch(/no estás quebrado/i); // lo cita como ejemplo de lo que NO hacer
+    // Fuera de tema: respuesta breve, no monólogo financiero.
+    expect(prompt).toMatch(/No llevo la hora/i);
+    // Los 3 "no sé con dato".
+    expect(prompt).toMatch(/Me pasé del presupuesto/i);
+    expect(prompt).toMatch(/alcanza para qué/i);
+  });
+
   it("distingue HERRAMIENTAS de cálculo vs ACCIONES y ofrece create_goal como acción proponible", () => {
     const prompt = buildSystemPrompt({ currency: "CRC" });
     // create_goal es una acción proponible (bloque action), no una herramienta.

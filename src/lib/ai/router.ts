@@ -146,15 +146,25 @@ const AFFORD_LOOSE_RE =
 const AFFORD_ITEM_RE =
   /(?:quiero|comprar(?:me)?|darme|gustar[ií]a)\s+(?:un|una|unos|unas)\s+([^,.?!¿¡]+)|(?:^|[,\s])(?:un|una|unos|unas)\s+([^,.?!¿¡]+)/i;
 
-/** Monto SOLO si viene con señal de moneda (₡/$/…) o multiplicador (mil/k); si no, null (no
- *  agarra números sueltos como "2 cervezas"). es-CR: "." = miles, "," = decimales. */
-export function extractAmount(text: string): number | null {
-  const m = text.match(/(?:₡|\$|col\$|mx\$|crc|usd)\s*([\d.,]+)|(\d[\d.,]*)\s*(mil|k)\b/i);
+/** Monto + MONEDA SOLO si viene con señal de moneda (₡/$/…) o multiplicador (mil/k); si no, null (no
+ *  agarra números sueltos como "2 cervezas"). es-CR: "." = miles, "," = decimales. La moneda sale del
+ *  SÍMBOLO (₡/crc → CRC, $/usd → USD, col$ → COP, mx$ → MXN); sin símbolo (mil/k) → null (= "la de
+ *  visualización"). NUNCA se asume que "₡8.000" está en la moneda de display: el caller lo convierte. */
+export function extractAmount(text: string): { monto: number; moneda: string | null } | null {
+  const m = text.match(/(₡|\$|col\$|mx\$|crc|usd)\s*([\d.,]+)|(\d[\d.,]*)\s*(mil|k)\b/i);
   if (!m) return null;
-  const raw = (m[1] ?? m[2] ?? "").trim();
-  const mult = m[3] ? 1000 : 1;
+  const sym = (m[1] ?? "").toLowerCase();
+  const raw = (m[2] ?? m[3] ?? "").trim();
+  const mult = m[4] ? 1000 : 1;
   const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? n * mult : null;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const moneda =
+    sym === "₡" || sym === "crc" ? "CRC" :
+    sym === "col$" ? "COP" :
+    sym === "mx$" ? "MXN" :
+    sym === "$" || sym === "usd" ? "USD" :
+    null;
+  return { monto: n * mult, moneda };
 }
 
 /**
@@ -776,7 +786,10 @@ async function resolveFetchIntent(
     if (intent === "puedo_gastar") {
       const desc = typeof params.desc === "string" ? params.desc : "";
       if (!desc) return null; // sin ítem (no debería pasar: matchIntent exige desc)
-      const amount = typeof params.amount === "number" ? params.amount : null;
+      const amt =
+        params.amount && typeof params.amount === "object"
+          ? (params.amount as { monto: number; moneda: string | null })
+          : null;
       const { suggestSobreForChatFast, getSobreRemaining } = await import("@/modules/financial-base");
       const sug = await suggestSobreForChatFast(desc, "gasto");
       if (!sug.categoryId) {
@@ -790,6 +803,21 @@ async function resolveFetchIntent(
         return say(
           `Encontré ${sug.categoryPath ?? "tu sobre"} pero no pude leer su presupuesto ahora. Probá de nuevo en un momento.`,
         );
+      }
+      // El monto se compara en la MONEDA DEL SOBRE (rem.currency = visualización). Si el usuario dio
+      // otra ("₡8.000" con display USD), se CONVIERTE antes de comparar — nunca ₡8.000 tratado como $8.000.
+      let amount: number | null = null;
+      if (amt) {
+        if (!amt.moneda || amt.moneda === rem.currency) amount = amt.monto;
+        else {
+          try {
+            const { getFxRates } = await import("@/lib/market-data/fx-rates");
+            const { convertCurrency } = await import("@/lib/fx");
+            amount = Math.round(convertCurrency(amt.monto, amt.moneda, rem.currency, await getFxRates()));
+          } catch {
+            amount = amt.monto; // sin FX: usa el crudo (mejor que descartar la pregunta)
+          }
+        }
       }
       const path = sug.categoryPath ?? rem.path;
       return say(affordReply(path, rem, amount, (n) => formatMoney(n, rem.currency)));
@@ -1164,6 +1192,34 @@ export function buildMarketReply(
  * tokens) o null si hay que escalar al razonamiento (modelo completo). NUNCA adivina: si el
  * patrón no matchea Y el clasificador no está seguro, o el contexto no alcanza → null.
  */
+/** Resultado de matchIntent (patrón), ya sin null. Público para el CONTEXTO PEREZOSO de la ruta. */
+export type MatchedIntent = NonNullable<ReturnType<typeof matchIntent>>;
+
+/**
+ * Resuelve un intent YA matcheado por patrón (0 tokens): mercado / lectura fresca / cifra del ctx.
+ * Extraído de tryRouteQuery para que la ruta pueda correrlo tras construir SOLO el contexto que ese
+ * carril necesita (contexto perezoso). Devuelve null si el dato no alcanza → el llamador escala al LLM.
+ */
+export async function resolveMatchedIntent(
+  matched: MatchedIntent,
+  ctx: FinancialContext,
+  toolContext: ToolContext,
+): Promise<RoutedQuery | null> {
+  // Datos de mercado (precio/ATH): usa ctx.holdings + el tool. Si no resuelve el símbolo o no hay
+  // dato, devuelve la respuesta honesta (no escala a repetir negativas).
+  if (matched.intent === "datos_mercado") {
+    const response = await resolveMarketQuery(matched.params, ctx, toolContext.currency);
+    return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
+  }
+  if (FETCH_INTENTS.has(matched.intent)) {
+    const response = await resolveFetchIntent(matched.intent, toolContext.currency, matched.params);
+    return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
+  }
+  const response = answerFromContext(matched.intent, matched.params, toolContext, ctx);
+  if (response) return { response, tokensIn: 0, tokensOut: 0, lane: "template" };
+  return null; // el contexto no alcanza → escalar
+}
+
 export async function tryRouteQuery(
   messages: { role: string; content: string }[],
   ctx: FinancialContext,
@@ -1174,22 +1230,7 @@ export async function tryRouteQuery(
 
   // 1) Patrones (0 tokens de clasificación).
   const matched = matchIntent(lastUser);
-  if (matched) {
-    // Datos de mercado (precio/ATH): carril determinista que usa ctx.holdings + el tool. Si no
-    // resuelve el símbolo o no hay dato, devuelve la respuesta honesta (no escala a repetir negativas).
-    if (matched.intent === "datos_mercado") {
-      const response = await resolveMarketQuery(matched.params, ctx, toolContext.currency);
-      return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
-    }
-    if (FETCH_INTENTS.has(matched.intent)) {
-      const response = await resolveFetchIntent(matched.intent, toolContext.currency, matched.params);
-      // La lectura no consume tokens del LLM; su "coste" es una query a la BD.
-      return response ? { response, tokensIn: 0, tokensOut: 0, lane: "template" } : null;
-    }
-    const response = answerFromContext(matched.intent, matched.params, toolContext, ctx);
-    if (response) return { response, tokensIn: 0, tokensOut: 0, lane: "template" };
-    return null; // el contexto no alcanza → escalar
-  }
+  if (matched) return await resolveMatchedIntent(matched, ctx, toolContext);
 
   // 1b) Carril de ACCIÓN determinista: intents de CREAR (alerta, meta, sobre, gasto). Va DESPUÉS de
   //     los intents de lectura (que ganan) y ANTES del LLM: el parseo/propuesta salen del router,
