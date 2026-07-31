@@ -47,7 +47,7 @@ vi.mock("@/modules/wealth", () => ({
 // FX del carril multi-posición (import dinámico): tasas fijas para no pegarle a la red.
 vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: async () => ({ USD: 1, CRC: 530 }) }));
 
-import { matchIntent, answerFromContext, tryRouteQuery, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote, normalizeSlang } from "@/lib/ai/router";
+import { matchIntent, answerFromContext, tryRouteQuery, resolveMatchedIntent, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote, normalizeSlang } from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
 // FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
@@ -946,5 +946,60 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
       " (precio guardado del 01/08, no en vivo).",
     );
     expect(reply).toMatch(/no en vivo/i);
+  });
+});
+
+// ── Carril DEEP: informe de inversiones determinista (0 tokens, 0 llamadas nuevas) ──
+describe("informe_inversion · carril deep", () => {
+  it("atrapa el pedido de informe en cualquier orden (informe/reporte/análisis/revisión/diagnóstico/radiografía)", () => {
+    for (const q of [
+      "analizame el portafolio",
+      "hacé un informe de mi cartera",
+      "revisión de mis inversiones",
+      "quiero un reporte de mi portafolio",
+      "dame un diagnóstico de mis inversiones",
+      "hacé una radiografía de mi portafolio",
+      "análisis de mis posiciones",
+      "revisá mi portfolio",
+    ]) {
+      expect(matchIntent(q)?.intent, q).toBe("informe_inversion");
+    }
+  });
+
+  it("NO se come el resumen ni los datos de mercado (cada consulta sigue en su carril)", () => {
+    expect(matchIntent("cuánto tengo invertido")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cómo va mi portafolio?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cuál es el ATH de BTC?")?.intent).toBe("datos_mercado");
+    expect(matchIntent("¿a cómo está el bitcoin hoy?")?.intent).toBe("datos_mercado");
+    // Un "análisis" sin portafolio no es un informe de portafolio.
+    expect(matchIntent("hacé un análisis de BTC")?.intent).not.toBe("informe_inversion");
+    // Escenario de venta: sigue siendo mercado, no informe.
+    expect(matchIntent("si vendo todas mis inversiones al ATH, ¿cuánto gano?")?.intent).toBe("datos_mercado");
+  });
+
+  it("resuelve por PLANTILLA con lane 'deep' y cero tokens", async () => {
+    const ctx = {
+      currency: "USD",
+      holdings: [
+        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 20_000, value: 30_000, price: 30_000, pl: 10_000, plPct: 0.5, currency: "USD", priceUnavailable: false },
+      ],
+      investmentValue: 30_000,
+      investmentInvested: 20_000,
+      investmentPL: 10_000,
+      mesesDeColchon: 4,
+    } as FinancialContext;
+    const routed = await resolveMatchedIntent({ intent: "informe_inversion", params: {} }, ctx, tc);
+    expect(routed?.lane).toBe("deep");
+    expect(routed?.tokensIn).toBe(0);
+    expect(routed?.tokensOut).toBe(0);
+    expect(routed?.response.reply).toContain("# Informe de tu portafolio");
+    // La cifra sale del contexto/motor, nunca del modelo.
+    expect(routed?.response.reply).toContain("$30.000");
+    expect(routed?.response.action).toBeNull();
+  });
+
+  it("sin posiciones ni valor de inversión → null (escala; no emite un informe vacío)", async () => {
+    const routed = await resolveMatchedIntent({ intent: "informe_inversion", params: {} }, CTX, tc);
+    expect(routed).toBeNull();
   });
 });

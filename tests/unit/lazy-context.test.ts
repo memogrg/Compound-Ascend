@@ -48,6 +48,14 @@ describe("scopeForIntent · contexto perezoso (rutear primero, construir solo lo
     expect(deuda.tool.debts).toBe(true);
   });
 
+  it("informe_inversion (carril deep) → portfolio+patrimonio+defensa y deudas/números; SIN flavor ni metas", () => {
+    const s = scopeForIntent("informe_inversion");
+    expect(s.context).toEqual({ portfolio: true, patrimonio: true, defense: true });
+    expect(s.context?.flavor).toBeUndefined(); // flavor solo lo usa el LLM; el informe es plantilla
+    expect(s.tool).toEqual({ debts: true, goals: false, numbers: true });
+    expect(s.tool.goals).toBe(false); // el paquete de evidencia no consume metas → no se pagan
+  });
+
   it("intent DESCONOCIDO → contexto completo (seguro, nunca degrada)", () => {
     const s = scopeForIntent("algo_raro");
     expect(s.context).toEqual({ patrimonio: true, portfolio: true, defense: true, flavor: true });
