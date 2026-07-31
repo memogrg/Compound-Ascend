@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// El toolContext de la herramienta de deuda debe usar la moneda PRINCIPAL del
-// usuario (user_settings.primary_currency), NO getDisplayCurrency() — que honra la
-// cookie de visualización y haría que un cálculo use la moneda con la que el usuario
-// mira el dashboard.
+// El toolContext usa la moneda de VISUALIZACIÓN del usuario (getDisplayCurrency, cookie
+// ca_display_currency) — TODO el chat en la misma moneda que el usuario ve en la app. Con
+// display=USD, el toolContext queda en USD y la deuda USD no se convierte.
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/security/cors", () => ({
@@ -66,7 +65,7 @@ beforeEach(() => {
 });
 
 describe("chat route · moneda del toolContext", () => {
-  it("usa la moneda principal (no el override de visualización) y normaliza FX", async () => {
+  it("usa la moneda de VISUALIZACIÓN (getDisplayCurrency) y normaliza FX a ella", async () => {
     const req = new Request("http://localhost/api/assistant/chat", {
       method: "POST",
       headers: { "content-type": "application/json", origin: "http://localhost" },
@@ -79,10 +78,9 @@ describe("chat route · moneda del toolContext", () => {
     expect(financeChatWithTools).toHaveBeenCalledTimes(1);
     const toolContext = financeChatWithTools.mock.calls[0]![2] as CapturedToolContext;
 
-    expect(toolContext.currency).toBe("CRC"); // principal, NO el display USD
-    expect(getPrimaryCurrency).toHaveBeenCalled();
-    expect(getDisplayCurrency).not.toHaveBeenCalled();
-    // la deuda en USD se normalizó a la principal (1000 USD × 500 = 500000 CRC)
-    expect(toolContext.debts[0]!.balance).toBe(500_000);
+    expect(toolContext.currency).toBe("USD"); // la de VISUALIZACIÓN
+    expect(getDisplayCurrency).toHaveBeenCalled();
+    // la deuda ya está en USD (= display) → no se convierte (1000 USD → 1000)
+    expect(toolContext.debts[0]!.balance).toBe(1000);
   });
 });

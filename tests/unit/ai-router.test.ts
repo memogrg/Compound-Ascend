@@ -603,11 +603,22 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
     expect((m?.params.desc as string).toLowerCase()).toContain("hamburguesa");
   });
 
-  it("extractAmount: solo con señal de moneda/multiplicador (no números sueltos)", () => {
-    expect(extractAmount("algo de ₡8.000")).toBe(8000);
-    expect(extractAmount("un gusto de 8 mil")).toBe(8000);
-    expect(extractAmount("$12")).toBe(12);
+  it("extractAmount: devuelve {monto, moneda} según el símbolo (₡→CRC, $→USD), sin asumir display", () => {
+    expect(extractAmount("algo de ₡8.000")).toEqual({ monto: 8000, moneda: "CRC" });
+    expect(extractAmount("un gusto de 8 mil")).toEqual({ monto: 8000, moneda: null }); // sin símbolo → null
+    expect(extractAmount("$12")).toEqual({ monto: 12, moneda: "USD" });
     expect(extractAmount("2 cervezas")).toBeNull(); // número suelto → no lo agarra
+  });
+
+  it("afford con display USD: '¿me da para un gustito de ₡8.000?' convierte ₡8.000 (~$15), no lo trata como $8.000", async () => {
+    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-rest", categoryPath: "Alimentación › Restaurantes" });
+    getSobreRemaining.mockResolvedValue({ path: "Alimentación › Restaurantes", currency: "USD", budget: 300, spent: 168, remaining: 132, hasBudget: true });
+    const routed = await tryRouteQuery(ask("¿me da para un gustito de ₡8.000?"), CTX, { ...tc, currency: "USD" });
+    const reply = routed?.response.reply ?? "";
+    // ₡8.000 / 530 ≈ $15 → entra en los $132; NUNCA "$8.000 se pasa".
+    expect(reply).toMatch(/\$15\b/);
+    expect(reply).not.toMatch(/\$8\.000|se pasa|estarías pasando/i);
+    expect(reply).toMatch(/te quedar[íi]an/i); // sí alcanza
   });
 
   it("extractAffordDesc deja el ítem sin el monto ni el artículo", () => {
