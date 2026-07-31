@@ -414,6 +414,25 @@ export type TransactionTemplateRow = Timestamps & Audited & {
 };
 
 // ---------- IA / tokens ----------
+/**
+ * Evento de IA para observabilidad durable (migración 20260806000001). SIN CONTENIDO: solo
+ * métricas. `reply_len`/`resumen_len` son largos, no texto. Escribe el backend con service-role;
+ * el usuario solo lee lo suyo.
+ */
+export type AiEventRow = {
+  id: number;
+  user_id: string;
+  event: string; // 'tool' | 'lane'
+  name: string | null;
+  ms: number | null;
+  ok: boolean | null;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  reply_len: number | null;
+  resumen_len: number | null;
+  created_at: string;
+};
+
 export type AiUsageLedgerRow = Timestamps & {
   id: string;
   user_id: string;
@@ -1039,6 +1058,8 @@ export interface Database {
       transaction_rules: UserTable<TransactionRuleRow>;
       transaction_templates: UserTable<TransactionTemplateRow>;
       ai_usage_ledger: UserTable<AiUsageLedgerRow>;
+      // Eventos de IA (observabilidad). Escritura service-role; el usuario solo lee lo suyo.
+      ai_events: UserTable<AiEventRow>;
       expense_categories: TableShape<
         ExpenseCategoryRow,
         Partial<ExpenseCategoryRow> & { name: string },
