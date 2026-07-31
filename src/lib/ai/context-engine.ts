@@ -590,12 +590,18 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
       }
     };
 
-    // Inflación interanual del IPC de la moneda del usuario; se guarda como %.
+    // Inflación interanual del IPC de la moneda PRINCIPAL del usuario (en la que gana y gasta), no
+    // de la de visualización: el toggle del topbar cambia cómo MIRA sus totales, no en qué economía
+    // vive. Con ctx.currency (display desde #560), un tico que ponía el switch en dólares recibía el
+    // IPC de EE. UU. como "su" inflación — y el prompt le ordena al asesor citarla al aconsejar
+    // sobre deuda e inversión. Sin moneda principal (el bloque base falló) no se adivina: se omite.
     try {
-      const { getYoYInflation } = await import("@/lib/economic-indicators/insights");
-      const cpiCode = ctx.currency === "CRC" ? "IPC" : "US_CPI";
-      const infl = await getYoYInflation(cpiCode);
-      if (infl !== null) ctx.inflacionYoYPct = infl * 100;
+      if (primaryCurrency) {
+        const { getYoYInflation } = await import("@/lib/economic-indicators/insights");
+        const cpiCode = primaryCurrency === "CRC" ? "IPC" : "US_CPI";
+        const infl = await getYoYInflation(cpiCode);
+        if (infl !== null) ctx.inflacionYoYPct = infl * 100;
+      }
     } catch {
       // inflación no disponible
     }
