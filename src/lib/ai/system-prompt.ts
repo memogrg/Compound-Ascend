@@ -382,7 +382,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
         "no inventes progreso ni cifras que no estén aquí.",
     );
     if (e.expense.length) {
-      facts.push("Sobres de gasto mensual (por frasco):");
+      // A diferencia de las posiciones y las deudas, un sobre no tiene moneda propia: el
+      // presupuesto del período se resuelve en UNA moneda y viene convertido a ella. Se dice, para
+      // que el asesor no lo presente como si cada sobre estuviera en su moneda de origen.
+      facts.push(
+        `Sobres de gasto mensual (por frasco). Los presupuestos están CONVERTIDOS a ${e.currency}: ` +
+          "un sobre es una sola olla mensual, no lleva monedas separadas.",
+      );
       for (const g of e.expense) {
         const items = g.envelopes
           .map((x) => (x.budget > 0 ? `${x.name} (${x.budget} ${e.currency})` : x.name))

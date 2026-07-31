@@ -208,8 +208,13 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
     const { getEnvelopesSummary } = await import("@/modules/financial-base");
     const summary = await getEnvelopesSummary();
     if (summary.expense.length > 0 || summary.goals.length > 0) {
-      // getEnvelopesSummary viene en moneda de DISPLAY; el AI usa la PRINCIPAL (ctx.currency). El
-      // helper puro CONVIERTE los presupuestos y calcula el sobre de mayor gasto → nunca "$X como ₡X".
+      // getEnvelopesSummary viene en moneda de DISPLAY y el AI también trabaja en DISPLAY
+      // (ctx.currency, desde #560): el helper puro reetiqueta y, si difieren, CONVIERTE.
+      // Convertir acá es INTENCIONAL, no una omisión del trabajo de moneda nativa: un sobre es una
+      // olla contra la que se gasta, y su razón de ser es un solo número. "Restaurantes: ₡80.000 +
+      // $50" no es más honesto que el total convertido — es menos usable y rompe la mecánica de
+      // sobres. Lo que sí importa es DECIRLO: el prompt aclara que los presupuestos vienen
+      // convertidos (ver la línea de sobres en system-prompt.ts).
       const { normalizeEnvelopes } = await import("@/lib/ai/envelopes-currency");
       const norm = normalizeEnvelopes(summary, ctx.currency, rates ?? {});
       ctx.envelopes = norm.envelopes;
