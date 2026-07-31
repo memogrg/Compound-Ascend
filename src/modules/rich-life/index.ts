@@ -12,3 +12,4 @@ export {
 export { RichLifeDashboard } from "./components/rich-life-dashboard";
 export { RichActions } from "./components/rich-actions";
 export type { RichLifeSummary, NetWorthAggregate } from "./services/rich-life-service";
+export type { RichTrend, RichLifeIndicators, RichLifeSnapshot } from "./types";

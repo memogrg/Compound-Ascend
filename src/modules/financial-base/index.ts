@@ -7,7 +7,15 @@ export { computeHealthScore } from "./engine/health";
 export { classifyTxnFlow, aggregateMonthFlow } from "./engine/month-flow";
 export type { MonthFlow, FlowClass, MonthFlowRow } from "./engine/month-flow";
 export { getMonthFlow } from "./services/month-flow-service";
+// Piloto Inicio · Delta 1: helpers de datos
+export { unbudgetedExpenseShare } from "./engine/budget-coverage";
+export type { BudgetCoverage, KeyedValue } from "./engine/budget-coverage";
 export type { HealthScore } from "./engine/health";
+// Piloto Inicio · Delta 1: agregados de periodo para las fichas
+export { getRealTotals } from "./services/transaction-service";
+export type { RealTotals } from "./services/transaction-service";
+export { getBudgetTotals } from "./services/budget-service";
+export type { BudgetTotals } from "./services/budget-service";
 export {
   getBaseSummary,
   getDisplayCurrency,
