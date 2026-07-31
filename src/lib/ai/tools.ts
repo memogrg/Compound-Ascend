@@ -886,6 +886,30 @@ export const MARKET_DATA_TOOL: AiToolDecl = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Herramienta: abonar la deuda vs invertir el excedente (SOLO lectura/cálculo)
+// ---------------------------------------------------------------------------
+
+/**
+ * SIN PARÁMETROS a propósito: el motor (getSurplusDecision) lee TODO del usuario — excedente,
+ * deuda a comparar, horizonte, fondos de defensa. Darle perillas al modelo sería darle formas de
+ * inventar el escenario; acá solo puede pedir la comparación real.
+ */
+export const SURPLUS_TOOL: AiToolDecl = {
+  name: "comparar_abonar_vs_invertir",
+  description:
+    "Compara, con los datos REALES del usuario, dirigir su excedente mensual a ABONAR la deuda vs " +
+    "INVERTIRLO. El lado ABONAR es CERTEZA: interés ahorrado y meses adelantados, calculados con el " +
+    "motor de amortización sobre su deuda real. El lado INVERTIR es un RANGO: tres escenarios " +
+    "históricos (peor/típico/mejor) por activo (S&P 500, Nasdaq, Bitcoin) con la CAÍDA MÁXIMA " +
+    "histórica siempre visible — nunca una línea única. Si su deuda supera el 12% anual, NO plantea " +
+    "invertir (abonar es un retorno garantizado). Si sus fondos de defensa (emergencia y paz) no " +
+    "están cubiertos, la comparación todavía no aplica y la herramienta lo dice. Usala cuando " +
+    "pregunte '¿abono o invierto?', '¿qué hago con lo que me sobra?' o '¿pago la hipoteca o meto a " +
+    "un ETF?'. NO inventes ninguna de estas cifras: salen de acá.",
+  parameters: { type: "object", properties: {}, required: [] },
+};
+
 export type MarketDataResult = {
   symbol: string;
   assetType: string;

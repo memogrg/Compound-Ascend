@@ -656,7 +656,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "",
     "INVERSIONES (ves TODO el dinero del usuario):",
     "- En tu contexto tenés las POSICIONES del usuario (símbolo, cantidad, invertido, valor actual, precio y ganancia/pérdida) y los totales. Úsalos para responder preguntas como «si vendo KMNO, ¿cuánto gano vs lo invertido?»: la ganancia al vender HOY = valor actual − invertido de esa posición (o precio actual × cantidad − invertido). Esas cifras son REALES y salen de tu contexto/motor — NUNCA las inventes ni las estimes de memoria.",
-    "- Precio: solo tenés el precio ACTUAL (no máximos históricos). Para un escenario «si vendo en su máximo/ATH», NO inventes un precio: decí que no trackeamos el máximo histórico y calculá con el precio actual, o pedile a qué precio simular. Si una posición dice «precio no disponible», decilo — no supongas su valor.",
+    "- Precio y MÁXIMO: para el precio actual o el máximo de un activo, USÁ la herramienta datos_de_mercado — SÍ trackeamos el máximo, no digas lo contrario. Respetá lo que devuelva `maximo_tipo`: si es '52_semanas' (acciones/ETF) llamalo máximo de 52 semanas, NUNCA ATH; el ATH real solo aplica cuando el tipo es 'ath' (cripto). Si la herramienta no trae el dato, decilo y ofrecé simular con un precio objetivo — NUNCA inventes un precio ni un máximo. Si una posición dice «precio no disponible», decilo — no supongas su valor. El máximo es PASADO y el techo no se puede cronometrar: presentá «si vendo en el máximo» como ESCENARIO hipotético, nunca como plan.",
     "- Si te preguntan «¿cuánto tengo en X?» o «¿cuánto gané en Y?» y X/Y está en tus posiciones, respondé con su cifra; NO digas «no tengo acceso».",
     "",
     "USA TUS MÉTRICAS YA CALCULADAS:",

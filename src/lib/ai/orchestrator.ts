@@ -26,6 +26,7 @@ import {
   GOALS_TOOL,
   YEARS_TO_FREEDOM_TOOL,
   MARKET_DATA_TOOL,
+  SURPLUS_TOOL,
   simulateDebtPayoff,
   compareDebtStrategies,
   analyzeMinPayment,
@@ -195,6 +196,12 @@ async function buildKnowledge(messages: ChatMessage[], ctx: FinancialContext): P
 }
 
 /**
+ * Tope para el comparador abonar-vs-invertir: 5 lecturas en paralelo dentro de una iteración del
+ * tool-loop. Si tarda más que esto, mejor un error explicable que quemar el presupuesto de la ruta.
+ */
+const SURPLUS_TIMEOUT_MS = 6_000;
+
+/**
  * Construye el ejecutor de herramientas (SOLO lectura/cálculo) con los datos del
  * usuario. Mapea cada nombre de tool a su motor puro; herramienta desconocida → error
  * explicable (nunca escribe nada).
@@ -238,6 +245,33 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
         investableWealth: toolContext.investableWealth,
         currency: toolContext.currency,
       });
+    }
+    if (name === "comparar_abonar_vs_invertir") {
+      // El comparador REAL (fondos + base + moneda + deudas + FX, 5 lecturas en paralelo). Va
+      // acotado: corre DENTRO del tool-loop (hasta 3 iteraciones bajo maxDuration=60), así que no
+      // puede comerse el presupuesto. Si vence o falla, error explicable — NUNCA una comparación a
+      // medias, que sería peor que no responder.
+      try {
+        const { getSurplusDecision } = await import(
+          "@/modules/wealth/services/surplus-decision-service"
+        );
+        const { renderSurplusDecision } = await import("@/lib/ai/surplus-render");
+        const { withTimeout } = await import("@/lib/async/with-timeout");
+        const reporte = await withTimeout(getSurplusDecision(), SURPLUS_TIMEOUT_MS, null);
+        if (!reporte) {
+          return {
+            error:
+              "no pude leer tus datos para la comparación a tiempo (fondos de defensa, flujo libre y deudas). Reintentá en un momento.",
+          };
+        }
+        // `resumen_md` viene YA renderizado por plantilla determinista: el modelo lo pasa tal cual.
+        return { ...reporte, resumen_md: renderSurplusDecision(reporte) };
+      } catch {
+        return {
+          error:
+            "no pude armar la comparación abonar-vs-invertir con tus datos ahora mismo. Reintentá en un momento.",
+        };
+      }
     }
     if (name === "datos_de_mercado") {
       // Trae precio + máximo REAL de la capa market-data (cacheada, timeout corto → no suma 503) y
@@ -311,7 +345,13 @@ export const TOOLS_PROMPT_LINE =
   "actual y al máximo — NO inventes precio ni máximo. Respetá la honestidad del dato: si " +
   "maximo_tipo es '52_semanas' aclará que es el máximo de 52 semanas, no un ATH. El máximo es " +
   "PASADO: presentá la ganancia 'al máximo' como ESCENARIO hipotético, no como plan (no se puede " +
-  "cronometrar el techo). Si no trae el dato, decilo y ofrecé simular con un precio objetivo.";
+  "cronometrar el techo). Si no trae el dato, decilo y ofrecé simular con un precio objetivo. " +
+  "Si el usuario pregunta si ABONAR la deuda o INVERTIR, qué hacer con lo que le sobra, o si pagar " +
+  "la hipoteca o meter la plata a un ETF, USÁ comparar_abonar_vs_invertir — no armes esa " +
+  "comparación de memoria ni estimes retornos. Esa herramienta devuelve un campo `resumen_md` YA " +
+  "REDACTADO: pasalo TAL CUAL (íntegro, sin recortar escenarios ni caídas máximas) y agregá como " +
+  "mucho UNA frase corta de encuadre. No reescribas sus cifras ni las resumas en una sola línea: el " +
+  "rango con el peor caso visible ES la respuesta. Si devuelve `error`, decí qué no pudiste leer.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
@@ -363,6 +403,7 @@ export async function financeChatWithTools(
       GOALS_TOOL,
       YEARS_TO_FREEDOM_TOOL,
       MARKET_DATA_TOOL,
+      SURPLUS_TOOL,
     ],
     execute: buildToolExecutor(toolContext),
   });
