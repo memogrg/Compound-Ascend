@@ -1,4 +1,5 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
+import { getUserTimezone } from "@/lib/time/user-time";
 import { MobileHeader } from "../../components/mobile-header";
 import { getMyLink } from "@/lib/whatsapp/links-service";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
@@ -38,6 +39,7 @@ function tk(n: number): string {
 
 export default async function MobilePerfil() {
   const acc = await getAccountInfo();
+  const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
   const wa = await getMyLink().catch(() => null);
   const whatsappConfigured = isWhatsAppConfigured();
 
@@ -128,6 +130,7 @@ export default async function MobilePerfil() {
         {/* Ajustes gestionables (moneda · WhatsApp · hogar · notificaciones · ingesta · borrar) */}
         <ConfiguracionManager
           currency={acc.currency}
+          timezone={savedTz}
           notifications={acc.notifications}
           wa={wa}
           whatsappConfigured={whatsappConfigured}

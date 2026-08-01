@@ -5,9 +5,11 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import {
   updatePrimaryCurrency,
+  updateUserTimezone,
   clearAllFinancialData,
   updateNotificationChannel,
 } from "@/modules/account/services/account-service";
+import { TZ_COOKIE } from "@/lib/time/user-time";
 import {
   NOTIFICATION_CHANNELS,
   type NotificationChannel,
@@ -121,6 +123,27 @@ export async function updateNotificationPrefAction(
  * principal ni los datos: solo cómo se muestran los totales en los dashboards.
  * Para "Predeterminado" se borra la cookie y vuelve a usarse la moneda principal.
  */
+/**
+ * Guarda la zona horaria IANA del usuario: la persiste en user_settings y fija la
+ * cookie `tz` para que el PRIMER render server ya calcule "hoy / mes actual" en su
+ * zona (sin esperar a leer el perfil). La invoca el capturador silencioso del layout
+ * (con la zona del dispositivo) y el selector de Configuración.
+ */
+export async function saveUserTimezone(tz: string): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const ok = await updateUserTimezone(tz);
+    if (!ok) return { ok: false, message: "Zona horaria no válida." };
+    const store = await cookies();
+    store.set(TZ_COOKIE, tz, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+    PATHS.forEach((p) => revalidatePath(p));
+    return { ok: true };
+  } catch (err) {
+    logger.error("saveUserTimezone fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos guardar tu zona horaria." };
+  }
+}
+
 export async function setDisplayCurrencyAction(code: string): Promise<AccountActionResult> {
   const store = await cookies();
   if (code === "") {

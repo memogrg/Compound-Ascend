@@ -63,8 +63,8 @@ describe("period", () => {
   it("previousMonthPeriod cruza año", () => {
     expect(previousMonthPeriod(monthPeriod(2026, 1)).label).toBe("dic 2025");
   });
-  it("parseMonthParam usa el mes actual si el param es inválido", () => {
-    const p = parseMonthParam("xx", new Date(2026, 5, 15)); // junio
+  it("parseMonthParam cae al fallback si el param es inválido", () => {
+    const p = parseMonthParam("xx", monthPeriod(2026, 6)); // junio
     expect(p.month).toBe(6);
     expect(p.year).toBe(2026);
   });

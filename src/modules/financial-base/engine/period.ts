@@ -59,13 +59,19 @@ export function previousMonthPeriod(p: Period): Period {
   return monthPeriod(y, m);
 }
 
-/** Parsea "YYYY-MM" (o vacío) a periodo; cae al mes actual de `now`. */
-export function parseMonthParam(param: string | undefined | null, now: Date): Period {
+/**
+ * Parsea "YYYY-MM" (o vacío) a periodo; si el param no es válido, cae a `fallback`.
+ *
+ * El fallback es un `Period` YA construido (el mes actual del usuario, vía
+ * `userCurrentPeriod()`), NO un `Date`: derivar el mes de un `Date` aquí usaría los
+ * getters locales del servidor (UTC en Vercel) y rompería la zona del usuario.
+ */
+export function parseMonthParam(param: string | undefined | null, fallback: Period): Period {
   if (param && /^\d{4}-\d{2}$/.test(param)) {
     const [y, m] = param.split("-").map(Number);
     return monthPeriod(y!, m!);
   }
-  return monthPeriod(now.getFullYear(), now.getMonth() + 1);
+  return fallback;
 }
 
 /** "YYYY-MM" del periodo (para enlaces/deep-link). */

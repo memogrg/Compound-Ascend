@@ -1,4 +1,5 @@
 import { MobileHeader } from "../../components/mobile-header";
+import { userToday } from "@/lib/time/user-time";
 import {
   getDebtsOverview,
   getDebtDetail,
@@ -106,8 +107,8 @@ export default async function MobileDeudas() {
     .filter((d): d is DebtVM => Boolean(d));
   const next = ordered[0];
   // ¿La cuota más próxima ya venció? Solo presentación: el cálculo de nextDue no se toca.
-  // Fecha local en ISO ("sv-SE" da YYYY-MM-DD) para comparar cadenas sin líos de zona.
-  const todayIso = new Date().toLocaleDateString("sv-SE");
+  // "Hoy" en la ZONA DEL USUARIO (no la del servidor): compara cadenas YYYY-MM-DD.
+  const todayIso = await userToday();
   const overdue = Boolean(next?.nextDue && next.nextDue < todayIso);
 
   const items: DebtItem[] = ordered.map((vm, i) => ({

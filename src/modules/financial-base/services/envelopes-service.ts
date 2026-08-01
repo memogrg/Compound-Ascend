@@ -18,7 +18,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { householdMemberIds } from "@/lib/household/active";
 import { listCategoryTree } from "@/modules/financial-base/services/categories-service";
 import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
-import { parseMonthParam } from "@/modules/financial-base/engine/period";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 
 /** Frascos VINCULADOS: muestran entidades vivas, no sobres de gasto favoritos. */
 const LINKED_GROUP_KEYS = new Set(["g_libertad", "g_deudas", "g_defensa", "g_ahorro_lp"]);
@@ -41,7 +41,7 @@ export async function getEnvelopesSummary(): Promise<EnvelopesSummary> {
 
   const [tree, budget] = await Promise.all([
     listCategoryTree("expense"),
-    getBudgetTotals(parseMonthParam(undefined, new Date())),
+    getBudgetTotals(await userCurrentPeriod()),
   ]);
 
   // (a) Sobres de gasto: hojas favoritas de los frascos NORMALES, con presupuesto del mes.

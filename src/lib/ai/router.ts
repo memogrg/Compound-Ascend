@@ -16,6 +16,7 @@ import { formatMoney } from "@/lib/format";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
 import { detectCreateAction } from "@/lib/ai/action-lane";
+import { userToday } from "@/lib/time/user-time";
 import { projectInvestment } from "@/lib/ai/tools";
 import {
   parseMultiScope,
@@ -850,7 +851,7 @@ async function resolveFetchIntent(
           `No estoy seguro a qué sobre cargar «${desc}». ¿A cuál lo llevo — Restaurantes, Salidas…? Decímelo y te digo cuánto te queda.`,
         );
       }
-      const rem = await getSobreRemaining(sug.categoryId, new Date().toISOString().slice(0, 10));
+      const rem = await getSobreRemaining(sug.categoryId, await userToday());
       if (!rem) {
         return say(
           `Encontré ${sug.categoryPath ?? "tu sobre"} pero no pude leer su presupuesto ahora. Probá de nuevo en un momento.`,
@@ -881,7 +882,7 @@ async function resolveFetchIntent(
       const names = Array.isArray(params.names) ? (params.names as string[]) : [];
       if (names.length === 0) return null;
       const { listSobresForKind, suggestSobreForChatFast, getSobreRemaining } = await import("@/modules/financial-base");
-      const today = new Date().toISOString().slice(0, 10);
+      const today = await userToday();
       // El usuario NOMBRA el sobre → match por NOMBRE contra sus sobres reales (no el clasificador
       // comercio→sobre de puedo_gastar, que es para "¿me alcanza para X?"). Fallback: el clasificador.
       const sobres = await listSobresForKind("gasto").catch(() => [] as { id: string; sobre: string; frasco: string | null }[]);
@@ -1304,7 +1305,7 @@ export async function tryRouteQuery(
   const created = detectCreateAction(lastUser, {
     currency: toolContext.currency,
     holdings: (ctx.holdings ?? []).map((h) => ({ symbol: h.symbol, name: h.name, assetType: h.assetType })),
-    today: new Date().toISOString().slice(0, 10),
+    today: await userToday(),
   });
   if (created) return { response: created, tokensIn: 0, tokensOut: 0, lane: "template" };
 

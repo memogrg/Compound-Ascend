@@ -11,6 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { householdMemberIds } from "@/lib/household/active";
 import { getDisplayCurrency, monthlyize, type Frequency } from "@/modules/financial-base";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { computeTotalCommitment, type CommitmentBreakdown } from "@/modules/wealth/engine/total-commitment";
 
@@ -27,7 +28,7 @@ export async function getTotalMonthlyCommitment(opts?: { currency?: string }): P
   const [members, rates] = await Promise.all([householdMemberIds(supabase, user.id), getFxRates()]);
   const targetCurrency = opts?.currency ?? (await getDisplayCurrency());
 
-  const now = new Date();
+  const period = await userCurrentPeriod();
   const [budgetRows, debtRows, goalRows, policyRows, holdingRows] = await Promise.all([
     // Presupuesto del mes: TODAS las líneas de gasto (sin filtro esencial). El engine cuenta solo
     // los sobres propios (manual/recurring); las derivadas van por su entidad (regla #1).
@@ -36,8 +37,8 @@ export async function getTotalMonthlyCommitment(opts?: { currency?: string }): P
       .select("amount,currency,source_kind")
       .in("user_id", members)
       .eq("type", "expense")
-      .eq("period_month", now.getMonth() + 1)
-      .eq("period_year", now.getFullYear()),
+      .eq("period_month", period.month)
+      .eq("period_year", period.year),
     // TODAS las deudas vigentes (sin filtro esencial): cuota = current_payment (o min_payment).
     supabase.from("debts").select("current_payment,min_payment,currency").in("user_id", members).eq("is_current", true),
     // TODAS las metas: aporte mensual + policy_id (regla #2) + nombre.

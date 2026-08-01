@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
 import { getPrimaryCurrency, getDisplayCurrency } from "@/modules/financial-base";
+import { getUserTimezone } from "@/lib/time/user-time";
+import { TimezoneSync } from "@/components/tz/timezone-sync";
 import { CurrencyProvider } from "@/components/layout/currency-context";
 import { ToastProvider } from "../components/form-kit/toast";
 import { AppLockOverlay } from "../components/app-lock-overlay";
@@ -34,12 +36,15 @@ export default async function MobileAppLayout({ children }: { children: React.Re
   // Sin sesión (modo demo) no se consultan monedas del usuario: CRC/CRC de relleno. Con
   // sesión, las dos reales; best-effort para no tumbar el layout si el fetch falla.
   let currencies = { primary: "CRC", display: "CRC" };
+  let savedTz: string | null = null;
   if (user) {
-    const [primary, display] = await Promise.all([
+    const [primary, display, tz] = await Promise.all([
       getPrimaryCurrency().catch(() => "CRC"),
       getDisplayCurrency().catch(() => "CRC"),
+      getUserTimezone().catch(() => null),
     ]);
     currencies = { primary, display };
+    savedTz = tz;
   }
 
   return (
@@ -53,6 +58,8 @@ export default async function MobileAppLayout({ children }: { children: React.Re
         <AppLockOverlay />
         {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
         <WidgetSnapshotWriter />
+        {/* Captura silenciosa de la zona horaria del dispositivo (una vez, si no hay guardada). */}
+        <TimezoneSync savedTz={savedTz} />
         {children}
       </ToastProvider>
     </CurrencyProvider>

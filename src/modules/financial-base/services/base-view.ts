@@ -44,11 +44,12 @@ import {
 import { tryGenerateMonthlySnapshot } from "@/modules/financial-base/services/snapshot-service";
 import { computeV2Totals, composition } from "@/modules/financial-base/engine/base-v2";
 import { buildBaseReading, buildCapsule } from "@/modules/financial-base/engine/reading";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import type { V2View } from "@/modules/financial-base/components/v2/sections";
 
 export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promise<V2View | null> {
   if (!isSupabaseConfigured()) return null;
-  const period = parseMonthParam(periodRaw, new Date());
+  const period = parseMonthParam(periodRaw, await userCurrentPeriod());
 
   // Rango del histórico/cuadros (solo lo pasa el tab de Ingresos). Sin rango se
   // conserva la ventana de 6 meses que usan Mi Base, Gastos y Transacciones.

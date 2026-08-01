@@ -12,7 +12,8 @@ import {
   getRichLifeSummary,
   aggregateNetWorth,
 } from "@/modules/rich-life/services/rich-life-service";
-import { getExpenseRangeView, monthPeriod } from "@/modules/financial-base";
+import { getExpenseRangeView } from "@/modules/financial-base";
+import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import { getDebtsOverview, getIndexRates } from "@/modules/control";
 import { getLatest, getChange, findIndicator } from "@/lib/economic-indicators";
 import { isSupabaseConfigured, requireUser } from "@/lib/auth/session";
@@ -179,8 +180,7 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
     let budgetExpense: number | null = null;
     let realExpense: number | null = null;
     try {
-      const now = new Date();
-      const period = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+      const period = await userCurrentPeriod();
       const view = await getExpenseRangeView("1m", period);
       budgetExpense = view.budgetExpense;
       realExpense = view.realExpense;
@@ -199,7 +199,7 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
     try {
       const rates = await getIndexRates();
       const ov = await getDebtsOverview(rates);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = await userToday();
       const withDue = ov.debts
         .filter((d) => d.nextDue)
         .map((d) => ({ d, due: d.nextDue!.slice(0, 10) }));

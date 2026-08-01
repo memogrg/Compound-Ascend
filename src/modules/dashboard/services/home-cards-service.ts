@@ -16,8 +16,8 @@ import {
   getBudgetTotals,
   getBaseSummary,
   getDisplayCurrency,
-  monthPeriod,
 } from "@/modules/financial-base";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { getControlSummary, getDebtsOverview } from "@/modules/control";
 import { getPortfolioReport, getWealthSummary, getPatrimonioReport } from "@/modules/wealth";
 import { getRichLifeSummary } from "@/modules/rich-life";
@@ -39,8 +39,7 @@ const safe = <T>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
 
 /** Datos de las 9 fichas del carrusel del home. Cada ficha es `null` si su fuente falló. */
 export async function getHomeCardsData(): Promise<HomeCards> {
-  const now = new Date();
-  const period = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+  const period = await userCurrentPeriod();
 
   const [mf, real, budget, base, control, debts, portfolio, wealth, richLife, patrimonio, currency] =
     await Promise.all([

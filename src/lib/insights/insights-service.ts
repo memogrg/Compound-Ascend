@@ -120,9 +120,7 @@ async function getDisfruteSpend(): Promise<{
   const { listTransactions } = await import(
     "@/modules/financial-base/services/transaction-service"
   );
-  const { monthPeriod, previousMonthPeriod } = await import(
-    "@/modules/financial-base/engine/period"
-  );
+  const { previousMonthPeriod } = await import("@/modules/financial-base/engine/period");
 
   const cats = await listCategories();
   const root = cats.find((c) => c.key === "disfrute");
@@ -141,15 +139,15 @@ async function getDisfruteSpend(): Promise<{
     }
   }
 
-  const sumFor = async (period: ReturnType<typeof monthPeriod>): Promise<number> => {
+  const sumFor = async (period: ReturnType<typeof previousMonthPeriod>): Promise<number> => {
     const txns = await listTransactions(period, { kind: "gasto" });
     return txns
       .filter((t) => t.categoryId && ids.has(t.categoryId))
       .reduce((acc, t) => acc + t.amount, 0);
   };
 
-  const now = new Date();
-  const cur = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+  const { userCurrentPeriod } = await import("@/lib/time/user-time");
+  const cur = await userCurrentPeriod();
   const p1 = previousMonthPeriod(cur);
   const p2 = previousMonthPeriod(p1);
   const p3 = previousMonthPeriod(p2);

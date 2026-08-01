@@ -11,6 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { householdMemberIds } from "@/lib/household/active";
 import { getDisplayCurrency, monthlyize, type Frequency } from "@/modules/financial-base";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import {
   computeEssentialMonthly,
@@ -46,7 +47,7 @@ export async function getEssentialMonthlyExpense(
   ]);
   const targetCurrency = opts?.currency ?? (await getDisplayCurrency());
 
-  const now = new Date();
+  const period = await userCurrentPeriod();
   const [budgetRows, debtRows, goalRows, policyRows] = await Promise.all([
     // Presupuesto del mes: solo líneas de gasto de sobres esenciales. El engine
     // filtra por source_kind (regla #1); traemos source_kind para eso.
@@ -55,8 +56,8 @@ export async function getEssentialMonthlyExpense(
       .select("amount,currency,source_kind,category_id,expense_categories!inner(is_essential)")
       .in("user_id", members)
       .eq("type", "expense")
-      .eq("period_month", now.getMonth() + 1)
-      .eq("period_year", now.getFullYear())
+      .eq("period_month", period.month)
+      .eq("period_year", period.year)
       .eq("expense_categories.is_essential", true),
     // Deudas esenciales: cuota = current_payment (o min_payment) mensual.
     supabase

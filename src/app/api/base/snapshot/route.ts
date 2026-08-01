@@ -24,11 +24,13 @@ async function handle(req: Request) {
 
   const { monthPeriod, previousMonthPeriod } =
     await import("@/modules/financial-base/engine/period");
-  const now = new Date();
-  const closed = previousMonthPeriod(monthPeriod(now.getFullYear(), now.getMonth() + 1));
 
   try {
     if (isCronRequest(req)) {
+      // Cron (todos los usuarios, sin sesión): el mes cerrado se ancla en UTC — es un
+      // job de sistema que corre a una hora fija de UTC, no la vista de un usuario.
+      const now = new Date();
+      const closed = previousMonthPeriod(monthPeriod(now.getFullYear(), now.getMonth() + 1));
       const { generateSnapshotsForAllUsers } =
         await import("@/modules/financial-base/services/snapshot-service");
       const res = await generateSnapshotsForAllUsers(closed);
@@ -37,6 +39,9 @@ async function handle(req: Request) {
 
     const user = await getUser();
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    // Usuario autenticado: el "mes cerrado" es el anterior a SU mes actual (su zona).
+    const { userCurrentPeriod } = await import("@/lib/time/user-time");
+    const closed = previousMonthPeriod(await userCurrentPeriod());
     const { generateMonthlySnapshot } =
       await import("@/modules/financial-base/services/snapshot-service");
     await generateMonthlySnapshot(closed);

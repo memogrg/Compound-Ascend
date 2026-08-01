@@ -5,12 +5,12 @@ import { getExpenseRangeView } from "@/modules/financial-base/services/expense-r
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sections";
 import { createSavingsSobreAction } from "@/modules/control";
+import { userToday } from "@/lib/time/user-time";
 
-/** Fecha de corte de los frascos: ?asOf=YYYY-MM-DD válido, o el día de hoy. */
-function resolveAsOf(raw: string | undefined): string {
+/** Fecha de corte de los frascos: ?asOf=YYYY-MM-DD válido, o el día de hoy (zona del usuario). */
+async function resolveAsOf(raw: string | undefined): Promise<string> {
   if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return userToday();
 }
 
 /** Gastos — ruta propia. Lee del mismo modelo V2 (budget_items + transactions). */
@@ -32,7 +32,7 @@ export default async function Page({
 
   // Filtro propio de "Categorías de gasto": los frascos reflejan el mes del día
   // elegido, con el gasto real cortado a ese día. No re-scopea cards ni gráficas.
-  const asOf = resolveAsOf(sp.asOf);
+  const asOf = await resolveAsOf(sp.asOf);
   const [ay, am] = asOf.split("-").map(Number) as [number, number];
   const jarsPeriod = monthPeriod(ay, am);
 

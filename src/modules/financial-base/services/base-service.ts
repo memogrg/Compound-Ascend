@@ -13,7 +13,7 @@ import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
-import { monthPeriod } from "@/modules/financial-base/engine/period";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { convertCurrency, SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type {
@@ -265,8 +265,7 @@ async function computeV2Totals(
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const memberIds = await householdMemberIds(supabase, user.id);
-  const now = new Date();
-  const p = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+  const p = await userCurrentPeriod();
 
   const [bi, tx] = await Promise.all([
     supabase

@@ -2,7 +2,7 @@ import { MobileHeader } from "../../components/mobile-header";
 import { MEmptyState } from "../../components/content-kit";
 import { loadBaseView } from "@/modules/financial-base/services/base-view";
 import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
-import { monthPeriod } from "@/modules/financial-base";
+import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import { GastosManager } from "./gastos-manager";
 
@@ -55,9 +55,8 @@ export default async function MobileGastos() {
     );
   }
 
-  const now = new Date();
-  const period = monthPeriod(now.getFullYear(), now.getMonth() + 1);
-  const asOf = now.toISOString().slice(0, 10);
+  const period = await userCurrentPeriod();
+  const asOf = await userToday();
   const currency = view.currency;
   const jars = await getExpenseJarsAsOf({ tree: view.tree, period, asOf, currency });
 

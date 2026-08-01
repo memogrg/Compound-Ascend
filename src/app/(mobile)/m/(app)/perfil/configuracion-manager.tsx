@@ -21,6 +21,7 @@ import { useThemeMode } from "../../components/use-theme-mode";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   updateCurrencyAction,
+  saveUserTimezone,
   linkWhatsAppAction,
   revokeWhatsAppAction,
   updateNotificationPrefAction,
@@ -54,7 +55,7 @@ import { AppLockToggle } from "../../components/app-lock-toggle";
 import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/app-lock";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
-type SheetId = "currency" | "theme" | "whatsapp" | "household" | "password" | null;
+type SheetId = "currency" | "timezone" | "theme" | "whatsapp" | "household" | "password" | null;
 
 /** Etiquetas del selector de apariencia. "Sistema" primero: es el valor por defecto y el
  *  que la mayoría deja puesto. */
@@ -75,6 +76,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ConfiguracionManager({
   currency,
+  timezone,
   notifications,
   wa,
   whatsappConfigured,
@@ -83,6 +85,7 @@ export function ConfiguracionManager({
   emailConfigured,
 }: {
   currency: string;
+  timezone: string | null;
   notifications: NotificationPrefs;
   wa: WaLink;
   whatsappConfigured: boolean;
@@ -113,6 +116,19 @@ export function ConfiguracionManager({
           chevron
           onClick={() => setSheet("currency")}
           ariaLabel="Cambiar moneda principal"
+        />
+        <MDataRow
+          leading={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} style={{ width: 19, height: 19 }}>
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20M3 12h18" strokeLinecap="round" />
+            </svg>
+          }
+          title="Zona horaria"
+          subtitle={timezone ?? "Detectada de tu dispositivo"}
+          chevron
+          onClick={() => setSheet("timezone")}
+          ariaLabel="Cambiar zona horaria"
         />
         <MDataRow
           leading={
@@ -216,6 +232,11 @@ export function ConfiguracionManager({
       {/* Hoja: moneda */}
       <BottomSheet open={sheet === "currency"} onClose={() => setSheet(null)} title="Moneda principal">
         <CurrencySheet current={currency} onDone={() => setSheet(null)} />
+      </BottomSheet>
+
+      {/* Hoja: zona horaria */}
+      <BottomSheet open={sheet === "timezone"} onClose={() => setSheet(null)} title="Zona horaria">
+        <TimezoneSheet current={timezone} onDone={() => setSheet(null)} />
       </BottomSheet>
 
       {/* Hoja: apariencia */}
@@ -454,6 +475,68 @@ function CurrencySheet({ current, onDone }: { current: string; onDone: () => voi
           <span className="m-opt-t">{c.label}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Lista de zonas IANA del navegador; si no está disponible, al menos la actual. */
+function tzZones(current: string | null): string[] {
+  try {
+    const all = (
+      Intl as unknown as { supportedValuesOf?: (key: string) => string[] }
+    ).supportedValuesOf?.("timeZone");
+    if (all && all.length) return all;
+  } catch {
+    // Intl.supportedValuesOf no soportado: se cae a la actual.
+  }
+  return current ? [current] : ["UTC"];
+}
+
+/**
+ * Selector de zona horaria. Native `<select>`: con ~400 zonas, el picker del sistema
+ * (con su búsqueda) es mejor UX que una lista de botones. Persiste con saveUserTimezone.
+ */
+function TimezoneSheet({ current, onDone }: { current: string | null; onDone: () => void }) {
+  const router = useRouter();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  const pick = async (tz: string) => {
+    if (!tz || tz === current) return onDone();
+    setBusy(true);
+    const res = await saveUserTimezone(tz);
+    setBusy(false);
+    if (res.ok) {
+      document.cookie = `tz=${encodeURIComponent(tz)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+      toast.show("Zona horaria actualizada", "success");
+      onDone();
+      router.refresh();
+    } else {
+      toast.show(res.message ?? "No se pudo cambiar la zona horaria", "error");
+    }
+  };
+
+  return (
+    <div style={{ padding: "4px 4px 10px" }}>
+      <select
+        className="sel"
+        defaultValue={current ?? ""}
+        disabled={busy}
+        onChange={(e) => pick(e.target.value)}
+        aria-label="Zona horaria"
+        style={{ width: "100%" }}
+      >
+        {current == null ? (
+          <option value="" disabled>
+            Detectada de tu dispositivo
+          </option>
+        ) : null}
+        {tzZones(current).map((z) => (
+          <option key={z} value={z}>
+            {z}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
