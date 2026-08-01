@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^9.1.2",
-    "@capacitor/app": "^7.1.2",
+    "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^7.6.7",
     "@capacitor/preferences": "^7.0.4",
     "@floating-ui/react": "^0.27.20",
