@@ -329,6 +329,10 @@ export function AssistantConversation({
   const idRef = useRef(1);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  // Cerrojo de envío en un ref, NO en el estado: dos clicks en el mismo tick leen el mismo
+  // `sending === false` (React aún no re-renderizó) y ambos pasaban la guarda. El resultado
+  // eran dos turnos `user` seguidos, que Gemini rechaza con 400 por romper la alternancia.
+  const sendingRef = useRef(false);
 
   const nextId = () => idRef.current++;
 
@@ -374,7 +378,8 @@ export function AssistantConversation({
 
   const send = async (raw: string) => {
     const q = raw.trim();
-    if (!q || sending) return;
+    if (!q || sendingRef.current) return;
+    sendingRef.current = true;
     setInput("");
     // Solo los últimos turnos como CONTEXTO (no toda la conversación): acota el prompt y evita
     // re-responder temas viejos. El servidor además usa su propia memoria reciente.
@@ -418,6 +423,7 @@ export function AssistantConversation({
         : "Hubo un problema de conexión.";
       setMessages((m) => [...m, { id: nextId(), role: "assistant", text }]);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
