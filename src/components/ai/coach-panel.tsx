@@ -15,6 +15,7 @@
  * Ninguna acción financiera se ejecuta sin confirmación del usuario.
  */
 import { useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
@@ -46,6 +47,7 @@ function todayISO(): string {
 export function CoachPanel() {
   // PRINCIPAL, no la de visualización: es la moneda con la que se captura.
   const captureCurrency = useCaptureCurrency();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("assistant");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -86,6 +88,11 @@ export function CoachPanel() {
       setScanning(false);
     }
   };
+
+  // En /asistente el FAB no aporta —ya estás en la conversación— y en móvil se monta justo
+  // encima del botón de enviar. Sigue disponible en TODAS las demás pantallas.
+  // El early return va después de los hooks: el orden no puede variar entre renders.
+  if (pathname.startsWith("/asistente")) return null;
 
   return (
     <>

@@ -22,7 +22,10 @@ export type NavGroup = { label: string; items: NavItem[] };
 export const NAV: NavGroup[] = [
   {
     label: "Resumen",
-    items: [{ id: "dashboard", name: "Centro de mando", icon: "dashboard", href: "/dashboard" }],
+    items: [
+      { id: "dashboard", name: "Centro de mando", icon: "dashboard", href: "/dashboard" },
+      { id: "assistant", name: "Asistente", icon: "spark", href: "/asistente" },
+    ],
   },
   {
     label: "Presupuesto",
@@ -66,9 +69,10 @@ export const NAV: NavGroup[] = [
   },
 ];
 
-/** Ítems de la barra inferior móvil (5 destinos principales). */
+/** Ítems de la barra inferior móvil (6 destinos principales). */
 export const BOTTOM_NAV: NavItem[] = [
   { id: "dashboard", name: "Centro de mando", icon: "dashboard", href: "/dashboard" },
+  { id: "assistant", name: "Asistente", icon: "spark", href: "/asistente" },
   { id: "base", name: "Base", icon: "budget", href: "/mi-base-financiera" },
   { id: "control", name: "Ahorro", icon: "savings", href: "/control-financiero" },
   { id: "wealth", name: "Portafolio de inversiones", icon: "invest", href: "/patrimonio" },

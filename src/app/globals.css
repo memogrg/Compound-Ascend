@@ -1245,6 +1245,125 @@ input[type="radio"] {
   border-left: 2px solid var(--pos);
 }
 
+/* ---------- Tab de página completa (/asistente) ----------
+   Mismo componente que el panel, otro contenedor: ocupa el área de contenido, con
+   burbujas amplias y CUERPO 15px (el panel se queda en 13px por su ancho de 392px). */
+.ac-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 96px); /* topbar (~51px) + padding vertical de .content (44px) */
+  min-height: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.ac-page-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.ac-page-top .spark {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+  flex: none;
+}
+.ac-page-top .spark svg {
+  width: 20px;
+  height: 20px;
+}
+.ac-page-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+.ac-page-sub {
+  font-size: 12.5px;
+  color: var(--pos);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.ac-page-sub::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pos);
+}
+.ac-page .ac-toolbar {
+  padding: 10px 24px 0;
+}
+.ac-page .coach-body {
+  padding: 22px 24px;
+  gap: 18px;
+}
+.ac-page .coach-msg {
+  max-width: 800px;
+  gap: 12px;
+}
+.ac-page .coach-msg .ava {
+  width: 30px;
+  height: 30px;
+}
+.ac-page .coach-msg .ava svg {
+  width: 16px;
+  height: 16px;
+}
+/* CUERPO 15px: el tab se lee de lejos, no es el panel de 392px. */
+.ac-page .coach-bubble {
+  font-size: 15px;
+  line-height: 1.62;
+  padding: 13px 17px;
+  border-radius: 16px;
+  border-top-left-radius: 6px;
+}
+.ac-page .coach-msg.me .coach-bubble {
+  border-radius: 16px;
+  border-top-right-radius: 6px;
+}
+.ac-page .ac-thinking {
+  font-size: 13px;
+  padding-left: 42px;
+}
+.ac-page .ac-card-wrap {
+  padding-left: 42px;
+  max-width: 800px;
+}
+.ac-page .coach-chips {
+  padding: 0 24px 10px;
+}
+.ac-page .coach-chip {
+  font-size: 13px;
+}
+.ac-page .coach-input {
+  padding: 12px 24px calc(14px + env(safe-area-inset-bottom));
+  gap: 10px;
+  background: var(--surface);
+}
+.ac-page .coach-input input {
+  min-height: 44px;
+  font-size: 15px;
+  padding: 11px 14px;
+}
+.ac-page .coach-send,
+.ac-page .ac-cam {
+  width: 44px;
+  height: 44px;
+}
+.ac-page .coach-send svg,
+.ac-page .ac-cam svg {
+  width: 18px;
+  height: 18px;
+}
+
 .ring-wrap {
   position: relative;
   display: inline-grid;
@@ -1319,6 +1438,27 @@ input[type="radio"] {
   }
   .coach-fab {
     bottom: 78px;
+  }
+  /* El área de contenido pierde alto por el tabbar inferior: .content pasa a
+     16px arriba + 90px abajo (contra 22+22), así que el tab respira 60px menos. */
+  .ac-page {
+    height: calc(100dvh - 157px);
+  }
+  .ac-page-top,
+  .ac-page .ac-toolbar,
+  .ac-page .coach-body,
+  .ac-page .coach-chips,
+  .ac-page .coach-input {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .ac-page .coach-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .ac-page .coach-chip {
+    flex: none;
   }
   .coach-panel {
     right: 0;

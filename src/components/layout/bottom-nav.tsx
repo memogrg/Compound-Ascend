@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 /** Etiquetas cortas del tabbar (los nombres completos del NAV no caben en móvil). */
 const SHORT_LABEL: Record<string, string> = {
   dashboard: "Centro",
+  assistant: "Agente",
   base: "Base",
   control: "Ahorro",
   wealth: "Portafolio",

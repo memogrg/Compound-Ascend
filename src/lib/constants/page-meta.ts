@@ -6,6 +6,11 @@ export type PageMeta = { crumb: string; title: string; titleHTML?: string };
 
 export const PAGE_META: Record<string, PageMeta> = {
   "/dashboard": { crumb: "Resumen", title: "Panel", titleHTML: 'Tu <span class="it">panel</span>' },
+  "/asistente": {
+    crumb: "Resumen",
+    title: "Asistente",
+    titleHTML: 'Tu <span class="it">asistente</span>',
+  },
   "/mi-perfil-financiero": {
     crumb: "Perfil",
     title: "Mi Perfil Financiero",
