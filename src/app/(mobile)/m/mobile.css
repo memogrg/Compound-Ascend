@@ -3083,6 +3083,274 @@ body:has(.m-shell[data-theme="dark"]) {
   white-space: nowrap;
 }
 
+/* ═══ Piloto Inicio · Delta 2 — gráficos del `vis` de las 9 fichas ═══════════
+   Todos viven en la columna derecha (.m-hcard-vis, flex:none) y caben en el alto
+   del cuerpo de la ficha. Compactos a propósito: la altura de .m-hcard es fija,
+   así que ningún gráfico puede empujarla. Un ajuste aquí se propaga a su ficha en
+   las 9 sin tocar el chasis. Semántica de color: verde entra/crece, rojo sale. */
+
+/* Estado degradado común (sin datos / sin proyección). */
+.m-shell .m-hficha-empty {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* — Dona + leyenda (Ingresos activo/pasivo · Inversiones · Patrimonio) — */
+.m-shell .m-hficha-donut {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.m-shell .m-hficha-donut-svg {
+  width: 58px;
+  height: 58px;
+  flex: none;
+}
+.m-shell .m-hficha-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.m-shell .m-hficha-leg {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.m-shell .m-hficha-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+.m-shell .m-hficha-leg-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.m-shell .m-hficha-leg-l {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.m-shell .m-hficha-leg-v {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* — Barras agrupadas plan·real, línea base común (Presupuesto) — */
+.m-shell .m-hficha-gb {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.m-shell .m-hficha-gb-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.m-shell .m-hficha-gb-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+.m-shell .m-hficha-gb-bar {
+  width: 13px;
+  border-radius: 3px 3px 0 0;
+}
+.m-shell .m-hficha-gb-l {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+.m-shell .m-hficha-gb-v {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+}
+.m-shell .m-hficha-gb-v b {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.m-shell .m-hficha-gb-plan {
+  font-size: 8.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* — Ranking horizontal, escala del mayor (Gastos) — */
+.m-shell .m-hficha-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 150px;
+}
+.m-shell .m-hficha-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-shell .m-hficha-rank-l {
+  width: 44px;
+  flex: none;
+  font-size: 9.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-shell .m-hficha-rank-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.m-shell .m-hficha-rank-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.m-shell .m-hficha-rank-v {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+/* — Proyección de cierre: línea saldo→0 (Deudas) — */
+.m-shell .m-hficha-payoff {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 132px;
+}
+.m-shell .m-hficha-payoff-svg {
+  width: 100%;
+  height: 46px;
+  display: block;
+}
+.m-shell .m-hficha-payoff-ax {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.m-shell .m-hficha-payoff-ax b {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+.m-shell .m-hficha-payoff-flat {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.m-shell .m-hficha-payoff-x {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.m-shell .m-hficha-payoff-note {
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+/* — Checklist de protecciones base ✓/✗ (Protección) — */
+.m-shell .m-hficha-check {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.m-shell .m-hficha-check-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-shell .m-hficha-check-i {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  flex: none;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.m-shell .m-hficha-check-row.on .m-hficha-check-i {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.m-shell .m-hficha-check-l {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.m-shell .m-hficha-check-row.on .m-hficha-check-l {
+  color: var(--text);
+}
+
+/* — Hitos de la escalera, monto + % (Libertad) — */
+.m-shell .m-hficha-miles {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 150px;
+}
+.m-shell .m-hficha-mile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.m-shell .m-hficha-mile-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--text-dim);
+  box-sizing: border-box;
+  flex: none;
+}
+.m-shell .m-hficha-mile-l {
+  width: 58px;
+  flex: none;
+  font-size: 9.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-shell .m-hficha-mile.on .m-hficha-mile-l {
+  color: var(--text);
+}
+.m-shell .m-hficha-mile-v {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
 .m-shell .m-hcard-msg {
   font-size: 11.5px;
   line-height: 1.35;
