@@ -1758,7 +1758,8 @@ body:has(.m-shell[data-theme="dark"]) {
   border-radius: 16px;
   border-top-left-radius: 5px;
   padding: 11px 14px;
-  font-size: 14.5px;
+  /* CUERPO 15px, a la par del tab de la web (el asistente comparte componente). */
+  font-size: 15px;
   line-height: 1.5;
   color: var(--text);
   white-space: pre-wrap;
@@ -1856,6 +1857,42 @@ body:has(.m-shell[data-theme="dark"]) {
   color: var(--success);
   font-size: 13.5px;
   font-weight: 600;
+}
+/* Piezas de la tarjeta que antes iban con estilos en línea; ahora son clases porque el
+   markup lo genera <AssistantConversation> (compartido con la web) y solo cambia la piel. */
+.m-shell .m-confirm-sub {
+  font-size: 12.5px;
+  margin-top: 3px;
+}
+.m-shell .m-confirm-name {
+  font-size: 16px;
+}
+.m-shell .m-confirm-tag {
+  margin-top: 8px;
+}
+.m-shell .m-confirm-err {
+  margin-top: 8px;
+}
+.m-shell .m-field-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+/* Fila del transcript (entre el header y los mensajes). */
+.m-shell .m-chat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 10px 16px 0;
+}
+.m-shell .m-chat-toolbar .m-btn {
+  font-size: 12px;
+  padding: 6px 10px;
+  min-height: 34px;
+}
+.m-shell .m-chat-toolbar-msg {
+  font-size: 11.5px;
+  margin-right: auto;
 }
 
 /* barra de entrada fija (abajo, respeta safe area; esta ruta no monta botón de crear) */
