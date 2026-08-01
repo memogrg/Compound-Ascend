@@ -389,9 +389,8 @@ async function adoptedExpenseIds(): Promise<Set<string>> {
   try {
     const { getBudgetTotals } = await import("@/modules/financial-base/services/budget-service");
     const { getRealTotals } = await import("@/modules/financial-base/services/transaction-service");
-    const { monthPeriod } = await import("@/modules/financial-base/engine/period");
-    const now = new Date();
-    const period = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+    const { userCurrentPeriod } = await import("@/lib/time/user-time");
+    const period = await userCurrentPeriod();
     const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
     for (const [k, v] of Object.entries(budget.expenseByKey)) if (v.value > 0) set.add(k);
     for (const [k, v] of Object.entries(real.expenseByKey)) if (v.value > 0) set.add(k);

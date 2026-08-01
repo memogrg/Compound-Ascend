@@ -1,5 +1,7 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
+import { getUserTimezone } from "@/lib/time/user-time";
 import { CurrencySelector } from "@/modules/account/components/currency-selector";
+import { TimezoneSelector } from "@/modules/account/components/timezone-selector";
 import { NotificationPrefs } from "@/modules/account/components/notification-prefs";
 import { EmailTester } from "@/modules/account/components/email-tester";
 import { WhatsAppLink } from "@/modules/account/components/whatsapp-link";
@@ -46,6 +48,7 @@ function SetRow({
  */
 export default async function Page() {
   const acc = await getAccountInfo();
+  const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
   const usagePct =
     acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
   const whatsappLink = isSupabaseConfigured() ? await getMyLink() : null;
@@ -116,6 +119,13 @@ export default async function Page() {
         desc="Se usa para mostrar tus cifras y como predeterminada al agregar ítems nuevos."
       >
         <CurrencySelector current={acc.currency} />
+      </SetRow>
+
+      <SetRow
+        title="Zona horaria"
+        desc="Con ella calculamos tu “mes actual” y “hoy”. Se detecta sola de tu dispositivo; cámbiala si prefieres fijarla."
+      >
+        <TimezoneSelector current={savedTz} />
       </SetRow>
 
       <SetRow

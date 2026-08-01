@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { monedaDelPagoEsCoherente } from "@/modules/control/engine/debt-strategy";
 import {
   registerLinkedTransaction,
@@ -353,7 +354,8 @@ export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, st
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const memberIds = await householdMemberIds(supabase, user.id);
-  const monthStart = `${new Date().toISOString().slice(0, 8)}01`; // yyyy-mm-01
+  // Primer día del mes actual EN LA ZONA DEL USUARIO (period.from = "YYYY-MM-01").
+  const { from: monthStart } = await userCurrentPeriod();
   const { data } = await supabase
     .from("debt_payments")
     .select("debt_id,occurred_on")

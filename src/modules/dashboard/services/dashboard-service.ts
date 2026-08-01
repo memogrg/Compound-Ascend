@@ -5,7 +5,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { computeBaseIndicators } from "@/modules/financial-base";
-import { getMonthFlow, monthPeriod, type MonthFlow } from "@/modules/financial-base";
+import { getMonthFlow, type MonthFlow } from "@/modules/financial-base";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { computeHealthScore, type HealthScore } from "@/modules/financial-base";
 import { buildInsights, type DashboardInsights } from "@/modules/dashboard/engine/insights";
 import { getControlSummary, type ControlSummary } from "@/modules/control";
@@ -142,9 +143,7 @@ export async function getDashboardData(
   // Best-effort: si falla, el pilar cae al plan (comportamiento anterior).
   let monthFlow: MonthFlow | null = null;
   if (configured && user) {
-    const now = new Date();
-    monthFlow = (await conLimite(getMonthFlow(monthPeriod(now.getFullYear(), now.getMonth() + 1))))
-      .valor;
+    monthFlow = (await conLimite(getMonthFlow(await userCurrentPeriod()))).valor;
   }
 
   const panel = buildPanel({ ind: summary.indicators, currency, control, richLife, wealth, monthFlow });

@@ -7,6 +7,7 @@ import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { registerPurchaseExpense } from "./holdings-service";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { selectPlansToCharge, planPaidUntil, type PlanPeriod } from "@/modules/wealth/engine/premiums";
 
 const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
@@ -24,9 +25,9 @@ const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
 export async function ensureMonthlyContributions(): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const now = new Date();
-  const periodYear = now.getFullYear();
-  const periodMonth = now.getMonth() + 1;
+  const period = await userCurrentPeriod();
+  const periodYear = period.year;
+  const periodMonth = period.month;
 
   const { data: holdings, error } = await supabase
     .from("investment_holdings")
@@ -170,13 +171,13 @@ export async function listOpenContributions(): Promise<OpenContribution[]> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const memberIds = await householdMemberIds(supabase, user.id);
-  const now = new Date();
+  const period = await userCurrentPeriod();
   const { data, error } = await supabase
     .from("holding_contributions")
     .select("id, holding_id, amount, unit_price, currency, status")
     .in("user_id", memberIds)
-    .eq("period_year", now.getFullYear())
-    .eq("period_month", now.getMonth() + 1)
+    .eq("period_year", period.year)
+    .eq("period_month", period.month)
     .in("status", ["auto", "pendiente"]);
   if (error || !data) return [];
   const holdingIds = [...new Set(data.map((r) => r.holding_id))];
@@ -282,10 +283,10 @@ export async function adjustContributionPrice(
 export async function ensureMonthlyPremiums(): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const now = new Date();
-  const periodYear = now.getFullYear();
-  const periodMonth = now.getMonth() + 1;
-  const periodStart = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
+  const period = await userCurrentPeriod();
+  const periodYear = period.year;
+  const periodMonth = period.month;
+  const periodStart = period.from;
 
   const { data: plans, error } = await supabase
     .from("investment_holdings")
@@ -409,9 +410,9 @@ export async function advancePremiums(
     m = last.period_month + 1;
     if (m > 12) { m = 1; y += 1; }
   } else {
-    const now = new Date();
-    y = now.getFullYear();
-    m = now.getMonth() + 1;
+    const period = await userCurrentPeriod();
+    y = period.year;
+    m = period.month;
   }
 
   const maturity = p.maturity_date ? new Date(p.maturity_date) : null;
@@ -444,12 +445,12 @@ export async function advancePremiums(
     .eq("id", holdingId)
     .eq("user_id", user.id);
 
-  const now = new Date();
+  const period = await userCurrentPeriod();
   await registerPurchaseExpense({
     holdingId,
     label: p.label ?? "Plan a plazo",
     currency: p.currency,
-    purchaseDate: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`,
+    purchaseDate: period.from,
     amount: total,
     verb: "Adelanto",
   });

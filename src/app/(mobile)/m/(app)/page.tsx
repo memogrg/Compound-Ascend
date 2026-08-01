@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth/session";
 import { getDashboardData, getHomeCardsData } from "@/modules/dashboard";
+import { userHour } from "@/lib/time/user-time";
 import { SurplusDecision, getSurplusDecision } from "@/modules/wealth";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
 import { MHomeCarousel } from "../components/home-carousel";
@@ -28,8 +29,7 @@ import { HomeAddLauncher } from "../components/home-add-launcher";
  */
 export const dynamic = "force-dynamic"; // datos por sesión/usuario: nunca estático
 
-function greeting(now: Date): string {
-  const h = now.getHours();
+function greeting(h: number): string {
   if (h < 12) return "Buenos días";
   if (h < 19) return "Buenas tardes";
   return "Buenas noches";
@@ -137,7 +137,7 @@ export default async function MobileHome() {
           </Link>
         )}
         {/* Header sticky de cristal unificado (variant home): logo + saludo + chat/campana/menú. */}
-        <MobileHeader variant="home" greeting={greeting(now)} name={data.name} />
+        <MobileHeader variant="home" greeting={greeting(await userHour())} name={data.name} />
 
         {/* A-01: el Flujo del mes REAL (operativo) como línea de contexto — para que el home
             deje de mezclar plan (Ingresos) y adherencia (Presupuesto) sin decir lo que de

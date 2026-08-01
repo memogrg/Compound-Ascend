@@ -55,6 +55,8 @@ export type UserSettingsRow = Timestamps & {
   notifications: Record<string, boolean>;
   /** Meses de gasto esencial para el fondo de paz (3-6, default 3). Preferencia personal. */
   peace_fund_months: number;
+  /** Zona horaria IANA del usuario (p.ej. "America/Costa_Rica"). Null → cookie tz o UTC. */
+  timezone: string | null;
 };
 
 export type HouseholdRow = Timestamps & {

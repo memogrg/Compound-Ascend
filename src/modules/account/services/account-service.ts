@@ -3,6 +3,7 @@ import "server-only";
 /** Datos de cuenta: plan, consumo de IA, moneda y limpieza de datos. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUser, isSupabaseConfigured, requireUser } from "@/lib/auth/session";
+import { isValidTimeZone } from "@/lib/time/user-time";
 import { aiTokenLimit, type Plan } from "@/lib/plan";
 import {
   setNotificationChannel,
@@ -123,6 +124,21 @@ export async function updatePrimaryCurrency(code: string): Promise<void> {
   await supabase
     .from("user_settings")
     .upsert({ user_id: user.id, primary_currency: code }, { onConflict: "user_id" });
+}
+
+/**
+ * Guarda la zona horaria IANA del usuario (user_settings.timezone). El cálculo de
+ * "mes/día actual" del servidor la usa para no depender de la hora del servidor (UTC).
+ * Devuelve false si la zona no es válida (no se persiste basura).
+ */
+export async function updateUserTimezone(tz: string): Promise<boolean> {
+  if (!isValidTimeZone(tz)) return false;
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("user_settings")
+    .upsert({ user_id: user.id, timezone: tz }, { onConflict: "user_id" });
+  return !error;
 }
 
 /** Borra todos los datos financieros del usuario y la marca de ejemplo. */

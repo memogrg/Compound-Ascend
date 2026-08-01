@@ -4,6 +4,8 @@ import {
   getDisplayCurrency,
   getPrimaryCurrency,
 } from "@/modules/financial-base/services/base-service";
+import { getUserTimezone } from "@/lib/time/user-time";
+import { TimezoneSync } from "@/components/tz/timezone-sync";
 
 /**
  * Layout del área autenticada. Obtiene el usuario (si Supabase está configurado)
@@ -26,12 +28,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   // Monedas para el switch de visualización del topbar (best-effort).
   let currency = { display: "CRC", primary: "CRC" };
+  // Zona horaria guardada del usuario (para el capturador silencioso).
+  let savedTz: string | null = null;
   // Badge dinámico: stubs de inversión por completar (Fase 3). Best-effort.
   let navBadges: Record<string, number> | undefined;
   if (isSupabaseConfigured() && user) {
     try {
-      const [display, primary] = await Promise.all([getDisplayCurrency(), getPrimaryCurrency()]);
+      const [display, primary, tz] = await Promise.all([
+        getDisplayCurrency(),
+        getPrimaryCurrency(),
+        getUserTimezone(),
+      ]);
       currency = { display, primary };
+      savedTz = tz;
     } catch {
       // sin perfil aún: se mantiene el valor por defecto
     }
@@ -48,6 +57,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <AppShell user={{ name, sub, initials }} currency={currency} navBadges={navBadges}>
+      <TimezoneSync savedTz={savedTz} />
       {children}
     </AppShell>
   );

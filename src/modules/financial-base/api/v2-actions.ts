@@ -66,6 +66,7 @@ import {
   registerPassiveIncomeWithStub,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
+import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import {
   createTransaction,
   updateTransaction,
@@ -928,8 +929,7 @@ export async function runTemplateAction(
       return { ok: false, message: "Las transferencias no se registran por plantilla." };
     const amount = overrides?.amount ?? tpl.amount ?? 0;
     if (!(amount > 0)) return { ok: false, message: "La plantilla necesita un monto." };
-    const today = new Date();
-    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const iso = await userToday();
     await createTransaction({
       kind,
       amount,
@@ -1066,13 +1066,12 @@ export async function getSpendFormDataAction(): Promise<{
       import("@/modules/financial-base/services/base-view"),
       import("@/modules/financial-base/services/expense-jars-service"),
     ]);
-    const now = new Date();
     const view = await loadBaseView();
     if (!view) return { jars: [], accounts: [], currency: "CRC" };
     const jars = await getExpenseJarsAsOf({
       tree: view.tree,
-      period: monthPeriod(now.getFullYear(), now.getMonth() + 1),
-      asOf: now.toISOString().slice(0, 10),
+      period: await userCurrentPeriod(),
+      asOf: await userToday(),
       currency: view.currency,
     });
     // Los jars completos, como los recibe AddSpendForm en /m/gastos (filtra a normales él

@@ -12,7 +12,7 @@ import {
   findUnlinkedCandidates,
   buildEntityAlerts,
 } from "@/modules/financial-base/engine/reconciliation";
-import { monthPeriod } from "@/modules/financial-base";
+import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import {
   getLiquidityBalance,
   getLiquidityAfterByTxn,
@@ -81,12 +81,11 @@ export default async function MobileTransacciones() {
 
   // Frascos para el selector de categoría (sobre) del registro de gastos (misma
   // orquestación que /m/gastos; excluye los frascos vinculados).
-  const now = new Date();
-  const jarsPeriod = monthPeriod(now.getFullYear(), now.getMonth() + 1);
+  const jarsPeriod = await userCurrentPeriod();
   const jars = await getExpenseJarsAsOf({
     tree: view.tree,
     period: jarsPeriod,
-    asOf: now.toISOString().slice(0, 10),
+    asOf: await userToday(),
     currency,
   });
 
