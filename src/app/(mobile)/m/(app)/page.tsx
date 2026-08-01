@@ -1,19 +1,20 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth/session";
-import { getDashboardData } from "@/modules/dashboard";
-import { getPatrimonioReport, SurplusDecision, getSurplusDecision } from "@/modules/wealth";
+import { getDashboardData, getHomeCardsData } from "@/modules/dashboard";
+import { SurplusDecision, getSurplusDecision } from "@/modules/wealth";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
-import { getExpenseRangeView } from "@/modules/financial-base/services/expense-range-service";
-import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { MHomeCarousel } from "../components/home-carousel";
-import { BudgetCard } from "../components/home-cards/budget-card";
-import { NetWorthCard } from "../components/home-cards/networth-card";
-import { LibertadCard } from "../components/home-cards/libertad-card";
-import { IncomeCard } from "../components/home-cards/income-card";
-import { SavingsCard } from "../components/home-cards/savings-card";
-import { DebtCard } from "../components/home-cards/debt-card";
-import { InvestCard, InvestCardError } from "../components/home-cards/invest-card";
-import { DefenseCard, DefenseCardError } from "../components/home-cards/defense-card";
+import {
+  PresupuestoFicha,
+  IngresosFicha,
+  GastosFicha,
+  AhorrosFicha,
+  DeudasFicha,
+  InversionesFicha,
+  ProteccionFicha,
+  PatrimonioFicha,
+  LibertadFicha,
+} from "../components/home-cards/ficha-cards";
 import { MHomeCardError } from "../components/home-cards/card-shell";
 import { formatMoney } from "@/lib/format";
 import { MobileHeader } from "../components/mobile-header";
@@ -94,35 +95,22 @@ export default async function MobileHome() {
   const user = await getUser();
   const preview = !user && process.env.MOBILE_DEMO_PREVIEW === "1";
 
-  // Los tres agregados van EN PARALELO. Ninguno usa el resultado de otro, pero estaban
-  // encadenados con tres `await` seguidos, así que la pantalla pagaba la suma de los
-  // tres en vez del más lento. El comentario que había aquí afirmaba que ya iban en
-  // paralelo; no era cierto, y por eso el coste del tercero (que arrastra las consultas
-  // de getEntityFallbackBudget) se sumaba entero al arranque.
-  // Cada uno conserva su propio `.catch`: si uno falla, los otros dos siguen.
-  const [data, recent, expenseView, patrimonio, surplus] = await Promise.all([
+  // Cuatro agregados EN PARALELO, cada uno con su propio `.catch`: si uno falla, los
+  // demás siguen. `data` (panel) alimenta el saludo, el flujo del mes, los accesos y los
+  // insights; `homeCards` (capa de datos del carrusel, Delta 1) alimenta las 9 fichas.
+  const [data, recent, surplus, homeCards] = await Promise.all([
     getDashboardData({ previewDemo: preview }),
     preview
       ? Promise.resolve([] as Transaction[])
       : listTransactions(recentPeriod(now), {}, 6).catch(() => [] as Transaction[]),
-    preview
-      ? Promise.resolve(null)
-      : getExpenseRangeView("1m", monthPeriod(now.getFullYear(), now.getMonth() + 1)).catch(
-          () => null,
-        ),
-    // Marco Patrimonial (los tres números) para la tarjeta Libertad. Best-effort y en
-    // paralelo: si falla, la tarjeta muestra su estado "no cargó" sin romper el resto.
-    preview ? Promise.resolve(null) : getPatrimonioReport().catch(() => null),
     // Decisión del excedente (F3): solo con fondos cubiertos y excedente. Best-effort.
     preview ? Promise.resolve(null) : getSurplusDecision().catch(() => null),
+    // Las 9 fichas del carrusel (Delta 1). En vista demo no hay sesión, así que se omite
+    // y cada ficha degrada a su estado "no cargó".
+    preview ? Promise.resolve(null) : getHomeCardsData().catch(() => null),
   ]);
 
   const { currency, panel, insights, monthFlow } = data;
-  const norte = panel.norte;
-  const ind = data.summary.indicators;
-  // Las cifras crudas detrás de los pilares. El carrusel no puede reusar PillarVM.value
-  // porque llega formateado para el ancho de la web y aquí se necesita la forma compacta.
-  const cifras = panel.cifras;
   const firstInsight = insights.insights[0];
 
   return (
@@ -170,123 +158,90 @@ export default async function MobileHome() {
           </div>
         ) : null}
 
-        {/* Carrusel de tarjetas financieras (sustituye al hero de patrimonio).
-            El carrusel entero va DENTRO de .m-pad pero su pista sangra a los bordes
-            (.m-carousel-wrap) para que la tarjeta siguiente asome: esa es la
-            afordancia de que se desliza.
+        {/* Carrusel de las 9 fichas del brief lockeado (piloto · Delta 2), sobre el mismo
+            chasis compartido (MHomeCard) y en el orden fijo: Presupuesto · Ingresos ·
+            Gastos · Ahorros · Deudas · Inversiones · Protección · Patrimonio · Libertad
+            (Patrimonio y Libertad al final). Los datos vienen de getHomeCardsData (Delta 1);
+            si esa capa no cargó (`null`: vista demo o fallo), cada ficha degrada a su estado
+            "no cargó". El destino /m/* de cada ficha viaja en su propio `href`. La mecánica
+            del carrusel (swipe, dots) es la misma: MHomeCarousel no se toca.
 
-            Las SIETE tarjetas salen de datos que Inicio ya cargaba: ninguna añade una
-            llamada. Presupuesto usa getExpenseRangeView; Ingresos, Ahorro y Deudas salen
-            de los indicadores base; Patrimonio, Inversiones y Protección reusan los
-            resúmenes best-effort que el panel ya pedía y hasta ahora descartaba antes de
-            llegar a la vista. Por eso no hace falta <Suspense> por tarjeta: no hay nada
-            que esperar por separado.
-
-            Patrimonio va en segundo lugar a propósito: era el hero de esta pantalla y es
-            la cifra que el usuario viene a ver. Mandarla al final obligaría a deslizar
-            seis veces para llegar a ella.
-
-            Los destinos son rutas /m/* explícitas y NO los href de pillars.ts, que
-            apuntan a la web y sacarían al usuario de la app. Tampoco se reusa M_ROUTE tal
-            cual: ahí `flujo` va a /m/gastos, que es correcto para el atajo del pilar pero
-            mandaría la tarjeta de INGRESOS a la pantalla de gastos. */}
+            La pista sangra a los bordes (.m-carousel-wrap) para que la ficha siguiente asome
+            —esa es la afordancia de que se desliza—. */}
         <div style={{ marginBottom: 14 }}>
           <MHomeCarousel
             cards={[
               {
-                name: "Adherencia",
-                node:
-                  // `null` aquí es "no cargó" (getExpenseRangeView tiene su propio catch),
-                  // no "no hay presupuesto": eso lo distingue la tarjeta con budget<=0.
-                  !preview && expenseView === null ? (
-                    <MHomeCardError eyebrow="Presupuesto" icon="rules" />
-                  ) : (
-                    <BudgetCard
-                      budget={expenseView?.budgetExpense ?? 0}
-                      spent={expenseView?.realExpense ?? 0}
-                      currency={currency}
-                      now={now}
-                    />
-                  ),
-              },
-              {
-                name: "Patrimonio",
-                node: data.degradado.richLife ? (
-                  <MHomeCardError eyebrow="Patrimonio" icon="household" />
+                name: "Presupuesto",
+                node: homeCards?.presupuesto ? (
+                  <PresupuestoFicha c={homeCards.presupuesto} currency={homeCards.currency} />
                 ) : (
-                  <NetWorthCard
-                    netWorth={norte.netWorth}
-                    velocity={norte.velocity}
-                    assets={norte.totalAssets}
-                    liabilities={norte.totalLiabilities}
-                    currency={currency}
-                  />
-                ),
-              },
-              {
-                name: "Libertad",
-                node: patrimonio ? (
-                  <LibertadCard report={patrimonio.report} currency={patrimonio.currency} />
-                ) : (
-                  <MHomeCardError eyebrow="Libertad" icon="goal" />
+                  <MHomeCardError eyebrow="Presupuesto" icon="rules" />
                 ),
               },
               {
                 name: "Ingresos",
-                node: (
-                  <IncomeCard
-                    incomeMonthly={ind.incomeMonthly}
-                    activo={(ind.incomeByType.activo ?? 0) + (ind.incomeByType.extraordinario ?? 0)}
-                    pasivo={ind.incomeByType.pasivo ?? 0}
-                    currency={currency}
-                  />
+                node: homeCards?.ingresos ? (
+                  <IngresosFicha c={homeCards.ingresos} currency={homeCards.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Ingresos" icon="income" />
                 ),
               },
               {
-                name: "Ahorro",
-                node: (
-                  <SavingsCard
-                    savingsRate={ind.savingsRate}
-                    monthsOfIndependence={cifras.monthsOfIndependence}
-                  />
+                name: "Gastos",
+                node: homeCards?.gastos ? (
+                  <GastosFicha c={homeCards.gastos} currency={homeCards.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Gastos" icon="food" />
+                ),
+              },
+              {
+                name: "Ahorros",
+                node: homeCards?.ahorros ? (
+                  <AhorrosFicha c={homeCards.ahorros} currency={homeCards.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Ahorros" icon="goal" />
                 ),
               },
               {
                 name: "Deudas",
-                node: (
-                  <DebtCard
-                    debtWeight={ind.debtWeight}
-                    totalLiabilities={norte.totalLiabilities}
-                    currency={currency}
-                  />
+                node: homeCards?.deudas ? (
+                  <DeudasFicha c={homeCards.deudas} currency={homeCards.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Deudas" icon="debt" />
                 ),
               },
               {
                 name: "Inversiones",
-                node: data.degradado.wealth ? (
-                  <InvestCardError />
+                node: homeCards?.inversiones ? (
+                  <InversionesFicha c={homeCards.inversiones} currency={homeCards.currency} />
                 ) : (
-                  <InvestCard
-                    totalInvested={cifras.totalInvested}
-                    monthlyContribution={cifras.monthlyContribution}
-                    productivePct={cifras.productiveAssetsPct}
-                    currency={currency}
-                  />
+                  <MHomeCardError eyebrow="Inversiones" icon="investment" />
                 ),
               },
               {
                 name: "Protección",
-                node:
-                  data.degradado.wealth || cifras.proteccion === null ? (
-                    <DefenseCardError />
-                  ) : (
-                    <DefenseCard
-                      score={cifras.proteccion.score}
-                      activePolicies={cifras.proteccion.activePolicies}
-                      totalCoverage={cifras.proteccion.totalCoverage}
-                      currency={currency}
-                    />
-                  ),
+                node: homeCards?.proteccion ? (
+                  <ProteccionFicha c={homeCards.proteccion} currency={homeCards.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Protección" icon="protection" />
+                ),
+              },
+              {
+                name: "Patrimonio",
+                node: homeCards?.patrimonio ? (
+                  <PatrimonioFicha c={homeCards.patrimonio} currency={homeCards.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Patrimonio" icon="household" />
+                ),
+              },
+              {
+                name: "Libertad",
+                node: homeCards?.libertad ? (
+                  <LibertadFicha c={homeCards.libertad} currency={homeCards.currency} />
+                ) : (
+                  <MHomeCardError eyebrow="Libertad" icon="goal" />
+                ),
               },
             ]}
           />
