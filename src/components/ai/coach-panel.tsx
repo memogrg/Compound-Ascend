@@ -1,47 +1,35 @@
 "use client";
 
 /**
- * AI Coach con dos modos + receipt scanner (F8).
+ * AI Coach flotante con dos modos + receipt scanner (F8). Disponible desde CUALQUIER
+ * pantalla de la app (lo monta app-shell).
  * - "Asistente": wizard guiado que registra una transacción (solo tras confirmar).
- * - "Finanzas AI": chat con Gemini vía /api/assistant/chat; las acciones que
- *   propone requieren confirmación explícita (ActionCard).
+ * - "Finanzas AI": la conversación con My Agent C+.
  * - Receipt: sube/captura imagen → /api/assistant/scan-receipt → tarjeta de
  *   confirmación → crea la transacción solo si el usuario confirma.
  *
+ * La conversación NO vive aquí: es <AssistantConversation>, el mismo componente que
+ * renderiza el tab de página completa (/asistente) y el móvil (/m/asistente). Este
+ * archivo solo aporta el contenedor (FAB + panel + tabs) y el wizard manual.
+ *
  * Ninguna acción financiera se ejecuta sin confirmación del usuario.
  */
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { AgentMark } from "@/components/ui/agent-mark";
-import { confirmTransactionAction, confirmGoalAction, confirmPriceAlertAction, loadTodayChatAction, emailTranscriptAction } from "@/modules/assistant/api/actions";
-import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
+import {
+  AssistantConversation,
+  TxnConfirmCard,
+  type DraftTxn,
+} from "@/components/ai/assistant-conversation";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
-import type { AIActionProposal } from "@/lib/ai/types";
-import { formatMoney } from "@/lib/format";
-import { renderMarkdown } from "@/lib/markdown";
+import { todayLocalISO } from "@/lib/validation";
 
-type Msg = { role: "ai" | "me"; html: string; action?: AIActionProposal | null };
-type Mode = "assistant" | "ai";
-
-/** Restante del sobre que devuelve confirmTransactionAction (solo gasto con sobre). */
-type SobreRemaining = {
-  path: string;
-  currency: string;
-  budget: number;
-  spent: number;
-  remaining: number;
-  hasBudget: boolean;
-};
-/** Mensaje de éxito: con restante del sobre si aplica, o el genérico si no. */
-function sobreSuccessMessage(s: SobreRemaining | null): string {
-  if (!s) return "✓ Transacción registrada.";
-  if (!s.hasBudget) return `✓ Registrado en ${s.path}. (Este sobre no tiene presupuesto asignado)`;
-  if (s.remaining < 0)
-    return `✓ Registrado en ${s.path}. Te pasaste por ${formatMoney(-s.remaining, s.currency)}.`;
-  return `✓ Registrado en ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
-}
+/** Saludo del panel (web = voseo). */
+const GREETING =
+  "Hola, soy **My Agent C+**. Preguntame sobre tu dinero. Si propongo registrar algo, te pediré confirmación.";
 
 const CHIPS = [
   "¿Cómo está mi salud financiera?",
@@ -49,8 +37,10 @@ const CHIPS = [
   "¿Voy bien para mi Rich Life?",
 ];
 
+type Mode = "assistant" | "ai";
+
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocalISO();
 }
 
 export function CoachPanel() {
@@ -176,7 +166,11 @@ export function CoachPanel() {
           </div>
         ) : null}
 
-        {mode === "assistant" ? <TransactionWizard /> : <FinanceChat />}
+        {mode === "assistant" ? (
+          <TransactionWizard />
+        ) : (
+          <AssistantConversation variant="panel" greeting={GREETING} chips={CHIPS} />
+        )}
       </div>
     </>
   );
@@ -212,276 +206,8 @@ function Tab({
 }
 
 // ----------------------------------------------------------------------------
-// Modo 2 — Finanzas AI (chat)
-// ----------------------------------------------------------------------------
-/** Timeout del cliente para el chat (~40s), por debajo del maxDuration=60 del endpoint. */
-const CHAT_TIMEOUT_MS = 40_000;
-
-const GREETING: Msg = {
-  role: "ai",
-  html: "Hola, soy <strong>My Agent C+</strong>. Pregúntame sobre tu dinero. Si propongo registrar algo, te pediré confirmación.",
-};
-
-function FinanceChat() {
-  const [messages, setMessages] = useState<Msg[]>([GREETING]);
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [transcriptMsg, setTranscriptMsg] = useState<string | null>(null);
-  const [sendingTranscript, setSendingTranscript] = useState(false);
-  const bodyRef = useRef<HTMLDivElement>(null);
-
-  // Al abrir: cargar la conversación de HOY (persistida por usuario) para que el hilo sobreviva a
-  // minimizar/refrescar/cambio de dispositivo. Si no hay nada del día, queda solo el saludo.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const hoy = await loadTodayChatAction();
-        if (!alive || hoy.length === 0) return;
-        setMessages([
-          GREETING,
-          ...hoy.map((m): Msg =>
-            m.role === "assistant"
-              ? { role: "ai", html: renderMarkdown(m.content) }
-              : { role: "me", html: escapeHtml(m.content) },
-          ),
-        ]);
-      } catch {
-        // best-effort: si falla la carga, se queda el saludo
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
-  }, [messages, busy]);
-
-  const sendTranscript = async () => {
-    if (sendingTranscript) return;
-    setSendingTranscript(true);
-    setTranscriptMsg(null);
-    try {
-      const res = await emailTranscriptAction();
-      setTranscriptMsg(res.message ?? (res.ok ? "Transcript enviado." : "No se pudo enviar."));
-    } catch {
-      setTranscriptMsg("No se pudo enviar el transcript.");
-    } finally {
-      setSendingTranscript(false);
-    }
-  };
-
-  const send = async (text: string) => {
-    const q = text.trim();
-    if (!q || busy) return;
-    setValue("");
-    // Solo los últimos turnos como CONTEXTO (no toda la conversación): mantiene el prompt acotado
-    // y evita re-responder temas viejos. El servidor además usa su propia memoria reciente.
-    const history = messages
-      .filter((m) => !m.action)
-      .slice(-12)
-      .map((m) => ({ role: m.role === "me" ? "user" : "assistant", content: stripHtml(m.html) }));
-    setMessages((m) => [...m, { role: "me", html: escapeHtml(q) }]);
-    setBusy(true);
-    try {
-      // Timeout del cliente (~40s, bajo el maxDuration=60 del server): si tarda, cortamos con un
-      // mensaje claro en vez de dejar el spinner girando para siempre.
-      const res = await fetchWithTimeout(
-        "/api/assistant/chat",
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: q, history }) },
-        CHAT_TIMEOUT_MS,
-      );
-      const data = await res.json();
-      if (res.ok) {
-        setMessages((m) => [
-          ...m,
-          // La IA responde en Markdown → HTML seguro (escape-first + allowlist). Ver lib/markdown.
-        { role: "ai", html: renderMarkdown(String(data.reply ?? "")), action: data.action ?? null },
-        ]);
-      } else {
-        setMessages((m) => [
-          ...m,
-          { role: "ai", html: escapeHtml(data.error?.message ?? "No pude responder ahora.") },
-        ]);
-      }
-    } catch (err) {
-      const html = isTimeoutError(err)
-        ? "Se está tardando más de lo normal, probá de nuevo."
-        : "Hubo un problema de conexión.";
-      setMessages((m) => [...m, { role: "ai", html }]);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="coach-toolbar" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", justifyContent: "flex-end" }}>
-        {transcriptMsg ? (
-          <span className="muted" style={{ fontSize: 11.5, marginRight: "auto" }}>
-            {transcriptMsg}
-          </span>
-        ) : null}
-        <button
-          className="btn btn-secondary"
-          style={{ fontSize: 12, padding: "4px 10px" }}
-          onClick={sendTranscript}
-          disabled={sendingTranscript}
-          title="Recibí por correo la conversación de hoy"
-        >
-          {sendingTranscript ? "Enviando…" : "✉︎ Enviarme el transcript"}
-        </button>
-      </div>
-      <div className="coach-body" ref={bodyRef}>
-        {messages.map((m, i) => (
-          <div key={i}>
-            <div className={`coach-msg${m.role === "me" ? " me" : ""}`}>
-              {m.role === "ai" ? (
-                <span className="ava">
-                  <AgentMark />
-                </span>
-              ) : null}
-              <div className="coach-bubble" dangerouslySetInnerHTML={{ __html: m.html }} />
-            </div>
-            {m.action ? <ActionCard action={m.action} /> : null}
-          </div>
-        ))}
-        {busy ? (
-          <div className="muted" style={{ fontSize: 12, paddingLeft: 36 }}>
-            Pensando…
-          </div>
-        ) : null}
-      </div>
-      <div className="coach-chips">
-        {CHIPS.map((c) => (
-          <button key={c} className="coach-chip" onClick={() => send(c)}>
-            {c}
-          </button>
-        ))}
-      </div>
-      <div className="coach-input">
-        <input
-          placeholder="Pregunta sobre tu dinero…"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send(value)}
-          aria-label="Mensaje para My Agent C+"
-        />
-        <button className="coach-send" aria-label="Enviar" onClick={() => send(value)}>
-          <Icon name="send" width={2} />
-        </button>
-      </div>
-    </>
-  );
-}
-
-/** Tarjeta de acción propuesta por la IA. Solo create_transaction es ejecutable aquí. */
-function ActionCard({ action }: { action: AIActionProposal }) {
-  const captureCurrency = useCaptureCurrency();
-  const [done, setDone] = useState(false);
-  if (action.type === "create_transaction") {
-    const p = action.payload as Record<string, unknown>;
-    const VALID_LINKS = new Set(["debt", "goal", "holding", "policy", "rental"]);
-    const linkedKind =
-      typeof p.linkedKind === "string" && VALID_LINKS.has(p.linkedKind)
-        ? (p.linkedKind as DraftTxn["linkedKind"])
-        : null;
-    const draft: DraftTxn = {
-      kind: (p.kind as "ingreso" | "gasto") ?? "gasto",
-      description: String(p.description ?? action.summary ?? "Transacción"),
-      amount: Number(p.amount ?? 0),
-      currency: String(p.currency ?? captureCurrency),
-      occurredOn: String(p.date ?? p.occurredOn ?? todayISO()),
-      source: "chat",
-      // Sobre sugerido por el backend (hoja real del usuario) — preselecciona el selector.
-      categoryId: typeof p.categoryId === "string" ? p.categoryId : null,
-      categoryPath: typeof p.categoryPath === "string" ? p.categoryPath : null,
-      linkedKind,
-      linkedId: linkedKind && typeof p.linkedId === "string" ? p.linkedId : null,
-      linkedName: linkedKind && typeof p.linkedName === "string" ? p.linkedName : null,
-    };
-    return (
-      <div style={{ padding: "4px 0 0 36px" }}>
-        {done ? null : (
-          <TxnConfirmCard
-            draft={draft}
-            title="Acción propuesta"
-            onCancel={() => setDone(true)}
-            onConfirmed={() => setDone(true)}
-          />
-        )}
-      </div>
-    );
-  }
-  if (action.type === "create_goal") {
-    const p = action.payload as Record<string, unknown>;
-    const targetDate =
-      typeof p.targetDate === "string" && p.targetDate.trim() ? p.targetDate : null;
-    const draft: DraftGoal = {
-      name: String(p.name ?? action.summary ?? "Meta"),
-      targetAmount: Number(p.targetAmount ?? 0),
-      monthlyContribution: Number(p.monthlyContribution ?? 0),
-      currency: String(p.currency ?? captureCurrency),
-      targetDate,
-    };
-    return (
-      <div style={{ padding: "4px 0 0 36px" }}>
-        {done ? null : (
-          <GoalConfirmCard
-            draft={draft}
-            onCancel={() => setDone(true)}
-            onConfirmed={() => setDone(true)}
-          />
-        )}
-      </div>
-    );
-  }
-  if (action.type === "create_price_alert") {
-    const p = action.payload as Record<string, unknown>;
-    const at = p.assetType === "etf" || p.assetType === "accion" ? p.assetType : "cripto";
-    const draft: DraftAlert = {
-      symbol: String(p.symbol ?? "").toUpperCase(),
-      targetPrice: Number(p.targetPrice ?? 0),
-      assetType: at,
-      currency: String(p.currency ?? (at === "cripto" ? "USD" : captureCurrency)),
-    };
-    return (
-      <div style={{ padding: "4px 0 0 36px" }}>
-        {done ? null : (
-          <PriceAlertConfirmCard
-            draft={draft}
-            onCancel={() => setDone(true)}
-            onConfirmed={() => setDone(true)}
-          />
-        )}
-      </div>
-    );
-  }
-  // Ya no hay otros tipos de acción ejecutables; nada que mostrar.
-  return null;
-}
-
-// ----------------------------------------------------------------------------
 // Modo 1 — Asistente guiado (wizard de transacción)
 // ----------------------------------------------------------------------------
-type DraftTxn = {
-  kind: "ingreso" | "gasto";
-  description: string;
-  amount: number;
-  currency: string;
-  occurredOn: string;
-  source: "chat" | "receipt" | "manual";
-  // Sobre (hoja) sugerido por la IA; el usuario lo confirma/corrige. null/undefined = "Sin sobre".
-  categoryId?: string | null;
-  categoryPath?: string | null; // "Frasco › Sobre" del sugerido (solo display inicial)
-  // Fase 5: vínculo propuesto por la IA (el usuario lo ve antes de confirmar).
-  linkedKind?: "debt" | "goal" | "holding" | "policy" | "rental" | null;
-  linkedId?: string | null;
-  linkedName?: string | null;
-};
-
 function TransactionWizard() {
   const [draft, setDraft] = useState<DraftTxn>({
     kind: "gasto",
@@ -522,9 +248,7 @@ function TransactionWizard() {
             <button
               key={k}
               className="coach-chip"
-              style={
-                draft.kind === k ? { background: "var(--ink)", color: "var(--bg)" } : undefined
-              }
+              style={draft.kind === k ? { background: "var(--ink)", color: "var(--bg)" } : undefined}
               // Al cambiar de naturaleza, el sobre elegido ya no aplica → se limpia.
               onClick={() => setDraft((d) => ({ ...d, kind: k, categoryId: null }))}
             >
@@ -623,330 +347,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** Tarjeta de confirmación compartida (wizard, IA, recibo). Crea solo al confirmar. */
-function TxnConfirmCard({
-  draft,
-  title,
-  onCancel,
-  onConfirmed,
-  onRegisterAnother,
-}: {
-  draft: DraftTxn;
-  title: string;
-  onCancel: () => void;
-  onConfirmed: () => void;
-  /** Solo el FORM MANUAL lo pasa: al éxito muestra "Registrar otro"/"Listo" y NO auto-cierra. */
-  onRegisterAnother?: () => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
-  // Restante del sobre tras crear el gasto (para el mensaje de éxito); null = mensaje genérico.
-  const [sobre, setSobre] = useState<SobreRemaining | null>(null);
-  // Sobre elegido (arranca en el sugerido por la IA / el elegido en el form manual); "" = Sin sobre.
-  const [categoryId, setCategoryId] = useState<string>(draft.categoryId ?? "");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Limpia el timeout pendiente si la tarjeta se desmonta antes de los 1200ms
-  // (evita invocar onConfirmed sobre un componente ya desmontado).
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    [],
-  );
-
-  const confirm = async () => {
-    setPending(true);
-    setError(null);
-    const res = await confirmTransactionAction({ ...draft, categoryId: categoryId || null });
-    setPending(false);
-    if (res.ok) {
-      setSobre(res.sobre ?? null);
-      setOk(true);
-      // Manual: nunca auto-cierra (el usuario elige "otro"/"listo"). IA/recibo: auto-cierra salvo
-      // que haya restante para leer.
-      if (!onRegisterAnother && !res.sobre) timerRef.current = setTimeout(onConfirmed, 1200);
-    } else {
-      setError(res.message ?? "No se pudo guardar.");
-    }
-  };
-
-  if (ok) {
-    return (
-      <div className="coach-bubble" style={{ borderLeft: "2px solid var(--pos)" }}>
-        {sobreSuccessMessage(sobre)}
-        {onRegisterAnother ? (
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button
-              className="btn btn-primary"
-              style={{ flex: 1, justifyContent: "center" }}
-              onClick={onRegisterAnother}
-            >
-              Registrar otro gasto
-            </button>
-            <button
-              className="btn btn-secondary"
-              style={{ flex: 1, justifyContent: "center" }}
-              onClick={onConfirmed}
-            >
-              Listo
-            </button>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="card" style={{ padding: 14 }}>
-      <div className="eyebrow">{title}</div>
-      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 6 }}>
-        {draft.kind === "ingreso" ? "+" : "−"}
-        {formatMoney(draft.amount, draft.currency)}
-      </div>
-      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-        {draft.description} · {draft.occurredOn}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
-        <span className="fld-label">Sobre</span>
-        <SobreCombobox
-          kind={draft.kind}
-          value={categoryId}
-          onChange={setCategoryId}
-          disabled={pending}
-          suggestedPath={draft.categoryPath}
-        />
-      </div>
-      {draft.linkedKind && draft.linkedId ? (
-        <div style={{ marginTop: 6 }}>
-          <span className="chip" style={{ fontSize: 10.5 }}>
-            Vinculada a{" "}
-            {draft.linkedKind === "debt"
-              ? "deuda"
-              : draft.linkedKind === "goal"
-                ? "meta"
-                : "entidad"}
-            {draft.linkedName ? `: ${draft.linkedName}` : ""}
-          </span>
-        </div>
-      ) : null}
-      {error ? (
-        <div className="auth-err" style={{ marginTop: 6 }}>
-          {error}
-        </div>
-      ) : null}
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button
-          className="btn btn-secondary"
-          style={{ flex: 1, justifyContent: "center" }}
-          onClick={onCancel}
-          disabled={pending}
-        >
-          Cancelar
-        </button>
-        <button
-          className="btn btn-primary"
-          style={{ flex: 1, justifyContent: "center" }}
-          onClick={confirm}
-          disabled={pending}
-        >
-          {pending ? "Guardando…" : "Confirmar"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// Confirmación de meta propuesta por la IA (create_goal)
-// ----------------------------------------------------------------------------
-type DraftGoal = {
-  name: string;
-  targetAmount: number;
-  monthlyContribution: number;
-  currency: string;
-  targetDate: string | null;
-};
-
-function GoalConfirmCard({
-  draft,
-  onCancel,
-  onConfirmed,
-}: {
-  draft: DraftGoal;
-  onCancel: () => void;
-  onConfirmed: () => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    [],
-  );
-
-  const confirm = async () => {
-    setPending(true);
-    setError(null);
-    const res = await confirmGoalAction({
-      name: draft.name,
-      targetAmount: draft.targetAmount,
-      monthlyContribution: draft.monthlyContribution,
-      currency: draft.currency,
-      ...(draft.targetDate ? { targetDate: draft.targetDate } : {}),
-    });
-    setPending(false);
-    if (res.ok) {
-      setOk(true);
-      timerRef.current = setTimeout(onConfirmed, 1200);
-    } else {
-      setError(res.message ?? "No se pudo crear la meta.");
-    }
-  };
-
-  if (ok) {
-    return (
-      <div className="coach-bubble" style={{ borderLeft: "2px solid var(--pos)" }}>
-        ✓ Meta creada.
-      </div>
-    );
-  }
-
-  return (
-    <div className="card" style={{ padding: 14 }}>
-      <div className="eyebrow">Crear meta</div>
-      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 6 }}>{draft.name}</div>
-      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-        Objetivo: {formatMoney(draft.targetAmount, draft.currency)}
-        {draft.monthlyContribution > 0
-          ? ` · ${formatMoney(draft.monthlyContribution, draft.currency)}/mes`
-          : ""}
-        {draft.targetDate ? ` · para ${draft.targetDate}` : ""}
-      </div>
-      {error ? (
-        <div className="auth-err" style={{ marginTop: 6 }}>
-          {error}
-        </div>
-      ) : null}
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button
-          className="btn btn-secondary"
-          style={{ flex: 1, justifyContent: "center" }}
-          onClick={onCancel}
-          disabled={pending}
-        >
-          Cancelar
-        </button>
-        <button
-          className="btn btn-primary"
-          style={{ flex: 1, justifyContent: "center" }}
-          onClick={confirm}
-          disabled={pending}
-        >
-          {pending ? "Creando…" : "Confirmar"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------------
-// Confirmación de alerta de precio propuesta por la IA (create_price_alert)
-// ----------------------------------------------------------------------------
-type DraftAlert = {
-  symbol: string;
-  targetPrice: number;
-  assetType: "etf" | "accion" | "cripto";
-  currency: string;
-};
-
-function PriceAlertConfirmCard({
-  draft,
-  onCancel,
-  onConfirmed,
-}: {
-  draft: DraftAlert;
-  onCancel: () => void;
-  onConfirmed: () => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    [],
-  );
-
-  const confirm = async () => {
-    setPending(true);
-    setError(null);
-    const res = await confirmPriceAlertAction({
-      symbol: draft.symbol,
-      targetPrice: draft.targetPrice,
-      assetType: draft.assetType,
-      currency: draft.currency,
-    });
-    setPending(false);
-    if (res.ok) {
-      setOk(true);
-      timerRef.current = setTimeout(onConfirmed, 1200);
-    } else {
-      setError(res.message ?? "No se pudo crear la alerta.");
-    }
-  };
-
-  if (ok) {
-    return (
-      <div className="coach-bubble" style={{ borderLeft: "2px solid var(--pos)" }}>
-        ✓ Alerta creada.
-      </div>
-    );
-  }
-
-  return (
-    <div className="card" style={{ padding: 14 }}>
-      <div className="eyebrow">Crear alerta de precio</div>
-      <div style={{ fontSize: 14, fontWeight: 500, marginTop: 6 }}>{draft.symbol}</div>
-      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-        Te avisamos cuando llegue a {formatMoney(draft.targetPrice, draft.currency)} (la dirección se
-        calcula con el precio actual).
-      </div>
-      {error ? (
-        <div className="auth-err" style={{ marginTop: 6 }}>
-          {error}
-        </div>
-      ) : null}
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button
-          className="btn btn-secondary"
-          style={{ flex: 1, justifyContent: "center" }}
-          onClick={onCancel}
-          disabled={pending}
-        >
-          Cancelar
-        </button>
-        <button
-          className="btn btn-primary"
-          style={{ flex: 1, justifyContent: "center" }}
-          onClick={confirm}
-          disabled={pending}
-        >
-          {pending ? "Creando…" : "Confirmar"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ----------------------------------------------------------------------------
 function readImage(file: File): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
@@ -959,15 +359,4 @@ function readImage(file: File): Promise<{ base64: string; mimeType: string }> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-function stripHtml(s: string): string {
-  return s.replace(/<[^>]*>/g, "");
 }

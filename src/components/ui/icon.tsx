@@ -37,6 +37,7 @@ export type IconName =
   | "filter"
   | "repeat"
   | "lock"
+  | "camera"
   | "calendar";
 
 const PATHS: Record<IconName, string> = {
@@ -78,6 +79,8 @@ const PATHS: Record<IconName, string> = {
   send: '<path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/>',
   check: '<path d="m5 12 5 5 9-11"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/>',
+  camera:
+    '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
 };
 
 type IconProps = {
