@@ -21,7 +21,14 @@ import { AssistantConversation } from "@/components/ai/assistant-conversation";
 const GREETING =
   "¡Hola! Soy tu asistente de CARTERA+. Pregúntame sobre tus finanzas, o escanea un recibo con la cámara y lo registro por ti (siempre con tu confirmación).";
 
-export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }) {
+export function MobileAssistant({
+  primaryCurrency,
+  timezone,
+}: {
+  primaryCurrency: string;
+  /** Zona del perfil; null = todavía sin capturar → se usa la del dispositivo. */
+  timezone: string | null;
+}) {
   return (
     <div className="m-chat">
       <header className="m-chat-head">
@@ -45,12 +52,13 @@ export function MobileAssistant({ primaryCurrency }: { primaryCurrency: string }
         </div>
       </header>
 
-      {/* La moneda de captura va por prop: esta ruta vive fuera del grupo (app), que es
-          donde se monta CurrencyProvider. */}
+      {/* La moneda y la zona de captura van por prop: esta ruta vive fuera del grupo (app),
+          que es donde se montan CurrencyProvider y TimezoneProvider. */}
       <AssistantConversation
         variant="mobile"
         greeting={GREETING}
         captureCurrency={primaryCurrency}
+        timezone={timezone}
         scanner
       />
     </div>

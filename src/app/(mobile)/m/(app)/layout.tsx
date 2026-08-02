@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
 import { getPrimaryCurrency, getDisplayCurrency } from "@/modules/financial-base";
-import { getUserTimezone } from "@/lib/time/user-time";
+import { getUserTimezone, knownUserTz } from "@/lib/time/user-time";
 import { TimezoneSync } from "@/components/tz/timezone-sync";
+import { TimezoneProvider } from "@/components/tz/timezone-context";
 import { CurrencyProvider } from "@/components/layout/currency-context";
 import { ToastProvider } from "../components/form-kit/toast";
 import { AppLockOverlay } from "../components/app-lock-overlay";
@@ -37,31 +38,37 @@ export default async function MobileAppLayout({ children }: { children: React.Re
   // sesión, las dos reales; best-effort para no tumbar el layout si el fetch falla.
   let currencies = { primary: "CRC", display: "CRC" };
   let savedTz: string | null = null;
+  // Zona EFECTIVA (cookie → perfil) para las capturas del cliente; null = sin capturar aún.
+  let knownTz: string | null = null;
   if (user) {
-    const [primary, display, tz] = await Promise.all([
+    const [primary, display, tz, effectiveTz] = await Promise.all([
       getPrimaryCurrency().catch(() => "CRC"),
       getDisplayCurrency().catch(() => "CRC"),
       getUserTimezone().catch(() => null),
+      knownUserTz().catch(() => null),
     ]);
     currencies = { primary, display };
     savedTz = tz;
+    knownTz = effectiveTz;
   }
 
   return (
-    <CurrencyProvider value={currencies}>
-      <ToastProvider>
-        {/* Fondo ambiental "Cristal Cálido": halos de marca detrás de todo el contenido.
+    <TimezoneProvider value={knownTz}>
+      <CurrencyProvider value={currencies}>
+        <ToastProvider>
+          {/* Fondo ambiental "Cristal Cálido": halos de marca detrás de todo el contenido.
           Fijo, no interactivo (pointer-events:none) → no afecta scroll ni hit-testing. */}
-        <div className="m-ambient" aria-hidden />
-        {/* Candado local con biometría (solo app nativa): se monta primero para tapar
+          <div className="m-ambient" aria-hidden />
+          {/* Candado local con biometría (solo app nativa): se monta primero para tapar
           la UI lo antes posible al reanudar. No afecta a la web. */}
-        <AppLockOverlay />
-        {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
-        <WidgetSnapshotWriter />
-        {/* Captura silenciosa de la zona horaria del dispositivo (una vez, si no hay guardada). */}
-        <TimezoneSync savedTz={savedTz} />
-        {children}
-      </ToastProvider>
-    </CurrencyProvider>
+          <AppLockOverlay />
+          {/* Escribe el snapshot del widget nativo en cada carga (solo app nativa; no-op en web). */}
+          <WidgetSnapshotWriter />
+          {/* Captura silenciosa de la zona horaria del dispositivo (una vez, si no hay guardada). */}
+          <TimezoneSync savedTz={savedTz} />
+          {children}
+        </ToastProvider>
+      </CurrencyProvider>
+    </TimezoneProvider>
   );
 }

@@ -3,6 +3,7 @@
 // probarse en el entorno node de vitest sin arrastrar next/headers ni la sesión.
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import type { Period } from "@/modules/financial-base/types";
+import { todayLocalISO } from "@/lib/validation";
 
 /** Nombre de la cookie que transporta la zona al primer render server. */
 export const TZ_COOKIE = "tz";
@@ -47,6 +48,19 @@ export function todayISOInTz(tz: string, at: Date = new Date()): string {
 export function currentPeriodInTz(tz: string, at: Date = new Date()): Period {
   const { year, month } = ymdInTz(tz, at);
   return monthPeriod(year, month);
+}
+
+/**
+ * "Hoy" para el DEFAULT de fecha de una captura en el CLIENTE.
+ *
+ * Con la zona del PERFIL conocida se calcula en ella, para que el día que propone el
+ * formulario sea el MISMO que el servidor considera "hoy" (`userToday()`): si no, un
+ * gasto capturado a las 11pm podía guardarse en un día y caer en el corte del otro.
+ * Sin zona conocida (todavía no se capturó) cae a la del dispositivo, que sigue siendo
+ * mejor que UTC. `at` se inyecta para poder fijar el instante en un test.
+ */
+export function captureToday(tz: string | null | undefined, at: Date = new Date()): string {
+  return isValidTimeZone(tz) ? todayISOInTz(tz, at) : todayLocalISO(at);
 }
 
 /** Hora (0-23) del instante `at` en la zona `tz` (para saludos por franja del día). */

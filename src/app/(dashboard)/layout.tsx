@@ -4,7 +4,7 @@ import {
   getDisplayCurrency,
   getPrimaryCurrency,
 } from "@/modules/financial-base/services/base-service";
-import { getUserTimezone } from "@/lib/time/user-time";
+import { getUserTimezone, knownUserTz } from "@/lib/time/user-time";
 import { TimezoneSync } from "@/components/tz/timezone-sync";
 
 /**
@@ -30,24 +30,27 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let currency = { display: "CRC", primary: "CRC" };
   // Zona horaria guardada del usuario (para el capturador silencioso).
   let savedTz: string | null = null;
+  // Zona EFECTIVA (cookie → perfil), para que las capturas del cliente fechen "hoy" igual
+  // que el servidor. null = todavía no se capturó → el cliente usa la del dispositivo.
+  let knownTz: string | null = null;
   // Badge dinámico: stubs de inversión por completar (Fase 3). Best-effort.
   let navBadges: Record<string, number> | undefined;
   if (isSupabaseConfigured() && user) {
     try {
-      const [display, primary, tz] = await Promise.all([
+      const [display, primary, tz, effectiveTz] = await Promise.all([
         getDisplayCurrency(),
         getPrimaryCurrency(),
         getUserTimezone(),
+        knownUserTz(),
       ]);
       currency = { display, primary };
       savedTz = tz;
+      knownTz = effectiveTz;
     } catch {
       // sin perfil aún: se mantiene el valor por defecto
     }
     try {
-      const { countPendingHoldings } = await import(
-        "@/modules/wealth/services/holdings-service"
-      );
+      const { countPendingHoldings } = await import("@/modules/wealth/services/holdings-service");
       const pending = await countPendingHoldings();
       if (pending > 0) navBadges = { wealth: pending };
     } catch {
@@ -56,7 +59,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <AppShell user={{ name, sub, initials }} currency={currency} navBadges={navBadges}>
+    <AppShell
+      user={{ name, sub, initials }}
+      currency={currency}
+      navBadges={navBadges}
+      timezone={knownTz}
+    >
       <TimezoneSync savedTz={savedTz} />
       {children}
     </AppShell>

@@ -134,8 +134,11 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
 // seguridad de "ante duda, escalá": una pregunta de consejo/proyección nunca se atrapa por patrón.
+// "recort|reduc|optimiz" entran acá porque "¿dónde puedo recortar gastos?" no es una
+// consulta de dato: pide un análisis de qué sobres discrecionales pesan más. Sin esto, el
+// clasificador lite la mandaría a gasto_categoria y contestaría un total, no un consejo.
 const REASONING_CUES =
-  /\bc[oó]mo\b|deber[ií]a|conviene|qu[eé] hago|estrategia|plan\b|recomend|proyec|si (?:invierto|aporto|abono|pago|ahorro)|abon|extra|escenario|comparar?|vs\.?|mejor opci|cu[aá]nto tendr[ií]a|\ben cu[aá]nto\b|en \d+\s*a[nñ]os|simula/i;
+  /\bc[oó]mo\b|deber[ií]a|conviene|qu[eé] hago|estrategia|plan\b|recomend|proyec|si (?:invierto|aporto|abono|pago|ahorro)|abon|extra|escenario|comparar?|vs\.?|mejor opci|cu[aá]nto tendr[ií]a|\ben cu[aá]nto\b|en \d+\s*a[nñ]os|simula|recort|reduc(?:ir)?\s+(?:mis\s+)?gast|optimiz/i;
 
 /** Extrae el nombre de una deuda tras el verbo, limpiando conectores ("de mi X" → "X"). */
 function extractDebtName(text: string): string | null {

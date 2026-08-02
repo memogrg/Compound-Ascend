@@ -24,6 +24,7 @@ import { Icon } from "@/components/ui/icon";
 import { AgentMark } from "@/components/ui/agent-mark";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import {
   confirmTransactionAction,
   confirmGoalAction,
@@ -35,7 +36,6 @@ import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
-import { todayLocalISO } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 
 // ----------------------------------------------------------------------------
@@ -209,11 +209,6 @@ const LINK_LABEL: Record<string, string> = {
 /** Timeout del cliente para el chat (~40s), por debajo del maxDuration=60 del endpoint. */
 const CHAT_TIMEOUT_MS = 40_000;
 
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
-}
-
 /** Mensaje de éxito: con restante del sobre si aplica, o el genérico si no. */
 export function sobreSuccessMessage(s: SobreRemaining | null): string {
   if (!s) return "✓ Transacción registrada.";
@@ -223,8 +218,12 @@ export function sobreSuccessMessage(s: SobreRemaining | null): string {
   return `✓ Registrado en ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
 }
 
-/** Mapea action.payload → borrador de transacción. */
-function txnFromAction(action: AIActionProposal, fallbackCurrency: string): DraftTxn {
+/** Mapea action.payload → borrador de transacción. `today` = hoy en la zona del perfil. */
+function txnFromAction(
+  action: AIActionProposal,
+  fallbackCurrency: string,
+  today: string,
+): DraftTxn {
   const p = action.payload as Record<string, unknown>;
   const VALID = new Set(["debt", "goal", "holding", "policy", "rental"]);
   const linkedKind =
@@ -236,7 +235,7 @@ function txnFromAction(action: AIActionProposal, fallbackCurrency: string): Draf
     description: String(p.description ?? action.summary ?? "Transacción"),
     amount: Number(p.amount ?? 0),
     currency: String(p.currency ?? fallbackCurrency),
-    occurredOn: String(p.date ?? p.occurredOn ?? todayISO()),
+    occurredOn: String(p.date ?? p.occurredOn ?? today),
     source: "chat",
     categoryId: typeof p.categoryId === "string" ? p.categoryId : null,
     categoryPath: typeof p.categoryPath === "string" ? p.categoryPath : null,
@@ -297,6 +296,11 @@ type Props = {
    * del grupo (app)); si se omite, sale del contexto.
    */
   captureCurrency?: string;
+  /**
+   * Zona horaria del perfil para fechar la captura. Mismo motivo que `captureCurrency`:
+   * el asistente móvil vive fuera del provider. null/omitida = sale del contexto.
+   */
+  timezone?: string | null;
   /** Chips de sugerencias sobre el input. Vacío = no se dibuja la fila. */
   chips?: string[];
   /** Botón «enviarme el transcript por correo». */
@@ -309,6 +313,7 @@ export function AssistantConversation({
   variant,
   greeting,
   captureCurrency,
+  timezone,
   chips = [],
   transcript = true,
   scanner = false,
@@ -317,6 +322,11 @@ export function AssistantConversation({
   // La PRINCIPAL, no la de visualización: es la moneda con la que se captura.
   const contextCurrency = useCaptureCurrency();
   const currency = captureCurrency ?? contextCurrency;
+  // "Hoy" en la ZONA DEL PERFIL, la misma que usa el servidor (`userToday`): si el cliente
+  // fechara con la del navegador, un gasto capturado a las 11pm desde un dispositivo en
+  // otra zona caería en un día distinto del que el resto de la app considera hoy. Es una
+  // función, no un valor: se evalúa al capturar, no en el render (que puede ser de ayer).
+  const today = useCaptureToday(timezone);
 
   const [messages, setMessages] = useState<ChatMsg[]>([
     { id: 0, role: "assistant", text: greeting },
@@ -455,7 +465,7 @@ export function AssistantConversation({
           amount: ext.amount ?? 0,
           // La detectada en el recibo (el extractor distingue ₡ de $); si no hay, la principal.
           currency: ext.currency ?? currency,
-          occurredOn: ext.date ?? todayISO(),
+          occurredOn: ext.date ?? today(),
           source: "receipt",
         };
         setMessages((m) => [
@@ -521,7 +531,7 @@ export function AssistantConversation({
             </div>
             {m.action?.type === "create_transaction" ? (
               <div className={s.cardWrap}>
-                <TxnConfirmCard skin={s} draft={txnFromAction(m.action, currency)} />
+                <TxnConfirmCard skin={s} draft={txnFromAction(m.action, currency, today())} />
               </div>
             ) : null}
             {m.action?.type === "create_goal" ? (

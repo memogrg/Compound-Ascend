@@ -25,8 +25,8 @@ import {
   TxnConfirmCard,
   type DraftTxn,
 } from "@/components/ai/assistant-conversation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
-import { todayLocalISO } from "@/lib/validation";
 
 /** Saludo del panel (web = voseo). */
 const GREETING =
@@ -40,13 +40,11 @@ const CHIPS = [
 
 type Mode = "assistant" | "ai";
 
-function todayISO(): string {
-  return todayLocalISO();
-}
-
 export function CoachPanel() {
   // PRINCIPAL, no la de visualización: es la moneda con la que se captura.
   const captureCurrency = useCaptureCurrency();
+  // "Hoy" en la zona del PERFIL (la misma que usa el servidor), no la del navegador.
+  const today = useCaptureToday();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("assistant");
@@ -77,7 +75,7 @@ export function CoachPanel() {
           // La detectada en el recibo; si no hay, la PRINCIPAL. El "CRC" literal
           // descartaba la moneda que el extractor sí devuelve (distingue ₡ de $).
           currency: data.extract.currency ?? captureCurrency,
-          occurredOn: data.extract.date ?? todayISO(),
+          occurredOn: data.extract.date ?? today(),
           source: "receipt",
         });
       } else {
@@ -174,7 +172,7 @@ export function CoachPanel() {
         ) : null}
 
         {mode === "assistant" ? (
-          <TransactionWizard />
+          <TransactionWizard today={today} />
         ) : (
           <AssistantConversation variant="panel" greeting={GREETING} chips={CHIPS} />
         )}
@@ -215,15 +213,15 @@ function Tab({
 // ----------------------------------------------------------------------------
 // Modo 1 — Asistente guiado (wizard de transacción)
 // ----------------------------------------------------------------------------
-function TransactionWizard() {
-  const [draft, setDraft] = useState<DraftTxn>({
+function TransactionWizard({ today }: { today: () => string }) {
+  const [draft, setDraft] = useState<DraftTxn>(() => ({
     kind: "gasto",
     description: "",
     amount: 0,
     currency: "CRC",
-    occurredOn: todayISO(),
+    occurredOn: today(),
     source: "manual",
-  });
+  }));
   const [confirming, setConfirming] = useState(false);
   const descRef = useRef<HTMLInputElement>(null);
 
@@ -235,7 +233,7 @@ function TransactionWizard() {
       description: "",
       amount: 0,
       currency: d.currency,
-      occurredOn: todayISO(),
+      occurredOn: today(),
       source: "manual",
       categoryId: null,
     }));
