@@ -6,10 +6,10 @@
  * "todavía no tengo suficiente historial" — NUNCA "no tengo acceso", y nunca una
  * tendencia inventada a partir de un solo punto.
  *
- * FUENTES (ver nota en el service): patrimonio y portafolio salen de
+ * FUENTES (ver nota en el service): patrimonio sale de `net_worth_snapshots` (mensual,
+ * con fallback a `portfolio_snapshots` mientras no haya historial); portafolio de
  * `portfolio_snapshots` (diario, con moneda); gasto/ingreso/ahorro de
- * `monthly_snapshots` (mensual). `net_worth_snapshots` NO se usa: la tabla existe pero
- * nadie la escribe, así que su "historia" está siempre vacía.
+ * `monthly_snapshots` (mensual).
  */
 import { formatMoney } from "@/lib/format";
 import type { AiToolDecl } from "@/lib/ai/tools";
