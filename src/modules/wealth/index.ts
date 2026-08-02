@@ -25,7 +25,11 @@ export type { PolicyInput } from "./schemas";
 export { addPolicyAction, setPeaceMonthsAction } from "./api/actions";
 export { DefenseFunds } from "./components/defense-funds";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
-export { getPositionForSymbol } from "./services/holdings-service";
+export { getPositionForSymbol, listHoldings } from "./services/holdings-service";
+// Detalle por dominio para la IA (solo lectura): compras de un activo y dividendos cobrados.
+export { listHoldingPurchases } from "./services/holding-history-service";
+export type { HoldingPurchase } from "./services/holding-history-service";
+export { listDividends } from "./services/dividend-service";
 export { createInvestmentAlert, type CreateAlertInput } from "./services/price-alerts-service";
 export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patrimonio-service";
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";

@@ -40,6 +40,7 @@ import {
 } from "@/lib/ai/tools";
 import { CONSULTAR_TRANSACCIONES_TOOL } from "@/lib/ai/transactions-query";
 import { CONSULTAR_HISTORIAL_TOOL } from "@/lib/ai/history-query";
+import { CONSULTAR_DETALLE_TOOL } from "@/lib/ai/detail-query";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { convertCurrency } from "@/lib/fx";
 // Router de complejidad (R1): carril barato para consultas de dato. Solo importa la función
@@ -290,6 +291,19 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
         };
       }
     }
+    if (name === "consultar_detalle") {
+      // Detalle fino por dominio (pagos, aportes, compras, dividendos, liquidez). Cierra el
+      // principio: ningún dominio responde "no tengo acceso".
+      try {
+        const { consultarDetalle } = await import("@/lib/ai/detail-query-service");
+        return await consultarDetalle(args, toolContext.currency);
+      } catch {
+        return {
+          error:
+            "no pude leer ese detalle ahora mismo. Reintentá en un momento — está en la pantalla del dominio.",
+        };
+      }
+    }
     if (name === "consultar_historial") {
       // Serie histórica REAL desde los snapshots. Sin historia suficiente el motor lo dice
       // ("todavía no tengo suficiente historial"), nunca inventa una tendencia.
@@ -466,6 +480,7 @@ export async function financeChatWithTools(
       SURPLUS_TOOL,
       CONSULTAR_TRANSACCIONES_TOOL,
       CONSULTAR_HISTORIAL_TOOL,
+      CONSULTAR_DETALLE_TOOL,
     ],
     execute: buildToolExecutor(toolContext),
   });

@@ -28,6 +28,8 @@ export {
   deleteTransaction,
 } from "./services/transaction-service";
 export { getLiquidityBalance } from "./services/liquidity-service";
+// Cuentas del usuario (trazabilidad de liquidez para la IA).
+export { listAccounts } from "./services/accounts-service";
 // Resumen ligero de sobres (gasto favoritos + metas) agrupados por frasco, para la IA
 // (contexto) y el router (intent determinista "listá mis sobres").
 export { getEnvelopesSummary, formatEnvelopesReply } from "./services/envelopes-service";

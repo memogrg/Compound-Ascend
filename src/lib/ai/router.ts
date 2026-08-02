@@ -101,7 +101,10 @@ type Intent =
   | "consulta_transacciones"
   // HISTORIAL/TENDENCIA: serie por periodo + variación desde los snapshots ("¿cómo cambió mi
   // patrimonio?", "¿cómo vengo con el gasto?"). Lectura fresca:
-  | "consulta_historial";
+  | "consulta_historial"
+  // DETALLE por dominio: pagos de una deuda, aportes a una meta, compras, dividendos,
+  // trazabilidad de liquidez. Lectura fresca:
+  | "consulta_detalle";
 
 const KNOWN_INTENTS: Intent[] = [
   "numero_seguridad",
@@ -130,6 +133,7 @@ const KNOWN_INTENTS: Intent[] = [
   "plan_independencia",
   "consulta_transacciones",
   "consulta_historial",
+  "consulta_detalle",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -141,6 +145,7 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "puedo_gastar",
   "consulta_transacciones",
   "consulta_historial",
+  "consulta_detalle",
 ]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
@@ -209,6 +214,31 @@ export function extractTerminoGasto(text: string): string | null {
     .trim();
   if (!t || t.length < 2 || TERMINO_STOP.test(t)) return null;
   return t;
+}
+
+/**
+ * Nombre de la entidad concreta en una consulta de detalle ("cuánto le he pagado a la
+ * TARJETA BAC", "mis aportes a VIAJE A JAPÓN"). Se corta en la palabra del dominio para
+ * no arrastrarla al nombre. null → el detalle del dominio completo.
+ */
+export function extractNombreDominio(text: string): string | null {
+  const m = text.match(
+    /(?:pagad[oa]?|aportad[oa]?|abonad[oa]?|invertid[oa]?|pagos?|aportes?|abonos?|compras?|dividendos?)\s+(?:a|de|en|para|del|a la|al)\s+(?:mi\s+|mis\s+|la\s+|el\s+|los\s+|las\s+)?([^,.?!¿¡]+)/i,
+  );
+  let n = m?.[1]?.trim();
+  if (!n) return null;
+  // "…la tarjeta este mes" → "tarjeta"; no queremos el marcador temporal en el nombre.
+  n = n
+    .replace(
+      /\s+(?:hoy|ayer|esta semana|la semana pasada|este mes|el mes pasado|este a[nñ]o|en total|hasta ahora|hasta hoy)\b.*$/i,
+      "",
+    )
+    .trim();
+  // Una palabra genérica del dominio no es un nombre propio: eso es "todo el dominio".
+  if (!n || n.length < 2 || /^(?:deuda|deudas|meta|metas|cuenta|cuentas|todo|todos|eso)$/i.test(n)) {
+    return null;
+  }
+  return n;
 }
 
 /** Extrae el nombre de una deuda tras el verbo, limpiando conectores ("de mi X" → "X"). */
@@ -409,6 +439,43 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   // carril determinista respondería SOLO una mitad (la auditoría lo cazó) → ESCALAR al LLM, que las
   // cubre juntas. Requiere DOS "cuánto" unidos por "y" (no atrapa un "¿y cuánto…?" de arrastre solo).
   if (/cu[aá]nto\b[\s\S]*?\by\s+cu[aá]nto\b/i.test(t)) return null;
+
+  // ── DETALLE POR DOMINIO (consulta_detalle). Va ANTES de cuota_deuda/metas/resumen_inversiones,
+  //    que responden la FOTO (saldo, progreso, valor) cuando la pregunta es por el HISTORIAL de
+  //    movimientos ("cuánto le he pagado", "cuál fue mi último pago", "mis dividendos").
+  //    Exige señal de acumulado / "último movimiento" / trazabilidad + un dominio reconocible.
+  //    Va al TOPE de matchIntent: resumen_inversiones ("cuánto…invertido") y REASONING_CUES
+  //    ("cómo", "último") se lo comían. Las condiciones son estrictas, así que no roba nada.
+  {
+    // "he pagado / llevo pagado / cuánto le he aportado": acumulado, no la cuota de este mes.
+    const acumulado =
+      // El participio es OBLIGATORIO. Un "cuánto llevo…" suelto se comía "cuánto llevo
+      // AHORRADO en mis metas", que es progreso (metas), no el historial de aportes.
+      // Por eso `ahorrad` NO está en la lista: pertenece a la foto, no al detalle.
+      /\b(?:he|has|llevo|tengo)\s+(?:pagad|aportad|abonad|invertid|sacad|retirad|puesto|metido)/i.test(t) ||
+      /\bhistorial\s+de\s+(?:pagos?|aportes?|compras?)|\btod[oa]s\s+(?:mis|los|las)\s+(?:pagos?|aportes?|compras?)/i.test(t);
+    const ultimoMov =
+      /[uú]ltim[oa]s?\s+(?:pago|aporte|abono|compra|dividendo)|\bcu[aá]ndo\s+(?:pagu[eé]|aport[eé]|compr[eé])/i.test(t);
+    // La trazabilidad de liquidez ("de dónde salió", "a dónde fue") ES la consulta: no
+    // necesita señal de acumulado, la pregunta ya pide el movimiento.
+    const trazabilidad =
+      /\b(?:de|a)\s+d[oó]nde\s+(?:sali[oó]|vino|fue|se\s+fue|lo\s+saqu[eé])|\btrazabilidad\b/i.test(t);
+    const dominio =
+      /\bdividendos?\b/i.test(t) ? "dividendos"
+      : /\bdeuda|\btarjeta|\bpr[eé]stamo|\bcr[eé]dito\b/i.test(t) ? "deudas"
+      : /\bmeta\b|\bmetas\b|\bahorro\s+para\b/i.test(t) ? "metas"
+      : /\bcompras?\s+de\b|\bactivo\b|\bacci[oó]n(?:es)?\b|\bcripto\b|\betf\b/i.test(t) ? "inversiones"
+      : /\bcuenta\b|\bcuentas\b|\bliquidez\b|\bde\s+d[oó]nde\s+(?:sali[oó]|vino)|\ba\s+d[oó]nde\s+(?:fue|se\s+fue)/i.test(t) ? "liquidez"
+      : null;
+    // Los dividendos son inequívocos: la sola mención ya es una consulta de detalle.
+    if (dominio && (acumulado || ultimoMov || trazabilidad || dominio === "dividendos")) {
+      return {
+        intent: "consulta_detalle",
+        params: { dominio, nombre: extractNombreDominio(t), tope: ultimoMov ? 1 : 10 },
+      };
+    }
+  }
+
 
   // ── Carriles nuevos (van ANTES de datos_mercado y del guard de REASONING_CUES, que atraparían
   //    "cuánto vale" / "cómo va" / "debería" y los mandaría al LLM). Todos deterministas, cifra del motor. ──
@@ -1118,6 +1185,13 @@ async function resolveFetchIntent(
       // Estructura AGRUPADA POR FRASCO (gasto y acumulables por separado) → Markdown determinista.
       // 0 tokens, exacto, sin alucinar (el cliente lo pasa por renderMarkdown → HTML seguro).
       return say(formatEnvelopesReply(await getEnvelopesSummary()));
+    }
+    if (intent === "consulta_detalle") {
+      // Detalle fino por dominio (0 tokens). Un nombre que no resuelve dice cuáles SÍ existen;
+      // un dominio vacío lo dice. Nunca "no tengo acceso".
+      const { consultarDetalle } = await import("@/lib/ai/detail-query-service");
+      const r = await consultarDetalle(params, cur);
+      return say(r.resumen_md);
     }
     if (intent === "consulta_historial") {
       // Serie histórica REAL desde los snapshots (0 tokens, plantilla determinista). Sin
