@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { useRouter } from "next/navigation";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 
@@ -42,11 +42,6 @@ const KIND_OPTS: Opt[] = [
   { value: "gasto", label: "Gasto" },
   { value: "ingreso", label: "Ingreso" },
 ];
-
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
-}
 
 export type TxnFormValues = {
   kind: string;
@@ -102,6 +97,7 @@ export function TxnForm({
   // la moneda equivocada.
   const captureCurrency = useCaptureCurrency();
   const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(initial?.occurredOn ?? todayISO());
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
   const [sobreLabel, setSobreLabel] = useState<string>(envById(initial?.categoryId)?.name ?? "");

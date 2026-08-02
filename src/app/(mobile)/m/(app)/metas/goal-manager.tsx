@@ -21,7 +21,7 @@ import type {
   GoalMovementType,
 } from "@/modules/control/services/goal-detail-service";
 import { formatMoney } from "@/lib/format";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 
 import {
   Fab,
@@ -93,11 +93,6 @@ function goalSubtitle(args: {
   const fecha = fmtMonth(targetDate);
   if (missing <= 0) return `¡Completada! · ${fecha}`;
   return `Faltan ${mAmount(missing, currency)} · ${fecha}`;
-}
-
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
 }
 
 export function GoalManager({
@@ -409,6 +404,7 @@ function GoalPickerSheet({
 /** Aporte: monto + fecha → addGoalContributionAction (crea la transacción vinculada). */
 function ContributionForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => void }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const values = { goalId: goal.id, amount, contributionDate: date };
   return (
@@ -428,6 +424,7 @@ function ContributionForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: (
 /** Retiro: monto + fecha + nota → withdrawGoalAction (el backend valida que no exceda el saldo). */
 function WithdrawalForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => void }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
   const values = { goalId: goal.id, amount, withdrawalDate: date, note: note || undefined };
@@ -454,6 +451,7 @@ function WithdrawalForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () 
  */
 function SpendForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => void }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const [categoryId, setCategoryId] = useState<string>("");
   const [note, setNote] = useState("");

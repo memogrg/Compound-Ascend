@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatMoney, formatPercent, formatMonthYear } from "@/lib/format";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import {
   listHoldingPurchasesAction,
   listDividendsAction,
@@ -83,11 +83,6 @@ const RENTAL_FREQ_OPTS = [
 ];
 
 type Mode = "detail" | "dividend" | "valuation" | "rental";
-
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
-}
 
 const QUOTED_ALERT = new Set(["etf", "accion", "cripto"]);
 /** asset_type del holding → tipo de mercado del endpoint /api/market-price. */
@@ -198,6 +193,7 @@ export function HoldingDetailSheet({
 
   const [delDiv, setDelDiv] = useState<Dividend | null>(null);
   const [delRent, setDelRent] = useState<RentalPayment | null>(null);
+  const todayISO = useCaptureToday();
   const [valDate, setValDate] = useState(todayISO());
   const [valAmount, setValAmount] = useState<number | undefined>(undefined);
   const [valError, setValError] = useState<string | null>(null);
