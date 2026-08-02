@@ -340,8 +340,8 @@ export function AssistantConversation({
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   // Cerrojo de envío en un ref, NO en el estado: dos clicks en el mismo tick leen el mismo
-  // `sending === false` (React aún no re-renderizó) y ambos pasaban la guarda. El resultado
-  // eran dos turnos `user` seguidos, que Gemini rechaza con 400 por romper la alternancia.
+  // `sending === false` (React aún no re-renderizó) y ambos pasaban la guarda. El usuario veía
+  // su mensaje duplicado y el segundo turno gastaba una llamada al modelo de más.
   const sendingRef = useRef(false);
 
   const nextId = () => idRef.current++;
