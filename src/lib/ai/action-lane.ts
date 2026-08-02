@@ -69,7 +69,44 @@ const say = (reply: string, action: AIActionProposal | null): AIChatResponse => 
 const ALERT_RE = /\b(alerta|alertame|avisa|avísame|avisame|avisar|avisá|notif)/i;
 const GOAL_RE = /\bmeta( de ahorro)?\b/i;
 const SOBRE_RE = /\b(sobre|frasco|acumulador)\b/i;
-const EXPENSE_RE = /\b(gast|compr|pagu|pag[oó]|registr|anot|apunt)/i;
+/**
+ * GASTO. Tres piezas, porque el patrón viejo (`/\b(gast|compr|…)/`) era demasiado goloso:
+ * "¿dónde puedo recortar gastos?" trae "gast" y se lo comía, contestando "¿de cuánto fue
+ * el gasto?" a una pregunta de análisis. Registrar un gasto es una ORDEN o un HECHO, nunca
+ * una pregunta.
+ */
+/** Orden de registrar: "registrá/anotá/apuntá/meté/cargá … un gasto". */
+const EXPENSE_ORDER_RE = /\b(?:registr|anot|apunt|met[eé]|carg[aá]|agreg|añad|anad)/i;
+/** Sustantivo del movimiento, para acompañar a la orden ("anotá UN GASTO de …"). */
+const EXPENSE_NOUN_RE = /\bgast|\bcompr|\bpag|\bmovimiento|\btransacci/i;
+/**
+ * Hecho consumado en 1ª persona: "gasté 5000 en el súper", "pagué el recibo".
+ * El cierre es un lookahead de "no-letra", no \b: en JS \b es ASCII y una vocal acentuada
+ * no es \w, así que "\bgast[eé]\b" nunca matchearía "gasté" (misma trampa que los verbos
+ * en voseo de arriba). Así entra "gasté"/"gaste" y quedan fuera "gastos" y "gastemos".
+ */
+const EXPENSE_FACT_RE = /\b(?:gast[eé]|compr[eé]|pagu[eé]|me cobraron)(?!\p{L})/iu;
+/**
+ * Lenguaje de ANÁLISIS de gastos: recortar, reducir, optimizar, en qué se va la plata.
+ * Nunca es una captura, ni siquiera en imperativo ("recortá mis gastos" pide un análisis,
+ * no registra nada). Va al LLM, que tiene el desglose por sobre.
+ */
+const EXPENSE_ANALYSIS_RE =
+  /\brecort|\breduc|\brebaj|\boptimiz|\bahorrar\b|\bbajar\b|\bd[oó]nde\b|\ben qu[eé](?!\p{L})|\bse me va\b|\bse va (?:la|mi)\b/iu;
+
+/**
+ * ¿Es una PREGUNTA? Signo de interrogación (de apertura o de cierre) o arranque con
+ * palabra interrogativa. Es deliberadamente amplia: un falso positivo solo manda la frase
+ * al LLM —que igual sabe registrar—, mientras que un falso negativo le contesta al usuario
+ * con una pregunta absurda. Ante duda, escalá.
+ */
+function isQuestion(t: string): boolean {
+  if (/[¿?]/.test(t)) return true;
+  // Cierre con lookahead y no \b, por lo mismo que arriba (á/é/í no son \w en JS).
+  return /^\s*(?:d[oó]nde|c[oó]mo|cu[aá]l|cu[aá]nt\w*|cu[aá]ndo|qu[eé]|por qu[eé]|para qu[eé]|puedo|podr[ií]a|se puede|me conviene)(?!\p{L})/iu.test(
+    t,
+  );
+}
 const CREATE_VERB_RE = /\b(cre[aá]|crear|hac[eé]|hacer|nuev[oa]|agreg|arm[aá]|arma|pon[eé]|ponme|añad|generame|gener[aá]|abr[íi]|abrir|configur)/i;
 // Verbo IMPERATIVO de alerta (para no confundir "creá una alerta" con "tengo alertas activas").
 const ALERT_CREATE_SIGNAL = /\b(avisa|avísame|avisame|avisá|alertame|generame|gener[aá]|ponme|pon[eé]|cre[aá]|crear|configur|agreg|arm[aá]|arma|quiero|necesito)/i;
@@ -98,6 +135,7 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
   if (/\b(deber[ií]a|convien|convendr[ií]a|es mejor|vale la pena|qu[eé] (?:pienso|opin[aá]|recomend)|me recomend|ser[ií]a bueno)\b/i.test(t)) {
     return null;
   }
+  const pregunta = isQuestion(t);
   const money = extractMoney(t);
 
   // 1) ALERTA DE PRECIO — "alerta/avisame … {símbolo} … {precio}". La dirección la infiere el
@@ -149,8 +187,12 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
     });
   }
 
-  // 4) GASTO — "registrá/anotá un gasto de $Z en W".
-  if (EXPENSE_RE.test(t) && /\bgast|\bcompr|\bpagu|\bpag[ué]|\bgasto\b/i.test(t)) {
+  // 4) GASTO — "registrá/anotá un gasto de $Z en W" o "gasté $Z en W".
+  //    Una PREGUNTA nunca registra: "¿dónde puedo recortar gastos?" es análisis, no captura,
+  //    y con el patrón viejo caía acá y contestaba "¿de cuánto fue el gasto?". Tampoco entra
+  //    el lenguaje de recortar/reducir aunque venga en imperativo ("recortá mis gastos").
+  //    Todo eso sale por null → LLM con contexto, que es quien sabe dónde recortar.
+  if (!pregunta && !EXPENSE_ANALYSIS_RE.test(t) && (EXPENSE_FACT_RE.test(t) || (EXPENSE_ORDER_RE.test(t) && EXPENSE_NOUN_RE.test(t)))) {
     const desc = extractExpenseDesc(t) ?? "Gasto";
     if (money === null) {
       return say(`¿De cuánto fue el gasto${desc !== "Gasto" ? ` en ${desc}` : ""}?`, null);

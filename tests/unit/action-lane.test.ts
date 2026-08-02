@@ -77,6 +77,50 @@ describe("detectCreateAction · sobre, meta, gasto", () => {
   });
 });
 
+describe("detectCreateAction · GASTO no secuestra el análisis de gastos", () => {
+  // El bug: el patrón viejo (/\b(gast|compr|…)/) veía "gast" en "gastos" y contestaba
+  // "¿de cuánto fue el gasto?" a una pregunta de dónde recortar.
+  it('"¿dónde puedo recortar gastos?" → null (análisis, no captura)', () => {
+    expect(detectCreateAction("¿dónde puedo recortar gastos?", OPTS)).toBeNull();
+  });
+
+  it.each([
+    "donde recorto gastos",
+    "en qué se me va la plata",
+    "¿cuáles son mis gastos más grandes?",
+    "cómo reduzco mis gastos fijos",
+    "recortá mis gastos discrecionales",
+    "quiero bajar mis gastos",
+  ])('"%s" → null', (q) => {
+    expect(detectCreateAction(q, OPTS)).toBeNull();
+  });
+
+  it("una PREGUNTA con monto tampoco captura", () => {
+    expect(detectCreateAction("¿me conviene un gasto de 5000 en esto?", OPTS)).toBeNull();
+  });
+});
+
+describe("detectCreateAction · GASTO sigue capturando lo que debe", () => {
+  it.each([
+    ["registrá un gasto de 5000 en super", 5000],
+    ["anotá una compra de 12000 en farmacia", 12000],
+    ["apuntá un gasto de 3000 en gasolina", 3000],
+    ["gasté 5000 en el super", 5000],
+    ["pagué 25000 de luz", 25000],
+    ["compré 8000 en ropa", 8000],
+  ])('"%s" → create_transaction por %i', (frase, monto) => {
+    const r = detectCreateAction(frase, OPTS);
+    expect(r?.action?.type).toBe("create_transaction");
+    expect(r?.action?.payload).toMatchObject({ kind: "gasto", amount: monto });
+  });
+
+  it("orden de registro SIN monto → pide solo el monto (no rechaza)", () => {
+    const r = detectCreateAction("registrá un gasto en el super", OPTS);
+    expect(r?.action).toBeNull();
+    expect(r?.reply).toMatch(/de cuánto fue el gasto/i);
+  });
+});
+
 describe("detectCreateAction · no secuestra otras consultas", () => {
   it("pregunta de CONSEJO ('¿debería crear una meta?') → null (va al razonamiento)", () => {
     expect(detectCreateAction("¿debería crear una meta o pagar deuda primero?", OPTS)).toBeNull();
