@@ -1,4 +1,4 @@
-import { getRichLifeSummary } from "@/modules/rich-life";
+import { getRichLifeSummary, ensureCurrentNetWorthSnapshot } from "@/modules/rich-life";
 import { getSnapshotHistory, ensureTodaySnapshot } from "@/modules/wealth";
 import { MobileHeader } from "../../components/mobile-header";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
@@ -38,6 +38,10 @@ export default async function MobilePatrimonio() {
   // —no había nada que escribiera snapshots— y el gráfico no aparecía nunca. Si falla, la
   // pantalla se pinta igual: solo se queda sin el punto de hoy.
   await ensureTodaySnapshot(ind.netWorth, currency).catch(() => {});
+
+  // Y el patrimonio del MES en curso en net_worth_snapshots: es la serie mensual que lee el
+  // asesor ("¿cómo cambió mi patrimonio?"). Reusa lo ya calculado, no vuelve a agregar.
+  await ensureCurrentNetWorthSnapshot(summary);
 
   // Historia REAL de patrimonio neto (snapshots) para el gráfico con scrub. Sin datos inventados:
   // si aún no hay ≥2 snapshots, se muestra un estado honesto en vez del gráfico.

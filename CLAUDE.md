@@ -93,6 +93,24 @@ Three clients with different privilege levels — use the right one:
 
 `src/lib/insights/` powers the dashboard notification bell. Pure `detect*` functions in `detectors.ts` each turn some slice of user data into `DetectedInsight`s (kind + severity + optional `relatedKind`/`relatedId`). `refreshInsights()` runs them behind a **freshness guard** (only if the last run is stale) and hands the result to `syncInsights()`, which **reconciles by `(kind, related_id)`**: a detector that stops emitting an insight marks the persisted row `resuelto` automatically — this is how an insight self-clears once the underlying condition is fixed. `getActiveInsights()` triggers a refresh on read. Keep side-effectful work (merges, expense writes) **out of `refreshInsights()`** — it also runs from the AI context-engine; do such work in the page load instead (see the DCA gap below).
 
+### Snapshots (three tables, three questions)
+
+- `monthly_snapshots` — income/expense/free cashflow per month (`financial-base`).
+- `portfolio_snapshots` — daily market value of the **investments** (`wealth`).
+- `net_worth_snapshots` — monthly **net worth** (liquid + investments + assets − debts) as the
+  Rich Life engine computes it (`rich-life/services/net-worth-snapshot-service.ts`). Period is the
+  1st of the month. Written by the monthly cron (`/api/base/snapshot`, which composes both the base
+  and the net-worth snapshot — the route does the composing so `financial-base` never depends on
+  `rich-life`) and, for the month in progress, by the patrimonio screens on load (web
+  `/mi-rich-life`, mobile `/m/patrimonio`) reusing the already-computed `getRichLifeSummary()`.
+  The table has no currency column: the writing currency lives inside `breakdown`.
+
+The AI's `consultar_historial` reads net worth from `net_worth_snapshots` and falls back to
+`portfolio_snapshots` while that series has fewer than 2 points (old accounts start empty). Sources
+are never mixed — their values aren't comparable. `aggregateNetWorth`'s `previousNetWorth` reads the
+last **closed** period (`lt` on the current period), otherwise the current month's own row would
+zero out `wealthVelocity`.
+
 ### DCA gap (brecha de aporte) — cross-module example
 
 A worked example of the patterns above. Recurring quoted holdings (`is_recurring`, `monthly_contribution > 0`) auto-register a monthly contribution at the live price when Patrimonio **or** the dashboard loads (`ensureMonthlyContributions()`, best-effort, idempotent via a unique index on `(holding_id, period_year, period_month)`). Each contribution row (`holding_contributions`) links to its expense `transaction_id`; the user confirms/adjusts the price (`adjustContributionPrice`, reverse + re-merge — the weighted average is order-independent). Open contributions surface as an `aporte_pendiente` insight that self-resolves on confirmation. Every purchase is also persisted to `investment_transactions` (`tx_type='compra'`, with `holding_id`) for DCA history — the holding's running average is unchanged by this, it's history only.

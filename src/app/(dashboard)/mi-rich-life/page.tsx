@@ -3,6 +3,7 @@ import {
   getRichLifeSummary,
   buildDemoRichLifeSummary,
 } from "@/modules/rich-life/services/rich-life-service";
+import { ensureCurrentNetWorthSnapshot } from "@/modules/rich-life/services/net-worth-snapshot-service";
 import { getPatrimonioReport, type PatrimonioServiceResult } from "@/modules/wealth";
 import { RichLifeDashboard } from "@/modules/rich-life/components/rich-life-dashboard";
 import { RichActions } from "@/modules/rich-life/components/rich-actions";
@@ -17,6 +18,11 @@ export default async function Page() {
   const summary: RichLifeSummary = configured
     ? await getRichLifeSummary()
     : buildDemoRichLifeSummary();
+
+  // Deja registrado el patrimonio del mes EN CURSO (net_worth_snapshots) con lo que ya
+  // se calculó arriba: es lo que le da historia real al "¿cómo cambió mi patrimonio?"
+  // del asesor sin esperar al cron del día 1. Best-effort; nunca en modo demo.
+  if (configured) await ensureCurrentNetWorthSnapshot(summary);
 
   // Marco Patrimonial (solo con datos reales). Best-effort: si falla, el dashboard
   // cae al modo Rich Life Score sin romperse. Sí, reagrega además de getRichLifeSummary;

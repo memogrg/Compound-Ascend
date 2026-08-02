@@ -4,13 +4,18 @@ import "server-only";
  * y delega todo el cálculo al motor puro de `history-query.ts`.
  *
  * FUENTES y por qué:
- * - patrimonio / portafolio → `portfolio_snapshots` (diario, con moneda propia). Se
- *   colapsa a mensual tomando el ÚLTIMO día de cada mes (valor de cierre).
+ * - patrimonio → `net_worth_snapshots` (mensual): patrimonio NETO real —líquido +
+ *   inversiones + activos − deudas—, escrito por el cron mensual y por las pantallas
+ *   de patrimonio. Con FALLBACK a `portfolio_snapshots` mientras esa serie no tenga
+ *   al menos dos puntos: para las cuentas viejas la tabla arranca vacía y responder
+ *   "no tengo historial" teniendo snapshots de portafolio sería peor.
+ * - portafolio → `portfolio_snapshots` (diario, con moneda propia). Se colapsa a
+ *   mensual tomando el ÚLTIMO día de cada mes (valor de cierre).
  * - gasto / ingreso / ahorro → `monthly_snapshots` (ya mensual, uno por periodo).
  *
- * `net_worth_snapshots` NO se usa aunque exista y parezca la fuente natural del
- * patrimonio: hoy NADIE la escribe (solo se lee un `limit 1` en rich-life-service, que
- * por eso siempre vuelve vacío). Leerla daría "sin historial" para todo el mundo.
+ * OJO con el fallback: `portfolio_snapshots.net_worth` es el patrimonio que había al
+ * escribir la fila, no el valor de las inversiones —esa es `portfolio_value`—; sirve
+ * como puente, pero la fuente autoritativa del patrimonio es `net_worth_snapshots`.
  *
  * Solo lectura, scope de hogar vía los servicios existentes (RLS por sesión).
  */
@@ -43,7 +48,7 @@ async function serieMensual(metrica: "gasto" | "ingreso" | "ahorro", meses: numb
 }
 
 /** Serie mensual de `portfolio_snapshots` (diario → cierre de mes) + su moneda. */
-async function seriePatrimonio(
+async function seriePortfolioSnapshots(
   metrica: "patrimonio" | "portafolio",
 ): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
   const { getSnapshotHistory } = await import("@/modules/wealth/services/snapshot-service");
@@ -56,6 +61,36 @@ async function seriePatrimonio(
   // motor de patrimonio estaba usando al escribirlos).
   const moneda = snaps.length > 0 ? (snaps[snaps.length - 1]!.currency ?? null) : null;
   return { serie: colapsarAMensual(puntos), moneda };
+}
+
+/** Serie mensual de `net_worth_snapshots` (ya mensual) + la moneda con la que se escribió. */
+async function serieNetWorthSnapshots(): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
+  const { getNetWorthHistory } = await import(
+    "@/modules/rich-life/services/net-worth-snapshot-service"
+  );
+  const snaps = await getNetWorthHistory();
+  // colapsarAMensual sobre datos ya mensuales es identidad + orden + dedupe: barato y
+  // deja una sola forma de construir la serie.
+  const serie = colapsarAMensual(snaps.map((s) => ({ fecha: s.period, valor: s.netWorth })));
+  const moneda = snaps.length > 0 ? (snaps[snaps.length - 1]!.currency ?? null) : null;
+  return { serie, moneda };
+}
+
+/**
+ * Serie de patrimonio/portafolio. Para `patrimonio` manda `net_worth_snapshots`; si esa
+ * serie todavía no da una tendencia (menos de 2 puntos) se cae a `portfolio_snapshots`
+ * SOLO si aporta más puntos. Nunca se mezclan fuentes: sus valores no son comparables.
+ */
+async function seriePatrimonio(
+  metrica: "patrimonio" | "portafolio",
+): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
+  if (metrica === "portafolio") return seriePortfolioSnapshots(metrica);
+
+  const nw = await serieNetWorthSnapshots();
+  if (nw.serie.length >= 2) return nw;
+
+  const pf = await seriePortfolioSnapshots(metrica);
+  return pf.serie.length > nw.serie.length ? pf : nw;
 }
 
 /**
