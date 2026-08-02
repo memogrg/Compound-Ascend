@@ -520,6 +520,10 @@
           {
             "selector": "ImportDeclaration[source.value=/(^@\\/lib\\/validation$)|(\\/validation$)/] > ImportSpecifier[imported.name='todayLocalISO']",
             "message": "`todayLocalISO()` fecha con la zona del DISPOSITIVO, y en un componente de servidor con la del PROCESO (UTC en Vercel). Para el \"hoy\" del usuario: `useCaptureToday()` en cliente, `await userToday()` en servidor (@/lib/time/user-time). Solo @/lib/time puede importarlo."
+          },
+          {
+            "selector": "Literal[regex.pattern=/\\\\b[áéíóúüñÁÉÍÓÚÜÑ]|[áéíóúüñÁÉÍÓÚÜÑ]\\\\b|\\\\b\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]\\\\b/]",
+            "message": "`\\b` se define sobre [A-Za-z0-9_]: una vocal acentuada NO es \\w, así que el límite pegado a ella nunca se cumple — `/\\bqu[eé]\\b/` matchea \"que\" pero JAMÁS \"qué\". Quitá el `\\b` del lado acentuado (`/\\bqu[eé]/`), cortá el stem antes de la tilde (`revis\\w*`), o usá `(?:^|[^\\wáéíóúüñ])` si necesitás el límite de verdad."
           }
         ]
       }
@@ -529,7 +533,13 @@
         "src/lib/time/**/*.ts"
       ],
       "rules": {
-        "no-restricted-syntax": "off"
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "Literal[regex.pattern=/\\\\b[áéíóúüñÁÉÍÓÚÜÑ]|[áéíóúüñÁÉÍÓÚÜÑ]\\\\b|\\\\b\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]\\\\b/]",
+            "message": "`\\b` se define sobre [A-Za-z0-9_]: una vocal acentuada NO es \\w, así que el límite pegado a ella nunca se cumple — `/\\bqu[eé]\\b/` matchea \"que\" pero JAMÁS \"qué\". Quitá el `\\b` del lado acentuado (`/\\bqu[eé]/`), cortá el stem antes de la tilde (`revis\\w*`), o usá `(?:^|[^\\wáéíóúüñ])` si necesitás el límite de verdad."
+          }
+        ]
       }
     }
   ]
