@@ -98,7 +98,10 @@ type Intent =
   // LIBRO DIARIO: consulta real de transacciones por fecha/periodo/comercio/sobre, con agregación
   // ("¿qué días gasto más?", "¿cuánto le gasté a Walmart?", "¿gasté más este mes que el pasado?").
   // Lectura fresca; el dato NO está en ctx (que solo trae agregados del mes en curso):
-  | "consulta_transacciones";
+  | "consulta_transacciones"
+  // HISTORIAL/TENDENCIA: serie por periodo + variación desde los snapshots ("¿cómo cambió mi
+  // patrimonio?", "¿cómo vengo con el gasto?"). Lectura fresca:
+  | "consulta_historial";
 
 const KNOWN_INTENTS: Intent[] = [
   "numero_seguridad",
@@ -126,6 +129,7 @@ const KNOWN_INTENTS: Intent[] = [
   "datos_mercado",
   "plan_independencia",
   "consulta_transacciones",
+  "consulta_historial",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -136,6 +140,7 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "listar_sobres",
   "puedo_gastar",
   "consulta_transacciones",
+  "consulta_historial",
 ]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
@@ -477,6 +482,28 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
     /\b(?:c[oó]mo|plan|hoja de ruta)\b[^?]*\b(?:para\s+)?(?:mi\s+)?(?:independencia (?:financiera)?|libertad financiera)\b/i.test(t)
   ) {
     return { intent: "plan_independencia", params: {} };
+  }
+
+  // ── HISTORIAL / TENDENCIA (consulta_historial). Va ANTES de REASONING_CUES, que atrapa
+  //    "cómo" y mandaría "¿cómo cambió mi patrimonio?" al LLM sin la serie. Y antes de
+  //    resumen_inversiones/gasto_mes, que responderían la foto de HOY a una pregunta de EVOLUCIÓN.
+  //    Exige señal de CAMBIO (cambió/evolución/tendencia/viene/vs el mes pasado) + un objeto
+  //    reconocible; sin objeto claro no entra (la métrica no se adivina).
+  {
+    const senalCambio =
+      /\bc[oó]mo\s+(?:cambi|viene|va\s+cambiando|evolucion|vengo)|\bevoluci[oó]n\b|\btendencia\b|\bhist[oó]rico\b|\bhistorial\b|\bmes\s+a\s+mes\b|\b(?:vs\.?|versus|comparado con)\s+(?:el\s+)?(?:mes|a[nñ]o)\s+(?:pasado|anterior)\b|\b(?:subi[oó]|baj[oó]|creci[oó]|mejor[oó]|empeor[oó])|\bc[oó]mo\s+vengo\b/i.test(t);
+    if (senalCambio) {
+      const metrica =
+        /\bpatrimonio\b|\bnet\s*worth\b|\bvalor\s+neto\b/i.test(t) ? "patrimonio"
+        : /\bportafolio\b|\bportfolio\b|\bcartera\b|\binversion(?:es)?\b/i.test(t) ? "portafolio"
+        : /\bahorro\b|\bahorr\w+\b/i.test(t) ? "ahorro"
+        : /\bingres\w+\b/i.test(t) ? "ingreso"
+        : /\bgast\w+\b/i.test(t) ? "gasto"
+        : null;
+      if (metrica) {
+        return { intent: "consulta_historial", params: { metrica, meses: 6 } };
+      }
+    }
   }
 
   // ── LIBRO DIARIO (consulta_transacciones). Va ANTES de REASONING_CUES —que atrapa "comparar"
@@ -1091,6 +1118,13 @@ async function resolveFetchIntent(
       // Estructura AGRUPADA POR FRASCO (gasto y acumulables por separado) → Markdown determinista.
       // 0 tokens, exacto, sin alucinar (el cliente lo pasa por renderMarkdown → HTML seguro).
       return say(formatEnvelopesReply(await getEnvelopesSummary()));
+    }
+    if (intent === "consulta_historial") {
+      // Serie histórica REAL desde los snapshots (0 tokens, plantilla determinista). Sin
+      // historia suficiente responde "todavía no tengo historial…", nunca "no tengo acceso".
+      const { consultarHistorial } = await import("@/lib/ai/history-query-service");
+      const r = await consultarHistorial(params, cur);
+      return say(r.resumen_md);
     }
     if (intent === "consulta_transacciones") {
       // Libro diario REAL: el servicio resuelve el periodo en la zona del PERFIL, lee con scope
