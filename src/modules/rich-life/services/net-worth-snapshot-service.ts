@@ -74,11 +74,34 @@ export async function generateNetWorthSnapshot(
   opts: { precios?: "vivo" | "cache" } = {},
 ): Promise<NetWorthSnapshotPoint | null> {
   const { db, userId } = await resolveAuth(ctx);
-  const agg = await aggregateNetWorth(ctx, opts);
+  const calc = await computeNetWorth(ctx, opts);
+  if (!calc) return null;
 
+  return upsertNetWorthSnapshot(db, userId, periodo, calc.indicators, calc.currency, calc.assets);
+}
+
+export type NetWorthComputation = {
+  indicators: { netWorth: number; totalAssets: number; totalLiabilities: number };
+  currency: string;
+  assets: { assetClass: string; value: number }[];
+};
+
+/**
+ * Patrimonio neto del usuario según el MOTOR, sin escribir nada. Exportada porque el
+ * snapshot de portafolio (wealth) también necesita el número real en modo cron: antes
+ * arrastraba el `net_worth` de la fila anterior por no tener de dónde sacarlo.
+ *
+ * Devuelve null si no hay NADA que medir (sin activos ni pasivos): quien llame decide
+ * si eso es "no escribas" o "usá otra cosa".
+ */
+export async function computeNetWorth(
+  ctx?: AuthContext,
+  opts: { precios?: "vivo" | "cache" } = {},
+): Promise<NetWorthComputation | null> {
+  const agg = await aggregateNetWorth(ctx, opts);
   if (agg.assets.length === 0 && agg.liabilities.length === 0) return null;
 
-  const ind = computeRichLifeIndicators({
+  const indicators = computeRichLifeIndicators({
     assets: agg.assets,
     liabilities: agg.liabilities,
     passiveIncomeMonthly: agg.passiveIncomeMonthly,
@@ -90,7 +113,7 @@ export async function generateNetWorthSnapshot(
     currency: agg.currency,
   });
 
-  return upsertNetWorthSnapshot(db, userId, periodo, ind, agg.currency, agg.assets);
+  return { indicators, currency: agg.currency, assets: agg.assets };
 }
 
 /**

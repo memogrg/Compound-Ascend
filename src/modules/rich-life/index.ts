@@ -10,6 +10,7 @@ export {
   aggregateNetWorth,
 } from "./services/rich-life-service";
 export {
+  computeNetWorth,
   generateNetWorthSnapshot,
   generateNetWorthSnapshotsForAllUsers,
   ensureCurrentNetWorthSnapshot,
@@ -18,5 +19,8 @@ export {
 export { RichLifeDashboard } from "./components/rich-life-dashboard";
 export { RichActions } from "./components/rich-actions";
 export type { RichLifeSummary, NetWorthAggregate } from "./services/rich-life-service";
-export type { NetWorthSnapshotPoint } from "./services/net-worth-snapshot-service";
+export type {
+  NetWorthSnapshotPoint,
+  NetWorthComputation,
+} from "./services/net-worth-snapshot-service";
 export type { RichTrend, RichLifeIndicators, RichLifeSnapshot } from "./types";

@@ -6,6 +6,8 @@ import { householdMemberIds } from "@/lib/household/active";
  * Generación automática (una vez al día) y lectura por período.
  * Las escrituras usan service-role para omitir RLS.
  */
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -151,9 +153,11 @@ export async function maybeGenerateSnapshot(
  * del usuario indicado, precios/FX con lib/market-data (no requieren sesión) y
  * la misma normalización del portfolio (fetchNormalizedPrices).
  *
- * net_worth: se arrastra el último valor conocido (carry-forward del snapshot
- * más reciente). Calcularlo fresco exigiría replicar rich-life con service-role
- * — pendiente documentado en docs/revision/02-pendientes-fase3.md.
+ * net_worth: se calcula FRESCO con el motor de patrimonio (`computeNetWorth` de
+ * rich-life, con el mismo cliente service-role). Antes se arrastraba el valor del
+ * snapshot anterior porque el motor parecía atado a la sesión; no lo está —
+ * `aggregateNetWorth` acepta un AuthContext—. El arrastre solo sobrevive como
+ * degradación si la agregación falla (ver `netWorthDelUsuario`).
  *
  * Devuelve null si el usuario no tiene holdings (no hay nada que snapshotear).
  */
@@ -182,17 +186,11 @@ export async function generateSnapshotForUserCron(
   const prices = await fetchNormalizedPrices(holdings, currency, rates, { db: supabase, userId });
   const analytics = computePortfolioAnalytics(normalized, prices);
 
-  const { data: last } = await supabase
-    .from("portfolio_snapshots")
-    .select("net_worth")
-    .eq("user_id", userId)
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!last) {
-    logger.warn("cron-snapshot: sin snapshot previo; net_worth cae a portfolioValue", { userId });
-  }
-  const netWorth = last ? Number(last.net_worth) : analytics.totalPortfolioValue;
+  const netWorth = await netWorthDelUsuario(
+    supabase,
+    userId,
+    analytics.totalPortfolioValue,
+  );
 
   const snap = await generateAndSaveSnapshot(
     userId,
@@ -207,6 +205,58 @@ export async function generateSnapshotForUserCron(
     logger.warn("cron-snapshot: generateAndSaveSnapshot devolvio null", { userId });
   }
   return snap;
+}
+
+/**
+ * Patrimonio neto del usuario para el snapshot de cron, en orden de preferencia:
+ *
+ *  1. el MOTOR (`computeNetWorth` con service-role): líquido + inversiones + activos −
+ *     deudas, el mismo número que ve el usuario en pantalla;
+ *  2. el último snapshot (arrastre) si la agregación falla o el usuario no tiene aún
+ *     activos ni pasivos registrados;
+ *  3. el valor del portafolio, último recurso cuando tampoco hay historia.
+ *
+ * Los pasos 2 y 3 son degradación con log, no la ruta normal: una corrida de cron no
+ * debe quedarse sin snapshot porque un proveedor de precios se cayó.
+ *
+ * El import es dinámico a propósito: `rich-life` importa el barrel de `wealth`, y este
+ * archivo se exporta desde ese barrel — estáticamente sería un ciclo.
+ */
+async function netWorthDelUsuario(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  portfolioValue: number,
+): Promise<number> {
+  try {
+    const { computeNetWorth } = await import(
+      "@/modules/rich-life/services/net-worth-snapshot-service"
+    );
+    // "cache": el cron ya salió a los proveedores arriba (fetchNormalizedPrices) y esa
+    // llamada persiste en market_price_cache; repetir la ronda en vivo sería pagarla dos
+    // veces por usuario.
+    const calc = await computeNetWorth({ db: supabase, userId }, { precios: "cache" });
+    if (calc) return Math.round(calc.indicators.netWorth);
+    logger.warn("cron-snapshot: usuario sin activos ni pasivos; net_worth por arrastre", {
+      userId,
+    });
+  } catch (err) {
+    logger.warn("cron-snapshot: falló el motor de patrimonio; net_worth por arrastre", {
+      userId,
+      err,
+    });
+  }
+
+  const { data: last } = await supabase
+    .from("portfolio_snapshots")
+    .select("net_worth")
+    .eq("user_id", userId)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (last) return Number(last.net_worth);
+
+  logger.warn("cron-snapshot: sin snapshot previo; net_worth cae a portfolioValue", { userId });
+  return portfolioValue;
 }
 
 function periodCutoff(period: SnapshotPeriod): string | null {
