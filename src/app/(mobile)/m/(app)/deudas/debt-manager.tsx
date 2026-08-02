@@ -16,7 +16,7 @@ import type { Debt, DebtVM, DebtPayment } from "@/modules/control";
 // VM convertido, el test de multimoneda lo dice.
 import { cuotaPrecargada, montoFilaDeuda } from "@/modules/control/engine/debt-strategy";
 import { formatMoney, formatPercent } from "@/lib/format";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 
 import {
   Fab,
@@ -89,11 +89,6 @@ function debtSubtitle(args: { rank: number; apr: number; months: number | null }
   if (rank === 1) return `Págala primero · ${tasa}`;
   if (months != null) return `${tasa} · ≈${months} ${months === 1 ? "mes" : "meses"}`;
   return tasa;
-}
-
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
 }
 
 function fmtDate(iso: string | null | undefined): string {
@@ -600,6 +595,7 @@ function PaymentForm({
   const [amount, setAmount] = useState<number | undefined>(initial ? initial.amount : cuota || undefined);
   const [extra, setExtra] = useState<number | undefined>(initial?.extraAmount || undefined);
   const [mode, setMode] = useState<string>(initial?.extraMode ?? "tiempo");
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(initial?.paymentDate ?? todayISO());
 
   const isExtra = kind === "extraordinario";

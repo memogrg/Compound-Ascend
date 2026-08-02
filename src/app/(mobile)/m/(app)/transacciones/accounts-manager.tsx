@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { useRouter } from "next/navigation";
 
 import {
@@ -52,11 +52,6 @@ const KIND_LABEL: Record<AccountKind, string> = {
   otro: "Otro",
 };
 
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
-}
-
 export function AccountsManager({
   accounts,
   currency,
@@ -84,6 +79,7 @@ export function AccountsManager({
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [amount, setAmount] = useState<number | undefined>(undefined);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
   const [trError, setTrError] = useState<string | null>(null);

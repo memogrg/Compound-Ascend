@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatMoney } from "@/lib/format";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import {
   addTemplateAction,
   editTemplateAction,
@@ -58,11 +58,6 @@ function isRunnable(t: TransactionTemplate): boolean {
   return t.kind === "ingreso" || t.kind === "gasto";
 }
 
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
-}
-
 export function TemplatesManager({
   templates,
   categories,
@@ -96,6 +91,7 @@ export function TemplatesManager({
   // Usar una plantilla sin monto fijo.
   const [running, setRunning] = useState<TransactionTemplate | null>(null);
   const [runAmount, setRunAmount] = useState<number | undefined>(undefined);
+  const todayISO = useCaptureToday();
   const [runDate, setRunDate] = useState(todayISO());
   const [runError, setRunError] = useState<string | null>(null);
 

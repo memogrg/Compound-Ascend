@@ -17,7 +17,7 @@ import {
 } from "@/modules/wealth/api/actions";
 import type { InsurancePolicy } from "@/modules/wealth/types";
 import { formatMoney } from "@/lib/format";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 
 import {
   Fab,
@@ -304,11 +304,12 @@ function PolicyPickerSheet({
 // la moneda no es editable) + fecha. Guarda vía payPolicyPremiumAction (una transacción
 // vinculada; la moneda la valida el servidor contra la póliza).
 function PremiumForm({ policy, onSuccess }: { policy: InsurancePolicy; onSuccess: () => void }) {
+  const todayISO = useCaptureToday();
   const label = POLICY_LABEL[policy.policyType] ?? "Cobertura";
   const name = policy.provider ? `${label} · ${policy.provider}` : label;
   const cur = policy.currency;
   const [amount, setAmount] = useState<number | undefined>(policy.premium ?? undefined);
-  const [date, setDate] = useState(todayLocalISO());
+  const [date, setDate] = useState(todayISO());
 
   const action = (v: { amount: number | undefined; paymentDate: string }): Promise<ActionResult> =>
     payPolicyPremiumAction({

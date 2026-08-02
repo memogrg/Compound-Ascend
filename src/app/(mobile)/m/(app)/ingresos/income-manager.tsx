@@ -13,7 +13,7 @@ import {
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import { formatMoney } from "@/lib/format";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 
 import {
   Fab,
@@ -68,11 +68,6 @@ const TYPE_ICON: Record<IncomeType, MIconName> = {
 const RECURRENT_FRACTION: Record<string, number> = { semanal: 0.25, quincenal: 0.5 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
-}
 
 /** Monto sugerido al pulsar "Recibido": fracción recurrente o restante del mes. */
 function suggestedAmount(it: BudgetItem, received: number): number {
@@ -402,6 +397,7 @@ export function ReceiveForm({
   onSuccess: () => void;
 }) {
   const [amount, setAmount] = useState<number | undefined>(suggestedAmount(source, received));
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const remaining = round2(source.amount - received);
   const values = { budgetItemId: source.id, amount, date };

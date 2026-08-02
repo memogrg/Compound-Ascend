@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { formatMoney, currencySymbol } from "@/lib/format";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   addHoldingAction,
@@ -82,9 +82,6 @@ const MONTH_OPTS: Opt[] = MONTHS.map((m, i) => ({ value: String(i + 1), label: m
 
 const API_TYPE_MAP: Partial<Record<AssetType, string>> = { etf: "etf", accion: "stock", cripto: "crypto" };
 
-// Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-const todayISO = (): string => todayLocalISO();
-
 // ── Wizard alta / edición / compra ───────────────────────────────────────────
 export function HoldingWizardSheet({
   open,
@@ -145,6 +142,7 @@ export function HoldingWizardSheet({
     prefill?.maturityDate ? String(prefill.maturityDate).slice(0, 7) : "",
   );
   const [termYears, setTermYears] = useState(prefill?.termYears != null ? String(prefill.termYears) : "");
+  const todayISO = useCaptureToday();
   const [startDate, setStartDate] = useState(prefill?.purchaseDate ?? todayISO());
 
   // Inmueble de renta
@@ -852,6 +850,7 @@ export function SellHoldingForm({
 }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const [quantitySold, setQuantitySold] = useState<number | undefined>(undefined);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const cur = holding.currency || currency;
 
@@ -894,6 +893,7 @@ export function DividendForm({
   onSuccess: () => void;
 }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const [frequency, setFrequency] = useState("trimestral");
   const cur = holding.currency || currency;
@@ -1011,6 +1011,7 @@ export function ContributeHoldingForm({
   const [unitPrice, setUnitPrice] = useState<number | undefined>(
     quoted ? holding.averageCost : undefined,
   );
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const name = holding.label || holding.symbol || "esta inversión";
 

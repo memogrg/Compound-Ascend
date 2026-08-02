@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { todayLocalISO } from "@/lib/validation";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import type { IncomeType } from "@/modules/financial-base/types";
@@ -60,11 +60,6 @@ const GROUP_KEY_BY_TYPE: Record<IncomeType, string> = {
 
 const NO_SUBCATEGORY = "";
 
-function todayISO(): string {
-  // Fecha LOCAL del dispositivo (no UTC): un movimiento de noche no se fecha mañana.
-  return todayLocalISO();
-}
-
 /** Hojas (subcategorías) del grupo del tipo elegido, tomadas del incomeTree (como la web). */
 function leavesForType(incomeTree: CategoryNode[], incomeType: string): Opt[] {
   const incomeRoot = incomeTree.find((r) => r.key === "g_ingresos") ?? incomeTree[0];
@@ -106,6 +101,7 @@ export function IncomeSourceForm({
   // caía a `currency`, la de visualización del topbar — la siembra equivocada.
   const captureCurrency = useCaptureCurrency();
   const [cur, setCur] = useState(initial?.currency ?? captureCurrency);
+  const todayISO = useCaptureToday();
   const [date, setDate] = useState(initial?.occurredOn ?? todayISO());
   const [incomeType, setIncomeTypeRaw] = useState(initial?.incomeType ?? "activo");
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? NO_SUBCATEGORY);
