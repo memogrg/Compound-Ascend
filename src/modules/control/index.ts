@@ -20,7 +20,7 @@ export type {
   PaymentRecord,
   RecomputeResult,
 } from "./engine/amortization";
-export { getControlSummary, listDebts, listGoals, createGoal } from "./services/control-service";
+export { getControlSummary, listDebts, listGoals, createGoal, listDebtPayments } from "./services/control-service";
 export { createSavingsSobreAction } from "./api/actions";
 export { goalInputSchema } from "./schemas";
 export { getDebtsOverview } from "./services/debts-service";
