@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getUser } from "@/lib/auth/session";
 import { getPrimaryCurrency } from "@/modules/financial-base";
+import { knownUserTz } from "@/lib/time/user-time";
 
 import { MobileAssistant } from "./mobile-assistant";
 
@@ -20,8 +21,11 @@ export default async function MobileAsistente() {
   if (!user) redirect("/m/login");
 
   // La PRINCIPAL (no la de visualización del topbar): es la moneda con la que se captura.
-  // Va por prop porque el shell móvil no monta CurrencyProvider todavía; cuando lo monte,
-  // esto puede pasar a useCaptureCurrency().
-  const primaryCurrency = await getPrimaryCurrency();
-  return <MobileAssistant primaryCurrency={primaryCurrency} />;
+  // Va por prop, igual que la zona horaria, porque esta ruta vive FUERA del grupo (app),
+  // que es donde se montan CurrencyProvider y TimezoneProvider.
+  const [primaryCurrency, timezone] = await Promise.all([
+    getPrimaryCurrency(),
+    knownUserTz().catch(() => null),
+  ]);
+  return <MobileAssistant primaryCurrency={primaryCurrency} timezone={timezone} />;
 }

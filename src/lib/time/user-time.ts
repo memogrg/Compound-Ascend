@@ -31,6 +31,7 @@ export {
   ymdInTz,
   todayISOInTz,
   currentPeriodInTz,
+  captureToday,
   hourInTz,
 } from "@/lib/time/user-time-core";
 
@@ -53,21 +54,35 @@ async function _getUserTimezone(ctx?: AuthContext): Promise<string | null> {
 export const getUserTimezone = cache(_getUserTimezone);
 
 /**
- * Zona horaria efectiva para "hoy / mes actual".
- * Con `ctx` (cron/service-role) no hay cookie de request → perfil → "UTC".
- * Sin `ctx` (sesión): cookie `tz` (sin BD) → perfil → "UTC".
+ * Zona EFECTIVA si se conoce, o null si todavía no se capturó ninguna.
+ * Con `ctx` (cron/service-role) no hay cookie de request → solo perfil.
+ * Sin `ctx` (sesión): cookie `tz` (sin BD) → perfil.
+ *
+ * El null importa: es la diferencia entre "el usuario está en UTC" y "todavía no sabemos
+ * dónde está". Los cálculos de servidor asumen UTC (ver `resolveUserTz`), pero el cliente
+ * puede hacer algo mejor con el null — preguntarle al dispositivo (ver `captureToday`).
  */
-async function _resolveUserTz(ctx?: AuthContext): Promise<string> {
+async function _knownUserTz(ctx?: AuthContext): Promise<string | null> {
   if (!ctx) {
     try {
       const store = await cookies();
       const fromCookie = store.get(TZ_COOKIE)?.value;
       if (isValidTimeZone(fromCookie)) return fromCookie;
     } catch {
-      // Fuera de un request (tests, jobs sin scope): sin cookie → perfil → UTC.
+      // Fuera de un request (tests, jobs sin scope): sin cookie → perfil.
     }
   }
-  return (await getUserTimezone(ctx)) ?? "UTC";
+  return await getUserTimezone(ctx);
+}
+/** Dedup por request (React cache). */
+export const knownUserTz = cache(_knownUserTz);
+
+/**
+ * Zona horaria efectiva para "hoy / mes actual", con "UTC" como piso (comportamiento
+ * anterior; se auto-cura al capturar la zona).
+ */
+async function _resolveUserTz(ctx?: AuthContext): Promise<string> {
+  return (await knownUserTz(ctx)) ?? "UTC";
 }
 /** Dedup por request (React cache): se resuelve una sola vez aunque lo pidan N servicios. */
 export const resolveUserTz = cache(_resolveUserTz);
