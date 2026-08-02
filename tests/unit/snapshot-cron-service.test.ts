@@ -1,9 +1,11 @@
 /**
  * Cobertura directa de generateSnapshotForUserCron (wealth/snapshot-service):
  * el servicio REAL con dependencias mockeadas. Verifica el early-return sin
- * holdings, el carry-forward de net_worth y que JAMÁS dependa de la sesión.
+ * holdings, que el net_worth se calcule con el MOTOR (ya no se arrastra el del
+ * snapshot anterior), la degradación cuando ese motor falla, y que JAMÁS
+ * dependa de la sesión.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/session", () => ({
@@ -32,9 +34,15 @@ vi.mock("@/modules/wealth/engine/portfolio-engine", () => ({
 }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: vi.fn() }));
 
+const computeNetWorthMock = vi.fn();
+vi.mock("@/modules/rich-life/services/net-worth-snapshot-service", () => ({
+  computeNetWorth: (...args: unknown[]) => computeNetWorthMock(...args),
+}));
+
 const upserts: unknown[] = [];
 let holdingsRows: unknown[] = [];
 const LAST_NET_WORTH = 9999;
+const NET_WORTH_MOTOR = 12_345_678;
 
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({
@@ -80,38 +88,87 @@ import { generateSnapshotForUserCron } from "@/modules/wealth/services/snapshot-
 
 const VALID_UUID = "e7040f66-42de-4a15-a9a2-14d2b3e16b6c";
 
+const HOLDING = {
+  id: "h1",
+  investment_id: null,
+  symbol: "VOO",
+  asset_type: "etf",
+  quantity: 12,
+  average_cost: 400,
+  purchase_date: null,
+  broker: null,
+  currency: "USD",
+  label: null,
+  current_value_manual: null,
+  rental_income: null,
+  rental_frequency: null,
+  rental_subtype: null,
+};
+
+type UpsertRow = { net_worth: number; portfolio_value: number; user_id: string };
+
+beforeEach(() => {
+  upserts.length = 0;
+  holdingsRows = [];
+  computeNetWorthMock.mockReset();
+  computeNetWorthMock.mockResolvedValue({
+    indicators: { netWorth: NET_WORTH_MOTOR, totalAssets: NET_WORTH_MOTOR, totalLiabilities: 0 },
+    currency: "CRC",
+    assets: [],
+  });
+});
+
 describe("generateSnapshotForUserCron", () => {
   it("sin holdings devuelve null y no escribe nada", async () => {
-    holdingsRows = [];
     expect(await generateSnapshotForUserCron(VALID_UUID)).toBeNull();
     expect(upserts).toHaveLength(0);
+    expect(computeNetWorthMock).not.toHaveBeenCalled();
   });
 
-  it("con holdings genera snapshot y arrastra net_worth del último snapshot", async () => {
-    holdingsRows = [
-      {
-        id: "h1",
-        investment_id: null,
-        symbol: "VOO",
-        asset_type: "etf",
-        quantity: 12,
-        average_cost: 400,
-        purchase_date: null,
-        broker: null,
-        currency: "USD",
-        label: null,
-        current_value_manual: null,
-        rental_income: null,
-        rental_frequency: null,
-        rental_subtype: null,
-      },
-    ];
+  it("el net_worth sale del MOTOR, no del snapshot anterior", async () => {
+    holdingsRows = [HOLDING];
+
     const snap = await generateSnapshotForUserCron(VALID_UUID);
+
     expect(snap).not.toBeNull();
     expect(upserts).toHaveLength(1);
-    const row = upserts[0] as { net_worth: number; portfolio_value: number; user_id: string };
-    expect(row.net_worth).toBe(LAST_NET_WORTH); // carry-forward, no recálculo
+    const row = upserts[0] as UpsertRow;
+    expect(row.net_worth).toBe(NET_WORTH_MOTOR);
+    expect(row.net_worth).not.toBe(LAST_NET_WORTH); // se acabó el arrastre
     expect(row.portfolio_value).toBe(6000);
     expect(row.user_id).toBe(VALID_UUID);
+  });
+
+  it("el motor corre con service-role y precios de caché (no repite la ronda en vivo)", async () => {
+    holdingsRows = [HOLDING];
+
+    await generateSnapshotForUserCron(VALID_UUID);
+
+    const [ctx, opts] = computeNetWorthMock.mock.calls[0] as [
+      { userId: string; db: unknown },
+      { precios: string },
+    ];
+    expect(ctx.userId).toBe(VALID_UUID);
+    expect(ctx.db).toBeTruthy(); // cliente inyectado: nunca la sesión
+    expect(opts).toEqual({ precios: "cache" });
+  });
+
+  it("si el motor revienta, degrada al último snapshot en vez de perder la corrida", async () => {
+    holdingsRows = [HOLDING];
+    computeNetWorthMock.mockRejectedValue(new Error("proveedor caído"));
+
+    const snap = await generateSnapshotForUserCron(VALID_UUID);
+
+    expect(snap).not.toBeNull();
+    expect((upserts[0] as UpsertRow).net_worth).toBe(LAST_NET_WORTH);
+  });
+
+  it("usuario sin activos ni pasivos: el motor devuelve null y también degrada", async () => {
+    holdingsRows = [HOLDING];
+    computeNetWorthMock.mockResolvedValue(null);
+
+    await generateSnapshotForUserCron(VALID_UUID);
+
+    expect((upserts[0] as UpsertRow).net_worth).toBe(LAST_NET_WORTH);
   });
 });
