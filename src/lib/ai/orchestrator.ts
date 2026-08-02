@@ -39,6 +39,7 @@ import {
   type AiToolExecutor,
 } from "@/lib/ai/tools";
 import { CONSULTAR_TRANSACCIONES_TOOL } from "@/lib/ai/transactions-query";
+import { CONSULTAR_HISTORIAL_TOOL } from "@/lib/ai/history-query";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { convertCurrency } from "@/lib/fx";
 // Router de complejidad (R1): carril barato para consultas de dato. Solo importa la función
@@ -289,6 +290,19 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
         };
       }
     }
+    if (name === "consultar_historial") {
+      // Serie histórica REAL desde los snapshots. Sin historia suficiente el motor lo dice
+      // ("todavía no tengo suficiente historial"), nunca inventa una tendencia.
+      try {
+        const { consultarHistorial } = await import("@/lib/ai/history-query-service");
+        return await consultarHistorial(args, toolContext.currency);
+      } catch {
+        return {
+          error:
+            "no pude leer tu historial ahora mismo. Reintentá en un momento — la evolución está en Patrimonio.",
+        };
+      }
+    }
     if (name === "datos_de_mercado") {
       // Trae precio + máximo REAL de la capa market-data (cacheada, timeout corto → no suma 503) y
       // calcula el escenario de forma determinista. Best-effort: si no hay dato, lo dice sin inventar.
@@ -451,6 +465,7 @@ export async function financeChatWithTools(
       MARKET_DATA_TOOL,
       SURPLUS_TOOL,
       CONSULTAR_TRANSACCIONES_TOOL,
+      CONSULTAR_HISTORIAL_TOOL,
     ],
     execute: buildToolExecutor(toolContext),
   });
