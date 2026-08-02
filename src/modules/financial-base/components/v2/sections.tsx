@@ -42,7 +42,7 @@ import {
 } from "@/modules/financial-base/services/liquidity-service";
 import type { MonthFlow } from "@/modules/financial-base/engine/month-flow";
 import { buildMonthMarker, type MonthMarker } from "@/modules/financial-base/engine/period";
-import { todayLocalISO } from "@/lib/validation";
+import { userToday } from "@/lib/time/user-time";
 import {
   findUnlinkedCandidates,
   buildEntityAlerts,
@@ -723,7 +723,9 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
       period: view.period,
       flow: monthFlow.real.operatingFlow, // A-01: flujo operativo canónico
       liquidity: closing.balance,
-      todayIso: todayLocalISO(),
+      // Esto corre en el SERVIDOR (Vercel, en UTC): `todayLocalISO()` acá era UTC disfrazado
+      // de "local" y adelantaba el marcador de hoy medio día. La zona del perfil es la buena.
+      todayIso: await userToday(),
     });
   } catch {
     liquidity = null;

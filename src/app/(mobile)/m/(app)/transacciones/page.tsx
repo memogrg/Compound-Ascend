@@ -19,7 +19,6 @@ import {
   getClosingLiquidity,
 } from "@/modules/financial-base/services/liquidity-service";
 import { buildMonthMarker, type MonthMarker } from "@/modules/financial-base/engine/period";
-import { todayLocalISO } from "@/lib/validation";
 import {
   MMetricGrid,
   MMetricCard,
@@ -125,7 +124,9 @@ export default async function MobileTransacciones() {
       period,
       flow: monthFlow.real.operatingFlow, // A-01: flujo operativo canónico
       liquidity: closing.balance,
-      todayIso: todayLocalISO(),
+      // Esto corre en el SERVIDOR (Vercel, en UTC): `todayLocalISO()` acá era UTC disfrazado
+      // de "local". Es la misma zona que ya usa el `asOf` de arriba.
+      todayIso: await userToday(),
     });
   } catch {
     liquidity = null;
