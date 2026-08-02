@@ -153,8 +153,14 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
 // "recort|reduc|optimiz" entran acá porque "¿dónde puedo recortar gastos?" no es una
 // consulta de dato: pide un análisis de qué sobres discrecionales pesan más. Sin esto, el
 // clasificador lite la mandaría a gasto_categoria y contestaría un total, no un consejo.
-const REASONING_CUES =
-  /\bc[oó]mo\b|deber[ií]a|conviene|qu[eé] hago|estrategia|plan\b|recomend|proyec|si (?:invierto|aporto|abono|pago|ahorro)|abon|extra|escenario|comparar?|vs\.?|mejor opci|cu[aá]nto tendr[ií]a|\ben cu[aá]nto\b|en \d+\s*a[nñ]os|simula|recort|reduc(?:ir)?\s+(?:mis\s+)?gast|optimiz/i;
+//
+// Está partida en dos a propósito: "cómo" es la señal MÁS ambigua de la lista —encabeza
+// tanto "¿cómo invierto mejor?" (consejo) como "¿cómo van mis metas?" (dato)—, así que los
+// carriles que necesitan rescatar una consulta factual pueden preguntar por el RESTO de las
+// señales sin ella. `REASONING_CUES` sigue siendo exactamente la unión de ambas.
+const REASONING_SIN_COMO =
+  /deber[ií]a|conviene|qu[eé] hago|estrategia|plan\b|recomend|proyec|si (?:invierto|aporto|abono|pago|ahorro)|abon|extra|escenario|comparar?|vs\.?|mejor opci|cu[aá]nto tendr[ií]a|\ben cu[aá]nto\b|en \d+\s*a[nñ]os|simula|recort|reduc(?:ir)?\s+(?:mis\s+)?gast|optimiz/i;
+const REASONING_CUES = new RegExp(`\\bc[oó]mo\\b|${REASONING_SIN_COMO.source}`, "i");
 
 /** Meses en español, para reconocer "en marzo" como periodo. */
 const MESES_RE =
@@ -668,6 +674,22 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
     }
   }
 
+  // "¿cómo van mis metas?" → progreso de metas. Va ANTES del guard de REASONING_CUES: la rama
+  // de `metas` de abajo YA tenía el patrón "cómo va(n) mi(s) meta", pero era inalcanzable —
+  // cualquier texto con "cómo" moría acá primero y una consulta puramente factual terminaba
+  // escalando al modelo grande. El historial ("cómo vengo con el ahorro/gasto") ya corrió más
+  // arriba y se queda con lo suyo.
+  //
+  // Ante duda seguimos escalando: si además de "cómo" hay señal de razonamiento —"¿cómo van
+  // mis metas SI APORTO 50 mil más?", "¿cómo debería priorizar mis metas?"— este carril no
+  // toca la pregunta y cae al guard de abajo.
+  if (
+    !REASONING_SIN_COMO.test(t) &&
+    /c[oó]mo\s+(?:va|van|voy|vengo|vamos)\b[\s\S]{0,24}\bmetas?\b/i.test(t)
+  ) {
+    return { intent: "metas", params: {} };
+  }
+
   if (REASONING_CUES.test(t)) return null; // consejo/proyección → razonamiento
 
   // "¿me puedo comprar / me alcanza para X?" en CUALQUIER orden (verbo+ítem o señal suelta + ítem).
@@ -715,7 +737,7 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   // Gasto dominante / sobre más caro. Incluye slang ya normalizado ("en qué se me va el dinero") y el
   // sinónimo "sobre más caro" (= sobre de mayor gasto). "dónde se va" / "en qué se me va".
   if (
-    /en qu[eé] (?:gasto|gast[eé])|(?:categor[ií]a|rubro).*(?:m[aá]s gasto|gasto)|(?:mayor|m[aá]s alto|principal) gasto|sobre (?:m[aá]s caro|de mayor gasto)|d[oó]nde se (?:va|van) (?:mi|el|la)|en qu[eé] se (?:me )?va\b/i.test(t)
+    /en qu[eé] (?:gasto|gast[eé])|(?:categor[ií]a|rubro).*(?:m[aá]s gasto|gasto)|(?:mayor|m[aá]s alto|principal) gasto|sobre (?:m[aá]s caro|de mayor gasto)|d[oó]nde se (?:me\s+)?(?:va|van)\s+(?:mis?|el|la|los|las)\b|en qu[eé] se (?:me )?va\b/i.test(t)
   ) {
     return { intent: "gasto_categoria", params: {} };
   }

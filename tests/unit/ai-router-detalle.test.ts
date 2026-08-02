@@ -86,9 +86,10 @@ describe("NO REGRESIÓN: la foto sigue siendo la foto", () => {
 
   it("'mis metas' sigue siendo metas (progreso, no aportes)", () => {
     expect(intentOf("mostrame mis metas")).toBe("metas");
-    // OJO: "¿cómo van mis metas?" NO llega acá — REASONING_CUES atrapa "cómo" antes.
-    // Es un hueco PREEXISTENTE (idéntico en main), no una regresión de este cambio.
-    expect(intentOf("¿cómo van mis metas?")).toBeNull();
+    // El hueco que este test dejaba anotado ("¿cómo van mis metas?" moría en REASONING_CUES,
+    // que atrapa "cómo" antes de la rama de metas) ya está cerrado: hay un carril propio
+    // arriba del guard. Ver ai-router-preguntas-frecuentes.test.ts.
+    expect(intentOf("¿cómo van mis metas?")).toBe("metas");
   });
 
   it("'¿cuánto tengo invertido?' sigue siendo resumen_inversiones", () => {

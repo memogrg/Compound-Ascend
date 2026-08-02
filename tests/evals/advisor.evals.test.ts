@@ -193,9 +193,13 @@ const SCENARIOS: Scenario[] = [
   },
 
   // 4d) Tool de metas: usa las metas REALES del toolContext (faltante/meses reales).
+  // La pregunta pide una PROYECCIÓN ("en cuánto tiempo llego"), que es lo que resuelve
+  // proyectar_metas. Antes decía "¿cómo voy con mis metas de ahorro?", pero eso es una
+  // consulta de dato —progreso por meta— y desde el carril de "¿cómo van mis metas?" la
+  // contesta el router sin gastar un token, así que ya no llegaba al proveedor.
   {
     name: "tools: proyectar_metas → reply con faltante/meses reales + 12 decls",
-    messages: ask("¿cómo voy con mis metas de ahorro?"),
+    messages: ask("¿en cuánto tiempo llego a mis metas de ahorro?"),
     tools: { debts: [], currency: "CRC", goals: GOALS_CTX },
     script: { reply: "Tus metas:", toolCall: { name: "proyectar_metas", args: GOALS_ARGS } },
     assert: ({ result, provider }) => {
