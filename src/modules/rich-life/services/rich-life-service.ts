@@ -9,6 +9,7 @@ import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import {
   getBaseSummary,
   getDisplayCurrency,
@@ -185,7 +186,7 @@ export type NetWorthAggregate = {
   // Extras para preservar EXACTO el resultado de getRichLifeSummary:
   explicitAssets: Asset[]; // solo activos manuales (tabla `assets`)
   explicitLiabilities: Liability[]; // solo pasivos manuales (tabla `liabilities`)
-  previousNetWorth: number | null; // último snapshot de patrimonio neto
+  previousNetWorth: number | null; // patrimonio del último periodo CERRADO (net_worth_snapshots)
 };
 
 export async function aggregateNetWorth(
@@ -199,11 +200,12 @@ export async function aggregateNetWorth(
   const { db, userId } = await resolveAuth(ctx);
 
   const memberIds = await householdMemberIds(db, userId);
-  const [base, currency, primaryCurrency, rates] = await Promise.all([
+  const [base, currency, primaryCurrency, rates, periodoActual] = await Promise.all([
     getBaseSummary(ctx),
     getDisplayCurrency(ctx),
     getPrimaryCurrency(ctx),
     getFxRates(),
+    userCurrentPeriod(ctx),
   ]);
 
   const [
@@ -234,10 +236,16 @@ export async function aggregateNetWorth(
         .select("dependents_count")
         .eq("user_id", userId)
         .maybeSingle(),
+      // Patrimonio del ÚLTIMO periodo CERRADO (de ahí sale `wealthVelocity`). Esta
+      // lectura estuvo muerta hasta que el cron mensual empezó a escribir la tabla
+      // (`net-worth-snapshot-service`); ahora que además las pantallas registran el mes
+      // EN CURSO, hay que excluirlo con `lt`: si no, "lo anterior" sería la fila de hoy
+      // y la velocidad patrimonial daría 0 siempre.
       db
         .from("net_worth_snapshots")
         .select("net_worth,period")
         .eq("user_id", userId)
+        .lt("period", periodoActual.from)
         .order("period", { ascending: false })
         .limit(1)
         .maybeSingle(),
