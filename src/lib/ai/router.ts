@@ -94,7 +94,11 @@ type Intent =
   | "datos_mercado"
   // "¿cómo llego a mi independencia? / cuánto invertir para llegar" → proyección determinista hacia
   // el número de INDEPENDENCIA (sin pedir estilo de vida deseado):
-  | "plan_independencia";
+  | "plan_independencia"
+  // LIBRO DIARIO: consulta real de transacciones por fecha/periodo/comercio/sobre, con agregación
+  // ("¿qué días gasto más?", "¿cuánto le gasté a Walmart?", "¿gasté más este mes que el pasado?").
+  // Lectura fresca; el dato NO está en ctx (que solo trae agregados del mes en curso):
+  | "consulta_transacciones";
 
 const KNOWN_INTENTS: Intent[] = [
   "numero_seguridad",
@@ -121,6 +125,7 @@ const KNOWN_INTENTS: Intent[] = [
   "puedo_gastar",
   "datos_mercado",
   "plan_independencia",
+  "consulta_transacciones",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -130,6 +135,7 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "ultimos_movimientos",
   "listar_sobres",
   "puedo_gastar",
+  "consulta_transacciones",
 ]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
@@ -139,6 +145,66 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
 // clasificador lite la mandaría a gasto_categoria y contestaría un total, no un consejo.
 const REASONING_CUES =
   /\bc[oó]mo\b|deber[ií]a|conviene|qu[eé] hago|estrategia|plan\b|recomend|proyec|si (?:invierto|aporto|abono|pago|ahorro)|abon|extra|escenario|comparar?|vs\.?|mejor opci|cu[aá]nto tendr[ií]a|\ben cu[aá]nto\b|en \d+\s*a[nñ]os|simula|recort|reduc(?:ir)?\s+(?:mis\s+)?gast|optimiz/i;
+
+/** Meses en español, para reconocer "en marzo" como periodo. */
+const MESES_RE =
+  /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/i;
+
+/**
+ * Marcador temporal EXPLÍCITO en la pregunta → el `periodo` que entiende
+ * `resolverRango`. Devuelve null si no hay ninguno: eso es lo que distingue una
+ * consulta del libro diario ("¿cuánto gasté la semana pasada?") de la pregunta
+ * genérica del mes en curso, que sigue yendo a `gasto_mes` con la cifra del contexto.
+ *
+ * "este mes" a secas devuelve null a propósito: no queremos regresionar `gasto_mes`.
+ */
+export function extractPeriodo(text: string): string | null {
+  const t = text.toLowerCase();
+  if (/\bhoy\b/.test(t)) return "hoy";
+  if (/\bayer\b/.test(t)) return "ayer";
+  if (/\bsemana\s+pasada\b|\bsemana\s+anterior\b|\bla\s+semana\s+pasada\b/.test(t)) return "semana_pasada";
+  if (/\besta\s+semana\b|\ben\s+la\s+semana\b|\bde\s+la\s+semana\b/.test(t)) return "semana";
+  if (/\bmes\s+pasado\b|\bmes\s+anterior\b/.test(t)) return "mes_pasado";
+  if (/\ba[nñ]o\s+pasado\b|\ba[nñ]o\s+anterior\b/.test(t)) return "anio_pasado";
+  if (/\beste\s+a[nñ]o\b|\bdel\s+a[nñ]o\b|\ben\s+el\s+a[nñ]o\b/.test(t)) return "anio";
+  const dias = t.match(/[uú]ltimos?\s+(\d+)\s*d[ií]as?|\b(\d+)\s*d[ií]as\b/);
+  if (dias) {
+    const n = Number(dias[1] ?? dias[2]);
+    if (Number.isFinite(n) && n > 0) return `ultimos_${n}_dias`;
+  }
+  const mes = t.match(MESES_RE);
+  if (mes?.[1]) return mes[1] === "setiembre" ? "septiembre" : mes[1];
+  return null;
+}
+
+/**
+ * Término de la consulta tras "en/a/con" ("cuánto gasté EN walmart"). Puede ser un
+ * comercio o un sobre — el motor lo resuelve contra ambos (`termino`). Se descartan
+ * las palabras que en realidad son marcadores de tiempo o muletillas, para no filtrar
+ * por "total" en "¿cuánto gasté en total?".
+ */
+const TERMINO_STOP =
+  /^(?:total|todo|general|promedio|hoy|ayer|esta semana|la semana|el mes|este mes|el a[nñ]o|este a[nñ]o|qu[eé]|eso|ello|mi|mis)$/i;
+
+export function extractTerminoGasto(text: string): string | null {
+  const m = text.match(
+    /(?:gast[eéoó]\w*|pagu[eé]|compr[eéoó]\w*)\s+(?:le\s+)?(?:en|a|con|para)\s+(?:el\s+|la\s+|los\s+|las\s+|mi\s+|mis\s+|un\s+|una\s+)?([^,.?!¿¡]+)/i,
+  );
+  let t = m?.[1]?.trim();
+  if (!t) return null;
+  // Corta el marcador temporal pegado al término ("en walmart este mes" → "walmart").
+  t = t
+    .replace(
+      /\s+(?:hoy|ayer|esta semana|la semana pasada|semana pasada|este mes|el mes pasado|mes pasado|este a[nñ]o|el a[nñ]o pasado|a[nñ]o pasado|en total|en \w+ [uú]ltimos? \d+ d[ií]as)\b.*$/i,
+      "",
+    )
+    .replace(new RegExp(`\\s+(?:en|de|durante)?\\s*${MESES_RE.source}\\b.*$`, "i"), "")
+    // Preposición huérfana que quedó tras cortar el marcador temporal ("Walmart en" → "Walmart").
+    .replace(/\s+(?:en|de|a|con|para|del|desde|hasta|durante)$/i, "")
+    .trim();
+  if (!t || t.length < 2 || TERMINO_STOP.test(t)) return null;
+  return t;
+}
 
 /** Extrae el nombre de una deuda tras el verbo, limpiando conectores ("de mi X" → "X"). */
 function extractDebtName(text: string): string | null {
@@ -411,6 +477,101 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
     /\b(?:c[oó]mo|plan|hoja de ruta)\b[^?]*\b(?:para\s+)?(?:mi\s+)?(?:independencia (?:financiera)?|libertad financiera)\b/i.test(t)
   ) {
     return { intent: "plan_independencia", params: {} };
+  }
+
+  // ── LIBRO DIARIO (consulta_transacciones). Va ANTES de REASONING_CUES —que atrapa "comparar"
+  //    y "vs" y mandaría "¿gasté más este mes que el pasado?" al LLM sin datos— y antes de
+  //    gasto_categoria/gasto_mes, que son golosos y responderían el agregado del mes en curso a
+  //    una pregunta que pide OTRO periodo. Todos devuelven cifras reales del libro diario.
+
+  // A) Picos por fecha: "¿qué días/fechas gasto más?", "¿en qué fechas gasto más?".
+  if (
+    /(?:qu[eé]|cu[aá]les|en qu[eé])\s+(?:d[ií]as?|fechas?)\b[^?]*\b(?:gast|compr|se me va|se va)/i.test(t) ||
+    /\b(?:d[ií]as?|fechas?)\s+(?:que|en que|donde|en los que)\b[^?]*\bm[aá]s\s+gast/i.test(t)
+  ) {
+    return {
+      intent: "consulta_transacciones",
+      params: {
+        periodo: extractPeriodo(t) ?? "ultimos_90_dias",
+        tipo: "gasto",
+        agrupacion: "dia",
+        orden: "monto_desc",
+        tope: 5,
+      },
+    };
+  }
+
+  // B) Comparación de dos periodos: "¿gasté más este mes que el pasado?", "este mes vs el pasado".
+  if (
+    /\b(?:este\s+mes|mes\s+actual)\b[^?]*\b(?:vs\.?|versus|contra|comparado con|que\s+(?:el\s+)?(?:mes\s+)?(?:pasado|anterior))\b/i.test(t) ||
+    /\bgast[eé]\s+(?:m[aá]s|menos)\b[^?]*\b(?:este\s+mes|mes\s+pasado|mes\s+anterior)\b/i.test(t) ||
+    /\bcompar\w+\b[^?]*\b(?:mes\s+pasado|mes\s+anterior|este\s+mes)\b/i.test(t)
+  ) {
+    return {
+      intent: "consulta_transacciones",
+      params: { periodo: "mes_y_anterior", tipo: "gasto", agrupacion: "mes", orden: "fecha_asc", tope: 2 },
+    };
+  }
+
+  // C) "¿a quién/qué comercio le gasto más?" → ranking por comercio.
+  if (
+    /(?:a\s+qui[eé]n|qu[eé]\s+(?:comercio|negocio|tienda|lugar|local))\b[^?]*\b(?:m[aá]s\s+)?(?:le\s+)?gast/i.test(t) ||
+    /\b(?:comercio|negocio|tienda)s?\b[^?]*\bdonde\s+m[aá]s\s+gast/i.test(t)
+  ) {
+    return {
+      intent: "consulta_transacciones",
+      params: {
+        periodo: extractPeriodo(t) ?? "ultimos_90_dias",
+        tipo: "gasto",
+        agrupacion: "comercio",
+        orden: "monto_desc",
+        tope: 5,
+      },
+    };
+  }
+
+  // D) Gasto con un periodo EXPLÍCITO distinto del mes en curso, con o sin término
+  //    ("¿cuánto gasté la semana pasada?", "¿en qué gasté esta semana?", "¿cuánto gasté en marzo?").
+  //    Sin marcador temporal explícito NO entra acá: eso sigue siendo gasto_mes/gasto_categoria.
+  {
+    const periodo = extractPeriodo(t);
+    // OJO con `\b` después de vocal acentuada: `é` no es carácter de palabra en JS, así que
+    // `\bqu[eé]\b` NUNCA matchea "qué". Por eso acá no hay `\b` de cierre en esos grupos.
+    const esConsultaGasto =
+      /(?:\bcu[aá]nto|\bqu[eé]|\ben\s+qu[eé])[^?]*\b(?:gast[eéoó]|compr[eéoó]|pagu[eé]|se me fue|se fue|ingres[eéoó]|gan[eé]|cobr[eé]|recib[ií])/i.test(t) ||
+      /\b(?:movimientos?|transacciones?|compras?)\b/i.test(t);
+    if (periodo && esConsultaGasto) {
+      // Sin `\b` de cierre tras `qu[eé]` (ver nota arriba: `é` no es carácter de palabra).
+      const desglose = /\ben\s+qu[eé]|\bd[oó]nde\b|\bdesglos|\bdetalle\b|\bcategor|\bsobres?\b/i.test(t);
+      return {
+        intent: "consulta_transacciones",
+        params: {
+          periodo,
+          tipo: /\bingres|\bgan[eé]|\bcobr[eé]|\brecib[ií]/i.test(t) ? "ingreso" : "gasto",
+          agrupacion: desglose ? "categoria" : "ninguna",
+          termino: extractTerminoGasto(t),
+          tope: 10,
+        },
+      };
+    }
+  }
+
+  // E) Gasto en un COMERCIO/sobre concreto, sin periodo ("¿cuánto le gasté a Walmart?").
+  //    El término es el guard: sin él no entra (si no, se comería "¿cuánto gasté?" a secas).
+  if (/\b(?:cu[aá]nto)\b[^?]*\b(?:le\s+)?(?:he\s+)?(?:gast[eé]\w*|pagu[eé]|compr[eé]\w*)\s+(?:en|a|con)\b/i.test(t)) {
+    const termino = extractTerminoGasto(t);
+    if (termino) {
+      return {
+        intent: "consulta_transacciones",
+        params: {
+          periodo: extractPeriodo(t) ?? "ultimos_180_dias",
+          tipo: "gasto",
+          agrupacion: "ninguna",
+          termino,
+          tope: 10,
+        },
+      };
+    }
   }
 
   if (REASONING_CUES.test(t)) return null; // consejo/proyección → razonamiento
@@ -930,6 +1091,14 @@ async function resolveFetchIntent(
       // Estructura AGRUPADA POR FRASCO (gasto y acumulables por separado) → Markdown determinista.
       // 0 tokens, exacto, sin alucinar (el cliente lo pasa por renderMarkdown → HTML seguro).
       return say(formatEnvelopesReply(await getEnvelopesSummary()));
+    }
+    if (intent === "consulta_transacciones") {
+      // Libro diario REAL: el servicio resuelve el periodo en la zona del PERFIL, lee con scope
+      // de hogar y el motor puro agrega. `resumen_md` ya viene renderizado (0 tokens). Un periodo
+      // sin movimientos responde "no tenés movimientos en ese periodo" — nunca "no tengo acceso".
+      const { consultarTransacciones } = await import("@/lib/ai/transactions-query-service");
+      const r = await consultarTransacciones(params, cur);
+      return say(r.resumen_md);
     }
     if (intent === "ultimos_movimientos") {
       const { listTransactions } = await import("@/modules/financial-base");
