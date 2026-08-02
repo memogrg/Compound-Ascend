@@ -56,9 +56,11 @@ async function seriePortfolioSnapshots(
   const puntos = snaps.map((s) => ({
     fecha: s.date,
     valor: metrica === "patrimonio" ? s.netWorth : s.portfolioValue,
+    moneda: s.currency ?? null,
   }));
   // Los snapshots traen su propia moneda; se usa la del más reciente (es la que el
-  // motor de patrimonio estaba usando al escribirlos).
+  // motor de patrimonio estaba usando al escribirlos). La de CADA punto viaja aparte:
+  // si el usuario cambió de moneda, la serie las cruza y el motor lo aclara.
   const moneda = snaps.length > 0 ? (snaps[snaps.length - 1]!.currency ?? null) : null;
   return { serie: colapsarAMensual(puntos), moneda };
 }
@@ -71,7 +73,9 @@ async function serieNetWorthSnapshots(): Promise<{ serie: SeriePunto[]; moneda: 
   const snaps = await getNetWorthHistory();
   // colapsarAMensual sobre datos ya mensuales es identidad + orden + dedupe: barato y
   // deja una sola forma de construir la serie.
-  const serie = colapsarAMensual(snaps.map((s) => ({ fecha: s.period, valor: s.netWorth })));
+  const serie = colapsarAMensual(
+    snaps.map((s) => ({ fecha: s.period, valor: s.netWorth, moneda: s.currency })),
+  );
   const moneda = snaps.length > 0 ? (snaps[snaps.length - 1]!.currency ?? null) : null;
   return { serie, moneda };
 }
@@ -98,6 +102,10 @@ async function seriePatrimonio(
  * de snapshots con moneda propia distinta, gana la del snapshot: los valores NO se
  * convierten (no hay tasa histórica por fecha, y convertir con la de hoy mentiría
  * sobre la evolución).
+ *
+ * Cuando el usuario cambió de moneda a mitad de la historia, la serie cruza dos: cada
+ * punto lleva la suya y el motor lo detecta (`monedasMezcladas`) para aclararlo en vez
+ * de restar unidades distintas.
  */
 export async function consultarHistorial(
   args: Record<string, unknown>,

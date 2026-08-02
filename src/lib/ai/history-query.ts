@@ -16,8 +16,15 @@ import type { AiToolDecl } from "@/lib/ai/tools";
 
 export type Metrica = "patrimonio" | "portafolio" | "gasto" | "ingreso" | "ahorro";
 
-/** Un punto de la serie, ya normalizado a periodo mensual "YYYY-MM". */
-export type SeriePunto = { periodo: string; valor: number };
+/**
+ * Un punto de la serie, ya normalizado a periodo mensual "YYYY-MM".
+ *
+ * `moneda` es la del SNAPSHOT (no la de visualización) y es opcional: las series de
+ * flujo (`monthly_snapshots`) no la guardan. Viaja punto a punto porque un usuario que
+ * cambió de moneda deja una serie con dos: sin esto, el render mezclaba ₡ y $ bajo un
+ * solo símbolo y la variación salía inventada.
+ */
+export type SeriePunto = { periodo: string; valor: number; moneda?: string | null };
 
 export type Direccion = "sube" | "baja" | "estable";
 
@@ -32,10 +39,16 @@ export type Variacion = {
 export type HistorialResult = {
   metrica: Metrica;
   moneda: string;
-  serie: { periodo: string; etiqueta: string; valor: number }[];
+  serie: { periodo: string; etiqueta: string; valor: number; moneda?: string | null }[];
   variacion: Variacion | null;
   /** Motivo por el que no hay serie/variación utilizable (para la respuesta honesta). */
   insuficiente: "sin_datos" | "un_solo_punto" | null;
+  /**
+   * Monedas distintas presentes en la VENTANA mostrada, si son más de una; null si la
+   * serie es homogénea. Cuando viene poblado, `variacion` mezcla unidades y NO debe
+   * leerse como un cambio real — el render lo dice y el modelo lo ve acá.
+   */
+  monedasMezcladas: string[] | null;
 };
 
 const MESES = [
@@ -65,15 +78,19 @@ export function claveMes(fecha: string): string {
  * `portfolio_snapshots`, que se escribe día por día: promediar mezclaría un mes con 30
  * lecturas y otro con 2.
  */
-export function colapsarAMensual(puntos: { fecha: string; valor: number }[]): SeriePunto[] {
-  const porMes = new Map<string, { fecha: string; valor: number }>();
+export function colapsarAMensual(
+  puntos: { fecha: string; valor: number; moneda?: string | null }[],
+): SeriePunto[] {
+  const porMes = new Map<string, { fecha: string; valor: number; moneda?: string | null }>();
   for (const p of puntos) {
     const k = claveMes(p.fecha);
     const previo = porMes.get(k);
     if (!previo || p.fecha >= previo.fecha) porMes.set(k, p);
   }
   return [...porMes.entries()]
-    .map(([periodo, p]) => ({ periodo, valor: p.valor }))
+    // `moneda` se copia tal cual (puede venir ausente): inventar un null acá obligaría a
+    // todos los consumidores a distinguir "sin moneda" de "moneda desconocida".
+    .map(([periodo, p]) => ({ periodo, valor: p.valor, moneda: p.moneda }))
     .sort((a, b) => a.periodo.localeCompare(b.periodo));
 }
 
@@ -113,8 +130,19 @@ export function construirHistorial(
     serie: serie.map((p) => ({ ...p, etiqueta: etiquetaPeriodo(p.periodo) })),
     variacion: calcularVariacion(serie),
     insuficiente: serie.length === 0 ? "sin_datos" : serie.length === 1 ? "un_solo_punto" : null,
+    monedasMezcladas: monedasDe(serie),
   };
   return base;
+}
+
+/**
+ * Monedas distintas en la ventana, o null si hay una sola (o ninguna declarada). Se mira
+ * la ventana YA recortada: si el cambio de moneda quedó fuera de los meses que se
+ * muestran, la aclaración sobraría.
+ */
+function monedasDe(serie: SeriePunto[]): string[] | null {
+  const monedas = [...new Set(serie.map((p) => p.moneda).filter((m): m is string => !!m))];
+  return monedas.length > 1 ? monedas : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,8 +187,25 @@ export function renderHistorial(r: HistorialResult): string {
     );
   }
 
+  // Con monedas mezcladas cada mes se muestra en LA SUYA: un solo símbolo para ₡ y $
+  // haría pasar por comparables dos cifras que no lo son.
+  const lineas = r.serie.map(
+    (p) =>
+      `• ${p.etiqueta}: ${r.monedasMezcladas ? formatMoney(p.valor, p.moneda ?? r.moneda) : money(p.valor)}`,
+  );
+
+  if (r.monedasMezcladas) {
+    return (
+      `${NOMBRE[r.metrica].charAt(0).toUpperCase()}${NOMBRE[r.metrica].slice(1)}, mes a mes:\n` +
+      `${lineas.join("\n")}\n\n` +
+      `Ojo: esta serie cambia de moneda en el camino (${r.monedasMezcladas.join(" y ")}), así que ` +
+      `no te puedo dar una variación honesta — los montos están en unidades distintas y no se ` +
+      `restan entre sí. Cada mes va en la moneda con la que se guardó; no los convierto porque no ` +
+      `tengo el tipo de cambio de cada fecha, y usar el de hoy mentiría sobre la evolución.`
+    );
+  }
+
   const v = r.variacion!;
-  const lineas = r.serie.map((p) => `• ${p.etiqueta}: ${money(p.valor)}`);
   const verbo = v.direccion === "sube" ? "subió" : v.direccion === "baja" ? "bajó" : "se mantuvo";
 
   const cierre =
@@ -184,7 +229,9 @@ export const CONSULTAR_HISTORIAL_TOOL: AiToolDecl = {
     "valor del portafolio, o gasto/ingreso/ahorro mensual. Devuelve la serie por mes más la " +
     "variación (monto y %). Usala cuando pregunte cómo cambió algo, cómo viene, si mejoró o " +
     "empeoró, o para comparar con el mes o el año pasado. Si no hay suficientes snapshots la " +
-    "herramienta lo dice — NUNCA respondas que no tenés acceso a su historial. Solo lee.",
+    "herramienta lo dice — NUNCA respondas que no tenés acceso a su historial. Si devuelve " +
+    "`monedasMezcladas`, la serie cruza monedas distintas: repetí esa aclaración y NO afirmes " +
+    "la variación (restar ₡ con $ no significa nada). Solo lee.",
   parameters: {
     type: "object",
     properties: {
