@@ -508,6 +508,29 @@
           }
         ]
       }
+    },
+    {
+      "files": [
+        "src/**/*.ts",
+        "src/**/*.tsx"
+      ],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "ImportDeclaration[source.value=/(^@\\/lib\\/validation$)|(\\/validation$)/] > ImportSpecifier[imported.name='todayLocalISO']",
+            "message": "`todayLocalISO()` fecha con la zona del DISPOSITIVO, y en un componente de servidor con la del PROCESO (UTC en Vercel). Para el \"hoy\" del usuario: `useCaptureToday()` en cliente, `await userToday()` en servidor (@/lib/time/user-time). Solo @/lib/time puede importarlo."
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/lib/time/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-syntax": "off"
+      }
     }
   ]
 }
