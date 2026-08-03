@@ -44,21 +44,31 @@ const pct100 = (n: number) => Math.round(n * 100);
 
 // ── 1 · Presupuesto ────────────────────────────────────────────────────────
 export function PresupuestoFicha({ c, currency }: { c: PresupuestoCard; currency: string }) {
+  // Sin base declarada (ni ingresos ni gastos): no hay flujo que mostrar.
   if (c.plan.income <= 0 && c.plan.expense <= 0 && c.flujoReal === 0) {
     return (
       <MHomeCardEmpty
-        eyebrow="Presupuesto"
+        eyebrow="Flujo del mes"
         icon="rules"
-        title="Define tu plan del mes y sabrás de un vistazo si vas por buen camino."
-        cta="Arma tu presupuesto"
+        title="Registra tus ingresos y gastos base y verás tu flujo del mes de un vistazo."
+        cta="Empezar por tu base"
         href={c.href}
       />
     );
   }
   const sin = pct100(c.pctSinPresupuesto);
+  // Mes recién arrancado: hay base (plan), pero aún no hay movimientos reales. NO se
+  // compara el flujo a la fecha (0) contra el plan de mes completo (daría "por debajo"
+  // por construcción); se dice la verdad: la proyección de tu base.
+  const mesFresco = c.barras.ingreso.real === 0 && c.barras.gasto.real === 0;
+  // La proyección (flujo libre de tu base) vive AQUÍ y solo aquí en todo el home.
+  const proj =
+    c.plan.free >= 0
+      ? `proyecta ${mAmount(c.plan.free, currency, 8)} libres/mes`
+      : `gasta ${mAmount(Math.abs(c.plan.free), currency, 8)} de más al mes`;
   return (
     <MHomeCard
-      eyebrow="Presupuesto"
+      eyebrow="Flujo del mes"
       value={
         <FVal tone={c.flujoTone}>
           {c.flujoReal >= 0 ? "+" : "−"}
@@ -66,15 +76,11 @@ export function PresupuestoFicha({ c, currency }: { c: PresupuestoCard; currency
         </FVal>
       }
       chip={sin > 0 ? <MChip tone="warning">{sin}% sin plan</MChip> : undefined}
-      sub={`Plan: ${mAmount(c.plan.free, currency, 8)} libres`}
+      sub="operativo real"
       vis={<FGroupedBars ingreso={c.barras.ingreso} gasto={c.barras.gasto} currency={currency} />}
-      message={
-        c.gap >= 0
-          ? `Vas ${mAmount(c.gap, currency, 8)} mejor que tu plan.`
-          : `Vas ${mAmount(Math.abs(c.gap), currency, 8)} por debajo del plan.`
-      }
+      message={mesFresco ? `Mes recién arrancado — tu base ${proj}.` : `Tu base ${proj}.`}
       href={c.href}
-      ariaLabel="Flujo del mes frente a tu plan. Ver gastos"
+      ariaLabel="Flujo del mes: real frente a tu base. Ver gastos"
     />
   );
 }

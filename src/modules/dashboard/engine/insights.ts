@@ -67,19 +67,19 @@ export function buildInsights(
     });
   }
 
-  const nextBestAction = chooseNextAction(ind, currency);
+  const nextBestAction = chooseNextAction(ind);
   return { nextBestAction, insights: insights.slice(0, 3) };
 }
 
-function chooseNextAction(ind: BaseIndicators, currency: string): string {
+function chooseNextAction(ind: BaseIndicators): string {
   if (ind.freeCashflow < 0) {
     return "Detén la fuga: revisa tus gastos flexibles para volver a flujo positivo antes de cualquier otra meta.";
   }
   if (ind.debtWeight >= 0.3) {
-    return `Dirige parte de tus ${formatMoney(ind.freeCashflow, currency)} libres a tu deuda de mayor costo este mes.`;
+    return "Dirige tu flujo libre a tu deuda de mayor costo este mes.";
   }
   if (ind.savingsRate < 0.1) {
-    return `Automatiza un ahorro mensual con parte de tus ${formatMoney(ind.freeCashflow, currency)} libres para construir tu fondo de emergencia.`;
+    return "Automatiza un ahorro mensual para construir tu fondo de emergencia.";
   }
   return "Vas bien: considera convertir parte de tu ahorro en inversión de largo plazo según tu perfil.";
 }
