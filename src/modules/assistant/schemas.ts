@@ -40,6 +40,34 @@ export const priceAlertInputSchema = z.object({
 
 export type PriceAlertInput = z.infer<typeof priceAlertInputSchema>;
 
+/**
+ * Confirmaciones de las acciones que nacen de un CONSEJO. Los ids ya vienen resueltos contra los
+ * datos reales por `resolveActionProposal`; acá se valida la forma antes de ejecutar el dominio.
+ */
+export const setDcaInputSchema = z.object({
+  holdingId: z.string().uuid(),
+  monthlyContribution: z.number().nonnegative(),
+});
+export type SetDcaInput = z.infer<typeof setDcaInputSchema>;
+
+export const adjustBudgetInputSchema = z.object({
+  categoryId: z.string().uuid(),
+  name: z.string().trim().min(1).max(120),
+  amount: z.number().nonnegative(),
+  currency: z.string().length(3),
+  periodMonth: z.number().int().min(1).max(12),
+  periodYear: z.number().int().min(2000).max(3000),
+});
+export type AdjustBudgetInput = z.infer<typeof adjustBudgetInputSchema>;
+
+export const debtExtraPaymentInputSchema = z.object({
+  debtId: z.string().uuid(),
+  amount: z.number().positive(),
+  paymentDate: z.string().min(1),
+  currency: z.string().length(3).optional(),
+});
+export type DebtExtraPaymentInput = z.infer<typeof debtExtraPaymentInputSchema>;
+
 export const chatRequestSchema = z.object({
   message: z.string().trim().min(1).max(2000),
   history: z

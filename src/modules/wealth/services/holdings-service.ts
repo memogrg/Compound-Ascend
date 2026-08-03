@@ -605,6 +605,31 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
   }
 }
 
+/**
+ * Fija SOLO el aporte mensual (DCA) de una posición, y la marca recurrente si el aporte es > 0.
+ *
+ * Escritura ESTRECHA a propósito, en vez de reusar `updateHolding`: esa hace un update completo
+ * desde `HoldingInput`, así que cambiar un campo obliga a reconstruir el resto de la posición y
+ * cualquier omisión lo pisaría con un default. Para un ajuste que nace de un consejo del asesor
+ * ("subí el aporte a $200"), tocar dos columnas es lo correcto y lo seguro.
+ *
+ * Aporte 0 = deja de ser recurrente (así se apaga un DCA sin borrar la posición).
+ */
+export async function setHoldingDca(id: string, monthlyContribution: number): Promise<void> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const scope = await householdWriteScope(supabase, user.id);
+  const { error } = await supabase
+    .from("investment_holdings")
+    .update({
+      monthly_contribution: monthlyContribution,
+      is_recurring: monthlyContribution > 0,
+    })
+    .eq("id", id)
+    .in("user_id", scope);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteHolding(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

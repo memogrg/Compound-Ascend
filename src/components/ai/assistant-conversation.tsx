@@ -31,6 +31,9 @@ import {
   confirmTransactionAction,
   confirmGoalAction,
   confirmPriceAlertAction,
+  confirmSetDcaAction,
+  confirmAdjustBudgetAction,
+  confirmDebtExtraPaymentAction,
   loadChatHistoryAction,
   emailTranscriptAction,
 } from "@/modules/assistant/api/actions";
@@ -38,6 +41,7 @@ import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import { retentionNoticeText } from "@/lib/ai/chat-retention";
 import { quoteExcerpt, QUOTE_MISSING_TEXT } from "@/lib/ai/chat-quote";
 import type { AIActionProposal } from "@/lib/ai/types";
+import type { ConfirmResult } from "@/modules/assistant/api/actions";
 import { formatMoney } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
@@ -665,6 +669,23 @@ export function AssistantConversation({
                 <PriceAlertConfirmCard skin={s} draft={alertFromAction(m.action, currency)} />
               </div>
             ) : null}
+            {/* Acciones que nacen de un CONSEJO. El payload ya viene RESUELTO por el servidor
+                (ids reales, montos del motor), así que la tarjeta solo muestra y confirma. */}
+            {m.action?.type === "set_dca" ? (
+              <div className={s.cardWrap}>
+                <SetDcaConfirmCard skin={s} p={m.action.payload} />
+              </div>
+            ) : null}
+            {m.action?.type === "adjust_budget" ? (
+              <div className={s.cardWrap}>
+                <AdjustBudgetConfirmCard skin={s} p={m.action.payload} />
+              </div>
+            ) : null}
+            {m.action?.type === "debt_extra_payment" ? (
+              <div className={s.cardWrap}>
+                <DebtExtraPaymentConfirmCard skin={s} p={m.action.payload} />
+              </div>
+            ) : null}
             {m.txn ? (
               <div className={s.cardWrap}>
                 <TxnConfirmCard skin={s} draft={m.txn} title="Recibo escaneado" />
@@ -982,6 +1003,155 @@ function GoalConfirmCard({ draft, skin }: { draft: DraftGoal; skin: Skin }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Acciones que nacen de un CONSEJO (set_dca, adjust_budget, debt_extra_payment)
+//
+// Las tres tienen el MISMO ciclo —mostrar, confirmar, ejecutar, avisar— y solo cambian el texto
+// y a qué server action llaman, así que comparten cascarón. El payload llega ya resuelto por el
+// servidor: acá no se calcula ni se corrige nada, solo se muestra lo que se va a ejecutar.
+// ----------------------------------------------------------------------------
+
+/** Lee un número del payload (viene como unknown desde la propuesta). */
+const pNum = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+/** Lee un texto del payload. */
+const pStr = (v: unknown, fallback = ""): string =>
+  typeof v === "string" && v.trim() ? v : fallback;
+
+function AdviceConfirmCard({
+  skin,
+  eyebrow,
+  amount,
+  detail,
+  okText,
+  onConfirm,
+}: {
+  skin: Skin;
+  eyebrow: string;
+  amount: string;
+  detail: string;
+  okText: string;
+  onConfirm: () => Promise<ConfirmResult>;
+}) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"idle" | "ok" | "cancel">("idle");
+
+  const confirm = async () => {
+    setPending(true);
+    setError(null);
+    const res = await onConfirm();
+    setPending(false);
+    if (res.ok) setPhase("ok");
+    else setError(res.message ?? "No se pudo aplicar.");
+  };
+
+  if (phase === "cancel") return null;
+  if (phase === "ok") return <div className={skin.done}>{okText}</div>;
+
+  return (
+    <div className={skin.card}>
+      <div className={skin.eyebrow}>{eyebrow}</div>
+      <div className={skin.amount}>{amount}</div>
+      <div className={skin.sub}>{detail}</div>
+      {error ? <div className={skin.error}>{error}</div> : null}
+      <div className={skin.actions}>
+        <button className={skin.btnSecondary} onClick={() => setPhase("cancel")} disabled={pending}>
+          Cancelar
+        </button>
+        <button className={skin.btnPrimary} onClick={confirm} disabled={pending}>
+          {pending ? "Aplicando…" : "Confirmar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Fijar/ajustar el aporte mensual (DCA) de una inversión. */
+function SetDcaConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknown> }) {
+  const monto = pNum(p.monthlyContribution);
+  const actual = pNum(p.currentContribution);
+  const currency = pStr(p.currency, "CRC");
+  const label = pStr(p.label, "tu inversión");
+  return (
+    <AdviceConfirmCard
+      skin={skin}
+      eyebrow="Aporte mensual"
+      amount={`${formatMoney(monto, currency)}/mes`}
+      // Se muestra DE CUÁNTO A CUÁNTO: confirmar un cambio sin ver el punto de partida es a ciegas.
+      detail={
+        actual > 0
+          ? `${label} · hoy aportás ${formatMoney(actual, currency)}/mes`
+          : `${label} · hoy no tiene aporte automático`
+      }
+      okText="✓ Aporte mensual actualizado."
+      onConfirm={() =>
+        confirmSetDcaAction({
+          holdingId: pStr(p.holdingId),
+          monthlyContribution: monto,
+        })
+      }
+    />
+  );
+}
+
+/** Subir/bajar el presupuesto de un sobre del mes en curso. */
+function AdjustBudgetConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknown> }) {
+  const monto = pNum(p.amount);
+  const actual = pNum(p.currentAmount);
+  const currency = pStr(p.currency, "CRC");
+  const path = pStr(p.path, pStr(p.name, "el sobre"));
+  const sube = monto > actual;
+  return (
+    <AdviceConfirmCard
+      skin={skin}
+      eyebrow={`${sube ? "Subir" : "Bajar"} presupuesto`}
+      amount={formatMoney(monto, currency)}
+      detail={
+        actual > 0
+          ? `${path} · hoy está en ${formatMoney(actual, currency)}`
+          : `${path} · hoy no tiene presupuesto`
+      }
+      okText="✓ Presupuesto actualizado."
+      onConfirm={() =>
+        confirmAdjustBudgetAction({
+          categoryId: pStr(p.categoryId),
+          name: pStr(p.name),
+          amount: monto,
+          currency,
+          periodMonth: pNum(p.periodMonth),
+          periodYear: pNum(p.periodYear),
+        })
+      }
+    />
+  );
+}
+
+/** Abono EXTRA a capital de una deuda. */
+function DebtExtraPaymentConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknown> }) {
+  const monto = pNum(p.amount);
+  const saldo = pNum(p.balance);
+  const apr = typeof p.apr === "number" ? p.apr : null;
+  const currency = pStr(p.currency, "CRC");
+  const name = pStr(p.name, "tu deuda");
+  return (
+    <AdviceConfirmCard
+      skin={skin}
+      eyebrow="Abono extra a capital"
+      amount={formatMoney(monto, currency)}
+      detail={`${name} · saldo ${formatMoney(saldo, currency)}${apr != null ? ` · ${apr}% anual` : ""}`}
+      okText="✓ Abono registrado."
+      onConfirm={() =>
+        confirmDebtExtraPaymentAction({
+          debtId: pStr(p.debtId),
+          amount: monto,
+          paymentDate: pStr(p.paymentDate),
+          currency,
+        })
+      }
+    />
   );
 }
 

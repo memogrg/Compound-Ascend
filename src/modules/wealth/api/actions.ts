@@ -26,6 +26,7 @@ import {
   createHolding,
   updateHolding,
   deleteHolding,
+  setHoldingDca,
   recordHoldingSale,
   contributeToHolding,
 } from "@/modules/wealth/services/holdings-service";
@@ -253,6 +254,30 @@ export async function editHoldingAction(id: string, raw: unknown): Promise<Actio
   } catch (err) {
     logger.error("editHolding fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos actualizar la posición." };
+  }
+}
+
+/**
+ * Fija el aporte mensual (DCA) de una posición. Es la ejecución del consejo "apartá X/mes para
+ * esta inversión" que el asesor propone como acción: el usuario confirma en la tarjeta y recién
+ * ahí se escribe. 0 apaga el recurrente.
+ */
+export async function setHoldingDcaAction(
+  id: string,
+  monthlyContribution: number,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (!Number.isFinite(monthlyContribution) || monthlyContribution < 0) {
+    return { ok: false, message: "El aporte mensual no es válido." };
+  }
+  try {
+    await setHoldingDca(id, monthlyContribution);
+    revalidatePath("/patrimonio");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    logger.error("setHoldingDca fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos actualizar el aporte mensual." };
   }
 }
 
