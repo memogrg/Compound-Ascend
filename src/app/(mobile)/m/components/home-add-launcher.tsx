@@ -57,7 +57,11 @@ export function HomeAddLauncher() {
   // Ingreso: carga → picker de fuentes → ReceiveForm de la fuente elegida.
   const [incomeLoading, setIncomeLoading] = useState(false);
   const [income, setIncome] = useState<IncomeData | null>(null);
-  const [receiving, setReceiving] = useState<BudgetItem | null>(null);
+  // Se guarda la fuente elegida JUNTO con su "recibido": el picker llama a su `onClose`
+  // (que limpia `income`) antes que a `onPick`, así que el ReceiveForm no puede depender
+  // de `income` — se queda con lo que necesita capturado aquí. (Bug: sin esto la hoja
+  // "Registrar lo recibido" abría vacía.)
+  const [receiving, setReceiving] = useState<{ source: BudgetItem; received: number } | null>(null);
 
   const abrirGasto = async () => {
     setSpend(null);
@@ -143,22 +147,24 @@ export function HomeAddLauncher() {
         <div className="muted" style={{ padding: "20px 2px", fontSize: 13.5 }}>Abriendo…</div>
       </BottomSheet>
 
-      {/* Ingreso · paso 1: elegir la fuente (el MISMO FuentePicker de /m/ingresos). */}
+      {/* Ingreso · paso 1: elegir la fuente (el MISMO FuentePicker de /m/ingresos). Se captura
+          el "recibido" de la fuente al elegirla (aquí `income` sigue vivo en el closure). */}
       {income ? (
         <FuentePickerSheet
           open={!receiving}
           sources={income.sources}
-          onPick={(s) => setReceiving(s)}
+          onPick={(s) => setReceiving({ source: s, received: income.received[s.id] ?? 0 })}
           onClose={cerrarIngreso}
         />
       ) : null}
 
-      {/* Ingreso · paso 2: el MISMO ReceiveForm de /m/ingresos, para la fuente elegida. */}
+      {/* Ingreso · paso 2: el MISMO ReceiveForm de /m/ingresos, para la fuente elegida. NO
+          depende de `income` (que el picker ya limpió): usa lo capturado en `receiving`. */}
       <BottomSheet open={!!receiving} onClose={() => setReceiving(null)} title="Registrar lo recibido">
-        {receiving && income ? (
+        {receiving ? (
           <ReceiveForm
-            source={receiving}
-            received={income.received[receiving.id] ?? 0}
+            source={receiving.source}
+            received={receiving.received}
             onSuccess={guardado}
           />
         ) : null}
