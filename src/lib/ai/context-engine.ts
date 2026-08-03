@@ -612,10 +612,19 @@ export async function buildFinancialContext(scope: ContextScope = FULL_CONTEXT_S
   // Memoria conductual (Fase 4c): observaciones recientes para que el asesor las
   // mencione con tacto. getActiveInsights dispara refreshInsights (auto-activación).
   if (scope.flavor) try {
-    const { getActiveInsights } = await import("@/lib/insights");
+    const { getActiveInsights, suggestedAction } = await import("@/lib/insights");
     const items = await getActiveInsights(4);
     if (items.length)
-      ctx.insights = items.map((i) => ({ severity: i.severity, title: i.title, body: i.body }));
+      // `kind` viaja para que el asesor pueda reconocer si YA mencionó esta observación antes en
+      // la conversación; `action` para que pueda cerrar ofreciendo arreglarlo en vez de solo
+      // señalar el problema. Los insights llegan ordenados por severidad (accionar primero).
+      ctx.insights = items.map((i) => ({
+        kind: i.kind,
+        severity: i.severity,
+        title: i.title,
+        body: i.body,
+        action: suggestedAction(i.kind)?.label,
+      }));
   } catch {
     // Sin insights: el contexto sigue.
   }

@@ -25,5 +25,15 @@ export {
   detectGrowingDebt,
   detectPositiveStreak,
   detectDisfruteSpike,
+  detectOverspentEnvelopes,
+  detectLowSavingsRate,
+  detectExpensiveDebt,
+  detectEmergencyFundGap,
+  detectConcentration,
+  detectReturnBelowInflation,
   runDetectors,
+  APR_CARO,
+  CONCENTRACION_ALTA,
 } from "@/lib/insights/detectors";
+
+export { suggestedAction, type InsightAction } from "@/lib/insights/actions";
