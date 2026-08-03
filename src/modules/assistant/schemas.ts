@@ -46,6 +46,11 @@ export const chatRequestSchema = z.object({
     .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) }))
     .max(20)
     .default([]),
+  /**
+   * Mensaje del historial que el usuario está CITANDO (chat_messages.id). El servidor lo resuelve
+   * bajo RLS antes de usarlo: un id ajeno o ya borrado por la retención se degrada con aviso.
+   */
+  replyToMessageId: z.string().uuid().nullish(),
 });
 
 export type ChatRequest = z.infer<typeof chatRequestSchema>;

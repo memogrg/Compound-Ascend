@@ -23,7 +23,15 @@ export const MAX_DAY_MESSAGES = 300;
 /** Costa Rica: UTC−6 fijo (sin DST). Corte del día = 00:00 hora CR. */
 const CR_OFFSET_MS = 6 * 60 * 60 * 1000;
 
-export type StoredChatMessage = { role: "user" | "assistant"; content: string; createdAt: string };
+export type StoredChatMessage = {
+  /** id de la fila: lo que permite CITAR este mensaje (reply_to_message_id). */
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+  /** Mensaje al que este responde. null = suelto, o el citado ya lo borró la retención. */
+  replyToId: string | null;
+};
 
 /**
  * Instante UTC (ISO) de las 00:00 de Costa Rica del día que contiene `nowMs`. Puro y testeable:
@@ -45,12 +53,30 @@ async function loadChatSince(
   ctx?: AuthContext,
 ): Promise<StoredChatMessage[]> {
   const { db, userId } = await resolveAuth(ctx);
-  let query = db.from("chat_messages").select("role, content, created_at").gte("created_at", since);
+  let query = db
+    .from("chat_messages")
+    .select("id, role, content, created_at, reply_to_message_id")
+    .gte("created_at", since);
   if (ctx) query = query.eq("user_id", userId); // service-role → filtro explícito
   const { data } = await query.order("created_at", { ascending: false }).limit(limit);
-  return (data ?? [])
-    .reverse()
-    .map((r) => ({ role: r.role === "assistant" ? "assistant" : "user", content: r.content, createdAt: r.created_at }));
+  return (data ?? []).reverse().map(toStored);
+}
+
+/** Fila cruda → StoredChatMessage (el rol de la BD es texto libre con check). */
+function toStored(r: {
+  id: string;
+  role: string;
+  content: string;
+  created_at: string;
+  reply_to_message_id: string | null;
+}): StoredChatMessage {
+  return {
+    id: r.id,
+    role: r.role === "assistant" ? "assistant" : "user",
+    content: r.content,
+    createdAt: r.created_at,
+    replyToId: r.reply_to_message_id,
+  };
 }
 
 /**
@@ -99,19 +125,85 @@ export async function purgeExpiredChatMessages(nowMs: number = Date.now()): Prom
   return count ?? null;
 }
 
-/** Persiste mensajes del chat (user/assistant). Best-effort: si el insert falla, no rompe nada. */
+/**
+ * Persiste mensajes del chat (user/assistant) y devuelve sus ids EN ORDEN (RETURNING respeta el
+ * orden de los VALUES). Los ids importan: son lo que la UI necesita para poder CITAR un mensaje
+ * recién enviado, sin esperar a recargar el hilo.
+ *
+ * `replyToMessageId` solo debe venir con un id YA verificado como existente y del usuario (lo
+ * hace loadQuotedContext): la FK rechazaría un id fantasma y se perdería el turno entero.
+ *
+ * Best-effort: si el insert falla, no rompe nada — devuelve [].
+ */
 export async function appendChatMessages(
   ctx: AuthContext | undefined,
-  msgs: { role: "user" | "assistant"; content: string }[],
-): Promise<void> {
-  if (msgs.length === 0) return;
+  msgs: { role: "user" | "assistant"; content: string; replyToMessageId?: string | null }[],
+): Promise<string[]> {
+  if (msgs.length === 0) return [];
   try {
     const { db, userId } = await resolveAuth(ctx);
-    const rows = msgs.map((m) => ({ user_id: userId, role: m.role, content: m.content }));
-    const { error } = await db.from("chat_messages").insert(rows);
+    const rows = msgs.map((m) => ({
+      user_id: userId,
+      role: m.role,
+      content: m.content,
+      reply_to_message_id: m.replyToMessageId ?? null,
+    }));
+    const { data, error } = await db.from("chat_messages").insert(rows).select("id");
     if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => r.id);
   } catch (err) {
     logger.warn("appendChatMessages falló", { message: err instanceof Error ? err.message : "?" });
+    return [];
+  }
+}
+
+/**
+ * Resuelve una CITA: el mensaje citado + su respuesta asociada (el otro lado del turno).
+ *
+ * Se lee bajo RLS (sin ctx), así que un id ajeno devuelve null aunque el request lo fabrique: es
+ * la verificación de pertenencia que la FK no puede hacer. null también cuando la retención ya lo
+ * borró — el caller degrada con aviso, no inventa contexto.
+ *
+ * El emparejado usa `gte`/`lte` y descarta el propio id, NO `gt`/`lt`: el par usuario+asistente se
+ * inserta en UN solo statement, así que ambas filas comparten `created_at` (`now()` es el
+ * timestamp de la transacción) y un `gt` estricto se saltaría justo la respuesta que se busca.
+ */
+export async function loadQuotedContext(
+  messageId: string,
+): Promise<{ quoted: StoredChatMessage; partner: StoredChatMessage | null } | null> {
+  try {
+    const { db } = await resolveAuth();
+    const cols = "id, role, content, created_at, reply_to_message_id";
+    const { data } = await db.from("chat_messages").select(cols).eq("id", messageId).maybeSingle();
+    if (!data) return null;
+    const quoted = toStored(data);
+
+    // Si citó una pregunta suya, la pareja es la respuesta que vino DESPUÉS; si citó una respuesta
+    // del asesor, es la pregunta que la provocó. Se piden pocas filas y se filtra en memoria.
+    const buscaAsistente = quoted.role === "user";
+    const vecinos = buscaAsistente
+      ? await db
+          .from("chat_messages")
+          .select(cols)
+          .gte("created_at", quoted.createdAt)
+          .order("created_at", { ascending: true })
+          .limit(4)
+      : await db
+          .from("chat_messages")
+          .select(cols)
+          .lte("created_at", quoted.createdAt)
+          .order("created_at", { ascending: false })
+          .limit(4);
+
+    const partner =
+      (vecinos.data ?? [])
+        .map(toStored)
+        .find((m) => m.id !== quoted.id && m.role === (buscaAsistente ? "assistant" : "user")) ??
+      null;
+    return { quoted, partner };
+  } catch (err) {
+    logger.warn("loadQuotedContext falló", { message: err instanceof Error ? err.message : "?" });
+    return null;
   }
 }
 

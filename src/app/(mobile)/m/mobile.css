@@ -1895,6 +1895,80 @@ body:has(.m-shell[data-theme="dark"]) {
   margin-right: auto;
 }
 
+/* ── Citar un mensaje ──────────────────────────────────────────────────────── */
+/* A diferencia de la web, acá el botón está SIEMPRE visible: sin puntero no hay hover que
+   revele nada, y esconderlo detrás de un long-press lo volvería invisible. */
+.m-shell .m-reply-btn {
+  background: none;
+  border: 0;
+  padding: 2px 0 0 36px;
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 24px;
+}
+.m-shell .m-msg.me .m-reply-btn {
+  padding: 2px 36px 0 0;
+}
+.m-shell .m-quote {
+  border-left: 2px solid var(--accent);
+  padding: 2px 0 2px 8px;
+  margin-bottom: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.78;
+}
+/* citando dentro de la burbuja propia (fondo acento): la barra tiene que verse sobre él */
+.m-shell .m-msg.me .m-quote {
+  border-left-color: var(--accent-ink);
+}
+.m-shell .m-quote.is-missing {
+  border-left-color: var(--border);
+}
+.m-shell .m-quote .ac-quote-who {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+}
+.m-shell .m-replying {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  /* justo debajo de la barra de entrada (z-30): son la misma pieza, apilada */
+  z-index: 29;
+}
+.m-shell .m-replying em {
+  font-style: normal;
+  color: var(--ink);
+}
+.m-shell .m-replying > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-shell .m-replying-x {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-height: 28px;
+}
+.m-shell .m-replying-x svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* aviso de retención: encabeza el hilo, deliberadamente discreto (no es un mensaje) */
 .m-shell .m-chat-retention {
   font-size: 11.5px;

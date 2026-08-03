@@ -891,6 +891,9 @@ export type ChatMessageRow = {
   role: string; // 'user' | 'assistant'
   content: string;
   created_at: string;
+  // Mensaje citado, misma tabla (migración 20260808000001). ON DELETE SET NULL: si la retención
+  // borra el citado, este mensaje sobrevive sin la cita.
+  reply_to_message_id: string | null;
 };
 
 /** Informe de portafolio del carril "deep" (migración 20260805000001). Personal: RLS por dueño. */
