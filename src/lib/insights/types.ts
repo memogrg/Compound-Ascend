@@ -5,7 +5,18 @@
 
 export type InsightSeverity = "celebrar" | "info" | "observar" | "accionar";
 export type InsightStatus = "activo" | "descartado" | "resuelto";
-export type InsightRelatedKind = "goal" | "debt" | "category" | "holding";
+
+/**
+ * Entidades a las que un insight se puede asociar.
+ *
+ * Es un ARRAY en runtime y no solo un tipo porque el check de `user_insights.related_kind`
+ * (migración 20260810000001) tiene que decir EXACTAMENTE lo mismo. Un valor que exista acá y no
+ * en la BD no falla solo en su fila: syncInsights hace un upsert con todas las filas de la
+ * pasada, así que el statement entero se aborta y el usuario se queda sin NINGÚN insight. Ya
+ * pasó una vez con 'holding'; hay un test que lo vigila.
+ */
+export const INSIGHT_RELATED_KINDS = ["goal", "debt", "category", "holding"] as const;
+export type InsightRelatedKind = (typeof INSIGHT_RELATED_KINDS)[number];
 
 export type InsightKind =
   | "meta_estancada"
