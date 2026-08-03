@@ -11,6 +11,7 @@ import {
   copyPreviousMonthIncomeAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
+import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import { formatMoney } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
@@ -64,18 +65,7 @@ const TYPE_ICON: Record<IncomeType, MIconName> = {
   extraordinario: "income",
 };
 
-// Fracción sugerida por clic en fuentes recurrentes sub-mensuales (igual que la web).
-const RECURRENT_FRACTION: Record<string, number> = { semanal: 0.25, quincenal: 0.5 };
-
 const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/** Monto sugerido al pulsar "Recibido": fracción recurrente o restante del mes. */
-function suggestedAmount(it: BudgetItem, received: number): number {
-  const frac = it.recurringItemId ? RECURRENT_FRACTION[it.frequency] : undefined;
-  if (frac) return round2(it.amount * frac);
-  const remaining = round2(it.amount - received);
-  return remaining > 0 ? remaining : it.amount;
-}
 
 /** BudgetItem (fuente) → valores del form de edición (mismo shape que la web). */
 function toValues(it: BudgetItem): IncomeSourceValues {
@@ -197,26 +187,27 @@ export function IncomeManager({
                       ) : (
                         <span style={{ flex: 1 }} />
                       )}
-                      {/* Con la fuente ya cobrada al 100%, "Recibido" invitaba a registrar
-                          otra vez lo mismo y duplicar el ingreso. Se sustituye por el estado:
-                          si hace falta corregir algo, Editar sigue estando en el swipe. */}
+                      {/* La fuente al 100% NO se bloquea: lo real puede exceder al plan, así que
+                          "Recibido" sigue disponible para registrar un extra. El "✓" es solo
+                          señal de que ya alcanzaste lo proyectado, no un bloqueo. */}
                       {budget > 0 && pct >= 1 ? (
                         <span
                           className="pos"
-                          style={{ flex: "none", fontSize: 12.5, fontWeight: 600, padding: "0 6px" }}
+                          aria-label="Ya cobraste lo proyectado"
+                          title="Ya cobraste lo proyectado"
+                          style={{ flex: "none", fontSize: 14, fontWeight: 700 }}
                         >
-                          Cobrado
+                          ✓
                         </span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="m-btn m-btn-secondary"
-                          style={{ flex: "none", minHeight: 38, padding: "0 14px", fontSize: 13 }}
-                          onClick={() => setReceiving(it)}
-                        >
-                          Recibido
-                        </button>
-                      )}
+                      ) : null}
+                      <button
+                        type="button"
+                        className="m-btn m-btn-secondary"
+                        style={{ flex: "none", minHeight: 38, padding: "0 14px", fontSize: 13 }}
+                        onClick={() => setReceiving(it)}
+                      >
+                        Recibido
+                      </button>
                     </span>
                   }
                 />
@@ -396,7 +387,7 @@ export function ReceiveForm({
   received: number;
   onSuccess: () => void;
 }) {
-  const [amount, setAmount] = useState<number | undefined>(suggestedAmount(source, received));
+  const [amount, setAmount] = useState<number | undefined>(suggestedReceipt(source, received));
   const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const remaining = round2(source.amount - received);
