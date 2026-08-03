@@ -29,7 +29,8 @@ import { toSafeResponse, AppError } from "@/lib/errors";
 import { alert } from "@/server/observability/alerts";
 import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/ai/provider";
-import { loadTodayChat, appendChatMessages } from "@/lib/ai/chat-store";
+import { loadRetainedChat, appendChatMessages } from "@/lib/ai/chat-store";
+import { capHistory } from "@/lib/ai/history";
 
 export const runtime = "nodejs";
 // El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
@@ -147,14 +148,18 @@ export async function POST(req: Request) {
     if (!result) {
       // Fallback: sin patrón (o el determinista escaló). AHÍ sí se arma el contexto COMPLETO + tools.
       const ctx = await buildFinancialContext();
-      // Memoria persistente (fuente de verdad): el chat del DÍA del usuario (chat_messages). El
-      // `history` del cliente se acepta por compat en el schema, pero NO se usa. El LLM ve solo los
-      // últimos N (capHistory en el orquestador), aunque se persista todo el día.
-      const today = await loadTodayChat();
-      const messages: ChatMessage[] = [
-        ...today.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
+      // Memoria persistente (fuente de verdad): el chat RETENIDO del usuario (chat_messages). El
+      // `history` del cliente se acepta por compat en el schema, pero NO se usa.
+      //
+      // El capHistory acá NO es redundante con el del orquestador: acota la ventana ANTES de que
+      // se deriven `isFirstTurn` y `priorAssistantReplies` (el guardrail "no repitas una nota ya
+      // dicha"). Sin él, alargar la retención alargaría también esas señales — y lo que se le manda
+      // al LLM debe seguir siendo los últimos N turnos, independiente de cuánto se retenga.
+      const retenidos = await loadRetainedChat();
+      const messages: ChatMessage[] = capHistory([
+        ...retenidos.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
         { role: "user", content: userMessage },
-      ];
+      ]);
       // Herramientas (function-calling) sólo con sesión; deudas/metas/números normalizados a la moneda
       // de VISUALIZACIÓN. Best-effort: si falla, se sigue sin herramientas.
       const toolContext = user ? await buildToolContext({ debts: true, goals: true, numbers: true }, user.id) : undefined;

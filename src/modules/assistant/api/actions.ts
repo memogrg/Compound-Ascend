@@ -13,7 +13,7 @@ import type { SobreOption, SobreRemaining } from "@/modules/financial-base";
 import { createGoal, goalInputSchema } from "@/modules/control";
 import { createInvestmentAlert } from "@/modules/wealth";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
-import { loadTodayChat, buildTranscriptText, startOfCostaRicaDayISO, type StoredChatMessage } from "@/lib/ai/chat-store";
+import { loadRetainedChat, loadTodayChat, buildTranscriptText, startOfCostaRicaDayISO, type StoredChatMessage } from "@/lib/ai/chat-store";
 import { sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
 
@@ -128,10 +128,13 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
   }
 }
 
-/** Mensajes del chat de HOY del usuario (para que la UI cargue el hilo al abrir, no arranque vacía). */
-export async function loadTodayChatAction(): Promise<StoredChatMessage[]> {
+/**
+ * Hilo del chat que ve el usuario al abrir: la ventana RETENIDA (últimos CHAT_RETENTION_DAYS),
+ * no solo el día — así puede scrollear y responder a un mensaje de días atrás.
+ */
+export async function loadChatHistoryAction(): Promise<StoredChatMessage[]> {
   if (!isSupabaseConfigured()) return [];
-  return loadTodayChat();
+  return loadRetainedChat();
 }
 
 /** Etiqueta DD/MM/YYYY del día actual en hora de Costa Rica (deriva del corte del día). */

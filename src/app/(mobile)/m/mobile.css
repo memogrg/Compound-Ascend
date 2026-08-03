@@ -1895,6 +1895,14 @@ body:has(.m-shell[data-theme="dark"]) {
   margin-right: auto;
 }
 
+/* aviso de retención: encabeza el hilo, deliberadamente discreto (no es un mensaje) */
+.m-shell .m-chat-retention {
+  font-size: 11.5px;
+  line-height: 1.4;
+  text-align: center;
+  margin: 0;
+}
+
 /* barra de entrada fija (abajo, respeta safe area; esta ruta no monta botón de crear) */
 .m-shell .m-chat-bar {
   position: fixed;

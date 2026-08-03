@@ -2,17 +2,22 @@ import "server-only";
 
 /**
  * Persistencia del CHAT del asesor por usuario (UI web + móvil). A diferencia de conversation-store
- * (memoria rodante del LLM, ventana corta, ambos canales), esto guarda la conversación del DÍA para
- * que el hilo sobreviva a minimizar/refrescar/cambio de dispositivo y para enviar el TRANSCRIPT.
+ * (memoria rodante del LLM, ventana corta, ambos canales), esto guarda la conversación RETENIDA
+ * (últimos CHAT_RETENTION_DAYS días) para que el hilo sobreviva a minimizar/refrescar/cambio de
+ * dispositivo, para poder responder a un mensaje de días atrás y para enviar el TRANSCRIPT.
  *
- * PERSONAL: RLS por dueño (chat_messages). Corte "del día" = desde las 00:00 de Costa Rica (la app
- * es es-CR, UTC−6 sin horario de verano). Tope de filas leídas para que no crezca infinito.
+ * PERSONAL: RLS por dueño (chat_messages). Dos cortes distintos y a propósito:
+ *   - la UI y la memoria del asesor leen la VENTANA RETENIDA (loadRetainedChat),
+ *   - el transcript por correo sigue siendo "la conversación de HOY" (loadTodayChat), que es lo
+ *     que promete el botón: desde las 00:00 de Costa Rica (la app es es-CR, UTC−6 sin DST).
+ * Lo que cae fuera de la retención lo borra el cron diario (purgeExpiredChatMessages).
  * Best-effort: cualquier fallo → [] / no-op, nunca rompe la respuesta.
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
+import { CHAT_RETENTION_DAYS, MAX_CHAT_MESSAGES, retentionCutoffISO } from "@/lib/ai/chat-retention";
 import { logger } from "@/lib/logger";
 
-/** Tope de mensajes del día que se leen (protege memoria/tokens; el resto queda en la BD). */
+/** Tope de mensajes del día que se leen para el transcript (el resto queda en la BD). */
 export const MAX_DAY_MESSAGES = 300;
 
 /** Costa Rica: UTC−6 fijo (sin DST). Corte del día = 00:00 hora CR. */
@@ -31,26 +36,67 @@ export function startOfCostaRicaDayISO(nowMs: number): string {
 }
 
 /**
+ * Mensajes del chat del usuario desde `since` (cronológico viejo→nuevo), acotados a `limit`.
+ * Toma los MÁS RECIENTES (DESC + limit) y los invierte. [] ante cualquier fallo.
+ */
+async function loadChatSince(
+  since: string,
+  limit: number,
+  ctx?: AuthContext,
+): Promise<StoredChatMessage[]> {
+  const { db, userId } = await resolveAuth(ctx);
+  let query = db.from("chat_messages").select("role, content, created_at").gte("created_at", since);
+  if (ctx) query = query.eq("user_id", userId); // service-role → filtro explícito
+  const { data } = await query.order("created_at", { ascending: false }).limit(limit);
+  return (data ?? [])
+    .reverse()
+    .map((r) => ({ role: r.role === "assistant" ? "assistant" : "user", content: r.content, createdAt: r.created_at }));
+}
+
+/**
+ * Hilo que ve el usuario: la VENTANA RETENIDA (últimos CHAT_RETENTION_DAYS días), acotada a los
+ * MAX_CHAT_MESSAGES más recientes para que abrir el chat no cargue una semana entera de golpe.
+ * Es lo que hace que se pueda scrollear y responder a un mensaje de anteayer.
+ */
+export async function loadRetainedChat(ctx?: AuthContext): Promise<StoredChatMessage[]> {
+  try {
+    return await loadChatSince(retentionCutoffISO(Date.now()), MAX_CHAT_MESSAGES, ctx);
+  } catch (err) {
+    logger.warn("loadRetainedChat falló", { message: err instanceof Error ? err.message : "?" });
+    return [];
+  }
+}
+
+/**
  * Mensajes del chat de HOY del usuario (cronológico viejo→nuevo), acotados a MAX_DAY_MESSAGES.
- * Toma los MÁS RECIENTES del día (DESC + limit) y los invierte. [] ante cualquier fallo.
+ * Solo para el TRANSCRIPT por correo, que promete "la conversación de hoy".
  */
 export async function loadTodayChat(ctx?: AuthContext): Promise<StoredChatMessage[]> {
   try {
-    const { db, userId } = await resolveAuth(ctx);
-    const since = startOfCostaRicaDayISO(Date.now());
-    let query = db
-      .from("chat_messages")
-      .select("role, content, created_at")
-      .gte("created_at", since);
-    if (ctx) query = query.eq("user_id", userId); // service-role → filtro explícito
-    const { data } = await query.order("created_at", { ascending: false }).limit(MAX_DAY_MESSAGES);
-    return (data ?? [])
-      .reverse()
-      .map((r) => ({ role: r.role === "assistant" ? "assistant" : "user", content: r.content, createdAt: r.created_at }));
+    return await loadChatSince(startOfCostaRicaDayISO(Date.now()), MAX_DAY_MESSAGES, ctx);
   } catch (err) {
     logger.warn("loadTodayChat falló", { message: err instanceof Error ? err.message : "?" });
     return [];
   }
+}
+
+/**
+ * LIMPIEZA de retención: borra los mensajes más viejos que CHAT_RETENTION_DAYS de TODOS los
+ * usuarios. La corre el cron diario (/api/assistant/chat-retention), sin sesión, por lo que usa
+ * el cliente service-role (bypassa RLS). Idempotente: correrlo dos veces borra lo mismo (nada la
+ * segunda vez). Devuelve cuántas filas borró (null si Postgres no reportó el conteo).
+ */
+export async function purgeExpiredChatMessages(nowMs: number = Date.now()): Promise<number | null> {
+  const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
+  const db = createServiceRoleClient();
+  const cutoff = retentionCutoffISO(nowMs);
+  const { error, count } = await db
+    .from("chat_messages")
+    .delete({ count: "exact" })
+    .lt("created_at", cutoff);
+  if (error) throw new Error(error.message);
+  logger.info("chat.retention.purge", { cutoff, days: CHAT_RETENTION_DAYS, deleted: count ?? 0 });
+  return count ?? null;
 }
 
 /** Persiste mensajes del chat (user/assistant). Best-effort: si el insert falla, no rompe nada. */
