@@ -80,6 +80,8 @@ export async function consultarTransacciones(
   ]);
 
   const txns: TxnLike[] = filas.map((t) => ({
+    // El id viaja para poder distinguir dos movimientos que se ven idénticos en la tabla.
+    id: t.id,
     kind: t.kind,
     amount: t.amount,
     currency: t.currency,

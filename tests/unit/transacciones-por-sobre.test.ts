@@ -18,6 +18,7 @@ const SOBRES = [
   { id: "cat-super", sobre: "Supermercado", frasco: "Vivir" },
   { id: "cat-corte", sobre: "Corte Pelo David", frasco: "Cuidado personal" },
   { id: "cat-padel", sobre: "Padel", frasco: "Disfrute" },
+  { id: "cat-namore", sobre: "Namore", frasco: "Vivir" },
 ];
 
 const NOMBRES: Record<string, string> = {
@@ -26,6 +27,7 @@ const NOMBRES: Record<string, string> = {
   "cat-super": "Supermercado",
   "cat-corte": "Corte Pelo David",
   "cat-padel": "Padel",
+  "cat-namore": "Namore",
 };
 
 // Libro diario del mes pasado: un movimiento por sobre + varios en Restaurantes, y uno en USD
@@ -38,6 +40,10 @@ const TXNS = [
   { kind: "gasto", amount: 90_000, currency: "CRC", occurredOn: "2026-07-08", merchantOrSource: "Auto Mercado", description: null, categoryId: "cat-super" },
   { kind: "gasto", amount: 15_000, currency: "CRC", occurredOn: "2026-07-14", merchantOrSource: "Barbería Central", description: null, categoryId: "cat-corte" },
   { kind: "gasto", amount: 25_000, currency: "CRC", occurredOn: "2026-07-21", merchantOrSource: "Club Padel CR", description: null, categoryId: "cat-padel" },
+  // DOS consumos reales el mismo día, mismo lugar, mismo monto: ids distintos. Es el caso que
+  // en la app se veía como "una fila repetida".
+  { id: "dup1aaaa-0000", kind: "gasto", amount: 9_500, currency: "CRC", occurredOn: "2026-07-12", merchantOrSource: "Namore", description: null, categoryId: "cat-namore" },
+  { id: "dup2bbbb-0000", kind: "gasto", amount: 9_500, currency: "CRC", occurredOn: "2026-07-12", merchantOrSource: "Namore", description: null, categoryId: "cat-namore" },
 ];
 
 const listSobres = vi.fn(async () => SOBRES);
@@ -129,25 +135,60 @@ describe("salida en TABLA con total", () => {
   });
 });
 
-describe("moneda de visualización, sin mezcla", () => {
-  it("el movimiento en USD se muestra convertido a CRC", async () => {
-    const r = await consultar("restaurantes");
-    const uber = r.movimientos.find((m) => m.etiqueta === "Uber Eats");
-    expect(uber?.moneda).toBe("USD"); // el dato original se conserva
-    expect(uber?.montoConvertido).toBe(10_000); // 20 × 500
-    // En la tabla NO aparece el símbolo de dólar: todo va en la moneda de visualización.
-    expect(r.resumen_md).not.toContain("$20");
-  });
-
-  it("consultando en USD, la misma consulta sale toda en dólares", async () => {
+describe("MONEDA NATIVA en la lista de movimientos", () => {
+  // Cambio de contrato: un movimiento individual es un HECHO ("pagué ₡3.900"). Convertirlo a la
+  // moneda de visualización lo vuelve irreconocible contra el estado de cuenta o el recibo. La
+  // conversión sigue viva en los AGREGADOS (desglose por sobre, por mes, comparaciones).
+  it("un gasto en colones se muestra en colones aunque el display sea USD", async () => {
     const r = await consultarTransacciones(
-      { periodo: "mes_pasado", tipo: "gasto", sobre: "restaurantes", agrupacion: "ninguna" },
+      { periodo: "mes_pasado", tipo: "gasto", sobre: "transporte", agrupacion: "ninguna" },
       "USD",
     );
-    expect(r.moneda).toBe("USD");
-    // 20.900 CRC / 500 = 41,8 + 20 USD = 61,8 → 62: `convertirTotal` redondea a entero (ya lo
-    // hacía antes de este cambio; se fija acá para que el redondeo no se mueva sin querer).
-    expect(r.total).toBe(62);
+    expect(r.resumen_md).toContain("₡35.000");
+    expect(r.resumen_md).not.toContain("$70"); // 35.000/500, la conversión que ya NO se hace
+  });
+
+  it("el total de la lista va en la moneda de los movimientos, no en la de display", async () => {
+    const r = await consultarTransacciones(
+      { periodo: "mes_pasado", tipo: "gasto", sobre: "transporte", agrupacion: "ninguna" },
+      "USD",
+    );
+    expect(r.resumen_md).toMatch(/\|\s*\*\*Total\*\*\s*\|\s*\|\s*\*\*₡35\.000\*\*/);
+  });
+
+  it("lista con DOS monedas: subtotal por moneda, sin sumar peras con manzanas", async () => {
+    // Restaurantes trae ₡12.500 + ₡8.400 + $20.
+    const r = await consultar("restaurantes");
+    expect(r.resumen_md).toContain("₡20.900");
+    expect(r.resumen_md).toContain("$20");
+    // Y NO aparece el total convertido (30.900) como si fuera una sola cifra.
+    expect(r.resumen_md).not.toMatch(/\*\*₡30\.900\*\*/);
+  });
+
+  it("el dato convertido SIGUE en el payload (los agregados lo usan)", async () => {
+    const r = await consultar("restaurantes");
+    const uber = r.movimientos.find((m) => m.etiqueta === "Uber Eats");
+    expect(uber?.moneda).toBe("USD");
+    expect(uber?.montoConvertido).toBe(10_000); // 20 × 500
+    expect(r.total).toBe(30_900);
+  });
+});
+
+describe("movimientos que se ven idénticos", () => {
+  it("mismo día, comercio y monto → se distinguen con el id corto", async () => {
+    const r = await consultarTransacciones(
+      { periodo: "mes_pasado", tipo: "gasto", sobre: "namore", agrupacion: "ninguna" },
+      "CRC",
+    );
+    expect(r.conteo).toBe(2);
+    // Las dos filas existen y se pueden distinguir: cada una trae su sufijo.
+    expect(r.resumen_md).toContain("#dup1");
+    expect(r.resumen_md).toContain("#dup2");
+  });
+
+  it("una fila sola NO lleva sufijo (sería ruido)", async () => {
+    const r = await consultar("transporte");
+    expect(r.resumen_md).not.toContain("#");
   });
 });
 
@@ -216,14 +257,14 @@ describe("banco · «transacciones de {sobre} del mes pasado» en USD", () => {
       expect(r.resumen_md).not.toContain(excluye);
     });
 
-    it(`«${frase.slice(0, 52)}…» → tabla con total, en USD`, async () => {
+    it(`«${frase.slice(0, 52)}…» → tabla con total, en la moneda del gasto`, async () => {
       const r = await consultarDesdeFrase(frase);
       expect(r.resumen_md).toContain("| Fecha | Comercio | Monto |");
       expect(r.resumen_md).toMatch(/\|\s*\*\*Total\*\*\s*\|/);
       expect(r.resumen_md).not.toMatch(/^•/m); // nada de viñetas
-      expect(r.moneda).toBe("USD");
-      // Una sola moneda en toda la respuesta: ni un colón suelto.
-      expect(r.resumen_md).not.toContain("₡");
+      // Los gastos del fixture son en colones: se muestran en COLONES aunque el display sea USD.
+      // Un movimiento individual es un hecho, no una cifra a convertir.
+      expect(r.resumen_md).toContain("₡");
       expect(r.total).not.toBeNull();
     });
   }
