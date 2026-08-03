@@ -34,6 +34,7 @@ import {
   confirmSetDcaAction,
   confirmAdjustBudgetAction,
   confirmDebtExtraPaymentAction,
+  confirmBatchTransactionsAction,
   loadChatHistoryAction,
   emailTranscriptAction,
 } from "@/modules/assistant/api/actions";
@@ -41,7 +42,7 @@ import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import { retentionNoticeText } from "@/lib/ai/chat-retention";
 import { quoteExcerpt, QUOTE_MISSING_TEXT } from "@/lib/ai/chat-quote";
 import type { AIActionProposal } from "@/lib/ai/types";
-import type { ConfirmResult } from "@/modules/assistant/api/actions";
+import type { ConfirmResult, BatchResult } from "@/modules/assistant/api/actions";
 import { formatMoney } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
@@ -725,6 +726,11 @@ export function AssistantConversation({
                 <DebtExtraPaymentConfirmCard skin={s} p={m.action.payload} />
               </div>
             ) : null}
+            {m.action?.type === "create_transactions_batch" ? (
+              <div className={s.cardWrap}>
+                <BatchTxnConfirmCard skin={s} p={m.action.payload} />
+              </div>
+            ) : null}
             {m.txn ? (
               <div className={s.cardWrap}>
                 <TxnConfirmCard skin={s} draft={m.txn} title="Recibo escaneado" />
@@ -1191,6 +1197,120 @@ function DebtExtraPaymentConfirmCard({ skin, p }: { skin: Skin; p: Record<string
         })
       }
     />
+  );
+}
+
+/** Fila del alta en lote, tal como la deja el conciliador (sobre ya sugerido). */
+type BatchRow = {
+  kind: "gasto" | "ingreso";
+  description: string;
+  amount: number;
+  currency: string;
+  occurredOn: string;
+  categoryId: string | null;
+  categoryPath: string | null;
+};
+
+/**
+ * Alta EN LOTE de las transacciones que faltaban del estado de cuenta.
+ *
+ * Cada fila trae su sobre sugerido y es EDITABLE antes de confirmar: el mapeo comercio→sobre
+ * acierta casi siempre, pero "PAGO SERVICIOS" puede ser cualquier cosa, y descubrirlo después de
+ * registrar 12 movimientos obliga a corregirlos de a uno.
+ *
+ * También se puede sacar una fila del lote (✕) sin perder el resto — un estado suele traer algo
+ * que el usuario no quiere anotar.
+ */
+function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknown> }) {
+  const iniciales = Array.isArray(p.rows) ? (p.rows as BatchRow[]) : [];
+  const [rows, setRows] = useState<BatchRow[]>(iniciales);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hecho, setHecho] = useState<BatchResult | null>(null);
+
+  const setSobre = (i: number, categoryId: string) =>
+    setRows((rs) => rs.map((r, k) => (k === i ? { ...r, categoryId: categoryId || null } : r)));
+  const quitar = (i: number) => setRows((rs) => rs.filter((_, k) => k !== i));
+
+  const confirmar = async () => {
+    setPending(true);
+    setError(null);
+    const res = await confirmBatchTransactionsAction({
+      rows: rows.map((r) => ({
+        kind: r.kind,
+        description: r.description,
+        amount: r.amount,
+        currency: r.currency,
+        occurredOn: r.occurredOn,
+        categoryId: r.categoryId,
+      })),
+    });
+    setPending(false);
+    if (res.creadas > 0 || res.fallidas.length > 0) setHecho(res);
+    else setError(res.message ?? "No se pudo registrar el lote.");
+  };
+
+  if (rows.length === 0 && !hecho) return null;
+
+  if (hecho) {
+    return (
+      <div className={skin.done}>
+        ✓ {hecho.creadas} {hecho.creadas === 1 ? "movimiento registrado" : "movimientos registrados"}.
+        {hecho.fallidas.length > 0 ? (
+          <div className={skin.sub}>
+            No pude con {hecho.fallidas.length}: {hecho.fallidas.map((f) => f.description).join(", ")}.
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className={skin.card}>
+      <div className={skin.eyebrow}>
+        Registrar {rows.length} {rows.length === 1 ? "movimiento" : "movimientos"}
+      </div>
+      <div className="ac-batch">
+        {rows.map((r, i) => (
+          <div className="ac-batch-row" key={`${r.occurredOn}-${r.description}-${i}`}>
+            <div className="ac-batch-head">
+              <span className="ac-batch-desc">{r.description}</span>
+              <span className="ac-batch-amt">
+                {r.kind === "ingreso" ? "+" : "−"}
+                {formatMoney(r.amount, r.currency)}
+              </span>
+              <button
+                type="button"
+                className="ac-batch-x"
+                onClick={() => quitar(i)}
+                disabled={pending}
+                aria-label={`Quitar ${r.description} del lote`}
+              >
+                <Icon name="x" />
+              </button>
+            </div>
+            <div className={skin.sub}>{r.occurredOn}</div>
+            <SobreCombobox
+              kind={r.kind}
+              value={r.categoryId ?? ""}
+              onChange={(v) => setSobre(i, v)}
+              disabled={pending}
+              suggestedPath={r.categoryPath}
+              {...(skin.sobreInput ? { inputClassName: skin.sobreInput } : {})}
+            />
+          </div>
+        ))}
+      </div>
+      {error ? <div className={skin.error}>{error}</div> : null}
+      <div className={skin.actions}>
+        <button className={skin.btnSecondary} onClick={() => setRows([])} disabled={pending}>
+          Cancelar
+        </button>
+        <button className={skin.btnPrimary} onClick={confirmar} disabled={pending}>
+          {pending ? "Registrando…" : `Registrar ${rows.length}`}
+        </button>
+      </div>
+    </div>
   );
 }
 

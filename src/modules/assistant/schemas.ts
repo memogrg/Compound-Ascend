@@ -68,6 +68,34 @@ export const debtExtraPaymentInputSchema = z.object({
 });
 export type DebtExtraPaymentInput = z.infer<typeof debtExtraPaymentInputSchema>;
 
+/**
+ * Alta EN LOTE de las transacciones que faltaban del estado de cuenta.
+ *
+ * Es una action nueva y no N llamadas a confirmTransactionAction: con 12 filas serían 12 round
+ * trips y, sobre todo, 12 resultados sueltos que la tarjeta no podría reportar como un todo. Acá
+ * el lote se ejecuta fila por fila con `createTransaction` —la MISMA función del alta individual,
+ * así que cada una pasa por el pipeline central (auto-categorización, vínculos, household)— y se
+ * devuelve cuántas entraron y cuáles no.
+ */
+export const batchTransactionsInputSchema = z.object({
+  rows: z
+    .array(
+      z.object({
+        kind: z.enum(["ingreso", "gasto"]),
+        description: z.string().trim().min(1).max(160),
+        amount: z.number().positive(),
+        currency: z.string().length(3),
+        occurredOn: z.string().min(8).max(10),
+        categoryId: z.string().uuid().nullable().optional(),
+      }),
+    )
+    .min(1)
+    // Tope duro: un estado de cuenta pegado son decenas de filas, no cientos. Sin tope, un pegado
+    // accidental dispararía cientos de inserts detrás de un solo tap.
+    .max(60),
+});
+export type BatchTransactionsInput = z.infer<typeof batchTransactionsInputSchema>;
+
 export const chatRequestSchema = z.object({
   message: z.string().trim().min(1).max(2000),
   history: z

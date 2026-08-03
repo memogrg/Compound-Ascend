@@ -3858,3 +3858,55 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-qa-guardar {
   margin-top: 2px;
 }
+
+/* ── Alta EN LOTE de un estado de cuenta conciliado ─────────────────────────── */
+.m-shell .ac-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 8px 0 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.m-shell .ac-batch-row {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.m-shell .ac-batch-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.m-shell .ac-batch-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.m-shell .ac-batch-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 14px;
+}
+.m-shell .ac-batch-amt {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  flex: none;
+}
+.m-shell .ac-batch-x {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-width: 32px;
+  min-height: 32px;
+}
+.m-shell .ac-batch-x svg {
+  width: 16px;
+  height: 16px;
+}

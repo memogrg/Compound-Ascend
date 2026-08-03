@@ -5849,3 +5849,57 @@ summary:focus-visible {
     }
   }
 }
+
+/* ── Alta EN LOTE de un estado de cuenta conciliado ─────────────────────────── */
+/* Lista scrolleable: un estado puede traer 15 filas y la tarjeta no puede comerse el hilo. */
+.ac-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 8px 0 4px;
+}
+.ac-batch-row {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.ac-batch-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.ac-batch-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ac-batch-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 13px;
+}
+.ac-batch-amt {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  flex: none;
+}
+.ac-batch-x {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.ac-batch-x svg {
+  width: 14px;
+  height: 14px;
+}
+.ac-batch-x:hover {
+  color: var(--ink);
+}

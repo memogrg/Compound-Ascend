@@ -19,6 +19,9 @@ export const FETCH_INTENTS_LAZY: ReadonlySet<string> = new Set([
   "ultimos_movimientos",
   "listar_sobres",
   "puedo_gastar",
+  // La conciliación de un estado pegado lee el libro diario del rango y nada más: no necesita
+  // patrimonio, portafolio ni perfil. Sin esto pagaría el contexto completo por cada pegado.
+  "conciliar_estado",
 ]);
 
 const NONE: ToolNeed = { debts: false, goals: false, numbers: false };
