@@ -18,6 +18,12 @@ import type { AiToolDecl } from "@/lib/ai/tools";
 
 /** Fila mínima que necesita la consulta (subconjunto de `Transaction`). */
 export type TxnLike = {
+  /**
+   * id de la fila. Opcional (los tests puros arman filas sin él) y solo se usa para DISTINGUIR
+   * movimientos que se ven idénticos: mismo día, mismo comercio, mismo monto. Sin esto, dos
+   * consumos reales en el mismo lugar el mismo día parecen un error de la app.
+   */
+  id?: string;
   kind: string;
   amount: number;
   currency: string;
@@ -66,13 +72,20 @@ export type ConsultaResult = {
     moneda: string;
     montoConvertido: number | null;
     tipo: string;
+    /** id de la fila, para poder distinguir dos movimientos que se ven idénticos. */
+    id?: string;
   }[];
   /** Filtros que se aplicaron, para que la respuesta pueda nombrarlos. */
   filtros: { comercio: string | null; sobre: string | null; termino: string | null };
 };
 
 const TOPE_DEFAULT = 10;
-const TOPE_MAX = 50;
+/**
+ * Tope duro. Alto a propósito: cuando el usuario pide "TODAS las transacciones de X", cortar en
+ * 10 —o en 50— responde otra cosa de la que preguntó. Un sobre en un mes rara vez pasa de 100
+ * movimientos, así que 300 es "todas" en la práctica sin dejar la puerta abierta a un volcado.
+ */
+const TOPE_MAX = 300;
 
 // ---------------------------------------------------------------------------
 // Resolución de periodo (pura: `hoy` se inyecta, nunca se lee del reloj acá)
@@ -362,6 +375,7 @@ export function agregarTransacciones(
       montoConvertido:
         convertirTotal([{ monto: t.amount, moneda: t.currency }], opts.moneda, rates)?.monto ?? null,
       tipo: t.kind,
+      ...(t.id ? { id: t.id } : {}),
     }));
     return base;
   }
@@ -439,29 +453,54 @@ export function renderConsulta(r: ConsultaResult): string {
     // TABLA, no viñetas: una lista de movimientos es una columna de fechas, una de comercios y
     // una de montos — en viñetas los números quedan desalineados y no se pueden comparar de un
     // vistazo. El renderer del chat dibuja tablas markdown y alinea la columna numérica sola.
-    const todoConvertido = r.movimientos.every((m) => m.montoConvertido != null);
+    //
+    // MONEDA NATIVA: cada movimiento se muestra en la moneda en que se GASTÓ, no convertido a la
+    // de visualización. Un movimiento individual es un hecho —"pagué ₡3.900"—, y convertirlo a
+    // dólares lo vuelve irreconocible contra el estado de cuenta o el recibo. La conversión sigue
+    // donde tiene sentido: en los AGREGADOS (desglose por sobre, por mes, comparaciones).
+    const monedas = new Set(r.movimientos.map((m) => m.moneda));
+    // Con una sola moneda el total va en ESA; si la lista mezcla, subtotales por moneda — sumar
+    // colones y dólares en un número sería la cifra inventada de siempre.
+    // Se formatea acá con formatMoney (₡20.900 + $20) en vez de usar subtotalesStr, que rinde
+    // "20900 CRC + 20 USD": correcto pero ilegible en una tabla que el usuario mira de reojo.
+    // subtotalesStr queda intacta para sus otros llamadores.
+    const totalLista =
+      monedas.size === 1
+        ? formatMoney(
+            r.movimientos.reduce((a, m) => a + m.monto, 0),
+            [...monedas][0]!,
+          )
+        : subtotales(r.movimientos.map((m) => ({ monto: m.monto, moneda: m.moneda })))
+            .map((m) => formatMoney(m.monto, m.moneda))
+            .join(" + ");
+
+    // Movimientos que se ven IDÉNTICOS (día, comercio y monto): se les agrega un sufijo con el id
+    // corto. Dos consumos reales en el mismo lugar el mismo día existen, y sin distinguirlos la
+    // tabla parece estar repitiendo una fila por error.
+    const claveVisual = (m: (typeof r.movimientos)[number]): string =>
+      `${m.fecha}|${m.etiqueta}|${m.monto}|${m.moneda}`;
+    const veces = new Map<string, number>();
+    for (const m of r.movimientos) veces.set(claveVisual(m), (veces.get(claveVisual(m)) ?? 0) + 1);
+
     const filas = r.movimientos.map((m) => {
       const signo = m.tipo === "ingreso" ? "+" : "−";
-      // Con todas las tasas disponibles la columna va ENTERA en la moneda de visualización; si
-      // falta una, se muestra cada fila en su moneda antes que inventar una conversión.
-      const importe =
-        todoConvertido && m.montoConvertido != null
-          ? formatMoney(m.montoConvertido, r.moneda)
-          : formatMoney(m.monto, m.moneda);
-      return `| ${etiquetaFecha(m.fecha)} | ${m.etiqueta} | ${signo}${importe} |`;
+      const repetida = (veces.get(claveVisual(m)) ?? 0) > 1 && m.id;
+      const etiqueta = repetida ? `${m.etiqueta} · #${m.id!.slice(0, 4)}` : m.etiqueta;
+      return `| ${etiquetaFecha(m.fecha)} | ${etiqueta} | ${signo}${formatMoney(m.monto, m.moneda)} |`;
     });
-    const cab = `Tus ${nombreTipo}${filtro} de ${r.rango.etiqueta} suman ${totalStr} en ${r.conteo} ${r.conteo === 1 ? "movimiento" : "movimientos"}:`;
+    const cab = `Tus ${nombreTipo}${filtro} de ${r.rango.etiqueta} suman ${totalLista} en ${r.conteo} ${r.conteo === 1 ? "movimiento" : "movimientos"}:`;
     const tabla = [
       "| Fecha | Comercio | Monto |",
       "| --- | --- | --- |",
       ...filas,
-      `| **Total** |  | **${totalStr}** |`,
+      `| **Total** |  | **${totalLista}** |`,
     ].join("\n");
     // Si el tope recortó la lista, se dice — un total que no cuadra con las filas visibles
-    // parece un error de suma.
+    // parece un error de suma. OJO: acá el total es el de las filas MOSTRADAS (moneda nativa),
+    // así que el aviso aclara que el general es otro.
     const recorte =
       r.movimientos.length < r.conteo
-        ? `\n\n(Se muestran ${r.movimientos.length} de ${r.conteo}; el total es de todos.)`
+        ? `\n\n(Se muestran ${r.movimientos.length} de ${r.conteo} movimientos; el total de arriba es el de los mostrados.)`
         : "";
     return `${cab}\n\n${tabla}${recorte}`;
   }

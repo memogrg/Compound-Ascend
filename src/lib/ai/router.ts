@@ -703,6 +703,10 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
       // que es justo lo que pasaba, porque extractTerminoGasto exige un verbo de gasto ("gasté
       // en…") y esta forma no lo tiene, así que salía sin ningún filtro.
       const sobre = extractSobreMencionado(t);
+      // "TODAS las transacciones de X" pide la lista COMPLETA: cortar en 10 responde otra cosa.
+      // También se asume completa cuando pidió una TABLA de un sobre concreto — nadie pide la
+      // tabla de un sobre para ver diez filas de las cuarenta que tuvo.
+      const pideTodas = /\btod[oa]s\b|\bcompleta\b|\bentera\b|\bdetallad/i.test(t) || !!sobre;
       return {
         intent: "consulta_transacciones",
         params: {
@@ -712,7 +716,7 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
           // con una sola fila inútil.
           agrupacion: desglose && !sobre ? "categoria" : "ninguna",
           ...(sobre ? { sobre } : { termino: extractTerminoGasto(t) }),
-          tope: 10,
+          tope: pideTodas ? 300 : 10,
         },
       };
     }
