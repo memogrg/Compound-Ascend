@@ -12,6 +12,7 @@ import {
   reassignBudgetItemAction,
   removeBudgetItemAction,
   removeTransactionAction,
+  copyPreviousMonthBudgetAction,
 } from "@/modules/financial-base/api/v2-actions";
 import {
   isLinkedOrphan,
@@ -234,6 +235,33 @@ export function GastosManager({
   const [revertPending, setRevertPending] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [essPending, setEssPending] = useState(false);
+  // Menú ⋮ del header + "Copiar presupuesto del mes anterior" (espejo de "copiar fuentes"
+  // en Ingresos): reusa la MISMA action de la web (copyPreviousMonthBudgetAction), idempotente.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyPending, setCopyPending] = useState(false);
+
+  const confirmCopyBudget = async () => {
+    setCopyPending(true);
+    const res = await copyPreviousMonthBudgetAction({
+      periodMonth: period.month,
+      periodYear: period.year,
+    });
+    setCopyPending(false);
+    setCopyOpen(false);
+    if (res.ok) {
+      const n = res.copied ?? 0;
+      toast.show(
+        n > 0
+          ? `Copiados ${n} ${n === 1 ? "sobre" : "sobres"} del mes anterior`
+          : "No había presupuesto del mes anterior que copiar",
+        n > 0 ? "success" : "info",
+      );
+      router.refresh();
+    } else {
+      toast.show(res.message ?? "No pudimos copiar el presupuesto", "error");
+    }
+  };
 
   /** ¿La categoría visible es una copia (fork) del hogar? → su base para revertir. */
   const forkBaseOf = (id: string): string | null => personalization.forkToBase[id] ?? null;
@@ -346,6 +374,62 @@ export function GastosManager({
 
   return (
     <>
+      {/* Menú ⋮ de Gastos: acciones del presupuesto que no son el "+" (crear gasto/sobre).
+          Hoy una sola opción; el patrón (menú → confirmación → toast) queda listo para más. */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button
+          type="button"
+          aria-label="Más opciones de presupuesto"
+          aria-haspopup="menu"
+          onClick={() => setMenuOpen(true)}
+          style={{
+            display: "grid",
+            placeItems: "center",
+            width: 38,
+            height: 38,
+            flex: "none",
+            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--surface)",
+            color: "var(--text-muted)",
+          }}
+        >
+          <svg viewBox="0 0 24 24" width={18} height={18} fill="currentColor" aria-hidden>
+            <circle cx="12" cy="5" r="1.7" />
+            <circle cx="12" cy="12" r="1.7" />
+            <circle cx="12" cy="19" r="1.7" />
+          </svg>
+        </button>
+      </div>
+
+      <PlusChoiceSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title="Presupuesto del mes"
+        options={[
+          {
+            key: "copiar",
+            label: "Copiar presupuesto del mes anterior",
+            desc: "Trae tus sobres del mes pasado con sus montos",
+            onSelect: () => {
+              setMenuOpen(false);
+              setCopyOpen(true);
+            },
+          },
+        ]}
+      />
+
+      <ConfirmDialog
+        open={copyOpen}
+        title="Copiar presupuesto del mes anterior"
+        message="Traeremos los sobres de gasto del mes pasado con sus montos. No se duplican los que ya tengas este mes."
+        confirmLabel="Copiar"
+        variant="warning"
+        pending={copyPending}
+        onConfirm={confirmCopyBudget}
+        onCancel={() => setCopyOpen(false)}
+      />
+
       {/* Resumen del mes: gastado (exacto) + % de ejecución + cuánto queda */}
       <MSummaryCard
         eyebrow="Gastado del mes"
