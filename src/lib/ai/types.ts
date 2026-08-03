@@ -45,31 +45,63 @@ export type AIChatResponse = {
   action: AIActionProposal | null;
 };
 
-const ACTION_RE = /```action\s*([\s\S]*?)```/i;
+/**
+ * GLOBAL a propósito. Con la versión sin `/g`, `match` tomaba solo el primer bloque y `replace`
+ * strippeaba solo ese: si el modelo emitía cuatro ```action```, tres se RENDERIZABAN CRUDOS en el
+ * chat (JSON a la vista del usuario) y sus acciones se perdían. Un bloque ```action``` nunca debe
+ * llegar a la pantalla.
+ */
+const ACTION_RE = /```action\s*([\s\S]*?)```/gi;
+
+/** Convierte un bloque ya parseado en propuesta, o null si el tipo no es válido. */
+function aPropuesta(crudo: string): AIActionProposal | null {
+  try {
+    const parsed = JSON.parse(crudo.trim()) as Partial<AIActionProposal>;
+    if (!parsed.type || !isValidType(parsed.type)) return null;
+    return {
+      type: parsed.type,
+      payload: (parsed.payload as Record<string, unknown>) ?? {},
+      summary: typeof parsed.summary === "string" ? parsed.summary : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
- * Extrae una acción propuesta (bloque ```action {json}```) del texto del modelo
- * y devuelve el texto limpio + la acción (o null). Tolera JSON inválido.
+ * Extrae las acciones propuestas del texto del modelo y devuelve el texto LIMPIO + la acción.
+ *
+ * Se strippean TODOS los bloques aunque el JSON de alguno sea inválido: el usuario nunca debe ver
+ * un ```action``` crudo, ni siquiera uno roto.
+ *
+ * VARIAS transacciones sueltas se fusionan en UN `create_transactions_batch`. La UI muestra una
+ * acción por mensaje, así que quedarse con la primera dropearía las demás en silencio — y el caso
+ * real que motivó esto (confirmar el alta de un estado de cuenta) son justo N altas juntas. Una
+ * tarjeta de lote es además lo que corresponde mostrar ahí.
  */
 export function parseAction(text: string): AIChatResponse {
-  const match = text.match(ACTION_RE);
-  if (!match) return { reply: text.trim(), action: null };
+  const bloques = [...text.matchAll(ACTION_RE)];
+  if (bloques.length === 0) return { reply: text.trim(), action: null };
 
   const reply = text.replace(ACTION_RE, "").trim();
-  try {
-    const parsed = JSON.parse(match[1]!.trim()) as Partial<AIActionProposal>;
-    if (!parsed.type || !isValidType(parsed.type)) return { reply, action: null };
+  const acciones = bloques.map((m) => aPropuesta(m[1] ?? "")).filter((a): a is AIActionProposal => a !== null);
+  if (acciones.length === 0) return { reply, action: null };
+  if (acciones.length === 1) return { reply, action: acciones[0]! };
+
+  const transacciones = acciones.filter((a) => a.type === "create_transaction");
+  if (transacciones.length === acciones.length) {
     return {
       reply,
       action: {
-        type: parsed.type,
-        payload: (parsed.payload as Record<string, unknown>) ?? {},
-        summary: typeof parsed.summary === "string" ? parsed.summary : undefined,
+        type: "create_transactions_batch",
+        payload: { rows: transacciones.map((a) => a.payload) },
+        summary: `Registrar ${transacciones.length} movimientos`,
       },
     };
-  } catch {
-    return { reply, action: null };
   }
+  // Mezcla de tipos distintos: se queda la primera (la UI muestra una), pero el texto ya salió
+  // limpio de todos los bloques.
+  return { reply, action: acciones[0]! };
 }
 
 function isValidType(t: string): t is AIActionType {

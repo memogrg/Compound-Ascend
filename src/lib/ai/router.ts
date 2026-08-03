@@ -13,7 +13,7 @@ import "server-only";
  * Vive DENTRO de financeChatWithTools → cubre web y WhatsApp (ambos pasan por ahí).
  */
 import { formatMoney } from "@/lib/format";
-import { pareceBloqueDeEstado } from "@/lib/ai/statement-parse";
+import { pareceBloqueDeEstado, pareceConfirmacionDeAlta } from "@/lib/ai/statement-parse";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
 import { detectCreateAction } from "@/lib/ai/action-lane";
@@ -100,6 +100,7 @@ type Intent =
   // ("¿qué días gasto más?", "¿cuánto le gasté a Walmart?", "¿gasté más este mes que el pasado?").
   // Lectura fresca; el dato NO está en ctx (que solo trae agregados del mes en curso):
   | "conciliar_estado"
+  | "confirmar_alta_estado"
   | "consulta_transacciones"
   // HISTORIAL/TENDENCIA: serie por periodo + variación desde los snapshots ("¿cómo cambió mi
   // patrimonio?", "¿cómo vengo con el gasto?"). Lectura fresca:
@@ -137,6 +138,7 @@ const KNOWN_INTENTS: Intent[] = [
   "consulta_historial",
   "consulta_detalle",
   "conciliar_estado",
+  "confirmar_alta_estado",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -150,6 +152,7 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "consulta_historial",
   "consulta_detalle",
   "conciliar_estado",
+  "confirmar_alta_estado",
 ]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
@@ -493,6 +496,14 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
     // El texto CRUDO, no el normalizado por slang: los montos y comercios del banco se parsean
     // tal como vinieron.
     return { intent: "conciliar_estado", params: { texto: text } };
+  }
+
+  // CONFIRMACIÓN del alta ("dale, registralas"). Va acá arriba por el mismo motivo que el bloque:
+  // si cae al LLM, escribe los create_transaction a mano —montos convertidos, bloques crudos— en
+  // vez de usar el lote determinista. El resolver exige encontrar un estado pegado en la
+  // conversación reciente; si no lo hay, devuelve null y esto escala como cualquier otra frase.
+  if (pareceConfirmacionDeAlta(text)) {
+    return { intent: "confirmar_alta_estado", params: {} };
   }
 
   // Pregunta COMPUESTA ("¿cuánto gasto y cuánto ahorro al mes?"): dos consultas distintas en una. Un
@@ -1287,6 +1298,15 @@ async function resolveFetchIntent(
       const { consultarHistorial } = await import("@/lib/ai/history-query-service");
       const r = await consultarHistorial(params, cur);
       return say(r.resumen_md);
+    }
+    if (intent === "confirmar_alta_estado") {
+      // Se RE-DERIVA la conciliación desde el bloque que el usuario pegó, que está en
+      // chat_messages: no hace falta guardar estado en ningún lado, y de paso, si registró algo
+      // entre medio, la re-conciliación lo detecta y no lo propone dos veces.
+      const { resolverConfirmacionDeAlta } = await import("@/lib/ai/statement-service");
+      const r = await resolverConfirmacionDeAlta(cur);
+      if (!r) return null; // no hay estado pegado reciente → que lo atienda el LLM
+      return { reply: r.resumen_md, action: r.action };
     }
     if (intent === "conciliar_estado") {
       // Estado de cuenta pegado: se concilia contra lo registrado y se responde con la tabla +

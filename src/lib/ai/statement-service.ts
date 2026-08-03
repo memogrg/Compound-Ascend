@@ -135,8 +135,43 @@ export async function conciliarEstado(
 }
 
 /**
- * Reporte en TABLA. Los montos van en la moneda de visualización; si falta la tasa de alguna, esa
- * fila se muestra en su moneda de origen antes que inventar la conversión.
+ * Atiende el "dale, registralas" que viene DESPUÉS de la tabla de conciliación.
+ *
+ * Re-deriva todo desde el bloque que el usuario pegó, que ya está en `chat_messages`: no hay
+ * estado que guardar en memoria (inútil en serverless) ni tabla nueva, y como se vuelve a
+ * conciliar, lo que haya registrado entre medio deja de proponerse. Mismos insumos → mismo
+ * resultado, con los montos y monedas ORIGINALES del estado.
+ *
+ * `null` si no hay un estado pegado en la conversación reciente: ahí "sí" no significa esto y la
+ * frase debe escalar como cualquier otra.
+ */
+export async function resolverConfirmacionDeAlta(
+  moneda: string,
+): Promise<ConciliacionPayload | null> {
+  const { loadRetainedChat } = await import("@/lib/ai/chat-store");
+  const { pareceBloqueDeEstado } = await import("@/lib/ai/statement-parse");
+  const hilo = await loadRetainedChat().catch(() => []);
+  // El último bloque pegado por el USUARIO, de atrás para adelante.
+  const bloque = [...hilo]
+    .reverse()
+    .find((m) => m.role === "user" && pareceBloqueDeEstado(m.content));
+  if (!bloque) return null;
+
+  const r = await conciliarEstado(bloque.content, moneda);
+  if (!r) return null;
+  if (!r.action) {
+    // Ya no falta ninguna (las registró en el ínterin, o la tarjeta ya se usó).
+    return { resumen_md: "Ya están todas registradas: no me queda ninguna por agregar.", action: null };
+  }
+  const cuantas = (r.action.payload.rows as unknown[]).length;
+  return {
+    resumen_md: `Listo — te dejo ${cuantas} ${cuantas === 1 ? "movimiento" : "movimientos"} para confirmar con un toque. Podés cambiarle el sobre a cualquiera antes de guardar.`,
+    action: r.action,
+  };
+}
+
+/**
+ * Reporte en TABLA. Los montos van en la MONEDA EN QUE SE GASTÓ (ver renderReporte).
  */
 export function renderReporte(
   filas: FilaConciliada[],
