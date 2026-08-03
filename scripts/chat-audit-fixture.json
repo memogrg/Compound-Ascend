@@ -1,0 +1,7 @@
+{
+  "currency": "CRC",
+  "hasSobres": true,
+  "ingresoMensual": 1800000,
+  "gastoMensual": 1465000,
+  "_nota": "gasto/ingreso son CRC-exactos (asertables). compromiso/independencia incluyen DCA en USD (FX en vivo) → no se asertan exacto."
+}
