@@ -29,8 +29,9 @@ import { toSafeResponse, AppError } from "@/lib/errors";
 import { alert } from "@/server/observability/alerts";
 import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/ai/provider";
-import { loadRetainedChat, appendChatMessages } from "@/lib/ai/chat-store";
+import { loadRetainedChat, appendChatMessages, loadQuotedContext } from "@/lib/ai/chat-store";
 import { capHistory } from "@/lib/ai/history";
+import { annotateReply, buildQuotedContext } from "@/lib/ai/chat-quote";
 
 export const runtime = "nodejs";
 // El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
@@ -126,11 +127,24 @@ export async function POST(req: Request) {
 
     const userMessage = parsed.data.message;
 
+    // ── CITA: el usuario está respondiendo a un mensaje pasado. Se resuelve ACÁ, bajo RLS, y de
+    //    eso salen tres cosas: el contexto extra para el modelo, el aviso si ya no existe y el
+    //    reply_to_message_id que se persiste (que NO se escribe si el id no resolvió: la FK
+    //    rechazaría el insert y se perdería el turno entero). ──
+    const quoteRef = parsed.data.replyToMessageId ?? null;
+    const quote = quoteRef && user ? await loadQuotedContext(quoteRef) : null;
+    // Pedida pero irrecuperable = la borró la retención (o no es suya). Se avisa, no se inventa.
+    const quoteMissing = !!quoteRef && !quote;
+
     // ── CONTEXTO PEREZOSO: rutear PRIMERO (matchIntent es texto puro, 0 IO), y construir SOLO lo que
     //    ese carril usa. Una consulta que el router resuelve determinista NO paga el contexto completo
     //    (portafolio con precios en vivo, patrimonio, bloques flavor). Solo si escala → contexto full. ──
+    //
+    //    Con CITA no se toma el atajo determinista: ese carril resuelve con el mensaje actual y nada
+    //    más (no mira historial), que es exactamente lo contrario de lo que pide citar. "¿y el mes
+    //    pasado?" respondido sin saber a qué se refiere sería peor que gastar el turno completo.
     let result: Awaited<ReturnType<typeof financeChatWithTools>> | null = null;
-    const matched = user ? matchIntent(userMessage) : null;
+    const matched = user && !quote ? matchIntent(userMessage) : null;
     if (matched) {
       const scope = scopeForIntent(matched.intent, matched.params);
       const liteCtx =
@@ -156,10 +170,32 @@ export async function POST(req: Request) {
       // dicha"). Sin él, alargar la retención alargaría también esas señales — y lo que se le manda
       // al LLM debe seguir siendo los últimos N turnos, independiente de cuánto se retenga.
       const retenidos = await loadRetainedChat();
-      const messages: ChatMessage[] = capHistory([
+      const ventana = capHistory([
         ...retenidos.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
         { role: "user", content: userMessage },
       ]);
+      // Con CITA, el par citado va DELANTE de la ventana aunque haya quedado fuera por antigüedad
+      // (el caso que da sentido a citar), y el turno actual se anota para que el modelo sepa a QUÉ
+      // se refiere. Se le suma a la ventana en vez de comerse turnos de ella: son unos cientos de
+      // tokens y solo en este turno. Sin cita, `messages` queda byte-idéntico a antes.
+      let messages: ChatMessage[] = ventana;
+      if (quote) {
+        const pares = [quote.quoted, ...(quote.partner ? [quote.partner] : [])].sort((a, b) =>
+          a.createdAt < b.createdAt ? -1 : 1,
+        );
+        // Cuántos RETENIDOS sobrevivieron al capHistory: la ventana trae además el turno actual,
+        // que no está en `retenidos`. Sin el −1 se contaría como "ya presente" un mensaje que
+        // quedó justo afuera, y la cita no se inyectaría. El guard evita `slice(-0)`, que en JS
+        // devuelve el arreglo ENTERO y haría exactamente lo contrario de lo que se pide.
+        const enVentana = ventana.length > 1 ? retenidos.slice(-(ventana.length - 1)) : [];
+        const idsVentana = new Set(enVentana.map((m) => m.id));
+        const anotado = annotateReply(userMessage, quote.quoted);
+        messages = [
+          ...buildQuotedContext(pares, idsVentana, pares.map((m) => m.id)),
+          ...ventana.slice(0, -1),
+          { role: "user", content: anotado },
+        ];
+      }
       // Herramientas (function-calling) sólo con sesión; deudas/metas/números normalizados a la moneda
       // de VISUALIZACIÓN. Best-effort: si falla, se sigue sin herramientas.
       const toolContext = user ? await buildToolContext({ debts: true, goals: true, numbers: true }, user.id) : undefined;
@@ -209,12 +245,23 @@ export async function POST(req: Request) {
     }
 
     // Persistir el turno en el chat del usuario (best-effort; no bloquea la respuesta si falla).
-    await appendChatMessages(undefined, [
-      { role: "user", content: parsed.data.message },
+    // Se guarda el mensaje CRUDO, no el anotado con la cita: la anotación es andamiaje del prompt
+    // y, persistida, se vería en el hilo y la citaría el próximo que responda a este mensaje.
+    const ids = await appendChatMessages(undefined, [
+      { role: "user", content: parsed.data.message, replyToMessageId: quote ? quoteRef : null },
       { role: "assistant", content: result.reply },
     ]);
 
-    return NextResponse.json({ reply: result.reply, action: result.action }, { headers: corsHeaders(req.headers.get("origin")) });
+    // Los ids vuelven para que la UI pueda CITAR el turno recién enviado sin recargar el hilo.
+    return NextResponse.json(
+      {
+        reply: result.reply,
+        action: result.action,
+        messageIds: { user: ids[0] ?? null, assistant: ids[1] ?? null },
+        ...(quoteMissing ? { quoteMissing: true } : {}),
+      },
+      { headers: corsHeaders(req.headers.get("origin")) },
+    );
   } catch (err) {
     const { status, body } = toSafeResponse(err);
     return NextResponse.json(body, { status, headers: corsHeaders(req.headers.get("origin")) });

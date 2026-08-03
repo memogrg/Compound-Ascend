@@ -1194,6 +1194,87 @@ input[type="radio"] {
   font-size: 12px;
   padding-left: 36px;
 }
+/* ── Citar un mensaje ──────────────────────────────────────────────────────── */
+/* La acción se REVELA al pasar por encima o al tabular: con un botón por mensaje siempre
+   visible, el hilo se convierte en una lista de botones. Se usa opacity y no display/visibility
+   para que siga siendo enfocable con teclado y :focus-within pueda mostrarlo. */
+.ac-reply-btn {
+  background: none;
+  border: 0;
+  padding: 2px 0 0 36px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+/* el mensaje del usuario va alineado a la derecha: ahí la sangría del avatar no aplica */
+.coach-msg.me .ac-reply-btn {
+  padding-left: 0;
+}
+.coach-body > div:hover .ac-reply-btn,
+.ac-reply-btn:focus-visible {
+  opacity: 1;
+}
+.ac-reply-btn:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+/* fragmento citado dentro de la burbuja: barra lateral, como en cualquier cliente de chat */
+.ac-quote {
+  border-left: 2px solid var(--accent);
+  padding: 2px 0 2px 8px;
+  margin-bottom: 7px;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.78;
+}
+.ac-quote.is-missing {
+  border-left-color: var(--border);
+}
+.ac-quote-who {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+}
+/* barra "respondiendo a…" sobre el input */
+.ac-replying {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 18px;
+  font-size: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ac-replying em {
+  font-style: normal;
+  color: var(--ink);
+}
+.ac-replying > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-replying-x {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.ac-replying-x svg {
+  width: 15px;
+  height: 15px;
+}
+.ac-replying-x:hover {
+  color: var(--ink);
+}
+
 /* aviso de retención: encabeza el hilo, deliberadamente discreto (no es un mensaje) */
 .ac-retention {
   font-size: 11.5px;
@@ -1342,6 +1423,17 @@ input[type="radio"] {
 }
 .ac-page .ac-retention {
   font-size: 12px;
+}
+.ac-page .ac-reply-btn {
+  padding-left: 42px;
+  font-size: 12px;
+}
+.ac-page .coach-msg.me .ac-reply-btn {
+  padding-left: 0;
+}
+.ac-page .ac-replying {
+  padding: 9px 24px;
+  font-size: 13px;
 }
 .ac-page .ac-card-wrap {
   padding-left: 42px;

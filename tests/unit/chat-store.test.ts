@@ -17,8 +17,8 @@ describe("startOfCostaRicaDayISO · corte del día en hora de Costa Rica (UTC−
 
 describe("buildTranscriptText · texto limpio con hora CR y roles", () => {
   const msgs: StoredChatMessage[] = [
-    { role: "user", content: "¿cuánto tengo en JUP?", createdAt: "2026-07-29T18:30:00Z" },
-    { role: "assistant", content: "Tenés **1.250 JUP**. Mirá [acá](https://x). \n\nUn escenario.", createdAt: "2026-07-29T18:31:00Z" },
+    { id: "m1", role: "user", content: "¿cuánto tengo en JUP?", createdAt: "2026-07-29T18:30:00Z", replyToId: null },
+    { id: "m2", role: "assistant", content: "Tenés **1.250 JUP**. Mirá [acá](https://x). \n\nUn escenario.", createdAt: "2026-07-29T18:31:00Z", replyToId: null },
   ];
   const out = buildTranscriptText(msgs, { name: "David", dateLabel: "29/07/2026" });
 

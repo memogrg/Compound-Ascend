@@ -36,6 +36,7 @@ import {
 } from "@/modules/assistant/api/actions";
 import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import { retentionNoticeText } from "@/lib/ai/chat-retention";
+import { quoteExcerpt, QUOTE_MISSING_TEXT } from "@/lib/ai/chat-quote";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
@@ -62,6 +63,13 @@ export type Skin = {
   toolbarMsg: string;
   /** Línea sutil de retención, arriba del hilo. */
   retention: string;
+  /** Acción "Responder" bajo cada mensaje citable. */
+  replyBtn: string;
+  /** Fragmento citado, dentro de la burbuja del mensaje que responde. */
+  quote: string;
+  /** Barra de "respondiendo a…" sobre el input, con su botón de cancelar. */
+  replyBar: string;
+  replyBarX: string;
   cardWrap: string;
   card: string;
   eyebrow: string;
@@ -96,6 +104,10 @@ const WEB_SKIN: Skin = {
   toolbar: "ac-toolbar",
   toolbarMsg: "muted ac-toolbar-msg",
   retention: "muted ac-retention",
+  replyBtn: "ac-reply-btn",
+  quote: "ac-quote",
+  replyBar: "ac-replying",
+  replyBarX: "ac-replying-x",
   cardWrap: "ac-card-wrap",
   card: "card ac-confirm",
   eyebrow: "eyebrow",
@@ -128,6 +140,10 @@ const MOBILE_SKIN: Skin = {
   toolbar: "m-chat-toolbar",
   toolbarMsg: "muted m-chat-toolbar-msg",
   retention: "muted m-chat-retention",
+  replyBtn: "m-reply-btn",
+  quote: "m-quote",
+  replyBar: "m-replying",
+  replyBarX: "m-replying-x",
   cardWrap: "",
   card: "m-confirm",
   eyebrow: "m-confirm-eyebrow",
@@ -196,10 +212,20 @@ export type SobreRemaining = {
   hasBudget: boolean;
 };
 
+/** Cita mostrada arriba de un mensaje. `missing` = el citado ya lo borró la retención. */
+type Quote = { id: string; excerpt: string; role: "user" | "assistant"; missing?: boolean };
+
 type ChatMsg = {
   id: number;
   role: "user" | "assistant";
   text: string;
+  /**
+   * id REAL de chat_messages. Solo los mensajes persistidos lo tienen — son los únicos que se
+   * pueden citar (el saludo, los borradores y un turno en vuelo todavía no existen en la BD).
+   */
+  dbId?: string;
+  /** Mensaje al que este responde. */
+  quote?: Quote;
   action?: AIActionProposal | null;
   /** Borrador que viene del escáner de recibos (no de la IA). */
   txn?: DraftTxn;
@@ -343,6 +369,8 @@ export function AssistantConversation({
   const [scanning, setScanning] = useState(false);
   const [transcriptMsg, setTranscriptMsg] = useState<string | null>(null);
   const [sendingTranscript, setSendingTranscript] = useState(false);
+  // Mensaje que se está citando (null = mensaje suelto). Se limpia al enviar o al cancelar.
+  const [replying, setReplying] = useState<Quote | null>(null);
   const idRef = useRef(1);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -362,9 +390,28 @@ export function AssistantConversation({
       try {
         const previos = await loadChatHistoryAction();
         if (!alive || previos.length === 0) return;
+        // La cita se resuelve contra el propio hilo cargado: si el citado quedó fuera de la
+        // ventana retenida (o ya se borró), no hay texto que mostrar y se avisa en vez de
+        // dibujar una cita vacía.
+        const porId = new Map(previos.map((m) => [m.id, m]));
         setMessages((prev) => [
           prev[0]!, // saludo
-          ...previos.map((m): ChatMsg => ({ id: nextId(), role: m.role, text: m.content })),
+          ...previos.map((m): ChatMsg => {
+            const citado = m.replyToId ? porId.get(m.replyToId) : undefined;
+            return {
+              id: nextId(),
+              role: m.role,
+              text: m.content,
+              dbId: m.id,
+              ...(m.replyToId
+                ? {
+                    quote: citado
+                      ? { id: citado.id, excerpt: quoteExcerpt(citado.content), role: citado.role }
+                      : { id: m.replyToId, excerpt: "", role: "assistant" as const, missing: true },
+                  }
+                : {}),
+            };
+          }),
         ]);
       } catch {
         // best-effort: si falla la carga, se queda el saludo
@@ -398,13 +445,23 @@ export function AssistantConversation({
     if (!q || sendingRef.current) return;
     sendingRef.current = true;
     setInput("");
+    // La cita se captura ACÁ y se limpia ya: si el usuario elige otra mientras este turno está en
+    // vuelo, la respuesta que vuelve no debe pisarla.
+    const cita = replying;
+    setReplying(null);
     // Solo los últimos turnos como CONTEXTO (no toda la conversación): acota el prompt y evita
     // re-responder temas viejos. El servidor además usa su propia memoria reciente.
     const history = messages
       .filter((m) => !m.action && !m.txn)
       .slice(-12)
       .map((m) => ({ role: m.role, content: m.text.slice(0, 4000) }));
-    setMessages((m) => [...m, { id: nextId(), role: "user", text: q }]);
+    // Se guarda el id local del mensaje para poder colgarle después su dbId: sin eso el mensaje
+    // recién enviado no sería citable hasta recargar el hilo.
+    const localId = nextId();
+    setMessages((m) => [
+      ...m,
+      { id: localId, role: "user", text: q, ...(cita ? { quote: cita } : {}) },
+    ]);
     setSending(true);
     try {
       // Timeout del cliente (~40s, bajo el maxDuration=60 del server): si tarda, cortamos con un
@@ -414,23 +471,37 @@ export function AssistantConversation({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: q, history }),
+          body: JSON.stringify({ message: q, history, replyToMessageId: cita?.id ?? null }),
         },
         CHAT_TIMEOUT_MS,
       );
       const data = await res.json();
+      // Los ids que devuelve el servidor se cuelgan del mensaje ya pintado (el del usuario) y del
+      // nuevo (el del asesor): a partir de acá los dos se pueden citar. Si el citado ya no existía,
+      // la cita del mensaje del usuario pasa a mostrar el aviso en vez del fragmento.
       setMessages((m) => [
-        ...m,
+        ...m.map((prev) =>
+          prev.id === localId && res.ok
+            ? {
+                ...prev,
+                ...(data.messageIds?.user ? { dbId: String(data.messageIds.user) } : {}),
+                ...(prev.quote && data.quoteMissing
+                  ? { quote: { ...prev.quote, missing: true } }
+                  : {}),
+              }
+            : prev,
+        ),
         res.ok
           ? {
               id: nextId(),
-              role: "assistant",
+              role: "assistant" as const,
               text: String(data.reply ?? ""),
               action: data.action ?? null,
+              ...(data.messageIds?.assistant ? { dbId: String(data.messageIds.assistant) } : {}),
             }
           : {
               id: nextId(),
-              role: "assistant",
+              role: "assistant" as const,
               text: data.error?.message ?? "No pude responder ahora.",
             },
       ]);
@@ -530,16 +601,43 @@ export function AssistantConversation({
                 </span>
               ) : null}
               {/* La IA responde en Markdown → HTML seguro (escape-first + allowlist, ver
-                  lib/markdown). El texto del usuario va como texto plano (React lo escapa). */}
+                  lib/markdown). El texto del usuario va como texto plano (React lo escapa).
+                  La CITA va SIEMPRE como texto plano, incluso citando al asesor: es un
+                  fragmento recortado, no un mensaje — renderizar markdown a medias abriría
+                  etiquetas sin cerrar. */}
               {m.role === "assistant" ? (
-                <div
-                  className={s.bubble}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }}
-                />
+                <div className={s.bubble}>
+                  {m.quote ? <QuoteStrip skin={s} quote={m.quote} /> : null}
+                  <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }} />
+                </div>
               ) : (
-                <div className={s.bubble}>{m.text}</div>
+                <div className={s.bubble}>
+                  {m.quote ? <QuoteStrip skin={s} quote={m.quote} /> : null}
+                  {m.text}
+                </div>
               )}
             </div>
+            {/* Solo lo persistido se puede citar: el saludo y un turno en vuelo no existen en la
+                BD todavía. En web el botón se revela al pasar por encima o al tabular (CSS); en
+                móvil queda siempre visible, que es lo que sirve sin puntero. */}
+            {m.dbId ? (
+              <div className={cn(s.msg, m.role === "user" && s.msgMe)}>
+                <button
+                  type="button"
+                  className={s.replyBtn}
+                  onClick={() =>
+                    setReplying({
+                      id: m.dbId!,
+                      excerpt: quoteExcerpt(m.text),
+                      role: m.role,
+                    })
+                  }
+                  aria-label={`Responder a este mensaje: ${quoteExcerpt(m.text, 60)}`}
+                >
+                  Responder
+                </button>
+              </div>
+            ) : null}
             {m.action?.type === "create_transaction" ? (
               <div className={s.cardWrap}>
                 <TxnConfirmCard skin={s} draft={txnFromAction(m.action, currency, today())} />
@@ -581,6 +679,25 @@ export function AssistantConversation({
               {c}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {replying ? (
+        <div className={s.replyBar}>
+          {/* "tu mensaje" y no "vos"/"ti": el mismo texto sirve al voseo de la web y al "tú" del
+              móvil, sin partir la copia por superficie (el Skin es solo CSS). */}
+          <span className="muted">
+            Respondiendo a {replying.role === "assistant" ? "My Agent C+" : "tu mensaje"}:{" "}
+            <em>{replying.excerpt}</em>
+          </span>
+          <button
+            type="button"
+            className={s.replyBarX}
+            onClick={() => setReplying(null)}
+            aria-label="Cancelar la respuesta a ese mensaje"
+          >
+            <Icon name="x" />
+          </button>
         </div>
       ) : null}
 
@@ -634,6 +751,27 @@ export function AssistantConversation({
         </button>
       </div>
     </>
+  );
+}
+
+/**
+ * Fragmento citado arriba de un mensaje. Si el citado ya no existe (lo borró la retención) se
+ * muestra el aviso en vez de un hueco: el usuario ve POR QUÉ no está, no una cita vacía.
+ */
+function QuoteStrip({ skin, quote }: { skin: Skin; quote: Quote }) {
+  return (
+    <div className={cn(skin.quote, quote.missing && "is-missing")}>
+      {quote.missing ? (
+        <em>{QUOTE_MISSING_TEXT}</em>
+      ) : (
+        <>
+          <span className="ac-quote-who">
+            {quote.role === "assistant" ? "My Agent C+" : "Tu mensaje"}
+          </span>
+          {quote.excerpt}
+        </>
+      )}
+    </div>
   );
 }
 
