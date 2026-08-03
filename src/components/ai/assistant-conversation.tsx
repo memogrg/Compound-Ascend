@@ -7,14 +7,16 @@
  *  - tab de página   (/asistente,      variant="page")    — mismo hilo, a lo ancho
  *  - móvil           (/m/asistente,    variant="mobile")  — piel de mobile.css
  *
- * Las tres comparten la MISMA lógica (carga del hilo de hoy, envío, historial acotado,
+ * Las tres comparten la MISMA lógica (carga del hilo retenido, envío, historial acotado,
  * tarjetas de acción, escáner de recibos) y el MISMO markup. Lo único que cambia por
  * superficie son las clases CSS, que salen del mapa `SKINS`: así el panel conserva su
  * piel `coach-*` y el móvil la suya `m-*` sin que la lógica se duplique ni divergir.
  *
- * El hilo es compartido de verdad porque las tres leen `loadTodayChatAction()` y el
+ * El hilo es compartido de verdad porque las tres leen `loadChatHistoryAction()` y el
  * backend persiste cada turno en `chat_messages`: pasar del panel al tab (o al móvil)
- * no pierde la conversación.
+ * no pierde la conversación. Se carga la VENTANA RETENIDA (lib/ai/chat-retention), no solo
+ * el día, para poder scrollear y responder a un mensaje de días atrás; el aviso de arriba
+ * del hilo dice cuánto se guarda y sale de la misma constante.
  *
  * Ninguna acción financiera se ejecuta sin confirmación explícita del usuario.
  */
@@ -29,10 +31,11 @@ import {
   confirmTransactionAction,
   confirmGoalAction,
   confirmPriceAlertAction,
-  loadTodayChatAction,
+  loadChatHistoryAction,
   emailTranscriptAction,
 } from "@/modules/assistant/api/actions";
 import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
+import { retentionNoticeText } from "@/lib/ai/chat-retention";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { formatMoney } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
@@ -57,6 +60,8 @@ export type Skin = {
   cam: string;
   toolbar: string;
   toolbarMsg: string;
+  /** Línea sutil de retención, arriba del hilo. */
+  retention: string;
   cardWrap: string;
   card: string;
   eyebrow: string;
@@ -90,6 +95,7 @@ const WEB_SKIN: Skin = {
   cam: "coach-send ac-cam",
   toolbar: "ac-toolbar",
   toolbarMsg: "muted ac-toolbar-msg",
+  retention: "muted ac-retention",
   cardWrap: "ac-card-wrap",
   card: "card ac-confirm",
   eyebrow: "eyebrow",
@@ -121,6 +127,7 @@ const MOBILE_SKIN: Skin = {
   cam: "icon-btn m-chat-cam",
   toolbar: "m-chat-toolbar",
   toolbarMsg: "muted m-chat-toolbar-msg",
+  retention: "muted m-chat-retention",
   cardWrap: "",
   card: "m-confirm",
   eyebrow: "m-confirm-eyebrow",
@@ -346,18 +353,18 @@ export function AssistantConversation({
 
   const nextId = () => idRef.current++;
 
-  // Al abrir: cargar la conversación de HOY (persistida por usuario) para que el hilo sobreviva
-  // a minimizar/refrescar/cambiar de superficie. Es lo que hace que el panel y el tab muestren
-  // el MISMO hilo. Sin nada del día, queda solo el saludo.
+  // Al abrir: cargar la VENTANA RETENIDA (persistida por usuario) para que el hilo sobreviva a
+  // minimizar/refrescar/cambiar de superficie y se pueda scrollear/responder a un mensaje de días
+  // atrás. Es lo que hace que el panel y el tab muestren el MISMO hilo. Sin nada, queda el saludo.
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const hoy = await loadTodayChatAction();
-        if (!alive || hoy.length === 0) return;
+        const previos = await loadChatHistoryAction();
+        if (!alive || previos.length === 0) return;
         setMessages((prev) => [
           prev[0]!, // saludo
-          ...hoy.map((m): ChatMsg => ({ id: nextId(), role: m.role, text: m.content })),
+          ...previos.map((m): ChatMsg => ({ id: nextId(), role: m.role, text: m.content })),
         ]);
       } catch {
         // best-effort: si falla la carga, se queda el saludo
@@ -510,6 +517,10 @@ export function AssistantConversation({
       ) : null}
 
       <div className={s.scroll}>
+        {/* Retención: encabeza el hilo porque explica dónde EMPIEZA (lo anterior ya se borró).
+            Es el sitio al que se llega al scrollear hacia arriba buscando "¿hasta dónde llega
+            esto?". Sale de CHAT_RETENTION_DAYS: si mañana son 30 días, el texto cambia solo. */}
+        <p className={s.retention}>{retentionNoticeText()}</p>
         {messages.map((m) => (
           <div key={m.id}>
             <div className={cn(s.msg, m.role === "user" && s.msgMe)}>
