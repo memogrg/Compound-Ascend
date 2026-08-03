@@ -12,6 +12,7 @@ import {
   setDcaInputSchema,
   adjustBudgetInputSchema,
   debtExtraPaymentInputSchema,
+  batchTransactionsInputSchema,
 } from "@/modules/assistant/schemas";
 import { createTransaction } from "@/modules/assistant/services/transaction-service";
 import { listSobresForKind, getSobreRemaining } from "@/modules/financial-base";
@@ -132,6 +133,71 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
     logger.error("confirmPriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos crear la alerta." };
   }
+}
+
+/** Resultado del alta en lote: cuántas entraron y cuáles no (con su motivo). */
+export type BatchResult = {
+  ok: boolean;
+  creadas: number;
+  fallidas: { description: string; message: string }[];
+  message?: string;
+};
+
+/**
+ * Alta EN LOTE de las transacciones faltantes de un estado de cuenta conciliado.
+ *
+ * Reusa `createTransaction` fila por fila — la MISMA función del alta individual — así que cada
+ * una pasa por el pipeline central (auto-categorización, auto-vínculo, propagación, household).
+ * No hay atajo por SQL.
+ *
+ * SIN transacción global a propósito: si la fila 7 falla (una categoría borrada entre que se
+ * mostró la tarjeta y el tap), abortar las 6 anteriores dejaría al usuario peor — tendría que
+ * volver a empezar el pegado. Se registran las que se pueden y se reporta exactamente cuáles no,
+ * que además son las que puede reintentar.
+ */
+export async function confirmBatchTransactionsAction(raw: unknown): Promise<BatchResult> {
+  const parsed = batchTransactionsInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      creadas: 0,
+      fallidas: [],
+      message: parsed.error.issues[0]?.message ?? "Datos inválidos.",
+    };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, creadas: 0, fallidas: [], message: "Conecta Supabase para guardar." };
+  }
+
+  const fallidas: BatchResult["fallidas"] = [];
+  let creadas = 0;
+  for (const row of parsed.data.rows) {
+    try {
+      await createTransaction({
+        kind: row.kind,
+        description: row.description,
+        amount: row.amount,
+        currency: row.currency,
+        occurredOn: row.occurredOn,
+        categoryId: row.categoryId ?? null,
+        source: "chat",
+      });
+      creadas++;
+    } catch (err) {
+      logger.error("confirmBatchTransactions: fila fallida", {
+        message: err instanceof Error ? err.message : "?",
+      });
+      fallidas.push({ description: row.description, message: "No se pudo registrar." });
+    }
+  }
+
+  if (creadas > 0) {
+    revalidatePath("/transacciones");
+    revalidatePath("/gastos");
+    revalidatePath("/mi-base-financiera");
+    revalidatePath("/dashboard");
+  }
+  return { ok: creadas > 0, creadas, fallidas };
 }
 
 /**

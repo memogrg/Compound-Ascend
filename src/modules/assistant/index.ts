@@ -5,6 +5,7 @@ export {
   confirmSetDcaAction,
   confirmAdjustBudgetAction,
   confirmDebtExtraPaymentAction,
+  confirmBatchTransactionsAction,
   loadChatHistoryAction,
   emailTranscriptAction,
 } from "./api/actions";

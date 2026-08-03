@@ -20,7 +20,8 @@ export type AIActionType =
   | "create_price_alert"
   | "set_dca"
   | "adjust_budget"
-  | "debt_extra_payment";
+  | "debt_extra_payment"
+  | "create_transactions_batch";
 
 const ACTION_TYPES: ReadonlySet<string> = new Set<AIActionType>([
   "create_transaction",
@@ -29,6 +30,7 @@ const ACTION_TYPES: ReadonlySet<string> = new Set<AIActionType>([
   "set_dca",
   "adjust_budget",
   "debt_extra_payment",
+  "create_transactions_batch",
 ]);
 
 export type AIActionProposal = {

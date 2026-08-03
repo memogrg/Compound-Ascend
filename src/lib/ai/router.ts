@@ -13,6 +13,7 @@ import "server-only";
  * Vive DENTRO de financeChatWithTools → cubre web y WhatsApp (ambos pasan por ahí).
  */
 import { formatMoney } from "@/lib/format";
+import { pareceBloqueDeEstado } from "@/lib/ai/statement-parse";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
 import { detectCreateAction } from "@/lib/ai/action-lane";
@@ -98,6 +99,7 @@ type Intent =
   // LIBRO DIARIO: consulta real de transacciones por fecha/periodo/comercio/sobre, con agregación
   // ("¿qué días gasto más?", "¿cuánto le gasté a Walmart?", "¿gasté más este mes que el pasado?").
   // Lectura fresca; el dato NO está en ctx (que solo trae agregados del mes en curso):
+  | "conciliar_estado"
   | "consulta_transacciones"
   // HISTORIAL/TENDENCIA: serie por periodo + variación desde los snapshots ("¿cómo cambió mi
   // patrimonio?", "¿cómo vengo con el gasto?"). Lectura fresca:
@@ -134,6 +136,7 @@ const KNOWN_INTENTS: Intent[] = [
   "consulta_transacciones",
   "consulta_historial",
   "consulta_detalle",
+  "conciliar_estado",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -146,6 +149,7 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "consulta_transacciones",
   "consulta_historial",
   "consulta_detalle",
+  "conciliar_estado",
 ]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
@@ -479,6 +483,17 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
   // Normalizamos el slang de dinero ("lana/guita/pisto…" → "dinero") antes de matchear. No afecta la
   // extracción de montos (usa ₡/$ y dígitos) ni de nombres de sobre (no son palabras de slang).
   const t = normalizeSlang(text.trim());
+
+  // ── ESTADO DE CUENTA PEGADO. Va PRIMERO de todo: un bloque de filas no es una pregunta, y
+  //    cualquier patrón de abajo lo leería como texto suelto (trae fechas, montos y comercios,
+  //    justo lo que buscan los otros carriles) y contestaría cualquier cosa. La detección exige
+  //    que la MAYORÍA de las líneas parseen como fila, así que una frase que mencione dos gastos
+  //    no entra acá.
+  if (pareceBloqueDeEstado(text)) {
+    // El texto CRUDO, no el normalizado por slang: los montos y comercios del banco se parsean
+    // tal como vinieron.
+    return { intent: "conciliar_estado", params: { texto: text } };
+  }
 
   // Pregunta COMPUESTA ("¿cuánto gasto y cuánto ahorro al mes?"): dos consultas distintas en una. Un
   // carril determinista respondería SOLO una mitad (la auditoría lo cazó) → ESCALAR al LLM, que las
@@ -1268,6 +1283,16 @@ async function resolveFetchIntent(
       const { consultarHistorial } = await import("@/lib/ai/history-query-service");
       const r = await consultarHistorial(params, cur);
       return say(r.resumen_md);
+    }
+    if (intent === "conciliar_estado") {
+      // Estado de cuenta pegado: se concilia contra lo registrado y se responde con la tabla +
+      // la propuesta de alta de las faltantes. Es el ÚNICO carril determinista que devuelve una
+      // ACCIÓN además del texto — el resto solo informa.
+      const { conciliarEstado } = await import("@/lib/ai/statement-service");
+      const texto = typeof params.texto === "string" ? params.texto : "";
+      const r = await conciliarEstado(texto, cur);
+      if (!r) return null; // no se entendió ninguna fila → que lo intente el LLM
+      return { reply: r.resumen_md, action: r.action };
     }
     if (intent === "consulta_transacciones") {
       // Libro diario REAL: el servicio resuelve el periodo en la zona del PERFIL, lee con scope
