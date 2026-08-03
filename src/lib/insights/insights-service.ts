@@ -498,7 +498,19 @@ export async function syncInsights(detected: DetectedInsight[]): Promise<void> {
         status: "activo" as const,
       }));
     if (rows.length > 0) {
-      await supabase.from("user_insights").upsert(rows, { onConflict: "user_id,kind,related_id" });
+      // El error se MIRA. Es un upsert en lote: una sola fila inválida aborta el statement
+      // completo y el usuario se queda sin ningún insight de la pasada. Tragarlo en silencio fue
+      // exactamente lo que dejó vivo el bug de related_kind='holding' — sin este log, la única
+      // señal es una campana vacía, que parece "no hay nada que decirte".
+      const { error } = await supabase
+        .from("user_insights")
+        .upsert(rows, { onConflict: "user_id,kind,related_id" });
+      if (error)
+        logger.warn("syncInsights: upsert rechazado (se pierde la pasada completa)", {
+          message: error.message,
+          rows: rows.length,
+          kinds: [...new Set(rows.map((r) => r.kind))].join(","),
+        });
     }
   }
 
