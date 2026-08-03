@@ -1194,6 +1194,48 @@ input[type="radio"] {
   font-size: 12px;
   padding-left: 36px;
 }
+/* ── Tablas del asesor (las emite lib/markdown) ────────────────────────────── */
+/* Todo con variables de tema: la misma tabla se lee en claro y en oscuro sin reglas aparte. */
+.md-table-wrap {
+  /* la tabla scrollea sola en vez de desbordar la burbuja */
+  overflow-x: auto;
+  margin: 10px 0 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.md-table th,
+.md-table td {
+  padding: 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.md-table thead th {
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom-width: 1.5px;
+}
+.md-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+/* Los números alineados a la derecha y en tabular-nums: así una columna se compara de un vistazo
+   (las cifras quedan en la misma grilla aunque cambie el ancho de cada dígito). */
+.md-table .md-r {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.md-table .md-c {
+  text-align: center;
+}
+
 /* ── Citar un mensaje ──────────────────────────────────────────────────────── */
 /* La acción se REVELA al pasar por encima o al tabular: con un botón por mensaje siempre
    visible, el hilo se convierte en una lista de botones. Se usa opacity y no display/visibility
@@ -1273,6 +1315,16 @@ input[type="radio"] {
 }
 .ac-replying-x:hover {
   color: var(--ink);
+}
+
+/* Encuadre educativo al pie: siempre visible y deliberadamente chico. Reemplaza al disclaimer
+   que antes venía dentro de cada respuesta del modelo. */
+.ac-disclaimer {
+  margin: 0;
+  padding: 0 16px 10px;
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-align: center;
 }
 
 /* aviso de retención: encabeza el hilo, deliberadamente discreto (no es un mensaje) */
@@ -1434,6 +1486,18 @@ input[type="radio"] {
 .ac-page .ac-replying {
   padding: 9px 24px;
   font-size: 13px;
+}
+.ac-page .ac-disclaimer {
+  padding: 0 24px 12px;
+  font-size: 11px;
+}
+/* el tab se lee de lejos: la tabla acompaña al cuerpo de 15px */
+.ac-page .md-table {
+  font-size: 13.5px;
+}
+.ac-page .md-table th,
+.ac-page .md-table td {
+  padding: 7px 12px;
 }
 .ac-page .ac-card-wrap {
   padding-left: 42px;

@@ -166,9 +166,9 @@ export async function POST(req: Request) {
       // `history` del cliente se acepta por compat en el schema, pero NO se usa.
       //
       // El capHistory acá NO es redundante con el del orquestador: acota la ventana ANTES de que
-      // se deriven `isFirstTurn` y `priorAssistantReplies` (el guardrail "no repitas una nota ya
-      // dicha"). Sin él, alargar la retención alargaría también esas señales — y lo que se le manda
-      // al LLM debe seguir siendo los últimos N turnos, independiente de cuánto se retenga.
+      // se derive `priorAssistantReplies` (el guardrail "no repitas una nota ya dicha"). Sin él,
+      // alargar la retención alargaría también esa señal — y lo que se le manda al LLM debe seguir
+      // siendo los últimos N turnos, independiente de cuánto se retenga.
       const retenidos = await loadRetainedChat();
       const ventana = capHistory([
         ...retenidos.map((m) => ({ role: m.role, content: m.content }) as ChatMessage),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { capHistory, isFirstTurn, priorAssistantReplies, LLM_HISTORY_WINDOW } from "@/lib/ai/history";
+import { capHistory, priorAssistantReplies, LLM_HISTORY_WINDOW } from "@/lib/ai/history";
 import type { ChatMessage } from "@/lib/ai/provider";
 
 const turns = (n: number): ChatMessage[] =>
@@ -21,21 +21,6 @@ describe("capHistory · acota el arrastre a la ventana del LLM", () => {
 
   it("ventana explícita", () => {
     expect(capHistory(turns(10), 4)).toHaveLength(4);
-  });
-});
-
-describe("isFirstTurn · primer turno de la conversación (para el encuadre 1 vez)", () => {
-  it("solo el mensaje del usuario, sin respuesta previa del asistente → true", () => {
-    expect(isFirstTurn([{ role: "user", content: "hola" }])).toBe(true);
-  });
-  it("ya hay un turno del asistente → false (el encuadre ya se dio)", () => {
-    expect(
-      isFirstTurn([
-        { role: "user", content: "hola" },
-        { role: "assistant", content: "respuesta" },
-        { role: "user", content: "otra" },
-      ]),
-    ).toBe(false);
   });
 });
 
