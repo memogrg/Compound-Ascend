@@ -35,6 +35,28 @@ export function quoteExcerpt(content: string, max: number = QUOTE_EXCERPT_MAX): 
 /** Mensaje citado tal como lo necesita el prompt (rol + texto). */
 export type QuotedMessage = { role: "user" | "assistant"; content: string };
 
+/** Lo mínimo para elegir la pareja de un turno. */
+export type PartnerCandidate = { id: string; role: "user" | "assistant" };
+
+/**
+ * De un mensaje citado y sus vecinos EN ORDEN DE CERCANÍA, elige la otra mitad del turno: si se
+ * citó una pregunta del usuario, la respuesta del asesor; si se citó una respuesta, la pregunta
+ * que la provocó.
+ *
+ * Filtra por id y no por timestamp a propósito. Desde 20260809000001 los dos lados del turno
+ * tienen instantes distintos (clock_timestamp), pero las filas escritas ANTES comparten
+ * created_at, así que el caller pide vecinos con `gte`/`lte` (no `gt`/`lt`, que se saltarían la
+ * fila empatada) y el descarte del propio mensaje pasa a ser responsabilidad de acá. Correcto en
+ * los dos mundos, que es lo que hace falta mientras convivan filas viejas y nuevas.
+ */
+export function pickPartner<T extends PartnerCandidate>(
+  quoted: PartnerCandidate,
+  vecinos: T[],
+): T | null {
+  const buscado = quoted.role === "user" ? "assistant" : "user";
+  return vecinos.find((m) => m.id !== quoted.id && m.role === buscado) ?? null;
+}
+
 /**
  * Anota el turno del usuario para que el modelo sepa QUÉ está citando. La anotación va SOLO al
  * prompt: en `chat_messages` se persiste el mensaje crudo, sin decorar (si no, el historial se

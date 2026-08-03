@@ -4,6 +4,7 @@ import {
   quoteExcerpt,
   annotateReply,
   buildQuotedContext,
+  pickPartner,
   QUOTE_MISSING_TEXT,
   QUOTE_EXCERPT_MAX,
 } from "@/lib/ai/chat-quote";
@@ -83,6 +84,44 @@ describe("buildQuotedContext · el par citado se agrega solo si falta", () => {
   it("mitad y mitad: entra solo lo que falta", () => {
     const out = buildQuotedContext(par, new Set(["b"]), ["a", "b"]);
     expect(out).toEqual([{ role: "user", content: "¿cuánto gasté en comida?" }]);
+  });
+});
+
+describe("pickPartner · la otra mitad del turno", () => {
+  const pregunta = { id: "u1", role: "user" as const };
+  const respuesta = { id: "a1", role: "assistant" as const };
+
+  it("citando la pregunta, la pareja es la respuesta", () => {
+    expect(pickPartner(pregunta, [pregunta, respuesta])).toEqual(respuesta);
+  });
+
+  it("citando la respuesta, la pareja es la pregunta que la provocó", () => {
+    expect(pickPartner(respuesta, [respuesta, pregunta])).toEqual(pregunta);
+  });
+
+  it("NUNCA se devuelve a sí mismo, aunque venga primero en los vecinos", () => {
+    // El caller pide con gte/lte, así que el propio mensaje SIEMPRE viene en la lista.
+    expect(pickPartner(pregunta, [pregunta])).toBeNull();
+  });
+
+  it("filas VIEJAS (empatadas en created_at): igual encuentra la pareja", () => {
+    // Antes de 20260809000001 los dos lados compartían instante y llegaban en cualquier orden.
+    expect(pickPartner(pregunta, [respuesta, pregunta])).toEqual(respuesta);
+    expect(pickPartner(respuesta, [respuesta, pregunta])).toEqual(pregunta);
+  });
+
+  it("toma el vecino MÁS CERCANO, no cualquiera del mismo rol", () => {
+    const lejana = { id: "a0", role: "assistant" as const };
+    // Los vecinos llegan ordenados por cercanía desde la consulta.
+    expect(pickPartner(pregunta, [pregunta, respuesta, lejana])).toEqual(respuesta);
+  });
+
+  it("sin pareja (turno huérfano: la retención se llevó el otro lado) devuelve null", () => {
+    expect(pickPartner(pregunta, [pregunta, { id: "u2", role: "user" as const }])).toBeNull();
+  });
+
+  it("sin vecinos devuelve null, no revienta", () => {
+    expect(pickPartner(pregunta, [])).toBeNull();
   });
 });
 

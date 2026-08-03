@@ -15,6 +15,7 @@ import "server-only";
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { CHAT_RETENTION_DAYS, MAX_CHAT_MESSAGES, retentionCutoffISO } from "@/lib/ai/chat-retention";
+import { pickPartner } from "@/lib/ai/chat-quote";
 import { logger } from "@/lib/logger";
 
 /** Tope de mensajes del día que se leen para el transcript (el resto queda en la BD). */
@@ -164,9 +165,11 @@ export async function appendChatMessages(
  * la verificación de pertenencia que la FK no puede hacer. null también cuando la retención ya lo
  * borró — el caller degrada con aviso, no inventa contexto.
  *
- * El emparejado usa `gte`/`lte` y descarta el propio id, NO `gt`/`lt`: el par usuario+asistente se
- * inserta en UN solo statement, así que ambas filas comparten `created_at` (`now()` es el
- * timestamp de la transacción) y un `gt` estricto se saltaría justo la respuesta que se busca.
+ * El emparejado pide vecinos con `gte`/`lte` y descarta el propio id (pickPartner), NO `gt`/`lt`:
+ * desde 20260809000001 los dos lados del turno tienen instantes distintos (clock_timestamp), pero
+ * las filas escritas ANTES comparten `created_at` — se insertaban en un solo statement, con un
+ * `now()` que es el timestamp de la transacción — y un `gt` estricto se saltaría justo la fila
+ * que se busca. Así funciona con las viejas y con las nuevas.
  */
 export async function loadQuotedContext(
   messageId: string,
@@ -195,12 +198,7 @@ export async function loadQuotedContext(
           .order("created_at", { ascending: false })
           .limit(4);
 
-    const partner =
-      (vecinos.data ?? [])
-        .map(toStored)
-        .find((m) => m.id !== quoted.id && m.role === (buscaAsistente ? "assistant" : "user")) ??
-      null;
-    return { quoted, partner };
+    return { quoted, partner: pickPartner(quoted, (vecinos.data ?? []).map(toStored)) };
   } catch (err) {
     logger.warn("loadQuotedContext falló", { message: err instanceof Error ? err.message : "?" });
     return null;
