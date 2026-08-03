@@ -1718,10 +1718,17 @@ body:has(.m-shell[data-theme="dark"]) {
   font-size: 17px;
   letter-spacing: -0.01em;
 }
-/* zona de mensajes: deja aire abajo para la barra de entrada fija */
+/* Alto del pie con el encuadre educativo. Es fijo al fondo, así que la barra de entrada, la
+   barra de cita y el scroll cuelgan de ESTE número: una sola variable en vez de cuatro
+   constantes que se desincronizan al primer retoque. */
+.m-shell .m-chat {
+  --m-disclaimer-h: 22px;
+}
+
+/* zona de mensajes: deja aire abajo para la barra de entrada fija y el pie */
 .m-shell .m-chat-scroll {
   flex: 1;
-  padding: 16px 16px calc(84px + env(safe-area-inset-bottom));
+  padding: 16px 16px calc(84px + var(--m-disclaimer-h) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1895,6 +1902,55 @@ body:has(.m-shell[data-theme="dark"]) {
   margin-right: auto;
 }
 
+/* ── Tablas del asesor (las emite lib/markdown) ────────────────────────────── */
+/* Misma pieza que en la web, con la escala del móvil. El wrapper es lo que evita que una tabla
+   de tres columnas desborde una burbuja de ~88% de 390px: scrollea ella, no la pantalla. */
+.m-shell .md-table-wrap {
+  overflow-x: auto;
+  margin: 9px 0 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.m-shell .md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.m-shell .md-table th,
+.m-shell .md-table td {
+  padding: 6px 9px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+.m-shell .md-table thead th {
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom-width: 1.5px;
+}
+.m-shell .md-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.m-shell .md-table .md-r {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.m-shell .md-table .md-c {
+  text-align: center;
+}
+/* Dentro de la burbuja propia (fondo acento) el borde gris no se ve: se usa el tinte del texto. */
+.m-shell .m-msg.me .md-table th,
+.m-shell .m-msg.me .md-table td {
+  border-bottom-color: color-mix(in srgb, var(--accent-ink) 35%, transparent);
+}
+.m-shell .m-msg.me .md-table thead th {
+  color: inherit;
+  opacity: 0.75;
+}
+
 /* ── Citar un mensaje ──────────────────────────────────────────────────────── */
 /* A diferencia de la web, acá el botón está SIEMPRE visible: sin puntero no hay hover que
    revele nada, y esconderlo detrás de un long-press lo volvería invisible. */
@@ -1933,7 +1989,7 @@ body:has(.m-shell[data-theme="dark"]) {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(64px + env(safe-area-inset-bottom));
+  bottom: calc(64px + var(--m-disclaimer-h) + env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1969,6 +2025,25 @@ body:has(.m-shell[data-theme="dark"]) {
   height: 16px;
 }
 
+/* Encuadre educativo: pegado al fondo, debajo de la barra de entrada. Es quien absorbe el
+   safe-area inferior (home indicator), por eso la barra se apoya sobre él. */
+.m-shell .m-chat-disclaimer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 31;
+  margin: 0;
+  padding: 3px 16px calc(3px + env(safe-area-inset-bottom));
+  min-height: var(--m-disclaimer-h);
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-align: center;
+  background: color-mix(in srgb, var(--canvas) 94%, transparent);
+  -webkit-backdrop-filter: saturate(1.4) blur(8px);
+  backdrop-filter: saturate(1.4) blur(8px);
+}
+
 /* aviso de retención: encabeza el hilo, deliberadamente discreto (no es un mensaje) */
 .m-shell .m-chat-retention {
   font-size: 11.5px;
@@ -1982,14 +2057,14 @@ body:has(.m-shell[data-theme="dark"]) {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  /* se apoya sobre el pie del encuadre, que es quien toca el borde y absorbe el safe-area */
+  bottom: calc(var(--m-disclaimer-h) + env(safe-area-inset-bottom));
   z-index: 30;
   display: flex;
   align-items: center;
   gap: 8px;
-  /* El inset inferior ya estaba (home indicator); faltaban los laterales del landscape. */
-  padding: 10px calc(14px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom))
-    calc(14px + env(safe-area-inset-left));
+  /* Los insets laterales del landscape siguen acá; el inferior lo toma el pie. */
+  padding: 10px calc(14px + env(safe-area-inset-right)) 10px calc(14px + env(safe-area-inset-left));
   background: color-mix(in srgb, var(--canvas) 94%, transparent);
   -webkit-backdrop-filter: saturate(1.4) blur(8px);
   backdrop-filter: saturate(1.4) blur(8px);

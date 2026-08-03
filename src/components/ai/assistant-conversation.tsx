@@ -70,6 +70,8 @@ export type Skin = {
   /** Barra de "respondiendo a…" sobre el input, con su botón de cancelar. */
   replyBar: string;
   replyBarX: string;
+  /** Pie fijo con el encuadre educativo (reemplaza el disclaimer por mensaje). */
+  disclaimer: string;
   cardWrap: string;
   card: string;
   eyebrow: string;
@@ -108,6 +110,7 @@ const WEB_SKIN: Skin = {
   quote: "ac-quote",
   replyBar: "ac-replying",
   replyBarX: "ac-replying-x",
+  disclaimer: "muted ac-disclaimer",
   cardWrap: "ac-card-wrap",
   card: "card ac-confirm",
   eyebrow: "eyebrow",
@@ -144,6 +147,7 @@ const MOBILE_SKIN: Skin = {
   quote: "m-quote",
   replyBar: "m-replying",
   replyBarX: "m-replying-x",
+  disclaimer: "muted m-chat-disclaimer",
   cardWrap: "",
   card: "m-confirm",
   eyebrow: "m-confirm-eyebrow",
@@ -241,6 +245,14 @@ const LINK_LABEL: Record<string, string> = {
 
 /** Timeout del cliente para el chat (~40s), por debajo del maxDuration=60 del endpoint. */
 const CHAT_TIMEOUT_MS = 40_000;
+
+/**
+ * Encuadre educativo. Vive ACÁ, fijo al pie de la conversación, y ya NO en cada respuesta del
+ * modelo (el system prompt tiene prohibido repetirlo): dicho una vez y siempre visible informa
+ * mejor que un párrafo de disclaimer por mensaje, que se vuelve ruido y se deja de leer.
+ * Impersonal, así que sirve al voseo de la web y al "tú" del móvil sin duplicarse.
+ */
+const DISCLAIMER = "My Agent C+ da información educativa, no asesoría financiera.";
 
 /** Mensaje de éxito: con restante del sobre si aplica, o el genérico si no. */
 export function sobreSuccessMessage(s: SobreRemaining | null): string {
@@ -750,6 +762,10 @@ export function AssistantConversation({
           <Icon name="send" />
         </button>
       </div>
+
+      {/* Encuadre educativo: fijo al pie y siempre visible, en vez de repetido en cada respuesta.
+          Va DESPUÉS de la barra de entrada porque es del producto, no de la conversación. */}
+      <p className={s.disclaimer}>{DISCLAIMER}</p>
     </>
   );
 }

@@ -46,7 +46,7 @@ import { convertCurrency } from "@/lib/fx";
 // Router de complejidad (R1): carril barato para consultas de dato. Solo importa la función
 // (los tipos que el router necesita de aquí son type-only → sin ciclo en runtime).
 import { tryRouteQuery, resolveMatchedIntent, type RouterLane, type MatchedIntent } from "@/lib/ai/router";
-import { capHistory, isFirstTurn, priorAssistantReplies } from "@/lib/ai/history";
+import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
 
 export type { FinancialContext };
 export type { MatchedIntent };
@@ -153,7 +153,7 @@ export async function financeChat(
     ...selectPatrimonioGuidance(ctx.patrimonioDiagnosis ?? []),
   ].slice(0, 5);
   const result = await provider.chat({
-    system: buildSystemPrompt({ ...ctx, knowledge, firstTurn: isFirstTurn(messages) }),
+    system: buildSystemPrompt({ ...ctx, knowledge }),
     messages: capHistory(messages),
   });
   const parsed = parseAction(result.text);
@@ -466,7 +466,7 @@ export async function financeChatWithTools(
 
   const knowledge = await buildKnowledge(messages, ctx);
   const result = await provider.chatWithTools({
-    system: `${buildSystemPrompt({ ...ctx, knowledge, firstTurn: isFirstTurn(messages) })}\n\n${TOOLS_PROMPT_LINE}`,
+    system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages: capHistory(messages),
     tools: [
       SIMULATE_DEBT_TOOL,

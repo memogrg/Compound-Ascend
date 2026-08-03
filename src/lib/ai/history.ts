@@ -15,11 +15,6 @@ export function capHistory(messages: ChatMessage[], window = LLM_HISTORY_WINDOW)
   return messages.length > window ? messages.slice(-window) : messages;
 }
 
-/** true si NO hay un turno previo del asistente → primer turno de la conversación (encuadre 1 vez). */
-export function isFirstTurn(messages: ChatMessage[]): boolean {
-  return !messages.some((m) => m.role === "assistant");
-}
-
 /** Respuestas previas del asistente: para que el guardrail no repita una nota ya dicha antes. */
 export function priorAssistantReplies(messages: ChatMessage[]): string[] {
   return messages.filter((m) => m.role === "assistant").map((m) => m.content);

@@ -655,18 +655,26 @@ describe("buildSystemPrompt · compromiso mensual (base de la Independencia)", (
   });
 });
 
-describe("buildSystemPrompt · encuadre/disclaimer UNA vez (firstTurn)", () => {
-  it("primer turno → invita a dar el encuadre una vez", () => {
-    const prompt = buildSystemPrompt({ currency: "CRC", firstTurn: true });
-    expect(prompt).toMatch(/ENCUADRE \(una sola vez/i);
-    expect(prompt).toMatch(/información, no asesoría/i);
+describe("buildSystemPrompt · el encuadre ya NO va en los mensajes (está fijo en la UI)", () => {
+  // El disclaimer vive al pie del chat (assistant-conversation), siempre visible. El modelo tiene
+  // prohibido repetirlo: dicho en cada respuesta se vuelve ruido y se deja de leer.
+  it("le prohíbe escribir el encuadre y explica que está fijo al pie", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toMatch(/ENCUADRE: NO lo escribas/i);
+    expect(prompt).toMatch(/fijo y siempre visible al pie/i);
+    expect(prompt).toMatch(/NUNCA abras ni cierres con/i);
   });
 
-  it("turno posterior → NO repetir el encuadre; solo 'es un escenario, no un plan' breve", () => {
-    const prompt = buildSystemPrompt({ currency: "CRC", firstTurn: false });
-    expect(prompt).toMatch(/ENCUADRE \(ya dado\)/i);
-    expect(prompt).toMatch(/NO los repitas/i);
-    expect(prompt).toMatch(/es un escenario, no un plan/i);
+  it("deja viva la única excepción: 'es un escenario' corto en proyecciones", () => {
+    const prompt = buildSystemPrompt({ currency: "CRC" });
+    expect(prompt).toMatch(/es un escenario, no una predicción/i);
+    expect(prompt).toMatch(/media frase/i);
+  });
+
+  it("ya no depende de si es el primer turno (esa distinción existía solo para el encuadre)", () => {
+    // Mismo contexto → mismo prompt: no queda una rama que dependa del turno.
+    expect(buildSystemPrompt({ currency: "CRC" })).toBe(buildSystemPrompt({ currency: "CRC" }));
+    expect(buildSystemPrompt({ currency: "CRC" })).not.toMatch(/ENCUADRE \(una sola vez/i);
   });
 
   it("acota el historial: instruye responder SOLO la última consulta, sin recalcular lo previo", () => {
@@ -806,5 +814,83 @@ describe("buildSystemPrompt · precio y máximo", () => {
     expect(prompt).toMatch(/NUNCA inventes un precio ni un máximo/i);
     expect(prompt).toMatch(/no se puede cronometrar/i);
     expect(prompt).toMatch(/precio no disponible/i);
+  });
+});
+
+describe("buildSystemPrompt · formato según lo que se pidió (tablas para números)", () => {
+  const prompt = buildSystemPrompt({ currency: "CRC" });
+
+  it("un dato rápido se responde en prosa, no tabulado", () => {
+    expect(prompt).toMatch(/DATO RÁPIDO/i);
+    expect(prompt).toMatch(/1-2 frases en prosa/i);
+    expect(prompt).toMatch(/Sin encabezados, sin viñetas, sin tabla/i);
+  });
+
+  it("números en varios escenarios o categorías → tabla", () => {
+    expect(prompt).toMatch(/NÚMEROS EN VARIOS ESCENARIOS O CATEGORÍAS/i);
+    expect(prompt).toMatch(/TABLA markdown/i);
+    // Los casos concretos que motivaron el cambio.
+    expect(prompt).toMatch(/capital según la tasa/i);
+    expect(prompt).toMatch(/gasto por sobre/i);
+  });
+
+  it("un plan de varios pasos va en secciones cortas con encabezado", () => {
+    expect(prompt).toMatch(/PLAN DE VARIOS PASOS/i);
+    expect(prompt).toMatch(/secciones cortas con encabezado/i);
+  });
+
+  it("exige la fila de guiones, que es lo que el renderer necesita para dibujar la tabla", () => {
+    expect(prompt).toMatch(/fila de guiones/i);
+    expect(prompt).toMatch(/Sin la fila de guiones NO se renderiza/i);
+  });
+
+  it("prohíbe repetir en prosa lo que ya está en la tabla", () => {
+    expect(prompt).toMatch(/NO repitas en prosa lo que ya está en la tabla/i);
+  });
+
+  it("la concisión sigue mandando: las filas no son excusa para explayarse", () => {
+    expect(prompt).toMatch(/CONCISIÓN DURA/i);
+    expect(prompt).toMatch(/filas de una tabla no cuentan como frases/i);
+  });
+
+  it("no tabula lo que no son datos", () => {
+    expect(prompt).toMatch(/Nada de tablas para una sola cifra/i);
+  });
+});
+
+describe("buildSystemPrompt · tono de amigo que es asesor experto", () => {
+  const prompt = buildSystemPrompt({ currency: "CRC" });
+
+  it("se define como amigo experto: cálido, directo y honesto", () => {
+    expect(prompt).toMatch(/AMIGO que además es asesor financiero experto/i);
+    expect(prompt).toMatch(/Cálido, directo y HONESTO/i);
+  });
+
+  it("prioriza la honestidad sobre la comodidad, pero sin sermón", () => {
+    expect(prompt).toMatch(/HONESTIDAD por encima de la comodidad/i);
+    expect(prompt).toMatch(/sin sermón/i);
+  });
+
+  it("VE el daño y lo nombra: sobregasto, patrón repetido, deuda cara, sin fondo", () => {
+    expect(prompt).toMatch(/VER EL DAÑO/i);
+    expect(prompt).toMatch(/deuda cara/i);
+    expect(prompt).toMatch(/sin fondo de emergencia/i);
+    expect(prompt).toMatch(/NOMBRALO/i);
+  });
+
+  it("pero acotado: una sola cosa, la más grave, y no en cada mensaje", () => {
+    expect(prompt).toMatch(/de a UNA cosa/i);
+    expect(prompt).toMatch(/la más grave, no un inventario/i);
+    expect(prompt).toMatch(/NO en cada mensaje/i);
+  });
+
+  it("sin culpa ni alarma, y con la salida concreta", () => {
+    expect(prompt).toMatch(/sin culpa, sin alarma/i);
+    expect(prompt).toMatch(/la salida concreta/i);
+    expect(prompt).toMatch(/Nunca 'estás en problemas'/i);
+  });
+
+  it("no se mete en una consulta ajena ni sirve de excusa para ofrecer algo", () => {
+    expect(prompt).toMatch(/Nunca lo metas a la fuerza en una consulta ajena/i);
   });
 });
