@@ -9,7 +9,18 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { logger } from "@/lib/logger";
-import { runDetectors, detectDisfruteSpike, detectOpenContributions } from "@/lib/insights/detectors";
+import {
+  runDetectors,
+  detectDisfruteSpike,
+  detectOpenContributions,
+  detectOverspentEnvelopes,
+  detectLowSavingsRate,
+  detectExpensiveDebt,
+  detectEmergencyFundGap,
+  detectConcentration,
+  detectReturnBelowInflation,
+} from "@/lib/insights/detectors";
+import type { Debt } from "@/modules/control/types";
 import type { UserInsightRow } from "@/lib/supabase/database.types";
 import type {
   DetectedInsight,
@@ -99,10 +110,124 @@ export async function refreshInsights(): Promise<void> {
     } catch {
       // best-effort.
     }
+    detected.push(...(await detectDamageSignals(debts)));
     await syncInsights(detected);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
   }
+}
+
+/**
+ * Señales de DAÑO: sobres sobregirados, tasa de ahorro, deuda cara, fondo de emergencia,
+ * concentración y rendimiento contra la inflación.
+ *
+ * Cada bloque va en su propio try/catch: son lecturas de módulos distintos y una caída (un
+ * proveedor de precios, una tabla vacía) no puede dejar sin insights a los demás. Todo es
+ * LECTURA — nada de escrituras acá, porque refreshInsights también corre desde el context-engine
+ * del asesor (ver CLAUDE.md).
+ *
+ * `debts` se recibe ya cargado para no volver a pedirlo.
+ */
+async function detectDamageSignals(debts: Debt[]): Promise<DetectedInsight[]> {
+  const out: DetectedInsight[] = [];
+
+  // Deuda cara por TASA (la de atraso ya la ve runDetectors). Sin IO: la lista ya está.
+  try {
+    out.push(...detectExpensiveDebt(debts));
+  } catch {
+    // best-effort
+  }
+
+  // Sobres pasados de presupuesto este mes (presupuesto vs real, por categoría).
+  try {
+    const { getBudgetTotals, getRealTotals } = await import("@/modules/financial-base");
+    const { userCurrentPeriod } = await import("@/lib/time/user-time");
+    const period = await userCurrentPeriod();
+    const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
+    // `expenseByKey` ya viene con el nombre del sobre: no hace falta leer el árbol de categorías
+    // solo para etiquetar (una consulta menos en un camino que corre desde el chat).
+    const sobres = Object.entries(budget.expenseByKey).map(([categoryId, b]) => ({
+      categoryId,
+      path: b.label,
+      budget: b.value,
+      spent: real.expenseByKey[categoryId]?.value ?? 0,
+    }));
+    out.push(...detectOverspentEnvelopes({ sobres, currency: real.currency }));
+  } catch {
+    // best-effort
+  }
+
+  // Tasa de ahorro del mes (misma cifra que ve el usuario en su base financiera).
+  try {
+    const { getBaseSummary, getDisplayCurrency } = await import("@/modules/financial-base");
+    const [base, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
+    out.push(
+      ...detectLowSavingsRate({
+        savingsRate: base.indicators.savingsRate,
+        incomeMonthly: base.indicators.incomeMonthly,
+        freeCashflow: base.indicators.freeCashflow,
+        currency,
+      }),
+    );
+  } catch {
+    // best-effort
+  }
+
+  // Fondo de EMERGENCIA incompleto (el de paz ya se detecta arriba, y exige este cubierto).
+  try {
+    const { getDefenseFundsReport } = await import("@/modules/wealth");
+    const plan = await getDefenseFundsReport();
+    out.push(
+      ...detectEmergencyFundGap({
+        covered: plan.emergency.covered,
+        current: plan.emergency.current,
+        target: plan.emergency.target,
+        recommendedMonthly: plan.emergency.recommendedMonthly,
+        currency: plan.currency,
+      }),
+    );
+  } catch {
+    // best-effort
+  }
+
+  // Portafolio: concentración y rendimiento contra la inflación. Una sola lectura para los dos.
+  try {
+    const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
+    const { concentrationByAsset } = await import("@/modules/wealth/engine/portfolio-engine");
+    const report = await getPortfolioReport();
+    const a = report.analytics;
+    out.push(
+      ...detectConcentration({
+        slices: concentrationByAsset(a.holdingsWithPerformance).map((s) => ({
+          label: s.label,
+          pct: s.pct,
+        })),
+        totalValue: a.totalPortfolioValue,
+      }),
+    );
+    try {
+      // El IPC de la moneda PRINCIPAL (en la que gana y gasta), no la de visualización — mismo
+      // criterio que el context-engine. getYoYInflation ya devuelve una proporción (0..1).
+      const { getPrimaryCurrency } = await import("@/modules/financial-base");
+      const { getYoYInflation } = await import("@/lib/economic-indicators/insights");
+      const primary = await getPrimaryCurrency();
+      const infl = await getYoYInflation(primary === "CRC" ? "IPC" : "US_CPI");
+      if (infl != null)
+        out.push(
+          ...detectReturnBelowInflation({
+            returnPct: a.totalReturnPct,
+            inflationPct: infl,
+            totalValue: a.totalPortfolioValue,
+          }),
+        );
+    } catch {
+      // sin macro no se afirma nada sobre inflación
+    }
+  } catch {
+    // best-effort
+  }
+
+  return out;
 }
 
 /**

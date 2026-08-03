@@ -210,7 +210,7 @@ export type FinancialContext = {
     goal: { id: string; name: string }[];
   };
   /** Observaciones conductuales recientes (memoria conductual, Fase 4). */
-  insights?: { severity: string; title: string; body: string }[];
+  insights?: { kind: string; severity: string; title: string; body: string; action?: string }[];
   /** Guía conductual recuperada de la Biblia para esta conversación (Fase 5c). */
   knowledge?: string[];
 };
@@ -517,9 +517,11 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
 
   // Memoria conductual (Fase 4): observaciones recientes detectadas.
   if (ctx.insights?.length) {
-    facts.push("Observaciones recientes de su comportamiento:");
+    facts.push("Observaciones recientes de su comportamiento (ordenadas: lo accionable primero):");
     for (const i of ctx.insights) {
-      facts.push(`Observación reciente (${i.severity}): ${i.title} — ${i.body}`);
+      // La acción viaja pegada a la observación para que ofrecer la salida no cueste inventarla.
+      const arreglo = i.action ? ` [se arregla: ${i.action}]` : "";
+      facts.push(`Observación reciente (${i.severity}) [${i.kind}]: ${i.title} — ${i.body}${arreglo}`);
     }
   }
 
@@ -673,7 +675,14 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   // Memoria conductual (Fase 4): cómo usar las observaciones recientes.
   if (ctx.insights?.length)
     behaviorRules.push(
-      "Tienes observaciones recientes de su comportamiento. Menciónalas SOLO si vienen al caso, con tacto y sin juicio; conéctalas con su meta o Rich Life; celebra las positivas; respeta su intensidad de alertas y su arquetipo. No las enumeres mecánicamente.",
+      "OBSERVACIONES (cómo usarlas — reglas DURAS, no sugerencias):",
+      "- MÁXIMO UNA por respuesta. Nunca dos, nunca una lista. Si hay varias, elegí la más relevante a lo que preguntó; ante un empate, la de severidad 'accionar'.",
+      "- SOLO si es RELEVANTE a lo que preguntó. Si preguntó por otra cosa, contestá eso y no la menciones. La única excepción es una consulta ABIERTA ('¿cómo voy?', '¿cómo estoy?', '¿qué ves?'): ahí sí traé la más importante, aunque no la haya pedido.",
+      "- NO REPITAS una que YA mencionaste en esta conversación. Si el tema vuelve, avanzá (ofrecé el siguiente paso), no la vuelvas a anunciar.",
+      "- TONO DE AMIGO QUE AYUDA, no de auditor: el dato concreto y la mano tendida. Así: 'Ojo, gastaste ₡40.000 de más en Restaurantes este mes — si querés lo ajustamos.' Nunca moralices ('deberías tener más cuidado'), nunca alarmes ('estás en problemas'), nunca uses culpa ni signos de alarma.",
+      "- CERRALA OFRECIENDO ARREGLARLO. Cada observación trae entre corchetes cómo se arregla: convertilo en un ofrecimiento corto y concreto ('¿lo ajustamos?', '¿te lo simulo?'), y si podés proponer la acción, proponela. Señalar sin ofrecer salida es dejar al usuario peor que antes.",
+      "- Celebra las positivas ('celebrar') con la misma economía: una frase, sin globos.",
+      "- Respetá su intensidad de alertas y su arquetipo: si pidió tono suave, más suave todavía.",
     );
 
   // Memoria longitudinal: cómo usar la trayectoria mes a mes.

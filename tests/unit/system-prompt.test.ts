@@ -184,19 +184,42 @@ describe("buildSystemPrompt · perfil conductual", () => {
     const conInsights = buildSystemPrompt({
       currency: "CRC",
       insights: [
-        { severity: "celebrar", title: "¡Estás muy cerca de \"Viaje\"!", body: "Un último empujón." },
+        {
+          kind: "racha_positiva",
+          severity: "celebrar",
+          title: '¡Estás muy cerca de "Viaje"!',
+          body: "Un último empujón.",
+          action: "definir el próximo objetivo",
+        },
       ],
     });
-    // Bloque A: sección + el insight como hecho.
-    expect(conInsights).toContain("Observaciones recientes de su comportamiento:");
-    expect(conInsights).toContain("Observación reciente (celebrar): ¡Estás muy cerca de \"Viaje\"! — Un último empujón.");
-    // Bloque B: la regla de uso con tacto.
-    expect(conInsights).toContain("Menciónalas SOLO si vienen al caso");
+    // Bloque A: sección + el insight como hecho, con su kind y su arreglo pegados.
+    expect(conInsights).toContain("Observaciones recientes de su comportamiento");
+    expect(conInsights).toContain(
+      'Observación reciente (celebrar) [racha_positiva]: ¡Estás muy cerca de "Viaje"! — Un último empujón. [se arregla: definir el próximo objetivo]',
+    );
 
     const sinInsights = buildSystemPrompt({ currency: "CRC" });
     expect(sinInsights).toContain("PERFIL DEL USUARIO:");
-    expect(sinInsights).not.toContain("Observaciones recientes de su comportamiento:");
-    expect(sinInsights).not.toContain("Menciónalas SOLO si vienen al caso");
+    expect(sinInsights).not.toContain("Observaciones recientes de su comportamiento");
+    expect(sinInsights).not.toContain("MÁXIMO UNA por respuesta");
+  });
+
+  it("las reglas de observaciones son duras: una sola, relevante, sin repetir y con salida", () => {
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      insights: [{ kind: "sobre_sobregirado", severity: "accionar", title: "t", body: "b" }],
+    });
+    expect(prompt).toMatch(/MÁXIMO UNA por respuesta/);
+    expect(prompt).toMatch(/SOLO si es RELEVANTE a lo que preguntó/);
+    expect(prompt).toMatch(/NO REPITAS una que YA mencionaste/);
+    expect(prompt).toMatch(/CERRALA OFRECIENDO ARREGLARLO/);
+    // La excepción explícita: ante un "¿cómo voy?" sí trae la más importante.
+    expect(prompt).toMatch(/cómo voy/i);
+    // Tono: el ejemplo concreto de amigo que ayuda, y las prohibiciones.
+    expect(prompt).toMatch(/si querés lo ajustamos/i);
+    expect(prompt).toMatch(/Nunca moralices/);
+    expect(prompt).toMatch(/nunca alarmes/);
   });
 
   it("con métricas patrimoniales: rinde los facts y las reglas de uso directo", () => {

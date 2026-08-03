@@ -16,7 +16,15 @@ export type InsightKind =
   | "aporte_pendiente"
   | "perfil_revision"
   | "fondo_paz"
-  | "alerta_precio";
+  | "alerta_precio"
+  // ── Cobertura de "daño": lo que un asesor amigo vería y diría. Todos deterministas,
+  // sobre datos reales del usuario, con severidad y una acción concreta (ver actions.ts).
+  | "sobre_sobregirado"
+  | "ahorro_bajo"
+  | "deuda_cara"
+  | "fondo_emergencia"
+  | "concentracion_inversion"
+  | "rendimiento_bajo_inflacion";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {
