@@ -389,6 +389,7 @@ export function AssistantConversation({
   const [replying, setReplying] = useState<Quote | null>(null);
   const idRef = useRef(1);
   const fileRef = useRef<HTMLInputElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   // Cerrojo de envío en un ref, NO en el estado: dos clicks en el mismo tick leen el mismo
   // `sending === false` (React aún no re-renderizó) y ambos pasaban la guarda. El usuario veía
@@ -441,6 +442,44 @@ export function AssistantConversation({
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, sending, scanning]);
+
+  // AUTO-RESIZE del campo: crece con el contenido y vuelve a una línea al enviar (el efecto
+  // corre también cuando `input` pasa a ""). El TOPE vive en CSS (`max-height` + scroll) y no
+  // acá: cada piel tiene su tipografía, así que un tope en píxeles fijo daría distinta cantidad
+  // de líneas en web y en móvil. Poner "auto" antes de medir es obligatorio — si no, scrollHeight
+  // devuelve el alto ya inflado y el campo nunca vuelve a achicarse.
+  useEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
+  /**
+   * En la WEB el Enter envía (es un chat de escritorio, con teclado y modificadores a mano).
+   * En MÓVIL no: el Enter del teclado virtual hace salto de línea y se envía con el botón, que es
+   * lo que hacen WhatsApp y Telegram en teléfono. Ahí no hay Ctrl ni Shift cómodos, y un Enter que
+   * envía convierte cualquier intento de escribir dos renglones en dos mensajes cortados.
+   */
+  const enterEnvia = variant !== "mobile";
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key !== "Enter") return;
+    if (e.shiftKey) return; // Shift+Enter: el textarea ya inserta el salto por sí solo.
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd+Enter NO inserta nada por defecto en un textarea: hay que hacerlo a mano.
+      // `setRangeText` con "end" respeta la selección actual y deja el cursor después del salto,
+      // que es lo que no se logra reconstruyendo el string a mano.
+      e.preventDefault();
+      const el = e.currentTarget;
+      el.setRangeText("\n", el.selectionStart, el.selectionEnd, "end");
+      setInput(el.value);
+      return;
+    }
+    if (!enterEnvia) return; // móvil: Enter = salto de línea.
+    e.preventDefault();
+    void send(input);
+  };
 
   const sendTranscript = async () => {
     if (sendingTranscript) return;
@@ -758,19 +797,19 @@ export function AssistantConversation({
             </button>
           </>
         ) : null}
-        <input
+        <textarea
+          ref={taRef}
           className={s.input}
           value={input}
           maxLength={2000}
+          rows={1}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void send(input);
-            }
-          }}
+          onKeyDown={onKeyDown}
           placeholder="Pregunta sobre tu dinero…"
           aria-label="Mensaje para My Agent C+"
+          // En la web el Enter envía, así que la tecla del teclado virtual dice "enviar"; en
+          // móvil hace salto de línea y decir "enviar" sería mentirle al usuario.
+          enterKeyHint={enterEnvia ? "send" : "enter"}
           inputMode="text"
         />
         <button

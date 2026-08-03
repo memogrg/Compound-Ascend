@@ -1778,6 +1778,8 @@ body:has(.m-shell[data-theme="dark"]) {
   border: 0;
   border-radius: 16px;
   border-top-right-radius: 5px;
+  /* Igual que en web: el mensaje propio es texto plano, sus saltos los preserva el CSS. */
+  white-space: pre-wrap;
 }
 
 /* indicador de "escribiendo" */
@@ -2075,6 +2077,12 @@ body:has(.m-shell[data-theme="dark"]) {
   min-width: 0;
   padding: 11px 14px;
   background: var(--surface);
+  /* Multilínea: el alto lo pone el JS, el tope vive acá. ~5 líneas a 16px y después scrollea
+     (16px es el umbral de .m-inp por debajo del cual iOS hace zoom al enfocar; no bajarlo). */
+  line-height: 1.4;
+  max-height: 132px;
+  overflow-y: auto;
+  resize: none;
 }
 .m-shell .m-chat-cam {
   flex: none;

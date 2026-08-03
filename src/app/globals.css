@@ -1091,6 +1091,9 @@ input[type="radio"] {
   border: 0;
   border-radius: 14px;
   border-top-right-radius: 5px;
+  /* El mensaje del usuario va como TEXTO PLANO (React lo escapa), así que sus saltos de línea
+     los preserva el CSS. El del asesor no lo necesita: renderMarkdown ya los convierte en <br>. */
+  white-space: pre-wrap;
 }
 .coach-insight {
   border-left: 2px solid var(--accent);
@@ -1140,7 +1143,10 @@ input[type="radio"] {
   padding: 14px 16px;
   border-top: 1px solid var(--border);
 }
-.coach-input input {
+/* El campo es un TEXTAREA (multilínea con auto-resize), no un input. El selector apunta al
+   elemento porque en la piel web `Skin.input` va vacío: el estilo cuelga del contenedor. El
+   `input[type=file]` oculto del escáner vive en este mismo contenedor y por eso NO se toca acá. */
+.coach-input textarea {
   flex: 1;
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -1148,10 +1154,16 @@ input[type="radio"] {
   padding: 10px 12px;
   font: inherit;
   font-size: 13px;
+  line-height: 1.45;
   color: var(--text);
   outline: none;
+  /* El alto lo maneja el JS (scrollHeight); el TOPE es de acá: ~5 líneas y después scrollea,
+     para que un mensaje largo no se coma el hilo. */
+  max-height: 116px;
+  overflow-y: auto;
+  resize: none;
 }
-.coach-input input:focus {
+.coach-input textarea:focus {
   border-color: var(--accent);
 }
 .coach-send {
@@ -1514,10 +1526,12 @@ input[type="radio"] {
   gap: 10px;
   background: var(--surface);
 }
-.ac-page .coach-input input {
+.ac-page .coach-input textarea {
   min-height: 44px;
   font-size: 15px;
   padding: 11px 14px;
+  /* El tab tiene más aire que el panel: ~6 líneas antes de scrollear. */
+  max-height: 160px;
 }
 .ac-page .coach-send,
 .ac-page .ac-cam {
