@@ -1295,8 +1295,20 @@ async function resolveFetchIntent(
       });
       return say(`Tus últimos movimientos:\n${lines.join("\n")}`);
     }
-  } catch {
-    return null; // sin sesión / lectura fallida → escala al razonamiento
+  } catch (err) {
+    // Escalar al razonamiento es correcto, pero hacerlo EN SILENCIO no: desde afuera se ve una
+    // respuesta del LLM con formato libre (viñetas, monedas mezcladas) y es indistinguible de
+    // "el patrón no matcheó". Sin esta línea no hay forma de saber, con una consulta real en
+    // producción, si el carril determinista se intentó y falló o si nunca se intentó.
+    // Import dinámico como el resto del módulo: router.ts es puro/testeable y no arrastra el
+    // logger en el árbol de imports.
+    const { logger } = await import("@/lib/logger");
+    logger.warn("router.fetchIntent.escala", {
+      intent,
+      params: JSON.stringify(params).slice(0, 300),
+      message: err instanceof Error ? err.message : "?",
+    });
+    return null;
   }
   return null;
 }

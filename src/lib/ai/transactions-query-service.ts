@@ -103,9 +103,15 @@ export async function consultarTransacciones(
   let categoriaIds: string[] | null = null;
   let sobreLabel = sobreArg;
   if (sobreArg) {
-    const { listSobresForKind } = await import("@/modules/financial-base");
+    // listAllSobresForKind y NO listSobresForKind: esta última recorta a los sobres "adoptados"
+    // (configurados ∪ presupuestados o usados ESTE MES) porque responde "¿a qué sobre cargo un
+    // gasto hoy?". Para una consulta HISTÓRICA ese recorte es el error: un sobre usado en julio y
+    // no en agosto quedaba fuera y el nombre no resolvía.
+    const { listAllSobresForKind } = await import("@/modules/financial-base");
     const { matchSobre, rutaSobre } = await import("@/lib/ai/sobre-match");
-    const sobres = await listSobresForKind(tipo === "ingreso" ? "ingreso" : "gasto").catch(() => []);
+    const sobres = await listAllSobresForKind(tipo === "ingreso" ? "ingreso" : "gasto").catch(
+      () => [],
+    );
     const m = matchSobre(sobreArg, sobres);
     if (m.estado === "ambiguo") {
       const opciones = m.candidatos.slice(0, 5).map(rutaSobre);
