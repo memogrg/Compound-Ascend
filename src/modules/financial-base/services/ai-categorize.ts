@@ -361,6 +361,24 @@ export type SobreOption = { id: string; sobre: string; frasco: string | null };
  * en la vista de frascos (expense-jars.ts:492). Así el selector del chat coincide con Gastos y
  * Transacciones. INGRESO: sin filtro de adopción (no hay vista de frascos de ingreso).
  */
+/**
+ * TODOS los sobres hoja de una naturaleza, SIN el filtro de adopción.
+ *
+ * Existe porque `listSobresForKind` responde otra pregunta: "¿a qué sobre puedo cargar un gasto
+ * HOY?", y por eso se queda con los configurados ∪ los presupuestados/usados ESTE MES. Para
+ * RESOLVER UN NOMBRE en una consulta histórica ("las transacciones de restaurante del mes
+ * pasado") ese recorte es el error: un sobre que se usó en julio y no en agosto queda fuera de la
+ * lista, el nombre no resuelve y la consulta responde "no encontré ese sobre" — o peor, escala.
+ *
+ * Regla: para ESCRIBIR, la lista adoptada; para LEER historia, todas.
+ */
+export async function listAllSobresForKind(kind: "gasto" | "ingreso"): Promise<SobreOption[]> {
+  const cats = await listCategories();
+  return selectableSobresByFrasco(cats)
+    .filter((s) => categoryMatchesKind(s.categoryType, kind))
+    .map((s) => ({ id: s.id, sobre: s.sobre, frasco: s.frasco }));
+}
+
 export async function listSobresForKind(kind: "gasto" | "ingreso"): Promise<SobreOption[]> {
   const cats = await listCategories();
   const leaves = selectableSobresByFrasco(cats).filter((s) =>

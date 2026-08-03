@@ -63,7 +63,16 @@ export async function resolveDeterministic(
   ctx: FinancialContext,
   toolContext: ToolContext,
 ): Promise<(AIChatResponse & { tokensIn: number; tokensOut: number; provider: string; lane: RouterLane }) | null> {
-  const routed = await resolveMatchedIntent(matched, ctx, toolContext).catch(() => null);
+  const routed = await resolveMatchedIntent(matched, ctx, toolContext).catch((err: unknown) => {
+    // Mismo motivo que el catch de resolveFetchIntent: tragarlo hace que un carril determinista
+    // roto se vea exactamente igual que uno que no aplicaba. Con el log, una consulta real en
+    // producción dice cuál de las dos cosas pasó.
+    logger.warn("orchestrator.determinista.escala", {
+      intent: matched.intent,
+      message: err instanceof Error ? err.message : "?",
+    });
+    return null;
+  });
   if (!routed) return null;
   return {
     ...guardReply(routed.response, ctx, `router:${routed.lane}`, priorAssistantReplies(messages)),
@@ -425,7 +434,20 @@ export const TOOLS_PROMPT_LINE =
   "comparación de memoria ni estimes retornos. Esa herramienta devuelve un campo `resumen_md` YA " +
   "REDACTADO: pasalo TAL CUAL (íntegro, sin recortar escenarios ni caídas máximas) y agregá como " +
   "mucho UNA frase corta de encuadre. No reescribas sus cifras ni las resumas en una sola línea: el " +
-  "rango con el peor caso visible ES la respuesta. Si devuelve `error`, decí qué no pudiste leer.";
+  "rango con el peor caso visible ES la respuesta. Si devuelve `error`, decí qué no pudiste leer. " +
+  // El carril determinista responde estas consultas sin gastar tokens, pero cuando por lo que sea
+  // no aplica y caés acá, el resultado tiene que ser EL MISMO. Sin esta regla el modelo recibía el
+  // payload y lo reformateaba a su gusto: viñetas y ₡/$ mezclados, justo lo que el motor ya había
+  // resuelto en una tabla y en una sola moneda.
+  "REGLA DE PASO DIRECTO — consultar_transacciones, consultar_historial y consultar_detalle " +
+  "devuelven `resumen_md` YA REDACTADO por una plantilla determinista, con la TABLA armada y todas " +
+  "las cifras en la moneda de visualización del usuario. Pasalo TAL CUAL: no lo conviertas en " +
+  "viñetas, no reordenes, no recalcules el total y NUNCA mezcles monedas (si ves montos en otra " +
+  "moneda dentro del payload crudo, ignoralos: el `resumen_md` ya los convirtió). Como mucho, UNA " +
+  "frase corta antes o después. " +
+  "Y si el usuario NOMBRA UN SOBRE ('las transacciones de restaurante', 'lo de transporte'), pasá " +
+  "ese nombre en el argumento `sobre` de consultar_transacciones — sin él la herramienta devuelve " +
+  "TODAS las categorías y estarías contestando otra pregunta.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web

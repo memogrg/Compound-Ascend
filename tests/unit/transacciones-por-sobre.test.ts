@@ -44,7 +44,13 @@ const listSobres = vi.fn(async () => SOBRES);
 vi.mock("@/modules/financial-base", () => ({
   listTransactions: async () => TXNS,
   getCategoryNameMap: async () => NOMBRES,
-  listSobresForKind: () => listSobres(),
+  // La consulta HISTÓRICA resuelve contra listAllSobresForKind (todas las hojas), no contra
+  // listSobresForKind (recortada a las adoptadas ESTE mes). El mock hace fallar a la segunda a
+  // propósito: si alguien vuelve a engancharla, estos tests se caen en vez de romperlo en prod.
+  listAllSobresForKind: () => listSobres(),
+  listSobresForKind: () => {
+    throw new Error("consulta histórica: debe usar listAllSobresForKind");
+  },
 }));
 vi.mock("@/lib/time/user-time", () => ({ userToday: async () => "2026-08-03" }));
 // 1 USD = 500 CRC (rates expresadas como en la app: unidades por USD).
@@ -170,5 +176,70 @@ describe("degradación honesta", () => {
     const r = await consultar("mascotas");
     expect(r.conteo).toBe(0);
     expect(r.resumen_md).toMatch(/No tenés gastos.*Mascotas/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BANCO · la consulta REAL que seguía fallando en producción, punta a punta y en USD
+// (la moneda de visualización del usuario que la reportó).
+//
+// Se rutea con matchIntent para que el test cubra el camino ENTERO —frase → intent → params →
+// servicio— y no solo el servicio con params escritos a mano, que es lo que dejó pasar el bug.
+// ---------------------------------------------------------------------------
+import { matchIntent } from "@/lib/ai/router";
+
+const consultarDesdeFrase = async (frase: string, moneda = "USD") => {
+  const m = matchIntent(frase);
+  expect(m?.intent, `«${frase}» no ruteó al libro diario`).toBe("consulta_transacciones");
+  return consultarTransacciones(m!.params, moneda);
+};
+
+describe("banco · «transacciones de {sobre} del mes pasado» en USD", () => {
+  const casos: [string, string, string][] = [
+    // frase, comercio que SÍ tiene que salir, comercio que NO
+    [
+      "dame una tabla de todas las transacciones de restaurante del mes pasado y el total del gasto",
+      "Rosti Pollos",
+      "Gasolinera Delta",
+    ],
+    ["dame todas las transacciones de transporte del mes pasado y el total", "Gasolinera Delta", "Rosti Pollos"],
+    ["dame una tabla de las transacciones de super del mes pasado y el total", "Auto Mercado", "Rosti Pollos"],
+    // Sobre CREADO por el usuario.
+    ["dame las transacciones de Corte Pelo David del mes pasado", "Barbería Central", "Auto Mercado"],
+    ["dame una tabla de las transacciones de padel del mes pasado y el total", "Club Padel CR", "Rosti Pollos"],
+  ];
+
+  for (const [frase, incluye, excluye] of casos) {
+    it(`«${frase.slice(0, 52)}…» → solo ese sobre`, async () => {
+      const r = await consultarDesdeFrase(frase);
+      expect(r.resumen_md).toContain(incluye);
+      expect(r.resumen_md).not.toContain(excluye);
+    });
+
+    it(`«${frase.slice(0, 52)}…» → tabla con total, en USD`, async () => {
+      const r = await consultarDesdeFrase(frase);
+      expect(r.resumen_md).toContain("| Fecha | Comercio | Monto |");
+      expect(r.resumen_md).toMatch(/\|\s*\*\*Total\*\*\s*\|/);
+      expect(r.resumen_md).not.toMatch(/^•/m); // nada de viñetas
+      expect(r.moneda).toBe("USD");
+      // Una sola moneda en toda la respuesta: ni un colón suelto.
+      expect(r.resumen_md).not.toContain("₡");
+      expect(r.total).not.toBeNull();
+    });
+  }
+
+  it("el singular «restaurante» resuelve el sobre «Restaurantes» (plural)", async () => {
+    const r = await consultarDesdeFrase(
+      "dame una tabla de todas las transacciones de restaurante del mes pasado y el total del gasto",
+    );
+    expect(r.filtros.sobre).toBe("Vivir › Restaurantes");
+    expect(r.conteo).toBe(3);
+  });
+
+  it("un sobre usado el mes PASADO y no este resuelve igual (el bug del recorte por adopción)", async () => {
+    // listAllSobresForKind no filtra por adopción del mes en curso: por eso este caso funciona.
+    const r = await consultarDesdeFrase("dame las transacciones de padel del mes pasado");
+    expect(r.conteo).toBe(1);
+    expect(r.resumen_md).toContain("Club Padel CR");
   });
 });
