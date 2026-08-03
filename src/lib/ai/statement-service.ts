@@ -11,8 +11,8 @@ import "server-only";
  * nada se registra por pegarlo.
  */
 import { formatMoney } from "@/lib/format";
-import { convertirTotal } from "@/lib/ai/money";
-import { parseStatement } from "@/lib/ai/statement-parse";
+import { subtotales } from "@/lib/ai/money";
+import { parseStatement, bloqueEsLimpio } from "@/lib/ai/statement-parse";
 import { conciliar, rangoDeFilas, type FilaConciliada } from "@/lib/ai/statement-reconcile";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { logger } from "@/lib/logger";
@@ -34,6 +34,34 @@ export type FaltanteSugerida = {
   categoryPath: string | null;
 };
 
+/**
+ * Parseo del bloque: DETERMINISTA como fast-path, LLM para todo lo demás.
+ *
+ * La decisión es por BLOQUE y no por línea a propósito. Para elegir el monto correcto entre
+ * varias columnas hay que VER las otras filas —el saldo se reconoce porque varía poco mientras el
+ * monto cambia—, y mandarle al modelo una línea suelta le quita justamente esa señal. Así que:
+ * si TODAS las líneas con fecha son limpias (parsean y traen un solo importe), se resuelve sin
+ * llamada; si alguna no lo es, el bloque entero va al extractor.
+ *
+ * Si el LLM no está disponible o no devuelve nada usable, se cae a lo determinista —mejor unas
+ * filas leídas que ninguna— y las que no se pudieron leer se listan para que el usuario las mire.
+ */
+async function parsearBloque(
+  texto: string,
+): Promise<{ filas: ReturnType<typeof parseStatement>["filas"]; ignoradas: string[] }> {
+  const det = parseStatement(texto);
+  if (bloqueEsLimpio(texto) && det.ignoradas.length === 0) return det;
+
+  const { extraerConLLM } = await import("@/lib/ai/statement-extract");
+  const llm = await extraerConLLM(texto);
+  if (!llm) return det; // sin proveedor o respuesta inservible: lo determinista es mejor que nada
+
+  // El LLM leyó el bloque entero: sus filas mandan. Solo se reportan como ilegibles las líneas
+  // que TAMPOCO él pudo convertir en movimiento — y se listan, no se cuentan nada más.
+  const ignoradas = llm.length >= det.filas.length ? [] : det.ignoradas;
+  return { filas: llm, ignoradas };
+}
+
 /** Etiqueta de fecha corta y estable (no depende del locale del server). */
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 function fechaCorta(iso: string): string {
@@ -49,7 +77,7 @@ export async function conciliarEstado(
   texto: string,
   moneda: string,
 ): Promise<ConciliacionPayload | null> {
-  const { filas, ignoradas } = parseStatement(texto);
+  const { filas, ignoradas } = await parsearBloque(texto);
   const rango = rangoDeFilas(filas);
   if (filas.length === 0 || !rango) return null;
 
@@ -114,16 +142,29 @@ export function renderReporte(
   filas: FilaConciliada[],
   opts: { moneda: string; rates: Record<string, number> | null; ignoradas: number },
 ): string {
-  const conv = (monto: number, desde: string): string => {
-    const c = convertirTotal([{ monto, moneda: desde }], opts.moneda, opts.rates);
-    return c ? formatMoney(c.monto, opts.moneda) : formatMoney(monto, desde);
-  };
-
+  // MONEDA NATIVA: cada movimiento en la moneda en que se gastó, como en las listas del libro
+  // diario. Acá pesa todavía más que allá — el usuario está comparando fila por fila contra un
+  // estado de cuenta que dice ₡3.900; verlo como $7,80 vuelve imposible el cotejo, que es
+  // literalmente para lo que pegó el bloque.
   const cuerpo = filas.map((f) => {
     const signo = f.fila.tipo === "ingreso" ? "+" : "−";
     const estado = f.estado === "registrada" ? "✓ registrada" : "falta";
-    return `| ${fechaCorta(f.fila.fecha)} | ${f.fila.comercio} | ${signo}${conv(f.fila.monto, f.fila.moneda)} | ${estado} |`;
+    return `| ${fechaCorta(f.fila.fecha)} | ${f.fila.comercio} | ${signo}${formatMoney(f.fila.monto, f.fila.moneda)} | ${estado} |`;
   });
+
+  // Total del bloque en la moneda de los movimientos; con varias, subtotal por moneda.
+  const montos = filas.map((f) => ({ monto: f.fila.monto, moneda: f.fila.moneda }));
+  const monedas = new Set(montos.map((m) => m.moneda));
+  const total =
+    monedas.size === 1
+      ? formatMoney(
+          montos.reduce((a, m) => a + m.monto, 0),
+          [...monedas][0]!,
+        )
+      : subtotales(montos)
+          .map((m) => formatMoney(m.monto, m.moneda))
+          .join(" + ");
+  cuerpo.push(`| **Total** |  | **${total}** |  |`);
 
   const registradas = filas.filter((f) => f.estado === "registrada").length;
   const faltantes = filas.length - registradas;
