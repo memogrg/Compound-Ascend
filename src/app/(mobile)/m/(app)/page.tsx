@@ -2,7 +2,6 @@ import Link from "next/link";
 import { getUser } from "@/lib/auth/session";
 import { getDashboardData, getHomeCardsData } from "@/modules/dashboard";
 import { userHour } from "@/lib/time/user-time";
-import { SurplusDecision, getSurplusDecision } from "@/modules/wealth";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
 import { MHomeCarousel } from "../components/home-carousel";
 import {
@@ -95,23 +94,20 @@ export default async function MobileHome() {
   const user = await getUser();
   const preview = !user && process.env.MOBILE_DEMO_PREVIEW === "1";
 
-  // Cuatro agregados EN PARALELO, cada uno con su propio `.catch`: si uno falla, los
-  // demás siguen. `data` (panel) alimenta el saludo, el flujo del mes, los accesos y los
-  // insights; `homeCards` (capa de datos del carrusel, Delta 1) alimenta las 9 fichas.
-  const [data, recent, surplus, homeCards] = await Promise.all([
+  // Tres agregados EN PARALELO, cada uno con su propio `.catch`: si uno falla, los demás
+  // siguen. `data` (panel) alimenta el saludo, los accesos y la próxima acción; `homeCards`
+  // (capa de datos del carrusel, Delta 1) alimenta las 9 fichas.
+  const [data, recent, homeCards] = await Promise.all([
     getDashboardData({ previewDemo: preview }),
     preview
       ? Promise.resolve([] as Transaction[])
       : listTransactions(recentPeriod(now), {}, 6).catch(() => [] as Transaction[]),
-    // Decisión del excedente (F3): solo con fondos cubiertos y excedente. Best-effort.
-    preview ? Promise.resolve(null) : getSurplusDecision().catch(() => null),
     // Las 9 fichas del carrusel (Delta 1). En vista demo no hay sesión, así que se omite
     // y cada ficha degrada a su estado "no cargó".
     preview ? Promise.resolve(null) : getHomeCardsData().catch(() => null),
   ]);
 
-  const { currency, panel, insights, monthFlow } = data;
-  const firstInsight = insights.insights[0];
+  const { panel, insights } = data;
 
   return (
     <div className="m-scroll">
@@ -139,24 +135,8 @@ export default async function MobileHome() {
         {/* Header sticky de cristal unificado (variant home): logo + saludo + chat/campana/menú. */}
         <MobileHeader variant="home" greeting={greeting(await userHour())} name={data.name} />
 
-        {/* A-01: el Flujo del mes REAL (operativo) como línea de contexto — para que el home
-            deje de mezclar plan (Ingresos) y adherencia (Presupuesto) sin decir lo que de
-            verdad te quedó. La tarjeta "Presupuesto" es adherencia; esto es el flujo. */}
-        {monthFlow ? (
-          <div className="muted" style={{ fontSize: 12.5, marginTop: -4, marginBottom: 12 }}>
-            Flujo del mes:{" "}
-            <strong
-              style={{
-                color:
-                  monthFlow.real.operatingFlow >= 0 ? "var(--accent)" : "var(--danger)",
-              }}
-            >
-              {monthFlow.real.operatingFlow >= 0 ? "+" : "−"}
-              {formatMoney(Math.abs(monthFlow.real.operatingFlow), currency)}
-            </strong>{" "}
-            libres · operativo real
-          </div>
-        ) : null}
+        {/* El "Flujo del mes" ya no va como strip suelto: es la PRIMERA ficha del carrusel
+            (misma cifra que este strip mostraba), así no se repite el número. */}
 
         {/* Carrusel de las 9 fichas del brief lockeado (piloto · Delta 2), sobre el mismo
             chasis compartido (MHomeCard) y en el orden fijo: Presupuesto · Ingresos ·
@@ -172,11 +152,11 @@ export default async function MobileHome() {
           <MHomeCarousel
             cards={[
               {
-                name: "Presupuesto",
+                name: "Flujo del mes",
                 node: homeCards?.presupuesto ? (
                   <PresupuestoFicha c={homeCards.presupuesto} currency={homeCards.currency} />
                 ) : (
-                  <MHomeCardError eyebrow="Presupuesto" icon="rules" />
+                  <MHomeCardError eyebrow="Flujo del mes" icon="rules" />
                 ),
               },
               {
@@ -289,27 +269,6 @@ export default async function MobileHome() {
             </svg>
           </div>
         </Link>
-
-        {/* Un insight (real: primer insight del engine) */}
-        {firstInsight && (
-          <div className="wgt" style={{ marginBottom: 16 }}>
-            <div className="between" style={{ marginBottom: 8 }}>
-              <span className="wlabel">{firstInsight.h}</span>
-              <span className="wic" style={{ background: "var(--accent-soft)", color: "var(--accent)" }} aria-hidden>
-                <StarIcon />
-              </span>
-            </div>
-            <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>{firstInsight.d}</div>
-          </div>
-        )}
-
-        {/* Decisión del excedente (F3): abonar deuda vs invertir. Solo con fondos cubiertos y
-            excedente > 0; si no, no se muestra. */}
-        {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
-          <div style={{ marginBottom: 16 }}>
-            <SurplusDecision report={surplus} />
-          </div>
-        ) : null}
 
         {/* Movimientos recientes (reales) */}
         <section>
