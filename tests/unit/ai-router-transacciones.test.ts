@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { vi } from "vitest";
-import { matchIntent, extractPeriodo, extractTerminoGasto } from "@/lib/ai/router";
+import { matchIntent, extractPeriodo, extractTerminoGasto, extractSobreMencionado } from "@/lib/ai/router";
 
 const intentOf = (q: string) => matchIntent(q)?.intent ?? null;
 const paramsOf = (q: string) => matchIntent(q)?.params ?? {};
@@ -181,5 +181,82 @@ describe("NO REGRESIÓN de los intents golosos", () => {
 
   it("una proyección sigue escalando pese a mencionar gastos", () => {
     expect(intentOf("¿cómo debería reducir mis gastos el próximo año?")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Sobre nombrado en la consulta: "dame las transacciones de {sobre} del {periodo}"
+//
+// El bug: extractTerminoGasto EXIGE un verbo de gasto ("gasté en…"), y esta forma no lo tiene,
+// así que la consulta salía SIN filtro y devolvía todas las categorías.
+// ---------------------------------------------------------------------------
+
+describe("extractSobreMencionado · el sobre que el usuario nombró", () => {
+  it("lo saca de las formas naturales, sin verbo de gasto", () => {
+    expect(extractSobreMencionado("dame las transacciones de restaurantes del mes pasado")).toBe(
+      "restaurantes",
+    );
+    expect(extractSobreMencionado("movimientos de transporte de julio")).toBe("transporte");
+    expect(extractSobreMencionado("gastos de supermercados esta semana")).toBe("supermercados");
+    expect(extractSobreMencionado("compras de la farmacia ayer")).toBe("farmacia");
+  });
+
+  it("funciona con un sobre PROPIO del usuario, de varias palabras", () => {
+    expect(extractSobreMencionado("transacciones de Corte Pelo David del mes pasado")).toBe(
+      "Corte Pelo David",
+    );
+    expect(extractSobreMencionado("movimientos de Padel el mes pasado")).toBe("Padel");
+  });
+
+  it("NO confunde el periodo con un sobre", () => {
+    expect(extractSobreMencionado("transacciones de julio")).toBeNull();
+    expect(extractSobreMencionado("movimientos de ayer")).toBeNull();
+    expect(extractSobreMencionado("gastos del mes pasado")).toBeNull();
+    expect(extractSobreMencionado("transacciones de la semana pasada")).toBeNull();
+  });
+
+  it("sin sobre nombrado devuelve null", () => {
+    expect(extractSobreMencionado("¿cuánto gasté el mes pasado?")).toBeNull();
+    expect(extractSobreMencionado("dame mis transacciones")).toBeNull();
+  });
+});
+
+describe("ruteo · el sobre nombrado viaja como filtro `sobre`", () => {
+  it("«transacciones de restaurantes del mes pasado» rutea con el sobre puesto", () => {
+    const p = paramsOf("dame las transacciones de restaurantes del mes pasado");
+    expect(intentOf("dame las transacciones de restaurantes del mes pasado")).toBe(
+      "consulta_transacciones",
+    );
+    expect(p.periodo).toBe("mes_pasado");
+    expect(p.sobre).toBe("restaurantes");
+    expect(p.tipo).toBe("gasto");
+  });
+
+  it("lista los movimientos, NO agrupa por categoría (una sola fila sería inútil)", () => {
+    expect(paramsOf("dame las transacciones de transporte del mes pasado").agrupacion).toBe(
+      "ninguna",
+    );
+    // Y con un sobre nombrado, la palabra "sobre" en la pregunta no fuerza el desglose.
+    expect(paramsOf("dame el detalle de mis transacciones de transporte de julio").agrupacion).toBe(
+      "ninguna",
+    );
+  });
+
+  it("un sobre propio también viaja entero", () => {
+    expect(paramsOf("transacciones de Corte Pelo David del mes pasado").sobre).toBe(
+      "Corte Pelo David",
+    );
+  });
+
+  it("sin sobre nombrado NO se inventa el filtro (sigue el comportamiento viejo)", () => {
+    const p = paramsOf("¿cuánto gasté la semana pasada?");
+    expect(p.sobre).toBeUndefined();
+    expect(p.periodo).toBe("semana_pasada");
+  });
+
+  it("«¿en qué gasté el mes pasado?» sigue agrupando por categoría", () => {
+    const p = paramsOf("¿en qué gasté el mes pasado?");
+    expect(p.agrupacion).toBe("categoria");
+    expect(p.sobre).toBeUndefined();
   });
 });

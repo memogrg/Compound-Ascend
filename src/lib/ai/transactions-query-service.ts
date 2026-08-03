@@ -90,8 +90,45 @@ export async function consultarTransacciones(
   }));
 
   const comercio = str(args.comercio);
-  const sobre = str(args.sobre);
-  const filtradas = filtrarTransacciones(txns, { tipo, comercio, sobre }, nombres);
+  const sobreArg = str(args.sobre);
+  // `termino` lo pone el ruteo determinista cuando no sabe si el texto es un comercio o un sobre.
+  // Antes se leía `args.comercio`/`args.sobre` y nada más, así que ese filtro se perdía en el
+  // camino y la consulta salía sin acotar: se aplica igual que los otros.
+  const termino = str(args.termino);
+
+  // ── Resolución del SOBRE contra los sobres REALES del usuario ──
+  // Nada hardcodeado: la lista sale de listSobresForKind, la misma fuente del selector del chat,
+  // así que incluye los de fábrica y los que él creó. Si nombró un sobre y no se puede resolver,
+  // se DICE — nunca se cae a "sin filtro", que respondería con todas las categorías.
+  let categoriaIds: string[] | null = null;
+  let sobreLabel = sobreArg;
+  if (sobreArg) {
+    const { listSobresForKind } = await import("@/modules/financial-base");
+    const { matchSobre, rutaSobre } = await import("@/lib/ai/sobre-match");
+    const sobres = await listSobresForKind(tipo === "ingreso" ? "ingreso" : "gasto").catch(() => []);
+    const m = matchSobre(sobreArg, sobres);
+    if (m.estado === "ambiguo") {
+      const opciones = m.candidatos.slice(0, 5).map(rutaSobre);
+      return {
+        ...vacio(rango, tipo, moneda, { comercio, sobre: sobreArg, termino }),
+        resumen_md: `Tenés varios sobres que coinciden con «${sobreArg}»: ${opciones.join(", ")}. ¿Cuál querés ver?`,
+      };
+    }
+    if (m.estado === "sin_match") {
+      return {
+        ...vacio(rango, tipo, moneda, { comercio, sobre: sobreArg, termino }),
+        resumen_md: `No encontré un sobre que se llame «${sobreArg}». Revisá el nombre o pedime la lista de tus sobres.`,
+      };
+    }
+    categoriaIds = [m.sobre.id];
+    sobreLabel = rutaSobre(m.sobre);
+  }
+
+  const filtradas = filtrarTransacciones(
+    txns,
+    { tipo, comercio, sobre: sobreArg, termino, categoriaIds },
+    nombres,
+  );
 
   const resultado = agregarTransacciones(filtradas, {
     rango,
@@ -102,8 +139,31 @@ export async function consultarTransacciones(
     moneda,
     rates,
     nombresPorCategoria: nombres,
-    filtros: { comercio, sobre },
+    // La etiqueta que ve el usuario es la del sobre REAL ("Vivir › Restaurantes"), no lo que
+    // escribió: confirma contra qué se filtró.
+    filtros: { comercio, sobre: sobreLabel, termino },
   });
 
   return { ...resultado, resumen_md: renderConsulta(resultado) };
+}
+
+/** Resultado vacío para los cortes tempranos (sobre ambiguo o inexistente). */
+function vacio(
+  rango: ConsultaResult["rango"],
+  tipo: TipoTxn,
+  moneda: string,
+  filtros: ConsultaResult["filtros"],
+): ConsultaResult {
+  return {
+    rango,
+    tipo,
+    agrupacion: "ninguna",
+    moneda,
+    conteo: 0,
+    total: null,
+    subtotalesGenerales: [],
+    grupos: [],
+    movimientos: [],
+    filtros,
+  };
 }

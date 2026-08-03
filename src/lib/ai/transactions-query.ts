@@ -53,8 +53,20 @@ export type ConsultaResult = {
   total: number | null;
   subtotalesGenerales: Monto[];
   grupos: Grupo[];
-  /** Movimientos individuales (solo con agrupacion="ninguna"), ya topeados. */
-  movimientos: { fecha: string; etiqueta: string; monto: number; moneda: string; tipo: string }[];
+  /**
+   * Movimientos individuales (solo con agrupacion="ninguna"), ya topeados.
+   * `montoConvertido` es el importe en la moneda de VISUALIZACIÓN; null si faltó la tasa de esa
+   * moneda — en ese caso la tabla cae a mostrar cada fila en su moneda de origen, que es feo pero
+   * honesto (etiquetar colones como dólares no es una opción).
+   */
+  movimientos: {
+    fecha: string;
+    etiqueta: string;
+    monto: number;
+    moneda: string;
+    montoConvertido: number | null;
+    tipo: string;
+  }[];
   /** Filtros que se aplicaron, para que la respuesta pueda nombrarlos. */
   filtros: { comercio: string | null; sobre: string | null; termino: string | null };
 };
@@ -196,6 +208,13 @@ export type Filtros = {
   /** Nombre del sobre/categoría; se resuelve contra `nombresPorCategoria`. */
   sobre?: string | null;
   /**
+   * Sobres YA RESUELTOS a sus ids (por `matchSobre` contra los sobres reales del usuario).
+   * Tiene PRECEDENCIA sobre `sobre`/`termino`: comparar ids es exacto, mientras que el substring
+   * del nombre confunde vecinos ("Super" cazaría "Supermercado" y "Superávit"). Cuando el sobre
+   * se pudo identificar, filtrar por su id es la única forma de no traer de más.
+   */
+  categoriaIds?: string[] | null;
+  /**
    * Término AMBIGUO: matchea si coincide el comercio O el sobre. Lo usa el ruteo
    * determinista, que no puede saber si "comida" en "¿cuánto gasté en comida?" es un
    * comercio o un sobre. El LLM, que sí puede distinguir, usa `comercio`/`sobre`.
@@ -221,10 +240,13 @@ export function filtrarTransacciones(
 ): TxnLike[] {
   const tipo = filtros.tipo ?? "todos";
   const comercio = filtros.comercio ? normalizar(filtros.comercio) : null;
-  const sobre = filtros.sobre ? normalizar(filtros.sobre) : null;
-  const termino = filtros.termino ? normalizar(filtros.termino) : null;
+  const ids = filtros.categoriaIds?.length ? new Set(filtros.categoriaIds) : null;
+  // Con el sobre YA resuelto a ids, el filtro por nombre sobra y solo puede traer de más.
+  const sobre = !ids && filtros.sobre ? normalizar(filtros.sobre) : null;
+  const termino = !ids && filtros.termino ? normalizar(filtros.termino) : null;
   return txns.filter((t) => {
     if (tipo !== "todos" && t.kind !== tipo) return false;
+    if (ids && !(t.categoryId && ids.has(t.categoryId))) return false;
     if (comercio && !campoComercio(t).includes(comercio)) return false;
     if (sobre && !campoSobre(t, nombresPorCategoria).includes(sobre)) return false;
     if (
@@ -335,6 +357,10 @@ export function agregarTransacciones(
       etiqueta: (t.merchantOrSource ?? t.description ?? "Movimiento").trim() || "Movimiento",
       monto: t.amount,
       moneda: t.currency,
+      // Se convierte fila por fila con la MISMA función que el total, así la columna y el total
+      // no pueden discrepar. Sin tasa → null y la tabla lo resuelve mostrando la moneda origen.
+      montoConvertido:
+        convertirTotal([{ monto: t.amount, moneda: t.currency }], opts.moneda, rates)?.monto ?? null,
       tipo: t.kind,
     }));
     return base;
@@ -410,12 +436,34 @@ export function renderConsulta(r: ConsultaResult): string {
   const totalStr = r.total != null ? formatMoney(r.total, r.moneda) : subtotalesStr(r.subtotalesGenerales);
 
   if (r.agrupacion === "ninguna") {
-    const lineas = r.movimientos.map((m) => {
+    // TABLA, no viñetas: una lista de movimientos es una columna de fechas, una de comercios y
+    // una de montos — en viñetas los números quedan desalineados y no se pueden comparar de un
+    // vistazo. El renderer del chat dibuja tablas markdown y alinea la columna numérica sola.
+    const todoConvertido = r.movimientos.every((m) => m.montoConvertido != null);
+    const filas = r.movimientos.map((m) => {
       const signo = m.tipo === "ingreso" ? "+" : "−";
-      return `• ${etiquetaFecha(m.fecha)} · ${m.etiqueta}: ${signo}${formatMoney(m.monto, m.moneda)}`;
+      // Con todas las tasas disponibles la columna va ENTERA en la moneda de visualización; si
+      // falta una, se muestra cada fila en su moneda antes que inventar una conversión.
+      const importe =
+        todoConvertido && m.montoConvertido != null
+          ? formatMoney(m.montoConvertido, r.moneda)
+          : formatMoney(m.monto, m.moneda);
+      return `| ${etiquetaFecha(m.fecha)} | ${m.etiqueta} | ${signo}${importe} |`;
     });
     const cab = `Tus ${nombreTipo}${filtro} de ${r.rango.etiqueta} suman ${totalStr} en ${r.conteo} ${r.conteo === 1 ? "movimiento" : "movimientos"}:`;
-    return `${cab}\n${lineas.join("\n")}`;
+    const tabla = [
+      "| Fecha | Comercio | Monto |",
+      "| --- | --- | --- |",
+      ...filas,
+      `| **Total** |  | **${totalStr}** |`,
+    ].join("\n");
+    // Si el tope recortó la lista, se dice — un total que no cuadra con las filas visibles
+    // parece un error de suma.
+    const recorte =
+      r.movimientos.length < r.conteo
+        ? `\n\n(Se muestran ${r.movimientos.length} de ${r.conteo}; el total es de todos.)`
+        : "";
+    return `${cab}\n\n${tabla}${recorte}`;
   }
 
   const comoSe: Record<Exclude<Agrupacion, "ninguna">, string> = {

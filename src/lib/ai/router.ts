@@ -223,6 +223,45 @@ export function extractTerminoGasto(text: string): string | null {
 }
 
 /**
+ * SOBRE mencionado en una consulta del libro diario: "dame las transacciones DE RESTAURANTES del
+ * mes pasado", "movimientos de transporte de julio", "gastos de Corte Pelo David".
+ *
+ * Devuelve el CANDIDATO en crudo; quién decide si existe es el servicio, que lo resuelve contra
+ * los sobres REALES del usuario (`matchSobre`). Acá no puede haber lista de nombres: el usuario
+ * crea los suyos y ninguno estaría en un `switch`.
+ *
+ * Guard clave: si lo que queda tras cortar el marcador temporal es un periodo ("transacciones de
+ * julio", "movimientos de la semana pasada"), NO es un sobre — devuelve null y la consulta sale
+ * sin filtro, que es lo correcto ahí.
+ */
+export function extractSobreMencionado(text: string): string | null {
+  const m = text.match(
+    /\b(?:transacci\w*|movimientos?|gastos?|compras?|consumos?)\s+(?:de|del|en|para)\s+(?:la\s+|el\s+|los\s+|las\s+|mi\s+|mis\s+|un\s+|una\s+)?([^,.?!¿¡]+)/i,
+  );
+  let t = m?.[1]?.trim();
+  if (!t) return null;
+  // Corta el marcador temporal pegado ("restaurantes del mes pasado" → "restaurantes").
+  t = t
+    .replace(
+      /\s+(?:de|del|en|durante)?\s*(?:hoy|ayer|esta semana|la semana pasada|semana pasada|este mes|el mes pasado|mes pasado|este a[nñ]o|el a[nñ]o pasado|a[nñ]o pasado|[uú]ltimos?\s+\d+\s+d[ií]as)\b.*$/i,
+      "",
+    )
+    .replace(new RegExp(`\\s+(?:de|del|en|durante)?\\s*${MESES_RE.source}\\b.*$`, "i"), "")
+    .replace(/\s+(?:de|del|en|a|con|para|desde|hasta|durante)$/i, "")
+    .trim();
+  if (!t || t.length < 2) return null;
+  // Lo que quedó ES el periodo (no había sobre): "transacciones de julio", "gastos de ayer".
+  if (
+    new RegExp(`^${MESES_RE.source}$`, "i").test(t) ||
+    /^(?:hoy|ayer|esta semana|la semana pasada|semana pasada|este mes|el mes pasado|mes pasado|este a[nñ]o|el a[nñ]o pasado|a[nñ]o pasado)$/i.test(t)
+  ) {
+    return null;
+  }
+  if (TERMINO_STOP.test(t)) return null;
+  return t;
+}
+
+/**
  * Nombre de la entidad concreta en una consulta de detalle ("cuánto le he pagado a la
  * TARJETA BAC", "mis aportes a VIAJE A JAPÓN"). Se corta en la palabra del dominio para
  * no arrastrarla al nombre. null → el detalle del dominio completo.
@@ -643,13 +682,21 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
     if (periodo && esConsultaGasto) {
       // Sin `\b` de cierre tras `qu[eé]` (ver nota arriba: `é` no es carácter de palabra).
       const desglose = /\ben\s+qu[eé]|\bd[oó]nde\b|\bdesglos|\bdetalle\b|\bcategor|\bsobres?\b/i.test(t);
+      // Sobre nombrado explícitamente ("transacciones DE RESTAURANTES del mes pasado"). Va como
+      // `sobre` y no como `termino`: el servicio lo resuelve contra los sobres reales y filtra por
+      // ID. Si el usuario nombró un sobre, la respuesta JAMÁS debe traer todas las categorías —
+      // que es justo lo que pasaba, porque extractTerminoGasto exige un verbo de gasto ("gasté
+      // en…") y esta forma no lo tiene, así que salía sin ningún filtro.
+      const sobre = extractSobreMencionado(t);
       return {
         intent: "consulta_transacciones",
         params: {
           periodo,
           tipo: /\bingres|\bgan[eé]|\bcobr[eé]|\brecib[ií]/i.test(t) ? "ingreso" : "gasto",
-          agrupacion: desglose ? "categoria" : "ninguna",
-          termino: extractTerminoGasto(t),
+          // Con un sobre nombrado se listan SUS movimientos; agrupar por categoría respondería
+          // con una sola fila inútil.
+          agrupacion: desglose && !sobre ? "categoria" : "ninguna",
+          ...(sobre ? { sobre } : { termino: extractTerminoGasto(t) }),
           tope: 10,
         },
       };
