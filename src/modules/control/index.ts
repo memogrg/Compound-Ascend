@@ -21,7 +21,7 @@ export type {
   RecomputeResult,
 } from "./engine/amortization";
 export { getControlSummary, listDebts, listGoals, createGoal, listDebtPayments } from "./services/control-service";
-export { createSavingsSobreAction } from "./api/actions";
+export { createSavingsSobreAction, reportPaymentAction } from "./api/actions";
 export { goalInputSchema } from "./schemas";
 export { getDebtsOverview } from "./services/debts-service";
 export { getDebtDetail } from "./services/debt-detail-service";

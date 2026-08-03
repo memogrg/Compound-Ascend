@@ -6,7 +6,13 @@
  * tarjeta de acción de IA o el receipt scanner). El endpoint de chat nunca crea.
  */
 import { revalidatePath } from "next/cache";
-import { transactionInputSchema, priceAlertInputSchema } from "@/modules/assistant/schemas";
+import {
+  transactionInputSchema,
+  priceAlertInputSchema,
+  setDcaInputSchema,
+  adjustBudgetInputSchema,
+  debtExtraPaymentInputSchema,
+} from "@/modules/assistant/schemas";
 import { createTransaction } from "@/modules/assistant/services/transaction-service";
 import { listSobresForKind, getSobreRemaining } from "@/modules/financial-base";
 import type { SobreOption, SobreRemaining } from "@/modules/financial-base";
@@ -125,6 +131,87 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
   } catch (err) {
     logger.error("confirmPriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos crear la alerta." };
+  }
+}
+
+/**
+ * Confirma el APORTE MENSUAL (DCA) de una posición — la ejecución del consejo "apartá X/mes para
+ * esta inversión". El holdingId ya viene resuelto contra las posiciones reales del usuario
+ * (resolveActionProposal); acá solo se valida la forma y se delega en el dominio.
+ */
+export async function confirmSetDcaAction(raw: unknown): Promise<ConfirmResult> {
+  const parsed = setDcaInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const { setHoldingDcaAction } = await import("@/modules/wealth");
+    const res = await setHoldingDcaAction(parsed.data.holdingId, parsed.data.monthlyContribution);
+    if (!res.ok) return { ok: false, message: res.message ?? "No se pudo fijar el aporte." };
+    return { ok: true };
+  } catch (err) {
+    logger.error("confirmSetDca fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos fijar el aporte mensual." };
+  }
+}
+
+/**
+ * Confirma el AJUSTE DE PRESUPUESTO de un sobre del periodo actual. Reusa la misma server action
+ * que el tab de Gastos, así que hereda su candado: un sobre derivado de una entidad
+ * (`source_kind` ≠ manual) se rechaza con su mensaje, no se fuerza desde el chat.
+ */
+export async function confirmAdjustBudgetAction(raw: unknown): Promise<ConfirmResult> {
+  const parsed = adjustBudgetInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const { setEnvelopeBudgetAction } = await import("@/modules/financial-base");
+    const res = await setEnvelopeBudgetAction(parsed.data);
+    if (!res.ok) return { ok: false, message: res.message ?? "No se pudo ajustar el presupuesto." };
+    revalidatePath("/gastos");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("confirmAdjustBudget fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos ajustar el presupuesto." };
+  }
+}
+
+/**
+ * Confirma un ABONO EXTRA a capital. Reusa reportPaymentAction del módulo control, así que el
+ * abono nace con su transacción vinculada como cualquier pago hecho desde Deudas.
+ *
+ * `amount: 0` + `extraAmount` a propósito: es un abono EXTRAORDINARIO (todo a capital), no la
+ * cuota del mes. Meterlo en `amount` lo registraría como pago ordinario y distorsionaría el plan.
+ */
+export async function confirmDebtExtraPaymentAction(raw: unknown): Promise<ConfirmResult> {
+  const parsed = debtExtraPaymentInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const { reportPaymentAction } = await import("@/modules/control");
+    const res = await reportPaymentAction({
+      debtId: parsed.data.debtId,
+      paymentDate: parsed.data.paymentDate,
+      amount: 0,
+      extraAmount: parsed.data.amount,
+      kind: "extraordinario",
+      ...(parsed.data.currency ? { currency: parsed.data.currency } : {}),
+    });
+    if (!res.ok) return { ok: false, message: res.message ?? "No se pudo registrar el abono." };
+    return { ok: true };
+  } catch (err) {
+    logger.error("confirmDebtExtraPayment fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos registrar el abono." };
   }
 }
 

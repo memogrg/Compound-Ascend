@@ -82,3 +82,5 @@ export { BaseActions } from "./components/base-actions";
 export type { BaseSummary } from "./services/base-service";
 export type { BaseIndicators, IncomeSource, ExpenseItem, ExpenseNature } from "./types";
 export type { Transaction, TxnKind, Period } from "./types";
+/** Fija el presupuesto de un sobre del periodo (lo usa el tab de Gastos y el asesor). */
+export { setEnvelopeBudgetAction } from "./api/v2-actions";

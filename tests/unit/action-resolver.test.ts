@@ -1,0 +1,223 @@
+/**
+ * El resolver es lo que hace que una acción nacida de un CONSEJO sea segura de ejecutar con un
+ * tap: el modelo dice nombres y montos, y acá se reconstruye el payload contra los datos REALES
+ * del usuario. Lo que se prueba:
+ *
+ *  - el id SIEMPRE sale de la entidad real (nunca del modelo),
+ *  - si la entidad no se resuelve, la acción se DESCARTA (mejor sin tarjeta que con una que
+ *    apunta a nada),
+ *  - los montos de referencia (saldo, presupuesto actual, aporte actual) salen del motor,
+ *  - los tipos que ya existían pasan intactos.
+ */
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
+const holdings = vi.fn(async () => [
+  {
+    id: "11111111-1111-4111-8111-111111111111",
+    symbol: "VOO",
+    label: "Vanguard S&P 500",
+    monthlyContribution: 100,
+    currency: "USD",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222222",
+    symbol: "BTC",
+    label: "Bitcoin",
+    monthlyContribution: 0,
+    currency: "USD",
+  },
+]);
+vi.mock("@/modules/wealth/services/holdings-service", () => ({ listHoldings: () => holdings() }));
+
+const debts = vi.fn(async () => [
+  { id: "33333333-3333-4333-8333-333333333333", name: "Tarjeta BAC", balance: 800_000, apr: 45, currency: "CRC" },
+  { id: "44444444-4444-4444-8444-444444444444", name: "Préstamo personal", balance: 2_000_000, apr: 18, currency: "CRC" },
+]);
+vi.mock("@/modules/control/services/control-service", () => ({ listDebts: () => debts() }));
+
+const sobres = vi.fn(async () => [
+  { id: "55555555-5555-4555-8555-555555555555", sobre: "Restaurantes", frasco: "Vivir" },
+  { id: "66666666-6666-4666-8666-666666666666", sobre: "Súper", frasco: "Vivir" },
+]);
+const budgetTotals = vi.fn(async () => ({
+  currency: "CRC",
+  expenseByKey: {
+    "55555555-5555-4555-8555-555555555555": { label: "Restaurantes", value: 100_000 },
+  },
+}));
+vi.mock("@/modules/financial-base", () => ({
+  listSobresForKind: () => sobres(),
+  getBudgetTotals: () => budgetTotals(),
+}));
+vi.mock("@/lib/time/user-time", () => ({
+  userCurrentPeriod: async () => ({ year: 2026, month: 8 }),
+}));
+
+import { resolveActionProposal } from "@/lib/ai/action-resolver";
+import type { AIActionProposal } from "@/lib/ai/types";
+
+const CTX = { currency: "CRC", today: "2026-08-03" };
+const resolve = (a: AIActionProposal) => resolveActionProposal(a, CTX);
+
+beforeEach(() => {
+  holdings.mockClear();
+  debts.mockClear();
+  sobres.mockClear();
+  budgetTotals.mockClear();
+});
+
+describe("set_dca · fijar el aporte mensual de una inversión", () => {
+  it("resuelve el holdingId por símbolo y trae el aporte ACTUAL del dato real", async () => {
+    const out = await resolve({
+      type: "set_dca",
+      payload: { symbol: "VOO", monthlyContribution: 200 },
+    });
+    expect(out?.payload).toMatchObject({
+      holdingId: "11111111-1111-4111-8111-111111111111",
+      monthlyContribution: 200,
+      currentContribution: 100, // del motor, no del modelo
+      currency: "USD", // la de la posición
+    });
+  });
+
+  it("también resuelve por nombre de la posición", async () => {
+    const out = await resolve({
+      type: "set_dca",
+      payload: { label: "Bitcoin", monthlyContribution: 50 },
+    });
+    expect(out?.payload.holdingId).toBe("22222222-2222-4222-8222-222222222222");
+    expect(out?.payload.currentContribution).toBe(0);
+  });
+
+  it("una posición que NO tiene → se descarta (no se inventa un id)", async () => {
+    expect(await resolve({ type: "set_dca", payload: { symbol: "TSLA", monthlyContribution: 100 } })).toBeNull();
+  });
+
+  it("sin monto no hay acción", async () => {
+    expect(await resolve({ type: "set_dca", payload: { symbol: "VOO" } })).toBeNull();
+  });
+
+  it("IGNORA un holdingId que venga del modelo: el id sale de la búsqueda", async () => {
+    const out = await resolve({
+      type: "set_dca",
+      payload: { holdingId: "99999999-9999-4999-8999-999999999999", symbol: "VOO", monthlyContribution: 200 },
+    });
+    expect(out?.payload.holdingId).toBe("11111111-1111-4111-8111-111111111111");
+  });
+});
+
+describe("adjust_budget · subir o bajar el presupuesto de un sobre", () => {
+  it("resuelve el sobre y trae el presupuesto vigente del motor", async () => {
+    const out = await resolve({
+      type: "adjust_budget",
+      payload: { name: "Restaurantes", amount: 150_000 },
+    });
+    expect(out?.payload).toMatchObject({
+      categoryId: "55555555-5555-4555-8555-555555555555",
+      amount: 150_000,
+      currentAmount: 100_000,
+      periodMonth: 8,
+      periodYear: 2026,
+      currency: "CRC",
+    });
+  });
+
+  it('acepta la ruta completa "Frasco › Sobre"', async () => {
+    const out = await resolve({
+      type: "adjust_budget",
+      payload: { categoryPath: "Vivir › Restaurantes", amount: 120_000 },
+    });
+    expect(out?.payload.categoryId).toBe("55555555-5555-4555-8555-555555555555");
+  });
+
+  it("un sobre sin presupuesto arranca de 0, no de una cifra inventada", async () => {
+    const out = await resolve({ type: "adjust_budget", payload: { name: "Súper", amount: 200_000 } });
+    expect(out?.payload.currentAmount).toBe(0);
+  });
+
+  it("proponer EXACTAMENTE lo que ya tiene no es una acción: se descarta", async () => {
+    expect(
+      await resolve({ type: "adjust_budget", payload: { name: "Restaurantes", amount: 100_000 } }),
+    ).toBeNull();
+  });
+
+  it("un sobre inexistente se descarta", async () => {
+    expect(
+      await resolve({ type: "adjust_budget", payload: { name: "Criptomonedas", amount: 50_000 } }),
+    ).toBeNull();
+  });
+});
+
+describe("debt_extra_payment · abono extra a capital", () => {
+  it("resuelve la deuda por nombre y trae saldo y tasa reales", async () => {
+    const out = await resolve({
+      type: "debt_extra_payment",
+      payload: { name: "Tarjeta BAC", amount: 100_000 },
+    });
+    expect(out?.payload).toMatchObject({
+      debtId: "33333333-3333-4333-8333-333333333333",
+      amount: 100_000,
+      balance: 800_000,
+      apr: 45,
+      paymentDate: "2026-08-03",
+    });
+  });
+
+  it("matchea parcial: «tarjeta» encuentra «Tarjeta BAC»", async () => {
+    const out = await resolve({
+      type: "debt_extra_payment",
+      payload: { name: "tarjeta", amount: 50_000 },
+    });
+    expect(out?.payload.debtId).toBe("33333333-3333-4333-8333-333333333333");
+  });
+
+  it("TOPEA el abono al saldo: no se propone pagar más de lo que se debe", async () => {
+    const out = await resolve({
+      type: "debt_extra_payment",
+      payload: { name: "Tarjeta BAC", amount: 5_000_000 },
+    });
+    expect(out?.payload.amount).toBe(800_000);
+  });
+
+  it("sin nombre y con VARIAS deudas se descarta (adivinar cuál es inaceptable)", async () => {
+    expect(await resolve({ type: "debt_extra_payment", payload: { amount: 100_000 } })).toBeNull();
+  });
+
+  it("sin nombre pero con UNA sola deuda, esa es", async () => {
+    debts.mockResolvedValueOnce([
+      { id: "77777777-7777-4777-8777-777777777777", name: "Única", balance: 500_000, apr: 30, currency: "CRC" },
+    ]);
+    const out = await resolve({ type: "debt_extra_payment", payload: { amount: 100_000 } });
+    expect(out?.payload.debtId).toBe("77777777-7777-4777-8777-777777777777");
+  });
+
+  it("una deuda que no existe se descarta", async () => {
+    expect(
+      await resolve({ type: "debt_extra_payment", payload: { name: "Hipoteca", amount: 100_000 } }),
+    ).toBeNull();
+  });
+});
+
+describe("el resto no se toca", () => {
+  it("los tipos que ya existían pasan intactos", async () => {
+    const a: AIActionProposal = {
+      type: "create_transaction",
+      payload: { kind: "gasto", amount: 5000 },
+      summary: "x",
+    };
+    expect(await resolve(a)).toEqual(a);
+  });
+
+  it("null entra y null sale", async () => {
+    expect(await resolveActionProposal(null, CTX)).toBeNull();
+  });
+
+  it("si una lectura revienta, se cae la tarjeta pero no la respuesta", async () => {
+    holdings.mockRejectedValueOnce(new Error("db caída"));
+    expect(
+      await resolve({ type: "set_dca", payload: { symbol: "VOO", monthlyContribution: 200 } }),
+    ).toBeNull();
+  });
+});

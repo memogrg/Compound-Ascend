@@ -222,6 +222,22 @@ export async function POST(req: Request) {
         // deja la acción sin sobre sugerido; la card ofrece el selector igual
       }
     }
+
+    // RESOLUCIÓN de la acción propuesta contra los datos REALES del usuario. Las acciones que
+    // nacen de un consejo ("subí el sobre de Restaurantes a X", "abonale Y a la tarjeta") vienen
+    // con nombres, no con ids: acá se buscan sus entidades y se reconstruye el payload. Si la
+    // entidad no existe, la acción se cae y queda solo el texto — una tarjeta que apunta a nada
+    // ejecutaría algo que el usuario no puede revisar.
+    if (user && result.action) {
+      const { resolveActionProposal } = await import("@/lib/ai/action-resolver");
+      const { userToday } = await import("@/lib/time/user-time");
+      const today = await userToday().catch(() => new Date().toISOString().slice(0, 10));
+      result.action = await resolveActionProposal(result.action, {
+        currency: await getDisplayCurrency().catch(() => "CRC"),
+        today,
+      });
+    }
+
     // Carril del router (template/lite/reasoning) para medir el ahorro de tokens antes/después.
     logger.info("assistant.chat.lane", {
       lane: result.lane ?? "reasoning",

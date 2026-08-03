@@ -26,6 +26,7 @@ export { addPolicyAction, setPeaceMonthsAction } from "./api/actions";
 export { DefenseFunds } from "./components/defense-funds";
 export { getPortfolioReport, getPortfolioMarketValues } from "./services/portfolio-service";
 export { getPositionForSymbol, listHoldings } from "./services/holdings-service";
+export { setHoldingDcaAction } from "./api/actions";
 // Detalle por dominio para la IA (solo lectura): compras de un activo y dividendos cobrados.
 export { listHoldingPurchases } from "./services/holding-history-service";
 export type { HoldingPurchase } from "./services/holding-history-service";
