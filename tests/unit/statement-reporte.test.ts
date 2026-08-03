@@ -79,19 +79,41 @@ describe("renderReporte · tabla y resumen", () => {
   });
 });
 
-describe("moneda de visualización", () => {
-  it("los colones del estado se muestran en USD si esa es la moneda de display", () => {
+describe("MONEDA NATIVA en el reporte de conciliación", () => {
+  // Cambio de contrato: acá pesa más que en las listas del libro diario. El usuario está
+  // cotejando fila por fila contra un estado que dice ₡3.900; verlo como $7,80 vuelve imposible
+  // la comparación, que es literalmente para lo que pegó el bloque.
+  it("los colones del estado se muestran en COLONES aunque el display sea USD", () => {
     const r = conciliar(filas, []);
     const md = renderReporte(r.filas, { moneda: "USD", rates: RATES, ignoradas: 0 });
-    // 3.900 CRC / 500 = 7,8 → $8 (convertirTotal redondea).
-    expect(md).toContain("$8");
-    expect(md).not.toContain("₡");
+    expect(md).toContain("₡3.900");
+    expect(md).not.toContain("$8"); // la conversión que ya NO se hace
   });
 
-  it("sin tasas, cada fila se muestra en su moneda de origen (no se inventa la conversión)", () => {
+  it("el total va en la moneda de los movimientos", () => {
+    const r = conciliar(filas, []);
+    const md = renderReporte(r.filas, { moneda: "USD", rates: RATES, ignoradas: 0 });
+    // 3.900 + 24.150 + 18.700 = 46.750
+    expect(md).toMatch(/\|\s*\*\*Total\*\*\s*\|\s*\|\s*\*\*₡46\.750\*\*/);
+  });
+
+  it("con dos monedas: subtotal por moneda, sin sumarlas", () => {
+    const mixto = parseStatement(
+      `2026-07-17  SUBWAY  3,900.00  COL  D\n2026-07-19  AMAZON  25.00  USD  D`,
+    ).filas;
+    const md = renderReporte(conciliar(mixto, []).filas, {
+      moneda: "CRC",
+      rates: RATES,
+      ignoradas: 0,
+    });
+    expect(md).toContain("₡3.900 + $25");
+  });
+
+  it("no depende de las tasas: sin FX el reporte sale igual", () => {
     const r = conciliar(filas, []);
     const md = renderReporte(r.filas, { moneda: "USD", rates: null, ignoradas: 0 });
-    expect(md).toContain("₡");
+    expect(md).toContain("₡3.900");
+    expect(md).toContain("₡46.750");
   });
 });
 

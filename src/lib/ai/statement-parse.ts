@@ -144,6 +144,50 @@ export function parseStatement(text: string): { filas: StatementRow[]; ignoradas
   return { filas, ignoradas };
 }
 
+/**
+ * ¿El token parece un IMPORTE y no un número cualquiera del texto?
+ * Exige separador decimal/de miles, o al menos 4 dígitos. Así "SUBWAY 221" no cuenta como monto
+ * y "3,900.00" / "125430.00" / "3900" sí.
+ */
+function pareceMonto(token: string): boolean {
+  if (/[.,]/.test(token)) return true;
+  return token.replace(/\D/g, "").length >= 4;
+}
+
+/**
+ * Cuántos IMPORTES trae la línea, sin contar la referencia inicial ni la fecha.
+ *
+ * Es el guard contra el fallo SILENCIOSO del fast-path: con columnas extra
+ * (`… 3,900.00  125,430.00` = monto y SALDO) la regex parsea sin quejarse y se queda con el
+ * número de la derecha — el saldo. Una línea con más de un importe es ambigua por definición y
+ * no la puede resolver un patrón posicional.
+ */
+export function montosEnLinea(linea: string): number {
+  let s = linea.trim().replace(/^\d{4,}\s+/, ""); // referencia del banco
+  s = s.replace(/\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}/g, " "); // fechas
+  const tokens = s.match(/-?\d[\d.,]*\d|\d+/g) ?? [];
+  return tokens.filter(pareceMonto).length;
+}
+
+/**
+ * ¿La línea se puede resolver con el fast-path determinista? Necesita parsear Y traer un solo
+ * importe. Si no, va al extractor con LLM: es preferible pagar una llamada a registrar el saldo
+ * de la cuenta como si fuera un consumo.
+ */
+export function esFilaLimpia(linea: string): boolean {
+  const l = linea.trim();
+  if (!l || !FILA.test(l)) return false;
+  return montosEnLinea(l) === 1;
+}
+
+/** ¿TODO el bloque se puede resolver sin LLM? Solo entonces se salta la llamada. */
+export function bloqueEsLimpio(text: string): boolean {
+  const lineas = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const candidatas = lineas.filter((l) => new RegExp(FECHA).test(l));
+  if (candidatas.length === 0) return false;
+  return candidatas.every(esFilaLimpia);
+}
+
 /** Mínimo de filas para considerar que el usuario PEGÓ un estado y no escribió una frase. */
 export const MIN_FILAS_BLOQUE = 2;
 
@@ -157,7 +201,12 @@ export const MIN_FILAS_BLOQUE = 2;
 export function pareceBloqueDeEstado(text: string): boolean {
   const lineas = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lineas.length < MIN_FILAS_BLOQUE) return false;
-  const { filas } = parseStatement(text);
-  if (filas.length < MIN_FILAS_BLOQUE) return false;
-  return filas.length >= Math.ceil(lineas.length * 0.6);
+  // La detección NO puede depender del parser estricto. Cuando dependía, un formato sucio —el que
+  // más necesita ayuda— no se reconocía como estado y se iba al chat normal: el camino de
+  // conciliación no llegaba a ejecutarse nunca. Ahora alcanza con que la línea traiga FECHA y un
+  // IMPORTE, que es lo que define un movimiento en cualquier formato; quién lo lee (patrón o LLM)
+  // se decide después.
+  const conDatos = lineas.filter((l) => new RegExp(FECHA).test(l) && montosEnLinea(l) >= 1);
+  if (conDatos.length < MIN_FILAS_BLOQUE) return false;
+  return conDatos.length >= Math.ceil(lineas.length * 0.6);
 }
