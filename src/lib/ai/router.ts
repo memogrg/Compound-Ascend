@@ -750,7 +750,12 @@ export function matchIntent(
     // `\bqu[eé]\b` NUNCA matchea "qué". Por eso acá no hay `\b` de cierre en esos grupos.
     const esConsultaGasto =
       /(?:\bcu[aá]nto|\bqu[eé]|\ben\s+qu[eé])[^?]*\b(?:gast[eéoó]|compr[eéoó]|pagu[eé]|se me fue|se fue|ingres[eéoó]|gan[eé]|cobr[eé]|recib[ií])/i.test(t) ||
-      /\b(?:movimientos?|transacciones?|compras?)\b/i.test(t);
+      // "gastos" y "consumos" faltaban en esta lista, y eran la forma más natural de pedirlo:
+      // "dame los GASTOS de supermercado del mes pasado" no entraba al carril —aunque el sobre y
+      // el periodo se extraían perfecto— y se iba al LLM, que INVENTABA las transacciones.
+      // "transacciones", "movimientos" y "compras" sí entraban: la misma consulta funcionaba o no
+      // según el sustantivo que el usuario eligiera.
+      /\b(?:movimientos?|transacciones?|compras?|gastos?|consumos?)\b/i.test(t);
     if (periodo && esConsultaGasto) {
       // Sin `\b` de cierre tras `qu[eé]` (ver nota arriba: `é` no es carácter de palabra).
       const desglose = /\ben\s+qu[eé]|\bd[oó]nde\b|\bdesglos|\bdetalle\b|\bcategor|\bsobres?\b/i.test(t);
@@ -760,11 +765,15 @@ export function matchIntent(
       // que es justo lo que pasaba, porque extractTerminoGasto exige un verbo de gasto ("gasté
       // en…") y esta forma no lo tiene, así que salía sin ningún filtro.
       const sobre = extractSobreMencionado(t);
+      const termino = sobre ? null : extractTerminoGasto(t);
       // "TODAS las transacciones de X" pide la lista COMPLETA: cortar en 10 responde otra cosa.
-      // También se asume completa cuando pidió una TABLA de un sobre concreto — nadie pide la
-      // tabla de un sobre para ver diez filas de las cuarenta que tuvo.
+      // También se asume completa cuando la consulta está ACOTADA a un sobre o a un término: el
+      // recorte a 10 solo tiene sentido en una consulta amplia ("¿cuánto gasté la semana pasada?").
       const pideTodas =
-        /\btod[oa]s\b|\bcompleta\b|\bentera\b|\bdetallad/i.test(t) || !!sobre || pideTodoElHistorial(t);
+        /\btod[oa]s\b|\bcompleta\b|\bentera\b|\bdetallad/i.test(t) ||
+        !!sobre ||
+        !!termino ||
+        pideTodoElHistorial(t);
       return {
         intent: "consulta_transacciones",
         params: {
@@ -773,7 +782,7 @@ export function matchIntent(
           // Con un sobre nombrado se listan SUS movimientos; agrupar por categoría respondería
           // con una sola fila inútil.
           agrupacion: desglose && !sobre ? "categoria" : "ninguna",
-          ...(sobre ? { sobre } : { termino: extractTerminoGasto(t) }),
+          ...(sobre ? { sobre } : { termino }),
           tope: pideTodas ? 300 : 10,
         },
       };
