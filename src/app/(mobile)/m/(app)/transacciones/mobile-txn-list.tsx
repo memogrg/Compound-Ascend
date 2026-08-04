@@ -197,33 +197,10 @@ export function MobileTxnList({
   /** Marcador de cierre de mes (derivado). Fase C. */
   monthMarker?: MonthMarker | null;
 }) {
-  const router = useRouter();
-  const toast = useToast();
   const [filter, setFilter] = useState<Filter>("all");
   const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<Transaction | null>(null);
-  const [deleting, setDeleting] = useState<Transaction | null>(null);
-  const [delPending, setDelPending] = useState(false);
-  const [actionsFor, setActionsFor] = useState<Transaction | null>(null);
-  // Fase B: una fila abierta a la vez (tocar la fila despliega su detalle del viaje).
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const toggleExpand = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
 
   const list = filter === "all" ? transactions : transactions.filter((t) => t.kind === filter);
-
-  const confirmDelete = async () => {
-    if (!deleting) return;
-    setDelPending(true);
-    const res = await removeTransactionAction(deleting.id);
-    setDelPending(false);
-    if (res.ok) {
-      toast.show("Transacción eliminada", "success");
-      setDeleting(null);
-      router.refresh();
-    } else {
-      toast.show(res.message ?? "No se pudo eliminar.", "error");
-    }
-  };
 
   return (
     <>
@@ -266,86 +243,22 @@ export function MobileTxnList({
           onAction={() => setAdding(true)}
         />
       ) : (
-        // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
-        // lateral lo pone la regla puente .m-swipe-content .m-drow.
-        <MContentCard style={{ padding: 0, overflow: "hidden" }}>
-          {list.map((t) => {
-            const linked = isLinked(t);
-            const origin = linked && t.linkedKind ? LINKED_ORIGIN[t.linkedKind] : undefined;
-            // El viaje del dinero (Fase B): efecto en liquidez, origen y destino. Puro.
-            const flow = describeMoneyFlow(t);
-            const expanded = expandedId === t.id;
-            const row = <TxnRow t={t} flow={flow} currency={currency} />;
-            const detail = expanded ? (
-              <TxnDetail
-                t={t}
-                flow={flow}
-                currency={currency}
-                categoryNames={categoryNames}
-                balanceAfter={balanceAfter?.[t.id]}
-                origin={origin}
-                // El sheet de acciones (duplicar/dividir/…) sólo cuelga de las gestionables.
-                onMore={isManageable(t) ? () => setActionsFor(t) : undefined}
-              />
-            ) : null;
-
-            // Gestionable (ingreso/gasto suelto): swipe editar/eliminar + tap→detalle.
-            if (isManageable(t)) {
-              return (
-                <div key={t.id}>
-                  <SwipeRow
-                    onEdit={() => setEditing(t)}
-                    onDelete={() => setDeleting(t)}
-                    onTap={() => toggleExpand(t.id)}
-                  >
-                    {row}
-                  </SwipeRow>
-                  {detail}
-                </div>
-              );
-            }
-            // Vinculada / transferencia / ajuste: tap→detalle (el "Ver en X" del detalle navega).
-            return (
-              <div key={t.id}>
-                <button
-                  type="button"
-                  className="m-row-wrap"
-                  style={{
-                    display: "block",
-                    width: "100%",
-                    textAlign: "left",
-                    background: "none",
-                    border: 0,
-                    padding: 0,
-                    color: "inherit",
-                    font: "inherit",
-                    cursor: "pointer",
-                  }}
-                  aria-expanded={expanded}
-                  onClick={() => toggleExpand(t.id)}
-                >
-                  {row}
-                </button>
-                {detail}
-              </div>
-            );
-          })}
-        </MContentCard>
+        <ManagedTxnRows
+          transactions={list}
+          currency={currency}
+          categoryNames={categoryNames}
+          categories={categories}
+          jars={jars}
+          accounts={accounts}
+          incomeCats={incomeCats}
+          incomeGroupId={incomeGroupId}
+          balanceAfter={balanceAfter}
+        />
       )}
 
       <Fab onClick={() => setAdding(true)} label="Registrar transacción" />
 
-      {/* Acciones del movimiento (toque en la fila): duplicar, dividir, reasignar, recibo, revisar */}
-      <TxnActionsSheet
-        txn={actionsFor}
-        categories={categories}
-        categoryNames={categoryNames}
-        onClose={() => setActionsFor(null)}
-        onEdit={(t) => setEditing(t)}
-        onDelete={(t) => setDeleting(t)}
-      />
-
-      {/* Crear */}
+      {/* Crear (nivel lista; el editar/borrar/acciones por fila vive en ManagedTxnRows) */}
       <BottomSheet open={adding} onClose={() => setAdding(false)} title="Registrar transacción">
         <TxnForm
           jars={jars}
@@ -359,6 +272,137 @@ export function MobileTxnList({
           onSuccess={() => setAdding(false)}
         />
       </BottomSheet>
+    </>
+  );
+}
+
+/**
+ * Cuerpo GESTIONABLE de la lista: filas con swipe (editar/borrar) + tap→detalle del viaje del
+ * dinero, y sus modales de editar/eliminar/acciones. Extraído de MobileTxnList para reusarse
+ * TAL CUAL en "Movimientos recientes" del Inicio — misma capacidad, sin duplicar la fila.
+ */
+export function ManagedTxnRows({
+  transactions,
+  currency,
+  categoryNames,
+  categories,
+  jars,
+  accounts,
+  incomeCats,
+  incomeGroupId,
+  balanceAfter,
+}: {
+  transactions: Transaction[];
+  currency: string;
+  categoryNames: Record<string, string>;
+  categories: SelectableCategory[];
+  jars: Jar[];
+  accounts: Account[];
+  incomeCats: { id: string; name: string }[];
+  incomeGroupId: string | null;
+  balanceAfter?: Record<string, number>;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [deleting, setDeleting] = useState<Transaction | null>(null);
+  const [delPending, setDelPending] = useState(false);
+  const [actionsFor, setActionsFor] = useState<Transaction | null>(null);
+  // Fase B: una fila abierta a la vez (tocar la fila despliega su detalle del viaje).
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const toggleExpand = (id: string) => setExpandedId((cur) => (cur === id ? null : id));
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setDelPending(true);
+    const res = await removeTransactionAction(deleting.id);
+    setDelPending(false);
+    if (res.ok) {
+      toast.show("Transacción eliminada", "success");
+      setDeleting(null);
+      router.refresh();
+    } else {
+      toast.show(res.message ?? "No se pudo eliminar.", "error");
+    }
+  };
+
+  return (
+    <>
+      {/* padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
+          lateral lo pone la regla puente .m-swipe-content .m-drow. */}
+      <MContentCard style={{ padding: 0, overflow: "hidden" }}>
+        {transactions.map((t) => {
+          const linked = isLinked(t);
+          const origin = linked && t.linkedKind ? LINKED_ORIGIN[t.linkedKind] : undefined;
+          // El viaje del dinero (Fase B): efecto en liquidez, origen y destino. Puro.
+          const flow = describeMoneyFlow(t);
+          const expanded = expandedId === t.id;
+          const row = <TxnRow t={t} flow={flow} currency={currency} />;
+          const detail = expanded ? (
+            <TxnDetail
+              t={t}
+              flow={flow}
+              currency={currency}
+              categoryNames={categoryNames}
+              balanceAfter={balanceAfter?.[t.id]}
+              origin={origin}
+              // El sheet de acciones (duplicar/dividir/…) sólo cuelga de las gestionables.
+              onMore={isManageable(t) ? () => setActionsFor(t) : undefined}
+            />
+          ) : null;
+
+          // Gestionable (ingreso/gasto suelto): swipe editar/eliminar + tap→detalle.
+          if (isManageable(t)) {
+            return (
+              <div key={t.id}>
+                <SwipeRow
+                  onEdit={() => setEditing(t)}
+                  onDelete={() => setDeleting(t)}
+                  onTap={() => toggleExpand(t.id)}
+                >
+                  {row}
+                </SwipeRow>
+                {detail}
+              </div>
+            );
+          }
+          // Vinculada / transferencia / ajuste: tap→detalle (el "Ver en X" del detalle navega).
+          return (
+            <div key={t.id}>
+              <button
+                type="button"
+                className="m-row-wrap"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  background: "none",
+                  border: 0,
+                  padding: 0,
+                  color: "inherit",
+                  font: "inherit",
+                  cursor: "pointer",
+                }}
+                aria-expanded={expanded}
+                onClick={() => toggleExpand(t.id)}
+              >
+                {row}
+              </button>
+              {detail}
+            </div>
+          );
+        })}
+      </MContentCard>
+
+      {/* Acciones del movimiento (toque en la fila): duplicar, dividir, reasignar, recibo, revisar */}
+      <TxnActionsSheet
+        txn={actionsFor}
+        categories={categories}
+        categoryNames={categoryNames}
+        onClose={() => setActionsFor(null)}
+        onEdit={(t) => setEditing(t)}
+        onDelete={(t) => setDeleting(t)}
+      />
 
       {/* Editar (tipo fijo, como la web) */}
       <BottomSheet open={!!editing} onClose={() => setEditing(null)} title="Editar transacción">
