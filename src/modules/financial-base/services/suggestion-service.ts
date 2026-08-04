@@ -16,6 +16,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { listCategories } from "@/modules/financial-base/services/categories-service";
 import { listRules } from "@/modules/financial-base/services/rules-service";
+import { MERCHANT_SEED } from "@/modules/financial-base/engine/merchant-seed";
 
 export type SuggestionEntry = {
   pattern: string; // texto en minúsculas a buscar como substring
@@ -23,66 +24,6 @@ export type SuggestionEntry = {
   categoryName: string;
   weight: number; // mayor gana
 };
-
-/** Diccionario semilla: comercios frecuentes → key de categoría destino. */
-const SEED: { patterns: string[]; categoryKey: string }[] = [
-  // Transporte
-  { patterns: ["uber", "didi", "indriver"], categoryKey: "trans_uber" },
-  { patterns: ["taxi"], categoryKey: "trans_taxi" },
-  {
-    patterns: ["gasolina", "combustible", "delta", "gas station", "servicentro"],
-    categoryKey: "trans_combustible",
-  },
-  { patterns: ["peaje", "ruta 27"], categoryKey: "trans_peajes" },
-  { patterns: ["parqueo", "parking"], categoryKey: "trans_parqueos" },
-  { patterns: ["bus", "tren", "incofer"], categoryKey: "trans_bus" },
-  { patterns: ["marchamo"], categoryKey: "auto_marchamo" },
-  { patterns: ["riteve", "dekra", "revision tecnica"], categoryKey: "auto_revision" },
-  // Alimentación
-  {
-    patterns: [
-      "automercado",
-      "walmart",
-      "mas x menos",
-      "masxmenos",
-      "pricesmart",
-      "perimercados",
-      "super",
-    ],
-    categoryKey: "alim_supermercado",
-  },
-  { patterns: ["feria"], categoryKey: "alim_feria" },
-  {
-    patterns: ["mcdonald", "kfc", "burger", "pizza", "rostipollo", "taco"],
-    categoryKey: "alim_comida_rapida",
-  },
-  { patterns: ["starbucks", "cafe", "coffee", "britt"], categoryKey: "alim_cafe" },
-  {
-    patterns: ["uber eats", "rappi", "pedidosya", "glovo", "didi food"],
-    categoryKey: "alim_delivery",
-  },
-  { patterns: ["restaurante", "rest "], categoryKey: "alim_restaurantes" },
-  // Vivienda / servicios
-  { patterns: ["alquiler", "renta"], categoryKey: "vivienda_alquiler" },
-  { patterns: ["hipoteca"], categoryKey: "vivienda_hipoteca" },
-  { patterns: ["ice", "cnfl", "electricidad", "luz"], categoryKey: "serv_luz" },
-  { patterns: ["aya", "acueductos", "agua"], categoryKey: "serv_agua" },
-  { patterns: ["internet", "cabletica", "tigo", "telecable"], categoryKey: "serv_internet" },
-  { patterns: ["kolbi", "movistar", "claro", "celular", "recarga"], categoryKey: "serv_celular" },
-  // Estilo de vida
-  {
-    patterns: ["netflix", "spotify", "hbo", "disney", "max", "youtube", "apple tv", "prime video"],
-    categoryKey: "estilo_streaming",
-  },
-  { patterns: ["smartfit", "gimnasio", "gym", "crossfit"], categoryKey: "estilo_gimnasio" },
-  { patterns: ["zara", "h&m", "ropa", "aeropostale"], categoryKey: "estilo_ropa" },
-  // Salud
-  { patterns: ["farmacia", "fischel", "sucre", "la bomba"], categoryKey: "salud_farmacia" },
-  { patterns: ["clinica", "hospital", "consulta", "medico"], categoryKey: "salud_consultas" },
-  { patterns: ["dentista", "dental", "odonto"], categoryKey: "salud_dental" },
-  // Otros
-  { patterns: ["amazon", "aliexpress", "temu", "shein"], categoryKey: "miscelaneos" },
-];
 
 /**
  * Construye el índice de sugerencias para el tipo dado. Solo gastos por ahora
@@ -140,7 +81,7 @@ export async function buildSuggestionIndex(): Promise<SuggestionEntry[]> {
   }
 
   // 3) Diccionario semilla.
-  for (const seed of SEED) {
+  for (const seed of MERCHANT_SEED) {
     const cat = byKey.get(seed.categoryKey);
     if (!cat) continue;
     for (const pat of seed.patterns) push(pat, cat.id, 40);
