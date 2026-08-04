@@ -10,6 +10,7 @@ import {
   selectPatrimonio,
   selectLibertad,
   deriveFundFlags,
+  deriveFundAmounts,
   phaseLabel,
 } from "@/modules/dashboard/engine/home-cards";
 import type { MonthFlow } from "@/modules/financial-base";
@@ -138,7 +139,7 @@ describe("selectInversiones", () => {
 });
 
 describe("selectProteccion", () => {
-  it("cobertura/prima + checklist de 5 + conteo de huecos", () => {
+  it("monto protegido = pólizas + fondos; desglose, prima y checklist de 5", () => {
     const c = selectProteccion(
       {
         totalCoverage: 50000,
@@ -146,13 +147,32 @@ describe("selectProteccion", () => {
         annualPremium: 1200,
         coverageByType: [{ type: "vehiculo", coverage: 15000 }],
       },
-      { hasEmergencyFund: true, hasPeaceFund: false },
+      { emergencia: 8000, paz: 0 },
     );
-    expect(c.cobertura).toBe(50000);
+    expect(c.coberturaPolizas).toBe(50000);
+    expect(c.fondos).toEqual({ emergencia: 8000, paz: 0 });
+    expect(c.montoProtegido).toBe(58000); // 50000 pólizas + 8000 fondo de emergencia
     expect(c.primaAnual).toBe(1200);
     expect(c.checklist).toHaveLength(5);
     // cubiertos: auto + fondo_emergencia; faltan vida, médico, fondo_paz → 3 huecos
     expect(c.huecos).toBe(3);
+  });
+
+  it("sin fondos definidos: entran como 0 y quedan pendientes (✗); monto = solo pólizas", () => {
+    const c = selectProteccion(
+      {
+        totalCoverage: 15000,
+        activePolicies: 1,
+        annualPremium: 600,
+        coverageByType: [{ type: "vehiculo", coverage: 15000 }],
+      },
+      { emergencia: 0, paz: 0 },
+    );
+    expect(c.montoProtegido).toBe(15000);
+    expect(c.fondos).toEqual({ emergencia: 0, paz: 0 });
+    const covered = Object.fromEntries(c.checklist.map((i) => [i.key, i.covered]));
+    expect(covered.fondo_emergencia).toBe(false);
+    expect(covered.fondo_paz).toBe(false);
   });
 });
 
@@ -222,6 +242,25 @@ describe("deriveFundFlags", () => {
     expect(
       deriveFundFlags([{ goalType: "defensa:fondo_emergencia", name: "X", currentAmount: 0 }]),
     ).toEqual({ hasEmergencyFund: false, hasPeaceFund: false });
+  });
+});
+
+describe("deriveFundAmounts", () => {
+  it("suma saldos por goalType o por nombre; ignora metas no-defensa y saldo 0", () => {
+    expect(
+      deriveFundAmounts([
+        { goalType: "defensa:fondo_emergencia", name: "Colchón", currentAmount: 900_000 },
+        { goalType: null, name: "Fondo de paz", currentAmount: 300_000 },
+        { goalType: "seguridad", name: "Otra meta", currentAmount: 500_000 },
+        { goalType: "defensa:fondo_paz", name: "Paz 0", currentAmount: 0 },
+      ]),
+    ).toEqual({ emergencia: 900_000, paz: 300_000 });
+  });
+  it("sin metas de defensa → 0/0", () => {
+    expect(deriveFundAmounts([{ goalType: "seguridad", name: "Auto", currentAmount: 1000 }])).toEqual({
+      emergencia: 0,
+      paz: 0,
+    });
   });
 });
 

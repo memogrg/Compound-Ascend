@@ -257,7 +257,12 @@ export function selectInversiones(analytics: PortfolioAnalytics, natureItems: Na
 export type ProteccionCard = {
   key: "proteccion";
   href: string;
-  cobertura: number;
+  /** Monto protegido = cobertura de pólizas + saldos de los fondos de defensa. */
+  montoProtegido: number;
+  /** Cobertura de las pólizas activas (sin fondos). */
+  coberturaPolizas: number;
+  /** Saldos actuales de los fondos de defensa (0 si no están definidos). */
+  fondos: { emergencia: number; paz: number };
   numActivas: number;
   primaAnual: number;
   checklist: ProtectionChecklistItem[];
@@ -267,17 +272,25 @@ export type ProteccionCard = {
 
 export function selectProteccion(
   protection: Pick<ProtectionDiagnosis, "totalCoverage" | "activePolicies" | "annualPremium" | "coverageByType">,
-  fundFlags: { hasEmergencyFund: boolean; hasPeaceFund: boolean },
+  funds: { emergencia: number; paz: number },
 ): ProteccionCard {
+  // El "monto protegido" suma pólizas + fondos de defensa. Ambos llegan ya en la moneda
+  // de display (pólizas convertidas en wealth-service, metas en control-service), así que
+  // sumarlos es coherente. Un fondo no definido entra como 0 (no se inventa) y el checklist
+  // lo marca ✗ = pendiente. No se toca el cálculo de pólizas ni de metas.
   const checklist = buildBaseProtectionChecklist({
     coverageByType: protection.coverageByType,
-    hasEmergencyFund: fundFlags.hasEmergencyFund,
-    hasPeaceFund: fundFlags.hasPeaceFund,
+    hasEmergencyFund: funds.emergencia > 0,
+    hasPeaceFund: funds.paz > 0,
   });
+  const coberturaPolizas = round2(protection.totalCoverage);
+  const fondos = { emergencia: round2(funds.emergencia), paz: round2(funds.paz) };
   return {
     key: "proteccion",
     href: "/m/proteccion",
-    cobertura: round2(protection.totalCoverage),
+    montoProtegido: round2(coberturaPolizas + fondos.emergencia + fondos.paz),
+    coberturaPolizas,
+    fondos,
     numActivas: protection.activePolicies,
     primaAnual: round2(protection.annualPremium),
     checklist,
@@ -424,15 +437,32 @@ export type HomeCards = {
   currency: string;
 };
 
-/** Flags de fondos de defensa desde las metas (mismo criterio que wealth-service). */
-export function deriveFundFlags(
-  goals: { goalType?: string | null; name?: string | null; currentAmount: number }[],
-): { hasEmergencyFund: boolean; hasPeaceFund: boolean } {
-  const has = (type: string, rx: RegExp) =>
-    goals.some((g) => (g.goalType === type || rx.test(g.name ?? "")) && g.currentAmount > 0);
+type FundGoal = { goalType?: string | null; name?: string | null; currentAmount: number };
+
+/**
+ * Saldos de los fondos de defensa desde las metas (mismo criterio que wealth-service): por
+ * `goalType` canónico o por nombre, y sólo lo ya ahorrado (`currentAmount > 0`). Suma todas
+ * las metas que matchean cada fondo. Fuente única del criterio; los flags se derivan de aquí.
+ */
+export function deriveFundAmounts(goals: FundGoal[]): { emergencia: number; paz: number } {
+  const sumOf = (type: string, rx: RegExp) =>
+    goals
+      .filter((g) => (g.goalType === type || rx.test(g.name ?? "")) && g.currentAmount > 0)
+      .reduce((s, g) => s + g.currentAmount, 0);
   return {
-    hasEmergencyFund: has("defensa:fondo_emergencia", /emergencia/i),
-    hasPeaceFund: has("defensa:fondo_paz", /\bpaz\b/i),
+    emergencia: sumOf("defensa:fondo_emergencia", /emergencia/i),
+    paz: sumOf("defensa:fondo_paz", /\bpaz\b/i),
+  };
+}
+
+/** Flags de fondos de defensa desde las metas (existe = tiene saldo). */
+export function deriveFundFlags(
+  goals: FundGoal[],
+): { hasEmergencyFund: boolean; hasPeaceFund: boolean } {
+  const amounts = deriveFundAmounts(goals);
+  return {
+    hasEmergencyFund: amounts.emergencia > 0,
+    hasPeaceFund: amounts.paz > 0,
   };
 }
 
