@@ -17,6 +17,31 @@ export function buildCategoryOptionGroups(categories: Category[]): CategoryOptio
   const usable = categories.filter(
     (c) => c.isActive && (c.categoryType === "expense" || c.categoryType === "both"),
   );
+
+  // TODOS los descendientes del frasco, no solo las hijas directas — igual que
+  // `listCategoryTree`. Listar un solo nivel escondía sobres reales: mientras la
+  // taxonomía tuvo tres niveles (20260605000004 degradó las raíces viejas a hoja y
+  // dejó a las suyas un escalón más abajo), este selector no podía ofrecer Luz, Agua,
+  // Internet, Marchamo, Feria, Café… 21 sobres inalcanzables desde el modal de
+  // reasignar huérfanas. 20260812000001 aplanó la BD a dos niveles, pero recorrer los
+  // descendientes es lo que hace que un tercer nivel futuro no vuelva a esconder nada.
+  // `visto` corta un eventual ciclo de parent_id (el FK no lo impide).
+  function descendientes(raizId: string): Category[] {
+    const out: Category[] = [];
+    const visto = new Set<string>([raizId]);
+    const pila = usable.filter((c) => c.parentId === raizId);
+    while (pila.length) {
+      const nodo = pila.shift()!;
+      if (visto.has(nodo.id)) continue;
+      visto.add(nodo.id);
+      out.push(nodo);
+      for (const h of usable.filter((c) => c.parentId === nodo.id)) {
+        if (!visto.has(h.id)) pila.push(h);
+      }
+    }
+    return out.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "es"));
+  }
+
   return usable
     .filter((c) => c.parentId == null)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -27,15 +52,11 @@ export function buildCategoryOptionGroups(categories: Category[]): CategoryOptio
         // FRASCO (su id es el del grupo), y llamarla con el nombre del grupo producía
         // pares indistinguibles cuando existe además una hoja legada homónima:
         // "Vivienda · Vivienda (general)" junto a "Vivienda · Vivienda" (la hoja real
-        // key='vivienda', preservada de la taxonomía antigua). Colisiona en Vivienda,
-        // Transporte, Alimentación y Educación. Nombrarla por lo que HACE en vez de
-        // repetir el nombre del frasco desambigua sin tocar datos, y además explica la
-        // opción: "(general)" no decía nada.
+        // key='vivienda', de la taxonomía antigua). 20260812000001 retiró esas cuatro
+        // hojas, pero el nombre se queda: dice lo que la opción HACE, y "(general)" no
+        // decía nada. La desambiguación sigue cubierta por si reaparece una homónima.
         { id: g.id, name: "Sin sobre específico" },
-        ...usable
-          .filter((c) => c.parentId === g.id)
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((c) => ({ id: c.id, name: c.name })),
+        ...descendientes(g.id).map((c) => ({ id: c.id, name: c.name })),
       ],
     }));
 }
