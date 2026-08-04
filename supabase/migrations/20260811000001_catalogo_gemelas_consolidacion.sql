@@ -36,129 +36,129 @@
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 0) Los tres pares, explícitos. Lista cerrada a propósito: una heurística por
---    nombre fusionaría los tres «Mantenimiento» y el Alquiler/Alquileres.
+-- 0-2) Consolidación, entera dentro de un solo bloque.
+--
+--   Los tres pares van EXPLÍCITOS: una heurística por nombre fusionaría los tres
+--   «Mantenimiento» y el Alquiler/Alquileres.
+--
+--   Todo en un `do $$` y sin tablas temporales a propósito. El SQL Editor de
+--   Supabase va contra un pool en modo transacción: cada statement puede caer en
+--   una sesión distinta, así que una tabla temporal creada en el primero no
+--   existe en el segundo ("relation _gemelas does not exist"). Un bloque es UN
+--   statement — misma sesión, misma transacción, y aplica igual desde el editor
+--   que desde `supabase db reset`.
 -- ----------------------------------------------------------------------------
---    Tablas temporales de sesión (sin `on commit drop`): la migración corre
---    igual desde el SQL Editor que desde `supabase db reset`, sin depender de
---    que el script entero vaya en una sola transacción.
-drop table if exists _gemelas;
-drop table if exists _pares;
-
-create temporary table _gemelas (perdedora_key text, canonica_key text);
-insert into _gemelas values
-  ('alim_supermercado',  'alim_super'),          -- «Supermercado»   → «Supermercados»
-  ('vivienda_alquiler',  'viv_alquiler'),        -- «Alquiler»       → «Alquiler»
-  ('auto_mantenimiento', 'trans_mantenimiento'); -- «Mantenimiento»  → «Mantenimiento»
-
-create temporary table _pares (perdedora uuid, canonica uuid);
-insert into _pares (perdedora, canonica)
-select p.id, c.id
-from _gemelas g
-join public.expense_categories p on p.key = g.perdedora_key and p.is_system
-join public.expense_categories c on c.key = g.canonica_key  and c.is_system;
-
--- Si el catálogo no tuviera los 3 pares, algo cambió desde la auditoría: parar
--- antes de mover un solo dato.
 do $$
-declare n int;
+declare
+  r     record;
+  n     int := 0;
+  vacio constant uuid := '00000000-0000-0000-0000-000000000000';
 begin
-  select count(*) into n from _pares;
+  for r in
+    select p.id as perdedora, c.id as canonica, g.perdedora_key, g.canonica_key
+    from (values
+      ('alim_supermercado',  'alim_super'),          -- «Supermercado»  → «Supermercados»
+      ('vivienda_alquiler',  'viv_alquiler'),        -- «Alquiler»      → «Alquiler»
+      ('auto_mantenimiento', 'trans_mantenimiento')  -- «Mantenimiento» → «Mantenimiento»
+    ) as g(perdedora_key, canonica_key)
+    join public.expense_categories p on p.key = g.perdedora_key and p.is_system
+    join public.expense_categories c on c.key = g.canonica_key  and c.is_system
+  loop
+    n := n + 1;
+
+    -- ---- Repuntar TODAS las referencias de la perdedora a la canónica.
+    --      La lista sale de los FK reales a expense_categories(id); espeja lo
+    --      que hace `reassignReferences` en categories-service.ts.
+    update public.transactions
+      set category_id = r.canonica where category_id = r.perdedora;
+
+    update public.expense_items
+      set category_id = r.canonica where category_id = r.perdedora;
+
+    update public.expense_items
+      set subcategory_id = r.canonica where subcategory_id = r.perdedora;
+
+    update public.transaction_rules
+      set suggested_category_id = r.canonica where suggested_category_id = r.perdedora;
+
+    update public.transaction_templates
+      set category_id = r.canonica where category_id = r.perdedora;
+
+    update public.merchant_suggestion_cache
+      set category_id = r.canonica where category_id = r.perdedora;
+
+    update public.savings_goals
+      set default_category_id = r.canonica where default_category_id = r.perdedora;
+
+    -- Hijas: hoy las tres perdedoras tienen 0, pero si alguien colgó algo va al
+    -- frasco correcto en vez de quedar bajo una categoría inactiva.
+    update public.expense_categories
+      set parent_id = r.canonica where parent_id = r.perdedora;
+
+    -- `budget_items` NO tiene unique sobre (usuario, periodo, categoría), así que
+    -- un update ciego podría dejar DOS líneas de la misma categoría en el mismo
+    -- periodo. Hoy las perdedoras tienen 0 líneas, pero se fusiona el monto en
+    -- vez de duplicar la fila por si algo entra entre la auditoría y el apply.
+    update public.budget_items dst
+    set amount = dst.amount + src.amount,
+        updated_at = now()
+    from public.budget_items src
+    where src.category_id = r.perdedora
+      and dst.category_id = r.canonica
+      and dst.user_id = src.user_id
+      and dst.period_year = src.period_year
+      and dst.period_month = src.period_month
+      and dst.type = src.type
+      and coalesce(dst.household_id, vacio) = coalesce(src.household_id, vacio);
+
+    delete from public.budget_items src
+    using public.budget_items dst
+    where src.category_id = r.perdedora
+      and dst.category_id = r.canonica
+      and dst.user_id = src.user_id
+      and dst.period_year = src.period_year
+      and dst.period_month = src.period_month
+      and dst.type = src.type
+      and coalesce(dst.household_id, vacio) = coalesce(src.household_id, vacio);
+
+    update public.budget_items
+      set category_id = r.canonica where category_id = r.perdedora;
+
+    -- `category_overrides` sí tiene unique por scope (uq_covr_household /
+    -- uq_covr_user): si el hogar ya intervino la canónica, la intervención sobre
+    -- la perdedora sobra — se borra en vez de reventar el índice.
+    delete from public.category_overrides src
+    using public.category_overrides dst
+    where src.category_id = r.perdedora
+      and dst.category_id = r.canonica
+      and dst.user_id = src.user_id
+      and coalesce(dst.household_id, vacio) = coalesce(src.household_id, vacio);
+
+    update public.category_overrides
+      set category_id = r.canonica where category_id = r.perdedora;
+
+    update public.category_overrides
+      set fork_id = r.canonica where fork_id = r.perdedora;
+
+    -- ---- Retirar la perdedora. Misma convención que `mergeCategory`:
+    --      trazabilidad + desactivación, sin borrar (las de sistema no se pueden
+    --      borrar por RLS, y así el cambio se revierte con un solo update).
+    update public.expense_categories
+    set is_active     = false,
+        is_favorite   = false,
+        merged_into_id = r.canonica,
+        updated_at    = now()
+    where id = r.perdedora;
+
+    raise notice 'Fusionada % → %', r.perdedora_key, r.canonica_key;
+  end loop;
+
+  -- Si el catálogo no tuviera los 3 pares, algo cambió desde la auditoría: el
+  -- bloque entero se revierte.
   if n <> 3 then
     raise exception 'Se esperaban 3 pares de gemelas y se resolvieron %. Revisar el catálogo antes de consolidar.', n;
   end if;
 end $$;
-
--- ----------------------------------------------------------------------------
--- 1) Repuntar TODAS las referencias de la perdedora a la canónica.
---    La lista sale de los FK reales a expense_categories(id); espeja lo que
---    hace `reassignReferences` en categories-service.ts.
--- ----------------------------------------------------------------------------
-update public.transactions t set category_id = p.canonica
-from _pares p where t.category_id = p.perdedora;
-
-update public.expense_items e set category_id = p.canonica
-from _pares p where e.category_id = p.perdedora;
-
-update public.expense_items e set subcategory_id = p.canonica
-from _pares p where e.subcategory_id = p.perdedora;
-
-update public.transaction_rules r set suggested_category_id = p.canonica
-from _pares p where r.suggested_category_id = p.perdedora;
-
-update public.transaction_templates tt set category_id = p.canonica
-from _pares p where tt.category_id = p.perdedora;
-
-update public.merchant_suggestion_cache m set category_id = p.canonica
-from _pares p where m.category_id = p.perdedora;
-
-update public.savings_goals s set default_category_id = p.canonica
-from _pares p where s.default_category_id = p.perdedora;
-
--- Hijas: hoy las tres perdedoras tienen 0, pero si alguien colgó algo, va al
--- frasco correcto en vez de quedar colgando de una categoría inactiva.
-update public.expense_categories c set parent_id = p.canonica
-from _pares p where c.parent_id = p.perdedora;
-
--- `budget_items` NO tiene unique sobre (usuario, periodo, categoría), así que un
--- update ciego podría dejar DOS líneas manuales de la misma categoría en el
--- mismo periodo. Hoy las perdedoras tienen 0 líneas, pero se fusiona el monto en
--- vez de duplicar la fila por si algo entra entre la auditoría y el apply.
-update public.budget_items dst
-set amount = dst.amount + src.amount,
-    updated_at = now()
-from public.budget_items src
-join _pares p on src.category_id = p.perdedora
-where dst.category_id = p.canonica
-  and dst.user_id = src.user_id
-  and dst.period_year = src.period_year
-  and dst.period_month = src.period_month
-  and dst.type = src.type
-  and coalesce(dst.household_id, '00000000-0000-0000-0000-000000000000'::uuid)
-    = coalesce(src.household_id, '00000000-0000-0000-0000-000000000000'::uuid);
-
-delete from public.budget_items src
-using _pares p, public.budget_items dst
-where src.category_id = p.perdedora
-  and dst.category_id = p.canonica
-  and dst.user_id = src.user_id
-  and dst.period_year = src.period_year
-  and dst.period_month = src.period_month
-  and dst.type = src.type
-  and coalesce(dst.household_id, '00000000-0000-0000-0000-000000000000'::uuid)
-    = coalesce(src.household_id, '00000000-0000-0000-0000-000000000000'::uuid);
-
-update public.budget_items b set category_id = p.canonica
-from _pares p where b.category_id = p.perdedora;
-
--- `category_overrides` sí tiene unique por scope (uq_covr_household /
--- uq_covr_user): si el hogar ya intervino la canónica, la intervención sobre la
--- perdedora sobra — se borra en vez de reventar el índice.
-delete from public.category_overrides src
-using _pares p, public.category_overrides dst
-where src.category_id = p.perdedora
-  and dst.category_id = p.canonica
-  and dst.user_id = src.user_id
-  and coalesce(dst.household_id, '00000000-0000-0000-0000-000000000000'::uuid)
-    = coalesce(src.household_id, '00000000-0000-0000-0000-000000000000'::uuid);
-
-update public.category_overrides o set category_id = p.canonica
-from _pares p where o.category_id = p.perdedora;
-
-update public.category_overrides o set fork_id = p.canonica
-from _pares p where o.fork_id = p.perdedora;
-
--- ----------------------------------------------------------------------------
--- 2) Retirar la perdedora. Misma convención que `mergeCategory`: trazabilidad +
---    desactivación, sin borrar.
--- ----------------------------------------------------------------------------
-update public.expense_categories c
-set is_active = false,
-    is_favorite = false,
-    merged_into_id = p.canonica,
-    updated_at = now()
-from _pares p
-where c.id = p.perdedora;
 
 -- ============================================================================
 -- B) PREVENCIÓN
@@ -314,9 +314,6 @@ create trigger trg_cat_sin_gemelas
   on public.expense_categories
   for each row
   execute function public.cat_sin_gemelas();
-
-drop table if exists _gemelas;
-drop table if exists _pares;
 
 -- ============================================================================
 -- VERIFICACIÓN. `ok` debe dar true. Si da false ⇒ NO correr el `repair`.
