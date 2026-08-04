@@ -41,14 +41,21 @@
 --   Los tres pares van EXPLÍCITOS: una heurística por nombre fusionaría los tres
 --   «Mantenimiento» y el Alquiler/Alquileres.
 --
---   Todo en un `do $$` y sin tablas temporales a propósito. El SQL Editor de
---   Supabase va contra un pool en modo transacción: cada statement puede caer en
---   una sesión distinta, así que una tabla temporal creada en el primero no
---   existe en el segundo ("relation _gemelas does not exist"). Un bloque es UN
---   statement — misma sesión, misma transacción, y aplica igual desde el editor
---   que desde `supabase db reset`.
+--   Todo en un bloque anónimo y sin tablas temporales a propósito. El SQL Editor
+--   de Supabase ejecuta los statements por separado: una tabla temporal creada
+--   en el primero no existe en el siguiente ("relation _gemelas does not
+--   exist"). Un bloque es UN statement — misma sesión, misma transacción, y
+--   aplica igual desde el editor que desde `supabase db reset`.
+--
+--   OJO con las comillas-dólar: los delimitadores llevan ETIQUETA (dolar-do,
+--   dolar-fn) y no la forma desnuda. El editor parte el script buscando esos
+--   delimitadores sin entender los comentarios, así que un par desnudo escrito
+--   en prosa acá arriba descuadra el emparejamiento y el cuerpo de una función
+--   termina ejecutándose suelto, statement por statement. Ya pasó: reventó con
+--   `relation "v_padre" does not exist`, que es una variable, no una tabla.
+--   Por eso tampoco se escribe el delimitador desnudo en estos comentarios.
 -- ----------------------------------------------------------------------------
-do $$
+do $do$
 declare
   r     record;
   n     int := 0;
@@ -158,7 +165,7 @@ begin
   if n <> 3 then
     raise exception 'Se esperaban 3 pares de gemelas y se resolvieron %. Revisar el catálogo antes de consolidar.', n;
   end if;
-end $$;
+end $do$;
 
 -- ============================================================================
 -- B) PREVENCIÓN
@@ -205,7 +212,7 @@ create or replace function public.cat_norm(txt text)
 returns text
 language sql
 immutable
-as $$
+as $fn$
   select coalesce(
     (
       select string_agg(
@@ -233,7 +240,7 @@ as $$
     ),
     ''
   );
-$$;
+$fn$;
 
 comment on function public.cat_norm(text) is
   'Nombre de categoría normalizado (minúsculas, sin acentos, sin puntuación, singular). '
@@ -242,7 +249,7 @@ comment on function public.cat_norm(text) is
 create or replace function public.cat_sin_gemelas()
 returns trigger
 language plpgsql
-as $$
+as $fn$
 declare
   v_raiz   uuid;
   v_padre  uuid;
@@ -304,7 +311,7 @@ begin
   end if;
 
   return new;
-end $$;
+end $fn$;
 
 -- AFTER y no BEFORE: la comprobación necesita ver la fila ya en la tabla para
 -- recorrer el árbol desde ella.
