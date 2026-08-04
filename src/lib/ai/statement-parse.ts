@@ -188,6 +188,49 @@ export function bloqueEsLimpio(text: string): boolean {
   return candidatas.every(esFilaLimpia);
 }
 
+/**
+ * ¿El mensaje es una CONFIRMACIÓN para dar de alta lo que faltaba del estado pegado?
+ *
+ * Existe porque el flujo se rompía justo acá: tras la tabla de conciliación, el usuario escribe
+ * "dale, registralas" en vez de tocar la tarjeta. Ese turno no traía bloque, así que no matcheaba
+ * ningún carril determinista y lo atendía el LLM — que escribía los `create_transaction` a mano,
+ * con montos convertidos e inventados, y encima los dumpeaba como texto crudo.
+ *
+ * Deliberadamente CORTA y acotada: un "sí" suelto es ambiguo, así que además de matchear acá el
+ * resolver exige encontrar un estado pegado en la conversación reciente. Sin eso, escala.
+ */
+export function pareceConfirmacionDeAlta(text: string): boolean {
+  const t = text.trim();
+  if (t.length > 60) return false; // una confirmación es corta; un párrafo es otra cosa
+  // Una confirmación NO trae datos nuevos. Con esto "registrá un gasto de 5000 en super" y
+  // "vender todos los altcoins a 90% de su ATH" vuelven a su carril: traen cifras, así que son
+  // una orden nueva, no un "sí" a lo anterior. (Lo cazó la suite: sin esta línea este detector
+  // le robaba el turno al alta de gastos y a los datos de mercado.)
+  if (/\d/.test(t)) return false;
+  if (/[?¿]/.test(t)) return false; // una pregunta no confirma nada
+  // Cierre con lookahead `(?!\p{L})` y NO con `\b`: en JS `\b` se define sobre [A-Za-z0-9_], así
+  // que una vocal acentuada no es carácter de palabra y `\bs[ií]\b` NUNCA matchea "sí" — la misma
+  // trampa que ya está anotada en el router. Acá costó que un "sí" pelado no confirmara nada.
+  // `\p{L}*` y NO `\w*`: `\w` tampoco incluye vocales acentuadas, así que `registr\w*` se para
+  // antes de la "á" de "registrá" y el lookahead de cierre falla. Con `\p{L}*` la cola del verbo
+  // en voseo entra completa.
+  const afirma =
+    /\b(?:s[ií]|dale|ok(?:ey)?|listo|perfecto|correcto|confirm\p{L}*|proced\p{L}*|adelante)(?!\p{L})/iu;
+  const registrar =
+    /\b(?:registr\p{L}*|agreg\p{L}*|a[ñn]ad\p{L}*|apunt\p{L}*|met[eé]\p{L}*|carg\p{L}*|dar de alta|alta)(?!\p{L})/iu;
+  // Referencia a lo PENDIENTE. Sin "movimientos/gastos" a propósito: esas palabras aparecen en
+  // órdenes nuevas ("registrá un gasto en super") y no distinguen confirmar de crear.
+  const refPendientes = /\b(?:faltan\p{L}*|falta|todas?|todos?|esas?|esos?|pendientes?)(?!\p{L})/iu;
+  // Verbo con clítico: "registralas", "agregalas", "anotalos" — ya traen el objeto pegado.
+  const verboConClitico = /\b(?:registr|agreg|a[ñn]ad|apunt|anot|carg)\p{L}*(?:las|los)(?!\p{L})/iu;
+
+  if (verboConClitico.test(t)) return true;
+  if (registrar.test(t) && refPendientes.test(t)) return true;
+  // Afirmación pelada ("dale", "ok", "sí"): solo si el mensaje es MUY corto, porque ahí no hay
+  // lugar para otra intención.
+  return afirma.test(t) && t.length <= 20;
+}
+
 /** Mínimo de filas para considerar que el usuario PEGÓ un estado y no escribió una frase. */
 export const MIN_FILAS_BLOQUE = 2;
 

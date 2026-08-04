@@ -447,7 +447,16 @@ export const TOOLS_PROMPT_LINE =
   "frase corta antes o después. " +
   "Y si el usuario NOMBRA UN SOBRE ('las transacciones de restaurante', 'lo de transporte'), pasá " +
   "ese nombre en el argumento `sobre` de consultar_transacciones — sin él la herramienta devuelve " +
-  "TODAS las categorías y estarías contestando otra pregunta.";
+  "TODAS las categorías y estarías contestando otra pregunta. " +
+  // El caso real: tras la tabla de conciliación el usuario escribía "dale, registralas" y el
+  // modelo emitía N bloques create_transaction a mano, con montos convertidos a dólares que no
+  // estaban en ningún lado. Ese camino ahora lo atiende un carril determinista.
+  "ESTADO DE CUENTA PEGADO — PROHIBIDO escribir las altas a mano. Si el usuario pegó una lista de " +
+  "movimientos y después pide registrar las que faltan ('dale', 'registralas', 'agregá las que " +
+  "faltan'), NO emitas bloques ```action``` de create_transaction: el sistema ya tiene el bloque " +
+  "parseado con los montos y las MONEDAS ORIGINALES y arma la tarjeta de alta en lote solo. " +
+  "Copiar esas cifras a mano las convierte o las inventa. Si por lo que sea llegás a ese turno, " +
+  "decí en una línea que la lista está lista para confirmar y NO propongas ninguna acción.";
 
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
