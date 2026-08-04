@@ -346,7 +346,20 @@ export function agregarTransacciones(
 ): ConsultaResult {
   const agrupacion = opts.agrupacion ?? "ninguna";
   const orden = opts.orden ?? (agrupacion === "ninguna" ? "fecha_desc" : "monto_desc");
-  const tope = Math.min(Math.max(1, opts.tope ?? TOPE_DEFAULT), TOPE_MAX);
+  // Una LISTA de movimientos (`agrupacion: "ninguna"`) se devuelve COMPLETA. Pedir "los gastos de
+  // Supermercados de julio" y recibir "10 de 13" responde otra cosa de la que se preguntó, y el
+  // corte no lo decidía el usuario: el carril determinista ya mandaba 300, pero cuando la frase no
+  // matchea la atiende el LLM y el tope caía en el default. Ponerlo acá y no en el ruteo es lo que
+  // hace que no dependa de quién llame — mismo criterio que `guardMovimientos`.
+  //
+  // La excepción es el ranking de movimientos sueltos ("los 3 gastos más grandes"): ahí el tope ES
+  // la pregunta, y se respeta. Se reconoce porque el que llama pidió orden por MONTO junto con un
+  // tope explícito. Las consultas agrupadas (por día, mes, comercio) no cambian.
+  const rankingDeMovimientos =
+    (opts.orden === "monto_desc" || opts.orden === "monto_asc") && opts.tope != null;
+  const topePedido =
+    agrupacion === "ninguna" && !rankingDeMovimientos ? TOPE_MAX : (opts.tope ?? TOPE_DEFAULT);
+  const tope = Math.min(Math.max(1, topePedido), TOPE_MAX);
   const nombres = opts.nombresPorCategoria ?? {};
   const rates = opts.rates ?? null;
 
@@ -624,7 +637,11 @@ export const CONSULTAR_TRANSACCIONES_TOOL: AiToolDecl = {
       },
       tope: {
         type: "number",
-        description: `Máximo de grupos o movimientos a devolver (por defecto ${TOPE_DEFAULT}, máximo ${TOPE_MAX}).`,
+        description:
+          `Máximo de GRUPOS a devolver cuando hay agrupación (por defecto ${TOPE_DEFAULT}, máximo ${TOPE_MAX}). ` +
+          "Con agrupacion='ninguna' la lista de movimientos sale COMPLETA y este campo se ignora: " +
+          "no lo mandes para recortar una tabla. La única excepción es un ranking de movimientos " +
+          "sueltos ('los 3 gastos más grandes'), donde va junto con orden='monto_desc'.",
       },
     },
     required: [],
