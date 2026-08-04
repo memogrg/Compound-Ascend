@@ -450,7 +450,10 @@ export function extractSobreNames(text: string): string[] {
       return s;
     })
     .filter(
-      (p) => p.length >= 3 && !LIQUIDITY_TERM.test(p) && !/\b(?:pendiente|aporte|inversi|ahorro|deuda|meta|libertad|independencia|ingres|gan[eéoó])\b/i.test(p),
+      // `(?!\p{L})` y no `\b` de cierre: la última alternativa termina en clase acentuada, así que
+      // el `\b` nunca se cumplía para "gané"/"ganó" y esos términos NO se filtraban — entraban
+      // como candidatos a nombre de sobre. Lo cazó el guard extendido del lint.
+      (p) => p.length >= 3 && !LIQUIDITY_TERM.test(p) && !/\b(?:pendiente|aporte|inversi|ahorro|deuda|meta|libertad|independencia|ingres|gan[eéoó])(?!\p{L})/iu.test(p),
     );
   return [...new Set(names.map((n) => n.toLowerCase()))].slice(0, 4);
 }
@@ -462,7 +465,11 @@ export function extractSobreNames(text: string): string[] {
  */
 export function isMultiPart(text: string): boolean {
   const twoQ = (text.match(/\?/g) ?? []).length >= 2;
-  const secondTopic = /\by\s+(?:hay|tengo|ten[eé]s|cu[aá]nto|qu[eé]|est[aá]|falta|el|un)\b[\s\S]*?(?:aporte|inversi|pendiente|ahorro|deuda|meta|ingres|libertad|independencia)/i.test(text);
+  // `(?!\p{L})` y no `\b`: dos alternativas cierran en clase acentuada (`qu[eé]`, `est[aá]`), así
+  // que el `\b` no se cumplía para "qué" ni "está" — y una pregunta compuesta con esas dos formas
+  // (las más comunes) NO se detectaba, que es justo lo que esta función existe para evitar: el
+  // router contestaba una sola mitad en vez de escalar. Lo cazó el guard extendido del lint.
+  const secondTopic = /\by\s+(?:hay|tengo|ten[eé]s|cu[aá]nto|qu[eé]|est[aá]|falta|el|un)(?!\p{L})[\s\S]*?(?:aporte|inversi|pendiente|ahorro|deuda|meta|ingres|libertad|independencia)/iu.test(text);
   return twoQ || secondTopic;
 }
 
