@@ -15,11 +15,16 @@ import { formatMoney } from "@/lib/format";
 import type { Jar, JarItem } from "@/modules/financial-base/engine/expense-jars";
 
 /**
- * Acción por sobre de ahorro, INYECTADA desde la página. No se importa el botón de `control`
- * acá: la dependencia va control → financial-base y nunca al revés (CLAUDE.md). La página de
- * Gastos, que ya compone los dos módulos, pasa el slot.
+ * Acción por sobre de ahorro, INYECTADA desde la página, indexada por id de la meta.
+ *
+ * Dos restricciones se cruzan acá y explican la forma. (1) El botón vive en `control` y no se
+ * puede importar desde `financial-base`: la dependencia va control → financial-base y nunca al
+ * revés (CLAUDE.md). (2) Es un MAPA de elementos ya construidos y no una función `(goal) =>
+ * ReactNode`, porque `JarRow` es un client component y React no deja pasarle funciones desde un
+ * server component ("Functions cannot be passed directly to Client Components"). Un elemento sí
+ * viaja en la carga RSC; una función no.
  */
-export type JarGoalAction = (goal: { id: string; name: string }) => ReactNode;
+export type JarGoalActions = Record<string, ReactNode>;
 
 const KIND_TITLE: Record<string, string> = {
   holding: "Inversiones del portafolio",
@@ -75,17 +80,17 @@ export function JarLinkedModal({
   jar,
   currency,
   onClose,
-  goalAction,
+  goalActions,
 }: {
   jar: Extract<Jar, { kind: "linked" }>;
   currency: string;
   onClose: () => void;
   /** Solo Ahorro: botón de aporte por sobre, inyectado por la página. */
-  goalAction?: JarGoalAction;
+  goalActions?: JarGoalActions;
 }) {
   const hasItems = jar.items.length > 0;
   // El aporte solo aplica a metas; en Deudas/Pólizas/Inversiones la fila sigue de solo lectura.
-  const accionMeta = jar.linkedKind === "goal" ? goalAction : undefined;
+  const accionesMeta = jar.linkedKind === "goal" ? goalActions : undefined;
   const fixed = jar.fixedFunds ?? [];
   const L = BUDGET_LABELS[jar.linkedKind] ?? BUDGET_LABELS.debt!;
 
@@ -177,7 +182,7 @@ export function JarLinkedModal({
                             currency={currency}
                             jarColor={jar.color}
                             labels={L}
-                            goalAction={accionMeta}
+                            goalActions={accionesMeta}
                           />
                         ))}
                       </Fragment>
@@ -189,7 +194,7 @@ export function JarLinkedModal({
                         currency={currency}
                         jarColor={jar.color}
                         labels={L}
-                        goalAction={accionMeta}
+                        goalActions={accionesMeta}
                       />
                     ))}
               </>
@@ -295,13 +300,13 @@ function BudgetItemRow({
   currency,
   jarColor,
   labels,
-  goalAction,
+  goalActions,
 }: {
   it: JarItem;
   currency: string;
   jarColor: string;
   labels: { done: string; unit: string };
-  goalAction?: JarGoalAction;
+  goalActions?: JarGoalActions;
 }) {
   const budget = it.budget ?? 0;
   const spent = it.spent ?? 0;
@@ -312,7 +317,8 @@ function BudgetItemRow({
   const extra = it.extraordinary ?? 0;
   // Pendiente = este mes todavía no tiene NINGÚN aporte. Se marca con un borde de aviso a la
   // izquierda: en una lista de ocho sobres, el que falta se pierde entre barras a medio llenar.
-  const sinAporte = !!goalAction && !advanced && spent <= 0;
+  const accion = goalActions?.[it.id];
+  const sinAporte = !!accion && !advanced && spent <= 0;
   return (
     <div
       style={{
@@ -409,7 +415,7 @@ function BudgetItemRow({
           distingue "todavía no aporté" de "aporté poco", y esa distinción es justo la que hace
           accionable el frasco. Los importes van en la moneda de VISUALIZACIÓN, como el resto de
           la fila; el modal de aporte carga los suyos en la moneda de la meta. */}
-      {goalAction && !advanced ? (
+      {accion && !advanced ? (
         <div
           style={{
             display: "flex",
@@ -428,7 +434,7 @@ function BudgetItemRow({
                 ? `${formatMoney(spent, currency)} de ${formatMoney(budget, currency)} este mes`
                 : `${formatMoney(spent, currency)} este mes`}
           </span>
-          {goalAction({ id: it.id, name: it.name })}
+          {accion}
         </div>
       ) : null}
     </div>

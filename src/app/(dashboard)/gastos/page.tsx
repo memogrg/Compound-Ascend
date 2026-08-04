@@ -56,6 +56,17 @@ export default async function Page({
     },
   };
 
+  // Un botón de aporte por sobre del frasco de Ahorro, indexado por id de la meta.
+  const goalActions: Record<string, React.ReactNode> = {};
+  for (const jar of jars) {
+    if (jar.kind !== "linked" || jar.linkedKind !== "goal") continue;
+    for (const it of jar.items) {
+      goalActions[it.id] = (
+        <AportarMetaButton goalId={it.id} goalName={it.name} tone="compact" />
+      );
+    }
+  }
+
   return (
     <div className="grid">
       <EssentialExpenseSummary />
@@ -67,10 +78,10 @@ export default async function Page({
         range={rangeView.range}
         createSavingsSobre={createSavingsSobreAction}
         /* El botón de aporte vive en `control`; la página es la que puede componer los dos
-           módulos sin invertir la dependencia (control → financial-base, nunca al revés). */
-        goalAction={(goal) => (
-          <AportarMetaButton goalId={goal.id} goalName={goal.name} tone="compact" />
-        )}
+           módulos sin invertir la dependencia (control → financial-base, nunca al revés).
+           Van los ELEMENTOS ya construidos, no una función: `JarRow` es un client component y
+           React no deja pasarle funciones desde el servidor. */
+        goalActions={goalActions}
       />
     </div>
   );

@@ -13,7 +13,7 @@ import { formatMoney } from "@/lib/format";
 import { JarNormalModal } from "@/modules/financial-base/components/v2/expense-jars/jar-normal-modal";
 import {
   JarLinkedModal,
-  type JarGoalAction,
+  type JarGoalActions,
 } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
 import { JarOrphansModal } from "@/modules/financial-base/components/v2/expense-jars/jar-orphans-modal";
 import { CategoryKebab } from "@/modules/financial-base/components/v2/expense-jars/category-kebab";
@@ -61,7 +61,7 @@ export function JarRow({
   categories,
   canPersonalize,
   personalization,
-  goalAction,
+  goalActions,
 }: {
   jar: Jar;
   currency: string;
@@ -70,7 +70,7 @@ export function JarRow({
   canPersonalize: boolean;
   personalization: CategoryPersonalization;
   /** Solo el frasco de Ahorro: acción de aporte por sobre, inyectada por la página. */
-  goalAction?: JarGoalAction;
+  goalActions?: JarGoalActions;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -188,7 +188,7 @@ export function JarRow({
               jar={jar}
               currency={currency}
               onClose={() => setOpen(false)}
-              goalAction={goalAction}
+              goalActions={goalActions}
             />
           ) : null}
         </>

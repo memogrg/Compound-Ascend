@@ -5,7 +5,7 @@
  * reales del módulo origen (el modal llega en el commit de vinculados).
  */
 import { JarRow } from "@/modules/financial-base/components/v2/expense-jars/jar-row";
-import type { JarGoalAction } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
+import type { JarGoalActions } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 import type {
@@ -20,7 +20,7 @@ export function ExpenseJars({
   categories,
   canPersonalize,
   personalization,
-  goalAction,
+  goalActions,
 }: {
   jars: Jar[];
   currency: string;
@@ -29,7 +29,7 @@ export function ExpenseJars({
   canPersonalize: boolean;
   personalization: CategoryPersonalization;
   /** Solo el frasco de Ahorro: acción de aporte por sobre, inyectada por la página. */
-  goalAction?: JarGoalAction;
+  goalActions?: JarGoalActions;
 }) {
   if (jars.length === 0) {
     return (
@@ -49,7 +49,7 @@ export function ExpenseJars({
           categories={categories}
           canPersonalize={canPersonalize}
           personalization={personalization}
-          goalAction={goalAction}
+          goalActions={goalActions}
         />
       ))}
     </div>
