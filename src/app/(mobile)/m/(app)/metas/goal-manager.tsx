@@ -12,10 +12,19 @@ import {
   spendFromGoalAction,
   listExpenseCategoriesAction,
   getGoalDetailAction,
+  getGoalContributionContextAction,
   revertGoalMovementAction,
   type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
 import type { SavingsGoal } from "@/modules/control";
+// Del ENGINE directo, no del barrel: `@/modules/control` reexporta servicios con `server-only`
+// y este es un client component — importarlo de ahí rompe el build de producción (no el
+// typecheck, que no ve la frontera).
+import {
+  montoSugerido,
+  textoAvanceMes,
+  type AporteContext,
+} from "@/modules/control/engine/aporte-meta";
 import type {
   GoalDetailVM,
   GoalMovementType,
@@ -401,12 +410,44 @@ export function GoalPickerSheet({
   );
 }
 
-/** Aporte: monto + fecha → addGoalContributionAction (crea la transacción vinculada). */
-export function ContributionForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => void }) {
+/**
+ * Aporte: monto + fecha → addGoalContributionAction (crea la transacción vinculada).
+ *
+ * Precarga lo que FALTA del aporte mensual y muestra el avance del mes, con las mismas reglas
+ * que el modal de la web (`engine/aporte-meta`): lo que no puede divergir entre las dos
+ * superficies es la regla, no el markup — acá los primitivos son los del móvil.
+ *
+ * El contexto se pide al servidor en la moneda de la META. Precargarlo desde lo que muestra el
+ * frasco de Gastos guardaría un importe convertido a la moneda de visualización.
+ */
+export function ContributionForm({
+  goal,
+  onSuccess,
+}: {
+  /** Forma mínima a propósito: el frasco de Ahorro del tab de Gastos tiene un `JarItem`, no una
+   *  `SavingsGoal` entera, y el resto del contexto lo carga este mismo formulario. */
+  goal: { id: string; name: string; currency: string };
+  onSuccess: () => void;
+}) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
-  const values = { goalId: goal.id, amount, contributionDate: date };
+  const [ctx, setCtx] = useState<AporteContext | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    void getGoalContributionContextAction(goal.id).then((c) => {
+      if (!vivo || !c) return;
+      setCtx(c);
+      const sug = montoSugerido(c);
+      if (sug > 0) setAmount(sug);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [goal.id]);
+
+  const values = { goalId: goal.id, amount, contributionDate: date, currency: goal.currency };
   return (
     <FormShell
       action={addGoalContributionAction}
@@ -415,6 +456,11 @@ export function ContributionForm({ goal, onSuccess }: { goal: SavingsGoal; onSuc
       successMessage="Aporte registrado"
       onSuccess={onSuccess}
     >
+      {ctx ? (
+        <p className="muted" style={{ fontSize: 13, margin: "0 0 4px" }}>
+          {textoAvanceMes(ctx, formatMoney)}
+        </p>
+      ) : null}
       <MoneyField name="amount" label="Monto del aporte" value={amount} onChange={setAmount} currency={goal.currency} />
       <DateField name="contributionDate" label="Fecha" value={date} onChange={setDate} />
     </FormShell>

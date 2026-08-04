@@ -19,6 +19,7 @@ import {
   goalContributionToTxn,
   goalWithdrawalToTxn,
   goalSpendToTxn,
+  monedaVinculadaEsCoherente,
 } from "@/modules/financial-base";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { deriveRecurrenceFields, type Recurrence } from "@/modules/control/engine/recurrence";
@@ -525,6 +526,10 @@ export async function addGoalContribution(input: {
   goalId: string;
   amount: number;
   contributionDate: string;
+  /** Moneda del importe capturado. Opcional por compatibilidad con los llamadores viejos;
+   *  si viene y NO coincide con la de la meta, se rechaza en vez de guardar el importe tal
+   *  cual bajo otra unidad. Ver la nota de `monedaVinculadaEsCoherente`. */
+  currency?: string;
 }): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -545,6 +550,16 @@ export async function addGoalContribution(input: {
       throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
     }
     throw new Error("Meta no encontrada");
+  }
+
+  // El aporte SIEMPRE se guarda en la moneda de la meta (abajo se usa `goalRow.currency`).
+  // Si el llamador capturó en otra, guardarlo igual metería el importe multiplicado por el
+  // tipo de cambio sin dejar rastro: se corta acá con el mismo criterio que usa la
+  // propagación del composer.
+  if (!monedaVinculadaEsCoherente(input.currency, goalRow.currency)) {
+    throw new Error(
+      `El aporte viene en ${input.currency} pero la meta está en ${goalRow.currency}.`,
+    );
   }
 
   const txnId = await registerLinkedTransaction(
@@ -568,6 +583,71 @@ export async function addGoalContribution(input: {
     await deleteLinkedTransaction(txnId);
     throw new Error(error.message);
   }
+}
+
+/**
+ * Contexto NATIVO de una meta para el modal de aporte: su moneda, su plan mensual, su acumulado
+ * y lo ya aportado en el mes en curso.
+ *
+ * Todo en la moneda de la META, a propósito. El frasco "Ahorro a largo plazo" del tab de Gastos
+ * también sabe cuánto se aportó este mes, pero convertido a la moneda de VISUALIZACIÓN
+ * (`getLinkedSpentByEntity`): precargar el modal desde ahí guardaría un importe multiplicado por
+ * el tipo de cambio en una meta que no está en la moneda de display. Por eso el modal pide su
+ * propio contexto en vez de recibirlo de la fila que lo abre.
+ *
+ * El mes en curso se resuelve con la zona horaria del usuario, igual que el resto de la captura.
+ */
+export async function getGoalContributionContext(goalId: string): Promise<{
+  goalId: string;
+  goalName: string;
+  currency: string;
+  monthlyContribution: number;
+  currentAmount: number;
+  targetAmount: number;
+  aportadoMes: number;
+} | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
+
+  const { data: goal, error } = await supabase
+    .from("savings_goals")
+    .select("id,name,currency,current_amount,target_amount,monthly_contribution")
+    .eq("id", goalId)
+    .in("user_id", memberIds)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!goal) return null;
+
+  const period = await userCurrentPeriod();
+  // Solo las transacciones vinculadas a ESTA meta y del mes. Nacen en la moneda de la meta
+  // (`goalContributionToTxn` usa `goal.currency`), así que se suman directo, sin convertir.
+  const { data: txns } = await supabase
+    .from("transactions")
+    .select("amount,currency")
+    .in("user_id", memberIds)
+    .eq("linked_kind", "goal")
+    .eq("linked_id", goalId)
+    .eq("kind", "gasto")
+    .gte("occurred_on", period.from)
+    .lte("occurred_on", period.to);
+
+  let aportadoMes = 0;
+  for (const t of txns ?? []) {
+    // Una fila en otra moneda solo puede venir de datos viejos; ignorarla es preferible a
+    // sumarla como si fuera de la meta y mentir sobre el avance del mes.
+    if (t.currency === goal.currency) aportadoMes += Number(t.amount);
+  }
+
+  return {
+    goalId: goal.id,
+    goalName: goal.name,
+    currency: goal.currency,
+    monthlyContribution: Number(goal.monthly_contribution ?? 0),
+    currentAmount: Number(goal.current_amount),
+    targetAmount: Number(goal.target_amount),
+    aportadoMes,
+  };
 }
 
 /**

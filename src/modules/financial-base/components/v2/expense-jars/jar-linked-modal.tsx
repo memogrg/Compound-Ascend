@@ -7,12 +7,24 @@
  * creación del módulo origen (?new=<kind>, lo atrapa useDeepLinkModal allá).
  * Ahorro suma los fondos fijos (Emergencia/Paz) siempre disponibles.
  */
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney } from "@/lib/format";
 import type { Jar, JarItem } from "@/modules/financial-base/engine/expense-jars";
+
+/**
+ * Acción por sobre de ahorro, INYECTADA desde la página, indexada por id de la meta.
+ *
+ * Dos restricciones se cruzan acá y explican la forma. (1) El botón vive en `control` y no se
+ * puede importar desde `financial-base`: la dependencia va control → financial-base y nunca al
+ * revés (CLAUDE.md). (2) Es un MAPA de elementos ya construidos y no una función `(goal) =>
+ * ReactNode`, porque `JarRow` es un client component y React no deja pasarle funciones desde un
+ * server component ("Functions cannot be passed directly to Client Components"). Un elemento sí
+ * viaja en la carga RSC; una función no.
+ */
+export type JarGoalActions = Record<string, ReactNode>;
 
 const KIND_TITLE: Record<string, string> = {
   holding: "Inversiones del portafolio",
@@ -68,12 +80,17 @@ export function JarLinkedModal({
   jar,
   currency,
   onClose,
+  goalActions,
 }: {
   jar: Extract<Jar, { kind: "linked" }>;
   currency: string;
   onClose: () => void;
+  /** Solo Ahorro: botón de aporte por sobre, inyectado por la página. */
+  goalActions?: JarGoalActions;
 }) {
   const hasItems = jar.items.length > 0;
+  // El aporte solo aplica a metas; en Deudas/Pólizas/Inversiones la fila sigue de solo lectura.
+  const accionesMeta = jar.linkedKind === "goal" ? goalActions : undefined;
   const fixed = jar.fixedFunds ?? [];
   const L = BUDGET_LABELS[jar.linkedKind] ?? BUDGET_LABELS.debt!;
 
@@ -165,6 +182,7 @@ export function JarLinkedModal({
                             currency={currency}
                             jarColor={jar.color}
                             labels={L}
+                            goalActions={accionesMeta}
                           />
                         ))}
                       </Fragment>
@@ -176,6 +194,7 @@ export function JarLinkedModal({
                         currency={currency}
                         jarColor={jar.color}
                         labels={L}
+                        goalActions={accionesMeta}
                       />
                     ))}
               </>
@@ -281,11 +300,13 @@ function BudgetItemRow({
   currency,
   jarColor,
   labels,
+  goalActions,
 }: {
   it: JarItem;
   currency: string;
   jarColor: string;
   labels: { done: string; unit: string };
+  goalActions?: JarGoalActions;
 }) {
   const budget = it.budget ?? 0;
   const spent = it.spent ?? 0;
@@ -294,14 +315,21 @@ function BudgetItemRow({
   const over = budget > 0 && spent > budget;
   const color = over ? "var(--neg)" : jarColor;
   const extra = it.extraordinary ?? 0;
+  // Pendiente = este mes todavía no tiene NINGÚN aporte. Se marca con un borde de aviso a la
+  // izquierda: en una lista de ocho sobres, el que falta se pierde entre barras a medio llenar.
+  const accion = goalActions?.[it.id];
+  const sinAporte = !!accion && !advanced && spent <= 0;
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
         gap: 6,
-        padding: "10px 0",
+        padding: "10px 0 10px",
         borderBottom: "1px solid var(--line)",
+        ...(sinAporte
+          ? { borderLeft: "3px solid var(--warn)", paddingLeft: 8, marginLeft: -8 }
+          : null),
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -382,6 +410,32 @@ function BudgetItemRow({
         >
           incluye {formatMoney(extra, currency)} extraordinario
         </span>
+      ) : null}
+      {/* Aporte del mes + acción. La línea repite el avance en palabras porque la barra sola no
+          distingue "todavía no aporté" de "aporté poco", y esa distinción es justo la que hace
+          accionable el frasco. Los importes van en la moneda de VISUALIZACIÓN, como el resto de
+          la fila; el modal de aporte carga los suyos en la moneda de la meta. */}
+      {accion && !advanced ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            marginTop: 2,
+          }}
+        >
+          <span style={{ fontSize: 11.5, color: sinAporte ? "var(--warn)" : "var(--muted)" }}>
+            {sinAporte
+              ? budget > 0
+                ? `Sin aporte este mes · plan ${formatMoney(budget, currency)}`
+                : "Sin aporte este mes"
+              : budget > 0
+                ? `${formatMoney(spent, currency)} de ${formatMoney(budget, currency)} este mes`
+                : `${formatMoney(spent, currency)} este mes`}
+          </span>
+          {accion}
+        </div>
       ) : null}
     </div>
   );

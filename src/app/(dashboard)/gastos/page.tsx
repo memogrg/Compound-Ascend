@@ -5,6 +5,7 @@ import { getExpenseRangeView } from "@/modules/financial-base/services/expense-r
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sections";
 import { createSavingsSobreAction } from "@/modules/control";
+import { AportarMetaButton } from "@/modules/control";
 import { userToday } from "@/lib/time/user-time";
 
 /** Fecha de corte de los frascos: ?asOf=YYYY-MM-DD válido, o el día de hoy (zona del usuario). */
@@ -55,6 +56,17 @@ export default async function Page({
     },
   };
 
+  // Un botón de aporte por sobre del frasco de Ahorro, indexado por id de la meta.
+  const goalActions: Record<string, React.ReactNode> = {};
+  for (const jar of jars) {
+    if (jar.kind !== "linked" || jar.linkedKind !== "goal") continue;
+    for (const it of jar.items) {
+      goalActions[it.id] = (
+        <AportarMetaButton goalId={it.id} goalName={it.name} tone="compact" />
+      );
+    }
+  }
+
   return (
     <div className="grid">
       <EssentialExpenseSummary />
@@ -65,6 +77,11 @@ export default async function Page({
         jarsPeriod={jarsPeriod}
         range={rangeView.range}
         createSavingsSobre={createSavingsSobreAction}
+        /* El botón de aporte vive en `control`; la página es la que puede componer los dos
+           módulos sin invertir la dependencia (control → financial-base, nunca al revés).
+           Van los ELEMENTOS ya construidos, no una función: `JarRow` es un client component y
+           React no deja pasarle funciones desde el servidor. */
+        goalActions={goalActions}
       />
     </div>
   );

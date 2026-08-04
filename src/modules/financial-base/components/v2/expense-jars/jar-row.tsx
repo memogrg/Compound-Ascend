@@ -11,7 +11,10 @@ import { Icon, type IconName } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { JarNormalModal } from "@/modules/financial-base/components/v2/expense-jars/jar-normal-modal";
-import { JarLinkedModal } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
+import {
+  JarLinkedModal,
+  type JarGoalActions,
+} from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
 import { JarOrphansModal } from "@/modules/financial-base/components/v2/expense-jars/jar-orphans-modal";
 import { CategoryKebab } from "@/modules/financial-base/components/v2/expense-jars/category-kebab";
 import {
@@ -58,6 +61,7 @@ export function JarRow({
   categories,
   canPersonalize,
   personalization,
+  goalActions,
 }: {
   jar: Jar;
   currency: string;
@@ -65,6 +69,8 @@ export function JarRow({
   categories: Category[];
   canPersonalize: boolean;
   personalization: CategoryPersonalization;
+  /** Solo el frasco de Ahorro: acción de aporte por sobre, inyectada por la página. */
+  goalActions?: JarGoalActions;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -177,7 +183,14 @@ export function JarRow({
               </div>
             </div>
           </button>
-          {open ? <JarLinkedModal jar={jar} currency={currency} onClose={() => setOpen(false)} /> : null}
+          {open ? (
+            <JarLinkedModal
+              jar={jar}
+              currency={currency}
+              onClose={() => setOpen(false)}
+              goalActions={goalActions}
+            />
+          ) : null}
         </>
       );
     }

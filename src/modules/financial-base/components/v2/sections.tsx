@@ -20,6 +20,7 @@ import { RegisterIncomeButton } from "@/modules/financial-base/components/v2/reg
 import { CopyPreviousIncomeButton } from "@/modules/financial-base/components/v2/copy-previous-income-button";
 import { LinkedIncomeCard } from "@/modules/financial-base/components/v2/linked-income-card";
 import { ExpenseJars } from "@/modules/financial-base/components/v2/expense-jars/expense-jars";
+import type { JarGoalActions } from "@/modules/financial-base/components/v2/expense-jars/jar-linked-modal";
 import { ExpenseToolbar } from "@/modules/financial-base/components/v2/expense-jars/expense-toolbar";
 import type { CreateSavingsSobre } from "@/modules/financial-base/components/v2/expense-jars/new-savings-sobre-modal";
 import { JarDatePicker } from "@/modules/financial-base/components/v2/expense-jars/jar-date-picker";
@@ -468,6 +469,7 @@ export function IncomeExpenseSection({
   jarsPeriod,
   range,
   createSavingsSobre,
+  goalActions,
 }: {
   view: V2View;
   kind: "income" | "expense";
@@ -478,6 +480,11 @@ export function IncomeExpenseSection({
   range?: string;
   /** Solo Gastos: server action para crear un sobre de ahorro desde la toolbar. */
   createSavingsSobre?: CreateSavingsSobre;
+  /**
+   * Solo Gastos: botón de aporte por sobre del frasco de Ahorro. Lo inyecta la página porque el
+   * botón vive en `control` y la dependencia va control → financial-base, nunca al revés.
+   */
+  goalActions?: JarGoalActions;
 }) {
   if (kind === "income") return <IncomeSection view={view} />;
 
@@ -567,6 +574,7 @@ export function IncomeExpenseSection({
           categories={view.categories}
           canPersonalize={view.canPersonalize}
           personalization={view.personalization}
+          goalActions={goalActions}
         />
       </div>
 

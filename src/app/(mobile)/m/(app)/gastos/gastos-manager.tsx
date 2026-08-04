@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -50,6 +51,16 @@ import {
   TONE_TEXT,
 } from "../../components/content-kit";
 import { levelTone, isUnbudgeted } from "./budget-status";
+
+/**
+ * Formulario de aporte del módulo de metas, reusado tal cual (mismo `engine/aporte-meta`, mismos
+ * primitivos del móvil). Dinámico porque solo hace falta si el usuario abre el frasco de Ahorro
+ * y toca "Aportar" — mismo patrón que ya usa home-add-launcher.
+ */
+const ContributionForm = dynamic(
+  () => import("../metas/goal-manager").then((m) => m.ContributionForm),
+  { ssr: false },
+);
 import {
   AddSpendForm,
   CreateSobreForm,
@@ -1071,6 +1082,13 @@ function OrphanLineRow({
 }
 
 function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen?: () => void }) {
+  const router = useRouter();
+  // Sobre de ahorro al que se está aportando (hook izado ANTES de los early-returns por tipo de
+  // frasco, regla de hooks). Solo lo usa la rama de frasco vinculado a metas.
+  const [aportar, setAportar] = useState<{ id: string; name: string; currency: string } | null>(
+    null,
+  );
+
   // "Por reasignar": suma en el presupuesto pero no tiene gasto real ni barra.
   // Tono de alerta y CTA a revisar; el detalle vive en su propio BottomSheet.
   if (jar.kind === "orphan") {
@@ -1203,21 +1221,53 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
               // Aporte SIN presupuesto (p. ej. un aporte único a una inversión): mostrar el
               // gastado en ámbar y marcarlo, en vez del "₡0" de su presupuesto inexistente.
               const unbudgeted = isUnbudgeted(it.spent ?? 0, it.budget ?? 0);
+              // Metas: el sobre deja de ser de solo lectura — se aporta desde acá. La línea
+              // dice el avance del mes en palabras porque "sin aporte todavía" y "aporté poco"
+              // se ven igual en un número suelto, y es la distinción que mueve a la acción.
+              const esMeta = jar.linkedKind === "goal" && !it.advanced;
+              const sinAporte = esMeta && (it.spent ?? 0) <= 0;
+              const avanceTexto = esMeta
+                ? (it.budget ?? 0) > 0
+                  ? sinAporte
+                    ? `Sin aporte este mes · plan ${mAmount(it.budget ?? 0, currency)}`
+                    : `${mAmount(it.spent ?? 0, currency)} de ${mAmount(it.budget ?? 0, currency)} este mes`
+                  : sinAporte
+                    ? "Sin aporte este mes"
+                    : `${mAmount(it.spent ?? 0, currency)} este mes`
+                : null;
               return (
-                <MDataRow
-                  key={it.id}
-                  dense
-                  title={it.name}
-                  subtitle={
-                    it.advanced
-                      ? "Adelantado · no se cobra este mes"
-                      : unbudgeted
-                        ? "Sin presupuesto"
-                        : it.sub
-                  }
-                  value={it.advanced ? "—" : unbudgeted ? mAmount(it.spent ?? 0, currency) : it.amount}
-                  valueTone={unbudgeted ? "warning" : undefined}
-                />
+                <div key={it.id}>
+                  <MDataRow
+                    dense
+                    title={it.name}
+                    subtitle={
+                      it.advanced
+                        ? "Adelantado · no se cobra este mes"
+                        : avanceTexto
+                          ? avanceTexto
+                          : unbudgeted
+                            ? "Sin presupuesto"
+                            : it.sub
+                    }
+                    value={it.advanced ? "—" : unbudgeted ? mAmount(it.spent ?? 0, currency) : it.amount}
+                    valueTone={sinAporte ? "warning" : unbudgeted ? "warning" : undefined}
+                  />
+                  {esMeta ? (
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4, marginBottom: 6 }}>
+                      <button
+                        type="button"
+                        className={sinAporte ? "m-btn m-btn-primary" : "m-btn m-btn-secondary"}
+                        style={{ minHeight: 36, padding: "0 14px", fontSize: 13 }}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          setAportar({ id: it.id, name: it.name, currency: it.currency ?? currency });
+                        }}
+                      >
+                        Aportar
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
       </div>
@@ -1234,12 +1284,28 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
   );
 
   return (
-    <MContentCard
-      onClick={onOpen}
-      ariaLabel={onOpen ? `Gestionar ${jar.name}` : undefined}
-      style={{ marginBottom: 12 }}
-    >
-      {body}
-    </MContentCard>
+    <>
+      <MContentCard
+        onClick={onOpen}
+        ariaLabel={onOpen ? `Gestionar ${jar.name}` : undefined}
+        style={{ marginBottom: 12 }}
+      >
+        {body}
+      </MContentCard>
+      {/* El aporte se registra acá mismo, sin saltar a /m/metas. `router.refresh()` reconstruye
+          la vista de Gastos: el avance del mes, el acumulado de la meta y el gasto del mes salen
+          del mismo render de servidor, así que el aporte se ve reflejado al instante. */}
+      {aportar ? (
+        <BottomSheet open title={`Aportar — ${aportar.name}`} onClose={() => setAportar(null)}>
+          <ContributionForm
+            goal={aportar}
+            onSuccess={() => {
+              setAportar(null);
+              router.refresh();
+            }}
+          />
+        </BottomSheet>
+      ) : null}
+    </>
   );
 }

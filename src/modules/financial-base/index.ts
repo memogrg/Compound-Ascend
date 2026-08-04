@@ -48,7 +48,7 @@ export { getExpenseRangeView } from "./services/expense-range-service";
 // Árbol de categorías (grupo → hojas) para selectores de gasto reutilizables.
 export { listCategoryTree, getCategoryNameMap, createCategory } from "./services/categories-service";
 export type { CategoryNode } from "./services/categories-service";
-export { groupByJar } from "./engine/expense-jars";
+export { groupByJar, monedaVinculadaEsCoherente } from "./engine/expense-jars";
 export type { JarGroup } from "./engine/expense-jars";
 // Sugerencia de sobre para el chat (IA acotada a los sobres del usuario + fallback historial)
 // y listado "Frasco › Sobre" para el selector de la card de confirmación.
