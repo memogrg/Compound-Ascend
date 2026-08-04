@@ -47,6 +47,7 @@ import { convertCurrency } from "@/lib/fx";
 // (los tipos que el router necesita de aquí son type-only → sin ciclo en runtime).
 import { tryRouteQuery, resolveMatchedIntent, type RouterLane, type MatchedIntent } from "@/lib/ai/router";
 import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
+import { guardMovimientos, TOOLS_DE_MOVIMIENTOS } from "@/lib/ai/movimientos-guard";
 
 export type { FinancialContext };
 export type { MatchedIntent };
@@ -496,6 +497,8 @@ export async function financeChatWithTools(
   }
 
   const knowledge = await buildKnowledge(messages, ctx);
+  /** Herramientas que EFECTIVAMENTE corrieron en este turno (la llena `registrarUso`). */
+  const usadas = new Set<string>();
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages: capHistory(messages),
@@ -513,15 +516,47 @@ export async function financeChatWithTools(
       CONSULTAR_HISTORIAL_TOOL,
       CONSULTAR_DETALLE_TOOL,
     ],
-    execute: buildToolExecutor(toolContext),
+    // Se registra QUÉ herramientas corrieron: es el dato que habilita (o no) enumerar movimientos.
+    execute: registrarUso(buildToolExecutor(toolContext), usadas),
   });
   const parsed = parseAction(result.text);
+
+  // RED DETERMINISTA sobre los movimientos. Una instrucción en el prompt no es garantía: si la
+  // respuesta enumera transacciones o afirma un total y en ESTE turno no corrió ninguna tool de
+  // movimientos, la respuesta NO sale. Es el cierre de la clase de bug que entró tres veces por
+  // puertas distintas (un sustantivo faltante en el ruteo, una cita que apagaba los carriles, una
+  // ambigüedad sin salida): en todos, el LLM terminaba inventando comercios y montos.
+  const consultoTool = TOOLS_DE_MOVIMIENTOS.some((t) => usadas.has(t));
+  const g = guardMovimientos(parsed.reply, consultoTool);
+  if (g.bloqueado) {
+    logger.warn("assistant.movimientos_bloqueados", {
+      // Sin el texto: puede traer cifras del usuario. Alcanza con saber que pasó y con qué tools.
+      tools: [...usadas].join(",") || "ninguna",
+      largo: parsed.reply.length,
+    });
+  }
+
   return {
-    ...guardReply(parsed, ctx, provider.name, priorAssistantReplies(messages)),
+    ...guardReply(
+      // Una respuesta bloqueada tampoco puede arrastrar una ACCIÓN propuesta: se armó sobre datos
+      // que no existen.
+      g.bloqueado ? { reply: g.reply, action: null } : parsed,
+      ctx,
+      provider.name,
+      priorAssistantReplies(messages),
+    ),
     tokensIn: result.tokensIn,
     tokensOut: result.tokensOut,
     provider: provider.name,
     lane: "reasoning",
+  };
+}
+
+/** Envuelve el ejecutor para anotar el nombre de cada herramienta que se llegó a correr. */
+function registrarUso(run: AiToolExecutor, usadas: Set<string>): AiToolExecutor {
+  return async (name, args) => {
+    usadas.add(name);
+    return run(name, args);
   };
 }
 
