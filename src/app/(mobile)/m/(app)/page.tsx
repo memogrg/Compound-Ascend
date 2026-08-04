@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { getUser } from "@/lib/auth/session";
 import { getDashboardData, getHomeCardsData } from "@/modules/dashboard";
-import { userHour } from "@/lib/time/user-time";
+import { userHour, userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import { listTransactions, type Transaction, type Period } from "@/modules/financial-base";
+import { loadBaseView } from "@/modules/financial-base/services/base-view";
+import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-jars-service";
+import { getLiquidityAfterByTxn } from "@/modules/financial-base/services/liquidity-service";
+import { selectableCategoryLeaves } from "@/modules/financial-base/engine/classify";
+import { ManagedTxnRows } from "./transacciones/mobile-txn-list";
 import { MHomeCarousel } from "../components/home-carousel";
 import {
   PresupuestoFicha,
@@ -16,7 +21,6 @@ import {
   LibertadFicha,
 } from "../components/home-cards/ficha-cards";
 import { MHomeCardError } from "../components/home-cards/card-shell";
-import { formatMoney } from "@/lib/format";
 import { MobileHeader } from "../components/mobile-header";
 import { HomeAddLauncher } from "../components/home-add-launcher";
 
@@ -43,22 +47,6 @@ function recentPeriod(now: Date): Period {
   return { month: now.getMonth() + 1, year: now.getFullYear(), from, to, label: "recientes" };
 }
 
-function relativeDay(iso: string, now: Date): string {
-  const d = new Date(`${iso}T00:00:00`);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
-  if (diff <= 0) return "Hoy";
-  if (diff === 1) return "Ayer";
-  if (diff < 7) return d.toLocaleDateString("es-MX", { weekday: "short" });
-  return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
-}
-
-const KIND_LABEL: Record<Transaction["kind"], string> = {
-  ingreso: "Ingreso",
-  gasto: "Gasto",
-  transferencia: "Transferencia",
-  ajuste: "Ajuste",
-};
 
 /** Ruta móvil por pilar para los accesos rápidos (pantallas /m ya construidas).
  *  "ahorro" apunta a las metas de ahorro (/m/ingresos sigue accesible por URL). */
@@ -94,20 +82,33 @@ export default async function MobileHome() {
   const user = await getUser();
   const preview = !user && process.env.MOBILE_DEMO_PREVIEW === "1";
 
-  // Tres agregados EN PARALELO, cada uno con su propio `.catch`: si uno falla, los demás
-  // siguen. `data` (panel) alimenta el saludo, los accesos y la próxima acción; `homeCards`
-  // (capa de datos del carrusel, Delta 1) alimenta las 9 fichas.
-  const [data, recent, homeCards] = await Promise.all([
+  // Agregados EN PARALELO, cada uno con su propio `.catch`: si uno falla, los demás siguen.
+  // `data` (panel) alimenta el saludo, los accesos y la próxima acción; `homeCards` (Delta 1)
+  // alimenta las 9 fichas; `view`+`liq` dan a "Movimientos recientes" la MISMA capacidad que
+  // Transacciones (editar/borrar + detalle del viaje del dinero).
+  const [data, recent, homeCards, view, liq] = await Promise.all([
     getDashboardData({ previewDemo: preview }),
     preview
       ? Promise.resolve([] as Transaction[])
       : listTransactions(recentPeriod(now), {}, 6).catch(() => [] as Transaction[]),
-    // Las 9 fichas del carrusel (Delta 1). En vista demo no hay sesión, así que se omite
-    // y cada ficha degrada a su estado "no cargó".
     preview ? Promise.resolve(null) : getHomeCardsData().catch(() => null),
+    preview ? Promise.resolve(null) : loadBaseView().catch(() => null),
+    preview ? Promise.resolve(null) : getLiquidityAfterByTxn().catch(() => null),
   ]);
 
   const { panel, insights } = data;
+
+  // Datos de EDICIÓN de las filas recientes (mismos que Transacciones, vía loadBaseView). Los
+  // jars —para el sobre del editor— dependen del árbol de la vista, así que van en una lectura
+  // aparte. Sin sesión/vista (demo) queda null y la sección cae a su mensaje vacío.
+  const recentJars = view
+    ? await getExpenseJarsAsOf({
+        tree: view.tree,
+        period: await userCurrentPeriod(),
+        asOf: await userToday(),
+        currency: view.currency,
+      }).catch(() => [])
+    : [];
 
   return (
     <div className="m-scroll">
@@ -270,20 +271,32 @@ export default async function MobileHome() {
           </div>
         </Link>
 
-        {/* Movimientos recientes (reales) */}
+        {/* Movimientos recientes: MISMA capacidad que Transacciones — swipe editar/borrar en las
+            filas gestionables + tap→detalle del viaje del dinero (origen→destino, efecto en
+            liquidez, "Ver en X" para vinculadas). Reusa ManagedTxnRows. */}
         <section>
           <div className="between" style={{ marginBottom: 10 }}>
             <div className="sec-title">Movimientos recientes</div>
           </div>
-          <div className="wgt" style={{ padding: "4px 18px" }}>
-            {recent.length === 0 ? (
+          {view && recent.length > 0 ? (
+            <ManagedTxnRows
+              transactions={recent}
+              currency={view.currency}
+              categoryNames={view.categoryNames}
+              categories={selectableCategoryLeaves(view.categories)}
+              jars={recentJars}
+              accounts={view.accounts}
+              incomeCats={view.incomeTree.flatMap((g) => g.children).map((c) => ({ id: c.id, name: c.name }))}
+              incomeGroupId={view.incomeTree[0]?.id ?? null}
+              balanceAfter={liq?.afterByTxn}
+            />
+          ) : (
+            <div className="wgt" style={{ padding: "4px 18px" }}>
               <div className="muted" style={{ padding: "16px 0", fontSize: 13.5 }}>
                 Aún no hay movimientos recientes. Registra un gasto o ingreso para empezar.
               </div>
-            ) : (
-              recent.map((t) => <MovementRow key={t.id} t={t} now={now} />)
-            )}
-          </div>
+            </div>
+          )}
         </section>
       </div>
       {/* El "+" de Inicio. Va FUERA de .m-pad: se posiciona respecto al scroll, no al
@@ -294,41 +307,6 @@ export default async function MobileHome() {
 }
 
 
-function MovementRow({ t, now }: { t: Transaction; now: Date }) {
-  const income = t.kind === "ingreso";
-  const sign = income ? "+" : t.kind === "gasto" ? "−" : "";
-  const name = t.merchantOrSource || t.description || KIND_LABEL[t.kind];
-  return (
-    <div className="lrow">
-      <span
-        className="lic"
-        style={income ? { background: "var(--accent-soft)", color: "var(--accent)" } : undefined}
-        aria-hidden
-      >
-        {income ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M6 6h15l-1.5 9h-12z" strokeLinejoin="round" />
-            <path d="M6 6 5 3H3M9 20a1 1 0 1 0 0-.01M18 20a1 1 0 1 0 0-.01" strokeLinecap="round" />
-          </svg>
-        )}
-      </span>
-      <div>
-        <div className="lname">{name}</div>
-        <div className="lsub">
-          {KIND_LABEL[t.kind]} · {relativeDay(t.occurredOn, now)}
-        </div>
-      </div>
-      <div className={`lamt ${income ? "pos" : ""}`}>
-        {sign}
-        {formatMoney(Math.abs(t.amount), t.currency)}
-      </div>
-    </div>
-  );
-}
 
 function StarIcon() {
   return (
