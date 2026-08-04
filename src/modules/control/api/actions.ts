@@ -19,10 +19,12 @@ import {
   updateDebtPayment,
   deleteDebtPayment,
   addGoalContribution,
+  getGoalContributionContext,
   withdrawFromGoal,
   spendFromGoal,
   listGoals,
 } from "@/modules/control/services/control-service";
+import type { AporteContext } from "@/modules/control/engine/aporte-meta";
 import { getDebtsOverview, type DebtVM } from "@/modules/control/services/debts-service";
 import { getIndexRates } from "@/modules/control/services/index-rates";
 import { addPolicyAction, createPolicy, deletePolicy } from "@/modules/wealth";
@@ -304,6 +306,10 @@ const goalContributionSchema = z.object({
   goalId: z.string().uuid(),
   amount: z.number().positive("Debe ser mayor a 0"),
   contributionDate: z.string().min(8).max(10).refine(notFutureDate, { message: NOT_FUTURE_MSG }),
+  /** Moneda del importe capturado. Opcional: los llamadores viejos no la mandaban y el aporte
+   *  siempre se guarda en la de la meta. Cuando viene y no coincide, el servicio la rechaza —
+   *  guardarla igual metería el importe multiplicado por el tipo de cambio. */
+  currency: z.string().length(3).optional(),
 });
 
 /** Aporte a meta: sube current_amount y crea la transacción vinculada. */
@@ -322,7 +328,31 @@ export async function addGoalContributionAction(raw: unknown): Promise<ActionRes
     logger.error("addGoalContribution fallido", {
       message: err instanceof Error ? err.message : "?",
     });
-    return { ok: false, message: "No pudimos registrar el aporte." };
+    // El desajuste de moneda es la única causa que el usuario puede corregir; el resto es
+    // ruido de infraestructura y se resuelve con el mensaje genérico.
+    const msg = err instanceof Error ? err.message : "";
+    return {
+      ok: false,
+      message: msg.includes("pero la meta está en") ? msg : "No pudimos registrar el aporte.",
+    };
+  }
+}
+
+/**
+ * Contexto NATIVO de una meta para el modal de aporte (moneda, plan mensual, acumulado y lo ya
+ * aportado este mes). Solo lectura. `null` si la meta no existe o no es del hogar.
+ */
+export async function getGoalContributionContextAction(
+  goalId: string,
+): Promise<AporteContext | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    return await getGoalContributionContext(goalId);
+  } catch (err) {
+    logger.error("getGoalContributionContext fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return null;
   }
 }
 

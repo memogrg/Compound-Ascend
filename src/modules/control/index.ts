@@ -22,11 +22,20 @@ export type {
 } from "./engine/amortization";
 export { getControlSummary, listDebts, listGoals, createGoal, listDebtPayments } from "./services/control-service";
 export { createSavingsSobreAction, reportPaymentAction } from "./api/actions";
+export {
+  montoSugerido,
+  avanceMes,
+  textoAvanceMes,
+  validarAporte,
+  aporteValido,
+} from "./engine/aporte-meta";
+export type { AporteContext, AporteErrores } from "./engine/aporte-meta";
 export { goalInputSchema } from "./schemas";
 export { getDebtsOverview } from "./services/debts-service";
 export { getDebtDetail } from "./services/debt-detail-service";
 export { getIndexRates, effectiveApr, buildRateNote } from "./services/index-rates";
 export { ControlDashboard } from "./components/control-dashboard";
+export { AportarMetaButton } from "./components/aportar-meta-button";
 export { ControlActions } from "./components/control-actions";
 export { DebtsView } from "./components/debts-view";
 export { DebtDetail } from "./components/debt-detail";

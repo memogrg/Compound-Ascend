@@ -2,6 +2,7 @@ import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
 // Fase 4.1 (interconexión): botón Retirar — aditivo, coordinar con el owner
 // de esta pantalla. El componente es autocontenido (goal-withdraw-button).
+import { AportarMetaButton } from "./aportar-meta-button";
 import { GoalWithdrawButton } from "./goal-withdraw-button";
 import { GoalSpendButton } from "./goal-spend-button";
 import { GoalDetailButton } from "./goal-detail-button";
@@ -346,6 +347,9 @@ function GoalCard({
       ) : null}
       <div className="acts">
         <GoalDetailButton goal={g} />
+        {/* Aportar va PRIMERO y como acción primaria: es lo que se hace todos los meses;
+            gastar y retirar son excepciones. */}
+        <AportarMetaButton goalId={g.id} goalName={g.name} />
         <GoalSpendButton goal={g} />
         <GoalWithdrawButton goal={g} />
         <EditControlButton kind="goal" item={g} currency={currency} />

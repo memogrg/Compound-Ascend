@@ -7,12 +7,19 @@
  * creación del módulo origen (?new=<kind>, lo atrapa useDeepLinkModal allá).
  * Ahorro suma los fondos fijos (Emergencia/Paz) siempre disponibles.
  */
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { formatMoney } from "@/lib/format";
 import type { Jar, JarItem } from "@/modules/financial-base/engine/expense-jars";
+
+/**
+ * Acción por sobre de ahorro, INYECTADA desde la página. No se importa el botón de `control`
+ * acá: la dependencia va control → financial-base y nunca al revés (CLAUDE.md). La página de
+ * Gastos, que ya compone los dos módulos, pasa el slot.
+ */
+export type JarGoalAction = (goal: { id: string; name: string }) => ReactNode;
 
 const KIND_TITLE: Record<string, string> = {
   holding: "Inversiones del portafolio",
@@ -68,12 +75,17 @@ export function JarLinkedModal({
   jar,
   currency,
   onClose,
+  goalAction,
 }: {
   jar: Extract<Jar, { kind: "linked" }>;
   currency: string;
   onClose: () => void;
+  /** Solo Ahorro: botón de aporte por sobre, inyectado por la página. */
+  goalAction?: JarGoalAction;
 }) {
   const hasItems = jar.items.length > 0;
+  // El aporte solo aplica a metas; en Deudas/Pólizas/Inversiones la fila sigue de solo lectura.
+  const accionMeta = jar.linkedKind === "goal" ? goalAction : undefined;
   const fixed = jar.fixedFunds ?? [];
   const L = BUDGET_LABELS[jar.linkedKind] ?? BUDGET_LABELS.debt!;
 
@@ -165,6 +177,7 @@ export function JarLinkedModal({
                             currency={currency}
                             jarColor={jar.color}
                             labels={L}
+                            goalAction={accionMeta}
                           />
                         ))}
                       </Fragment>
@@ -176,6 +189,7 @@ export function JarLinkedModal({
                         currency={currency}
                         jarColor={jar.color}
                         labels={L}
+                        goalAction={accionMeta}
                       />
                     ))}
               </>
@@ -281,11 +295,13 @@ function BudgetItemRow({
   currency,
   jarColor,
   labels,
+  goalAction,
 }: {
   it: JarItem;
   currency: string;
   jarColor: string;
   labels: { done: string; unit: string };
+  goalAction?: JarGoalAction;
 }) {
   const budget = it.budget ?? 0;
   const spent = it.spent ?? 0;
@@ -294,14 +310,20 @@ function BudgetItemRow({
   const over = budget > 0 && spent > budget;
   const color = over ? "var(--neg)" : jarColor;
   const extra = it.extraordinary ?? 0;
+  // Pendiente = este mes todavía no tiene NINGÚN aporte. Se marca con un borde de aviso a la
+  // izquierda: en una lista de ocho sobres, el que falta se pierde entre barras a medio llenar.
+  const sinAporte = !!goalAction && !advanced && spent <= 0;
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
         gap: 6,
-        padding: "10px 0",
+        padding: "10px 0 10px",
         borderBottom: "1px solid var(--line)",
+        ...(sinAporte
+          ? { borderLeft: "3px solid var(--warn)", paddingLeft: 8, marginLeft: -8 }
+          : null),
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
@@ -382,6 +404,32 @@ function BudgetItemRow({
         >
           incluye {formatMoney(extra, currency)} extraordinario
         </span>
+      ) : null}
+      {/* Aporte del mes + acción. La línea repite el avance en palabras porque la barra sola no
+          distingue "todavía no aporté" de "aporté poco", y esa distinción es justo la que hace
+          accionable el frasco. Los importes van en la moneda de VISUALIZACIÓN, como el resto de
+          la fila; el modal de aporte carga los suyos en la moneda de la meta. */}
+      {goalAction && !advanced ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            marginTop: 2,
+          }}
+        >
+          <span style={{ fontSize: 11.5, color: sinAporte ? "var(--warn)" : "var(--muted)" }}>
+            {sinAporte
+              ? budget > 0
+                ? `Sin aporte este mes · plan ${formatMoney(budget, currency)}`
+                : "Sin aporte este mes"
+              : budget > 0
+                ? `${formatMoney(spent, currency)} de ${formatMoney(budget, currency)} este mes`
+                : `${formatMoney(spent, currency)} este mes`}
+          </span>
+          {goalAction({ id: it.id, name: it.name })}
+        </div>
       ) : null}
     </div>
   );

@@ -5,6 +5,7 @@ import { getExpenseRangeView } from "@/modules/financial-base/services/expense-r
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sections";
 import { createSavingsSobreAction } from "@/modules/control";
+import { AportarMetaButton } from "@/modules/control";
 import { userToday } from "@/lib/time/user-time";
 
 /** Fecha de corte de los frascos: ?asOf=YYYY-MM-DD válido, o el día de hoy (zona del usuario). */
@@ -65,6 +66,11 @@ export default async function Page({
         jarsPeriod={jarsPeriod}
         range={rangeView.range}
         createSavingsSobre={createSavingsSobreAction}
+        /* El botón de aporte vive en `control`; la página es la que puede componer los dos
+           módulos sin invertir la dependencia (control → financial-base, nunca al revés). */
+        goalAction={(goal) => (
+          <AportarMetaButton goalId={goal.id} goalName={goal.name} tone="compact" />
+        )}
       />
     </div>
   );
