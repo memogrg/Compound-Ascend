@@ -10,8 +10,11 @@
  * `\w`, así que `/\bqu[eé]\b/` matchea "que" y JAMÁS "qué" — el router perdía en
  * silencio justo la forma que la gente escribe.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 import { ESLint } from "eslint";
+import { isMultiPart } from "@/lib/ai/router";
 
 let eslint: ESLint;
 
@@ -63,6 +66,61 @@ describe("guard del \\b pegado a vocal acentuada", () => {
   }, 30_000);
 });
 
+describe("el \\b pegado a un GRUPO (el hueco que dejó pasar el bug del 'sí')", () => {
+  // La regla original solo miraba el `\b` pegado DIRECTAMENTE a la vocal o a una clase. En
+  // `/\b(s[ií]|dale)\b/` toca el `)` que cierra el grupo, así que pasaba limpio — y un "sí" pelado
+  // no confirmaba nada en el chat (#612). El guard se extiende para que no vuelva a colarse.
+  it("bloquea el \\b de cierre cuando UNA alternativa termina en clase acentuada", async () => {
+    const errs = await guardErrors("export const RE = /\\b(s[ií]|dale)\\b/i;");
+    expect(errs).toHaveLength(1);
+    expect(errs[0]).toContain("GRUPO");
+  }, 60_000);
+
+  it("bloquea con grupo no-capturante y con la vocal acentuada suelta", async () => {
+    expect(await guardErrors("export const RE = /\\b(?:dale|s[ií])\\b/i;")).toHaveLength(1);
+    expect(await guardErrors("export const RE = /\\b(hola|holá)\\b/i;")).toHaveLength(1);
+  }, 60_000);
+
+  it("bloquea el \\b de apertura cuando el grupo ARRANCA con acento", async () => {
+    expect(await guardErrors("export const RE = /\\b([eé]xito|otro)/i;")).toHaveLength(1);
+    expect(await guardErrors("export const RE = /\\b(?:[eé]xito|otro)/i;")).toHaveLength(1);
+  }, 60_000);
+
+  it("NO marca el grupo cuyas alternativas cierran en ASCII (tilde interna)", async () => {
+    // `/\b(cómo|dale)\b/` funciona: los \b miran los extremos y ahí hay letras ASCII.
+    expect(await guardErrors("export const RE = /\\b(c[oó]mo|dale)\\b/i;")).toEqual([]);
+    expect(/\b(c[oó]mo|dale)\b/i.test("¿cómo van mis metas?")).toBe(true);
+  }, 60_000);
+
+  it("NO marca la forma correcta, sin \\b en los extremos", async () => {
+    expect(await guardErrors("export const RE = /(?:s[ií]|dale)(?!\\p{L})/iu;")).toEqual([]);
+  }, 60_000);
+});
+
+describe("los dos defectos VIVOS que destapó el guard extendido", () => {
+  // Al correr el lint con el selector nuevo, `router.ts` marcó dos regex que llevaban tiempo en
+  // producción fallando en silencio. Se fijan acá para que el arreglo no se revierta.
+  it("isMultiPart detecta la pregunta compuesta con «qué» y con «está» acentuados", () => {
+    // `…|qu[eé]|est[aá]|…)\b` no se cumplía para esas formas: una pregunta de dos partes NO se
+    // detectaba y el router contestaba una sola mitad en vez de escalar.
+    expect(isMultiPart("¿cuánto tengo en ahorro y qué aporte me falta?")).toBe(true);
+    expect(isMultiPart("¿cuál es mi meta y está al día mi aporte?")).toBe(true);
+  });
+
+  it("y sigue sin marcar una pregunta simple", () => {
+    expect(isMultiPart("¿cuánto tengo en ahorro?")).toBe(false);
+  });
+
+  it("los términos de dominio acentuados ya no pasan como nombre de sobre", () => {
+    // El filtro terminaba en `gan[eéoó])\b`: "gané"/"ganó" se colaban como candidatos.
+    const RE = /\b(?:pendiente|aporte|inversi|ahorro|deuda|meta|libertad|independencia|ingres|gan[eéoó])(?!\p{L})/iu;
+    expect(RE.test("gané")).toBe(true);
+    expect(RE.test("ganó")).toBe(true);
+    expect(RE.test("gane")).toBe(true);
+    expect(RE.test("ganancia")).toBe(false); // no corta una palabra más larga
+  });
+});
+
 describe("por qué el guard existe (semántica de JS, sin ESLint de por medio)", () => {
   it("el patrón vetado pierde la forma acentuada", () => {
     expect(/\bqu[eé]\b/i.test("que")).toBe(true);
@@ -72,5 +130,15 @@ describe("por qué el guard existe (semántica de JS, sin ESLint de por medio)",
   it("sin el \\b de cierre, ambas formas entran", () => {
     expect(/\bqu[eé]/i.test("que")).toBe(true);
     expect(/\bqu[eé]/i.test("qué")).toBe(true);
+  });
+
+  it("el hueco del GRUPO tenía el mismo efecto", () => {
+    expect(/\b(s[ií]|dale)\b/i.test("si")).toBe(true);
+    expect(/\b(s[ií]|dale)\b/i.test("sí")).toBe(false); // ← el bug del chat (#612)
+  });
+
+  it("la forma que recomienda el mensaje toma las dos", () => {
+    expect(/\b(?:s[ií]|dale)(?!\p{L})/iu.test("si")).toBe(true);
+    expect(/\b(?:s[ií]|dale)(?!\p{L})/iu.test("sí")).toBe(true);
   });
 });

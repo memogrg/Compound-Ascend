@@ -524,6 +524,14 @@
           {
             "selector": "Literal[regex.pattern=/\\\\b[áéíóúüñÁÉÍÓÚÜÑ]|[áéíóúüñÁÉÍÓÚÜÑ]\\\\b|\\\\b\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]\\\\b/]",
             "message": "`\\b` se define sobre [A-Za-z0-9_]: una vocal acentuada NO es \\w, así que el límite pegado a ella nunca se cumple — `/\\bqu[eé]\\b/` matchea \"que\" pero JAMÁS \"qué\". Quitá el `\\b` del lado acentuado (`/\\bqu[eé]/`), cortá el stem antes de la tilde (`revis\\w*`), o usá `(?:^|[^\\wáéíóúüñ])` si necesitás el límite de verdad."
+          },
+          {
+            "selector": "Literal[regex.pattern=/\\((?:[^()]*)(?:[áéíóúüñÁÉÍÓÚÜÑ]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\])(?:\\)|\\|[^()]*\\))\\\\b/]",
+            "message": "`\\b` tras un GRUPO cuya alternativa termina en vocal acentuada nunca se cumple para esa alternativa: `/\\b(s[ií]|dale)\\b/` matchea \"si\" y \"dale\", pero JAMÁS \"sí\". Cerrá con `(?!\\p{L})` y flag `u`, o sacá el `\\b`. Ojo también con `\\w*`: tampoco cruza la tilde (`registr\\w*` se para antes de la \"á\" de \"registrá\") — ahí va `\\p{L}*`."
+          },
+          {
+            "selector": "Literal[regex.pattern=/\\\\b\\((?:\\?:)?(?:[áéíóúüñÁÉÍÓÚÜÑ]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\])/]",
+            "message": "`\\b` antes de un GRUPO que arranca con vocal acentuada nunca se cumple para esa alternativa: `/\\b([eé]xito|otro)/` matchea \"exito\" pero JAMÁS \"éxito\". Usá `(?:^|[^\\p{L}])` con flag `u`, o sacá el `\\b`."
           }
         ]
       }
@@ -538,6 +546,14 @@
           {
             "selector": "Literal[regex.pattern=/\\\\b[áéíóúüñÁÉÍÓÚÜÑ]|[áéíóúüñÁÉÍÓÚÜÑ]\\\\b|\\\\b\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\]\\\\b/]",
             "message": "`\\b` se define sobre [A-Za-z0-9_]: una vocal acentuada NO es \\w, así que el límite pegado a ella nunca se cumple — `/\\bqu[eé]\\b/` matchea \"que\" pero JAMÁS \"qué\". Quitá el `\\b` del lado acentuado (`/\\bqu[eé]/`), cortá el stem antes de la tilde (`revis\\w*`), o usá `(?:^|[^\\wáéíóúüñ])` si necesitás el límite de verdad."
+          },
+          {
+            "selector": "Literal[regex.pattern=/\\((?:[^()]*)(?:[áéíóúüñÁÉÍÓÚÜÑ]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\])(?:\\)|\\|[^()]*\\))\\\\b/]",
+            "message": "`\\b` tras un GRUPO cuya alternativa termina en vocal acentuada nunca se cumple para esa alternativa: `/\\b(s[ií]|dale)\\b/` matchea \"si\" y \"dale\", pero JAMÁS \"sí\". Cerrá con `(?!\\p{L})` y flag `u`, o sacá el `\\b`. Ojo también con `\\w*`: tampoco cruza la tilde (`registr\\w*` se para antes de la \"á\" de \"registrá\") — ahí va `\\p{L}*`."
+          },
+          {
+            "selector": "Literal[regex.pattern=/\\\\b\\((?:\\?:)?(?:[áéíóúüñÁÉÍÓÚÜÑ]|\\[[^\\]]*[áéíóúüñÁÉÍÓÚÜÑ][^\\]]*\\])/]",
+            "message": "`\\b` antes de un GRUPO que arranca con vocal acentuada nunca se cumple para esa alternativa: `/\\b([eé]xito|otro)/` matchea \"exito\" pero JAMÁS \"éxito\". Usá `(?:^|[^\\p{L}])` con flag `u`, o sacá el `\\b`."
           }
         ]
       }
