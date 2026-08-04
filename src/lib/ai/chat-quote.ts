@@ -66,11 +66,40 @@ export function annotateReply(userMessage: string, quoted: QuotedMessage): strin
   const quien = quoted.role === "assistant" ? "tuyo (el asesor)" : "suyo";
   return [
     `[El usuario está RESPONDIENDO a este mensaje ${quien}, más arriba en la conversación:`,
-    `"${quoteExcerpt(quoted.content, 600)}"`,
+    `"${quoteBloque(quoted.content, 1200)}"`,
     `Respondé entendiendo que su mensaje se refiere a eso.]`,
     "",
     userMessage,
   ].join("\n");
+}
+
+/**
+ * Recorte que CONSERVA los saltos de línea, para lo que va al prompt.
+ *
+ * `quoteExcerpt` aplana todo a una línea — correcto para la burbuja de la UI, desastroso acá: si
+ * el usuario citó una lista pegada (un estado de cuenta, un desglose), el modelo la recibía como
+ * un renglón interminable y perdía la estructura de filas que es justamente lo que se le pide
+ * leer. El tope es más generoso por lo mismo.
+ */
+export function quoteBloque(content: string, max: number): string {
+  const t = content.trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max).trimEnd()}…`;
+}
+
+/**
+ * ¿El mensaje APUNTA a lo citado en vez de traer su propia consulta? ("¿estas están registradas?",
+ * "¿y esto?", "lo de arriba", "esos gastos").
+ *
+ * Es la señal que permite resolver la referencia: cuando el usuario responde con un pronombre, el
+ * pedido real está en el mensaje CITADO, no en el que acaba de escribir. Sin esto, "¿estas están
+ * registradas?" no matchea ningún carril —no nombra sobre, periodo ni nada— y se contesta con
+ * cualquier cosa.
+ */
+export function pareceReferenciaACitado(text: string): boolean {
+  return /\b(?:est[aeo]s?|es[aeo]s?|aquell[aeo]s?|lo de arriba|de arriba|lo anterior|el anterior|la anterior|ah[ií]|eso)(?!\p{L})/iu.test(
+    text.trim(),
+  );
 }
 
 /**
