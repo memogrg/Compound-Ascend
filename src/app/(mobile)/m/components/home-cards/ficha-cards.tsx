@@ -13,7 +13,7 @@ import type {
 import type { DebtMethod } from "@/modules/control";
 import type { RichTrend } from "@/modules/rich-life";
 
-import { MChip, mAmount, type MTone } from "../content-kit";
+import { MChip, MVsMes, mAmount, type MTone } from "../content-kit";
 import { MHomeCard, MHomeCardEmpty } from "./card-shell";
 import { MHomeMeter } from "./meter";
 import {
@@ -178,6 +178,7 @@ export function AhorrosFicha({ c, currency }: { c: AhorrosCard; currency: string
     <MHomeCard
       eyebrow="Ahorros"
       value={<FVal tone="pos">{mAmount(c.ahorrado, currency, 10)}</FVal>}
+      delta={c.vsMes ? <MVsMes vs={c.vsMes} currency={currency} /> : undefined}
       chip={
         c.pct >= 1 ? <MChip tone="success">Meta ✓</MChip> : <MChip tone="neutral">{pct100(c.pct)}%</MChip>
       }
@@ -223,6 +224,7 @@ export function DeudasFicha({ c, currency }: { c: DeudasCard; currency: string }
     <MHomeCard
       eyebrow="Deudas"
       value={<FVal tone="neg">{mAmount(c.total, currency, 10)}</FVal>}
+      delta={c.vsMes ? <MVsMes vs={c.vsMes} currency={currency} /> : undefined}
       chip={c.metodo ? <MChip tone="neutral">{DEBT_METHOD_LABEL[c.metodo]}</MChip> : undefined}
       sub={`${c.numDeudas} ${c.numDeudas === 1 ? "deuda" : "deudas"}`}
       vis={<FPayoff total={c.total} mesesACierre={c.mesesACierre} currency={currency} />}
@@ -255,6 +257,7 @@ export function InversionesFicha({ c, currency }: { c: InversionesCard; currency
     <MHomeCard
       eyebrow="Inversiones"
       value={mAmount(c.valorActual, currency, 10)}
+      delta={c.vsMes ? <MVsMes vs={c.vsMes} currency={currency} /> : undefined}
       chip={
         <MChip tone={c.gananciaTone === "pos" ? "success" : c.gananciaTone === "neg" ? "danger" : "neutral"}>
           {c.ganancia >= 0 ? "+" : "−"}
@@ -359,6 +362,7 @@ export function PatrimonioFicha({ c, currency }: { c: PatrimonioCard; currency: 
     <MHomeCard
       eyebrow="Patrimonio"
       value={<FVal tone={netoTone}>{mAmount(c.neto, currency, 10)}</FVal>}
+      delta={c.vsMes ? <MVsMes vs={c.vsMes} currency={currency} /> : undefined}
       chip={t ? <MChip tone={t.tone}>{t.label}</MChip> : undefined}
       sub={`Activos ${mAmount(c.activos, currency, 7)} · Deudas ${mAmount(c.pasivos, currency, 7)}`}
       vis={

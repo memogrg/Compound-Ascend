@@ -44,6 +44,9 @@ export type PaymentKind = "ordinario" | "extraordinario";
 export type Debt = {
   id: string;
   name: string;
+  /** Fecha de alta de la fila (ISO). Aproxima "cuándo adquiriste la deuda" para el delta vs mes.
+   *  Opcional en el tipo (factories de test la omiten); en producción `rowToDebt` siempre la puebla. */
+  createdAt?: string;
   debtType?: string | null;
   balance: number;
   minPayment: number;

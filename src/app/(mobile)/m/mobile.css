@@ -3154,6 +3154,39 @@ body:has(.m-shell[data-theme="dark"]) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* "Vs mes anterior": línea propia bajo la cifra (no inline con el hero, que va nowrap). */
+.m-shell .m-hcard-delta {
+  margin-top: 2px;
+  line-height: 1;
+  overflow: hidden;
+}
+.m-shell .m-vsmes {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: -0.02em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.m-shell .m-vsmes.pos {
+  color: var(--accent);
+}
+.m-shell .m-vsmes.neg {
+  color: var(--danger);
+}
+.m-shell .m-vsmes-arrow {
+  font-weight: 800;
+}
+/* El verbo ("aportaste"/"pagaste") queda atenuado; el color vive en la flecha + cifra. */
+.m-shell .m-vsmes-label {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--text-muted);
+}
 /* El visual vive a la derecha y NO se encoge: su tamaño es parte del contrato de
    altura. Todas las tarjetas deben poner algo aquí — si una lo deja vacío, deja de
    parecerse a sus hermanas (le pasaba a Patrimonio). */
