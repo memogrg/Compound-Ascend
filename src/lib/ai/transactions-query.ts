@@ -75,6 +75,11 @@ export type ConsultaResult = {
     /** id de la fila, para poder distinguir dos movimientos que se ven idénticos. */
     id?: string;
   }[];
+  /**
+   * Montos por sobre (categoryId → montos), sobre TODAS las filas que matchean. Lo usa el
+   * desglose cuando se consultan varios sobres juntos; se calcula antes del tope, como el total.
+   */
+  movimientosPorSobre?: Record<string, Monto[]>;
   /** Filtros que se aplicaron, para que la respuesta pueda nombrarlos. */
   filtros: { comercio: string | null; sobre: string | null; termino: string | null };
 };
@@ -356,6 +361,13 @@ export function agregarTransacciones(
     conteo: txns.length,
     total: totalGeneral?.monto ?? null,
     subtotalesGenerales: subtotales(montosGenerales),
+    // Por sobre, sobre TODAS las filas (antes del tope): el desglose tiene que cuadrar con el
+    // total, no con lo que se muestre.
+    movimientosPorSobre: txns.reduce<Record<string, Monto[]>>((acc, t) => {
+      if (!t.categoryId) return acc;
+      (acc[t.categoryId] ??= []).push({ monto: t.amount, moneda: t.currency });
+      return acc;
+    }, {}),
     grupos: [],
     movimientos: [],
     filtros: {
@@ -442,7 +454,15 @@ function montoGrupo(g: Grupo, moneda: string): string {
  * como tal (nunca "no tengo acceso"). Con dos grupos temporales agrega la comparación,
  * que es lo que pide "¿gasté más este mes que el pasado?".
  */
-export function renderConsulta(r: ConsultaResult): string {
+export function renderConsulta(
+  r: ConsultaResult,
+  opts?: {
+    /** id → nombre del sobre, para el desglose cuando se consultaron varios. */
+    nombresPorCategoria?: Record<string, string>;
+    /** Sobres consultados juntos. Con más de uno se agrega el subtotal por sobre. */
+    porSobre?: { id: string; sobre: string }[];
+  },
+): string {
   const nombreTipo = TIPO_SUST[r.tipo];
   const filtro =
     r.filtros.comercio ? ` en ${r.filtros.comercio}`
@@ -504,7 +524,23 @@ export function renderConsulta(r: ConsultaResult): string {
       r.movimientos.length < r.conteo
         ? `\n\n(Se muestran ${r.movimientos.length} de ${r.conteo} movimientos; el total es de los ${r.conteo}.)`
         : "";
-    return `${cab}\n\n${tabla}${recorte}`;
+    // SUBTOTAL POR SOBRE cuando se consultaron varios juntos ("Supermercado" + "Supermercados"):
+    // el total general no deja ver cuánto cayó en cada uno, que es justo lo que hace falta para
+    // decidir si conviene unificarlos.
+    let desglose = "";
+    if (opts?.porSobre && opts.porSobre.length > 1) {
+      const lineas = opts.porSobre
+        .map((s) => {
+          const suyos = r.movimientosPorSobre?.[s.id] ?? [];
+          if (suyos.length === 0) return null;
+          const porMoneda = subtotales(suyos);
+          const monto = porMoneda.map((mm) => formatMoney(mm.monto, mm.moneda)).join(" + ");
+          return `- ${s.sobre}: ${monto} (${suyos.length})`;
+        })
+        .filter(Boolean);
+      if (lineas.length > 0) desglose = `\n\nPor sobre:\n${lineas.join("\n")}`;
+    }
+    return `${cab}\n\n${tabla}${desglose}${recorte}`;
   }
 
   const comoSe: Record<Exclude<Agrupacion, "ninguna">, string> = {

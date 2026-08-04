@@ -13,6 +13,7 @@ import "server-only";
  * Vive DENTRO de financeChatWithTools → cubre web y WhatsApp (ambos pasan por ahí).
  */
 import { formatMoney } from "@/lib/format";
+import { pareceTodosLosCandidatos } from "@/lib/ai/sobre-match";
 import {
   pareceBloqueDeEstado,
   pareceConfirmacionDeAlta,
@@ -105,6 +106,7 @@ type Intent =
   // Lectura fresca; el dato NO está en ctx (que solo trae agregados del mes en curso):
   | "conciliar_estado"
   | "confirmar_alta_estado"
+  | "consulta_transacciones_varios"
   | "consulta_transacciones"
   // HISTORIAL/TENDENCIA: serie por periodo + variación desde los snapshots ("¿cómo cambió mi
   // patrimonio?", "¿cómo vengo con el gasto?"). Lectura fresca:
@@ -143,6 +145,7 @@ const KNOWN_INTENTS: Intent[] = [
   "consulta_detalle",
   "conciliar_estado",
   "confirmar_alta_estado",
+  "consulta_transacciones_varios",
 ];
 
 /** Intents cuyo dato NO está en ctx: se resuelven con lectura fresca (solo con sesión web). */
@@ -157,6 +160,7 @@ const FETCH_INTENTS: ReadonlySet<Intent> = new Set([
   "consulta_detalle",
   "conciliar_estado",
   "confirmar_alta_estado",
+  "consulta_transacciones_varios",
 ]);
 
 // Señales de RAZONAMIENTO: si aparecen, NO es una consulta simple → escalar. Es la red de
@@ -550,6 +554,14 @@ export function matchIntent(
   // conversación reciente; si no lo hay, devuelve null y esto escala como cualquier otra frase.
   if (pareceConfirmacionDeAlta(text)) {
     return { intent: "confirmar_alta_estado", params: {} };
+  }
+
+  // "los dos" / "ambos" — respuesta a una pregunta de ambigüedad de sobres. Sin este carril la
+  // respuesta se perdía: no existía forma de contestar esa pregunta, y la consulta terminaba
+  // diciendo "no tenés movimientos" sobre datos que SÍ existen. El resolver re-deriva la consulta
+  // original del hilo; si no encuentra una, devuelve null y esto escala como cualquier frase.
+  if (pareceTodosLosCandidatos(text)) {
+    return { intent: "consulta_transacciones_varios", params: {} };
   }
 
   // Pregunta COMPUESTA ("¿cuánto gasto y cuánto ahorro al mes?"): dos consultas distintas en una. Un
@@ -1357,6 +1369,11 @@ async function resolveFetchIntent(
       const { consultarHistorial } = await import("@/lib/ai/history-query-service");
       const r = await consultarHistorial(params, cur);
       return say(r.resumen_md);
+    }
+    if (intent === "consulta_transacciones_varios") {
+      const { resolverConsultaVarios } = await import("@/lib/ai/transactions-query-service");
+      const r = await resolverConsultaVarios(cur);
+      return r ? say(r.resumen_md) : null;
     }
     if (intent === "confirmar_alta_estado") {
       // Se RE-DERIVA la conciliación desde el bloque que el usuario pegó, que está en
