@@ -70,6 +70,7 @@ function rowToDebt(r: DebtRow): Debt {
     isEssential: r.is_essential,
     id: r.id,
     name: r.name,
+    createdAt: r.created_at,
     debtType: r.debt_type,
     balance: Number(r.balance),
     minPayment: Number(r.min_payment ?? 0),
@@ -801,6 +802,7 @@ export function buildDemoControlSummary(): ControlSummary {
     {
       id: "d1",
       name: "Tarjeta de crédito",
+      createdAt: "2020-01-01T00:00:00.000Z",
       balance: 1_400_000,
       minPayment: 70_000,
       currentPayment: 70_000,
@@ -814,6 +816,7 @@ export function buildDemoControlSummary(): ControlSummary {
     {
       id: "d2",
       name: "Préstamo personal",
+      createdAt: "2020-01-01T00:00:00.000Z",
       balance: 2_200_000,
       minPayment: 95_000,
       currentPayment: 95_000,

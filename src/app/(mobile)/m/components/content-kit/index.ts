@@ -19,6 +19,7 @@ export { MSectionHeader } from "./section-header";
 export { MDataRow } from "./data-row";
 export { MMetricGrid, MMetricCard } from "./metric-grid";
 export { MChip } from "./chip";
+export { MVsMes } from "./vs-mes";
 export { MEmptyState } from "./empty-state";
 export { MContentCard } from "./content-card";
 export { MProgress } from "./progress";

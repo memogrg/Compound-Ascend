@@ -25,8 +25,10 @@ export {
 export {
   createTransaction,
   listTransactions,
+  listLinkedMovements,
   deleteTransaction,
 } from "./services/transaction-service";
+export type { LinkedMovement } from "./services/transaction-service";
 export { getLiquidityBalance } from "./services/liquidity-service";
 // Cuentas del usuario (trazabilidad de liquidez para la IA).
 export { listAccounts } from "./services/accounts-service";
@@ -37,7 +39,7 @@ export type { EnvelopesSummary } from "./services/envelopes-service";
 // Líneas derivadas del presupuesto (renta/dividendos/…): wealth las sincroniza
 // al registrar un pago para conciliarlo contra la barra "Recibido".
 export { syncDerivedBudget } from "./services/derived-budget-service";
-export { monthPeriod } from "./engine/period";
+export { monthPeriod, previousMonthPeriod } from "./engine/period";
 // Fase 3 · flujo inverso: al borrar un stub de inversión, wealth revierte las
 // fuentes de ingreso vinculadas (dirección wealth → financial-base).
 export { deleteIncomeSourcesByHolding } from "./services/budget-service";

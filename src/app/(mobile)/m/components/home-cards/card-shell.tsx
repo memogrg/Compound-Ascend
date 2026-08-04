@@ -36,6 +36,7 @@ import { MHomeCardRetry } from "./card-retry";
 export function MHomeCard({
   eyebrow,
   value,
+  delta,
   chip,
   sub,
   vis,
@@ -46,6 +47,9 @@ export function MHomeCard({
   eyebrow: string;
   /** Cifra protagonista, ya formateada por quien llama (mAmount / formatCompact). */
   value: ReactNode;
+  /** "Vs mes anterior" en su propia línea bajo la cifra (chip flecha+color). La cifra hero
+   *  va en `white-space:nowrap` y recortaría un chip inline; por eso va aparte. */
+  delta?: ReactNode;
   /** Estado a la derecha del eyebrow (MChip). */
   chip?: ReactNode;
   sub?: ReactNode;
@@ -67,6 +71,7 @@ export function MHomeCard({
       <div className="m-hcard-body">
         <div className="m-hcard-figs">
           <div className="m-hcard-val">{value}</div>
+          {delta ? <div className="m-hcard-delta">{delta}</div> : null}
           {sub ? <div className="m-hcard-sub">{sub}</div> : null}
         </div>
         <div className="m-hcard-vis">{vis ?? null}</div>

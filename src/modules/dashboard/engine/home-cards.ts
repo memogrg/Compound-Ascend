@@ -38,8 +38,23 @@ import type { RichTrend } from "@/modules/rich-life";
 /** Signo semántico para colorear (verde/pos, rojo/neg, gris/neutral). */
 export type Tone = "pos" | "neg" | "neutral";
 
-/** Comparación vs mes anterior. `null` = sin dato → la UI degrada sin flecha. */
-export type VsMes = { deltaPct: number; tone: Tone } | null;
+/**
+ * Comparación "vs mes anterior" de una ficha. Un solo tipo para dos formatos: monto movido
+ * (Ahorros/Deudas) y porcentaje (Inversiones/Patrimonio). `dir` es la dirección de la FLECHA
+ * (movimiento del subyacente); `tone` es el color YA resuelto por dominio (Deudas lo invierte:
+ * bajar deuda es bueno → verde). `null` = sin dato → la UI degrada sin chip.
+ */
+export type VsMesFormat = "amount" | "percent";
+export type VsMesDir = "up" | "down" | "flat";
+export type VsMes = {
+  format: VsMesFormat;
+  /** Magnitud a mostrar, SIEMPRE ≥ 0 (monto movido o |deltaPct| 0-1). El signo va en `dir`. */
+  value: number;
+  dir: VsMesDir;
+  tone: Tone;
+  /** Verbo/etiqueta corta: "aportaste" · "pagaste" · "vs mes ant." */
+  label: string;
+} | null;
 
 // ---------------------------------------------------------------------------
 // 1 · Presupuesto — flujo real + plan/gap + % sin presupuesto + barras plan·real
@@ -163,6 +178,7 @@ export type AhorrosCard = {
 
 export function selectAhorros(
   goals: (GoalLagInput & { monthlyContribution: number })[],
+  vsMes: VsMes = null,
 ): AhorrosCard {
   const metas = goals.filter((g) => g.targetAmount > 0);
   const ahorrado = sum(metas.map((g) => g.currentAmount));
@@ -178,7 +194,7 @@ export function selectAhorros(
     numMetas: metas.length,
     aporteMensual: round2(aporteMensual),
     rezagadas: rankSavingsGoalsByLag(metas, 3),
-    vsMes: null,
+    vsMes,
   };
 }
 
@@ -200,6 +216,7 @@ export function selectDeudas(
   debts: { id: string; name: string; balance: number; apr: number; minPayment: number }[],
   method: DebtMethod | null,
   extra: number,
+  vsMes: VsMes = null,
 ): DeudasCard {
   const active = debts.filter((d) => d.balance > 0);
   const total = sum(active.map((d) => d.balance));
@@ -215,7 +232,7 @@ export function selectDeudas(
     numDeudas: active.length,
     metodo: method,
     mesesACierre,
-    vsMes: null,
+    vsMes,
   };
 }
 
@@ -232,11 +249,15 @@ export type InversionesCard = {
   gananciaTone: Tone;
   numActivos: number;
   naturaleza: NatureBreakdown; // largo plazo (growth) vs flujo de caja (cashflow)
-  /** Aporte/retiro del mes (Delta 3): capital de holdings. */
-  aporteRetiroMes: VsMes;
+  /** ±% del valor del portafolio vs el cierre del mes anterior (snapshot). */
+  vsMes: VsMes;
 };
 
-export function selectInversiones(analytics: PortfolioAnalytics, natureItems: NatureInput[]): InversionesCard {
+export function selectInversiones(
+  analytics: PortfolioAnalytics,
+  natureItems: NatureInput[],
+  vsMes: VsMes = null,
+): InversionesCard {
   return {
     key: "inversiones",
     href: "/m/inversiones",
@@ -247,7 +268,7 @@ export function selectInversiones(analytics: PortfolioAnalytics, natureItems: Na
     gananciaTone: toneOf(analytics.totalProfitLoss),
     numActivos: natureItems.length,
     naturaleza: aggregateHoldingsByNature(natureItems),
-    aporteRetiroMes: null,
+    vsMes,
   };
 }
 
@@ -311,16 +332,20 @@ export type PatrimonioCard = {
   veredicto: RichTrend;
   productivos: { value: number; pct: number };
   noProductivos: { value: number; pct: number };
-  deltaVsMes: VsMes; // Δ neto vs mes (Delta 3)
+  /** ±% del patrimonio neto vs el mes anterior (de wealthVelocity). */
+  vsMes: VsMes;
 };
 
-export function selectPatrimonio(ind: {
-  netWorth: number;
-  totalAssets: number;
-  totalLiabilities: number;
-  productiveAssetsPct: number; // 0-1, ya existe en rich-life
-  trend: RichTrend;
-}): PatrimonioCard {
+export function selectPatrimonio(
+  ind: {
+    netWorth: number;
+    totalAssets: number;
+    totalLiabilities: number;
+    productiveAssetsPct: number; // 0-1, ya existe en rich-life
+    trend: RichTrend;
+  },
+  vsMes: VsMes = null,
+): PatrimonioCard {
   const productive = Math.max(0, round2(ind.productiveAssetsPct * ind.totalAssets));
   const noProd = Math.max(0, round2(ind.totalAssets - productive));
   const pct = (v: number) => (ind.totalAssets > 0 ? round2(v / ind.totalAssets) : 0);
@@ -333,7 +358,7 @@ export function selectPatrimonio(ind: {
     veredicto: ind.trend,
     productivos: { value: productive, pct: pct(productive) },
     noProductivos: { value: noProd, pct: pct(noProd) },
-    deltaVsMes: null,
+    vsMes,
   };
 }
 

@@ -16,10 +16,18 @@ import {
   getBudgetTotals,
   getBaseSummary,
   getDisplayCurrency,
+  listLinkedMovements,
+  previousMonthPeriod,
 } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
+import { convertCurrency } from "@/lib/fx";
 import { getControlSummary, getDebtsOverview } from "@/modules/control";
-import { getPortfolioReport, getWealthSummary, getPatrimonioReport } from "@/modules/wealth";
+import {
+  getPortfolioReport,
+  getWealthSummary,
+  getPatrimonioReport,
+  getSnapshotHistory,
+} from "@/modules/wealth";
 import { getRichLifeSummary } from "@/modules/rich-life";
 import {
   selectPresupuesto,
@@ -34,6 +42,12 @@ import {
   deriveFundAmounts,
   type HomeCards,
 } from "@/modules/dashboard/engine/home-cards";
+import {
+  buildAhorrosVsMes,
+  buildDeudasVsMes,
+  buildInversionesVsMes,
+  buildPatrimonioVsMes,
+} from "@/modules/dashboard/engine/vs-mes";
 
 const safe = <T>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
 
@@ -41,20 +55,91 @@ const safe = <T>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
 export async function getHomeCardsData(): Promise<HomeCards> {
   const period = await userCurrentPeriod();
 
-  const [mf, real, budget, base, control, debts, portfolio, wealth, richLife, patrimonio, currency] =
-    await Promise.all([
-      safe(getMonthFlow(period)),
-      safe(getRealTotals(period)),
-      safe(getBudgetTotals(period)),
-      safe(getBaseSummary()),
-      safe(getControlSummary()),
-      safe(getDebtsOverview()),
-      safe(getPortfolioReport()),
-      safe(getWealthSummary()),
-      safe(getRichLifeSummary({ precios: "cache" })),
-      safe(getPatrimonioReport()),
-      getDisplayCurrency(),
-    ]);
+  // Las 3 lecturas NUEVAS del "vs mes" (movimientos vinculados del periodo + snapshots del
+  // portafolio) van en el MISMO Promise.all: corren en paralelo con todo lo demás, así el
+  // Inicio no gana latencia serial. Patrimonio no añade lectura (reusa wealthVelocity de
+  // rich-life); las altas de deuda reusan control.debts; el FX reusa control.fxRates.
+  const [
+    mf,
+    real,
+    budget,
+    base,
+    control,
+    debts,
+    portfolio,
+    wealth,
+    richLife,
+    patrimonio,
+    movements,
+    snapshots,
+    currency,
+  ] = await Promise.all([
+    safe(getMonthFlow(period)),
+    safe(getRealTotals(period)),
+    safe(getBudgetTotals(period)),
+    safe(getBaseSummary()),
+    safe(getControlSummary()),
+    safe(getDebtsOverview()),
+    safe(getPortfolioReport()),
+    safe(getWealthSummary()),
+    safe(getRichLifeSummary({ precios: "cache" })),
+    safe(getPatrimonioReport()),
+    safe(listLinkedMovements(period, ["goal", "debt"])),
+    safe(getSnapshotHistory("3M")),
+    getDisplayCurrency(),
+  ]);
+
+  // "Vs mes anterior" (Delta 3). Todo se normaliza a la moneda de display; el mes de flujo
+  // (Ahorros/Deudas) es el EN CURSO (`period`), el de nivel (Inversiones) es el cierre del
+  // mes anterior. Cada delta degrada a `null` (sin chip) si le falta su fuente.
+  const prevPeriod = previousMonthPeriod(period);
+  const convert = (amount: number, from: string) =>
+    convertCurrency(amount, from, currency, control?.fxRates ?? {});
+  // Los movimientos de meta/deuda son ingreso o gasto (el aporte es gasto, el retiro ingreso);
+  // una transferencia no debería venir vinculada, pero la excluimos para no contarla mal.
+  const asMov = (m: { kind: string }) => (m.kind === "ingreso" ? ("ingreso" as const) : ("gasto" as const));
+  const goalMovs = (movements ?? []).filter((m) => m.linkedKind === "goal" && m.kind !== "transferencia");
+  const debtMovs = (movements ?? []).filter((m) => m.linkedKind === "debt" && m.kind !== "transferencia");
+
+  const ahorrosVsMes = movements
+    ? buildAhorrosVsMes(
+        goalMovs.map((m) => ({
+          kind: asMov(m),
+          amount: m.amount,
+          currency: m.currency,
+          countsInBudget: m.countsInBudget,
+        })),
+        convert,
+      )
+    : null;
+  const deudasVsMes = movements
+    ? buildDeudasVsMes({
+        payments: debtMovs.map((m) => ({ kind: asMov(m), amount: m.amount, currency: m.currency })),
+        debts: (control?.debts ?? []).map((d) => ({
+          balance: d.balance,
+          originalAmount: d.originalAmount ?? null,
+          currency: d.currency,
+          createdOn: d.createdAt ?? "",
+        })),
+        from: period.from,
+        to: period.to,
+        convert,
+      })
+    : null;
+  const inversionesVsMes =
+    snapshots && portfolio
+      ? buildInversionesVsMes({
+          currentValue: portfolio.analytics.totalPortfolioValue,
+          snapshots: snapshots.map((s) => ({ date: s.date, portfolioValue: s.portfolioValue })),
+          prevMonthEnd: prevPeriod.to,
+        })
+      : null;
+  const patrimonioVsMes = richLife
+    ? buildPatrimonioVsMes({
+        netWorth: richLife.snapshot.indicators.netWorth,
+        wealthVelocity: richLife.snapshot.indicators.wealthVelocity,
+      })
+    : null;
 
   // 1-3 · Presupuesto / Ingresos / Gastos — flujo canónico (A-01) + expenseByKey.
   const presupuesto =
@@ -63,10 +148,10 @@ export async function getHomeCardsData(): Promise<HomeCards> {
   const gastos =
     mf && real && budget ? selectGastos(mf, real.expenseByKey, budget.expenseByKey) : null;
 
-  // 4 · Ahorros — metas.
-  const ahorros = control ? selectAhorros(control.goals) : null;
+  // 4 · Ahorros — metas + neto aportado/retirado del mes (vsMes).
+  const ahorros = control ? selectAhorros(control.goals, ahorrosVsMes) : null;
 
-  // 5 · Deudas — saldos normalizados (getDebtsOverview) + método (diagnóstico de control).
+  // 5 · Deudas — saldos normalizados (getDebtsOverview) + método + neto pagado/adquirido (vsMes).
   const deudas = debts
     ? selectDeudas(
         debts.debts.map((d) => ({
@@ -78,10 +163,11 @@ export async function getHomeCardsData(): Promise<HomeCards> {
         })),
         control?.diagnosis.debtMethod?.method ?? null,
         debts.freeCashflow,
+        deudasVsMes,
       )
     : null;
 
-  // 6 · Inversiones — analytics + naturaleza (holdingsWithPerformance llevan nature + currentValue).
+  // 6 · Inversiones — analytics + naturaleza + ±% vs cierre del mes anterior (vsMes).
   const inversiones = portfolio
     ? selectInversiones(
         portfolio.analytics,
@@ -89,6 +175,7 @@ export async function getHomeCardsData(): Promise<HomeCards> {
           nature: h.nature ?? null,
           value: h.currentValue,
         })),
+        inversionesVsMes,
       )
     : null;
 
@@ -108,13 +195,16 @@ export async function getHomeCardsData(): Promise<HomeCards> {
 
   // 8 · Patrimonio — indicadores de rich-life (neto/activos/pasivos/productivo/tendencia).
   const patrimonioCard = richLife
-    ? selectPatrimonio({
-        netWorth: richLife.snapshot.indicators.netWorth,
-        totalAssets: richLife.snapshot.indicators.totalAssets,
-        totalLiabilities: richLife.snapshot.indicators.totalLiabilities,
-        productiveAssetsPct: richLife.snapshot.indicators.productiveAssetsPct,
-        trend: richLife.snapshot.indicators.trend,
-      })
+    ? selectPatrimonio(
+        {
+          netWorth: richLife.snapshot.indicators.netWorth,
+          totalAssets: richLife.snapshot.indicators.totalAssets,
+          totalLiabilities: richLife.snapshot.indicators.totalLiabilities,
+          productiveAssetsPct: richLife.snapshot.indicators.productiveAssetsPct,
+          trend: richLife.snapshot.indicators.trend,
+        },
+        patrimonioVsMes,
+      )
     : null;
 
   // 9 · Libertad — report de patrimonio (hitos + fase).

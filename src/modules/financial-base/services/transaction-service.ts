@@ -92,6 +92,43 @@ export async function listTransactions(
   return (data ?? []).map(rowToTransaction);
 }
 
+/** Movimiento vinculado del periodo, en bruto (cada uno en SU moneda). Para los deltas "vs mes". */
+export type LinkedMovement = {
+  linkedKind: "goal" | "debt";
+  kind: TxnKind; // "ingreso" | "gasto"
+  amount: number;
+  currency: string;
+  countsInBudget: boolean;
+};
+
+/**
+ * Aportes/retiros de metas y abonos de deuda del periodo, household-scoped. Selecciona sólo
+ * las columnas necesarias y filtra por `linked_kind` en la query: mucho más liviano que
+ * `listTransactions` (que trae `*` y todas las filas). El caller normaliza la moneda por fila.
+ */
+export async function listLinkedMovements(
+  period: Period,
+  linkedKinds: Array<"goal" | "debt">,
+): Promise<LinkedMovement[]> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
+  const { data } = await supabase
+    .from("transactions")
+    .select("kind,amount,currency,linked_kind,counts_in_budget")
+    .in("user_id", memberIds)
+    .in("linked_kind", linkedKinds)
+    .gte("occurred_on", period.from)
+    .lte("occurred_on", period.to);
+  return (data ?? []).map((r) => ({
+    linkedKind: r.linked_kind as "goal" | "debt",
+    kind: r.kind as TxnKind,
+    amount: Number(r.amount),
+    currency: r.currency,
+    countsInBudget: r.counts_in_budget ?? true,
+  }));
+}
+
 export type CreatedTransaction = {
   id: string;
   /** Vínculo final tras aplicar reglas (puede diferir del input). */
