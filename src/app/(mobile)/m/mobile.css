@@ -3893,41 +3893,73 @@ body:has(.m-shell[data-theme="dark"]) {
 }
 
 /* ── Alta EN LOTE de un estado de cuenta conciliado ─────────────────────────── */
+/* Cada fila es un formulario completo (comercio, fecha, monto, moneda, sobre), así que el scroll
+   es el modo normal: se le da más alto que en web porque la pantalla es la tarjeta, y `contain`
+   evita que el gesto arrastre el hilo del chat detrás. */
 .m-shell .ac-batch {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 300px;
+  gap: 14px;
+  max-height: 58vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 8px 0 4px;
   -webkit-overflow-scrolling: touch;
 }
 .m-shell .ac-batch-row {
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-}
-.m-shell .ac-batch-row:first-child {
-  border-top: 0;
-  padding-top: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .m-shell .ac-batch-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+  margin-bottom: 2px;
 }
-.m-shell .ac-batch-desc {
+.m-shell .ac-batch-kind {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-  font-size: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.m-shell .ac-batch-amt {
-  font-variant-numeric: tabular-nums;
-  font-size: 14px;
-  flex: none;
+.m-shell .ac-batch-kind.is-in {
+  color: var(--pos);
+}
+.m-shell .ac-batch-kind.is-out {
+  color: var(--muted);
+}
+/* Dos columnas y la moneda abajo: en un teléfono, tres campos en una línea no se pueden tocar. */
+.m-shell .ac-batch-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+.m-shell .ac-batch-cell {
+  min-width: 0;
+}
+.m-shell .ac-batch-cell-cur {
+  grid-column: 1 / -1;
+}
+/* 44px: objetivo táctil mínimo. Con `font-size: 16px` iOS no hace zoom al enfocar el campo,
+   que en un formulario de N filas dejaba la tarjeta descuadrada. */
+.m-shell .ac-batch-field {
+  width: 100%;
+  margin-top: 2px;
+  min-height: 44px;
+  font-size: 16px;
+}
+.m-shell .ac-batch-field.is-bad {
+  border-color: var(--neg);
+}
+.m-shell .ac-batch-row .m-confirm-err {
+  margin-top: 4px;
 }
 .m-shell .ac-batch-x {
   background: none;

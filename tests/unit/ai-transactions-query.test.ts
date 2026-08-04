@@ -203,6 +203,65 @@ describe("agregarTransacciones", () => {
     ).toBeLessThanOrEqual(50);
   });
 
+  /**
+   * "Los gastos de Supermercados de julio" respondía "se muestran 10 de 13". El carril
+   * determinista ya mandaba tope 300, pero cuando la frase no matchea la atiende el LLM y el tope
+   * caía en el default. Por eso la regla vive acá y no en el ruteo: no depende de quién llame.
+   */
+  it("una LISTA de movimientos sale completa aunque pidan un tope chico", () => {
+    const txns = Array.from({ length: 13 }, (_, i) =>
+      tx(`2026-08-${String(i + 1).padStart(2, "0")}`, (i + 1) * 100),
+    );
+    const r = agregarTransacciones(txns, {
+      rango,
+      agrupacion: "ninguna",
+      tope: 10, // lo que mandaba el LLM
+      moneda: "CRC",
+    });
+    expect(r.movimientos).toHaveLength(13);
+    expect(r.conteo).toBe(13);
+    // Y el render no trae la nota de recorte, porque no hubo recorte.
+    expect(renderConsulta(r)).not.toMatch(/Se muestran \d+ de/);
+  });
+
+  it("un RANKING de movimientos sí respeta el tope (los 3 gastos más grandes)", () => {
+    const txns = Array.from({ length: 13 }, (_, i) =>
+      tx(`2026-08-${String(i + 1).padStart(2, "0")}`, (i + 1) * 100),
+    );
+    const r = agregarTransacciones(txns, {
+      rango,
+      agrupacion: "ninguna",
+      orden: "monto_desc",
+      tope: 3,
+      moneda: "CRC",
+    });
+    expect(r.movimientos).toHaveLength(3);
+    expect(r.movimientos[0]?.monto).toBe(1300);
+    // El total sigue siendo el de TODOS, no el de los tres mostrados.
+    expect(r.conteo).toBe(13);
+  });
+
+  it("las consultas AGRUPADAS no cambian: el tope sigue siendo el de grupos", () => {
+    const txns = Array.from({ length: 40 }, (_, i) =>
+      tx(`2026-08-${String((i % 28) + 1).padStart(2, "0")}`, i + 1),
+    );
+    expect(
+      agregarTransacciones(txns, { rango, agrupacion: "dia", tope: 3, moneda: "CRC" }).grupos,
+    ).toHaveLength(3);
+  });
+
+  it("por encima del tope duro se corta y se DICE, sin mentir sobre el total", () => {
+    const txns = Array.from({ length: 320 }, (_, i) =>
+      tx(`2026-08-${String((i % 28) + 1).padStart(2, "0")}`, 100),
+    );
+    const r = agregarTransacciones(txns, { rango, agrupacion: "ninguna", moneda: "CRC" });
+    expect(r.movimientos).toHaveLength(300);
+    expect(r.conteo).toBe(320);
+    const md = renderConsulta(r);
+    expect(md).toMatch(/Se muestran 300 de 320 movimientos/);
+    expect(md).toMatch(/el total es de los 320/);
+  });
+
   it("sin agrupación lista movimientos ordenados por fecha descendente", () => {
     const txns = [tx("2026-08-01", 100), tx("2026-08-05", 200)];
     const r = agregarTransacciones(txns, { rango, agrupacion: "ninguna", moneda: "CRC" });

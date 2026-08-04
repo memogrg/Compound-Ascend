@@ -41,9 +41,16 @@ import {
 import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
 import { retentionNoticeText } from "@/lib/ai/chat-retention";
 import { quoteExcerpt, QUOTE_MISSING_TEXT } from "@/lib/ai/chat-quote";
+import {
+  normalizarFilas,
+  validarFila,
+  resumenValidacion,
+  aPayload,
+  type BatchRowDraft,
+} from "@/lib/ai/batch-rows";
 import type { AIActionProposal } from "@/lib/ai/types";
 import type { ConfirmResult, BatchResult } from "@/modules/assistant/api/actions";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +100,10 @@ export type Skin = {
   done: string;
   /** Clase del input del combobox de sobres (el móvil necesita `m-inp`). */
   sobreInput?: string;
+  /** Campos de texto/fecha/número dentro de una tarjeta (alta en lote). */
+  fieldInput?: string;
+  /** Selects dentro de una tarjeta (moneda del alta en lote). */
+  fieldSelect?: string;
 };
 
 const WEB_SKIN: Skin = {
@@ -130,6 +141,8 @@ const WEB_SKIN: Skin = {
   btnPrimary: "btn btn-primary",
   btnSecondary: "btn btn-secondary",
   done: "coach-bubble ac-done",
+  fieldInput: "inp",
+  fieldSelect: "sel",
 };
 
 const MOBILE_SKIN: Skin = {
@@ -168,6 +181,8 @@ const MOBILE_SKIN: Skin = {
   btnSecondary: "m-btn m-btn-secondary",
   done: "m-confirm-done",
   sobreInput: "m-inp",
+  fieldInput: "m-inp",
+  fieldSelect: "m-inp",
 };
 
 export type AssistantVariant = "panel" | "page" | "mobile";
@@ -1200,51 +1215,44 @@ function DebtExtraPaymentConfirmCard({ skin, p }: { skin: Skin; p: Record<string
   );
 }
 
-/** Fila del alta en lote, tal como la deja el conciliador (sobre ya sugerido). */
-type BatchRow = {
-  kind: "gasto" | "ingreso";
-  description: string;
-  amount: number;
-  currency: string;
-  occurredOn: string;
-  categoryId: string | null;
-  categoryPath: string | null;
-};
-
 /**
  * Alta EN LOTE de las transacciones que faltaban del estado de cuenta.
  *
- * Cada fila trae su sobre sugerido y es EDITABLE antes de confirmar: el mapeo comercio→sobre
- * acierta casi siempre, pero "PAGO SERVICIOS" puede ser cualquier cosa, y descubrirlo después de
- * registrar 12 movimientos obliga a corregirlos de a uno.
+ * Cada fila es EDITABLE ENTERA antes de confirmar —fecha, comercio, monto, moneda y sobre—, no
+ * solo el sobre. Las filas salen de un estado de cuenta pegado que leyó un parser determinista o
+ * el LLM, y los dos se equivocan de formas conocidas: el comercio arrastra ruido del banco
+ * ("OCN00PHEREDIA" pegado al nombre), el monto puede confundirse con el saldo cuando la fila trae
+ * los dos, y la moneda se asume la del estado. Corregir DESPUÉS significa editar N transacciones
+ * ya registradas de a una.
  *
  * También se puede sacar una fila del lote (✕) sin perder el resto — un estado suele traer algo
  * que el usuario no quiere anotar.
+ *
+ * Se registra EXACTAMENTE lo que quedó en la tarjeta: `aPayload` toma los valores editados y el
+ * LLM no vuelve a intervenir. Las reglas de validación viven en `lib/ai/batch-rows` (puras) y
+ * espejan `batchTransactionsInputSchema`, que es lo que el servidor va a exigir igual.
  */
 function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknown> }) {
-  const iniciales = Array.isArray(p.rows) ? (p.rows as BatchRow[]) : [];
-  const [rows, setRows] = useState<BatchRow[]>(iniciales);
+  const [rows, setRows] = useState<BatchRowDraft[]>(() => normalizarFilas(p.rows));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [intento, setIntento] = useState(false);
   const [hecho, setHecho] = useState<BatchResult | null>(null);
 
-  const setSobre = (i: number, categoryId: string) =>
-    setRows((rs) => rs.map((r, k) => (k === i ? { ...r, categoryId: categoryId || null } : r)));
-  const quitar = (i: number) => setRows((rs) => rs.filter((_, k) => k !== i));
+  const editar = (uid: string, cambio: Partial<BatchRowDraft>) =>
+    setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, ...cambio } : r)));
+  const quitar = (uid: string) => setRows((rs) => rs.filter((r) => r.uid !== uid));
+
+  const { conError } = resumenValidacion(rows);
 
   const confirmar = async () => {
+    // Primero se marcan los errores; recién cuando no queda ninguno se registra. Sin esto, la
+    // tarjeta mostraría los campos en rojo desde que abre, antes de que el usuario toque nada.
+    setIntento(true);
+    if (conError > 0 || rows.length === 0) return;
     setPending(true);
     setError(null);
-    const res = await confirmBatchTransactionsAction({
-      rows: rows.map((r) => ({
-        kind: r.kind,
-        description: r.description,
-        amount: r.amount,
-        currency: r.currency,
-        occurredOn: r.occurredOn,
-        categoryId: r.categoryId,
-      })),
-    });
+    const res = await confirmBatchTransactionsAction({ rows: aPayload(rows) });
     setPending(false);
     if (res.creadas > 0 || res.fallidas.length > 0) setHecho(res);
     else setError(res.message ?? "No se pudo registrar el lote.");
@@ -1270,37 +1278,113 @@ function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknow
       <div className={skin.eyebrow}>
         Registrar {rows.length} {rows.length === 1 ? "movimiento" : "movimientos"}
       </div>
+      <div className={skin.sub}>Revisá y corregí lo que haga falta antes de registrar.</div>
       <div className="ac-batch">
-        {rows.map((r, i) => (
-          <div className="ac-batch-row" key={`${r.occurredOn}-${r.description}-${i}`}>
-            <div className="ac-batch-head">
-              <span className="ac-batch-desc">{r.description}</span>
-              <span className="ac-batch-amt">
-                {r.kind === "ingreso" ? "+" : "−"}
-                {formatMoney(r.amount, r.currency)}
-              </span>
-              <button
-                type="button"
-                className="ac-batch-x"
-                onClick={() => quitar(i)}
+        {rows.map((r) => {
+          const err = validarFila(r);
+          const ver = intento; // los errores aparecen recién al intentar registrar
+          return (
+            <div className="ac-batch-row" key={r.uid}>
+              <div className="ac-batch-head">
+                <span className={`ac-batch-kind ${r.kind === "ingreso" ? "is-in" : "is-out"}`}>
+                  {r.kind === "ingreso" ? "Ingreso" : "Gasto"}
+                </span>
+                <button
+                  type="button"
+                  className="ac-batch-x"
+                  onClick={() => quitar(r.uid)}
+                  disabled={pending}
+                  aria-label={`Quitar ${r.description || "la fila"} del lote`}
+                >
+                  <Icon name="x" />
+                </button>
+              </div>
+
+              <label className={skin.fieldLabel} htmlFor={`bd-${r.uid}`}>
+                Comercio
+              </label>
+              <input
+                id={`bd-${r.uid}`}
+                className={`${skin.fieldInput ?? "inp"} ac-batch-field${ver && err.comercio ? " is-bad" : ""}`}
+                value={r.description}
+                onChange={(e) => editar(r.uid, { description: e.target.value })}
                 disabled={pending}
-                aria-label={`Quitar ${r.description} del lote`}
-              >
-                <Icon name="x" />
-              </button>
+                placeholder="Nombre del comercio"
+                autoComplete="off"
+              />
+              {ver && err.comercio ? <div className={skin.error}>{err.comercio}</div> : null}
+
+              <div className="ac-batch-grid">
+                <div className="ac-batch-cell">
+                  <label className={skin.fieldLabel} htmlFor={`bf-${r.uid}`}>
+                    Fecha
+                  </label>
+                  <input
+                    id={`bf-${r.uid}`}
+                    type="date"
+                    className={`${skin.fieldInput ?? "inp"} ac-batch-field${ver && err.fecha ? " is-bad" : ""}`}
+                    value={r.occurredOn}
+                    onChange={(e) => editar(r.uid, { occurredOn: e.target.value })}
+                    disabled={pending}
+                  />
+                  {ver && err.fecha ? <div className={skin.error}>{err.fecha}</div> : null}
+                </div>
+                <div className="ac-batch-cell">
+                  <label className={skin.fieldLabel} htmlFor={`bm-${r.uid}`}>
+                    Monto
+                  </label>
+                  <input
+                    id={`bm-${r.uid}`}
+                    className={`${skin.fieldInput ?? "inp"} ac-batch-field${ver && err.monto ? " is-bad" : ""}`}
+                    value={r.amountText}
+                    onChange={(e) => editar(r.uid, { amountText: e.target.value })}
+                    disabled={pending}
+                    inputMode="decimal"
+                    placeholder="0"
+                  />
+                  {ver && err.monto ? <div className={skin.error}>{err.monto}</div> : null}
+                </div>
+                <div className="ac-batch-cell ac-batch-cell-cur">
+                  <label className={skin.fieldLabel} htmlFor={`bc-${r.uid}`}>
+                    Moneda
+                  </label>
+                  <select
+                    id={`bc-${r.uid}`}
+                    className={`${skin.fieldSelect ?? "sel"} ac-batch-field`}
+                    value={r.currency}
+                    onChange={(e) => editar(r.uid, { currency: e.target.value })}
+                    disabled={pending}
+                  >
+                    {CURRENCY_OPTIONS.map((o) => (
+                      <option key={o.code} value={o.code}>
+                        {o.code}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <label className={skin.fieldLabel}>Sobre</label>
+              <SobreCombobox
+                kind={r.kind}
+                value={r.categoryId ?? ""}
+                onChange={(v) => editar(r.uid, { categoryId: v || null })}
+                disabled={pending}
+                suggestedPath={r.categoryPath}
+                {...(skin.sobreInput ? { inputClassName: skin.sobreInput } : {})}
+              />
+              {ver && err.sobre ? <div className={skin.error}>{err.sobre}</div> : null}
             </div>
-            <div className={skin.sub}>{r.occurredOn}</div>
-            <SobreCombobox
-              kind={r.kind}
-              value={r.categoryId ?? ""}
-              onChange={(v) => setSobre(i, v)}
-              disabled={pending}
-              suggestedPath={r.categoryPath}
-              {...(skin.sobreInput ? { inputClassName: skin.sobreInput } : {})}
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
+      {intento && conError > 0 ? (
+        <div className={skin.error}>
+          {conError === 1
+            ? "Hay 1 fila con algo que corregir."
+            : `Hay ${conError} filas con algo que corregir.`}
+        </div>
+      ) : null}
       {error ? <div className={skin.error}>{error}</div> : null}
       <div className={skin.actions}>
         <button className={skin.btnSecondary} onClick={() => setRows([])} disabled={pending}>

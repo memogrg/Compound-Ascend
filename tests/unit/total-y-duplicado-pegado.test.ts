@@ -34,11 +34,32 @@ const TXNS: TxnLike[] = Array.from({ length: 23 }, (_, i) => ({
 const RANGO = { from: "2026-07-01", to: "2026-07-31", etiqueta: "julio 2026" };
 
 describe("1 · el TOTAL es de TODAS las filas, no de las mostradas", () => {
-  it("con tope 10 sobre 23 filas, el total sigue siendo el de las 23", () => {
+  /**
+   * El escenario original era "tope 10 sobre 23 filas". Ya no recorta: una LISTA de movimientos
+   * sale completa (ver ai-transactions-query.test.ts), que era el otro bug de esta misma sesión.
+   * La propiedad que este bloque cuida —el total no es el de las mostradas— se sigue probando,
+   * ahora en los dos casos donde el recorte SÍ existe: un ranking y el tope duro.
+   */
+  it("con tope 10 sobre 23 filas ya NO recorta: la lista sale entera", () => {
     const r = agregarTransacciones(TXNS, {
       rango: RANGO,
       tipo: "gasto",
       agrupacion: "ninguna",
+      tope: 10,
+      moneda: "CRC",
+      rates: { CRC: 500, USD: 1 },
+    });
+    expect(r.conteo).toBe(23);
+    expect(r.movimientos).toHaveLength(23);
+    expect(renderConsulta(r)).toContain("₡23.000");
+  });
+
+  it("en un RANKING, que sí recorta, el total sigue siendo el de las 23", () => {
+    const r = agregarTransacciones(TXNS, {
+      rango: RANGO,
+      tipo: "gasto",
+      agrupacion: "ninguna",
+      orden: "monto_desc",
       tope: 10,
       moneda: "CRC",
       rates: { CRC: 500, USD: 1 },
@@ -56,6 +77,7 @@ describe("1 · el TOTAL es de TODAS las filas, no de las mostradas", () => {
       rango: RANGO,
       tipo: "gasto",
       agrupacion: "ninguna",
+      orden: "monto_desc",
       tope: 10,
       moneda: "CRC",
       rates: null,

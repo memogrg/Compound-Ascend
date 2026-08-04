@@ -5851,41 +5851,77 @@ summary:focus-visible {
 }
 
 /* ── Alta EN LOTE de un estado de cuenta conciliado ─────────────────────────── */
-/* Lista scrolleable: un estado puede traer 15 filas y la tarjeta no puede comerse el hilo. */
+/* Lista scrolleable: un estado puede traer 15 filas y la tarjeta no puede comerse el hilo.
+   Con la fila entera editable cada una ocupa cuatro campos, así que el alto crece y el scroll
+   pasa a ser el modo normal de uso, no la excepción: de ahí el separador marcado entre filas y
+   el respiro interno, para no leer un bloque de inputs sin costuras. */
 .ac-batch {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  max-height: 280px;
+  gap: 14px;
+  max-height: 420px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   margin: 8px 0 4px;
+  padding-right: 4px;
 }
 .ac-batch-row {
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-}
-.ac-batch-row:first-child {
-  border-top: 0;
-  padding-top: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .ac-batch-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
+  margin-bottom: 2px;
 }
-.ac-batch-desc {
+/* Gasto/ingreso ya no se deduce del signo del monto, porque el monto ahora es un input. */
+.ac-batch-kind {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-  font-size: 13px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.ac-batch-amt {
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  flex: none;
+.ac-batch-kind.is-in {
+  color: var(--pos);
+}
+.ac-batch-kind.is-out {
+  color: var(--muted);
+}
+/* Fecha, monto y moneda en una línea: son cortos y juntos se leen como "cuándo y cuánto". */
+.ac-batch-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.7fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+.ac-batch-cell {
+  min-width: 0;
+}
+.ac-batch-field {
+  width: 100%;
+  margin-top: 2px;
+}
+.ac-batch-field.is-bad {
+  border-color: var(--neg);
+}
+.ac-batch-row .ac-err {
+  margin-top: 4px;
+}
+/* En una tarjeta angosta (panel flotante) tres columnas dejan los campos ilegibles. */
+@media (max-width: 560px) {
+  .ac-batch-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .ac-batch-cell-cur {
+    grid-column: 1 / -1;
+  }
 }
 .ac-batch-x {
   background: none;
