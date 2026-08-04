@@ -15,13 +15,37 @@ export type SobreRef = { id: string; sobre: string; frasco: string | null };
 
 export type SobreMatch =
   | { estado: "resuelto"; sobre: SobreRef }
-  /** Varios sobres compiten con la misma fuerza: hay que preguntar cuál. */
+  /**
+   * Varios sobres que son EL MISMO concepto partido en dos ("Supermercado" y "Supermercados").
+   * No se pregunta: se consultan JUNTOS y se avisa. Preguntar "¿cuál?" ante dos nombres que
+   * significan lo mismo es una pregunta sin respuesta buena — el usuario quiere los dos.
+   */
+  | { estado: "varios"; sobres: SobreRef[] }
+  /** Candidatos que significan cosas DISTINTAS (Seguro auto / Seguro casa): hay que preguntar. */
   | { estado: "ambiguo"; candidatos: SobreRef[] }
   | { estado: "sin_match" };
 
 /** Ruta legible "Frasco › Sobre" (o solo el sobre si no cuelga de un frasco). */
 export function rutaSobre(s: SobreRef): string {
   return s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre;
+}
+
+/**
+ * ¿El usuario está diciendo "todos los candidatos" tras una pregunta de ambigüedad?
+ * ("los dos", "ambos", "las dos", "todos", "los tres").
+ *
+ * Existe porque no había forma de contestar esa pregunta: `SobreMatch` no tenía un estado para
+ * "varios", así que un "dame los dos" se perdía y la consulta terminaba diciendo "no tenés
+ * movimientos" — falso, y encima sobre datos que sí existen.
+ */
+export function pareceTodosLosCandidatos(text: string): boolean {
+  // ANCLADO al mensaje COMPLETO a propósito. Con una búsqueda suelta, "mostrame TODAS mis compras
+  // de VOO" y "vender TODOS los altcoins al ATH" caían acá y perdían su carril: "todos" aparece en
+  // muchas consultas legítimas. Esto es una respuesta de una o dos palabras a una pregunta, no
+  // una consulta — así que se exige que sea TODO el mensaje.
+  return /^\s*(?:dame\s+|quiero\s+|mostrame\s+|most[rá]\w*\s+|ver\s+|s[ií],?\s+)?(?:l[ao]s\s+dos|amb[ao]s|l[ao]s\s+tres|tod[ao]s(?:\s+l[ao]s)?|l[ao]s\s+dos\s+sobres?)\s*[.!]?\s*$/iu.test(
+    text,
+  );
 }
 
 /** minúsculas, sin acentos, sin puntuación, espacios colapsados. */
@@ -105,5 +129,12 @@ export function matchSobre(termino: string, sobres: SobreRef[]): SobreMatch {
 
 function decidir(candidatos: SobreRef[]): SobreMatch {
   if (candidatos.length === 1) return { estado: "resuelto", sobre: candidatos[0]! };
+  // MISMA RAÍZ = el mismo concepto duplicado ("Supermercado" / "Supermercados"). Preguntar "¿cuál
+  // de los dos?" ante dos nombres que significan lo mismo no tiene respuesta buena: el usuario
+  // quiere los dos, y con la pregunta se perdía la consulta entera.
+  const raiz = raices(candidatos[0]!.sobre);
+  if (candidatos.every((c) => raices(c.sobre) === raiz)) {
+    return { estado: "varios", sobres: candidatos };
+  }
   return { estado: "ambiguo", candidatos };
 }

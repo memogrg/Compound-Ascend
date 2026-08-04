@@ -104,6 +104,10 @@ export async function consultarTransacciones(
   // se DICE — nunca se cae a "sin filtro", que respondería con todas las categorías.
   let categoriaIds: string[] | null = null;
   let sobreLabel = sobreArg;
+  /** Aviso cuando se consultaron VARIOS sobres del mismo nombre (va arriba de la tabla). */
+  let avisoVarios: string | null = null;
+  /** Los sobres efectivamente consultados, para el subtotal por sobre. */
+  let sobresElegidos: { id: string; sobre: string }[] = [];
   if (sobreArg) {
     // listAllSobresForKind y NO listSobresForKind: esta última recorta a los sobres "adoptados"
     // (configurados ∪ presupuestados o usados ESTE MES) porque responde "¿a qué sobre cargo un
@@ -115,21 +119,50 @@ export async function consultarTransacciones(
       () => [],
     );
     const m = matchSobre(sobreArg, sobres);
-    if (m.estado === "ambiguo") {
+    // VARIOS sobres que son el mismo concepto ("Supermercado" y "Supermercados"): se consultan
+    // JUNTOS y se avisa. Preguntar "¿cuál?" ante dos nombres que significan lo mismo no tiene
+    // respuesta buena — y antes, si el usuario contestaba "los dos", la consulta se perdía.
+    //
+    // `incluirTodos` es la respuesta explícita a una pregunta de ambigüedad ("dame los dos"): ahí
+    // se consultan todos los candidatos aunque signifiquen cosas distintas, porque lo pidió.
+    const incluirTodos = args.incluirTodos === true;
+    if (m.estado === "varios" || (m.estado === "ambiguo" && incluirTodos)) {
+      const elegidos = m.estado === "varios" ? m.sobres : m.candidatos;
+      categoriaIds = elegidos.map((s) => s.id);
+      sobreLabel = elegidos.map(rutaSobre).join(" + ");
+      avisoVarios =
+        m.estado === "varios"
+          ? `Tenés ${elegidos.length} sobres con el mismo nombre (${elegidos.map((s) => s.sobre).join(" y ")}); te muestro los dos juntos.`
+          : null;
+      sobresElegidos = elegidos;
+    } else if (m.estado === "ambiguo") {
       const opciones = m.candidatos.slice(0, 5).map(rutaSobre);
       return {
         ...vacio(rango, tipo, moneda, { comercio, sobre: sobreArg, termino }),
         resumen_md: `Tenés varios sobres que coinciden con «${sobreArg}»: ${opciones.join(", ")}. ¿Cuál querés ver?`,
       };
     }
-    if (m.estado === "sin_match") {
+    else if (m.estado === "sin_match") {
       return {
         ...vacio(rango, tipo, moneda, { comercio, sobre: sobreArg, termino }),
+        // Se dice que NO SE ENCONTRÓ EL SOBRE, que es distinto de "no tenés movimientos": lo
+        // segundo afirma sobre los datos y sería mentira si el sobre existe con otro nombre.
         resumen_md: `No encontré un sobre que se llame «${sobreArg}». Revisá el nombre o pedime la lista de tus sobres.`,
       };
+    } else if (m.estado === "resuelto") {
+      categoriaIds = [m.sobre.id];
+      sobreLabel = rutaSobre(m.sobre);
     }
-    categoriaIds = [m.sobre.id];
-    sobreLabel = rutaSobre(m.sobre);
+
+    // Si se nombró un sobre y la resolución NO produjo filtro, se DICE. Antes esto caía a una
+    // consulta sin acotar (todas las categorías) o a un "no tenés movimientos" que afirma sobre
+    // los datos sin haber podido filtrarlos.
+    if (!categoriaIds) {
+      return {
+        ...vacio(rango, tipo, moneda, { comercio, sobre: sobreArg, termino }),
+        resumen_md: `No pude resolver el sobre «${sobreArg}» contra tus sobres. Pedime la lista y lo vemos.`,
+      };
+    }
   }
 
   const filtradas = filtrarTransacciones(
@@ -152,7 +185,39 @@ export async function consultarTransacciones(
     filtros: { comercio, sobre: sobreLabel, termino },
   });
 
-  return { ...resultado, resumen_md: renderConsulta(resultado) };
+  const md = renderConsulta(resultado, {
+    nombresPorCategoria: nombres,
+    porSobre: sobresElegidos.length > 1 ? sobresElegidos : undefined,
+  });
+  return { ...resultado, resumen_md: avisoVarios ? `${avisoVarios}
+
+${md}` : md };
+}
+
+/**
+ * Atiende el "dame los dos" que viene DESPUÉS de una pregunta de ambigüedad de sobres.
+ *
+ * Re-deriva la consulta ORIGINAL desde el hilo —el último mensaje del usuario que rutea al libro
+ * diario con un sobre— y la vuelve a correr con `incluirTodos`. Mismo patrón que la confirmación
+ * del estado de cuenta: sin estado en memoria (inútil en serverless) ni tabla nueva.
+ *
+ * `null` si no hay una consulta así en la conversación reciente: ahí "los dos" no significa esto
+ * y la frase debe escalar.
+ */
+export async function resolverConsultaVarios(
+  moneda: string,
+): Promise<ConsultaTransaccionesPayload | null> {
+  const { loadRetainedChat } = await import("@/lib/ai/chat-store");
+  const { matchIntent } = await import("@/lib/ai/router");
+  const hilo = await loadRetainedChat().catch(() => []);
+  for (const m of [...hilo].reverse()) {
+    if (m.role !== "user") continue;
+    const r = matchIntent(m.content);
+    if (r?.intent === "consulta_transacciones" && r.params.sobre) {
+      return consultarTransacciones({ ...r.params, incluirTodos: true }, moneda);
+    }
+  }
+  return null;
 }
 
 /** Resultado vacío para los cortes tempranos (sobre ambiguo o inexistente). */
