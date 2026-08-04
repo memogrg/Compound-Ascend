@@ -31,7 +31,7 @@ import {
   selectProteccion,
   selectPatrimonio,
   selectLibertad,
-  deriveFundFlags,
+  deriveFundAmounts,
   type HomeCards,
 } from "@/modules/dashboard/engine/home-cards";
 
@@ -92,11 +92,11 @@ export async function getHomeCardsData(): Promise<HomeCards> {
       )
     : null;
 
-  // 7 · Protección — diagnóstico + flags de fondos derivados de las metas de defensa.
+  // 7 · Protección — diagnóstico de pólizas + saldos de los fondos de defensa (metas).
   const proteccion = wealth
     ? selectProteccion(
         wealth.protection,
-        deriveFundFlags(
+        deriveFundAmounts(
           (control?.goals ?? []).map((g) => ({
             goalType: g.goalType,
             name: g.name,

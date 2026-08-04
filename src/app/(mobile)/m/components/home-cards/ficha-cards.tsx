@@ -306,27 +306,29 @@ export function ProteccionFicha({ c, currency }: { c: ProteccionCard; currency: 
     );
   }
   const items = c.checklist.map((i) => ({ key: i.key, label: SHORT_PROT[i.key] ?? i.label, covered: i.covered }));
+  const fondos = c.fondos.emergencia + c.fondos.paz;
+  const primaTxt = `prima ${mAmount(c.primaAnual, currency, 7)}/año`;
+  const polizasTxt = `${c.numActivas} ${c.numActivas === 1 ? "póliza" : "pólizas"}`;
   return (
     <MHomeCard
       eyebrow="Protección"
-      value={mAmount(c.cobertura, currency, 10)}
+      value={mAmount(c.montoProtegido, currency, 10)}
       chip={
         c.huecos > 0 ? <MChip tone="danger">{c.huecos} sin cubrir</MChip> : <MChip tone="success">Completa</MChip>
       }
       sub={
         <>
-          {c.numActivas} {c.numActivas === 1 ? "póliza" : "pólizas"} ·{" "}
-          <span className="neg">{mAmount(c.primaAnual, currency, 7)}/año</span>
+          Pólizas {mAmount(c.coberturaPolizas, currency, 7)} · Fondos {mAmount(fondos, currency, 7)}
         </>
       }
       vis={<FChecklist items={items} />}
       message={
         c.huecos > 0
-          ? `Te faltan ${c.huecos} de 5 protecciones base.`
-          : "Tus 5 protecciones base están cubiertas."
+          ? `${polizasTxt} · ${primaTxt} · te faltan ${c.huecos} de 5 base`
+          : `${polizasTxt} · ${primaTxt} · 5 base cubiertas`
       }
       href={c.href}
-      ariaLabel="Protección y coberturas base. Ver protección"
+      ariaLabel="Protección: pólizas más fondos de defensa. Ver protección"
     />
   );
 }

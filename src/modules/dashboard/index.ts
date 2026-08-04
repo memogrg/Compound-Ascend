@@ -20,6 +20,7 @@ export {
   selectPatrimonio,
   selectLibertad,
   deriveFundFlags,
+  deriveFundAmounts,
 } from "./engine/home-cards";
 export type {
   HomeCards,
