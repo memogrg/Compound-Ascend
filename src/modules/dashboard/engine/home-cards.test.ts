@@ -191,13 +191,22 @@ describe("selectLibertad", () => {
     expect(c.pct).toBe(0.4);
     expect(c.falta).toBe(18_000_000); // 30M − 12M
     expect(c.metaLibertad).toBe(50_000_000);
+    expect(c.actual).toBe(12_000_000); // valor actual = investableWealth
     expect(c.hitos.map((h) => h.label)).toEqual([
       "Punto de partida",
       "Seguridad",
       "Independencia",
       "Libertad",
     ]);
-    expect(c.hitos[2]).toEqual({ key: "independencia", label: "Independencia", amount: 30_000_000, pct: 0.4 });
+    expect(c.hitos[2]).toEqual({
+      key: "independencia",
+      label: "Independencia",
+      amount: 30_000_000,
+      pct: 0.4,
+      state: "current",
+    });
+    // Estado por fase: alcanzado (verde) → en curso (ámbar) → pendiente (rojo).
+    expect(c.hitos.map((h) => h.state)).toEqual(["done", "done", "current", "pending"]);
   });
 });
 

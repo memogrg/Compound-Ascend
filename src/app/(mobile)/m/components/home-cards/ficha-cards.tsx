@@ -400,25 +400,43 @@ export function LibertadFicha({ c, currency }: { c: LibertadCard; currency: stri
       />
     );
   }
+  // El hito EN CURSO (ámbar) es la "fase actual": hacia dónde vas, no lo último que pasaste.
+  // Si no hay ninguno en curso, alcanzaste todos los hitos.
+  const current = c.hitos.find((h) => h.state === "current");
+  const faltaCurrent = current ? Math.max(0, current.amount - c.actual) : 0;
+  const currentHasMeta = current != null && current.amount > 0;
   return (
     <MHomeCard
       eyebrow="Libertad"
-      value={`${pct100(c.pct)}%`}
-      chip={<MChip tone="neutral">{c.faseLabel}</MChip>}
+      value={mAmount(c.actual, currency, 9)}
+      chip={
+        current ? (
+          <MChip tone="warning">{SHORT_HITO[current.key] ?? current.label}</MChip>
+        ) : (
+          <MChip tone="success">Libertad ✓</MChip>
+        )
+      }
       sub={
-        c.metaLibertad != null
-          ? `Faltan ${mAmount(c.falta, currency, 7)} · meta ${mAmount(c.metaLibertad, currency, 7)}`
-          : `Faltan ${mAmount(c.falta, currency, 8)} para Independencia`
+        current
+          ? currentHasMeta
+            ? `Meta ${mAmount(current.amount, currency, 7)} · faltan ${mAmount(faltaCurrent, currency, 7)}`
+            : `Define tu meta de ${current.label}`
+          : "¡Alcanzaste todos los hitos!"
       }
       vis={
         <FMilestones
-          steps={c.hitos.map((h) => ({ label: SHORT_HITO[h.key] ?? h.label, amount: h.amount, pct: h.pct }))}
+          steps={c.hitos.map((h) => ({
+            label: SHORT_HITO[h.key] ?? h.label,
+            amount: h.amount,
+            pct: h.pct,
+            state: h.state,
+          }))}
           currency={currency}
         />
       }
-      message={`Fase actual: ${c.faseLabel}.`}
+      message={c.fase !== "ninguno" ? `Ya alcanzaste ${c.faseLabel}.` : "Tu primer hito: Seguridad."}
       href={c.href}
-      ariaLabel="Escalera de libertad financiera. Ver libertad"
+      ariaLabel="Escalera de libertad financiera. Valor actual y hito en curso. Ver libertad"
     />
   );
 }
