@@ -13,7 +13,11 @@ import "server-only";
  * Vive DENTRO de financeChatWithTools → cubre web y WhatsApp (ambos pasan por ahí).
  */
 import { formatMoney } from "@/lib/format";
-import { pareceBloqueDeEstado, pareceConfirmacionDeAlta } from "@/lib/ai/statement-parse";
+import {
+  pareceBloqueDeEstado,
+  pareceConfirmacionDeAlta,
+  pareceIntencionDeConciliar,
+} from "@/lib/ai/statement-parse";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
 import { detectCreateAction } from "@/lib/ai/action-lane";
@@ -488,8 +492,18 @@ export function normalizeSlang(text: string): string {
   return t;
 }
 
-/** PATRONES: intent + params con CERO tokens. null si no matchea con confianza. */
-export function matchIntent(text: string): { intent: Intent; params: Record<string, unknown> } | null {
+/**
+ * PATRONES: intent + params con CERO tokens. null si no matchea con confianza.
+ *
+ * `citado` es el contenido del mensaje al que se está RESPONDIENDO (solo si es del usuario). No
+ * es un extra decorativo: cuando el citado es un estado de cuenta y el mensaje actual pide
+ * verificarlo, la conciliación tiene que GANARLE a `consulta_transacciones` — y esa precedencia
+ * vive acá, con el resto del ruteo, no en la ruta.
+ */
+export function matchIntent(
+  text: string,
+  citado?: string,
+): { intent: Intent; params: Record<string, unknown> } | null {
   // Normalizamos el slang de dinero ("lana/guita/pisto…" → "dinero") antes de matchear. No afecta la
   // extracción de montos (usa ₡/$ y dígitos) ni de nombres de sobre (no son palabras de slang).
   const t = normalizeSlang(text.trim());
@@ -503,6 +517,19 @@ export function matchIntent(text: string): { intent: Intent; params: Record<stri
     // El texto CRUDO, no el normalizado por slang: los montos y comercios del banco se parsean
     // tal como vinieron.
     return { intent: "conciliar_estado", params: { texto: text } };
+  }
+
+  // ── ESTADO CITADO + INTENCIÓN DE VERIFICAR. Va ANTES de todo lo demás porque el mensaje que
+  //    acompaña a la cita suele matchear `consulta_transacciones` por su cuenta: "verificar si
+  //    estas transacciones DEL MES PASADO ya están registradas" trae la palabra "transacciones" y
+  //    un periodo, así que ese carril se lo llevaba y la conciliación NO SE CONSIDERABA NUNCA —
+  //    respondía con todo el mes en vez de cotejar las filas citadas.
+  //
+  //    Se exige la intención (verificar / están registradas / cuáles faltan): sin ella, responder
+  //    al bloque con "¿cuánto gasté en restaurantes?" seguiría yendo a su carril, que es lo
+  //    correcto. La cita no secuestra cualquier pregunta, solo la que pide conciliar.
+  if (citado && pareceBloqueDeEstado(citado) && pareceIntencionDeConciliar(text)) {
+    return { intent: "conciliar_estado", params: { texto: citado } };
   }
 
   // CONFIRMACIÓN del alta ("dale, registralas"). Va acá arriba por el mismo motivo que el bloque:

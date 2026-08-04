@@ -231,6 +231,35 @@ export function pareceConfirmacionDeAlta(text: string): boolean {
   return afirma.test(t) && t.length <= 20;
 }
 
+/**
+ * ¿El mensaje pide VERIFICAR/CONCILIAR contra lo registrado?
+ *
+ * Es la señal que le gana el turno a `consulta_transacciones`. Sin ella, "verificar si estas
+ * transacciones del mes pasado ya están registradas" matchea como consulta del mes —trae
+ * "transacciones" y un periodo— y la conciliación no se considera nunca, aunque el mensaje
+ * citado sea el estado de cuenta.
+ *
+ * Cubre las dos formas que fallaban por motivos distintos: la que matcheaba consulta (verificar
+ * … del mes pasado) y la que no matcheaba nada ni tenía pronombre ("¿están registradas?").
+ */
+export function pareceIntencionDeConciliar(text: string): boolean {
+  const t = text.trim();
+  return (
+    // "verificá", "conciliá", "chequeá", "revisá si…", "comparar con lo registrado"
+    /\b(?:verific|concili|chequ|cotej|compar)\p{L}*(?!\p{L})/iu.test(t) ||
+    // "están registradas", "ya están anotadas", "las tengo cargadas"
+    /\b(?:est[aá]n|estan|tengo|ten[eé]s|hay)\p{L}*(?:\s+\p{L}+){0,3}\s+(?:registrad|anotad|guardad|cargad|apuntad)\p{L}*(?!\p{L})/iu.test(
+      t,
+    ) ||
+    /\b(?:registrad|anotad|guardad|cargad|apuntad)[ao]s(?!\p{L})/iu.test(t) ||
+    // "cuáles faltan", "qué falta", "cuáles me faltan"
+    /\b(?:cu[aá]les|qu[eé]|cuant\p{L}*)(?:\s+\p{L}+){0,2}\s+falta\p{L}*(?!\p{L})/iu.test(t) ||
+    /\bfaltan(?!\p{L})/iu.test(t) ||
+    // "ya las tengo", "ya están"
+    /\bya\s+(?:las|los|est[aá]n|estan|est[aá])(?!\p{L})/iu.test(t)
+  );
+}
+
 /** Mínimo de filas para considerar que el usuario PEGÓ un estado y no escribió una frase. */
 export const MIN_FILAS_BLOQUE = 2;
 
