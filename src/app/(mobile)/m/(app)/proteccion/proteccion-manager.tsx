@@ -250,7 +250,7 @@ export function ProteccionManager({
 // ── Pagar una prima a un seguro EXISTENTE (el "+" contextual, Fase 3b) ──────────
 // Paso 1: elegir cuál. Calca los pickers de las fases previas: cada seguro con su prima en su
 // moneda. Al elegir, abre el PremiumForm.
-function PolicyPickerSheet({
+export function PolicyPickerSheet({
   open,
   policies,
   onPick,
@@ -303,7 +303,7 @@ function PolicyPickerSheet({
 // Paso 2: el pago, ligero. Importe SIEMPRE en la moneda de la póliza (prefijado con su prima;
 // la moneda no es editable) + fecha. Guarda vía payPolicyPremiumAction (una transacción
 // vinculada; la moneda la valida el servidor contra la póliza).
-function PremiumForm({ policy, onSuccess }: { policy: InsurancePolicy; onSuccess: () => void }) {
+export function PremiumForm({ policy, onSuccess }: { policy: InsurancePolicy; onSuccess: () => void }) {
   const todayISO = useCaptureToday();
   const label = POLICY_LABEL[policy.policyType] ?? "Cobertura";
   const name = policy.provider ? `${label} · ${policy.provider}` : label;

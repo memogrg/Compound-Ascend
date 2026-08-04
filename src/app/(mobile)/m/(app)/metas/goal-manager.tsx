@@ -360,7 +360,7 @@ export function GoalManager({
 // ── Aportar a un ahorro EXISTENTE (el "+" contextual, Fase 3) ───────────────────
 // Paso 1: elegir cuál. Calca los pickers de las fases previas: cada meta con su acumulado en
 // su moneda. Al elegir, abre el aporte existente.
-function GoalPickerSheet({
+export function GoalPickerSheet({
   open,
   goals,
   onPick,
@@ -402,7 +402,7 @@ function GoalPickerSheet({
 }
 
 /** Aporte: monto + fecha → addGoalContributionAction (crea la transacción vinculada). */
-function ContributionForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => void }) {
+export function ContributionForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => void }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());

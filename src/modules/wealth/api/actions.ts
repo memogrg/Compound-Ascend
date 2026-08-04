@@ -21,7 +21,10 @@ import {
   deleteInvestment,
   deletePolicy,
   payPolicyPremium,
+  listPolicies,
 } from "@/modules/wealth/services/wealth-service";
+import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
+import type { HoldingPerformance, HoldingNativo, InsurancePolicy } from "@/modules/wealth/types";
 import {
   createHolding,
   updateHolding,
@@ -599,4 +602,26 @@ export async function advancePremiumsAction(
     logger.error("advancePremiums fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: err instanceof Error ? err.message : "No pudimos adelantar cuotas." };
   }
+}
+
+// ── Destinos para el selector unificado de "salida de dinero" del Inicio ─────
+// Getters on-demand que pueblan los pickers vinculados del "+". Solo lectura; el
+// registro real va por su acción canónica (contributeToHoldingAction / payPolicyPremiumAction).
+
+/** Holdings (con rendimiento) + crudos para el picker de "invertir / aportar". */
+export async function getHoldingContribTargetsAction(): Promise<{
+  holdings: HoldingPerformance[];
+  rawHoldings: HoldingNativo[];
+  currency: string;
+}> {
+  const report = await getPortfolioReport();
+  const holdings = [...report.analytics.holdingsWithPerformance].sort(
+    (a, b) => b.currentValue - a.currentValue,
+  );
+  return { holdings, rawHoldings: report.holdings, currency: report.currency };
+}
+
+/** Pólizas para el picker de "pagar una prima". */
+export async function getPolicyPremiumTargetsAction(): Promise<{ policies: InsurancePolicy[] }> {
+  return { policies: await listPolicies() };
 }

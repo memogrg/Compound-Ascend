@@ -508,7 +508,7 @@ export function DebtManager({
 // ── Pagar/abonar a una deuda EXISTENTE (el "+" contextual, Fase 2) ─────────────
 // Paso 1: elegir cuál. Calca HoldingPickerSheet de inversiones: cada deuda con su saldo en su
 // moneda NATIVA (mismo cálculo que la fila). Al elegir, se abre el PaymentForm existente.
-function DebtPickerSheet({
+export function DebtPickerSheet({
   open,
   debts,
   rawById,
@@ -563,7 +563,7 @@ function DebtPickerSheet({
   );
 }
 
-function PaymentForm({
+export function PaymentForm({
   debtId,
   currency,
   cuota,
