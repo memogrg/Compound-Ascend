@@ -136,6 +136,53 @@ export function conciliar(
   };
 }
 
+/**
+ * Colapsa filas del MISMO pegado que son el mismo movimiento listado dos veces.
+ *
+ * El caso real: el usuario pega un export que trae la misma compra en DOS formatos —la fila
+ * tabular limpia y la fila "sucia" con fecha de posteo y ruido del banco—:
+ *
+ *   2026-07-25   POPS LAGUNILLA HEREDIA   4,100.00  COL  D
+ *   27/07/2026   4,100.00   25-07-2026 POPS LAGUNILLA HEREDIA HEREDIA CRI/BNCR
+ *
+ * El extractor produce dos filas correctas, el conciliador empareja la primera con la transacción
+ * registrada, la CONSUME, y la segunda se queda sin candidato → "falta" → se registra de nuevo.
+ * Así se duplicó un POPS de ₡4.100.
+ *
+ * El criterio distingue este caso del duplicado LEGÍTIMO: se colapsa solo si los comercios son
+ * DISTINTOS pero uno contiene al otro ("POPS LAGUNILLA" ⊂ "POPS LAGUNILLA HEREDIA") — dos
+ * grafías del mismo negocio. Si el texto es IDÉNTICO son dos consumos de verdad (dos cafés el
+ * mismo día por el mismo monto existen) y se conservan los dos.
+ *
+ * Devuelve también las colapsadas, para poder decírselo al usuario en vez de descontarlas calladas.
+ */
+export function dedupeFilas(filas: StatementRow[]): {
+  filas: StatementRow[];
+  colapsadas: StatementRow[];
+} {
+  const out: StatementRow[] = [];
+  const colapsadas: StatementRow[] = [];
+
+  for (const f of filas) {
+    const gemela = out.find((o) => {
+      if (o.fecha !== f.fecha || o.moneda !== f.moneda || o.tipo !== f.tipo) return false;
+      if (Math.abs(o.monto - f.monto) > TOLERANCIA_MONTO) return false;
+      const a = normalizar(o.comercio);
+      const b = normalizar(f.comercio);
+      if (a === b) return false; // grafía idéntica → dos consumos reales, no se colapsan
+      return a.includes(b) || b.includes(a);
+    });
+    if (gemela) {
+      // Se conserva la grafía MÁS LARGA: trae más señal para conciliar contra lo registrado.
+      if (f.comercio.length > gemela.comercio.length) gemela.comercio = f.comercio;
+      colapsadas.push(f);
+      continue;
+    }
+    out.push({ ...f });
+  }
+  return { filas: out, colapsadas };
+}
+
 /** Rango [min, max] de fechas del bloque — lo que hay que leer de la BD para conciliar. */
 export function rangoDeFilas(
   filas: StatementRow[],

@@ -144,6 +144,13 @@ export function resolverRango(
   const { y, m } = parseISO(hoy);
   const p = (periodo ?? "mes").toLowerCase().trim();
 
+  // TODO EL HISTORIAL. "¿cuánto gasté en restaurantes EN TOTAL?" pedía justamente esto y caía en
+  // una ventana de 180 días SILENCIOSA: la respuesta decía "en total" y sumaba medio año. El
+  // 2000-01-01 es un piso simbólico (ninguna transacción es anterior) y la etiqueta lo dice, para
+  // que el usuario sepa sobre qué se sumó.
+  if (p === "todo" || p === "historico" || p === "histórico" || p === "siempre") {
+    return { from: "2000-01-01", to: hoy, etiqueta: "todo tu historial" };
+  }
   if (p === "hoy") return { from: hoy, to: hoy, etiqueta: "hoy" };
   if (p === "ayer") {
     const a = sumarDias(hoy, -1);
@@ -458,21 +465,17 @@ export function renderConsulta(r: ConsultaResult): string {
     // de visualización. Un movimiento individual es un hecho —"pagué ₡3.900"—, y convertirlo a
     // dólares lo vuelve irreconocible contra el estado de cuenta o el recibo. La conversión sigue
     // donde tiene sentido: en los AGREGADOS (desglose por sobre, por mes, comparaciones).
-    const monedas = new Set(r.movimientos.map((m) => m.moneda));
-    // Con una sola moneda el total va en ESA; si la lista mezcla, subtotales por moneda — sumar
-    // colones y dólares en un número sería la cifra inventada de siempre.
-    // Se formatea acá con formatMoney (₡20.900 + $20) en vez de usar subtotalesStr, que rinde
-    // "20900 CRC + 20 USD": correcto pero ilegible en una tabla que el usuario mira de reojo.
-    // subtotalesStr queda intacta para sus otros llamadores.
+    // EL TOTAL ES DE TODAS LAS FILAS QUE MATCHEAN, no de las mostradas. `subtotalesGenerales` se
+    // calcula sobre `txns` ANTES del tope, así que ya trae la suma completa por moneda.
+    //
+    // Sumar `r.movimientos` —como hacía antes— daba el total de las 10 visibles y obligaba a
+    // aclarar "el total de arriba es el de los mostrados": una respuesta a "¿cuánto gasté en
+    // restaurantes EN TOTAL?" que justamente NO da el total. Fue una regresión que entró al pasar
+    // a moneda nativa: hasta entonces el total salía de `r.total`, que sí es de todas.
     const totalLista =
-      monedas.size === 1
-        ? formatMoney(
-            r.movimientos.reduce((a, m) => a + m.monto, 0),
-            [...monedas][0]!,
-          )
-        : subtotales(r.movimientos.map((m) => ({ monto: m.monto, moneda: m.moneda })))
-            .map((m) => formatMoney(m.monto, m.moneda))
-            .join(" + ");
+      r.subtotalesGenerales.length === 1
+        ? formatMoney(r.subtotalesGenerales[0]!.monto, r.subtotalesGenerales[0]!.moneda)
+        : r.subtotalesGenerales.map((m) => formatMoney(m.monto, m.moneda)).join(" + ");
 
     // Movimientos que se ven IDÉNTICOS (día, comercio y monto): se les agrega un sufijo con el id
     // corto. Dos consumos reales en el mismo lugar el mismo día existen, y sin distinguirlos la
@@ -495,12 +498,11 @@ export function renderConsulta(r: ConsultaResult): string {
       ...filas,
       `| **Total** |  | **${totalLista}** |`,
     ].join("\n");
-    // Si el tope recortó la lista, se dice — un total que no cuadra con las filas visibles
-    // parece un error de suma. OJO: acá el total es el de las filas MOSTRADAS (moneda nativa),
-    // así que el aviso aclara que el general es otro.
+    // Si el tope recortó la lista, se dice — pero dejando claro que el TOTAL sigue siendo de
+    // todas, que es lo que el usuario preguntó.
     const recorte =
       r.movimientos.length < r.conteo
-        ? `\n\n(Se muestran ${r.movimientos.length} de ${r.conteo} movimientos; el total de arriba es el de los mostrados.)`
+        ? `\n\n(Se muestran ${r.movimientos.length} de ${r.conteo} movimientos; el total es de los ${r.conteo}.)`
         : "";
     return `${cab}\n\n${tabla}${recorte}`;
   }
