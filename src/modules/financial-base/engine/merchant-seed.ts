@@ -83,7 +83,15 @@ export const MERCHANT_SEED: { patterns: string[]; categoryKey: string }[] = [
  * de TypeScript siguiera nombrándolas — eso lo cubre el test.
  */
 export const CATEGORIAS_RETIRADAS: Record<string, string> = {
+  // Gemelas consolidadas (20260811000001): el mismo concepto sembrado dos veces.
   alim_supermercado: "alim_super",
   vivienda_alquiler: "viv_alquiler",
   auto_mantenimiento: "trans_mantenimiento",
+  // Hojas legadas que repetían el nombre de su propio frasco (20260812000001). Acá el
+  // destino es el FRASCO, que es lo que la hoja duplicaba: quien quiera "el gasto de
+  // Vivienda sin sobre específico" categoriza en `g_vivienda`.
+  vivienda: "g_vivienda",
+  alimentacion: "g_alimentacion",
+  transporte: "g_transporte",
+  educacion: "g_educacion",
 };

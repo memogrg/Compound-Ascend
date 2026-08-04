@@ -57,6 +57,38 @@ describe("buildCategoryOptionGroups (destinos de reasignación)", () => {
    * preservadas de la taxonomía vieja), y repetir el nombre producía pares
    * indistinguibles — "Vivienda · Vivienda (general)" junto a "Vivienda · Vivienda".
    */
+  /**
+   * El bug que arregló 20260812000001. Mientras la taxonomía tuvo tres niveles, este
+   * selector listaba solo las hijas DIRECTAS del frasco, así que 21 sobres reales —Luz,
+   * Agua, Internet, Marchamo, Feria, Café…— eran inalcanzables desde el modal de
+   * reasignar huérfanas. La BD ya está aplanada; recorrer los descendientes es lo que
+   * evita que un tercer nivel futuro vuelva a esconderlos.
+   */
+  it("ofrece los NIETOS, no solo las hijas directas del frasco", () => {
+    const groups = buildCategoryOptionGroups([
+      cat({ id: "g1", name: "Vivienda" }),
+      cat({ id: "medio", name: "Servicios y hogar", parentId: "g1", sortOrder: 1 }),
+      cat({ id: "nieta", name: "Luz", parentId: "medio", sortOrder: 2 }),
+      cat({ id: "bisnieta", name: "Recibo viejo", parentId: "nieta", sortOrder: 3 }),
+    ]);
+    expect(groups[0]!.options.map((o) => o.name)).toEqual([
+      "Sin sobre específico",
+      "Servicios y hogar",
+      "Luz",
+      "Recibo viejo",
+    ]);
+  });
+
+  it("un ciclo de parent_id no cuelga el selector", () => {
+    const groups = buildCategoryOptionGroups([
+      cat({ id: "g1", name: "Vivienda" }),
+      cat({ id: "a", name: "A", parentId: "g1" }),
+      cat({ id: "b", name: "B", parentId: "a" }),
+    ]);
+    // `a` y `b` entran una sola vez cada una.
+    expect(groups[0]!.options.map((o) => o.id)).toEqual(["g1", "a", "b"]);
+  });
+
   it("la opción del frasco no repite el nombre del frasco (desambigua de una hoja homónima)", () => {
     const groups = buildCategoryOptionGroups([
       cat({ id: "g1", name: "Vivienda" }),
