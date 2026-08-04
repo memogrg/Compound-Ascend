@@ -234,6 +234,18 @@ export function extractTerminoGasto(text: string): string | null {
 }
 
 /**
+ * "¿cuánto gasté en X EN TOTAL?" — pide todo el historial, no una ventana arbitraria.
+ *
+ * Va aparte de `extractPeriodo` porque no es un periodo con fechas: es la AUSENCIA de recorte.
+ * Sin esto caía en el default de 180 días y la respuesta decía "en total" sumando medio año.
+ */
+export function pideTodoElHistorial(text: string): boolean {
+  return /\b(?:en total|en toda la historia|hist[oó]ric\p{L}*|desde siempre|de siempre|acumulad\p{L}*)(?!\p{L})/iu.test(
+    text,
+  );
+}
+
+/**
  * SOBRE mencionado en una consulta del libro diario: "dame las transacciones DE RESTAURANTES del
  * mes pasado", "movimientos de transporte de julio", "gastos de Corte Pelo David".
  *
@@ -751,7 +763,8 @@ export function matchIntent(
       // "TODAS las transacciones de X" pide la lista COMPLETA: cortar en 10 responde otra cosa.
       // También se asume completa cuando pidió una TABLA de un sobre concreto — nadie pide la
       // tabla de un sobre para ver diez filas de las cuarenta que tuvo.
-      const pideTodas = /\btod[oa]s\b|\bcompleta\b|\bentera\b|\bdetallad/i.test(t) || !!sobre;
+      const pideTodas =
+        /\btod[oa]s\b|\bcompleta\b|\bentera\b|\bdetallad/i.test(t) || !!sobre || pideTodoElHistorial(t);
       return {
         intent: "consulta_transacciones",
         params: {
@@ -775,11 +788,14 @@ export function matchIntent(
       return {
         intent: "consulta_transacciones",
         params: {
-          periodo: extractPeriodo(t) ?? "ultimos_180_dias",
+          // "en total" / "en toda la historia" = TODO el historial, no una ventana de 180 días
+          // silenciosa: la respuesta decía "en total" y sumaba medio año sin avisarlo.
+          periodo: extractPeriodo(t) ?? (pideTodoElHistorial(t) ? "todo" : "ultimos_180_dias"),
           tipo: "gasto",
           agrupacion: "ninguna",
           termino,
-          tope: 10,
+          // Preguntar por un sobre concreto es pedir SUS movimientos, no una muestra de diez.
+          tope: 300,
         },
       };
     }

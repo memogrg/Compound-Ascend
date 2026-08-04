@@ -13,7 +13,7 @@ import "server-only";
 import { formatMoney } from "@/lib/format";
 import { subtotales } from "@/lib/ai/money";
 import { parseStatement, bloqueEsLimpio } from "@/lib/ai/statement-parse";
-import { conciliar, rangoDeFilas, type FilaConciliada } from "@/lib/ai/statement-reconcile";
+import { conciliar, dedupeFilas, rangoDeFilas, type FilaConciliada } from "@/lib/ai/statement-reconcile";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { logger } from "@/lib/logger";
 
@@ -77,7 +77,11 @@ export async function conciliarEstado(
   texto: string,
   moneda: string,
 ): Promise<ConciliacionPayload | null> {
-  const { filas, ignoradas } = await parsearBloque(texto);
+  const { filas: crudas, ignoradas } = await parsearBloque(texto);
+  // El mismo movimiento puede venir DOS VECES en un pegado (formato limpio + formato sucio). Sin
+  // colapsarlo, el conciliador empareja el primero, consume la transacción registrada, y el
+  // segundo sale como "falta" → se registra duplicado. Pasó con un POPS de ₡4.100.
+  const { filas, colapsadas } = dedupeFilas(crudas);
   const rango = rangoDeFilas(filas);
   if (filas.length === 0 || !rango) return null;
 
@@ -122,7 +126,12 @@ export async function conciliarEstado(
   }
 
   return {
-    resumen_md: renderReporte(r.filas, { moneda, rates, ignoradas: ignoradas.length }),
+    resumen_md: renderReporte(r.filas, {
+      moneda,
+      rates,
+      ignoradas: ignoradas.length,
+      colapsadas: colapsadas.length,
+    }),
     action:
       faltantes.length > 0
         ? {
@@ -175,7 +184,13 @@ export async function resolverConfirmacionDeAlta(
  */
 export function renderReporte(
   filas: FilaConciliada[],
-  opts: { moneda: string; rates: Record<string, number> | null; ignoradas: number },
+  opts: {
+    moneda: string;
+    rates: Record<string, number> | null;
+    ignoradas: number;
+    /** Filas del pegado que eran el MISMO movimiento repetido y se contaron una sola vez. */
+    colapsadas?: number;
+  },
 ): string {
   // MONEDA NATIVA: cada movimiento en la moneda en que se gastó, como en las listas del libro
   // diario. Acá pesa todavía más que allá — el usuario está comparando fila por fila contra un
@@ -208,6 +223,13 @@ export function renderReporte(
       ? `Revisé ${filas.length} ${filas.length === 1 ? "movimiento" : "movimientos"}: **están todos registrados**.`
       : `De ${filas.length} movimientos, **${registradas} ya ${registradas === 1 ? "está" : "están"}** y **${faltantes} ${faltantes === 1 ? "falta" : "faltan"}**.`;
 
+  const repetidas =
+    (opts.colapsadas ?? 0) > 0
+      ? `
+
+(${opts.colapsadas} ${opts.colapsadas === 1 ? "fila venía" : "filas venían"} repetida${opts.colapsadas === 1 ? "" : "s"} en el pegado —el mismo movimiento en dos formatos—; ${opts.colapsadas === 1 ? "la conté" : "las conté"} una sola vez.)`
+      : "";
+
   const nota =
     opts.ignoradas > 0
       ? `\n\n(No pude leer ${opts.ignoradas} ${opts.ignoradas === 1 ? "línea" : "líneas"} del pegado; revisalas aparte.)`
@@ -221,5 +243,5 @@ export function renderReporte(
     "| Fecha | Comercio | Monto | Estado |",
     "| --- | --- | --- | --- |",
     ...cuerpo,
-  ].join("\n") + nota + cierre;
+  ].join("\n") + repetidas + nota + cierre;
 }
