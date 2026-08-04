@@ -32,6 +32,7 @@ import type { ChatMessage } from "@/lib/ai/provider";
 import { loadRetainedChat, appendChatMessages, loadQuotedContext } from "@/lib/ai/chat-store";
 import { capHistory } from "@/lib/ai/history";
 import { annotateReply, buildQuotedContext, pareceReferenciaACitado } from "@/lib/ai/chat-quote";
+import { pareceBloqueDeEstado, pareceIntencionDeConciliar } from "@/lib/ai/statement-parse";
 
 export const runtime = "nodejs";
 // El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
@@ -150,9 +151,24 @@ export async function POST(req: Request) {
     //    está en el mensaje CITADO: se rutea sobre ese texto. Solo si el citado es del USUARIO —un
     //    mensaje del asesor no es un pedido, y ruteralo no tendría sentido.
     let result: Awaited<ReturnType<typeof financeChatWithTools>> | null = null;
-    let matched = user ? matchIntent(userMessage) : null;
-    if (!matched && user && quote && quote.quoted.role === "user" && pareceReferenciaACitado(userMessage)) {
-      matched = matchIntent(quote.quoted.content);
+    // El citado solo cuenta si es del USUARIO: un mensaje del asesor no es un pedido.
+    const citado = quote?.quoted.role === "user" ? quote.quoted.content : undefined;
+    let matched = user ? matchIntent(userMessage, citado) : null;
+    // Referencia sin intención explícita ("¿y esto?"): se rutea el citado como si fuera el pedido.
+    if (!matched && user && citado && pareceReferenciaACitado(userMessage)) {
+      matched = matchIntent(citado);
+    }
+
+    // INSTRUMENTACIÓN del ruteo con cita. Sin esto, desde afuera no se distingue "la conciliación
+    // se consideró y no aplicaba" de "nunca se evaluó" — que fue exactamente el bug: el mensaje
+    // matcheaba consulta_transacciones y el bloque citado no se miraba jamás.
+    if (user && citado) {
+      logger.info("assistant.chat.ruteo_con_cita", {
+        lane: matched?.intent ?? "ninguno",
+        citadoEsEstado: pareceBloqueDeEstado(citado),
+        intencionConciliar: pareceIntencionDeConciliar(userMessage),
+        concilioGano: matched?.intent === "conciliar_estado",
+      });
     }
     if (matched) {
       const scope = scopeForIntent(matched.intent, matched.params);
