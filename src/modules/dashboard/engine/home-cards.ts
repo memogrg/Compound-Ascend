@@ -327,7 +327,15 @@ export function selectPatrimonio(ind: {
 // ---------------------------------------------------------------------------
 // 9 · Libertad — fase + % + falta + meta + hitos (monto + %)
 // ---------------------------------------------------------------------------
-export type MilestoneStep = { key: Hito; label: string; amount: number; pct: number };
+/** Estado del hito en la escalera: alcanzado (verde) · en curso (ámbar) · pendiente (rojo). */
+export type MilestoneState = "done" | "current" | "pending";
+export type MilestoneStep = {
+  key: Hito;
+  label: string;
+  amount: number;
+  pct: number;
+  state: MilestoneState;
+};
 
 export type LibertadCard = {
   key: "libertad";
@@ -337,6 +345,8 @@ export type LibertadCard = {
   pct: number; // progreso a Independencia (0-1)
   falta: number; // numeroDeIndependencia − capital que trabaja (≥0)
   metaLibertad: number | null;
+  /** Valor actual: el capital que ya trabaja (investableWealth). El "cuánto tengo hoy". */
+  actual: number;
   hitos: MilestoneStep[];
 };
 
@@ -364,6 +374,27 @@ export function selectLibertad(
     | "investableWealth"
   >,
 ): LibertadCard {
+  // Escalera de hitos con su monto objetivo y su avance (ya capado a 1 por el motor). El
+  // ESTADO se deriva aquí (presentación, no toca el cálculo de patrimonio): el primer hito no
+  // alcanzado es el "en curso" (ámbar); los ya alcanzados son "done" (verde); el resto,
+  // "pending" (rojo). Con avances monótonos, el primer pct<1 es el hito en el que estás.
+  const raw: { key: Hito; label: string; amount: number; pct: number }[] = [
+    { key: "ninguno", label: "Punto de partida", amount: 0, pct: 1 },
+    { key: "seguridad", label: "Seguridad", amount: round2(report.numeroDeSeguridad), pct: clamp01(report.progresoSeguridad) },
+    { key: "independencia", label: "Independencia", amount: round2(report.numeroDeIndependencia), pct: clamp01(report.progresoIndependencia) },
+    { key: "libertad", label: "Libertad", amount: round2(report.numeroDeLibertad ?? 0), pct: clamp01(report.progresoLibertad) },
+  ];
+  let currentSeen = false;
+  const hitos: MilestoneStep[] = raw.map((h) => {
+    let state: MilestoneState;
+    if (h.pct >= 1) state = "done";
+    else if (!currentSeen) {
+      state = "current";
+      currentSeen = true;
+    } else state = "pending";
+    return { ...h, state };
+  });
+
   return {
     key: "libertad",
     href: "/m/libertad",
@@ -372,12 +403,8 @@ export function selectLibertad(
     pct: clamp01(report.progresoIndependencia),
     falta: Math.max(0, round2(report.numeroDeIndependencia - report.investableWealth)),
     metaLibertad: report.numeroDeLibertad,
-    hitos: [
-      { key: "ninguno" as Hito, label: "Punto de partida", amount: 0, pct: 1 },
-      { key: "seguridad" as Hito, label: "Seguridad", amount: round2(report.numeroDeSeguridad), pct: clamp01(report.progresoSeguridad) },
-      { key: "independencia" as Hito, label: "Independencia", amount: round2(report.numeroDeIndependencia), pct: clamp01(report.progresoIndependencia) },
-      { key: "libertad" as Hito, label: "Libertad", amount: round2(report.numeroDeLibertad ?? 0), pct: clamp01(report.progresoLibertad) },
-    ],
+    actual: round2(report.investableWealth),
+    hitos,
   };
 }
 

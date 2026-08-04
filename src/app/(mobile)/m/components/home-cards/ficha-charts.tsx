@@ -20,6 +20,7 @@ import { mAmountScale } from "../content-kit";
  */
 
 const GREEN = "var(--accent)";
+const AMBER = "var(--warning)";
 const RED = "var(--danger)";
 const BLUE = "var(--info)";
 
@@ -256,14 +257,19 @@ export function FChecklist({
 // Hitos (Libertad): Partida → Seguridad → Independencia → Libertad, monto + %
 // ---------------------------------------------------------------------------
 /**
- * La escalera de hitos como filas compactas: un punto que se rellena con el progreso,
- * la etiqueta, y a la derecha el monto + %. Un hito alcanzado (pct ≥ 1) va en verde.
+ * La escalera de hitos como filas compactas: un punto, la etiqueta, y a la derecha el
+ * monto objetivo + % de avance. El COLOR codifica el estado, no solo el pct: alcanzado
+ * (verde, relleno), en curso (ámbar, relleno), pendiente (rojo, contorno). Así se ve de
+ * un vistazo en qué hito estás, no solo cuáles pasaste. El monto ₡0 no se imprime como
+ * cifra: Partida (alcanzada) muestra ✓ y Libertad sin meta definida, "Por definir".
  */
+export type MilestoneVisState = "done" | "current" | "pending";
+
 export function FMilestones({
   steps,
   currency,
 }: {
-  steps: { label: string; amount: number; pct: number }[];
+  steps: { label: string; amount: number; pct: number; state: MilestoneVisState }[];
   currency: string;
 }) {
   const fmt = mAmountScale(
@@ -271,20 +277,26 @@ export function FMilestones({
     currency,
     6,
   );
+  const color = (st: MilestoneVisState) => (st === "done" ? GREEN : st === "current" ? AMBER : RED);
   return (
     <span className="m-hficha-miles">
       {steps.map((s, i) => {
-        const done = s.pct >= 1;
+        const c = color(s.state);
+        const filled = s.state !== "pending"; // pendiente = contorno; alcanzado/en curso = relleno
         return (
-          <span key={i} className={`m-hficha-mile${done ? " on" : ""}`}>
+          <span key={i} className={`m-hficha-mile${s.state === "pending" ? "" : " on"}`}>
             <span
               className="m-hficha-mile-dot"
-              style={{ background: done ? GREEN : "transparent", borderColor: done ? GREEN : "var(--text-dim)" }}
+              style={{ background: filled ? c : "transparent", borderColor: c }}
               aria-hidden
             />
             <span className="m-hficha-mile-l">{s.label}</span>
-            <span className="m-hficha-mile-v">
-              {fmt(s.amount)} · {Math.round(Math.min(1, s.pct) * 100)}%
+            <span className="m-hficha-mile-v" style={{ color: c }}>
+              {s.amount > 0
+                ? `${fmt(s.amount)} · ${Math.round(Math.min(1, s.pct) * 100)}%`
+                : s.state === "done"
+                  ? "✓"
+                  : "Por definir"}
             </span>
           </span>
         );
