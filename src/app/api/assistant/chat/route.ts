@@ -31,7 +31,7 @@ import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/ai/provider";
 import { loadRetainedChat, appendChatMessages, loadQuotedContext } from "@/lib/ai/chat-store";
 import { capHistory } from "@/lib/ai/history";
-import { annotateReply, buildQuotedContext } from "@/lib/ai/chat-quote";
+import { annotateReply, buildQuotedContext, pareceReferenciaACitado } from "@/lib/ai/chat-quote";
 
 export const runtime = "nodejs";
 // El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
@@ -140,11 +140,20 @@ export async function POST(req: Request) {
     //    ese carril usa. Una consulta que el router resuelve determinista NO paga el contexto completo
     //    (portafolio con precios en vivo, patrimonio, bloques flavor). Solo si escala → contexto full. ──
     //
-    //    Con CITA no se toma el atajo determinista: ese carril resuelve con el mensaje actual y nada
-    //    más (no mira historial), que es exactamente lo contrario de lo que pide citar. "¿y el mes
-    //    pasado?" respondido sin saber a qué se refiere sería peor que gastar el turno completo.
+    //    LA CITA YA NO APAGA LOS CARRILES. Antes, cualquier mensaje con reply se mandaba entero al
+    //    LLM (`!quote`), con el argumento de que el carril determinista no mira historial. El
+    //    efecto real era el opuesto: responder al bloque de transacciones pegadas con "¿estas están
+    //    registradas?" dejaba de conciliar y contestaba con TODO el mes. La cita es contexto EXTRA,
+    //    no motivo para apagar lo que funciona.
+    //
+    //    Y cuando el mensaje es una REFERENCIA ("estas", "esto", "lo de arriba"), el pedido real
+    //    está en el mensaje CITADO: se rutea sobre ese texto. Solo si el citado es del USUARIO —un
+    //    mensaje del asesor no es un pedido, y ruteralo no tendría sentido.
     let result: Awaited<ReturnType<typeof financeChatWithTools>> | null = null;
-    const matched = user && !quote ? matchIntent(userMessage) : null;
+    let matched = user ? matchIntent(userMessage) : null;
+    if (!matched && user && quote && quote.quoted.role === "user" && pareceReferenciaACitado(userMessage)) {
+      matched = matchIntent(quote.quoted.content);
+    }
     if (matched) {
       const scope = scopeForIntent(matched.intent, matched.params);
       const liteCtx =

@@ -170,11 +170,22 @@ describe("con cita · el mensaje citado llega al modelo", () => {
     expect(apariciones).toBe(1);
   });
 
-  it("NO toma el atajo determinista aunque el texto matchee un intent", async () => {
+  it("SÍ toma el carril determinista: la cita es contexto, no un apagador", async () => {
+    // CAMBIO DE CONTRATO. Antes la ruta apagaba todos los carriles cuando había cita
+    // (`matched = user && !quote ? … : null`). El efecto real era el opuesto al buscado:
+    // responder a un bloque de transacciones con "¿estas están registradas?" dejaba de conciliar
+    // y contestaba con todo el mes. Ahora el router corre igual y la cita suma contexto.
     matchIntentResult = { intent: "gasto_categoria", params: {} };
     await POST(pedir({ message: "¿y el mes pasado?", replyToMessageId: VIEJO.id }));
-    expect(resolveDeterministicMock).not.toHaveBeenCalled();
+    expect(resolveDeterministicMock).toHaveBeenCalled();
+  });
+
+  it("sin match en el mensaje actual, escala al LLM con la cita en el contexto", async () => {
+    matchIntentResult = null;
+    await POST(pedir({ message: "¿y el mes pasado?", replyToMessageId: VIEJO.id }));
     expect(financeChatWithToolsMock).toHaveBeenCalled();
+    const ultimo = ultimosMensajes().at(-1)!;
+    expect(ultimo.content).toContain("RESPONDIENDO");
   });
 });
 
