@@ -21,9 +21,18 @@ import {
   addGoalContribution,
   withdrawFromGoal,
   spendFromGoal,
+  listGoals,
 } from "@/modules/control/services/control-service";
+import { getDebtsOverview, type DebtVM } from "@/modules/control/services/debts-service";
+import { getIndexRates } from "@/modules/control/services/index-rates";
 import { addPolicyAction, createPolicy, deletePolicy } from "@/modules/wealth";
-import { listCategoryTree, deleteTransaction, createCategory } from "@/modules/financial-base";
+import {
+  listCategoryTree,
+  deleteTransaction,
+  createCategory,
+  getDisplayCurrency,
+} from "@/modules/financial-base";
+import type { Debt, SavingsGoal } from "@/modules/control/types";
 import { getGoalDetail, type GoalDetailVM } from "@/modules/control/services/goal-detail-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { logger } from "@/lib/logger";
@@ -516,4 +525,25 @@ export async function removeDebtAction(id: string): Promise<ActionResult> {
   } catch {
     return { ok: false };
   }
+}
+
+// ── Destinos para el selector unificado de "salida de dinero" del Inicio ─────
+// Getters on-demand (espejo de get*FormDataAction de financial-base) que pueblan los
+// pickers vinculados del "+" sin cargar la pantalla de dominio. Solo lectura; cada
+// registro real va por su acción canónica (reportPaymentAction / addGoalContributionAction).
+
+/** Deudas + saldos crudos para el picker de "abonar a deuda". */
+export async function getDebtPayTargetsAction(): Promise<{
+  debts: DebtVM[];
+  raw: Debt[];
+  currency: string;
+}> {
+  const rates = await getIndexRates();
+  const [ov, currency] = await Promise.all([getDebtsOverview(rates), getDisplayCurrency()]);
+  return { debts: ov.debts, raw: ov.raw, currency };
+}
+
+/** Metas para el picker de "aportar a un ahorro". */
+export async function getGoalContribTargetsAction(): Promise<{ goals: SavingsGoal[] }> {
+  return { goals: await listGoals() };
 }

@@ -119,21 +119,23 @@ export function AddSpendForm({
           : { categoryId: "Seleccioná un sobre para guardar" }
       }
     >
+      {/* Moneda ANTES del monto: se elige en qué moneda se captura y luego cuánto. */}
+      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
       <MoneyField name="amount" label="Monto" value={amount} onChange={setAmount} currency={cur} />
+      {/* Nombre con su propio campo y protagonismo (sigue siendo opcional en el submit). */}
+      <TextField
+        name="merchantOrSource"
+        label="Nombre del gasto"
+        value={merchant}
+        onChange={setMerchant}
+        placeholder="Súper, gasolina, farmacia…"
+        maxLength={160}
+      />
       <SobreField
         label={sobreLabel}
         onOpen={() => setPickerOpen(true)}
       />
-      <TextField
-        name="merchantOrSource"
-        label="Comercio / descripción (opcional)"
-        value={merchant}
-        onChange={setMerchant}
-        placeholder="Súper, gasolina…"
-        maxLength={160}
-      />
       <DateField name="occurredOn" label="Fecha" value={date} onChange={setDate} />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
 
       {/* Selector de sobre agrupado por frasco (como el composer de gasto) */}
       <SobrePicker
