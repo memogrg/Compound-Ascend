@@ -12,7 +12,7 @@ import {
   spendFromGoalAction,
   listExpenseCategoriesAction,
   getGoalDetailAction,
-  getGoalContributionContextAction,
+  getPagoContextAction,
   revertGoalMovementAction,
   type ExpenseCategoryGroup,
 } from "@/modules/control/api/actions";
@@ -23,8 +23,8 @@ import type { SavingsGoal } from "@/modules/control";
 import {
   montoSugerido,
   textoAvanceMes,
-  type AporteContext,
-} from "@/modules/control/engine/aporte-meta";
+  type PagoContext,
+} from "@/modules/control/engine/pago-vinculado";
 import type {
   GoalDetailVM,
   GoalMovementType,
@@ -414,7 +414,7 @@ export function GoalPickerSheet({
  * Aporte: monto + fecha → addGoalContributionAction (crea la transacción vinculada).
  *
  * Precarga lo que FALTA del aporte mensual y muestra el avance del mes, con las mismas reglas
- * que el modal de la web (`engine/aporte-meta`): lo que no puede divergir entre las dos
+ * que el modal de la web (`engine/pago-vinculado`): lo que no puede divergir entre las dos
  * superficies es la regla, no el markup — acá los primitivos son los del móvil.
  *
  * El contexto se pide al servidor en la moneda de la META. Precargarlo desde lo que muestra el
@@ -432,11 +432,11 @@ export function ContributionForm({
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
-  const [ctx, setCtx] = useState<AporteContext | null>(null);
+  const [ctx, setCtx] = useState<PagoContext | null>(null);
 
   useEffect(() => {
     let vivo = true;
-    void getGoalContributionContextAction(goal.id).then((c) => {
+    void getPagoContextAction("meta", goal.id).then((c) => {
       if (!vivo || !c) return;
       setCtx(c);
       const sug = montoSugerido(c);

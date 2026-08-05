@@ -651,6 +651,77 @@ export async function getGoalContributionContext(goalId: string): Promise<{
 }
 
 /**
+ * Contexto NATIVO de una deuda para el modal de pago: su moneda, su cuota vigente, el saldo y los
+ * datos de amortización, más lo ya pagado en el mes en curso.
+ *
+ * Mismo criterio que `getGoalContributionContext` y por la misma razón: el frasco de Deudas del
+ * tab de Gastos también sabe cuánto se pagó este mes, pero convertido a la moneda de
+ * VISUALIZACIÓN. `debt_payments` ni siquiera tiene columna de moneda — su `amount` es
+ * implícitamente la de la deuda —, así que precargar desde el frasco guardaría un importe
+ * multiplicado por el tipo de cambio en una deuda que no esté en la moneda de display.
+ */
+export async function getDebtPaymentContext(debtId: string): Promise<{
+  id: string;
+  name: string;
+  currency: string;
+  cuota: number;
+  balance: number;
+  apr: number | null;
+  termMonths: number | null;
+  insurance: number | null;
+  pagadoMes: number;
+} | null> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
+
+  const { data: debt, error } = await supabase
+    .from("debts")
+    .select("id,name,currency,balance,apr,term_months,insurance,current_payment,min_payment")
+    .eq("id", debtId)
+    .in("user_id", memberIds)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!debt) return null;
+
+  const period = await userCurrentPeriod();
+  // Solo las transacciones vinculadas a ESTA deuda y del mes. Nacen en la moneda de la deuda
+  // (`debtPaymentToTxn` usa `debt.currency`), así que se suman directo, sin convertir.
+  const { data: txns } = await supabase
+    .from("transactions")
+    .select("amount,currency")
+    .in("user_id", memberIds)
+    .eq("linked_kind", "debt")
+    .eq("linked_id", debtId)
+    .eq("kind", "gasto")
+    .gte("occurred_on", period.from)
+    .lte("occurred_on", period.to);
+
+  let pagadoMes = 0;
+  for (const t of txns ?? []) {
+    if (t.currency === debt.currency) pagadoMes += Number(t.amount);
+  }
+
+  // La cuota vigente es `current_payment`; si no está puesta, la mínima. Mismo orden que usa
+  // `propagateLinkedTransaction` para estimar el split, para que el desglose que ve el usuario
+  // sea el que el servidor va a aplicar.
+  const cuota =
+    Number(debt.current_payment) > 0 ? Number(debt.current_payment) : Number(debt.min_payment ?? 0);
+
+  return {
+    id: debt.id,
+    name: debt.name,
+    currency: debt.currency,
+    cuota,
+    balance: Number(debt.balance),
+    apr: debt.apr == null ? null : Number(debt.apr),
+    termMonths: debt.term_months,
+    insurance: debt.insurance == null ? null : Number(debt.insurance),
+    pagadoMes,
+  };
+}
+
+/**
  * Retiro de una meta (Fase 4 · flujos inversos): crea el ingreso vinculado
  * (linked_kind='goal') y baja current_amount (sin pasar de 0).
  */

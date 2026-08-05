@@ -35,6 +35,10 @@ import type {
   Category,
   CategoryPersonalization,
 } from "@/modules/financial-base/services/categories-service";
+import {
+  getPagoContextAction,
+  reportPaymentAction,
+} from "@/modules/control/api/actions";
 import { formatMoney } from "@/lib/format";
 
 import { Fab, BottomSheet, PlusChoiceSheet, SheetSelect, ConfirmDialog, useToast, type Opt } from "../../components/form-kit";
@@ -53,12 +57,22 @@ import {
 import { levelTone, isUnbudgeted } from "./budget-status";
 
 /**
- * Formulario de aporte del módulo de metas, reusado tal cual (mismo `engine/aporte-meta`, mismos
+ * Formulario de aporte del módulo de metas, reusado tal cual (mismo `engine/pago-vinculado`, mismos
  * primitivos del móvil). Dinámico porque solo hace falta si el usuario abre el frasco de Ahorro
  * y toca "Aportar" — mismo patrón que ya usa home-add-launcher.
  */
 const ContributionForm = dynamic(
   () => import("../metas/goal-manager").then((m) => m.ContributionForm),
+  { ssr: false },
+);
+
+/**
+ * Formulario de pago del módulo de deudas, reusado tal cual: va por `reportPaymentAction`, la
+ * misma acción canónica que el tab de Deudas (RPC atómica `record_debt_payment`). Una sola
+ * fuente de escritura — desde Gastos no se abre un segundo camino que se desincronice.
+ */
+const PaymentForm = dynamic(
+  () => import("../deudas/debt-manager").then((m) => m.PaymentForm),
   { ssr: false },
 );
 import {
@@ -1085,9 +1099,13 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
   const router = useRouter();
   // Sobre de ahorro al que se está aportando (hook izado ANTES de los early-returns por tipo de
   // frasco, regla de hooks). Solo lo usa la rama de frasco vinculado a metas.
-  const [aportar, setAportar] = useState<{ id: string; name: string; currency: string } | null>(
-    null,
-  );
+  const [aportar, setAportar] = useState<{
+    kind: "meta" | "deuda";
+    id: string;
+    name: string;
+    currency: string;
+    cuota: number;
+  } | null>(null);
 
   // "Por reasignar": suma en el presupuesto pero no tiene gasto real ni barra.
   // Tono de alerta y CTA a revisar; el detalle vive en su propio BottomSheet.
@@ -1224,17 +1242,29 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
               // Metas: el sobre deja de ser de solo lectura — se aporta desde acá. La línea
               // dice el avance del mes en palabras porque "sin aporte todavía" y "aporté poco"
               // se ven igual en un número suelto, y es la distinción que mueve a la acción.
-              const esMeta = jar.linkedKind === "goal" && !it.advanced;
-              const sinAporte = esMeta && (it.spent ?? 0) <= 0;
-              const avanceTexto = esMeta
-                ? (it.budget ?? 0) > 0
-                  ? sinAporte
-                    ? `Sin aporte este mes · plan ${mAmount(it.budget ?? 0, currency)}`
-                    : `${mAmount(it.spent ?? 0, currency)} de ${mAmount(it.budget ?? 0, currency)} este mes`
-                  : sinAporte
-                    ? "Sin aporte este mes"
-                    : `${mAmount(it.spent ?? 0, currency)} este mes`
-                : null;
+              // Metas y deudas: los dos frascos tienen compromiso mensual y se saldan desde acá.
+              const tipoPago =
+                jar.linkedKind === "goal" ? "meta" : jar.linkedKind === "debt" ? "deuda" : null;
+              const saldable = !!tipoPago && !it.advanced;
+              const sinAporte = saldable && (it.spent ?? 0) <= 0;
+              const cubierto =
+                saldable && (it.budget ?? 0) > 0 && (it.spent ?? 0) >= (it.budget ?? 0);
+              const nada = tipoPago === "deuda" ? "Sin pago este mes" : "Sin aporte este mes";
+              const unidad = tipoPago === "deuda" ? "cuota" : "plan";
+              const avanceTexto = !saldable
+                ? null
+                : sinAporte
+                  ? (it.budget ?? 0) > 0
+                    ? `${nada} · ${unidad} ${mAmount(it.budget ?? 0, currency)}`
+                    : nada
+                  : cubierto
+                    ? // "Cuota pagada" dice de una lo que "₡X de ₡X" obliga a deducir comparando.
+                      tipoPago === "deuda"
+                      ? "Cuota pagada"
+                      : "Aporte del mes cubierto"
+                    : (it.budget ?? 0) > 0
+                      ? `${mAmount(it.spent ?? 0, currency)} de ${mAmount(it.budget ?? 0, currency)} este mes`
+                      : `${mAmount(it.spent ?? 0, currency)} este mes`;
               return (
                 <div key={it.id}>
                   <MDataRow
@@ -1252,7 +1282,7 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
                     value={it.advanced ? "—" : unbudgeted ? mAmount(it.spent ?? 0, currency) : it.amount}
                     valueTone={sinAporte ? "warning" : unbudgeted ? "warning" : undefined}
                   />
-                  {esMeta ? (
+                  {saldable && tipoPago ? (
                     <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4, marginBottom: 6 }}>
                       <button
                         type="button"
@@ -1260,10 +1290,21 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
                         style={{ minHeight: 36, padding: "0 14px", fontSize: 13 }}
                         onClick={(ev) => {
                           ev.stopPropagation();
-                          setAportar({ id: it.id, name: it.name, currency: it.currency ?? currency });
+                          // El contexto se pide al servidor en la moneda de la ENTIDAD: `it.budget`
+                          // viene convertido a la de visualización y precargar desde ahí guardaría
+                          // un importe multiplicado por el tipo de cambio.
+                          void getPagoContextAction(tipoPago, it.id).then((c) => {
+                            setAportar({
+                              kind: tipoPago,
+                              id: it.id,
+                              name: it.name,
+                              currency: c?.currency ?? it.currency ?? currency,
+                              cuota: c?.compromisoMensual ?? 0,
+                            });
+                          });
                         }}
                       >
-                        Aportar
+                        {tipoPago === "deuda" ? "Pagar" : "Aportar"}
                       </button>
                     </div>
                   ) : null}
@@ -1296,14 +1337,33 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
           la vista de Gastos: el avance del mes, el acumulado de la meta y el gasto del mes salen
           del mismo render de servidor, así que el aporte se ve reflejado al instante. */}
       {aportar ? (
-        <BottomSheet open title={`Aportar — ${aportar.name}`} onClose={() => setAportar(null)}>
-          <ContributionForm
-            goal={aportar}
-            onSuccess={() => {
-              setAportar(null);
-              router.refresh();
-            }}
-          />
+        <BottomSheet
+          open
+          title={`${aportar.kind === "deuda" ? "Pagar" : "Aportar"} — ${aportar.name}`}
+          onClose={() => setAportar(null)}
+        >
+          {aportar.kind === "deuda" ? (
+            <PaymentForm
+              debtId={aportar.id}
+              currency={aportar.currency}
+              cuota={aportar.cuota}
+              action={reportPaymentAction}
+              submitLabel="Registrar pago"
+              successMessage="Pago registrado"
+              onSuccess={() => {
+                setAportar(null);
+                router.refresh();
+              }}
+            />
+          ) : (
+            <ContributionForm
+              goal={aportar}
+              onSuccess={() => {
+                setAportar(null);
+                router.refresh();
+              }}
+            />
+          )}
         </BottomSheet>
       ) : null}
     </>

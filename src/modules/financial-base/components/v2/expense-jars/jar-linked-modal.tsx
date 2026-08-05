@@ -41,21 +41,35 @@ function pct(spent: number, budget: number): number {
 /** Etiquetas del modo budget-aware por tipo de vínculo (Deudas vs Ahorro). */
 const BUDGET_LABELS: Record<
   string,
-  { header: string; done: string; unit: string; cta: string; tip: string }
+  {
+    header: string;
+    done: string;
+    unit: string;
+    cta: string;
+    tip: string;
+    /** Checklist mensual: qué decir cuando el mes no tiene movimiento y cuando ya está cubierto. */
+    sinMovimiento?: string;
+    cubierto?: string;
+  }
 > = {
   debt: {
     header: "Obligaciones de este mes",
     done: "pagado",
     unit: "cuota",
     cta: "Agregar o editar deuda",
-    tip: "Solo lectura. Registra el pago desde «Registrar gasto»; se reflejará aquí.",
+    // Ya no dice "solo lectura": la cuota se paga desde acá mismo, con el botón de la fila.
+    tip: "Pagá la cuota desde la fila; el pago cuenta como gasto del mes y baja el saldo.",
+    sinMovimiento: "Sin pago este mes",
+    cubierto: "Cuota pagada",
   },
   goal: {
     header: "Aportes de este mes",
     done: "aportado",
     unit: "aporte",
     cta: "Agregar o editar objetivo",
-    tip: "Solo lectura. Registra el aporte desde «Registrar gasto»; se reflejará aquí.",
+    tip: "Aportá desde la fila; el aporte cuenta como gasto del mes y sube el acumulado.",
+    sinMovimiento: "Sin aporte este mes",
+    cubierto: "Aporte del mes cubierto",
   },
   // Inversiones: aportar a un holding es un APORTE, no un pago de cuota. Sin esta entrada
   // caía al fallback de deuda ("pagado/cuota"), incoherente con la fila (que dice "aportado").
@@ -90,7 +104,10 @@ export function JarLinkedModal({
 }) {
   const hasItems = jar.items.length > 0;
   // El aporte solo aplica a metas; en Deudas/Pólizas/Inversiones la fila sigue de solo lectura.
-  const accionesMeta = jar.linkedKind === "goal" ? goalActions : undefined;
+  // Metas y deudas: los dos frascos tienen compromiso mensual y se saldan desde la fila.
+  // Pólizas e inversiones siguen de solo lectura.
+  const accionesMeta =
+    jar.linkedKind === "goal" || jar.linkedKind === "debt" ? goalActions : undefined;
   const fixed = jar.fixedFunds ?? [];
   const L = BUDGET_LABELS[jar.linkedKind] ?? BUDGET_LABELS.debt!;
 
@@ -305,7 +322,7 @@ function BudgetItemRow({
   it: JarItem;
   currency: string;
   jarColor: string;
-  labels: { done: string; unit: string };
+  labels: { done: string; unit: string; sinMovimiento?: string; cubierto?: string };
   goalActions?: JarGoalActions;
 }) {
   const budget = it.budget ?? 0;
@@ -428,11 +445,14 @@ function BudgetItemRow({
           <span style={{ fontSize: 11.5, color: sinAporte ? "var(--warn)" : "var(--muted)" }}>
             {sinAporte
               ? budget > 0
-                ? `Sin aporte este mes · plan ${formatMoney(budget, currency)}`
-                : "Sin aporte este mes"
-              : budget > 0
-                ? `${formatMoney(spent, currency)} de ${formatMoney(budget, currency)} este mes`
-                : `${formatMoney(spent, currency)} este mes`}
+                ? `${labels.sinMovimiento ?? "Sin movimiento este mes"} · ${labels.unit} ${formatMoney(budget, currency)}`
+                : (labels.sinMovimiento ?? "Sin movimiento este mes")
+              : budget > 0 && spent >= budget
+                ? // "Cuota pagada" dice de una lo que "₡X de ₡X" obliga a deducir comparando.
+                  `${labels.cubierto ?? "Cubierto"}${spent > budget ? ` · ${formatMoney(spent - budget, currency)} extra` : ""}`
+                : budget > 0
+                  ? `${formatMoney(spent, currency)} de ${formatMoney(budget, currency)} este mes`
+                  : `${formatMoney(spent, currency)} este mes`}
           </span>
           {accion}
         </div>
