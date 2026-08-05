@@ -369,6 +369,39 @@ export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, st
 }
 
 /**
+ * TODOS los pagos reportados, agrupados por deuda, en UNA query.
+ *
+ * Para derivar el saldo de cada deuda en la lista sin caer en un N+1. Los importes van en la
+ * moneda NATIVA de su deuda: `debt_payments` no tiene columna de moneda, así que su `amount` es
+ * implícitamente la de la deuda (ver la guarda del #474 en `addDebtPayment`).
+ */
+export async function listDebtPaymentsByDebt(): Promise<
+  Record<string, { paymentDate: string; amount: number; extraAmount: number; kind: PaymentKind }[]>
+> {
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
+  const { data } = await supabase
+    .from("debt_payments")
+    .select("debt_id,occurred_on,amount,extra_amount,kind")
+    .in("user_id", memberIds)
+    .order("occurred_on", { ascending: true });
+  const out: Record<
+    string,
+    { paymentDate: string; amount: number; extraAmount: number; kind: PaymentKind }[]
+  > = {};
+  for (const p of data ?? []) {
+    (out[p.debt_id] ??= []).push({
+      paymentDate: p.occurred_on,
+      amount: Number(p.amount),
+      extraAmount: Number(p.extra_amount ?? 0),
+      kind: (p.kind ?? "ordinario") as PaymentKind,
+    });
+  }
+  return out;
+}
+
+/**
  * Registra un pago reportado. Si el extra es modo 'cuota', baja la cuota.
  * Fase 1: el pago pasa por el orquestador — nace también como transacción
  * vinculada (gasto, linked_kind='debt') y debt_payments guarda su id.

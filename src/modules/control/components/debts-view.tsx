@@ -483,8 +483,11 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           // Fila = moneda de la deuda. El VM trae los montos convertidos a la de display (para
           // los totales y el motor); si la deuda está en OTRA moneda, la fila muestra sus
           // importes NATIVOS (saldo, original y cuota), como ya hacen inversiones/metas/pólizas.
+          // `d.nativeBalance`, no `raw.balance`: el saldo DERIVADO de los pagos en la moneda de
+          // la deuda. `raw` trae el guardado, que solo cambia al editar la deuda o al abonar en
+          // modo 'cuota' — usarlo acá dejaba la fila desfasada de sus propios totales.
           const saldo = montoFilaDeuda(
-            raw ? { amount: raw.balance, currency: raw.currency } : undefined,
+            raw ? { amount: d.nativeBalance, currency: raw.currency } : undefined,
             d.balance,
             currency,
           );
