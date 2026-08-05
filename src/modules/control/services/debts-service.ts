@@ -9,7 +9,9 @@ import "server-only";
 import {
   listDebts,
   listDebtPaymentDatesThisMonth,
+  listDebtPaymentsByDebt,
 } from "@/modules/control/services/control-service";
+import { recomputeFromPayments } from "@/modules/control/engine/amortization";
 import { getBaseSummary } from "@/modules/financial-base";
 import { getDisplayCurrency } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";
@@ -25,7 +27,21 @@ export interface DebtVM {
   bank: string | null;
   /** Moneda principal (montos ya normalizados). */
   currency: string;
+  /**
+   * Saldo ACTUAL, derivado de los pagos reportados igual que en el detalle. `debts.balance` es el
+   * saldo con el que se dio de alta la deuda y solo se toca al editarla o al abonar en modo
+   * 'cuota'; mostrarlo tal cual dejaba la lista congelada mientras el detalle bajaba a cada pago,
+   * y la simulación de estrategia partía de un número viejo.
+   */
   balance: number;
+  /**
+   * El mismo saldo derivado, en la moneda NATIVA de la deuda. La fila muestra los importes
+   * nativos cuando la deuda no está en la moneda de display; sin esto, esa fila seguiría
+   * mostrando el saldo guardado mientras los totales usan el derivado — la misma incoherencia,
+   * movida de lugar. El form de edición NO usa esto: precarga el guardado (`raw`), porque
+   * guardar el derivado y volver a aplicarle los pagos lo contaría dos veces.
+   */
+  nativeBalance: number;
   originalAmount: number | null;
   /** TAE efectiva (índice + spread en variables; F5). */
   apr: number;
@@ -64,12 +80,13 @@ export interface DebtsOverview {
 export async function getDebtsOverview(
   indexRates: Record<string, number> = {},
 ): Promise<DebtsOverview> {
-  const [debts, base, currency, rates, paidThisMonthMap] = await Promise.all([
+  const [debts, base, currency, rates, paidThisMonthMap, paymentsByDebt] = await Promise.all([
     listDebts(),
     getBaseSummary(),
     getDisplayCurrency(),
     getFxRates(),
     listDebtPaymentDatesThisMonth(),
+    listDebtPaymentsByDebt(),
   ]);
 
   const conv = (n: number, from: string) => convertCurrency(n, from, currency, rates);
@@ -81,15 +98,37 @@ export async function getDebtsOverview(
         { payDay: d.payDay, startDate: d.startDate, paymentDates: paidThisMonthMap[d.id] ?? [] },
         now,
       );
+      const apr = effectiveApr(d, indexRates);
+      // Saldo derivado con la MISMA función que usa el detalle, para que los dos números
+      // coincidan por construcción y no por disciplina. Se corre en la moneda NATIVA de la
+      // deuda — que es la de sus pagos — y después se convierte.
+      const pmts = paymentsByDebt[d.id] ?? [];
+      const saldoNativo =
+        pmts.length > 0
+          ? recomputeFromPayments(
+              {
+                balance: d.balance,
+                apr,
+                termMonths: d.termMonths,
+                monthlyPayment: d.currentPayment > 0 ? d.currentPayment : null,
+                insurance: d.insurance ?? 0,
+                extraMonthly: d.extraMonthly ?? 0,
+                startDate: d.startDate,
+                originalAmount: d.originalAmount ?? null,
+              },
+              pmts,
+            ).currentBalance
+          : d.balance;
       return {
         id: d.id,
         name: d.name,
         debtType: d.debtType ?? null,
         bank: d.bank ?? null,
         currency,
-        balance: conv(d.balance, d.currency),
+        balance: conv(saldoNativo, d.currency),
+        nativeBalance: saldoNativo,
         originalAmount: d.originalAmount != null ? conv(d.originalAmount, d.currency) : null,
-        apr: effectiveApr(d, indexRates),
+        apr,
         rateType: d.rateType ?? null,
         rateIndex: d.rateIndex ?? null,
         rateSpread: d.rateSpread ?? null,

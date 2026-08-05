@@ -234,7 +234,9 @@ export function DebtManager({
           // Una escala compartida entre monedas distintas no compara, así que la fila extranjera
           // se formatea sola en la suya.
           const saldo = montoFilaDeuda(
-            debtRaw ? { amount: debtRaw.balance, currency: debtRaw.currency } : undefined,
+            // Saldo DERIVADO en moneda nativa (no `debtRaw.balance`, que es el guardado):
+            // si no, la fila queda desfasada de sus propios totales. Ver DebtVM.nativeBalance.
+            debtRaw ? { amount: vm.nativeBalance, currency: debtRaw.currency } : undefined,
             vm.balance,
             currency,
           );
@@ -536,7 +538,7 @@ export function DebtPickerSheet({
             // Saldo en la moneda NATIVA de la deuda (igual que la fila): una tarjeta en USD se
             // ve en $, y el pago se abrirá en $.
             const saldo = montoFilaDeuda(
-              raw ? { amount: raw.balance, currency: raw.currency } : undefined,
+              raw ? { amount: vm.nativeBalance, currency: raw.currency } : undefined,
               vm.balance,
               currency,
             );
