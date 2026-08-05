@@ -5,7 +5,7 @@ import { getExpenseRangeView } from "@/modules/financial-base/services/expense-r
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sections";
 import { createSavingsSobreAction } from "@/modules/control";
-import { AportarMetaButton } from "@/modules/control";
+import { PagoVinculadoButton } from "@/modules/control";
 import { userToday } from "@/lib/time/user-time";
 
 /** Fecha de corte de los frascos: ?asOf=YYYY-MM-DD válido, o el día de hoy (zona del usuario). */
@@ -56,13 +56,16 @@ export default async function Page({
     },
   };
 
-  // Un botón de aporte por sobre del frasco de Ahorro, indexado por id de la meta.
+  // Un botón por entidad de los frascos vinculados con compromiso mensual: aportar a una meta
+  // (Ahorro) y pagar una deuda (Deudas). Mismo componente, mismo mapa, distinto `kind`.
   const goalActions: Record<string, React.ReactNode> = {};
   for (const jar of jars) {
-    if (jar.kind !== "linked" || jar.linkedKind !== "goal") continue;
+    if (jar.kind !== "linked") continue;
+    const kind = jar.linkedKind === "goal" ? "meta" : jar.linkedKind === "debt" ? "deuda" : null;
+    if (!kind) continue;
     for (const it of jar.items) {
       goalActions[it.id] = (
-        <AportarMetaButton goalId={it.id} goalName={it.name} tone="compact" />
+        <PagoVinculadoButton kind={kind} id={it.id} name={it.name} tone="compact" />
       );
     }
   }

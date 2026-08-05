@@ -20,11 +20,12 @@ import {
   deleteDebtPayment,
   addGoalContribution,
   getGoalContributionContext,
+  getDebtPaymentContext,
   withdrawFromGoal,
   spendFromGoal,
   listGoals,
 } from "@/modules/control/services/control-service";
-import type { AporteContext } from "@/modules/control/engine/aporte-meta";
+import type { PagoContext } from "@/modules/control/engine/pago-vinculado";
 import { getDebtsOverview, type DebtVM } from "@/modules/control/services/debts-service";
 import { getIndexRates } from "@/modules/control/services/index-rates";
 import { addPolicyAction, createPolicy, deletePolicy } from "@/modules/wealth";
@@ -247,6 +248,9 @@ export async function reportPaymentAction(raw: unknown): Promise<ActionResult> {
   try {
     await addDebtPayment(parsed.data);
     revalidatePath("/deudas");
+    // El pago también se registra DESDE el frasco "Deudas" del tab de Gastos, y cambia el avance
+    // del mes de esa fila.
+    revalidatePath("/gastos");
     revalidatePath(`/deudas/${parsed.data.debtId}`);
     // El pago también nace como transacción vinculada (Fase 1 · orquestador).
     revalidatePath("/transacciones");
@@ -320,6 +324,8 @@ export async function addGoalContributionAction(raw: unknown): Promise<ActionRes
   try {
     await addGoalContribution(parsed.data);
     revalidatePath("/control-financiero");
+    // El aporte también se registra DESDE el frasco de Ahorro del tab de Gastos.
+    revalidatePath("/gastos");
     revalidatePath("/ahorro");
     revalidatePath("/transacciones");
     revalidatePath("/mi-base-financiera");
@@ -339,18 +345,45 @@ export async function addGoalContributionAction(raw: unknown): Promise<ActionRes
 }
 
 /**
- * Contexto NATIVO de una meta para el modal de aporte (moneda, plan mensual, acumulado y lo ya
- * aportado este mes). Solo lectura. `null` si la meta no existe o no es del hogar.
+ * Contexto del modal de pago vinculado, para los dos tipos. Devuelve la forma ÚNICA que consume
+ * el motor (`PagoContext`), así el modal no tiene que saber de dónde salió cada campo.
  */
-export async function getGoalContributionContextAction(
-  goalId: string,
-): Promise<AporteContext | null> {
+export async function getPagoContextAction(
+  kind: "meta" | "deuda",
+  id: string,
+): Promise<PagoContext | null> {
   if (!isSupabaseConfigured()) return null;
   try {
-    return await getGoalContributionContext(goalId);
+    if (kind === "meta") {
+      const c = await getGoalContributionContext(id);
+      if (!c) return null;
+      return {
+        kind: "meta",
+        id: c.goalId,
+        name: c.goalName,
+        currency: c.currency,
+        compromisoMensual: c.monthlyContribution,
+        hechoMes: c.aportadoMes,
+      };
+    }
+    const d = await getDebtPaymentContext(id);
+    if (!d) return null;
+    return {
+      kind: "deuda",
+      id: d.id,
+      name: d.name,
+      currency: d.currency,
+      compromisoMensual: d.cuota,
+      hechoMes: d.pagadoMes,
+      balance: d.balance,
+      apr: d.apr,
+      termMonths: d.termMonths,
+      insurance: d.insurance,
+    };
   } catch (err) {
-    logger.error("getGoalContributionContext fallido", {
+    logger.error("getPagoContext fallido", {
       message: err instanceof Error ? err.message : "?",
+      kind,
     });
     return null;
   }

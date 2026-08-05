@@ -26,16 +26,17 @@ export {
   montoSugerido,
   avanceMes,
   textoAvanceMes,
-  validarAporte,
-  aporteValido,
-} from "./engine/aporte-meta";
-export type { AporteContext, AporteErrores } from "./engine/aporte-meta";
+  desglosePago,
+  validarPago,
+  pagoValido,
+} from "./engine/pago-vinculado";
+export type { PagoContext, PagoKind, PagoErrores, Desglose } from "./engine/pago-vinculado";
 export { goalInputSchema } from "./schemas";
 export { getDebtsOverview } from "./services/debts-service";
 export { getDebtDetail } from "./services/debt-detail-service";
 export { getIndexRates, effectiveApr, buildRateNote } from "./services/index-rates";
 export { ControlDashboard } from "./components/control-dashboard";
-export { AportarMetaButton } from "./components/aportar-meta-button";
+export { PagoVinculadoButton } from "./components/pago-vinculado-button";
 export { ControlActions } from "./components/control-actions";
 export { DebtsView } from "./components/debts-view";
 export { DebtDetail } from "./components/debt-detail";
