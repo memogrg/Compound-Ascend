@@ -1042,16 +1042,17 @@ export function matchIntent(
   return null;
 }
 
-/** Clasificador Flash-Lite (solo cuando el patrón NO matchea). Barato. Devuelve null si no
- *  está seguro (intent desconocido/complejo/parseo fallido) → escalar al razonamiento. */
-async function classifyWithLite(
-  text: string,
-): Promise<{
+/** Lo que devuelve el clasificador barato: el intent más lo que costó clasificarlo. */
+type LiteClassification = {
   intent: Intent;
   params: Record<string, unknown>;
   tokensIn: number;
   tokensOut: number;
-} | null> {
+};
+
+/** Clasificador Flash-Lite (solo cuando el patrón NO matchea). Barato. Devuelve null si no
+ *  está seguro (intent desconocido/complejo/parseo fallido) → escalar al razonamiento. */
+async function classifyWithLite(text: string): Promise<LiteClassification | null> {
   const lite = createGeminiProvider(LITE_MODEL);
   if (!lite) return null;
   const system =
@@ -1642,14 +1643,20 @@ const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = {
  * computeMarketScenario (cifra real) — NO depende de que el LLM decida llamar el tool. Fallo honesto:
  * si no hay símbolo o el dato vuelve null, dice el motivo real (nunca "no tengo acceso").
  */
+/** Posición del usuario en un símbolo, con lo necesario para armar el escenario. */
+type FullPosition = {
+  quantity: number;
+  invested: number;
+  currency: string;
+  assetType: string;
+};
+
 /**
  * Lee la posición COMPLETA del usuario en un símbolo (cantidad + invertido + moneda), de las
  * holdings completas con scope de hogar — NO del top-N compacto. Best-effort: sin sesión (WhatsApp)
  * o ante cualquier fallo → null (el carril sigue sin la posición). Import dinámico (server-only).
  */
-async function getFullPosition(
-  symbol: string,
-): Promise<{ quantity: number; invested: number; currency: string; assetType: string } | null> {
+async function getFullPosition(symbol: string): Promise<FullPosition | null> {
   try {
     const { getPositionForSymbol } = await import("@/modules/wealth");
     return await getPositionForSymbol(symbol);

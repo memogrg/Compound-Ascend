@@ -154,13 +154,14 @@ export type TransactionInsert = Partial<TransactionRow> & { user_id: string };
  * resuelta a una RPC transaccional (atomicidad real) sin duplicar esta lógica
  * de negocio en SQL. `createTransaction` la usa para el camino normal.
  */
-export async function buildTransactionRow(
-  input: TxnInput,
-): Promise<{
+/** La fila ya resuelta, más el vínculo final que la RPC transaccional necesita propagar. */
+export type BuiltTransactionRow = {
   row: TransactionInsert;
   linkedKind: CreatedTransaction["linkedKind"];
   linkedId: string | null;
-}> {
+};
+
+export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransactionRow> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
