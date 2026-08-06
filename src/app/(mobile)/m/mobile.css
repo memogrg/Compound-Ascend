@@ -3975,35 +3975,56 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .ac-batch-kind.is-out {
   color: var(--muted);
 }
-/* Dos columnas y la moneda abajo: en un teléfono, tres campos en una línea no se pueden tocar.
-   La tarjeta del RECIBO (.ac-rc-*) usa la misma rejilla: es el mismo trío de campos. */
-.m-shell .ac-batch-grid,
-.m-shell .ac-rc-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
-  margin-top: 6px;
-}
-.m-shell .ac-batch-cell,
-.m-shell .ac-rc-cell {
-  min-width: 0;
-}
-.m-shell .ac-batch-cell-cur,
-.m-shell .ac-rc-cell-cur {
-  grid-column: 1 / -1;
+/* La rejilla (dos columnas con minmax(0,1fr), qué campo ocupa la fila entera y el min-width:0
+   de los campos) vive en globals.css y vale igual acá: el shell móvil carga las dos hojas.
+   Lo que cambia en el teléfono es solo la MEDIDA. */
+.m-shell .ac-rc-fields,
+.m-shell .ac-batch-grid {
+  gap: 12px 8px;
 }
 /* 44px: objetivo táctil mínimo. Con `font-size: 16px` iOS no hace zoom al enfocar el campo,
-   que en un formulario de N filas dejaba la tarjeta descuadrada. */
+   que en un formulario de N filas dejaba la tarjeta descuadrada — por eso NO se baja.
+   El padding sí baja de los 14px de `.m-inp`: a 16px de tipografía, 28px de relleno
+   horizontal dejaban al input de fecha sin sitio para su valor en una columna de ~140px. */
 .m-shell .ac-batch-field,
 .m-shell .ac-rc-field {
-  width: 100%;
-  margin-top: 2px;
   min-height: 44px;
   font-size: 16px;
+  padding: 10px 12px;
+}
+/* Igual que en la web: el select de moneda tiene que verse como el resto de los campos. Va acá
+   además de en globals porque `.m-inp` usa el atajo `background`, que borra el background-image
+   de la flecha; esta regla carga después y lo repone con los tokens del shell. */
+.m-shell select.ac-batch-field,
+.m-shell select.ac-rc-field {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 2px),
+    calc(100% - 13px) calc(50% - 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
 }
 .m-shell .ac-batch-field.is-bad,
 .m-shell .ac-rc-field.is-bad {
-  border-color: var(--neg);
+  border-color: var(--danger);
+}
+/* La tarjeta del recibo es un FORMULARIO, no un mensaje: recupera los 36px de sangría con los
+   que el resto de las burbujas se alinean bajo el avatar. Son 18px más por columna, que es la
+   diferencia entre que el valor de la fecha entre o quede cortado. */
+.m-shell .m-confirm.ac-rc-card {
+  margin-left: 0;
+}
+/* Cancelar y Confirmar, mismo ancho y mismo alto, abajo de todo. */
+.m-shell .ac-rc-card .m-confirm-actions .m-btn {
+  flex: 1 1 0;
+  min-width: 0;
 }
 .m-shell .ac-batch-row .m-confirm-err {
   margin-top: 4px;

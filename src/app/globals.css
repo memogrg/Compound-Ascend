@@ -5894,42 +5894,113 @@ summary:focus-visible {
 .ac-batch-kind.is-out {
   color: var(--muted);
 }
-/* Fecha, monto y moneda en una línea: son cortos y juntos se leen como "cuándo y cuánto".
-   La tarjeta del RECIBO (.ac-rc-*) usa la misma rejilla: es el mismo trío de campos. */
-.ac-batch-grid,
-.ac-rc-grid {
+/* ── Rejilla de campos de las tarjetas de confirmación (recibo y alta en lote) ──────
+   DOS columnas iguales de verdad. `repeat(2, minmax(0, 1fr))` y no `1fr 1fr`: el `1fr`
+   pelado tiene un mínimo implícito de `auto`, así que una columna NO puede encoger por
+   debajo del contenido — y el `input[type=date]` trae ancho intrínseco propio ("dd/mm/aaaa"
+   más el icono del calendario). Con `auto` ese input empujaba su columna y la fila se
+   desbordaba; con `minmax(0, …)` la columna puede achicarse y el campo la respeta.
+   Los tres campos en línea de antes (fecha | monto | moneda) se partieron en dos: en el
+   panel flotante, que mide ~380px con el viewport ancho, las tres columnas recortaban el
+   valor de la fecha y dejaban "CRC" en "CR". La media query anterior no ayudaba porque
+   mide el VIEWPORT, no el ancho real del contenedor. */
+.ac-rc-fields,
+.ac-batch-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.7fr);
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* `start`: si un campo muestra su error, no estira al de al lado — quedan alineados arriba. */
+  align-items: start;
+  gap: 10px 8px;
+}
+.ac-rc-fields {
+  margin: 10px 0 2px;
+}
+.ac-batch-grid {
   margin-top: 6px;
 }
 .ac-batch-cell,
 .ac-rc-cell {
   min-width: 0;
 }
+/* Campos que ocupan la fila entera (comercio, moneda, sobre, avisos). */
+.ac-rc-wide,
+.ac-batch-cell-cur {
+  grid-column: 1 / -1;
+}
+/* Una sola definición para TODOS los campos de las dos tarjetas: misma altura, mismo radio,
+   mismo padding, mismo ancho. Antes el combobox de sobre no la llevaba y quedaba desparejo.
+   `min-width: 0` es imprescindible: el mínimo por defecto de un input es su ancho intrínseco,
+   así que sin esto `width: 100%` no alcanza para que quepa en una columna angosta. */
 .ac-batch-field,
 .ac-rc-field {
   width: 100%;
-  margin-top: 2px;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 40px;
+  margin-top: 4px;
+}
+/* El input de fecha es el que se desbordaba. `appearance: none` le quita el ancho intrínseco
+   que le da el motor; el indicador del calendario se empuja al final para que no corra el
+   valor, y el valor se alinea a la izquierda como el de los demás campos. */
+.ac-batch-field[type="date"],
+.ac-rc-field[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+}
+.ac-batch-field[type="date"]::-webkit-date-and-time-value,
+.ac-rc-field[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  min-width: 0;
+}
+.ac-batch-field[type="date"]::-webkit-calendar-picker-indicator,
+.ac-rc-field[type="date"]::-webkit-calendar-picker-indicator {
+  flex: none;
+  margin-inline-start: auto;
+  padding-inline-start: 4px;
+}
+/* El <select> de moneda con el aspecto de los DEMÁS campos. Sin `appearance: none` el motor lo
+   pinta con su propio fondo y su propio borde (gris en WebKit), y quedaba como el único campo
+   de otro color dentro de la tarjeta. La flechita se dibuja con la misma técnica de gradientes
+   que `.m-select` del shell móvil, así que sigue los tokens del tema. */
+select.ac-batch-field,
+select.ac-rc-field {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 34px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 2px),
+    calc(100% - 13px) calc(50% - 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
 }
 .ac-batch-field.is-bad,
 .ac-rc-field.is-bad {
   border-color: var(--neg);
 }
+/* Etiquetas: mismo tamaño y mismo aire en los cinco campos, sin alturas sueltas. */
+.ac-rc-fields .fld-label,
+.ac-batch-row .fld-label {
+  display: block;
+  line-height: 1.3;
+}
+/* El error de un campo cuelga de SU campo, no del final de la tarjeta. */
+.ac-rc-cell > .ac-err,
+.ac-rc-cell > .ac-rc-warn {
+  margin-top: 6px;
+}
 .ac-batch-row .ac-err {
   margin-top: 4px;
 }
-/* En una tarjeta angosta (panel flotante) tres columnas dejan los campos ilegibles. */
-@media (max-width: 560px) {
-  .ac-batch-grid,
-  .ac-rc-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-  .ac-batch-cell-cur,
-  .ac-rc-cell-cur {
-    grid-column: 1 / -1;
-  }
-}
+/* La media query de antes ("en pantallas angostas, dos columnas") ya no existe: medía el
+   VIEWPORT, así que el panel flotante —380px dentro de un escritorio de 1280— nunca la
+   activaba y era justo donde los campos se recortaban. Ahora la rejilla es de dos columnas
+   SIEMPRE, en las tres superficies. */
 .ac-batch-x {
   background: none;
   border: 0;
