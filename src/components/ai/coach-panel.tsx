@@ -22,10 +22,12 @@ import { AgentMark } from "@/components/ui/agent-mark";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import {
   AssistantConversation,
+  ReceiptConfirmCard,
   TxnConfirmCard,
   type DraftTxn,
 } from "@/components/ai/assistant-conversation";
-import { useCaptureToday } from "@/components/tz/timezone-context";
+import { draftFromExtract, type ReceiptDraft, type ReceiptExtract } from "@/lib/ai/receipt-draft";
+import { useCaptureToday, useUserTimezone } from "@/components/tz/timezone-context";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 
 /** Saludo del panel (web = voseo). */
@@ -45,11 +47,14 @@ export function CoachPanel() {
   const captureCurrency = useCaptureCurrency();
   // "Hoy" en la zona del PERFIL (la misma que usa el servidor), no la del navegador.
   const today = useCaptureToday();
+  // La zona en crudo: cuando el recibo no declara moneda, el país que sale de ella es mejor
+  // default que la moneda principal (ver `resolveReceiptCurrency`).
+  const tz = useUserTimezone();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("assistant");
   const fileRef = useRef<HTMLInputElement>(null);
-  const [receipt, setReceipt] = useState<DraftTxn | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptDraft | null>(null);
   const [scanning, setScanning] = useState(false);
 
   const onPickFile = () => fileRef.current?.click();
@@ -68,16 +73,15 @@ export function CoachPanel() {
       });
       const data = await res.json();
       if (res.ok && data.extract) {
-        setReceipt({
-          kind: "gasto",
-          description: data.extract.merchant ?? "Compra",
-          amount: data.extract.amount ?? 0,
-          // La detectada en el recibo; si no hay, la PRINCIPAL. El "CRC" literal
-          // descartaba la moneda que el extractor sí devuelve (distingue ₡ de $).
-          currency: data.extract.currency ?? captureCurrency,
-          occurredOn: data.extract.date ?? today(),
-          source: "receipt",
-        });
+        // Los defaults (moneda no declarada, fecha imposible) los decide `draftFromExtract`, la
+        // MISMA regla que aplica el chat móvil. Acá solo se le da el contexto del usuario.
+        setReceipt(
+          draftFromExtract(data.extract as ReceiptExtract, {
+            hoy: today(),
+            primaryCurrency: captureCurrency,
+            timezone: tz,
+          }),
+        );
       } else {
         setReceipt(null);
         alert("No pudimos leer el recibo. Intenta con otra foto.");
@@ -162,9 +166,9 @@ export function CoachPanel() {
 
         {receipt ? (
           <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--line)" }}>
-            <TxnConfirmCard
+            <ReceiptConfirmCard
               draft={receipt}
-              title="Recibo escaneado"
+              hoy={today()}
               onCancel={() => setReceipt(null)}
               onConfirmed={() => setReceipt(null)}
             />

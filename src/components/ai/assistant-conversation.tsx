@@ -20,13 +20,13 @@
  *
  * Ninguna acción financiera se ejecuta sin confirmación explícita del usuario.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { Icon } from "@/components/ui/icon";
 import { AgentMark } from "@/components/ui/agent-mark";
 import { SobreCombobox } from "@/components/ai/sobre-combobox";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
-import { useCaptureToday } from "@/components/tz/timezone-context";
+import { useCaptureToday, useUserTimezone } from "@/components/tz/timezone-context";
 import {
   confirmTransactionAction,
   confirmGoalAction,
@@ -46,8 +46,20 @@ import {
   validarFila,
   resumenValidacion,
   aPayload,
+  parsearMonto,
   type BatchRowDraft,
 } from "@/lib/ai/batch-rows";
+import {
+  draftFromExtract,
+  validarRecibo,
+  necesitaConfirmarMoneda,
+  etiquetaConfirmarMoneda,
+  avisoFecha,
+  aPayloadRecibo,
+  resumenRegistro,
+  type ReceiptDraft,
+  type ReceiptExtract,
+} from "@/lib/ai/receipt-draft";
 import type { AIActionProposal } from "@/lib/ai/types";
 import type { ConfirmResult, BatchResult } from "@/modules/assistant/api/actions";
 import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
@@ -251,8 +263,8 @@ type ChatMsg = {
   /** Mensaje al que este responde. */
   quote?: Quote;
   action?: AIActionProposal | null;
-  /** Borrador que viene del escáner de recibos (no de la IA). */
-  txn?: DraftTxn;
+  /** Borrador EDITABLE que viene del escáner de recibos (no de la IA). */
+  receipt?: ReceiptDraft;
 };
 
 const LINK_LABEL: Record<string, string> = {
@@ -392,6 +404,10 @@ export function AssistantConversation({
   // otra zona caería en un día distinto del que el resto de la app considera hoy. Es una
   // función, no un valor: se evalúa al capturar, no en el render (que puede ser de ayer).
   const today = useCaptureToday(timezone);
+  // La zona en crudo, además de "hoy": cuando el recibo no declara moneda, el país que sale de la
+  // zona es mejor default que la moneda principal (ver `resolveReceiptCurrency`).
+  const contextTz = useUserTimezone();
+  const tz = timezone ?? contextTz;
 
   const [messages, setMessages] = useState<ChatMsg[]>([
     { id: 0, role: "assistant", text: greeting },
@@ -523,7 +539,7 @@ export function AssistantConversation({
     // Solo los últimos turnos como CONTEXTO (no toda la conversación): acota el prompt y evita
     // re-responder temas viejos. El servidor además usa su propia memoria reciente.
     const history = messages
-      .filter((m) => !m.action && !m.txn)
+      .filter((m) => !m.action && !m.receipt)
       .slice(-12)
       .map((m) => ({ role: m.role, content: m.text.slice(0, 4000) }));
     // Se guarda el id local del mensaje para poder colgarle después su dbId: sin eso el mensaje
@@ -602,28 +618,20 @@ export function AssistantConversation({
       });
       const data = await res.json();
       if (res.ok && data.extract) {
-        const ext = data.extract as {
-          amount: number | null;
-          merchant: string | null;
-          date: string | null;
-          currency: string | null;
-        };
-        const txn: DraftTxn = {
-          kind: "gasto",
-          description: ext.merchant ?? "Compra",
-          amount: ext.amount ?? 0,
-          // La detectada en el recibo (el extractor distingue ₡ de $); si no hay, la principal.
-          currency: ext.currency ?? currency,
-          occurredOn: ext.date ?? today(),
-          source: "receipt",
-        };
+        // Los defaults (moneda no declarada, fecha imposible) los decide `draftFromExtract`, no
+        // este handler: es la MISMA regla que aplica el panel web. Acá solo se le da el contexto.
+        const receipt = draftFromExtract(data.extract as ReceiptExtract, {
+          hoy: today(),
+          primaryCurrency: currency,
+          timezone: tz,
+        });
         setMessages((m) => [
           ...m,
           {
             id: nextId(),
             role: "assistant",
-            text: "Leí tu recibo. Revisá y confirmá para registrarlo:",
-            txn,
+            text: "Leí tu recibo. Revisá y corregí lo que haga falta antes de registrarlo:",
+            receipt,
           },
         ]);
       } else {
@@ -746,9 +754,9 @@ export function AssistantConversation({
                 <BatchTxnConfirmCard skin={s} p={m.action.payload} />
               </div>
             ) : null}
-            {m.txn ? (
+            {m.receipt ? (
               <div className={s.cardWrap}>
-                <TxnConfirmCard skin={s} draft={m.txn} title="Recibo escaneado" />
+                <ReceiptConfirmCard skin={s} draft={m.receipt} hoy={today()} />
               </div>
             ) : null}
           </div>
@@ -1011,6 +1019,243 @@ export function TxnConfirmCard({
           Cancelar
         </button>
         <button className={skin.btnPrimary} onClick={confirm} disabled={pending}>
+          {pending ? "Guardando…" : "Confirmar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Restante del sobre para el resumen del recibo (sin repetir el "✓ Registrado" de la línea 1). */
+function detalleSobre(s: SobreRemaining | null): string | null {
+  if (!s) return null;
+  if (!s.hasBudget) return `Sobre: ${s.path} (sin presupuesto asignado).`;
+  if (s.remaining < 0)
+    return `Sobre: ${s.path}. Te pasaste por ${formatMoney(-s.remaining, s.currency)}.`;
+  return `Sobre: ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
+}
+
+/**
+ * RECIBO ESCANEADO — la tarjeta de confirmación del escáner, ENTERA editable.
+ *
+ * Es la última defensa antes de escribir, y hasta ahora solo dejaba tocar el sobre: monto, moneda,
+ * comercio y fecha se registraban tal como los hubiera leído el OCR. Un tiquete de ₡4.100 sin
+ * moneda impresa entraba como $4.100 (la principal del usuario) con fecha de dos años atrás, sin
+ * un solo aviso — y el "✓ registrado" tampoco decía dónde había quedado.
+ *
+ * Ahora los cuatro campos se editan, precargados con lo del OCR, y se registra EXACTAMENTE lo que
+ * queda en la tarjeta (`aPayloadRecibo`). Las reglas —qué moneda proponer, qué fecha es
+ * sospechosa, qué avisar— son puras y viven en `lib/ai/receipt-draft`.
+ *
+ * La comparte el chat de las tres superficies (panel web, /asistente y móvil): solo cambia la piel.
+ */
+export function ReceiptConfirmCard({
+  draft,
+  hoy,
+  title = "Recibo escaneado",
+  skin = WEB_SKIN,
+  onCancel,
+  onConfirmed,
+}: {
+  draft: ReceiptDraft;
+  /** Hoy en la zona del PERFIL (la misma que usa el servidor), no la del navegador. */
+  hoy: string;
+  title?: string;
+  skin?: Skin;
+  onCancel?: () => void;
+  onConfirmed?: () => void;
+}) {
+  // Los id de los campos se generan por instancia: en el hilo del chat pueden convivir dos
+  // recibos escaneados, y con id fijos los <label> del segundo apuntarían a los campos del
+  // primero (tocar "Monto" enfocaría el recibo de arriba).
+  const uid = useId();
+  const [d, setD] = useState<ReceiptDraft>(draft);
+  // La moneda que no venía en el recibo se PROPONE, no se adopta: hasta que el usuario la
+  // confirme (o elija otra) no se registra nada.
+  const [monedaOk, setMonedaOk] = useState(!necesitaConfirmarMoneda(draft));
+  const [intento, setIntento] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<"idle" | "ok" | "cancel">("idle");
+  const [hecho, setHecho] = useState<{
+    titulo: string;
+    periodo: string | null;
+    sobre: string | null;
+  } | null>(null);
+
+  const editar = (cambio: Partial<ReceiptDraft>) => setD((prev) => ({ ...prev, ...cambio }));
+
+  const err = validarRecibo(d, hoy);
+  const ver = intento; // los errores aparecen recién al intentar confirmar
+  // La vista previa se calcula con lo EDITADO: el símbolo del importe cambia con el select de
+  // moneda, que es justo lo que faltaba para notar un "$4.100" que debía ser "₡4.100".
+  const montoPrevio = parsearMonto(d.amountText) ?? 0;
+  const aviso = avisoFecha(d.occurredOn, hoy, { flag: d.dateFlag, leida: d.dateRead });
+
+  const confirmar = async () => {
+    setIntento(true);
+    if (Object.keys(err).length > 0 || !monedaOk) return;
+    setPending(true);
+    setError(null);
+    const payload = aPayloadRecibo(d);
+    const res = await confirmTransactionAction(payload);
+    setPending(false);
+    if (!res.ok) {
+      setError(res.message ?? "No se pudo guardar.");
+      return;
+    }
+    // Se muestra lo que QUEDÓ registrado (monto + moneda + fecha + sobre) y, si cayó fuera del
+    // mes en curso, se dice explícitamente: si no, el usuario lo busca en sus movimientos y no
+    // está. Nunca auto-cierra — este resumen es el que permite notar que el OCR se equivocó.
+    const { titulo, periodo } = resumenRegistro(
+      {
+        amount: payload.amount,
+        currency: payload.currency,
+        occurredOn: payload.occurredOn,
+        description: payload.description,
+      },
+      hoy,
+    );
+    setHecho({ titulo, periodo, sobre: detalleSobre(res.sobre ?? null) });
+    setPhase("ok");
+  };
+
+  if (phase === "cancel") return null;
+  if (phase === "ok" && hecho) {
+    return (
+      <div className={skin.done}>
+        {hecho.titulo}
+        {hecho.sobre ? <div className={skin.sub}>{hecho.sobre}</div> : null}
+        {hecho.periodo ? <div className="ac-rc-warn">{hecho.periodo}</div> : null}
+        {onConfirmed ? (
+          <div className={skin.actions}>
+            <button className={skin.btnSecondary} onClick={onConfirmed}>
+              Listo
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className={skin.card}>
+      <div className={skin.eyebrow}>{title}</div>
+      {/* El signo lo pone formatMoney (cero neutro: "₡0", no "−₡0"). */}
+      <div className={skin.amount}>{formatMoney(-montoPrevio, d.currency)}</div>
+
+      <label className={skin.fieldLabel} htmlFor={`rc-com-${uid}`}>
+        Comercio
+      </label>
+      <input
+        id={`rc-com-${uid}`}
+        className={`${skin.fieldInput ?? "inp"} ac-rc-field${ver && err.comercio ? " is-bad" : ""}`}
+        value={d.description}
+        onChange={(e) => editar({ description: e.target.value })}
+        disabled={pending}
+        placeholder="Nombre del comercio"
+        autoComplete="off"
+      />
+      {ver && err.comercio ? <div className={skin.error}>{err.comercio}</div> : null}
+
+      <div className="ac-rc-grid">
+        <div className="ac-rc-cell">
+          <label className={skin.fieldLabel} htmlFor={`rc-fec-${uid}`}>
+            Fecha
+          </label>
+          <input
+            id={`rc-fec-${uid}`}
+            type="date"
+            max={hoy}
+            className={`${skin.fieldInput ?? "inp"} ac-rc-field${ver && err.fecha ? " is-bad" : ""}`}
+            value={d.occurredOn}
+            onChange={(e) => editar({ occurredOn: e.target.value })}
+            disabled={pending}
+          />
+        </div>
+        <div className="ac-rc-cell">
+          <label className={skin.fieldLabel} htmlFor={`rc-mon-${uid}`}>
+            Monto
+          </label>
+          <input
+            id={`rc-mon-${uid}`}
+            className={`${skin.fieldInput ?? "inp"} ac-rc-field${ver && err.monto ? " is-bad" : ""}`}
+            value={d.amountText}
+            onChange={(e) => editar({ amountText: e.target.value })}
+            disabled={pending}
+            inputMode="decimal"
+            placeholder="0"
+          />
+        </div>
+        <div className="ac-rc-cell ac-rc-cell-cur">
+          <label className={skin.fieldLabel} htmlFor={`rc-cur-${uid}`}>
+            Moneda
+          </label>
+          <select
+            id={`rc-cur-${uid}`}
+            className={`${skin.fieldSelect ?? "sel"} ac-rc-field${ver && !monedaOk ? " is-bad" : ""}`}
+            value={d.currency}
+            // Elegir en el select ES confirmar: el usuario ya miró el campo.
+            onChange={(e) => {
+              editar({ currency: e.target.value });
+              setMonedaOk(true);
+            }}
+            disabled={pending}
+          >
+            {CURRENCY_OPTIONS.map((o) => (
+              <option key={o.code} value={o.code}>
+                {o.code}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {/* La fecha y la moneda avisan JUNTO a su campo y antes de confirmar, no después. */}
+      {ver && err.fecha ? <div className={skin.error}>{err.fecha}</div> : null}
+      {aviso ? (
+        <div className={aviso.tono === "error" ? skin.error : "ac-rc-warn"}>{aviso.texto}</div>
+      ) : null}
+      {ver && err.monto ? <div className={skin.error}>{err.monto}</div> : null}
+      {!monedaOk ? (
+        <div className="ac-rc-warn">
+          No detecté la moneda en el recibo.{" "}
+          {d.currencyOrigin === "pais"
+            ? "Propongo la de tu país; confirmala o elegí otra."
+            : "Propongo tu moneda principal; confirmala o elegí otra."}
+          <button
+            type="button"
+            className="ac-rc-chip"
+            onClick={() => setMonedaOk(true)}
+            disabled={pending}
+          >
+            {etiquetaConfirmarMoneda(d.currency)}
+          </button>
+        </div>
+      ) : null}
+      {ver && !monedaOk ? <div className={skin.error}>Confirmá la moneda del recibo.</div> : null}
+
+      <label className={skin.fieldLabel}>Sobre</label>
+      <SobreCombobox
+        kind="gasto"
+        value={d.categoryId ?? ""}
+        onChange={(v) => editar({ categoryId: v || null })}
+        disabled={pending}
+        {...(skin.sobreInput ? { inputClassName: skin.sobreInput } : {})}
+      />
+
+      {error ? <div className={skin.error}>{error}</div> : null}
+      <div className={skin.actions}>
+        <button
+          className={skin.btnSecondary}
+          onClick={() => {
+            setPhase("cancel");
+            onCancel?.();
+          }}
+          disabled={pending}
+        >
+          Cancelar
+        </button>
+        <button className={skin.btnPrimary} onClick={confirmar} disabled={pending}>
           {pending ? "Guardando…" : "Confirmar"}
         </button>
       </div>

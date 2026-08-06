@@ -5894,21 +5894,26 @@ summary:focus-visible {
 .ac-batch-kind.is-out {
   color: var(--muted);
 }
-/* Fecha, monto y moneda en una línea: son cortos y juntos se leen como "cuándo y cuánto". */
-.ac-batch-grid {
+/* Fecha, monto y moneda en una línea: son cortos y juntos se leen como "cuándo y cuánto".
+   La tarjeta del RECIBO (.ac-rc-*) usa la misma rejilla: es el mismo trío de campos. */
+.ac-batch-grid,
+.ac-rc-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.7fr);
   gap: 8px;
   margin-top: 6px;
 }
-.ac-batch-cell {
+.ac-batch-cell,
+.ac-rc-cell {
   min-width: 0;
 }
-.ac-batch-field {
+.ac-batch-field,
+.ac-rc-field {
   width: 100%;
   margin-top: 2px;
 }
-.ac-batch-field.is-bad {
+.ac-batch-field.is-bad,
+.ac-rc-field.is-bad {
   border-color: var(--neg);
 }
 .ac-batch-row .ac-err {
@@ -5916,10 +5921,12 @@ summary:focus-visible {
 }
 /* En una tarjeta angosta (panel flotante) tres columnas dejan los campos ilegibles. */
 @media (max-width: 560px) {
-  .ac-batch-grid {
+  .ac-batch-grid,
+  .ac-rc-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
-  .ac-batch-cell-cur {
+  .ac-batch-cell-cur,
+  .ac-rc-cell-cur {
     grid-column: 1 / -1;
   }
 }
@@ -5938,4 +5945,39 @@ summary:focus-visible {
 }
 .ac-batch-x:hover {
   color: var(--ink);
+}
+
+/* ── Recibo escaneado: avisos de la tarjeta ─────────────────────────────────
+   Ámbar y no rojo: una fecha de otro mes o una moneda no detectada NO impiden
+   registrar —pueden ser correctas—, pero tienen que verse ANTES de confirmar.
+   El rojo queda para lo que sí bloquea (`.ac-err`). */
+.ac-rc-warn {
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border-left: 2px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.45;
+}
+/* El chip de confirmar la moneda vive DENTRO del aviso: confirmar es la salida del aviso. */
+.ac-rc-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 9px;
+  border: 1px solid var(--warning);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--warning);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ac-rc-chip:hover {
+  background: var(--warning);
+  color: var(--bg);
+}
+.ac-done .ac-rc-warn {
+  margin-top: 8px;
 }
