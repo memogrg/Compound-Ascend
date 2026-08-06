@@ -20,7 +20,13 @@ import type { SobreOption, SobreRemaining } from "@/modules/financial-base";
 import { createGoal, goalInputSchema } from "@/modules/control";
 import { createInvestmentAlert } from "@/modules/wealth";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
-import { loadRetainedChat, loadTodayChat, buildTranscriptText, startOfCostaRicaDayISO, type StoredChatMessage } from "@/lib/ai/chat-store";
+import {
+  loadRetainedChat,
+  loadTodayChat,
+  buildTranscriptText,
+  startOfCostaRicaDayISO,
+  type StoredChatMessage,
+} from "@/lib/ai/chat-store";
 import { sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
 
@@ -32,9 +38,7 @@ export type ConfirmResult = { ok: boolean; message?: string; sobre?: SobreRemain
  * mostrar "Frasco › Sobre". Reusa el motor de categorización; RLS acota al hogar. Best-effort:
  * si no hay sesión/Supabase, devuelve vacío y la card muestra solo "Sin sobre".
  */
-export async function listSobresForKindAction(
-  kind: "gasto" | "ingreso",
-): Promise<SobreOption[]> {
+export async function listSobresForKindAction(kind: "gasto" | "ingreso"): Promise<SobreOption[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     return await listSobresForKind(kind);
@@ -130,7 +134,9 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
     revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
-    logger.error("confirmPriceAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("confirmPriceAlert fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos crear la alerta." };
   }
 }
@@ -306,7 +312,8 @@ function escapeHtml(s: string): string {
  * Acción iniciada por el usuario (botón); destinatario = su propio email de sesión.
  */
 export async function emailTranscriptAction(): Promise<ConfirmResult> {
-  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para usar el transcript." };
+  if (!isSupabaseConfigured())
+    return { ok: false, message: "Conecta Supabase para usar el transcript." };
   const user = await getUser();
   const to = user?.email;
   if (!to) return { ok: false, message: "No encontramos tu correo para enviarte el transcript." };
@@ -316,9 +323,18 @@ export async function emailTranscriptAction(): Promise<ConfirmResult> {
     const dateLabel = costaRicaDateLabel();
     const text = buildTranscriptText(msgs, { dateLabel });
     const html = `<pre style="font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;font-size:14px;line-height:1.5">${escapeHtml(text)}</pre>`;
-    const res = await sendEmail({ to, subject: `Tu conversación con My Agent C+ — ${dateLabel}`, html });
+    const res = await sendEmail({
+      to,
+      subject: `Tu conversación con My Agent C+ — ${dateLabel}`,
+      html,
+    });
     if (!res.ok) {
-      return { ok: false, message: res.skipped ? "El correo no está configurado ahora." : "No pudimos enviar el correo." };
+      return {
+        ok: false,
+        message: res.skipped
+          ? "El correo no está configurado ahora."
+          : "No pudimos enviar el correo.",
+      };
     }
     return { ok: true, message: `Te enviamos el transcript a ${to}.` };
   } catch (err) {

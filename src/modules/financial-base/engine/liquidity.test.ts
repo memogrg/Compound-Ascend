@@ -34,7 +34,12 @@ describe("computeLiquidityBalance", () => {
   });
 
   it("redondea a 2 decimales", () => {
-    expect(computeLiquidityBalance([row(0.1, "transaccion", "2026-06-01"), row(0.2, "transaccion", "2026-06-02")])).toBe(0.3);
+    expect(
+      computeLiquidityBalance([
+        row(0.1, "transaccion", "2026-06-01"),
+        row(0.2, "transaccion", "2026-06-02"),
+      ]),
+    ).toBe(0.3);
   });
 });
 

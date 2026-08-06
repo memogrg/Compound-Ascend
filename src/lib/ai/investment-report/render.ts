@@ -50,22 +50,32 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
     if (p.valorTotal.length) totales.push(`vale ${subs(p.valorTotal)}`);
     if (p.invertidoTotal.length) totales.push(`invertiste ${subs(p.invertidoTotal)}`);
     if (p.plTotal.length) {
-      const signos = p.plTotal.map((m) => `${signo(m.monto)}${money(Math.abs(m.monto), m.moneda)}`).join(" ");
+      const signos = p.plTotal
+        .map((m) => `${signo(m.monto)}${money(Math.abs(m.monto), m.moneda)}`)
+        .join(" ");
       totales.push(`tu resultado sobre lo invertido es ${signos}`);
     }
     if (totales.length) out.push(`Tu portafolio ${totales.join("; ")}.`);
     if (p.valorConvertido)
-      out.push(`Convertido a tu moneda de visualización, el valor total equivale a ${mstr(p.valorConvertido)}.`);
+      out.push(
+        `Convertido a tu moneda de visualización, el valor total equivale a ${mstr(p.valorConvertido)}.`,
+      );
     if (p.valorTotal.length > 1 && !p.valorConvertido)
-      out.push("_No hay tipo de cambio disponible ahora, así que no puedo darte un total único: quedan los subtotales por moneda._");
+      out.push(
+        "_No hay tipo de cambio disponible ahora, así que no puedo darte un total único: quedan los subtotales por moneda._",
+      );
     for (const h of p.items) {
       const cierre = h.priceUnavailable
         ? "sin precio de mercado ahora (el valor mostrado es lo invertido)"
         : `vale ${money(h.valor, h.moneda)} · P/L ${signo(h.pl)}${money(Math.abs(h.pl), h.moneda)} (${signo(h.plPct)}${pct(Math.abs(h.plPct), 1)})`;
-      out.push(`- **${h.etiqueta}** (${h.assetType}): invertido ${money(h.invertido, h.moneda)} · ${cierre}`);
+      out.push(
+        `- **${h.etiqueta}** (${h.assetType}): invertido ${money(h.invertido, h.moneda)} · ${cierre}`,
+      );
     }
     if (p.masCount > 0) {
-      out.push(`_Hay ${p.masCount} ${p.masCount === 1 ? "posición más" : "posiciones más"} que no entraron en este detalle._`);
+      out.push(
+        `_Hay ${p.masCount} ${p.masCount === 1 ? "posición más" : "posiciones más"} que no entraron en este detalle._`,
+      );
     }
   }
 
@@ -79,14 +89,21 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
       `Tu posición más grande es **${c.top1.etiqueta}**: ${mstr(c.top1.valor)}, ${pct(c.top1.pct)} del portafolio. ` +
         `Las tres más grandes suman ${pct(c.top3Pct)}. Índice de concentración (HHI): ${dec(c.hhi)} (1,00 = una sola posición).`,
     );
-    out.push(`Mezcla por tipo: ${c.mezcla.map((m) => `${m.assetType} ${pct(m.pct)}`).join(" · ")}.`);
+    out.push(
+      `Mezcla por tipo: ${c.mezcla.map((m) => `${m.assetType} ${pct(m.pct)}`).join(" · ")}.`,
+    );
     if (c.alta)
       out.push(
         `Marcado como concentración **alta**: más de ${pct(UMBRAL_CONCENTRACION)} del valor está en una sola posición.`,
       );
-    if (c.parcial) out.push("_Los porcentajes salen de las posiciones listadas arriba; hay otras que no entraron en el detalle._");
+    if (c.parcial)
+      out.push(
+        "_Los porcentajes salen de las posiciones listadas arriba; hay otras que no entraron en el detalle._",
+      );
     if (c.preciosIncompletos)
-      out.push("_Alguna posición no cotizó: para esa, el valor usado es lo invertido, no el de mercado._");
+      out.push(
+        "_Alguna posición no cotizó: para esa, el valor usado es lo invertido, no el de mercado._",
+      );
   }
 
   // ── Moneda ──
@@ -130,7 +147,9 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
   if (!pack.deudaVsInversion.disponible) {
     out.push(falta(pack.deudaVsInversion));
   } else if (pack.deudaVsInversion.sinDeudas) {
-    out.push("No tenés deudas registradas, así que no hay tasa que comparar contra el rendimiento supuesto.");
+    out.push(
+      "No tenés deudas registradas, así que no hay tasa que comparar contra el rendimiento supuesto.",
+    );
   } else {
     const d = pack.deudaVsInversion;
     const supuesto = pct(RENDIMIENTO_SUPUESTO);
@@ -139,7 +158,9 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
         `Contra el rendimiento SUPUESTO del ${supuesto} anual (el mismo que usan tus Números), la diferencia es ` +
         `${signo(d.spreadPp)}${dec(Math.abs(d.spreadPp), 1)} puntos porcentuales${d.deudaCara ? " **a favor de la deuda**: te cuesta más de lo que ese supuesto rinde." : ": el supuesto queda por encima de esa tasa."}`,
     );
-    out.push(`_El ${supuesto} es un supuesto de referencia, no un rendimiento garantizado ni el tuyo._`);
+    out.push(
+      `_El ${supuesto} es un supuesto de referencia, no un rendimiento garantizado ni el tuyo._`,
+    );
   }
 
   // ── Defensa ──
@@ -147,9 +168,13 @@ export function renderEvidenceReport(pack: EvidencePack, currency: string): stri
   if (!pack.defensa.disponible) {
     out.push(falta(pack.defensa));
   } else {
-    out.push(`Tenés ${dec(pack.defensa.meses, 1)} meses de colchón (liquidez sobre tu gasto mensual).`);
+    out.push(
+      `Tenés ${dec(pack.defensa.meses, 1)} meses de colchón (liquidez sobre tu gasto mensual).`,
+    );
     if (pack.defensa.invierteConColchonCorto)
-      out.push(`Dato: estás invirtiendo con un colchón por debajo de ${MESES_COLCHON_MINIMO} meses.`);
+      out.push(
+        `Dato: estás invirtiendo con un colchón por debajo de ${MESES_COLCHON_MINIMO} meses.`,
+      );
   }
 
   // ── Frescura de precios ──

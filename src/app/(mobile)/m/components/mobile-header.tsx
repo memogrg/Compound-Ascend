@@ -87,7 +87,14 @@ export function MobileHeader({
                 Por eso `home` solo se atiende cuando no hay `backHref`. */}
             {backHref ? (
               <Link href={backHref} className="bk" aria-label={backLabel}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M15 6l-6 6 6 6" />
                 </svg>
               </Link>
@@ -111,8 +118,20 @@ export function MobileHeader({
       <div className="row" style={{ gap: 6, flex: "none" }}>
         {badge}
         {/* Chat del agente: misma ruta que Inicio, presente en todas las pantallas. */}
-        <Link href="/m/asistente" className="icon-btn" aria-label="Asistente IA" title="Asistente IA">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+        <Link
+          href="/m/asistente"
+          className="icon-btn"
+          aria-label="Asistente IA"
+          title="Asistente IA"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.9}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 15a2 2 0 0 1-2 2H8l-4 3V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z" />
             <path d="M12 8.5v4M10 10.5h4" />
           </svg>

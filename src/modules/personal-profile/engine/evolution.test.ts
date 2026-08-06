@@ -19,10 +19,7 @@ describe("buildEvolution", () => {
 
   it("disciplina 6→8 y fondo false→true → esos dos changes", () => {
     const ev = buildEvolution(
-      snaps(
-        { discipline: 8, hasEmergencyFund: true },
-        { discipline: 6, hasEmergencyFund: false },
-      ),
+      snaps({ discipline: 8, hasEmergencyFund: true }, { discipline: 6, hasEmergencyFund: false }),
     );
     expect(ev).not.toBeNull();
     expect(ev!.since).toBe("2026-06-01");

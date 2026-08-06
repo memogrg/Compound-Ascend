@@ -31,20 +31,15 @@ export type { EssentialBreakdown };
  * de seguridad queda en la misma moneda que el resto del reporte). Con opts.currency
  * NO se consulta getDisplayCurrency.
  */
-export async function getEssentialMonthlyExpense(
-  opts?: {
-    currency?: string;
-    /** Excluye los aportes a los PROPIOS fondos de defensa (emergencia/paz). Se usa al
-     *  DIMENSIONAR el fondo de paz: no dimensionar el fondo con aportes al fondo (circularidad). */
-    excludeDefenseFunds?: boolean;
-  },
-): Promise<EssentialBreakdown> {
+export async function getEssentialMonthlyExpense(opts?: {
+  currency?: string;
+  /** Excluye los aportes a los PROPIOS fondos de defensa (emergencia/paz). Se usa al
+   *  DIMENSIONAR el fondo de paz: no dimensionar el fondo con aportes al fondo (circularidad). */
+  excludeDefenseFunds?: boolean;
+}): Promise<EssentialBreakdown> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const [members, rates] = await Promise.all([
-    householdMemberIds(supabase, user.id),
-    getFxRates(),
-  ]);
+  const [members, rates] = await Promise.all([householdMemberIds(supabase, user.id), getFxRates()]);
   const targetCurrency = opts?.currency ?? (await getDisplayCurrency());
 
   const period = await userCurrentPeriod();

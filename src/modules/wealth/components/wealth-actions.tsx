@@ -298,13 +298,7 @@ function InvestmentForm({
   );
 }
 
-function PolicyForm({
-  onDone,
-  item,
-}: {
-  onDone: () => void;
-  item?: InsurancePolicy;
-}) {
+function PolicyForm({ onDone, item }: { onDone: () => void; item?: InsurancePolicy }) {
   const action = item ? (raw: unknown) => editPolicyAction(item.id, raw) : addPolicyAction;
   const { pending, message, run } = useSubmit(action);
   const captureCurrency = useCaptureCurrency();

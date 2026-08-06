@@ -78,7 +78,13 @@ export function MobileMenu() {
           aria-expanded={open}
           onClick={() => setOpen(true)}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+          >
             <path d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
@@ -88,40 +94,46 @@ export function MobileMenu() {
         // Portal a <body>: el drawer es position:fixed y el header contenedor tiene
         // .m-glass (transform/backdrop-filter). Sin portal quedaría atrapado (cuadro gris).
         <MobilePortal>
-        <div className="m-menu-overlay" role="dialog" aria-modal="true" aria-label="Navegación">
-          <button className="m-menu-backdrop" aria-label="Cerrar menú" onClick={close} />
-          <nav className="m-menu-panel">
-            <div className="m-menu-head">
-              <span className="m-menu-brand">CARTERA+</span>
-              <button type="button" className="icon-btn" aria-label="Cerrar menú" onClick={close}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-            <div className="m-menu-scroll">
-              {MENU.map((group) => (
-                <div key={group.label} className="m-menu-group">
-                  <div className="m-menu-glabel">{group.label}</div>
-                  {group.items.map((it) => {
-                    const active = pathname === it.href;
-                    return (
-                      <Link
-                        key={it.href}
-                        href={it.href}
-                        className={`m-menu-item${active ? " on" : ""}`}
-                        aria-current={active ? "page" : undefined}
-                        onClick={close}
-                      >
-                        {it.name}
-                      </Link>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </nav>
-        </div>
+          <div className="m-menu-overlay" role="dialog" aria-modal="true" aria-label="Navegación">
+            <button className="m-menu-backdrop" aria-label="Cerrar menú" onClick={close} />
+            <nav className="m-menu-panel">
+              <div className="m-menu-head">
+                <span className="m-menu-brand">CARTERA+</span>
+                <button type="button" className="icon-btn" aria-label="Cerrar menú" onClick={close}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                  >
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+              <div className="m-menu-scroll">
+                {MENU.map((group) => (
+                  <div key={group.label} className="m-menu-group">
+                    <div className="m-menu-glabel">{group.label}</div>
+                    {group.items.map((it) => {
+                      const active = pathname === it.href;
+                      return (
+                        <Link
+                          key={it.href}
+                          href={it.href}
+                          className={`m-menu-item${active ? " on" : ""}`}
+                          aria-current={active ? "page" : undefined}
+                          onClick={close}
+                        >
+                          {it.name}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </nav>
+          </div>
         </MobilePortal>
       ) : null}
     </>

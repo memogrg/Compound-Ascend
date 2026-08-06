@@ -64,9 +64,7 @@ export async function POST(req: Request) {
     }));
 
     const supabase = createServiceRoleClient();
-    const { error } = await supabase
-      .from("biblia_chunks")
-      .upsert(rows, { onConflict: "content" });
+    const { error } = await supabase.from("biblia_chunks").upsert(rows, { onConflict: "content" });
     if (error) throw new AppError("INTERNAL", undefined, error.message);
 
     // Total de chunks en el corpus tras el upsert (idempotencia: re-correr no lo sube).
@@ -74,7 +72,10 @@ export async function POST(req: Request) {
       .from("biblia_chunks")
       .select("*", { count: "exact", head: true });
 
-    return NextResponse.json({ seeded: rows.length, total: count ?? rows.length }, { headers: cors });
+    return NextResponse.json(
+      { seeded: rows.length, total: count ?? rows.length },
+      { headers: cors },
+    );
   } catch (err) {
     const { status, body } = toSafeResponse(err);
     return NextResponse.json(body, { status, headers: cors });

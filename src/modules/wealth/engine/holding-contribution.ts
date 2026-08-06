@@ -21,7 +21,13 @@ export function isQuotedType(assetType: AssetType): boolean {
 
 export type ContributionPlan =
   | { kind: "quoted"; quantity: number; unitPrice: number; currency: string }
-  | { kind: "manual"; addedAmount: number; newInvested: number; newValue: number; currency: string };
+  | {
+      kind: "manual";
+      addedAmount: number;
+      newInvested: number;
+      newValue: number;
+      currency: string;
+    };
 
 export function planContribution(
   holding: {

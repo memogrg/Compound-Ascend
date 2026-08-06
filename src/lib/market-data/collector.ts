@@ -38,7 +38,10 @@ export async function collectTargets(): Promise<SymbolTarget[]> {
   };
 
   const [holdings, alerts] = await Promise.all([
-    admin.from("investment_holdings").select("symbol, asset_type").in("asset_type", ["etf", "accion", "cripto"]),
+    admin
+      .from("investment_holdings")
+      .select("symbol, asset_type")
+      .in("asset_type", ["etf", "accion", "cripto"]),
     admin.from("price_alerts").select("symbol, asset_type").eq("kind", "price").eq("active", true),
   ]);
   for (const h of holdings.data ?? []) add(h.symbol, h.asset_type);
@@ -120,7 +123,10 @@ export async function runCollection(): Promise<CollectResult> {
         });
         if (isValidPrice(r.price)) written += 1;
       } catch (err) {
-        logger.error("collector: upsert cripto falló", { symbol, message: err instanceof Error ? err.message : "?" });
+        logger.error("collector: upsert cripto falló", {
+          symbol,
+          message: err instanceof Error ? err.message : "?",
+        });
       }
     }
   }
@@ -144,7 +150,10 @@ export async function runCollection(): Promise<CollectResult> {
       });
       if (isValidPrice(h.price)) written += 1;
     } catch (err) {
-      logger.error("collector: upsert acción falló", { symbol: t.symbol, message: err instanceof Error ? err.message : "?" });
+      logger.error("collector: upsert acción falló", {
+        symbol: t.symbol,
+        message: err instanceof Error ? err.message : "?",
+      });
     }
   }
 

@@ -110,7 +110,12 @@ export function TemplatesManager({
     return [cat, acc].filter(Boolean).join(" · ") || "Sin sobre ni cuenta";
   };
 
-  const run = (fn: () => Promise<ActionResult>, okMsg: string, errMsg: string, after: () => void) => {
+  const run = (
+    fn: () => Promise<ActionResult>,
+    okMsg: string,
+    errMsg: string,
+    after: () => void,
+  ) => {
     startTransition(async () => {
       const res = await fn();
       if (res.ok) {

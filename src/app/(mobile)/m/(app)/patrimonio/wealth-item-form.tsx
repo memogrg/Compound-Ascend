@@ -118,7 +118,14 @@ export function WealthItemForm({
         options={isAsset ? ASSET_CLASS_OPTS : LIAB_CLASS_OPTS}
         sheetTitle="Tipo"
       />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
       {isAsset ? (
         <Toggle
           name="generatesIncome"

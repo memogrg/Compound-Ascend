@@ -93,7 +93,11 @@ function debtSubtitle(args: { rank: number; apr: number; months: number | null }
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function viaLabel(source: string | null | undefined): string {
@@ -165,8 +169,13 @@ export function DebtManager({
   const [plusOpen, setPlusOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const [history, setHistory] = useState<DebtVM | null>(null);
-  const [editingPayment, setEditingPayment] = useState<{ vm: DebtVM; payment: DebtPayment } | null>(null);
-  const [deletingPayment, setDeletingPayment] = useState<{ debtId: string; payment: DebtPayment } | null>(null);
+  const [editingPayment, setEditingPayment] = useState<{ vm: DebtVM; payment: DebtPayment } | null>(
+    null,
+  );
+  const [deletingPayment, setDeletingPayment] = useState<{
+    debtId: string;
+    payment: DebtPayment;
+  } | null>(null);
   const [payDelPending, setPayDelPending] = useState(false);
 
   const confirmDeleteDebt = async () => {
@@ -214,95 +223,101 @@ export function DebtManager({
         // padding 0: la fila va a sangre para que el gesto revele Editar/Eliminar; el aire
         // lateral lo pone la regla puente .m-swipe-content .m-drow.
         <MContentCard style={{ padding: 0, overflow: "hidden" }}>
-        {items.map(({ vm, rank, months }) => {
-          // El saldo se formatea con la escala de TODA la columna, no celda a celda: si
-          // se decide por celda, la lista mezcla "₡18,2 M" con "₡4.540.188" y deja de
-          // poder compararse de un vistazo (era el caso real de esta pantalla).
-          // La barra mide lo PAGADO, no lo que debes: antes era balance/originalAmount y se
-          // llenaba cuanto MÁS debías (una deuda recién pedida salía al 100%). Sin
-          // originalAmount no hay forma de saber qué se pagó → no se pinta barra, en vez de
-          // inventar un 100% como hacía el `: 1` de antes.
-          const conOriginal = Boolean(vm.originalAmount && vm.originalAmount > 0);
-          const pagado = conOriginal ? Math.max(0, (vm.originalAmount ?? 0) - vm.balance) : 0;
-          const pct = conOriginal ? Math.min(1, pagado / (vm.originalAmount ?? 1)) : 0;
-          const cuota = vm.monthlyPayment || vm.minPayment;
-          const nPay = paymentsByDebt[vm.id]?.length ?? 0;
-          const debtRaw = rawById.get(vm.id);
-          // Fila = moneda de la deuda. Si está en otra moneda que la de display, se muestra su
-          // importe NATIVO (una tarjeta en USD se ve en $, no como ₡ convertidos); si coinciden
-          // —el 90%—, el convertido con la escala compartida de la columna (idéntico a hoy).
-          // Una escala compartida entre monedas distintas no compara, así que la fila extranjera
-          // se formatea sola en la suya.
-          const saldo = montoFilaDeuda(
-            // Saldo DERIVADO en moneda nativa (no `debtRaw.balance`, que es el guardado):
-            // si no, la fila queda desfasada de sus propios totales. Ver DebtVM.nativeBalance.
-            debtRaw ? { amount: vm.nativeBalance, currency: debtRaw.currency } : undefined,
-            vm.balance,
-            currency,
-          );
-          const otraMoneda = saldo.currency !== currency;
-          const saldoStr = otraMoneda ? mAmount(saldo.amount, saldo.currency, 10) : balanceFmt(vm.balance);
-          const cuotaNativa =
-            otraMoneda && debtRaw
-              ? debtRaw.currentPayment > 0
-                ? debtRaw.currentPayment
-                : (debtRaw.minPayment ?? 0)
-              : cuota;
-          return (
-            <SwipeRow
-              key={vm.id}
-              onEdit={debtRaw ? () => setEditing(debtRaw) : undefined}
-              onDelete={() => setDeleting(vm)}
-            >
-              {/* Los botones NO van en `trailing`: estrecharía toda la columna de texto, el
+          {items.map(({ vm, rank, months }) => {
+            // El saldo se formatea con la escala de TODA la columna, no celda a celda: si
+            // se decide por celda, la lista mezcla "₡18,2 M" con "₡4.540.188" y deja de
+            // poder compararse de un vistazo (era el caso real de esta pantalla).
+            // La barra mide lo PAGADO, no lo que debes: antes era balance/originalAmount y se
+            // llenaba cuanto MÁS debías (una deuda recién pedida salía al 100%). Sin
+            // originalAmount no hay forma de saber qué se pagó → no se pinta barra, en vez de
+            // inventar un 100% como hacía el `: 1` de antes.
+            const conOriginal = Boolean(vm.originalAmount && vm.originalAmount > 0);
+            const pagado = conOriginal ? Math.max(0, (vm.originalAmount ?? 0) - vm.balance) : 0;
+            const pct = conOriginal ? Math.min(1, pagado / (vm.originalAmount ?? 1)) : 0;
+            const cuota = vm.monthlyPayment || vm.minPayment;
+            const nPay = paymentsByDebt[vm.id]?.length ?? 0;
+            const debtRaw = rawById.get(vm.id);
+            // Fila = moneda de la deuda. Si está en otra moneda que la de display, se muestra su
+            // importe NATIVO (una tarjeta en USD se ve en $, no como ₡ convertidos); si coinciden
+            // —el 90%—, el convertido con la escala compartida de la columna (idéntico a hoy).
+            // Una escala compartida entre monedas distintas no compara, así que la fila extranjera
+            // se formatea sola en la suya.
+            const saldo = montoFilaDeuda(
+              // Saldo DERIVADO en moneda nativa (no `debtRaw.balance`, que es el guardado):
+              // si no, la fila queda desfasada de sus propios totales. Ver DebtVM.nativeBalance.
+              debtRaw ? { amount: vm.nativeBalance, currency: debtRaw.currency } : undefined,
+              vm.balance,
+              currency,
+            );
+            const otraMoneda = saldo.currency !== currency;
+            const saldoStr = otraMoneda
+              ? mAmount(saldo.amount, saldo.currency, 10)
+              : balanceFmt(vm.balance);
+            const cuotaNativa =
+              otraMoneda && debtRaw
+                ? debtRaw.currentPayment > 0
+                  ? debtRaw.currentPayment
+                  : (debtRaw.minPayment ?? 0)
+                : cuota;
+            return (
+              <SwipeRow
+                key={vm.id}
+                onEdit={debtRaw ? () => setEditing(debtRaw) : undefined}
+                onDelete={() => setDeleting(vm)}
+              >
+                {/* Los botones NO van en `trailing`: estrecharía toda la columna de texto, el
                   subtítulo incluido (Ingresos/Ahorro). Van en el slot, con el padding
                   lateral reducido — .m-btn reserva 40px que parten la etiqueta. */}
-              <MDataRow
-                icon="debt"
-                iconTone={rank === 1 ? "danger" : "neutral"}
-                title={vm.name}
-                subtitle={debtSubtitle({ rank, apr: vm.apr, months })}
-                value={saldoStr}
-                valueTone="danger"
-                slot={
-                  <>
-                    {conOriginal ? (
-                      <MProgress value={pct} tone={rank === 1 ? "warning" : "success"} height={7} />
-                    ) : null}
-                    <div className="between" style={{ marginTop: conOriginal ? 9 : 0 }}>
-                      <span className="muted" style={{ fontSize: 11 }}>
-                        Cuota {mAmount(cuotaNativa, saldo.currency)}/mes
-                      </span>
+                <MDataRow
+                  icon="debt"
+                  iconTone={rank === 1 ? "danger" : "neutral"}
+                  title={vm.name}
+                  subtitle={debtSubtitle({ rank, apr: vm.apr, months })}
+                  value={saldoStr}
+                  valueTone="danger"
+                  slot={
+                    <>
                       {conOriginal ? (
-                        <span className="mono muted" style={{ fontSize: 11 }}>
-                          {Math.round(pct * 100)}% pagado
-                        </span>
+                        <MProgress
+                          value={pct}
+                          tone={rank === 1 ? "warning" : "success"}
+                          height={7}
+                        />
                       ) : null}
-                    </div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                      <button
-                        type="button"
-                        className="m-btn m-btn-secondary"
-                        style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
-                        onClick={() => setReporting(vm)}
-                      >
-                        Reportar pago
-                      </button>
-                      <button
-                        type="button"
-                        className="m-btn m-btn-secondary"
-                        style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
-                        onClick={() => setHistory(vm)}
-                      >
-                        Historial{nPay > 0 ? ` (${nPay})` : ""}
-                      </button>
-                    </div>
-                  </>
-                }
-              />
-            </SwipeRow>
-          );
-        })}
+                      <div className="between" style={{ marginTop: conOriginal ? 9 : 0 }}>
+                        <span className="muted" style={{ fontSize: 11 }}>
+                          Cuota {mAmount(cuotaNativa, saldo.currency)}/mes
+                        </span>
+                        {conOriginal ? (
+                          <span className="mono muted" style={{ fontSize: 11 }}>
+                            {Math.round(pct * 100)}% pagado
+                          </span>
+                        ) : null}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                        <button
+                          type="button"
+                          className="m-btn m-btn-secondary"
+                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                          onClick={() => setReporting(vm)}
+                        >
+                          Reportar pago
+                        </button>
+                        <button
+                          type="button"
+                          className="m-btn m-btn-secondary"
+                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                          onClick={() => setHistory(vm)}
+                        >
+                          Historial{nPay > 0 ? ` (${nPay})` : ""}
+                        </button>
+                      </div>
+                    </>
+                  }
+                />
+              </SwipeRow>
+            );
+          })}
         </MContentCard>
       )}
 
@@ -379,12 +394,10 @@ export function DebtManager({
             // montos ya convertidos: precargar de ahí con la etiqueta de la deuda es
             // exactamente el P0 del #437 (2.341 USD guardados como 1.063.076 USD).
             currency={rawById.get(reporting.id)?.currency ?? currency}
-            cuota={
-              (() => {
-                const d = rawById.get(reporting.id);
-                return d ? cuotaPrecargada(d).amount : undefined;
-              })()
-            }
+            cuota={(() => {
+              const d = rawById.get(reporting.id);
+              return d ? cuotaPrecargada(d).amount : undefined;
+            })()}
             action={reportPaymentAction}
             submitLabel="Registrar pago"
             successMessage="Pago registrado"
@@ -394,22 +407,39 @@ export function DebtManager({
       </BottomSheet>
 
       {/* Historial de pagos */}
-      <BottomSheet open={!!history} onClose={() => setHistory(null)} title={history ? `Pagos · ${history.name}` : "Pagos"}>
+      <BottomSheet
+        open={!!history}
+        onClose={() => setHistory(null)}
+        title={history ? `Pagos · ${history.name}` : "Pagos"}
+      >
         {history ? (
           historyPayments.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.5, padding: "4px 2px 8px" }}>
+            <div
+              className="muted"
+              style={{ fontSize: 13.5, lineHeight: 1.5, padding: "4px 2px 8px" }}
+            >
               Aún no hay pagos registrados en esta deuda.
             </div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {historyPayments.map((p) => (
-                <div key={p.id} className="row between" style={{ gap: 10, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 12 }}>
+                <div
+                  key={p.id}
+                  className="row between"
+                  style={{
+                    gap: 10,
+                    padding: "10px 12px",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                  }}
+                >
                   <div style={{ minWidth: 0 }}>
                     <div className="mono" style={{ fontWeight: 700, fontSize: 14.5 }}>
                       {formatMoney(p.amount + p.extraAmount, currency)}
                     </div>
                     <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                      {fmtDate(p.paymentDate)} · {p.kind === "extraordinario" ? "Abono a capital" : "Cuota"}
+                      {fmtDate(p.paymentDate)} ·{" "}
+                      {p.kind === "extraordinario" ? "Abono a capital" : "Cuota"}
                       {p.extraAmount > 0 ? ` · +${formatMoney(p.extraAmount, currency)} extra` : ""}
                       {viaLabel(p.viaSource)}
                     </div>
@@ -421,7 +451,14 @@ export function DebtManager({
                       aria-label="Editar pago"
                       onClick={() => setEditingPayment({ vm: history, payment: p })}
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.9}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M12 20h9" />
                         <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
                       </svg>
@@ -432,7 +469,14 @@ export function DebtManager({
                       aria-label="Eliminar pago"
                       onClick={() => setDeletingPayment({ debtId: history.id, payment: p })}
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.9}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                       </svg>
                     </button>
@@ -445,7 +489,11 @@ export function DebtManager({
       </BottomSheet>
 
       {/* Editar pago (encima del historial) */}
-      <BottomSheet open={!!editingPayment} onClose={() => setEditingPayment(null)} title="Editar pago">
+      <BottomSheet
+        open={!!editingPayment}
+        onClose={() => setEditingPayment(null)}
+        title="Editar pago"
+      >
         {editingPayment ? (
           <PaymentForm
             debtId={editingPayment.vm.id}
@@ -594,7 +642,9 @@ export function PaymentForm({
 }) {
   const isEdit = !!initial;
   const [kind, setKind] = useState<string>(initial?.kind ?? "ordinario");
-  const [amount, setAmount] = useState<number | undefined>(initial ? initial.amount : cuota || undefined);
+  const [amount, setAmount] = useState<number | undefined>(
+    initial ? initial.amount : cuota || undefined,
+  );
   const [extra, setExtra] = useState<number | undefined>(initial?.extraAmount || undefined);
   const [mode, setMode] = useState<string>(initial?.extraMode ?? "tiempo");
   const todayISO = useCaptureToday();
@@ -627,7 +677,13 @@ export function PaymentForm({
       onSuccess={onSuccess}
     >
       {!isEdit ? (
-        <Segmented name="kind" label="Tipo de pago" value={kind} onChange={setKind} options={KIND_OPTS} />
+        <Segmented
+          name="kind"
+          label="Tipo de pago"
+          value={kind}
+          onChange={setKind}
+          options={KIND_OPTS}
+        />
       ) : null}
       {/* La moneda se NOMBRA, no solo se insinúa con el símbolo: "$" y "₡" se confunden de
           un vistazo, y aquí equivocarse cuesta un factor 510. No es editable a propósito —
@@ -651,12 +707,19 @@ export function PaymentForm({
         />
       ) : null}
       {!isExtra && extraNum > 0 ? (
-        <Segmented name="extraMode" label="¿Qué reduce el pago extra?" value={mode} onChange={setMode} options={MODE_OPTS} />
+        <Segmented
+          name="extraMode"
+          label="¿Qué reduce el pago extra?"
+          value={mode}
+          onChange={setMode}
+          options={MODE_OPTS}
+        />
       ) : null}
       <DateField name="paymentDate" label="Fecha" value={date} onChange={setDate} />
       {isExtra ? (
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, marginTop: -2 }}>
-          Abono directo a capital: reduce el saldo sin pagar intereses y no cuenta como la cuota del mes.
+          Abono directo a capital: reduce el saldo sin pagar intereses y no cuenta como la cuota del
+          mes.
         </div>
       ) : !isEdit && cuota ? (
         <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, marginTop: -2 }}>

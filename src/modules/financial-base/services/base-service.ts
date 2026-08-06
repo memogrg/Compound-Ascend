@@ -9,7 +9,11 @@ import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
@@ -134,7 +138,8 @@ export async function updateIncome(id: string, input: IncomeInput): Promise<void
   const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("income_sources")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       name: input.name,
       income_type: input.incomeType,
       category: input.category ?? null,
@@ -157,7 +162,8 @@ export async function updateExpense(id: string, input: ExpenseInput): Promise<vo
   const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("expense_items")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       name: input.name,
       nature: input.nature,
       amount: input.amount,
@@ -260,7 +266,10 @@ async function computeV2Totals(
   displayCurrency: string,
   rates: Record<string, number>,
 ): Promise<
-  Pick<BaseSummary, "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances" | "monedasVistas">
+  Pick<
+    BaseSummary,
+    "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances" | "monedasVistas"
+  >
 > {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();

@@ -490,7 +490,10 @@ export function ProfileDashboard({
       {/* Etapa y enfoque */}
       <Card title="Tu momento financiero">
         <div className="cols-2" style={{ gap: "14px 28px" }}>
-          <Info label="Etapa" value={pick(O.LIFE_STAGES, primaryOf(draft.lifeStage)) ?? undefined} />
+          <Info
+            label="Etapa"
+            value={pick(O.LIFE_STAGES, primaryOf(draft.lifeStage)) ?? undefined}
+          />
           <Info
             label="Urgencia de mejorar"
             value={draft.urgency ? URGENCY[draft.urgency] : undefined}
@@ -667,7 +670,9 @@ export function ProfileDashboard({
                 {protectionGaps.map((g, i) => (
                   <li key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                     <Icon name="chev" width={2} />
-                    <span style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>{g}</span>
+                    <span style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.5 }}>
+                      {g}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -717,14 +722,7 @@ function Ring({ value }: { value: number }) {
   return (
     <div className="ring-wrap">
       <svg width="108" height="108" viewBox="0 0 42 42">
-        <circle
-          cx="21"
-          cy="21"
-          r="15.915"
-          fill="none"
-          stroke="var(--surface-2)"
-          strokeWidth="4"
-        />
+        <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" strokeWidth="4" />
         <circle
           cx="21"
           cy="21"

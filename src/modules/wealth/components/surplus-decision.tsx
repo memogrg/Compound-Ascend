@@ -7,11 +7,18 @@
 import { formatMoney, formatPercent } from "@/lib/format";
 import type { SurplusDecisionReport } from "@/modules/wealth/services/surplus-decision-service";
 
-const BAND_LABEL: Record<string, string> = { peor: "Peor caso", tipico: "Típico", mejor: "Mejor caso" };
+const BAND_LABEL: Record<string, string> = {
+  peor: "Peor caso",
+  tipico: "Típico",
+  mejor: "Mejor caso",
+};
 
 function Card({ children, accent }: { children: React.ReactNode; accent?: string }) {
   return (
-    <div className="card" style={{ padding: 16, borderLeft: accent ? `3px solid ${accent}` : undefined }}>
+    <div
+      className="card"
+      style={{ padding: 16, borderLeft: accent ? `3px solid ${accent}` : undefined }}
+    >
       {children}
     </div>
   );
@@ -62,7 +69,9 @@ export function SurplusDecision({ report }: { report: SurplusDecisionReport }) {
             <Card accent="var(--pos)">
               <div style={{ fontWeight: 600, fontSize: 14.5 }}>
                 Abonar a tu deuda{debtName ? ` — ${debtName}` : ""}{" "}
-                <span style={{ color: "var(--pos)", fontSize: 12, fontWeight: 600 }}>garantizado</span>
+                <span style={{ color: "var(--pos)", fontSize: 12, fontWeight: 600 }}>
+                  garantizado
+                </span>
               </div>
               <div className="muted" style={{ fontSize: 13, marginTop: 6, lineHeight: 1.55 }}>
                 Dirigiendo {c(monthlySurplus)}/mes: te ahorrás{" "}
@@ -76,19 +85,28 @@ export function SurplusDecision({ report }: { report: SurplusDecisionReport }) {
           <Card accent="var(--accent)">
             <div style={{ fontWeight: 600, fontSize: 14.5 }}>Invertir el excedente</div>
             <div className="muted" style={{ fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>
-              Aportando {c(monthlySurplus)}/mes por ~{years} años. Escenarios históricos (peor/típico/
-              mejor), <strong>no una predicción</strong>. La caída máxima es lo que podrías ver en el
-              camino.
+              Aportando {c(monthlySurplus)}/mes por ~{years} años. Escenarios históricos
+              (peor/típico/ mejor), <strong>no una predicción</strong>. La caída máxima es lo que
+              podrías ver en el camino.
             </div>
 
             <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
               {invest.map((p) => (
                 <div key={p.asset} style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                    }}
+                  >
                     <div style={{ fontWeight: 600, fontSize: 13.5 }}>
                       {p.label}
                       {p.sliver ? (
-                        <span style={{ color: "var(--gold)", fontSize: 11, fontWeight: 600 }}> · astilla de alto riesgo</span>
+                        <span style={{ color: "var(--gold)", fontSize: 11, fontWeight: 600 }}>
+                          {" "}
+                          · astilla de alto riesgo
+                        </span>
                       ) : null}
                     </div>
                     <div className="muted" style={{ fontSize: 11.5 }}>
@@ -114,7 +132,9 @@ export function SurplusDecision({ report }: { report: SurplusDecisionReport }) {
                     ))}
                   </div>
                   {p.caveat ? (
-                    <div style={{ fontSize: 12, marginTop: 6, color: "var(--gold)", lineHeight: 1.5 }}>
+                    <div
+                      style={{ fontSize: 12, marginTop: 6, color: "var(--gold)", lineHeight: 1.5 }}
+                    >
                       ⚠ {p.caveat}
                     </div>
                   ) : null}
@@ -122,9 +142,9 @@ export function SurplusDecision({ report }: { report: SurplusDecisionReport }) {
               ))}
             </div>
             <div className="muted" style={{ fontSize: 11.5, marginTop: 10, lineHeight: 1.5 }}>
-              Aportado en el período: {c(invest[0]?.contributed ?? 0)}. Ojo con el <strong>riesgo de
-              secuencia</strong>: un mal comienzo de mercado cambia mucho el resultado, aunque el
-              promedio de largo plazo sea bueno.
+              Aportado en el período: {c(invest[0]?.contributed ?? 0)}. Ojo con el{" "}
+              <strong>riesgo de secuencia</strong>: un mal comienzo de mercado cambia mucho el
+              resultado, aunque el promedio de largo plazo sea bueno.
             </div>
           </Card>
 
@@ -134,8 +154,8 @@ export function SurplusDecision({ report }: { report: SurplusDecisionReport }) {
               <strong>El trade-off:</strong> abonar te da{" "}
               {pay ? <strong>{c(pay.interestSaved)}</strong> : "un ahorro"} garantizados y la paz de
               deber menos. Invertir <strong>históricamente</strong> rindió más, pero con caídas de
-              hasta {formatPercent(Math.min(...invest.map((p) => p.maxDrawdown)))} y sin garantía. Vos
-              decidís según tu tolerancia al riesgo.
+              hasta {formatPercent(Math.min(...invest.map((p) => p.maxDrawdown)))} y sin garantía.
+              Vos decidís según tu tolerancia al riesgo.
             </div>
           </Card>
         </>

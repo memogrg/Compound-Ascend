@@ -132,7 +132,8 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
   // de gasto a configuradas (favorito/propio) ∪ adoptadas; los grupos se conservan. `tree` crudo
   // sigue intacto para el gestor de categorías.
   const expenseAdoptedIds = new Set<string>();
-  for (const [k, v] of Object.entries(budget.expenseByKey)) if (v.value > 0) expenseAdoptedIds.add(k);
+  for (const [k, v] of Object.entries(budget.expenseByKey))
+    if (v.value > 0) expenseAdoptedIds.add(k);
   for (const [k, v] of Object.entries(real.expenseByKey)) if (v.value > 0) expenseAdoptedIds.add(k);
   const composerTree = filterConfiguredSobreTree(tree, expenseAdoptedIds);
 

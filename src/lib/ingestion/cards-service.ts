@@ -32,7 +32,10 @@ export interface AccountCard {
  * Devuelve la etiqueta de la tarjeta cuyo último-4 coincide, o null si no está
  * registrada (o no hay last4). Puro: testeable sin BD.
  */
-export function resolveCardLabel(cards: AccountCard[], last4: string | null | undefined): string | null {
+export function resolveCardLabel(
+  cards: AccountCard[],
+  last4: string | null | undefined,
+): string | null {
   if (!last4) return null;
   return cards.find((c) => c.last4 === last4)?.label ?? null;
 }

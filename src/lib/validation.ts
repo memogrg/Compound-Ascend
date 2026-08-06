@@ -39,7 +39,4 @@ export const notFutureDate = (d: string): boolean => d <= todayISO();
  * pago): no puede ser futura. Para fechas a futuro legítimas (metas, vencimientos,
  * renovaciones) NO usar esto.
  */
-export const pastDateSchema = z
-  .string()
-  .date()
-  .refine(notFutureDate, { message: NOT_FUTURE_MSG });
+export const pastDateSchema = z.string().date().refine(notFutureDate, { message: NOT_FUTURE_MSG });

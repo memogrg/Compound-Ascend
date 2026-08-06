@@ -170,7 +170,13 @@ export function MobileBell() {
             Tienes las notificaciones en la app desactivadas. Actívalas en{" "}
             <button
               type="button"
-              style={{ background: "none", border: 0, padding: 0, color: "var(--accent)", cursor: "pointer" }}
+              style={{
+                background: "none",
+                border: 0,
+                padding: 0,
+                color: "var(--accent)",
+                cursor: "pointer",
+              }}
               onClick={() => {
                 setOpen(false);
                 router.push("/m/perfil");
@@ -213,12 +219,19 @@ export function MobileBell() {
                       disabled={!href}
                       onClick={() => openRelated(o)}
                     >
-                      <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>{o.title}</div>
-                      <div className="muted" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.45 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>
+                        {o.title}
+                      </div>
+                      <div
+                        className="muted"
+                        style={{ fontSize: 12, marginTop: 2, lineHeight: 1.45 }}
+                      >
                         {o.body}
                       </div>
                       {href ? (
-                        <div style={{ fontSize: 11.5, marginTop: 4, color: s.color, fontWeight: 600 }}>
+                        <div
+                          style={{ fontSize: 11.5, marginTop: 4, color: s.color, fontWeight: 600 }}
+                        >
                           Ver detalle →
                         </div>
                       ) : null}

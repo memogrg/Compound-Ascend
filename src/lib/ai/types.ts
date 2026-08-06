@@ -84,7 +84,9 @@ export function parseAction(text: string): AIChatResponse {
   if (bloques.length === 0) return { reply: text.trim(), action: null };
 
   const reply = text.replace(ACTION_RE, "").trim();
-  const acciones = bloques.map((m) => aPropuesta(m[1] ?? "")).filter((a): a is AIActionProposal => a !== null);
+  const acciones = bloques
+    .map((m) => aPropuesta(m[1] ?? ""))
+    .filter((a): a is AIActionProposal => a !== null);
   if (acciones.length === 0) return { reply, action: null };
   if (acciones.length === 1) return { reply, action: acciones[0]! };
 

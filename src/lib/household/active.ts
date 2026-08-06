@@ -52,10 +52,7 @@ export async function getActiveHouseholdId(
  * aportarle, el saldo antes de un pago): ahí `user_id` sigue siendo el control
  * de propiedad. La edición compartida es un delta aparte, con is_household_editor.
  */
-async function _householdMemberIds(
-  supabase: ServerClient,
-  userId: string,
-): Promise<string[]> {
+async function _householdMemberIds(supabase: ServerClient, userId: string): Promise<string[]> {
   const { householdId } = await resolveActiveMembership(supabase, userId);
   if (!householdId) return [userId]; // modo solo
   const { data } = await supabase

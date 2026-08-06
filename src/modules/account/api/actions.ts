@@ -10,10 +10,7 @@ import {
   updateNotificationChannel,
 } from "@/modules/account/services/account-service";
 import { TZ_COOKIE } from "@/lib/time/user-time";
-import {
-  NOTIFICATION_CHANNELS,
-  type NotificationChannel,
-} from "@/lib/notifications/preferences";
+import { NOTIFICATION_CHANNELS, type NotificationChannel } from "@/lib/notifications/preferences";
 import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base";
 import { SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
@@ -237,7 +234,9 @@ export async function requestIngestEmailAction(email: string): Promise<AccountAc
     if (res.ok) revalidatePath("/configuracion");
     return res;
   } catch (err) {
-    logger.error("requestIngestEmail fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("requestIngestEmail fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos enviar el código." };
   }
 }
@@ -252,7 +251,9 @@ export async function confirmIngestEmailAction(
     if (res.ok) revalidatePath("/configuracion");
     return res;
   } catch (err) {
-    logger.error("confirmIngestEmail fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("confirmIngestEmail fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos confirmar el correo." };
   }
 }
@@ -264,7 +265,9 @@ export async function removeIngestEmailAction(id: string): Promise<AccountAction
     if (res.ok) revalidatePath("/configuracion");
     return res;
   } catch (err) {
-    logger.error("removeIngestEmail fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("removeIngestEmail fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos eliminar el correo." };
   }
 }

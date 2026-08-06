@@ -33,7 +33,11 @@ export function reviewCutoff(now: Date, months = REVIEW_INTERVAL_MONTHS): Date {
 }
 
 /** ¿El perfil está "viejo" (updated_at anterior al corte)? */
-export function isProfileStale(updatedAtIso: string, now: Date, months = REVIEW_INTERVAL_MONTHS): boolean {
+export function isProfileStale(
+  updatedAtIso: string,
+  now: Date,
+  months = REVIEW_INTERVAL_MONTHS,
+): boolean {
   const t = Date.parse(updatedAtIso);
   return Number.isFinite(t) && t < reviewCutoff(now, months).getTime();
 }

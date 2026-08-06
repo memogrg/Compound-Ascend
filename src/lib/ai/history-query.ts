@@ -52,8 +52,18 @@ export type HistorialResult = {
 };
 
 const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
 ];
 
 /** Banda de "sin cambio": por debajo de esto la variación se llama estable. */
@@ -87,11 +97,13 @@ export function colapsarAMensual(
     const previo = porMes.get(k);
     if (!previo || p.fecha >= previo.fecha) porMes.set(k, p);
   }
-  return [...porMes.entries()]
-    // `moneda` se copia tal cual (puede venir ausente): inventar un null acá obligaría a
-    // todos los consumidores a distinguir "sin moneda" de "moneda desconocida".
-    .map(([periodo, p]) => ({ periodo, valor: p.valor, moneda: p.moneda }))
-    .sort((a, b) => a.periodo.localeCompare(b.periodo));
+  return (
+    [...porMes.entries()]
+      // `moneda` se copia tal cual (puede venir ausente): inventar un null acá obligaría a
+      // todos los consumidores a distinguir "sin moneda" de "moneda desconocida".
+      .map(([periodo, p]) => ({ periodo, valor: p.valor, moneda: p.moneda }))
+      .sort((a, b) => a.periodo.localeCompare(b.periodo))
+  );
 }
 
 /** Recorta la serie a los últimos `meses` puntos (orden cronológico ascendente). */
@@ -113,8 +125,16 @@ export function calcularVariacion(serie: SeriePunto[]): Variacion | null {
   const pct = base > 0 ? Math.round((delta / base) * 100) : null;
   const direccion: Direccion =
     pct == null
-      ? delta === 0 ? "estable" : delta > 0 ? "sube" : "baja"
-      : Math.abs(pct) < PCT_ESTABLE ? "estable" : pct > 0 ? "sube" : "baja";
+      ? delta === 0
+        ? "estable"
+        : delta > 0
+          ? "sube"
+          : "baja"
+      : Math.abs(pct) < PCT_ESTABLE
+        ? "estable"
+        : pct > 0
+          ? "sube"
+          : "baja";
   return { delta, pct, direccion, desde, hasta };
 }
 

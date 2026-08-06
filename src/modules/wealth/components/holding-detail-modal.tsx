@@ -29,9 +29,19 @@ import { AlertManager } from "@/modules/wealth/components/alert-manager";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { Holding, Dividend, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
-import type { Period, HoldingPurchase, HoldingValuation } from "@/modules/wealth/services/holding-history-service";
+import type {
+  Period,
+  HoldingPurchase,
+  HoldingValuation,
+} from "@/modules/wealth/services/holding-history-service";
 
-const RENTAL_FREQ_PER_YEAR: Record<string, number> = { semanal: 52, mensual: 12, trimestral: 4, semestral: 2, anual: 1 };
+const RENTAL_FREQ_PER_YEAR: Record<string, number> = {
+  semanal: 52,
+  mensual: 12,
+  trimestral: 4,
+  semestral: 2,
+  anual: 1,
+};
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
 const PERIODS: { label: string; value: Period }[] = [
@@ -375,25 +385,73 @@ export function HoldingDetailModal({
         {/* Plan a plazo · progreso del plazo */}
         {isPlan && holding.termYears ? (
           <div style={{ padding: "14px 22px 0" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 12,
+                color: "var(--muted)",
+                marginBottom: 6,
+              }}
+            >
               <span>Progreso del plazo</span>
               <span>
-                <b style={{ color: "var(--ink)" }}>Año {planYearOf} de {holding.termYears}</b> · {Math.round(planPct * 100)}%
+                <b style={{ color: "var(--ink)" }}>
+                  Año {planYearOf} de {holding.termYears}
+                </b>{" "}
+                · {Math.round(planPct * 100)}%
               </span>
             </div>
-            <div style={{ height: 8, background: "var(--chip)", borderRadius: 999, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${planPct * 100}%`, background: "var(--info)", borderRadius: 999 }} />
+            <div
+              style={{
+                height: 8,
+                background: "var(--chip)",
+                borderRadius: 999,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${planPct * 100}%`,
+                  background: "var(--info)",
+                  borderRadius: 999,
+                }}
+              />
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 12,
+                marginTop: 10,
+              }}
+            >
               <span style={{ color: "var(--muted)" }}>Vence</span>
               <span>{holding.maturityDate ?? "—"}</span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 12,
+                marginTop: 4,
+              }}
+            >
               <span style={{ color: "var(--muted)" }}>Primas</span>
-              <span>{primasPagadas} de {termMonths}</span>
+              <span>
+                {primasPagadas} de {termMonths}
+              </span>
             </div>
             {paidUntil ? (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 4 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 12,
+                  marginTop: 4,
+                }}
+              >
                 <span
                   style={{ color: "var(--muted)", cursor: "help" }}
                   title="El último mes con cuota registrada, incluyendo las que adelantaste. No pasa del vencimiento del plan."
@@ -413,8 +471,12 @@ export function HoldingDetailModal({
               ) : (
                 <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                   <div style={{ flex: 1 }}>
-                    <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>
-                      Monto a adelantar {premium > 0 && parseFloat(advAmount) > 0
+                    <label
+                      className="muted"
+                      style={{ fontSize: 11, display: "block", marginBottom: 4 }}
+                    >
+                      Monto a adelantar{" "}
+                      {premium > 0 && parseFloat(advAmount) > 0
                         ? `· ${Math.round(parseFloat(advAmount) / premium)} cuota(s)`
                         : ""}
                     </label>
@@ -429,10 +491,19 @@ export function HoldingDetailModal({
                       style={{ width: "100%" }}
                     />
                   </div>
-                  <button className="btn btn-primary" onClick={doAdvance} disabled={advancing || !(parseFloat(advAmount) > 0)} style={{ height: 38 }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={doAdvance}
+                    disabled={advancing || !(parseFloat(advAmount) > 0)}
+                    style={{ height: 38 }}
+                  >
                     {advancing ? "…" : "Confirmar"}
                   </button>
-                  <button className="btn btn-ghost" onClick={() => setAdvOpen(false)} style={{ height: 38 }}>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setAdvOpen(false)}
+                    style={{ height: 38 }}
+                  >
                     Cancelar
                   </button>
                 </div>
@@ -443,13 +514,21 @@ export function HoldingDetailModal({
 
         {/* Plan a plazo · valor del estado de cuenta + curva */}
         {isPlan && (
-          <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>Valor del estado de cuenta</div>
+          <div
+            style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}
+          >
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>
+              Valor del estado de cuenta
+            </div>
             <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
               Cargá el valor de tu estado de cuenta. Actualiza el valor actual del plan.
             </div>
             {valuations.length > 1 && (
-              <svg viewBox="0 0 300 60" preserveAspectRatio="none" style={{ width: "100%", height: 60, marginBottom: 10 }}>
+              <svg
+                viewBox="0 0 300 60"
+                preserveAspectRatio="none"
+                style={{ width: "100%", height: 60, marginBottom: 10 }}
+              >
                 <polyline
                   fill="none"
                   stroke="var(--info)"
@@ -472,14 +551,44 @@ export function HoldingDetailModal({
             )}
             <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 10 }}>
               <div style={{ flex: 1 }}>
-                <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>Fecha</label>
-                <input type="date" value={valDate} onChange={(e) => setValDate(e.target.value)} className="inp" style={{ width: "100%" }} />
+                <label
+                  className="muted"
+                  style={{ fontSize: 11, display: "block", marginBottom: 4 }}
+                >
+                  Fecha
+                </label>
+                <input
+                  type="date"
+                  value={valDate}
+                  onChange={(e) => setValDate(e.target.value)}
+                  className="inp"
+                  style={{ width: "100%" }}
+                />
               </div>
               <div style={{ flex: 1 }}>
-                <label className="muted" style={{ fontSize: 11, display: "block", marginBottom: 4 }}>Valor</label>
-                <input type="number" step="any" min="0" value={valAmount} onChange={(e) => setValAmount(e.target.value)} placeholder="0" className="inp" style={{ width: "100%" }} />
+                <label
+                  className="muted"
+                  style={{ fontSize: 11, display: "block", marginBottom: 4 }}
+                >
+                  Valor
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={valAmount}
+                  onChange={(e) => setValAmount(e.target.value)}
+                  placeholder="0"
+                  className="inp"
+                  style={{ width: "100%" }}
+                />
               </div>
-              <button className="btn btn-primary" onClick={saveValuation} disabled={savingVal || !(parseFloat(valAmount) > 0)} style={{ height: 38 }}>
+              <button
+                className="btn btn-primary"
+                onClick={saveValuation}
+                disabled={savingVal || !(parseFloat(valAmount) > 0)}
+                style={{ height: 38 }}
+              >
                 {savingVal ? "…" : "Actualizar"}
               </button>
             </div>
@@ -487,7 +596,16 @@ export function HoldingDetailModal({
               {/* Una fila por MES (la última valoración de cada mes). La curva de arriba conserva
                   todos los puntos. */}
               {[...monthlyValuations(valuations)].reverse().map((v) => (
-                <div key={v.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "5px 0", borderTop: "1px solid var(--line)" }}>
+                <div
+                  key={v.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: 12.5,
+                    padding: "5px 0",
+                    borderTop: "1px solid var(--line)",
+                  }}
+                >
                   <span style={{ color: "var(--muted)" }}>{formatMonthYear(v.asOf)}</span>
                   <span style={{ fontWeight: 500 }}>{formatMoney(v.value, v.currency)}</span>
                 </div>
@@ -510,10 +628,13 @@ export function HoldingDetailModal({
 
         {/* Compras: historial + promedio acumulado (solo cotizados) */}
         {!isRental && purchases.length > 0 && (
-          <div style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
+          <div
+            style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}
+          >
             <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>Compras</div>
             <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-              Precio promedio acumulado: {formatMoney(avgFinal, currency)} · {purchases.length} compra(s)
+              Precio promedio acumulado: {formatMoney(avgFinal, currency)} · {purchases.length}{" "}
+              compra(s)
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {purchaseRows.map((r) => (
@@ -532,8 +653,12 @@ export function HoldingDetailModal({
                 >
                   <span style={{ color: "var(--muted)", minWidth: 78 }}>{r.occurredOn}</span>
                   <span style={{ fontWeight: 500 }}>{formatMoney(r.amount, r.currency)}</span>
-                  <span style={{ color: "var(--muted)" }}>@ {formatMoney(r.price, r.currency)}</span>
-                  <span style={{ fontWeight: 600 }}>prom. {formatMoney(r.avgAfter, r.currency)}</span>
+                  <span style={{ color: "var(--muted)" }}>
+                    @ {formatMoney(r.price, r.currency)}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>
+                    prom. {formatMoney(r.avgAfter, r.currency)}
+                  </span>
                 </div>
               ))}
             </div>

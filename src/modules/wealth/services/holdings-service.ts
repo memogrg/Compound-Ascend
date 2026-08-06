@@ -5,7 +5,11 @@ import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfoli
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import {
   registerLinkedTransaction,
@@ -19,7 +23,11 @@ import {
   purchaseExpenseAmount,
   positionIncreaseAmount,
 } from "@/modules/financial-base";
-import type { HoldingInput, HoldingSaleInput, HoldingContributionInput } from "@/modules/wealth/schemas";
+import type {
+  HoldingInput,
+  HoldingSaleInput,
+  HoldingContributionInput,
+} from "@/modules/wealth/schemas";
 import { planContribution } from "@/modules/wealth/engine/holding-contribution";
 import type { Holding, HoldingNativo, AssetType, InvestmentNature } from "@/modules/wealth/types";
 import { comoNativo } from "@/modules/wealth/types";
@@ -283,7 +291,12 @@ export async function getPositionForSymbol(
     }
   }
   return best
-    ? { quantity: best.quantity, invested: Math.round(best.invested), currency, assetType: best.assetType }
+    ? {
+        quantity: best.quantity,
+        invested: Math.round(best.invested),
+        currency,
+        assetType: best.assetType,
+      }
     : null;
 }
 
@@ -346,7 +359,8 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         : input.averageCost;
     const { error } = await supabase
       .from("investment_holdings")
-      .update({ last_edited_by: user.id,
+      .update({
+        last_edited_by: user.id,
         quantity: newQty,
         average_cost: newAvg,
         cost_basis: newQty * newAvg,
@@ -411,11 +425,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
         verb: "Compra",
       });
     } catch (err) {
-      await supabase
-        .from("investment_holdings")
-        .delete()
-        .eq("id", created.id)
-        .in("user_id", scope);
+      await supabase.from("investment_holdings").delete().eq("id", created.id).in("user_id", scope);
       throw err;
     }
   }
@@ -579,7 +589,8 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
 
   const { error } = await supabase
     .from("investment_holdings")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       investment_id: input.investmentId ?? null,
       symbol,
       asset_type: input.assetType,
@@ -655,7 +666,11 @@ export async function deleteHolding(id: string): Promise<void> {
   if (error) throw new Error(error.message);
   // Log: la entidad primaria es el holding; sus transacciones/ingresos vinculados
   // se borraron en cascada como parte de esta misma acción del usuario.
-  await logHouseholdDeletion(supabase, { userId: user.id, table: "investment_holdings", rowId: id });
+  await logHouseholdDeletion(supabase, {
+    userId: user.id,
+    table: "investment_holdings",
+    rowId: id,
+  });
 }
 
 /** Posiciones stub pendientes de completar (needs_detail=true). */

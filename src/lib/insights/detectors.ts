@@ -241,16 +241,15 @@ const isFuture = (dateIso: string, now: Date): boolean =>
   new Date(dateIso).getTime() > now.getTime();
 
 /** Metas que perdieron ritmo: atrasadas o cuyo aporte no alcanza para su fecha. */
-export function detectStalledGoals(goals: SavingsGoal[], now: Date = new Date()): DetectedInsight[] {
+export function detectStalledGoals(
+  goals: SavingsGoal[],
+  now: Date = new Date(),
+): DetectedInsight[] {
   const out: DetectedInsight[] = [];
   for (const g of goals) {
     let requiredMonthly = 0;
     let qualifies = g.status === "atrasado";
-    if (
-      g.targetDate &&
-      isFuture(g.targetDate, now) &&
-      g.currentAmount < g.targetAmount
-    ) {
+    if (g.targetDate && isFuture(g.targetDate, now) && g.currentAmount < g.targetAmount) {
       const months = Math.max(monthsUntil(g.targetDate, now), 1);
       requiredMonthly = (g.targetAmount - g.currentAmount) / months;
       if (requiredMonthly > g.monthlyContribution) qualifies = true;

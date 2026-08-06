@@ -71,7 +71,6 @@ const POLICY_ICON: Record<string, MIconName> = {
   otro: "protection",
 };
 
-
 /** InsurancePolicy → valores del form de edición (mismo shape que el modal web). */
 function toValues(p: InsurancePolicy): PolicyValues {
   return {
@@ -85,11 +84,7 @@ function toValues(p: InsurancePolicy): PolicyValues {
   };
 }
 
-export function ProteccionManager({
-  policies,
-}: {
-  policies: InsurancePolicy[];
-}) {
+export function ProteccionManager({ policies }: { policies: InsurancePolicy[] }) {
   const router = useRouter();
   const toast = useToast();
   const [adding, setAdding] = useState(false);
@@ -133,20 +128,28 @@ export function ProteccionManager({
           {policies.map((pol) => {
             const label = POLICY_LABEL[pol.policyType] ?? "Cobertura";
             const suffix = FREQ_SUFFIX[pol.premiumFrequency ?? "anual"] ?? "año";
-            const premStr = pol.premium ? `${mAmount(pol.premium, pol.currency, 8)}/${suffix}` : null;
+            const premStr = pol.premium
+              ? `${mAmount(pol.premium, pol.currency, 8)}/${suffix}`
+              : null;
             // Valor (derecha) = la SUMA ASEGURADA: en una pantalla de defensa, cuánto estás
             // protegido es EL número. Si no hay cobertura, cae a la prima.
             // Subtítulo: prima PRIMERO (así sobrevive a la elipsis), aseguradora después
             // (un nombre, trunca sin perder info clave). El vencimiento no cabe con tres
             // piezas a 375px → vive en la métrica "Próximo vencimiento", medido.
-            const value = pol.coverage ? mAmount(pol.coverage, pol.currency, 10) : (premStr ?? undefined);
+            const value = pol.coverage
+              ? mAmount(pol.coverage, pol.currency, 10)
+              : (premStr ?? undefined);
             const subParts = (
               pol.coverage
                 ? [premStr, pol.provider || null, pol.fundingReference || null]
                 : [pol.provider || null, pol.fundingReference || null]
             ).filter(Boolean);
             return (
-              <SwipeRow key={pol.id} onEdit={() => setEditing(pol)} onDelete={() => setDeleting(pol)}>
+              <SwipeRow
+                key={pol.id}
+                onEdit={() => setEditing(pol)}
+                onDelete={() => setDeleting(pol)}
+              >
                 {/* icon (no leading): los tipos de póliza SON glifos del set. Sin tinte
                     semántico: un seguro no es "bueno/malo", es cobertura → tinte de marca. */}
                 <MDataRow
@@ -303,7 +306,13 @@ export function PolicyPickerSheet({
 // Paso 2: el pago, ligero. Importe SIEMPRE en la moneda de la póliza (prefijado con su prima;
 // la moneda no es editable) + fecha. Guarda vía payPolicyPremiumAction (una transacción
 // vinculada; la moneda la valida el servidor contra la póliza).
-export function PremiumForm({ policy, onSuccess }: { policy: InsurancePolicy; onSuccess: () => void }) {
+export function PremiumForm({
+  policy,
+  onSuccess,
+}: {
+  policy: InsurancePolicy;
+  onSuccess: () => void;
+}) {
   const todayISO = useCaptureToday();
   const label = POLICY_LABEL[policy.policyType] ?? "Cobertura";
   const name = policy.provider ? `${label} · ${policy.provider}` : label;
@@ -331,7 +340,13 @@ export function PremiumForm({ policy, onSuccess }: { policy: InsurancePolicy; on
       <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
         Se registra como <strong>gasto vinculado</strong> a {label}, en {cur}.
       </div>
-      <MoneyField name="amount" label="Monto de la prima" value={amount} onChange={setAmount} currency={cur} />
+      <MoneyField
+        name="amount"
+        label="Monto de la prima"
+        value={amount}
+        onChange={setAmount}
+        currency={cur}
+      />
       <DateField name="paymentDate" label="Fecha del pago" value={date} onChange={setDate} />
     </FormShell>
   );

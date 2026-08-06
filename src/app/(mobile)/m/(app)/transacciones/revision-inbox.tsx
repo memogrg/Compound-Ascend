@@ -21,12 +21,7 @@ import type {
   EntityAlert,
 } from "@/modules/financial-base/engine/reconciliation";
 import type { PendingProposalView } from "@/modules/financial-base/services/ingest-proposals-view";
-import {
-  MContentCard,
-  MSectionHeader,
-  MChip,
-  MEmptyState,
-} from "../../components/content-kit";
+import { MContentCard, MSectionHeader, MChip, MEmptyState } from "../../components/content-kit";
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 import type { Transaction } from "@/modules/financial-base/types";
 
@@ -197,7 +192,16 @@ export function RevisionInbox({
             <div key={p.id} style={ROW}>
               <div style={TTL}>{p.merchant || "Movimiento"}</div>
               <div style={META}>
-                <span className="muted" style={{ fontSize: 11.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span
+                  className="muted"
+                  style={{
+                    fontSize: 11.5,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {shortDate(p.occurredOn)}
                   {p.cardLabel ? ` · ${p.cardLabel}` : ""}
                 </span>
@@ -243,7 +247,9 @@ export function RevisionInbox({
             <div key={t.id} style={ROW}>
               <div style={TTL}>{txnLabel(t)}</div>
               <div style={META}>
-                <span className="muted" style={{ fontSize: 11.5 }}>{shortDate(t.occurredOn)}</span>
+                <span className="muted" style={{ fontSize: 11.5 }}>
+                  {shortDate(t.occurredOn)}
+                </span>
                 <span className={`mono ${t.kind === "ingreso" ? "pos" : "neg"}`} style={AMT}>
                   {formatMoney(t.amount, t.currency)}
                 </span>
@@ -286,7 +292,16 @@ export function RevisionInbox({
             <div key={c.transaction.id} style={ROW}>
               <div style={TTL}>{txnLabel(c.transaction)}</div>
               <div style={META}>
-                <span className="muted" style={{ fontSize: 11.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span
+                  className="muted"
+                  style={{
+                    fontSize: 11.5,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {shortDate(c.transaction.occurredOn)} · sugerido:{" "}
                   {KIND_LABEL[c.suggestedKind] ?? c.suggestedKind}
                 </span>
@@ -333,7 +348,16 @@ export function RevisionInbox({
                 <div key={`${a.sourceKind}:${a.sourceId}`} style={ROW}>
                   <div style={TTL}>{a.name}</div>
                   <div style={META}>
-                    <span className="muted" style={{ fontSize: 11.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span
+                      className="muted"
+                      style={{
+                        fontSize: 11.5,
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       Plan {formatMoney(a.planned, a.currency)} · real{" "}
                       {formatMoney(a.real, a.currency)}
                     </span>

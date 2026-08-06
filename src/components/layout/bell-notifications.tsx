@@ -146,7 +146,10 @@ export function BellNotifications() {
               Cargando…
             </div>
           ) : !inApp ? (
-            <div className="muted" style={{ padding: "18px 14px", fontSize: 12.5, lineHeight: 1.5 }}>
+            <div
+              className="muted"
+              style={{ padding: "18px 14px", fontSize: 12.5, lineHeight: 1.5 }}
+            >
               Tienes los avisos en la app desactivados. Actívalos en{" "}
               <Link href="/configuracion" onClick={() => setOpen(false)}>
                 Configuración
@@ -164,7 +167,14 @@ export function BellNotifications() {
                 const href = KIND_HREF[o.kind];
                 const content = (
                   <>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", lineHeight: 1.35 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "var(--ink)",
+                        lineHeight: 1.35,
+                      }}
+                    >
                       {o.title}
                     </div>
                     <div className="muted" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.45 }}>
@@ -222,12 +232,7 @@ export function BellNotifications() {
                 textAlign: "center",
               }}
             >
-              <button
-                type="button"
-                className="bell-recall"
-                onClick={restore}
-                disabled={restoring}
-              >
+              <button type="button" className="bell-recall" onClick={restore} disabled={restoring}>
                 {restoring ? "Recordando…" : "Recordar acciones"}
               </button>
             </div>

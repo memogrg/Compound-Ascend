@@ -1508,10 +1508,12 @@ function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknow
   if (hecho) {
     return (
       <div className={skin.done}>
-        ✓ {hecho.creadas} {hecho.creadas === 1 ? "movimiento registrado" : "movimientos registrados"}.
+        ✓ {hecho.creadas}{" "}
+        {hecho.creadas === 1 ? "movimiento registrado" : "movimientos registrados"}.
         {hecho.fallidas.length > 0 ? (
           <div className={skin.sub}>
-            No pude con {hecho.fallidas.length}: {hecho.fallidas.map((f) => f.description).join(", ")}.
+            No pude con {hecho.fallidas.length}:{" "}
+            {hecho.fallidas.map((f) => f.description).join(", ")}.
           </div>
         ) : null}
       </div>
@@ -1671,8 +1673,8 @@ function PriceAlertConfirmCard({ draft, skin }: { draft: DraftAlert; skin: Skin 
       <div className={skin.eyebrow}>Crear alerta de precio</div>
       <div className={skin.amountName}>{draft.symbol}</div>
       <div className={skin.sub}>
-        Te avisamos cuando llegue a {formatMoney(draft.targetPrice, draft.currency)} (la dirección se
-        calcula con el precio actual).
+        Te avisamos cuando llegue a {formatMoney(draft.targetPrice, draft.currency)} (la dirección
+        se calcula con el precio actual).
       </div>
       {error ? <div className={skin.error}>{error}</div> : null}
       <div className={skin.actions}>

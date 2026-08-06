@@ -27,7 +27,10 @@ export const runtime = "nodejs";
 
 function isCronRequest(req: Request): boolean {
   return cronAuthorized(
-    { authorization: req.headers.get("authorization"), xCronSecret: req.headers.get("x-cron-secret") },
+    {
+      authorization: req.headers.get("authorization"),
+      xCronSecret: req.headers.get("x-cron-secret"),
+    },
     process.env.CRON_SECRET,
   );
 }
@@ -112,7 +115,9 @@ async function notifyTriggered(
         status: "activo",
       });
     } catch (err) {
-      logger.error("investment-alert: campana falló", { message: err instanceof Error ? err.message : "?" });
+      logger.error("investment-alert: campana falló", {
+        message: err instanceof Error ? err.message : "?",
+      });
     }
   }
 
@@ -143,7 +148,9 @@ async function notifyTriggered(
         footer;
       await sendEmail({ to, subject: title, html });
     } catch (err) {
-      logger.error("investment-alert: email falló", { message: err instanceof Error ? err.message : "?" });
+      logger.error("investment-alert: email falló", {
+        message: err instanceof Error ? err.message : "?",
+      });
     }
   }
 }
@@ -153,12 +160,10 @@ async function handle(req: Request) {
   try {
     if (!isCronRequest(req)) throw new AppError("UNAUTHORIZED");
 
-    const { getActiveInvestmentAlerts, markInvestmentAlertTriggered } = await import(
-      "@/modules/wealth/services/price-alerts-service"
-    );
-    const { distinctSymbolFetches, selectFiringAlerts, priceKey, kindsFromParam } = await import(
-      "@/modules/wealth/engine/price-alerts"
-    );
+    const { getActiveInvestmentAlerts, markInvestmentAlertTriggered } =
+      await import("@/modules/wealth/services/price-alerts-service");
+    const { distinctSymbolFetches, selectFiringAlerts, priceKey, kindsFromParam } =
+      await import("@/modules/wealth/engine/price-alerts");
     const { getMarketPrice } = await import("@/lib/market-data");
     const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
 
@@ -169,7 +174,10 @@ async function handle(req: Request) {
 
     const alerts = await getActiveInvestmentAlerts(kindFilter);
     if (alerts.length === 0) {
-      return NextResponse.json({ ok: true, kinds: kindsParam ?? "all", alerts: 0, triggered: 0 }, { headers: cors });
+      return NextResponse.json(
+        { ok: true, kinds: kindsParam ?? "all", alerts: 0, triggered: 0 },
+        { headers: cors },
+      );
     }
 
     // Precios: un fetch por símbolo distinto (solo alertas price). Best-effort por símbolo.
@@ -184,7 +192,10 @@ async function handle(req: Request) {
       try {
         const quote = await getMarketPrice(f.symbol, marketType);
         if (quote && quote.price > 0) {
-          priceByKey.set(priceKey(f.symbol, f.assetType), { price: quote.price, currency: quote.currency });
+          priceByKey.set(priceKey(f.symbol, f.assetType), {
+            price: quote.price,
+            currency: quote.currency,
+          });
         }
       } catch (err) {
         logger.error("investment-alert: precio falló", {
@@ -205,7 +216,10 @@ async function handle(req: Request) {
         .select("id, label, symbol, purchase_date")
         .in("id", holdingIds);
       for (const h of data ?? []) {
-        holdingMeta.set(h.id, { label: h.label ?? h.symbol ?? "tu inversión", purchaseDate: h.purchase_date });
+        holdingMeta.set(h.id, {
+          label: h.label ?? h.symbol ?? "tu inversión",
+          purchaseDate: h.purchase_date,
+        });
         purchaseDateByHolding.set(h.id, h.purchase_date);
       }
     }
@@ -213,8 +227,11 @@ async function handle(req: Request) {
     const nowIso = new Date().toISOString();
     let triggered = 0;
     for (const a of selectFiringAlerts(alerts, { nowIso, priceByKey, purchaseDateByHolding })) {
-      const quote = a.symbol && a.assetType ? priceByKey.get(priceKey(a.symbol, a.assetType)) : undefined;
-      const name = a.holdingId ? (holdingMeta.get(a.holdingId)?.label ?? a.symbol ?? "tu inversión") : (a.symbol ?? "tu inversión");
+      const quote =
+        a.symbol && a.assetType ? priceByKey.get(priceKey(a.symbol, a.assetType)) : undefined;
+      const name = a.holdingId
+        ? (holdingMeta.get(a.holdingId)?.label ?? a.symbol ?? "tu inversión")
+        : (a.symbol ?? "tu inversión");
       try {
         await notifyTriggered(a, quote?.price ?? 0, quote?.currency ?? a.currency ?? "USD", name);
         await markInvestmentAlertTriggered(a.id, a.oneShot, nowIso);
@@ -228,7 +245,13 @@ async function handle(req: Request) {
     }
 
     return NextResponse.json(
-      { ok: true, kinds: kindsParam ?? "all", alerts: alerts.length, symbols: priceByKey.size, triggered },
+      {
+        ok: true,
+        kinds: kindsParam ?? "all",
+        alerts: alerts.length,
+        symbols: priceByKey.size,
+        triggered,
+      },
       { headers: cors },
     );
   } catch (err) {

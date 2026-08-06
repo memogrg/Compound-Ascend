@@ -39,8 +39,13 @@ export function crossed(direction: AlertDirection, price: number, target: number
  * la dirección es AMBIGUA → devuelve null y el llamador debe rechazar (no guardar ambiguo).
  * `epsRel` por defecto 0,01% del precio actual.
  */
-export function inferDirection(target: number, current: number, epsRel = 1e-4): AlertDirection | null {
-  if (!Number.isFinite(target) || !Number.isFinite(current) || target <= 0 || current <= 0) return null;
+export function inferDirection(
+  target: number,
+  current: number,
+  epsRel = 1e-4,
+): AlertDirection | null {
+  if (!Number.isFinite(target) || !Number.isFinite(current) || target <= 0 || current <= 0)
+    return null;
   const band = current * epsRel;
   if (target > current + band) return "above";
   if (target < current - band) return "below";
@@ -141,6 +146,9 @@ export function alertFires(a: EvaluableAlert, ctx: AlertEvalContext): boolean {
 }
 
 /** Alertas que deben dispararse (best-effort: las que no cumplen o no tienen datos se descartan). */
-export function selectFiringAlerts<T extends EvaluableAlert>(alerts: T[], ctx: AlertEvalContext): T[] {
+export function selectFiringAlerts<T extends EvaluableAlert>(
+  alerts: T[],
+  ctx: AlertEvalContext,
+): T[] {
   return alerts.filter((a) => alertFires(a, ctx));
 }

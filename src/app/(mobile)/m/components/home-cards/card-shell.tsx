@@ -138,7 +138,10 @@ export function MHomeCardEmpty({
       <div className="m-hcard-top">
         <span className="ov">{eyebrow}</span>
       </div>
-      <div className="m-hcard-body" style={{ flexDirection: "column", gap: 8, justifyContent: "center" }}>
+      <div
+        className="m-hcard-body"
+        style={{ flexDirection: "column", gap: 8, justifyContent: "center" }}
+      >
         <span className="m-dic" aria-hidden>
           <MIcon name={icon} size={20} />
         </span>

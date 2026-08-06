@@ -4,13 +4,7 @@
  */
 export type Recurrence = "ninguna" | "mensual" | "trimestral" | "semestral" | "anual";
 
-export const RECURRENCES: Recurrence[] = [
-  "ninguna",
-  "mensual",
-  "trimestral",
-  "semestral",
-  "anual",
-];
+export const RECURRENCES: Recurrence[] = ["ninguna", "mensual", "trimestral", "semestral", "anual"];
 
 const CADENCE_MONTHS: Record<Exclude<Recurrence, "ninguna">, number> = {
   mensual: 1,

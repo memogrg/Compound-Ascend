@@ -24,13 +24,25 @@ function toneOf(dir: "up" | "down" | "flat", inverted: boolean): Tone {
 /** Delta de MONTO (Ahorros/Deudas): `net` con signo; el valor mostrado es su magnitud. */
 function amountVsMes(net: number, label: string, inverted: boolean): VsMes {
   const dir = net > 0 ? "up" : net < 0 ? "down" : "flat";
-  return { format: "amount", value: Math.abs(round2(net)), dir, tone: toneOf(dir, inverted), label };
+  return {
+    format: "amount",
+    value: Math.abs(round2(net)),
+    dir,
+    tone: toneOf(dir, inverted),
+    label,
+  };
 }
 
 /** Delta de PORCENTAJE (Inversiones/Patrimonio): `deltaPct` en 0-1 con signo. */
 function pctVsMes(deltaPct: number, label: string): VsMes {
   const dir = deltaPct > 0 ? "up" : deltaPct < 0 ? "down" : "flat";
-  return { format: "percent", value: Math.abs(round2(deltaPct)), dir, tone: toneOf(dir, false), label };
+  return {
+    format: "percent",
+    value: Math.abs(round2(deltaPct)),
+    dir,
+    tone: toneOf(dir, false),
+    label,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -636,8 +636,8 @@ function GoalForm({
                 {isRecurring ? (
                   <div className="fld" style={{ display: "flex", alignItems: "flex-end" }}>
                     <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-                      La <strong>Fecha objetivo</strong> marca el primer reinicio; si la dejas vacía,
-                      se reinicia una cadencia después de hoy.
+                      La <strong>Fecha objetivo</strong> marca el primer reinicio; si la dejas
+                      vacía, se reinicia una cadencia después de hoy.
                     </p>
                   </div>
                 ) : null}
@@ -712,7 +712,12 @@ function GoalForm({
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    style={{ fontSize: 12, padding: "4px 8px", marginTop: 6, color: "var(--muted)" }}
+                    style={{
+                      fontSize: 12,
+                      padding: "4px 8px",
+                      marginTop: 6,
+                      color: "var(--muted)",
+                    }}
                     onClick={() => setNewCatOpen(true)}
                   >
                     <Icon name="plus" width={2} /> Crear frasco nuevo
@@ -1026,7 +1031,9 @@ function DebtForm({
                 />
               </div>
               <div className="fld">
-                <label className="fld-label">Tasa Anual Equivalente fija inicial (%) (opcional)</label>
+                <label className="fld-label">
+                  Tasa Anual Equivalente fija inicial (%) (opcional)
+                </label>
                 <input
                   className="inp"
                   type="number"
@@ -1044,7 +1051,9 @@ function DebtForm({
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">
-              {rateType === "variable" ? "Tasa Anual Equivalente efectiva actual (%)" : "Tasa anual (%)"}
+              {rateType === "variable"
+                ? "Tasa Anual Equivalente efectiva actual (%)"
+                : "Tasa anual (%)"}
             </label>
             <input
               className="inp"

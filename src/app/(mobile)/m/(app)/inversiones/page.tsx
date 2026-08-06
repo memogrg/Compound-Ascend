@@ -41,7 +41,11 @@ export default async function MobileInversiones() {
 
   const slices: MSlice[] = Object.values(a.allocation)
     .filter((s) => s.value > 0)
-    .map((s, i) => ({ label: s.label, value: s.value, color: RING_COLORS[i % RING_COLORS.length]! }));
+    .map((s, i) => ({
+      label: s.label,
+      value: s.value,
+      color: RING_COLORS[i % RING_COLORS.length]!,
+    }));
 
   const holdings = [...a.holdingsWithPerformance].sort((x, y) => y.currentValue - x.currentValue);
   // Los CRUDOS, además de los de rendimiento. `holdingsWithPerformance` trae los importes
@@ -63,7 +67,12 @@ export default async function MobileInversiones() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" home eyebrow="Crecimiento" title="Portafolio de inversiones" />
+        <MobileHeader
+          variant="inner"
+          home
+          eyebrow="Crecimiento"
+          title="Portafolio de inversiones"
+        />
 
         {/* Resumen: valor del portafolio (exacto mientras quepa) + ganancia/pérdida.
             Los montos YA vienen en la moneda primaria (portfolio-service normaliza con
@@ -88,7 +97,8 @@ export default async function MobileInversiones() {
         />
         {hasForeign ? (
           <div className="muted" style={{ fontSize: 11.5, marginBottom: 16, lineHeight: 1.4 }}>
-            Los totales del portafolio están convertidos a {currencySymbol(currency)}; cada inversión se ve en su moneda.
+            Los totales del portafolio están convertidos a {currencySymbol(currency)}; cada
+            inversión se ve en su moneda.
           </div>
         ) : null}
 
@@ -97,7 +107,11 @@ export default async function MobileInversiones() {
           <>
             <MSectionHeader title="Tu portafolio en números" />
             <MMetricGrid style={{ marginBottom: 16 }}>
-              <MMetricCard label="Invertido" value={mAmount(a.totalCostBasis, currency, 8)} sub="costo base" />
+              <MMetricCard
+                label="Invertido"
+                value={mAmount(a.totalCostBasis, currency, 8)}
+                sub="costo base"
+              />
               <MMetricCard
                 label="Ganancia/pérdida"
                 value={`${gainSign}${mAmount(Math.abs(gain), currency, 7)}`}
@@ -113,7 +127,11 @@ export default async function MobileInversiones() {
               <MMetricCard
                 label="Posiciones"
                 value={String(holdings.length)}
-                sub={slices.length > 0 ? `${slices.length} ${slices.length === 1 ? "clase" : "clases"}` : "de activo"}
+                sub={
+                  slices.length > 0
+                    ? `${slices.length} ${slices.length === 1 ? "clase" : "clases"}`
+                    : "de activo"
+                }
               />
             </MMetricGrid>
           </>

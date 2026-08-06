@@ -11,7 +11,8 @@ const noFund = (f?: string): boolean => f === "no" || f === "no_se";
 /** Cierre opcional por arquetipo (sin punto final; el cuerpo lo añade). */
 function archetypeTail(archetypeLabel?: string): string {
   const l = (archetypeLabel ?? "").toLowerCase();
-  if (l.includes("constructor") || l.includes("estratega")) return " Piensa en escenarios a 5/10/20 años";
+  if (l.includes("constructor") || l.includes("estratega"))
+    return " Piensa en escenarios a 5/10/20 años";
   if (l.includes("protector") || l.includes("guard")) return " manteniendo siempre tu base segura";
   return "";
 }

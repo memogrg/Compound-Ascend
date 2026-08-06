@@ -40,9 +40,7 @@ export type ExpenseRangeView = {
 
 /** Normaliza el ?range crudo; cae a "1m" si no es válido. */
 export function parseExpenseRange(raw: string | undefined | null): ExpenseRange {
-  return (EXPENSE_RANGES as readonly string[]).includes(raw ?? "")
-    ? (raw as ExpenseRange)
-    : "1m";
+  return (EXPENSE_RANGES as readonly string[]).includes(raw ?? "") ? (raw as ExpenseRange) : "1m";
 }
 
 /** Cuántos meses cubre el rango, contando hacia atrás desde `period` (incluido). */

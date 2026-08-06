@@ -112,16 +112,41 @@ export function computeArchetype(d: ProfileDraft): ArchetypeResult {
   // Etapa de vida (ranking).
   eachRanked(d.lifeStage, (stage, addw) => {
     switch (stage) {
-      case "ordenar": addw("organizador", 3); addw("clarificador", 1); break;
-      case "vivir_al_dia": addw("navegante", 3); break;
-      case "salir_deudas": addw("liberador", 4); break;
-      case "ahorrar_mejor": addw("protector", 1); addw("organizador", 1); break;
-      case "empezar_invertir": addw("constructor", 2); break;
-      case "hacer_crecer": addw("constructor", 3); break;
-      case "proteger_familia": addw("guardian", 3); addw("protector", 1); break;
-      case "libertad_financiera": addw("constructor", 2); break;
-      case "prepararme_retiro": addw("guardian", 1); addw("constructor", 1); break;
-      case "emprender": addw("creador", 1); addw("constructor", 1); break;
+      case "ordenar":
+        addw("organizador", 3);
+        addw("clarificador", 1);
+        break;
+      case "vivir_al_dia":
+        addw("navegante", 3);
+        break;
+      case "salir_deudas":
+        addw("liberador", 4);
+        break;
+      case "ahorrar_mejor":
+        addw("protector", 1);
+        addw("organizador", 1);
+        break;
+      case "empezar_invertir":
+        addw("constructor", 2);
+        break;
+      case "hacer_crecer":
+        addw("constructor", 3);
+        break;
+      case "proteger_familia":
+        addw("guardian", 3);
+        addw("protector", 1);
+        break;
+      case "libertad_financiera":
+        addw("constructor", 2);
+        break;
+      case "prepararme_retiro":
+        addw("guardian", 1);
+        addw("constructor", 1);
+        break;
+      case "emprender":
+        addw("creador", 1);
+        addw("constructor", 1);
+        break;
     }
   });
 
@@ -129,13 +154,29 @@ export function computeArchetype(d: ProfileDraft): ArchetypeResult {
   const concerns = asRanked(d.mainConcerns ?? (d.mainConcern ? [d.mainConcern] : []));
   eachRanked(concerns, (c, addw) => {
     switch (c) {
-      case "deudas": addw("liberador", 3); break;
-      case "fin_de_mes": addw("navegante", 2); break;
-      case "claridad": addw("clarificador", 2); addw("organizador", 1); break;
-      case "sin_emergencia": addw("protector", 2); break;
-      case "sin_proteccion": addw("guardian", 2); break;
-      case "no_invertir": addw("constructor", 1); break;
-      case "retiro": addw("guardian", 1); addw("constructor", 1); break;
+      case "deudas":
+        addw("liberador", 3);
+        break;
+      case "fin_de_mes":
+        addw("navegante", 2);
+        break;
+      case "claridad":
+        addw("clarificador", 2);
+        addw("organizador", 1);
+        break;
+      case "sin_emergencia":
+        addw("protector", 2);
+        break;
+      case "sin_proteccion":
+        addw("guardian", 2);
+        break;
+      case "no_invertir":
+        addw("constructor", 1);
+        break;
+      case "retiro":
+        addw("guardian", 1);
+        addw("constructor", 1);
+        break;
     }
   });
 
@@ -170,13 +211,18 @@ export function computeArchetype(d: ProfileDraft): ArchetypeResult {
   }
   eachRanked(d.hardest, (h, addw) => {
     if (h === "decir_no") addw("disfrutador", 2);
-    else if (h === "controlar_gastos") { addw("disfrutador", 1); addw("navegante", 1); }
+    else if (h === "controlar_gastos") {
+      addw("disfrutador", 1);
+      addw("navegante", 1);
+    }
   });
 
   // Prioridades (ranking).
   eachRanked(d.priorities, (p, addw) => {
-    if (p === "experiencias") { addw("creador", 2); addw("disfrutador", 1); }
-    else if (p === "seguridad" || p === "tranquilidad") addw("protector", 1);
+    if (p === "experiencias") {
+      addw("creador", 2);
+      addw("disfrutador", 1);
+    } else if (p === "seguridad" || p === "tranquilidad") addw("protector", 1);
     else if (p === "patrimonio") addw("constructor", 1);
     else if (p === "familia") addw("guardian", 1);
   });
@@ -190,109 +236,260 @@ export function computeArchetype(d: ProfileDraft): ArchetypeResult {
   // ── Paso 6 · psicología del dinero (Fase 3a) — ranking ──
   eachRanked(d.incomeReaction, (v, addw) => {
     switch (v) {
-      case "distribuyo": addw("organizador", 2); break;
-      case "pago_urgente": addw("navegante", 2); break;
-      case "gasto_mas": addw("disfrutador", 2); break;
-      case "guardo": addw("protector", 2); break;
-      case "invierto": addw("constructor", 2); break;
-      case "no_se": addw("clarificador", 2); break;
-      case "familia": addw("guardian", 2); break;
+      case "distribuyo":
+        addw("organizador", 2);
+        break;
+      case "pago_urgente":
+        addw("navegante", 2);
+        break;
+      case "gasto_mas":
+        addw("disfrutador", 2);
+        break;
+      case "guardo":
+        addw("protector", 2);
+        break;
+      case "invierto":
+        addw("constructor", 2);
+        break;
+      case "no_se":
+        addw("clarificador", 2);
+        break;
+      case "familia":
+        addw("guardian", 2);
+        break;
     }
   });
   eachRanked(d.stressSpending, (v, addw) => {
     switch (v) {
-      case "gusto": addw("disfrutador", 2); break;
-      case "no_gasto_ansiedad": addw("protector", 1); addw("clarificador", 1); break;
-      case "reviso_metas": addw("estratega", 1); addw("constructor", 1); break;
-      case "automatico": addw("clarificador", 1); addw("navegante", 1); break;
-      case "ahorro": addw("protector", 1); break;
-      case "animo": addw("disfrutador", 1); break;
+      case "gusto":
+        addw("disfrutador", 2);
+        break;
+      case "no_gasto_ansiedad":
+        addw("protector", 1);
+        addw("clarificador", 1);
+        break;
+      case "reviso_metas":
+        addw("estratega", 1);
+        addw("constructor", 1);
+        break;
+      case "automatico":
+        addw("clarificador", 1);
+        addw("navegante", 1);
+        break;
+      case "ahorro":
+        addw("protector", 1);
+        break;
+      case "animo":
+        addw("disfrutador", 1);
+        break;
     }
   });
   eachRanked(d.unplannedPurchase, (v, addw) => {
     switch (v) {
-      case "compro": addw("disfrutador", 2); break;
-      case "reviso_presupuesto": addw("organizador", 1); addw("estratega", 1); break;
-      case "evito": addw("protector", 1); break;
-      case "depende_dia": addw("disfrutador", 1); break;
-      case "compro_acomodo": addw("navegante", 1); addw("disfrutador", 1); break;
-      case "merezco": addw("disfrutador", 1); addw("creador", 1); break;
-      case "pienso": addw("estratega", 1); break;
+      case "compro":
+        addw("disfrutador", 2);
+        break;
+      case "reviso_presupuesto":
+        addw("organizador", 1);
+        addw("estratega", 1);
+        break;
+      case "evito":
+        addw("protector", 1);
+        break;
+      case "depende_dia":
+        addw("disfrutador", 1);
+        break;
+      case "compro_acomodo":
+        addw("navegante", 1);
+        addw("disfrutador", 1);
+        break;
+      case "merezco":
+        addw("disfrutador", 1);
+        addw("creador", 1);
+        break;
+      case "pienso":
+        addw("estratega", 1);
+        break;
     }
   });
   eachRanked(d.socialComparison, (v, addw) => {
     switch (v) {
-      case "presiona": addw("creador", 2); break;
-      case "atrasado": addw("creador", 1); addw("clarificador", 1); break;
-      case "gastar_mas": addw("creador", 1); addw("disfrutador", 1); break;
-      case "cuestiono": addw("creador", 1); break;
-      case "motiva": addw("constructor", 1); break;
-      case "mis_metas": addw("constructor", 1); break;
-      case "igual": addw("protector", 1); break;
+      case "presiona":
+        addw("creador", 2);
+        break;
+      case "atrasado":
+        addw("creador", 1);
+        addw("clarificador", 1);
+        break;
+      case "gastar_mas":
+        addw("creador", 1);
+        addw("disfrutador", 1);
+        break;
+      case "cuestiono":
+        addw("creador", 1);
+        break;
+      case "motiva":
+        addw("constructor", 1);
+        break;
+      case "mis_metas":
+        addw("constructor", 1);
+        break;
+      case "igual":
+        addw("protector", 1);
+        break;
     }
   });
   eachRanked(d.moneyScriptPhrase, (v, addw) => {
     switch (v) {
-      case "no_se_donde": addw("clarificador", 1); break;
-      case "controlo_todo": addw("estratega", 1); addw("protector", 1); break;
-      case "merezco_disfrutar": addw("disfrutador", 2); break;
-      case "mas_seguridad": addw("protector", 2); break;
-      case "construya_futuro": addw("constructor", 2); break;
-      case "incomoda_hablar": addw("clarificador", 2); break;
-      case "voy_tarde": addw("creador", 1); break;
-      case "aprender": addw("organizador", 1); addw("clarificador", 1); break;
-      case "familia_depende": addw("guardian", 2); break;
-      case "realmente_bien": addw("constructor", 1); addw("protector", 1); break;
+      case "no_se_donde":
+        addw("clarificador", 1);
+        break;
+      case "controlo_todo":
+        addw("estratega", 1);
+        addw("protector", 1);
+        break;
+      case "merezco_disfrutar":
+        addw("disfrutador", 2);
+        break;
+      case "mas_seguridad":
+        addw("protector", 2);
+        break;
+      case "construya_futuro":
+        addw("constructor", 2);
+        break;
+      case "incomoda_hablar":
+        addw("clarificador", 2);
+        break;
+      case "voy_tarde":
+        addw("creador", 1);
+        break;
+      case "aprender":
+        addw("organizador", 1);
+        addw("clarificador", 1);
+        break;
+      case "familia_depende":
+        addw("guardian", 2);
+        break;
+      case "realmente_bien":
+        addw("constructor", 1);
+        addw("protector", 1);
+        break;
     }
   });
 
   // ── Pasos 3 y 5 · problema único y narrativa de valor (Fase 3b) — ranking ──
   eachRanked(d.singleProblem, (v, addw) => {
     switch (v) {
-      case "salir_deuda": addw("liberador", 2); break;
-      case "construir_fondo": addw("protector", 2); break;
-      case "empezar_invertir": addw("constructor", 2); break;
-      case "proteger_familia": addw("guardian", 2); break;
-      case "ordenar_gastos": addw("organizador", 1); break;
-      case "crear_presupuesto": addw("organizador", 1); break;
-      case "ahorrar_algo": addw("protector", 1); break;
-      case "entender": addw("clarificador", 1); break;
-      case "dejar_estres": addw("navegante", 1); addw("clarificador", 1); break;
+      case "salir_deuda":
+        addw("liberador", 2);
+        break;
+      case "construir_fondo":
+        addw("protector", 2);
+        break;
+      case "empezar_invertir":
+        addw("constructor", 2);
+        break;
+      case "proteger_familia":
+        addw("guardian", 2);
+        break;
+      case "ordenar_gastos":
+        addw("organizador", 1);
+        break;
+      case "crear_presupuesto":
+        addw("organizador", 1);
+        break;
+      case "ahorrar_algo":
+        addw("protector", 1);
+        break;
+      case "entender":
+        addw("clarificador", 1);
+        break;
+      case "dejar_estres":
+        addw("navegante", 1);
+        addw("clarificador", 1);
+        break;
     }
   });
   eachRanked(d.dineroPrimero, (v, addw) => {
     switch (v) {
-      case "seguridad_familia": addw("guardian", 2); break;
-      case "crecimiento": addw("constructor", 2); break;
-      case "experiencias": addw("creador", 2); break;
-      case "menos_deudas": addw("liberador", 2); break;
-      case "tranquilidad": addw("protector", 1); break;
-      case "libertad": addw("constructor", 1); break;
-      case "control": addw("estratega", 1); break;
-      case "opciones": addw("constructor", 1); break;
-      case "menos_estres": addw("navegante", 1); addw("clarificador", 1); break;
+      case "seguridad_familia":
+        addw("guardian", 2);
+        break;
+      case "crecimiento":
+        addw("constructor", 2);
+        break;
+      case "experiencias":
+        addw("creador", 2);
+        break;
+      case "menos_deudas":
+        addw("liberador", 2);
+        break;
+      case "tranquilidad":
+        addw("protector", 1);
+        break;
+      case "libertad":
+        addw("constructor", 1);
+        break;
+      case "control":
+        addw("estratega", 1);
+        break;
+      case "opciones":
+        addw("constructor", 1);
+        break;
+      case "menos_estres":
+        addw("navegante", 1);
+        addw("clarificador", 1);
+        break;
     }
   });
   eachRanked(d.conectaFrase, (v, addw) => {
     switch (v) {
-      case "disfrutar_sin_desorden": addw("disfrutador", 2); break;
-      case "dinero_trabaje": addw("constructor", 2); break;
-      case "proteger": addw("guardian", 2); break;
-      case "dormir_tranquilo": addw("protector", 1); break;
-      case "no_voy_tarde": addw("creador", 1); break;
-      case "mas_opciones": addw("constructor", 1); break;
-      case "por_fin_control": addw("estratega", 1); addw("organizador", 1); break;
-      case "avanzar_simple": addw("organizador", 1); addw("navegante", 1); break;
+      case "disfrutar_sin_desorden":
+        addw("disfrutador", 2);
+        break;
+      case "dinero_trabaje":
+        addw("constructor", 2);
+        break;
+      case "proteger":
+        addw("guardian", 2);
+        break;
+      case "dormir_tranquilo":
+        addw("protector", 1);
+        break;
+      case "no_voy_tarde":
+        addw("creador", 1);
+        break;
+      case "mas_opciones":
+        addw("constructor", 1);
+        break;
+      case "por_fin_control":
+        addw("estratega", 1);
+        addw("organizador", 1);
+        break;
+      case "avanzar_simple":
+        addw("organizador", 1);
+        addw("navegante", 1);
+        break;
     }
   });
   // Nudge leve por la emoción directa (ranking).
   eachRanked(d.dominantEmotionAnswer, (v, addw) => {
     switch (v) {
-      case "culpa": addw("disfrutador", 1); break;
-      case "miedo": addw("protector", 1); break;
-      case "presion": addw("navegante", 1); break;
-      case "confusion": addw("clarificador", 1); break;
-      case "evito": addw("clarificador", 1); break;
+      case "culpa":
+        addw("disfrutador", 1);
+        break;
+      case "miedo":
+        addw("protector", 1);
+        break;
+      case "presion":
+        addw("navegante", 1);
+        break;
+      case "confusion":
+        addw("clarificador", 1);
+        break;
+      case "evito":
+        addw("clarificador", 1);
+        break;
     }
   });
 

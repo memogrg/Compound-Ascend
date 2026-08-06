@@ -12,12 +12,24 @@ import "server-only";
  * NOTA: la tabla se llama `price_alerts` por continuidad de migración, pero guarda los 3 tipos.
  */
 import { requireUser } from "@/lib/auth/session";
-import { householdMemberIds, householdWriteScope, getActiveHouseholdId } from "@/lib/household/active";
+import {
+  householdMemberIds,
+  householdWriteScope,
+  getActiveHouseholdId,
+} from "@/lib/household/active";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { inferDirection, type AlertDirection, type AlertKind } from "@/modules/wealth/engine/price-alerts";
+import {
+  inferDirection,
+  type AlertDirection,
+  type AlertKind,
+} from "@/modules/wealth/engine/price-alerts";
 
 /** asset_type del holding → tipo de mercado de getMarketPrice (también gatea "cotizable"). */
-const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = { etf: "etf", accion: "stock", cripto: "crypto" };
+const MARKET_TYPE: Record<string, "stock" | "etf" | "crypto"> = {
+  etf: "etf",
+  accion: "stock",
+  cripto: "crypto",
+};
 
 export type InvestmentAlert = {
   id: string;
@@ -130,13 +142,17 @@ export async function createInvestmentAlert(
     if (!symbol) return { ok: false, message: "Falta el símbolo." };
     const marketType = MARKET_TYPE[input.assetType];
     if (!marketType) return { ok: false, message: "Este activo no tiene precio de mercado." };
-    if (!(input.targetPrice > 0)) return { ok: false, message: "El precio objetivo debe ser mayor a 0." };
+    if (!(input.targetPrice > 0))
+      return { ok: false, message: "El precio objetivo debe ser mayor a 0." };
 
     // Dirección AUTORITATIVA: se infiere con el precio actual (no la manda el cliente).
     const { getMarketPrice } = await import("@/lib/market-data");
     const quote = await getMarketPrice(symbol, marketType);
     if (!quote || !(quote.price > 0)) {
-      return { ok: false, message: "No pudimos leer el precio ahora. Probá de nuevo en un momento." };
+      return {
+        ok: false,
+        message: "No pudimos leer el precio ahora. Probá de nuevo en un momento.",
+      };
     }
     const direction = inferDirection(input.targetPrice, quote.price);
     if (direction === null) {
@@ -155,16 +171,23 @@ export async function createInvestmentAlert(
     };
   } else if (input.kind === "time_held") {
     if (!input.holdingId) return { ok: false, message: "Falta la inversión." };
-    if (!(input.yearsThreshold > 0)) return { ok: false, message: "Los años deben ser mayores a 0." };
+    if (!(input.yearsThreshold > 0))
+      return { ok: false, message: "Los años deben ser mayores a 0." };
     row = { ...base, holding_id: input.holdingId, years_threshold: input.yearsThreshold };
   } else {
     if (!input.holdingId) return { ok: false, message: "Falta la inversión." };
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.triggerDate)) return { ok: false, message: "Fecha inválida." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.triggerDate))
+      return { ok: false, message: "Fecha inválida." };
     row = { ...base, holding_id: input.holdingId, trigger_date: input.triggerDate };
   }
 
-  const { data, error } = await supabase.from("price_alerts").insert(row).select("id").maybeSingle();
-  if (error || !data) return { ok: false, message: error?.message ?? "No se pudo crear la alerta." };
+  const { data, error } = await supabase
+    .from("price_alerts")
+    .insert(row)
+    .select("id")
+    .maybeSingle();
+  if (error || !data)
+    return { ok: false, message: error?.message ?? "No se pudo crear la alerta." };
   return { ok: true, id: data.id };
 }
 
@@ -192,16 +215,19 @@ export async function updateInvestmentAlert(
     triggered_at?: string | null;
   } = {};
   if (patch.targetPrice !== undefined) {
-    if (!(patch.targetPrice > 0)) return { ok: false, message: "El precio objetivo debe ser mayor a 0." };
+    if (!(patch.targetPrice > 0))
+      return { ok: false, message: "El precio objetivo debe ser mayor a 0." };
     update.target_price = patch.targetPrice;
   }
   if (patch.direction !== undefined) update.direction = patch.direction;
   if (patch.yearsThreshold !== undefined) {
-    if (!(patch.yearsThreshold > 0)) return { ok: false, message: "Los años deben ser mayores a 0." };
+    if (!(patch.yearsThreshold > 0))
+      return { ok: false, message: "Los años deben ser mayores a 0." };
     update.years_threshold = patch.yearsThreshold;
   }
   if (patch.triggerDate !== undefined) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.triggerDate)) return { ok: false, message: "Fecha inválida." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(patch.triggerDate))
+      return { ok: false, message: "Fecha inválida." };
     update.trigger_date = patch.triggerDate;
   }
   if (patch.active !== undefined) {
@@ -210,13 +236,19 @@ export async function updateInvestmentAlert(
   }
   if (Object.keys(update).length === 0) return { ok: true };
 
-  const { error } = await supabase.from("price_alerts").update(update).eq("id", id).in("user_id", scope);
+  const { error } = await supabase
+    .from("price_alerts")
+    .update(update)
+    .eq("id", id)
+    .in("user_id", scope);
   if (error) return { ok: false, message: error.message };
   return { ok: true };
 }
 
 /** Borra una alerta. */
-export async function deleteInvestmentAlert(id: string): Promise<{ ok: boolean; message?: string }> {
+export async function deleteInvestmentAlert(
+  id: string,
+): Promise<{ ok: boolean; message?: string }> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
@@ -248,7 +280,9 @@ export type ActiveInvestmentAlert = {
  * tipo EN LA CONSULTA (así la corrida de fecha no lee alertas de precio y no gasta llamadas
  * de mercado). Sin `kinds` → todas (retrocompatible).
  */
-export async function getActiveInvestmentAlerts(kinds?: AlertKind[]): Promise<ActiveInvestmentAlert[]> {
+export async function getActiveInvestmentAlerts(
+  kinds?: AlertKind[],
+): Promise<ActiveInvestmentAlert[]> {
   const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
   const admin = createServiceRoleClient();
   let q = admin

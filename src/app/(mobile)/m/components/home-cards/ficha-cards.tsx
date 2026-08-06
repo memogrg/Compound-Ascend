@@ -106,7 +106,9 @@ export function IngresosFicha({ c, currency }: { c: IngresosCard; currency: stri
       value={<FVal tone="pos">{mAmount(c.real, currency, 10)}</FVal>}
       chip={
         c.plan > 0 ? (
-          <MChip tone={c.pctDelPlan >= 1 ? "success" : "neutral"}>{pct100(c.pctDelPlan)}% del plan</MChip>
+          <MChip tone={c.pctDelPlan >= 1 ? "success" : "neutral"}>
+            {pct100(c.pctDelPlan)}% del plan
+          </MChip>
         ) : undefined
       }
       sub={`Plan ${mAmount(c.plan, currency, 8)}`}
@@ -151,7 +153,11 @@ export function GastosFicha({ c, currency }: { c: GastosCard; currency: string }
       eyebrow="Gastos"
       value={<FVal tone="neg">{mAmount(c.real, currency, 10)}</FVal>}
       chip={sin > 0 ? <MChip tone="warning">{sin}% sin sobre</MChip> : undefined}
-      sub={c.plan > 0 ? `${pct100(c.pctDelPlan)}% del plan (${mAmount(c.plan, currency, 7)})` : "sin plan"}
+      sub={
+        c.plan > 0
+          ? `${pct100(c.pctDelPlan)}% del plan (${mAmount(c.plan, currency, 7)})`
+          : "sin plan"
+      }
       vis={<FRanking items={c.topSobres} currency={currency} />}
       message={c.pctDelPlan > 1 ? "Te pasaste de tu plan del mes." : "Dentro de tu plan del mes."}
       href={c.href}
@@ -180,7 +186,11 @@ export function AhorrosFicha({ c, currency }: { c: AhorrosCard; currency: string
       value={<FVal tone="pos">{mAmount(c.ahorrado, currency, 10)}</FVal>}
       delta={c.vsMes ? <MVsMes vs={c.vsMes} currency={currency} /> : undefined}
       chip={
-        c.pct >= 1 ? <MChip tone="success">Meta ✓</MChip> : <MChip tone="neutral">{pct100(c.pct)}%</MChip>
+        c.pct >= 1 ? (
+          <MChip tone="success">Meta ✓</MChip>
+        ) : (
+          <MChip tone="neutral">{pct100(c.pct)}%</MChip>
+        )
       }
       sub={`Meta ${mAmount(c.meta, currency, 7)} · faltan ${mAmount(c.falta, currency, 7)}`}
       vis={
@@ -259,7 +269,11 @@ export function InversionesFicha({ c, currency }: { c: InversionesCard; currency
       value={mAmount(c.valorActual, currency, 10)}
       delta={c.vsMes ? <MVsMes vs={c.vsMes} currency={currency} /> : undefined}
       chip={
-        <MChip tone={c.gananciaTone === "pos" ? "success" : c.gananciaTone === "neg" ? "danger" : "neutral"}>
+        <MChip
+          tone={
+            c.gananciaTone === "pos" ? "success" : c.gananciaTone === "neg" ? "danger" : "neutral"
+          }
+        >
           {c.ganancia >= 0 ? "+" : "−"}
           {Math.abs(g)}%
         </MChip>
@@ -270,7 +284,11 @@ export function InversionesFicha({ c, currency }: { c: InversionesCard; currency
           slices={[
             { label: "Largo plazo", value: c.naturaleza.growth.value, color: FICHA_GREEN },
             { label: "Flujo", value: c.naturaleza.cashflow.value, color: FICHA_BLUE },
-            { label: "Sin clasif.", value: c.naturaleza.sinClasificar.value, color: "var(--text-dim)" },
+            {
+              label: "Sin clasif.",
+              value: c.naturaleza.sinClasificar.value,
+              color: "var(--text-dim)",
+            },
           ]}
           currency={currency}
         />
@@ -308,7 +326,11 @@ export function ProteccionFicha({ c, currency }: { c: ProteccionCard; currency: 
       />
     );
   }
-  const items = c.checklist.map((i) => ({ key: i.key, label: SHORT_PROT[i.key] ?? i.label, covered: i.covered }));
+  const items = c.checklist.map((i) => ({
+    key: i.key,
+    label: SHORT_PROT[i.key] ?? i.label,
+    covered: i.covered,
+  }));
   const fondos = c.fondos.emergencia + c.fondos.paz;
   const primaTxt = `prima ${mAmount(c.primaAnual, currency, 7)}/año`;
   const polizasTxt = `${c.numActivas} ${c.numActivas === 1 ? "póliza" : "pólizas"}`;
@@ -317,7 +339,11 @@ export function ProteccionFicha({ c, currency }: { c: ProteccionCard; currency: 
       eyebrow="Protección"
       value={mAmount(c.montoProtegido, currency, 10)}
       chip={
-        c.huecos > 0 ? <MChip tone="danger">{c.huecos} sin cubrir</MChip> : <MChip tone="success">Completa</MChip>
+        c.huecos > 0 ? (
+          <MChip tone="danger">{c.huecos} sin cubrir</MChip>
+        ) : (
+          <MChip tone="success">Completa</MChip>
+        )
       }
       sub={
         <>
@@ -440,7 +466,9 @@ export function LibertadFicha({ c, currency }: { c: LibertadCard; currency: stri
           currency={currency}
         />
       }
-      message={c.fase !== "ninguno" ? `Ya alcanzaste ${c.faseLabel}.` : "Tu primer hito: Seguridad."}
+      message={
+        c.fase !== "ninguno" ? `Ya alcanzaste ${c.faseLabel}.` : "Tu primer hito: Seguridad."
+      }
       href={c.href}
       ariaLabel="Escalera de libertad financiera. Valor actual y hito en curso. Ver libertad"
     />

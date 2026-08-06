@@ -61,7 +61,13 @@ export default async function MobileDeudas() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          <MobileHeader variant="inner" eyebrow="Control" title="Deudas y Préstamos" backHref="/m" backLabel="Volver a Inicio" />
+          <MobileHeader
+            variant="inner"
+            eyebrow="Control"
+            title="Deudas y Préstamos"
+            backHref="/m"
+            backLabel="Volver a Inicio"
+          />
           {/* Aquí se veían DOS vacíos seguidos: este ("Sin deudas registradas 🎉", con
               emoji donde el resto del móvil usa MIcon) y, justo debajo, el del manager
               con items=[]. Ahora el mensaje vive en un solo sitio: el del manager, que es
@@ -120,20 +126,34 @@ export default async function MobileDeudas() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" eyebrow="Control" title="Deudas y Préstamos" backHref="/m" backLabel="Volver a Inicio" />
+        <MobileHeader
+          variant="inner"
+          eyebrow="Control"
+          title="Deudas y Préstamos"
+          backHref="/m"
+          backLabel="Volver a Inicio"
+        />
 
         {/* Resumen: lo que debes (exacto mientras quepa) y cuánto llevas pagado. */}
         <MSummaryCard
           eyebrow="Deuda total"
           value={mAmount(total, currency, 11)}
           tone="danger"
-          chip={totalOriginal > 0 ? <MChip tone="success">{formatPercent(pctPagado)} pagado</MChip> : undefined}
+          chip={
+            totalOriginal > 0 ? (
+              <MChip tone="success">{formatPercent(pctPagado)} pagado</MChip>
+            ) : undefined
+          }
           sub={
             totalOriginal > 0
               ? `Llevas ${formatMoney(pagado, currency)} pagados de ${formatMoney(totalOriginal, currency)} que pediste.`
               : `${debts.length} ${debts.length === 1 ? "deuda activa" : "deudas activas"}.`
           }
-          slot={totalOriginal > 0 ? <MProgress value={pctPagado} tone="success" height={9} /> : undefined}
+          slot={
+            totalOriginal > 0 ? (
+              <MProgress value={pctPagado} tone="success" height={9} />
+            ) : undefined
+          }
           style={{ marginBottom: 16 }}
         />
 
@@ -172,7 +192,9 @@ export default async function MobileDeudas() {
             <div className={`mcard${rec.method === "avalancha" ? " sel" : ""}`}>
               <div className="mt">Avalancha</div>
               <div className="md">Ataca la tasa más alta primero</div>
-              <div className="mm">{saving > 0 ? `Ahorra ${formatMoney(saving, currency)}` : "Menos intereses"}</div>
+              <div className="mm">
+                {saving > 0 ? `Ahorra ${formatMoney(saving, currency)}` : "Menos intereses"}
+              </div>
             </div>
             <div className={`mcard${rec.method === "bola_nieve" ? " sel" : ""}`}>
               <div className="mt">Bola de nieve</div>
@@ -181,7 +203,8 @@ export default async function MobileDeudas() {
             </div>
           </div>
           <div className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
-            Recomendado para ti: <strong>{METHOD_LABEL[rec.method] ?? rec.method}</strong>. {rec.reason}
+            Recomendado para ti: <strong>{METHOD_LABEL[rec.method] ?? rec.method}</strong>.{" "}
+            {rec.reason}
           </div>
         </div>
 
@@ -195,7 +218,14 @@ export default async function MobileDeudas() {
                   Próximo pago
                 </div>
                 <div
-                  style={{ fontWeight: 700, fontSize: 15, marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 15,
+                    marginTop: 6,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
                 >
                   {next.name}
                 </div>
@@ -207,7 +237,9 @@ export default async function MobileDeudas() {
                   className={overdue ? "neg" : "muted"}
                   style={{ fontSize: 12, marginTop: 2, fontWeight: overdue ? 600 : undefined }}
                 >
-                  {overdue ? `Venció el ${fmtDate(next.nextDue)}` : `Vence ${fmtDate(next.nextDue)}`}
+                  {overdue
+                    ? `Venció el ${fmtDate(next.nextDue)}`
+                    : `Vence ${fmtDate(next.nextDue)}`}
                 </div>
               </div>
               <div className="display" style={{ fontSize: 22, flex: "none" }}>
@@ -231,4 +263,3 @@ export default async function MobileDeudas() {
     </div>
   );
 }
-

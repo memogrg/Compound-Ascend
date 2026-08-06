@@ -13,7 +13,10 @@ import { householdMemberIds } from "@/lib/household/active";
 import { getDisplayCurrency, monthlyize, type Frequency } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import { computeTotalCommitment, type CommitmentBreakdown } from "@/modules/wealth/engine/total-commitment";
+import {
+  computeTotalCommitment,
+  type CommitmentBreakdown,
+} from "@/modules/wealth/engine/total-commitment";
 
 export type { CommitmentBreakdown };
 
@@ -22,7 +25,9 @@ export type { CommitmentBreakdown };
  * pasa la PRINCIPAL del reporte, para no meter el override de display en el número); por defecto la
  * de visualización.
  */
-export async function getTotalMonthlyCommitment(opts?: { currency?: string }): Promise<CommitmentBreakdown> {
+export async function getTotalMonthlyCommitment(opts?: {
+  currency?: string;
+}): Promise<CommitmentBreakdown> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const [members, rates] = await Promise.all([householdMemberIds(supabase, user.id), getFxRates()]);
@@ -40,16 +45,26 @@ export async function getTotalMonthlyCommitment(opts?: { currency?: string }): P
       .eq("period_month", period.month)
       .eq("period_year", period.year),
     // TODAS las deudas vigentes (sin filtro esencial): cuota = current_payment (o min_payment).
-    supabase.from("debts").select("current_payment,min_payment,currency").in("user_id", members).eq("is_current", true),
+    supabase
+      .from("debts")
+      .select("current_payment,min_payment,currency")
+      .in("user_id", members)
+      .eq("is_current", true),
     // TODAS las metas: aporte mensual + policy_id (regla #2) + nombre.
-    supabase.from("savings_goals").select("name,monthly_contribution,currency,policy_id").in("user_id", members),
+    supabase
+      .from("savings_goals")
+      .select("name,monthly_contribution,currency,policy_id")
+      .in("user_id", members),
     // TODAS las pólizas con prima: se mensualiza.
     supabase
       .from("insurance_policies")
       .select("id,policy_type,provider,premium,premium_frequency,currency")
       .in("user_id", members),
     // DCA: holdings con aporte mensual recurrente (monthly_contribution).
-    supabase.from("investment_holdings").select("monthly_contribution,currency").in("user_id", members),
+    supabase
+      .from("investment_holdings")
+      .select("monthly_contribution,currency")
+      .in("user_id", members),
   ]);
 
   const budgetLines = (budgetRows.data ?? []).map((b) => ({
@@ -83,5 +98,13 @@ export async function getTotalMonthlyCommitment(opts?: { currency?: string }): P
     .filter((h) => Number(h.monthly_contribution ?? 0) > 0)
     .map((h) => ({ monthly: Number(h.monthly_contribution), currency: h.currency }));
 
-  return computeTotalCommitment({ displayCurrency: targetCurrency, rates, budgetLines, goals, dca, debts, policies });
+  return computeTotalCommitment({
+    displayCurrency: targetCurrency,
+    rates,
+    budgetLines,
+    goals,
+    dca,
+    debts,
+    policies,
+  });
 }

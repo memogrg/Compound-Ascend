@@ -16,8 +16,7 @@ export const EMOTION_RULES: Record<string, string> = {
   evasion: "Tiende a evitar: cero juicio, normaliza, recupera claridad con microacciones.",
   miedo: "Hay miedo: prioriza seguridad, fondo de emergencia y escenarios conservadores.",
   frustracion: "Frustración: da una acción de impacto rápido y una victoria temprana.",
-  motivacion:
-    "Aprovecha su motivación: retos y automatización antes de que baje la energía.",
+  motivacion: "Aprovecha su motivación: retos y automatización antes de que baje la energía.",
   confusion: "Confusión: simplifica, ejemplos cotidianos, una cosa a la vez.",
   tranquilidad: "Tranquilo: tono estratégico, avanza hacia optimización y crecimiento.",
 };

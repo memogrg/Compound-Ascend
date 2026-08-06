@@ -80,7 +80,11 @@ export type MoveResult =
   | { status: "no_txn"; amount: number | null }
   | { status: "error" };
 
-function rowToTarget(data: { id: string; merchant_or_source: string | null; kind: string }): LastTransaction {
+function rowToTarget(data: {
+  id: string;
+  merchant_or_source: string | null;
+  kind: string;
+}): LastTransaction {
   return {
     id: data.id,
     merchant: data.merchant_or_source ?? null,
@@ -205,7 +209,12 @@ async function applyMove(
     }
   }
 
-  return { status: "ok", categoryName: resolved.categoryName, merchant: target.merchant, ruleUpdated };
+  return {
+    status: "ok",
+    categoryName: resolved.categoryName,
+    merchant: target.merchant,
+    ruleUpdated,
+  };
 }
 
 /** Re-clasifica la ÚLTIMA transacción al sobre `name`. */

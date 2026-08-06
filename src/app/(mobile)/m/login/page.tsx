@@ -33,7 +33,12 @@ export default function MobileLogin() {
               strokeLinecap="round"
               fill="none"
             />
-            <path d="M45 27 V37 M40 32 H50" stroke="#51AF6F" strokeWidth={3.6} strokeLinecap="round" />
+            <path
+              d="M45 27 V37 M40 32 H50"
+              stroke="#51AF6F"
+              strokeWidth={3.6}
+              strokeLinecap="round"
+            />
           </svg>
         </span>
         <h1

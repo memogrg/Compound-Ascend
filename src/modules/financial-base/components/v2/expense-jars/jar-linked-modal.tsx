@@ -134,7 +134,11 @@ export function JarLinkedModal({
                 }}
               >
                 {fixed.map((f) => (
-                  <div key={f.name} className="list-row" style={{ gridTemplateColumns: "1fr auto" }}>
+                  <div
+                    key={f.name}
+                    className="list-row"
+                    style={{ gridTemplateColumns: "1fr auto" }}
+                  >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{f.name}</div>
                       <div className="muted" style={{ fontSize: 11.5 }}>
@@ -303,8 +307,7 @@ export function JarLinkedModal({
           Cerrar
         </button>
         <Link href={jar.cta.href} className="btn btn-primary" style={{ textDecoration: "none" }}>
-          <Icon name="plus" width={2} />{" "}
-          {jar.budgetAware ? L.cta : jar.cta.label}
+          <Icon name="plus" width={2} /> {jar.budgetAware ? L.cta : jar.cta.label}
         </Link>
       </div>
     </Modal>
@@ -370,7 +373,11 @@ function BudgetItemRow({
           {advanced ? (
             <span
               className="chip"
-              style={{ fontSize: 10, background: "var(--info-soft, var(--chip))", color: "var(--info)" }}
+              style={{
+                fontSize: 10,
+                background: "var(--info-soft, var(--chip))",
+                color: "var(--info)",
+              }}
             >
               Adelantado
             </span>
@@ -394,7 +401,10 @@ function BudgetItemRow({
       ) : (
         <>
           <div className="bar-track">
-            <div className="bar-fill" style={{ width: `${pct(spent, budget)}%`, background: color }} />
+            <div
+              className="bar-fill"
+              style={{ width: `${pct(spent, budget)}%`, background: color }}
+            />
           </div>
           <div
             style={{

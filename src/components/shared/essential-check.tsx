@@ -41,12 +41,19 @@ export function EssentialCheck({
   return (
     <label
       className="fld-check"
-      style={{ display: "flex", alignItems: "center", gap: 8, cursor: disabled ? "default" : "pointer" }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        cursor: disabled ? "default" : "pointer",
+      }}
     >
       <input
         type="checkbox"
         name={controlled ? undefined : name}
-        {...(controlled ? { checked, onChange: (e) => onChange!(e.target.checked) } : { defaultChecked })}
+        {...(controlled
+          ? { checked, onChange: (e) => onChange!(e.target.checked) }
+          : { defaultChecked })}
         disabled={disabled}
       />
       <span style={{ fontSize: 13 }}>Gasto esencial (número de seguridad)</span>
@@ -56,7 +63,14 @@ export function EssentialCheck({
         aria-label="Qué es un gasto esencial"
         style={{ display: "inline-flex", color: "var(--muted)", cursor: "help" }}
       >
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2}>
+        <svg
+          viewBox="0 0 24 24"
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
           <circle cx="12" cy="12" r="10" />
           <path d="M12 16v-4M12 8h.01" strokeLinecap="round" />
         </svg>

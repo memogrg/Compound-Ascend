@@ -67,7 +67,9 @@ async function coingeckoFetch(url: string): Promise<unknown | null> {
   } catch (err) {
     // Separa la causa REAL: AbortError = timeout (lento); el resto = error de red/bloqueo (hard).
     const cause =
-      err instanceof Error && err.name === "AbortError" ? `timeout(${COINGECKO_TIMEOUT_MS}ms)` : "network";
+      err instanceof Error && err.name === "AbortError"
+        ? `timeout(${COINGECKO_TIMEOUT_MS}ms)`
+        : "network";
     logger.warn("coingecko.call", { endpoint, status: cause, auth });
     return null;
   } finally {
@@ -90,7 +92,9 @@ export async function finnhub(symbol: string): Promise<Quote | null> {
     `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`,
   )) as { c?: number; dp?: number } | null;
   const price = data ? num(data.c) : null;
-  return price ? { price, currency: "USD", provider: "finnhub", changePct: signedNum(data?.dp) } : null;
+  return price
+    ? { price, currency: "USD", provider: "finnhub", changePct: signedNum(data?.dp) }
+    : null;
 }
 
 export async function alphaVantage(symbol: string): Promise<Quote | null> {
@@ -102,7 +106,12 @@ export async function alphaVantage(symbol: string): Promise<Quote | null> {
   const gq = data?.["Global Quote"];
   const price = gq ? num(gq["05. price"]) : null;
   return price
-    ? { price, currency: "USD", provider: "alphavantage", changePct: signedNum(gq?.["10. change percent"]) }
+    ? {
+        price,
+        currency: "USD",
+        provider: "alphavantage",
+        changePct: signedNum(gq?.["10. change percent"]),
+      }
     : null;
 }
 
@@ -128,8 +137,7 @@ export async function yahoo(symbol: string): Promise<Quote | null> {
     const price = meta ? num(meta.regularMarketPrice) : null;
     if (price) {
       const prev = meta?.previousClose ?? meta?.chartPreviousClose;
-      const changePct =
-        prev && prev > 0 ? ((price - prev) / prev) * 100 : undefined;
+      const changePct = prev && prev > 0 ? ((price - prev) / prev) * 100 : undefined;
       return { price, currency: meta?.currency ?? "USD", provider: "yahoo", changePct };
     }
   }
@@ -146,7 +154,12 @@ export async function binance(ticker: string): Promise<Quote | null> {
     )) as { lastPrice?: string; priceChangePercent?: string } | null;
     const price = data ? num(data.lastPrice) : null;
     if (price)
-      return { price, currency: "USD", provider: "binance", changePct: signedNum(data?.priceChangePercent) };
+      return {
+        price,
+        currency: "USD",
+        provider: "binance",
+        changePct: signedNum(data?.priceChangePercent),
+      };
   }
   return null;
 }
@@ -235,7 +248,9 @@ export async function coingecko(ticker: string): Promise<Quote | null> {
   )) as Record<string, { usd?: number; usd_24h_change?: number }> | null;
   const row = data?.[id];
   const price = row ? num(row.usd) : null;
-  return price ? { price, currency: "USD", provider: "coingecko", changePct: signedNum(row?.usd_24h_change) } : null;
+  return price
+    ? { price, currency: "USD", provider: "coingecko", changePct: signedNum(row?.usd_24h_change) }
+    : null;
 }
 
 /**
@@ -264,7 +279,13 @@ export async function coingeckoBatch(symbols: string[]): Promise<Record<string, 
   for (const [id, row] of Object.entries(data)) {
     const s = idToSymbol.get(id);
     const price = s ? num(row?.usd) : null;
-    if (s && price) out[s] = { price, currency: "USD", provider: "coingecko", changePct: signedNum(row?.usd_24h_change) };
+    if (s && price)
+      out[s] = {
+        price,
+        currency: "USD",
+        provider: "coingecko",
+        changePct: signedNum(row?.usd_24h_change),
+      };
   }
   return out;
 }
@@ -282,7 +303,9 @@ export type CryptoMarketRow = {
  * Es lo que usa el RECOLECTOR (cron) para poblar el store: colapsa el enjambre en 1-2 requests.
  * Mapea por SÍMBOLO (MAYÚS). Best-effort: solo las que respondieron.
  */
-export async function coingeckoMarketsBatch(symbols: string[]): Promise<Record<string, CryptoMarketRow>> {
+export async function coingeckoMarketsBatch(
+  symbols: string[],
+): Promise<Record<string, CryptoMarketRow>> {
   const out: Record<string, CryptoMarketRow> = {};
   const idToSymbol = new Map<string, string>();
   const ids: string[] = [];
@@ -297,7 +320,9 @@ export async function coingeckoMarketsBatch(symbols: string[]): Promise<Record<s
   if (ids.length === 0) return out;
   const data = (await coingeckoFetch(
     `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids.map(encodeURIComponent).join(",")}`,
-  )) as { id?: string; current_price?: number; ath?: number; ath_date?: string; high_24h?: number }[] | null;
+  )) as
+    | { id?: string; current_price?: number; ath?: number; ath_date?: string; high_24h?: number }[]
+    | null;
   if (!data) return out;
   for (const row of data) {
     const s = row.id ? idToSymbol.get(row.id) : undefined;
@@ -353,8 +378,12 @@ export async function finnhubHighlights(symbol: string): Promise<Highlights | nu
   const token = getServerEnv().FINNHUB_TOKEN;
   if (!token) return null;
   const [q, m] = await Promise.all([
-    fetchJson(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`),
-    fetchJson(`https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`),
+    fetchJson(
+      `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`,
+    ),
+    fetchJson(
+      `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`,
+    ),
   ]);
   const price = num((q as { c?: number } | null)?.c);
   const metric = (m as { metric?: Record<string, unknown> } | null)?.metric ?? {};

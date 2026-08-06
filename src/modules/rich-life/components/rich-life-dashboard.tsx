@@ -46,7 +46,13 @@ export function RichLifeDashboard({
             {formatMoney(ind.netWorth, currency)}
           </div>
           <div
-            style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 10 }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+              marginTop: 10,
+            }}
           >
             <span className={`delta ${trend.delta}`} style={{ marginTop: 0 }}>
               {trend.label}
@@ -233,7 +239,9 @@ export function RichLifeDashboard({
                 <div className="ft-cap" style={{ left: `${m}%` }} />
                 <div
                   className="ft-lb"
-                  style={m === 100 ? { left: "100%", transform: "translateX(-100%)" } : { left: `${m}%` }}
+                  style={
+                    m === 100 ? { left: "100%", transform: "translateX(-100%)" } : { left: `${m}%` }
+                  }
                 >
                   {m}%
                 </div>
@@ -353,13 +361,7 @@ function MetricCard({
  * cards compactas con tooltip, y Fragilidad Financiera desde el diagnóstico.
  * Lenguaje aspiracional, nunca humillante.
  */
-function PatrimonioSections({
-  p,
-  currency,
-}: {
-  p: PatrimonioServiceResult;
-  currency: string;
-}) {
+function PatrimonioSections({ p, currency }: { p: PatrimonioServiceResult; currency: string }) {
   const r = p.report;
   const anios = r.añosDeLibertad;
 
@@ -410,7 +412,8 @@ function FragilidadCard({ diagnosis }: { diagnosis: PatrimonioServiceResult["dia
       </div>
       {diagnosis.length === 0 ? (
         <div className="muted fs12" style={{ marginTop: 10, lineHeight: 1.5, color: "var(--pos)" }}>
-          Tu base se ve sólida: no detectamos fragilidades. Sigue construyendo patrimonio invertible.
+          Tu base se ve sólida: no detectamos fragilidades. Sigue construyendo patrimonio
+          invertible.
         </div>
       ) : (
         <ul style={{ margin: "10px 0 0", paddingLeft: 16, display: "grid", gap: 6 }}>

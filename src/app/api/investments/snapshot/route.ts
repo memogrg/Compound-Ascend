@@ -38,9 +38,8 @@ export async function POST(req: Request) {
       if (!parsed.success)
         throw new AppError("VALIDATION", "userId inválido o ausente en el body del cron.");
 
-      const { generateSnapshotForUserCron } = await import(
-        "@/modules/wealth/services/snapshot-service"
-      );
+      const { generateSnapshotForUserCron } =
+        await import("@/modules/wealth/services/snapshot-service");
       const snapshot = await generateSnapshotForUserCron(parsed.data);
       return NextResponse.json({ ok: true, mode: "cron", snapshot }, { headers: cors });
     }

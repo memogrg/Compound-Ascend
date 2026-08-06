@@ -10,13 +10,7 @@ import type { CSSProperties } from "react";
  * existentes (.spark svg, .ava svg, etc.) lo dimensionan sin cambios, así que
  * es un reemplazo directo del antiguo <Icon name="spark" />.
  */
-export function AgentMark({
-  className,
-  style,
-}: {
-  className?: string;
-  style?: CSSProperties;
-}) {
+export function AgentMark({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <svg
       viewBox="0 0 120 120"

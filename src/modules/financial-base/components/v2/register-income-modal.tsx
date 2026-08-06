@@ -254,7 +254,9 @@ export function RegisterIncomeModal({
               </div>
             ) : null}
             <div className="fld">
-              <label className="fld-label">{isRental ? "Nombre del bien" : "Ticker o nombre"}</label>
+              <label className="fld-label">
+                {isRental ? "Nombre del bien" : "Ticker o nombre"}
+              </label>
               <input
                 autoFocus
                 className="inp"
@@ -439,10 +441,21 @@ export function RegisterIncomeModal({
                     }
                   }}
                 />
-                <button type="button" className="btn btn-secondary" style={{ padding: "7px 12px" }} onClick={() => void onCreateSub()}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ padding: "7px 12px" }}
+                  onClick={() => void onCreateSub()}
+                >
                   Crear
                 </button>
-                <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Cancelar" onClick={() => setCreating(false)}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  style={{ width: 30, height: 30 }}
+                  aria-label="Cancelar"
+                  onClick={() => setCreating(false)}
+                >
                   <Icon name="x" width={2} />
                 </button>
               </div>
@@ -464,10 +477,21 @@ export function RegisterIncomeModal({
                       }
                     }}
                   />
-                  <button type="button" className="btn btn-secondary" style={{ padding: "7px 12px" }} onClick={() => void onRenameSub()}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: "7px 12px" }}
+                    onClick={() => void onRenameSub()}
+                  >
                     Guardar
                   </button>
-                  <button type="button" className="icon-btn" style={{ width: 30, height: 30 }} aria-label="Cancelar" onClick={() => setRenaming(false)}>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    style={{ width: 30, height: 30 }}
+                    aria-label="Cancelar"
+                    onClick={() => setRenaming(false)}
+                  >
                     <Icon name="x" width={2} />
                   </button>
                 </div>
@@ -475,7 +499,12 @@ export function RegisterIncomeModal({
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  style={{ alignSelf: "flex-start", padding: "4px 0", marginTop: 6, color: "var(--info)" }}
+                  style={{
+                    alignSelf: "flex-start",
+                    padding: "4px 0",
+                    marginTop: 6,
+                    color: "var(--info)",
+                  }}
                   onClick={() => {
                     setRenameName(selectedLeaf.name);
                     setRenaming(true);
@@ -492,7 +521,10 @@ export function RegisterIncomeModal({
               </div>
             ) : null}
             {showSubWarn ? (
-              <div role="alert" style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}>
+              <div
+                role="alert"
+                style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}
+              >
                 Seleccioná una subcategoría para guardar
               </div>
             ) : null}

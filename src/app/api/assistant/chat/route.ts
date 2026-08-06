@@ -55,7 +55,12 @@ async function buildToolContext(need: ToolNeed, userId?: string): Promise<ToolCo
     } catch {
       rates = null;
     }
-    const toolContext: ToolContext = { currency: display, fxUnavailable: !rates, debts: [], userId };
+    const toolContext: ToolContext = {
+      currency: display,
+      fxUnavailable: !rates,
+      debts: [],
+      userId,
+    };
     if (need.debts) {
       try {
         toolContext.debts = normalizeDebtsForTool(await listDebts(), display, rates);
@@ -67,11 +72,16 @@ async function buildToolContext(need: ToolNeed, userId?: string): Promise<ToolCo
       try {
         const pat = await getPatrimonioReport();
         const toDisplay = (v: number): number =>
-          pat.currency === display ? v : rates ? convertCurrency(v, pat.currency, display, rates) : NaN;
+          pat.currency === display
+            ? v
+            : rates
+              ? convertCurrency(v, pat.currency, display, rates)
+              : NaN;
         const seguridad = toDisplay(pat.report.numeroDeSeguridad);
         const independencia = toDisplay(pat.report.numeroDeIndependencia);
         const invertible = toDisplay(pat.report.investableWealth);
-        const libertad = pat.report.numeroDeLibertad != null ? toDisplay(pat.report.numeroDeLibertad) : null;
+        const libertad =
+          pat.report.numeroDeLibertad != null ? toDisplay(pat.report.numeroDeLibertad) : null;
         if (Number.isFinite(seguridad)) toolContext.securityNumber = seguridad;
         if (Number.isFinite(independencia)) toolContext.independenceNumber = independencia;
         if (libertad != null && Number.isFinite(libertad)) toolContext.libertyNumber = libertad;
@@ -86,7 +96,8 @@ async function buildToolContext(need: ToolNeed, userId?: string): Promise<ToolCo
         const mapped = goals
           .filter((g) => g.targetAmount > 0 && (g.currency === display || !!rates))
           .map((g) => {
-            const conv = (n: number) => (g.currency === display ? n : convertCurrency(n, g.currency, display, rates!));
+            const conv = (n: number) =>
+              g.currency === display ? n : convertCurrency(n, g.currency, display, rates!);
             return {
               nombre: g.name,
               objetivo: conv(g.targetAmount),
@@ -179,7 +190,12 @@ export async function POST(req: Request) {
       const liteTool = await buildToolContext(scope.tool, user?.id);
       if (liteTool) {
         // Turno único: los intents deterministas resuelven con el mensaje actual (no necesitan historial).
-        const det = await resolveDeterministic(matched, [{ role: "user", content: userMessage }], liteCtx, liteTool);
+        const det = await resolveDeterministic(
+          matched,
+          [{ role: "user", content: userMessage }],
+          liteCtx,
+          liteTool,
+        );
         if (det) result = det;
       }
     }
@@ -216,14 +232,20 @@ export async function POST(req: Request) {
         const idsVentana = new Set(enVentana.map((m) => m.id));
         const anotado = annotateReply(userMessage, quote.quoted);
         messages = [
-          ...buildQuotedContext(pares, idsVentana, pares.map((m) => m.id)),
+          ...buildQuotedContext(
+            pares,
+            idsVentana,
+            pares.map((m) => m.id),
+          ),
           ...ventana.slice(0, -1),
           { role: "user", content: anotado },
         ];
       }
       // Herramientas (function-calling) sólo con sesión; deudas/metas/números normalizados a la moneda
       // de VISUALIZACIÓN. Best-effort: si falla, se sigue sin herramientas.
-      const toolContext = user ? await buildToolContext({ debts: true, goals: true, numbers: true }, user.id) : undefined;
+      const toolContext = user
+        ? await buildToolContext({ debts: true, goals: true, numbers: true }, user.id)
+        : undefined;
       result = await financeChatWithTools(messages, ctx, toolContext);
     }
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);

@@ -51,7 +51,15 @@ const level: PatrimonioLevel = {
 
 const flag = (code: string): DiagnosisFlag => ({ code, hint: `hint ${code}` });
 
-const SHAMING = ["pobre", "fracaso", "vergüenza", "no eres", "mal manejo", "irresponsable", "tonto"];
+const SHAMING = [
+  "pobre",
+  "fracaso",
+  "vergüenza",
+  "no eres",
+  "mal manejo",
+  "irresponsable",
+  "tonto",
+];
 const noShame = (s: string) => {
   const low = s.toLowerCase();
   for (const w of SHAMING) expect(low.includes(w)).toBe(false);
@@ -76,7 +84,13 @@ describe("buildDailyPatrimonioInsight", () => {
 
   it("sin fragilidad y con patrimonio invertible: mensaje aspiracional con años y Número", () => {
     const ins = buildDailyPatrimonioInsight(
-      rep({ investableWealth: 150_000_000, numeroDeIndependencia: 772_000_000, añosDeLibertad: 5, ratioLibertad: 0.6, indice: 60 }),
+      rep({
+        investableWealth: 150_000_000,
+        numeroDeIndependencia: 772_000_000,
+        añosDeLibertad: 5,
+        ratioLibertad: 0.6,
+        indice: 60,
+      }),
       level,
       [],
     );
@@ -88,7 +102,12 @@ describe("buildDailyPatrimonioInsight", () => {
 
   it("sin fragilidad y ratioLibertad bajo → info (no celebrar)", () => {
     const ins = buildDailyPatrimonioInsight(
-      rep({ investableWealth: 10_000_000, numeroDeIndependencia: 772_000_000, añosDeLibertad: 1, ratioLibertad: 0.1 }),
+      rep({
+        investableWealth: 10_000_000,
+        numeroDeIndependencia: 772_000_000,
+        añosDeLibertad: 1,
+        ratioLibertad: 0.1,
+      }),
       level,
       [],
     );
@@ -96,7 +115,11 @@ describe("buildDailyPatrimonioInsight", () => {
   });
 
   it("sin patrimonio invertible: mensaje de construcción (info)", () => {
-    const ins = buildDailyPatrimonioInsight(rep({ investableWealth: 0, numeroDeIndependencia: 0 }), level, []);
+    const ins = buildDailyPatrimonioInsight(
+      rep({ investableWealth: 0, numeroDeIndependencia: 0 }),
+      level,
+      [],
+    );
     expect(ins.severity).toBe("info");
     expect(ins.body.toLowerCase()).toContain("invertible");
   });
@@ -105,7 +128,11 @@ describe("buildDailyPatrimonioInsight", () => {
     const cases = [
       buildDailyPatrimonioInsight(rep(), level, [flag("patrimonio_neto_negativo")]),
       buildDailyPatrimonioInsight(rep(), level, [flag("alto_pero_poco_productivo")]),
-      buildDailyPatrimonioInsight(rep({ investableWealth: 5, numeroDeIndependencia: 100, añosDeLibertad: 0 }), level, []),
+      buildDailyPatrimonioInsight(
+        rep({ investableWealth: 5, numeroDeIndependencia: 100, añosDeLibertad: 0 }),
+        level,
+        [],
+      ),
       buildDailyPatrimonioInsight(rep(), level, []),
     ];
     for (const c of cases) {

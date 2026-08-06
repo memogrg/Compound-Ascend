@@ -46,7 +46,11 @@ export { deleteIncomeSourcesByHolding } from "./services/budget-service";
 // Headline de Gastos (planificado vs real por rango) — el widget de Presupuesto lo calca.
 export { getExpenseRangeView } from "./services/expense-range-service";
 // Árbol de categorías (grupo → hojas) para selectores de gasto reutilizables.
-export { listCategoryTree, getCategoryNameMap, createCategory } from "./services/categories-service";
+export {
+  listCategoryTree,
+  getCategoryNameMap,
+  createCategory,
+} from "./services/categories-service";
 export type { CategoryNode } from "./services/categories-service";
 export { groupByJar, monedaVinculadaEsCoherente } from "./engine/expense-jars";
 export type { JarGroup } from "./engine/expense-jars";

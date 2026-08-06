@@ -44,7 +44,9 @@ export async function logHouseholdDeletion(
       action: "delete",
     });
     if (error) {
-      console.warn(`[activity-log] no se pudo registrar el borrado de ${args.table}: ${error.message}`);
+      console.warn(
+        `[activity-log] no se pudo registrar el borrado de ${args.table}: ${error.message}`,
+      );
     }
   } catch (err) {
     console.warn(

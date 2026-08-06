@@ -22,8 +22,10 @@ import {
   GOALS,
 } from "@/modules/personal-profile/constants";
 
-const labelOf = (options: { value: string; label: string }[], value?: string): string | undefined =>
-  value ? options.find((o) => o.value === value)?.label : undefined;
+const labelOf = (
+  options: { value: string; label: string }[],
+  value?: string,
+): string | undefined => (value ? options.find((o) => o.value === value)?.label : undefined);
 
 const URGENCY_LABEL: Record<string, string> = {
   baja: "Baja",
@@ -38,7 +40,13 @@ const level = (n: number): string =>
 
 /** Igual pero invertido (menos = mejor), p. ej. impulsividad. Escala 1-5. */
 const levelInverted = (n: number): string =>
-  n <= 2 ? "muy baja, a tu favor" : n === 3 ? "media" : n === 4 ? "alta, conviene cuidarla" : "muy alta, a vigilar";
+  n <= 2
+    ? "muy baja, a tu favor"
+    : n === 3
+      ? "media"
+      : n === 4
+        ? "alta, conviene cuidarla"
+        : "muy alta, a vigilar";
 
 /** Prioridades de acompañamiento por arquetipo (de qué hablar primero). */
 const COMPANION_PRIORITIES: Record<Archetype, string[]> = {
@@ -56,13 +64,22 @@ const COMPANION_PRIORITIES: Record<Archetype, string[]> = {
 
 /** Ruta sugerida con el porqué de cada paso (alineada con buildDiagnosis). */
 const ROUTE: { step: string; why: string }[] = [
-  { step: "Construir tu Base Financiera", why: "Para conocer tu capacidad real de inversión y gasto." },
-  { step: "Crear o fortalecer tu fondo de emergencia", why: "Para sostener tu estrategia sin fragilidad." },
+  {
+    step: "Construir tu Base Financiera",
+    why: "Para conocer tu capacidad real de inversión y gasto.",
+  },
+  {
+    step: "Crear o fortalecer tu fondo de emergencia",
+    why: "Para sostener tu estrategia sin fragilidad.",
+  },
   { step: "Reducir riesgos financieros", why: "Para que un imprevisto no descarrile tu plan." },
   { step: "Priorizar tus metas", why: "Para enfocar tu dinero en lo que más te importa." },
   { step: "Iniciar o fortalecer la inversión", why: "Para que tu dinero crezca con el tiempo." },
   { step: "Proteger tu patrimonio", why: "Para cuidar lo que vas construyendo." },
-  { step: "Avanzar hacia la libertad financiera", why: "Para ganar opciones y tranquilidad a largo plazo." },
+  {
+    step: "Avanzar hacia la libertad financiera",
+    why: "Para ganar opciones y tranquilidad a largo plazo.",
+  },
 ];
 
 /** Lectura espejo (Cierre v3): titular en 2ª persona por arquetipo. */
@@ -156,7 +173,11 @@ export function buildProfileReading(d: ProfileDraft): ProfileReading {
   scorecard.push({ label: "Perfil de riesgo", value: riskDisplay, reading: riskReading });
   const topPriority = labelOf(PRIORITIES, d.priorities?.[0]);
   if (topPriority)
-    scorecard.push({ label: "Prioridad principal", value: topPriority, reading: "Tu eje al decidir." });
+    scorecard.push({
+      label: "Prioridad principal",
+      value: topPriority,
+      reading: "Tu eje al decidir.",
+    });
   const topGoal = labelOf(GOALS, d.goals?.[0]);
   if (topGoal)
     scorecard.push({ label: "Meta", value: topGoal, reading: "Tu primer objetivo concreto." });

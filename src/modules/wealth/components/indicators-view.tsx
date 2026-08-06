@@ -91,9 +91,7 @@ function Card({ card }: { card: IndicatorCard }) {
 
           <PerformanceChart data={card.history} currency="CRC" formatValue={fmtTooltip} />
 
-          {card.observedDate && (
-            <div className="ind-date">Último dato: {card.observedDate}</div>
-          )}
+          {card.observedDate && <div className="ind-date">Último dato: {card.observedDate}</div>}
         </>
       ) : (
         <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>

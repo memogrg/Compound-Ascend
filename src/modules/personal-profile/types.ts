@@ -132,12 +132,7 @@ export type Archetype =
 
 /** "Money script": creencia profunda sobre el dinero (deriva de la frase elegida). */
 export type MoneyScript =
-  | "evitacion"
-  | "vigilancia"
-  | "estatus"
-  | "seguridad"
-  | "crecimiento"
-  | "suficiencia";
+  "evitacion" | "vigilancia" | "estatus" | "seguridad" | "crecimiento" | "suficiencia";
 
 export type DominantEmotion =
   | "tranquilidad"

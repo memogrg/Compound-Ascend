@@ -46,7 +46,10 @@ export type HouseholdMembersView = {
   quota: HouseholdQuota;
 };
 
-async function getPlan(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string): Promise<Plan> {
+async function getPlan(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string,
+): Promise<Plan> {
   const { data } = await supabase.from("profiles").select("plan").eq("id", userId).maybeSingle();
   return (data?.plan ?? "free") as Plan;
 }

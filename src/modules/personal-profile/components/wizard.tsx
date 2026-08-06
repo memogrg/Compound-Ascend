@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
-import { OptionCards, Chips, RankedChips, Scale, YesNo, NumStepper, HelpTip, Dropdown } from "./primitives";
+import {
+  OptionCards,
+  Chips,
+  RankedChips,
+  Scale,
+  YesNo,
+  NumStepper,
+  HelpTip,
+  Dropdown,
+} from "./primitives";
 import { HouseholdInvites } from "./household-invites";
 import { ProfileSummary } from "./summary";
 import { StartChoice } from "./start-choice";
@@ -177,7 +186,9 @@ const STEPS: Step[] = [
           />
         </div>
         <div className="fld">
-          <label className="fld-label">Cuando piensas en tus finanzas hoy, lo que más sientes es…</label>
+          <label className="fld-label">
+            Cuando piensas en tus finanzas hoy, lo que más sientes es…
+          </label>
           <RankedChips
             options={O.DOMINANT_EMOTIONS}
             values={d.dominantEmotionAnswer ?? []}
@@ -204,11 +215,7 @@ const STEPS: Step[] = [
     help: "Tus objetivos guían las metas de ahorro e inversión y la ruta que te sugerimos. Puedes elegir varios; luego les pondremos montos y fechas.",
     celebration: "Excelente. El dinero ya tiene dirección.",
     render: (d, set) => (
-      <RankedChips
-        options={O.GOALS}
-        values={d.goals ?? []}
-        onChange={(v) => set({ goals: v })}
-      />
+      <RankedChips options={O.GOALS} values={d.goals ?? []} onChange={(v) => set({ goals: v })} />
     ),
   },
   {
@@ -229,7 +236,9 @@ const STEPS: Step[] = [
           />
         </div>
         <div className="fld">
-          <label className="fld-label">Si tu dinero tuviera que darte una cosa primero, sería…</label>
+          <label className="fld-label">
+            Si tu dinero tuviera que darte una cosa primero, sería…
+          </label>
           <RankedChips
             options={O.DINERO_PRIMERO}
             values={d.dineroPrimero ?? []}
@@ -301,7 +310,9 @@ const STEPS: Step[] = [
           />
         </div>
         <div className="fld">
-          <label className="fld-label">Después de una semana pesada, ¿qué pasa con tus gastos?</label>
+          <label className="fld-label">
+            Después de una semana pesada, ¿qué pasa con tus gastos?
+          </label>
           <RankedChips
             options={O.STRESS_SPENDING}
             values={d.stressSpending ?? []}
@@ -325,7 +336,9 @@ const STEPS: Step[] = [
           />
         </div>
         <div className="fld">
-          <label className="fld-label">¿Cuál frase se parece más a lo que a veces piensas sobre el dinero?</label>
+          <label className="fld-label">
+            ¿Cuál frase se parece más a lo que a veces piensas sobre el dinero?
+          </label>
           <RankedChips
             options={O.MONEY_SCRIPT_PHRASES}
             values={d.moneyScriptPhrase ?? []}
@@ -367,7 +380,9 @@ const STEPS: Step[] = [
           />
         </div>
         <div className="fld">
-          <label className="fld-label">¿Qué tan cómodo te sientes tomando decisiones financieras?</label>
+          <label className="fld-label">
+            ¿Qué tan cómodo te sientes tomando decisiones financieras?
+          </label>
           <OptionCards
             options={O.DECISION_COMFORT}
             value={d.decisionComfort}
@@ -464,7 +479,9 @@ const STEPS: Step[] = [
           />
         </div>
         <div className="fld">
-          <label className="fld-label">Si mañana tu ingreso principal se detiene, ¿cuánto cubrirías?</label>
+          <label className="fld-label">
+            Si mañana tu ingreso principal se detiene, ¿cuánto cubrirías?
+          </label>
           <OptionCards
             options={O.INCOME_STOP_COVERAGE}
             value={d.incomeStopCoverage}
@@ -527,7 +544,9 @@ const STEPS: Step[] = [
           />
         </div>
         <div className="fld">
-          <label className="fld-label">Cuando estás por desviarte de una meta, ¿qué te ayuda más?</label>
+          <label className="fld-label">
+            Cuando estás por desviarte de una meta, ¿qué te ayuda más?
+          </label>
           <RankedChips
             options={O.INTERVENTION_STYLES}
             values={d.interventionStyle ?? []}

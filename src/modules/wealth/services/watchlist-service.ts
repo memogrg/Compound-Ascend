@@ -11,7 +11,11 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 
 export type WatchKind = "stock" | "etf" | "crypto";
@@ -28,7 +32,11 @@ export async function listWatchlist(): Promise<WatchItem[]> {
       .in("user_id", memberIds)
       .order("created_at", { ascending: true });
     if (error) return [];
-    return (data ?? []).map((r) => ({ id: r.id, symbol: r.symbol, kind: r.asset_type as WatchKind }));
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      symbol: r.symbol,
+      kind: r.asset_type as WatchKind,
+    }));
   } catch {
     return [];
   }

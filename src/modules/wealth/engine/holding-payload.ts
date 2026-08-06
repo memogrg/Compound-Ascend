@@ -13,12 +13,7 @@ import type { AssetType, InvestmentCategory } from "@/modules/wealth/types";
 import type { HoldingInput } from "@/modules/wealth/schemas";
 
 export type HoldingFrequency =
-  | "semanal"
-  | "mensual"
-  | "trimestral"
-  | "semestral"
-  | "anual"
-  | "al_vencimiento";
+  "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento";
 
 /** Costos operativos del inmueble de renta (perfil B · propiedad_alquiler). Strings de formulario. */
 export type RentalCosts = {

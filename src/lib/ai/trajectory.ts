@@ -8,7 +8,12 @@
  */
 
 /** Punto mensual (de monthly_snapshots), en orden cronológico ascendente. */
-export type MonthlyPoint = { period: string; income: number; expense: number; freeCashflow: number };
+export type MonthlyPoint = {
+  period: string;
+  income: number;
+  expense: number;
+  freeCashflow: number;
+};
 /** Punto de patrimonio (de portfolio_snapshots), en orden cronológico ascendente. */
 export type PortfolioPoint = { date: string; portfolioValue: number; netWorth: number };
 

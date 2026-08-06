@@ -38,7 +38,13 @@ export default async function MobileIngresos() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          <MobileHeader variant="inner" eyebrow="Presupuesto" title="Ingresos" backHref="/m" backLabel="Volver a Inicio" />
+          <MobileHeader
+            variant="inner"
+            eyebrow="Presupuesto"
+            title="Ingresos"
+            backHref="/m"
+            backLabel="Volver a Inicio"
+          />
           {/* Antes decía "Conecta Supabase para gestionar tus ingresos": un mensaje para
               quien programa, no para quien usa la app. */}
           <MEmptyState
@@ -55,7 +61,9 @@ export default async function MobileIngresos() {
 
   const { currency, budget, real, rates, incomeTree } = view;
   const incomeItems = budget.items.filter((b) => b.type === "income");
-  const manualSources = incomeItems.filter((b) => (b.sourceKind ?? "manual") === "manual" && !isLinked(b));
+  const manualSources = incomeItems.filter(
+    (b) => (b.sourceKind ?? "manual") === "manual" && !isLinked(b),
+  );
   const linkedSources = incomeItems.filter(isLinked);
   const receivedNative = real.incomeReceivedBySourceNative;
 
@@ -90,19 +98,33 @@ export default async function MobileIngresos() {
   return (
     <div className="m-scroll">
       <div className="m-pad">
-        <MobileHeader variant="inner" eyebrow="Presupuesto" title="Ingresos" backHref="/m" backLabel="Volver a Inicio" />
+        <MobileHeader
+          variant="inner"
+          eyebrow="Presupuesto"
+          title="Ingresos"
+          backHref="/m"
+          backLabel="Volver a Inicio"
+        />
 
         {/* Resumen: lo recibido (exacto mientras quepa) sobre lo planificado. */}
         <MSummaryCard
           eyebrow={`Ingresos del mes · ${view.period.label}`}
           value={mAmount(realIncome, currency, 11)}
-          chip={budgetIncome > 0 ? <MChip tone={complPct >= 1 ? "success" : "neutral"}>{formatPercent(complPct)}</MChip> : undefined}
+          chip={
+            budgetIncome > 0 ? (
+              <MChip tone={complPct >= 1 ? "success" : "neutral"}>{formatPercent(complPct)}</MChip>
+            ) : undefined
+          }
           sub={
             budgetIncome > 0
               ? `Recibido de ${formatMoney(budgetIncome, currency)} planificados este mes.`
               : "Aún no has planificado ingresos para este mes."
           }
-          slot={budgetIncome > 0 ? <MProgress value={complPct} tone={complPct >= 1 ? "success" : "warning"} height={8} /> : undefined}
+          slot={
+            budgetIncome > 0 ? (
+              <MProgress value={complPct} tone={complPct >= 1 ? "success" : "warning"} height={8} />
+            ) : undefined
+          }
           style={{ marginBottom: 16 }}
         />
 
@@ -136,7 +158,11 @@ export default async function MobileIngresos() {
           <MMetricCard
             label="Fuentes"
             value={String(totalSources)}
-            sub={linkedSources.length > 0 ? `${manualSources.length} manuales + ${linkedSources.length} vinculadas` : "este mes"}
+            sub={
+              linkedSources.length > 0
+                ? `${manualSources.length} manuales + ${linkedSources.length} vinculadas`
+                : "este mes"
+            }
           />
         </MMetricGrid>
 
@@ -174,7 +200,11 @@ export default async function MobileIngresos() {
                     icon={b.sourceKind === "rental" ? "rental" : "investment"}
                     title={b.name}
                     subtitle={
-                      b.sourceKind === "dividend" ? "Dividendos" : b.sourceKind === "rental" ? "Renta" : "Inversión"
+                      b.sourceKind === "dividend"
+                        ? "Dividendos"
+                        : b.sourceKind === "rental"
+                          ? "Renta"
+                          : "Inversión"
                     }
                     value={mAmount(rec > 0 ? rec : b.amount, b.currency)}
                     valueTone="success"

@@ -139,7 +139,8 @@ function CapitalPendingLine({ mf }: { mf: MonthFlow }) {
   const parts: string[] = [];
   if (mf.capital.out > 0 || mf.capital.in > 0) {
     const out = `moviste ${formatMoney(mf.capital.out, mf.currency)} a inversiones/metas`;
-    const inc = mf.capital.in > 0 ? ` · recuperaste ${formatMoney(mf.capital.in, mf.currency)}` : "";
+    const inc =
+      mf.capital.in > 0 ? ` · recuperaste ${formatMoney(mf.capital.in, mf.currency)}` : "";
     parts.push(`Capital: ${out}${inc}`);
   }
   if (mf.pending.count > 0) {
@@ -203,10 +204,7 @@ function TopTable({
       <div className="card-head">
         <div className="card-title">{title}</div>
       </div>
-      <div
-        className="list-row tbl-h"
-        style={{ gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr" }}
-      >
+      <div className="list-row tbl-h" style={{ gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr" }}>
         <span>{dimLabel}</span>
         <span style={{ textAlign: "right" }}>Presup.</span>
         <span style={{ textAlign: "right" }}>Real</span>
@@ -613,8 +611,7 @@ function IncomeSection({ view }: { view: V2View }) {
     return r > 0 ? r : conv(b);
   };
   const budgetIncome =
-    manualSources.reduce((s, b) => s + conv(b), 0) +
-    linkedSources.reduce((s, b) => s + conv(b), 0);
+    manualSources.reduce((s, b) => s + conv(b), 0) + linkedSources.reduce((s, b) => s + conv(b), 0);
   const realIncome =
     manualSources.reduce((s, b) => s + receivedOf(b), 0) +
     linkedSources.reduce((s, b) => s + linkedValueOf(b), 0);
@@ -763,8 +760,18 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
       sub: "operativo · real",
       tone: monthFlow.real.operatingFlow >= 0 ? "pos" : "neg",
     },
-    { ttl: "Ingresos", val: formatMoney(monthFlow.real.operatingIncome, currency), sub: "operativo", tone: "pos" },
-    { ttl: "Gastos", val: formatMoney(monthFlow.real.operatingExpense, currency), sub: "operativo", tone: "neg" },
+    {
+      ttl: "Ingresos",
+      val: formatMoney(monthFlow.real.operatingIncome, currency),
+      sub: "operativo",
+      tone: "pos",
+    },
+    {
+      ttl: "Gastos",
+      val: formatMoney(monthFlow.real.operatingExpense, currency),
+      sub: "operativo",
+      tone: "neg",
+    },
     {
       ttl: "Movimientos",
       val: String(real.count),

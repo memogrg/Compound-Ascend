@@ -23,7 +23,10 @@ function asStrings(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
-export async function readProfileContext(db: Db, userId: string): Promise<Partial<FinancialContext>> {
+export async function readProfileContext(
+  db: Db,
+  userId: string,
+): Promise<Partial<FinancialContext>> {
   const ctx: Partial<FinancialContext> = {};
 
   // Lecturas agrupadas (una fila por tabla): perfil, riesgo, conducta, settings, prioridades.

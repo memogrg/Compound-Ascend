@@ -257,7 +257,9 @@ function TransactionWizard({ today }: { today: () => string }) {
             <button
               key={k}
               className="coach-chip"
-              style={draft.kind === k ? { background: "var(--ink)", color: "var(--bg)" } : undefined}
+              style={
+                draft.kind === k ? { background: "var(--ink)", color: "var(--bg)" } : undefined
+              }
               // Al cambiar de naturaleza, el sobre elegido ya no aplica → se limpia.
               onClick={() => setDraft((d) => ({ ...d, kind: k, categoryId: null }))}
             >

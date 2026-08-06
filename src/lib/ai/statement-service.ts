@@ -13,7 +13,12 @@ import "server-only";
 import { formatMoney } from "@/lib/format";
 import { subtotales } from "@/lib/ai/money";
 import { parseStatement, bloqueEsLimpio } from "@/lib/ai/statement-parse";
-import { conciliar, dedupeFilas, rangoDeFilas, type FilaConciliada } from "@/lib/ai/statement-reconcile";
+import {
+  conciliar,
+  dedupeFilas,
+  rangoDeFilas,
+  type FilaConciliada,
+} from "@/lib/ai/statement-reconcile";
 import type { AIActionProposal } from "@/lib/ai/types";
 import { logger } from "@/lib/logger";
 
@@ -170,7 +175,10 @@ export async function resolverConfirmacionDeAlta(
   if (!r) return null;
   if (!r.action) {
     // Ya no falta ninguna (las registró en el ínterin, o la tarjeta ya se usó).
-    return { resumen_md: "Ya están todas registradas: no me queda ninguna por agregar.", action: null };
+    return {
+      resumen_md: "Ya están todas registradas: no me queda ninguna por agregar.",
+      action: null,
+    };
   }
   const cuantas = (r.action.payload.rows as unknown[]).length;
   return {
@@ -235,13 +243,19 @@ export function renderReporte(
       ? `\n\n(No pude leer ${opts.ignoradas} ${opts.ignoradas === 1 ? "línea" : "líneas"} del pegado; revisalas aparte.)`
       : "";
 
-  const cierre = faltantes > 0 ? "\n\nPodés registrar las que faltan de una, con el sobre que les puse:" : "";
+  const cierre =
+    faltantes > 0 ? "\n\nPodés registrar las que faltan de una, con el sobre que les puse:" : "";
 
-  return [
-    resumen,
-    "",
-    "| Fecha | Comercio | Monto | Estado |",
-    "| --- | --- | --- | --- |",
-    ...cuerpo,
-  ].join("\n") + repetidas + nota + cierre;
+  return (
+    [
+      resumen,
+      "",
+      "| Fecha | Comercio | Monto | Estado |",
+      "| --- | --- | --- | --- |",
+      ...cuerpo,
+    ].join("\n") +
+    repetidas +
+    nota +
+    cierre
+  );
 }

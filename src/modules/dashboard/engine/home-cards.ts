@@ -10,11 +10,7 @@
  * Regla del brief: el "vs mes anterior" es OPCIONAL (`vsMes`/`delta`); su cálculo
  * es el Delta 3. Aquí queda `null` para degradar sin flecha.
  */
-import {
-  unbudgetedExpenseShare,
-  type MonthFlow,
-  type KeyedValue,
-} from "@/modules/financial-base";
+import { unbudgetedExpenseShare, type MonthFlow, type KeyedValue } from "@/modules/financial-base";
 import {
   aggregateHoldingsByNature,
   buildBaseProtectionChecklist,
@@ -71,7 +67,11 @@ export type PresupuestoCard = {
   vsMes: VsMes;
 };
 
-export function selectPresupuesto(mf: MonthFlow, real: KeyedValue, budget: KeyedValue): PresupuestoCard {
+export function selectPresupuesto(
+  mf: MonthFlow,
+  real: KeyedValue,
+  budget: KeyedValue,
+): PresupuestoCard {
   const flujoReal = mf.real.operatingFlow;
   const cov = unbudgetedExpenseShare(real, budget);
   return {
@@ -292,7 +292,10 @@ export type ProteccionCard = {
 };
 
 export function selectProteccion(
-  protection: Pick<ProtectionDiagnosis, "totalCoverage" | "activePolicies" | "annualPremium" | "coverageByType">,
+  protection: Pick<
+    ProtectionDiagnosis,
+    "totalCoverage" | "activePolicies" | "annualPremium" | "coverageByType"
+  >,
   funds: { emergencia: number; paz: number },
 ): ProteccionCard {
   // El "monto protegido" suma pólizas + fondos de defensa. Ambos llegan ya en la moneda
@@ -418,9 +421,24 @@ export function selectLibertad(
   // "pending" (rojo). Con avances monótonos, el primer pct<1 es el hito en el que estás.
   const raw: { key: Hito; label: string; amount: number; pct: number }[] = [
     { key: "ninguno", label: "Punto de partida", amount: 0, pct: 1 },
-    { key: "seguridad", label: "Seguridad", amount: round2(report.numeroDeSeguridad), pct: clamp01(report.progresoSeguridad) },
-    { key: "independencia", label: "Independencia", amount: round2(report.numeroDeIndependencia), pct: clamp01(report.progresoIndependencia) },
-    { key: "libertad", label: "Libertad", amount: round2(report.numeroDeLibertad ?? 0), pct: clamp01(report.progresoLibertad) },
+    {
+      key: "seguridad",
+      label: "Seguridad",
+      amount: round2(report.numeroDeSeguridad),
+      pct: clamp01(report.progresoSeguridad),
+    },
+    {
+      key: "independencia",
+      label: "Independencia",
+      amount: round2(report.numeroDeIndependencia),
+      pct: clamp01(report.progresoIndependencia),
+    },
+    {
+      key: "libertad",
+      label: "Libertad",
+      amount: round2(report.numeroDeLibertad ?? 0),
+      pct: clamp01(report.progresoLibertad),
+    },
   ];
   let currentSeen = false;
   const hitos: MilestoneStep[] = raw.map((h) => {
@@ -481,9 +499,10 @@ export function deriveFundAmounts(goals: FundGoal[]): { emergencia: number; paz:
 }
 
 /** Flags de fondos de defensa desde las metas (existe = tiene saldo). */
-export function deriveFundFlags(
-  goals: FundGoal[],
-): { hasEmergencyFund: boolean; hasPeaceFund: boolean } {
+export function deriveFundFlags(goals: FundGoal[]): {
+  hasEmergencyFund: boolean;
+  hasPeaceFund: boolean;
+} {
   const amounts = deriveFundAmounts(goals);
   return {
     hasEmergencyFund: amounts.emergencia > 0,

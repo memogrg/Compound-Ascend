@@ -61,19 +61,33 @@ export default async function MobileMetas() {
       <div className="m-pad">
         {/* /m/metas no es una pestaña y era la ÚNICA pantalla no-pestaña sin backHref: se
             entraba desde Inicio y no había forma de volver salvo saltar a otra sección. */}
-        <MobileHeader variant="inner" eyebrow="Control" title="Ahorro" backHref="/m" backLabel="Volver a Inicio" />
+        <MobileHeader
+          variant="inner"
+          eyebrow="Control"
+          title="Ahorro"
+          backHref="/m"
+          backLabel="Volver a Inicio"
+        />
 
         {/* Resumen: lo ahorrado (exacto mientras quepa) sobre el objetivo global. */}
         <MSummaryCard
           eyebrow="Total ahorrado"
           value={mAmount(totalSaved, currency, 11)}
-          chip={totalTarget > 0 ? <MChip tone={pct >= 1 ? "success" : "neutral"}>{formatPercent(pct)}</MChip> : undefined}
+          chip={
+            totalTarget > 0 ? (
+              <MChip tone={pct >= 1 ? "success" : "neutral"}>{formatPercent(pct)}</MChip>
+            ) : undefined
+          }
           sub={
             totalTarget > 0
               ? `De ${formatMoney(totalTarget, currency)} en objetivos. Te faltan ${formatMoney(missing, currency)}.`
               : "Aún no tienes metas con objetivo: lo que guardes aquí se acumula sin tope."
           }
-          slot={totalTarget > 0 ? <MProgress value={pct} tone={pct >= 1 ? "success" : "success"} height={9} /> : undefined}
+          slot={
+            totalTarget > 0 ? (
+              <MProgress value={pct} tone={pct >= 1 ? "success" : "success"} height={9} />
+            ) : undefined
+          }
           style={{ marginBottom: 16 }}
         />
 
@@ -83,7 +97,9 @@ export default async function MobileMetas() {
           <MMetricCard
             label="Metas activas"
             value={String(goals.length)}
-            sub={sobres > 0 ? `${sobres} ${sobres === 1 ? "es sobre" : "son sobres"}` : "con objetivo"}
+            sub={
+              sobres > 0 ? `${sobres} ${sobres === 1 ? "es sobre" : "son sobres"}` : "con objetivo"
+            }
           />
           <MMetricCard
             label="Aporte mensual"
@@ -137,5 +153,8 @@ export default async function MobileMetas() {
 
 /** Fecha corta para la celda de métrica, que es estrecha y no parte línea: "dic 2026". */
 function fmtShort(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { month: "short", year: "numeric" });
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
+    month: "short",
+    year: "numeric",
+  });
 }

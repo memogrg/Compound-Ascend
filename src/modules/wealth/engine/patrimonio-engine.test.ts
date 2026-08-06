@@ -31,7 +31,9 @@ const codes = (r: ReturnType<typeof computePatrimonio>) =>
 describe("computePatrimonio · base de la Independencia = compromiso mensual total", () => {
   it("con monthlyCommitment, la Independencia sale de ESE total (no de monthlyExpenses)", () => {
     // Usuario con sobres+metas+DCA (compromiso 3.000) pero lista base "expenses" vacía (0).
-    const r = computePatrimonio(inp({ monthlyExpenses: 0, monthlyCommitment: 3_000, essentialMonthlyExpenses: 1_000 }));
+    const r = computePatrimonio(
+      inp({ monthlyExpenses: 0, monthlyCommitment: 3_000, essentialMonthlyExpenses: 1_000 }),
+    );
     expect(r.numeroDeIndependencia).toBe(numeroPatrimonial(3_000)); // 3.000×12÷0,08
     expect(r.numeroDeIndependencia).toBeGreaterThan(0); // ya NO da 0
     // Seguridad sigue siendo SOLO el esencial (1.000), distinto de la Independencia.
@@ -56,7 +58,16 @@ describe("computePatrimonio · base de la Independencia = compromiso mensual tot
 describe("computePatrimonio · totales y ajustado", () => {
   it("totalAssets, netWorth y adjustedNetWorth", () => {
     const r = computePatrimonio(
-      inp({ assetsByClass: { liquido: 100, inversion: 200, productivo: 300, uso_personal: 400, especial: 500 }, totalLiabilities: 100 }),
+      inp({
+        assetsByClass: {
+          liquido: 100,
+          inversion: 200,
+          productivo: 300,
+          uso_personal: 400,
+          especial: 500,
+        },
+        totalLiabilities: 100,
+      }),
     );
     expect(r.totalAssets).toBe(1500);
     expect(r.netWorth).toBe(1400);
@@ -65,15 +76,61 @@ describe("computePatrimonio · totales y ajustado", () => {
   });
 
   it("descuentos: efectivo 100% vs especial 55%", () => {
-    expect(computePatrimonio(inp({ assetsByClass: { liquido: 100000, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 } })).adjustedNetWorth).toBe(100000);
-    expect(computePatrimonio(inp({ assetsByClass: { liquido: 0, inversion: 0, productivo: 0, uso_personal: 0, especial: 100000 } })).adjustedNetWorth).toBe(55000);
+    expect(
+      computePatrimonio(
+        inp({
+          assetsByClass: {
+            liquido: 100000,
+            inversion: 0,
+            productivo: 0,
+            uso_personal: 0,
+            especial: 0,
+          },
+        }),
+      ).adjustedNetWorth,
+    ).toBe(100000);
+    expect(
+      computePatrimonio(
+        inp({
+          assetsByClass: {
+            liquido: 0,
+            inversion: 0,
+            productivo: 0,
+            uso_personal: 0,
+            especial: 100000,
+          },
+        }),
+      ).adjustedNetWorth,
+    ).toBe(55000);
   });
 });
 
 describe("computePatrimonio · personas del PDF (A vs B)", () => {
   // Mismo gasto; A: 1.000.000 totales pero solo 50.000 invertible. B: 600.000 totales con 450.000 invertible.
-  const A = computePatrimonio(inp({ assetsByClass: { liquido: 0, inversion: 50_000, productivo: 0, uso_personal: 950_000, especial: 0 }, monthlyExpenses: 5_000 }));
-  const B = computePatrimonio(inp({ assetsByClass: { liquido: 0, inversion: 450_000, productivo: 0, uso_personal: 150_000, especial: 0 }, monthlyExpenses: 5_000 }));
+  const A = computePatrimonio(
+    inp({
+      assetsByClass: {
+        liquido: 0,
+        inversion: 50_000,
+        productivo: 0,
+        uso_personal: 950_000,
+        especial: 0,
+      },
+      monthlyExpenses: 5_000,
+    }),
+  );
+  const B = computePatrimonio(
+    inp({
+      assetsByClass: {
+        liquido: 0,
+        inversion: 450_000,
+        productivo: 0,
+        uso_personal: 150_000,
+        especial: 0,
+      },
+      monthlyExpenses: 5_000,
+    }),
+  );
 
   it("A tiene años de libertad e índice bajos pese a mayor patrimonio total", () => {
     expect(A.totalAssets).toBe(1_000_000);
@@ -90,11 +147,33 @@ describe("computePatrimonio · personas del PDF (A vs B)", () => {
 
 describe("computePatrimonio · años de libertad", () => {
   it("invertible 600.000 / gasto anual 120.000 = 5", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 0, inversion: 600_000, productivo: 0, uso_personal: 0, especial: 0 }, monthlyExpenses: 10_000 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 0,
+          inversion: 600_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        monthlyExpenses: 10_000,
+      }),
+    );
     expect(r.añosDeLibertad).toBe(5);
   });
   it("invertible 600.000 / gasto anual 24.000 = 25", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 0, inversion: 600_000, productivo: 0, uso_personal: 0, especial: 0 }, monthlyExpenses: 2_000 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 0,
+          inversion: 600_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        monthlyExpenses: 2_000,
+      }),
+    );
     expect(r.añosDeLibertad).toBe(25);
   });
 });
@@ -121,58 +200,187 @@ describe("patrimonioLevel · bordes de cada rango", () => {
 
 describe("millonarioReadings", () => {
   it("patrimonio invertible y flujo cubren todas las lecturas", () => {
-    const m = millonarioReadings(inp({ assetsByClass: { liquido: 0, inversion: 1_500_000, productivo: 0, uso_personal: 0, especial: 0 }, monthlyExpenses: 1_000, passiveIncomeMonthly: 1_200 }));
-    expect(m).toEqual({ nominal: true, netWorth: true, invertible: true, libertad: true, flujo: true });
+    const m = millonarioReadings(
+      inp({
+        assetsByClass: {
+          liquido: 0,
+          inversion: 1_500_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+        passiveIncomeMonthly: 1_200,
+      }),
+    );
+    expect(m).toEqual({
+      nominal: true,
+      netWorth: true,
+      invertible: true,
+      libertad: true,
+      flujo: true,
+    });
   });
   it("perfil bajo → todas falsas", () => {
-    const m = millonarioReadings(inp({ assetsByClass: { liquido: 1_000, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 }, monthlyExpenses: 1_000 }));
-    expect(m).toEqual({ nominal: false, netWorth: false, invertible: false, libertad: false, flujo: false });
+    const m = millonarioReadings(
+      inp({
+        assetsByClass: {
+          liquido: 1_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+      }),
+    );
+    expect(m).toEqual({
+      nominal: false,
+      netWorth: false,
+      invertible: false,
+      libertad: false,
+      flujo: false,
+    });
   });
 });
 
 describe("buildPatrimonioDiagnosis · banderas §15", () => {
   it("patrimonio_neto_negativo (pasivos > activos)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 1_000, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 }, totalLiabilities: 5_000 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 1_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        totalLiabilities: 5_000,
+      }),
+    );
     expect(r.netWorth).toBe(-4_000);
     expect(codes(r)).toContain("patrimonio_neto_negativo");
   });
 
   it("patrimonio_alto_baja_liquidez (sustancial pero <3 meses)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 0, inversion: 200_000, productivo: 0, uso_personal: 0, especial: 0 }, monthlyExpenses: 1_000 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 0,
+          inversion: 200_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+      }),
+    );
     expect(codes(r)).toContain("patrimonio_alto_baja_liquidez");
   });
 
   it("alto_pero_poco_productivo (sustancial, invertible <30%)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 3_000, inversion: 0, productivo: 0, uso_personal: 200_000, especial: 0 }, monthlyExpenses: 1_000 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 3_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 200_000,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+      }),
+    );
     const c = codes(r);
     expect(c).toContain("alto_pero_poco_productivo");
     expect(c).not.toContain("patrimonio_alto_baja_liquidez"); // 3 meses justos, no <3
   });
 
   it("alta_tasa_baja_proteccion (tasa>=15%, protección<50)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 3_000, inversion: 0, productivo: 0, uso_personal: 20_000, especial: 0 }, monthlyExpenses: 1_000, netMonthlyIncome: 1_000, monthlyInvested: 200, protectionScore: 10 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 3_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 20_000,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+        netMonthlyIncome: 1_000,
+        monthlyInvested: 200,
+        protectionScore: 10,
+      }),
+    );
     expect(codes(r)).toContain("alta_tasa_baja_proteccion");
   });
 
   it("deuda_mala_alta (pago deuda cara >=20% ingreso)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 3_000, inversion: 0, productivo: 0, uso_personal: 20_000, especial: 0 }, monthlyExpenses: 1_000, netMonthlyIncome: 1_000, badDebtMonthlyPayment: 300 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 3_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 20_000,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+        netMonthlyIncome: 1_000,
+        badDebtMonthlyPayment: 300,
+      }),
+    );
     expect(codes(r)).toContain("deuda_mala_alta");
   });
 
   it("alta_concentracion (topConcentration >=0.6)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 3_000, inversion: 0, productivo: 0, uso_personal: 20_000, especial: 0 }, monthlyExpenses: 1_000, topConcentration: 0.7 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 3_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 20_000,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+        topConcentration: 0.7,
+      }),
+    );
     expect(codes(r)).toContain("alta_concentracion");
   });
 
   it("alto_gasto_vs_patrimonio (gasto anual > patrimonio neto)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 5_000, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 }, monthlyExpenses: 1_000 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 5_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        monthlyExpenses: 1_000,
+      }),
+    );
     expect(codes(r)).toContain("alto_gasto_vs_patrimonio");
   });
 });
 
 describe("computePatrimonio · bordes", () => {
   it("gasto 0 → sin división por cero (índice finito, métricas 0)", () => {
-    const r = computePatrimonio(inp({ assetsByClass: { liquido: 10_000, inversion: 5_000, productivo: 0, uso_personal: 0, especial: 0 }, monthlyExpenses: 0 }));
+    const r = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 10_000,
+          inversion: 5_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        monthlyExpenses: 0,
+      }),
+    );
     expect(Number.isFinite(r.indice)).toBe(true);
     expect(r.mesesDeColchon).toBe(0);
     expect(r.coberturaPasiva).toBe(0);
@@ -184,10 +392,32 @@ describe("computePatrimonio · bordes", () => {
   });
 
   it("patrimonioEsperado y ratioAcumulacion (§10.2) — null si falta edad/ingreso", () => {
-    const conEdad = computePatrimonio(inp({ assetsByClass: { liquido: 500_000, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 }, age: 40, annualNetIncome: 250_000 }));
+    const conEdad = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 500_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+        age: 40,
+        annualNetIncome: 250_000,
+      }),
+    );
     expect(conEdad.patrimonioEsperado).toBe(1_000_000); // 40*250000/10
     expect(conEdad.ratioAcumulacion).toBe(0.5); // 500000 / 1.000.000
-    const sinEdad = computePatrimonio(inp({ assetsByClass: { liquido: 500_000, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 } }));
+    const sinEdad = computePatrimonio(
+      inp({
+        assetsByClass: {
+          liquido: 500_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
+      }),
+    );
     expect(sinEdad.patrimonioEsperado).toBeNull();
     expect(sinEdad.ratioAcumulacion).toBeNull();
   });
@@ -196,7 +426,11 @@ describe("computePatrimonio · bordes", () => {
 describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => {
   it("seguridad = esencial·12/0.08, independencia = total·12/0.08, libertad = deseado·12/0.08", () => {
     const r = computePatrimonio(
-      inp({ essentialMonthlyExpenses: 1_000, monthlyExpenses: 2_000, desiredMonthlyLifestyle: 5_000 }),
+      inp({
+        essentialMonthlyExpenses: 1_000,
+        monthlyExpenses: 2_000,
+        desiredMonthlyLifestyle: 5_000,
+      }),
     );
     expect(r.numeroDeSeguridad).toBe(150_000); // 1000*12/0.08
     expect(r.numeroDeIndependencia).toBe(300_000); // 2000*12/0.08
@@ -204,7 +438,9 @@ describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => 
   });
 
   it("libertad = null cuando no hay estilo de vida deseado (no se inventa un múltiplo)", () => {
-    const sinDeseo = computePatrimonio(inp({ essentialMonthlyExpenses: 1_000, monthlyExpenses: 2_000 }));
+    const sinDeseo = computePatrimonio(
+      inp({ essentialMonthlyExpenses: 1_000, monthlyExpenses: 2_000 }),
+    );
     expect(sinDeseo.numeroDeLibertad).toBeNull();
     expect(sinDeseo.progresoLibertad).toBe(0);
     // Deseo 0 o negativo también → null (no cuenta como definido).
@@ -214,7 +450,13 @@ describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => 
   it("capital que trabaja = inversión + productivo + (líquido − fondos de defensa)", () => {
     const r = computePatrimonio(
       inp({
-        assetsByClass: { liquido: 100_000, inversion: 50_000, productivo: 20_000, uso_personal: 0, especial: 0 },
+        assetsByClass: {
+          liquido: 100_000,
+          inversion: 50_000,
+          productivo: 20_000,
+          uso_personal: 0,
+          especial: 0,
+        },
         defenseFundsBalance: 30_000,
       }),
     );
@@ -228,7 +470,13 @@ describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => 
     // Colchón mayor que el líquido → aporte líquido pisado en 0, no negativo.
     const soloLiquido = computePatrimonio(
       inp({
-        assetsByClass: { liquido: 10_000, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 },
+        assetsByClass: {
+          liquido: 10_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
         defenseFundsBalance: 50_000,
       }),
     );
@@ -236,7 +484,13 @@ describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => 
     // El descuento del colchón sólo afecta al líquido: no reduce inversión/productivo.
     const conInversion = computePatrimonio(
       inp({
-        assetsByClass: { liquido: 0, inversion: 100_000, productivo: 0, uso_personal: 0, especial: 0 },
+        assetsByClass: {
+          liquido: 0,
+          inversion: 100_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
         defenseFundsBalance: 50_000,
       }),
     );
@@ -257,7 +511,13 @@ describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => 
     // Capital cubre seguridad (150k) pero no independencia (300k).
     const enSeguridad = computePatrimonio(
       inp({
-        assetsByClass: { liquido: 0, inversion: 200_000, productivo: 0, uso_personal: 0, especial: 0 },
+        assetsByClass: {
+          liquido: 0,
+          inversion: 200_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
         essentialMonthlyExpenses: 1_000,
         monthlyExpenses: 2_000,
       }),
@@ -266,14 +526,22 @@ describe("computePatrimonio · los tres números (N2 · TASA_RETIRO 8%)", () => 
     expect(enSeguridad.siguienteHito).toBe("independencia");
 
     // Sin capital → ninguno, siguiente = seguridad.
-    const cero = computePatrimonio(inp({ essentialMonthlyExpenses: 1_000, monthlyExpenses: 2_000 }));
+    const cero = computePatrimonio(
+      inp({ essentialMonthlyExpenses: 1_000, monthlyExpenses: 2_000 }),
+    );
     expect(cero.hitoAlcanzado).toBe("ninguno");
     expect(cero.siguienteHito).toBe("seguridad");
 
     // En independencia sin estilo de vida deseado → no hay siguiente hito (libertad indefinida).
     const enIndep = computePatrimonio(
       inp({
-        assetsByClass: { liquido: 0, inversion: 400_000, productivo: 0, uso_personal: 0, especial: 0 },
+        assetsByClass: {
+          liquido: 0,
+          inversion: 400_000,
+          productivo: 0,
+          uso_personal: 0,
+          especial: 0,
+        },
         essentialMonthlyExpenses: 1_000,
         monthlyExpenses: 2_000,
       }),
@@ -287,7 +555,13 @@ describe("computePatrimonio · calidadPatrimonio (§6.10 · promedio ponderado)"
   it("perfil frágil (productivo 0%, deuda cara alta, alta concentración, div baja) → calidad baja, no inflada", () => {
     const r = computePatrimonio(
       inp({
-        assetsByClass: { liquido: 5_000, inversion: 0, productivo: 0, uso_personal: 95_000, especial: 0 },
+        assetsByClass: {
+          liquido: 5_000,
+          inversion: 0,
+          productivo: 0,
+          uso_personal: 95_000,
+          especial: 0,
+        },
         protectionScore: 10,
         netMonthlyIncome: 1_000,
         badDebtMonthlyPayment: 300, // ratioDeudaMala 0.3 ≥ 0.2 → lowBadDebt 0
@@ -301,7 +575,13 @@ describe("computePatrimonio · calidadPatrimonio (§6.10 · promedio ponderado)"
   it("perfil fuerte (productivo alto, sin deuda cara, baja concentración, div alta, buena protección) → calidad alta", () => {
     const r = computePatrimonio(
       inp({
-        assetsByClass: { liquido: 30_000, inversion: 10_000, productivo: 60_000, uso_personal: 0, especial: 0 },
+        assetsByClass: {
+          liquido: 30_000,
+          inversion: 10_000,
+          productivo: 60_000,
+          uso_personal: 0,
+          especial: 0,
+        },
         protectionScore: 90,
         netMonthlyIncome: 1_000,
         badDebtMonthlyPayment: 0,
@@ -314,7 +594,13 @@ describe("computePatrimonio · calidadPatrimonio (§6.10 · promedio ponderado)"
 
   it("invariante a la moneda: mismos ratios escalados por FX → misma calidad", () => {
     const base = {
-      assetsByClass: { liquido: 30_000, inversion: 0, productivo: 60_000, uso_personal: 10_000, especial: 0 },
+      assetsByClass: {
+        liquido: 30_000,
+        inversion: 0,
+        productivo: 60_000,
+        uso_personal: 10_000,
+        especial: 0,
+      },
       protectionScore: 70,
       netMonthlyIncome: 2_000,
       badDebtMonthlyPayment: 100,

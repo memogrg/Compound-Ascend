@@ -47,7 +47,10 @@ export const FX_PER_USD: Record<string, number> = {
  * del feed cripto (getMarketPrice("BTC","crypto")); si es null (feed caído), cae al estático
  * PERO marcado `stale: true` — el estático NO se presenta como vivo. Puro y testeable.
  */
-export function btcPerUsd(liveUsdPrice: number | null | undefined): { rate: number; stale: boolean } {
+export function btcPerUsd(liveUsdPrice: number | null | undefined): {
+  rate: number;
+  stale: boolean;
+} {
   if (typeof liveUsdPrice === "number" && Number.isFinite(liveUsdPrice) && liveUsdPrice > 0) {
     return { rate: 1 / liveUsdPrice, stale: false };
   }

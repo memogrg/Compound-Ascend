@@ -74,7 +74,21 @@ function raiz(palabra: string): string {
 const raices = (s: string): string => normalizarSobre(s).split(" ").map(raiz).join(" ");
 
 /** Palabras significativas de un texto ya normalizado (descarta conectores). */
-const STOP = new Set(["de", "del", "la", "el", "los", "las", "y", "en", "para", "por", "a", "mi", "mis"]);
+const STOP = new Set([
+  "de",
+  "del",
+  "la",
+  "el",
+  "los",
+  "las",
+  "y",
+  "en",
+  "para",
+  "por",
+  "a",
+  "mi",
+  "mis",
+]);
 const tokens = (s: string): string[] =>
   raices(s)
     .split(" ")

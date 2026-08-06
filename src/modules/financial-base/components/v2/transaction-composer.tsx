@@ -647,7 +647,10 @@ export function TransactionComposer({
                   </div>
                 ) : null}
                 {showCatWarn ? (
-                  <div role="alert" style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}>
+                  <div
+                    role="alert"
+                    style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}
+                  >
                     {categoryHint}
                   </div>
                 ) : null}
@@ -704,7 +707,11 @@ export function TransactionComposer({
                 className="chip-grid"
                 style={
                   showCatWarn
-                    ? { outline: "1.5px solid var(--neg, #c0392b)", outlineOffset: 4, borderRadius: 8 }
+                    ? {
+                        outline: "1.5px solid var(--neg, #c0392b)",
+                        outlineOffset: 4,
+                        borderRadius: 8,
+                      }
                     : undefined
                 }
               >
@@ -777,7 +784,10 @@ export function TransactionComposer({
                 )}
               </div>
               {showCatWarn ? (
-                <div role="alert" style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}>
+                <div
+                  role="alert"
+                  style={{ color: "var(--neg, #c0392b)", fontSize: 12.5, marginTop: 6 }}
+                >
                   {categoryHint}
                 </div>
               ) : null}

@@ -14,12 +14,7 @@ import type { LinkedKind, Transaction } from "@/modules/financial-base/types";
 export type MoneyFlowEffect = "out" | "in" | "neutral";
 
 export type MoneyFlowVerb =
-  | "se_almacena_en"
-  | "abona_a"
-  | "pagado_a"
-  | "recibido_en"
-  | "movido_entre_cuentas"
-  | "ajuste";
+  "se_almacena_en" | "abona_a" | "pagado_a" | "recibido_en" | "movido_entre_cuentas" | "ajuste";
 
 export type MoneyFlow = {
   effect: MoneyFlowEffect;
@@ -80,13 +75,25 @@ export function describeMoneyFlow(t: MoneyFlowInput): MoneyFlow {
   // Consumo de un frasco de meta (gasto OFF-BUDGET): el dinero sale del frasco, NO
   // de tu liquidez (ya salió al aportar). Neutro. La contraparte es el frasco.
   if (t.kind === "gasto" && linked === "goal" && t.countsInBudget === false) {
-    return { effect: "neutral", fromLabel: counterparty, toLabel: "", verb: "pagado_a", isJarSpend: true };
+    return {
+      effect: "neutral",
+      fromLabel: counterparty,
+      toLabel: "",
+      verb: "pagado_a",
+      isJarSpend: true,
+    };
   }
 
   // Transferencia entre cuentas: neutra. merchant_or_source viene como "A → B".
   if (t.kind === "transferencia") {
     const [from, to] = splitTransfer(t.merchantOrSource, t.accountLabel);
-    return { effect: "neutral", fromLabel: from, toLabel: to, verb: "movido_entre_cuentas", isJarSpend: false };
+    return {
+      effect: "neutral",
+      fromLabel: from,
+      toLabel: to,
+      verb: "movido_entre_cuentas",
+      isJarSpend: false,
+    };
   }
 
   // Ajuste: neutro, sin viaje.
@@ -96,7 +103,13 @@ export function describeMoneyFlow(t: MoneyFlowInput): MoneyFlow {
 
   // Ingreso (salario, dividendo/renta, venta o retiro): entra a tu liquidez.
   if (t.kind === "ingreso") {
-    return { effect: "in", fromLabel: counterparty, toLabel: LIQUIDITY_LABEL, verb: "recibido_en", isJarSpend: false };
+    return {
+      effect: "in",
+      fromLabel: counterparty,
+      toLabel: LIQUIDITY_LABEL,
+      verb: "recibido_en",
+      isJarSpend: false,
+    };
   }
 
   // Gasto: sale de tu liquidez. El verbo del destino depende del vínculo:
@@ -107,14 +120,18 @@ export function describeMoneyFlow(t: MoneyFlowInput): MoneyFlow {
       : linked === "goal" || linked === "holding"
         ? "se_almacena_en"
         : "pagado_a";
-  return { effect: "out", fromLabel: LIQUIDITY_LABEL, toLabel: counterparty, verb, isJarSpend: false };
+  return {
+    effect: "out",
+    fromLabel: LIQUIDITY_LABEL,
+    toLabel: counterparty,
+    verb,
+    isJarSpend: false,
+  };
 }
 
 /** Cómo presentar la línea "Liquidez después" del detalle. */
 export type LiquidityAfterDisplay =
-  | { mode: "amount"; value: number }
-  | { mode: "unchanged" }
-  | { mode: "hidden" };
+  { mode: "amount"; value: number } | { mode: "unchanged" } | { mode: "hidden" };
 
 /**
  * Decide "Liquidez después" por el EFECTO real del movimiento, no por la mera

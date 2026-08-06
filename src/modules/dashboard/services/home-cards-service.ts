@@ -97,9 +97,14 @@ export async function getHomeCardsData(): Promise<HomeCards> {
     convertCurrency(amount, from, currency, control?.fxRates ?? {});
   // Los movimientos de meta/deuda son ingreso o gasto (el aporte es gasto, el retiro ingreso);
   // una transferencia no debería venir vinculada, pero la excluimos para no contarla mal.
-  const asMov = (m: { kind: string }) => (m.kind === "ingreso" ? ("ingreso" as const) : ("gasto" as const));
-  const goalMovs = (movements ?? []).filter((m) => m.linkedKind === "goal" && m.kind !== "transferencia");
-  const debtMovs = (movements ?? []).filter((m) => m.linkedKind === "debt" && m.kind !== "transferencia");
+  const asMov = (m: { kind: string }) =>
+    m.kind === "ingreso" ? ("ingreso" as const) : ("gasto" as const);
+  const goalMovs = (movements ?? []).filter(
+    (m) => m.linkedKind === "goal" && m.kind !== "transferencia",
+  );
+  const debtMovs = (movements ?? []).filter(
+    (m) => m.linkedKind === "debt" && m.kind !== "transferencia",
+  );
 
   const ahorrosVsMes = movements
     ? buildAhorrosVsMes(

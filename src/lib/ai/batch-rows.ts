@@ -56,7 +56,8 @@ export function normalizarFilas(raw: unknown): BatchRowDraft[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((r, i) => {
     const o = (r ?? {}) as Record<string, unknown>;
-    const amount = typeof o.amount === "number" && Number.isFinite(o.amount) ? Math.abs(o.amount) : 0;
+    const amount =
+      typeof o.amount === "number" && Number.isFinite(o.amount) ? Math.abs(o.amount) : 0;
     return {
       uid: `f${i}`,
       kind: o.kind === "ingreso" ? "ingreso" : "gasto",
@@ -98,10 +99,7 @@ export function parsearMonto(texto: string): number | null {
   const iPunto = s.lastIndexOf(".");
   let limpio: string;
   if (iComa >= 0 && iPunto >= 0) {
-    limpio =
-      iComa > iPunto
-        ? s.replace(/\./g, "").replace(",", ".")
-        : s.replace(/,/g, "");
+    limpio = iComa > iPunto ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
   } else if (iComa >= 0) {
     // Una coma sola: decimal si deja 1-2 dígitos detrás ("3900,5"), miles si deja 3 ("3,900").
     limpio = /,\d{1,2}$/.test(s) ? s.replace(",", ".") : s.replace(/,/g, "");

@@ -120,7 +120,14 @@ export function AddSpendForm({
       }
     >
       {/* Moneda ANTES del monto: se elige en qué moneda se captura y luego cuánto. */}
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
       <MoneyField name="amount" label="Monto" value={amount} onChange={setAmount} currency={cur} />
       {/* Nombre con su propio campo y protagonismo (sigue siendo opcional en el submit). */}
       <TextField
@@ -131,10 +138,7 @@ export function AddSpendForm({
         placeholder="Súper, gasolina, farmacia…"
         maxLength={160}
       />
-      <SobreField
-        label={sobreLabel}
-        onOpen={() => setPickerOpen(true)}
-      />
+      <SobreField label={sobreLabel} onOpen={() => setPickerOpen(true)} />
       <DateField name="occurredOn" label="Fecha" value={date} onChange={setDate} />
 
       {/* Selector de sobre agrupado por frasco (como el composer de gasto) */}
@@ -168,7 +172,13 @@ function SobreField({ label, onOpen }: { label: string; onOpen: () => void }) {
         onClick={onOpen}
       >
         <span className={label ? "" : "m-sheetselect-ph"}>{label || "Selecciona un sobre…"}</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+        >
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
@@ -275,7 +285,8 @@ export function CreateSobreForm({
         periodMonth: period.month,
         periodYear: period.year,
       });
-      if (!b.ok) return { ok: false, message: b.message ?? "Se creó el sobre, pero no su presupuesto." };
+      if (!b.ok)
+        return { ok: false, message: b.message ?? "Se creó el sobre, pero no su presupuesto." };
     }
     return { ok: true };
   };
@@ -297,8 +308,21 @@ export function CreateSobreForm({
         maxLength={60}
         autoFocus
       />
-      <MoneyField name="amount" label="Presupuesto del mes (opcional)" value={amount} onChange={setAmount} currency={cur} />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <MoneyField
+        name="amount"
+        label="Presupuesto del mes (opcional)"
+        value={amount}
+        onChange={setAmount}
+        currency={cur}
+      />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
       <EssentialCheck checked={essential} onChange={setEssential} />
     </FormShell>
   );
@@ -352,12 +376,18 @@ export function BudgetEditForm({
   return (
     <>
       <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginBottom: 12 }}>
-        El presupuesto debería fijarse antes de que arranque el mes. Confirma que entiendes
-        esto para poder ajustarlo a mitad de período.
+        El presupuesto debería fijarse antes de que arranque el mes. Confirma que entiendes esto
+        para poder ajustarlo a mitad de período.
       </div>
       <div style={{ display: "grid", gap: 4, marginBottom: 8 }}>
         {CHECKS.map((c, i) => (
-          <Toggle key={i} name={`check${i}`} label={c} value={checks[i]!} onChange={(v) => setCheck(i, v)} />
+          <Toggle
+            key={i}
+            name={`check${i}`}
+            label={c}
+            value={checks[i]!}
+            onChange={(v) => setCheck(i, v)}
+          />
         ))}
       </div>
 
@@ -435,7 +465,14 @@ export function ForkCategoryForm({
   const [essential, setEssential] = useState(target.isEssential);
 
   const action = (v: { name: string }): Promise<ActionResult> =>
-    forkCategoryAction({ baseId: target.id, name: v.name, icon, color, isFavorite: favorite, isEssential: essential });
+    forkCategoryAction({
+      baseId: target.id,
+      name: v.name,
+      icon,
+      color,
+      isFavorite: favorite,
+      isEssential: essential,
+    });
 
   return (
     <FormShell
@@ -448,7 +485,14 @@ export function ForkCategoryForm({
       <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginBottom: 4 }}>
         Se crea una copia para tu hogar que reemplaza a la original. Puedes revertir cuando quieras.
       </div>
-      <TextField name="name" label="Nombre" value={name} onChange={setName} maxLength={60} autoFocus />
+      <TextField
+        name="name"
+        label="Nombre"
+        value={name}
+        onChange={setName}
+        maxLength={60}
+        autoFocus
+      />
       <Toggle
         name="isFavorite"
         label="Favorito"
@@ -536,7 +580,8 @@ export function HideCategoryForm({
       onSuccess={onSuccess}
     >
       <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
-        <strong>{target.name}</strong> dejará de verse para todo el hogar. Su histórico no se pierde;
+        <strong>{target.name}</strong> dejará de verse para todo el hogar. Su histórico no se
+        pierde;
         {hasMovements
           ? " elige a dónde mover sus movimientos (o déjalos sin categoría)."
           : " no tiene movimientos."}
@@ -571,8 +616,16 @@ export function EditSobreForm({
   const [favorite, setFavorite] = useState(initialFavorite);
   const [essential, setEssential] = useState(initialEssential);
 
-  const action = (v: { name: string; isFavorite: boolean; isEssential: boolean }): Promise<ActionResult> =>
-    editCategoryAction(envelope.id, { name: v.name, isFavorite: v.isFavorite, isEssential: v.isEssential });
+  const action = (v: {
+    name: string;
+    isFavorite: boolean;
+    isEssential: boolean;
+  }): Promise<ActionResult> =>
+    editCategoryAction(envelope.id, {
+      name: v.name,
+      isFavorite: v.isFavorite,
+      isEssential: v.isEssential,
+    });
 
   return (
     <FormShell
@@ -582,7 +635,14 @@ export function EditSobreForm({
       successMessage="Sobre actualizado"
       onSuccess={onSuccess}
     >
-      <TextField name="name" label="Nombre del sobre" value={name} onChange={setName} maxLength={60} autoFocus />
+      <TextField
+        name="name"
+        label="Nombre del sobre"
+        value={name}
+        onChange={setName}
+        maxLength={60}
+        autoFocus
+      />
       <Toggle
         name="isFavorite"
         label="Favorito"

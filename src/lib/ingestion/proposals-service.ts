@@ -33,7 +33,10 @@ type ProposalRow = {
 };
 
 /** Mapea fila + tarjetas de la cuenta a PendingProposal (etiqueta resuelta). */
-function toPendingProposal(row: ProposalRow, cards: Awaited<ReturnType<typeof listAccountCards>>): PendingProposal {
+function toPendingProposal(
+  row: ProposalRow,
+  cards: Awaited<ReturnType<typeof listAccountCards>>,
+): PendingProposal {
   return {
     id: row.id,
     kind: row.kind,

@@ -18,10 +18,7 @@ import {
 } from "@/modules/financial-base";
 import { computeProtection, computePortfolio } from "@/modules/wealth";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
-import {
-  mapInvestmentLiquidity,
-  savingsLiquidity,
-} from "@/modules/rich-life/engine/asset-mapping";
+import { mapInvestmentLiquidity, savingsLiquidity } from "@/modules/rich-life/engine/asset-mapping";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { AssetInput, LiabilityInput } from "@/modules/rich-life/schemas";
@@ -87,7 +84,8 @@ export async function updateAsset(id: string, input: AssetInput): Promise<void> 
   const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("assets")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       name: input.name,
       asset_class: input.assetClass,
       value: input.value,
@@ -105,7 +103,8 @@ export async function updateLiability(id: string, input: LiabilityInput): Promis
   const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("liabilities")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       name: input.name,
       liability_class: input.liabilityClass,
       balance: input.balance,
@@ -220,43 +219,39 @@ export async function aggregateNetWorth(
     liquidityBucket,
     goalRows,
   ] = await Promise.all([
-      db.from("assets").select("*").in("user_id", memberIds),
-      db.from("liabilities").select("*").in("user_id", memberIds),
-      db
-        .from("debts")
-        .select("id,name,balance,classification,apr,delinquency,currency")
-        .in("user_id", memberIds),
-      db.from("investments").select("*").in("user_id", memberIds),
-      db
-        .from("insurance_policies")
-        .select("policy_type,coverage,premium,premium_frequency")
-        .in("user_id", memberIds),
-      db
-        .from("personal_profiles")
-        .select("dependents_count")
-        .eq("user_id", userId)
-        .maybeSingle(),
-      // Patrimonio del ÚLTIMO periodo CERRADO (de ahí sale `wealthVelocity`). Esta
-      // lectura estuvo muerta hasta que el cron mensual empezó a escribir la tabla
-      // (`net-worth-snapshot-service`); ahora que además las pantallas registran el mes
-      // EN CURSO, hay que excluirlo con `lt`: si no, "lo anterior" sería la fila de hoy
-      // y la velocidad patrimonial daría 0 siempre.
-      db
-        .from("net_worth_snapshots")
-        .select("net_worth,period")
-        .eq("user_id", userId)
-        .lt("period", periodoActual.from)
-        .order("period", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      tryGetPortfolioMarketValues(ctx, opts),
-      // Fase 1 · Patrimonio líquido real: saco de liquidez + metas de ahorro.
-      getLiquidityBalance(ctx),
-      db
-        .from("savings_goals")
-        .select("id,name,current_amount,stored_in,status,currency")
-        .eq("user_id", userId),
-    ]);
+    db.from("assets").select("*").in("user_id", memberIds),
+    db.from("liabilities").select("*").in("user_id", memberIds),
+    db
+      .from("debts")
+      .select("id,name,balance,classification,apr,delinquency,currency")
+      .in("user_id", memberIds),
+    db.from("investments").select("*").in("user_id", memberIds),
+    db
+      .from("insurance_policies")
+      .select("policy_type,coverage,premium,premium_frequency")
+      .in("user_id", memberIds),
+    db.from("personal_profiles").select("dependents_count").eq("user_id", userId).maybeSingle(),
+    // Patrimonio del ÚLTIMO periodo CERRADO (de ahí sale `wealthVelocity`). Esta
+    // lectura estuvo muerta hasta que el cron mensual empezó a escribir la tabla
+    // (`net-worth-snapshot-service`); ahora que además las pantallas registran el mes
+    // EN CURSO, hay que excluirlo con `lt`: si no, "lo anterior" sería la fila de hoy
+    // y la velocidad patrimonial daría 0 siempre.
+    db
+      .from("net_worth_snapshots")
+      .select("net_worth,period")
+      .eq("user_id", userId)
+      .lt("period", periodoActual.from)
+      .order("period", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    tryGetPortfolioMarketValues(ctx, opts),
+    // Fase 1 · Patrimonio líquido real: saco de liquidez + metas de ahorro.
+    getLiquidityBalance(ctx),
+    db
+      .from("savings_goals")
+      .select("id,name,current_amount,stored_in,status,currency")
+      .eq("user_id", userId),
+  ]);
 
   // Activos: explícitos + inversiones.
   const explicitAssets: Asset[] = (assetRows.data ?? []).map((r) => ({
@@ -526,5 +521,11 @@ export function buildDemoRichLifeSummary(): RichLifeSummary {
     previous: { netWorth: 29_500_000 },
     currency,
   };
-  return { snapshot: buildRichLifeSnapshot(input), assets, allAssets: assets, liabilities, currency };
+  return {
+    snapshot: buildRichLifeSnapshot(input),
+    assets,
+    allAssets: assets,
+    liabilities,
+    currency,
+  };
 }

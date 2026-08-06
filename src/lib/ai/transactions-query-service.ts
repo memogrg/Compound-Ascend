@@ -67,7 +67,13 @@ export async function consultarTransacciones(
 
   // `listTransactions` filtra por rango con `period.from/to`; month/year solo etiquetan.
   const [y, m] = rango.from.split("-").map(Number);
-  const period = { month: m ?? 1, year: y ?? 1970, from: rango.from, to: rango.to, label: rango.etiqueta };
+  const period = {
+    month: m ?? 1,
+    year: y ?? 1970,
+    from: rango.from,
+    to: rango.to,
+    label: rango.etiqueta,
+  };
 
   // El filtro de `kind` se aplica en la BD cuando es concreto (menos filas que traer);
   // el resto (comercio, sobre) es texto libre y va en el motor puro.
@@ -141,8 +147,7 @@ export async function consultarTransacciones(
         ...vacio(rango, tipo, moneda, { comercio, sobre: sobreArg, termino }),
         resumen_md: `Tenés varios sobres que coinciden con «${sobreArg}»: ${opciones.join(", ")}. ¿Cuál querés ver?`,
       };
-    }
-    else if (m.estado === "sin_match") {
+    } else if (m.estado === "sin_match") {
       return {
         ...vacio(rango, tipo, moneda, { comercio, sobre: sobreArg, termino }),
         // Se dice que NO SE ENCONTRÓ EL SOBRE, que es distinto de "no tenés movimientos": lo
@@ -189,9 +194,14 @@ export async function consultarTransacciones(
     nombresPorCategoria: nombres,
     porSobre: sobresElegidos.length > 1 ? sobresElegidos : undefined,
   });
-  return { ...resultado, resumen_md: avisoVarios ? `${avisoVarios}
+  return {
+    ...resultado,
+    resumen_md: avisoVarios
+      ? `${avisoVarios}
 
-${md}` : md };
+${md}`
+      : md,
+  };
 }
 
 /**

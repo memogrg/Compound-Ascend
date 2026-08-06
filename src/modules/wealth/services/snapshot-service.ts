@@ -186,11 +186,7 @@ export async function generateSnapshotForUserCron(
   const prices = await fetchNormalizedPrices(holdings, currency, rates, { db: supabase, userId });
   const analytics = computePortfolioAnalytics(normalized, prices);
 
-  const netWorth = await netWorthDelUsuario(
-    supabase,
-    userId,
-    analytics.totalPortfolioValue,
-  );
+  const netWorth = await netWorthDelUsuario(supabase, userId, analytics.totalPortfolioValue);
 
   const snap = await generateAndSaveSnapshot(
     userId,
@@ -228,9 +224,8 @@ async function netWorthDelUsuario(
   portfolioValue: number,
 ): Promise<number> {
   try {
-    const { computeNetWorth } = await import(
-      "@/modules/rich-life/services/net-worth-snapshot-service"
-    );
+    const { computeNetWorth } =
+      await import("@/modules/rich-life/services/net-worth-snapshot-service");
     // "cache": el cron ya salió a los proveedores arriba (fetchNormalizedPrices) y esa
     // llamada persiste en market_price_cache; repetir la ronda en vivo sería pagarla dos
     // veces por usuario.

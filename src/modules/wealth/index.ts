@@ -70,7 +70,10 @@ export {
   type InvestProjection,
   type AssetClass,
 } from "./engine/surplus-decision";
-export { getSurplusDecision, type SurplusDecisionReport } from "./services/surplus-decision-service";
+export {
+  getSurplusDecision,
+  type SurplusDecisionReport,
+} from "./services/surplus-decision-service";
 export { SurplusDecision } from "./components/surplus-decision";
 export { buildDailyPatrimonioInsight, RITUAL_KIND } from "./engine/daily-insight";
 export { buildWeeklyDigest, type WeeklyDigest } from "./engine/weekly-digest";

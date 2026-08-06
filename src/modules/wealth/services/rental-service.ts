@@ -20,7 +20,11 @@ import {
   monthPeriod,
 } from "@/modules/financial-base";
 import { rentalPaymentToTxn } from "@/modules/financial-base";
-import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import type { RentalPaymentInput } from "@/modules/wealth/schemas";
 import type { RentalPayment } from "@/modules/wealth/types";

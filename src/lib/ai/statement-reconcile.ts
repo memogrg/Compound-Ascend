@@ -68,8 +68,16 @@ export function diasEntre(a: string, b: string): number {
  * Es solo confianza — un match no depende de esto.
  */
 function comerciosCoinciden(a: string, b: string): boolean {
-  const A = new Set(normalizar(a).split(" ").filter((w) => w.length > 2));
-  const B = new Set(normalizar(b).split(" ").filter((w) => w.length > 2));
+  const A = new Set(
+    normalizar(a)
+      .split(" ")
+      .filter((w) => w.length > 2),
+  );
+  const B = new Set(
+    normalizar(b)
+      .split(" ")
+      .filter((w) => w.length > 2),
+  );
   if (A.size === 0 || B.size === 0) return false;
   for (const w of A) if (B.has(w)) return true;
   return false;

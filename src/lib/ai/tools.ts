@@ -362,7 +362,8 @@ export const PROJECT_INVESTMENT_TOOL: AiToolDecl = {
       anios: { type: "number", description: "Horizonte de la proyección, en años." },
       rendimiento_anual_pct: {
         type: "number",
-        description: "Rendimiento anual SUPUESTO en % (default 8). Es un supuesto, no una garantía.",
+        description:
+          "Rendimiento anual SUPUESTO en % (default 8). Es un supuesto, no una garantía.",
       },
       monto_inicial: {
         type: "number",
@@ -415,7 +416,12 @@ const round2 = (x: number): number => Math.round(x * 100) / 100;
  * Por construcción, el saldo_final del último año coincide con valor_futuro.
  * Pura y determinista; si n=0 devuelve [].
  */
-function annualSchedule(inicial: number, aporte: number, n: number, r: number): AnnualScheduleRow[] {
+function annualSchedule(
+  inicial: number,
+  aporte: number,
+  n: number,
+  r: number,
+): AnnualScheduleRow[] {
   const rows: AnnualScheduleRow[] = [];
   let saldo = inicial;
   let anio = 0;
@@ -447,7 +453,12 @@ function requiredMonthly(objetivo: number, inicial: number, n: number, r: number
 }
 
 /** Meses para que `inicial` + aportes alcancen `objetivo`. null si nunca (r=0 y aporte no llega). */
-function monthsToReach(objetivo: number, inicial: number, aporte: number, r: number): number | null {
+function monthsToReach(
+  objetivo: number,
+  inicial: number,
+  aporte: number,
+  r: number,
+): number | null {
   if (objetivo <= inicial) return 0;
   if (r === 0) return aporte > 0 ? Math.ceil((objetivo - inicial) / aporte) : null;
   const k = aporte / r;
@@ -521,7 +532,8 @@ export const FREEDOM_TOOL: AiToolDecl = {
       anios: { type: "number", description: "Horizonte en años (opcional)." },
       rendimiento_anual_pct: {
         type: "number",
-        description: "Rendimiento anual SUPUESTO en % (default 8). Es un supuesto, no una garantía.",
+        description:
+          "Rendimiento anual SUPUESTO en % (default 8). Es un supuesto, no una garantía.",
       },
     },
   },
@@ -660,7 +672,8 @@ export const YEARS_TO_FREEDOM_TOOL: AiToolDecl = {
       },
       rendimiento_anual_pct: {
         type: "number",
-        description: "Rendimiento anual REAL SUPUESTO en % (default 5). Es un supuesto, no una garantía.",
+        description:
+          "Rendimiento anual REAL SUPUESTO en % (default 5). Es un supuesto, no una garantía.",
       },
     },
     required: ["aporte_mensual"],
@@ -769,7 +782,8 @@ export const GOALS_TOOL: AiToolDecl = {
       },
       aporte_extra_mensual: {
         type: "number",
-        description: "Aporte extra mensual a sumar a TODAS las metas para simular aceleración (opcional).",
+        description:
+          "Aporte extra mensual a sumar a TODAS las metas para simular aceleración (opcional).",
       },
     },
   },
@@ -791,8 +805,7 @@ export type GoalsResult =
   | { disponible: false; motivo: string }
   | { disponible: true; moneda: string; metas: GoalProjection[] };
 
-const normTool = (s: string): string =>
-  s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const normTool = (s: string): string => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 /** Meses (calendario) desde `today` hasta `dateStr` (YYYY-MM-DD); null si inválida. */
 function monthsUntil(today: Date, dateStr: string | null | undefined): number | null {
@@ -833,7 +846,8 @@ export function projectGoals(
       const mu = monthsUntil(today, g.fecha_objetivo);
       if (mu == null) en_camino = null;
       else if (cumplida) en_camino = true;
-      else if (meses == null) en_camino = false; // no llega con el aporte actual
+      else if (meses == null)
+        en_camino = false; // no llega con el aporte actual
       else en_camino = meses <= mu;
     }
 
@@ -880,7 +894,10 @@ export const MARKET_DATA_TOOL: AiToolDecl = {
         type: "number",
         description: "Lo invertido (costo de compra) en esa posición, de tu contexto. Opcional.",
       },
-      cantidad: { type: "number", description: "Unidades que tiene el usuario, de tu contexto. Opcional." },
+      cantidad: {
+        type: "number",
+        description: "Unidades que tiene el usuario, de tu contexto. Opcional.",
+      },
     },
     required: ["symbol", "assetType"],
   },
@@ -959,7 +976,14 @@ export function computeMarketScenario(input: {
   const hasInv = typeof invertido === "number" && invertido >= 0;
   const valorActual = hasQty && price !== null ? Math.round(cantidad! * price) : null;
   const valorMaximo = hasQty && high !== null ? Math.round(cantidad! * high) : null;
-  const maximoTipo = high === null ? null : input.highKind === "ath" ? "ath" : input.highKind === "52w" ? "52_semanas" : null;
+  const maximoTipo =
+    high === null
+      ? null
+      : input.highKind === "ath"
+        ? "ath"
+        : input.highKind === "52w"
+          ? "52_semanas"
+          : null;
   return {
     symbol: input.symbol,
     assetType: input.assetType,
@@ -1029,7 +1053,12 @@ export async function runToolLoop(opts: {
     tokensOut += turn.tokensOut;
     if (turn.kind === "text") return { text: turn.text, tokensIn, tokensOut };
     const result = await opts.execute(turn.name, turn.args);
-    calls.push({ name: turn.name, args: turn.args, result, thoughtSignature: turn.thoughtSignature });
+    calls.push({
+      name: turn.name,
+      args: turn.args,
+      result,
+      thoughtSignature: turn.thoughtSignature,
+    });
   }
   // Agotó el tope sin texto final: una consulta más para que cierre con palabras.
   const final = await opts.ask(calls);

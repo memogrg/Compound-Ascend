@@ -18,11 +18,7 @@
 import type { Transaction, TxnKind } from "@/modules/financial-base/types";
 
 export type FlowClass =
-  | "operating_income"
-  | "operating_expense"
-  | "capital_in"
-  | "capital_out"
-  | "excluded";
+  "operating_income" | "operating_expense" | "capital_in" | "capital_out" | "excluded";
 
 /** Clasifica una transacción en el marco operativo/capital. Puro. */
 export function classifyTxnFlow(

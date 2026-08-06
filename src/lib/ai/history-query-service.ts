@@ -33,7 +33,10 @@ export type ConsultarHistorialPayload = HistorialResult & { resumen_md: string }
 const METRICAS: Metrica[] = ["patrimonio", "portafolio", "gasto", "ingreso", "ahorro"];
 
 /** Serie mensual de `monthly_snapshots` para las métricas de flujo. */
-async function serieMensual(metrica: "gasto" | "ingreso" | "ahorro", meses: number): Promise<SeriePunto[]> {
+async function serieMensual(
+  metrica: "gasto" | "ingreso" | "ahorro",
+  meses: number,
+): Promise<SeriePunto[]> {
   const { getSnapshotHistory } = await import("@/modules/financial-base/services/snapshot-service");
   // Se piden algunos más de los que se van a mostrar: el motor recorta al final, y así
   // un mes sin snapshot no deja la serie corta.
@@ -41,9 +44,7 @@ async function serieMensual(metrica: "gasto" | "ingreso" | "ahorro", meses: numb
   return puntos.map((p) => ({
     periodo: p.period.slice(0, 7),
     valor:
-      metrica === "gasto" ? p.realExpense
-      : metrica === "ingreso" ? p.realIncome
-      : p.freeCashflow,
+      metrica === "gasto" ? p.realExpense : metrica === "ingreso" ? p.realIncome : p.freeCashflow,
   }));
 }
 
@@ -67,9 +68,8 @@ async function seriePortfolioSnapshots(
 
 /** Serie mensual de `net_worth_snapshots` (ya mensual) + la moneda con la que se escribió. */
 async function serieNetWorthSnapshots(): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
-  const { getNetWorthHistory } = await import(
-    "@/modules/rich-life/services/net-worth-snapshot-service"
-  );
+  const { getNetWorthHistory } =
+    await import("@/modules/rich-life/services/net-worth-snapshot-service");
   const snaps = await getNetWorthHistory();
   // colapsarAMensual sobre datos ya mensuales es identidad + orden + dedupe: barato y
   // deja una sola forma de construir la serie.

@@ -74,7 +74,5 @@ export async function sendWeeklyDigestForAllUsers(): Promise<{
   const admin = createServiceRoleClient();
   const { data: users } = await admin.from("profiles").select("id");
   const ids = (users ?? []).map((u) => u.id);
-  return runForUsersBestEffort(ids, (id) =>
-    sendWeeklyDigestForUser(id, { db: admin, userId: id }),
-  );
+  return runForUsersBestEffort(ids, (id) => sendWeeklyDigestForUser(id, { db: admin, userId: id }));
 }

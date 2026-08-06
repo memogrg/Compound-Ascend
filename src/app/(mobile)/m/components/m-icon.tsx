@@ -57,7 +57,9 @@ const GLYPHS: Record<MIconName, React.ReactNode> = {
     </>
   ),
   services: <path d="M2 -16 l-11 15 h7 l-1 11 11 -15 h-7 l1 -11z" />,
-  dining: <path d="M-11 -14 v9 a4 4 0 0 0 8 0 v-9 M-7 -5 v19 M9 -14 c-2 0 -3 4 -3 7 s1 4 3 4 v12" />,
+  dining: (
+    <path d="M-11 -14 v9 a4 4 0 0 0 8 0 v-9 M-7 -5 v19 M9 -14 c-2 0 -3 4 -3 7 s1 4 3 4 v12" />
+  ),
   health: (
     <>
       <path d="M-12 8 c0 -10 5 -16 12 -16 c-3 4 -3 8 0 10 c5 3 3 9 -1 11" />
@@ -113,7 +115,9 @@ const GLYPHS: Record<MIconName, React.ReactNode> = {
   // ---- acciones / navegación ----
   add: <path d="M0 -13 v26 M-13 0 h26" />,
   transfer: <path d="M-11 4 h22 l-4 -4 M11 -4 h-22 l4 4" />,
-  template: <path d="M-8 -13 h12 l4 4 v18 a1 1 0 0 1 -1 1 h-15 a1 1 0 0 1 -1 -1 v-21 a1 1 0 0 1 1 -1z M4 -13 v5 h5" />,
+  template: (
+    <path d="M-8 -13 h12 l4 4 v18 a1 1 0 0 1 -1 1 h-15 a1 1 0 0 1 -1 -1 v-21 a1 1 0 0 1 1 -1z M4 -13 v5 h5" />
+  ),
   rules: <path d="M-12 -8 h24 M-12 0 h24 M-12 8 h16" />,
   search: (
     <>

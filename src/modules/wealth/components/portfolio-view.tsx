@@ -26,7 +26,12 @@ import {
 } from "@/modules/wealth/engine/portfolio-engine";
 import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import { CATEGORY_META } from "@/modules/wealth/constants";
-import { editHoldingAction, removeHoldingAction, getHoldingHistoryAction, adjustContributionPriceAction } from "@/modules/wealth/api/actions";
+import {
+  editHoldingAction,
+  removeHoldingAction,
+  getHoldingHistoryAction,
+  adjustContributionPriceAction,
+} from "@/modules/wealth/api/actions";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 import { AddHoldingButton, AddHoldingModal } from "./add-holding-wizard";
 import { HoldingDetailModal } from "./holding-detail-modal";
@@ -44,7 +49,20 @@ import type {
   HoldingNativo,
 } from "@/modules/wealth/types";
 
-const MONTH_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const MONTH_ABBR = [
+  "Ene",
+  "Feb",
+  "Mar",
+  "Abr",
+  "May",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dic",
+];
 
 type Subtab = "portafolio" | "calculadora" | "monitor";
 type Period = "1m" | "3m" | "ytd" | "all";
@@ -144,7 +162,10 @@ export function PortfolioView({
           openContributions={openContributions}
         />
       ) : subtab === "calculadora" ? (
-        <CompoundCalculator defaultCapital={report.analytics.totalCostBasis} currency={report.currency} />
+        <CompoundCalculator
+          defaultCapital={report.analytics.totalCostBasis}
+          currency={report.currency}
+        />
       ) : (
         <FundMonitor />
       )}
@@ -190,7 +211,10 @@ function PortfolioPanel({
   // fila (USD para cotizados; registrada para el resto), no la registrada — si no, un BTC en USD con
   // display CRC no marcaría la nota.
   const hasForeign = useMemo(
-    () => report.holdings.some((h) => holdingDisplayCurrency(h.assetType, h.currency) !== displayCurrency),
+    () =>
+      report.holdings.some(
+        (h) => holdingDisplayCurrency(h.assetType, h.currency) !== displayCurrency,
+      ),
     [report.holdings, displayCurrency],
   );
   const contribById = useMemo(
@@ -254,7 +278,9 @@ function PortfolioPanel({
             Monto total invertido
             <TipQ text="Base de costo total: cuánto has puesto en tus inversiones." />
           </div>
-          <div className="val">{formatMoney(toDisplay(analytics.totalCostBasis), displayCurrency)}</div>
+          <div className="val">
+            {formatMoney(toDisplay(analytics.totalCostBasis), displayCurrency)}
+          </div>
         </div>
 
         <div className="card kpi">
@@ -265,7 +291,10 @@ function PortfolioPanel({
           <div className="val">{formatPercent(investmentRate)}</div>
           <div className="sub">del ingreso recurrente</div>
           <div className="bar-track" style={{ marginTop: 12 }}>
-            <div className="bar-fill" style={{ width: `${ratePct}%`, background: "var(--c-invest)" }} />
+            <div
+              className="bar-fill"
+              style={{ width: `${ratePct}%`, background: "var(--c-invest)" }}
+            />
           </div>
         </div>
 
@@ -291,7 +320,10 @@ function PortfolioPanel({
           ) : (
             <>
               <div className="val muted">—</div>
-              <div className="sub muted tip tip-wrap" data-tip="No hay snapshot al inicio de este periodo para comparar. Registrá inversiones y volvé más adelante.">
+              <div
+                className="sub muted tip tip-wrap"
+                data-tip="No hay snapshot al inicio de este periodo para comparar. Registrá inversiones y volvé más adelante."
+              >
                 sin datos del periodo
               </div>
             </>
@@ -322,7 +354,10 @@ function PortfolioPanel({
         </div>
         <div className="card kpi">
           <div className="lab">Rentabilidad total acumulada</div>
-          <div className="val" style={{ color: analytics.totalProfitLoss >= 0 ? "var(--pos)" : "var(--neg)" }}>
+          <div
+            className="val"
+            style={{ color: analytics.totalProfitLoss >= 0 ? "var(--pos)" : "var(--neg)" }}
+          >
             {analytics.totalProfitLoss >= 0 ? "+" : ""}
             {formatMoney(toDisplay(analytics.totalProfitLoss), displayCurrency)}
           </div>
@@ -338,7 +373,9 @@ function PortfolioPanel({
             Ingreso mensual por flujo de caja
             <TipQ text="Dividendos, alquileres e intereses recurrentes de tus inversiones de flujo de caja." />
           </div>
-          <div className="val" style={{ color: "var(--c-income)" }}>{formatMoney(toDisplay(cashflowMonthly), displayCurrency)}</div>
+          <div className="val" style={{ color: "var(--c-income)" }}>
+            {formatMoney(toDisplay(cashflowMonthly), displayCurrency)}
+          </div>
           <div className="sub">dividendos, alquileres, intereses · recurrente</div>
         </div>
       </div>
@@ -389,7 +426,14 @@ function PortfolioPanel({
           </div>
         ) : (
           holds.map((h) => (
-            <InvRow key={h.id} h={h} raw={rawById.get(h.id)} currency={currency} period={tablePeriod} contribution={contribById.get(h.id)} />
+            <InvRow
+              key={h.id}
+              h={h}
+              raw={rawById.get(h.id)}
+              currency={currency}
+              period={tablePeriod}
+              contribution={contribById.get(h.id)}
+            />
           ))
         )}
       </div>
@@ -401,11 +445,7 @@ function PortfolioPanel({
  * Rendimiento del periodo: valor ACTUAL − valor al INICIO del periodo (snapshot más cercano ≤
  * cutoff). Sin baseline del periodo → available:false (la UI muestra "—", no un +$0 engañoso).
  */
-function periodReturnFor(
-  snapshots: PortfolioSnapshot[],
-  period: Period,
-  currentValue: number,
-) {
+function periodReturnFor(snapshots: PortfolioSnapshot[], period: Period, currentValue: number) {
   const cutoff = periodCutoff(period);
   const pts = snapshots.map((s) => ({ date: s.date, portfolioValue: s.portfolioValue }));
   return periodReturnFromBaseline(pts, cutoff, currentValue);
@@ -413,7 +453,15 @@ function periodReturnFor(
 
 // ── Filtro de periodo (seg) ────────────────────────────────────────
 
-function PeriodSeg({ value, onChange, label }: { value: Period; onChange: (p: Period) => void; label: string }) {
+function PeriodSeg({
+  value,
+  onChange,
+  label,
+}: {
+  value: Period;
+  onChange: (p: Period) => void;
+  label: string;
+}) {
   return (
     <div className="seg" role="group" aria-label={label}>
       {PERIODS.map((p) => (
@@ -448,22 +496,32 @@ function DonutCard({
   showAmount?: boolean;
 }) {
   const visible = slices.filter((s) => s.value > 0);
-  const data: DonutDatum[] = visible.map((s) => ({ name: s.label, value: Math.round(s.value), color: s.color }));
+  const data: DonutDatum[] = visible.map((s) => ({
+    name: s.label,
+    value: Math.round(s.value),
+    color: s.color,
+  }));
   return (
     <div className="card donut-card">
-      <div className="card-title" style={{ fontSize: 14 }}>{title}</div>
+      <div className="card-title" style={{ fontSize: 14 }}>
+        {title}
+      </div>
       <div className="donut-row">
         <div className="ring-wrap">
           <DonutChart data={data} centerLabel={centerTop} centerSub={centerSub} />
         </div>
         <div className="leg">
           {visible.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12.5 }}>Agrega inversiones para ver su distribución.</span>
+            <span className="muted" style={{ fontSize: 12.5 }}>
+              Agrega inversiones para ver su distribución.
+            </span>
           ) : (
             visible.map((s) => (
               <div key={s.label} className="leg-row">
                 <span className="sw" style={{ background: s.color }} />
-                <span className="nm" title={s.label}>{s.label}</span>
+                <span className="nm" title={s.label}>
+                  {s.label}
+                </span>
                 <span className="pc">
                   {formatPercent(s.pct)}
                   {showAmount ? ` · ${formatCompact(s.value, currency)}` : ""}
@@ -520,7 +578,9 @@ function BrechaBanner({ contribution }: { contribution: OpenContribution }) {
     <div className="brecha-aporte">
       <span className="brecha-dot" />
       <span className="brecha-txt">Aporte del mes · confirmá el precio de compra</span>
-      <span className="brecha-monto">{formatMoney(contribution.amount, contribution.currency)}</span>
+      <span className="brecha-monto">
+        {formatMoney(contribution.amount, contribution.currency)}
+      </span>
       <div className="brecha-inp-wrap">
         <span className="pre">{contribution.currency}</span>
         <input
@@ -564,7 +624,8 @@ function InvRow({
   const editHolding = raw ?? h;
 
   const isCashflow =
-    h.nature === "cashflow" || (h.category ? CATEGORY_META[h.category]?.nature === "cashflow" : false);
+    h.nature === "cashflow" ||
+    (h.category ? CATEGORY_META[h.category]?.nature === "cashflow" : false);
   const natureLabel = isCashflow ? "Flujo de caja" : "Crecimiento patrimonial";
   const natureColor = isCashflow ? "var(--c-income)" : "var(--c-invest)";
   const catLabel = h.category ? CATEGORY_META[h.category]?.label : null;
@@ -631,8 +692,14 @@ function InvRow({
           </div>
         </div>
         <div>
-          <span className="tag" style={{ color: natureColor }}>{natureLabel}</span>
-          {catLabel ? <div className="cell-sub" style={{ marginTop: 5 }}>{catLabel}</div> : null}
+          <span className="tag" style={{ color: natureColor }}>
+            {natureLabel}
+          </span>
+          {catLabel ? (
+            <div className="cell-sub" style={{ marginTop: 5 }}>
+              {catLabel}
+            </div>
+          ) : null}
         </div>
         <div className="inv-amt">{formatMoney(nativeCostBasis, rowCurrency)}</div>
         <div className="inv-amt c-valor">
@@ -709,9 +776,16 @@ function InvRow({
 
       {/* Movimientos de capital · aporte/compra reusa el wizard. El retiro/venta
           vive en el Dashboard (HoldingDetailModal), que ya lo soporta. */}
-      {modal === "movimiento" ? <AddHoldingModal prefill={editHolding} mode="compra" currency={currency} onClose={close} /> : null}
+      {modal === "movimiento" ? (
+        <AddHoldingModal prefill={editHolding} mode="compra" currency={currency} onClose={close} />
+      ) : null}
       {modal === "editar" ? (
-        <AddHoldingModal prefill={editHolding} editId={editHolding.id} currency={currency} onClose={close} />
+        <AddHoldingModal
+          prefill={editHolding}
+          editId={editHolding.id}
+          currency={currency}
+          onClose={close}
+        />
       ) : null}
       {/* `holding={raw}` y no `{h}`: dentro del modal se capturan renta y dividendos, y `h`
           trae los importes ya convertidos a la primaria con la etiqueta nativa. Ese cruce
@@ -734,7 +808,10 @@ function InvRow({
         />
       ) : null}
       {modal === "alerta" ? (
-        <Modal title={`Alertas · ${raw?.label ?? h.label ?? h.symbol ?? "inversión"}`} onClose={close}>
+        <Modal
+          title={`Alertas · ${raw?.label ?? h.label ?? h.symbol ?? "inversión"}`}
+          onClose={close}
+        >
           <div style={{ padding: "6px 22px 20px" }}>
             <AlertManager holding={alertHolding(raw ?? h)} compact />
           </div>
@@ -798,7 +875,11 @@ function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () =>
   };
 
   return (
-    <Modal title="Valoración de la inversión" sub={`${holding.label ?? holding.symbol} · valor en el tiempo`} onClose={onClose}>
+    <Modal
+      title="Valoración de la inversión"
+      sub={`${holding.label ?? holding.symbol} · valor en el tiempo`}
+      onClose={onClose}
+    >
       <div className="modal-body">
         <div className="fld-2">
           <div className="fld">
@@ -819,14 +900,21 @@ function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () =>
           </div>
         </div>
         <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.5, margin: "-2px 0 14px" }}>
-          El valor actual (manual) actualiza el patrimonio y la rentabilidad de esta inversión a la fecha de hoy.
+          El valor actual (manual) actualiza el patrimonio y la rentabilidad de esta inversión a la
+          fecha de hoy.
         </p>
-        <div style={{ fontWeight: 600, fontSize: 12.5, marginBottom: 6 }}>Historial de valoración</div>
+        <div style={{ fontWeight: 600, fontSize: 12.5, marginBottom: 6 }}>
+          Historial de valoración
+        </div>
         <div>
           {hist === null ? (
-            <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>Cargando…</div>
+            <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>
+              Cargando…
+            </div>
           ) : hist.length === 0 ? (
-            <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>Aún no hay valoraciones registradas.</div>
+            <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>
+              Aún no hay valoraciones registradas.
+            </div>
           ) : (
             hist
               .slice()
@@ -837,12 +925,19 @@ function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () =>
                 return (
                   <div
                     key={`${v.date}-${i}`}
-                    style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid var(--line)" }}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "10px 0",
+                      borderTop: "1px solid var(--line)",
+                    }}
                   >
                     <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>
                       {Number(dd ?? 1)} {MONTH_ABBR[Number(mm ?? 1) - 1] ?? ""} {yy}
                     </span>
-                    <strong className="tnum" style={{ fontSize: 13.5 }}>{formatMoney(v.value, holding.currency)}</strong>
+                    <strong className="tnum" style={{ fontSize: 13.5 }}>
+                      {formatMoney(v.value, holding.currency)}
+                    </strong>
                   </div>
                 );
               })
@@ -850,8 +945,15 @@ function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () =>
         </div>
       </div>
       <div className="modal-foot">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>Cerrar</button>
-        <button type="button" className="btn btn-primary" disabled={pending} onClick={() => void save()}>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cerrar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={pending}
+          onClick={() => void save()}
+        >
           {pending ? "Guardando…" : "Guardar valoración"}
         </button>
       </div>
@@ -881,12 +983,21 @@ function DeleteModal({ holding, onClose }: { holding: Holding; onClose: () => vo
     <Modal title="Eliminar inversión" sub={holding.label ?? holding.symbol} onClose={onClose}>
       <div className="modal-body">
         <p style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.55 }}>
-          ¿Eliminar <strong>{holding.label ?? holding.symbol}</strong> de tu portafolio? Esta acción no se puede deshacer.
+          ¿Eliminar <strong>{holding.label ?? holding.symbol}</strong> de tu portafolio? Esta acción
+          no se puede deshacer.
         </p>
       </div>
       <div className="modal-foot">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-        <button type="button" className="btn btn-primary" style={{ background: "var(--neg)" }} disabled={pending} onClick={() => void remove()}>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ background: "var(--neg)" }}
+          disabled={pending}
+          onClick={() => void remove()}
+        >
           {pending ? "Eliminando…" : "Eliminar"}
         </button>
       </div>

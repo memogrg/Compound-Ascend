@@ -65,11 +65,23 @@ const TEMA_LABEL: Record<ThemeMode, string> = {
   dark: "Oscuro",
 };
 
-const NOTIF_ROWS: { key: NotificationChannel; label: string; hint: string; disabled?: boolean; badge?: string }[] = [
+const NOTIF_ROWS: {
+  key: NotificationChannel;
+  label: string;
+  hint: string;
+  disabled?: boolean;
+  badge?: string;
+}[] = [
   { key: "inApp", label: "En la app", hint: 'Avisos del día en "Qué noté".' },
   { key: "email", label: "Correo", hint: "Resumen semanal por correo." },
   { key: "whatsapp", label: "WhatsApp", hint: "Resumen semanal (si vinculaste tu WhatsApp)." },
-  { key: "push", label: "Notificaciones push", hint: "Avisos en tu dispositivo.", disabled: true, badge: "Próximamente" },
+  {
+    key: "push",
+    label: "Notificaciones push",
+    hint: "Avisos en tu dispositivo.",
+    disabled: true,
+    badge: "Próximamente",
+  },
 ];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -106,7 +118,13 @@ export function ConfiguracionManager({
       <MContentCard style={{ marginBottom: 14 }}>
         <MDataRow
           leading={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} style={{ width: 19, height: 19 }}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.9}
+              style={{ width: 19, height: 19 }}
+            >
               <circle cx="12" cy="12" r="9" />
               <path d="M12 7v5l3 2" strokeLinecap="round" />
             </svg>
@@ -119,9 +137,18 @@ export function ConfiguracionManager({
         />
         <MDataRow
           leading={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} style={{ width: 19, height: 19 }}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.9}
+              style={{ width: 19, height: 19 }}
+            >
               <circle cx="12" cy="12" r="9" />
-              <path d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20M3 12h18" strokeLinecap="round" />
+              <path
+                d="M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20M3 12h18"
+                strokeLinecap="round"
+              />
             </svg>
           }
           title="Zona horaria"
@@ -132,9 +159,18 @@ export function ConfiguracionManager({
         />
         <MDataRow
           leading={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} style={{ width: 19, height: 19 }}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.9}
+              style={{ width: 19, height: 19 }}
+            >
               <circle cx="12" cy="12" r="4.2" />
-              <path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6" strokeLinecap="round" />
+              <path
+                d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"
+                strokeLinecap="round"
+              />
             </svg>
           }
           title="Apariencia"
@@ -172,7 +208,15 @@ export function ConfiguracionManager({
       <MContentCard style={{ marginBottom: 14 }}>
         <MDataRow
           leading={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 19, height: 19 }}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.9}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ width: 19, height: 19 }}
+            >
               <path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6A8.5 8.5 0 1 1 21 11.5Z" />
             </svg>
           }
@@ -190,8 +234,8 @@ export function ConfiguracionManager({
       <MSectionHeader title="Correos del banco" />
       <MContentCard style={{ marginBottom: 14 }}>
         <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
-          Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y registra
-          aquí el correo desde el que reenvías.
+          Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y
+          registra aquí el correo desde el que reenvías.
         </p>
         <IngestSection emails={ingestEmails} />
       </MContentCard>
@@ -202,7 +246,15 @@ export function ConfiguracionManager({
       <MContentCard style={{ marginBottom: 14 }}>
         <MDataRow
           leading={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 19, height: 19 }}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.9}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ width: 19, height: 19 }}
+            >
               <rect x="5" y="11" width="14" height="9" rx="2" />
               <path d="M8 11V7a4 4 0 0 1 8 0v4" />
             </svg>
@@ -220,17 +272,32 @@ export function ConfiguracionManager({
       {/* Zona de peligro — separada y en tono de peligro; su ConfirmDialog de 2 pasos intacto. */}
       <MSectionHeader title="Zona de peligro" />
       <MContentCard style={{ marginBottom: 14, background: "var(--danger-soft)" }}>
-        <p style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px", color: "var(--text-muted)" }}>
+        <p
+          style={{
+            fontSize: 12.5,
+            lineHeight: 1.5,
+            margin: "0 0 10px",
+            color: "var(--text-muted)",
+          }}
+        >
           Borra todos tus datos financieros (ingresos, gastos, deudas, inversiones, patrimonio…). Tu
           cuenta y perfil se conservan. No se puede deshacer.
         </p>
-        <button type="button" className="m-btn m-btn-block m-btn-danger" onClick={() => setDanger(1)}>
+        <button
+          type="button"
+          className="m-btn m-btn-block m-btn-danger"
+          onClick={() => setDanger(1)}
+        >
           Borrar todos mis datos
         </button>
       </MContentCard>
 
       {/* Hoja: moneda */}
-      <BottomSheet open={sheet === "currency"} onClose={() => setSheet(null)} title="Moneda principal">
+      <BottomSheet
+        open={sheet === "currency"}
+        onClose={() => setSheet(null)}
+        title="Moneda principal"
+      >
         <CurrencySheet current={currency} onDone={() => setSheet(null)} />
       </BottomSheet>
 
@@ -264,17 +331,29 @@ export function ConfiguracionManager({
       </BottomSheet>
 
       {/* Hoja: WhatsApp */}
-      <BottomSheet open={sheet === "whatsapp"} onClose={() => setSheet(null)} title="Asistente de WhatsApp">
+      <BottomSheet
+        open={sheet === "whatsapp"}
+        onClose={() => setSheet(null)}
+        title="Asistente de WhatsApp"
+      >
         <WhatsAppSheet wa={wa} configured={whatsappConfigured} onDone={() => setSheet(null)} />
       </BottomSheet>
 
       {/* Hoja: hogar */}
-      <BottomSheet open={sheet === "household"} onClose={() => setSheet(null)} title="Miembros del hogar">
+      <BottomSheet
+        open={sheet === "household"}
+        onClose={() => setSheet(null)}
+        title="Miembros del hogar"
+      >
         <HouseholdSheet household={household} emailConfigured={emailConfigured} />
       </BottomSheet>
 
       {/* Hoja: cambiar contraseña */}
-      <BottomSheet open={sheet === "password"} onClose={() => setSheet(null)} title="Cambiar contraseña">
+      <BottomSheet
+        open={sheet === "password"}
+        onClose={() => setSheet(null)}
+        title="Cambiar contraseña"
+      >
         <PasswordSheet />
       </BottomSheet>
 
@@ -394,7 +473,13 @@ function NotifToggle({
   row,
   initial,
 }: {
-  row: { key: NotificationChannel; label: string; hint: string; disabled?: boolean; badge?: string };
+  row: {
+    key: NotificationChannel;
+    label: string;
+    hint: string;
+    disabled?: boolean;
+    badge?: string;
+  };
   initial: boolean;
 }) {
   const router = useRouter();
@@ -542,11 +627,23 @@ function TimezoneSheet({ current, onDone }: { current: string | null; onDone: ()
 }
 
 /** Vincular (muestra OTP + instrucciones) / desvincular WhatsApp. */
-function WhatsAppSheet({ wa, configured, onDone }: { wa: WaLink; configured: boolean; onDone: () => void }) {
+function WhatsAppSheet({
+  wa,
+  configured,
+  onDone,
+}: {
+  wa: WaLink;
+  configured: boolean;
+  onDone: () => void;
+}) {
   const router = useRouter();
   const toast = useToast();
   const [pending, start] = useTransition();
-  const [otp, setOtp] = useState<{ code: string; botNumber: string | null; expiresInMin: number } | null>(null);
+  const [otp, setOtp] = useState<{
+    code: string;
+    botNumber: string | null;
+    expiresInMin: number;
+  } | null>(null);
   const isActive = wa?.status === "active";
 
   const generate = () =>
@@ -578,7 +675,12 @@ function WhatsAppSheet({ wa, configured, onDone }: { wa: WaLink; configured: boo
           <div className="ss pos" style={{ fontSize: 13.5 }}>
             Vinculado{wa?.phone ? ` · ${wa.phone}` : ""}
           </div>
-          <button type="button" className="m-btn m-btn-block m-btn-secondary" onClick={revoke} disabled={pending}>
+          <button
+            type="button"
+            className="m-btn m-btn-block m-btn-secondary"
+            onClick={revoke}
+            disabled={pending}
+          >
             {pending ? "Desvinculando…" : "Desvincular WhatsApp"}
           </button>
         </>
@@ -589,7 +691,14 @@ function WhatsAppSheet({ wa, configured, onDone }: { wa: WaLink; configured: boo
           </div>
           <div
             className="mono"
-            style={{ fontSize: 30, fontWeight: 800, letterSpacing: "0.14em", textAlign: "center", margin: "14px 0 6px", color: "var(--accent)" }}
+            style={{
+              fontSize: 30,
+              fontWeight: 800,
+              letterSpacing: "0.14em",
+              textAlign: "center",
+              margin: "14px 0 6px",
+              color: "var(--accent)",
+            }}
           >
             {otp.code}
           </div>
@@ -603,7 +712,12 @@ function WhatsAppSheet({ wa, configured, onDone }: { wa: WaLink; configured: boo
             Registra gastos por foto o texto y consulta tu presupuesto desde WhatsApp. Tu número se
             vincula solo tras confirmar un código.
           </div>
-          <button type="button" className="m-btn m-btn-block m-btn-primary" onClick={generate} disabled={pending}>
+          <button
+            type="button"
+            className="m-btn m-btn-block m-btn-primary"
+            onClick={generate}
+            disabled={pending}
+          >
             {pending ? "Generando…" : "Vincular WhatsApp"}
           </button>
         </>
@@ -642,7 +756,9 @@ function HouseholdSheet({
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{ userId: string; email: string } | null>(
+    null,
+  );
 
   if (!household) {
     return (
@@ -673,7 +789,7 @@ function HouseholdSheet({
   const revoke = (id: string) =>
     start(async () => {
       const res = await revokeInvitationAction(id);
-      toast.show(res.ok ? "Invitación revocada" : res.message ?? "No pudimos revocar");
+      toast.show(res.ok ? "Invitación revocada" : (res.message ?? "No pudimos revocar"));
       if (res.ok) router.refresh();
     });
 
@@ -681,7 +797,7 @@ function HouseholdSheet({
     start(async () => {
       const res = await removeHouseholdMemberAction(userId);
       setConfirmRemove(null);
-      toast.show(res.ok ? "Miembro removido del hogar" : res.message ?? "No pudimos quitar");
+      toast.show(res.ok ? "Miembro removido del hogar" : (res.message ?? "No pudimos quitar"));
       if (res.ok) router.refresh();
     });
 
@@ -692,9 +808,22 @@ function HouseholdSheet({
         {members.map((m) => (
           <div key={m.userId} className="row" style={{ gap: 8, alignItems: "center" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {m.email}
-                {m.isSelf ? <span className="muted" style={{ fontWeight: 400 }}> (tú)</span> : null}
+                {m.isSelf ? (
+                  <span className="muted" style={{ fontWeight: 400 }}>
+                    {" "}
+                    (tú)
+                  </span>
+                ) : null}
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
                 <MChip>{HH_ROLE_LABEL[m.role] ?? m.role}</MChip>
@@ -719,10 +848,21 @@ function HouseholdSheet({
       {/* Invitaciones pendientes */}
       {canManage && pend.length > 0 ? (
         <div style={{ display: "grid", gap: 6 }}>
-          <div className="muted" style={{ fontSize: 12 }}>Invitaciones pendientes</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Invitaciones pendientes
+          </div>
           {pend.map((p) => (
             <div key={p.id} className="row" style={{ gap: 8, alignItems: "center" }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {p.email}
               </span>
               <MChip tone="warning">pendiente</MChip>
@@ -873,17 +1013,35 @@ function IngestSection({ emails }: { emails: IngestEmailRow[] }) {
         <div style={{ display: "grid", gap: 8 }}>
           {emails.map((e) => (
             <div key={e.id} className="between" style={{ gap: 10 }}>
-              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13 }}>
+              <span
+                style={{
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontSize: 13,
+                }}
+              >
                 {e.forwarderEmail}
               </span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flex: "none" }}>
-                <span className={`badge ${e.verified ? "pos" : "neutral"}`} style={{ fontSize: 10.5 }}>
+                <span
+                  className={`badge ${e.verified ? "pos" : "neutral"}`}
+                  style={{ fontSize: 10.5 }}
+                >
                   {e.verified ? "Verificado" : "Pendiente"}
                 </span>
                 <button
                   type="button"
                   className="linkbtn"
-                  style={{ background: "none", border: 0, color: "var(--danger)", cursor: "pointer", fontSize: 12.5, fontWeight: 600 }}
+                  style={{
+                    background: "none",
+                    border: 0,
+                    color: "var(--danger)",
+                    cursor: "pointer",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                  }}
                   disabled={pending && busyId === e.id}
                   onClick={() => remove(e.id)}
                 >
@@ -910,10 +1068,21 @@ function IngestSection({ emails }: { emails: IngestEmailRow[] }) {
             style={{ letterSpacing: "0.3em", textAlign: "center" }}
           />
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="m-btn m-btn-secondary" style={{ flex: "none", padding: "0 16px" }} onClick={() => setVerifying(null)} disabled={pending}>
+            <button
+              type="button"
+              className="m-btn m-btn-secondary"
+              style={{ flex: "none", padding: "0 16px" }}
+              onClick={() => setVerifying(null)}
+              disabled={pending}
+            >
               Cancelar
             </button>
-            <button type="button" className="m-btn m-btn-block m-btn-primary" onClick={confirm} disabled={pending || code.trim().length !== 6}>
+            <button
+              type="button"
+              className="m-btn m-btn-block m-btn-primary"
+              onClick={confirm}
+              disabled={pending || code.trim().length !== 6}
+            >
               {pending ? "Verificando…" : "Confirmar"}
             </button>
           </div>
@@ -929,7 +1098,13 @@ function IngestSection({ emails }: { emails: IngestEmailRow[] }) {
             onChange={(e) => setEmail(e.target.value)}
             style={{ flex: 1 }}
           />
-          <button type="button" className="m-btn m-btn-secondary" style={{ flex: "none", padding: "0 16px" }} onClick={sendCode} disabled={pending || email.trim().length < 5}>
+          <button
+            type="button"
+            className="m-btn m-btn-secondary"
+            style={{ flex: "none", padding: "0 16px" }}
+            onClick={sendCode}
+            disabled={pending || email.trim().length < 5}
+          >
             {pending ? "Enviando…" : "Enviar código"}
           </button>
         </div>

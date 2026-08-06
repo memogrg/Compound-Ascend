@@ -49,9 +49,18 @@ function FundBlock({
           <span style={{ color: "var(--pos)", fontSize: 12.5, fontWeight: 600 }}>Cubierto ✓</span>
         ) : null}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginTop: 8,
+        }}
+      >
         <div style={{ fontSize: 18, fontWeight: 600 }}>{mAmount(fund.current, currency)}</div>
-        <div className="muted" style={{ fontSize: 13 }}>de {mAmount(fund.target, currency)}</div>
+        <div className="muted" style={{ fontSize: 13 }}>
+          de {mAmount(fund.target, currency)}
+        </div>
       </div>
       <div style={{ marginTop: 8 }}>
         <MProgress value={fund.progressPct} height={8} />
@@ -61,7 +70,8 @@ function FundBlock({
           Te faltan <strong>{mAmount(fund.gap, currency)}</strong>.{" "}
           {fund.recommendedMonthly > 0 ? (
             <>
-              Aparta <strong>{mAmount(fund.recommendedMonthly, currency)}/mes</strong> por ~12 meses.
+              Aparta <strong>{mAmount(fund.recommendedMonthly, currency)}/mes</strong> por ~12
+              meses.
             </>
           ) : note ? (
             note
@@ -72,7 +82,13 @@ function FundBlock({
   );
 }
 
-export function DefenseFundsMobile({ report, mortgageCase }: { report: Report; mortgageCase: boolean }) {
+export function DefenseFundsMobile({
+  report,
+  mortgageCase,
+}: {
+  report: Report;
+  mortgageCase: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const { emergency, peace, currency } = report;
@@ -81,12 +97,14 @@ export function DefenseFundsMobile({ report, mortgageCase }: { report: Report; m
   const [showPopup, setShowPopup] = useState(false);
   useEffect(() => {
     if (!showable) return;
-    if (typeof window !== "undefined" && window.localStorage.getItem("ca_peace_mortgage_dismissed")) return;
+    if (typeof window !== "undefined" && window.localStorage.getItem("ca_peace_mortgage_dismissed"))
+      return;
     setShowPopup(true);
   }, [showable]);
   const dismissPopup = () => {
     setShowPopup(false);
-    if (typeof window !== "undefined") window.localStorage.setItem("ca_peace_mortgage_dismissed", "1");
+    if (typeof window !== "undefined")
+      window.localStorage.setItem("ca_peace_mortgage_dismissed", "1");
   };
 
   const onMonths = (months: number) =>
@@ -106,7 +124,12 @@ export function DefenseFundsMobile({ report, mortgageCase }: { report: Report; m
         Primero el fondo de emergencia; luego el de paz. Te decimos cuánto apartar — tú decides.
       </div>
 
-      <FundBlock title="Fondo de emergencia" help={EMERGENCY_HELP} fund={emergency} currency={currency} />
+      <FundBlock
+        title="Fondo de emergencia"
+        help={EMERGENCY_HELP}
+        fund={emergency}
+        currency={currency}
+      />
       <div style={{ height: 10 }} />
       <FundBlock
         title="Fondo de paz"
@@ -126,16 +149,22 @@ export function DefenseFundsMobile({ report, mortgageCase }: { report: Report; m
             onChange={(e) => onMonths(Number(e.target.value))}
             style={{ width: "auto", display: "inline-block", padding: "4px 8px" }}
           >
-            {Array.from({ length: PEACE_MONTHS_MAX - PEACE_MONTHS_MIN + 1 }, (_, i) => PEACE_MONTHS_MIN + i).map(
-              (n) => (
-                <option key={n} value={n}>
-                  {n} meses
-                </option>
-              ),
-            )}
+            {Array.from(
+              { length: PEACE_MONTHS_MAX - PEACE_MONTHS_MIN + 1 },
+              (_, i) => PEACE_MONTHS_MIN + i,
+            ).map((n) => (
+              <option key={n} value={n}>
+                {n} meses
+              </option>
+            ))}
           </select>{" "}
           de gasto esencial.
-          {pending ? <span className="muted" style={{ fontSize: 12 }}> Recalculando…</span> : null}
+          {pending ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              {" "}
+              Recalculando…
+            </span>
+          ) : null}
         </div>
       </MContentCard>
 
@@ -151,8 +180,8 @@ export function DefenseFundsMobile({ report, mortgageCase }: { report: Report; m
       ) : null}
 
       <div className="muted" style={{ fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>
-        Son recomendaciones para orientarte, no una orden ni asesoría financiera. Tú eliges tu meta y
-        tu ritmo.
+        Son recomendaciones para orientarte, no una orden ni asesoría financiera. Tú eliges tu meta
+        y tu ritmo.
       </div>
 
       {showPopup ? (
@@ -170,7 +199,11 @@ export function DefenseFundsMobile({ report, mortgageCase }: { report: Report; m
             padding: 20,
           }}
         >
-          <div className="card card-p" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+          <div
+            className="card card-p"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 380 }}
+          >
             <div style={{ fontSize: 15.5, fontWeight: 600, marginBottom: 8 }}>Tu paz mental</div>
             <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6 }}>
               {mortgageNote}
@@ -181,7 +214,12 @@ export function DefenseFundsMobile({ report, mortgageCase }: { report: Report; m
                 ? "Primero completa tu fondo de emergencia."
                 : `Aparta ${mAmount(peace.recommendedMonthly, currency)}/mes para cerrarla en ~12 meses.`}
             </p>
-            <button type="button" className="m-btn m-btn-primary" onClick={dismissPopup} style={{ marginTop: 14 }}>
+            <button
+              type="button"
+              className="m-btn m-btn-primary"
+              onClick={dismissPopup}
+              style={{ marginTop: 14 }}
+            >
               Entendido
             </button>
           </div>

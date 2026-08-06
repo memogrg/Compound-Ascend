@@ -247,7 +247,10 @@ function HealthCard({ health }: { health: HealthScore }) {
             >
               <span style={{ fontSize: 12, color: "var(--ink-2)" }}>{b.label}</span>
               <div className="bar-track">
-                <div className="bar-fill" style={{ width: `${b.ratio * 100}%`, background: b.color }} />
+                <div
+                  className="bar-fill"
+                  style={{ width: `${b.ratio * 100}%`, background: b.color }}
+                />
               </div>
               <span className="muted tnum" style={{ fontSize: 11.5, textAlign: "right" }}>
                 {b.display}
@@ -277,7 +280,9 @@ function CompositionCard({
           Detalle <Icon name="chev" width={2.2} />
         </Link>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 14, flexWrap: "wrap" }}
+      >
         <DonutChart
           data={donutData}
           centerLabel={formatCompact(expenseMonthly, currency)}
@@ -318,10 +323,7 @@ function PerspectivesCard({ insights }: { insights: DashboardInsights }) {
     <div className="card card-pad">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
         <div className="card-title">Perspectivas de My Agent C+</div>
-        <span
-          className="chip-ai">
-          My Agent C+
-        </span>
+        <span className="chip-ai">My Agent C+</span>
       </div>
       {insights.insights.map((i, idx) => (
         <div

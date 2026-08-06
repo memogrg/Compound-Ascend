@@ -120,7 +120,9 @@ export function CategoryKebab({
             }}
           >
             {personalizeSlot ? (
-              <div style={{ marginBottom: 8, borderBottom: "1px solid var(--line)", paddingBottom: 6 }}>
+              <div
+                style={{ marginBottom: 8, borderBottom: "1px solid var(--line)", paddingBottom: 6 }}
+              >
                 <div
                   style={{
                     fontSize: 10.5,

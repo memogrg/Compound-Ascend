@@ -30,9 +30,10 @@ function isCronRequest(req: Request): boolean {
  * La composición vive en la ruta (y no dentro de financial-base) para no invertir la
  * dirección de dependencias del repo: rich-life → financial-base, nunca al revés.
  */
-async function snapshotPatrimonioAllUsers(
-  periodo: { year: number; month: number },
-): Promise<{ users: number; written: number } | { error: true }> {
+async function snapshotPatrimonioAllUsers(periodo: {
+  year: number;
+  month: number;
+}): Promise<{ users: number; written: number } | { error: true }> {
   try {
     const { generateNetWorthSnapshotsForAllUsers } =
       await import("@/modules/rich-life/services/net-worth-snapshot-service");
@@ -43,9 +44,10 @@ async function snapshotPatrimonioAllUsers(
 }
 
 /** Ídem para el usuario en sesión. */
-async function snapshotPatrimonioUser(
-  periodo: { year: number; month: number },
-): Promise<{ written: number } | { error: true }> {
+async function snapshotPatrimonioUser(periodo: {
+  year: number;
+  month: number;
+}): Promise<{ written: number } | { error: true }> {
   try {
     const { generateNetWorthSnapshot } =
       await import("@/modules/rich-life/services/net-worth-snapshot-service");

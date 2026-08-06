@@ -112,8 +112,7 @@ export type SeccionDeuda =
     };
 
 export type SeccionDefensa =
-  | SeccionFaltante
-  | { disponible: true; meses: number; invierteConColchonCorto: boolean };
+  SeccionFaltante | { disponible: true; meses: number; invierteConColchonCorto: boolean };
 
 export type SeccionFrescura = {
   sinPrecio: string[]; // etiquetas de las posiciones que no cotizaron
@@ -134,7 +133,8 @@ export type EvidencePack = {
   banderas: string[]; // códigos de diagnóstico §15, tal cual los emite el motor
 };
 
-const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+const num = (v: unknown): number | undefined =>
+  typeof v === "number" && Number.isFinite(v) ? v : undefined;
 
 /** Suma con redondeo a entero (mismo criterio que el mapeo de holdings del contexto). */
 const round = (n: number): number => Math.round(n);
@@ -142,7 +142,8 @@ const round = (n: number): number => Math.round(n);
 export function buildEvidencePack(ctx: FinancialContext, tc: ToolContext): EvidencePack {
   const currency = tc.currency || ctx.currency;
   const holdings = ctx.holdings ?? [];
-  const tieneInversiones = holdings.length > 0 || (ctx.investmentValue ?? []).some((m) => m.monto > 0);
+  const tieneInversiones =
+    holdings.length > 0 || (ctx.investmentValue ?? []).some((m) => m.monto > 0);
 
   return {
     currency,
@@ -188,9 +189,14 @@ function buildPosiciones(ctx: FinancialContext): SeccionPosiciones {
     })),
     masCount: ctx.holdingsMoreCount ?? 0,
     // Del contexto si vienen; si no, subtotales de lo listado (cada monto con su moneda).
-    invertidoTotal: ctx.investmentInvested ?? subtotales(holdings.map((h) => ({ monto: h.invested, moneda: h.monedaFila }))),
-    valorTotal: ctx.investmentValue ?? subtotales(holdings.map((h) => ({ monto: h.value, moneda: h.monedaFila }))),
-    plTotal: ctx.investmentPL ?? subtotales(holdings.map((h) => ({ monto: h.pl, moneda: h.monedaFila }))),
+    invertidoTotal:
+      ctx.investmentInvested ??
+      subtotales(holdings.map((h) => ({ monto: h.invested, moneda: h.monedaFila }))),
+    valorTotal:
+      ctx.investmentValue ??
+      subtotales(holdings.map((h) => ({ monto: h.value, moneda: h.monedaFila }))),
+    plTotal:
+      ctx.investmentPL ?? subtotales(holdings.map((h) => ({ monto: h.pl, moneda: h.monedaFila }))),
     ...(ctx.portfolioValueConvertido ? { valorConvertido: ctx.portfolioValueConvertido } : {}),
   };
 }
@@ -206,9 +212,10 @@ function buildConcentracion(ctx: FinancialContext): SeccionConcentracion {
   if (!c || c.porPosicion.length === 0) {
     return {
       disponible: false,
-      motivo: (ctx.holdings ?? []).length === 0
-        ? "no puedo calcular la concentración porque no hay posiciones registradas"
-        : "no puedo calcular la concentración porque no llegó el desglose del portafolio",
+      motivo:
+        (ctx.holdings ?? []).length === 0
+          ? "no puedo calcular la concentración porque no hay posiciones registradas"
+          : "no puedo calcular la concentración porque no llegó el desglose del portafolio",
       desbloquea: "registrá tus posiciones en Patrimonio",
     };
   }
@@ -219,7 +226,11 @@ function buildConcentracion(ctx: FinancialContext): SeccionConcentracion {
     disponible: true,
     base,
     // Monto y % vienen de la MISMA base (la del motor): comparables entre sí.
-    top1: { etiqueta: mayor.label, valor: { monto: round(mayor.valor), moneda: c.moneda }, pct: mayor.pct },
+    top1: {
+      etiqueta: mayor.label,
+      valor: { monto: round(mayor.valor), moneda: c.moneda },
+      pct: mayor.pct,
+    },
     top3Pct: c.top3Pct,
     hhi: c.hhi,
     mezcla: c.porTipo.map((s) => ({ assetType: s.label, pct: s.pct })),
@@ -236,7 +247,10 @@ function buildConcentracion(ctx: FinancialContext): SeccionConcentracion {
  * pregunta con otro denominador.
  */
 function buildMoneda(ctx: FinancialContext, visualizacion: string): SeccionMoneda {
-  const porMoneda = (ctx.concentracion?.porMoneda ?? []).map((s) => ({ currency: s.label, pct: s.pct }));
+  const porMoneda = (ctx.concentracion?.porMoneda ?? []).map((s) => ({
+    currency: s.label,
+    pct: s.pct,
+  }));
   if (porMoneda.length === 0) {
     return {
       disponible: false,
@@ -289,7 +303,8 @@ function buildDeuda(tc: ToolContext): SeccionDeuda {
   if (!(peor.apr > 0)) {
     return {
       disponible: false,
-      motivo: "no puedo comparar tu deuda contra el rendimiento supuesto porque ninguna tiene tasa (APR) registrada",
+      motivo:
+        "no puedo comparar tu deuda contra el rendimiento supuesto porque ninguna tiene tasa (APR) registrada",
       desbloquea: "agregá la tasa anual de tus deudas en Deudas",
     };
   }
@@ -315,8 +330,13 @@ function buildDefensa(ctx: FinancialContext): SeccionDefensa {
       desbloquea: "registrá tus cuentas líquidas y tus gastos del mes",
     };
   }
-  const invierte = (ctx.holdings ?? []).length > 0 || (ctx.investmentValue ?? []).some((m) => m.monto > 0);
-  return { disponible: true, meses, invierteConColchonCorto: invierte && meses < MESES_COLCHON_MINIMO };
+  const invierte =
+    (ctx.holdings ?? []).length > 0 || (ctx.investmentValue ?? []).some((m) => m.monto > 0);
+  return {
+    disponible: true,
+    meses,
+    invierteConColchonCorto: invierte && meses < MESES_COLCHON_MINIMO,
+  };
 }
 
 function buildFrescura(ctx: FinancialContext): SeccionFrescura {

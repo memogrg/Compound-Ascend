@@ -7,23 +7,77 @@ import {
 } from "@/modules/financial-base/engine/month-flow";
 
 type TxnLike = { id: string; kind: string; linkedKind?: string; countsInBudget?: boolean };
-const c = (t: TxnLike, dividends: string[] = []) =>
-  classifyTxnFlow(t as never, new Set(dividends));
+const c = (t: TxnLike, dividends: string[] = []) => classifyTxnFlow(t as never, new Set(dividends));
 
 describe("classifyTxnFlow · operativo vs capital", () => {
   const cases: Array<[string, TxnLike, string[], FlowClass]> = [
-    ["Salario / ingreso normal", { id: "1", kind: "ingreso", linkedKind: "none" }, [], "operating_income"],
-    ["Renta (ingreso/rental)", { id: "2", kind: "ingreso", linkedKind: "rental" }, [], "operating_income"],
+    [
+      "Salario / ingreso normal",
+      { id: "1", kind: "ingreso", linkedKind: "none" },
+      [],
+      "operating_income",
+    ],
+    [
+      "Renta (ingreso/rental)",
+      { id: "2", kind: "ingreso", linkedKind: "rental" },
+      [],
+      "operating_income",
+    ],
     // Caso ambiguo resuelto por el ledger de dividendos:
-    ["Dividendo (ingreso/holding, id ∈ dividends)", { id: "d1", kind: "ingreso", linkedKind: "holding" }, ["d1"], "operating_income"],
-    ["Venta de inversión (ingreso/holding, id ∉ dividends)", { id: "v1", kind: "ingreso", linkedKind: "holding" }, ["d1"], "capital_in"],
-    ["Retiro de meta (ingreso/goal)", { id: "3", kind: "ingreso", linkedKind: "goal" }, [], "capital_in"],
-    ["Gasto de consumo (gasto/none)", { id: "4", kind: "gasto", linkedKind: "none", countsInBudget: true }, [], "operating_expense"],
-    ["Pago de deuda (gasto/debt)", { id: "5", kind: "gasto", linkedKind: "debt", countsInBudget: true }, [], "operating_expense"],
-    ["Prima de seguro (gasto/policy)", { id: "6", kind: "gasto", linkedKind: "policy", countsInBudget: true }, [], "operating_expense"],
-    ["Compra de inversión (gasto/holding)", { id: "7", kind: "gasto", linkedKind: "holding", countsInBudget: true }, [], "capital_out"],
-    ["Aporte a meta (gasto/goal, budget-aware)", { id: "8", kind: "gasto", linkedKind: "goal", countsInBudget: true }, [], "capital_out"],
-    ["Consumo de frasco (gasto/goal, off-budget)", { id: "9", kind: "gasto", linkedKind: "goal", countsInBudget: false }, [], "excluded"],
+    [
+      "Dividendo (ingreso/holding, id ∈ dividends)",
+      { id: "d1", kind: "ingreso", linkedKind: "holding" },
+      ["d1"],
+      "operating_income",
+    ],
+    [
+      "Venta de inversión (ingreso/holding, id ∉ dividends)",
+      { id: "v1", kind: "ingreso", linkedKind: "holding" },
+      ["d1"],
+      "capital_in",
+    ],
+    [
+      "Retiro de meta (ingreso/goal)",
+      { id: "3", kind: "ingreso", linkedKind: "goal" },
+      [],
+      "capital_in",
+    ],
+    [
+      "Gasto de consumo (gasto/none)",
+      { id: "4", kind: "gasto", linkedKind: "none", countsInBudget: true },
+      [],
+      "operating_expense",
+    ],
+    [
+      "Pago de deuda (gasto/debt)",
+      { id: "5", kind: "gasto", linkedKind: "debt", countsInBudget: true },
+      [],
+      "operating_expense",
+    ],
+    [
+      "Prima de seguro (gasto/policy)",
+      { id: "6", kind: "gasto", linkedKind: "policy", countsInBudget: true },
+      [],
+      "operating_expense",
+    ],
+    [
+      "Compra de inversión (gasto/holding)",
+      { id: "7", kind: "gasto", linkedKind: "holding", countsInBudget: true },
+      [],
+      "capital_out",
+    ],
+    [
+      "Aporte a meta (gasto/goal, budget-aware)",
+      { id: "8", kind: "gasto", linkedKind: "goal", countsInBudget: true },
+      [],
+      "capital_out",
+    ],
+    [
+      "Consumo de frasco (gasto/goal, off-budget)",
+      { id: "9", kind: "gasto", linkedKind: "goal", countsInBudget: false },
+      [],
+      "excluded",
+    ],
     ["Transferencia", { id: "10", kind: "transferencia" }, [], "excluded"],
     ["Ajuste", { id: "11", kind: "ajuste" }, [], "excluded"],
   ];
@@ -39,7 +93,9 @@ describe("classifyTxnFlow · operativo vs capital", () => {
   });
 
   it("consumo de frasco off-budget nunca cuenta, aunque esté vinculado a meta", () => {
-    expect(c({ id: "y", kind: "gasto", linkedKind: "goal", countsInBudget: false })).toBe("excluded");
+    expect(c({ id: "y", kind: "gasto", linkedKind: "goal", countsInBudget: false })).toBe(
+      "excluded",
+    );
   });
 });
 

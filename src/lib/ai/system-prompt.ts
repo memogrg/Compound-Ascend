@@ -92,7 +92,13 @@ export type FinancialContext = {
   numeroDeIndependencia?: number; // capital para sostener la vida ACTUAL / gasto TOTAL (al 8%)
   /** Compromiso mensual TOTAL (base de la Independencia): sobres + metas + DCA + deudas + primas. */
   compromisoMensual?: number;
-  compromisoDesglose?: { sobres: number; metas: number; dca: number; deudas: number; seguros: number };
+  compromisoDesglose?: {
+    sobres: number;
+    metas: number;
+    dca: number;
+    deudas: number;
+    seguros: number;
+  };
   numeroDeLibertad?: number; // capital para el estilo de vida DESEADO (al 8%); ausente si no lo definió
   añosDeLibertad?: number; // años que cubre el patrimonio invertible
   mesesDeColchon?: number; // liquidez / gasto mensual (meses de colchón, no libertad)
@@ -180,8 +186,22 @@ export type FinancialContext = {
     convertido?: boolean;
     monedaOrigen?: string;
     activeFund: "emergency" | "peace" | "done";
-    emergency: { registrado: boolean; actual: number; objetivo: number; progresoPct: number; aporteRecomendado: number; cubierto: boolean };
-    paz: { registrado: boolean; actual: number; objetivo: number; progresoPct: number; aporteRecomendado: number; cubierto: boolean };
+    emergency: {
+      registrado: boolean;
+      actual: number;
+      objetivo: number;
+      progresoPct: number;
+      aporteRecomendado: number;
+      cubierto: boolean;
+    };
+    paz: {
+      registrado: boolean;
+      actual: number;
+      objetivo: number;
+      progresoPct: number;
+      aporteRecomendado: number;
+      cubierto: boolean;
+    };
   };
   // Arquetipo conductual (Fase 2). Best-effort: si el perfil no se completó, no aparecen.
   archetypePrimary?: string;
@@ -251,15 +271,21 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.trajectory) {
     const t = ctx.trajectory;
     const trend = (dir: "sube" | "baja" | "estable", mag: string): string =>
-      dir === "estable" ? "se mantiene estable" : `viene ${dir === "sube" ? "subiendo" : "bajando"} ${mag}`;
+      dir === "estable"
+        ? "se mantiene estable"
+        : `viene ${dir === "sube" ? "subiendo" : "bajando"} ${mag}`;
     if (t.savingsRate)
       facts.push(
         `Trayectoria (${t.months} meses): tu tasa de ahorro ${trend(t.savingsRate.dir, `~${Math.abs(t.savingsRate.deltaPp)} pp`)}.`,
       );
     if (t.expense)
-      facts.push(`Trayectoria: tu gasto mensual ${trend(t.expense.dir, `~${Math.abs(t.expense.pct)}%`)}.`);
+      facts.push(
+        `Trayectoria: tu gasto mensual ${trend(t.expense.dir, `~${Math.abs(t.expense.pct)}%`)}.`,
+      );
     if (t.netWorth)
-      facts.push(`Trayectoria: tu patrimonio neto ${trend(t.netWorth.dir, `~${Math.abs(t.netWorth.pct)}%`)}.`);
+      facts.push(
+        `Trayectoria: tu patrimonio neto ${trend(t.netWorth.dir, `~${Math.abs(t.netWorth.pct)}%`)}.`,
+      );
   }
   if (ctx.topConcern) facts.push(`Principal preocupación: ${ctx.topConcern}.`);
   if (ctx.portfolioValue && ctx.portfolioValue.length > 0)
@@ -286,7 +312,9 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
             : ""),
       );
     const lines = ctx.holdings.map((h) => {
-      const tag = h.symbol ? `${h.symbol}${h.name && h.name !== h.symbol ? ` (${h.name})` : ""}` : h.name;
+      const tag = h.symbol
+        ? `${h.symbol}${h.name && h.name !== h.symbol ? ` (${h.name})` : ""}`
+        : h.name;
       if (h.priceUnavailable || h.price === null) {
         return `  · ${tag}: ${h.quantity} uds, invertido ${h.invested} ${h.monedaFila} (precio actual no disponible).`;
       }
@@ -313,11 +341,15 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       );
     if (c.porTipo.length) facts.push(`  Por tipo de activo: ${slices(c.porTipo)}.`);
     if (c.porMoneda.length)
-      facts.push(`  Por moneda de EXPOSICIÓN (donde cotiza, no donde se compró): ${slices(c.porMoneda)}.`);
+      facts.push(
+        `  Por moneda de EXPOSICIÓN (donde cotiza, no donde se compró): ${slices(c.porMoneda)}.`,
+      );
     if (c.porRegion.length) facts.push(`  Por región: ${slices(c.porRegion)}.`);
   }
   if (ctx.growthScore !== undefined)
-    facts.push(`Score de crecimiento del portafolio: ${ctx.growthScore}/100 (rendimiento + diversificación + preparación).`);
+    facts.push(
+      `Score de crecimiento del portafolio: ${ctx.growthScore}/100 (rendimiento + diversificación + preparación).`,
+    );
   // Marco Patrimonial: cada línea solo si el campo existe (best-effort).
   if (ctx.indicePatrimonial !== undefined)
     facts.push(
@@ -383,8 +415,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.tipoCambioVenta !== undefined)
     facts.push(`Tipo de cambio USD/CRC (venta): ${ctx.tipoCambioVenta}.`);
   if (ctx.fedFundsPct !== undefined) facts.push(`Fed Funds (EE. UU.): ${ctx.fedFundsPct}%.`);
-  if (ctx.treasury10yPct !== undefined)
-    facts.push(`Tesoro 10A (EE. UU.): ${ctx.treasury10yPct}%.`);
+  if (ctx.treasury10yPct !== undefined) facts.push(`Tesoro 10A (EE. UU.): ${ctx.treasury10yPct}%.`);
   if (ctx.macroInsights?.length) {
     facts.push("Lecturas del entorno económico:");
     for (const m of ctx.macroInsights) facts.push(`Entorno (${m.tone}): ${m.title} — ${m.body}`);
@@ -467,17 +498,21 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.discipline !== undefined) facts.push(`Disciplina financiera: ${ctx.discipline}/5.`);
   if (ctx.impulsivity !== undefined) facts.push(`Impulsividad: ${ctx.impulsivity}/5.`);
   if (ctx.reviewHabit) facts.push(`Hábito de revisión: ${ctx.reviewHabit}.`);
-  if (ctx.hardest?.length) facts.push(`Lo que más le cuesta (por prioridad): ${formatRanking(ctx.hardest)}.`);
+  if (ctx.hardest?.length)
+    facts.push(`Lo que más le cuesta (por prioridad): ${formatRanking(ctx.hardest)}.`);
   if (ctx.knowledgeLevel) facts.push(`Nivel de conocimiento financiero: ${ctx.knowledgeLevel}.`);
-  if (ctx.topicsToLearn?.length) facts.push(`Quiere aprender sobre: ${ctx.topicsToLearn.join(", ")}.`);
-  if (ctx.priorities?.length) facts.push(`Sus prioridades (por prioridad): ${formatRanking(ctx.priorities)}.`);
+  if (ctx.topicsToLearn?.length)
+    facts.push(`Quiere aprender sobre: ${ctx.topicsToLearn.join(", ")}.`);
+  if (ctx.priorities?.length)
+    facts.push(`Sus prioridades (por prioridad): ${formatRanking(ctx.priorities)}.`);
   if (ctx.coachingTone) facts.push(`Tono de coaching preferido: ${ctx.coachingTone}.`);
   if (ctx.coachingFrequency) facts.push(`Frecuencia de coaching: ${ctx.coachingFrequency}.`);
   if (ctx.alertIntensity) facts.push(`Intensidad de alertas preferida: ${ctx.alertIntensity}.`);
   if (ctx.urgency) facts.push(`Urgencia financiera percibida: ${ctx.urgency}.`);
   if (ctx.perceivedControl !== undefined)
     facts.push(`Control percibido sobre sus finanzas: ${ctx.perceivedControl}/5.`);
-  if (ctx.dependentsCount !== undefined) facts.push(`Personas que dependen de él/ella: ${ctx.dependentsCount}.`);
+  if (ctx.dependentsCount !== undefined)
+    facts.push(`Personas que dependen de él/ella: ${ctx.dependentsCount}.`);
   if (ctx.financialNucleus) facts.push(`Núcleo financiero: ${ctx.financialNucleus}.`);
   // Fondos de defensa — estado REAL (fund-sizing) tiene prioridad sobre el auto-reporte del wizard.
   if (ctx.defenseFunds) {
@@ -496,7 +531,9 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
   } else if (ctx.hasEmergencyFund) {
     // Sin datos reales (WhatsApp/sin sesión) → cae al auto-reporte del onboarding.
-    facts.push(`Fondo de emergencia (auto-reporte del onboarding): ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`);
+    facts.push(
+      `Fondo de emergencia (auto-reporte del onboarding): ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`,
+    );
   }
   if (ctx.richLifePhrase) facts.push(`Su vida rica en una frase: "${ctx.richLifePhrase}".`);
   if (ctx.richLifeVision) facts.push(`Su visión de vida rica: "${ctx.richLifeVision}".`);
@@ -521,7 +558,9 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     for (const i of ctx.insights) {
       // La acción viaja pegada a la observación para que ofrecer la salida no cueste inventarla.
       const arreglo = i.action ? ` [se arregla: ${i.action}]` : "";
-      facts.push(`Observación reciente (${i.severity}) [${i.kind}]: ${i.title} — ${i.body}${arreglo}`);
+      facts.push(
+        `Observación reciente (${i.severity}) [${i.kind}]: ${i.title} — ${i.body}${arreglo}`,
+      );
     }
   }
 
@@ -575,7 +614,8 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
 
   // Arquetipo primero: marca el tono y el foco de toda la conversación.
   if (ctx.archetypeLabel) {
-    if (ctx.archetypeGuidance) behaviorRules.push(`Arquetipo ${ctx.archetypeLabel}: ${ctx.archetypeGuidance}`);
+    if (ctx.archetypeGuidance)
+      behaviorRules.push(`Arquetipo ${ctx.archetypeLabel}: ${ctx.archetypeGuidance}`);
     if (ctx.initialFocus) behaviorRules.push(`Foco inicial sugerido: ${ctx.initialFocus}.`);
     if (ctx.recommendedTone)
       behaviorRules.push(
@@ -604,7 +644,8 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     directo: "Explicación: ve directo al punto.",
     resumen_detalle: "Explicación: da primero un resumen y ofrece profundizar.",
   };
-  if (ctx.explainStyle && explainRule[ctx.explainStyle]) behaviorRules.push(explainRule[ctx.explainStyle]!);
+  if (ctx.explainStyle && explainRule[ctx.explainStyle])
+    behaviorRules.push(explainRule[ctx.explainStyle]!);
 
   const interventionRule: Record<string, string> = {
     recordatorio: "Si se desvía de una meta: un recordatorio amable.",
@@ -634,15 +675,21 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.knowledgeLevel === "basico")
     behaviorRules.push("Nivel básico: usa analogías cotidianas y cero jerga técnica.");
   if (ctx.knowledgeLevel === "experto")
-    behaviorRules.push("Nivel experto: ve directo a tasas, escenarios y números, sin rodeos didácticos.");
+    behaviorRules.push(
+      "Nivel experto: ve directo a tasas, escenarios y números, sin rodeos didácticos.",
+    );
   if (ctx.alertIntensity === "suaves")
     behaviorRules.push("Alertas: sin alarmismo; plantea los riesgos con calma.");
   if (ctx.alertIntensity === "directas")
     behaviorRules.push("Alertas: sé claro y contundente al señalar riesgos.");
   if (ctx.impulsivity !== undefined && ctx.impulsivity >= 4)
-    behaviorRules.push("Impulsividad alta: anticipa el impulso antes de las compras; ofrece una pausa o una regla simple antes de gastar.");
+    behaviorRules.push(
+      "Impulsividad alta: anticipa el impulso antes de las compras; ofrece una pausa o una regla simple antes de gastar.",
+    );
   if (ctx.urgency === "alta" || ctx.urgency === "critica")
-    behaviorRules.push("Urgencia financiera alta: prioriza primero la estabilidad (liquidez), no inversión de riesgo.");
+    behaviorRules.push(
+      "Urgencia financiera alta: prioriza primero la estabilidad (liquidez), no inversión de riesgo.",
+    );
   // Regla de seguridad (Biblia §18): sin fondo de emergencia (o sin saberlo) y bajo
   // presión (urgencia alta/crítica o etapa de vida de presión/deuda) → estabilizar antes.
   const noEmergencyFund = ctx.hasEmergencyFund === "no" || ctx.hasEmergencyFund === "no_se";
@@ -651,9 +698,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     ctx.urgency === "critica" ||
     (!!ctx.lifeStage && /deuda|presi|al d[ií]a/i.test(ctx.lifeStage));
   if (noEmergencyFund && underPressure)
-    behaviorRules.push("Sin fondo de emergencia y bajo presión: prioriza estabilidad y construir el fondo de emergencia antes que cualquier inversión de riesgo; no propongas estrategias agresivas.");
+    behaviorRules.push(
+      "Sin fondo de emergencia y bajo presión: prioriza estabilidad y construir el fondo de emergencia antes que cualquier inversión de riesgo; no propongas estrategias agresivas.",
+    );
   if (ctx.dependentsCount !== undefined && ctx.dependentsCount > 0)
-    behaviorRules.push("Tiene dependientes: prioriza la protección (seguro, fondo de emergencia) antes que estrategias agresivas.");
+    behaviorRules.push(
+      "Tiene dependientes: prioriza la protección (seguro, fondo de emergencia) antes que estrategias agresivas.",
+    );
 
   // Proteger antes de crecer: respaldo de emergencia bajo (señal dura, independiente de urgencia).
   if (ctx.emergencyMonths !== undefined && ctx.emergencyMonths < 3)
@@ -791,7 +842,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       : []),
     "",
     "Tenés DOS mecanismos distintos, NO los confundas: (a) HERRAMIENTAS de CÁLCULO de SOLO LECTURA (proyectar_inversion, simular_pago_deuda, comparar_estrategias_deuda) que te dan números; y (b) ACCIONES que PROPONÉS para que el usuario confirme: create_transaction, create_goal y create_price_alert, mediante un bloque ```action```. Registrar una transacción, CREAR UNA META/SOBRE y CREAR UNA ALERTA DE PRECIO se hacen SIEMPRE por (b), NUNCA por una herramienta.",
-    "PODÉS crear: gastos, metas de ahorro, sobres (metas acumulables) y ALERTAS DE PRECIO. NUNCA digas que \"no podés/no tenés capacidad de crear alertas/metas/sobres/gastos\": SÍ podés, proponiendo la acción. Si te falta un dato (símbolo, precio, monto, nombre), pedí SOLO ese dato en una pregunta corta; no rechaces la creación.",
+    'PODÉS crear: gastos, metas de ahorro, sobres (metas acumulables) y ALERTAS DE PRECIO. NUNCA digas que "no podés/no tenés capacidad de crear alertas/metas/sobres/gastos": SÍ podés, proponiendo la acción. Si te falta un dato (símbolo, precio, monto, nombre), pedí SOLO ese dato en una pregunta corta; no rechaces la creación.',
     "Si el usuario claramente quiere registrar una transacción o crear una meta de ahorro, PROPÓN una acción añadiendo al final un bloque:",
     "```action",
     '{"type":"create_transaction","payload":{"kind":"gasto","description":"...","amount":0,"currency":"' +
@@ -804,7 +855,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       ctx.currency +
       '","targetDate":"2036-07-01"},"summary":"texto corto"}',
     "```",
-    "Para una ALERTA DE PRECIO (avisar cuando un activo llegue a un precio), el bloque va así (la dirección la calcula el servidor con el precio actual; assetType es \"cripto\"|\"etf\"|\"accion\"):",
+    'Para una ALERTA DE PRECIO (avisar cuando un activo llegue a un precio), el bloque va así (la dirección la calcula el servidor con el precio actual; assetType es "cripto"|"etf"|"accion"):',
     "```action",
     '{"type":"create_price_alert","payload":{"symbol":"JUP","targetPrice":1,"assetType":"cripto","currency":"USD"},"summary":"Alerta JUP a $1"}',
     "```",
@@ -825,7 +876,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "REGLAS de estas tres: (a) el monto tiene que salir de un cálculo REAL —tu contexto o una herramienta—, nunca de una cifra redonda inventada para que suene bien; (b) identificá la entidad por su NOMBRE o SÍMBOLO tal como aparece en tu contexto (el servidor la busca y pone el id: si no la encuentra, la tarjeta no sale); (c) una sola acción por respuesta, la más importante; (d) proponé SOLO si venías recomendando eso — no conviertas cada mención en un botón.",
     "",
     "Tipos válidos: create_transaction, create_goal, create_price_alert, set_dca, adjust_budget, debt_extra_payment.",
-    "Cuando el usuario quiera crear o registrar una meta de ahorro y tengas nombre + objetivo + aporte mensual (si falta el aporte, calculalo con proyectar_inversion), PROPONÉ la acción create_goal. NUNCA digas que \"la herramienta para crear metas no está disponible\": crear metas SÍ está disponible mediante la acción create_goal.",
+    'Cuando el usuario quiera crear o registrar una meta de ahorro y tengas nombre + objetivo + aporte mensual (si falta el aporte, calculalo con proyectar_inversion), PROPONÉ la acción create_goal. NUNCA digas que "la herramienta para crear metas no está disponible": crear metas SÍ está disponible mediante la acción create_goal.',
     'Si la transacción es claramente un pago de deuda o un aporte/retiro de meta y existe la entidad en las listas de arriba, incluye "linkedKind" ("debt" o "goal"), "linkedId" (el id entre corchetes) y "linkedName" (el nombre legible). Si hay duda sobre cuál entidad, deja los tres en null.',
     "Para CUALQUIER monto de proyección, ahorro, retiro o meta USÁ la herramienta proyectar_inversion; NUNCA estimes el monto de memoria.",
     "Solo ofrecé o propongas acciones que EXISTEN (registrar transacción, crear meta/sobre, crear alerta de precio, fijar aporte mensual, ajustar presupuesto de un sobre, abonar extra a una deuda). No prometas otras capacidades; si el usuario pide algo que no podés ejecutar, dale los pasos manuales en texto.",

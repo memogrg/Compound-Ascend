@@ -17,7 +17,14 @@ import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import type { HoldingNativo, HoldingPerformance } from "@/modules/wealth/types";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
 
-import { Fab, BottomSheet, ConfirmDialog, SwipeRow, PlusChoiceSheet, useToast } from "../../components/form-kit";
+import {
+  Fab,
+  BottomSheet,
+  ConfirmDialog,
+  SwipeRow,
+  PlusChoiceSheet,
+  useToast,
+} from "../../components/form-kit";
 import { MContentCard, MDataRow, MEmptyState, mAmount } from "../../components/content-kit";
 import {
   HoldingWizardSheet,
@@ -103,7 +110,14 @@ export function InversionesManager({
             const rowCurrency = holdingDisplayCurrency(h.assetType, rw?.currency ?? currency);
             const rowValue = rw ? rw.quantity * rw.averageCost * (1 + h.returnPct) : h.currentValue;
             return (
-              <SwipeRow key={h.id} onEdit={() => { const r = rawById.get(h.id); if (r) setEditH(r); }} onDelete={() => setDeleteH(h)}>
+              <SwipeRow
+                key={h.id}
+                onEdit={() => {
+                  const r = rawById.get(h.id);
+                  if (r) setEditH(r);
+                }}
+                onDelete={() => setDeleteH(h)}
+              >
                 {/* Tocar la fila abre el detalle (con su sparkline R5); el chevron lo indica.
                     Valor actual arriba + retorno % coloreado debajo (el retorno es la señal
                     verde/roja, no el valor, que siempre es positivo).
@@ -139,15 +153,32 @@ export function InversionesManager({
                   value={
                     h.priceUnavailable ? (
                       // Cotizable sin precio: no mostramos valor/retorno inventados al costo.
-                      <span className="muted" style={{ fontSize: 11, fontStyle: "italic", textAlign: "right", lineHeight: 1.25 }}>
+                      <span
+                        className="muted"
+                        style={{
+                          fontSize: 11,
+                          fontStyle: "italic",
+                          textAlign: "right",
+                          lineHeight: 1.25,
+                        }}
+                      >
                         precio no
                         <br />
                         disponible
                       </span>
                     ) : (
-                      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          flexDirection: "column",
+                          alignItems: "flex-end",
+                        }}
+                      >
                         <span>{mAmount(rowValue, rowCurrency, 10)}</span>
-                        <span className={dir > 0 ? "pos" : dir < 0 ? "neg" : "muted"} style={{ fontSize: 11 }}>
+                        <span
+                          className={dir > 0 ? "pos" : dir < 0 ? "neg" : "muted"}
+                          style={{ fontSize: 11 }}
+                        >
                           {dir > 0 ? "+" : dir < 0 ? "−" : ""}
                           {formatPercent(Math.abs(h.returnPct), 1)}
                         </span>
@@ -239,7 +270,6 @@ export function InversionesManager({
         />
       ) : null}
 
-
       {/* Detalle de la inversión (aportes, dividendos, valuaciones + acciones). Se monta solo
           con la posición elegida: así sus listas se piden al abrir, no en la carga de la página. */}
       {/* Sin el crudo no se abre el detalle: dentro se capturan renta y valuaciones, y sin
@@ -275,7 +305,9 @@ export function InversionesManager({
 
       {/* Vender */}
       <BottomSheet open={!!sellH} onClose={() => setSellH(null)} title="Vender / retirar">
-        {sellH ? <SellHoldingForm holding={sellH} currency={currency} onSuccess={() => setSellH(null)} /> : null}
+        {sellH ? (
+          <SellHoldingForm holding={sellH} currency={currency} onSuccess={() => setSellH(null)} />
+        ) : null}
       </BottomSheet>
 
       {/* Eliminar */}

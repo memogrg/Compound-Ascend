@@ -3,7 +3,11 @@ import "server-only";
 /** CRUD + agregados de presupuesto por mes (budget_items). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -137,7 +141,8 @@ export async function updateBudgetItem(id: string, input: BudgetItemInput): Prom
   const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("budget_items")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       type: input.type,
       category_id: input.categoryId ?? null,
       name: input.name,
@@ -331,7 +336,11 @@ export async function updateIncomeSource(id: string, input: IncomeSourceInput): 
     recurringItemId = await createRecurringTemplate(supabase, user.id, input);
   } else if (!input.recurrent && recurringItemId) {
     // Dejó de ser recurrente: descarta la plantilla.
-    await supabase.from("recurring_items").delete().eq("id", recurringItemId).eq("user_id", user.id);
+    await supabase
+      .from("recurring_items")
+      .delete()
+      .eq("id", recurringItemId)
+      .eq("user_id", user.id);
     recurringItemId = null;
   }
 

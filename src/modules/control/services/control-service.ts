@@ -3,7 +3,13 @@ import "server-only";
 /** Servicio del Módulo 3 (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  existsInHousehold,
+  HOUSEHOLD_READ_ONLY_MESSAGE,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
@@ -254,7 +260,8 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
 
   await supabase
     .from("savings_goals")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       name: input.name,
       goal_type: input.goalType ?? null,
       kind: input.kind,
@@ -440,9 +447,7 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   // calculó contra una referencia distinta y guardarlo corrompería las dos cosas a la
   // vez (el gasto del mes y la amortización). Mejor fallar que guardar callado.
   if (!monedaDelPagoEsCoherente(input.currency, debt.currency)) {
-    throw new Error(
-      `El pago viene en ${input.currency} pero la deuda está en ${debt.currency}.`,
-    );
+    throw new Error(`El pago viene en ${input.currency} pero la deuda está en ${debt.currency}.`);
   }
   const total = input.amount + input.extraAmount;
 
@@ -505,7 +510,8 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     );
     const { error: upErr } = await supabase
       .from("debts")
-      .update({ last_edited_by: user.id,
+      .update({
+        last_edited_by: user.id,
         current_payment: decision.monthlyPayment,
         balance: Math.max(0, debt.balance - input.extraAmount),
       })
@@ -521,10 +527,7 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
  * y la proyección se recalculan en `getDebtDetail` desde los pagos, así que no
  * hace falta tocar la deuda aquí.
  */
-export async function updateDebtPayment(
-  paymentId: string,
-  input: DebtPaymentInput,
-): Promise<void> {
+export async function updateDebtPayment(paymentId: string, input: DebtPaymentInput): Promise<void> {
   await requireUser();
   const supabase = await createSupabaseServerClient();
 
@@ -619,7 +622,10 @@ export async function addGoalContribution(input: {
 
   const { error } = await supabase
     .from("savings_goals")
-    .update({ last_edited_by: user.id, current_amount: Number(goalRow.current_amount) + input.amount })
+    .update({
+      last_edited_by: user.id,
+      current_amount: Number(goalRow.current_amount) + input.amount,
+    })
     .eq("id", input.goalId)
     .in("user_id", scope);
   if (error) {
@@ -811,7 +817,10 @@ export async function withdrawFromGoal(input: {
 
   const { error } = await supabase
     .from("savings_goals")
-    .update({ last_edited_by: user.id, current_amount: Math.max(0, Number(goalRow.current_amount) - input.amount) })
+    .update({
+      last_edited_by: user.id,
+      current_amount: Math.max(0, Number(goalRow.current_amount) - input.amount),
+    })
     .eq("id", input.goalId)
     .in("user_id", scope);
   if (error) {

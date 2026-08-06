@@ -27,7 +27,12 @@ import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import type { AlertKind } from "@/modules/wealth/engine/price-alerts";
 import type { InvestmentAlert } from "@/modules/wealth/services/price-alerts-service";
-import type { Dividend, HoldingPerformance, RentalPayment, HoldingNativo } from "@/modules/wealth/types";
+import type {
+  Dividend,
+  HoldingPerformance,
+  RentalPayment,
+  HoldingNativo,
+} from "@/modules/wealth/types";
 import type {
   HistoryPoint,
   HoldingPurchase,
@@ -95,7 +100,10 @@ const ALERT_KIND_LABEL: Record<AlertKind, string> = {
 
 /** Etiqueta de fecha corta (día + mes) para los puntos del gráfico con scrub. */
 function dayLabel(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", { day: "numeric", month: "short" });
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 export function HoldingDetailSheet({
@@ -587,7 +595,10 @@ export function HoldingDetailSheet({
                     {formatMoney(contribution.amount, contribution.currency)}
                   </span>
                 </div>
-                <div className="muted" style={{ fontSize: 11.5, marginBottom: 8, lineHeight: 1.45 }}>
+                <div
+                  className="muted"
+                  style={{ fontSize: 11.5, marginBottom: 8, lineHeight: 1.45 }}
+                >
                   Confirma el precio de compra de este mes para que tu promedio quede exacto.
                 </div>
                 <MoneyField
@@ -614,7 +625,10 @@ export function HoldingDetailSheet({
               <div className="between">
                 <div className="ov">Valor actual</div>
                 {holding.priceUnavailable ? null : (
-                  <div className={`mono ${holding.returnPct >= 0 ? "pos" : "neg"}`} style={{ fontSize: 12, fontWeight: 700 }}>
+                  <div
+                    className={`mono ${holding.returnPct >= 0 ? "pos" : "neg"}`}
+                    style={{ fontSize: 12, fontWeight: 700 }}
+                  >
                     {holding.returnPct >= 0 ? "+" : ""}
                     {formatPercent(holding.returnPct, 1)}
                   </div>
@@ -623,7 +637,10 @@ export function HoldingDetailSheet({
               {holding.priceUnavailable ? (
                 // Cotizable sin precio: no inventamos valor/retorno al costo.
                 <>
-                  <div className="mono muted" style={{ fontSize: 17, fontWeight: 700, fontStyle: "italic", marginTop: 4 }}>
+                  <div
+                    className="mono muted"
+                    style={{ fontSize: 17, fontWeight: 700, fontStyle: "italic", marginTop: 4 }}
+                  >
                     Precio no disponible
                   </div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
@@ -645,7 +662,10 @@ export function HoldingDetailSheet({
               {quoted && history.length > 1 ? (
                 <div style={{ marginTop: 8 }}>
                   <MScrubChart
-                    points={history.map<MPoint>((h) => ({ label: dayLabel(h.date), value: h.value }))}
+                    points={history.map<MPoint>((h) => ({
+                      label: dayLabel(h.date),
+                      value: h.value,
+                    }))}
                     currency={cur}
                   />
                   <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
@@ -674,7 +694,9 @@ export function HoldingDetailSheet({
                       type="button"
                       className="m-chip"
                       onClick={() => setAlertKind(k)}
-                      style={alertKind === k ? { background: "var(--accent)", color: "#fff" } : undefined}
+                      style={
+                        alertKind === k ? { background: "var(--accent)", color: "#fff" } : undefined
+                      }
                     >
                       {ALERT_KIND_LABEL[k]}
                     </button>
@@ -716,7 +738,9 @@ export function HoldingDetailSheet({
                     min="0"
                     step="any"
                     value={alertYears ?? ""}
-                    onChange={(e) => setAlertYears(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={(e) =>
+                      setAlertYears(e.target.value ? Number(e.target.value) : undefined)
+                    }
                     placeholder="Ej. 5"
                   />
                 </div>
@@ -744,7 +768,10 @@ export function HoldingDetailSheet({
                   {alerts.map((a) => (
                     <div key={a.id} className="between" style={{ padding: "9px 12px" }}>
                       <span style={{ fontSize: 12.5 }}>
-                        <span className="muted" style={{ fontSize: 10.5, textTransform: "uppercase" }}>
+                        <span
+                          className="muted"
+                          style={{ fontSize: 10.5, textTransform: "uppercase" }}
+                        >
                           {ALERT_KIND_LABEL[a.kind]}
                         </span>{" "}
                         <span className="mono" style={{ fontWeight: 600 }}>
@@ -760,11 +787,21 @@ export function HoldingDetailSheet({
                       </span>
                       <span style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                         {!a.triggeredAt ? (
-                          <button type="button" className="m-chip" disabled={pending} onClick={() => toggleAlert(a)}>
+                          <button
+                            type="button"
+                            className="m-chip"
+                            disabled={pending}
+                            onClick={() => toggleAlert(a)}
+                          >
                             {a.active ? "Pausar" : "Reactivar"}
                           </button>
                         ) : null}
-                        <button type="button" className="m-chip" disabled={pending} onClick={() => removeAlert(a.id)}>
+                        <button
+                          type="button"
+                          className="m-chip"
+                          disabled={pending}
+                          onClick={() => removeAlert(a.id)}
+                        >
                           Borrar
                         </button>
                       </span>
@@ -905,7 +942,10 @@ export function HoldingDetailSheet({
                 ) : (
                   <>
                     <MScrubChart
-                      points={valuations.map<MPoint>((v) => ({ label: dayLabel(v.asOf), value: v.value }))}
+                      points={valuations.map<MPoint>((v) => ({
+                        label: dayLabel(v.asOf),
+                        value: v.value,
+                      }))}
                       currency={cur}
                     />
                     <div className="card" style={{ padding: 0 }}>

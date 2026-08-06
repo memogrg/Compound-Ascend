@@ -103,12 +103,16 @@ export async function persistInvestmentReport(
     });
     if (error) throw new Error(error.message);
   } catch (err) {
-    logger.warn("persistInvestmentReport falló", { message: err instanceof Error ? err.message : "?" });
+    logger.warn("persistInvestmentReport falló", {
+      message: err instanceof Error ? err.message : "?",
+    });
   }
 }
 
 /** Último informe guardado del usuario. null si no hay ninguno (o si la lectura falla). */
-export async function getLatestInvestmentReport(ctx?: AuthContext): Promise<InvestmentReport | null> {
+export async function getLatestInvestmentReport(
+  ctx?: AuthContext,
+): Promise<InvestmentReport | null> {
   try {
     const { db, userId } = await resolveAuth(ctx);
     let query = db.from("investment_reports").select("evidence, report_md, created_at");
@@ -124,7 +128,9 @@ export async function getLatestInvestmentReport(ctx?: AuthContext): Promise<Inve
       createdAt: row.created_at,
     };
   } catch (err) {
-    logger.warn("getLatestInvestmentReport falló", { message: err instanceof Error ? err.message : "?" });
+    logger.warn("getLatestInvestmentReport falló", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return null;
   }
 }

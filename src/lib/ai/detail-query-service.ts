@@ -160,7 +160,11 @@ async function detalleLiquidez(
 ): Promise<{ entidades: Entidad[]; entidad: Entidad | null; movs: Movimiento[] }> {
   const { listAccounts, listTransactions } = await import("@/modules/financial-base");
   const cuentas = await listAccounts();
-  const entidades: Entidad[] = cuentas.map((c) => ({ id: c.id, nombre: c.name, moneda: c.currency }));
+  const entidades: Entidad[] = cuentas.map((c) => ({
+    id: c.id,
+    nombre: c.name,
+    moneda: c.currency,
+  }));
   const entidad = resolverEntidad(nombre, entidades);
 
   // La trazabilidad legible ("de dónde salió") son las transacciones CON cuenta asignada.
@@ -197,11 +201,15 @@ export async function consultarDetalle(
   const hoy = await userToday();
 
   const datos =
-    dominio === "deudas" ? await detalleDeudas(nombre)
-    : dominio === "metas" ? await detalleMetas(nombre, hoy)
-    : dominio === "inversiones" ? await detalleInversiones(nombre)
-    : dominio === "dividendos" ? await detalleDividendos(nombre)
-    : await detalleLiquidez(nombre, hoy);
+    dominio === "deudas"
+      ? await detalleDeudas(nombre)
+      : dominio === "metas"
+        ? await detalleMetas(nombre, hoy)
+        : dominio === "inversiones"
+          ? await detalleInversiones(nombre)
+          : dominio === "dividendos"
+            ? await detalleDividendos(nombre)
+            : await detalleLiquidez(nombre, hoy);
 
   const rates = await getFxRates().catch(() => null);
 

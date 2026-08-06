@@ -132,7 +132,12 @@ export async function listHoldingValuations(holdingId: string): Promise<HoldingV
     .eq("holding_id", holdingId)
     .order("as_of", { ascending: true });
   if (error || !data) return [];
-  return data.map((r) => ({ id: r.id, asOf: r.as_of, value: Number(r.value), currency: r.currency }));
+  return data.map((r) => ({
+    id: r.id,
+    asOf: r.as_of,
+    value: Number(r.value),
+    currency: r.currency,
+  }));
 }
 
 /** Guarda un valor del estado de cuenta y actualiza el valor actual del plan al más reciente. */

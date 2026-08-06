@@ -168,7 +168,11 @@ export function PorRevisarCard({ proposals }: { proposals: PendingProposalView[]
                     style={{ fontSize: 11, padding: "4px 10px" }}
                     disabled={rowBusy}
                     onClick={() =>
-                      run(p.id, confirmIngestProposalAction, "Movimiento agregado a tus transacciones")
+                      run(
+                        p.id,
+                        confirmIngestProposalAction,
+                        "Movimiento agregado a tus transacciones",
+                      )
                     }
                   >
                     {rowBusy ? "…" : "Confirmar"}

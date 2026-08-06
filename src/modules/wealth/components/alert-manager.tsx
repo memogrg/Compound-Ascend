@@ -9,7 +9,10 @@ import {
   updateInvestmentAlertAction,
   deleteInvestmentAlertAction,
 } from "@/modules/wealth/api/actions";
-import type { InvestmentAlert, CreateAlertInput } from "@/modules/wealth/services/price-alerts-service";
+import type {
+  InvestmentAlert,
+  CreateAlertInput,
+} from "@/modules/wealth/services/price-alerts-service";
 import type { AlertKind } from "@/modules/wealth/engine/price-alerts";
 
 /** asset_type del holding → tipo de mercado del endpoint /api/market-price. */
@@ -45,7 +48,13 @@ function describe(a: InvestmentAlert): string {
  * fecha de compra; Vesting siempre), el form del tipo elegido, y la lista para pausar/borrar.
  * Extensible: agregar un tipo = un `case` en el form + uno en describe().
  */
-export function AlertManager({ holding, compact = false }: { holding: AlertHolding; compact?: boolean }) {
+export function AlertManager({
+  holding,
+  compact = false,
+}: {
+  holding: AlertHolding;
+  compact?: boolean;
+}) {
   const toast = useToast();
   const [alerts, setAlerts] = useState<InvestmentAlert[]>([]);
   const [busy, setBusy] = useState(false);
@@ -100,7 +109,11 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
   }, [kind, holding.symbol, marketType]);
 
   const inputValid =
-    kind === "price" ? parseFloat(target) > 0 : kind === "time_held" ? parseFloat(years) > 0 : /^\d{4}-\d{2}-\d{2}$/.test(date);
+    kind === "price"
+      ? parseFloat(target) > 0
+      : kind === "time_held"
+        ? parseFloat(years) > 0
+        : /^\d{4}-\d{2}-\d{2}$/.test(date);
 
   const create = async () => {
     if (!inputValid || busy) return;
@@ -147,9 +160,17 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
   };
 
   return (
-    <div style={compact ? undefined : { padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}>
+    <div
+      style={
+        compact
+          ? undefined
+          : { padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }
+      }
+    >
       {!compact ? (
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>Alertas</div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>
+          Alertas
+        </div>
       ) : null}
 
       {/* Selector de tipo (si hay más de uno) + form del tipo elegido */}
@@ -225,7 +246,12 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
           </div>
         )}
 
-        <button className="btn btn-primary" onClick={create} disabled={busy || !inputValid} style={{ height: 38 }}>
+        <button
+          className="btn btn-primary"
+          onClick={create}
+          disabled={busy || !inputValid}
+          style={{ height: 38 }}
+        >
           {busy ? "…" : "Crear alerta"}
         </button>
       </div>
@@ -275,7 +301,10 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
                 }}
               >
                 <span>
-                  <span className="muted" style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                  <span
+                    className="muted"
+                    style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.03em" }}
+                  >
                     {KIND_LABEL[a.kind]}
                   </span>{" "}
                   <strong>{describe(a)}</strong>
@@ -291,14 +320,26 @@ export function AlertManager({ holding, compact = false }: { holding: AlertHoldi
                   <button
                     type="button"
                     onClick={() => toggle(a)}
-                    style={{ background: "none", border: 0, cursor: "pointer", color: "var(--muted)", fontSize: 12 }}
+                    style={{
+                      background: "none",
+                      border: 0,
+                      cursor: "pointer",
+                      color: "var(--muted)",
+                      fontSize: 12,
+                    }}
                   >
                     {a.active ? "Pausar" : "Reactivar"}
                   </button>
                   <button
                     type="button"
                     onClick={() => remove(a.id)}
-                    style={{ background: "none", border: 0, cursor: "pointer", color: "var(--neg)", fontSize: 12 }}
+                    style={{
+                      background: "none",
+                      border: 0,
+                      cursor: "pointer",
+                      color: "var(--neg)",
+                      fontSize: 12,
+                    }}
                   >
                     Borrar
                   </button>

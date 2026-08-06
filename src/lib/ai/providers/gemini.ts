@@ -112,9 +112,7 @@ function safeEndpoint(url: string): string {
 
 /** Causa del fallo ya normalizada: es lo único que necesitan el log y el mensaje. */
 type GeminiFailure =
-  | { reason: "http"; status: number }
-  | { reason: "timeout" }
-  | { reason: "network" };
+  { reason: "http"; status: number } | { reason: "timeout" } | { reason: "network" };
 
 /**
  * Mensaje para el usuario según la causa, con un código corto entre paréntesis: es la pista
@@ -122,13 +120,15 @@ type GeminiFailure =
  * Google — ese solo va al log del servidor.
  */
 function userMessageFor(f: GeminiFailure): string {
-  if (f.reason === "timeout") return "La IA tardó demasiado en responder. Intenta de nuevo. (IA-503)";
+  if (f.reason === "timeout")
+    return "La IA tardó demasiado en responder. Intenta de nuevo. (IA-503)";
   if (f.reason === "network")
     return "No se pudo contactar la IA. Revisa tu conexión e intenta de nuevo. (IA-NET)";
   const s = f.status;
   if (s === 401 || s === 403)
     return "La IA no está disponible: su credencial no es válida o expiró. (IA-401)";
-  if (s === 429) return "Alcanzaste el límite de uso de la IA por ahora. Intenta más tarde. (IA-429)";
+  if (s === 429)
+    return "Alcanzaste el límite de uso de la IA por ahora. Intenta más tarde. (IA-429)";
   if (s === 400) return "La IA rechazó la solicitud (configuración/modelo). (IA-400)";
   if (s >= 500) return "La IA tardó demasiado en responder. Intenta de nuevo. (IA-503)";
   // Sin caso conocido: el genérico de siempre + el status crudo para poder rastrearlo.
@@ -394,7 +394,9 @@ export class GeminiProvider implements AIProvider {
         // undefined en flash → JSON.stringify lo descarta y el contrato queda igual que antes).
         contents.push({
           role: "model",
-          parts: [{ functionCall: { name: c.name, args: c.args }, thoughtSignature: c.thoughtSignature }],
+          parts: [
+            { functionCall: { name: c.name, args: c.args }, thoughtSignature: c.thoughtSignature },
+          ],
         });
         contents.push({
           role: "tool",
@@ -419,7 +421,10 @@ export class GeminiProvider implements AIProvider {
 }
 
 /** Resuelve el modelo de CHAT efectivo: explícito (evals) → env → CHAT_MODEL. Puro y testeable. */
-export function resolveChatModel(explicit: string | undefined, envModel: string | undefined): string {
+export function resolveChatModel(
+  explicit: string | undefined,
+  envModel: string | undefined,
+): string {
   return explicit ?? envModel ?? CHAT_MODEL;
 }
 

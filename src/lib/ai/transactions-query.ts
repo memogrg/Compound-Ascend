@@ -97,8 +97,18 @@ const TOPE_MAX = 300;
 // ---------------------------------------------------------------------------
 
 const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
 ];
 
 /** "YYYY-MM-DD" → partes numéricas. Sin `new Date(str)`: evita el corrimiento por zona. */
@@ -392,10 +402,13 @@ export function agregarTransacciones(
 
   if (agrupacion === "ninguna") {
     const ordenados = [...txns].sort((a, b) =>
-      orden === "monto_desc" ? b.amount - a.amount
-      : orden === "monto_asc" ? a.amount - b.amount
-      : orden === "fecha_asc" ? a.occurredOn.localeCompare(b.occurredOn)
-      : b.occurredOn.localeCompare(a.occurredOn),
+      orden === "monto_desc"
+        ? b.amount - a.amount
+        : orden === "monto_asc"
+          ? a.amount - b.amount
+          : orden === "fecha_asc"
+            ? a.occurredOn.localeCompare(b.occurredOn)
+            : b.occurredOn.localeCompare(a.occurredOn),
     );
     base.movimientos = ordenados.slice(0, tope).map((t) => ({
       fecha: t.occurredOn,
@@ -405,7 +418,8 @@ export function agregarTransacciones(
       // Se convierte fila por fila con la MISMA función que el total, así la columna y el total
       // no pueden discrepar. Sin tasa → null y la tabla lo resuelve mostrando la moneda origen.
       montoConvertido:
-        convertirTotal([{ monto: t.amount, moneda: t.currency }], opts.moneda, rates)?.monto ?? null,
+        convertirTotal([{ monto: t.amount, moneda: t.currency }], opts.moneda, rates)?.monto ??
+        null,
       tipo: t.kind,
       ...(t.id ? { id: t.id } : {}),
     }));
@@ -477,17 +491,20 @@ export function renderConsulta(
   },
 ): string {
   const nombreTipo = TIPO_SUST[r.tipo];
-  const filtro =
-    r.filtros.comercio ? ` en ${r.filtros.comercio}`
-    : r.filtros.sobre ? ` en ${r.filtros.sobre}`
-    : r.filtros.termino ? ` en ${r.filtros.termino}`
-    : "";
+  const filtro = r.filtros.comercio
+    ? ` en ${r.filtros.comercio}`
+    : r.filtros.sobre
+      ? ` en ${r.filtros.sobre}`
+      : r.filtros.termino
+        ? ` en ${r.filtros.termino}`
+        : "";
 
   if (r.conteo === 0) {
     return `No tenés ${nombreTipo}${filtro} registrados en ${r.rango.etiqueta}.`;
   }
 
-  const totalStr = r.total != null ? formatMoney(r.total, r.moneda) : subtotalesStr(r.subtotalesGenerales);
+  const totalStr =
+    r.total != null ? formatMoney(r.total, r.moneda) : subtotalesStr(r.subtotalesGenerales);
 
   if (r.agrupacion === "ninguna") {
     // TABLA, no viñetas: una lista de movimientos es una columna de fechas, una de comercios y
@@ -608,7 +625,10 @@ export const CONSULTAR_TRANSACCIONES_TOOL: AiToolDecl = {
           "anio, anio_pasado, 'ultimos_30_dias' (cualquier N), o un mes por nombre ('marzo'). " +
           "Para comparar el mes actual con el anterior usá 'mes_y_anterior'.",
       },
-      desde: { type: "string", description: "Inicio del rango YYYY-MM-DD (alternativa a `periodo`)." },
+      desde: {
+        type: "string",
+        description: "Inicio del rango YYYY-MM-DD (alternativa a `periodo`).",
+      },
       hasta: { type: "string", description: "Fin del rango YYYY-MM-DD (alternativa a `periodo`)." },
       tipo: {
         type: "string",
@@ -621,7 +641,8 @@ export const CONSULTAR_TRANSACCIONES_TOOL: AiToolDecl = {
       },
       sobre: {
         type: "string",
-        description: "Filtra por nombre del sobre/categoría (coincidencia parcial). Ej: 'Restaurantes'.",
+        description:
+          "Filtra por nombre del sobre/categoría (coincidencia parcial). Ej: 'Restaurantes'.",
       },
       agrupacion: {
         type: "string",
@@ -633,7 +654,8 @@ export const CONSULTAR_TRANSACCIONES_TOOL: AiToolDecl = {
       orden: {
         type: "string",
         enum: ["monto_desc", "monto_asc", "fecha_desc", "fecha_asc"],
-        description: "Orden del resultado. Por defecto monto_desc si hay agrupación, si no fecha_desc.",
+        description:
+          "Orden del resultado. Por defecto monto_desc si hay agrupación, si no fecha_desc.",
       },
       tope: {
         type: "number",

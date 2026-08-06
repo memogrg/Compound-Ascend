@@ -109,11 +109,7 @@ export function FGroupedBars({
   const H = 42;
   const max = Math.max(ingreso.plan, ingreso.real, gasto.plan, gasto.real, 1);
   const h = (v: number) => Math.max(3, Math.round((Math.max(0, v) / max) * H));
-  const fmt = mAmountScale(
-    [ingreso.plan, ingreso.real, gasto.plan, gasto.real],
-    currency,
-    6,
-  );
+  const fmt = mAmountScale([ingreso.plan, ingreso.real, gasto.plan, gasto.real], currency, 6);
   const Group = ({ label, par, color }: { label: string; par: ParPlanReal; color: string }) => (
     <span className="m-hficha-gb-group">
       <span className="m-hficha-gb-bars" style={{ height: H }} aria-hidden>
@@ -211,11 +207,24 @@ export function FPayoff({
   }
   return (
     <span className="m-hficha-payoff">
-      <svg className="m-hficha-payoff-svg" viewBox="0 0 100 46" preserveAspectRatio="none" aria-hidden>
+      <svg
+        className="m-hficha-payoff-svg"
+        viewBox="0 0 100 46"
+        preserveAspectRatio="none"
+        aria-hidden
+      >
         {/* Línea base (eje X) */}
         <line x1="2" y1="42" x2="98" y2="42" stroke="var(--border)" strokeWidth={1} />
         {/* Proyección descendente saldo→0 */}
-        <line x1="6" y1="6" x2="94" y2="40" stroke={GREEN} strokeWidth={2.5} strokeLinecap="round" />
+        <line
+          x1="6"
+          y1="6"
+          x2="94"
+          y2="40"
+          stroke={GREEN}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
         <circle cx="6" cy="6" r="3.4" fill={RED} />
         <circle cx="94" cy="40" r="3.4" fill={GREEN} />
       </svg>
@@ -309,7 +318,9 @@ export function FMilestones({
 // Helper de color semántico para la CIFRA titular
 // ---------------------------------------------------------------------------
 export function FVal({ tone, children }: { tone: "pos" | "neg" | "neutral"; children: ReactNode }) {
-  return <span className={tone === "pos" ? "pos" : tone === "neg" ? "neg" : undefined}>{children}</span>;
+  return (
+    <span className={tone === "pos" ? "pos" : tone === "neg" ? "neg" : undefined}>{children}</span>
+  );
 }
 
 export { BLUE as FICHA_BLUE, GREEN as FICHA_GREEN, RED as FICHA_RED };

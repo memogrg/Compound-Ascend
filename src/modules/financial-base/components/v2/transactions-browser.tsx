@@ -75,9 +75,7 @@ function fullDate(iso: string): string {
 /** Línea de viaje "origen → destino": colorea "Tu liquidez" según el efecto. */
 function TravelLine({ flow }: { flow: MoneyFlow }) {
   if (flow.isJarSpend) {
-    return (
-      <span style={{ color: "var(--ink-2)" }}>Sale del frasco · no toca tu liquidez</span>
-    );
+    return <span style={{ color: "var(--ink-2)" }}>Sale del frasco · no toca tu liquidez</span>;
   }
   const color = effectColor(flow.effect);
   const token = (label: string) =>

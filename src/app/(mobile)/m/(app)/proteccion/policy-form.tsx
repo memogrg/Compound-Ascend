@@ -112,7 +112,13 @@ export function PolicyForm({
         onChange={setCoverage}
         currency={cur}
       />
-      <MoneyField name="premium" label="Prima (opcional)" value={premium} onChange={setPremium} currency={cur} />
+      <MoneyField
+        name="premium"
+        label="Prima (opcional)"
+        value={premium}
+        onChange={setPremium}
+        currency={cur}
+      />
       <SheetSelect
         name="premiumFrequency"
         label="Frecuencia de la prima"
@@ -121,7 +127,14 @@ export function PolicyForm({
         options={PREMIUM_FREQ_OPTS}
         sheetTitle="Frecuencia de la prima"
       />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
       <TextField
         name="fundingReference"
         label="Referencia (banco / cuenta)"

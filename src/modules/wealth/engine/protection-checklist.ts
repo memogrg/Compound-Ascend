@@ -24,7 +24,11 @@ export type ProtectionChecklistItem = {
 };
 
 /** Lista canónica: los 3 ítems de póliza y los PolicyType que cuentan para cada uno. */
-const POLICY_BASE: { key: Extract<ProtectionKey, "auto" | "vida" | "medico">; label: string; types: PolicyType[] }[] = [
+const POLICY_BASE: {
+  key: Extract<ProtectionKey, "auto" | "vida" | "medico">;
+  label: string;
+  types: PolicyType[];
+}[] = [
   { key: "auto", label: "Auto", types: ["vehiculo"] },
   { key: "vida", label: "Vida", types: ["vida"] },
   // "Médico" agrupa la familia de salud.
@@ -54,7 +58,12 @@ export function buildBaseProtectionChecklist(
 
   return [
     ...policyItems,
-    { key: "fondo_emergencia", label: "Fondo de emergencia", covered: input.hasEmergencyFund, coverage: null },
+    {
+      key: "fondo_emergencia",
+      label: "Fondo de emergencia",
+      covered: input.hasEmergencyFund,
+      coverage: null,
+    },
     { key: "fondo_paz", label: "Fondo de paz", covered: input.hasPeaceFund, coverage: null },
   ];
 }

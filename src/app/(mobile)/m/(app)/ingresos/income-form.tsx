@@ -155,10 +155,16 @@ export function IncomeSourceForm({
   const submit = (v: IncomeSourceValues): Promise<ActionResult> => {
     if (!stubActive) return action(v);
     if (!assetName.trim()) {
-      return Promise.resolve({ ok: false, fieldErrors: { assetName: "Ponle un nombre al activo" } });
+      return Promise.resolve({
+        ok: false,
+        fieldErrors: { assetName: "Ponle un nombre al activo" },
+      });
     }
     if (baseValue === undefined || baseValue < 0) {
-      return Promise.resolve({ ok: false, fieldErrors: { baseValue: "Indica el valor del activo" } });
+      return Promise.resolve({
+        ok: false,
+        fieldErrors: { baseValue: "Indica el valor del activo" },
+      });
     }
     return registerPassiveIncomeWithStubAction({
       income: v,
@@ -189,9 +195,22 @@ export function IncomeSourceForm({
         autoFocus
       />
       <MoneyField name="amount" label="Monto" value={amount} onChange={setAmount} currency={cur} />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
       <DateField name="occurredOn" label="Fecha" value={date} onChange={setDate} />
-      <Segmented name="incomeType" label="Tipo de ingreso" value={incomeType} onChange={setIncomeType} options={TYPE_OPTS} />
+      <Segmented
+        name="incomeType"
+        label="Tipo de ingreso"
+        value={incomeType}
+        onChange={setIncomeType}
+        options={TYPE_OPTS}
+      />
       {subOpts.length > 0 ? (
         <SheetSelect
           name="categoryId"
@@ -210,7 +229,14 @@ export function IncomeSourceForm({
         hint="Se copia al traer los ingresos del mes anterior."
       />
       {recurrent ? (
-        <SheetSelect name="frequency" label="Frecuencia" value={frequency} onChange={setFrequency} options={FREQ_OPTS} sheetTitle="Frecuencia" />
+        <SheetSelect
+          name="frequency"
+          label="Frecuencia"
+          value={frequency}
+          onChange={setFrequency}
+          options={FREQ_OPTS}
+          sheetTitle="Frecuencia"
+        />
       ) : null}
 
       {allowPassiveStub && incomeType === "pasivo" ? (
@@ -225,7 +251,13 @@ export function IncomeSourceForm({
 
       {stubActive ? (
         <>
-          <Segmented name="subtype" label="Tipo de activo" value={subtype} onChange={setSubtype} options={SUBTYPE_OPTS} />
+          <Segmented
+            name="subtype"
+            label="Tipo de activo"
+            value={subtype}
+            onChange={setSubtype}
+            options={SUBTYPE_OPTS}
+          />
           <TextField
             name="assetName"
             label={isRental ? "Nombre del bien" : "Ticker o nombre"}

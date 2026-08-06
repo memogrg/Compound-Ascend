@@ -100,7 +100,19 @@ export function ControlDashboard({
               <span
                 className="tip"
                 data-tip="Mide qué tan bajo control están tus ahorros y deudas (0-100): metas avanzando, deudas al día y flujo libre bien dirigido suben el score."
-                style={{ width: 15, height: 15, borderRadius: "50%", border: "1px solid var(--line)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--muted)", marginLeft: 6, verticalAlign: "middle" }}
+                style={{
+                  width: 15,
+                  height: 15,
+                  borderRadius: "50%",
+                  border: "1px solid var(--line)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 10,
+                  color: "var(--muted)",
+                  marginLeft: 6,
+                  verticalAlign: "middle",
+                }}
               >
                 ?
               </span>
@@ -149,12 +161,24 @@ export function ControlDashboard({
         <div className="card-title">
           Orden recomendado de tu flujo libre
           <span
-                className="tip"
-                data-tip="El Motor de Prioridad ordena a dónde dirigir cada colón libre del mes: primero lo urgente (deuda cara, fondo de emergencia) y luego tus metas."
-                style={{ width: 15, height: 15, borderRadius: "50%", border: "1px solid var(--line)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "var(--muted)", marginLeft: 6, verticalAlign: "middle" }}
-              >
-                ?
-              </span>
+            className="tip"
+            data-tip="El Motor de Prioridad ordena a dónde dirigir cada colón libre del mes: primero lo urgente (deuda cara, fondo de emergencia) y luego tus metas."
+            style={{
+              width: 15,
+              height: 15,
+              borderRadius: "50%",
+              border: "1px solid var(--line)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10,
+              color: "var(--muted)",
+              marginLeft: 6,
+              verticalAlign: "middle",
+            }}
+          >
+            ?
+          </span>
         </div>
         <div className="card-sub" style={{ marginBottom: 12 }}>
           Flujo libre disponible: {formatMoney(summary.freeCashflow, currency)} / mes

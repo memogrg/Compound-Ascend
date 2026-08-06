@@ -122,7 +122,20 @@ export function formatPercent(ratio: number, decimals = 0): string {
   return `${(ratio * 100).toFixed(decimals)}%`;
 }
 
-const MONTHS_SHORT = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const MONTHS_SHORT = [
+  "Ene",
+  "Feb",
+  "Mar",
+  "Abr",
+  "May",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dic",
+];
 
 /**
  * Etiqueta "Mes Año" a partir de un ISO YYYY-MM-DD (o YYYY-MM): "2026-07-13" → "Jul 2026".

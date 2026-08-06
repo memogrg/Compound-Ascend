@@ -47,7 +47,10 @@ export default async function MobilePatrimonio() {
   // si aún no hay ≥2 snapshots, se muestra un estado honesto en vez del gráfico.
   const snapshots = await getSnapshotHistory("all");
   const nwPoints: MPoint[] = snapshots.map((s) => ({
-    label: new Date(`${s.date}T00:00:00`).toLocaleDateString("es-CR", { day: "numeric", month: "short" }),
+    label: new Date(`${s.date}T00:00:00`).toLocaleDateString("es-CR", {
+      day: "numeric",
+      month: "short",
+    }),
     value: s.netWorth,
   }));
 
@@ -55,7 +58,11 @@ export default async function MobilePatrimonio() {
   const slices: MSlice[] = snapshot.assetsByClass
     .filter((c) => c.value > 0)
     .slice(0, 5)
-    .map((c, i) => ({ label: c.label, value: c.value, color: RING_COLORS[i % RING_COLORS.length]! }));
+    .map((c, i) => ({
+      label: c.label,
+      value: c.value,
+      color: RING_COLORS[i % RING_COLORS.length]!,
+    }));
 
   // 0 no es ni positivo ni negativo: sin signo y en neutro. Los agregados (netWorth,
   // totalAssets…) YA vienen en la moneda de display (getRichLifeSummary los normaliza con
@@ -112,14 +119,29 @@ export default async function MobilePatrimonio() {
         {/* Métricas: balance + Rich Life Score + cuánto trabaja para ti. */}
         <MSectionHeader title="Tu patrimonio en números" />
         <MMetricGrid style={{ marginBottom: 16 }}>
-          <MMetricCard label="Activos totales" value={mAmount(ind.totalAssets, currency, 8)} sub="lo que tienes" tone="success" />
-          <MMetricCard label="Pasivos totales" value={mAmount(ind.totalLiabilities, currency, 8)} sub="lo que debes" tone="danger" />
+          <MMetricCard
+            label="Activos totales"
+            value={mAmount(ind.totalAssets, currency, 8)}
+            sub="lo que tienes"
+            tone="success"
+          />
+          <MMetricCard
+            label="Pasivos totales"
+            value={mAmount(ind.totalLiabilities, currency, 8)}
+            sub="lo que debes"
+            tone="danger"
+          />
           <MMetricCard
             label="Rich Life Score"
             value={String(Math.round(score.score))}
             sub={score.state}
           />
-          <MMetricCard label="Invertido" value={mAmount(bd?.invested ?? 0, currency, 8)} sub="trabaja para ti" tone="success" />
+          <MMetricCard
+            label="Invertido"
+            value={mAmount(bd?.invested ?? 0, currency, 8)}
+            sub="trabaja para ti"
+            tone="success"
+          />
         </MMetricGrid>
 
         {/* Composición — MDonut INTERACTIVO (R5): su lógica y props no se tocan. */}
@@ -141,4 +163,3 @@ export default async function MobilePatrimonio() {
     </div>
   );
 }
-

@@ -45,7 +45,10 @@ import {
   type PagoKind,
 } from "@/modules/control/engine/pago-vinculado";
 
-const COPY: Record<PagoKind, { cta: string; title: string; submit: string; ok: string; tip: string }> = {
+const COPY: Record<
+  PagoKind,
+  { cta: string; title: string; submit: string; ok: string; tip: string }
+> = {
   meta: {
     cta: "Aportar",
     title: "Aportar",
@@ -115,9 +118,7 @@ export function PagoVinculadoButton({
 
   const crudo = amount.trim() === "" ? null : Number(amount.replace(",", "."));
   const monto = crudo !== null && Number.isFinite(crudo) ? crudo : null;
-  const errs = ctx
-    ? validarPago({ monto, moneda: currency, fecha: date, ctx, hoy: hoy() })
-    : {};
+  const errs = ctx ? validarPago({ monto, moneda: currency, fecha: date, ctx, hoy: hoy() }) : {};
   const hayError = Object.keys(errs).length > 0;
   const avance = ctx ? avanceMes(ctx) : null;
   // Desglose EN VIVO: lo que el servidor va a aplicar igual, dicho antes de confirmar.

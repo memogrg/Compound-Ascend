@@ -101,7 +101,9 @@ export function TxnForm({
   const [date, setDate] = useState(initial?.occurredOn ?? todayISO());
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
   const [sobreLabel, setSobreLabel] = useState<string>(envById(initial?.categoryId)?.name ?? "");
-  const [merchant, setMerchant] = useState(initial && initial.kind === "gasto" ? (initial.merchantOrSource ?? "") : "");
+  const [merchant, setMerchant] = useState(
+    initial && initial.kind === "gasto" ? (initial.merchantOrSource ?? "") : "",
+  );
   // Ingreso: categoría REAL (id) + su nombre como fuente. En edición se siembra de la transacción.
   const [incomeCatId, setIncomeCatId] = useState<string | null>(
     initial && initial.kind === "ingreso" ? (initial.categoryId ?? null) : null,
@@ -139,8 +141,7 @@ export function TxnForm({
   // Registro manual COMPLETO: gasto exige sobre, ingreso exige categoría — MISMA fn que el web
   // (isManualEntryClassified). Solo al CREAR: editar una transacción vieja (incl. sin clasificar)
   // no se traba. Este form no maneja transfer/ajuste ni vinculadas.
-  const missingCategory =
-    !initial && !isManualEntryClassified({ kind, categoryId, incomeCatId });
+  const missingCategory = !initial && !isManualEntryClassified({ kind, categoryId, incomeCatId });
   const categoryHint = isExpense
     ? "Seleccioná un sobre para guardar"
     : "Seleccioná una subcategoría para guardar";
@@ -206,8 +207,22 @@ export function TxnForm({
       ) : null}
 
       <DateField name="occurredOn" label="Fecha" value={date} onChange={setDate} />
-      <TextField name="description" label="Nota (opcional)" value={note} onChange={setNote} placeholder="Detalle…" maxLength={280} />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <TextField
+        name="description"
+        label="Nota (opcional)"
+        value={note}
+        onChange={setNote}
+        placeholder="Detalle…"
+        maxLength={280}
+      />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
 
       {isExpense ? (
         <SobrePicker
@@ -256,7 +271,13 @@ function IncomeCatField({ label, onOpen }: { label: string; onOpen: () => void }
         <span className={label ? "" : "m-sheetselect-ph"}>
           {label || "Selecciona la categoría…"}
         </span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+        >
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
@@ -354,7 +375,13 @@ function SobreField({ label, onOpen }: { label: string; onOpen: () => void }) {
         onClick={onOpen}
       >
         <span className={label ? "" : "m-sheetselect-ph"}>{label || "Selecciona un sobre…"}</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+        >
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>

@@ -31,9 +31,8 @@ export async function createTransactionForUser(
     // Sin regla → auto-asignar con SEÑAL FUERTE (historial/caché, sin IA en vivo). Service-role →
     // scoping explícito por userId. Best-effort: si no hay señal fuerte, cae a "Por clasificar".
     if (!categoryId) {
-      const { resolveAutoCategory } = await import(
-        "@/modules/financial-base/services/ai-categorize"
-      );
+      const { resolveAutoCategory } =
+        await import("@/modules/financial-base/services/ai-categorize");
       const auto = await resolveAutoCategory({
         supabase,
         userId,
@@ -46,9 +45,8 @@ export async function createTransactionForUser(
     // Respeta la personalización del hogar: si la categoría (de regla o auto) fue
     // forkeada usa la copia; si fue ocultada sin fork, cae a "Por clasificar".
     if (categoryId) {
-      const { resolveOverrideTarget } = await import(
-        "@/modules/financial-base/services/categories-service"
-      );
+      const { resolveOverrideTarget } =
+        await import("@/modules/financial-base/services/categories-service");
       categoryId = await resolveOverrideTarget(supabase, { userId, householdId }, categoryId);
     }
   }

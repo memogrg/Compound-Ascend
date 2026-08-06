@@ -161,12 +161,16 @@ export async function listLinkableEntitiesDetailed(): Promise<DetailedEntities> 
       .order("created_at"),
     supabase
       .from("savings_goals")
-      .select("id,name,monthly_contribution,current_amount,target_amount,currency,default_category_id,goal_type")
+      .select(
+        "id,name,monthly_contribution,current_amount,target_amount,currency,default_category_id,goal_type",
+      )
       .in("user_id", memberIds)
       .order("created_at"),
     supabase
       .from("investment_holdings")
-      .select("id,label,symbol,quantity,average_cost,current_value_manual,rental_subtype,currency,monthly_contribution,is_recurring")
+      .select(
+        "id,label,symbol,quantity,average_cost,current_value_manual,rental_subtype,currency,monthly_contribution,is_recurring",
+      )
       .in("user_id", memberIds)
       .order("created_at"),
     supabase

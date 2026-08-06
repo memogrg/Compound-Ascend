@@ -45,7 +45,8 @@ export async function getSurplusDecision(): Promise<SurplusDecisionReport> {
   const expensive = [...active]
     .sort((a, b) => Number(b.apr ?? 0) - Number(a.apr ?? 0))
     .find((d) => Number(d.apr ?? 0) / 100 > DEBT_INVEST_THRESHOLD);
-  const selected = expensive ?? [...active].sort((a, b) => Number(b.balance) - Number(a.balance))[0] ?? null;
+  const selected =
+    expensive ?? [...active].sort((a, b) => Number(b.balance) - Number(a.balance))[0] ?? null;
 
   const conv = (n: number, from: string) => convertCurrency(n, from, currency, rates);
   const debtInput: AmortizationInput | null = selected
@@ -53,8 +54,12 @@ export async function getSurplusDecision(): Promise<SurplusDecisionReport> {
         balance: conv(Number(selected.balance), selected.currency),
         apr: Number(selected.apr ?? 0),
         termMonths: selected.termMonths ?? null,
-        monthlyPayment: selected.currentPayment != null ? conv(Number(selected.currentPayment), selected.currency) : null,
-        insurance: selected.insurance != null ? conv(Number(selected.insurance), selected.currency) : null,
+        monthlyPayment:
+          selected.currentPayment != null
+            ? conv(Number(selected.currentPayment), selected.currency)
+            : null,
+        insurance:
+          selected.insurance != null ? conv(Number(selected.insurance), selected.currency) : null,
         introApr: selected.introApr ?? null,
         introFixedMonths: selected.introFixedMonths ?? null,
       }

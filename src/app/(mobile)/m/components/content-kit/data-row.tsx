@@ -99,7 +99,9 @@ export function MDataRow({
   const wrap = (inner: ReactNode) =>
     slot ? (
       <span style={{ display: "block", width: "100%" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>{inner}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+          {inner}
+        </span>
         <span className="m-drow-slot" style={{ display: "block" }}>
           {slot}
         </span>

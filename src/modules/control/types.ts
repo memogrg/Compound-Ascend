@@ -102,12 +102,7 @@ export type DebtPayment = {
 };
 
 export type GoalAction =
-  | "mantener"
-  | "acelerar"
-  | "reducir"
-  | "pausar"
-  | "convertir"
-  | "replantear";
+  "mantener" | "acelerar" | "reducir" | "pausar" | "convertir" | "replantear";
 
 export type GoalRecommendation = {
   goalId: string;

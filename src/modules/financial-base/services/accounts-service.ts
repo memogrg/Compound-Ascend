@@ -57,11 +57,15 @@ export async function updateAccount(id: string, input: AccountInput): Promise<vo
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   if (input.isDefault) {
-    await supabase.from("accounts").update({ last_edited_by: user.id, is_default: false }).in("user_id", scope);
+    await supabase
+      .from("accounts")
+      .update({ last_edited_by: user.id, is_default: false })
+      .in("user_id", scope);
   }
   await supabase
     .from("accounts")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       name: input.name,
       kind: input.kind,
       currency: input.currency,

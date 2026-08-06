@@ -6,11 +6,7 @@
  * La DATA cruda vive en biblia-corpus.ts (compartida con el sembrado semántico);
  * acá solo está la lógica de recuperación keyword (sin cambio de comportamiento).
  */
-import {
-  EMOTION_RULES,
-  TOPIC_CHUNKS,
-  PATRIMONIO_GUIDANCE,
-} from "@/lib/ai/biblia-corpus";
+import { EMOTION_RULES, TOPIC_CHUNKS, PATRIMONIO_GUIDANCE } from "@/lib/ai/biblia-corpus";
 
 /**
  * Quita acentos y pasa a minúsculas para que el match tolere "inversión",
@@ -18,10 +14,7 @@ import {
  * normalizadas (sin acentos), así sólo hace falta normalizar el texto del usuario.
  */
 export function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
 /** Mapea banderas patrimoniales (§15) a su guía. Máx 3, sin repetir, ignora desconocidas. */

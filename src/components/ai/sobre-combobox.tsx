@@ -13,11 +13,7 @@ type SobreOption = { id: string; sobre: string; frasco: string | null };
 const labelOf = (s: SobreOption) => (s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre);
 // Misma lógica que normalize() de biblia-knowledge; inline para no arrastrar biblia-corpus al
 // bundle del cliente.
-const norm = (s: string) =>
-  s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export function SobreCombobox({
   kind,
@@ -52,7 +48,12 @@ export function SobreCombobox({
     };
   }, [kind]);
 
-  useEffect(() => () => { if (blurTimer.current) clearTimeout(blurTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (blurTimer.current) clearTimeout(blurTimer.current);
+    },
+    [],
+  );
 
   const selected = value ? (sobres.find((s) => s.id === value) ?? null) : null;
   const displayLabel = value

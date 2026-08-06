@@ -37,7 +37,9 @@ export function PremiumLineChart({
   height?: number;
 }) {
   if (data.length < 2) {
-    return <ChartEmpty message="No hay suficiente historial para mostrar la gráfica." height={height} />;
+    return (
+      <ChartEmpty message="No hay suficiente historial para mostrar la gráfica." height={height} />
+    );
   }
 
   const values = data.flatMap((d) =>

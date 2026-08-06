@@ -169,7 +169,14 @@ function baseNextAction(ind: BaseIndicators, currency: string): string {
   return "Vas bien: considera convertir parte de tu ahorro en inversión de largo plazo.";
 }
 
-function buildPillars({ ind, currency, control, richLife, wealth, monthFlow }: PanelInputs): PillarVM[] {
+function buildPillars({
+  ind,
+  currency,
+  control,
+  richLife,
+  wealth,
+  monthFlow,
+}: PanelInputs): PillarVM[] {
   // 1 · Flujo del mes (Base Financiera). A-01: el valor es el REAL operativo (lo que de
   // verdad te quedó); el PLAN (presupuesto) va en la meta, con el gap. Antes mostraba el
   // plan como si fuera el flujo — de ahí la contradicción con Mi Base/Transacciones.
@@ -225,7 +232,9 @@ function buildPillars({ ind, currency, control, richLife, wealth, monthFlow }: P
     accent: "var(--neg)",
     soft: "var(--neg-soft)",
     value: formatPercent(ind.debtWeight),
-    meta: method ? `Método ${METHOD_LABEL[method.method] ?? method.method}` : "de tu ingreso mensual",
+    meta: method
+      ? `Método ${METHOD_LABEL[method.method] ?? method.method}`
+      : "de tu ingreso mensual",
     ratio: clamp01(ind.debtWeight / 0.4),
     barColor: "var(--c-debt)",
     href: "/deudas",

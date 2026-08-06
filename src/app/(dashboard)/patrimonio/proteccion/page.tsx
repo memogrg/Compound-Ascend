@@ -17,9 +17,7 @@ export default async function Page() {
   const summary: WealthSummary = configured ? await getWealthSummary() : buildDemoWealthSummary();
 
   // Fondos de defensa (F1/F2): solo con sesión real. best-effort.
-  const funds = configured
-    ? await getDefenseFundsReport().catch(() => null)
-    : null;
+  const funds = configured ? await getDefenseFundsReport().catch(() => null) : null;
   const mortgageCase = configured
     ? await listDebts()
         .then((debts) =>

@@ -27,7 +27,9 @@ const PEACE_HELP =
 
 function Bar({ pct, color }: { pct: number; color: string }) {
   return (
-    <div style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
+    <div
+      style={{ height: 8, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}
+    >
       <div style={{ width: `${Math.round(pct * 100)}%`, height: "100%", background: color }} />
     </div>
   );
@@ -51,7 +53,9 @@ function FundCard({
   const color = fund.covered ? "var(--pos)" : priority ? "var(--accent)" : "var(--gold)";
   return (
     <div className="card card-pad" style={{ borderLeft: `3px solid ${color}` }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}
+      >
         <div className="card-title" style={{ fontSize: 15 }}>
           {title} <HelpTip text={help} />
         </div>
@@ -60,7 +64,14 @@ function FundCard({
         ) : null}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginTop: 10,
+        }}
+      >
         <div>
           <div className="label">Acumulado</div>
           <div style={{ fontSize: 20, fontWeight: 600 }}>{formatMoney(fund.current, currency)}</div>
@@ -83,7 +94,8 @@ function FundCard({
           {fund.recommendedMonthly > 0 ? (
             <>
               Para cerrarlo, apartá{" "}
-              <strong>{formatMoney(fund.recommendedMonthly, currency)}/mes</strong> durante ~12 meses.
+              <strong>{formatMoney(fund.recommendedMonthly, currency)}/mes</strong> durante ~12
+              meses.
             </>
           ) : note ? (
             note
@@ -105,12 +117,14 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
   const [showPopup, setShowPopup] = useState(false);
   useEffect(() => {
     if (!showable) return;
-    if (typeof window !== "undefined" && window.localStorage.getItem("ca_peace_mortgage_dismissed")) return;
+    if (typeof window !== "undefined" && window.localStorage.getItem("ca_peace_mortgage_dismissed"))
+      return;
     setShowPopup(true);
   }, [showable]);
   const dismissPopup = () => {
     setShowPopup(false);
-    if (typeof window !== "undefined") window.localStorage.setItem("ca_peace_mortgage_dismissed", "1");
+    if (typeof window !== "undefined")
+      window.localStorage.setItem("ca_peace_mortgage_dismissed", "1");
   };
 
   const onMonths = (months: number) =>
@@ -154,7 +168,10 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
       />
 
       {/* Ajuste de meses del fondo de paz (recálculo en vivo). */}
-      <div className="card card-pad" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div
+        className="card card-pad"
+        style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}
+      >
         <div style={{ fontSize: 13.5 }}>
           Dimensioná tu fondo de paz en{" "}
           <select
@@ -164,17 +181,22 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
             className="sel"
             style={{ width: "auto", display: "inline-block", padding: "4px 8px" }}
           >
-            {Array.from({ length: PEACE_MONTHS_MAX - PEACE_MONTHS_MIN + 1 }, (_, i) => PEACE_MONTHS_MIN + i).map(
-              (n) => (
-                <option key={n} value={n}>
-                  {n} meses
-                </option>
-              ),
-            )}
+            {Array.from(
+              { length: PEACE_MONTHS_MAX - PEACE_MONTHS_MIN + 1 },
+              (_, i) => PEACE_MONTHS_MIN + i,
+            ).map((n) => (
+              <option key={n} value={n}>
+                {n} meses
+              </option>
+            ))}
           </select>{" "}
           de gasto esencial.
         </div>
-        {pending ? <span className="muted" style={{ fontSize: 12 }}>Recalculando…</span> : null}
+        {pending ? (
+          <span className="muted" style={{ fontSize: 12 }}>
+            Recalculando…
+          </span>
+        ) : null}
       </div>
 
       {/* Lectura del caso hipoteca (inline, siempre visible cuando aplica). */}
@@ -190,8 +212,8 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
       ) : null}
 
       <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
-        Estas son recomendaciones para orientarte, no una orden ni asesoría financiera. Vos elegís tu
-        objetivo y tu ritmo.
+        Estas son recomendaciones para orientarte, no una orden ni asesoría financiera. Vos elegís
+        tu objetivo y tu ritmo.
       </div>
 
       {/* Pop-up informativo del caso hipoteca (una vez, descartable). */}
@@ -225,8 +247,8 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
                 <>primero completá tu fondo de emergencia.</>
               ) : (
                 <>
-                  <strong>{formatMoney(peace.recommendedMonthly, currency)}/mes</strong> para cerrarlo
-                  en ~12 meses.
+                  <strong>{formatMoney(peace.recommendedMonthly, currency)}/mes</strong> para
+                  cerrarlo en ~12 meses.
                 </>
               )}
             </p>

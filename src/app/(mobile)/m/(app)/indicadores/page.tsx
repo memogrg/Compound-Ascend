@@ -96,7 +96,10 @@ function trendClass(card: IndicatorCard, dir: -1 | 0 | 1): string {
 /** Fecha de observación en corto ("12 jul"); vacío si no hay. */
 function fmtObserved(iso: string | null): string {
   if (!iso) return "";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 /** Alturas (30–88%) de la mini-tendencia a partir de los últimos puntos reales. Lógica
@@ -142,8 +145,7 @@ export default async function MobileIndicadores() {
   const currencyCards = model.groups
     .flatMap((g) => g.cards)
     .filter((c) => c.unit === "currency" && c.value != null);
-  const hero =
-    currencyCards.find((c) => /venta/i.test(c.label)) ?? currencyCards[0] ?? null;
+  const hero = currencyCards.find((c) => /venta/i.test(c.label)) ?? currencyCards[0] ?? null;
   const heroChange = hero ? fmtChange(hero) : null;
   const heroBars = hero ? bars(hero) : [];
   // Mismo criterio de impacto que las filas, traducido al tono del chip.
@@ -197,7 +199,11 @@ export default async function MobileIndicadores() {
                   heroBars.length > 0 ? (
                     <div className="wminibars" aria-hidden>
                       {heroBars.map((h, i) => (
-                        <i key={i} className={i === heroBars.length - 1 ? "hi" : ""} style={{ height: `${h}%` }} />
+                        <i
+                          key={i}
+                          className={i === heroBars.length - 1 ? "hi" : ""}
+                          style={{ height: `${h}%` }}
+                        />
                       ))}
                     </div>
                   ) : undefined
@@ -219,7 +225,12 @@ export default async function MobileIndicadores() {
                   <MSectionHeader title={grp.group} />
                   <MContentCard style={{ padding: 0, overflow: "hidden" }}>
                     {cards.map((card) => (
-                      <MDataRow key={card.code} title={card.label} subtitle={rowSubtitle(card)} value={fmtValue(card)} />
+                      <MDataRow
+                        key={card.code}
+                        title={card.label}
+                        subtitle={rowSubtitle(card)}
+                        value={fmtValue(card)}
+                      />
                     ))}
                   </MContentCard>
                 </div>

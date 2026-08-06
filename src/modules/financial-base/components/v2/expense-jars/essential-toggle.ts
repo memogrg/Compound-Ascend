@@ -1,7 +1,4 @@
-import {
-  editCategoryAction,
-  forkCategoryAction,
-} from "@/modules/financial-base/api/v2-actions";
+import { editCategoryAction, forkCategoryAction } from "@/modules/financial-base/api/v2-actions";
 
 /**
  * Marcar/desmarcar un sobre como "Gasto esencial" (número de seguridad), como acción

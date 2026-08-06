@@ -91,5 +91,7 @@ export function capacitorSocialLogin(): SocialLoginPlugin | null {
 /** Oculta el splash nativo (mejor esfuerzo). No-op fuera de la app nativa. La intro web (MobileIntro)
  *  toma el relevo del splash sin gap: crema → crema. */
 export function capacitorSplashHide(): void {
-  bridge()?.Plugins?.SplashScreen?.hide?.({ fadeOutDuration: 120 })?.catch?.(() => {});
+  bridge()
+    ?.Plugins?.SplashScreen?.hide?.({ fadeOutDuration: 120 })
+    ?.catch?.(() => {});
 }
