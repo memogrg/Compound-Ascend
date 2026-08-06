@@ -98,6 +98,7 @@ import {
   proposalToTxnInput,
 } from "@/modules/financial-base/services/ingest-proposals-view";
 import { logger } from "@/lib/logger";
+import { AppError } from "@/lib/errors";
 // `import type` y no runtime: en un fichero "use server" solo pueden EXPORTARSE funciones
 // async, pero importar tipos es libre y desaparece al compilar.
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
@@ -959,8 +960,12 @@ export async function scanReceiptAction(
   mimeType: string,
 ): Promise<ScanResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
-  if (!imageBase64 || imageBase64.length > 8_000_000) {
-    return { ok: false, message: "Imagen inválida o demasiado grande (máx ~6 MB)." };
+  if (!imageBase64) return { ok: false, message: "No llegó ninguna imagen." };
+  if (imageBase64.length > 8_000_000) {
+    return {
+      ok: false,
+      message: "La foto es demasiado pesada para escanearla, incluso comprimida.",
+    };
   }
   try {
     const data = await extractReceipt(imageBase64, mimeType || "image/jpeg");
@@ -972,11 +977,20 @@ export async function scanReceiptAction(
     }
     return { ok: true, data };
   } catch (err) {
+    // El motivo REAL cuando existe: `AppError.userMessage` ya distingue timeout (IA-503), rate
+    // limit del proveedor (IA-429), credencial (IA-401) y límite de IA del plan. El genérico
+    // queda solo para lo que de verdad no sabemos, y el detalle estructurado va al log.
     const msg =
-      err instanceof Error && err.message.includes("límite")
-        ? err.message
+      err instanceof AppError
+        ? err.userMessage
         : "No pudimos leer el recibo. Inténtalo de nuevo o regístralo manual.";
-    logger.warn("scanReceipt fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.warn("scanReceipt fallido", {
+      message: err instanceof Error ? err.message : "?",
+      code: err instanceof AppError ? err.code : "UNKNOWN",
+      detail: err instanceof AppError ? err.detail : undefined,
+      bytesB64: imageBase64.length,
+      mimeType,
+    });
     return { ok: false, message: msg };
   }
 }
