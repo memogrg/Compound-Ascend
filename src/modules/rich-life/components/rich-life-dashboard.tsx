@@ -5,6 +5,7 @@ import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { RichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
 import { type PatrimonioServiceResult, MilestoneLadder } from "@/modules/wealth";
 import type { RichTrend, Asset, Liability } from "@/modules/rich-life/types";
+import { composeLiquidity } from "@/modules/rich-life/engine/liquidity-composition";
 
 const TREND: Record<RichTrend, { label: string; cls: string; delta: string }> = {
   mas_rico: { label: "Te estás haciendo más rico", cls: "var(--pos)", delta: "up" },
@@ -162,7 +163,15 @@ export function RichLifeDashboard({
         </div>
       </section>
 
-      {patrimonio ? <PatrimonioSections p={patrimonio} currency={currency} /> : null}
+      {patrimonio ? (
+        <PatrimonioSections
+          p={patrimonio}
+          currency={currency}
+          // `allAssets` es la MISMA lista con la que el motor calculó liquidWealth, así que
+          // el desglose del tooltip suma exactamente lo que muestra la tarjeta.
+          allAssets={summary.allAssets}
+        />
+      ) : null}
 
       {/* Indicadores (solo en modo sin Marco Patrimonial; las §12 los sustituyen). */}
       {!patrimonio ? (
@@ -361,9 +370,30 @@ function MetricCard({
  * cards compactas con tooltip, y Fragilidad Financiera desde el diagnóstico.
  * Lenguaje aspiracional, nunca humillante.
  */
-function PatrimonioSections({ p, currency }: { p: PatrimonioServiceResult; currency: string }) {
+function PatrimonioSections({
+  p,
+  currency,
+  allAssets,
+}: {
+  p: PatrimonioServiceResult;
+  currency: string;
+  allAssets: Asset[];
+}) {
   const r = p.report;
   const anios = r.añosDeLibertad;
+
+  // Qué compone el colchón y contra qué gasto se mide. El usuario no tiene por qué
+  // adivinar que su ROP y el ahorro de la asociación cuentan como líquido — ni que el
+  // divisor es su compromiso mensual y no la lista base de gastos.
+  const liq = composeLiquidity(allAssets);
+  const partes = liq.top.map((x) => `${x.name} ${formatCompact(x.value, currency)}`);
+  if (liq.restCount > 0) {
+    partes.push(`+${liq.restCount} más ${formatCompact(liq.restValue, currency)}`);
+  }
+  const queCuenta = partes.length
+    ? `Cuenta todo tu líquido (${formatMoney(liq.total, currency)}): ${partes.join(", ")}. `
+    : "";
+  const contraQue = `Entre tu compromiso mensual de ${formatMoney(r.gastoReferenciaMensual, currency)}. `;
 
   return (
     <>
@@ -376,19 +406,19 @@ function PatrimonioSections({ p, currency }: { p: PatrimonioServiceResult; curre
           label="Años de Libertad"
           value={`${anios}`}
           note="años que cubre tu patrimonio"
-          tip="Qué es: cuántos años de tu estilo de vida cubre tu patrimonio invertible. Por qué importa: traduce tu capital a tiempo de tranquilidad. Qué hago: súbelo invirtiendo más y conteniendo el gasto."
+          tip={`Qué es: cuántos años de tu estilo de vida cubre tu patrimonio invertible. ${contraQue}Por qué importa: traduce tu capital a tiempo de tranquilidad. Qué hago: súbelo invirtiendo más y conteniendo el gasto.`}
         />
         <MetricCard
           label="Meses de colchón"
           value={`${r.mesesDeColchon}`}
           note="liquidez vs. gasto mensual"
-          tip="Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. Por qué importa: es tu colchón de seguridad. Qué hago: apunta primero a 3-6 meses de gastos."
+          tip={`Qué es: cuántos meses cubrirías con tu dinero líquido si se cortaran tus ingresos. ${queCuenta}${contraQue}Por qué importa: es tu colchón de seguridad. Qué hago: apunta primero a 3-6 meses de gastos.`}
         />
         <MetricCard
           label="Cobertura de ingreso pasivo"
           value={formatPercent(r.coberturaPasiva)}
           note="del gasto, sin trabajar"
-          tip="Qué es: qué parte de tu gasto pagan tus ingresos pasivos. Por qué importa: al 100% eres financieramente independiente. Qué hago: construye activos que generen renta o dividendos."
+          tip={`Qué es: qué parte de tu gasto pagan tus ingresos pasivos — incluye el alquiler y los intereses de tus inversiones, no solo lo que registraste a mano. ${contraQue}Por qué importa: al 100% eres financieramente independiente. Qué hago: construye activos que generen renta o dividendos.`}
         />
         <MetricCard
           label="Calidad del patrimonio"
