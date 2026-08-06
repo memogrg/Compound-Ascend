@@ -11,6 +11,15 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
+import { useCaptureToday, useUserTimezone } from "@/components/tz/timezone-context";
+import {
+  avisoFecha,
+  etiquetaConfirmarMoneda,
+  evaluarFecha,
+  mesLegible,
+  mismoMes,
+  resolveReceiptCurrency,
+} from "@/lib/ai/receipt-draft";
 import {
   addTransactionAction,
   editTransactionAction,
@@ -27,11 +36,6 @@ export const INCOME_SOURCES = [
   "Ingreso pasivo",
   "Extraordinario",
 ] as const;
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export type ScanPrefill = {
   amount?: number | null;
@@ -66,25 +70,45 @@ export function QuickAddModal({
   const router = useRouter();
   const toast = useToast();
   const captureCurrency = useCaptureCurrency();
+  // "Hoy" y la zona del PERFIL, no las del navegador: es la fecha que el servidor considera hoy.
+  const today = useCaptureToday();
+  const tz = useUserTimezone();
   const editing = Boolean(item);
   const isGasto = kind === "gasto";
   const scanned = Boolean(prefill);
+  const hoy = today();
+
+  // Un recibo SIN moneda impresa (el caso normal de un tiquete de súper) ya no adopta en
+  // silencio la principal del usuario: se propone la del país y se pide confirmar. Fuera del
+  // escaneo manda la regla de siempre (ítem → principal).
+  const monedaRecibo = scanned
+    ? resolveReceiptCurrency({
+        detected: prefill?.currency,
+        timezone: tz,
+        primaryCurrency: captureCurrency,
+      })
+    : null;
+  // La fecha del OCR se valida: futura, imposible o de hace años cae a hoy y se avisa.
+  const fechaRecibo = scanned ? evaluarFecha(prefill?.date, hoy) : null;
 
   const [amount, setAmount] = useState(
     item ? String(item.amount) : prefill?.amount ? String(prefill.amount) : "",
   );
-  // Moneda de captura: al editar respeta la del ítem; con recibo, la detectada;
-  // si no, la principal del usuario (estable) — NUNCA la de visualización.
+  // Moneda de captura: al editar respeta la del ítem; con recibo, la detectada (o la propuesta
+  // por país); si no, la principal del usuario (estable) — NUNCA la de visualización.
   const [currency, setCurrency] = useState(
-    captureCurrencyDefault(item?.currency, prefill?.currency, captureCurrency),
+    captureCurrencyDefault(item?.currency, monedaRecibo?.currency, captureCurrency),
   );
+  const [monedaOk, setMonedaOk] = useState(!monedaRecibo || monedaRecibo.origin === "recibo");
   const [categoryId, setCategoryId] = useState(item?.categoryId ?? categories[0]?.id ?? "");
   const [source, setSource] = useState(item?.merchantOrSource ?? INCOME_SOURCES[0]);
   const [accountId, setAccountId] = useState(
     item?.accountId ?? accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "",
   );
-  const [more, setMore] = useState(Boolean(prefill?.date || prefill?.merchant));
-  const [date, setDate] = useState(item?.occurredOn ?? prefill?.date ?? todayISO());
+  // Con un recibo, "Más detalles" arranca ABIERTO siempre: la fecha y el comercio son justo lo
+  // que el OCR puede haber leído mal, y plegados se confirmaban sin verlos.
+  const [more, setMore] = useState(scanned || Boolean(prefill?.date || prefill?.merchant));
+  const [date, setDate] = useState(item?.occurredOn ?? fechaRecibo?.date ?? hoy);
   const [merchant, setMerchant] = useState(
     isGasto ? (item?.merchantOrSource ?? prefill?.merchant ?? "") : "",
   );
@@ -96,6 +120,10 @@ export function QuickAddModal({
     e.preventDefault();
     const amt = Number(amount);
     if (!Number.isFinite(amt) || amt <= 0) return setError("Ingresa un monto válido.");
+    // La moneda que no venía en el recibo se confirma ANTES de escribir: es el paso que evita
+    // que un tiquete de ₡4.100 quede registrado como $4.100.
+    if (!monedaOk) return setError("Confirma la moneda del recibo.");
+    if (date > hoy) return setError("La fecha no puede ser futura.");
     setPending(true);
     setError(null);
     const payload = {
@@ -117,9 +145,14 @@ export function QuickAddModal({
       : await addTransactionAction(payload);
     setPending(false);
     if (res.ok) {
+      // Si el movimiento NO cae en el mes en curso se dice explícito: con un "✓ registrado" a
+      // secas el usuario lo busca en sus movimientos de este mes y no está.
       toast(
         editing ? "Transacción actualizada" : isGasto ? "Gasto registrado" : "Ingreso registrado",
       );
+      if (!mismoMes(date, hoy)) {
+        toast(`Quedó en ${mesLegible(date)}, no en tu mes actual.`, "info");
+      }
       // Aprender regla: si recategorizaste un gasto con comercio, ofrece crearla.
       const merchantText = merchant.trim();
       if (isGasto && editing && merchantText && categoryId && categoryId !== item?.categoryId) {
@@ -143,6 +176,11 @@ export function QuickAddModal({
       setError(res.message ?? "No pudimos guardar.");
     }
   };
+
+  // Solo en el escaneo: en el alta manual la fecha la eligió el usuario, no hay nada que advertir.
+  const avisoDeFecha = fechaRecibo
+    ? avisoFecha(date, hoy, { flag: fechaRecibo.flag, leida: prefill?.date ?? null })
+    : null;
 
   const title = scanned
     ? "Revisar recibo"
@@ -205,7 +243,11 @@ export function QuickAddModal({
               <select
                 className="sel"
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
+                // Elegir en el select ES confirmar: el usuario ya miró el campo.
+                onChange={(e) => {
+                  setCurrency(e.target.value);
+                  setMonedaOk(true);
+                }}
                 aria-label="Moneda del monto"
                 style={{ flex: "0 0 auto", width: 104 }}
               >
@@ -217,6 +259,17 @@ export function QuickAddModal({
                 ))}
               </select>
             </div>
+            {!monedaOk ? (
+              <div className="ac-rc-warn">
+                No detectamos la moneda en el recibo.{" "}
+                {monedaRecibo?.origin === "pais"
+                  ? "Proponemos la de tu país; confírmala o elige otra."
+                  : "Proponemos tu moneda principal; confírmala o elige otra."}
+                <button type="button" className="ac-rc-chip" onClick={() => setMonedaOk(true)}>
+                  {etiquetaConfirmarMoneda(currency)}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {isGasto ? (
@@ -286,9 +339,18 @@ export function QuickAddModal({
                   <input
                     className="inp"
                     type="date"
+                    max={hoy}
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
                   />
+                  {/* El aviso se recalcula con la fecha que hay AHORA en el campo: corregirla lo
+                      apaga solo. Un recibo escaneado hoy con fecha de hace dos años es casi
+                      siempre un error de OCR, y hasta ahora se guardaba en silencio. */}
+                  {avisoDeFecha ? (
+                    <div className={avisoDeFecha.tono === "error" ? "auth-msg warn" : "ac-rc-warn"}>
+                      {avisoDeFecha.texto}
+                    </div>
+                  ) : null}
                 </div>
                 {isGasto ? (
                   <div className="fld">

@@ -3934,28 +3934,34 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .ac-batch-kind.is-out {
   color: var(--muted);
 }
-/* Dos columnas y la moneda abajo: en un teléfono, tres campos en una línea no se pueden tocar. */
-.m-shell .ac-batch-grid {
+/* Dos columnas y la moneda abajo: en un teléfono, tres campos en una línea no se pueden tocar.
+   La tarjeta del RECIBO (.ac-rc-*) usa la misma rejilla: es el mismo trío de campos. */
+.m-shell .ac-batch-grid,
+.m-shell .ac-rc-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   margin-top: 6px;
 }
-.m-shell .ac-batch-cell {
+.m-shell .ac-batch-cell,
+.m-shell .ac-rc-cell {
   min-width: 0;
 }
-.m-shell .ac-batch-cell-cur {
+.m-shell .ac-batch-cell-cur,
+.m-shell .ac-rc-cell-cur {
   grid-column: 1 / -1;
 }
 /* 44px: objetivo táctil mínimo. Con `font-size: 16px` iOS no hace zoom al enfocar el campo,
    que en un formulario de N filas dejaba la tarjeta descuadrada. */
-.m-shell .ac-batch-field {
+.m-shell .ac-batch-field,
+.m-shell .ac-rc-field {
   width: 100%;
   margin-top: 2px;
   min-height: 44px;
   font-size: 16px;
 }
-.m-shell .ac-batch-field.is-bad {
+.m-shell .ac-batch-field.is-bad,
+.m-shell .ac-rc-field.is-bad {
   border-color: var(--neg);
 }
 .m-shell .ac-batch-row .m-confirm-err {
@@ -3974,4 +3980,36 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .ac-batch-x svg {
   width: 16px;
   height: 16px;
+}
+
+/* ── Recibo escaneado: avisos de la tarjeta ─────────────────────────────────
+   Ámbar y no rojo: una fecha de otro mes o una moneda no detectada NO impiden registrar
+   —pueden ser correctas—, pero tienen que verse ANTES de confirmar. El rojo queda para lo
+   que sí bloquea (.m-confirm-err). */
+.m-shell .ac-rc-warn {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border-left: 2px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+/* El chip de confirmar la moneda vive DENTRO del aviso: confirmar es la salida del aviso.
+   Con su propio objetivo táctil de 32px: en un teléfono un chip inline no se puede tocar. */
+.m-shell .ac-rc-chip {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 7px 14px;
+  min-height: 32px;
+  border: 1px solid var(--warning);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 600;
+}
+.m-shell .m-confirm-done .ac-rc-warn {
+  margin-top: 8px;
 }
