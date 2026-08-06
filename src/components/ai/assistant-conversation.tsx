@@ -1164,27 +1164,43 @@ export function ReceiptConfirmCard({
     );
   }
 
+  // Todo campo lleva la MISMA clase: la altura, el radio y el padding salen de un solo sitio.
+  const campo = (extra?: string) =>
+    `${skin.fieldInput ?? "inp"} ac-rc-field${extra ? ` ${extra}` : ""}`;
+
   return (
-    <div className={skin.card}>
+    <div className={`${skin.card} ac-rc-card`}>
       <div className={skin.eyebrow}>{title}</div>
-      {/* El signo lo pone formatMoney (cero neutro: "₡0", no "−₡0"). */}
+      {/* Resumen arriba: el importe grande es lo primero que se lee, y recién debajo van los
+          campos. El signo lo pone formatMoney (cero neutro: "₡0", no "−₡0"). */}
       <div className={skin.amount}>{formatMoney(-montoPrevio, d.currency)}</div>
 
-      <label className={skin.fieldLabel} htmlFor={`rc-com-${uid}`}>
-        Comercio
-      </label>
-      <input
-        id={`rc-com-${uid}`}
-        className={`${skin.fieldInput ?? "inp"} ac-rc-field${ver && err.comercio ? " is-bad" : ""}`}
-        value={d.description}
-        onChange={(e) => editar({ description: e.target.value })}
-        disabled={pending}
-        placeholder="Nombre del comercio"
-        autoComplete="off"
-      />
-      {ver && err.comercio ? <div className={skin.error}>{err.comercio}</div> : null}
+      {/*
+        UNA sola rejilla para TODOS los campos, no un input suelto + una sub-rejilla para dos de
+        ellos. Con `repeat(2, minmax(0, 1fr))` las dos columnas son realmente iguales y —esto es
+        lo que fallaba— pueden ENCOGER por debajo de su contenido: el `minmax(0, …)` más el
+        `min-width: 0` de los propios campos es lo que impide que el input date, que trae ancho
+        intrínseco propio ("dd/mm/aaaa" + el icono del calendario), empuje su columna y desborde
+        la tarjeta. Los campos que ocupan la fila entera lo dicen con `ac-rc-wide`, así que no
+        hay ni un ancho suelto: todo cae en la misma grilla.
+      */}
+      <div className="ac-rc-fields">
+        <div className="ac-rc-cell ac-rc-wide">
+          <label className={skin.fieldLabel} htmlFor={`rc-com-${uid}`}>
+            Comercio
+          </label>
+          <input
+            id={`rc-com-${uid}`}
+            className={campo(ver && err.comercio ? "is-bad" : "")}
+            value={d.description}
+            onChange={(e) => editar({ description: e.target.value })}
+            disabled={pending}
+            placeholder="Nombre del comercio"
+            autoComplete="off"
+          />
+          {ver && err.comercio ? <div className={skin.error}>{err.comercio}</div> : null}
+        </div>
 
-      <div className="ac-rc-grid">
         <div className="ac-rc-cell">
           <label className={skin.fieldLabel} htmlFor={`rc-fec-${uid}`}>
             Fecha
@@ -1193,27 +1209,39 @@ export function ReceiptConfirmCard({
             id={`rc-fec-${uid}`}
             type="date"
             max={hoy}
-            className={`${skin.fieldInput ?? "inp"} ac-rc-field${ver && err.fecha ? " is-bad" : ""}`}
+            className={campo(ver && err.fecha ? "is-bad" : "")}
             value={d.occurredOn}
             onChange={(e) => editar({ occurredOn: e.target.value })}
             disabled={pending}
           />
+          {ver && err.fecha ? <div className={skin.error}>{err.fecha}</div> : null}
         </div>
+
         <div className="ac-rc-cell">
           <label className={skin.fieldLabel} htmlFor={`rc-mon-${uid}`}>
             Monto
           </label>
           <input
             id={`rc-mon-${uid}`}
-            className={`${skin.fieldInput ?? "inp"} ac-rc-field${ver && err.monto ? " is-bad" : ""}`}
+            className={campo(ver && err.monto ? "is-bad" : "")}
             value={d.amountText}
             onChange={(e) => editar({ amountText: e.target.value })}
             disabled={pending}
             inputMode="decimal"
             placeholder="0"
           />
+          {ver && err.monto ? <div className={skin.error}>{err.monto}</div> : null}
         </div>
-        <div className="ac-rc-cell ac-rc-cell-cur">
+
+        {/* El aviso de la fecha va JUSTO debajo de su fila, no al final de la tarjeta: antes
+            quedaba después del selector de moneda y ya no se leía como algo sobre la fecha. */}
+        {aviso ? (
+          <div className="ac-rc-cell ac-rc-wide">
+            <div className={aviso.tono === "error" ? skin.error : "ac-rc-warn"}>{aviso.texto}</div>
+          </div>
+        ) : null}
+
+        <div className="ac-rc-cell ac-rc-wide">
           <label className={skin.fieldLabel} htmlFor={`rc-cur-${uid}`}>
             Moneda
           </label>
@@ -1234,40 +1262,43 @@ export function ReceiptConfirmCard({
               </option>
             ))}
           </select>
+          {ver && !monedaOk ? (
+            <div className={skin.error}>Confirmá la moneda del recibo.</div>
+          ) : null}
+        </div>
+
+        {!monedaOk ? (
+          <div className="ac-rc-cell ac-rc-wide">
+            <div className="ac-rc-warn">
+              No detecté la moneda en el recibo.{" "}
+              {d.currencyOrigin === "pais"
+                ? "Propongo la de tu país; confirmala o elegí otra."
+                : "Propongo tu moneda principal; confirmala o elegí otra."}
+              <button
+                type="button"
+                className="ac-rc-chip"
+                onClick={() => setMonedaOk(true)}
+                disabled={pending}
+              >
+                {etiquetaConfirmarMoneda(d.currency)}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="ac-rc-cell ac-rc-wide">
+          <label className={skin.fieldLabel}>Sobre</label>
+          {/* `ac-rc-field` también acá: sin ella el combobox quedaba con otra altura y otro
+              radio que el resto, que es la mitad de la sensación de "campos desparejos". */}
+          <SobreCombobox
+            kind="gasto"
+            value={d.categoryId ?? ""}
+            onChange={(v) => editar({ categoryId: v || null })}
+            disabled={pending}
+            inputClassName={`${skin.sobreInput ?? "sel"} ac-rc-field`}
+          />
         </div>
       </div>
-      {/* La fecha y la moneda avisan JUNTO a su campo y antes de confirmar, no después. */}
-      {ver && err.fecha ? <div className={skin.error}>{err.fecha}</div> : null}
-      {aviso ? (
-        <div className={aviso.tono === "error" ? skin.error : "ac-rc-warn"}>{aviso.texto}</div>
-      ) : null}
-      {ver && err.monto ? <div className={skin.error}>{err.monto}</div> : null}
-      {!monedaOk ? (
-        <div className="ac-rc-warn">
-          No detecté la moneda en el recibo.{" "}
-          {d.currencyOrigin === "pais"
-            ? "Propongo la de tu país; confirmala o elegí otra."
-            : "Propongo tu moneda principal; confirmala o elegí otra."}
-          <button
-            type="button"
-            className="ac-rc-chip"
-            onClick={() => setMonedaOk(true)}
-            disabled={pending}
-          >
-            {etiquetaConfirmarMoneda(d.currency)}
-          </button>
-        </div>
-      ) : null}
-      {ver && !monedaOk ? <div className={skin.error}>Confirmá la moneda del recibo.</div> : null}
-
-      <label className={skin.fieldLabel}>Sobre</label>
-      <SobreCombobox
-        kind="gasto"
-        value={d.categoryId ?? ""}
-        onChange={(v) => editar({ categoryId: v || null })}
-        disabled={pending}
-        {...(skin.sobreInput ? { inputClassName: skin.sobreInput } : {})}
-      />
 
       {error ? <div className={skin.error}>{error}</div> : null}
       <div className={skin.actions}>
@@ -1638,13 +1669,15 @@ function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknow
               </div>
 
               <label className={skin.fieldLabel}>Sobre</label>
+              {/* `ac-batch-field` también acá: sin ella el combobox tenía otra altura que los
+                  cuatro campos de arriba y la fila se veía despareja. */}
               <SobreCombobox
                 kind={r.kind}
                 value={r.categoryId ?? ""}
                 onChange={(v) => editar(r.uid, { categoryId: v || null })}
                 disabled={pending}
                 suggestedPath={r.categoryPath}
-                {...(skin.sobreInput ? { inputClassName: skin.sobreInput } : {})}
+                inputClassName={`${skin.sobreInput ?? "sel"} ac-batch-field`}
               />
               {ver && err.sobre ? <div className={skin.error}>{err.sobre}</div> : null}
             </div>
