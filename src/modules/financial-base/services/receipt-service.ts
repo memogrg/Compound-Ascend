@@ -8,6 +8,7 @@ import "server-only";
 import { requireUser } from "@/lib/auth/session";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import { assertTokenBudget, recordUsage } from "@/lib/ai/usage";
+import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
 export type ReceiptExtraction = {
@@ -83,14 +84,15 @@ export async function extractReceipt(
 
     return { amount, date: dateRaw, merchant, currency, confidence, configured: true };
   } catch (err) {
-    logger.error("extractReceipt fallido", { message: err instanceof Error ? err.message : "?" });
-    return {
-      amount: null,
-      date: null,
-      merchant: null,
-      currency: null,
-      confidence: 0,
-      configured: true,
-    };
+    // Se RELANZA en vez de devolver un extracto vacío. Tragarse el error hacía que un timeout de
+    // la visión, un 429 del proveedor y una foto ilegible llegaran al usuario exactamente igual:
+    // todos los campos en null y ni una palabra del motivo. El AppError del proveedor ya trae el
+    // mensaje específico (IA-503, IA-429…) y `scanReceiptAction` lo propaga tal cual.
+    logger.error("extractReceipt fallido", {
+      message: err instanceof Error ? err.message : "?",
+      detail: err instanceof AppError ? err.detail : undefined,
+      mimeType,
+    });
+    throw err;
   }
 }

@@ -16,18 +16,11 @@ import {
 } from "@/modules/financial-base/components/v2/quick-add-modal";
 import type { Account } from "@/modules/financial-base/types";
 import type { Category } from "@/modules/financial-base/services/categories-service";
+import { prepararImagenRecibo } from "@/lib/image/prepare-image";
+import { mensajeFalloEscaneo, extraccionVacia } from "@/lib/ai/scan-errors";
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      resolve(result.slice(result.indexOf(",") + 1)); // quita "data:...;base64,"
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+/** Mismo tope que la ruta de escaneo; se mide sobre el base64 YA comprimido. */
+const MAX_B64_CLIENTE = 7_000_000;
 
 async function uploadReceipt(file: File): Promise<string | undefined> {
   try {
@@ -64,19 +57,23 @@ export function ScanReceiptButton({
     e.target.value = "";
     if (!file) return;
     // Allowlist de tipos (defensa en cliente; el server y el bucket revalidan).
-    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+    // heif además de heic: el iPhone produce los dos y antes el .heif se rechazaba acá mismo.
+    const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
     if (!ALLOWED_TYPES.includes(file.type)) {
       toast("Formato no admitido. Usa JPG, PNG, WEBP o HEIC.", "error");
       return;
     }
-    if (file.size > 6_000_000) {
-      toast("La imagen es muy grande (máx 6 MB).", "error");
-      return;
-    }
+    // El tope se comprueba DESPUÉS de comprimir: rechazar por el peso del original descartaba
+    // fotos de 8 MB que tras comprimir pesan 300 KB — justo las que saca cualquier teléfono.
     startTransition(async () => {
-      const base64 = await fileToBase64(file);
-      const res = await scanReceiptAction(base64, file.type);
+      const img = await prepararImagenRecibo(file);
+      if (img.base64Length > MAX_B64_CLIENTE) {
+        toast(mensajeFalloEscaneo({ tipo: "imagen-grande", bytes: img.bytes }), "error");
+        return;
+      }
+      const res = await scanReceiptAction(img.base64, img.mimeType);
       if (!res.ok) {
+        // `message` ya viene con el motivo real desde la action (timeout, límite de IA, formato…).
         toast(res.message, "error");
         return;
       }
@@ -89,7 +86,10 @@ export function ScanReceiptButton({
         confidence: res.data.confidence,
         receiptUrl,
       });
-      if (res.data.amount == null) {
+      // El modal se abre igual —editable— pero se dice qué no se pudo leer.
+      if (extraccionVacia(res.data)) {
+        toast(mensajeFalloEscaneo({ tipo: "vacio" }), "info");
+      } else if (res.data.amount == null) {
         toast("No detecté el monto; complétalo y guarda.", "info");
       }
     });

@@ -39,6 +39,16 @@ import {
   emailTranscriptAction,
 } from "@/modules/assistant/api/actions";
 import { fetchWithTimeout, isTimeoutError } from "@/lib/fetch-timeout";
+import { prepararImagenRecibo } from "@/lib/image/prepare-image";
+import {
+  mensajeFalloEscaneo,
+  metaFalloEscaneo,
+  falloDeRespuesta,
+  falloDeExcepcion,
+  extraccionVacia,
+  type FalloEscaneo,
+} from "@/lib/ai/scan-errors";
+import { logger } from "@/lib/logger";
 import { retentionNoticeText } from "@/lib/ai/chat-retention";
 import { quoteExcerpt, QUOTE_MISSING_TEXT } from "@/lib/ai/chat-quote";
 import {
@@ -279,6 +289,17 @@ const LINK_LABEL: Record<string, string> = {
 const CHAT_TIMEOUT_MS = 40_000;
 
 /**
+ * Timeout del cliente para el ESCANEO. Va POR ENCIMA del peor caso del servidor (~41,6s: dos
+ * intentos de visión de 20s más el backoff) y por debajo de su maxDuration=60, para que cuando la
+ * visión falle gane el mensaje ESPECÍFICO del servidor (IA-503, IA-429…) en vez de un timeout del
+ * cliente que no explica nada. Sin esto el fetch no tenía tope y el spinner podía quedar colgado.
+ */
+const SCAN_TIMEOUT_MS = 50_000;
+
+/** Tope de la ruta (MAX_B64). Comprobarlo acá ahorra subir megabytes para que los rechacen. */
+const MAX_B64_CLIENTE = 7_000_000;
+
+/**
  * Encuadre educativo. Vive ACÁ, fijo al pie de la conversación, y ya NO en cada respuesta del
  * modelo (el system prompt tiene prohibido repetirlo): dicho una vez y siempre visible informa
  * mejor que un párrafo de disclaimer por mensaje, que se vuelve ruido y se deja de leer.
@@ -345,19 +366,6 @@ function alertFromAction(action: AIActionProposal, fallbackCurrency: string): Dr
     assetType: at,
     currency: String(p.currency ?? (at === "cripto" ? "USD" : fallbackCurrency)),
   };
-}
-
-function readImage(file: File): Promise<{ base64: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      const base64 = result.split(",")[1] ?? "";
-      resolve({ base64, mimeType: file.type || "image/jpeg" });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 // ----------------------------------------------------------------------------
@@ -609,42 +617,60 @@ export function AssistantConversation({
     if (!file || scanning) return;
     setScanning(true);
     setMessages((m) => [...m, { id: nextId(), role: "user", text: "📷 Recibo enviado" }]);
+    /** Mensaje de fallo con el MOTIVO real, más su rastro en consola (nunca la imagen). */
+    const fallar = (f: FalloEscaneo) => {
+      logger.warn("[scan-receipt] fallo en cliente", metaFalloEscaneo(f));
+      setMessages((m) => [...m, { id: nextId(), role: "assistant", text: mensajeFalloEscaneo(f) }]);
+    };
     try {
-      const { base64, mimeType } = await readImage(file);
-      const res = await fetch("/api/assistant/scan-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mimeType }),
-      });
-      const data = await res.json();
-      if (res.ok && data.extract) {
-        // Los defaults (moneda no declarada, fecha imposible) los decide `draftFromExtract`, no
-        // este handler: es la MISMA regla que aplica el panel web. Acá solo se le da el contexto.
-        const receipt = draftFromExtract(data.extract as ReceiptExtract, {
-          hoy: today(),
-          primaryCurrency: currency,
-          timezone: tz,
-        });
-        setMessages((m) => [
-          ...m,
-          {
-            id: nextId(),
-            role: "assistant",
-            text: "Leí tu recibo. Revisá y corregí lo que haga falta antes de registrarlo:",
-            receipt,
-          },
-        ]);
-      } else {
-        setMessages((m) => [
-          ...m,
-          { id: nextId(), role: "assistant", text: "No pude leer el recibo. Probá con otra foto." },
-        ]);
+      // Comprimir ANTES de subir: una foto de teléfono son megabytes que no hacen falta.
+      const img = await prepararImagenRecibo(file);
+      if (img.base64Length > MAX_B64_CLIENTE) {
+        fallar({ tipo: "imagen-grande", bytes: img.bytes });
+        return;
       }
-    } catch {
+      const res = await fetchWithTimeout(
+        "/api/assistant/scan-receipt",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: img.base64, mimeType: img.mimeType }),
+        },
+        SCAN_TIMEOUT_MS,
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        fallar(falloDeRespuesta(res.status, data));
+        return;
+      }
+      if (!data?.extract) {
+        fallar({ tipo: "servidor", status: res.status, mensaje: "No pude leer el recibo." });
+        return;
+      }
+      // 2xx con los tres campos en null: el modelo no leyó nada. Se DICE —y aun así se abre la
+      // tarjeta, vacía pero editable, para poder escribirlo a mano sin volver a empezar.
+      const vacio = extraccionVacia(data.extract);
+      if (vacio) logger.warn("[scan-receipt] extracción vacía", { mime: img.mimeType });
+      // Los defaults (moneda no declarada, fecha imposible) los decide `draftFromExtract`, no
+      // este handler: es la MISMA regla que aplica el panel web. Acá solo se le da el contexto.
+      const receipt = draftFromExtract(data.extract as ReceiptExtract, {
+        hoy: today(),
+        primaryCurrency: currency,
+        timezone: tz,
+      });
       setMessages((m) => [
         ...m,
-        { id: nextId(), role: "assistant", text: "No pude procesar la imagen." },
+        {
+          id: nextId(),
+          role: "assistant",
+          text: vacio
+            ? mensajeFalloEscaneo({ tipo: "vacio" })
+            : "Leí tu recibo. Revisá y corregí lo que haga falta antes de registrarlo:",
+          receipt,
+        },
       ]);
+    } catch (err) {
+      fallar(falloDeExcepcion(err));
     } finally {
       setScanning(false);
     }

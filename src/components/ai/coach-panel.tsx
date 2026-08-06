@@ -27,6 +27,17 @@ import {
   type DraftTxn,
 } from "@/components/ai/assistant-conversation";
 import { draftFromExtract, type ReceiptDraft, type ReceiptExtract } from "@/lib/ai/receipt-draft";
+import { prepararImagenRecibo } from "@/lib/image/prepare-image";
+import {
+  mensajeFalloEscaneo,
+  metaFalloEscaneo,
+  falloDeRespuesta,
+  falloDeExcepcion,
+  extraccionVacia,
+  type FalloEscaneo,
+} from "@/lib/ai/scan-errors";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import { logger } from "@/lib/logger";
 import { useCaptureToday, useUserTimezone } from "@/components/tz/timezone-context";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 
@@ -42,6 +53,10 @@ const CHIPS = [
 
 type Mode = "assistant" | "ai";
 
+/** Mismos números que el chat compartido: ver `assistant-conversation.tsx` para el porqué. */
+const SCAN_TIMEOUT_MS = 50_000;
+const MAX_B64_CLIENTE = 7_000_000;
+
 export function CoachPanel() {
   // PRINCIPAL, no la de visualización: es la moneda con la que se captura.
   const captureCurrency = useCaptureCurrency();
@@ -56,6 +71,9 @@ export function CoachPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [receipt, setReceipt] = useState<ReceiptDraft | null>(null);
   const [scanning, setScanning] = useState(false);
+  // El motivo del último escaneo fallido. Reemplaza al `alert()`, que además de bloquear el hilo
+  // solo sabía decir "no pudimos leer el recibo" pasara lo que pasara.
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const onPickFile = () => fileRef.current?.click();
 
@@ -64,28 +82,51 @@ export function CoachPanel() {
     e.target.value = "";
     if (!file) return;
     setScanning(true);
+    setScanError(null);
+    /** Fallo con el MOTIVO real (no un genérico), más su rastro en consola sin la imagen. */
+    const fallar = (f: FalloEscaneo) => {
+      logger.warn("[scan-receipt] fallo en cliente", metaFalloEscaneo(f));
+      setReceipt(null);
+      setScanError(mensajeFalloEscaneo(f));
+    };
     try {
-      const { base64, mimeType } = await readImage(file);
-      const res = await fetch("/api/assistant/scan-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mimeType }),
-      });
-      const data = await res.json();
-      if (res.ok && data.extract) {
-        // Los defaults (moneda no declarada, fecha imposible) los decide `draftFromExtract`, la
-        // MISMA regla que aplica el chat móvil. Acá solo se le da el contexto del usuario.
-        setReceipt(
-          draftFromExtract(data.extract as ReceiptExtract, {
-            hoy: today(),
-            primaryCurrency: captureCurrency,
-            timezone: tz,
-          }),
-        );
-      } else {
-        setReceipt(null);
-        alert("No pudimos leer el recibo. Intenta con otra foto.");
+      // Comprimir ANTES de subir: una foto de teléfono son megabytes que no hacen falta.
+      const img = await prepararImagenRecibo(file);
+      if (img.base64Length > MAX_B64_CLIENTE) {
+        fallar({ tipo: "imagen-grande", bytes: img.bytes });
+        return;
       }
+      const res = await fetchWithTimeout(
+        "/api/assistant/scan-receipt",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: img.base64, mimeType: img.mimeType }),
+        },
+        SCAN_TIMEOUT_MS,
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        fallar(falloDeRespuesta(res.status, data));
+        return;
+      }
+      if (!data?.extract) {
+        fallar({ tipo: "servidor", status: res.status, mensaje: "No pudimos leer el recibo." });
+        return;
+      }
+      // Los tres campos en null: se abre la tarjeta igual (vacía pero editable) y se dice por qué.
+      if (extraccionVacia(data.extract)) setScanError(mensajeFalloEscaneo({ tipo: "vacio" }));
+      // Los defaults (moneda no declarada, fecha imposible) los decide `draftFromExtract`, la
+      // MISMA regla que aplica el chat móvil. Acá solo se le da el contexto del usuario.
+      setReceipt(
+        draftFromExtract(data.extract as ReceiptExtract, {
+          hoy: today(),
+          primaryCurrency: captureCurrency,
+          timezone: tz,
+        }),
+      );
+    } catch (err) {
+      fallar(falloDeExcepcion(err));
     } finally {
       setScanning(false);
     }
@@ -161,6 +202,14 @@ export function CoachPanel() {
         {scanning ? (
           <div className="muted" style={{ padding: "10px 18px", fontSize: 12 }}>
             Analizando recibo…
+          </div>
+        ) : null}
+
+        {scanError ? (
+          <div style={{ padding: "10px 16px" }}>
+            <div className="ac-rc-warn" role="alert">
+              {scanError}
+            </div>
           </div>
         ) : null}
 
@@ -356,18 +405,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   );
-}
-
-// ----------------------------------------------------------------------------
-function readImage(file: File): Promise<{ base64: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      const base64 = result.split(",")[1] ?? "";
-      resolve({ base64, mimeType: file.type || "image/jpeg" });
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }

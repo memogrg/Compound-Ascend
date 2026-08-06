@@ -8,6 +8,15 @@ import { createSavingsSobreAction } from "@/modules/control";
 import { PagoVinculadoButton } from "@/modules/control";
 import { userToday } from "@/lib/time/user-time";
 
+/**
+ * El escáner de recibos de este tab (`ScanReceiptButton`) llama a una SERVER ACTION, y una server
+ * action hereda el presupuesto de tiempo del segmento desde el que se invoca — no el de ninguna
+ * ruta de API. Sin esto corría con el default de la cuenta (~10-15s) y moría a mitad de la visión,
+ * exactamente el mismo fallo intermitente que /api/assistant/scan-receipt. 60s es el mismo número
+ * y la misma cuenta: ver el cálculo en esa ruta.
+ */
+export const maxDuration = 60;
+
 /** Fecha de corte de los frascos: ?asOf=YYYY-MM-DD válido, o el día de hoy (zona del usuario). */
 async function resolveAsOf(raw: string | undefined): Promise<string> {
   if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
