@@ -7,8 +7,7 @@ import "server-only";
  *
  * Lecturas con alcance de hogar (householdMemberIds): la plata es compartida.
  */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { householdMemberIds } from "@/lib/household/active";
 import { getDisplayCurrency, monthlyize, type Frequency } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
@@ -36,13 +35,15 @@ export async function getEssentialMonthlyExpense(opts?: {
   /** Excluye los aportes a los PROPIOS fondos de defensa (emergencia/paz). Se usa al
    *  DIMENSIONAR el fondo de paz: no dimensionar el fondo con aportes al fondo (circularidad). */
   excludeDefenseFunds?: boolean;
+  /** Lectura SIN sesión (cron / webhook) con el cliente service-role, igual que el compromiso
+   *  total: sin esto el número de seguridad valía 0 fuera de la web. */
+  ctx?: AuthContext;
 }): Promise<EssentialBreakdown> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const [members, rates] = await Promise.all([householdMemberIds(supabase, user.id), getFxRates()]);
-  const targetCurrency = opts?.currency ?? (await getDisplayCurrency());
+  const { db: supabase, userId } = await resolveAuth(opts?.ctx);
+  const [members, rates] = await Promise.all([householdMemberIds(supabase, userId), getFxRates()]);
+  const targetCurrency = opts?.currency ?? (await getDisplayCurrency(opts?.ctx));
 
-  const period = await userCurrentPeriod();
+  const period = await userCurrentPeriod(opts?.ctx);
   const [budgetRows, debtRows, goalRows, policyRows] = await Promise.all([
     // Presupuesto del mes: solo líneas de gasto de sobres esenciales. El engine
     // filtra por source_kind (regla #1); traemos source_kind para eso.

@@ -36,6 +36,7 @@ export { getPatrimonioReport, getPatrimonioReportForUser } from "./services/patr
 export type { PatrimonioServiceResult } from "./services/patrimonio-service";
 export type { PatrimonioReport, PatrimonioLevel, Hito } from "./engine/patrimonio-engine";
 export type { EssentialBreakdown } from "./engine/essential-expense";
+export type { CommitmentBreakdown } from "./engine/total-commitment";
 // Dimensionamiento de los fondos de defensa (F1).
 export {
   computeDefenseFunds,

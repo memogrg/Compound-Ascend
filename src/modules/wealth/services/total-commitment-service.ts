@@ -7,8 +7,7 @@ import "server-only";
  * Normaliza a mensual + moneda de visualización, con alcance de hogar. Delega las reglas de
  * deduplicación al engine puro computeTotalCommitment. Best-effort en el llamador (patrimonio-service).
  */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { householdMemberIds } from "@/lib/household/active";
 import { getDisplayCurrency, monthlyize, type Frequency } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
@@ -24,16 +23,21 @@ export type { CommitmentBreakdown };
  * Compromiso mensual total del hogar, con desglose por origen. Moneda: `opts.currency` (patrimonio
  * pasa la PRINCIPAL del reporte, para no meter el override de display en el número); por defecto la
  * de visualización.
+ *
+ * `opts.ctx` permite leerlo SIN sesión (cron / webhook de WhatsApp) con el cliente service-role,
+ * igual que aggregateNetWorth. Sin él, esas rutas no podían calcular el compromiso y el reporte
+ * caía a la lista base `expense_items` — que para quien presupuesta con sobres vale 0, así que
+ * WhatsApp reportaba números distintos a los de la web para el MISMO usuario.
  */
 export async function getTotalMonthlyCommitment(opts?: {
   currency?: string;
+  ctx?: AuthContext;
 }): Promise<CommitmentBreakdown> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const [members, rates] = await Promise.all([householdMemberIds(supabase, user.id), getFxRates()]);
-  const targetCurrency = opts?.currency ?? (await getDisplayCurrency());
+  const { db: supabase, userId } = await resolveAuth(opts?.ctx);
+  const [members, rates] = await Promise.all([householdMemberIds(supabase, userId), getFxRates()]);
+  const targetCurrency = opts?.currency ?? (await getDisplayCurrency(opts?.ctx));
 
-  const period = await userCurrentPeriod();
+  const period = await userCurrentPeriod(opts?.ctx);
   const [budgetRows, debtRows, goalRows, policyRows, holdingRows] = await Promise.all([
     // Presupuesto del mes: TODAS las líneas de gasto (sin filtro esencial). El engine cuenta solo
     // los sobres propios (manual/recurring); las derivadas van por su entidad (regla #1).

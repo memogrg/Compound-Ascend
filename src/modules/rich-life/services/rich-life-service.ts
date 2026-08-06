@@ -36,7 +36,26 @@ import type {
   PolicyType,
   ProtectionDiagnosis,
   PortfolioStats,
+  CommitmentBreakdown,
 } from "@/modules/wealth";
+
+/**
+ * Compromiso mensual total, best-effort. Import dinámico por la misma razón que
+ * `tryGetPortfolioMarketValues`: el servicio vive en wealth y este módulo ya es
+ * consumido por wealth (patrimonio-service), así que se evita el ciclo estático.
+ */
+async function tryGetCommitment(
+  ctx: AuthContext | undefined,
+  currency: string,
+): Promise<CommitmentBreakdown | null> {
+  try {
+    const { getTotalMonthlyCommitment } =
+      await import("@/modules/wealth/services/total-commitment-service");
+    return await getTotalMonthlyCommitment({ currency, ctx });
+  } catch {
+    return null;
+  }
+}
 
 async function tryGetPortfolioMarketValues(
   ctx?: AuthContext,
@@ -176,7 +195,14 @@ export type NetWorthAggregate = {
   assets: Asset[]; // normalizados a moneda principal (= assetsForEngine)
   liabilities: Liability[]; // normalizados (= liabsForEngine)
   passiveIncomeMonthly: number;
-  monthlyExpenses: number; // base.indicators.expenseMonthly
+  monthlyExpenses: number; // base.indicators.expenseMonthly (lista base; OPCIONAL → puede ser 0)
+  /**
+   * Compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas) con su desglose.
+   * Se lee ACÁ, una sola vez, y lo reusan rich-life y patrimonio-service: es el
+   * denominador real de los ratios (ver `gastoDeReferencia`) y antes cada consumidor
+   * lo pedía por su cuenta o no lo pedía del todo. null si la lectura falla.
+   */
+  commitment: CommitmentBreakdown | null;
   netMonthlyIncome: number; // base.indicators.incomeMonthly
   freeCashflow: number;
   protection: ProtectionDiagnosis;
@@ -218,6 +244,7 @@ export async function aggregateNetWorth(
     marketValues,
     liquidityBucket,
     goalRows,
+    rentalIncomeRows,
   ] = await Promise.all([
     db.from("assets").select("*").in("user_id", memberIds),
     db.from("liabilities").select("*").in("user_id", memberIds),
@@ -251,7 +278,24 @@ export async function aggregateNetWorth(
       .from("savings_goals")
       .select("id,name,current_amount,stored_in,status,currency")
       .eq("user_id", userId),
+    // Renta/intereses DERIVADOS de las inversiones (alquiler, bonos, CDP, préstamos):
+    // líneas de ingreso del presupuesto con source_kind='rental'. Es ingreso pasivo real
+    // y NO está en `income_sources` a propósito — rental-service registra el cobro como
+    // transacción vinculada "sin duplicar en income_sources". Sin esto, la cobertura
+    // pasiva daba 0% para quien tiene toda su renta en entidades y no en la lista manual.
+    db
+      .from("budget_items")
+      .select("amount,currency")
+      .in("user_id", memberIds)
+      .eq("type", "income")
+      .eq("source_kind", "rental")
+      .eq("period_month", periodoActual.month)
+      .eq("period_year", periodoActual.year),
   ]);
+
+  // Compromiso mensual total, en la moneda del agregado. Se lee una sola vez acá para
+  // que rich-life y patrimonio compartan EXACTAMENTE el mismo denominador.
+  const commitment = await tryGetCommitment(ctx, currency);
 
   // Activos: explícitos + inversiones.
   const explicitAssets: Asset[] = (assetRows.data ?? []).map((r) => ({
@@ -360,10 +404,20 @@ export async function aggregateNetWorth(
     }));
   const liabilities = [...explicitLiabs, ...debtLiabs];
 
-  // Ingreso pasivo mensual (normalizado a la moneda principal).
-  const passiveIncomeMonthly = base.incomes
+  // Ingreso pasivo mensual (normalizado a la moneda principal): la lista manual de
+  // ingresos marcados "pasivo" MÁS la renta/intereses derivados de las inversiones.
+  // Las dos fuentes son disjuntas por diseño (la renta no se escribe en income_sources),
+  // así que sumarlas no duplica. Ojo: un bono anual/semestral aporta el PAGO COMPLETO en
+  // su mes ancla y 0 en los demás — la cobertura pasiva se mueve con el calendario de
+  // cobro, igual que el presupuesto del que sale.
+  const manualPassive = base.incomes
     .filter((i) => i.incomeType === "pasivo" && i.includeInBudget)
     .reduce((s, i) => s + convertCurrency(i.amountMonthly, i.currency, currency, rates), 0);
+  const derivedPassive = (rentalIncomeRows.data ?? []).reduce(
+    (s, r) => s + convertCurrency(Number(r.amount), r.currency, currency, rates),
+    0,
+  );
+  const passiveIncomeMonthly = manualPassive + derivedPassive;
 
   // Protección y diversificación (reutiliza motores de Patrimonio).
   const policies: InsurancePolicy[] = (policyRows.data ?? []).map((p, i) => ({
@@ -419,6 +473,7 @@ export async function aggregateNetWorth(
     liabilities: liabsForEngine,
     passiveIncomeMonthly,
     monthlyExpenses: base.indicators.expenseMonthly,
+    commitment,
     netMonthlyIncome: base.indicators.incomeMonthly,
     freeCashflow: base.indicators.freeCashflow,
     protection,
@@ -443,6 +498,7 @@ export async function getRichLifeSummary(
     liabilities: agg.liabilities,
     passiveIncomeMonthly: agg.passiveIncomeMonthly,
     monthlyExpenses: agg.monthlyExpenses,
+    monthlyCommitment: agg.commitment?.total ?? null,
     freeCashflow: agg.freeCashflow,
     protectionScore: agg.protection.score,
     diversification: agg.portfolio.diversification,
