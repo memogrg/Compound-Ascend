@@ -20,7 +20,10 @@ const GRAPH = "https://graph.facebook.com";
 
 /** Meta quiere el número sin "whatsapp:" ni "+": dígitos con código de país. */
 function toMeta(to: string): string {
-  return to.replace(/^whatsapp:/, "").replace(/^\+/, "").trim();
+  return to
+    .replace(/^whatsapp:/, "")
+    .replace(/^\+/, "")
+    .trim();
 }
 
 export class MetaWhatsAppProvider implements WhatsAppProvider {

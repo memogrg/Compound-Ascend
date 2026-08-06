@@ -26,9 +26,7 @@ export type ScopeKind = "altcoins" | "crypto" | "all";
 
 /** Modificador de precio por posición: % del ATH, el ATH pleno, o el precio actual. */
 export type PriceModifier =
-  | { kind: "pct_ath"; pct: number }
-  | { kind: "ath" }
-  | { kind: "current" };
+  { kind: "pct_ath"; pct: number } | { kind: "ath" } | { kind: "current" };
 
 /** Símbolo que cuenta como "altcoin": cripto y NO Bitcoin. (Stablecoins NO se excluyen: el criterio es solo ≠ BTC.) */
 export function isAltcoin(assetType: string, symbol: string | null): boolean {
@@ -40,8 +38,15 @@ export function parseMultiScope(text: string): ScopeKind | null {
   const t = text.toLowerCase();
   // Requiere un cuantificador "todo/todos/todas" o el plural genérico para no confundir con un símbolo.
   if (/\baltcoins?\b/.test(t)) return "altcoins";
-  if (/\b(?:toda|todas?|todo)\b[^.]*\b(?:cripto|criptos|criptomonedas?)\b|\bmis\s+criptos?\b/.test(t)) return "crypto";
-  if (/\b(?:toda|todas?|todo)\b[^.]*\b(?:inversion|inversiones|posiciones|portafolio|cartera|holdings?)\b/.test(t))
+  if (
+    /\b(?:toda|todas?|todo)\b[^.]*\b(?:cripto|criptos|criptomonedas?)\b|\bmis\s+criptos?\b/.test(t)
+  )
+    return "crypto";
+  if (
+    /\b(?:toda|todas?|todo)\b[^.]*\b(?:inversion|inversiones|posiciones|portafolio|cartera|holdings?)\b/.test(
+      t,
+    )
+  )
     return "all";
   return null;
 }
@@ -58,7 +63,8 @@ export function parsePriceModifier(text: string): PriceModifier | null {
     const pct = Number(pctM[1]!.replace(",", "."));
     if (Number.isFinite(pct) && pct > 0) return { kind: "pct_ath", pct };
   }
-  if (/precio actual|al precio de hoy|precio de hoy|\bactual\b|\bhoy\b/.test(t)) return { kind: "current" };
+  if (/precio actual|al precio de hoy|precio de hoy|\bactual\b|\bhoy\b/.test(t))
+    return { kind: "current" };
   if (mentionsAth) return { kind: "ath" };
   return null;
 }
@@ -113,7 +119,10 @@ function targetFor(mod: PriceModifier, high: number | null, price: number | null
  * valor − invertido; suma total por moneda. Una posición sin el dato necesario NO rompe el total:
  * queda `missing` y se reporta aparte. Puro y determinista (Math.round como el motor de una posición).
  */
-export function computeMultiScenario(rows: HoldingScenarioInput[], mod: PriceModifier): MultiScenario {
+export function computeMultiScenario(
+  rows: HoldingScenarioInput[],
+  mod: PriceModifier,
+): MultiScenario {
   const perHolding: PerHolding[] = [];
   const totals = new Map<string, { value: number; gain: number; count: number }>();
   const missing: string[] = [];
@@ -121,13 +130,27 @@ export function computeMultiScenario(rows: HoldingScenarioInput[], mod: PriceMod
   for (const r of rows) {
     const target = targetFor(mod, r.high, r.price);
     if (target === null || !(target > 0) || !(r.quantity > 0)) {
-      perHolding.push({ symbol: r.symbol, currency: r.scenCurrency, targetPrice: null, value: null, gain: null, missing: true });
+      perHolding.push({
+        symbol: r.symbol,
+        currency: r.scenCurrency,
+        targetPrice: null,
+        value: null,
+        gain: null,
+        missing: true,
+      });
       missing.push(r.symbol);
       continue;
     }
     const value = Math.round(r.quantity * target);
     const gain = Math.round(value - r.investedScen);
-    perHolding.push({ symbol: r.symbol, currency: r.scenCurrency, targetPrice: target, value, gain, missing: false });
+    perHolding.push({
+      symbol: r.symbol,
+      currency: r.scenCurrency,
+      targetPrice: target,
+      value,
+      gain,
+      missing: false,
+    });
     const acc = totals.get(r.scenCurrency) ?? { value: 0, gain: 0, count: 0 };
     acc.value += value;
     acc.gain += gain;
@@ -154,7 +177,11 @@ function trimNum(n: number): string {
  * Redacta la respuesta multi-posición: total por moneda, desglose por posición y el guardaraíl.
  * Puro. `scopeLabel` = "tus altcoins" / "toda tu cripto" / "todas tus inversiones".
  */
-export function buildMultiReply(scenario: MultiScenario, mod: PriceModifier, scopeLabel: string): string {
+export function buildMultiReply(
+  scenario: MultiScenario,
+  mod: PriceModifier,
+  scopeLabel: string,
+): string {
   const computed = scenario.perHolding.filter((p) => !p.missing);
   if (computed.length === 0) {
     return `No pude calcular el escenario de ${scopeLabel}: me falta el precio/ATH de ${scenario.missing.length ? scenario.missing.join(", ") : "esas posiciones"} en la fuente ahora. Reintentá en un momento o decime un precio objetivo.`;
@@ -165,7 +192,10 @@ export function buildMultiReply(scenario: MultiScenario, mod: PriceModifier, sco
     return `${money(t.value, t.currency)} (ganancia ${signo}${money(t.gain, t.currency)} sobre lo invertido)`;
   });
   const detalle = computed
-    .map((p) => `· ${p.symbol}: ${money(p.value!, p.currency)} (${p.gain! >= 0 ? "+" : ""}${money(p.gain!, p.currency)})`)
+    .map(
+      (p) =>
+        `· ${p.symbol}: ${money(p.value!, p.currency)} (${p.gain! >= 0 ? "+" : ""}${money(p.gain!, p.currency)})`,
+    )
     .join("\n");
 
   let reply = `Vendiendo ${scopeLabel} ${modLabel(mod)} (${computed.length} ${computed.length === 1 ? "posición" : "posiciones"}): total ${totalLines.join(" · ")}.\n${detalle}`;

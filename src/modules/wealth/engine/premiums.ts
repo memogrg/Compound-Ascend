@@ -30,10 +30,7 @@ function comparePeriods(a: PlanPeriod, b: PlanPeriod): number {
  * Deriva de las filas existentes de holding_contributions — sin columna nueva.
  * Devuelve null si no hay ningún aporte. `maturity` es ISO YYYY-MM-DD o null.
  */
-export function planPaidUntil(
-  periods: PlanPeriod[],
-  maturity: string | null,
-): PlanPeriod | null {
+export function planPaidUntil(periods: PlanPeriod[], maturity: string | null): PlanPeriod | null {
   if (periods.length === 0) return null;
   let max = periods[0]!;
   for (const p of periods) {

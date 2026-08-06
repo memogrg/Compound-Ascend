@@ -14,7 +14,11 @@ import "server-only";
  * Best-effort: cualquier fallo → [] / no-op, nunca rompe la respuesta.
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import { CHAT_RETENTION_DAYS, MAX_CHAT_MESSAGES, retentionCutoffISO } from "@/lib/ai/chat-retention";
+import {
+  CHAT_RETENTION_DAYS,
+  MAX_CHAT_MESSAGES,
+  retentionCutoffISO,
+} from "@/lib/ai/chat-retention";
 import { pickPartner } from "@/lib/ai/chat-quote";
 import { logger } from "@/lib/logger";
 

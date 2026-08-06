@@ -156,7 +156,8 @@ export async function addDefenseSeguroAction(raw: unknown): Promise<ActionResult
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   const d = parsed.data;
-  const goalType = d.policyType === "vida" ? "defensa:seguro_vida" : "defensa:seguro_gastos_mayores";
+  const goalType =
+    d.policyType === "vida" ? "defensa:seguro_vida" : "defensa:seguro_gastos_mayores";
   try {
     // Hay datos de póliza si se ingresó cobertura, prima o aseguradora.
     const hasPolicyData = d.coverage != null || d.premium != null || Boolean(d.provider?.trim());

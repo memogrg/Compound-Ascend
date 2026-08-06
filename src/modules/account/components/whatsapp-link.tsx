@@ -71,8 +71,7 @@ export function WhatsAppLink({ initial, configured }: { initial: LinkState; conf
       ) : otp ? (
         <div>
           <div style={{ fontSize: 13.5 }}>
-            Envía este código por WhatsApp al número{" "}
-            <strong>{otp.botNumber ?? "del bot"}</strong>:
+            Envía este código por WhatsApp al número <strong>{otp.botNumber ?? "del bot"}</strong>:
           </div>
           <div className="otp-code">{otp.code}</div>
           <div className="otp-exp">
@@ -84,12 +83,7 @@ export function WhatsAppLink({ initial, configured }: { initial: LinkState; conf
           <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 14 }}>
             Aún no has vinculado un número de WhatsApp.
           </div>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={generate}
-            disabled={pending}
-          >
+          <button type="button" className="btn btn-primary" onClick={generate} disabled={pending}>
             {pending ? "Generando…" : "Vincular WhatsApp"}
           </button>
         </div>

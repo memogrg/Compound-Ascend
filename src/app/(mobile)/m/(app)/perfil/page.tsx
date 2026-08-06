@@ -7,20 +7,12 @@ import { signOutAction } from "@/lib/auth/actions";
 import { PLAN_LABEL } from "@/lib/plan";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { isEmailConfigured } from "@/lib/email/send";
-import {
-  listHouseholdMembers,
-  type HouseholdMembersView,
-} from "@/modules/personal-profile";
+import { listHouseholdMembers, type HouseholdMembersView } from "@/modules/personal-profile";
 import {
   listMyIngestEmails,
   type IngestEmailRow,
 } from "@/modules/account/services/ingest-email-service";
-import {
-  MSectionHeader,
-  MContentCard,
-  MDataRow,
-  MProgress,
-} from "../../components/content-kit";
+import { MSectionHeader, MContentCard, MDataRow, MProgress } from "../../components/content-kit";
 import { ConfiguracionManager } from "./configuracion-manager";
 import { BuildIdentity } from "./build-identity";
 
@@ -93,7 +85,12 @@ export default async function MobilePerfil() {
               <div style={{ fontWeight: 700, fontSize: 16 }}>{acc.name ?? "Tu cuenta"}</div>
               <div
                 className="muted"
-                style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                style={{
+                  fontSize: 13,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
               >
                 {acc.email ?? "Sesión activa"}
               </div>
@@ -109,7 +106,15 @@ export default async function MobilePerfil() {
           <MDataRow
             href="/m/mi-perfil-financiero"
             leading={
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ width: 19, height: 19 }}>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.9}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ width: 19, height: 19 }}
+              >
                 <path d="M12 2a7 7 0 0 0-4 12.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3A7 7 0 0 0 12 2Z" />
                 <path d="M9 22h6" />
               </svg>
@@ -141,9 +146,23 @@ export default async function MobilePerfil() {
 
         {/* Cerrar sesión (Server Action reutilizada de la web) */}
         <form action={signOutAction.bind(null, "/m/login")}>
-          <button className="m-btn m-btn-block m-btn-secondary" type="submit" style={{ color: "var(--danger)" }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 18, height: 18 }}>
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
+          <button
+            className="m-btn m-btn-block m-btn-secondary"
+            type="submit"
+            style={{ color: "var(--danger)" }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              style={{ width: 18, height: 18 }}
+            >
+              <path
+                d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             Cerrar sesión
           </button>
@@ -155,4 +174,3 @@ export default async function MobilePerfil() {
     </div>
   );
 }
-

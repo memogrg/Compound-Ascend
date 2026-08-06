@@ -193,7 +193,8 @@ export function extractPeriodo(text: string): string | null {
   const t = text.toLowerCase();
   if (/\bhoy\b/.test(t)) return "hoy";
   if (/\bayer\b/.test(t)) return "ayer";
-  if (/\bsemana\s+pasada\b|\bsemana\s+anterior\b|\bla\s+semana\s+pasada\b/.test(t)) return "semana_pasada";
+  if (/\bsemana\s+pasada\b|\bsemana\s+anterior\b|\bla\s+semana\s+pasada\b/.test(t))
+    return "semana_pasada";
   if (/\besta\s+semana\b|\ben\s+la\s+semana\b|\bde\s+la\s+semana\b/.test(t)) return "semana";
   if (/\bmes\s+pasado\b|\bmes\s+anterior\b/.test(t)) return "mes_pasado";
   if (/\ba[nñ]o\s+pasado\b|\ba[nñ]o\s+anterior\b/.test(t)) return "anio_pasado";
@@ -280,7 +281,9 @@ export function extractSobreMencionado(text: string): string | null {
   // Lo que quedó ES el periodo (no había sobre): "transacciones de julio", "gastos de ayer".
   if (
     new RegExp(`^${MESES_RE.source}$`, "i").test(t) ||
-    /^(?:hoy|ayer|esta semana|la semana pasada|semana pasada|este mes|el mes pasado|mes pasado|este a[nñ]o|el a[nñ]o pasado|a[nñ]o pasado)$/i.test(t)
+    /^(?:hoy|ayer|esta semana|la semana pasada|semana pasada|este mes|el mes pasado|mes pasado|este a[nñ]o|el a[nñ]o pasado|a[nñ]o pasado)$/i.test(
+      t,
+    )
   ) {
     return null;
   }
@@ -307,7 +310,11 @@ export function extractNombreDominio(text: string): string | null {
     )
     .trim();
   // Una palabra genérica del dominio no es un nombre propio: eso es "todo el dominio".
-  if (!n || n.length < 2 || /^(?:deuda|deudas|meta|metas|cuenta|cuentas|todo|todos|eso)$/i.test(n)) {
+  if (
+    !n ||
+    n.length < 2 ||
+    /^(?:deuda|deudas|meta|metas|cuenta|cuentas|todo|todos|eso)$/i.test(n)
+  ) {
     return null;
   }
   return n;
@@ -346,11 +353,15 @@ export function extractAmount(text: string): { monto: number; moneda: string | n
   const n = parseFloat(raw.replace(/\./g, "").replace(",", "."));
   if (!Number.isFinite(n) || n <= 0) return null;
   const moneda =
-    sym === "₡" || sym === "crc" ? "CRC" :
-    sym === "col$" ? "COP" :
-    sym === "mx$" ? "MXN" :
-    sym === "$" || sym === "usd" ? "USD" :
-    null;
+    sym === "₡" || sym === "crc"
+      ? "CRC"
+      : sym === "col$"
+        ? "COP"
+        : sym === "mx$"
+          ? "MXN"
+          : sym === "$" || sym === "usd"
+            ? "USD"
+            : null;
   return { monto: n * mult, moneda };
 }
 
@@ -427,14 +438,18 @@ const MARKET_ATH_RE = /\bath\b|m[aá]ximo/i;
  */
 const INFORME_CUE_RE =
   /\b(?:informe|reporte|an[aá]lisis|analiz\w*|revis\w*|diagn[oó]stic\w*|radiograf[ií]a|audit\w*)\b/i;
-const PORTAFOLIO_OBJ_RE = /\b(?:portafolios?|portfolios?|cartera|inversi[oó]n(?:es)?|posiciones)\b/i;
+const PORTAFOLIO_OBJ_RE =
+  /\b(?:portafolios?|portfolios?|cartera|inversi[oó]n(?:es)?|posiciones)\b/i;
 
 /**
  * Extrae el símbolo objetivo de una pregunta de mercado: un ticker en MAYÚSCULAS (2-6 letras/
  * dígitos) o el que matchee un símbolo/nombre de las posiciones del usuario. `known` = símbolos y
  * nombres de sus holdings (para resolver "kamino"/"bitcoin" además del ticker). Devuelve el TICKER.
  */
-export function extractMarketSymbol(text: string, known: { symbol: string | null; name: string }[]): string | null {
+export function extractMarketSymbol(
+  text: string,
+  known: { symbol: string | null; name: string }[],
+): string | null {
   // 1) Ticker explícito en mayúsculas (BTC, KMNO, VOO). Evita palabras comunes en mayúscula.
   const STOP = new Set(["ATH", "USD", "CRC", "EUR", "IA", "ETF"]);
   const upper = text.match(/\b[A-Z]{2,6}\d?\b/g)?.filter((w) => !STOP.has(w)) ?? [];
@@ -456,12 +471,15 @@ const LIQUIDITY_TERM = /\bl[ií]quido\b|liquidez|efectivo|disponible|\bcuentas?\
  * [] si no hay un nombre de sobre claro (→ el router NO rutea a saldo_sobre).
  */
 export function extractSobreNames(text: string): string[] {
-  const m = text.match(/cu[aá]nto\s+(?:me\s+queda|tengo|llevo(?:\s+gastado)?)\b[\s\S]*?\b(?:en|de|del)\b\s+(.+)/i);
+  const m = text.match(
+    /cu[aá]nto\s+(?:me\s+queda|tengo|llevo(?:\s+gastado)?)\b[\s\S]*?\b(?:en|de|del)\b\s+(.+)/i,
+  );
   if (!m || !m[1]) return [];
   const tail = m[1]
     .replace(/\b(?:este mes|del mes|hasta fin de mes|ahora mismo|ahora|hoy)\b/gi, " ")
     .replace(/[?¿.!]+/g, " ");
-  const stopArticle = /^(?:el sobre de|del sobre de|sobre de|sobre|mi|mis|la|el|los|las|un|una|de)\s+/i;
+  const stopArticle =
+    /^(?:el sobre de|del sobre de|sobre de|sobre|mi|mis|la|el|los|las|un|una|de)\s+/i;
   const names = tail
     .split(/\s*(?:,|\by\b|\be\b)\s*/i)
     .map((p) => {
@@ -473,7 +491,12 @@ export function extractSobreNames(text: string): string[] {
       // `(?!\p{L})` y no `\b` de cierre: la última alternativa termina en clase acentuada, así que
       // el `\b` nunca se cumplía para "gané"/"ganó" y esos términos NO se filtraban — entraban
       // como candidatos a nombre de sobre. Lo cazó el guard extendido del lint.
-      (p) => p.length >= 3 && !LIQUIDITY_TERM.test(p) && !/\b(?:pendiente|aporte|inversi|ahorro|deuda|meta|libertad|independencia|ingres|gan[eéoó])(?!\p{L})/iu.test(p),
+      (p) =>
+        p.length >= 3 &&
+        !LIQUIDITY_TERM.test(p) &&
+        !/\b(?:pendiente|aporte|inversi|ahorro|deuda|meta|libertad|independencia|ingres|gan[eéoó])(?!\p{L})/iu.test(
+          p,
+        ),
     );
   return [...new Set(names.map((n) => n.toLowerCase()))].slice(0, 4);
 }
@@ -489,7 +512,10 @@ export function isMultiPart(text: string): boolean {
   // que el `\b` no se cumplía para "qué" ni "está" — y una pregunta compuesta con esas dos formas
   // (las más comunes) NO se detectaba, que es justo lo que esta función existe para evitar: el
   // router contestaba una sola mitad en vez de escalar. Lo cazó el guard extendido del lint.
-  const secondTopic = /\by\s+(?:hay|tengo|ten[eé]s|cu[aá]nto|qu[eé]|est[aá]|falta|el|un)(?!\p{L})[\s\S]*?(?:aporte|inversi|pendiente|ahorro|deuda|meta|ingres|libertad|independencia)/iu.test(text);
+  const secondTopic =
+    /\by\s+(?:hay|tengo|ten[eé]s|cu[aá]nto|qu[eé]|est[aá]|falta|el|un)(?!\p{L})[\s\S]*?(?:aporte|inversi|pendiente|ahorro|deuda|meta|ingres|libertad|independencia)/iu.test(
+      text,
+    );
   return twoQ || secondTopic;
 }
 
@@ -499,7 +525,10 @@ export function isMultiPart(text: string): boolean {
  * Solo toca palabras coloquiales inequívocas (no altera montos, símbolos ni nombres de sobre).
  */
 const SLANG_MAP: [RegExp, string][] = [
-  [/\b(?:lana|guita|pisto|billete|biyuyo|varo|feria|plata|luca|luka|money|pasta|mosca|billullo)\b/gi, "dinero"],
+  [
+    /\b(?:lana|guita|pisto|billete|biyuyo|varo|feria|plata|luca|luka|money|pasta|mosca|billullo)\b/gi,
+    "dinero",
+  ],
   [/\bpa'?\b/gi, "para"], // "pa" / "pa'" → "para"
 ];
 export function normalizeSlang(text: string): string {
@@ -581,21 +610,35 @@ export function matchIntent(
       // El participio es OBLIGATORIO. Un "cuánto llevo…" suelto se comía "cuánto llevo
       // AHORRADO en mis metas", que es progreso (metas), no el historial de aportes.
       // Por eso `ahorrad` NO está en la lista: pertenece a la foto, no al detalle.
-      /\b(?:he|has|llevo|tengo)\s+(?:pagad|aportad|abonad|invertid|sacad|retirad|puesto|metido)/i.test(t) ||
-      /\bhistorial\s+de\s+(?:pagos?|aportes?|compras?)|\btod[oa]s\s+(?:mis|los|las)\s+(?:pagos?|aportes?|compras?)/i.test(t);
+      /\b(?:he|has|llevo|tengo)\s+(?:pagad|aportad|abonad|invertid|sacad|retirad|puesto|metido)/i.test(
+        t,
+      ) ||
+      /\bhistorial\s+de\s+(?:pagos?|aportes?|compras?)|\btod[oa]s\s+(?:mis|los|las)\s+(?:pagos?|aportes?|compras?)/i.test(
+        t,
+      );
     const ultimoMov =
-      /[uú]ltim[oa]s?\s+(?:pago|aporte|abono|compra|dividendo)|\bcu[aá]ndo\s+(?:pagu[eé]|aport[eé]|compr[eé])/i.test(t);
+      /[uú]ltim[oa]s?\s+(?:pago|aporte|abono|compra|dividendo)|\bcu[aá]ndo\s+(?:pagu[eé]|aport[eé]|compr[eé])/i.test(
+        t,
+      );
     // La trazabilidad de liquidez ("de dónde salió", "a dónde fue") ES la consulta: no
     // necesita señal de acumulado, la pregunta ya pide el movimiento.
     const trazabilidad =
-      /\b(?:de|a)\s+d[oó]nde\s+(?:sali[oó]|vino|fue|se\s+fue|lo\s+saqu[eé])|\btrazabilidad\b/i.test(t);
-    const dominio =
-      /\bdividendos?\b/i.test(t) ? "dividendos"
-      : /\bdeuda|\btarjeta|\bpr[eé]stamo|\bcr[eé]dito\b/i.test(t) ? "deudas"
-      : /\bmeta\b|\bmetas\b|\bahorro\s+para\b/i.test(t) ? "metas"
-      : /\bcompras?\s+de\b|\bactivo\b|\bacci[oó]n(?:es)?\b|\bcripto\b|\betf\b/i.test(t) ? "inversiones"
-      : /\bcuenta\b|\bcuentas\b|\bliquidez\b|\bde\s+d[oó]nde\s+(?:sali[oó]|vino)|\ba\s+d[oó]nde\s+(?:fue|se\s+fue)/i.test(t) ? "liquidez"
-      : null;
+      /\b(?:de|a)\s+d[oó]nde\s+(?:sali[oó]|vino|fue|se\s+fue|lo\s+saqu[eé])|\btrazabilidad\b/i.test(
+        t,
+      );
+    const dominio = /\bdividendos?\b/i.test(t)
+      ? "dividendos"
+      : /\bdeuda|\btarjeta|\bpr[eé]stamo|\bcr[eé]dito\b/i.test(t)
+        ? "deudas"
+        : /\bmeta\b|\bmetas\b|\bahorro\s+para\b/i.test(t)
+          ? "metas"
+          : /\bcompras?\s+de\b|\bactivo\b|\bacci[oó]n(?:es)?\b|\bcripto\b|\betf\b/i.test(t)
+            ? "inversiones"
+            : /\bcuenta\b|\bcuentas\b|\bliquidez\b|\bde\s+d[oó]nde\s+(?:sali[oó]|vino)|\ba\s+d[oó]nde\s+(?:fue|se\s+fue)/i.test(
+                  t,
+                )
+              ? "liquidez"
+              : null;
     // Los dividendos son inequívocos: la sola mención ya es una consulta de detalle.
     if (dominio && (acumulado || ultimoMov || trazabilidad || dominio === "dividendos")) {
       return {
@@ -605,20 +648,22 @@ export function matchIntent(
     }
   }
 
-
   // ── Carriles nuevos (van ANTES de datos_mercado y del guard de REASONING_CUES, que atraparían
   //    "cuánto vale" / "cómo va" / "debería" y los mandaría al LLM). Todos deterministas, cifra del motor. ──
 
   // DEFENSA (fondo de emergencia/paz, meses de colchón, "si me botan cuánto aguanto", "¿estoy blindado?").
   if (
-    /fondo de emergencia|fondo de paz|de emergencia\b|\bcolch[oó]n\b|si me (?:botan|despiden|corren|echan|largan)|me quedo sin (?:trabajo|empleo|chamba|pega)|blindad|protegid|(?:cu[aá]ntos?\s+)?meses (?:de colch|aguant|de respaldo)|si (?:viene|cae) una (?:vara|situaci)/i.test(t)
+    /fondo de emergencia|fondo de paz|de emergencia\b|\bcolch[oó]n\b|si me (?:botan|despiden|corren|echan|largan)|me quedo sin (?:trabajo|empleo|chamba|pega)|blindad|protegid|(?:cu[aá]ntos?\s+)?meses (?:de colch|aguant|de respaldo)|si (?:viene|cae) una (?:vara|situaci)/i.test(
+      t,
+    )
   ) {
-    const focus =
-      /\bpaz\b/i.test(t)
-        ? "paz"
-        : /\bcolch[oó]n\b|si me (?:botan|despiden|corren|echan|largan)|aguant|(?:cu[aá]ntos?\s+)?meses|me quedo sin/i.test(t)
-          ? "colchon"
-          : "emergencia";
+    const focus = /\bpaz\b/i.test(t)
+      ? "paz"
+      : /\bcolch[oó]n\b|si me (?:botan|despiden|corren|echan|largan)|aguant|(?:cu[aá]ntos?\s+)?meses|me quedo sin/i.test(
+            t,
+          )
+        ? "colchon"
+        : "emergencia";
     return { intent: "defensa_fondo", params: { focus } };
   }
 
@@ -649,17 +694,26 @@ export function matchIntent(
   }
 
   // AHORRO — "¿cuánto ahorro al mes?" (presente, cifra actual; NO "cuánto debo guardar para…", que proyecta).
-  if (/cu[aá]nto\s+(?:ahorro|guardo|aparto)\s+(?:al mes|mensual(?:mente)?|por mes|en total)/i.test(t)) {
+  if (
+    /cu[aá]nto\s+(?:ahorro|guardo|aparto)\s+(?:al mes|mensual(?:mente)?|por mes|en total)/i.test(t)
+  ) {
     return { intent: "ahorro_mensual", params: {} };
   }
   // META más cercana a completarse.
-  if (/meta\s+m[aá]s\s+(?:cercana|pr[oó]xima)|(?:cu[aá]l|qu[eé]).*meta.*(?:m[aá]s cerca|por completar|casi)/i.test(t)) {
+  if (
+    /meta\s+m[aá]s\s+(?:cercana|pr[oó]xima)|(?:cu[aá]l|qu[eé]).*meta.*(?:m[aá]s cerca|por completar|casi)/i.test(
+      t,
+    )
+  ) {
     return { intent: "meta_cercana", params: {} };
   }
   // "¿Cuánto me falta pa {meta}?" (por nombre). Defensa/independencia ya se atraparon arriba.
   const faltaMeta = t.match(/cu[aá]nto\s+(?:me\s+)?falta\s+(?:para|pa)\s+(.+?)[\?\.!¿¡]*$/i);
   if (faltaMeta?.[1]) {
-    return { intent: "falta_meta", params: { metaName: faltaMeta[1].replace(/^(?:el|la|los|las|mi|mis|un|una)\s+/i, "").trim() } };
+    return {
+      intent: "falta_meta",
+      params: { metaName: faltaMeta[1].replace(/^(?:el|la|los|las|mi|mis|un|una)\s+/i, "").trim() },
+    };
   }
 
   // Precio/ATH/"si vendo X en el máximo": carril DETERMINISTA (llama datos_de_mercado, no depende
@@ -673,9 +727,15 @@ export function matchIntent(
   // REASONING_CUES (que atrapa "cómo/plan/proyec") para no caer al LLM. "libertad financiera" acá =
   // la vida ACTUAL del usuario (independencia), como la usa coloquialmente. NO pide vida deseada.
   if (
-    /(?:c[oó]mo|cu[aá]ndo|en cu[aá]nto)\b[^?]*\b(?:llego|llegar|alcanz\w+)\b[^?]*\b(independencia|independiente|libertad financiera|mi n[uú]mero)\b/i.test(t) ||
-    /cu[aá]nto\s+(?:debo|tengo que|necesito|deber[ií]a|puedo)\b[^?]*\b(?:invertir|aportar|ahorrar)\b[^?]*\b(?:para|llegar|independencia|independiente|mi n[uú]mero|libertad)\b/i.test(t) ||
-    /\b(?:c[oó]mo|plan|hoja de ruta)\b[^?]*\b(?:para\s+)?(?:mi\s+)?(?:independencia (?:financiera)?|libertad financiera)\b/i.test(t)
+    /(?:c[oó]mo|cu[aá]ndo|en cu[aá]nto)\b[^?]*\b(?:llego|llegar|alcanz\w+)\b[^?]*\b(independencia|independiente|libertad financiera|mi n[uú]mero)\b/i.test(
+      t,
+    ) ||
+    /cu[aá]nto\s+(?:debo|tengo que|necesito|deber[ií]a|puedo)\b[^?]*\b(?:invertir|aportar|ahorrar)\b[^?]*\b(?:para|llegar|independencia|independiente|mi n[uú]mero|libertad)\b/i.test(
+      t,
+    ) ||
+    /\b(?:c[oó]mo|plan|hoja de ruta)\b[^?]*\b(?:para\s+)?(?:mi\s+)?(?:independencia (?:financiera)?|libertad financiera)\b/i.test(
+      t,
+    )
   ) {
     return { intent: "plan_independencia", params: {} };
   }
@@ -687,15 +747,21 @@ export function matchIntent(
   //    reconocible; sin objeto claro no entra (la métrica no se adivina).
   {
     const senalCambio =
-      /\bc[oó]mo\s+(?:cambi|viene|va\s+cambiando|evolucion|vengo)|\bevoluci[oó]n\b|\btendencia\b|\bhist[oó]rico\b|\bhistorial\b|\bmes\s+a\s+mes\b|\b(?:vs\.?|versus|comparado con)\s+(?:el\s+)?(?:mes|a[nñ]o)\s+(?:pasado|anterior)\b|\b(?:subi[oó]|baj[oó]|creci[oó]|mejor[oó]|empeor[oó])|\bc[oó]mo\s+vengo\b/i.test(t);
+      /\bc[oó]mo\s+(?:cambi|viene|va\s+cambiando|evolucion|vengo)|\bevoluci[oó]n\b|\btendencia\b|\bhist[oó]rico\b|\bhistorial\b|\bmes\s+a\s+mes\b|\b(?:vs\.?|versus|comparado con)\s+(?:el\s+)?(?:mes|a[nñ]o)\s+(?:pasado|anterior)\b|\b(?:subi[oó]|baj[oó]|creci[oó]|mejor[oó]|empeor[oó])|\bc[oó]mo\s+vengo\b/i.test(
+        t,
+      );
     if (senalCambio) {
-      const metrica =
-        /\bpatrimonio\b|\bnet\s*worth\b|\bvalor\s+neto\b/i.test(t) ? "patrimonio"
-        : /\bportafolio\b|\bportfolio\b|\bcartera\b|\binversion(?:es)?\b/i.test(t) ? "portafolio"
-        : /\bahorro\b|\bahorr\w+\b/i.test(t) ? "ahorro"
-        : /\bingres\w+\b/i.test(t) ? "ingreso"
-        : /\bgast\w+\b/i.test(t) ? "gasto"
-        : null;
+      const metrica = /\bpatrimonio\b|\bnet\s*worth\b|\bvalor\s+neto\b/i.test(t)
+        ? "patrimonio"
+        : /\bportafolio\b|\bportfolio\b|\bcartera\b|\binversion(?:es)?\b/i.test(t)
+          ? "portafolio"
+          : /\bahorro\b|\bahorr\w+\b/i.test(t)
+            ? "ahorro"
+            : /\bingres\w+\b/i.test(t)
+              ? "ingreso"
+              : /\bgast\w+\b/i.test(t)
+                ? "gasto"
+                : null;
       if (metrica) {
         return { intent: "consulta_historial", params: { metrica, meses: 6 } };
       }
@@ -709,7 +775,9 @@ export function matchIntent(
 
   // A) Picos por fecha: "¿qué días/fechas gasto más?", "¿en qué fechas gasto más?".
   if (
-    /(?:qu[eé]|cu[aá]les|en qu[eé])\s+(?:d[ií]as?|fechas?)\b[^?]*\b(?:gast|compr|se me va|se va)/i.test(t) ||
+    /(?:qu[eé]|cu[aá]les|en qu[eé])\s+(?:d[ií]as?|fechas?)\b[^?]*\b(?:gast|compr|se me va|se va)/i.test(
+      t,
+    ) ||
     /\b(?:d[ií]as?|fechas?)\s+(?:que|en que|donde|en los que)\b[^?]*\bm[aá]s\s+gast/i.test(t)
   ) {
     return {
@@ -726,19 +794,29 @@ export function matchIntent(
 
   // B) Comparación de dos periodos: "¿gasté más este mes que el pasado?", "este mes vs el pasado".
   if (
-    /\b(?:este\s+mes|mes\s+actual)\b[^?]*\b(?:vs\.?|versus|contra|comparado con|que\s+(?:el\s+)?(?:mes\s+)?(?:pasado|anterior))\b/i.test(t) ||
+    /\b(?:este\s+mes|mes\s+actual)\b[^?]*\b(?:vs\.?|versus|contra|comparado con|que\s+(?:el\s+)?(?:mes\s+)?(?:pasado|anterior))\b/i.test(
+      t,
+    ) ||
     /\bgast[eé]\s+(?:m[aá]s|menos)\b[^?]*\b(?:este\s+mes|mes\s+pasado|mes\s+anterior)\b/i.test(t) ||
     /\bcompar\w+\b[^?]*\b(?:mes\s+pasado|mes\s+anterior|este\s+mes)\b/i.test(t)
   ) {
     return {
       intent: "consulta_transacciones",
-      params: { periodo: "mes_y_anterior", tipo: "gasto", agrupacion: "mes", orden: "fecha_asc", tope: 2 },
+      params: {
+        periodo: "mes_y_anterior",
+        tipo: "gasto",
+        agrupacion: "mes",
+        orden: "fecha_asc",
+        tope: 2,
+      },
     };
   }
 
   // C) "¿a quién/qué comercio le gasto más?" → ranking por comercio.
   if (
-    /(?:a\s+qui[eé]n|qu[eé]\s+(?:comercio|negocio|tienda|lugar|local))\b[^?]*\b(?:m[aá]s\s+)?(?:le\s+)?gast/i.test(t) ||
+    /(?:a\s+qui[eé]n|qu[eé]\s+(?:comercio|negocio|tienda|lugar|local))\b[^?]*\b(?:m[aá]s\s+)?(?:le\s+)?gast/i.test(
+      t,
+    ) ||
     /\b(?:comercio|negocio|tienda)s?\b[^?]*\bdonde\s+m[aá]s\s+gast/i.test(t)
   ) {
     return {
@@ -761,7 +839,9 @@ export function matchIntent(
     // OJO con `\b` después de vocal acentuada: `é` no es carácter de palabra en JS, así que
     // `\bqu[eé]\b` NUNCA matchea "qué". Por eso acá no hay `\b` de cierre en esos grupos.
     const esConsultaGasto =
-      /(?:\bcu[aá]nto|\bqu[eé]|\ben\s+qu[eé])[^?]*\b(?:gast[eéoó]|compr[eéoó]|pagu[eé]|se me fue|se fue|ingres[eéoó]|gan[eé]|cobr[eé]|recib[ií])/i.test(t) ||
+      /(?:\bcu[aá]nto|\bqu[eé]|\ben\s+qu[eé])[^?]*\b(?:gast[eéoó]|compr[eéoó]|pagu[eé]|se me fue|se fue|ingres[eéoó]|gan[eé]|cobr[eé]|recib[ií])/i.test(
+        t,
+      ) ||
       // "gastos" y "consumos" faltaban en esta lista, y eran la forma más natural de pedirlo:
       // "dame los GASTOS de supermercado del mes pasado" no entraba al carril —aunque el sobre y
       // el periodo se extraían perfecto— y se iba al LLM, que INVENTABA las transacciones.
@@ -770,7 +850,8 @@ export function matchIntent(
       /\b(?:movimientos?|transacciones?|compras?|gastos?|consumos?)\b/i.test(t);
     if (periodo && esConsultaGasto) {
       // Sin `\b` de cierre tras `qu[eé]` (ver nota arriba: `é` no es carácter de palabra).
-      const desglose = /\ben\s+qu[eé]|\bd[oó]nde\b|\bdesglos|\bdetalle\b|\bcategor|\bsobres?\b/i.test(t);
+      const desglose =
+        /\ben\s+qu[eé]|\bd[oó]nde\b|\bdesglos|\bdetalle\b|\bcategor|\bsobres?\b/i.test(t);
       // Sobre nombrado explícitamente ("transacciones DE RESTAURANTES del mes pasado"). Va como
       // `sobre` y no como `termino`: el servicio lo resuelve contra los sobres reales y filtra por
       // ID. Si el usuario nombró un sobre, la respuesta JAMÁS debe traer todas las categorías —
@@ -803,7 +884,11 @@ export function matchIntent(
 
   // E) Gasto en un COMERCIO/sobre concreto, sin periodo ("¿cuánto le gasté a Walmart?").
   //    El término es el guard: sin él no entra (si no, se comería "¿cuánto gasté?" a secas).
-  if (/\b(?:cu[aá]nto)\b[^?]*\b(?:le\s+)?(?:he\s+)?(?:gast[eé]\w*|pagu[eé]|compr[eé]\w*)\s+(?:en|a|con)\b/i.test(t)) {
+  if (
+    /\b(?:cu[aá]nto)\b[^?]*\b(?:le\s+)?(?:he\s+)?(?:gast[eé]\w*|pagu[eé]|compr[eé]\w*)\s+(?:en|a|con)\b/i.test(
+      t,
+    )
+  ) {
     const termino = extractTerminoGasto(t);
     if (termino) {
       return {
@@ -848,13 +933,25 @@ export function matchIntent(
   }
 
   // Los TRES números patrimoniales — distinguidos explícitamente (no se mezclan).
-  if (/n[uú]mero de seguridad|cu[aá]nto necesito para (?:cubrir )?(?:lo esencial|mis? gastos? esenciales?)/i.test(t)) {
+  if (
+    /n[uú]mero de seguridad|cu[aá]nto necesito para (?:cubrir )?(?:lo esencial|mis? gastos? esenciales?)/i.test(
+      t,
+    )
+  ) {
     return { intent: "numero_seguridad", params: {} };
   }
-  if (/n[uú]mero de independencia|cu[aá]nto necesito para (?:sostener|cubrir) mi vida (?:actual)?/i.test(t)) {
+  if (
+    /n[uú]mero de independencia|cu[aá]nto necesito para (?:sostener|cubrir) mi vida (?:actual)?/i.test(
+      t,
+    )
+  ) {
     return { intent: "numero_independencia", params: {} };
   }
-  if (/n[uú]mero de libertad|cu[aá]nto necesito para (?:ser libre|mi libertad|mi estilo de vida)/i.test(t)) {
+  if (
+    /n[uú]mero de libertad|cu[aá]nto necesito para (?:ser libre|mi libertad|mi estilo de vida)/i.test(
+      t,
+    )
+  ) {
     return { intent: "numero_libertad", params: {} };
   }
   // "cuáles metas debo aportar este mes / qué metas toca aportar / aportes pendientes de metas":
@@ -870,12 +967,18 @@ export function matchIntent(
   const METAS_APORTE_CUE = /\bapor\w+|\bdebo\b|\btoca\b|\beste mes\b|\bpendientes?\b/i;
   if (
     /\b(?:sobres|frascos)\b/i.test(t) ||
-    (/(?:cu[aá]les|list[aá]|mostr[aá]|ver|dame|enumer\w*)\s+(?:son\s+)?(?:todas?\s+)?(?:mis\s+)?metas\b/i.test(t) &&
+    (/(?:cu[aá]les|list[aá]|mostr[aá]|ver|dame|enumer\w*)\s+(?:son\s+)?(?:todas?\s+)?(?:mis\s+)?metas\b/i.test(
+      t,
+    ) &&
       !METAS_APORTE_CUE.test(t))
   ) {
     return { intent: "listar_sobres", params: {} };
   }
-  if (/progreso de (?:mi\s+)?ahorro|c[oó]mo va(?:n)? (?:mi|mis) (?:meta|ahorro)|cu[aá]nto llevo (?:ahorrado|en mis metas)|(?:mis)\s+metas\b/i.test(t)) {
+  if (
+    /progreso de (?:mi\s+)?ahorro|c[oó]mo va(?:n)? (?:mi|mis) (?:meta|ahorro)|cu[aá]nto llevo (?:ahorrado|en mis metas)|(?:mis)\s+metas\b/i.test(
+      t,
+    )
+  ) {
     return { intent: "metas", params: {} };
   }
   if (/(?:cu[oó]ta|pago mensual|cu[aá]nto pago|pago m[ií]nimo)\b/i.test(t)) {
@@ -885,20 +988,32 @@ export function matchIntent(
   // Gasto dominante / sobre más caro. Incluye slang ya normalizado ("en qué se me va el dinero") y el
   // sinónimo "sobre más caro" (= sobre de mayor gasto). "dónde se va" / "en qué se me va".
   if (
-    /en qu[eé] (?:gasto|gast[eé])|(?:categor[ií]a|rubro).*(?:m[aá]s gasto|gasto)|(?:mayor|m[aá]s alto|principal) gasto|sobre (?:m[aá]s caro|de mayor gasto)|d[oó]nde se (?:me\s+)?(?:va|van)\s+(?:mis?|el|la|los|las)\b|en qu[eé] se (?:me )?va\b/i.test(t)
+    /en qu[eé] (?:gasto|gast[eé])|(?:categor[ií]a|rubro).*(?:m[aá]s gasto|gasto)|(?:mayor|m[aá]s alto|principal) gasto|sobre (?:m[aá]s caro|de mayor gasto)|d[oó]nde se (?:me\s+)?(?:va|van)\s+(?:mis?|el|la|los|las)\b|en qu[eé] se (?:me )?va\b/i.test(
+      t,
+    )
   ) {
     return { intent: "gasto_categoria", params: {} };
   }
-  if (/(?:cu[aá]nto|qu[eé])\s+(?:gast[eéoó]|llevo gastado)|(?:mi|el)\s+gasto (?:del mes|mensual|este mes)|gast[eé] (?:este mes|en el mes)/i.test(t)) {
+  if (
+    /(?:cu[aá]nto|qu[eé])\s+(?:gast[eéoó]|llevo gastado)|(?:mi|el)\s+gasto (?:del mes|mensual|este mes)|gast[eé] (?:este mes|en el mes)/i.test(
+      t,
+    )
+  ) {
     return { intent: "gasto_mes", params: {} };
   }
-  if (/(?:cu[aá]nto|qu[eé])\s+(?:gan[eéoó]|ingres[eéoó])|(?:mis|el|los)\s+ingresos?\b|cu[aá]nto (?:me )?(?:entr[oó]|cae|llega|cae al mes)/i.test(t)) {
+  if (
+    /(?:cu[aá]nto|qu[eé])\s+(?:gan[eéoó]|ingres[eéoó])|(?:mis|el|los)\s+ingresos?\b|cu[aá]nto (?:me )?(?:entr[oó]|cae|llega|cae al mes)/i.test(
+      t,
+    )
+  ) {
     return { intent: "ingreso_mes", params: {} };
   }
   // Flujo libre ("¿cuánto tengo libre pa gastar?", "¿cuánto me sobra?", "¿cuál es mi flujo libre?") →
   // ctx.freeCashflow, NO el saldo de liquidez (que devolvía ₡0). Antes de saldo_sobre/saldo_liquidez.
   if (
-    /\bflujo\s+libre\b|cu[aá]nto\s+(?:me\s+)?(?:queda|tengo|hay)\s+libre\b|\blibre\s+(?:pa'?|para)\s+gastar\b|cu[aá]nto\s+(?:me\s+)?sobra\b/i.test(t)
+    /\bflujo\s+libre\b|cu[aá]nto\s+(?:me\s+)?(?:queda|tengo|hay)\s+libre\b|\blibre\s+(?:pa'?|para)\s+gastar\b|cu[aá]nto\s+(?:me\s+)?sobra\b/i.test(
+      t,
+    )
   ) {
     return { intent: "flujo_libre", params: {} };
   }
@@ -910,10 +1025,18 @@ export function matchIntent(
   }
   // Liquidez SOLO ante términos explícitos (líquido/efectivo/disponible/en cuentas/saldo), no un
   // "cuánto me queda de {algo}" (eso ya lo tomó saldo_sobre). Bare/ambiguo → cae al LLM (no ₡0 malo).
-  if (/(?:mi\s+)?(?:saldo|liquidez|dinero l[ií]quido|efectivo)\b|\bl[ií]quido\b|\ben (?:mis |la |las )?cuentas?\b|cu[aá]nto (?:tengo|me queda|hay) (?:disponible|l[ií]quido|en (?:la |las |mis )?cuentas?|en efectivo|en el banco)\b/i.test(t)) {
+  if (
+    /(?:mi\s+)?(?:saldo|liquidez|dinero l[ií]quido|efectivo)\b|\bl[ií]quido\b|\ben (?:mis |la |las )?cuentas?\b|cu[aá]nto (?:tengo|me queda|hay) (?:disponible|l[ií]quido|en (?:la |las |mis )?cuentas?|en efectivo|en el banco)\b/i.test(
+      t,
+    )
+  ) {
     return { intent: "saldo_liquidez", params: {} };
   }
-  if (/(?:[uú]ltim[oa]s?|recientes?)\s+(?:movimiento|transacci|gasto|compra)|(?:mis|los)\s+(?:movimientos|transacciones)\b|qu[eé] (?:gast[eé]|compr[eé]) (?:hoy|ayer|[uú]ltim)/i.test(t)) {
+  if (
+    /(?:[uú]ltim[oa]s?|recientes?)\s+(?:movimiento|transacci|gasto|compra)|(?:mis|los)\s+(?:movimientos|transacciones)\b|qu[eé] (?:gast[eé]|compr[eé]) (?:hoy|ayer|[uú]ltim)/i.test(
+      t,
+    )
+  ) {
     return { intent: "ultimos_movimientos", params: {} };
   }
   return null;
@@ -923,7 +1046,12 @@ export function matchIntent(
  *  está seguro (intent desconocido/complejo/parseo fallido) → escalar al razonamiento. */
 async function classifyWithLite(
   text: string,
-): Promise<{ intent: Intent; params: Record<string, unknown>; tokensIn: number; tokensOut: number } | null> {
+): Promise<{
+  intent: Intent;
+  params: Record<string, unknown>;
+  tokensIn: number;
+  tokensOut: number;
+} | null> {
   const lite = createGeminiProvider(LITE_MODEL);
   if (!lite) return null;
   const system =
@@ -942,7 +1070,11 @@ async function classifyWithLite(
     "dca_mensual=cuánto aporta de DCA al mes. " +
     '"complejo": true si pide análisis, proyección, consejo, comparación o cualquier cosa más allá de consultar un dato simple. Ante duda: "otro" o complejo:true.';
   try {
-    const r = await lite.chat({ system, messages: [{ role: "user", content: text }], maxTokens: 40 });
+    const r = await lite.chat({
+      system,
+      messages: [{ role: "user", content: text }],
+      maxTokens: 40,
+    });
     const m = r.text.match(/\{[\s\S]*\}/);
     if (!m) return null;
     const parsed = JSON.parse(m[0]) as { intent?: string; complejo?: boolean };
@@ -996,9 +1128,13 @@ export function answerFromContext(
     const f = ctx?.freeCashflow;
     if (typeof f !== "number") return null; // sin dato → escala (no adivina)
     if (f <= 0) {
-      return say("Este mes no te queda flujo libre: tus compromisos ya igualan o superan tu ingreso. Si querés, revisamos los sobres para liberar margen.");
+      return say(
+        "Este mes no te queda flujo libre: tus compromisos ya igualan o superan tu ingreso. Si querés, revisamos los sobres para liberar margen.",
+      );
     }
-    return say(`Te queda ~${money(f)} libre este mes, después de tus compromisos (ingresos menos gastos y aportes).`);
+    return say(
+      `Te queda ~${money(f)} libre este mes, después de tus compromisos (ingresos menos gastos y aportes).`,
+    );
   }
   if (intent === "gasto_categoria") {
     // Sobre de MAYOR gasto (presupuesto YA convertido por el motor a ctx.currency). Determinista.
@@ -1008,7 +1144,9 @@ export function answerFromContext(
     }
     const top = ctx?.topExpenseCategory;
     if (!top) return null;
-    return say(`Donde más gastás es ${top.name}: ${money(top.monthly)} al mes (${top.pct}% de tu gasto).`);
+    return say(
+      `Donde más gastás es ${top.name}: ${money(top.monthly)} al mes (${top.pct}% de tu gasto).`,
+    );
   }
 
   // Los TRES números patrimoniales. Cada cifra sale del motor (patrimonio-engine, al 8% anual);
@@ -1112,7 +1250,9 @@ export function answerFromContext(
     }
     const lines = recurring.slice(0, 8).map((g) => {
       const nota =
-        g.recurrence === "mensual" ? "" : ` · ${g.recurrence}: es tu apartado mensual hacia el aporte del período`;
+        g.recurrence === "mensual"
+          ? ""
+          : ` · ${g.recurrence}: es tu apartado mensual hacia el aporte del período`;
       return `• ${g.nombre}: ${money(g.aporte_mensual)}${nota}`;
     });
     const total = recurring.reduce((s, g) => s + (g.aporte_mensual ?? 0), 0);
@@ -1123,16 +1263,23 @@ export function answerFromContext(
 
   if (intent === "metas") {
     const goals = (tc.goals ?? []).filter((g) => (g.objetivo ?? 0) > 0);
-    if (goals.length === 0) return say("Todavía no tenés metas de ahorro con objetivo registradas.");
+    if (goals.length === 0)
+      return say("Todavía no tenés metas de ahorro con objetivo registradas.");
     const lines = goals
       .slice(0, 6)
-      .map((g) => `• ${g.nombre}: ${money(g.actual)} de ${money(g.objetivo)} (${pct(g.actual, g.objetivo)}%)`);
-    return say(`Tenés ${goals.length} ${goals.length === 1 ? "meta" : "metas"}:\n${lines.join("\n")}`);
+      .map(
+        (g) =>
+          `• ${g.nombre}: ${money(g.actual)} de ${money(g.objetivo)} (${pct(g.actual, g.objetivo)}%)`,
+      );
+    return say(
+      `Tenés ${goals.length} ${goals.length === 1 ? "meta" : "metas"}:\n${lines.join("\n")}`,
+    );
   }
 
   // DEFENSA — estado REAL de los fondos (ctx.defenseFunds del fund-sizing) o meses de colchón.
   if (intent === "defensa_fondo") {
-    const focus = params.focus === "paz" ? "paz" : params.focus === "colchon" ? "colchon" : "emergencia";
+    const focus =
+      params.focus === "paz" ? "paz" : params.focus === "colchon" ? "colchon" : "emergencia";
     if (focus === "colchon") {
       const m = ctx?.mesesDeColchon;
       if (typeof m !== "number") return null;
@@ -1144,17 +1291,23 @@ export function answerFromContext(
     if (!df) {
       const m = ctx?.mesesDeColchon;
       if (typeof m === "number")
-        return say(`Todavía no tengo tus fondos de defensa registrados, pero tenés ~${m} ${m === 1 ? "mes" : "meses"} de colchón (liquidez ÷ gasto).`);
+        return say(
+          `Todavía no tengo tus fondos de defensa registrados, pero tenés ~${m} ${m === 1 ? "mes" : "meses"} de colchón (liquidez ÷ gasto).`,
+        );
       return null; // sin dato → escala
     }
     const f = focus === "paz" ? df.paz : df.emergency;
     const label = focus === "paz" ? "de paz" : "de emergencia";
     const m2 = (n: number) => formatMoney(n, df.currency);
     if (!f.registrado) {
-      return say(`Todavía no tenés registrado tu fondo ${label}. El objetivo sugerido es ${m2(f.objetivo)}; si querés lo creamos y te digo cuánto apartar al mes.`);
+      return say(
+        `Todavía no tenés registrado tu fondo ${label}. El objetivo sugerido es ${m2(f.objetivo)}; si querés lo creamos y te digo cuánto apartar al mes.`,
+      );
     }
     if (f.cubierto) {
-      return say(`Tu fondo ${label} está COMPLETO: ${m2(f.actual)} de ${m2(f.objetivo)} (100%). ¡Blindado por ese lado!`);
+      return say(
+        `Tu fondo ${label} está COMPLETO: ${m2(f.actual)} de ${m2(f.objetivo)} (100%). ¡Blindado por ese lado!`,
+      );
     }
     const falta = Math.max(0, f.objetivo - f.actual);
     return say(
@@ -1190,7 +1343,9 @@ export function answerFromContext(
     }
     const conv = ctx?.portfolioValueConvertido;
     const extra =
-      conv && val.length > 1 ? ` En ${conv.moneda}, el valor total equivale a ${formatMoney(conv.monto, conv.moneda)}.` : "";
+      conv && val.length > 1
+        ? ` En ${conv.moneda}, el valor total equivale a ${formatMoney(conv.monto, conv.moneda)}.`
+        : "";
     return say(parts.join("; ") + "." + extra);
   }
 
@@ -1203,21 +1358,35 @@ export function answerFromContext(
 
   // "¿Cuánto me falta pa {meta}?" — brecha de una meta por nombre (tc.goals).
   if (intent === "falta_meta") {
-    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
+    const norm = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .trim();
     const name = typeof params.metaName === "string" ? norm(params.metaName) : "";
     const goals = (tc.goals ?? []).filter((g) => (g.objetivo ?? 0) > 0);
-    const g = name ? goals.find((x) => norm(x.nombre).includes(name) || name.includes(norm(x.nombre))) : null;
+    const g = name
+      ? goals.find((x) => norm(x.nombre).includes(name) || name.includes(norm(x.nombre)))
+      : null;
     if (!g) return null; // sin meta que matchee → escala (no adivina)
     const falta = Math.max(0, g.objetivo - g.actual);
-    if (falta <= 0) return say(`Tu meta ${g.nombre} ya está completa: ${money(g.actual)} de ${money(g.objetivo)}. ¡Listo!`);
-    return say(`Para ${g.nombre} te faltan ${money(falta)} (llevás ${money(g.actual)} de ${money(g.objetivo)}, ${pct(g.actual, g.objetivo)}%).`);
+    if (falta <= 0)
+      return say(
+        `Tu meta ${g.nombre} ya está completa: ${money(g.actual)} de ${money(g.objetivo)}. ¡Listo!`,
+      );
+    return say(
+      `Para ${g.nombre} te faltan ${money(falta)} (llevás ${money(g.actual)} de ${money(g.objetivo)}, ${pct(g.actual, g.objetivo)}%).`,
+    );
   }
 
   // Meta más cercana a completarse (mayor % de progreso, aún en curso).
   if (intent === "meta_cercana") {
     const goals = (tc.goals ?? []).filter((g) => (g.objetivo ?? 0) > 0 && g.actual < g.objetivo);
     if (goals.length === 0) return say("No tenés metas de ahorro en curso ahora mismo.");
-    const closest = goals.reduce((a, b) => (pct(b.actual, b.objetivo) > pct(a.actual, a.objetivo) ? b : a));
+    const closest = goals.reduce((a, b) =>
+      pct(b.actual, b.objetivo) > pct(a.actual, a.objetivo) ? b : a,
+    );
     const falta = Math.max(0, closest.objetivo - closest.actual);
     return say(
       `Tu meta más cercana a completarse es ${closest.nombre}: ${pct(closest.actual, closest.objetivo)}% (${money(closest.actual)} de ${money(closest.objetivo)}), te faltan ${money(falta)}.`,
@@ -1239,11 +1408,16 @@ export function answerFromContext(
       : "";
     if (!debt) {
       // Varias deudas y no se identificó cuál → listar (sin adivinar).
-      const list = debts.slice(0, 6).map((d) => `• ${d.name}: ${money(d.minPayment)}/mes`).join("\n");
+      const list = debts
+        .slice(0, 6)
+        .map((d) => `• ${d.name}: ${money(d.minPayment)}/mes`)
+        .join("\n");
       return say(`Tenés varias deudas. Sus cuotas mensuales:\n${list}${asumeUnaMoneda}`);
     }
     const apr = debt.apr > 0 ? ` (APR ${debt.apr}%)` : "";
-    return say(`La cuota mensual de ${debt.name} es ${money(debt.minPayment)}${apr}.${asumeUnaMoneda}`);
+    return say(
+      `La cuota mensual de ${debt.name} es ${money(debt.minPayment)}${apr}.${asumeUnaMoneda}`,
+    );
   }
 
   return null;
@@ -1271,7 +1445,8 @@ async function resolveFetchIntent(
         params.amount && typeof params.amount === "object"
           ? (params.amount as { monto: number; moneda: string | null })
           : null;
-      const { suggestSobreForChatFast, getSobreRemaining } = await import("@/modules/financial-base");
+      const { suggestSobreForChatFast, getSobreRemaining } =
+        await import("@/modules/financial-base");
       const sug = await suggestSobreForChatFast(desc, "gasto");
       if (!sug.categoryId) {
         // Sin sobre claro → pedir precisión (determinista), NO escalar al LLM.
@@ -1294,7 +1469,9 @@ async function resolveFetchIntent(
           try {
             const { getFxRates } = await import("@/lib/market-data/fx-rates");
             const { convertCurrency } = await import("@/lib/fx");
-            amount = Math.round(convertCurrency(amt.monto, amt.moneda, rem.currency, await getFxRates()));
+            amount = Math.round(
+              convertCurrency(amt.monto, amt.moneda, rem.currency, await getFxRates()),
+            );
           } catch {
             amount = amt.monto; // sin FX: usa el crudo (mejor que descartar la pregunta)
           }
@@ -1309,19 +1486,29 @@ async function resolveFetchIntent(
       if (params.multiPart === true) return null;
       const names = Array.isArray(params.names) ? (params.names as string[]) : [];
       if (names.length === 0) return null;
-      const { listSobresForKind, suggestSobreForChatFast, getSobreRemaining } = await import("@/modules/financial-base");
+      const { listSobresForKind, suggestSobreForChatFast, getSobreRemaining } =
+        await import("@/modules/financial-base");
       const today = await userToday();
       // El usuario NOMBRA el sobre → match por NOMBRE contra sus sobres reales (no el clasificador
       // comercio→sobre de puedo_gastar, que es para "¿me alcanza para X?"). Fallback: el clasificador.
-      const sobres = await listSobresForKind("gasto").catch(() => [] as { id: string; sobre: string; frasco: string | null }[]);
-      const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").trim();
+      const sobres = await listSobresForKind("gasto").catch(
+        () => [] as { id: string; sobre: string; frasco: string | null }[],
+      );
+      const norm = (s: string) =>
+        s
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/\p{Diacritic}/gu, "")
+          .trim();
       const byName = (name: string) => {
         const n = norm(name);
         const hit = sobres.find((s) => {
           const so = norm(s.sobre);
           return so === n || so.includes(n) || n.includes(so);
         });
-        return hit ? { id: hit.id, path: hit.frasco ? `${hit.frasco} › ${hit.sobre}` : hit.sobre } : null;
+        return hit
+          ? { id: hit.id, path: hit.frasco ? `${hit.frasco} › ${hit.sobre}` : hit.sobre }
+          : null;
       };
       const parts: string[] = [];
       for (const name of names) {
@@ -1338,7 +1525,10 @@ async function resolveFetchIntent(
         const path = hit.path || rem?.path || name;
         const money = (n: number) => formatMoney(n, rem?.currency ?? cur);
         if (!rem || !rem.hasBudget) parts.push(`en ${path} no tenés presupuesto asignado`);
-        else if (rem.remaining <= 0) parts.push(`en ${path} ya te pasaste (gastaste ${money(rem.spent)} de ${money(rem.budget)})`);
+        else if (rem.remaining <= 0)
+          parts.push(
+            `en ${path} ya te pasaste (gastaste ${money(rem.spent)} de ${money(rem.budget)})`,
+          );
         else parts.push(`en ${path} te quedan ${money(rem.remaining)} de ${money(rem.budget)}`);
       }
       if (parts.length === 0) return null;
@@ -1351,7 +1541,8 @@ async function resolveFetchIntent(
       return say(`Tu saldo de liquidez actual es ${formatMoney(balance, cur)}.`);
     }
     if (intent === "listar_sobres") {
-      const { getEnvelopesSummary, formatEnvelopesReply } = await import("@/modules/financial-base");
+      const { getEnvelopesSummary, formatEnvelopesReply } =
+        await import("@/modules/financial-base");
       // Estructura AGRUPADA POR FRASCO (gasto y acumulables por separado) → Markdown determinista.
       // 0 tokens, exacto, sin alucinar (el cliente lo pasa por renderMarkdown → HTML seguro).
       return say(formatEnvelopesReply(await getEnvelopesSummary()));
@@ -1506,7 +1697,9 @@ async function resolveMultiMarketQuery(
   const say = (reply: string): AIChatResponse => ({ reply, action: null });
   const inScope = filterByScope(ctx.holdings ?? [], scope);
   if (inScope.length === 0) {
-    return say(`No encontré ${SCOPE_LABEL[scope]} en tus posiciones. Si las agregaste hace poco, dales un momento para cotizar.`);
+    return say(
+      `No encontré ${SCOPE_LABEL[scope]} en tus posiciones. Si las agregaste hace poco, dales un momento para cotizar.`,
+    );
   }
   // Alcance con modificador; sin modificador explícito asumimos el PRECIO ACTUAL.
   const mod = parsePriceModifier(text) ?? { kind: "current" as const };
@@ -1534,11 +1727,19 @@ async function resolveMultiMarketQuery(
       });
     }
     const scenario = computeMultiScenario(rows, mod);
-    logger.info("router.market_multi", { scope, mod: mod.kind, count: rows.length, missing: scenario.missing.length });
+    logger.info("router.market_multi", {
+      scope,
+      mod: mod.kind,
+      count: rows.length,
+      missing: scenario.missing.length,
+    });
     return say(buildMultiReply(scenario, mod, SCOPE_LABEL[scope]));
   } catch (err) {
     const { logger } = await import("@/lib/logger");
-    logger.error("router.market_multi falló", { scope, message: err instanceof Error ? err.message : "?" });
+    logger.error("router.market_multi falló", {
+      scope,
+      message: err instanceof Error ? err.message : "?",
+    });
     return say("No pude calcular ese escenario ahora mismo; reintentá en un momento.");
   }
 }
@@ -1555,7 +1756,10 @@ async function resolveMarketQuery(
   const multi = await resolveMultiMarketQuery(text, ctx, cur);
   if (multi) return multi;
   const holdings = ctx.holdings ?? [];
-  const symbol = extractMarketSymbol(text, holdings.map((h) => ({ symbol: h.symbol, name: h.name })));
+  const symbol = extractMarketSymbol(
+    text,
+    holdings.map((h) => ({ symbol: h.symbol, name: h.name })),
+  );
   if (!symbol) {
     // Pregunta de mercado sin símbolo claro → no forzamos; que el razonamiento la tome.
     return null;
@@ -1599,7 +1803,12 @@ async function resolveMarketQuery(
     const at = MARKET_TYPE[assetHint ?? ""] ?? "crypto";
 
     const h = await getMarketHighlights(symbol, at);
-    logger.info("router.market_lane", { symbol, assetType: at, gotData: !!h, gotHigh: h?.high != null });
+    logger.info("router.market_lane", {
+      symbol,
+      assetType: at,
+      gotData: !!h,
+      gotHigh: h?.high != null,
+    });
 
     // El máximo (ATH) viene en la moneda de highlights (USD en cripto). Lo invertido sale en la
     // moneda del holding; si difieren, se convierte para que cantidad×máximo − invertido sea coherente.
@@ -1624,12 +1833,25 @@ async function resolveMarketQuery(
       invertido,
       cantidad,
     });
-    return say(buildMarketReply(scenario, scenario.currency, wantsAth, hasPosition, freshnessNote(h?.asOf, Date.now())));
+    return say(
+      buildMarketReply(
+        scenario,
+        scenario.currency,
+        wantsAth,
+        hasPosition,
+        freshnessNote(h?.asOf, Date.now()),
+      ),
+    );
   } catch (err) {
     const { logger } = await import("@/lib/logger");
-    logger.error("router.market_lane falló", { symbol, message: err instanceof Error ? err.message : "?" });
+    logger.error("router.market_lane falló", {
+      symbol,
+      message: err instanceof Error ? err.message : "?",
+    });
     // Fallo real y distinguible (no el genérico "no tengo acceso").
-    return say(`No pude leer los datos de ${symbol.toUpperCase()} ahora mismo; reintentá en un momento o decime a qué precio simular.`);
+    return say(
+      `No pude leer los datos de ${symbol.toUpperCase()} ahora mismo; reintentá en un momento o decime a qué precio simular.`,
+    );
   }
 }
 
@@ -1659,7 +1881,9 @@ export function freshnessNote(asOf: string | null | undefined, nowMs: number): s
  * servidor y cliente; es-CR/ICU agrupa distinto según el motor).
  */
 function formatQuantity(n: number): string {
-  const fixed = Number.isInteger(n) ? String(Math.trunc(n)) : n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
+  const fixed = Number.isInteger(n)
+    ? String(Math.trunc(n))
+    : n.toFixed(6).replace(/0+$/, "").replace(/\.$/, "");
   const [int = "0", dec] = fixed.split(".");
   const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return dec ? `${grouped},${dec}` : grouped;
@@ -1689,7 +1913,8 @@ export function buildMarketReply(
   if (s.precio_actual === null && s.maximo === null) {
     return `No pude leer los datos de ${s.symbol} en la fuente ahora mismo; reintentá en un momento o decime a qué precio querés que simule.`;
   }
-  const maxLabel = s.maximo_tipo === "ath" ? "su máximo histórico (ATH)" : "su máximo de 52 semanas";
+  const maxLabel =
+    s.maximo_tipo === "ath" ? "su máximo histórico (ATH)" : "su máximo de 52 semanas";
   const maxShort = s.maximo_tipo === "ath" ? "ATH" : "máximo de 52 semanas";
   const fecha = s.maximo_fecha ? ` (${s.maximo_fecha})` : "";
   const knowsQty = typeof s.cantidad === "number";
@@ -1705,7 +1930,8 @@ export function buildMarketReply(
   } else if (s.precio_actual !== null) {
     parts.push(`${s.symbol} cotiza hoy a ${money(s.precio_actual)}`);
   }
-  if (s.maximo !== null && !(hasPosition && wantsAth)) parts.push(`${maxLabel} fue ${money(s.maximo)}`);
+  if (s.maximo !== null && !(hasPosition && wantsAth))
+    parts.push(`${maxLabel} fue ${money(s.maximo)}`);
   let reply = parts.length ? parts.join("; ") + "." : "";
 
   if (hasPosition && wantsAth) {
@@ -1713,9 +1939,13 @@ export function buildMarketReply(
     // se agrega solo si el invertido está disponible en la misma moneda (si no, se omite, no se inventa).
     if (s.maximo !== null && s.valor_al_maximo !== null) {
       const gain =
-        s.ganancia_al_maximo !== null ? ` — ganancia de ${money(s.ganancia_al_maximo)} sobre lo invertido` : "";
+        s.ganancia_al_maximo !== null
+          ? ` — ganancia de ${money(s.ganancia_al_maximo)} sobre lo invertido`
+          : "";
       const hoy =
-        gain && s.ganancia_al_precio_actual !== null ? ` (hoy, al precio actual, sería ${money(s.ganancia_al_precio_actual)})` : "";
+        gain && s.ganancia_al_precio_actual !== null
+          ? ` (hoy, al precio actual, sería ${money(s.ganancia_al_precio_actual)})`
+          : "";
       reply += ` Al ${maxShort} de ${money(s.maximo)}${fecha} tu posición valdría ${money(s.valor_al_maximo)}${gain}${hoy}. Ojo: el máximo es pasado y no se puede cronometrar el techo — es un escenario, no un plan.`;
     } else {
       reply += ` No tengo el máximo para calcular ese escenario; decime a qué precio simular.`;
@@ -1778,7 +2008,10 @@ export async function tryRouteQuery(
   ctx: FinancialContext,
   toolContext: ToolContext,
 ): Promise<RoutedQuery | null> {
-  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content?.trim();
+  const lastUser = [...messages]
+    .reverse()
+    .find((m) => m.role === "user")
+    ?.content?.trim();
   if (!lastUser) return null;
 
   // 1) Patrones (0 tokens de clasificación).
@@ -1790,7 +2023,11 @@ export async function tryRouteQuery(
   //     0 tokens. La acción propuesta va a la tarjeta de confirmación (nada se ejecuta sin confirmar).
   const created = detectCreateAction(lastUser, {
     currency: toolContext.currency,
-    holdings: (ctx.holdings ?? []).map((h) => ({ symbol: h.symbol, name: h.name, assetType: h.assetType })),
+    holdings: (ctx.holdings ?? []).map((h) => ({
+      symbol: h.symbol,
+      name: h.name,
+      assetType: h.assetType,
+    })),
     today: await userToday(),
   });
   if (created) return { response: created, tokensIn: 0, tokensOut: 0, lane: "template" };

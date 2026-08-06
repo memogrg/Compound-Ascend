@@ -84,7 +84,10 @@ const STATUS_TONE: Record<string, MTone> = {
  */
 function fmtMonth(iso: string | null | undefined): string {
   if (!iso) return "sin fecha";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { month: "short", year: "numeric" });
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /**
@@ -163,83 +166,83 @@ export function GoalManager({
             </div>
             <MContentCard style={{ padding: 0, overflow: "hidden" }}>
               {section.items.map((g) => {
-            const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
-            const pct = g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0;
-            const tone = STATUS_TONE[g.status] ?? "neutral";
-            const missing = Math.max(0, g.targetAmount - g.currentAmount);
-            return (
-              <SwipeRow key={g.id} onEdit={() => setEditing(g)} onDelete={() => setDeleting(g)}>
-                {/* Los cuatro botones NO caben en `trailing`: estrecharía toda la columna de
+                const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
+                const pct = g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0;
+                const tone = STATUS_TONE[g.status] ?? "neutral";
+                const missing = Math.max(0, g.targetAmount - g.currentAmount);
+                return (
+                  <SwipeRow key={g.id} onEdit={() => setEditing(g)} onDelete={() => setDeleting(g)}>
+                    {/* Los cuatro botones NO caben en `trailing`: estrecharía toda la columna de
                     texto —el subtítulo incluido— como pasó en Ingresos. Van bajo la barra,
                     en el slot, que además es donde ya vivían. El estado lo cantan el tile
                     y la barra, sin chip. */}
-                <MDataRow
-                  icon="goal"
-                  iconTone={tone}
-                  title={g.name}
-                  subtitle={`${goalSubtitle({
-                    isSobre,
-                    missing,
-                    currency: g.currency,
-                    targetDate: g.targetDate,
-                  })}${g.storedIn ? ` · ${g.storedIn}` : ""}`}
-                  value={mAmount(g.currentAmount, g.currency, 10)}
-                  valueTone={tone === "danger" ? "danger" : "neutral"}
-                  slot={
-                    <>
-                      {isSobre ? null : <MProgress value={pct} tone={tone} height={8} />}
-                      <div style={{ display: "flex", gap: 8, marginTop: isSobre ? 0 : 10 }}>
-                        <button
-                          type="button"
-                          className="m-btn m-btn-secondary"
-                          // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
-                          // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
-                          // dos líneas (necesita 51px y le quedaban 50).
-                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
-                          onClick={() => setContributing(g)}
-                        >
-                          + Aporte
-                        </button>
-                        <button
-                          type="button"
-                          className="m-btn m-btn-secondary"
-                          // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
-                          // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
-                          // dos líneas (necesita 51px y le quedaban 50).
-                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
-                          onClick={() => setWithdrawing(g)}
-                        >
-                          Retirar
-                        </button>
-                        {/* Meta cumplida ⇒ la acción que toca es USAR el dinero, no seguir
+                    <MDataRow
+                      icon="goal"
+                      iconTone={tone}
+                      title={g.name}
+                      subtitle={`${goalSubtitle({
+                        isSobre,
+                        missing,
+                        currency: g.currency,
+                        targetDate: g.targetDate,
+                      })}${g.storedIn ? ` · ${g.storedIn}` : ""}`}
+                      value={mAmount(g.currentAmount, g.currency, 10)}
+                      valueTone={tone === "danger" ? "danger" : "neutral"}
+                      slot={
+                        <>
+                          {isSobre ? null : <MProgress value={pct} tone={tone} height={8} />}
+                          <div style={{ display: "flex", gap: 8, marginTop: isSobre ? 0 : 10 }}>
+                            <button
+                              type="button"
+                              className="m-btn m-btn-secondary"
+                              // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
+                              // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
+                              // dos líneas (necesita 51px y le quedaban 50).
+                              style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                              onClick={() => setContributing(g)}
+                            >
+                              + Aporte
+                            </button>
+                            <button
+                              type="button"
+                              className="m-btn m-btn-secondary"
+                              // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
+                              // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
+                              // dos líneas (necesita 51px y le quedaban 50).
+                              style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                              onClick={() => setWithdrawing(g)}
+                            >
+                              Retirar
+                            </button>
+                            {/* Meta cumplida ⇒ la acción que toca es USAR el dinero, no seguir
                             aportando: con "+ Aporte" del mismo peso, un "¡Completada!"
                             seguía empujando a ahorrar para algo que ya está pagado. Se
                             cambia el énfasis, no las opciones: retirar y aportar siguen ahí. */}
-                        <button
-                          type="button"
-                          className={`m-btn ${missing <= 0 ? "m-btn-primary" : "m-btn-secondary"}`}
-                          // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
-                          // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
-                          // dos líneas (necesita 51px y le quedaban 50).
-                          style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
-                          onClick={() => setSpending(g)}
-                        >
-                          Gastar
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        className="m-btn m-btn-ghost"
-                        style={{ width: "100%", minHeight: 38, fontSize: 12.5, marginTop: 8 }}
-                        onClick={() => setViewing(g)}
-                      >
-                        Ver movimientos
-                      </button>
-                    </>
-                  }
-                />
-              </SwipeRow>
-            );
+                            <button
+                              type="button"
+                              className={`m-btn ${missing <= 0 ? "m-btn-primary" : "m-btn-secondary"}`}
+                              // padding lateral 8 y no los 20 de .m-btn: con flex:1 el ancho ya
+                              // lo reparte la fila, y esos 40px de sobra partían "+ Aporte" en
+                              // dos líneas (necesita 51px y le quedaban 50).
+                              style={{ flex: 1, minHeight: 42, fontSize: 13.5, padding: "0 8px" }}
+                              onClick={() => setSpending(g)}
+                            >
+                              Gastar
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="m-btn m-btn-ghost"
+                            style={{ width: "100%", minHeight: 38, fontSize: 12.5, marginTop: 8 }}
+                            onClick={() => setViewing(g)}
+                          >
+                            Ver movimientos
+                          </button>
+                        </>
+                      }
+                    />
+                  </SwipeRow>
+                );
               })}
             </MContentCard>
           </div>
@@ -321,14 +324,22 @@ export function GoalManager({
       </BottomSheet>
 
       {/* Aporte → transacción vinculada (linked_kind='goal') */}
-      <BottomSheet open={!!contributing} onClose={() => setContributing(null)} title="Registrar aporte">
+      <BottomSheet
+        open={!!contributing}
+        onClose={() => setContributing(null)}
+        title="Registrar aporte"
+      >
         {contributing ? (
           <ContributionForm goal={contributing} onSuccess={() => setContributing(null)} />
         ) : null}
       </BottomSheet>
 
       {/* Retiro → ingreso vinculado (el backend valida saldo) */}
-      <BottomSheet open={!!withdrawing} onClose={() => setWithdrawing(null)} title="Retirar de la meta">
+      <BottomSheet
+        open={!!withdrawing}
+        onClose={() => setWithdrawing(null)}
+        title="Retirar de la meta"
+      >
         {withdrawing ? (
           <WithdrawalForm goal={withdrawing} onSuccess={() => setWithdrawing(null)} />
         ) : null}
@@ -336,9 +347,7 @@ export function GoalManager({
 
       {/* Gastar del frasco → gasto categorizado off-budget (baja acumulado y meta) */}
       <BottomSheet open={!!spending} onClose={() => setSpending(null)} title="Gastar del frasco">
-        {spending ? (
-          <SpendForm goal={spending} onSuccess={() => setSpending(null)} />
-        ) : null}
+        {spending ? <SpendForm goal={spending} onSuccess={() => setSpending(null)} /> : null}
       </BottomSheet>
 
       {/* Movimientos del frasco (Delta C): aportes, gastos y retiros con saldo */}
@@ -355,7 +364,9 @@ export function GoalManager({
         variant="danger"
         dependencies={
           deleting && deleting.currentAmount > 0
-            ? [`Tiene ${formatMoney(deleting.currentAmount, deleting.currency)} en aportes acumulados; se perderá ese historial.`]
+            ? [
+                `Tiene ${formatMoney(deleting.currentAmount, deleting.currency)} en aportes acumulados; se perderá ese historial.`,
+              ]
             : undefined
         }
         pending={delPending}
@@ -461,7 +472,13 @@ export function ContributionForm({
           {textoAvanceMes(ctx, formatMoney)}
         </p>
       ) : null}
-      <MoneyField name="amount" label="Monto del aporte" value={amount} onChange={setAmount} currency={goal.currency} />
+      <MoneyField
+        name="amount"
+        label="Monto del aporte"
+        value={amount}
+        onChange={setAmount}
+        currency={goal.currency}
+      />
       <DateField name="contributionDate" label="Fecha" value={date} onChange={setDate} />
     </FormShell>
   );
@@ -482,9 +499,22 @@ function WithdrawalForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () 
       successMessage="Retiro registrado"
       onSuccess={onSuccess}
     >
-      <MoneyField name="amount" label="Monto a retirar" value={amount} onChange={setAmount} currency={goal.currency} />
+      <MoneyField
+        name="amount"
+        label="Monto a retirar"
+        value={amount}
+        onChange={setAmount}
+        currency={goal.currency}
+      />
       <DateField name="withdrawalDate" label="Fecha" value={date} onChange={setDate} />
-      <TextField name="note" label="Nota (opcional)" value={note} onChange={setNote} placeholder="Motivo del retiro…" maxLength={280} />
+      <TextField
+        name="note"
+        label="Nota (opcional)"
+        value={note}
+        onChange={setNote}
+        placeholder="Motivo del retiro…"
+        maxLength={280}
+      />
     </FormShell>
   );
 }
@@ -533,7 +563,13 @@ function SpendForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => vo
       successMessage="Gasto del frasco registrado"
       onSuccess={onSuccess}
     >
-      <MoneyField name="amount" label="Monto a gastar" value={amount} onChange={setAmount} currency={goal.currency} />
+      <MoneyField
+        name="amount"
+        label="Monto a gastar"
+        value={amount}
+        onChange={setAmount}
+        currency={goal.currency}
+      />
       <DateField name="spendDate" label="Fecha" value={date} onChange={setDate} />
       <SheetSelect
         name="categoryId"
@@ -544,7 +580,14 @@ function SpendForm({ goal, onSuccess }: { goal: SavingsGoal; onSuccess: () => vo
         placeholder="Sin categoría"
         sheetTitle="Elige la categoría del gasto"
       />
-      <TextField name="note" label="Nota (opcional)" value={note} onChange={setNote} placeholder="¿En qué lo usaste?" maxLength={280} />
+      <TextField
+        name="note"
+        label="Nota (opcional)"
+        value={note}
+        onChange={setNote}
+        placeholder="¿En qué lo usaste?"
+        maxLength={280}
+      />
     </FormShell>
   );
 }
@@ -559,7 +602,10 @@ const MOVE_LABEL: Record<GoalMovementType, string> = {
 
 function fmtMoveDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", { day: "2-digit", month: "short" });
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
+    day: "2-digit",
+    month: "short",
+  });
 }
 
 /**

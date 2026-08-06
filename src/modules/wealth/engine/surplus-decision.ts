@@ -165,5 +165,12 @@ export function compareSurplus(input: {
   // Con deuda cara (gated) no se plantea invertir: abonar es el retorno garantizado.
   const invest = gated ? [] : SURPLUS_ASSETS.map((a) => projectInvestment(surplus, years, a));
 
-  return { monthlySurplus: surplus, horizonYears: years, apr: input.apr, gated, pay: input.pay, invest };
+  return {
+    monthlySurplus: surplus,
+    horizonYears: years,
+    apr: input.apr,
+    gated,
+    pay: input.pay,
+    invest,
+  };
 }

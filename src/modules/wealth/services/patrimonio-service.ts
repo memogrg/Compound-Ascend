@@ -53,9 +53,7 @@ export type PatrimonioServiceResult = {
  * service-role. Filtra siempre por userId explícito (bypassa RLS). Usa moneda
  * primaria (no hay cookie de display). Queda exportada y dormida (cimiento).
  */
-export async function getPatrimonioReportForUser(
-  userId: string,
-): Promise<PatrimonioServiceResult> {
+export async function getPatrimonioReportForUser(userId: string): Promise<PatrimonioServiceResult> {
   const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
   return getPatrimonioReport({ db: createServiceRoleClient(), userId });
 }
@@ -76,10 +74,7 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
       .from("debts")
       .select("classification,apr,min_payment,current_payment,balance,currency")
       .in("user_id", memberIds),
-    db
-      .from("investments")
-      .select("contribution,contribution_frequency")
-      .in("user_id", memberIds),
+    db.from("investments").select("contribution,contribution_frequency").in("user_id", memberIds),
     db
       .from("savings_goals")
       .select("monthly_contribution,current_amount,goal_type,currency")
@@ -98,7 +93,12 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     .reduce(
       (s, d) =>
         s +
-        convertCurrency(Number(d.current_payment ?? d.min_payment ?? 0), d.currency, currency, rates),
+        convertCurrency(
+          Number(d.current_payment ?? d.min_payment ?? 0),
+          d.currency,
+          currency,
+          rates,
+        ),
       0,
     );
 
@@ -124,8 +124,7 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   // que trabaja. Son el current_amount de las metas defensa:fondo_emergencia/paz.
   const defenseFundsBalance = (goalRows.data ?? [])
     .filter(
-      (g) =>
-        g.goal_type === "defensa:fondo_emergencia" || g.goal_type === "defensa:fondo_paz",
+      (g) => g.goal_type === "defensa:fondo_emergencia" || g.goal_type === "defensa:fondo_paz",
     )
     .reduce(
       (s, g) => s + convertCurrency(Number(g.current_amount ?? 0), g.currency, currency, rates),
@@ -140,9 +139,8 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   // reporte, y el contexto del asesor no depende de la cookie de visualización.
   let essentialBreakdown: EssentialBreakdown | null = null;
   try {
-    const { getEssentialMonthlyExpense } = await import(
-      "@/modules/wealth/services/essential-expense-service"
-    );
+    const { getEssentialMonthlyExpense } =
+      await import("@/modules/wealth/services/essential-expense-service");
     essentialBreakdown = await getEssentialMonthlyExpense({ currency });
   } catch {
     essentialBreakdown = null;
@@ -154,9 +152,8 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   // sobres/metas/DCA. Best-effort: sin sesión (service-role) degrada a null → cae a monthlyExpenses.
   let commitmentBreakdown: CommitmentBreakdown | null = null;
   try {
-    const { getTotalMonthlyCommitment } = await import(
-      "@/modules/wealth/services/total-commitment-service"
-    );
+    const { getTotalMonthlyCommitment } =
+      await import("@/modules/wealth/services/total-commitment-service");
     commitmentBreakdown = await getTotalMonthlyCommitment({ currency });
   } catch {
     commitmentBreakdown = null;

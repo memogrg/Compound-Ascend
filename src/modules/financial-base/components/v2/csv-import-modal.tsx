@@ -100,7 +100,11 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
         </button>
 
         <div className="fld" style={{ marginTop: 12 }}>
-          <label className="fld-label" htmlFor="csv-fallback-cur" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <label
+            className="fld-label"
+            htmlFor="csv-fallback-cur"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
             Moneda por defecto
             <span
               className="tip"

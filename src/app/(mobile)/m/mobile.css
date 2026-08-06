@@ -108,9 +108,21 @@
   --radius-lg: 22px;
   /* Halos de marca detrás del contenido (derivados de la paleta con color-mix). */
   --ambient:
-    radial-gradient(46% 30% at 22% 6%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
-    radial-gradient(44% 28% at 88% 16%, color-mix(in srgb, var(--info) 16%, transparent), transparent 60%),
-    radial-gradient(60% 34% at 60% 100%, color-mix(in srgb, var(--warning) 16%, transparent), transparent 62%);
+    radial-gradient(
+      46% 30% at 22% 6%,
+      color-mix(in srgb, var(--accent) 20%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      44% 28% at 88% 16%,
+      color-mix(in srgb, var(--info) 16%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      60% 34% at 60% 100%,
+      color-mix(in srgb, var(--warning) 16%, transparent),
+      transparent 62%
+    );
 
   position: relative;
   min-height: 100dvh;
@@ -188,9 +200,21 @@
   --ov-scrim: rgba(0, 0, 0, 0.4);
   --ov-line: rgba(244, 242, 236, 0.12);
   --ambient:
-    radial-gradient(48% 30% at 20% 6%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 60%),
-    radial-gradient(46% 28% at 88% 18%, color-mix(in srgb, var(--info) 18%, transparent), transparent 60%),
-    radial-gradient(60% 32% at 60% 98%, color-mix(in srgb, var(--warning) 14%, transparent), transparent 62%);
+    radial-gradient(
+      48% 30% at 20% 6%,
+      color-mix(in srgb, var(--accent) 30%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      46% 28% at 88% 18%,
+      color-mix(in srgb, var(--info) 18%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      60% 32% at 60% 98%,
+      color-mix(in srgb, var(--warning) 14%, transparent),
+      transparent 62%
+    );
 }
 .m-shell * {
   box-sizing: border-box;
@@ -240,9 +264,7 @@ body:has(.m-shell[data-theme="dark"]) {
    entre el último control y el botón. Si :has() no estuviera soportado se cae al inset de
    .m-scroll, que es el comportamiento de hoy: no empeora nada. */
 .m-scroll:has(.m-fab) {
-  padding-bottom: calc(
-    var(--fab-gap) + var(--fab-size) + 16px + env(safe-area-inset-bottom)
-  );
+  padding-bottom: calc(var(--fab-gap) + var(--fab-size) + 16px + env(safe-area-inset-bottom));
 }
 .m-pad {
   padding: 0 20px;
@@ -425,7 +447,11 @@ body:has(.m-shell[data-theme="dark"]) {
   width: 44px;
   height: 44px;
   border-radius: 14px;
-  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 18%, var(--surface)), var(--surface));
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--accent) 18%, var(--surface)),
+    var(--surface)
+  );
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
   display: grid;
   place-items: center;
@@ -477,8 +503,16 @@ body:has(.m-shell[data-theme="dark"]) {
   padding: 20px;
   color: var(--text);
   background:
-    radial-gradient(120% 120% at 85% -20%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 55%),
-    linear-gradient(160deg, color-mix(in srgb, var(--accent) 14%, var(--surface)), var(--surface) 70%);
+    radial-gradient(
+      120% 120% at 85% -20%,
+      color-mix(in srgb, var(--accent) 30%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--accent) 14%, var(--surface)),
+      var(--surface) 70%
+    );
   border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
   box-shadow:
     0 18px 44px -20px color-mix(in srgb, var(--accent) 40%, transparent),
@@ -879,7 +913,11 @@ body:has(.m-shell[data-theme="dark"]) {
   overflow: hidden;
   border-radius: var(--r-xl);
   padding: 22px 20px;
-  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 22%, var(--surface)), var(--surface) 62%);
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--accent) 22%, var(--surface)),
+    var(--surface) 62%
+  );
   border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
 }
 
@@ -1432,7 +1470,8 @@ body:has(.m-shell[data-theme="dark"]) {
   appearance: none;
   -webkit-appearance: none;
   padding-right: 40px;
-  background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
     linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
   background-position:
     calc(100% - 20px) calc(50% - 2px),
@@ -3664,7 +3703,9 @@ body:has(.m-shell[data-theme="dark"]) {
   height: 5px;
   border-radius: 50%;
   background: var(--border);
-  transition: background 0.18s ease, width 0.18s ease;
+  transition:
+    background 0.18s ease,
+    width 0.18s ease;
 }
 .m-shell .m-carousel-dot.on {
   width: 16px;

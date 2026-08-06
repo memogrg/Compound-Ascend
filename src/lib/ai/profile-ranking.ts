@@ -5,7 +5,12 @@
  * reciba la MISMA jerarquía por ambos canales, sin divergir. Puro, sin IO.
  */
 import type { FinancialContext } from "@/lib/ai/orchestrator";
-import { asRanked, formatRanking, primaryOf, deUnderscore } from "@/modules/personal-profile/engine/ranking";
+import {
+  asRanked,
+  formatRanking,
+  primaryOf,
+  deUnderscore,
+} from "@/modules/personal-profile/engine/ranking";
 
 export function applyRankedProfile(
   ctx: Partial<FinancialContext>,

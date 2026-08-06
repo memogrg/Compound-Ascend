@@ -111,14 +111,16 @@ export async function getClosingLiquidity(
 ): Promise<{ balance: number; currency: string }> {
   const { db, userId } = await resolveAuth(ctx);
   const [{ data }, currency, rates] = await Promise.all([
-    db.from("liquidity_ledger").select("delta, currency, reason, occurred_on").eq("user_id", userId),
+    db
+      .from("liquidity_ledger")
+      .select("delta, currency, reason, occurred_on")
+      .eq("user_id", userId),
     getDisplayCurrency(ctx),
     getFxRates(),
   ]);
-  const rows = ((data ?? []) as Pick<
-    LiquidityLedgerRow,
-    "delta" | "currency" | "reason" | "occurred_on"
-  >[]).map((r) => ({
+  const rows = (
+    (data ?? []) as Pick<LiquidityLedgerRow, "delta" | "currency" | "reason" | "occurred_on">[]
+  ).map((r) => ({
     delta: r.delta,
     currency: r.currency,
     reason: r.reason,

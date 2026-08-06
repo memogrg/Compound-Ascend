@@ -63,7 +63,13 @@ const SYSTEM = [
 ].join("\n");
 
 /** Fila cruda tal como puede venir del modelo (todo por validar). */
-type Cruda = { fecha?: unknown; comercio?: unknown; monto?: unknown; moneda?: unknown; tipo?: unknown };
+type Cruda = {
+  fecha?: unknown;
+  comercio?: unknown;
+  monto?: unknown;
+  moneda?: unknown;
+  tipo?: unknown;
+};
 
 /** Extrae el primer array JSON del texto del modelo (tolera ``` y texto alrededor). */
 function extraerArray(texto: string): Cruda[] | null {
@@ -100,8 +106,17 @@ function validar(c: Cruda): StatementRow | null {
         : null;
   if (monto === null || monto <= 0) return null;
 
-  const moneda = MONEDAS[String(c.moneda ?? "").toUpperCase().trim()] ?? "CRC";
-  const tipo = String(c.tipo ?? "").toLowerCase().startsWith("ingr") ? "ingreso" : "gasto";
+  const moneda =
+    MONEDAS[
+      String(c.moneda ?? "")
+        .toUpperCase()
+        .trim()
+    ] ?? "CRC";
+  const tipo = String(c.tipo ?? "")
+    .toLowerCase()
+    .startsWith("ingr")
+    ? "ingreso"
+    : "gasto";
   return { ref: null, fecha, comercio, monto, moneda, tipo };
 }
 
@@ -125,7 +140,10 @@ export async function extraerConLLM(texto: string): Promise<StatementRow[] | nul
       logger.warn("statement: el modelo no devolvió un array JSON");
       return null;
     }
-    const filas = crudas.slice(0, MAX_FILAS).map(validar).filter((f): f is StatementRow => f !== null);
+    const filas = crudas
+      .slice(0, MAX_FILAS)
+      .map(validar)
+      .filter((f): f is StatementRow => f !== null);
     logger.info("statement.extraccion_llm", { crudas: crudas.length, validas: filas.length });
     return filas.length > 0 ? filas : null;
   } catch (err) {

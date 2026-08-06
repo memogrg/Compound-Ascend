@@ -56,51 +56,61 @@ export function MDonut({
             importe, así que dentro queda solo el dato corto (el %, o la etiqueta en reposo)
             y la cifra respira aquí abajo, donde además puede leerse a un tamaño decente. */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-        <div className="ring-wrap">
-          <svg width="112" height="112" viewBox="0 0 42 42">
-            <circle cx="21" cy="21" r="15.915" fill="none" stroke="var(--surface-2)" strokeWidth={5} />
-            {segs.map((s, i) => {
-              const isSel = sel === i;
-              const dim = sel != null && !isSel;
-              return (
-                <circle
-                  key={i}
-                  cx="21"
-                  cy="21"
-                  r="15.915"
-                  fill="none"
-                  stroke={s.color}
-                  strokeWidth={isSel ? 7 : 5}
-                  strokeDasharray={`${s.len} ${100 - s.len}`}
-                  strokeDashoffset={s.offset}
-                  opacity={dim ? 0.38 : 1}
-                  style={{ cursor: "pointer", transition: "stroke-width 0.15s ease, opacity 0.15s ease" }}
-                  onClick={() => toggle(i)}
-                  role="button"
-                  aria-label={`${slices[i]!.label}: ${Math.round((slices[i]!.value / total) * 100)}%`}
-                />
-              );
-            })}
-          </svg>
-          {/* Dentro del aro, solo el dato corto: el % del segmento tocado, o la etiqueta
+          <div className="ring-wrap">
+            <svg width="112" height="112" viewBox="0 0 42 42">
+              <circle
+                cx="21"
+                cy="21"
+                r="15.915"
+                fill="none"
+                stroke="var(--surface-2)"
+                strokeWidth={5}
+              />
+              {segs.map((s, i) => {
+                const isSel = sel === i;
+                const dim = sel != null && !isSel;
+                return (
+                  <circle
+                    key={i}
+                    cx="21"
+                    cy="21"
+                    r="15.915"
+                    fill="none"
+                    stroke={s.color}
+                    strokeWidth={isSel ? 7 : 5}
+                    strokeDasharray={`${s.len} ${100 - s.len}`}
+                    strokeDashoffset={s.offset}
+                    opacity={dim ? 0.38 : 1}
+                    style={{
+                      cursor: "pointer",
+                      transition: "stroke-width 0.15s ease, opacity 0.15s ease",
+                    }}
+                    onClick={() => toggle(i)}
+                    role="button"
+                    aria-label={`${slices[i]!.label}: ${Math.round((slices[i]!.value / total) * 100)}%`}
+                  />
+                );
+              })}
+            </svg>
+            {/* Dentro del aro, solo el dato corto: el % del segmento tocado, o la etiqueta
               del total en reposo ("activos"). Ambos rondan los 25-31px y sobra sitio. */}
-          <div className="ring-center" style={{ pointerEvents: "none" }}>
-            <div className="display" style={{ fontSize: 13 }}>
-              {centerSmall}
+            <div className="ring-center" style={{ pointerEvents: "none" }}>
+              <div className="display" style={{ fontSize: 13 }}>
+                {centerSmall}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Pie del anillo: la cifra y, si hay segmento tocado, de qué es. Aquí no hay
+          {/* Pie del anillo: la cifra y, si hay segmento tocado, de qué es. Aquí no hay
             restricción de ancho, así que la etiqueta larga ("Uso personal") se lee entera. */}
-        <div style={{ textAlign: "center" }}>
-          <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>
-            {centerBig}
+          <div style={{ textAlign: "center" }}>
+            <div className="mono" style={{ fontSize: 14, fontWeight: 700 }}>
+              {centerBig}
+            </div>
+            <div className="muted" style={{ fontSize: 10.5, marginTop: 1 }}>
+              {selected ? selected.label : centerLabel}
+            </div>
           </div>
-          <div className="muted" style={{ fontSize: 10.5, marginTop: 1 }}>
-            {selected ? selected.label : centerLabel}
-          </div>
-        </div>
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
           {slices.map((s, i) => {

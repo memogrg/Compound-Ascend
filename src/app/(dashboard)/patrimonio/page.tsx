@@ -8,7 +8,11 @@ import { listDividends } from "@/modules/wealth/services/dividend-service";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { listPendingHoldings } from "@/modules/wealth/services/holdings-service";
-import { ensureMonthlyContributions, ensureMonthlyPremiums, listOpenContributions } from "@/modules/wealth/services/contribution-service";
+import {
+  ensureMonthlyContributions,
+  ensureMonthlyPremiums,
+  listOpenContributions,
+} from "@/modules/wealth/services/contribution-service";
 import { PendingHoldingsCard } from "@/modules/wealth/components/pending-holdings-card";
 import { GrowthView } from "@/modules/wealth/components/growth-view";
 import { PortfolioView } from "@/modules/wealth/components/portfolio-view";
@@ -34,15 +38,16 @@ async function PortfolioSection({ summary }: { summary: WealthSummary }) {
   await ensureMonthlyContributions().catch(() => {});
   await ensureMonthlyPremiums().catch(() => {});
 
-  const [report, snapshots, dividends, base, displayCurrency, rates, openContributions] = await Promise.all([
-    getPortfolioReport(),
-    getSnapshotHistory("all"),
-    listDividends(),
-    getBaseSummary(),
-    getDisplayCurrency(),
-    getFxRates(),
-    listOpenContributions(),
-  ]);
+  const [report, snapshots, dividends, base, displayCurrency, rates, openContributions] =
+    await Promise.all([
+      getPortfolioReport(),
+      getSnapshotHistory("all"),
+      listDividends(),
+      getBaseSummary(),
+      getDisplayCurrency(),
+      getFxRates(),
+      listOpenContributions(),
+    ]);
 
   // Nota del asesor (Fase 5b): recomendación sobre el patrimonio en su tono. Best-effort.
   let advice: WealthAdvice | null = null;

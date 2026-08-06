@@ -56,7 +56,21 @@ describe("buildMonthMarker", () => {
   });
 
   it("preserva el signo del flujo (para colorear verde/rojo en la superficie)", () => {
-    expect(buildMonthMarker({ period: { year: 2026, month: 6 }, flow: 0, liquidity: 1, todayIso: "2026-07-01" }).flow).toBe(0);
-    expect(buildMonthMarker({ period: { year: 2026, month: 6 }, flow: -1, liquidity: 1, todayIso: "2026-07-01" }).flow).toBe(-1);
+    expect(
+      buildMonthMarker({
+        period: { year: 2026, month: 6 },
+        flow: 0,
+        liquidity: 1,
+        todayIso: "2026-07-01",
+      }).flow,
+    ).toBe(0);
+    expect(
+      buildMonthMarker({
+        period: { year: 2026, month: 6 },
+        flow: -1,
+        liquidity: 1,
+        todayIso: "2026-07-01",
+      }).flow,
+    ).toBe(-1);
   });
 });

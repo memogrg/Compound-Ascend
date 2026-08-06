@@ -66,43 +66,49 @@ export function BottomSheet({
 
   return (
     <MobilePortal>
-    <div
-      className="m-sheet-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title ?? "Formulario"}
-      // Ancla la hoja al área VISIBLE (sobre el teclado): con el documento congelado, sin
-      // esto la hoja quedaría anclada al fondo del layout viewport, bajo el teclado, y el
-      // input tapado. En navegadores sin visualViewport, `null` → alto de CSS de siempre.
-      style={visibleHeight != null ? { height: `${visibleHeight}px` } : undefined}
-    >
-      <button className="m-sheet-backdrop" aria-label="Cerrar" onClick={onClose} />
       <div
-        className="m-sheet-panel"
-        style={dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined}
+        className="m-sheet-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title ?? "Formulario"}
+        // Ancla la hoja al área VISIBLE (sobre el teclado): con el documento congelado, sin
+        // esto la hoja quedaría anclada al fondo del layout viewport, bajo el teclado, y el
+        // input tapado. En navegadores sin visualViewport, `null` → alto de CSS de siempre.
+        style={visibleHeight != null ? { height: `${visibleHeight}px` } : undefined}
       >
+        <button className="m-sheet-backdrop" aria-label="Cerrar" onClick={onClose} />
         <div
-          className="m-sheet-grip"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
+          className="m-sheet-panel"
+          style={dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined}
         >
-          <span className="m-sheet-handle" aria-hidden />
-          {title ? (
-            <div className="m-sheet-head">
-              <span className="m-sheet-title">{title}</span>
-              <button type="button" className="icon-btn" aria-label="Cerrar" onClick={onClose}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-          ) : null}
+          <div
+            className="m-sheet-grip"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          >
+            <span className="m-sheet-handle" aria-hidden />
+            {title ? (
+              <div className="m-sheet-head">
+                <span className="m-sheet-title">{title}</span>
+                <button type="button" className="icon-btn" aria-label="Cerrar" onClick={onClose}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                  >
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="m-sheet-body">{children}</div>
         </div>
-        <div className="m-sheet-body">{children}</div>
       </div>
-    </div>
     </MobilePortal>
   );
 }

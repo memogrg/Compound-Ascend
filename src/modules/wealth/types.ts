@@ -87,11 +87,7 @@ export type InsurancePolicy = {
 };
 
 export type ReadinessState =
-  | "no_listo"
-  | "empezar_pequeno"
-  | "constante"
-  | "diversificar"
-  | "optimizar";
+  "no_listo" | "empezar_pequeno" | "constante" | "diversificar" | "optimizar";
 
 export type InvestmentReadiness = {
   score: number;
@@ -145,12 +141,7 @@ export type PortfolioStats = {
 // ── Motor de inversiones ──────────────────────────────────────────
 
 export type RentalFrequency =
-  | "semanal"
-  | "mensual"
-  | "trimestral"
-  | "semestral"
-  | "anual"
-  | "al_vencimiento";
+  "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento";
 export type RentalSubtype = "alquiler" | "airbnb" | "auto" | "negocio" | "otro";
 
 /**

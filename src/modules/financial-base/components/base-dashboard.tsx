@@ -219,8 +219,19 @@ function Kpi({
         <span style={{ width: 8, height: 8, borderRadius: 999, background: accent }} />
         <span className="label">{label}</span>
         {tip ? (
-          <span className="tip" data-tip={tip} style={{ color: "var(--muted)", cursor: "help", display: "inline-flex" }}>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth={2}>
+          <span
+            className="tip"
+            data-tip={tip}
+            style={{ color: "var(--muted)", cursor: "help", display: "inline-flex" }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               <circle cx="12" cy="12" r="10" />
               <path d="M12 16v-4M12 8h.01" strokeLinecap="round" />
             </svg>

@@ -35,13 +35,18 @@ import type {
   Category,
   CategoryPersonalization,
 } from "@/modules/financial-base/services/categories-service";
-import {
-  getPagoContextAction,
-  reportPaymentAction,
-} from "@/modules/control/api/actions";
+import { getPagoContextAction, reportPaymentAction } from "@/modules/control/api/actions";
 import { formatMoney } from "@/lib/format";
 
-import { Fab, BottomSheet, PlusChoiceSheet, SheetSelect, ConfirmDialog, useToast, type Opt } from "../../components/form-kit";
+import {
+  Fab,
+  BottomSheet,
+  PlusChoiceSheet,
+  SheetSelect,
+  ConfirmDialog,
+  useToast,
+  type Opt,
+} from "../../components/form-kit";
 import { MIcon, type MIconName } from "../../components/m-icon";
 import {
   MSummaryCard,
@@ -71,10 +76,9 @@ const ContributionForm = dynamic(
  * misma acción canónica que el tab de Deudas (RPC atómica `record_debt_payment`). Una sola
  * fuente de escritura — desde Gastos no se abre un segundo camino que se desincronice.
  */
-const PaymentForm = dynamic(
-  () => import("../deudas/debt-manager").then((m) => m.PaymentForm),
-  { ssr: false },
-);
+const PaymentForm = dynamic(() => import("../deudas/debt-manager").then((m) => m.PaymentForm), {
+  ssr: false,
+});
 import {
   AddSpendForm,
   CreateSobreForm,
@@ -255,8 +259,14 @@ export function GastosManager({
   const [sobrePending, setSobrePending] = useState(false);
   // Personalización (Fase 3): forkear / ocultar / revertir un frasco o sobre BASE + ver ocultas.
   const [forkingTarget, setForkingTarget] = useState<PersonalizeTarget | null>(null);
-  const [hidingTarget, setHidingTarget] = useState<{ id: string; name: string; hasMovements: boolean } | null>(null);
-  const [revertingTarget, setRevertingTarget] = useState<{ baseId: string; name: string } | null>(null);
+  const [hidingTarget, setHidingTarget] = useState<{
+    id: string;
+    name: string;
+    hasMovements: boolean;
+  } | null>(null);
+  const [revertingTarget, setRevertingTarget] = useState<{ baseId: string; name: string } | null>(
+    null,
+  );
   const [revertPending, setRevertPending] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [essPending, setEssPending] = useState(false);
@@ -356,10 +366,16 @@ export function GastosManager({
   const confirmDeleteSobre = async () => {
     if (!deletingSobre) return;
     setSobrePending(true);
-    const res = await removeCategoryAction({ id: deletingSobre.id, reassignToId: reassignTo || null });
+    const res = await removeCategoryAction({
+      id: deletingSobre.id,
+      reassignToId: reassignTo || null,
+    });
     setSobrePending(false);
     if (res.ok) {
-      toast.show(reassignTo ? "Sobre eliminado (movimientos reasignados)" : "Sobre eliminado", "success");
+      toast.show(
+        reassignTo ? "Sobre eliminado (movimientos reasignados)" : "Sobre eliminado",
+        "success",
+      );
       setDeletingSobre(null);
       setReassignTo("");
       router.refresh();
@@ -553,18 +569,28 @@ export function GastosManager({
 
       {/* Registrar gasto (global) */}
       <BottomSheet open={addingSpend} onClose={() => setAddingSpend(false)} title="Registrar gasto">
-        <AddSpendForm jars={jars} currency={currency} accounts={accounts} onSuccess={() => setAddingSpend(false)} />
+        <AddSpendForm
+          jars={jars}
+          currency={currency}
+          accounts={accounts}
+          onSuccess={() => setAddingSpend(false)}
+        />
       </BottomSheet>
 
       {/* Detalle de un frasco: sobres + editar presupuesto + crear sobre */}
-      <BottomSheet open={!!detailJar} onClose={() => setDetailJar(null)} title={detailJar?.name ?? "Frasco"}>
+      <BottomSheet
+        open={!!detailJar}
+        onClose={() => setDetailJar(null)}
+        title={detailJar?.name ?? "Frasco"}
+      >
         {detailJar ? (
           <div style={{ display: "grid", gap: 10 }}>
             <div>
               {detailJar.envelopes.map((e) => {
                 const eTone = levelTone(e.spent, e.budget);
                 const ep = e.budget > 0 ? Math.min(1, e.spent / e.budget) : 0;
-                const budgetSub = e.budget > 0 ? `de ${mAmount(e.budget, currency)}` : "Sin presupuesto";
+                const budgetSub =
+                  e.budget > 0 ? `de ${mAmount(e.budget, currency)}` : "Sin presupuesto";
                 return (
                   <MDataRow
                     key={e.id}
@@ -580,7 +606,14 @@ export function GastosManager({
                           aria-label={`Editar presupuesto de ${e.name}`}
                           onClick={() => setEditingEnv(e)}
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.9}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
                             <path d="M12 20h9" />
                             <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
                           </svg>
@@ -593,7 +626,13 @@ export function GastosManager({
                             aria-label={`Opciones de ${e.name}`}
                             onClick={() => setManagingSobre(e)}
                           >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              strokeLinecap="round"
+                            >
                               <circle cx="12" cy="5" r="1" />
                               <circle cx="12" cy="12" r="1" />
                               <circle cx="12" cy="19" r="1" />
@@ -602,7 +641,9 @@ export function GastosManager({
                         ) : null}
                       </span>
                     }
-                    slot={e.budget > 0 ? <MProgress value={ep} tone={eTone} height={6} /> : undefined}
+                    slot={
+                      e.budget > 0 ? <MProgress value={ep} tone={eTone} height={6} /> : undefined
+                    }
                   />
                 );
               })}
@@ -633,7 +674,10 @@ export function GastosManager({
                     type="button"
                     className="m-btn m-btn-block m-btn-secondary"
                     onClick={() =>
-                      setRevertingTarget({ baseId: forkBaseOf(detailJar.group)!, name: detailJar.name })
+                      setRevertingTarget({
+                        baseId: forkBaseOf(detailJar.group)!,
+                        name: detailJar.name,
+                      })
                     }
                   >
                     Revertir personalización
@@ -654,7 +698,9 @@ export function GastosManager({
                         setHidingTarget({
                           id: detailJar.group,
                           name: detailJar.name,
-                          hasMovements: detailJar.envelopes.some((e) => e.spent > 0 || e.budget > 0),
+                          hasMovements: detailJar.envelopes.some(
+                            (e) => e.spent > 0 || e.budget > 0,
+                          ),
                         })
                       }
                     >
@@ -669,7 +715,11 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Crear sobre (encima del detalle) */}
-      <BottomSheet open={!!creatingSobreIn} onClose={() => setCreatingSobreIn(null)} title="Nuevo sobre">
+      <BottomSheet
+        open={!!creatingSobreIn}
+        onClose={() => setCreatingSobreIn(null)}
+        title="Nuevo sobre"
+      >
         {creatingSobreIn ? (
           <CreateSobreForm
             jarGroup={creatingSobreIn}
@@ -680,7 +730,11 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Editar presupuesto de un sobre (3 checks + líneas derivadas) */}
-      <BottomSheet open={!!editingEnv} onClose={() => setEditingEnv(null)} title="Editar presupuesto">
+      <BottomSheet
+        open={!!editingEnv}
+        onClose={() => setEditingEnv(null)}
+        title="Editar presupuesto"
+      >
         {editingEnv ? (
           <BudgetEditForm
             envelope={editingEnv}
@@ -691,7 +745,11 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Acciones de un sobre: usuario (editar/eliminar) · fork (editar/revertir) · base (personalizar/ocultar) */}
-      <BottomSheet open={!!managingSobre} onClose={() => setManagingSobre(null)} title={managingSobre?.name ?? "Sobre"}>
+      <BottomSheet
+        open={!!managingSobre}
+        onClose={() => setManagingSobre(null)}
+        title={managingSobre?.name ?? "Sobre"}
+      >
         {managingSobre ? (
           <div style={{ display: "grid", gap: 10 }}>
             {/* Marcar/desmarcar esencial: acción DIRECTA (2 taps desde la fila del sobre),
@@ -705,11 +763,68 @@ export function GastosManager({
               {essentialToggleLabel(categoryMeta[managingSobre.id]?.isEssential ?? false)}
             </button>
             <div style={{ borderTop: "1px solid var(--border)" }} />
-          {(() => {
-            const m = managingSobre;
-            const forkBase = forkBaseOf(m.id);
-            if (forkBase) {
-              // Sobre forkeado: editar la copia o revertir a la base.
+            {(() => {
+              const m = managingSobre;
+              const forkBase = forkBaseOf(m.id);
+              if (forkBase) {
+                // Sobre forkeado: editar la copia o revertir a la base.
+                return (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <button
+                      type="button"
+                      className="m-btn m-btn-block m-btn-secondary"
+                      onClick={() => {
+                        setEditingSobre(m);
+                        setManagingSobre(null);
+                      }}
+                    >
+                      Editar copia (nombre / favorito)
+                    </button>
+                    <button
+                      type="button"
+                      className="m-btn m-btn-block m-btn-secondary"
+                      onClick={() => {
+                        setRevertingTarget({ baseId: forkBase, name: m.name });
+                        setManagingSobre(null);
+                      }}
+                    >
+                      Revertir personalización
+                    </button>
+                  </div>
+                );
+              }
+              if (isSystemCat(m.id)) {
+                // Sobre BASE de sistema: personalizar (fork) u ocultar.
+                return (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <button
+                      type="button"
+                      className="m-btn m-btn-block m-btn-secondary"
+                      onClick={() => {
+                        setForkingTarget(targetFrom(m.id, m.name));
+                        setManagingSobre(null);
+                      }}
+                    >
+                      Personalizar (editar)
+                    </button>
+                    <button
+                      type="button"
+                      className="m-btn m-btn-block m-btn-secondary"
+                      onClick={() => {
+                        setHidingTarget({
+                          id: m.id,
+                          name: m.name,
+                          hasMovements: m.spent > 0 || m.budget > 0,
+                        });
+                        setManagingSobre(null);
+                      }}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                );
+              }
+              // Sobre del USUARIO: editar / eliminar (comportamiento previo).
               return (
                 <div style={{ display: "grid", gap: 10 }}>
                   <button
@@ -720,75 +835,22 @@ export function GastosManager({
                       setManagingSobre(null);
                     }}
                   >
-                    Editar copia (nombre / favorito)
+                    Editar sobre (nombre / favorito)
                   </button>
                   <button
                     type="button"
-                    className="m-btn m-btn-block m-btn-secondary"
+                    className="m-btn m-btn-block m-btn-quiet-danger"
                     onClick={() => {
-                      setRevertingTarget({ baseId: forkBase, name: m.name });
+                      setReassignTo("");
+                      setDeletingSobre(m);
                       setManagingSobre(null);
                     }}
                   >
-                    Revertir personalización
+                    Eliminar sobre
                   </button>
                 </div>
               );
-            }
-            if (isSystemCat(m.id)) {
-              // Sobre BASE de sistema: personalizar (fork) u ocultar.
-              return (
-                <div style={{ display: "grid", gap: 10 }}>
-                  <button
-                    type="button"
-                    className="m-btn m-btn-block m-btn-secondary"
-                    onClick={() => {
-                      setForkingTarget(targetFrom(m.id, m.name));
-                      setManagingSobre(null);
-                    }}
-                  >
-                    Personalizar (editar)
-                  </button>
-                  <button
-                    type="button"
-                    className="m-btn m-btn-block m-btn-secondary"
-                    onClick={() => {
-                      setHidingTarget({ id: m.id, name: m.name, hasMovements: m.spent > 0 || m.budget > 0 });
-                      setManagingSobre(null);
-                    }}
-                  >
-                    Remover
-                  </button>
-                </div>
-              );
-            }
-            // Sobre del USUARIO: editar / eliminar (comportamiento previo).
-            return (
-              <div style={{ display: "grid", gap: 10 }}>
-                <button
-                  type="button"
-                  className="m-btn m-btn-block m-btn-secondary"
-                  onClick={() => {
-                    setEditingSobre(m);
-                    setManagingSobre(null);
-                  }}
-                >
-                  Editar sobre (nombre / favorito)
-                </button>
-                <button
-                  type="button"
-                  className="m-btn m-btn-block m-btn-quiet-danger"
-                  onClick={() => {
-                    setReassignTo("");
-                    setDeletingSobre(m);
-                    setManagingSobre(null);
-                  }}
-                >
-                  Eliminar sobre
-                </button>
-              </div>
-            );
-          })()}
+            })()}
           </div>
         ) : null}
       </BottomSheet>
@@ -806,7 +868,11 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Eliminar sobre (con reasignación opcional) → removeCategoryAction */}
-      <BottomSheet open={!!deletingSobre} onClose={() => setDeletingSobre(null)} title="Eliminar sobre">
+      <BottomSheet
+        open={!!deletingSobre}
+        onClose={() => setDeletingSobre(null)}
+        title="Eliminar sobre"
+      >
         {deletingSobre ? (
           <div style={{ display: "grid", gap: 12 }}>
             <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
@@ -843,8 +909,8 @@ export function GastosManager({
           <div style={{ display: "grid", gap: 10 }}>
             <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
               Estas líneas suman en tu presupuesto pero su categoría ya no se muestra (se ocultó o
-              se borró). Reasígnalas para que vuelvan a su frasco: el total no cambia, solo se
-              mueve de lugar.
+              se borró). Reasígnalas para que vuelvan a su frasco: el total no cambia, solo se mueve
+              de lugar.
             </div>
             {orphanJar.items.length > 0 ? (
               <>
@@ -866,8 +932,8 @@ export function GastosManager({
                   Gasto real sin frasco
                 </div>
                 <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
-                  Estos gastos ya ocurrieron y suman en «Gastado». Recategorízalos para que
-                  vuelvan a su frasco.
+                  Estos gastos ya ocurrieron y suman en «Gastado». Recategorízalos para que vuelvan
+                  a su frasco.
                 </div>
                 {orphanJar.realItems.map((line) => (
                   <OrphanLineRow
@@ -886,14 +952,22 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Personalizar (fork) un frasco/sobre base → forkCategoryAction */}
-      <BottomSheet open={!!forkingTarget} onClose={() => setForkingTarget(null)} title="Personalizar categoría">
+      <BottomSheet
+        open={!!forkingTarget}
+        onClose={() => setForkingTarget(null)}
+        title="Personalizar categoría"
+      >
         {forkingTarget ? (
           <ForkCategoryForm target={forkingTarget} onSuccess={() => setForkingTarget(null)} />
         ) : null}
       </BottomSheet>
 
       {/* Ocultar un frasco/sobre base → hideCategoryAction (con reasignación opcional) */}
-      <BottomSheet open={!!hidingTarget} onClose={() => setHidingTarget(null)} title="Remover categoría">
+      <BottomSheet
+        open={!!hidingTarget}
+        onClose={() => setHidingTarget(null)}
+        title="Remover categoría"
+      >
         {hidingTarget ? (
           <HideCategoryForm
             target={{ id: hidingTarget.id, name: hidingTarget.name }}
@@ -905,10 +979,15 @@ export function GastosManager({
       </BottomSheet>
 
       {/* Categorías ocultas del hogar → Mostrar (unhideCategoryAction) */}
-      <BottomSheet open={showHidden} onClose={() => setShowHidden(false)} title="Categorías removidas">
+      <BottomSheet
+        open={showHidden}
+        onClose={() => setShowHidden(false)}
+        title="Categorías removidas"
+      >
         <div style={{ display: "grid", gap: 10 }}>
           <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-            Estas categorías base están removidas para todo tu hogar. Vuelve a mostrarlas cuando quieras.
+            Estas categorías base están removidas para todo tu hogar. Vuelve a mostrarlas cuando
+            quieras.
           </div>
           {personalization.hidden.map((h) => (
             <div key={h.id} className="between" style={{ gap: 10 }}>
@@ -1006,7 +1085,14 @@ function OrphanLineRow({
   };
 
   return (
-    <div style={{ display: "grid", gap: 8, paddingBottom: 10, borderBottom: "1px solid var(--m-border)" }}>
+    <div
+      style={{
+        display: "grid",
+        gap: 8,
+        paddingBottom: 10,
+        borderBottom: "1px solid var(--m-border)",
+      }}
+    >
       <div className="row" style={{ gap: 8, alignItems: "center" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>{line.name}</div>
@@ -1175,7 +1261,14 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="row" style={{ gap: 6 }}>
             <span
-              style={{ fontWeight: 700, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              style={{
+                fontWeight: 700,
+                fontSize: 15,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
             >
               {jar.name}
             </span>
@@ -1187,7 +1280,10 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
         </div>
         <div style={{ flex: "none", textAlign: "right" }}>
           {/* El gastado solo se tiñe cuando duele (rojo): en verde sería ruido. */}
-          <div className={`mono ${tone === "danger" ? TONE_TEXT.danger : ""}`} style={{ fontSize: 14 }}>
+          <div
+            className={`mono ${tone === "danger" ? TONE_TEXT.danger : ""}`}
+            style={{ fontSize: 14 }}
+          >
             {mAmount(spent, currency)}
           </div>
           {budget > 0 ? (
@@ -1279,11 +1375,20 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
                             ? "Sin presupuesto"
                             : it.sub
                     }
-                    value={it.advanced ? "—" : unbudgeted ? mAmount(it.spent ?? 0, currency) : it.amount}
+                    value={
+                      it.advanced ? "—" : unbudgeted ? mAmount(it.spent ?? 0, currency) : it.amount
+                    }
                     valueTone={sinAporte ? "warning" : unbudgeted ? "warning" : undefined}
                   />
                   {saldable && tipoPago ? (
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4, marginBottom: 6 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        marginTop: -4,
+                        marginBottom: 6,
+                      }}
+                    >
                       <button
                         type="button"
                         className={sinAporte ? "m-btn m-btn-primary" : "m-btn m-btn-secondary"}
@@ -1314,9 +1419,20 @@ function JarCard({ jar, currency, onOpen }: { jar: Jar; currency: string; onOpen
       </div>
 
       {jar.kind === "linked" && LINKED_HREF[jar.linkedKind] && (
-        <Link href={LINKED_HREF[jar.linkedKind]!} className="jar-link" onClick={(ev) => ev.stopPropagation()}>
+        <Link
+          href={LINKED_HREF[jar.linkedKind]!}
+          className="jar-link"
+          onClick={(ev) => ev.stopPropagation()}
+        >
           {jar.cta.label}
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M9 6l6 6-6 6" />
           </svg>
         </Link>

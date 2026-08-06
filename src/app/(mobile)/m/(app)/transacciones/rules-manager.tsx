@@ -174,7 +174,11 @@ export function RulesManager({
   const confirmDelete = () => {
     if (!deleting) return;
     const r = deleting;
-    run(() => removeRuleAction(r.id), "Regla eliminada", () => setDeleting(null));
+    run(
+      () => removeRuleAction(r.id),
+      "Regla eliminada",
+      () => setDeleting(null),
+    );
   };
 
   return (
@@ -208,8 +212,8 @@ export function RulesManager({
 
           {rules.length === 0 ? (
             <div className="muted" style={{ fontSize: 13, lineHeight: 1.45 }}>
-              Aún no tienes reglas. Crea la primera y dejarás de clasificar a mano los comercios
-              que se repiten.
+              Aún no tienes reglas. Crea la primera y dejarás de clasificar a mano los comercios que
+              se repiten.
             </div>
           ) : (
             rules.map((r) => (
@@ -217,8 +221,7 @@ export function RulesManager({
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>«{r.merchantPattern}»</div>
                   <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                    {r.type === "income" ? "Ingreso" : "Gasto"} →{" "}
-                    {catName(r.suggestedCategoryId)}
+                    {r.type === "income" ? "Ingreso" : "Gasto"} → {catName(r.suggestedCategoryId)}
                     {r.active ? "" : " · desactivada"}
                   </div>
                 </div>

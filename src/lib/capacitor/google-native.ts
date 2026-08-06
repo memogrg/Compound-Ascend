@@ -78,7 +78,9 @@ export async function nativeGoogleLogin(): Promise<NativeLoginResult> {
  * una sesión/idToken viejo cacheado. Los console.log "[google-native]" permiten leer el flujo en
  * la consola de Xcode / adb logcat.
  */
-async function attempt(plugin: NonNullable<ReturnType<typeof capacitorSocialLogin>>): Promise<void> {
+async function attempt(
+  plugin: NonNullable<ReturnType<typeof capacitorSocialLogin>>,
+): Promise<void> {
   console.log("[google-native] login:start");
   try {
     await plugin.logout({ provider: "google" });

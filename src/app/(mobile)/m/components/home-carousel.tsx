@@ -107,8 +107,7 @@ export function MHomeCarousel({
     const track = trackRef.current;
     if (!track) return;
     const target = track.children[Math.max(0, Math.min(track.children.length - 1, i))] as
-      | HTMLElement
-      | undefined;
+      HTMLElement | undefined;
     if (!target) return;
     // `smooth` solo si el usuario no ha pedido menos movimiento: el CSS ya lo cubre para
     // el scroll nativo, pero scrollTo con behavior explícito lo ignoraría.

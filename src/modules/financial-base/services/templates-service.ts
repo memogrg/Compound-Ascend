@@ -81,7 +81,8 @@ export async function updateTemplate(id: string, input: TemplateInput): Promise<
   const scope = await householdWriteScope(supabase, user.id);
   await supabase
     .from("transaction_templates")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       name: input.name,
       kind: input.kind,
       amount: input.amount ?? null,
@@ -102,7 +103,11 @@ export async function deleteTemplate(id: string): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("transaction_templates").delete().eq("id", id).in("user_id", scope);
-  await logHouseholdDeletion(supabase, { userId: user.id, table: "transaction_templates", rowId: id });
+  await logHouseholdDeletion(supabase, {
+    userId: user.id,
+    table: "transaction_templates",
+    rowId: id,
+  });
 }
 
 /** Marca uso (telemetría suave para ordenar por frecuencia). */

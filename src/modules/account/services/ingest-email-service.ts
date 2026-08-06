@@ -13,7 +13,11 @@ import { randomInt, createHash } from "node:crypto";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getActiveHouseholdId, householdMemberIds, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { isEmailConfigured, sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
@@ -113,7 +117,10 @@ export async function requestIngestEmailVerification(rawEmail: string): Promise<
  * el código. La verificación corre en la action (no por RLS directa); ver la nota de
  * hardening en la migración 0031.
  */
-export async function confirmIngestEmail(rawEmail: string, code: string): Promise<IngestEmailResult> {
+export async function confirmIngestEmail(
+  rawEmail: string,
+  code: string,
+): Promise<IngestEmailResult> {
   const parsed = emailSchema.safeParse(rawEmail);
   if (!parsed.success) return { ok: false, message: "Ingresá un correo válido." };
   const user = await requireUser();
@@ -128,7 +135,11 @@ export async function confirmIngestEmail(rawEmail: string, code: string): Promis
   if (!row) return { ok: false, message: "No encontramos ese correo. Pedí el código primero." };
   if (row.verified) return { ok: true }; // ya verificado: idempotente
 
-  if (!row.verify_code_hash || !row.verify_expires_at || new Date(row.verify_expires_at) < new Date()) {
+  if (
+    !row.verify_code_hash ||
+    !row.verify_expires_at ||
+    new Date(row.verify_expires_at) < new Date()
+  ) {
     return { ok: false, message: "El código venció. Pedí uno nuevo." };
   }
   if (row.verify_code_hash !== hashCode(code.trim())) {

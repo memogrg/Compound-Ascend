@@ -15,7 +15,9 @@ export function MMetricGrid({
   return (
     <div
       className="m-mgrid"
-      style={cols === 2 ? style : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, ...style }}
+      style={
+        cols === 2 ? style : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, ...style }
+      }
     >
       {children}
     </div>

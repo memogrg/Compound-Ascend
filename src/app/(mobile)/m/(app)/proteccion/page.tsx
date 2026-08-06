@@ -36,7 +36,10 @@ function statusOf(score: number): { label: string; tone: MTone } {
 /** Fecha corta ("dic 2026") para celdas estrechas; "—" si no hay. */
 function fmtShort(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", { month: "short", year: "numeric" });
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-MX", {
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export default async function MobileProteccion() {
@@ -101,8 +104,16 @@ export default async function MobileProteccion() {
         {/* Métricas. Brechas NO va aquí: tiene su propia sección abajo. */}
         <MSectionHeader title="Tu protección en números" />
         <MMetricGrid style={{ marginBottom: 16 }}>
-          <MMetricCard label="Pólizas activas" value={String(p.activePolicies)} sub="cubriéndote hoy" />
-          <MMetricCard label="Prima mensual" value={mAmount(monthlyPremium, currency, 8)} sub="lo que pagas" />
+          <MMetricCard
+            label="Pólizas activas"
+            value={String(p.activePolicies)}
+            sub="cubriéndote hoy"
+          />
+          <MMetricCard
+            label="Prima mensual"
+            value={mAmount(monthlyPremium, currency, 8)}
+            sub="lo que pagas"
+          />
           <MMetricCard
             label="Nivel de protección"
             value={`${p.score}`}

@@ -50,7 +50,10 @@ export async function POST(req: Request) {
     const chunks = chunkDocument(text);
     const total = chunks.length;
     if (total === 0) {
-      return NextResponse.json({ ingested: 0, skipped: 0, remaining: 0, total: 0 }, { headers: cors });
+      return NextResponse.json(
+        { ingested: 0, skipped: 0, remaining: 0, total: 0 },
+        { headers: cors },
+      );
     }
 
     const supabase = createServiceRoleClient();
@@ -80,7 +83,9 @@ export async function POST(req: Request) {
         embedding: vectors[i] ?? null,
         source,
       }));
-      const { error } = await supabase.from("biblia_chunks").upsert(rows, { onConflict: "content" });
+      const { error } = await supabase
+        .from("biblia_chunks")
+        .upsert(rows, { onConflict: "content" });
       if (error) throw new AppError("INTERNAL", undefined, error.message);
     }
 

@@ -40,7 +40,11 @@ type CardRow = { last4: string; label: string; holder_name: string | null };
 
 /** Mapea una fila + tarjetas de la cuenta a la vista (etiqueta resuelta). Puro. */
 export function mapProposalRow(row: ProposalRow, cards: CardRow[]): PendingProposalView {
-  const cardList = cards.map((c) => ({ last4: c.last4, label: c.label, holderName: c.holder_name }));
+  const cardList = cards.map((c) => ({
+    last4: c.last4,
+    label: c.label,
+    holderName: c.holder_name,
+  }));
   return {
     id: row.id,
     kind: row.kind,
@@ -63,7 +67,9 @@ export async function listMyPendingProposals(): Promise<PendingProposalView[]> {
     .eq("status", "pending")
     .order("created_at", { ascending: true });
   if (error || !data) return [];
-  const { data: cardRows } = await supabase.from("account_cards").select("last4, label, holder_name");
+  const { data: cardRows } = await supabase
+    .from("account_cards")
+    .select("last4, label, holder_name");
   const cards = (cardRows ?? []) as CardRow[];
   return (data as ProposalRow[]).map((r) => mapProposalRow(r, cards));
 }

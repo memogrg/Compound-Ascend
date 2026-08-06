@@ -10,7 +10,11 @@ import { userCurrentPeriod } from "@/lib/time/user-time";
 import { computeHealthScore, type HealthScore } from "@/modules/financial-base";
 import { buildInsights, type DashboardInsights } from "@/modules/dashboard/engine/insights";
 import { getControlSummary, type ControlSummary } from "@/modules/control";
-import { getRichLifeSummary, buildDemoRichLifeSummary, type RichLifeSummary } from "@/modules/rich-life";
+import {
+  getRichLifeSummary,
+  buildDemoRichLifeSummary,
+  type RichLifeSummary,
+} from "@/modules/rich-life";
 import { getWealthSummary, buildDemoWealthSummary, type WealthSummary } from "@/modules/wealth";
 import { buildPanel, type PanelVM } from "@/modules/dashboard/engine/pillars";
 import type { BaseSummary } from "@/modules/financial-base";
@@ -54,7 +58,9 @@ type Intento<T> = { valor: T | null; degradado: boolean };
  */
 function conLimite<T>(p: Promise<T>): Promise<Intento<T>> {
   return Promise.race([
-    p.then((valor) => ({ valor, degradado: false })).catch(() => ({ valor: null, degradado: true })),
+    p
+      .then((valor) => ({ valor, degradado: false }))
+      .catch(() => ({ valor: null, degradado: true })),
     new Promise<Intento<T>>((resolver) => {
       const t = setTimeout(() => resolver({ valor: null, degradado: true }), LIMITE_RESUMEN_MS);
       // No mantiene vivo el proceso si todo lo demás ya terminó (cron, scripts).
@@ -146,7 +152,14 @@ export async function getDashboardData(
     monthFlow = (await conLimite(getMonthFlow(await userCurrentPeriod()))).valor;
   }
 
-  const panel = buildPanel({ ind: summary.indicators, currency, control, richLife, wealth, monthFlow });
+  const panel = buildPanel({
+    ind: summary.indicators,
+    currency,
+    control,
+    richLife,
+    wealth,
+    monthFlow,
+  });
 
   return { name, currency, summary, health, insights, panel, configured, degradado, monthFlow };
 }
@@ -194,5 +207,10 @@ function buildDemoSummary(): BaseSummary {
     demoExpense("Seguro médico", "proteccion", 60_000),
   ];
   // Demo: todo en una sola moneda, así que no hubo conversión que declarar.
-  return { indicators: computeBaseIndicators(incomes, expenses), incomes, expenses, monedasVistas: ["CRC"] };
+  return {
+    indicators: computeBaseIndicators(incomes, expenses),
+    incomes,
+    expenses,
+    monedasVistas: ["CRC"],
+  };
 }

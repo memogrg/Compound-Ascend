@@ -27,7 +27,11 @@ export function buildEvolution(
   const changes: string[] = [];
 
   // Arquetipo: solo si ambos existen, cambiaron y las etiquetas resuelven.
-  if (cur.archetypePrimary && prev.archetypePrimary && cur.archetypePrimary !== prev.archetypePrimary) {
+  if (
+    cur.archetypePrimary &&
+    prev.archetypePrimary &&
+    cur.archetypePrimary !== prev.archetypePrimary
+  ) {
     const labelPrev = archetypeLabel(prev.archetypePrimary);
     const labelCur = archetypeLabel(cur.archetypePrimary);
     if (labelPrev && labelCur) {
@@ -36,10 +40,18 @@ export function buildEvolution(
   }
 
   // Escalas numéricas (solo si subieron).
-  if (typeof cur.completion === "number" && typeof prev.completion === "number" && cur.completion > prev.completion) {
+  if (
+    typeof cur.completion === "number" &&
+    typeof prev.completion === "number" &&
+    cur.completion > prev.completion
+  ) {
     changes.push(`Completaste más tu perfil (${prev.completion}% → ${cur.completion}%).`);
   }
-  if (typeof cur.discipline === "number" && typeof prev.discipline === "number" && cur.discipline > prev.discipline) {
+  if (
+    typeof cur.discipline === "number" &&
+    typeof prev.discipline === "number" &&
+    cur.discipline > prev.discipline
+  ) {
     changes.push(`Tu disciplina subió de ${prev.discipline} a ${cur.discipline}.`);
   }
   if (
@@ -47,11 +59,14 @@ export function buildEvolution(
     typeof prev.perceivedControl === "number" &&
     cur.perceivedControl > prev.perceivedControl
   ) {
-    changes.push(`Sientes más control de tus finanzas (${prev.perceivedControl} → ${cur.perceivedControl}).`);
+    changes.push(
+      `Sientes más control de tus finanzas (${prev.perceivedControl} → ${cur.perceivedControl}).`,
+    );
   }
 
   // Hitos booleanos (false → true).
-  if (cur.hasBase === true && prev.hasBase === false) changes.push("Construiste tu Base Financiera.");
+  if (cur.hasBase === true && prev.hasBase === false)
+    changes.push("Construiste tu Base Financiera.");
   if (cur.hasEmergencyFund === true && prev.hasEmergencyFund === false)
     changes.push("Creaste tu fondo de emergencia.");
   if (cur.hasGoals === true && prev.hasGoals === false) changes.push("Definiste tu primera meta.");

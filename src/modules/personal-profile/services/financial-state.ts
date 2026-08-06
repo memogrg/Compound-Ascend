@@ -22,16 +22,13 @@ export async function getFinancialState(draft: ProfileDraft): Promise<FinancialS
   try {
     const { getBaseSummary } = await import("@/modules/financial-base");
     const base = await getBaseSummary();
-    state.hasBase =
-      base.indicators.incomeMonthly > 0 || base.indicators.expenseMonthly > 0;
+    state.hasBase = base.indicators.incomeMonthly > 0 || base.indicators.expenseMonthly > 0;
   } catch {
     // Sin base: hasBase queda false.
   }
 
   try {
-    const { listGoals, listDebts } = await import(
-      "@/modules/control/services/control-service"
-    );
+    const { listGoals, listDebts } = await import("@/modules/control/services/control-service");
     const [goals, debts] = await Promise.all([listGoals(), listDebts()]);
     state.hasGoals = goals.length > 0;
     state.hasDebts = debts.some((d) => d.balance > 0);

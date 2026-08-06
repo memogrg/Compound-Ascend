@@ -150,13 +150,48 @@ const CALIDAD_WEIGHTS = {
 
 /** §8 · Niveles del Índice Patrimonial. */
 const LEVELS: PatrimonioLevel[] = [
-  { min: 0, max: 15, name: "Punto de partida", reading: "Estás empezando a construir tu base patrimonial." },
-  { min: 16, max: 30, name: "Base en construcción", reading: "Tu base toma forma; el siguiente paso es darle estructura." },
-  { min: 31, max: 45, name: "Estabilidad inicial", reading: "Ganas estabilidad; ya puedes pensar en hacer crecer tu capital." },
-  { min: 46, max: 60, name: "Constructor patrimonial", reading: "Construyes patrimonio con criterio; enfócate en el capital que trabaja." },
-  { min: 61, max: 75, name: "Patrimonio sólido", reading: "Tu patrimonio es sólido; afina liquidez, protección y diversificación." },
-  { min: 76, max: 90, name: "Alta independencia", reading: "Estás cerca de la independencia; tu dinero ya hace gran parte del trabajo." },
-  { min: 91, max: 100, name: "Libertad patrimonial", reading: "Tu patrimonio te da libertad real; el foco es preservar y dejar legado." },
+  {
+    min: 0,
+    max: 15,
+    name: "Punto de partida",
+    reading: "Estás empezando a construir tu base patrimonial.",
+  },
+  {
+    min: 16,
+    max: 30,
+    name: "Base en construcción",
+    reading: "Tu base toma forma; el siguiente paso es darle estructura.",
+  },
+  {
+    min: 31,
+    max: 45,
+    name: "Estabilidad inicial",
+    reading: "Ganas estabilidad; ya puedes pensar en hacer crecer tu capital.",
+  },
+  {
+    min: 46,
+    max: 60,
+    name: "Constructor patrimonial",
+    reading: "Construyes patrimonio con criterio; enfócate en el capital que trabaja.",
+  },
+  {
+    min: 61,
+    max: 75,
+    name: "Patrimonio sólido",
+    reading: "Tu patrimonio es sólido; afina liquidez, protección y diversificación.",
+  },
+  {
+    min: 76,
+    max: 90,
+    name: "Alta independencia",
+    reading: "Estás cerca de la independencia; tu dinero ya hace gran parte del trabajo.",
+  },
+  {
+    min: 91,
+    max: 100,
+    name: "Libertad patrimonial",
+    reading: "Tu patrimonio te da libertad real; el foco es preservar y dejar legado.",
+  },
 ];
 
 /** Puntaje 0-1 por nivel de diversificación. */
@@ -189,7 +224,9 @@ export function numeroPatrimonial(gastoMensual: number, tasa: number = TASA_RETI
 }
 
 /** Comparación informativa: qué capital haría falta a cada tasa (mismo gasto). */
-export function sensibilidadTasa(gastoMensual: number): Record<"0.04" | "0.06" | "0.08" | "0.10", number> {
+export function sensibilidadTasa(
+  gastoMensual: number,
+): Record<"0.04" | "0.06" | "0.08" | "0.10", number> {
   return {
     "0.04": round2(numeroPatrimonial(gastoMensual, 0.04)),
     "0.06": round2(numeroPatrimonial(gastoMensual, 0.06)),
@@ -390,7 +427,9 @@ export function millonarioReadings(input: PatrimonioInput): MillonarioReadings {
   // "Libertad millonario" = independencia al 8% (sostener la vida actual). Misma base que el número
   // de independencia del reporte: compromiso total (fallback a monthlyExpenses).
   const independenceBase =
-    input.monthlyCommitment != null && input.monthlyCommitment > 0 ? input.monthlyCommitment : input.monthlyExpenses;
+    input.monthlyCommitment != null && input.monthlyCommitment > 0
+      ? input.monthlyCommitment
+      : input.monthlyExpenses;
   const numeroIndependencia = numeroPatrimonial(independenceBase);
   return {
     nominal: netWorth > 1_000_000,

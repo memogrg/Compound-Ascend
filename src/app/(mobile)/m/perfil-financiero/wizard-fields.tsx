@@ -100,7 +100,11 @@ export function SelectField({
   return (
     <div className="m-qfield">
       <QLabel>{label}</QLabel>
-      <select className="m-inp m-select" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+      <select
+        className="m-inp m-select"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      >
         <option value="" disabled>
           {placeholder}
         </option>
@@ -293,7 +297,12 @@ export function RankedChips({
         {options.map((o) => {
           const rank = sel.indexOf(o.value);
           const on = rank >= 0;
-          const cls = ["m-chip", "chip-ranked", on ? "sel" : "", on ? `chip-rank-${Math.min(rank + 1, 3)}` : ""]
+          const cls = [
+            "m-chip",
+            "chip-ranked",
+            on ? "sel" : "",
+            on ? `chip-rank-${Math.min(rank + 1, 3)}` : "",
+          ]
             .filter(Boolean)
             .join(" ");
           return (
@@ -389,11 +398,21 @@ export function Stepper({
     <div className="m-qfield">
       <QLabel>{label}</QLabel>
       <div className="m-stepper">
-        <button type="button" onClick={() => onChange(clamp(v - 1))} aria-label="Restar" disabled={v <= min}>
+        <button
+          type="button"
+          onClick={() => onChange(clamp(v - 1))}
+          aria-label="Restar"
+          disabled={v <= min}
+        >
           −
         </button>
         <span className="m-stepper-v mono">{v}</span>
-        <button type="button" onClick={() => onChange(clamp(v + 1))} aria-label="Sumar" disabled={v >= max}>
+        <button
+          type="button"
+          onClick={() => onChange(clamp(v + 1))}
+          aria-label="Sumar"
+          disabled={v >= max}
+        >
           +
         </button>
       </div>
@@ -468,7 +487,12 @@ export function EmailList({
             placeholder="correo@ejemplo.com"
             onChange={(e) => update(i, e.target.value)}
           />
-          <button type="button" className="m-emailrm" onClick={() => remove(i)} aria-label="Quitar correo">
+          <button
+            type="button"
+            className="m-emailrm"
+            onClick={() => remove(i)}
+            aria-label="Quitar correo"
+          >
             ✕
           </button>
         </div>

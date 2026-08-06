@@ -37,7 +37,10 @@ export async function buildWhatsAppToolContext(
   const supabase = createServiceRoleClient();
   const memberIds = await householdMemberIds(supabase, userId);
   const [debtsRes, primary] = await Promise.all([
-    supabase.from("debts").select("id, name, balance, apr, min_payment, currency").in("user_id", memberIds),
+    supabase
+      .from("debts")
+      .select("id, name, balance, apr, min_payment, currency")
+      .in("user_id", memberIds),
     getUserCurrency(userId), // service-role: user_settings.primary_currency (default CRC)
   ]);
 
@@ -89,7 +92,9 @@ export async function buildWhatsAppToolContext(
   try {
     const goalsRes = await supabase
       .from("savings_goals")
-      .select("name, target_amount, current_amount, monthly_contribution, currency, target_date, recurrence")
+      .select(
+        "name, target_amount, current_amount, monthly_contribution, currency, target_date, recurrence",
+      )
       .in("user_id", memberIds);
     const mapped = (goalsRes.data ?? [])
       .map((g) => ({
@@ -111,7 +116,8 @@ export async function buildWhatsAppToolContext(
           actual: conv(g.current),
           aporte_mensual: conv(g.monthly),
           fecha_objetivo: g.targetDate ?? null,
-          recurrence: (g.recurrence ?? "ninguna") as import("@/modules/control/engine/recurrence").Recurrence,
+          recurrence: (g.recurrence ??
+            "ninguna") as import("@/modules/control/engine/recurrence").Recurrence,
         };
       });
     if (mapped.length) toolContext.goals = mapped;

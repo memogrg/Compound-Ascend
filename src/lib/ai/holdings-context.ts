@@ -120,7 +120,11 @@ export function mapHoldingsForContext(
  * falta o falla en CUALQUIERA de los montos, la fila entera se queda en la moneda primaria (con
  * monedaFila = primaria): mejor una fila honesta en otra moneda que una mal rotulada.
  */
-function toContext(h: HoldingPerf, monedaPrimaria: string, convertir?: MontoConverter): HoldingContext {
+function toContext(
+  h: HoldingPerf,
+  monedaPrimaria: string,
+  convertir?: MontoConverter,
+): HoldingContext {
   const objetivo = holdingDisplayCurrency(h.assetType, h.currency);
   const base = {
     symbol: h.symbol || null,
@@ -147,9 +151,15 @@ function toContext(h: HoldingPerf, monedaPrimaria: string, convertir?: MontoConv
   const invested = convertir(h.costBasis, monedaPrimaria, objetivo);
   const value = convertir(h.currentValue, monedaPrimaria, objetivo);
   const pl = convertir(h.profitLoss, monedaPrimaria, objetivo);
-  const price = precioPrimario === null ? null : convertir(precioPrimario, monedaPrimaria, objetivo);
+  const price =
+    precioPrimario === null ? null : convertir(precioPrimario, monedaPrimaria, objetivo);
   // Un solo monto sin convertir invalida la fila: se vuelve a primaria, bien etiquetada.
-  if (invested === null || value === null || pl === null || (precioPrimario !== null && price === null)) {
+  if (
+    invested === null ||
+    value === null ||
+    pl === null ||
+    (precioPrimario !== null && price === null)
+  ) {
     return enPrimaria;
   }
   return {

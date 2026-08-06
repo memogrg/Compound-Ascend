@@ -52,7 +52,9 @@ export function renderSurplusDecision(r: SurplusDecisionReport): string {
         "lo que evita que un imprevisto se convierta en deuda nueva.",
     );
     out.push(`Tu excedente mensual hoy es ${money(r.monthlySurplus)}.`);
-    out.push("_Cuando los dos fondos estén cubiertos, volvé a preguntarme y hacemos la comparación completa._");
+    out.push(
+      "_Cuando los dos fondos estén cubiertos, volvé a preguntarme y hacemos la comparación completa._",
+    );
     return out.join("\n");
   }
 
@@ -86,7 +88,9 @@ export function renderSurplusDecision(r: SurplusDecisionReport): string {
         "Esto pasa sí o sí; no depende del mercado.",
     );
   } else {
-    out.push("**Certeza — abonar:** no tenés deuda registrada que abonar, así que este lado queda vacío.");
+    out.push(
+      "**Certeza — abonar:** no tenés deuda registrada que abonar, así que este lado queda vacío.",
+    );
   }
 
   if (r.invest.length > 0) {

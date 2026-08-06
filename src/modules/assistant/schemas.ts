@@ -5,9 +5,7 @@ export const transactionInputSchema = z
   .object({
     kind: z.enum(["ingreso", "gasto"]),
     description: z.string().trim().min(1, "Describe la transacción").max(160),
-    amount: z
-      .number({ error: "Monto inválido" })
-      .positive("El monto debe ser mayor a 0"),
+    amount: z.number({ error: "Monto inválido" }).positive("El monto debe ser mayor a 0"),
     currency: z.string().length(3),
     occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
     category: z.string().max(60).optional(), // etiqueta legible (display); no persiste
@@ -33,7 +31,9 @@ export type TransactionInput = z.infer<typeof transactionInputSchema>;
  */
 export const priceAlertInputSchema = z.object({
   symbol: z.string().trim().min(1, "Falta el símbolo").max(12),
-  targetPrice: z.number({ error: "Precio inválido" }).positive("El precio objetivo debe ser mayor a 0"),
+  targetPrice: z
+    .number({ error: "Precio inválido" })
+    .positive("El precio objetivo debe ser mayor a 0"),
   assetType: z.enum(["etf", "accion", "cripto"]),
   currency: z.string().length(3),
 });

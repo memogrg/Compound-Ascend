@@ -125,8 +125,7 @@ export function JarRow({
       // Verbo según el tipo: metas/inversiones "aportado", deudas/pólizas "pagado".
       const doneVerb =
         jar.linkedKind === "goal" || jar.linkedKind === "holding" ? "aportado" : "pagado";
-      const subList =
-        n > 0 ? jar.items.map((it) => it.name).join(", ") : jar.emptyText;
+      const subList = n > 0 ? jar.items.map((it) => it.name).join(", ") : jar.emptyText;
       return (
         <>
           <button
@@ -234,7 +233,9 @@ export function JarRow({
             <div className="small">Ver</div>
           </div>
         </button>
-        {open ? <JarLinkedModal jar={jar} currency={currency} onClose={() => setOpen(false)} /> : null}
+        {open ? (
+          <JarLinkedModal jar={jar} currency={currency} onClose={() => setOpen(false)} />
+        ) : null}
       </>
     );
   }

@@ -180,7 +180,14 @@ export function AppLockOverlay() {
     <div className="m-lock" role="dialog" aria-modal="true" aria-label="CARTERA+ bloqueado">
       <div className="m-lock-brand">
         <span className="m-lock-badge" aria-hidden>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="4" y="10" width="16" height="10" rx="2.5" />
             <path d="M8 10V7a4 4 0 0 1 8 0v3" />
             <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none" />
@@ -198,11 +205,21 @@ export function AppLockOverlay() {
       </div>
 
       <div className="m-lock-actions">
-        <button type="button" className="m-btn m-btn-block m-btn-primary" onClick={() => void runUnlock()} disabled={prompting}>
+        <button
+          type="button"
+          className="m-btn m-btn-block m-btn-primary"
+          onClick={() => void runUnlock()}
+          disabled={prompting}
+        >
           {prompting ? "Verificando…" : failed ? "Reintentar" : "Desbloquear"}
         </button>
         {failed ? (
-          <button type="button" className="m-lock-recover" onClick={() => void recover()} disabled={prompting}>
+          <button
+            type="button"
+            className="m-lock-recover"
+            onClick={() => void recover()}
+            disabled={prompting}
+          >
             ¿Problemas con la biometría? Cerrar sesión
           </button>
         ) : null}

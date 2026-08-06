@@ -14,7 +14,15 @@ import { BottomSheet } from "./bottom-sheet";
 export type Opt = { value: string; label: string };
 
 /** Envoltura: etiqueta + contenido + error inline (por `name`, como fieldErrors de Zod). */
-function Field({ name, label, children }: { name: string; label: string; children: React.ReactNode }) {
+function Field({
+  name,
+  label,
+  children,
+}: {
+  name: string;
+  label: string;
+  children: React.ReactNode;
+}) {
   const error = useFormError(name);
   return (
     <div className="m-qfield">
@@ -115,7 +123,12 @@ export function DateField({
 }) {
   return (
     <Field name={name} label={label}>
-      <input className="m-inp" type="date" value={value} onChange={(e) => onChange(e.target.value)} />
+      <input
+        className="m-inp"
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </Field>
   );
 }
@@ -180,7 +193,8 @@ export function SheetSelect({
   // ruido, pero el de categorías pasa de 100 opciones y encontrar "Farmacia" a fuerza de
   // scroll es la peor parte de esa hoja.
   const withSearch = options.length >= SEARCH_MIN_OPTIONS;
-  const shown = withSearch && query.trim() ? options.filter((o) => matches(o.label, query)) : options;
+  const shown =
+    withSearch && query.trim() ? options.filter((o) => matches(o.label, query)) : options;
   const error = useFormError(name);
 
   const close = () => {
@@ -196,8 +210,16 @@ export function SheetSelect({
         style={error ? { borderColor: "var(--neg, #c0392b)" } : undefined}
         onClick={() => setOpen(true)}
       >
-        <span className={selected ? "" : "m-sheetselect-ph"}>{selected ? selected.label : placeholder}</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+        <span className={selected ? "" : "m-sheetselect-ph"}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+        >
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>

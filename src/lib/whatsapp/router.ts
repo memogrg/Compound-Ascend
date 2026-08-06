@@ -70,7 +70,8 @@ const CONFIRM_RE = /^(s[ií]|yes|ok|dale|confirmar|confirmo|listo|1)$/;
 const EDIT_RE = /^(edit(ar)?|2)$/;
 const REVIEW_RE = /^(revisar|revisi[oó]n|movimientos|pendientes)$/;
 const HELP_RE = /^(ayuda|men[uú]|hola|help|empezar|start|\?)$/;
-const MOVE_HINT = "\n↩️ ¿Sobre equivocado? Respondé *mover a <sobre>* (agregá *siempre* para recordarlo).";
+const MOVE_HINT =
+  "\n↩️ ¿Sobre equivocado? Respondé *mover a <sobre>* (agregá *siempre* para recordarlo).";
 const HELP_TEXT =
   "👋 Soy tu asistente de CARTERA+. Puedo:\n\n" +
   "📸 Registrar un gasto: enviá una *foto* del recibo.\n" +
@@ -115,11 +116,7 @@ export async function routeInbound(provider: WhatsAppProvider, msg: InboundMessa
 }
 
 /** Arma los puertos de review-flow con el provider, el vínculo y los servicios. */
-function buildReviewDeps(
-  provider: WhatsAppProvider,
-  link: ActiveLink,
-  phone: string,
-): ReviewDeps {
+function buildReviewDeps(provider: WhatsAppProvider, link: ActiveLink, phone: string): ReviewDeps {
   return {
     getOldestPending: () => getOldestPendingProposal(link.userId, link.householdId),
     setPending: (action) => setPendingAction(link.id, action),
@@ -156,7 +153,10 @@ async function handleActiveMessage(
     }
     if (EDIT_RE.test(lower)) {
       await setPendingAction(link.id, null);
-      await provider.sendText(msg.phone, "Listo, descarté esa meta. Escribime de nuevo cómo la querés.");
+      await provider.sendText(
+        msg.phone,
+        "Listo, descarté esa meta. Escribime de nuevo cómo la querés.",
+      );
       return;
     }
     // No es confirmación: descartamos la meta vieja y seguimos con el input nuevo.
@@ -207,9 +207,7 @@ async function handleActiveMessage(
 
   // Ayuda / saludo: respuesta rápida sin consumir IA. Con nudge si hay pendientes.
   if (HELP_RE.test(lower)) {
-    const nudge = buildPendingNudge(
-      await countPendingProposals(link.userId, link.householdId),
-    );
+    const nudge = buildPendingNudge(await countPendingProposals(link.userId, link.householdId));
     await provider.sendText(msg.phone, nudge ? `${HELP_TEXT}\n\n${nudge}` : HELP_TEXT);
     return;
   }
@@ -268,7 +266,7 @@ async function handleMoveCommand(
   move: { sobre: string; alsoRule: boolean; amount: number | null },
 ): Promise<void> {
   if (!move.sobre) {
-    await provider.sendText(phone, '¿A qué sobre lo movemos? Probá: *mover a Paseos*.');
+    await provider.sendText(phone, "¿A qué sobre lo movemos? Probá: *mover a Paseos*.");
     return;
   }
   const res = await moveTransaction(link.userId, move.amount, move.sobre, move.alsoRule);

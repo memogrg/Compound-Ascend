@@ -185,7 +185,12 @@ export function RankedChips({
             <button
               type="button"
               key={o.value}
-              className={cn("chip-sel", "chip-ranked", on && "on", on && `chip-rank-${Math.min(rank + 1, 3)}`)}
+              className={cn(
+                "chip-sel",
+                "chip-ranked",
+                on && "on",
+                on && `chip-rank-${Math.min(rank + 1, 3)}`,
+              )}
               onClick={() => !full && toggle(o.value)}
               aria-pressed={on}
               aria-label={on ? `${o.label} (prioridad ${rank + 1})` : o.label}
@@ -202,7 +207,8 @@ export function RankedChips({
         })}
       </div>
       <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
-        Tocá en orden de prioridad — 1ª, 2ª y 3ª. Elegí al menos 1 (hasta {max}). {values.length}/{max}
+        Tocá en orden de prioridad — 1ª, 2ª y 3ª. Elegí al menos 1 (hasta {max}). {values.length}/
+        {max}
       </div>
     </div>
   );

@@ -151,7 +151,11 @@ export default async function MobileMiBase() {
             sub="operativo · real"
             tone={monthFlow.real.operatingFlow >= 0 ? "success" : "danger"}
           />
-          <MMetricCard label="Gasto / ingreso" value={formatPercent(t.expenseRatio)} sub="ratio del mes" />
+          <MMetricCard
+            label="Gasto / ingreso"
+            value={formatPercent(t.expenseRatio)}
+            sub="ratio del mes"
+          />
           <MMetricCard
             label="Presión financiera"
             value={<MChip tone={pressure.tone}>{pressure.label}</MChip>}
@@ -163,7 +167,7 @@ export default async function MobileMiBase() {
             sub={`${mAmount(real.avgDaily, currency, 9)}/día`}
           />
         </MMetricGrid>
-        {(monthFlow.capital.out > 0 || monthFlow.capital.in > 0 || monthFlow.pending.count > 0) ? (
+        {monthFlow.capital.out > 0 || monthFlow.capital.in > 0 || monthFlow.pending.count > 0 ? (
           <div className="muted" style={{ fontSize: 12, marginTop: -8, marginBottom: 16 }}>
             {monthFlow.capital.out > 0 || monthFlow.capital.in > 0
               ? `Capital: moviste ${mAmount(monthFlow.capital.out, currency, 9)} a inversiones/metas${monthFlow.capital.in > 0 ? ` · recuperaste ${mAmount(monthFlow.capital.in, currency, 9)}` : ""}. `
@@ -182,7 +186,9 @@ export default async function MobileMiBase() {
               <div className="display" style={{ fontSize: 16 }}>
                 {baseReading.title}
               </div>
-              <div style={{ fontSize: 14, lineHeight: 1.55, marginTop: 6 }}>{baseReading.diagnosis}</div>
+              <div style={{ fontSize: 14, lineHeight: 1.55, marginTop: 6 }}>
+                {baseReading.diagnosis}
+              </div>
               {baseReading.insights.length > 0 ? (
                 <div style={{ marginTop: 16 }}>
                   <div className="ov" style={{ marginBottom: 8 }}>
@@ -225,7 +231,11 @@ function ReadingList({ items, accent }: { items: string[]; accent?: boolean }) {
   return (
     <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
       {items.map((it, i) => (
-        <li key={i} className="row" style={{ alignItems: "flex-start", gap: 8, fontSize: 13, lineHeight: 1.45 }}>
+        <li
+          key={i}
+          className="row"
+          style={{ alignItems: "flex-start", gap: 8, fontSize: 13, lineHeight: 1.45 }}
+        >
           <span
             style={{
               width: 6,

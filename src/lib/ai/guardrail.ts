@@ -42,7 +42,8 @@ const DIRECTIVE =
   /deber[ií]as|ten[ée]s que|tienes que|debes|convien|declar|deduc|no pagu|exent|aprovech|report/;
 
 // R3 — recomendación de invertir/asumir riesgo (tema de inversión + verbo de recomendación).
-const INVEST = /invert|acciones|bolsa|cripto|etf|fondo de inversion|asumir riesgo|tomar (mas )?riesgo|arriesg/;
+const INVEST =
+  /invert|acciones|bolsa|cripto|etf|fondo de inversion|asumir riesgo|tomar (mas )?riesgo|arriesg/;
 const RECOMMEND = /recomiend|deber[ií]as|convien|sugier|te conviene|empez/;
 
 /**

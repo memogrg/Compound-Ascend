@@ -308,7 +308,10 @@ export async function enableAppLock(): Promise<{ ok: boolean; message?: string }
   }
   const v = await verifyIdentity();
   if (!v.ok) {
-    return { ok: false, message: `No se pudo verificar: ${v.message ?? "sin detalle"} [code=${v.code}]` };
+    return {
+      ok: false,
+      message: `No se pudo verificar: ${v.message ?? "sin detalle"} [code=${v.code}]`,
+    };
   }
   await writeFlag(true);
   notifyChanged(true);

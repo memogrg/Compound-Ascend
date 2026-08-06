@@ -121,14 +121,17 @@ const reconcileSchema = z.number().min(0, "El saldo no puede ser negativo.");
 /** Fija el saldo inicial de liquidez (estado vacío). */
 export async function setOpeningBalanceAction(amount: number): Promise<ActionResult> {
   const parsed = openingSchema.safeParse(amount);
-  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Monto no válido." };
+  if (!parsed.success)
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Monto no válido." };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await setOpeningBalance(parsed.data);
     revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {
-    logger.error("setOpeningBalance fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("setOpeningBalance fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos guardar tu saldo inicial." };
   }
 }
@@ -136,7 +139,8 @@ export async function setOpeningBalanceAction(amount: number): Promise<ActionRes
 /** Reconciliación 1-toque: ajusta el saldo al valor real de hoy. */
 export async function reconcileBalanceAction(realBalance: number): Promise<ActionResult> {
   const parsed = reconcileSchema.safeParse(realBalance);
-  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Monto no válido." };
+  if (!parsed.success)
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Monto no válido." };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await reconcileBalance(parsed.data);

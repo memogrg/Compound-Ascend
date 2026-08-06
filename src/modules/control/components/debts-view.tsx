@@ -498,70 +498,72 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
           const filaMin = otraMoneda && raw ? raw.minPayment : d.minPayment;
           return (
             <div key={d.id} style={{ position: "relative" }}>
-            <Link href={`/deudas/${d.id}`} className="debt-row">
-              <span className="debt-ic" style={{ background: debtGradient(d.debtType) }}>
-                {i + 1}
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <div className="debt-name">{d.name}</div>
-                <div className="debt-sub">
-                  {d.debtType ?? "Deuda"}
-                  {d.bank ? ` · ${d.bank}` : ""}
-                  {d.rateType === "variable" ? " · variable" : ""}
-                  {i === 0 ? " · pagar primero" : ""}
-                </div>
-                {d.dueSoon && d.nextDue ? (
-                  <div style={{ fontSize: 11, color: "var(--neg)", marginTop: 3, fontWeight: 500 }}>
-                    Vence el {dueLabel(d.nextDue)} —{" "}
-                    {formatMoney(filaMensual > 0 ? filaMensual : filaMin, filaCur)}
-                  </div>
-                ) : null}
-                {d.rateNote ? (
-                  <div style={{ fontSize: 11, color: "var(--warn)", marginTop: 3 }}>
-                    {d.rateNote}
-                  </div>
-                ) : null}
-              </div>
-              <div className="dbar">
-                <div className="bar-track">
-                  <div
-                    className="bar-fill"
-                    style={{
-                      width: `${d.originalAmount ? Math.min(100, (d.balance / d.originalAmount) * 100) : 100}%`,
-                      background: debtColor(d.debtType),
-                    }}
-                  />
-                </div>
-                <div className="dbar-meta">
-                  <span>
-                    {filaOriginal
-                      ? `${formatMoney(saldo.amount, filaCur)} de ${formatMoney(filaOriginal, filaCur)}`
-                      : formatMoney(saldo.amount, filaCur)}
-                  </span>
-                  <span>
-                    {filaMensual > 0
-                      ? `${formatMoney(filaMensual, filaCur)}/mes`
-                      : `mín. ${formatMoney(filaMin, filaCur)}`}
-                  </span>
-                </div>
-              </div>
-              <div className={`drate${isHighest ? " high" : ""}`}>
-                <div className="r">{d.apr.toFixed(1)}%</div>
-                <div className="l">TAE</div>
-              </div>
-              <div className="dbal">
-                <div>
-                  <div className="b">{formatMoney(saldo.amount, filaCur)}</div>
-                  <div className="m">≈ {monthsToText(s.monthsRemaining)}</div>
-                </div>
-                <span className="chev">
-                  <Icon name="chev" width={1.8} />
+              <Link href={`/deudas/${d.id}`} className="debt-row">
+                <span className="debt-ic" style={{ background: debtGradient(d.debtType) }}>
+                  {i + 1}
                 </span>
-              </div>
-            </Link>
-            {raw ? (
-              <DebtRowActions debt={raw} currency={currency} indexRates={indexRates} />
-            ) : null}
+                <div style={{ minWidth: 0 }}>
+                  <div className="debt-name">{d.name}</div>
+                  <div className="debt-sub">
+                    {d.debtType ?? "Deuda"}
+                    {d.bank ? ` · ${d.bank}` : ""}
+                    {d.rateType === "variable" ? " · variable" : ""}
+                    {i === 0 ? " · pagar primero" : ""}
+                  </div>
+                  {d.dueSoon && d.nextDue ? (
+                    <div
+                      style={{ fontSize: 11, color: "var(--neg)", marginTop: 3, fontWeight: 500 }}
+                    >
+                      Vence el {dueLabel(d.nextDue)} —{" "}
+                      {formatMoney(filaMensual > 0 ? filaMensual : filaMin, filaCur)}
+                    </div>
+                  ) : null}
+                  {d.rateNote ? (
+                    <div style={{ fontSize: 11, color: "var(--warn)", marginTop: 3 }}>
+                      {d.rateNote}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="dbar">
+                  <div className="bar-track">
+                    <div
+                      className="bar-fill"
+                      style={{
+                        width: `${d.originalAmount ? Math.min(100, (d.balance / d.originalAmount) * 100) : 100}%`,
+                        background: debtColor(d.debtType),
+                      }}
+                    />
+                  </div>
+                  <div className="dbar-meta">
+                    <span>
+                      {filaOriginal
+                        ? `${formatMoney(saldo.amount, filaCur)} de ${formatMoney(filaOriginal, filaCur)}`
+                        : formatMoney(saldo.amount, filaCur)}
+                    </span>
+                    <span>
+                      {filaMensual > 0
+                        ? `${formatMoney(filaMensual, filaCur)}/mes`
+                        : `mín. ${formatMoney(filaMin, filaCur)}`}
+                    </span>
+                  </div>
+                </div>
+                <div className={`drate${isHighest ? " high" : ""}`}>
+                  <div className="r">{d.apr.toFixed(1)}%</div>
+                  <div className="l">TAE</div>
+                </div>
+                <div className="dbal">
+                  <div>
+                    <div className="b">{formatMoney(saldo.amount, filaCur)}</div>
+                    <div className="m">≈ {monthsToText(s.monthsRemaining)}</div>
+                  </div>
+                  <span className="chev">
+                    <Icon name="chev" width={1.8} />
+                  </span>
+                </div>
+              </Link>
+              {raw ? (
+                <DebtRowActions debt={raw} currency={currency} indexRates={indexRates} />
+              ) : null}
             </div>
           );
         })}
@@ -713,11 +715,7 @@ function RegisterPaymentModal({
   };
 
   return (
-    <Modal
-      title="Registrar pago"
-      sub="Elige la deuda y el tipo de pago."
-      onClose={onClose}
-    >
+    <Modal title="Registrar pago" sub="Elige la deuda y el tipo de pago." onClose={onClose}>
       <form onSubmit={submit}>
         <div className="modal-body">
           <div className="fld">
@@ -758,7 +756,9 @@ function RegisterPaymentModal({
 
           <div className="fld-2">
             <div className="fld">
-              <label className="fld-label">{kind === "extraordinario" ? "Monto del abono" : "Monto de la cuota"}</label>
+              <label className="fld-label">
+                {kind === "extraordinario" ? "Monto del abono" : "Monto de la cuota"}
+              </label>
               <div className="inp-money">
                 <input
                   type="number"
@@ -891,12 +891,7 @@ function DebtRowActions({
             <button type="button" className="btn btn-ghost" onClick={() => setDeleting(false)}>
               Cancelar
             </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={pending}
-              onClick={onDelete}
-            >
+            <button type="button" className="btn btn-danger" disabled={pending} onClick={onDelete}>
               {pending ? "Eliminando…" : "Eliminar"}
             </button>
           </div>

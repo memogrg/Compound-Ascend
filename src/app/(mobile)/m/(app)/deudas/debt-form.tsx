@@ -66,7 +66,9 @@ export function DebtForm({
   const [currentPayment, setCurrentPayment] = useState<number | undefined>(initial?.currentPayment);
   const [minPayment, setMinPayment] = useState<number | undefined>(initial?.minPayment);
   const [apr, setApr] = useState(initial?.apr != null ? String(initial.apr) : "");
-  const [termMonths, setTerm] = useState(initial?.termMonths != null ? String(initial.termMonths) : "");
+  const [termMonths, setTerm] = useState(
+    initial?.termMonths != null ? String(initial.termMonths) : "",
+  );
   // ALTA: la PRINCIPAL del contexto (importe libre); edición: la nativa del ítem. Antes
   // caía a `currency`, la de visualización del topbar — la siembra equivocada.
   const captureCurrency = useCaptureCurrency();
@@ -139,7 +141,13 @@ export function DebtForm({
         placeholder="BAC, BCR, Nu…"
         maxLength={80}
       />
-      <MoneyField name="balance" label="Saldo actual" value={balance} onChange={setBalance} currency={cur} />
+      <MoneyField
+        name="balance"
+        label="Saldo actual"
+        value={balance}
+        onChange={setBalance}
+        currency={cur}
+      />
       <MoneyField
         name="originalAmount"
         label="Monto original (opcional)"
@@ -161,7 +169,13 @@ export function DebtForm({
         onChange={setMinPayment}
         currency={cur}
       />
-      <TextField name="apr" label="Tasa anual TAE % (opcional)" value={apr} onChange={setApr} placeholder="24.9" />
+      <TextField
+        name="apr"
+        label="Tasa anual TAE % (opcional)"
+        value={apr}
+        onChange={setApr}
+        placeholder="24.9"
+      />
       <TextField
         name="termMonths"
         label="Plazo en meses (opcional)"
@@ -169,7 +183,14 @@ export function DebtForm({
         onChange={setTerm}
         placeholder="36"
       />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
     </FormShell>
   );
 }

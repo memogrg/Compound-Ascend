@@ -46,7 +46,11 @@ export function MoneyField({
 
   return (
     <div className="fld">
-      <label className="fld-label" htmlFor={inputId} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <label
+        className="fld-label"
+        htmlFor={inputId}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
         {label}
         {tip ? (
           <span

@@ -20,11 +20,7 @@ import { can, type Feature, type Plan } from "@/lib/plan";
 export async function getUserPlan(): Promise<Plan> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("profiles")
-    .select("plan")
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
   return (data?.plan ?? "free") as Plan;
 }
 

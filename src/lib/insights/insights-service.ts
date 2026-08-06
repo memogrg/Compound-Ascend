@@ -75,17 +75,14 @@ export async function refreshInsights(): Promise<void> {
     const last = await getInsightsFreshness();
     if (!isStale(last)) return; // guardia de frescura
     // Import dinámico para no acoplar lib/insights con el módulo control.
-    const { listGoals, listDebts } = await import(
-      "@/modules/control/services/control-service"
-    );
+    const { listGoals, listDebts } = await import("@/modules/control/services/control-service");
     const [goals, debts] = await Promise.all([listGoals(), listDebts()]);
     const detected = runDetectors({ goals, debts });
     const spend = await getDisfruteSpend();
     if (spend) detected.push(...detectDisfruteSpike(spend));
     try {
-      const { listOpenContributions } = await import(
-        "@/modules/wealth/services/contribution-service"
-      );
+      const { listOpenContributions } =
+        await import("@/modules/wealth/services/contribution-service");
       const contribs = await listOpenContributions();
       detected.push(...detectOpenContributions(contribs));
     } catch {
@@ -239,12 +236,9 @@ async function getDisfruteSpend(): Promise<{
   priorAvg: number;
   categoryId: string;
 } | null> {
-  const { listCategories } = await import(
-    "@/modules/financial-base/services/categories-service"
-  );
-  const { listTransactions } = await import(
-    "@/modules/financial-base/services/transaction-service"
-  );
+  const { listCategories } = await import("@/modules/financial-base/services/categories-service");
+  const { listTransactions } =
+    await import("@/modules/financial-base/services/transaction-service");
   const { previousMonthPeriod } = await import("@/modules/financial-base/engine/period");
 
   const cats = await listCategories();
@@ -383,9 +377,8 @@ export async function writeDailyInsightForUserCron(
  * algo falla (el orquestador lo trata best-effort).
  */
 export async function generateDailyRitualForUser(userId: string): Promise<void> {
-  const { getPatrimonioReportForUser, buildDailyPatrimonioInsight } = await import(
-    "@/modules/wealth"
-  );
+  const { getPatrimonioReportForUser, buildDailyPatrimonioInsight } =
+    await import("@/modules/wealth");
   const { report, level, diagnosis } = await getPatrimonioReportForUser(userId);
   const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
   await writeDailyInsightForUserCron(userId, detected);

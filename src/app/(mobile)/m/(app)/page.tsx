@@ -47,7 +47,6 @@ function recentPeriod(now: Date): Period {
   return { month: now.getMonth() + 1, year: now.getFullYear(), from, to, label: "recientes" };
 }
 
-
 /** Ruta móvil por pilar para los accesos rápidos (pantallas /m ya construidas).
  *  "ahorro" apunta a las metas de ahorro (/m/ingresos sigue accesible por URL). */
 const M_ROUTE: Record<string, string> = {
@@ -286,7 +285,9 @@ export default async function MobileHome() {
               categories={selectableCategoryLeaves(view.categories)}
               jars={recentJars}
               accounts={view.accounts}
-              incomeCats={view.incomeTree.flatMap((g) => g.children).map((c) => ({ id: c.id, name: c.name }))}
+              incomeCats={view.incomeTree
+                .flatMap((g) => g.children)
+                .map((c) => ({ id: c.id, name: c.name }))}
               incomeGroupId={view.incomeTree[0]?.id ?? null}
               balanceAfter={liq?.afterByTxn}
             />
@@ -306,8 +307,6 @@ export default async function MobileHome() {
   );
 }
 
-
-
 function StarIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" style={{ width: 19, height: 19 }}>
@@ -317,7 +316,12 @@ function StarIcon() {
 }
 
 function PillarIcon({ k }: { k: "flujo" | "ahorro" | "deudas" | "inversiones" }) {
-  const common = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2 } as const;
+  const common = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+  } as const;
   if (k === "inversiones") {
     return (
       <svg {...common}>

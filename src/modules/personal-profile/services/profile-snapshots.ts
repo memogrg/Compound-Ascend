@@ -57,9 +57,7 @@ export async function captureProfileSnapshot(draft: ProfileDraft): Promise<void>
 
     // Patrimonio neto: lectura cara, en su propio try/catch (opcional).
     try {
-      const { getRichLifeSummary } = await import(
-        "@/modules/rich-life/services/rich-life-service"
-      );
+      const { getRichLifeSummary } = await import("@/modules/rich-life/services/rich-life-service");
       const rich = await getRichLifeSummary();
       metrics.netWorth = rich.snapshot.indicators.netWorth;
     } catch {

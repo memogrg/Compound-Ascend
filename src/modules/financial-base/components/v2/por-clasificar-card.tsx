@@ -12,7 +12,10 @@ import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { assignCategoryAction } from "@/modules/financial-base/api/v2-actions";
-import { categoryMatchesKind, type SelectableCategory } from "@/modules/financial-base/engine/classify";
+import {
+  categoryMatchesKind,
+  type SelectableCategory,
+} from "@/modules/financial-base/engine/classify";
 import type { Transaction } from "@/modules/financial-base/types";
 
 const HELP =
@@ -130,7 +133,9 @@ export function PorClasificarCard({
         <div style={{ padding: "0 18px 12px", borderTop: "1px solid var(--line)" }}>
           {visible.map((t) => {
             const rowBusy = pending && busy === t.id;
-            const options = categories.filter((c) => categoryMatchesKind(c.categoryType, t.kind as "gasto" | "ingreso"));
+            const options = categories.filter((c) =>
+              categoryMatchesKind(c.categoryType, t.kind as "gasto" | "ingreso"),
+            );
             const sug = suggested?.[t.id];
             const sugName = sug ? options.find((o) => o.id === sug)?.name : undefined;
             return (
@@ -158,13 +163,21 @@ export function PorClasificarCard({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {t.merchantOrSource ?? t.description ?? (t.kind === "ingreso" ? "Ingreso" : "Gasto")}
+                  {t.merchantOrSource ??
+                    t.description ??
+                    (t.kind === "ingreso" ? "Ingreso" : "Gasto")}
                 </span>
                 <span className="muted" style={{ flex: "none" }}>
                   {t.occurredOn}
                 </span>
                 <span
-                  style={{ display: "inline-flex", gap: 8, marginLeft: "auto", alignItems: "center", flex: "none" }}
+                  style={{
+                    display: "inline-flex",
+                    gap: 8,
+                    marginLeft: "auto",
+                    alignItems: "center",
+                    flex: "none",
+                  }}
                 >
                   {sug && sugName ? (
                     <span
@@ -183,7 +196,11 @@ export function PorClasificarCard({
                       </button>
                     </span>
                   ) : null}
-                  <label className="tip" data-tip="Crear una regla para este comercio" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}>
+                  <label
+                    className="tip"
+                    data-tip="Crear una regla para este comercio"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11 }}
+                  >
                     <input
                       type="checkbox"
                       checked={remember.has(t.id)}

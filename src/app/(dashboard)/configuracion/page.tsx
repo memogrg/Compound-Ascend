@@ -14,7 +14,11 @@ import {
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Icon } from "@/components/ui/icon";
-import { HouseholdMembers, listHouseholdMembers, type HouseholdMembersView } from "@/modules/personal-profile";
+import {
+  HouseholdMembers,
+  listHouseholdMembers,
+  type HouseholdMembersView,
+} from "@/modules/personal-profile";
 import { isEmailConfigured } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getMyLink } from "@/lib/whatsapp/links-service";
@@ -167,8 +171,8 @@ export default async function Page() {
         desc={
           <>
             Configurá en tu correo un reenvío de los avisos de tu banco a{" "}
-            <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el
-            que reenviás.
+            <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el que
+            reenviás.
           </>
         }
       >

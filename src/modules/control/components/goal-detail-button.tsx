@@ -13,7 +13,10 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { formatMoney } from "@/lib/format";
 import { getGoalDetailAction, revertGoalMovementAction } from "@/modules/control/api/actions";
-import type { GoalDetailVM, GoalMovementType } from "@/modules/control/services/goal-detail-service";
+import type {
+  GoalDetailVM,
+  GoalMovementType,
+} from "@/modules/control/services/goal-detail-service";
 import type { SavingsGoal } from "@/modules/control/types";
 
 const TYPE_LABEL: Record<GoalMovementType, string> = {
@@ -29,7 +32,8 @@ const TYPE_TIP: Record<GoalMovementType, string> = {
   aporte: "Metiste plata al frasco (cuenta como ahorro del mes)",
   gasto: "Consumiste el frasco en una compra (off-budget: no toca tu presupuesto del mes)",
   retiro: "Devolviste la plata a tu cuenta (ingreso)",
-  reinicio: "El frasco recurrente reinició el período: la meta se restauró y el sobrante se arrastró",
+  reinicio:
+    "El frasco recurrente reinició el período: la meta se restauró y el sobrante se arrastró",
 };
 
 function fmtDate(iso: string | null): string {
@@ -125,7 +129,11 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
                   >
                     <span
                       className="chip"
-                      style={{ background: "var(--info-soft)", color: "var(--info)", fontWeight: 600 }}
+                      style={{
+                        background: "var(--info-soft)",
+                        color: "var(--info)",
+                        fontWeight: 600,
+                      }}
                     >
                       Categoría: {vm.defaultCategoryLabel}
                     </span>
@@ -200,7 +208,11 @@ export function GoalDetailButton({ goal }: { goal: SavingsGoal }) {
                                   <button
                                     type="button"
                                     className="btn btn-ghost"
-                                    style={{ fontSize: 11, padding: "3px 7px", color: "var(--neg)" }}
+                                    style={{
+                                      fontSize: 11,
+                                      padding: "3px 7px",
+                                      color: "var(--neg)",
+                                    }}
                                     disabled={pendingId === m.id}
                                     onClick={() => void revert(m.id)}
                                   >

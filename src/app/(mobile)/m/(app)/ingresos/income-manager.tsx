@@ -232,7 +232,9 @@ export function IncomeManager({
           ofrece la elección: registrar un ingreso a una fuente (primero) o crear fuente. */}
       <Fab
         onClick={() => (sources.length === 0 ? setAdding(true) : setPlusOpen(true))}
-        label={sources.length === 0 ? "Nueva fuente de ingreso" : "Registrar ingreso o crear fuente"}
+        label={
+          sources.length === 0 ? "Nueva fuente de ingreso" : "Registrar ingreso o crear fuente"
+        }
       />
 
       {/* El "+" contextual: registrar un ingreso a una fuente existente o crear una nueva. */}
@@ -294,7 +296,11 @@ export function IncomeManager({
       </BottomSheet>
 
       {/* Recibido → movimiento real (transactions) vinculado a la fuente */}
-      <BottomSheet open={!!receiving} onClose={() => setReceiving(null)} title="Registrar lo recibido">
+      <BottomSheet
+        open={!!receiving}
+        onClose={() => setReceiving(null)}
+        title="Registrar lo recibido"
+      >
         {receiving ? (
           <ReceiveForm
             source={receiving}
@@ -321,7 +327,9 @@ export function IncomeManager({
         open={!!deleting}
         title="Eliminar fuente"
         message={
-          deleting ? `Se eliminará "${deleting.name}". Los movimientos ya recibidos no se borran.` : undefined
+          deleting
+            ? `Se eliminará "${deleting.name}". Los movimientos ya recibidos no se borran.`
+            : undefined
         }
         confirmLabel="Eliminar"
         variant="danger"

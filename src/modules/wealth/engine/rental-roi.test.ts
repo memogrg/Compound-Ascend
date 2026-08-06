@@ -49,9 +49,16 @@ describe("computeRentalRoi", () => {
 
   it("sin efectivo invertido el ROI es 0 (no divide por cero)", () => {
     const r = computeRentalRoi({
-      rentalIncome: 500, rentalFrequency: "mensual", vacancyPct: 0, mgmtPct: 0,
-      maintenanceMonthly: 0, hoaMonthly: 0, servicesMonthly: 0,
-      propertyTaxAnnual: 0, insuranceAnnual: 0, investedCash: 0,
+      rentalIncome: 500,
+      rentalFrequency: "mensual",
+      vacancyPct: 0,
+      mgmtPct: 0,
+      maintenanceMonthly: 0,
+      hoaMonthly: 0,
+      servicesMonthly: 0,
+      propertyTaxAnnual: 0,
+      insuranceAnnual: 0,
+      investedCash: 0,
     });
     expect(r.operatingRoi).toBe(0);
   });

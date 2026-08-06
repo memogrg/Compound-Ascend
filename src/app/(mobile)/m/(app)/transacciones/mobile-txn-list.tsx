@@ -219,7 +219,13 @@ export function MobileTxnList({
       </div>
 
       <MSectionHeader
-        title={filter === "all" ? "Todas las transacciones" : filter === "ingreso" ? "Ingresos" : "Gastos"}
+        title={
+          filter === "all"
+            ? "Todas las transacciones"
+            : filter === "ingreso"
+              ? "Ingresos"
+              : "Gastos"
+        }
         action={
           <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)" }}>
             {list.length} · {periodLabel}
@@ -451,15 +457,7 @@ export function ManagedTxnRows({
  * decía lo mismo y dejaba el subtítulo a 1px de cortarse a 375px. Las gestionables no llevan
  * chevron: se tocan para abrir sus acciones y se deslizan para editar.
  */
-function TxnRow({
-  t,
-  flow,
-  currency,
-}: {
-  t: Transaction;
-  flow: MoneyFlow;
-  currency: string;
-}) {
+function TxnRow({ t, flow, currency }: { t: Transaction; flow: MoneyFlow; currency: string }) {
   const name = t.merchantOrSource || t.description || KIND_LABEL[t.kind];
   const amount = `${effectSign(flow.effect)}${mAmount(Math.abs(t.amount), t.currency || currency, 10)}`;
   return (
@@ -544,7 +542,10 @@ function TxnDetail({
       <DetailRow label="Fecha" value={fullDate} />
       {flow.isJarSpend ? (
         <>
-          <DetailRow label="Salió del frasco" value={<span style={{ color }}>{flow.fromLabel}</span>} />
+          <DetailRow
+            label="Salió del frasco"
+            value={<span style={{ color }}>{flow.fromLabel}</span>}
+          />
           <DetailRow label="Pagado con" value={cat} />
         </>
       ) : (

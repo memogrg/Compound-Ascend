@@ -30,7 +30,15 @@ export function AuthSuccess({
         }}
         aria-hidden
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" style={{ width: 30, height: 30 }}>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ width: 30, height: 30 }}
+        >
           <path d="m5 12 5 5 9-11" />
         </svg>
       </span>

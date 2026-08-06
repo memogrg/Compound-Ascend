@@ -200,7 +200,10 @@ export function QuickAddModal({
           ) : null}
 
           <div className="fld">
-            <label className="fld-label" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <label
+              className="fld-label"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
               Monto
               <span
                 className="tip"

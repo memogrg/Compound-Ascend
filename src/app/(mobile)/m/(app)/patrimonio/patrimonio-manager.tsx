@@ -22,7 +22,13 @@ import {
 import type { Asset, Liability } from "@/modules/rich-life/types";
 
 import { Fab, BottomSheet, SwipeRow, ConfirmDialog, useToast } from "../../components/form-kit";
-import { MContentCard, MSectionHeader, MDataRow, MEmptyState, mAmount } from "../../components/content-kit";
+import {
+  MContentCard,
+  MSectionHeader,
+  MDataRow,
+  MEmptyState,
+  mAmount,
+} from "../../components/content-kit";
 import {
   WealthItemForm,
   type AssetValues,
@@ -82,7 +88,8 @@ export function PatrimonioManager({
   const confirmDelete = async () => {
     if (!del) return;
     setDelPending(true);
-    const res = del.kind === "asset" ? await removeAssetAction(del.id) : await removeLiabilityAction(del.id);
+    const res =
+      del.kind === "asset" ? await removeAssetAction(del.id) : await removeLiabilityAction(del.id);
     setDelPending(false);
     if (res.ok) {
       toast.show(del.kind === "asset" ? "Activo eliminado" : "Pasivo eliminado", "success");
@@ -114,7 +121,11 @@ export function PatrimonioManager({
                   no un agregado — no se convierte ni se suma aquí. */}
               <MContentCard style={{ padding: 0, overflow: "hidden" }}>
                 {assets.map((a) => (
-                  <SwipeRow key={a.id} onEdit={() => setEditAsset(a)} onDelete={() => setDel({ kind: "asset", id: a.id, name: a.name })}>
+                  <SwipeRow
+                    key={a.id}
+                    onEdit={() => setEditAsset(a)}
+                    onDelete={() => setDel({ kind: "asset", id: a.id, name: a.name })}
+                  >
                     {/* icon+iconTone (no leading): casa/tarjeta SON glifos del set, y el tinte
                         verde/rojo distingue lo que suma de lo que resta antes de leer el monto. */}
                     <MDataRow
@@ -136,7 +147,11 @@ export function PatrimonioManager({
               <MSectionHeader title="Pasivos" />
               <MContentCard style={{ padding: 0, overflow: "hidden" }}>
                 {liabilities.map((l) => (
-                  <SwipeRow key={l.id} onEdit={() => setEditLiab(l)} onDelete={() => setDel({ kind: "liability", id: l.id, name: l.name })}>
+                  <SwipeRow
+                    key={l.id}
+                    onEdit={() => setEditLiab(l)}
+                    onDelete={() => setDel({ kind: "liability", id: l.id, name: l.name })}
+                  >
                     <MDataRow
                       icon="debt"
                       iconTone="danger"

@@ -203,8 +203,12 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       const withDue = ov.debts
         .filter((d) => d.nextDue)
         .map((d) => ({ d, due: d.nextDue!.slice(0, 10) }));
-      const upcoming = withDue.filter((x) => x.due >= today).sort((a, b) => a.due.localeCompare(b.due));
-      const overdue = withDue.filter((x) => x.due < today).sort((a, b) => b.due.localeCompare(a.due));
+      const upcoming = withDue
+        .filter((x) => x.due >= today)
+        .sort((a, b) => a.due.localeCompare(b.due));
+      const overdue = withDue
+        .filter((x) => x.due < today)
+        .sort((a, b) => b.due.localeCompare(a.due));
       const pick = upcoming[0] ?? overdue[0];
       if (pick) {
         nextDebtName = pick.d.name;
@@ -266,7 +270,9 @@ export async function getWidgetSnapshotAction(): Promise<WidgetSnapshot | null> 
       updatedAt: new Date().toISOString(),
     };
   } catch (err) {
-    logger.error("getWidgetSnapshot fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("getWidgetSnapshot fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return null;
   }
 }

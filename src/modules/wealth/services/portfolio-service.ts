@@ -6,7 +6,11 @@ import "server-only";
  * principal del usuario antes de pasarse al motor.
  */
 import { requireUser } from "@/lib/auth/session";
-import { getMarketPrice, getCryptoPricesBatch, type AssetType as MarketAssetType } from "@/lib/market-data";
+import {
+  getMarketPrice,
+  getCryptoPricesBatch,
+  type AssetType as MarketAssetType,
+} from "@/lib/market-data";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { isValidPrice } from "@/lib/market-data/validity";
 import { convertCurrency } from "@/lib/fx";
@@ -68,9 +72,7 @@ export async function fetchNormalizedPrices(
   const cryptoSymbols = quotable
     .filter((h) => MARKET_TYPE[h.assetType] === "crypto")
     .map((h) => h.symbol);
-  const cryptoPrices = cryptoSymbols.length
-    ? await getCryptoPricesBatch(cryptoSymbols)
-    : {};
+  const cryptoPrices = cryptoSymbols.length ? await getCryptoPricesBatch(cryptoSymbols) : {};
 
   await Promise.all(
     quotable.map(async (h) => {
@@ -112,7 +114,13 @@ const FALLBACK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * vivo (no servir un precio rancio como vigente), y se fija con tests sin tocar la BD.
  */
 export function pickFreshCachePrice(
-  rows: { symbol: string; asset_type: string; price: number | string; currency: string; fetched_at: string }[],
+  rows: {
+    symbol: string;
+    asset_type: string;
+    price: number | string;
+    currency: string;
+    fetched_at: string;
+  }[],
   now: number,
   maxAgeMs: number,
 ): Map<string, { price: number; currency: string }> {

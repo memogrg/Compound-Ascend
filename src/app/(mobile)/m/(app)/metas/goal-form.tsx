@@ -101,7 +101,9 @@ export function GoalForm({
   const [targetAmount, setTargetAmount] = useState<number | undefined>(
     initial?.targetAmount ?? undefined,
   );
-  const [monthlyContribution, setMonthly] = useState<number | undefined>(initial?.monthlyContribution);
+  const [monthlyContribution, setMonthly] = useState<number | undefined>(
+    initial?.monthlyContribution,
+  );
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [priority, setPriority] = useState(initial?.priority ?? "media");
   const [recurrence, setRecurrence] = useState(initial?.recurrence ?? "ninguna");
@@ -162,7 +164,13 @@ export function GoalForm({
   // El toggle (Normal/Defensa + selector de protección) va en ambas ramas.
   const toggle = (
     <>
-      <Segmented name="mode" label="Tipo de ahorro" value={mode} onChange={setMode} options={MODE_OPTS} />
+      <Segmented
+        name="mode"
+        label="Tipo de ahorro"
+        value={mode}
+        onChange={setMode}
+        options={MODE_OPTS}
+      />
       {isDefense ? (
         <SheetSelect
           name="defenseKind"
@@ -211,9 +219,28 @@ export function GoalForm({
           placeholder={isVida ? "Seguro de vida" : "Seguro de gastos mayores"}
           maxLength={120}
         />
-        <MoneyField name="targetAmount" label="Monto meta" value={targetAmount} onChange={setTargetAmount} currency={cur} />
-        <MoneyField name="monthlyContribution" label="Aporte mensual" value={monthlyContribution} onChange={setMonthly} currency={cur} />
-        <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia" />
+        <MoneyField
+          name="targetAmount"
+          label="Monto meta"
+          value={targetAmount}
+          onChange={setTargetAmount}
+          currency={cur}
+        />
+        <MoneyField
+          name="monthlyContribution"
+          label="Aporte mensual"
+          value={monthlyContribution}
+          onChange={setMonthly}
+          currency={cur}
+        />
+        <SheetSelect
+          name="recurrence"
+          label="Recurrencia"
+          value={recurrence}
+          onChange={setRecurrence}
+          options={RECUR_OPTS}
+          sheetTitle="Recurrencia"
+        />
         <TextField
           name="provider"
           label="Aseguradora (opcional)"
@@ -222,8 +249,20 @@ export function GoalForm({
           placeholder="Nombre"
           maxLength={80}
         />
-        <MoneyField name="coverage" label="Suma asegurada (opcional)" value={coverage} onChange={setCoverage} currency={cur} />
-        <MoneyField name="premium" label="Prima (opcional)" value={premium} onChange={setPremium} currency={cur} />
+        <MoneyField
+          name="coverage"
+          label="Suma asegurada (opcional)"
+          value={coverage}
+          onChange={setCoverage}
+          currency={cur}
+        />
+        <MoneyField
+          name="premium"
+          label="Prima (opcional)"
+          value={premium}
+          onChange={setPremium}
+          currency={cur}
+        />
         <SheetSelect
           name="premiumFrequency"
           label="Frecuencia de prima (opcional)"
@@ -232,7 +271,14 @@ export function GoalForm({
           options={FREQ_OPTS}
           sheetTitle="Frecuencia de prima"
         />
-        <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+        <SheetSelect
+          name="currency"
+          label="Moneda"
+          value={cur}
+          onChange={setCur}
+          options={CUR_OPTS}
+          sheetTitle="Moneda"
+        />
       </FormShell>
     );
   }
@@ -291,14 +337,38 @@ export function GoalForm({
         autoFocus
       />
       {!isSobre ? (
-        <MoneyField name="targetAmount" label={isRecurring ? "Monto por período" : "Objetivo"} value={targetAmount} onChange={setTargetAmount} currency={cur} />
+        <MoneyField
+          name="targetAmount"
+          label={isRecurring ? "Monto por período" : "Objetivo"}
+          value={targetAmount}
+          onChange={setTargetAmount}
+          currency={cur}
+        />
       ) : null}
-      <MoneyField name="monthlyContribution" label="Aporte mensual" value={monthlyContribution} onChange={setMonthly} currency={cur} />
+      <MoneyField
+        name="monthlyContribution"
+        label="Aporte mensual"
+        value={monthlyContribution}
+        onChange={setMonthly}
+        currency={cur}
+      />
       {!isSobre ? (
-        <DateField name="targetDate" label={isRecurring ? "Primer reinicio (opcional)" : "Fecha límite (opcional)"} value={targetDate} onChange={setTargetDate} />
+        <DateField
+          name="targetDate"
+          label={isRecurring ? "Primer reinicio (opcional)" : "Fecha límite (opcional)"}
+          value={targetDate}
+          onChange={setTargetDate}
+        />
       ) : null}
       {!isDefense && !isSobre ? (
-        <SheetSelect name="recurrence" label="Recurrencia" value={recurrence} onChange={setRecurrence} options={RECUR_OPTS} sheetTitle="Recurrencia del frasco" />
+        <SheetSelect
+          name="recurrence"
+          label="Recurrencia"
+          value={recurrence}
+          onChange={setRecurrence}
+          options={RECUR_OPTS}
+          sheetTitle="Recurrencia del frasco"
+        />
       ) : null}
       {!isDefense ? (
         <>
@@ -343,10 +413,24 @@ export function GoalForm({
         maxLength={120}
       />
       <div className="muted" style={{ fontSize: 12, marginTop: -4, lineHeight: 1.4 }}>
-        Dónde está guardado (solo referencia). También ayuda a estimar qué tan líquido es este ahorro.
+        Dónde está guardado (solo referencia). También ayuda a estimar qué tan líquido es este
+        ahorro.
       </div>
-      <Segmented name="priority" label="Prioridad" value={priority} onChange={setPriority} options={PRIORITY_OPTS} />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={setCur} options={CUR_OPTS} sheetTitle="Moneda" />
+      <Segmented
+        name="priority"
+        label="Prioridad"
+        value={priority}
+        onChange={setPriority}
+        options={PRIORITY_OPTS}
+      />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={setCur}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
     </FormShell>
   );
 }

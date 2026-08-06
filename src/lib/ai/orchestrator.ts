@@ -45,7 +45,12 @@ import type { DebtInput } from "@/modules/control/engine/debt-strategy";
 import { convertCurrency } from "@/lib/fx";
 // Router de complejidad (R1): carril barato para consultas de dato. Solo importa la función
 // (los tipos que el router necesita de aquí son type-only → sin ciclo en runtime).
-import { tryRouteQuery, resolveMatchedIntent, type RouterLane, type MatchedIntent } from "@/lib/ai/router";
+import {
+  tryRouteQuery,
+  resolveMatchedIntent,
+  type RouterLane,
+  type MatchedIntent,
+} from "@/lib/ai/router";
 import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
 import { guardMovimientos, TOOLS_DE_MOVIMIENTOS } from "@/lib/ai/movimientos-guard";
 
@@ -63,7 +68,10 @@ export async function resolveDeterministic(
   messages: ChatMessage[],
   ctx: FinancialContext,
   toolContext: ToolContext,
-): Promise<(AIChatResponse & { tokensIn: number; tokensOut: number; provider: string; lane: RouterLane }) | null> {
+): Promise<
+  | (AIChatResponse & { tokensIn: number; tokensOut: number; provider: string; lane: RouterLane })
+  | null
+> {
   const routed = await resolveMatchedIntent(matched, ctx, toolContext).catch((err: unknown) => {
     // Mismo motivo que el catch de resolveFetchIntent: tragarlo hace que un carril determinista
     // roto se vea exactamente igual que uno que no aplicaba. Con el log, una consulta real en
@@ -267,9 +275,8 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       // puede comerse el presupuesto. Si vence o falla, error explicable — NUNCA una comparación a
       // medias, que sería peor que no responder.
       try {
-        const { getSurplusDecision } = await import(
-          "@/modules/wealth/services/surplus-decision-service"
-        );
+        const { getSurplusDecision } =
+          await import("@/modules/wealth/services/surplus-decision-service");
         const { renderSurplusDecision } = await import("@/lib/ai/surplus-render");
         const { withTimeout } = await import("@/lib/async/with-timeout");
         const reporte = await withTimeout(getSurplusDecision(), SURPLUS_TIMEOUT_MS, null);
@@ -331,7 +338,8 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       // Trae precio + máximo REAL de la capa market-data (cacheada, timeout corto → no suma 503) y
       // calcula el escenario de forma determinista. Best-effort: si no hay dato, lo dice sin inventar.
       const symbol = typeof args.symbol === "string" ? args.symbol : "";
-      const at = args.assetType === "crypto" ? "crypto" : args.assetType === "etf" ? "etf" : "stock";
+      const at =
+        args.assetType === "crypto" ? "crypto" : args.assetType === "etf" ? "etf" : "stock";
       const invertido = typeof args.invertido === "number" ? args.invertido : undefined;
       const cantidad = typeof args.cantidad === "number" ? args.cantidad : undefined;
       if (!symbol) return { error: "falta el símbolo" };
@@ -381,7 +389,8 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
   return async (name, args) => {
     const inicio = Date.now();
     const result = await run(name, args);
-    const obj = typeof result === "object" && result !== null ? (result as Record<string, unknown>) : null;
+    const obj =
+      typeof result === "object" && result !== null ? (result as Record<string, unknown>) : null;
     const resumen = obj?.resumen_md;
     const ms = Date.now() - inicio;
     const ok = !obj || !("error" in obj);
@@ -485,7 +494,12 @@ export async function financeChatWithTools(
     const routed = await tryRouteQuery(messages, ctx, toolContext);
     if (routed) {
       return {
-        ...guardReply(routed.response, ctx, `router:${routed.lane}`, priorAssistantReplies(messages)),
+        ...guardReply(
+          routed.response,
+          ctx,
+          `router:${routed.lane}`,
+          priorAssistantReplies(messages),
+        ),
         tokensIn: routed.tokensIn,
         tokensOut: routed.tokensOut,
         provider: `router:${routed.lane}`,

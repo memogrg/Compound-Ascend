@@ -202,7 +202,10 @@ export function Landing() {
           <div className="ladder">
             <div className="step reveal">
               <span className="num">01</span>
-              <div className="ic" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+              <div
+                className="ic"
+                style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+              >
                 <StrokeSvg>
                   <path d="M3 7h18M6 7v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7M9 7V5a3 3 0 0 1 6 0v2" />
                 </StrokeSvg>
@@ -273,7 +276,9 @@ export function Landing() {
                   </StrokeSvg>
                 </div>
                 <h3>Base financiera clara</h3>
-                <p>Presupuesto por &quot;frascos y sobres&quot;, ingresos y gastos siempre al día.</p>
+                <p>
+                  Presupuesto por &quot;frascos y sobres&quot;, ingresos y gastos siempre al día.
+                </p>
               </div>
               <div className="feat reveal">
                 <div

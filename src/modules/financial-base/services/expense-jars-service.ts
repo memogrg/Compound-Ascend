@@ -11,7 +11,10 @@ import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { formatMoney } from "@/lib/format";
 import { listLinkableEntitiesDetailed } from "@/modules/financial-base/services/linkable-entities-service";
-import { getBudgetTotals, getLinkedBudgetBySource } from "@/modules/financial-base/services/budget-service";
+import {
+  getBudgetTotals,
+  getLinkedBudgetBySource,
+} from "@/modules/financial-base/services/budget-service";
 import {
   getRealTotals,
   getLinkedSpentByEntity,
@@ -183,31 +186,43 @@ export async function getExpenseJarsAsOf(args: {
   currency: string;
 }): Promise<Jar[]> {
   const cutoff: Period = { ...args.period, to: args.asOf };
-  const [budget, real, debtBudget, debtSpent, debtExtra, deudasCatId, goalBudget, goalSpent,
-    holdingSpent, policyBudget, policySpent, personalization, advancedHoldingIds] =
-    await Promise.all([
-      getBudgetTotals(args.period),
-      getRealTotals(cutoff),
-      // Deudas budget-aware: cuota derivada por deuda (mes) + pagado al corte +
-      // pagado extraordinario (subconjunto) + categoría de sistema del pago.
-      getLinkedBudgetBySource(args.period, "debt"),
-      getLinkedSpentByEntity(cutoff, "debt"),
-      getExtraordinarySpentByDebt(cutoff),
-      getSystemCategoryId("deudas"),
-      // Ahorro budget-aware: aporte derivado por meta (mes) + aportado al corte.
-      getLinkedBudgetBySource(args.period, "goal"),
-      getLinkedSpentByEntity(cutoff, "goal"),
-      // Libertad (holding): sin budget_items → el engine cae al aporte mensual
-      // (e.amount); aportado = transacciones vinculadas del corte.
-      getLinkedSpentByEntity(cutoff, "holding"),
-      // Defensa (policy): prima derivada por póliza (mes) + pagado al corte.
-      getLinkedBudgetBySource(args.period, "policy"),
-      getLinkedSpentByEntity(cutoff, "policy"),
-      // Bases ocultas: solo para etiquetar el motivo en "Por reasignar".
-      getCategoryPersonalization(),
-      // Planes con el aporte del mes ya adelantado → no se cobra este mes.
-      getAdvancedHoldingIds(args.period),
-    ]);
+  const [
+    budget,
+    real,
+    debtBudget,
+    debtSpent,
+    debtExtra,
+    deudasCatId,
+    goalBudget,
+    goalSpent,
+    holdingSpent,
+    policyBudget,
+    policySpent,
+    personalization,
+    advancedHoldingIds,
+  ] = await Promise.all([
+    getBudgetTotals(args.period),
+    getRealTotals(cutoff),
+    // Deudas budget-aware: cuota derivada por deuda (mes) + pagado al corte +
+    // pagado extraordinario (subconjunto) + categoría de sistema del pago.
+    getLinkedBudgetBySource(args.period, "debt"),
+    getLinkedSpentByEntity(cutoff, "debt"),
+    getExtraordinarySpentByDebt(cutoff),
+    getSystemCategoryId("deudas"),
+    // Ahorro budget-aware: aporte derivado por meta (mes) + aportado al corte.
+    getLinkedBudgetBySource(args.period, "goal"),
+    getLinkedSpentByEntity(cutoff, "goal"),
+    // Libertad (holding): sin budget_items → el engine cae al aporte mensual
+    // (e.amount); aportado = transacciones vinculadas del corte.
+    getLinkedSpentByEntity(cutoff, "holding"),
+    // Defensa (policy): prima derivada por póliza (mes) + pagado al corte.
+    getLinkedBudgetBySource(args.period, "policy"),
+    getLinkedSpentByEntity(cutoff, "policy"),
+    // Bases ocultas: solo para etiquetar el motivo en "Por reasignar".
+    getCategoryPersonalization(),
+    // Planes con el aporte del mes ya adelantado → no se cobra este mes.
+    getAdvancedHoldingIds(args.period),
+  ]);
 
   // La línea derivada de metas nace con categoryId NULL, pero Registrar gasto
   // exige un uuid. Imputamos el aporte a la categoría del GRUPO correspondiente

@@ -196,9 +196,8 @@ export async function inviteHouseholdMemberAction(email: string): Promise<Invite
   if (!isSupabaseConfigured()) {
     return { ok: false, sent: 0, configured: false, message: "Conecta Supabase para invitar." };
   }
-  const { hasHouseholdInviteCapacity } = await import(
-    "@/modules/personal-profile/services/household-members-service"
-  );
+  const { hasHouseholdInviteCapacity } =
+    await import("@/modules/personal-profile/services/household-members-service");
   const cap = await hasHouseholdInviteCapacity();
   if (!cap.ok) {
     return {
@@ -219,9 +218,8 @@ export async function revokeInvitationAction(invitationId: string): Promise<Mana
   if (!parsed.success) return { ok: false, message: "Invitación no válida." };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
   try {
-    const { revokeInvitation } = await import(
-      "@/modules/personal-profile/services/household-members-service"
-    );
+    const { revokeInvitation } =
+      await import("@/modules/personal-profile/services/household-members-service");
     await revokeInvitation(parsed.data);
     revalidatePath("/configuracion");
     return { ok: true };
@@ -236,14 +234,16 @@ export async function removeHouseholdMemberAction(userId: string): Promise<Manag
   if (!parsed.success) return { ok: false, message: "Miembro no válido." };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
   try {
-    const { removeHouseholdMember } = await import(
-      "@/modules/personal-profile/services/household-members-service"
-    );
+    const { removeHouseholdMember } =
+      await import("@/modules/personal-profile/services/household-members-service");
     await removeHouseholdMember(parsed.data);
     revalidatePath("/configuracion");
     return { ok: true };
   } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : "No pudimos quitar al miembro." };
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "No pudimos quitar al miembro.",
+    };
   }
 }
 
@@ -322,7 +322,9 @@ export async function generateProfileMaticesAction(): Promise<MaticesResult> {
     const name = (user.user_metadata?.display_name as string | undefined) ?? draft.displayName;
 
     const archetypeLabel = ARCHETYPE_PLAYBOOKS[arche.primary].label;
-    const archetypeLabel2 = arche.secondary ? ARCHETYPE_PLAYBOOKS[arche.secondary].label : undefined;
+    const archetypeLabel2 = arche.secondary
+      ? ARCHETYPE_PLAYBOOKS[arche.secondary].label
+      : undefined;
     const dominantValue = draft.dineroPrimero?.[0]?.replace(/_/g, " ");
     const topStrength = reading.strengths[0];
     const topOpportunity = reading.opportunities[0] ?? "";
@@ -448,9 +450,8 @@ export async function completeOnboardingAction(draft: ProfileDraft): Promise<Com
     // Próxima jugada dinámica (Palanca 1), best-effort: no rompe el cierre.
     let nextMove: CompleteResult["nextMove"];
     try {
-      const { getFinancialState } = await import(
-        "@/modules/personal-profile/services/financial-state"
-      );
+      const { getFinancialState } =
+        await import("@/modules/personal-profile/services/financial-state");
       const { buildNextMove } = await import("@/modules/personal-profile/engine/next-move");
       nextMove = buildNextMove(await getFinancialState(safe));
     } catch {

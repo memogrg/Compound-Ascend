@@ -356,7 +356,13 @@ export function JarOrphansModal({
               <strong>Presupuesto sin frasco</strong> · ¿por qué aparece acá?
             </p>
             {jar.items.map((line) => (
-              <OrphanRow key={line.id} line={line} currency={currency} cats={cats} onDone={onDone} />
+              <OrphanRow
+                key={line.id}
+                line={line}
+                currency={currency}
+                cats={cats}
+                onDone={onDone}
+              />
             ))}
           </>
         ) : null}

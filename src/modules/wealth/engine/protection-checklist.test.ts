@@ -48,7 +48,11 @@ describe("buildBaseProtectionChecklist", () => {
   });
 
   it("los fondos salen de los flags (sin cobertura numérica)", () => {
-    const items = buildBaseProtectionChecklist({ ...base, hasEmergencyFund: true, hasPeaceFund: false });
+    const items = buildBaseProtectionChecklist({
+      ...base,
+      hasEmergencyFund: true,
+      hasPeaceFund: false,
+    });
     const byKey = Object.fromEntries(items.map((i) => [i.key, i]));
     expect(byKey.fondo_emergencia).toEqual({
       key: "fondo_emergencia",

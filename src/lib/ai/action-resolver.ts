@@ -24,12 +24,7 @@ import { logger } from "@/lib/logger";
 
 /** Normaliza para comparar nombres: sin acentos, minúsculas, sin dobles espacios. */
 function norm(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -55,8 +50,7 @@ const num = (v: unknown): number | null => {
   const n = typeof v === "string" ? Number(v.replace(/[^\d.-]/g, "")) : v;
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;
 };
-const str = (v: unknown): string | null =>
-  typeof v === "string" && v.trim() ? v.trim() : null;
+const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 export type ResolveContext = {
   /** Moneda de captura (la principal del usuario). */

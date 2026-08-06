@@ -81,7 +81,13 @@ export function HelpTip({
   const click = useClick(context); // tap en móvil / click en desktop
   const dismiss = useDismiss(context); // Escape + tap fuera
   const role = useRole(context, { role: "tooltip" });
-  const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, click, dismiss, role]);
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    hover,
+    focus,
+    click,
+    dismiss,
+    role,
+  ]);
 
   return (
     <>

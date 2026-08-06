@@ -103,7 +103,10 @@ function parseTipo(raw: string | undefined): "gasto" | "ingreso" {
 
 /** Limpia el comercio: espacios colapsados y sin separadores de columna sobrantes. */
 function limpiarComercio(raw: string): string {
-  return raw.replace(/[|\t]+/g, " ").replace(/\s+/g, " ").trim();
+  return raw
+    .replace(/[|\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -182,7 +185,10 @@ export function esFilaLimpia(linea: string): boolean {
 
 /** ¿TODO el bloque se puede resolver sin LLM? Solo entonces se salta la llamada. */
 export function bloqueEsLimpio(text: string): boolean {
-  const lineas = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lineas = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const candidatas = lineas.filter((l) => new RegExp(FECHA).test(l));
   if (candidatas.length === 0) return false;
   return candidatas.every(esFilaLimpia);
@@ -271,7 +277,10 @@ export const MIN_FILAS_BLOQUE = 2;
  * no es un estado de cuenta, y tratarlo como tal secuestraría una conversación.
  */
 export function pareceBloqueDeEstado(text: string): boolean {
-  const lineas = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lineas = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lineas.length < MIN_FILAS_BLOQUE) return false;
   // La detección NO puede depender del parser estricto. Cuando dependía, un formato sucio —el que
   // más necesita ayuda— no se reconocía como estado y se iba al chat normal: el camino de

@@ -16,7 +16,11 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, isActiveHouseholdEditor, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  isActiveHouseholdEditor,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import {
   resolveCategoryOverrides,
@@ -156,7 +160,8 @@ export async function getCategoryPersonalization(): Promise<CategoryPersonalizat
   const forkToBase: Record<string, string> = {};
   for (const o of overrides) {
     if (o.forkId) forkToBase[o.forkId] = o.categoryId;
-    else if (o.hidden) hidden.push({ id: o.categoryId, name: nameOf.get(o.categoryId) ?? "Categoría" });
+    else if (o.hidden)
+      hidden.push({ id: o.categoryId, name: nameOf.get(o.categoryId) ?? "Categoría" });
   }
   return { hidden, forkToBase };
 }
@@ -367,7 +372,12 @@ export async function deleteCategory(id: string, reassignToId?: string | null): 
     await reassignReferences(supabase, id, reassignToId, user.id, householdId);
   }
   await supabase.from("expense_categories").delete().eq("id", id).in("user_id", scope);
-  await logHouseholdDeletion(supabase, { userId: user.id, table: "expense_categories", rowId: id, householdId });
+  await logHouseholdDeletion(supabase, {
+    userId: user.id,
+    table: "expense_categories",
+    rowId: id,
+    householdId,
+  });
 }
 
 /**
@@ -563,10 +573,7 @@ async function revertOverride(baseId: string): Promise<void> {
   await assertEditor(supabase, user.id);
   const householdId = await getActiveHouseholdId(supabase, user.id);
 
-  const base = supabase
-    .from("category_overrides")
-    .select("id, fork_id")
-    .eq("category_id", baseId);
+  const base = supabase.from("category_overrides").select("id, fork_id").eq("category_id", baseId);
   const scoped = householdId
     ? base.eq("household_id", householdId)
     : base.eq("user_id", user.id).is("household_id", null);
@@ -616,9 +623,18 @@ async function reassignMovements(
   userId: string,
   householdId: string | null,
 ): Promise<void> {
-  const txns = supabase.from("transactions").update({ category_id: intoId }).eq("category_id", fromId);
-  const budget = supabase.from("budget_items").update({ category_id: intoId }).eq("category_id", fromId);
-  const items = supabase.from("expense_items").update({ category_id: intoId }).eq("category_id", fromId);
+  const txns = supabase
+    .from("transactions")
+    .update({ category_id: intoId })
+    .eq("category_id", fromId);
+  const budget = supabase
+    .from("budget_items")
+    .update({ category_id: intoId })
+    .eq("category_id", fromId);
+  const items = supabase
+    .from("expense_items")
+    .update({ category_id: intoId })
+    .eq("category_id", fromId);
   await Promise.all([
     householdId ? txns.eq("household_id", householdId) : txns.eq("user_id", userId),
     householdId ? budget.eq("household_id", householdId) : budget.eq("user_id", userId),

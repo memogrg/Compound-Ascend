@@ -40,7 +40,9 @@ const cryptoBatchInFlight = new Map<string, Promise<Record<string, MarketPrice>>
  * cachea + persiste cada resultado. Single-flight: dos renders concurrentes con el mismo set
  * comparten UNA llamada. Devuelve un mapa SÍMBOLO(MAYÚS) → MarketPrice (solo los que respondieron).
  */
-export async function getCryptoPricesBatch(rawSymbols: string[]): Promise<Record<string, MarketPrice>> {
+export async function getCryptoPricesBatch(
+  rawSymbols: string[],
+): Promise<Record<string, MarketPrice>> {
   const symbols = [...new Set(rawSymbols.map((s) => s.trim().toUpperCase()).filter(isValidSymbol))];
   const out: Record<string, MarketPrice> = {};
 
@@ -116,7 +118,8 @@ export async function getMarketSparkline(
   const cached = priceCache.get<number[]>(cacheKey);
   if (cached) return cached;
 
-  const series = assetType === "crypto" ? await coingeckoHistory(symbol) : await yahooHistory(symbol);
+  const series =
+    assetType === "crypto" ? await coingeckoHistory(symbol) : await yahooHistory(symbol);
   if (series.length >= 2) priceCache.set(cacheKey, series, TTL.sparkline);
   return series;
 }

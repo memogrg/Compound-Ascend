@@ -64,7 +64,13 @@ export function MScrubChart({
     // Estático legible (sin interacción) cuando no hay suficiente historia.
     return (
       <div style={{ position: "relative", width: "100%" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          height={H}
+          preserveAspectRatio="none"
+          aria-hidden
+        >
           <line
             x1={PL}
             x2={W - PR}

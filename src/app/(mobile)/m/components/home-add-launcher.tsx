@@ -95,7 +95,15 @@ const Abriendo = () => (
 );
 
 /** Opción de la hoja "Registrar una salida" (mismo estilo que los pickers). */
-function SalidaOpt({ label, desc, onSelect }: { label: string; desc: string; onSelect: () => void }) {
+function SalidaOpt({
+  label,
+  desc,
+  onSelect,
+}: {
+  label: string;
+  desc: string;
+  onSelect: () => void;
+}) {
   return (
     <button type="button" className="m-opt" onClick={onSelect}>
       <span className="m-opt-t">{label}</span>
@@ -137,7 +145,10 @@ export function HomeAddLauncher() {
 
   const [invLoading, setInvLoading] = useState(false);
   const [invData, setInvData] = useState<InvData | null>(null);
-  const [contribHolding, setContribHolding] = useState<{ holding: HoldingNativo; currency: string } | null>(null);
+  const [contribHolding, setContribHolding] = useState<{
+    holding: HoldingNativo;
+    currency: string;
+  } | null>(null);
 
   const [polLoading, setPolLoading] = useState(false);
   const [polData, setPolData] = useState<PolData | null>(null);
@@ -276,20 +287,41 @@ export function HomeAddLauncher() {
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="¿Qué registrás?">
         <div className="m-optlist">
           <div style={sectionLabel}>Salidas</div>
-          <SalidaOpt label="Gasto a un sobre" desc="Supermercado, servicios, transporte…" onSelect={abrirGasto} />
-          <SalidaOpt label="Abono a una deuda" desc="Registra un pago o abono" onSelect={abrirDeuda} />
+          <SalidaOpt
+            label="Gasto a un sobre"
+            desc="Supermercado, servicios, transporte…"
+            onSelect={abrirGasto}
+          />
+          <SalidaOpt
+            label="Abono a una deuda"
+            desc="Registra un pago o abono"
+            onSelect={abrirDeuda}
+          />
           <SalidaOpt label="Aporte a un ahorro" desc="Suma a una meta" onSelect={abrirMeta} />
-          <SalidaOpt label="Invertir / aportar" desc="Aporta a una inversión" onSelect={abrirInversion} />
+          <SalidaOpt
+            label="Invertir / aportar"
+            desc="Aporta a una inversión"
+            onSelect={abrirInversion}
+          />
           <SalidaOpt label="Pagar una prima" desc="De una póliza de seguro" onSelect={abrirPrima} />
           <div style={sectionLabel}>Entrada</div>
-          <SalidaOpt label="Registrar lo recibido" desc="Anota un ingreso a una fuente" onSelect={abrirIngreso} />
+          <SalidaOpt
+            label="Registrar lo recibido"
+            desc="Anota un ingreso a una fuente"
+            onSelect={abrirIngreso}
+          />
         </div>
       </BottomSheet>
 
       {/* Gasto → AddSpendForm de /m/gastos (gasto plano, sobre normal). */}
       <BottomSheet open={spendOpen} onClose={cerrarGasto} title="Registrar gasto">
         {spend ? (
-          <AddSpendForm jars={spend.jars} currency={spend.currency} accounts={spend.accounts} onSuccess={guardado} />
+          <AddSpendForm
+            jars={spend.jars}
+            currency={spend.currency}
+            accounts={spend.accounts}
+            onSuccess={guardado}
+          />
         ) : (
           <Abriendo />
         )}
@@ -307,9 +339,17 @@ export function HomeAddLauncher() {
           onClose={cerrarIngreso}
         />
       ) : null}
-      <BottomSheet open={!!receiving} onClose={() => setReceiving(null)} title="Registrar lo recibido">
+      <BottomSheet
+        open={!!receiving}
+        onClose={() => setReceiving(null)}
+        title="Registrar lo recibido"
+      >
         {receiving ? (
-          <ReceiveForm source={receiving.source} received={receiving.received} onSuccess={guardado} />
+          <ReceiveForm
+            source={receiving.source}
+            received={receiving.received}
+            onSuccess={guardado}
+          />
         ) : null}
       </BottomSheet>
 
@@ -357,7 +397,11 @@ export function HomeAddLauncher() {
           onClose={cerrarMeta}
         />
       ) : null}
-      <BottomSheet open={!!contribGoal} onClose={() => setContribGoal(null)} title="Registrar aporte">
+      <BottomSheet
+        open={!!contribGoal}
+        onClose={() => setContribGoal(null)}
+        title="Registrar aporte"
+      >
         {contribGoal ? <ContributionForm goal={contribGoal} onSuccess={guardado} /> : null}
       </BottomSheet>
 
@@ -374,9 +418,17 @@ export function HomeAddLauncher() {
           onClose={cerrarInversion}
         />
       ) : null}
-      <BottomSheet open={!!contribHolding} onClose={() => setContribHolding(null)} title="Registrar aporte">
+      <BottomSheet
+        open={!!contribHolding}
+        onClose={() => setContribHolding(null)}
+        title="Registrar aporte"
+      >
         {contribHolding ? (
-          <ContributeHoldingForm holding={contribHolding.holding} currency={contribHolding.currency} onSuccess={guardado} />
+          <ContributeHoldingForm
+            holding={contribHolding.holding}
+            currency={contribHolding.currency}
+            onSuccess={guardado}
+          />
         ) : null}
       </BottomSheet>
 
@@ -392,7 +444,11 @@ export function HomeAddLauncher() {
           onClose={cerrarPrima}
         />
       ) : null}
-      <BottomSheet open={!!payingPolicy} onClose={() => setPayingPolicy(null)} title="Registrar prima">
+      <BottomSheet
+        open={!!payingPolicy}
+        onClose={() => setPayingPolicy(null)}
+        title="Registrar prima"
+      >
         {payingPolicy ? <PremiumForm policy={payingPolicy} onSuccess={guardado} /> : null}
       </BottomSheet>
     </>

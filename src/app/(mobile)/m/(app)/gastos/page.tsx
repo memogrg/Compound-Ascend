@@ -42,7 +42,13 @@ export default async function MobileGastos() {
     return (
       <div className="m-scroll">
         <div className="m-pad">
-          <MobileHeader variant="inner" eyebrow="Base" title="Gastos" backHref="/m" backLabel="Volver a Inicio" />
+          <MobileHeader
+            variant="inner"
+            eyebrow="Base"
+            title="Gastos"
+            backHref="/m"
+            backLabel="Volver a Inicio"
+          />
           <MEmptyState
             icon="template"
             title="Empieza por tu base"
@@ -102,7 +108,9 @@ export default async function MobileGastos() {
           title="Gastos"
           backHref="/m"
           backLabel="Volver a Inicio"
-          badge={headerPct != null ? <span className="badge neutral">{headerPct}%</span> : undefined}
+          badge={
+            headerPct != null ? <span className="badge neutral">{headerPct}%</span> : undefined
+          }
         />
         <GastosManager
           jars={jars}
@@ -118,4 +126,3 @@ export default async function MobileGastos() {
     </div>
   );
 }
-

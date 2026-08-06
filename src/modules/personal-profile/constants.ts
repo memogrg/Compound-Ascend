@@ -445,8 +445,7 @@ export const RISK_READING: Record<RiskClass, string> = {
 
 /** "Qué sí te permite" tu perfil de riesgo (segunda persona). */
 export const RISK_ALLOWS: Record<RiskClass, string> = {
-  conservador:
-    "preservar tu capital y dormir tranquilo, con instrumentos estables y líquidos.",
+  conservador: "preservar tu capital y dormir tranquilo, con instrumentos estables y líquidos.",
   moderado: "una mezcla equilibrada entre seguridad y crecimiento.",
   balanceado: "combinar protección y crecimiento con criterio.",
   crecimiento: "estrategias orientadas a crecimiento, con horizonte y un plan claro.",

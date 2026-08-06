@@ -578,7 +578,8 @@ export function periodReturnFromBaseline(
     baseline = sorted[0]!.portfolioValue; // "todo": desde el inicio de la serie
   } else {
     for (const s of sorted) {
-      if (s.date <= cutoff) baseline = s.portfolioValue; // el más reciente ≤ inicio del periodo
+      if (s.date <= cutoff)
+        baseline = s.portfolioValue; // el más reciente ≤ inicio del periodo
       else break;
     }
   }

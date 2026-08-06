@@ -135,7 +135,12 @@ export function PersonalizeMenuButtons({
   onRevert: () => void;
 }) {
   return isFork ? (
-    <MenuButton icon="repeat" label="Revertir personalización" disabled={pending} onClick={onRevert} />
+    <MenuButton
+      icon="repeat"
+      label="Revertir personalización"
+      disabled={pending}
+      onClick={onRevert}
+    />
   ) : (
     <>
       <MenuButton icon="edit" label="Personalizar (editar)" onClick={onEdit} />
@@ -296,9 +301,19 @@ export function ForkCategoryModal({
 
         <label
           className="fld"
-          style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+          style={{
+            marginTop: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            cursor: "pointer",
+          }}
         >
-          <input type="checkbox" checked={favorite} onChange={(e) => setFavorite(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={favorite}
+            onChange={(e) => setFavorite(e.target.checked)}
+          />
           <span style={{ fontSize: 13 }}>Marcar como favorita (visible como sobre)</span>
         </label>
 

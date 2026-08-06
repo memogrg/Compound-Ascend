@@ -29,10 +29,7 @@ export async function loadRecentTurns(ctx?: AuthContext): Promise<ChatMessage[]>
   try {
     const { db, userId } = await resolveAuth(ctx);
     const since = new Date(Date.now() - WINDOW_MIN * 60_000).toISOString();
-    let query = db
-      .from("ai_conversation_turns")
-      .select("role, content")
-      .gte("created_at", since);
+    let query = db.from("ai_conversation_turns").select("role, content").gte("created_at", since);
     // Sesión → RLS filtra por dueño; service-role (ctx inyectado) → filtro explícito por userId.
     if (ctx) query = query.eq("user_id", userId);
     const { data } = await query.order("created_at", { ascending: false }).limit(MAX_TURNS);

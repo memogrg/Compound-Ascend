@@ -101,7 +101,9 @@ export default async function MobileTransacciones() {
   const uncategorized = selectUncategorized(transactions);
   const selectableCategories = selectableCategoryLeaves(view.categories);
   // Categorías de ingreso (mismas que el composer web) para exigir categoría en el ingreso manual.
-  const incomeCats = view.incomeTree.flatMap((g) => g.children).map((c) => ({ id: c.id, name: c.name }));
+  const incomeCats = view.incomeTree
+    .flatMap((g) => g.children)
+    .map((c) => ({ id: c.id, name: c.name }));
   const incomeGroupId = view.incomeTree[0]?.id ?? null;
   const candidates = findUnlinkedCandidates(transactions, view.categories, view.linkables);
   const alerts = buildEntityAlerts(view.budget.items, transactions, currency, view.rates);
@@ -189,14 +191,12 @@ export default async function MobileTransacciones() {
             tone="danger"
           />
         </MMetricGrid>
-        {(monthFlow.capital.out > 0 || monthFlow.capital.in > 0 || monthFlow.pending.count > 0) ? (
+        {monthFlow.capital.out > 0 || monthFlow.capital.in > 0 || monthFlow.pending.count > 0 ? (
           <div className="muted" style={{ fontSize: 12, marginTop: -8, marginBottom: 14 }}>
             {monthFlow.capital.out > 0 || monthFlow.capital.in > 0
               ? `Capital: moviste ${mAmount(monthFlow.capital.out, currency, 9)} a inversiones/metas${monthFlow.capital.in > 0 ? ` · recuperaste ${mAmount(monthFlow.capital.in, currency, 9)}` : ""}. `
               : ""}
-            {monthFlow.pending.count > 0
-              ? `Por revisar: ${monthFlow.pending.count} mov.`
-              : ""}
+            {monthFlow.pending.count > 0 ? `Por revisar: ${monthFlow.pending.count} mov.` : ""}
           </div>
         ) : null}
 

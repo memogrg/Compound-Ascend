@@ -53,7 +53,11 @@ import {
   type Period,
 } from "@/modules/wealth/services/holding-history-service";
 import type { Holding } from "@/modules/wealth/types";
-import { adjustContributionPrice, advancePremiums, getPlanPaidUntil } from "@/modules/wealth/services/contribution-service";
+import {
+  adjustContributionPrice,
+  advancePremiums,
+  getPlanPaidUntil,
+} from "@/modules/wealth/services/contribution-service";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
 import {
   listInvestmentAlerts,
@@ -226,7 +230,10 @@ export async function payPolicyPremiumAction(raw: unknown): Promise<ActionResult
     return { ok: true };
   } catch (err) {
     logger.error("payPolicyPremium fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: err instanceof Error ? err.message : "No pudimos registrar la prima." };
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "No pudimos registrar la prima.",
+    };
   }
 }
 
@@ -306,8 +313,13 @@ export async function contributeToHoldingAction(raw: unknown): Promise<ActionRes
     revalidatePath("/patrimonio");
     return { ok: true };
   } catch (err) {
-    logger.error("contributeToHolding fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: err instanceof Error ? err.message : "No pudimos registrar el aporte." };
+    logger.error("contributeToHolding fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "No pudimos registrar el aporte.",
+    };
   }
 }
 
@@ -459,9 +471,7 @@ export async function listHoldingPurchasesAction(
   }
 }
 
-export async function listHoldingValuationsAction(
-  holdingId: string,
-): Promise<HoldingValuation[]> {
+export async function listHoldingValuationsAction(holdingId: string): Promise<HoldingValuation[]> {
   if (!isSupabaseConfigured()) return [];
   try {
     return await listHoldingValuations(holdingId);
@@ -546,14 +556,22 @@ export async function createInvestmentAlertAction(
     if (res.ok) revalidatePath("/patrimonio");
     return res;
   } catch (err) {
-    logger.error("createInvestmentAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("createInvestmentAlert fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos crear la alerta." };
   }
 }
 
 export async function updateInvestmentAlertAction(
   id: string,
-  patch: { targetPrice?: number; direction?: AlertDirection; yearsThreshold?: number; triggerDate?: string; active?: boolean },
+  patch: {
+    targetPrice?: number;
+    direction?: AlertDirection;
+    yearsThreshold?: number;
+    triggerDate?: string;
+    active?: boolean;
+  },
 ): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
@@ -561,7 +579,9 @@ export async function updateInvestmentAlertAction(
     if (res.ok) revalidatePath("/patrimonio");
     return res;
   } catch (err) {
-    logger.error("updateInvestmentAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("updateInvestmentAlert fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos actualizar la alerta." };
   }
 }
@@ -573,7 +593,9 @@ export async function deleteInvestmentAlertAction(id: string): Promise<ActionRes
     if (res.ok) revalidatePath("/patrimonio");
     return res;
   } catch (err) {
-    logger.error("deleteInvestmentAlert fallido", { message: err instanceof Error ? err.message : "?" });
+    logger.error("deleteInvestmentAlert fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return { ok: false, message: "No pudimos borrar la alerta." };
   }
 }
@@ -600,7 +622,10 @@ export async function advancePremiumsAction(
     return { ok: true, advanced };
   } catch (err) {
     logger.error("advancePremiums fallido", { message: err instanceof Error ? err.message : "?" });
-    return { ok: false, message: err instanceof Error ? err.message : "No pudimos adelantar cuotas." };
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "No pudimos adelantar cuotas.",
+    };
   }
 }
 

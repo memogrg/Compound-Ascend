@@ -20,16 +20,37 @@ export type InsightAction = {
 };
 
 const ACTIONS: Record<InsightKind, InsightAction> = {
-  sobre_sobregirado: { label: "ajustar el presupuesto de ese sobre o ver dónde recortar", route: "/gastos" },
-  ahorro_bajo: { label: "revisar el plan de gastos para liberar flujo", route: "/mi-base-financiera" },
+  sobre_sobregirado: {
+    label: "ajustar el presupuesto de ese sobre o ver dónde recortar",
+    route: "/gastos",
+  },
+  ahorro_bajo: {
+    label: "revisar el plan de gastos para liberar flujo",
+    route: "/mi-base-financiera",
+  },
   deuda_cara: { label: "priorizar esa deuda y simular el abono", route: "/deudas" },
   deuda_creciendo: { label: "ponerse al día con esa deuda", route: "/deudas" },
-  fondo_emergencia: { label: "definir un aporte mensual al fondo de emergencia", route: "/patrimonio/proteccion" },
-  fondo_paz: { label: "definir un aporte mensual al fondo de paz", route: "/patrimonio/proteccion" },
-  concentracion_inversion: { label: "revisar la distribución del portafolio", route: "/patrimonio" },
-  rendimiento_bajo_inflacion: { label: "revisar el portafolio y su composición", route: "/patrimonio" },
+  fondo_emergencia: {
+    label: "definir un aporte mensual al fondo de emergencia",
+    route: "/patrimonio/proteccion",
+  },
+  fondo_paz: {
+    label: "definir un aporte mensual al fondo de paz",
+    route: "/patrimonio/proteccion",
+  },
+  concentracion_inversion: {
+    label: "revisar la distribución del portafolio",
+    route: "/patrimonio",
+  },
+  rendimiento_bajo_inflacion: {
+    label: "revisar el portafolio y su composición",
+    route: "/patrimonio",
+  },
   meta_estancada: { label: "ajustar el aporte mensual de esa meta", route: "/control-financiero" },
-  gasto_disfrute_alza: { label: "definir un monto libre para disfrutar sin culpa", route: "/gastos" },
+  gasto_disfrute_alza: {
+    label: "definir un monto libre para disfrutar sin culpa",
+    route: "/gastos",
+  },
   aporte_pendiente: { label: "confirmar el precio de compra del aporte", route: "/patrimonio" },
   racha_positiva: { label: "definir el próximo objetivo", route: "/control-financiero" },
   ritual_patrimonio: { label: "revisar el marco patrimonial", route: "/mi-rich-life" },

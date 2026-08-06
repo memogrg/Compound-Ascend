@@ -10,5 +10,11 @@ export {
   emailTranscriptAction,
 } from "./api/actions";
 export type { ConfirmResult } from "./api/actions";
-export { transactionInputSchema, priceAlertInputSchema, setDcaInputSchema, adjustBudgetInputSchema, debtExtraPaymentInputSchema } from "./schemas";
+export {
+  transactionInputSchema,
+  priceAlertInputSchema,
+  setDcaInputSchema,
+  adjustBudgetInputSchema,
+  debtExtraPaymentInputSchema,
+} from "./schemas";
 export type { TransactionInput, PriceAlertInput } from "./schemas";

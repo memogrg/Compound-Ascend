@@ -60,7 +60,9 @@ export function PerformanceChart({
   const fmtTick = formatValue ?? ((v: number) => formatAxisCompact(v, currency));
   const reactId = useId();
   if (data.length < 2) {
-    return <ChartEmpty message="No hay suficiente historial para mostrar la gráfica." height={height} />;
+    return (
+      <ChartEmpty message="No hay suficiente historial para mostrar la gráfica." height={height} />
+    );
   }
 
   const last = data[data.length - 1]?.value ?? 0;

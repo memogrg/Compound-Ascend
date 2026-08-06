@@ -204,8 +204,11 @@ export async function resolveAutoCategory(opts: {
   try {
     // 1) Historial (0.95): dominante del comercio.
     const dominant = (await loadHistoryDominant(supabase, [norm], userId)).get(norm);
-    let candidate: { categoryId: string; confidence: number; source: "historial" | "cache" } | null =
-      dominant ? { categoryId: dominant, confidence: 0.95, source: "historial" } : null;
+    let candidate: {
+      categoryId: string;
+      confidence: number;
+      source: "historial" | "cache";
+    } | null = dominant ? { categoryId: dominant, confidence: 0.95, source: "historial" } : null;
 
     // 2) Caché (si no hay historial).
     if (!candidate) {
@@ -315,17 +318,15 @@ export async function getSuggestionsFor(items: SuggestItem[]): Promise<Map<strin
     const sug = await suggestSobre(sample.merchant!.trim(), sobres);
     cache.set(norm, { ...sug, source: "ia" });
     try {
-      await supabase
-        .from("merchant_suggestion_cache")
-        .upsert(
-          {
-            user_id: user.id,
-            merchant_norm: norm,
-            category_id: sug.categoryId,
-            confidence: sug.confidence,
-          },
-          { onConflict: "user_id,merchant_norm" },
-        );
+      await supabase.from("merchant_suggestion_cache").upsert(
+        {
+          user_id: user.id,
+          merchant_norm: norm,
+          category_id: sug.categoryId,
+          confidence: sug.confidence,
+        },
+        { onConflict: "user_id,merchant_norm" },
+      );
     } catch (err) {
       logger.warn("merchant_suggestion_cache upsert falló", {
         message: err instanceof Error ? err.message : "?",
@@ -486,7 +487,10 @@ export async function suggestSobreForChatFast(
     const byId = new Map(sobres.map((s) => [s.id, s]));
     const pathOf = (id: string): { categoryId: string; categoryPath: string | null } => {
       const hit = byId.get(id)!;
-      return { categoryId: id, categoryPath: hit.frasco ? `${hit.frasco} › ${hit.sobre}` : hit.sobre };
+      return {
+        categoryId: id,
+        categoryPath: hit.frasco ? `${hit.frasco} › ${hit.sobre}` : hit.sobre,
+      };
     };
 
     // 1) DETERMINISTA primero (historial/caché del hogar) — 0 tokens, no cuelga.
@@ -496,14 +500,19 @@ export async function suggestSobreForChatFast(
 
     // 2) LLM SOLO para afinar, con timeout corto + fallback inmediato (nunca IA-503).
     const ai = await withTimeout(
-      suggestSobre(merchant, sobres.map((s) => ({ id: s.id, name: s.sobre }))),
+      suggestSobre(
+        merchant,
+        sobres.map((s) => ({ id: s.id, name: s.sobre })),
+      ),
       llmTimeoutMs,
       { categoryId: null, confidence: 0 },
     );
     if (ai.categoryId && byId.has(ai.categoryId)) return pathOf(ai.categoryId);
     return NONE;
   } catch (err) {
-    logger.warn("suggestSobreForChatFast falló", { message: err instanceof Error ? err.message : "?" });
+    logger.warn("suggestSobreForChatFast falló", {
+      message: err instanceof Error ? err.message : "?",
+    });
     return NONE;
   }
 }

@@ -76,7 +76,8 @@ export function convertirTotal(
 ): Monto | null {
   const subs = subtotales(ms);
   if (subs.length === 0 || !destino) return null;
-  if (subs.length === 1 && subs[0]!.moneda === destino) return { monto: subs[0]!.monto, moneda: destino };
+  if (subs.length === 1 && subs[0]!.moneda === destino)
+    return { monto: subs[0]!.monto, moneda: destino };
   if (!rates || !rates[destino]) return null;
   let total = 0;
   for (const m of subs) {

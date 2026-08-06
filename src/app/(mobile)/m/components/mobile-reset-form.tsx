@@ -54,7 +54,12 @@ export function MobileResetForm() {
         ) : null}
       </label>
 
-      <button className="m-btn m-btn-block m-btn-primary" type="submit" disabled={pending} style={{ marginTop: 6 }}>
+      <button
+        className="m-btn m-btn-block m-btn-primary"
+        type="submit"
+        disabled={pending}
+        style={{ marginTop: 6 }}
+      >
         {pending ? "Enviando…" : "Enviar enlace de recuperación"}
       </button>
 

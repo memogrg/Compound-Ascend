@@ -19,7 +19,10 @@ export const runtime = "nodejs";
 
 function isAdminRequest(req: Request): boolean {
   return cronAuthorized(
-    { authorization: req.headers.get("authorization"), xCronSecret: req.headers.get("x-cron-secret") },
+    {
+      authorization: req.headers.get("authorization"),
+      xCronSecret: req.headers.get("x-cron-secret"),
+    },
     process.env.CRON_SECRET,
   );
 }
@@ -44,7 +47,11 @@ export async function GET(req: Request) {
     try {
       // Ping mínimo: 1 token de salida. Si el modelo no existe/está fuera de la key, el provider
       // lanza un AppError con el código (IA-400/IA-401/…), que capturamos y reportamos.
-      await provider.chat({ system: "ping", messages: [{ role: "user", content: "ping" }], maxTokens: 1 });
+      await provider.chat({
+        system: "ping",
+        messages: [{ role: "user", content: "ping" }],
+        maxTokens: 1,
+      });
       ok = true;
     } catch (err) {
       error = err instanceof Error ? err.message : "error desconocido";

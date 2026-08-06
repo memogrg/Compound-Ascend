@@ -80,7 +80,11 @@ const FREQ_OPTS: Opt[] = [
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MONTH_OPTS: Opt[] = MONTHS.map((m, i) => ({ value: String(i + 1), label: m }));
 
-const API_TYPE_MAP: Partial<Record<AssetType, string>> = { etf: "etf", accion: "stock", cripto: "crypto" };
+const API_TYPE_MAP: Partial<Record<AssetType, string>> = {
+  etf: "etf",
+  accion: "stock",
+  cripto: "crypto",
+};
 
 // ── Wizard alta / edición / compra ───────────────────────────────────────────
 export function HoldingWizardSheet({
@@ -101,7 +105,9 @@ export function HoldingWizardSheet({
   const toast = useToast();
   const isEdit = Boolean(editId);
 
-  const initialCategory = prefill ? (prefill.category ?? categoryFromAssetType(prefill.assetType)) : null;
+  const initialCategory = prefill
+    ? (prefill.category ?? categoryFromAssetType(prefill.assetType))
+    : null;
   const [category, setCategory] = useState<InvestmentCategory | null>(initialCategory);
   const [step, setStep] = useState<1 | 2>(prefill ? 2 : 1);
 
@@ -133,15 +139,21 @@ export function HoldingWizardSheet({
     prefill?.currentValueManual ?? undefined,
   );
   const [income, setIncome] = useState<number | undefined>(prefill?.rentalIncome ?? undefined);
-  const [frequency, setFrequency] = useState<HoldingFrequency>(prefill?.rentalFrequency ?? "mensual");
-  const [incomeMonth, setIncomeMonth] = useState(prefill?.incomeMonth ? String(prefill.incomeMonth) : "1");
+  const [frequency, setFrequency] = useState<HoldingFrequency>(
+    prefill?.rentalFrequency ?? "mensual",
+  );
+  const [incomeMonth, setIncomeMonth] = useState(
+    prefill?.incomeMonth ? String(prefill.incomeMonth) : "1",
+  );
   const [annualRatePct, setAnnualRatePct] = useState(
     prefill?.annualRatePct != null ? String(prefill.annualRatePct) : "",
   );
   const [maturityDate, setMaturityDate] = useState(
     prefill?.maturityDate ? String(prefill.maturityDate).slice(0, 7) : "",
   );
-  const [termYears, setTermYears] = useState(prefill?.termYears != null ? String(prefill.termYears) : "");
+  const [termYears, setTermYears] = useState(
+    prefill?.termYears != null ? String(prefill.termYears) : "",
+  );
   const todayISO = useCaptureToday();
   const [startDate, setStartDate] = useState(prefill?.purchaseDate ?? todayISO());
 
@@ -191,39 +203,39 @@ export function HoldingWizardSheet({
     },
     [],
   );
-  const lookupPrice = useCallback(
-    (symRaw: string, assetType: AssetType) => {
-      const s = symRaw.trim().toUpperCase();
-      const apiType = API_TYPE_MAP[assetType];
-      if (priceTimer.current) clearTimeout(priceTimer.current);
-      if (s.length < 1 || !apiType) {
-        setPriceState("idle");
-        setLivePrice(null);
-        return;
-      }
-      setPriceState("loading");
-      priceTimer.current = setTimeout(async () => {
-        priceAbort.current?.abort();
-        const ctrl = new AbortController();
-        priceAbort.current = ctrl;
-        try {
-          const res = await fetch(`/api/market-price?symbol=${encodeURIComponent(s)}&type=${apiType}`, {
+  const lookupPrice = useCallback((symRaw: string, assetType: AssetType) => {
+    const s = symRaw.trim().toUpperCase();
+    const apiType = API_TYPE_MAP[assetType];
+    if (priceTimer.current) clearTimeout(priceTimer.current);
+    if (s.length < 1 || !apiType) {
+      setPriceState("idle");
+      setLivePrice(null);
+      return;
+    }
+    setPriceState("loading");
+    priceTimer.current = setTimeout(async () => {
+      priceAbort.current?.abort();
+      const ctrl = new AbortController();
+      priceAbort.current = ctrl;
+      try {
+        const res = await fetch(
+          `/api/market-price?symbol=${encodeURIComponent(s)}&type=${apiType}`,
+          {
             signal: ctrl.signal,
-          });
-          if (!res.ok) return setPriceState("error");
-          const data = (await res.json()) as { price?: number; currency?: string };
-          if (typeof data.price === "number" && data.price > 0) {
-            setLivePrice(data.price);
-            setLivePriceCurrency(data.currency ?? "USD");
-            setPriceState("ok");
-          } else setPriceState("error");
-        } catch {
-          /* abort */
-        }
-      }, 350);
-    },
-    [],
-  );
+          },
+        );
+        if (!res.ok) return setPriceState("error");
+        const data = (await res.json()) as { price?: number; currency?: string };
+        if (typeof data.price === "number" && data.price > 0) {
+          setLivePrice(data.price);
+          setLivePriceCurrency(data.currency ?? "USD");
+          setPriceState("ok");
+        } else setPriceState("error");
+      } catch {
+        /* abort */
+      }
+    }, 350);
+  }, []);
 
   const investedNum = invested ?? 0;
   const canSave = !!category && name.trim().length > 0 && investedNum > 0;
@@ -263,7 +275,9 @@ export function HoldingWizardSheet({
     setPending(true);
     try {
       const payload = buildHoldingPayload(buildValues());
-      const res = editId ? await editHoldingAction(editId, payload) : await addHoldingAction(payload);
+      const res = editId
+        ? await editHoldingAction(editId, payload)
+        : await addHoldingAction(payload);
       if (!res.ok) {
         const firstErr = res.fieldErrors ? Object.values(res.fieldErrors)[0] : undefined;
         setErrorMsg(firstErr ?? res.message ?? "No pudimos guardar la posición.");
@@ -356,7 +370,12 @@ export function HoldingWizardSheet({
 
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             {step === 2 && !prefill ? (
-              <button type="button" className="m-btn m-btn-secondary" style={{ flex: "0 0 auto" }} onClick={() => setStep(1)}>
+              <button
+                type="button"
+                className="m-btn m-btn-secondary"
+                style={{ flex: "0 0 auto" }}
+                onClick={() => setStep(1)}
+              >
                 ← Atrás
               </button>
             ) : null}
@@ -384,11 +403,22 @@ function Step1Categories({ onChoose }: { onChoose: (c: InvestmentCategory) => vo
   const cashflow = CASHFLOW_CATEGORIES.filter(match);
   const growth = GROWTH_CATEGORIES.filter(match);
 
-  const Group = ({ title, hint, cats }: { title: string; hint: string; cats: InvestmentCategory[] }) =>
+  const Group = ({
+    title,
+    hint,
+    cats,
+  }: {
+    title: string;
+    hint: string;
+    cats: InvestmentCategory[];
+  }) =>
     cats.length > 0 ? (
       <div style={{ marginTop: 12 }}>
         <div className="ov" style={{ marginBottom: 6 }}>
-          {title} · <span className="muted" style={{ fontWeight: 400 }}>{hint}</span>
+          {title} ·{" "}
+          <span className="muted" style={{ fontWeight: 400 }}>
+            {hint}
+          </span>
         </div>
         <div className="m-optlist">
           {cats.map((c) => (
@@ -477,10 +507,30 @@ function Step2Fields(p: Step2Props) {
   const { profile, cur } = p;
   return (
     <div style={{ display: "grid", gap: 2 }}>
-      <TextInput name="name" label="Nombre" value={p.name} onChange={p.onName} placeholder="Ej. Apto Escazú, VOO, CDP…" autoFocus />
+      <TextInput
+        name="name"
+        label="Nombre"
+        value={p.name}
+        onChange={p.onName}
+        placeholder="Ej. Apto Escazú, VOO, CDP…"
+        autoFocus
+      />
 
-      <MoneyField name="invested" label="Monto invertido" value={p.invested} onChange={p.onInvested} currency={cur} />
-      <SheetSelect name="currency" label="Moneda" value={cur} onChange={p.onCurrency} options={CUR_OPTS} sheetTitle="Moneda" />
+      <MoneyField
+        name="invested"
+        label="Monto invertido"
+        value={p.invested}
+        onChange={p.onInvested}
+        currency={cur}
+      />
+      <SheetSelect
+        name="currency"
+        label="Moneda"
+        value={cur}
+        onChange={p.onCurrency}
+        options={CUR_OPTS}
+        sheetTitle="Moneda"
+      />
 
       {/* Perfil A · cotizado */}
       {profile === "A" ? (
@@ -493,20 +543,31 @@ function Step2Fields(p: Step2Props) {
             placeholder="Ej. VOO, BTC"
           />
           {p.priceState === "loading" ? (
-            <div className="muted" style={{ fontSize: 11, marginTop: -6, marginBottom: 8 }}>Buscando precio…</div>
+            <div className="muted" style={{ fontSize: 11, marginTop: -6, marginBottom: 8 }}>
+              Buscando precio…
+            </div>
           ) : p.priceState === "ok" && p.livePrice != null ? (
             <div style={{ fontSize: 11.5, marginTop: -6, marginBottom: 8, color: "var(--accent)" }}>
               {formatMoney(p.livePrice, p.livePriceCurrency)} en vivo
               {p.livePriceCurrency !== cur ? (
                 <span style={{ color: "var(--warn)", display: "block" }}>
-                  El precio está en {p.livePriceCurrency} y tu moneda es {cur}; ingresa el monto en {cur}.
+                  El precio está en {p.livePriceCurrency} y tu moneda es {cur}; ingresa el monto en{" "}
+                  {cur}.
                 </span>
               ) : null}
             </div>
           ) : p.priceState === "error" ? (
-            <div style={{ fontSize: 11, marginTop: -6, marginBottom: 8, color: "var(--warn)" }}>Precio no disponible</div>
+            <div style={{ fontSize: 11, marginTop: -6, marginBottom: 8, color: "var(--warn)" }}>
+              Precio no disponible
+            </div>
           ) : null}
-          <MoneyField name="unitPrice" label="Precio de compra (por unidad)" value={p.unitPrice} onChange={p.onUnitPrice} currency={cur} />
+          <MoneyField
+            name="unitPrice"
+            label="Precio de compra (por unidad)"
+            value={p.unitPrice}
+            onChange={p.onUnitPrice}
+            currency={cur}
+          />
           <TextInput
             name="quantity"
             label="Cantidad (opcional)"
@@ -549,7 +610,12 @@ function Step2Fields(p: Step2Props) {
               Vence: {p.maturityDate} · el aporte deja de contar al vencer.
             </div>
           ) : null}
-          <DateField name="startDate" label="Fecha de inicio del plan" value={p.startDate} onChange={p.onStartDate} />
+          <DateField
+            name="startDate"
+            label="Fecha de inicio del plan"
+            value={p.startDate}
+            onChange={p.onStartDate}
+          />
         </>
       ) : null}
 
@@ -567,7 +633,13 @@ function Step2Fields(p: Step2Props) {
             }}
             placeholder="0"
           />
-          <MoneyField name="income" label="Ingreso que genera (opcional)" value={p.income} onChange={p.onIncome} currency={cur} />
+          <MoneyField
+            name="income"
+            label="Ingreso que genera (opcional)"
+            value={p.income}
+            onChange={p.onIncome}
+            currency={cur}
+          />
           <SheetSelect
             name="frequency"
             label="Frecuencia"
@@ -581,15 +653,34 @@ function Step2Fields(p: Step2Props) {
             options={FREQ_OPTS}
             sheetTitle="Frecuencia del ingreso"
           />
-          {p.frequency !== "mensual" && p.frequency !== "semanal" && p.frequency !== "al_vencimiento" ? (
+          {p.frequency !== "mensual" &&
+          p.frequency !== "semanal" &&
+          p.frequency !== "al_vencimiento" ? (
             <>
-              <SheetSelect name="incomeMonth" label="Mes ancla (primer pago)" value={p.incomeMonth} onChange={p.onIncomeMonth} options={MONTH_OPTS} sheetTitle="Primer mes de pago" />
+              <SheetSelect
+                name="incomeMonth"
+                label="Mes ancla (primer pago)"
+                value={p.incomeMonth}
+                onChange={p.onIncomeMonth}
+                options={MONTH_OPTS}
+                sheetTitle="Primer mes de pago"
+              />
               {(() => {
                 const ms = derivedMonths(p.frequency, parseInt(p.incomeMonth, 10) || 1);
                 return ms.length > 1 ? (
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: -4, marginBottom: 8 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      flexWrap: "wrap",
+                      marginTop: -4,
+                      marginBottom: 8,
+                    }}
+                  >
                     {ms.map((m) => (
-                      <span key={m} className="badge neutral" style={{ fontSize: 11 }}>{MONTHS[m - 1]}</span>
+                      <span key={m} className="badge neutral" style={{ fontSize: 11 }}>
+                        {MONTHS[m - 1]}
+                      </span>
                     ))}
                   </div>
                 ) : null;
@@ -597,7 +688,12 @@ function Step2Fields(p: Step2Props) {
             </>
           ) : null}
           {p.frequency === "al_vencimiento" ? (
-            <MonthInput name="maturityDate" label="Fecha de vencimiento" value={p.maturityDate} onChange={p.onMaturityDate} />
+            <MonthInput
+              name="maturityDate"
+              label="Fecha de vencimiento"
+              value={p.maturityDate}
+              onChange={p.onMaturityDate}
+            />
           ) : null}
         </>
       ) : null}
@@ -619,13 +715,32 @@ function Step2Fields(p: Step2Props) {
       ) : null}
 
       {/* Aporto cada mes */}
-      <Toggle name="aportoCadaMes" label="Aporto cada mes" value={p.aportoCadaMes} onChange={p.onAportoCadaMes} hint="Aporte recurrente, aparte del total invertido." />
+      <Toggle
+        name="aportoCadaMes"
+        label="Aporto cada mes"
+        value={p.aportoCadaMes}
+        onChange={p.onAportoCadaMes}
+        hint="Aporte recurrente, aparte del total invertido."
+      />
       {p.aportoCadaMes ? (
-        <MoneyField name="aporteMensual" label="Aporte mensual" value={p.aporteMensual} onChange={p.onAporteMensual} currency={cur} />
+        <MoneyField
+          name="aporteMensual"
+          label="Aporte mensual"
+          value={p.aporteMensual}
+          onChange={p.onAporteMensual}
+          currency={cur}
+        />
       ) : null}
 
       {/* Región */}
-      <SheetSelect name="region" label="Región / país" value={p.region} onChange={p.onRegion} options={REGION_OPTS} sheetTitle="Región / país" />
+      <SheetSelect
+        name="region"
+        label="Región / país"
+        value={p.region}
+        onChange={p.onRegion}
+        options={REGION_OPTS}
+        sheetTitle="Región / país"
+      />
 
       {/* Nueva vs existente (al crear) / aporte real (al editar) */}
       {p.isEdit ? (
@@ -640,10 +755,18 @@ function Step2Fields(p: Step2Props) {
         <div className="m-qfield">
           <div className="m-qlabel">¿Esta inversión es nueva o ya la tenías?</div>
           <div className="m-optlist">
-            <button type="button" className={`m-opt${!p.registerExpense ? " sel" : ""}`} onClick={() => p.onRegisterExpense(false)}>
+            <button
+              type="button"
+              className={`m-opt${!p.registerExpense ? " sel" : ""}`}
+              onClick={() => p.onRegisterExpense(false)}
+            >
               <span className="m-opt-t">Ya la tenía · solo registrar la posición</span>
             </button>
-            <button type="button" className={`m-opt${p.registerExpense ? " sel" : ""}`} onClick={() => p.onRegisterExpense(true)}>
+            <button
+              type="button"
+              className={`m-opt${p.registerExpense ? " sel" : ""}`}
+              onClick={() => p.onRegisterExpense(true)}
+            >
               <span className="m-opt-t">La compré ahora · registrar el monto como gasto</span>
             </button>
           </div>
@@ -688,11 +811,27 @@ function TextInput({
   );
 }
 
-function MonthInput({ name, label, value, onChange }: { name: string; label: string; value: string; onChange: (v: string) => void }) {
+function MonthInput({
+  name,
+  label,
+  value,
+  onChange,
+}: {
+  name: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
-      <input className="m-inp" name={name} type="month" value={value} onChange={(e) => onChange(e.target.value)} />
+      <input
+        className="m-inp"
+        name={name}
+        type="month"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   );
 }
@@ -726,7 +865,9 @@ function RentalCostsBlock(props: {
   const debtServiceMonthly = linkedDebt ? linkedDebt.currentPayment : 0;
 
   const investedCash =
-    (parseFloat(rc.purchasePrice) || 0) + (parseFloat(rc.closingCosts) || 0) || parseFloat(props.invested) || 0;
+    (parseFloat(rc.purchasePrice) || 0) + (parseFloat(rc.closingCosts) || 0) ||
+    parseFloat(props.invested) ||
+    0;
 
   const roi = computeRentalRoi({
     rentalIncome: parseFloat(props.income) || 0,
@@ -745,7 +886,10 @@ function RentalCostsBlock(props: {
 
   const debtOpts: Opt[] = [
     { value: "", label: "Sin deuda ligada" },
-    ...debtsSameCur.map((d) => ({ value: d.id, label: `${d.name} · ${formatMoney(d.currentPayment, d.currency)}/mes` })),
+    ...debtsSameCur.map((d) => ({
+      value: d.id,
+      label: `${d.name} · ${formatMoney(d.currentPayment, d.currency)}/mes`,
+    })),
   ];
 
   return (
@@ -760,16 +904,48 @@ function RentalCostsBlock(props: {
           { value: "airbnb", label: "Airbnb" },
         ]}
       />
-      <MoneyStr label="Precio de compra" value={rc.purchasePrice} onChange={set("purchasePrice")} cur={cur} />
-      <MoneyStr label="Costos de cierre" value={rc.closingCosts} onChange={set("closingCosts")} cur={cur} />
+      <MoneyStr
+        label="Precio de compra"
+        value={rc.purchasePrice}
+        onChange={set("purchasePrice")}
+        cur={cur}
+      />
+      <MoneyStr
+        label="Costos de cierre"
+        value={rc.closingCosts}
+        onChange={set("closingCosts")}
+        cur={cur}
+      />
       <PctStr label="Vacancia" value={rc.vacancyPct} onChange={set("vacancyPct")} />
       <PctStr label="Administración" value={rc.mgmtPct} onChange={set("mgmtPct")} />
-      <MoneyStr label="Mantenimiento (mes)" value={rc.maintenance} onChange={set("maintenance")} cur={cur} />
+      <MoneyStr
+        label="Mantenimiento (mes)"
+        value={rc.maintenance}
+        onChange={set("maintenance")}
+        cur={cur}
+      />
       <MoneyStr label="Condominio / HOA (mes)" value={rc.hoa} onChange={set("hoa")} cur={cur} />
-      <MoneyStr label="Imp. Bienes Inmuebles (año)" value={rc.propertyTax} onChange={set("propertyTax")} cur={cur} />
+      <MoneyStr
+        label="Imp. Bienes Inmuebles (año)"
+        value={rc.propertyTax}
+        onChange={set("propertyTax")}
+        cur={cur}
+      />
       <MoneyStr label="Seguro (año)" value={rc.insurance} onChange={set("insurance")} cur={cur} />
-      <MoneyStr label="Servicios + limpieza (mes)" value={rc.services} onChange={set("services")} cur={cur} />
-      <SheetSelect name="debtId" label="Deuda que la financia" value={props.debtId} onChange={props.onDebtId} options={debtOpts} sheetTitle="Deuda ligada" />
+      <MoneyStr
+        label="Servicios + limpieza (mes)"
+        value={rc.services}
+        onChange={set("services")}
+        cur={cur}
+      />
+      <SheetSelect
+        name="debtId"
+        label="Deuda que la financia"
+        value={props.debtId}
+        onChange={props.onDebtId}
+        options={debtOpts}
+        sheetTitle="Deuda ligada"
+      />
       {debts.length > 0 && debtsSameCur.length === 0 ? (
         <div className="muted" style={{ fontSize: 11, marginTop: -6, marginBottom: 8 }}>
           No tienes deudas en {cur}. Regístralas en Deudas para ligarlas.
@@ -787,7 +963,9 @@ function RentalCostsBlock(props: {
           {linkedDebt ? (
             <div className="between" style={{ fontSize: 12.5, marginTop: 6 }}>
               <span className="muted">Flujo neto con deuda</span>
-              <strong style={{ color: roi.leveredNetMonthly >= 0 ? "var(--accent)" : "var(--danger)" }}>
+              <strong
+                style={{ color: roi.leveredNetMonthly >= 0 ? "var(--accent)" : "var(--danger)" }}
+              >
                 {formatMoney(roi.leveredNetMonthly, cur)}/mes
               </strong>
             </div>
@@ -803,7 +981,17 @@ function RentalCostsBlock(props: {
 }
 
 /** Input de dinero con string (para rc, que el engine espera como string). */
-function MoneyStr({ label, value, onChange, cur }: { label: string; value: string; onChange: (v: string) => void; cur: string }) {
+function MoneyStr({
+  label,
+  value,
+  onChange,
+  cur,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  cur: string;
+}) {
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
@@ -820,7 +1008,15 @@ function MoneyStr({ label, value, onChange, cur }: { label: string; value: strin
     </div>
   );
 }
-function PctStr({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function PctStr({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
@@ -854,7 +1050,11 @@ export function SellHoldingForm({
   const [date, setDate] = useState(todayISO());
   const cur = holding.currency || currency;
 
-  const action = (v: { amount: number | undefined; quantitySold: number | undefined; saleDate: string }): Promise<ActionResult> =>
+  const action = (v: {
+    amount: number | undefined;
+    quantitySold: number | undefined;
+    saleDate: string;
+  }): Promise<ActionResult> =>
     sellHoldingAction({
       holdingId: holding.id,
       saleDate: v.saleDate,
@@ -875,8 +1075,21 @@ export function SellHoldingForm({
         Se registra un <strong>ingreso vinculado</strong> y se reduce la posición. Tienes{" "}
         {holding.quantity} unidad{holding.quantity === 1 ? "" : "es"}.
       </div>
-      <MoneyField name="amount" label="Monto recibido" value={amount} onChange={setAmount} currency={cur} />
-      <MoneyField name="quantitySold" label="Unidades vendidas (opcional)" value={quantitySold} onChange={setQuantitySold} currency={cur} placeholder="todas" />
+      <MoneyField
+        name="amount"
+        label="Monto recibido"
+        value={amount}
+        onChange={setAmount}
+        currency={cur}
+      />
+      <MoneyField
+        name="quantitySold"
+        label="Unidades vendidas (opcional)"
+        value={quantitySold}
+        onChange={setQuantitySold}
+        currency={cur}
+        placeholder="todas"
+      />
       <DateField name="saleDate" label="Fecha de la venta" value={date} onChange={setDate} />
     </FormShell>
   );
@@ -898,7 +1111,11 @@ export function DividendForm({
   const [frequency, setFrequency] = useState("trimestral");
   const cur = holding.currency || currency;
 
-  const action = (v: { amount: number | undefined; paymentDate: string; frequency: string }): Promise<ActionResult> =>
+  const action = (v: {
+    amount: number | undefined;
+    paymentDate: string;
+    frequency: string;
+  }): Promise<ActionResult> =>
     addDividendAction({
       holdingId: holding.id,
       paymentDate: v.paymentDate,
@@ -920,7 +1137,13 @@ export function DividendForm({
       <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
         Se registra como <strong>ingreso/transacción vinculada</strong> a esta posición.
       </div>
-      <MoneyField name="amount" label="Monto recibido" value={amount} onChange={setAmount} currency={cur} />
+      <MoneyField
+        name="amount"
+        label="Monto recibido"
+        value={amount}
+        onChange={setAmount}
+        currency={cur}
+      />
       <SheetSelect
         name="frequency"
         label="Frecuencia"
@@ -1039,8 +1262,8 @@ export function ContributeHoldingForm({
       <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
         {quoted ? (
           <>
-            Compras más de <strong>{name}</strong>: se promedia tu costo y se registra el aporte
-            en {cur}.
+            Compras más de <strong>{name}</strong>: se promedia tu costo y se registra el aporte en{" "}
+            {cur}.
           </>
         ) : (
           <>
@@ -1048,7 +1271,13 @@ export function ContributeHoldingForm({
           </>
         )}
       </div>
-      <MoneyField name="amount" label="Importe aportado" value={amount} onChange={setAmount} currency={cur} />
+      <MoneyField
+        name="amount"
+        label="Importe aportado"
+        value={amount}
+        onChange={setAmount}
+        currency={cur}
+      />
       {quoted ? (
         <MoneyField
           name="unitPrice"

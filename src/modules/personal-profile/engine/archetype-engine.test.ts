@@ -54,7 +54,9 @@ describe("computeArchetype", () => {
   });
 
   it("socialComparison presiona → dominantEmotion 'frustracion'", () => {
-    expect(computeArchetype({ socialComparison: ["presiona"] }).dominantEmotion).toBe("frustracion");
+    expect(computeArchetype({ socialComparison: ["presiona"] }).dominantEmotion).toBe(
+      "frustracion",
+    );
   });
 
   it("sin frase de money script → moneyScript null", () => {

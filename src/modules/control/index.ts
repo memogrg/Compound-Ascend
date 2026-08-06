@@ -20,7 +20,13 @@ export type {
   PaymentRecord,
   RecomputeResult,
 } from "./engine/amortization";
-export { getControlSummary, listDebts, listGoals, createGoal, listDebtPayments } from "./services/control-service";
+export {
+  getControlSummary,
+  listDebts,
+  listGoals,
+  createGoal,
+  listDebtPayments,
+} from "./services/control-service";
 export { createSavingsSobreAction, reportPaymentAction } from "./api/actions";
 export {
   montoSugerido,

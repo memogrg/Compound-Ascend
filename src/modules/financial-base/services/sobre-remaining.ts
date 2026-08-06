@@ -43,14 +43,13 @@ export async function getSobreRemaining(
     ]);
     const leaf = cats.find((c) => c.id === categoryId);
     if (!leaf) return null;
-    const frasco = leaf.parentId
-      ? (cats.find((c) => c.id === leaf.parentId)?.name ?? null)
-      : null;
+    const frasco = leaf.parentId ? (cats.find((c) => c.id === leaf.parentId)?.name ?? null) : null;
     const path = frasco ? `${frasco} › ${leaf.name}` : leaf.name;
 
     const b = budget.expenseByKey[categoryId];
     const spent = real.expenseByKey[categoryId]?.value ?? 0;
-    if (!b) return { path, currency: real.currency, budget: 0, spent, remaining: 0, hasBudget: false };
+    if (!b)
+      return { path, currency: real.currency, budget: 0, spent, remaining: 0, hasBudget: false };
     return {
       path,
       currency: real.currency,

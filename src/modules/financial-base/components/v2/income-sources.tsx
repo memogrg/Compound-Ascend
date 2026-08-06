@@ -114,7 +114,8 @@ export function IncomeSources({
               received={received[it.id] ?? 0}
               onReceive={(amount) =>
                 run(
-                  () => receivePartialIncomeAction({ budgetItemId: it.id, amount, date: todayISO() }),
+                  () =>
+                    receivePartialIncomeAction({ budgetItemId: it.id, amount, date: todayISO() }),
                   "Recibido registrado",
                 )
               }
@@ -272,7 +273,12 @@ function SourceRow({
               }}
             />
           </div>
-          <button type="button" className="btn btn-secondary" style={{ padding: "7px 12px" }} onClick={submitReceive}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ padding: "7px 12px" }}
+            onClick={submitReceive}
+          >
             Agregar
           </button>
           <button

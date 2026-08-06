@@ -94,58 +94,58 @@ export async function getDebtsOverview(
 
   const active = debts.filter((d) => d.isCurrent !== false);
   const vms: DebtVM[] = active.map((d) => {
-      const due = computeDueStatus(
-        { payDay: d.payDay, startDate: d.startDate, paymentDates: paidThisMonthMap[d.id] ?? [] },
-        now,
-      );
-      const apr = effectiveApr(d, indexRates);
-      // Saldo derivado con la MISMA función que usa el detalle, para que los dos números
-      // coincidan por construcción y no por disciplina. Se corre en la moneda NATIVA de la
-      // deuda — que es la de sus pagos — y después se convierte.
-      const pmts = paymentsByDebt[d.id] ?? [];
-      const saldoNativo =
-        pmts.length > 0
-          ? recomputeFromPayments(
-              {
-                balance: d.balance,
-                apr,
-                termMonths: d.termMonths,
-                monthlyPayment: d.currentPayment > 0 ? d.currentPayment : null,
-                insurance: d.insurance ?? 0,
-                extraMonthly: d.extraMonthly ?? 0,
-                startDate: d.startDate,
-                originalAmount: d.originalAmount ?? null,
-              },
-              pmts,
-            ).currentBalance
-          : d.balance;
-      return {
-        id: d.id,
-        name: d.name,
-        debtType: d.debtType ?? null,
-        bank: d.bank ?? null,
-        currency,
-        balance: conv(saldoNativo, d.currency),
-        nativeBalance: saldoNativo,
-        originalAmount: d.originalAmount != null ? conv(d.originalAmount, d.currency) : null,
-        apr,
-        rateType: d.rateType ?? null,
-        rateIndex: d.rateIndex ?? null,
-        rateSpread: d.rateSpread ?? null,
-        introApr: d.introApr ?? null,
-        introFixedMonths: d.introFixedMonths ?? null,
-        minPayment: conv(d.minPayment, d.currency),
-        monthlyPayment: conv(d.currentPayment, d.currency),
-        insurance: d.insurance != null ? conv(d.insurance, d.currency) : 0,
-        extraMonthly: d.extraMonthly != null ? conv(d.extraMonthly, d.currency) : 0,
-        termMonths: d.termMonths ?? null,
-        startDate: d.startDate ?? null,
-        rateNote: buildRateNote(d, indexRates),
-        nextDue: due.nextDue,
-        dueSoon: due.dueSoon,
-        paidThisMonth: due.paidThisMonth,
-      };
-    });
+    const due = computeDueStatus(
+      { payDay: d.payDay, startDate: d.startDate, paymentDates: paidThisMonthMap[d.id] ?? [] },
+      now,
+    );
+    const apr = effectiveApr(d, indexRates);
+    // Saldo derivado con la MISMA función que usa el detalle, para que los dos números
+    // coincidan por construcción y no por disciplina. Se corre en la moneda NATIVA de la
+    // deuda — que es la de sus pagos — y después se convierte.
+    const pmts = paymentsByDebt[d.id] ?? [];
+    const saldoNativo =
+      pmts.length > 0
+        ? recomputeFromPayments(
+            {
+              balance: d.balance,
+              apr,
+              termMonths: d.termMonths,
+              monthlyPayment: d.currentPayment > 0 ? d.currentPayment : null,
+              insurance: d.insurance ?? 0,
+              extraMonthly: d.extraMonthly ?? 0,
+              startDate: d.startDate,
+              originalAmount: d.originalAmount ?? null,
+            },
+            pmts,
+          ).currentBalance
+        : d.balance;
+    return {
+      id: d.id,
+      name: d.name,
+      debtType: d.debtType ?? null,
+      bank: d.bank ?? null,
+      currency,
+      balance: conv(saldoNativo, d.currency),
+      nativeBalance: saldoNativo,
+      originalAmount: d.originalAmount != null ? conv(d.originalAmount, d.currency) : null,
+      apr,
+      rateType: d.rateType ?? null,
+      rateIndex: d.rateIndex ?? null,
+      rateSpread: d.rateSpread ?? null,
+      introApr: d.introApr ?? null,
+      introFixedMonths: d.introFixedMonths ?? null,
+      minPayment: conv(d.minPayment, d.currency),
+      monthlyPayment: conv(d.currentPayment, d.currency),
+      insurance: d.insurance != null ? conv(d.insurance, d.currency) : 0,
+      extraMonthly: d.extraMonthly != null ? conv(d.extraMonthly, d.currency) : 0,
+      termMonths: d.termMonths ?? null,
+      startDate: d.startDate ?? null,
+      rateNote: buildRateNote(d, indexRates),
+      nextDue: due.nextDue,
+      dueSoon: due.dueSoon,
+      paidThisMonth: due.paidThisMonth,
+    };
+  });
 
   return {
     currency,

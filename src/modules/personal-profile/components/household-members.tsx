@@ -90,9 +90,21 @@ export function HouseholdMembers({
             style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
           >
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 {m.email}
-                {m.isSelf ? <span className="muted" style={{ fontWeight: 400 }}> (vos)</span> : null}
+                {m.isSelf ? (
+                  <span className="muted" style={{ fontWeight: 400 }}>
+                    {" "}
+                    (vos)
+                  </span>
+                ) : null}
               </div>
               <span className="chip-linked">{ROLE_LABEL[m.role] ?? m.role}</span>
               {m.isOwner ? <span className="chip-linked">titular</span> : null}
@@ -145,10 +157,20 @@ export function HouseholdMembers({
       {/* Invitaciones pendientes */}
       {canManage && pending.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div className="muted" style={{ fontSize: 12 }}>Invitaciones pendientes</div>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Invitaciones pendientes
+          </div>
           {pending.map((p) => (
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis" }}>
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: 13,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 {p.email}
               </span>
               <span className="chip-linked">pendiente</span>

@@ -113,7 +113,15 @@ export function JarNormalModal({
     }
     setExtra((prev) => [
       ...prev,
-      { id: cat.id!, name: n, spent: 0, budget: amt, nativeSpent: 0, nativeBudget: amt, currency: subCur },
+      {
+        id: cat.id!,
+        name: n,
+        spent: 0,
+        budget: amt,
+        nativeSpent: 0,
+        nativeBudget: amt,
+        currency: subCur,
+      },
     ]);
     setName("");
     setAmount("");

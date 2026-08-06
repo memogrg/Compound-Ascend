@@ -29,7 +29,10 @@ export function asRanked(v: unknown): string[] {
  * solo valor devuelve ese valor pelado (sin la etiqueta "primaria", que solo aporta con ≥2).
  * `humanize` transforma cada valor (p. ej. reemplazar "_" por espacio). "" si vacío.
  */
-export function formatRanking(values: string[], humanize: (v: string) => string = (x) => x): string {
+export function formatRanking(
+  values: string[],
+  humanize: (v: string) => string = (x) => x,
+): string {
   const clean = values.slice(0, RANK_MAX);
   if (clean.length === 0) return "";
   if (clean.length === 1) return humanize(clean[0]!);

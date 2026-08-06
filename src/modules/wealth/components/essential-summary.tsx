@@ -66,12 +66,20 @@ export async function EssentialExpenseSummary({
       {data.excludedPolicies.length > 0 ? (
         <ul
           className="muted"
-          style={{ fontSize: 11.5, margin: "8px 0 0", paddingLeft: 16, lineHeight: 1.5, display: "grid", gap: 3 }}
+          style={{
+            fontSize: 11.5,
+            margin: "8px 0 0",
+            paddingLeft: 16,
+            lineHeight: 1.5,
+            display: "grid",
+            gap: 3,
+          }}
         >
           {data.excludedPolicies.map((p) => (
             <li key={p.id}>
-              Prima de <strong>{p.policyName}</strong> ({formatMoney(p.monthly, currency)}) excluida:
-              ya la pagás vía el ahorro <strong>{p.viaGoalName}</strong> (no se cuenta dos veces).
+              Prima de <strong>{p.policyName}</strong> ({formatMoney(p.monthly, currency)})
+              excluida: ya la pagás vía el ahorro <strong>{p.viaGoalName}</strong> (no se cuenta dos
+              veces).
             </li>
           ))}
         </ul>

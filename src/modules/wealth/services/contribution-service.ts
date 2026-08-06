@@ -8,7 +8,11 @@ import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
 import { registerPurchaseExpense } from "./holdings-service";
 import { userCurrentPeriod } from "@/lib/time/user-time";
-import { selectPlansToCharge, planPaidUntil, type PlanPeriod } from "@/modules/wealth/engine/premiums";
+import {
+  selectPlansToCharge,
+  planPaidUntil,
+  type PlanPeriod,
+} from "@/modules/wealth/engine/premiums";
 
 const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
   etf: "etf",
@@ -143,11 +147,7 @@ export async function getPlanPaidUntil(holdingId: string): Promise<PlanPeriod | 
       .select("period_year, period_month")
       .in("user_id", memberIds)
       .eq("holding_id", holdingId),
-    supabase
-      .from("investment_holdings")
-      .select("maturity_date")
-      .eq("id", holdingId)
-      .maybeSingle(),
+    supabase.from("investment_holdings").select("maturity_date").eq("id", holdingId).maybeSingle(),
   ]);
   const periods: PlanPeriod[] = (rows ?? []).map((r) => ({
     year: r.period_year,
@@ -307,7 +307,10 @@ export async function ensureMonthlyPremiums(): Promise<void> {
     .eq("user_id", user.id)
     .eq("period_year", periodYear)
     .eq("period_month", periodMonth)
-    .in("holding_id", plans.map((p) => p.id));
+    .in(
+      "holding_id",
+      plans.map((p) => p.id),
+    );
   const alreadyCharged = new Set((existing ?? []).map((r) => r.holding_id));
 
   for (const p of selectPlansToCharge(plans, alreadyCharged)) {
@@ -332,7 +335,9 @@ export async function ensureMonthlyPremiums(): Promise<void> {
         .maybeSingle();
       if (insErr) {
         if (insErr.code !== "23505") {
-          console.error(`[ensureMonthlyPremiums] reserva falló (${p.id}): ${insErr.code} ${insErr.message}`);
+          console.error(
+            `[ensureMonthlyPremiums] reserva falló (${p.id}): ${insErr.code} ${insErr.message}`,
+          );
         }
         continue;
       }
@@ -408,7 +413,10 @@ export async function advancePremiums(
   if (last) {
     y = last.period_year;
     m = last.period_month + 1;
-    if (m > 12) { m = 1; y += 1; }
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
   } else {
     const period = await userCurrentPeriod();
     y = period.year;
@@ -433,7 +441,10 @@ export async function advancePremiums(
     if (!error) advanced += 1;
     else if (error.code !== "23505") throw new Error(error.message); // ya existe → saltar
     m += 1;
-    if (m > 12) { m = 1; y += 1; }
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
   }
   if (advanced === 0) return { advanced: 0 };
 

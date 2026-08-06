@@ -182,7 +182,8 @@ export async function updateInvestment(id: string, input: InvestmentInput): Prom
   const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase
     .from("investments")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       asset_type: input.assetType,
       name: input.name,
       symbol: input.symbol ?? null,
@@ -204,7 +205,8 @@ export async function updatePolicy(id: string, input: PolicyInput): Promise<void
   const scope = await householdWriteScope(supabase, user.id);
   const { error } = await supabase
     .from("insurance_policies")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       policy_type: input.policyType,
       provider: input.provider ?? null,
       coverage: input.coverage ?? null,

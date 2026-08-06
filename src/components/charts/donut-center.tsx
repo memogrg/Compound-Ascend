@@ -38,7 +38,13 @@ export function DonutCenter({
 
   const valueStyle: CSSProperties =
     mode === "number"
-      ? { fontSize, lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }
+      ? {
+          fontSize,
+          lineHeight: 1,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }
       : {
           fontSize,
           lineHeight: 1.15,

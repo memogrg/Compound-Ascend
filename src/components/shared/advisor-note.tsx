@@ -26,7 +26,12 @@ export function AdvisorNote({
   return (
     <div
       className="card card-pad"
-      style={{ borderLeft: `3px solid ${color}`, display: "flex", gap: 12, alignItems: "flex-start" }}
+      style={{
+        borderLeft: `3px solid ${color}`,
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start",
+      }}
     >
       <span style={{ color, flex: "none", marginTop: 2 }}>
         <AgentMark />
@@ -35,7 +40,15 @@ export function AdvisorNote({
         <div className="label" style={{ fontSize: 11, color, letterSpacing: 0.3 }}>
           My Agent C+
         </div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginTop: 4, lineHeight: 1.4 }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--ink)",
+            marginTop: 4,
+            lineHeight: 1.4,
+          }}
+        >
           {title}
         </div>
         <p className="muted" style={{ fontSize: 13, marginTop: 4, lineHeight: 1.6 }}>

@@ -61,7 +61,10 @@ export function normalizar(s: string): string {
  * encuentre "Tarjeta BAC" y "tarjeta bac credomatic" encuentre "Tarjeta BAC").
  * Devuelve null si no hay match — el llamador lo dice y ofrece los nombres que sí tiene.
  */
-export function resolverEntidad(nombre: string | null | undefined, entidades: Entidad[]): Entidad | null {
+export function resolverEntidad(
+  nombre: string | null | undefined,
+  entidades: Entidad[],
+): Entidad | null {
   if (!nombre) return null;
   const n = normalizar(nombre);
   if (!n) return null;

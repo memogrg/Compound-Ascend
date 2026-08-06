@@ -20,7 +20,8 @@ export type DebtAdvice = {
 /** Cierre opcional por arquetipo (sin punto final; el cuerpo lo añade). */
 function archetypeTail(archetypeLabel?: string): string {
   const l = (archetypeLabel ?? "").toLowerCase();
-  if (l.includes("protector") || l.includes("guard")) return " sin comprometer tu fondo de emergencia";
+  if (l.includes("protector") || l.includes("guard"))
+    return " sin comprometer tu fondo de emergencia";
   if (l.includes("constructor") || l.includes("estratega")) return " para acelerar tu inversión";
   return "";
 }

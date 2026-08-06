@@ -96,7 +96,10 @@ export function FundMonitor() {
   }, [watchlist, query]);
 
   // En vivo si al menos una cotización trae precio y no viene de caché.
-  const live = useMemo(() => [...quotes.values()].some((q) => q.price != null && !q.cached), [quotes]);
+  const live = useMemo(
+    () => [...quotes.values()].some((q) => q.price != null && !q.cached),
+    [quotes],
+  );
 
   return (
     <div>
@@ -112,12 +115,25 @@ export function FundMonitor() {
             }}
           />
         </div>
-        <select className="sel" style={{ width: 110 }} value={kind} onChange={(e) => setKind(e.target.value as WatchKind)} aria-label="Tipo de activo">
+        <select
+          className="sel"
+          style={{ width: 110 }}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as WatchKind)}
+          aria-label="Tipo de activo"
+        >
           {KINDS.map((k) => (
-            <option key={k.value} value={k.value}>{k.label}</option>
+            <option key={k.value} value={k.value}>
+              {k.label}
+            </option>
           ))}
         </select>
-        <button type="button" className="btn btn-primary" disabled={busy || !query.trim()} onClick={() => void add()}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={busy || !query.trim()}
+          onClick={() => void add()}
+        >
           <Icon name="plus" width={2} /> Seguir
         </button>
         <button type="button" className="btn btn-secondary" onClick={() => void refresh()}>
@@ -138,7 +154,9 @@ export function FundMonitor() {
           <div className="c-spark">7 días</div>
         </div>
         {rows.length === 0 ? (
-          <div className="muted" style={{ padding: "30px", textAlign: "center", fontSize: 13 }}>Sin resultados.</div>
+          <div className="muted" style={{ padding: "30px", textAlign: "center", fontSize: 13 }}>
+            Sin resultados.
+          </div>
         ) : (
           rows.map((r) => (
             <MonitorRow
@@ -152,8 +170,8 @@ export function FundMonitor() {
         )}
       </div>
       <p className="muted" style={{ fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>
-        Precios vía cadena de proveedores (con caché) desde el servidor. La variación del día y el sparkline son best-effort
-        según el proveedor.
+        Precios vía cadena de proveedores (con caché) desde el servidor. La variación del día y el
+        sparkline son best-effort según el proveedor.
       </p>
     </div>
   );
@@ -172,22 +190,43 @@ function MonitorRow({
 }) {
   const change = quote?.changePct ?? null;
   const up = (change ?? 0) >= 0;
-  const priceFmt = quote && quote.price != null ? formatMoney(quote.price, quote.currency ?? "USD") : null;
+  const priceFmt =
+    quote && quote.price != null ? formatMoney(quote.price, quote.currency ?? "USD") : null;
   return (
     <div className="mon-row">
-      <div className="mon-ic" style={{ background: KIND_GRADIENT[row.kind] }}>{row.symbol.slice(0, 4)}</div>
+      <div className="mon-ic" style={{ background: KIND_GRADIENT[row.kind] }}>
+        {row.symbol.slice(0, 4)}
+      </div>
       <div style={{ minWidth: 0 }}>
         <div className="mon-name">{row.symbol}</div>
-        <div className="mon-sub">{row.name ?? (row.kind === "crypto" ? "Cripto" : row.kind === "etf" ? "ETF" : "Acción")}</div>
+        <div className="mon-sub">
+          {row.name ?? (row.kind === "crypto" ? "Cripto" : row.kind === "etf" ? "ETF" : "Acción")}
+        </div>
       </div>
       <div className="mon-price">{loading ? "…" : (priceFmt ?? "sin precio")}</div>
-      <div className={`mon-chg ${change == null ? "" : up ? "pos" : "neg"}`} style={{ color: change == null ? "var(--muted)" : up ? "var(--pos)" : "var(--neg)" }}>
-        {change != null ? `${up ? "+" : ""}${formatPercent(change / 100)}` : quote?.cached ? "caché" : ""}
+      <div
+        className={`mon-chg ${change == null ? "" : up ? "pos" : "neg"}`}
+        style={{ color: change == null ? "var(--muted)" : up ? "var(--pos)" : "var(--neg)" }}
+      >
+        {change != null
+          ? `${up ? "+" : ""}${formatPercent(change / 100)}`
+          : quote?.cached
+            ? "caché"
+            : ""}
       </div>
-      <div className="c-spark" style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}>
+      <div
+        className="c-spark"
+        style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "space-between" }}
+      >
         <Sparkline series={quote?.spark ?? []} up={up} loading={loading} />
         {onRemove ? (
-          <button type="button" className="icon-btn" aria-label={`Quitar ${row.symbol}`} style={{ width: 26, height: 26, flex: "none" }} onClick={onRemove}>
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label={`Quitar ${row.symbol}`}
+            style={{ width: 26, height: 26, flex: "none" }}
+            onClick={onRemove}
+          >
             <Icon name="x" />
           </button>
         ) : null}
@@ -206,11 +245,21 @@ function Sparkline({ series, up, loading }: { series: number[]; up: boolean; loa
   const span = max - min || 1;
   const stepX = W / (series.length - 1);
   const d = series
-    .map((v, i) => `${i ? "L" : "M"}${(i * stepX).toFixed(1)},${(H - 2 - ((v - min) / span) * (H - 6)).toFixed(1)}`)
+    .map(
+      (v, i) =>
+        `${i ? "L" : "M"}${(i * stepX).toFixed(1)},${(H - 2 - ((v - min) / span) * (H - 6)).toFixed(1)}`,
+    )
     .join(" ");
   return (
     <svg className="mon-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
-      <path d={d} fill="none" stroke={up ? "var(--pos)" : "var(--neg)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={d}
+        fill="none"
+        stroke={up ? "var(--pos)" : "var(--neg)"}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

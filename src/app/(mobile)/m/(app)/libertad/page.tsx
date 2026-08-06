@@ -29,10 +29,30 @@ const RANK: Record<Hito, number> = { ninguno: 0, seguridad: 1, independencia: 2,
 type RungKey = "seguridad" | "independencia" | "libertad";
 type RungState = "alcanzado" | "en_curso" | "pendiente";
 
-const RUNGS: { key: RungKey; title: string; subtitle: string; icon: "protection" | "income" | "goal" }[] = [
-  { key: "seguridad", title: "Seguridad", subtitle: "Tu capital cubre tus gastos esenciales.", icon: "protection" },
-  { key: "independencia", title: "Independencia", subtitle: "Tu capital sostiene tu vida actual completa.", icon: "income" },
-  { key: "libertad", title: "Libertad", subtitle: "Tu capital sostiene la vida que quieres vivir.", icon: "goal" },
+const RUNGS: {
+  key: RungKey;
+  title: string;
+  subtitle: string;
+  icon: "protection" | "income" | "goal";
+}[] = [
+  {
+    key: "seguridad",
+    title: "Seguridad",
+    subtitle: "Tu capital cubre tus gastos esenciales.",
+    icon: "protection",
+  },
+  {
+    key: "independencia",
+    title: "Independencia",
+    subtitle: "Tu capital sostiene tu vida actual completa.",
+    icon: "income",
+  },
+  {
+    key: "libertad",
+    title: "Libertad",
+    subtitle: "Tu capital sostiene la vida que quieres vivir.",
+    icon: "goal",
+  },
 ];
 
 const STATE_TONE: Record<RungState, MTone> = {
@@ -105,11 +125,23 @@ function Escalera({
   const essential = result.essentialBreakdown;
 
   const numeroOf = (k: RungKey): number | null =>
-    k === "seguridad" ? r.numeroDeSeguridad : k === "independencia" ? r.numeroDeIndependencia : r.numeroDeLibertad;
+    k === "seguridad"
+      ? r.numeroDeSeguridad
+      : k === "independencia"
+        ? r.numeroDeIndependencia
+        : r.numeroDeLibertad;
   const progresoOf = (k: RungKey): number =>
-    k === "seguridad" ? r.progresoSeguridad : k === "independencia" ? r.progresoIndependencia : r.progresoLibertad;
+    k === "seguridad"
+      ? r.progresoSeguridad
+      : k === "independencia"
+        ? r.progresoIndependencia
+        : r.progresoLibertad;
   const stateOf = (k: RungKey): RungState =>
-    RANK[k] <= RANK[r.hitoAlcanzado] ? "alcanzado" : k === r.siguienteHito ? "en_curso" : "pendiente";
+    RANK[k] <= RANK[r.hitoAlcanzado]
+      ? "alcanzado"
+      : k === r.siguienteHito
+        ? "en_curso"
+        : "pendiente";
 
   return (
     <>
@@ -142,7 +174,11 @@ function Escalera({
                 title={rung.title}
                 subtitle="Marca tus gastos esenciales para calcular este número."
                 slot={
-                  <Link href="/m/gastos" className="m-btn m-btn-secondary" style={{ minHeight: 40, fontSize: 13 }}>
+                  <Link
+                    href="/m/gastos"
+                    className="m-btn m-btn-secondary"
+                    style={{ minHeight: 40, fontSize: 13 }}
+                  >
                     Marcar esenciales en Gastos
                   </Link>
                 }
@@ -200,7 +236,11 @@ function Escalera({
         <>
           <MSectionHeader title="De dónde sale tu número de seguridad" />
           <MContentCard style={{ marginBottom: 16 }}>
-            <MDataRow dense title="Gasto esencial mensual" value={mAmount(essential.total, currency, 10)} />
+            <MDataRow
+              dense
+              title="Gasto esencial mensual"
+              value={mAmount(essential.total, currency, 10)}
+            />
             {(
               [
                 ["Sobres", essential.byOrigin.sobres],
@@ -211,7 +251,13 @@ function Escalera({
             )
               .filter(([, v]) => v > 0)
               .map(([label, v]) => (
-                <MDataRow key={label} dense title={label} value={mAmount(v, currency, 10)} valueTone="neutral" />
+                <MDataRow
+                  key={label}
+                  dense
+                  title={label}
+                  value={mAmount(v, currency, 10)}
+                  valueTone="neutral"
+                />
               ))}
             {essential.excludedPolicies.map((p) => (
               <MDataRow
@@ -226,7 +272,13 @@ function Escalera({
           </MContentCard>
           <Link
             href="/m/gastos"
-            style={{ color: "var(--accent)", fontWeight: 600, fontSize: 13, display: "inline-block", marginBottom: 16 }}
+            style={{
+              color: "var(--accent)",
+              fontWeight: 600,
+              fontSize: 13,
+              display: "inline-block",
+              marginBottom: 16,
+            }}
           >
             Ajustar qué es esencial →
           </Link>

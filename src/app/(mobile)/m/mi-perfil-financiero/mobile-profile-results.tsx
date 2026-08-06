@@ -51,7 +51,9 @@ export function MobileProfileResults({
     draft.age ? { k: "Edad", v: String(draft.age) } : null,
     draft.country ? { k: "País", v: draft.country } : null,
     draft.primaryCurrency ? { k: "Moneda", v: draft.primaryCurrency } : null,
-    label(O.NUCLEUS, draft.financialNucleus) ? { k: "Núcleo", v: label(O.NUCLEUS, draft.financialNucleus)! } : null,
+    label(O.NUCLEUS, draft.financialNucleus)
+      ? { k: "Núcleo", v: label(O.NUCLEUS, draft.financialNucleus)! }
+      : null,
     draft.dependentsCount != null ? { k: "Dependientes", v: String(draft.dependentsCount) } : null,
     label(O.KNOWLEDGE_LEVELS, draft.knowledgeLevel)
       ? { k: "Conocimiento", v: label(O.KNOWLEDGE_LEVELS, draft.knowledgeLevel)! }
@@ -222,7 +224,9 @@ export function MobileProfileResults({
           <div>
             <MSectionHeader title="Tu ruta sugerida" />
             <MContentCard>
-              <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 10 }}>
+              <ol
+                style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 10 }}
+              >
                 {diagnosis.suggestedPath.map((step, i) => (
                   <li key={i} className="row" style={{ alignItems: "flex-start", gap: 10 }}>
                     <span

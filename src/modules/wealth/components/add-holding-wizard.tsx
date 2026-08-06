@@ -88,7 +88,9 @@ export function AddPurchaseButton({ holding, currency }: { holding: Holding; cur
       >
         {quoted ? "+ Compra" : "+ Aporte"}
       </button>
-      {open && <AddHoldingModal currency={currency} prefill={holding} onClose={() => setOpen(false)} />}
+      {open && (
+        <AddHoldingModal currency={currency} prefill={holding} onClose={() => setOpen(false)} />
+      )}
     </>
   );
 }
@@ -190,7 +192,9 @@ export function AddHoldingModal({
   const [invested, setInvested] = useState(investedPrefill);
   // Moneda de captura: al editar/comprar respeta la del holding; al crear, la
   // principal del usuario (estable) — nunca la de visualización.
-  const [cur, setCur] = useState(captureCurrencyDefault(undefined, prefill?.currency, captureCurrency));
+  const [cur, setCur] = useState(
+    captureCurrencyDefault(undefined, prefill?.currency, captureCurrency),
+  );
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
   // Aporte mensual: separado del total invertido; persiste en monthly_contribution.
   const [aporteMensual, setAporteMensual] = useState(
@@ -214,11 +218,15 @@ export function AddHoldingModal({
   const [currentValue, setCurrentValue] = useState(
     prefill?.currentValueManual != null ? String(prefill.currentValueManual) : "",
   );
-  const [income, setIncome] = useState(prefill?.rentalIncome != null ? String(prefill.rentalIncome) : "");
-  const [frequency, setFrequency] = useState<"semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento">(
-    prefill?.rentalFrequency ?? "mensual",
+  const [income, setIncome] = useState(
+    prefill?.rentalIncome != null ? String(prefill.rentalIncome) : "",
   );
-  const [incomeMonth, setIncomeMonth] = useState(prefill?.incomeMonth ? String(prefill.incomeMonth) : "1");
+  const [frequency, setFrequency] = useState<
+    "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento"
+  >(prefill?.rentalFrequency ?? "mensual");
+  const [incomeMonth, setIncomeMonth] = useState(
+    prefill?.incomeMonth ? String(prefill.incomeMonth) : "1",
+  );
   const [annualRatePct, setAnnualRatePct] = useState(
     prefill?.annualRatePct != null ? String(prefill.annualRatePct) : "",
   );
@@ -395,13 +403,7 @@ export function AddHoldingModal({
             ? `Agregar compra — ${prefill?.label ?? prefill?.symbol}`
             : "Agregar inversión"
       }
-      sub={
-        step === 1
-          ? "Elige el tipo de inversión"
-          : meta
-            ? meta.label
-            : "Datos de la inversión"
-      }
+      sub={step === 1 ? "Elige el tipo de inversión" : meta ? meta.label : "Datos de la inversión"}
       onClose={onClose}
     >
       <div className="modal-body">
@@ -555,7 +557,13 @@ function CategoryGroup({
   return (
     <div style={{ marginTop: 10 }}>
       <div
-        style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "4px 0 8px", fontSize: 12.5 }}
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: 6,
+          margin: "4px 0 8px",
+          fontSize: 12.5,
+        }}
       >
         <span style={{ fontWeight: 600, color: "var(--ink-2)" }}>{title}</span>
         <span className="muted" style={{ fontSize: 11 }}>
@@ -611,7 +619,9 @@ function Step2Fields(props: {
   income: string;
   onIncome: (v: string) => void;
   frequency: "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento";
-  onFrequency: (v: "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento") => void;
+  onFrequency: (
+    v: "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento",
+  ) => void;
   incomeMonth: string;
   onIncomeMonth: (v: string) => void;
   annualRatePct: string;
@@ -682,77 +692,85 @@ function Step2Fields(props: {
       {/* Perfil A · cotizado */}
       {profile === "A" ? (
         <>
-        <div className="fld-2">
-          <div className="fld">
-            <label className="fld-label">
-              Símbolo (opcional) <HelpTip text="Si lo das, buscamos el precio en vivo y calculamos el valor con tu cantidad. Si lo dejas vacío, se usa el monto invertido." />
-            </label>
-            <input
-              className="inp"
-              value={props.symbol}
-              onChange={(e) => props.onSymbol(e.target.value.toUpperCase().slice(0, 12))}
-              placeholder="Ej. VOO, BTC"
-              autoComplete="off"
-            />
-            {props.priceState === "loading" ? (
-              <span className="muted" style={{ fontSize: 11 }}>
-                Buscando precio…
-              </span>
-            ) : props.priceState === "ok" && props.livePrice !== null ? (
-              <>
-                <span style={{ fontSize: 11.5, color: "var(--pos)" }}>
-                  {formatMoney(props.livePrice, props.livePriceCurrency)} en vivo
-                </span>
-                {props.livePriceCurrency !== cur ? (
-                  <span style={{ fontSize: 11, color: "var(--warn)", display: "block", marginTop: 2 }}>
-                    El precio está en {props.livePriceCurrency} y tu moneda es {cur}. Ingresa el monto
-                    invertido en {cur}; no convertimos automáticamente.
-                  </span>
-                ) : null}
-              </>
-            ) : props.priceState === "error" ? (
-              <span style={{ fontSize: 11, color: "var(--warn)" }}>Precio no disponible</span>
-            ) : null}
-          </div>
-          <div className="fld">
-            <label className="fld-label">
-              Precio de compra <HelpTip text="El precio por unidad al que compraste. Base para el promedio ponderado del costo." />
-            </label>
-            <div className="inp-money">
-              <span className="pre">{currencySymbol(cur)}</span>
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">
+                Símbolo (opcional){" "}
+                <HelpTip text="Si lo das, buscamos el precio en vivo y calculamos el valor con tu cantidad. Si lo dejas vacío, se usa el monto invertido." />
+              </label>
               <input
-                type="number"
-                step="any"
-                min="0"
-                value={props.unitPrice}
-                onChange={(e) => props.onUnitPrice(e.target.value)}
-                placeholder="0"
+                className="inp"
+                value={props.symbol}
+                onChange={(e) => props.onSymbol(e.target.value.toUpperCase().slice(0, 12))}
+                placeholder="Ej. VOO, BTC"
+                autoComplete="off"
               />
+              {props.priceState === "loading" ? (
+                <span className="muted" style={{ fontSize: 11 }}>
+                  Buscando precio…
+                </span>
+              ) : props.priceState === "ok" && props.livePrice !== null ? (
+                <>
+                  <span style={{ fontSize: 11.5, color: "var(--pos)" }}>
+                    {formatMoney(props.livePrice, props.livePriceCurrency)} en vivo
+                  </span>
+                  {props.livePriceCurrency !== cur ? (
+                    <span
+                      style={{ fontSize: 11, color: "var(--warn)", display: "block", marginTop: 2 }}
+                    >
+                      El precio está en {props.livePriceCurrency} y tu moneda es {cur}. Ingresa el
+                      monto invertido en {cur}; no convertimos automáticamente.
+                    </span>
+                  ) : null}
+                </>
+              ) : props.priceState === "error" ? (
+                <span style={{ fontSize: 11, color: "var(--warn)" }}>Precio no disponible</span>
+              ) : null}
+            </div>
+            <div className="fld">
+              <label className="fld-label">
+                Precio de compra{" "}
+                <HelpTip text="El precio por unidad al que compraste. Base para el promedio ponderado del costo." />
+              </label>
+              <div className="inp-money">
+                <span className="pre">{currencySymbol(cur)}</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={props.unitPrice}
+                  onChange={(e) => props.onUnitPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
             </div>
           </div>
-        </div>
-        <div className="fld">
-          <label className="fld-label">Cantidad (opcional)</label>
-          <input
-            className="inp"
-            type="number"
-            step="any"
-            min="0"
-            value={
-              (parseFloat(props.unitPrice) || 0) > 0 && (parseFloat(props.invested) || 0) > 0
-                ? String(+((parseFloat(props.invested) || 0) / (parseFloat(props.unitPrice) || 1)).toFixed(8))
-                : props.quantity
-            }
-            onChange={(e) => props.onQuantity(e.target.value)}
-            readOnly={(parseFloat(props.unitPrice) || 0) > 0}
-            placeholder="0"
-          />
-          {(parseFloat(props.unitPrice) || 0) > 0 ? (
-            <span className="muted" style={{ fontSize: 11 }}>
-              Calculado: monto ÷ precio. Ingresá precio o cantidad; el otro se deriva.
-            </span>
-          ) : null}
-        </div>
+          <div className="fld">
+            <label className="fld-label">Cantidad (opcional)</label>
+            <input
+              className="inp"
+              type="number"
+              step="any"
+              min="0"
+              value={
+                (parseFloat(props.unitPrice) || 0) > 0 && (parseFloat(props.invested) || 0) > 0
+                  ? String(
+                      +(
+                        (parseFloat(props.invested) || 0) / (parseFloat(props.unitPrice) || 1)
+                      ).toFixed(8),
+                    )
+                  : props.quantity
+              }
+              onChange={(e) => props.onQuantity(e.target.value)}
+              readOnly={(parseFloat(props.unitPrice) || 0) > 0}
+              placeholder="0"
+            />
+            {(parseFloat(props.unitPrice) || 0) > 0 ? (
+              <span className="muted" style={{ fontSize: 11 }}>
+                Calculado: monto ÷ precio. Ingresá precio o cantidad; el otro se deriva.
+              </span>
+            ) : null}
+          </div>
         </>
       ) : null}
 
@@ -781,7 +799,8 @@ function Step2Fields(props: {
       {props.category === "plan_inversion" ? (
         <div className="fld">
           <label className="fld-label">
-            Plazo <HelpTip text="Duración del plan. Deriva el vencimiento; el aporte deja de contar al vencer." />
+            Plazo{" "}
+            <HelpTip text="Duración del plan. Deriva el vencimiento; el aporte deja de contar al vencer." />
           </label>
           <div style={{ display: "flex", gap: 8 }}>
             {[5, 10, 15, 20].map((y) => {
@@ -817,7 +836,8 @@ function Step2Fields(props: {
           ) : null}
           <div className="fld" style={{ marginTop: 10 }}>
             <label className="fld-label">
-              Fecha de inicio del plan <HelpTip text="Cuándo empezó el plan. Define el progreso (año X de N) y el vencimiento." />
+              Fecha de inicio del plan{" "}
+              <HelpTip text="Cuándo empezó el plan. Define el progreso (año X de N) y el vencimiento." />
             </label>
             <input
               className="inp"
@@ -903,16 +923,40 @@ function Step2Fields(props: {
                 value={props.incomeMonth}
                 onChange={(e) => props.onIncomeMonth(e.target.value)}
               >
-                {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"].map(
-                  (mLbl, i) => (
-                    <option key={i + 1} value={String(i + 1)}>
-                      {mLbl}
-                    </option>
-                  ),
-                )}
+                {[
+                  "Ene",
+                  "Feb",
+                  "Mar",
+                  "Abr",
+                  "May",
+                  "Jun",
+                  "Jul",
+                  "Ago",
+                  "Sep",
+                  "Oct",
+                  "Nov",
+                  "Dic",
+                ].map((mLbl, i) => (
+                  <option key={i + 1} value={String(i + 1)}>
+                    {mLbl}
+                  </option>
+                ))}
               </select>
               {(() => {
-                const L = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+                const L = [
+                  "Ene",
+                  "Feb",
+                  "Mar",
+                  "Abr",
+                  "May",
+                  "Jun",
+                  "Jul",
+                  "Ago",
+                  "Sep",
+                  "Oct",
+                  "Nov",
+                  "Dic",
+                ];
                 const ms = derivedMonths(props.frequency, parseInt(props.incomeMonth, 10) || 1);
                 return ms.length > 1 ? (
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
@@ -1058,7 +1102,14 @@ function Step2Fields(props: {
             <HelpTip text="Si ya la tenías, solo se registra la posición: su valor NO cuenta como gasto de este mes. Si la compraste ahora, el monto se registra como gasto. El aporte mensual cuenta igual en ambos casos." />
           </span>
           <label
-            style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-2)", cursor: "pointer" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+              color: "var(--ink-2)",
+              cursor: "pointer",
+            }}
           >
             <input
               type="radio"
@@ -1069,7 +1120,14 @@ function Step2Fields(props: {
             Ya la tenía · registrar solo la posición
           </label>
           <label
-            style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-2)", cursor: "pointer" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+              color: "var(--ink-2)",
+              cursor: "pointer",
+            }}
           >
             <input
               type="radio"
@@ -1182,8 +1240,18 @@ function RentalCostsBlock(props: {
   );
   const pct = (k: keyof RentalCosts, ph: string) => (
     <div className="inp-money">
-      <input type="number" step="any" min="0" max="100" value={rc[k]} onChange={set(k)} placeholder={ph} />
-      <span className="pre" style={{ paddingLeft: 4, paddingRight: 11 }}>%</span>
+      <input
+        type="number"
+        step="any"
+        min="0"
+        max="100"
+        value={rc[k]}
+        onChange={set(k)}
+        placeholder={ph}
+      />
+      <span className="pre" style={{ paddingLeft: 4, paddingRight: 11 }}>
+        %
+      </span>
     </div>
   );
 
@@ -1207,33 +1275,74 @@ function RentalCostsBlock(props: {
       </div>
 
       <div className="fld-2">
-        <div className="fld"><label className="fld-label">Precio de compra <HelpTip text="Lo que pagaste por la propiedad. Base para plusvalía y ROI." /></label>{money("0", "purchasePrice")}</div>
-        <div className="fld"><label className="fld-label">Costos de cierre <HelpTip text="Traspaso, abogado, comisiones de compra." /></label>{money("0", "closingCosts")}</div>
+        <div className="fld">
+          <label className="fld-label">
+            Precio de compra{" "}
+            <HelpTip text="Lo que pagaste por la propiedad. Base para plusvalía y ROI." />
+          </label>
+          {money("0", "purchasePrice")}
+        </div>
+        <div className="fld">
+          <label className="fld-label">
+            Costos de cierre <HelpTip text="Traspaso, abogado, comisiones de compra." />
+          </label>
+          {money("0", "closingCosts")}
+        </div>
       </div>
 
       <div className="fld-2">
-        <div className="fld"><label className="fld-label">Vacancia <HelpTip text="% de meses sin alquilar. Airbnb suele rondar 25-40%." /></label>{pct("vacancyPct", "0")}</div>
-        <div className="fld"><label className="fld-label">Administración <HelpTip text="Property manager o co-host, sobre la renta cobrada. CR: 8-12% alquiler, 15-25% Airbnb." /></label>{pct("mgmtPct", "0")}</div>
+        <div className="fld">
+          <label className="fld-label">
+            Vacancia <HelpTip text="% de meses sin alquilar. Airbnb suele rondar 25-40%." />
+          </label>
+          {pct("vacancyPct", "0")}
+        </div>
+        <div className="fld">
+          <label className="fld-label">
+            Administración{" "}
+            <HelpTip text="Property manager o co-host, sobre la renta cobrada. CR: 8-12% alquiler, 15-25% Airbnb." />
+          </label>
+          {pct("mgmtPct", "0")}
+        </div>
       </div>
 
       <div className="fld-2">
-        <div className="fld"><label className="fld-label">Mantenimiento (mes)</label>{money("0", "maintenance")}</div>
-        <div className="fld"><label className="fld-label">Condominio / HOA (mes)</label>{money("0", "hoa")}</div>
+        <div className="fld">
+          <label className="fld-label">Mantenimiento (mes)</label>
+          {money("0", "maintenance")}
+        </div>
+        <div className="fld">
+          <label className="fld-label">Condominio / HOA (mes)</label>
+          {money("0", "hoa")}
+        </div>
       </div>
 
       <div className="fld-2">
-        <div className="fld"><label className="fld-label">Imp. Bienes Inmuebles (año) <HelpTip text="CR: 0,25% anual del valor registrado. Editable." /></label>{money("0", "propertyTax")}</div>
-        <div className="fld"><label className="fld-label">Seguro (año)</label>{money("0", "insurance")}</div>
+        <div className="fld">
+          <label className="fld-label">
+            Imp. Bienes Inmuebles (año){" "}
+            <HelpTip text="CR: 0,25% anual del valor registrado. Editable." />
+          </label>
+          {money("0", "propertyTax")}
+        </div>
+        <div className="fld">
+          <label className="fld-label">Seguro (año)</label>
+          {money("0", "insurance")}
+        </div>
       </div>
 
       <div className="fld">
-        <label className="fld-label">Servicios + limpieza (mes) <HelpTip text="Agua/luz/internet/limpieza que cubre el dueño (común en Airbnb)." /></label>
+        <label className="fld-label">
+          Servicios + limpieza (mes){" "}
+          <HelpTip text="Agua/luz/internet/limpieza que cubre el dueño (común en Airbnb)." />
+        </label>
         {money("0", "services")}
       </div>
 
       <div className="fld">
         <label className="fld-label">
-          Deuda que la financia <HelpTip text="Liga la hipoteca o préstamo de este inmueble; su cuota mensual se descuenta del flujo. Solo deudas en la misma moneda." />
+          Deuda que la financia{" "}
+          <HelpTip text="Liga la hipoteca o préstamo de este inmueble; su cuota mensual se descuenta del flujo. Solo deudas en la misma moneda." />
         </label>
         <select
           className="sel"
@@ -1271,14 +1380,20 @@ function RentalCostsBlock(props: {
             </strong>
           </div>
           {linkedDebt ? (
-            <div className="row" style={{ justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}>
+            <div
+              className="row"
+              style={{ justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}
+            >
               <span className="muted">Flujo neto con deuda</span>
               <strong style={{ color: roi.leveredNetMonthly >= 0 ? "var(--pos)" : "var(--neg)" }}>
                 {formatMoney(roi.leveredNetMonthly, cur)}/mes
               </strong>
             </div>
           ) : null}
-          <div className="row" style={{ justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}>
+          <div
+            className="row"
+            style={{ justifyContent: "space-between", fontSize: 12.5, marginTop: 6 }}
+          >
             <span className="muted">ROI operativo anual</span>
             <strong style={{ color: "var(--info)" }}>{(roi.operatingRoi * 100).toFixed(1)}%</strong>
           </div>

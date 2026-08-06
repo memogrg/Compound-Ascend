@@ -257,7 +257,9 @@ describe("deriveFundAmounts", () => {
     ).toEqual({ emergencia: 900_000, paz: 300_000 });
   });
   it("sin metas de defensa → 0/0", () => {
-    expect(deriveFundAmounts([{ goalType: "seguridad", name: "Auto", currentAmount: 1000 }])).toEqual({
+    expect(
+      deriveFundAmounts([{ goalType: "seguridad", name: "Auto", currentAmount: 1000 }]),
+    ).toEqual({
       emergencia: 0,
       paz: 0,
     });

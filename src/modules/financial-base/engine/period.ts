@@ -115,11 +115,10 @@ export function rangeToMonths(range: RangeKey): number {
 /** ¿El periodo es el mes natural en curso? `todayIso` = "YYYY-MM-DD" en la zona del
  *  usuario: `userToday()` en el servidor, `useCaptureToday()` en el cliente. Con la del
  *  servidor a secas sería UTC y el mes cambiaría antes de tiempo. */
-export function isCurrentMonth(
-  period: { year: number; month: number },
-  todayIso: string,
-): boolean {
-  return period.year === Number(todayIso.slice(0, 4)) && period.month === Number(todayIso.slice(5, 7));
+export function isCurrentMonth(period: { year: number; month: number }, todayIso: string): boolean {
+  return (
+    period.year === Number(todayIso.slice(0, 4)) && period.month === Number(todayIso.slice(5, 7))
+  );
 }
 
 /** Modelo del marcador de cierre de mes (Trazabilidad Fase C). */

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { sumAssetsByClass, isBadDebt, BAD_DEBT_APR } from "@/modules/wealth/engine/patrimonio-mappers";
+import {
+  sumAssetsByClass,
+  isBadDebt,
+  BAD_DEBT_APR,
+} from "@/modules/wealth/engine/patrimonio-mappers";
 
 describe("sumAssetsByClass", () => {
   it("suma por clase y arranca en cero las ausentes", () => {
@@ -9,11 +13,23 @@ describe("sumAssetsByClass", () => {
       { assetClass: "inversion", value: 200 },
       { assetClass: "productivo", value: 300 },
     ]);
-    expect(out).toEqual({ liquido: 150, inversion: 200, productivo: 300, uso_personal: 0, especial: 0 });
+    expect(out).toEqual({
+      liquido: 150,
+      inversion: 200,
+      productivo: 300,
+      uso_personal: 0,
+      especial: 0,
+    });
   });
 
   it("lista vacía → todas en cero", () => {
-    expect(sumAssetsByClass([])).toEqual({ liquido: 0, inversion: 0, productivo: 0, uso_personal: 0, especial: 0 });
+    expect(sumAssetsByClass([])).toEqual({
+      liquido: 0,
+      inversion: 0,
+      productivo: 0,
+      uso_personal: 0,
+      especial: 0,
+    });
   });
 
   it("ignora clases desconocidas", () => {

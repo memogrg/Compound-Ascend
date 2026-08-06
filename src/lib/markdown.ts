@@ -106,7 +106,9 @@ function buildTable(header: string[], seps: string[], body: string[][]): string 
   const thead = `<thead><tr>${header.map((c, i) => cell("th", c, aligns[i] ?? "")).join("")}</tr></thead>`;
   const tbody = body
     .map((row) => {
-      const celdas = Array.from({ length: cols }, (_, i) => cell("td", row[i] ?? "", aligns[i] ?? ""));
+      const celdas = Array.from({ length: cols }, (_, i) =>
+        cell("td", row[i] ?? "", aligns[i] ?? ""),
+      );
       return `<tr>${celdas.join("")}</tr>`;
     })
     .join("");

@@ -23,7 +23,9 @@ const TICKER_STOP = new Set(["ATH", "USD", "CRC", "EUR", "IA", "ETF"]);
 
 /** Extrae un ticker (2-6 letras/dígitos en MAYÚSCULA) o lo matchea contra las posiciones conocidas. */
 export function extractSymbol(text: string, holdings: KnownHolding[] = []): string | null {
-  const bySymbol = new Set(holdings.map((h) => h.symbol?.toUpperCase()).filter(Boolean) as string[]);
+  const bySymbol = new Set(
+    holdings.map((h) => h.symbol?.toUpperCase()).filter(Boolean) as string[],
+  );
   const upper = text.match(/\b[A-Z]{2,6}\d?\b/g) ?? [];
   // Primero: un ticker en mayúscula que sea de sus posiciones; si no, el primero no-stop.
   const known = upper.find((w) => bySymbol.has(w));
@@ -107,9 +109,11 @@ function isQuestion(t: string): boolean {
     t,
   );
 }
-const CREATE_VERB_RE = /\b(cre[aá]|crear|hac[eé]|hacer|nuev[oa]|agreg|arm[aá]|arma|pon[eé]|ponme|añad|generame|gener[aá]|abr[íi]|abrir|configur)/i;
+const CREATE_VERB_RE =
+  /\b(cre[aá]|crear|hac[eé]|hacer|nuev[oa]|agreg|arm[aá]|arma|pon[eé]|ponme|añad|generame|gener[aá]|abr[íi]|abrir|configur)/i;
 // Verbo IMPERATIVO de alerta (para no confundir "creá una alerta" con "tengo alertas activas").
-const ALERT_CREATE_SIGNAL = /\b(avisa|avísame|avisame|avisá|alertame|generame|gener[aá]|ponme|pon[eé]|cre[aá]|crear|configur|agreg|arm[aá]|arma|quiero|necesito)/i;
+const ALERT_CREATE_SIGNAL =
+  /\b(avisa|avísame|avisame|avisá|alertame|generame|gener[aá]|ponme|pon[eé]|cre[aá]|crear|configur|agreg|arm[aá]|arma|quiero|necesito)/i;
 
 /** Nombre de la meta/sobre: preferí "para X", luego "llamad[oa]/objetivo X", luego "sobre/meta X". */
 function extractName(text: string): string | null {
@@ -132,7 +136,11 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
   const t = text.trim();
   // Preguntas de CONSEJO ("¿debería crear una meta?", "¿conviene…?") NO son órdenes de crear:
   // van al razonamiento, no al carril de acción.
-  if (/\b(deber[ií]a|convien|convendr[ií]a|es mejor|vale la pena|qu[eé] (?:pienso|opin[aá]|recomend)|me recomend|ser[ií]a bueno)\b/i.test(t)) {
+  if (
+    /\b(deber[ií]a|convien|convendr[ií]a|es mejor|vale la pena|qu[eé] (?:pienso|opin[aá]|recomend)|me recomend|ser[ií]a bueno)\b/i.test(
+      t,
+    )
+  ) {
     return null;
   }
   const pregunta = isQuestion(t);
@@ -156,11 +164,14 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
     // Moneda de cotización: cripto siempre USD; cotizadas → la del usuario (aprox., editable luego).
     const alertCurrency = assetType === "cripto" ? "USD" : opts.currency;
     const money$ = formatMoneyPlain(money, alertCurrency);
-    return say(`Te propongo crear una alerta de precio de ${symbol} en ${money$}. Confirmá abajo.`, {
-      type: "create_price_alert",
-      payload: { symbol, targetPrice: money, assetType, currency: alertCurrency },
-      summary: `Alerta ${symbol} a ${money$}`,
-    });
+    return say(
+      `Te propongo crear una alerta de precio de ${symbol} en ${money$}. Confirmá abajo.`,
+      {
+        type: "create_price_alert",
+        payload: { symbol, targetPrice: money, assetType, currency: alertCurrency },
+        summary: `Alerta ${symbol} a ${money$}`,
+      },
+    );
   }
 
   // 2) SOBRE acumulable (savings_goals kind='sobre') — "creá un sobre de X". Antes que META porque
@@ -180,11 +191,14 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
     if (money === null) {
       return say(`¿De cuánto es la meta "${name}"?`, null);
     }
-    return say(`Te propongo crear la meta "${name}" por ${formatMoneyPlain(money, opts.currency)}. Confirmá abajo.`, {
-      type: "create_goal",
-      payload: { kind: "meta", name, targetAmount: money, currency: opts.currency },
-      summary: `Meta ${name}`,
-    });
+    return say(
+      `Te propongo crear la meta "${name}" por ${formatMoneyPlain(money, opts.currency)}. Confirmá abajo.`,
+      {
+        type: "create_goal",
+        payload: { kind: "meta", name, targetAmount: money, currency: opts.currency },
+        summary: `Meta ${name}`,
+      },
+    );
   }
 
   // 4) GASTO — "registrá/anotá un gasto de $Z en W" o "gasté $Z en W".
@@ -192,16 +206,29 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
   //    y con el patrón viejo caía acá y contestaba "¿de cuánto fue el gasto?". Tampoco entra
   //    el lenguaje de recortar/reducir aunque venga en imperativo ("recortá mis gastos").
   //    Todo eso sale por null → LLM con contexto, que es quien sabe dónde recortar.
-  if (!pregunta && !EXPENSE_ANALYSIS_RE.test(t) && (EXPENSE_FACT_RE.test(t) || (EXPENSE_ORDER_RE.test(t) && EXPENSE_NOUN_RE.test(t)))) {
+  if (
+    !pregunta &&
+    !EXPENSE_ANALYSIS_RE.test(t) &&
+    (EXPENSE_FACT_RE.test(t) || (EXPENSE_ORDER_RE.test(t) && EXPENSE_NOUN_RE.test(t)))
+  ) {
     const desc = extractExpenseDesc(t) ?? "Gasto";
     if (money === null) {
       return say(`¿De cuánto fue el gasto${desc !== "Gasto" ? ` en ${desc}` : ""}?`, null);
     }
-    return say(`Te propongo registrar un gasto de ${formatMoneyPlain(money, opts.currency)} en "${desc}". Confirmá abajo.`, {
-      type: "create_transaction",
-      payload: { kind: "gasto", description: desc, amount: money, currency: opts.currency, occurredOn: opts.today },
-      summary: `Gasto ${desc}`,
-    });
+    return say(
+      `Te propongo registrar un gasto de ${formatMoneyPlain(money, opts.currency)} en "${desc}". Confirmá abajo.`,
+      {
+        type: "create_transaction",
+        payload: {
+          kind: "gasto",
+          description: desc,
+          amount: money,
+          currency: opts.currency,
+          occurredOn: opts.today,
+        },
+        summary: `Gasto ${desc}`,
+      },
+    );
   }
 
   return null;
@@ -210,7 +237,9 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
 /** Descripción del gasto: primer "en/de/para/por X" que NO sea el monto. Preferí "en X". */
 function extractExpenseDesc(text: string): string | null {
   const all = [
-    ...text.matchAll(/\b(?:en|de|para|por)\s+(?:el\s+|la\s+|un\s+|una\s+|mi\s+)?([\p{L}][\p{L}\p{N} '-]{1,40}?)\s*(?:$|[.,;!?])/giu),
+    ...text.matchAll(
+      /\b(?:en|de|para|por)\s+(?:el\s+|la\s+|un\s+|una\s+|mi\s+)?([\p{L}][\p{L}\p{N} '-]{1,40}?)\s*(?:$|[.,;!?])/giu,
+    ),
   ];
   for (const m of all) {
     const cand = m[1]?.trim();
@@ -221,7 +250,9 @@ function extractExpenseDesc(text: string): string | null {
 
 /** Formato de dinero simple y determinista (miles con punto), sin depender de Intl. */
 function formatMoneyPlain(amount: number, currency: string): string {
-  const [int = "0", dec] = Math.abs(amount).toFixed(amount % 1 === 0 ? 0 : 2).split(".");
+  const [int = "0", dec] = Math.abs(amount)
+    .toFixed(amount % 1 === 0 ? 0 : 2)
+    .split(".");
   const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const sym = currency === "USD" ? "$" : currency === "CRC" ? "₡" : `${currency} `;
   return dec ? `${sym}${grouped},${dec}` : `${sym}${grouped}`;

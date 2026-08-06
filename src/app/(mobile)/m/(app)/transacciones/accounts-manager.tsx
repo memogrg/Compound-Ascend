@@ -52,13 +52,7 @@ const KIND_LABEL: Record<AccountKind, string> = {
   otro: "Otro",
 };
 
-export function AccountsManager({
-  accounts,
-  currency,
-}: {
-  accounts: Account[];
-  currency: string;
-}) {
+export function AccountsManager({ accounts, currency }: { accounts: Account[]; currency: string }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
@@ -88,7 +82,12 @@ export function AccountsManager({
   const accountOpts = accounts.map((a) => ({ value: a.id, label: a.name }));
   const formOpen = creating || editing !== null;
 
-  const run = (fn: () => Promise<ActionResult>, okMsg: string, errMsg: string, after: () => void) => {
+  const run = (
+    fn: () => Promise<ActionResult>,
+    okMsg: string,
+    errMsg: string,
+    after: () => void,
+  ) => {
     startTransition(async () => {
       const res = await fn();
       if (res.ok) {
@@ -152,8 +151,11 @@ export function AccountsManager({
   const confirmDelete = () => {
     if (!deleting) return;
     const a = deleting;
-    run(() => removeAccountAction(a.id), "Cuenta eliminada", "No pudimos eliminar la cuenta", () =>
-      setDeleting(null),
+    run(
+      () => removeAccountAction(a.id),
+      "Cuenta eliminada",
+      "No pudimos eliminar la cuenta",
+      () => setDeleting(null),
     );
   };
 

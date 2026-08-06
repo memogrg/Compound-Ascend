@@ -107,7 +107,11 @@ export function TxnActionsSheet({
     .map((c) => ({ value: c.id, label: c.name }));
   const currentCategory = t.categoryId ? categoryNames[t.categoryId] : undefined;
   const title =
-    mode === "reassign" ? "Reasignar sobre" : mode === "split" ? "Dividir movimiento" : "Acciones del movimiento";
+    mode === "reassign"
+      ? "Reasignar sobre"
+      : mode === "split"
+        ? "Dividir movimiento"
+        : "Acciones del movimiento";
 
   // --- Dividir: la suma de las partes debe cuadrar con el monto original (el servidor no lo valida).
   const sum = parts.reduce((acc, p) => acc + (p.amount ?? 0), 0);
@@ -152,7 +156,10 @@ export function TxnActionsSheet({
       amount: p.amount ?? 0,
       categoryId: p.categoryId || null,
     }));
-    run(() => splitTransactionAction(t.id, payload), `Movimiento dividido en ${payload.length} partes`);
+    run(
+      () => splitTransactionAction(t.id, payload),
+      `Movimiento dividido en ${payload.length} partes`,
+    );
   };
 
   return (
@@ -188,7 +195,12 @@ export function TxnActionsSheet({
               onClick={() => setMode("reassign")}
             />
             {t.receiptUrl ? (
-              <MenuItem label="Ver recibo" hint="Abre el comprobante" disabled={pending} onClick={openReceipt} />
+              <MenuItem
+                label="Ver recibo"
+                hint="Abre el comprobante"
+                disabled={pending}
+                onClick={openReceipt}
+              />
             ) : null}
             {t.status === "pending_review" ? (
               <MenuItem
@@ -316,7 +328,10 @@ export function TxnActionsSheet({
               <div className="muted" style={{ fontSize: 12.5 }}>
                 Suman {formatMoney(sum, t.currency)} de {formatMoney(t.amount, t.currency)}
               </div>
-              <div className={`mono ${splitOk ? "pos" : "neg"}`} style={{ fontSize: 12.5, fontWeight: 700 }}>
+              <div
+                className={`mono ${splitOk ? "pos" : "neg"}`}
+                style={{ fontSize: 12.5, fontWeight: 700 }}
+              >
                 {splitOk
                   ? "Cuadra"
                   : `${diff > 0 ? "+" : "−"}${formatMoney(Math.abs(diff), t.currency)}`}
@@ -371,7 +386,12 @@ function MenuItem({
     <button
       type="button"
       className="m-btn m-btn-block m-btn-secondary"
-      style={{ justifyContent: "flex-start", flexDirection: "column", alignItems: "flex-start", gap: 2 }}
+      style={{
+        justifyContent: "flex-start",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 2,
+      }}
       disabled={disabled}
       onClick={onClick}
     >

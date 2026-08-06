@@ -191,7 +191,9 @@ export async function buildContextForUser(
       const { subtotales } = await import("@/lib/ai/money");
       ctx.debtCount = raw.length;
       // Subtotales por la moneda NATIVA de cada deuda (nunca una suma cruda de monedas distintas).
-      ctx.debtTotals = subtotales(raw.map((d) => ({ monto: Math.round(d.balance), moneda: d.currency })));
+      ctx.debtTotals = subtotales(
+        raw.map((d) => ({ monto: Math.round(d.balance), moneda: d.currency })),
+      );
       // El total convertido sale de normalizeDebtsForTool (misma FX que las herramientas). Sin
       // tasas quedaría sin convertir y etiquetado con otra moneda → en ese caso no se publica.
       if (rates || ctx.debtTotals.every((m) => m.moneda === primary)) {

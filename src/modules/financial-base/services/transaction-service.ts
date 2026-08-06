@@ -7,7 +7,13 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
-import { getActiveHouseholdId, householdMemberIds, existsInHousehold, HOUSEHOLD_READ_ONLY_MESSAGE, householdWriteScope } from "@/lib/household/active";
+import {
+  getActiveHouseholdId,
+  householdMemberIds,
+  existsInHousehold,
+  HOUSEHOLD_READ_ONLY_MESSAGE,
+  householdWriteScope,
+} from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -150,7 +156,11 @@ export type TransactionInsert = Partial<TransactionRow> & { user_id: string };
  */
 export async function buildTransactionRow(
   input: TxnInput,
-): Promise<{ row: TransactionInsert; linkedKind: CreatedTransaction["linkedKind"]; linkedId: string | null }> {
+): Promise<{
+  row: TransactionInsert;
+  linkedKind: CreatedTransaction["linkedKind"];
+  linkedId: string | null;
+}> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
 
@@ -197,9 +207,8 @@ export async function buildTransactionRow(
     // sin IA en vivo) cuando la confianza ≥ umbral. Si no, sigue null → "Por clasificar". RLS
     // (sesión) → sin userId. Best-effort: no bloquea el registro.
     if (!categoryId) {
-      const { resolveAutoCategory } = await import(
-        "@/modules/financial-base/services/ai-categorize"
-      );
+      const { resolveAutoCategory } =
+        await import("@/modules/financial-base/services/ai-categorize");
       const auto = await resolveAutoCategory({
         supabase,
         merchant: input.merchantOrSource,
@@ -297,10 +306,7 @@ export async function createTransaction(input: TxnInput): Promise<CreatedTransac
  * enfocada — no recalcula el resto de la fila como updateTransaction. RLS acota a
  * las transacciones del usuario.
  */
-export async function setTransactionCategory(
-  id: string,
-  categoryId: string | null,
-): Promise<void> {
+export async function setTransactionCategory(id: string, categoryId: string | null): Promise<void> {
   await requireUser();
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
@@ -342,7 +348,8 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
   const accountLabel = await accountLabelFor(input.accountId);
   await supabase
     .from("transactions")
-    .update({ last_edited_by: user.id,
+    .update({
+      last_edited_by: user.id,
       kind: input.kind,
       description: input.description ?? null,
       merchant_or_source: input.merchantOrSource ?? null,
@@ -384,9 +391,8 @@ async function recordLiquidityDelta(args: {
   countsInBudget?: boolean;
 }): Promise<void> {
   try {
-    const { recordTransactionDelta } = await import(
-      "@/modules/financial-base/services/liquidity-service"
-    );
+    const { recordTransactionDelta } =
+      await import("@/modules/financial-base/services/liquidity-service");
     await recordTransactionDelta(args);
   } catch {
     // Liquidez best-effort: la reconciliación 1-toque corrige cualquier desfase.
@@ -409,9 +415,8 @@ export async function deleteTransaction(id: string): Promise<void> {
     .in("user_id", scope)
     .maybeSingle();
   if (txn && (txn.linked_kind ?? "none") !== "none") {
-    const { reverseLinkedTransaction } = await import(
-      "@/modules/financial-base/services/linked-transaction-service"
-    );
+    const { reverseLinkedTransaction } =
+      await import("@/modules/financial-base/services/linked-transaction-service");
     await reverseLinkedTransaction({
       transactionId: id,
       kind: txn.kind,
@@ -752,9 +757,7 @@ export async function getLinkedSpentByEntity(
  * Suma las transacciones vinculadas (linked_kind='debt') cuyo debt_payment es
  * kind='extraordinario'. Sirve para diferenciar en Gastos lo que no es la cuota.
  */
-export async function getExtraordinarySpentByDebt(
-  period: Period,
-): Promise<Record<string, number>> {
+export async function getExtraordinarySpentByDebt(period: Period): Promise<Record<string, number>> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const memberIds = await householdMemberIds(supabase, user.id);
@@ -766,9 +769,7 @@ export async function getExtraordinarySpentByDebt(
     .eq("kind", "extraordinario")
     .gte("occurred_on", period.from)
     .lte("occurred_on", period.to);
-  const txnIds = (pays ?? [])
-    .map((p) => p.transaction_id)
-    .filter((x): x is string => Boolean(x));
+  const txnIds = (pays ?? []).map((p) => p.transaction_id).filter((x): x is string => Boolean(x));
   if (txnIds.length === 0) return {};
   const { data: txns } = await supabase
     .from("transactions")

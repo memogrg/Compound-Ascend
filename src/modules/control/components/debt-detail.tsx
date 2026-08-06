@@ -106,9 +106,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
   const [deletePayment, setDeletePayment] = useState<string | null>(null);
 
   const editing = editPayment ? (vm.payments.find((p) => p.id === editPayment) ?? null) : null;
-  const deleting = deletePayment
-    ? (vm.payments.find((p) => p.id === deletePayment) ?? null)
-    : null;
+  const deleting = deletePayment ? (vm.payments.find((p) => p.id === deletePayment) ?? null) : null;
 
   return (
     <div className="grid">
@@ -150,8 +148,8 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
           <div className="due-banner">
             <Icon name="bell" width={2} />
             <span>
-              Tu pago de <strong>{vm.name}</strong> vence el <strong>{fmtDay(vm.nextDue)}</strong>{" "}
-              — {formatMoney(vm.monthlyPayment + vm.insurance, currency)}.
+              Tu pago de <strong>{vm.name}</strong> vence el <strong>{fmtDay(vm.nextDue)}</strong> —{" "}
+              {formatMoney(vm.monthlyPayment + vm.insurance, currency)}.
             </span>
           </div>
         ) : null}
@@ -259,7 +257,11 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
                   <td className="tnum">
                     {r.paid ? (
                       <span
-                        style={{ color: "var(--pos)", display: "inline-flex", alignItems: "center" }}
+                        style={{
+                          color: "var(--pos)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                        }}
                         title="Cuota pagada"
                       >
                         <Icon name="check" width={3} style={{ width: 13, height: 13 }} />
@@ -313,9 +315,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
         />
       ) : null}
 
-      {extraPay ? (
-        <ExtraordinaryPaymentModal vm={vm} onClose={() => setExtraPay(false)} />
-      ) : null}
+      {extraPay ? <ExtraordinaryPaymentModal vm={vm} onClose={() => setExtraPay(false)} /> : null}
 
       {editing ? (
         <ReportPaymentModal
@@ -620,9 +620,8 @@ function ScenarioCalculator({ input, currency }: { input: AmortizationInput; cur
           <div className="scen-res">
             {needed > 0 ? (
               <>
-                Necesitas pagar{" "}
-                <strong>{formatMoney(needed, currency)} extra al mes</strong>{" "}
-                para terminar en {targetYears} año(s).
+                Necesitas pagar <strong>{formatMoney(needed, currency)} extra al mes</strong> para
+                terminar en {targetYears} año(s).
               </>
             ) : (
               <>Ya terminarías en ese plazo (o antes) sin pagos extra.</>
@@ -678,7 +677,9 @@ function ReportPaymentModal({
   const initAmount = editing?.amount ?? cuotaNativa.amount;
   const [amount, setAmount] = useState<string>(initAmount ? String(initAmount) : "");
   const [date, setDate] = useState(editing?.paymentDate ?? preset?.date ?? today);
-  const [extra, setExtra] = useState<string>(editing?.extraAmount ? String(editing.extraAmount) : "");
+  const [extra, setExtra] = useState<string>(
+    editing?.extraAmount ? String(editing.extraAmount) : "",
+  );
   const [mode, setMode] = useState<"tiempo" | "cuota">(editing?.extraMode ?? "tiempo");
   const [pending, setPending] = useState(false);
 
@@ -864,15 +865,17 @@ function ExtraordinaryPaymentModal({ vm, onClose }: { vm: DebtDetailVM; onClose:
     <Modal title="Pago extraordinario" sub="Abono directo a capital." onClose={onClose}>
       <form onSubmit={submit}>
         <div className="modal-body">
-          <div
-            className="auth-msg"
-            style={{ margin: "0 0 14px", fontSize: 12.5, lineHeight: 1.5 }}
-          >
+          <div className="auth-msg" style={{ margin: "0 0 14px", fontSize: 12.5, lineHeight: 1.5 }}>
             <span
               className="tip tip-wrap"
               data-tip="Abono directo a capital. No paga intereses ni cuenta como la cuota del mes."
               aria-label="Abono directo a capital. No paga intereses ni cuenta como la cuota del mes."
-              style={{ display: "inline-flex", color: "var(--muted)", cursor: "help", marginRight: 6 }}
+              style={{
+                display: "inline-flex",
+                color: "var(--muted)",
+                cursor: "help",
+                marginRight: 6,
+              }}
             >
               <Icon name="info" />
             </span>

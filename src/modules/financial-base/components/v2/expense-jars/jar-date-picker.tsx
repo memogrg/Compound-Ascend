@@ -238,7 +238,10 @@ export function JarDatePicker({ current }: { current: string }) {
                   aria-current={isSelected ? "date" : undefined}
                   style={{
                     height: 30,
-                    border: isToday && !isSelected ? "1px solid var(--line-strong)" : "1px solid transparent",
+                    border:
+                      isToday && !isSelected
+                        ? "1px solid var(--line-strong)"
+                        : "1px solid transparent",
                     borderRadius: 8,
                     background: isSelected ? "var(--ink)" : "transparent",
                     color: isSelected ? "var(--bg)" : "var(--ink)",

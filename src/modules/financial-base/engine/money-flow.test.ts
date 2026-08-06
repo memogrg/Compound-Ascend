@@ -31,22 +31,35 @@ describe("describeMoneyFlow · tabla de verdad del viaje", () => {
   });
 
   it("Dividendo (ingreso/holding) → in, [activo] → tu liquidez", () => {
-    const f = describeMoneyFlow(txn({ kind: "ingreso", linkedKind: "holding", merchantOrSource: "AAPL" }));
-    expect(f).toMatchObject({ effect: "in", fromLabel: "AAPL", toLabel: LIQUIDITY_LABEL, verb: "recibido_en" });
+    const f = describeMoneyFlow(
+      txn({ kind: "ingreso", linkedKind: "holding", merchantOrSource: "AAPL" }),
+    );
+    expect(f).toMatchObject({
+      effect: "in",
+      fromLabel: "AAPL",
+      toLabel: LIQUIDITY_LABEL,
+      verb: "recibido_en",
+    });
   });
 
   it("Renta (ingreso/rental) → in", () => {
-    const f = describeMoneyFlow(txn({ kind: "ingreso", linkedKind: "rental", merchantOrSource: "Depto Centro" }));
+    const f = describeMoneyFlow(
+      txn({ kind: "ingreso", linkedKind: "rental", merchantOrSource: "Depto Centro" }),
+    );
     expect(f).toMatchObject({ effect: "in", fromLabel: "Depto Centro", toLabel: LIQUIDITY_LABEL });
   });
 
   it("Retiro de meta (ingreso/goal) → in, Meta → tu liquidez", () => {
-    const f = describeMoneyFlow(txn({ kind: "ingreso", linkedKind: "goal", merchantOrSource: "Viaje Japón" }));
+    const f = describeMoneyFlow(
+      txn({ kind: "ingreso", linkedKind: "goal", merchantOrSource: "Viaje Japón" }),
+    );
     expect(f).toMatchObject({ effect: "in", fromLabel: "Viaje Japón", toLabel: LIQUIDITY_LABEL });
   });
 
   it("Venta de inversión (ingreso/holding) → in", () => {
-    const f = describeMoneyFlow(txn({ kind: "ingreso", linkedKind: "holding", merchantOrSource: "BTC" }));
+    const f = describeMoneyFlow(
+      txn({ kind: "ingreso", linkedKind: "holding", merchantOrSource: "BTC" }),
+    );
     expect(f).toMatchObject({ effect: "in", toLabel: LIQUIDITY_LABEL });
   });
 
@@ -62,28 +75,46 @@ describe("describeMoneyFlow · tabla de verdad del viaje", () => {
   });
 
   it("Pago de deuda (gasto/debt) → out, tu liquidez → Deuda, abona_a", () => {
-    const f = describeMoneyFlow(txn({ kind: "gasto", linkedKind: "debt", merchantOrSource: "Tarjeta BBVA" }));
-    expect(f).toMatchObject({ effect: "out", fromLabel: LIQUIDITY_LABEL, toLabel: "Tarjeta BBVA", verb: "abona_a" });
+    const f = describeMoneyFlow(
+      txn({ kind: "gasto", linkedKind: "debt", merchantOrSource: "Tarjeta BBVA" }),
+    );
+    expect(f).toMatchObject({
+      effect: "out",
+      fromLabel: LIQUIDITY_LABEL,
+      toLabel: "Tarjeta BBVA",
+      verb: "abona_a",
+    });
   });
 
   it("Aporte a meta (gasto/goal, countsInBudget=true) → out, se_almacena_en", () => {
-    const f = describeMoneyFlow(txn({ kind: "gasto", linkedKind: "goal", merchantOrSource: "Fondo emergencia" }));
+    const f = describeMoneyFlow(
+      txn({ kind: "gasto", linkedKind: "goal", merchantOrSource: "Fondo emergencia" }),
+    );
     expect(f).toMatchObject({ effect: "out", toLabel: "Fondo emergencia", verb: "se_almacena_en" });
   });
 
   it("Compra de inversión (gasto/holding) → out, se_almacena_en", () => {
-    const f = describeMoneyFlow(txn({ kind: "gasto", linkedKind: "holding", merchantOrSource: "VOO" }));
+    const f = describeMoneyFlow(
+      txn({ kind: "gasto", linkedKind: "holding", merchantOrSource: "VOO" }),
+    );
     expect(f).toMatchObject({ effect: "out", toLabel: "VOO", verb: "se_almacena_en" });
   });
 
   it("Prima de seguro (gasto/policy) → out, abona_a", () => {
-    const f = describeMoneyFlow(txn({ kind: "gasto", linkedKind: "policy", merchantOrSource: "GNP Vida" }));
+    const f = describeMoneyFlow(
+      txn({ kind: "gasto", linkedKind: "policy", merchantOrSource: "GNP Vida" }),
+    );
     expect(f).toMatchObject({ effect: "out", toLabel: "GNP Vida", verb: "abona_a" });
   });
 
   it("Consumo de frasco (gasto/goal, countsInBudget=false) → neutral, sale del frasco", () => {
     const f = describeMoneyFlow(
-      txn({ kind: "gasto", linkedKind: "goal", merchantOrSource: "Viaje Japón", countsInBudget: false }),
+      txn({
+        kind: "gasto",
+        linkedKind: "goal",
+        merchantOrSource: "Viaje Japón",
+        countsInBudget: false,
+      }),
     );
     expect(f).toMatchObject({
       effect: "neutral",
@@ -126,7 +157,9 @@ describe("describeMoneyFlow · tabla de verdad del viaje", () => {
   });
 
   it("sin merchantOrSource → fallback legible por tipo", () => {
-    expect(describeMoneyFlow(txn({ kind: "ingreso", merchantOrSource: null })).fromLabel).toBe("Ingreso");
+    expect(describeMoneyFlow(txn({ kind: "ingreso", merchantOrSource: null })).fromLabel).toBe(
+      "Ingreso",
+    );
     expect(describeMoneyFlow(txn({ kind: "gasto", merchantOrSource: null })).toLabel).toBe("Gasto");
   });
 });

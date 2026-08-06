@@ -19,7 +19,10 @@ export const maxDuration = 60;
 
 function isCronRequest(req: Request): boolean {
   return cronAuthorized(
-    { authorization: req.headers.get("authorization"), xCronSecret: req.headers.get("x-cron-secret") },
+    {
+      authorization: req.headers.get("authorization"),
+      xCronSecret: req.headers.get("x-cron-secret"),
+    },
     process.env.CRON_SECRET,
   );
 }
