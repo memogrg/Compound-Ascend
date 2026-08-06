@@ -21,6 +21,7 @@ const rep = (over: Partial<PatrimonioReport> = {}): PatrimonioReport => ({
   siguienteHito: "seguridad",
   sensibilidadTasa: { "0.04": 0, "0.06": 0, "0.08": 0, "0.10": 0 },
   ratioLibertad: 0,
+  gastoReferenciaMensual: 0,
   mesesDeColchon: 0,
   coberturaPasiva: 0,
   tasaInversion: 0,

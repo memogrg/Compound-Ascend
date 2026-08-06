@@ -141,23 +141,17 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   try {
     const { getEssentialMonthlyExpense } =
       await import("@/modules/wealth/services/essential-expense-service");
-    essentialBreakdown = await getEssentialMonthlyExpense({ currency });
+    essentialBreakdown = await getEssentialMonthlyExpense({ currency, ctx });
   } catch {
     essentialBreakdown = null;
   }
   const essentialMonthlyExpenses = essentialBreakdown?.total ?? 0;
 
-  // Compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas) → número de INDEPENDENCIA.
-  // Base del "estilo de vida actual"; reemplaza a monthlyExpenses (lista base) que no incluye
-  // sobres/metas/DCA. Best-effort: sin sesión (service-role) degrada a null → cae a monthlyExpenses.
-  let commitmentBreakdown: CommitmentBreakdown | null = null;
-  try {
-    const { getTotalMonthlyCommitment } =
-      await import("@/modules/wealth/services/total-commitment-service");
-    commitmentBreakdown = await getTotalMonthlyCommitment({ currency });
-  } catch {
-    commitmentBreakdown = null;
-  }
+  // Compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas) → gasto de referencia de
+  // TODO el reporte (número de independencia, meses de colchón, años de libertad, cobertura).
+  // Ya lo leyó aggregateNetWorth en la moneda del reporte: se reusa esa MISMA lectura en vez de
+  // repetir la consulta, así rich-life y patrimonio no pueden divergir.
+  const commitmentBreakdown: CommitmentBreakdown | null = agg.commitment;
 
   // Estilo de vida DESEADO (dato PERSONAL en personal_profiles.extra) → número de
   // libertad. null si no lo definió (nunca se inventa). Se guarda con su propia moneda; se

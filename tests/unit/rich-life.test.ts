@@ -39,6 +39,33 @@ describe("computeRichLifeIndicators", () => {
     expect(ind.trend).toBe("sin_historico");
   });
 
+  it("con la lista base vacía usa el compromiso mensual, igual que patrimonio-engine", () => {
+    // Mismo caso real que el test del motor patrimonial: fondo de paz ₡18M como único
+    // líquido, `expense_items` vacía y el gasto real (₡3,6M) en el compromiso. Antes,
+    // /mi-rich-life mostraba 0 meses y 0% de cobertura y proponía "fortalece tu liquidez".
+    const paz: Asset[] = [
+      {
+        id: "p",
+        name: "Fondo de paz",
+        assetClass: "liquido",
+        value: 18_000_000,
+        currency: "CRC",
+        generatesIncome: false,
+      },
+    ];
+    const ind = computeRichLifeIndicators(
+      base({
+        assets: paz,
+        liabilities: [],
+        monthlyExpenses: 0,
+        monthlyCommitment: 3_600_000,
+        passiveIncomeMonthly: 720_000,
+      }),
+    );
+    expect(ind.monthsOfIndependence).toBe(5);
+    expect(ind.passiveIncomeCoverage).toBeCloseTo(0.2);
+  });
+
   it("detecta tendencia con histórico", () => {
     const richer = computeRichLifeIndicators(base({ previous: { netWorth: 7000 } }));
     expect(richer.trend).toBe("mas_rico");

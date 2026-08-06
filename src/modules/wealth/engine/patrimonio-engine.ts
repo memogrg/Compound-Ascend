@@ -8,7 +8,7 @@
  * los datos reales y corre este motor; aquí no se toca BD, UI ni IA.
  */
 
-import { mesesDeColchon } from "@/lib/wealth-math";
+import { mesesDeColchon, gastoDeReferencia } from "@/lib/wealth-math";
 export { mesesDeColchon };
 
 export type AssetClassKey = "liquido" | "inversion" | "productivo" | "uso_personal" | "especial";
@@ -81,6 +81,14 @@ export type PatrimonioReport = {
   /** Comparación informativa (mismo gasto total) a 4/6/8/10%. */
   sensibilidadTasa: Record<"0.04" | "0.06" | "0.08" | "0.10", number>;
   ratioLibertad: number; // 0-1 (= progresoIndependencia; alias legacy)
+  /**
+   * Gasto mensual que se usó de DENOMINADOR en mesesDeColchon / añosDeLibertad /
+   * coberturaPasiva / sensibilidadTasa y de base del número de independencia. Es
+   * `monthlyCommitment` si se pudo leer, si no `monthlyExpenses` (ver
+   * `gastoDeReferencia`). Se expone para que la UI y el asesor puedan decir CONTRA QUÉ
+   * gasto se midió, en vez de mostrar un ratio sin origen.
+   */
+  gastoReferenciaMensual: number;
   mesesDeColchon: number;
   coberturaPasiva: number; // 0-1+ (ingreso pasivo / gasto)
   tasaInversion: number; // 0-1
@@ -265,19 +273,19 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
   const productiveWealth = a.productivo;
   const protectedWealth = input.protectedCoverage;
 
-  const annualExpenses = input.monthlyExpenses * 12;
+  // Denominador ÚNICO de TODO ratio "contra lo que gasto" (ver gastoDeReferencia):
+  // compromiso mensual total, o la lista base si aquél no se pudo leer. Antes cada
+  // ratio usaba monthlyExpenses directo, así que con la lista vacía todos daban 0
+  // mientras el número de independencia (que ya usaba el compromiso) daba millones.
+  const gastoReferencia = gastoDeReferencia(input.monthlyExpenses, input.monthlyCommitment);
+  const annualExpenses = gastoReferencia * 12;
 
   // Los TRES números, fórmula única con TASA_RETIRO (8%). Libertad = null si el
   // usuario no definió su estilo de vida deseado (nunca se inventa un múltiplo).
-  // Base de INDEPENDENCIA = compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas), el
-  // "estilo de vida actual" del usuario. Antes usaba monthlyExpenses (lista base "expenses"), que
-  // NO incluye sobres/metas/DCA → daba 0 para quien tiene todo eso. Fallback a monthlyExpenses.
-  const independenceBase =
-    input.monthlyCommitment != null && input.monthlyCommitment > 0
-      ? input.monthlyCommitment
-      : input.monthlyExpenses;
+  // Base de INDEPENDENCIA = el mismo gasto de referencia (compromiso total: sobres +
+  // metas + DCA + deudas + primas), el "estilo de vida actual" del usuario.
   const numeroDeSeguridad = numeroPatrimonial(input.essentialMonthlyExpenses ?? 0);
-  const numeroDeIndependencia = numeroPatrimonial(independenceBase);
+  const numeroDeIndependencia = numeroPatrimonial(gastoReferencia);
   const numeroDeLibertad =
     input.desiredMonthlyLifestyle != null && input.desiredMonthlyLifestyle > 0
       ? numeroPatrimonial(input.desiredMonthlyLifestyle)
@@ -314,8 +322,8 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
   // el supuesto de retorno, coherente con la decisión de producto.
   const numeroIndiceDenom = numeroDeIndependencia;
   const ratioLibertad = progresoIndependencia; // alias legacy del progreso de independencia
-  const mesesColchon = mesesDeColchon(liquidWealth, input.monthlyExpenses);
-  const coberturaPasiva = safeRatio(input.passiveIncomeMonthly, input.monthlyExpenses);
+  const mesesColchon = mesesDeColchon(liquidWealth, gastoReferencia);
+  const coberturaPasiva = safeRatio(input.passiveIncomeMonthly, gastoReferencia);
   const tasaInversion = safeRatio(input.monthlyInvested, input.netMonthlyIncome);
   const ratioDeudaActivos = safeRatio(input.totalLiabilities, totalAssets);
   const ratioDeudaMala = safeRatio(input.badDebtMonthlyPayment, input.netMonthlyIncome);
@@ -391,8 +399,9 @@ export function computePatrimonio(input: PatrimonioInput): PatrimonioReport {
     progresoLibertad: round4(progresoLibertad),
     hitoAlcanzado,
     siguienteHito,
-    sensibilidadTasa: sensibilidadTasa(input.monthlyExpenses),
+    sensibilidadTasa: sensibilidadTasa(gastoReferencia),
     ratioLibertad: round4(ratioLibertad),
+    gastoReferenciaMensual: round2(gastoReferencia),
     mesesDeColchon: round2(mesesColchon),
     coberturaPasiva: round4(coberturaPasiva),
     tasaInversion: round4(tasaInversion),
@@ -424,19 +433,18 @@ export function millonarioReadings(input: PatrimonioInput): MillonarioReadings {
   // Mismo capital-que-trabaja que el motor (con el descuento del colchón de defensa).
   const liquidoInvertible = Math.max(0, a.liquido - (input.defenseFundsBalance ?? 0));
   const investableWealth = Math.max(0, a.inversion + a.productivo + liquidoInvertible);
-  // "Libertad millonario" = independencia al 8% (sostener la vida actual). Misma base que el número
-  // de independencia del reporte: compromiso total (fallback a monthlyExpenses).
-  const independenceBase =
-    input.monthlyCommitment != null && input.monthlyCommitment > 0
-      ? input.monthlyCommitment
-      : input.monthlyExpenses;
-  const numeroIndependencia = numeroPatrimonial(independenceBase);
+  // "Libertad millonario" = independencia al 8% (sostener la vida actual). Mismo gasto de
+  // referencia que el reporte: compromiso total (fallback a la lista base).
+  const gastoReferencia = gastoDeReferencia(input.monthlyExpenses, input.monthlyCommitment);
+  const numeroIndependencia = numeroPatrimonial(gastoReferencia);
   return {
     nominal: netWorth > 1_000_000,
     netWorth: netWorth >= 1_000_000,
     invertible: investableWealth >= 1_000_000,
     libertad: numeroIndependencia > 0 && investableWealth >= numeroIndependencia,
-    flujo: input.passiveIncomeMonthly >= input.monthlyExpenses && input.monthlyExpenses > 0,
+    // `flujo` comparaba contra monthlyExpenses: con la lista base vacía era false aunque
+    // el ingreso pasivo cubriera el gasto real. Ahora usa el mismo gasto de referencia.
+    flujo: input.passiveIncomeMonthly >= gastoReferencia && gastoReferencia > 0,
   };
 }
 
@@ -447,7 +455,9 @@ export function buildPatrimonioDiagnosis(report: PatrimonioReport): DiagnosisFla
   const substantial =
     report.numeroDeIndependencia > 0 && report.netWorth >= report.numeroDeIndependencia * 0.5;
   const investablePct = safeRatio(report.investableWealth, report.totalAssets);
-  const annualExpenses = report.monthlyExpenses * 12;
+  // Mismo gasto de referencia con el que se calcularon los ratios del reporte, no la
+  // lista base: si no, "tu gasto anual supera tu patrimonio" se evaluaba contra 0.
+  const annualExpenses = report.gastoReferenciaMensual * 12;
 
   if (report.netWorth < 0) {
     flags.push({

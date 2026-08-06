@@ -27,7 +27,12 @@ export type RichLifeInput = {
   assets: Asset[];
   liabilities: Liability[];
   passiveIncomeMonthly: number;
+  /** Lista base `expense_items`. OPCIONAL para el usuario → puede ser 0; no la uses
+   *  sola de denominador (ver `monthlyCommitment` y `gastoDeReferencia`). */
   monthlyExpenses: number;
+  /** Compromiso mensual TOTAL (sobres + metas + DCA + deudas + primas). Manda sobre
+   *  `monthlyExpenses` como denominador. null si no se pudo leer. */
+  monthlyCommitment?: number | null;
   freeCashflow: number;
   protectionScore: number; // 0-100
   diversification: "baja" | "media" | "alta";
