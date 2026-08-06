@@ -23,6 +23,7 @@ import {
 } from "@/modules/financial-base";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
 import { deriveRecurrenceFields, type Recurrence } from "@/modules/control/engine/recurrence";
+import { montoOriginalAlAlta } from "@/modules/control/engine/debt-alta";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { GoalInput, DebtInputForm, DebtPaymentInput } from "@/modules/control/schemas";
@@ -204,9 +205,18 @@ export async function createDebt(input: DebtInputForm): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const household_id = await getActiveHouseholdId(supabase, user.id);
-  const { error } = await supabase
-    .from("debts")
-    .insert({ user_id: user.id, household_id, is_current: true, ...debtColumns(input) });
+  const { error } = await supabase.from("debts").insert({
+    user_id: user.id,
+    household_id,
+    is_current: true,
+    ...debtColumns(input),
+    // El monto original queda anotado SIEMPRE, aunque el campo del formulario venga vacío: en el
+    // alta el saldo actual ES el original (todavía no hay ningún pago contra la deuda), y sin ese
+    // ancla el replay de `recomputeFromPayments` arranca del saldo guardado — que sí se mueve — y
+    // vuelve a descontar los pagos viejos. Ver `montoOriginalAlAlta`. Solo en el alta:
+    // `debtColumns` sigue mandando en la edición.
+    original_amount: montoOriginalAlAlta(input),
+  });
   if (error) throw new Error(error.message);
 }
 
