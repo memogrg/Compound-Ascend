@@ -55,6 +55,66 @@ describe("computePatrimonio · base de la Independencia = compromiso mensual tot
   });
 });
 
+/**
+ * Regresión del "todo en 0": usuario que presupuesta con SOBRES y metas, así que la
+ * lista base `expense_items` está vacía (monthlyExpenses = 0) mientras su gasto real
+ * vive en el compromiso. Antes, cada ratio dividía por esa lista vacía y `safeRatio`
+ * los mandaba a 0: 0 meses de colchón con el fondo de paz lleno, 0 años de libertad
+ * con el capital invertido, y la bandera "poca liquidez" encendida — todo mientras el
+ * número de independencia (que ya usaba el compromiso) daba millones. Datos con la
+ * forma de un caso real: fondo de paz ₡18M, compromiso ₡3,6M/mes, inversiones ₡343M.
+ */
+describe("computePatrimonio · lista base vacía → los ratios usan el compromiso", () => {
+  const real = (o: Partial<PatrimonioInput> = {}): PatrimonioInput =>
+    inp({
+      assetsByClass: {
+        liquido: 18_000_000, // solo el fondo de paz
+        inversion: 343_000_000,
+        productivo: 0,
+        uso_personal: 0,
+        especial: 0,
+      },
+      monthlyExpenses: 0, // `expense_items` vacío: el usuario no usa esa lista
+      monthlyCommitment: 3_600_000, // sobres + metas + DCA + deudas + primas
+      defenseFundsBalance: 18_000_000,
+      ...o,
+    });
+
+  it("meses de colchón: ₡18M ÷ ₡3,6M = 5 (antes 0)", () => {
+    expect(computePatrimonio(real()).mesesDeColchon).toBe(5);
+  });
+
+  it("años de libertad > 0 con ₡343M invertidos (antes 0)", () => {
+    const r = computePatrimonio(real());
+    // El colchón earmarkeado NO cuenta como capital que trabaja: 18M − 18M = 0.
+    expect(r.investableWealth).toBe(343_000_000);
+    expect(r.añosDeLibertad).toBeCloseTo(343_000_000 / (3_600_000 * 12), 2);
+    expect(r.añosDeLibertad).toBeGreaterThan(0);
+  });
+
+  it("cobertura pasiva y sensibilidad salen del mismo gasto, no de la lista vacía", () => {
+    const r = computePatrimonio(real({ passiveIncomeMonthly: 720_000 }));
+    expect(r.coberturaPasiva).toBe(0.2); // 720k / 3,6M
+    expect(r.sensibilidadTasa["0.08"]).toBe(r.numeroDeIndependencia);
+    expect(r.gastoReferenciaMensual).toBe(3_600_000);
+  });
+
+  it("ya no se marca «poca liquidez» teniendo el colchón lleno", () => {
+    expect(codes(computePatrimonio(real()))).not.toContain("patrimonio_alto_baja_liquidez");
+  });
+
+  it("los ratios son coherentes con los números: años × tasa = progreso de independencia", () => {
+    const r = computePatrimonio(real());
+    expect(r.añosDeLibertad * 0.08).toBeCloseTo(r.progresoIndependencia, 4);
+  });
+
+  it("con la lista base llena manda el compromiso (una sola base para todo el reporte)", () => {
+    const r = computePatrimonio(real({ monthlyExpenses: 1_000_000 }));
+    expect(r.gastoReferenciaMensual).toBe(3_600_000);
+    expect(r.mesesDeColchon).toBe(5);
+  });
+});
+
 describe("computePatrimonio · totales y ajustado", () => {
   it("totalAssets, netWorth y adjustedNetWorth", () => {
     const r = computePatrimonio(

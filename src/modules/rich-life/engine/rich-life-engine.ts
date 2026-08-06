@@ -13,7 +13,7 @@ import type {
   LiabilityClass,
 } from "@/modules/rich-life/types";
 import { formatMoney } from "@/lib/format";
-import { mesesDeColchon } from "@/lib/wealth-math";
+import { mesesDeColchon, gastoDeReferencia } from "@/lib/wealth-math";
 
 const ASSET_COLOR: Record<AssetClass, string> = {
   liquido: "var(--c-savings)",
@@ -55,9 +55,13 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
   const liquid = input.assets.filter((a) => a.assetClass === "liquido");
   const depreciable = input.assets.filter((a) => a.assetClass === "uso_personal");
 
-  const passiveIncomeCoverage = ratio(input.passiveIncomeMonthly, input.monthlyExpenses);
+  // Fuente única (gastoDeReferencia): MISMO denominador que patrimonio-engine, para que
+  // /mi-rich-life y los indicadores de Patrimonio no puedan decir cosas distintas. Con la
+  // lista base vacía esto daba 0 meses y 0% de cobertura teniendo el colchón lleno.
+  const gastoReferencia = gastoDeReferencia(input.monthlyExpenses, input.monthlyCommitment);
+  const passiveIncomeCoverage = ratio(input.passiveIncomeMonthly, gastoReferencia);
   // Fuente única (mesesDeColchon): mismo cálculo que patrimonio-engine.
-  const monthsOfIndependence = mesesDeColchon(sum(liquid), input.monthlyExpenses);
+  const monthsOfIndependence = mesesDeColchon(sum(liquid), gastoReferencia);
 
   let trend: RichTrend = "sin_historico";
   let wealthVelocity: number | null = null;
