@@ -31,6 +31,12 @@ jobs:
             next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
 
       - run: npm ci
+      # Va PRIMERO porque es el paso más barato (~5s) y el que más fácil se olvida.
+      # Existe para que `src/` no vuelva a divergir: cuando divergió, correr el propio
+      # `npm run format` del repo reformateaba 298 archivos y sepultaba el cambio real
+      # del PR bajo el ruido (ver #633). El arreglo se sostiene solo si algo lo vigila.
+      # Si falla: `npm run format` y commiteá lo que toque.
+      - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
