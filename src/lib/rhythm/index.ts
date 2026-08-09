@@ -39,10 +39,23 @@ export {
 } from "@/lib/rhythm/spend-pace";
 
 export {
+  OCIOSO_MESES_VENTANA,
+  OCIOSO_UMBRAL_SIN_USAR,
+  OCIOSO_PESO_MINIMO,
+  detectarOciosos,
+  textoOcioso,
+  textoSalidaOcioso,
+  type SobreHistorico,
+  type SalidaOcioso,
+  type SobreOcioso,
+} from "@/lib/rhythm/idle-envelopes";
+
+export {
   detectVentanaPresupuesto,
   detectCierreMes,
   detectRegistroDiario,
   detectRitmoSobre,
+  detectSobreOcioso,
 } from "@/lib/rhythm/detectors";
 
 export {
@@ -58,6 +71,8 @@ export {
   silenciarNudgeHoy,
   getSenalesRitmo,
   moverPresupuestoEntreSobres,
+  getSobresOciosos,
+  fusionarSobres,
   type MonthConfig,
   type LateEditCount,
   type ConteosCierre,

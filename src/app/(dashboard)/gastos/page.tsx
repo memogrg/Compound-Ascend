@@ -8,7 +8,7 @@ import { createSavingsSobreAction } from "@/modules/control";
 import { PagoVinculadoButton } from "@/modules/control";
 import { userToday } from "@/lib/time/user-time";
 import { RitmoPanel } from "@/components/shared/ritmo-panel";
-import { getSenalesRitmo } from "@/lib/rhythm/rhythm-service";
+import { getSenalesRitmo, getSobresOciosos } from "@/lib/rhythm/rhythm-service";
 import { isCurrentMonth } from "@/modules/financial-base/engine/period";
 
 /**
@@ -85,14 +85,18 @@ export default async function Page({
   // Avisos de ritmo: solo del mes EN CURSO. Proyectar "a este ritmo llegás a X" sobre un mes
   // ya cerrado no es un aviso, es un dato de museo — y sobre uno futuro no hay ritmo todavía.
   // Best-effort: un fallo acá no puede tumbar el tab de Gastos.
-  const ritmo = isCurrentMonth(jarsPeriod, asOf)
-    ? await getSenalesRitmo(jarsPeriod).catch(() => ({ senales: [], dia: 0 }))
-    : { senales: [], dia: 0 };
+  // En paralelo: van juntos en el mismo panel y ninguno depende del otro.
+  const [ritmo, ociosos] = isCurrentMonth(jarsPeriod, asOf)
+    ? await Promise.all([
+        getSenalesRitmo(jarsPeriod).catch(() => ({ senales: [], dia: 0 })),
+        getSobresOciosos(jarsPeriod).catch(() => ({ ociosos: [] })),
+      ])
+    : [{ senales: [], dia: 0 }, { ociosos: [] }];
 
   return (
     <div className="grid">
       <EssentialExpenseSummary />
-      <RitmoPanel senales={ritmo.senales} dia={ritmo.dia} />
+      <RitmoPanel senales={ritmo.senales} ociosos={ociosos.ociosos} dia={ritmo.dia} />
       <IncomeExpenseSection
         view={expenseView}
         kind="expense"

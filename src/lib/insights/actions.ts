@@ -65,6 +65,10 @@ const ACTIONS: Record<InsightKind, InsightAction> = {
     label: "mover presupuesto desde un sobre con holgura o bajar el ritmo",
     route: "/gastos",
   },
+  sobre_ocioso: {
+    label: "mover ese presupuesto al sobre que sí se usa, o fusionar los dos sobres",
+    route: "/gastos",
+  },
 };
 
 /** Acción sugerida para un kind. `undefined` para un kind desconocido (no inventa una salida). */

@@ -37,6 +37,7 @@ import {
   type PendienteCierre,
 } from "@/lib/rhythm/engine";
 import { semanaISO, textoDiagnostico, type SenalRitmo } from "@/lib/rhythm/spend-pace";
+import { textoOcioso, type SobreOcioso } from "@/lib/rhythm/idle-envelopes";
 
 /** "2026-08" — sufijo de las claves mensuales. */
 function claveMes(year: number, month: number): string {
@@ -217,6 +218,57 @@ export function detectRitmoSobre(input: {
  * mucha gente lo va a leer primero. Un insight que dice el problema y esconde la solución en
  * otra pantalla es medio insight.
  */
+// ── 5. Sobres ociosos (Fase C) ──────────────────────────────────────────────
+
+/**
+ * "Tenés plata apartada en {sobre} y casi no la usás" — un insight por sobre ocioso.
+ *
+ * ── UNA VEZ POR SOBRE POR MES ───────────────────────────────────────────────
+ * Mismo truco de clave que el ritmo, pero anclado al MES y no a la semana
+ * (`ocioso:{categoryId}:2026-08`): un sobre ocioso es una conclusión sobre tres meses de
+ * historia y no cambia de un lunes al otro. Recordárselo cada semana sería insistir con la
+ * misma frase sobre datos que no se movieron — el camino más corto a que el usuario deje de
+ * leer la campana.
+ *
+ * ── SEVERIDAD 'info' ────────────────────────────────────────────────────────
+ * Ni siquiera es un riesgo: es plata inmovilizada, y a veces a propósito. Va por debajo del
+ * ritmo ('observar') y muy por debajo de un sobregiro ('accionar') en el orden de la campana.
+ * Ese escalonamiento es lo que hace que las severidades signifiquen algo.
+ */
+export function detectSobreOcioso(input: {
+  ociosos: SobreOcioso[];
+  /** "YYYY-MM-DD" en la zona del perfil: de acá sale el ancla mensual de la clave. */
+  todayIso: string;
+  fmt: (amount: number, currency: string) => string;
+  max?: number;
+}): DetectedInsight[] {
+  const mes = input.todayIso.slice(0, 7);
+  return input.ociosos.slice(0, input.max ?? 2).map((o) => ({
+    kind: "sobre_ocioso" as const,
+    severity: "info" as const,
+    title: `Casi no usás ${o.path}`,
+    body: `${textoOcioso(o, input.fmt)} ${resumenSalidasOcioso(o, input.fmt)}`.trim(),
+    metric: Math.round(o.ociosoMensual),
+    relatedKind: "category" as const,
+    relatedId: `ocioso:${o.categoryId}:${mes}`,
+  }));
+}
+
+/** Cierra el diagnóstico del ocioso con sus salidas, para que sirva desde la campana. */
+function resumenSalidasOcioso(o: SobreOcioso, fmt: (a: number, c: string) => string): string {
+  const mover = o.salidas.find((x) => x.tipo === "mover");
+  const fusionar = o.salidas.find((x) => x.tipo === "fusionar");
+  const partes: string[] = [];
+  if (mover) partes.push(`mover ${fmt(mover.monto, o.currency)} a ${mover.hastaPath}`);
+  if (fusionar) partes.push(`fusionarlo con ${fusionar.hastaPath}`);
+  if (partes.length === 0) {
+    // Sin receptor ni hermano no hay nada que proponer, pero el dato igual vale: el usuario
+    // puede decidir bajarlo él. Lo que no se hace es fingir una salida que no existe.
+    return "Si no lo necesitás apartado, ese margen puede ir a otro lado.";
+  }
+  return `Podés ${partes.join(" o ")}. O dejarlo como está, si lo querés disponible.`;
+}
+
 function resumenSalidas(s: SenalRitmo, fmt: (a: number, c: string) => string): string {
   const mover = s.salidas.find((x) => x.tipo === "mover");
   const bajar = s.salidas.find((x) => x.tipo === "bajar_ritmo");

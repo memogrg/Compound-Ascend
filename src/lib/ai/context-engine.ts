@@ -659,6 +659,40 @@ export async function buildFinancialContext(
       // Sin insights: el contexto sigue.
     }
 
+  // DÓNDE RECORTAR (Fase C): los dos lados del presupuesto, para contestar "¿dónde puedo
+  // recortar?" con datos y no con generalidades.
+  //
+  // Va aparte de `ctx.insights` porque ahí solo entran los 4 más severos y un sobre ocioso es
+  // 'info' — nunca llegaría, justo el dato que la pregunta necesita. Best-effort: sin esto el
+  // asesor sigue contestando, solo que sin las cifras.
+  if (scope.flavor)
+    try {
+      const { getSenalesRitmo, getSobresOciosos } = await import("@/lib/rhythm/rhythm-service");
+      const { userCurrentPeriod } = await import("@/lib/time/user-time");
+      const period = await userCurrentPeriod();
+      const [ritmo, idle] = await Promise.all([getSenalesRitmo(period), getSobresOciosos(period)]);
+      if (ritmo.senales.length || idle.ociosos.length) {
+        ctx.dondeRecortar = {
+          // Tope de 3 por lado: el prompt tiene que caber y el asesor va a nombrar uno o dos.
+          ociosos: idle.ociosos.slice(0, 3).map((o) => ({
+            path: o.path,
+            presupuesto: Math.round(o.budgetMensual),
+            usadoEnVentana: Math.round(o.gastoVentana),
+            meses: o.mesesVentana,
+          })),
+          apretados: ritmo.senales.slice(0, 3).map((r) => ({
+            path: r.path,
+            gastado: Math.round(r.spent),
+            presupuesto: Math.round(r.budget),
+            proyeccion: Math.round(r.proyeccion),
+          })),
+          currency: idle.ociosos[0]?.currency ?? ritmo.senales[0]?.currency ?? ctx.currency,
+        };
+      }
+    } catch {
+      // Sin este bloque el contexto sigue.
+    }
+
   // Entorno macro/micro: indicadores económicos del entorno (no del usuario).
   // Best-effort; cada lectura en su propio try/catch para que un fallo aislado no
   // degrade el resto. Si un indicador no tiene datos (value null), no se inyecta.

@@ -97,6 +97,66 @@ export async function aplicarMoverPresupuestoAction(args: {
 }
 
 /**
+ * Fusiona un sobre ocioso dentro de otro (la salida "fusionar" del aviso de ocioso).
+ *
+ * DESTRUCTIVO e irreversible: `mergeCategory` reasigna todas las referencias del sobre origen
+ * —transacciones, líneas de presupuesto, reglas— y después lo borra. La superficie exige una
+ * confirmación aparte antes de llamar acá; esta acción no la puede exigir por sí sola, así que
+ * lo que sí hace es validar que los dos ids sean distintos y devolver el error en vez de
+ * lanzarlo.
+ */
+export async function fusionarSobresAction(args: {
+  fromId: string;
+  intoId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  try {
+    if (!args.fromId || !args.intoId || args.fromId === args.intoId) {
+      return { ok: false, message: "Elegí dos sobres distintos." };
+    }
+    const { fusionarSobres } = await import("@/lib/rhythm/rhythm-service");
+    await fusionarSobres(args.fromId, args.intoId);
+
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/gastos");
+    revalidatePath("/m/gastos");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("fusionarSobres fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos fusionar los sobres." };
+  }
+}
+
+/**
+ * Descarta el aviso de UN sobre ocioso por lo que queda del mes.
+ *
+ * Igual que el de ritmo pero con ancla MENSUAL: un sobre ocioso es una conclusión sobre tres
+ * meses de historia, así que "no me lo digas más" tiene que durar más que una semana.
+ */
+export async function descartarAvisoOciosoAction(categoryId: string): Promise<{ ok: boolean }> {
+  try {
+    const { requireUser } = await import("@/lib/auth/session");
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { userToday } = await import("@/lib/time/user-time");
+
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+    const relatedId = `ocioso:${categoryId}:${(await userToday()).slice(0, 7)}`;
+    await supabase
+      .from("user_insights")
+      .update({ status: "descartado" })
+      .eq("user_id", user.id)
+      .eq("kind", "sobre_ocioso")
+      .eq("related_id", relatedId);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
  * Descarta el aviso de ritmo de UN sobre por lo que queda de la semana.
  *
  * Marca el insight como descartado por su clave (`ritmo:{categoryId}:{semana}`). Como la
