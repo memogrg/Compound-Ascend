@@ -2262,6 +2262,86 @@ input[type="radio"] {
     width: auto;
   }
 }
+/* ── Pop-up del ritmo del mes ──────────────────────────────────────────────
+   Tarjeta flotante abajo a la derecha, UNA a la vez. Deliberadamente discreta:
+   acompaña, no interrumpe — nada de overlay, nada de bloquear la pantalla, y el
+   contenido de abajo sigue siendo clickeable. */
+.rhythm-nudge {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  z-index: 45; /* debajo de la campana (50): un modal abierto siempre gana */
+  padding: 14px 16px 12px;
+  box-shadow: var(--shadow-pop);
+  animation: rhythm-nudge-in 0.22s ease-out;
+}
+.rhythm-nudge[data-leaving] {
+  animation: rhythm-nudge-out 0.16s ease-in forwards;
+}
+@keyframes rhythm-nudge-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes rhythm-nudge-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* Quien pidió menos movimiento no necesita la animación para entender el aviso. */
+@media (prefers-reduced-motion: reduce) {
+  .rhythm-nudge,
+  .rhythm-nudge[data-leaving] {
+    animation: none;
+  }
+}
+.rhythm-nudge-head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.rhythm-nudge-icon {
+  color: var(--accent);
+  flex: none;
+  margin-top: 1px;
+}
+.rhythm-nudge-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.rhythm-nudge-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+.rhythm-nudge-foot {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.rhythm-nudge-foot .btn {
+  font-size: 12.5px;
+  padding: 7px 12px;
+}
+/* En móvil web se ancla a los dos bordes y sube: abajo a la derecha choca con la
+   barra de navegación inferior. */
+@media (max-width: 480px) {
+  .rhythm-nudge {
+    right: 12px;
+    left: 12px;
+    bottom: 76px;
+    width: auto;
+  }
+}
+
 .obs-card {
   display: flex;
   gap: 12px;

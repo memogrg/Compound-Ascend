@@ -6,6 +6,7 @@ import {
 } from "@/modules/financial-base/services/base-service";
 import { getUserTimezone, knownUserTz } from "@/lib/time/user-time";
 import { TimezoneSync } from "@/components/tz/timezone-sync";
+import { RhythmNudge } from "@/components/layout/rhythm-nudge";
 
 /**
  * Layout del área autenticada. Obtiene el usuario (si Supabase está configurado)
@@ -66,6 +67,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       timezone={knownTz}
     >
       <TimezoneSync savedTz={savedTz} />
+      {/* Va en el layout, no en cada página: el ritmo del mes acompaña en toda la app.
+          Se auto-oculta cuando no hay nada que decir (que es casi siempre). */}
+      <RhythmNudge />
       {children}
     </AppShell>
   );

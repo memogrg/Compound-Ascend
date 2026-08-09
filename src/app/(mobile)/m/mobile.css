@@ -4075,3 +4075,36 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .m-confirm-done .ac-rc-warn {
   margin-top: 8px;
 }
+
+/* ── Pop-up del ritmo del mes (móvil) ─────────────────────────────────────────
+   Paridad de contenido con .rhythm-nudge de la web; forma distinta: anclado a los
+   dos bordes, como una hoja que sube, en vez de una tarjeta flotante de escritorio.
+
+   Se sienta ARRIBA del FAB reusando sus variables (--fab-size/--fab-gap) en lugar de
+   un número mágico: si el botón cambia de tamaño, el aviso lo sigue solo. Esa fue
+   justamente la forma en que el FAB terminó tapando controles antes.
+
+   z-index 28: debajo de la barra de entrada del chat (29/30) y del BottomSheet, que
+   son interacciones activas. Un recordatorio nunca le gana a algo que el usuario está
+   haciendo. */
+.m-rhythm-nudge {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--fab-gap) + var(--fab-size) + 12px + env(safe-area-inset-bottom));
+  z-index: 28;
+  padding: 14px 16px 12px;
+  box-shadow: var(--shadow-pop, 0 12px 32px rgba(0, 0, 0, 0.16));
+  animation: m-rhythm-nudge-in 0.22s ease-out;
+}
+@keyframes m-rhythm-nudge-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-rhythm-nudge {
+    animation: none;
+  }
+}

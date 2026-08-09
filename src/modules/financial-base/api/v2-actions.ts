@@ -192,21 +192,66 @@ const envelopeBudgetSchema = z.object({
   currency: z.string().length(3),
   periodMonth: z.number().int().min(1).max(12),
   periodYear: z.number().int().min(2000).max(3000),
+  /**
+   * El usuario ya vio y aceptó el aviso de "estás fuera de la ventana; esto queda
+   * registrado". Sin esto, una edición fuera de ventana NO se ejecuta: devuelve
+   * `needsConfirmation` para que la superficie pregunte.
+   */
+  confirmedOutsideWindow: z.boolean().optional(),
 });
 
-/** Fija el presupuesto de un sobre del periodo (candado del tab de Gastos). */
-export async function setEnvelopeBudgetAction(raw: unknown): Promise<ActionResult> {
+/**
+ * Fija el presupuesto de un sobre del periodo (candado del tab de Gastos).
+ *
+ * ── LA VENTANA (días 1-5) ───────────────────────────────────────────────────
+ * Dentro de la ventana se guarda y punto: es el momento previsto para configurar.
+ *
+ * Fuera de la ventana NUNCA se bloquea — se pide una confirmación y se registra. Esa es
+ * la decisión de diseño central: la vida cambia a mitad de mes, y una app que le dice
+ * "no" a un cambio real de circunstancias enseña a mentirle a la app. Lo que sí hace es
+ * dejar rastro (`recordLateBudgetEdit`), porque un sobre ajustado cuatro veces tarde es
+ * información valiosa: no dice "sos indisciplinado", dice "este presupuesto está mal
+ * calibrado", y eso el asesor lo puede conversar.
+ *
+ * Quién decide si la ventana está abierta es el SERVIDOR, no el cliente. Si dependiera
+ * de una bandera del formulario, el registro sería opcional para cualquiera que llame la
+ * acción directo — y el contador dejaría de significar nada.
+ */
+export async function setEnvelopeBudgetAction(
+  raw: unknown,
+): Promise<ActionResult & { needsConfirmation?: boolean }> {
   const parsed = envelopeBudgetSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
+    const period = monthPeriod(parsed.data.periodYear, parsed.data.periodMonth);
+    const { getVentana, recordLateBudgetEdit } = await import("@/lib/rhythm");
+    const ventana = await getVentana(period);
+
+    if (!ventana.abierta && !parsed.data.confirmedOutsideWindow) {
+      return {
+        ok: false,
+        needsConfirmation: true,
+        message:
+          ventana.estado === "cerrada_por_el_usuario"
+            ? "Ya cerraste la configuración de este mes. Podés ajustarlo igual; queda registrado."
+            : "Estás fuera de la ventana de configuración. Podés ajustarlo igual; queda registrado.",
+      };
+    }
+
     await setCategoryBudget({
       categoryId: parsed.data.categoryId,
       name: parsed.data.name,
       amount: parsed.data.amount,
       currency: parsed.data.currency,
-      period: monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
+      period,
     });
+
+    // Después de guardar, nunca antes: el contador registra ediciones que OCURRIERON.
+    // `recordLateBudgetEdit` no lanza — si falla, el presupuesto ya está guardado y eso
+    // es lo que le importa al usuario.
+    if (!ventana.abierta) await recordLateBudgetEdit(parsed.data.categoryId, period);
+
     revalidate();
     return { ok: true };
   } catch (err) {
@@ -395,6 +440,7 @@ export async function addTransactionAction(raw: unknown): Promise<ActionResult> 
     revalidatePath("/transacciones");
     revalidatePath("/deudas");
     revalidatePath("/ahorro");
+
     return { ok: true };
   } catch (err) {
     logger.error("addTransaction fallido", { message: err instanceof Error ? err.message : "?" });

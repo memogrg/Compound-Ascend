@@ -108,6 +108,7 @@ export async function refreshInsights(): Promise<void> {
       // best-effort.
     }
     detected.push(...(await detectDamageSignals(debts)));
+    detected.push(...(await detectMonthRhythm()));
     await syncInsights(detected);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
@@ -224,6 +225,85 @@ async function detectDamageSignals(debts: Debt[]): Promise<DetectedInsight[]> {
     // best-effort
   }
 
+  return out;
+}
+
+/**
+ * EL RITMO DEL MES: ventana de configuración (días 1-5), cierre de mes (28→fin) y
+ * recordatorio diario de registro. Ver lib/rhythm/.
+ *
+ * Entran por ACÁ, en el mismo array que el resto, y no por un cron propio. `syncInsights`
+ * marca 'resuelto' todo activo que no venga en la pasada: unos detectores escribiendo
+ * desde un cron y otros desde la sesión se irían matando entre sí, alternando la campana
+ * entre dos conjuntos de insights. Un solo array, una sola verdad.
+ *
+ * El beneficio de estar acá es la auto-limpieza gratis: el día 6 la ventana deja de
+ * emitirse y su tarjeta se cierra sola; el usuario registra un gasto y el recordatorio
+ * del día desaparece en la siguiente pasada. Nadie borra nada a mano.
+ *
+ * Todo LECTURA (esta función también corre desde el context-engine del asesor). Cada
+ * bloque en su propio try/catch: los tres son independientes.
+ */
+async function detectMonthRhythm(): Promise<DetectedInsight[]> {
+  const out: DetectedInsight[] = [];
+  try {
+    const { userToday, userHour } = await import("@/lib/time/user-time");
+    const { diaDe, periodoDe, enDiasDeCierre } = await import("@/lib/rhythm/engine");
+    const { detectVentanaPresupuesto, detectCierreMes, detectRegistroDiario } =
+      await import("@/lib/rhythm/detectors");
+    const { getMonthConfig, getConteosCierre, contarMovimientosHoy, contarSobresConPresupuesto } =
+      await import("@/lib/rhythm/rhythm-service");
+    const { monthPeriod } = await import("@/modules/financial-base/engine/period");
+
+    const today = await userToday();
+    const { year, month } = periodoDe(today);
+    const dia = diaDe(today);
+    const period = monthPeriod(year, month);
+
+    // Ventana de configuración.
+    try {
+      const [config, sobres] = await Promise.all([
+        getMonthConfig(period),
+        contarSobresConPresupuesto(period),
+      ]);
+      out.push(
+        ...detectVentanaPresupuesto({
+          dia,
+          year,
+          month,
+          closedAt: config.closedAt,
+          sobresConPresupuesto: sobres,
+        }),
+      );
+    } catch {
+      // best-effort
+    }
+
+    // Cierre de mes. Los conteos son la parte cara (transacciones + metas + deudas +
+    // presupuesto), así que ni se piden fuera de los días de cierre.
+    try {
+      if (enDiasDeCierre({ dia, year, month })) {
+        const conteos = await getConteosCierre(period);
+        out.push(...detectCierreMes({ dia, year, month, conteos }));
+      }
+    } catch {
+      // best-effort
+    }
+
+    // Recordatorio diario. Ojo: la campana lo muestra con hasta 12 h de retraso por la
+    // guardia de frescura, así que la superficie fiel es el pop-up en vivo
+    // (getRhythmState). Acá igual se emite para que quede registro en "Qué noté".
+    try {
+      const [hora, movimientosHoy] = await Promise.all([userHour(), contarMovimientosHoy()]);
+      out.push(...detectRegistroDiario({ todayIso: today, horaLocal: hora, movimientosHoy }));
+    } catch {
+      // best-effort
+    }
+  } catch (err) {
+    logger.warn("detectMonthRhythm fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+  }
   return out;
 }
 

@@ -35,7 +35,15 @@ export type InsightKind =
   | "deuda_cara"
   | "fondo_emergencia"
   | "concentracion_inversion"
-  | "rendimiento_bajo_inflacion";
+  | "rendimiento_bajo_inflacion"
+  // ── El ritmo del mes: los tres momentos del ciclo (ver lib/rhythm/detectors.ts).
+  // `kind` NO tiene check en la BD —solo severity/status/related_kind lo tienen—, así que
+  // sumar tipos acá no necesita migración. Lo que sí la necesitó fue `related_id`: estos
+  // tres usan claves de texto con el período adentro ('ventana:2026-08'), imposibles en la
+  // columna uuid original (arreglado en 20260813000001).
+  | "ventana_presupuesto"
+  | "cierre_mes"
+  | "registro_diario";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {

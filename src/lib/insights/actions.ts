@@ -56,6 +56,11 @@ const ACTIONS: Record<InsightKind, InsightAction> = {
   ritual_patrimonio: { label: "revisar el marco patrimonial", route: "/mi-rich-life" },
   perfil_revision: { label: "revisar el perfil financiero", route: "/mi-perfil-financiero" },
   alerta_precio: { label: "revisar la alerta en el portafolio", route: "/patrimonio" },
+  // Ritmo del mes. Los tres caen en /gastos o /transacciones a propósito: el ritual se
+  // cumple donde están los sobres, no en una pantalla nueva de "rituales".
+  ventana_presupuesto: { label: "repartir el presupuesto de los sobres", route: "/gastos" },
+  cierre_mes: { label: "completar lo que falta del mes y conciliar", route: "/transacciones" },
+  registro_diario: { label: "registrar los gastos de hoy", route: "/transacciones" },
 };
 
 /** Acción sugerida para un kind. `undefined` para un kind desconocido (no inventa una salida). */
