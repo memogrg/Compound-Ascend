@@ -36,6 +36,7 @@ import {
   pendientesDeCierre,
   type PendienteCierre,
 } from "@/lib/rhythm/engine";
+import { semanaISO, textoDiagnostico, type SenalRitmo } from "@/lib/rhythm/spend-pace";
 
 /** "2026-08" — sufijo de las claves mensuales. */
 function claveMes(year: number, month: number): string {
@@ -161,4 +162,69 @@ export function detectRegistroDiario(input: {
       relatedId: `registro:${input.todayIso}`,
     },
   ];
+}
+
+// ── 4. Ritmo de gasto por sobre (Fase B) ────────────────────────────────────
+
+/**
+ * "Vas rápido para el día que es" — un insight por sobre que corre por delante del calendario.
+ *
+ * ── UNA VEZ POR SOBRE POR SEMANA, SIN CONTADOR ──────────────────────────────
+ * La semana va dentro de `relatedId` (`ritmo:{categoryId}:2026-W33`), así que el tope semanal
+ * lo impone el índice único de `syncInsights` y no un contador que alguien tenga que mantener:
+ *  · todas las pasadas de la misma semana caen en la MISMA fila → una tarjeta que se actualiza
+ *    con cifras frescas, no siete tarjetas apiladas;
+ *  · descartarla la calla hasta el lunes, cuando la clave cambia y la pregunta vuelve a ser
+ *    legítima (el ritmo de la semana pasada ya no dice nada del de esta);
+ *  · si el sobre vuelve a su carril, deja de emitirse y la tarjeta se cierra sola.
+ *
+ * ── SEVERIDAD 'observar', NO 'accionar' ─────────────────────────────────────
+ * Todavía no pasó nada malo: el sobre está dentro de su presupuesto y esto es una proyección.
+ * La campana ordena por severidad, y poner una advertencia preventiva por encima de una deuda
+ * en mora sería mentir sobre la urgencia. Cuando el sobre SÍ se pasa, el que habla es
+ * `detectOverspentEnvelopes` — ese sí es 'accionar'.
+ *
+ * `max` topea cuántos se emiten (2 por defecto): con un insight por sobre, un mes flojo
+ * convierte la campana en una lista de reproches y el usuario la vacía sin leer.
+ */
+export function detectRitmoSobre(input: {
+  senales: SenalRitmo[];
+  dia: number;
+  todayIso: string;
+  /** Formateador de moneda (se inyecta para no acoplar el detector a la capa de formato). */
+  fmt: (amount: number, currency: string) => string;
+  max?: number;
+}): DetectedInsight[] {
+  const semana = semanaISO(input.todayIso);
+  return input.senales.slice(0, input.max ?? 2).map((s) => ({
+    kind: "ritmo_sobre" as const,
+    severity: "observar" as const,
+    title: `Vas rápido en ${s.path}`,
+    body: `${textoDiagnostico(s, input.dia, input.fmt)} ${resumenSalidas(s, input.fmt)}`.trim(),
+    metric: Math.round(s.proyeccion),
+    // 'category' ya está permitido por el check de user_insights (20260810000001), así que la
+    // campana puede hacer deep-link al tab de Gastos por relatedKind.
+    relatedKind: "category" as const,
+    relatedId: `ritmo:${s.categoryId}:${semana}`,
+  }));
+}
+
+/**
+ * Cierra el diagnóstico con las salidas, en una frase.
+ *
+ * Que el cuerpo del insight NOMBRE las salidas —y no solo la tarjeta de la pantalla de
+ * Gastos— es lo que hace que el aviso sirva desde la campana y desde el chat, que es donde
+ * mucha gente lo va a leer primero. Un insight que dice el problema y esconde la solución en
+ * otra pantalla es medio insight.
+ */
+function resumenSalidas(s: SenalRitmo, fmt: (a: number, c: string) => string): string {
+  const mover = s.salidas.find((x) => x.tipo === "mover");
+  const bajar = s.salidas.find((x) => x.tipo === "bajar_ritmo");
+  const partes: string[] = [];
+  if (mover) partes.push(`mover ${fmt(mover.monto, s.currency)} desde ${mover.desdePath}`);
+  if (bajar && bajar.diasRestantes > 0) {
+    partes.push(`o quedarte en ${fmt(bajar.porDia, s.currency)} por día`);
+  }
+  if (partes.length === 0) return "";
+  return `Podés ${partes.join(" ")}. Y dejarlo así también es una opción.`;
 }

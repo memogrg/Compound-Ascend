@@ -27,9 +27,22 @@ export {
 } from "@/lib/rhythm/engine";
 
 export {
+  RITMO_MARGEN_PUNTOS,
+  RITMO_PESO_MINIMO,
+  detectarRitmo,
+  textoDiagnostico,
+  textoSalida,
+  semanaISO,
+  type SobrePace,
+  type SalidaRitmo,
+  type SenalRitmo,
+} from "@/lib/rhythm/spend-pace";
+
+export {
   detectVentanaPresupuesto,
   detectCierreMes,
   detectRegistroDiario,
+  detectRitmoSobre,
 } from "@/lib/rhythm/detectors";
 
 export {
@@ -43,6 +56,8 @@ export {
   getConteosCierre,
   getRhythmState,
   silenciarNudgeHoy,
+  getSenalesRitmo,
+  moverPresupuestoEntreSobres,
   type MonthConfig,
   type LateEditCount,
   type ConteosCierre,

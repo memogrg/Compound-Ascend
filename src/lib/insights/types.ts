@@ -43,7 +43,10 @@ export type InsightKind =
   // columna uuid original (arreglado en 20260813000001).
   | "ventana_presupuesto"
   | "cierre_mes"
-  | "registro_diario";
+  | "registro_diario"
+  // Ritmo de gasto: el sobre va más rápido que el calendario. Preventivo — cuando SÍ se pasa
+  // habla `sobre_sobregirado`, que es el que merece severidad 'accionar'.
+  | "ritmo_sobre";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {

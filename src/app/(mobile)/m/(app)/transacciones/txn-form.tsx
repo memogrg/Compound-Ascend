@@ -7,6 +7,12 @@ import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-j
 import type { Account, Transaction } from "@/modules/financial-base/types";
 import { addCategoryAction } from "@/modules/financial-base/api/v2-actions";
 import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
+import { formatMoney } from "@/lib/format";
+// "Te quedan X de Y en {sobre} este mes" — el MISMO texto que el chat y la web.
+import {
+  sobreRemainingText,
+  type SobreRemaining,
+} from "@/modules/financial-base/engine/sobre-remaining-copy";
 
 import {
   BottomSheet,
@@ -166,6 +172,12 @@ export function TxnForm({
       values={values}
       submitLabel={submitLabel}
       successMessage={successMessage}
+      // "Te quedan X de Y en {sobre} este mes". Solo sale en el ALTA: `addTransactionAction`
+      // devuelve el restante y `editTransactionAction` no, así que al editar el helper recibe
+      // undefined y devuelve null — sin toast, sin cifra inventada.
+      successDetail={(res) =>
+        sobreRemainingText((res as { sobre?: SobreRemaining }).sobre, formatMoney)
+      }
       onSuccess={onSuccess}
       validate={() => (missingCategory ? { categoryId: categoryHint } : null)}
     >

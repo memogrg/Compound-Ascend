@@ -61,6 +61,10 @@ const ACTIONS: Record<InsightKind, InsightAction> = {
   ventana_presupuesto: { label: "repartir el presupuesto de los sobres", route: "/gastos" },
   cierre_mes: { label: "completar lo que falta del mes y conciliar", route: "/transacciones" },
   registro_diario: { label: "registrar los gastos de hoy", route: "/transacciones" },
+  ritmo_sobre: {
+    label: "mover presupuesto desde un sobre con holgura o bajar el ritmo",
+    route: "/gastos",
+  },
 };
 
 /** Acción sugerida para un kind. `undefined` para un kind desconocido (no inventa una salida). */

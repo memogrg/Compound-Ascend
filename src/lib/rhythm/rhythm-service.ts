@@ -19,7 +19,8 @@ import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { logger } from "@/lib/logger";
 import { userToday, userHour } from "@/lib/time/user-time";
-import { monthPeriod } from "@/modules/financial-base/engine/period";
+import { lastDayOfMonth, monthPeriod } from "@/modules/financial-base/engine/period";
+import { detectarRitmo, type SenalRitmo } from "@/lib/rhythm/spend-pace";
 import {
   diaDe,
   enDiasDeCierre,
@@ -300,6 +301,137 @@ export async function getConteosCierre(period: Period): Promise<ConteosCierre> {
     logger.warn("getConteosCierre fallido", { message: err instanceof Error ? err.message : "?" });
     return vacio;
   }
+}
+
+// ── Ritmo de gasto por sobre (Fase B) ───────────────────────────────────────
+
+/**
+ * Señales de ritmo del mes en curso: sobres que van más rápido que el calendario.
+ *
+ * Reusa `getBudgetTotals`/`getRealTotals` —los MISMOS totales por `category_id` que ve el tab
+ * de Gastos— en vez de sumar transacciones a mano. Que el aviso y la pantalla salgan de la
+ * misma fuente no es elegancia: si difirieran, el usuario vería "llevás ₡200.000" en la
+ * campana y otro número en Gastos, y a partir de ahí no le cree a ninguno de los dos.
+ *
+ * Acá SÍ se paga la conversión de moneda (a diferencia de `contarSobresConPresupuesto`):
+ * comparar gastado contra presupuesto y proyectar exige que ambos estén en la misma unidad.
+ */
+export async function getSenalesRitmo(period: Period): Promise<{
+  senales: SenalRitmo[];
+  dia: number;
+  todayIso: string;
+}> {
+  const today = await userToday();
+  const dia = diaDe(today);
+  try {
+    const { getBudgetTotals } = await import("@/modules/financial-base/services/budget-service");
+    const { getRealTotals } = await import("@/modules/financial-base/services/transaction-service");
+    const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
+
+    const sobres = Object.entries(budget.expenseByKey).map(([categoryId, b]) => ({
+      categoryId,
+      // `expenseByKey` ya trae la etiqueta: no hace falta leer el árbol de categorías solo
+      // para nombrar (una consulta menos en un camino que corre desde el chat).
+      path: b.label,
+      budget: b.value,
+      spent: real.expenseByKey[categoryId]?.value ?? 0,
+    }));
+
+    const senales = detectarRitmo({
+      sobres,
+      dia,
+      diasDelMes: lastDayOfMonth(period.year, period.month),
+      currency: real.currency,
+    });
+    return { senales, dia, todayIso: today };
+  } catch (err) {
+    logger.warn("getSenalesRitmo fallido", { message: err instanceof Error ? err.message : "?" });
+    return { senales: [], dia, todayIso: today };
+  }
+}
+
+/**
+ * Mueve presupuesto de un sobre a otro, en el mismo período. La salida "un tap" del aviso de
+ * ritmo.
+ *
+ * Es UN hecho para el usuario ("saco de acá y pongo allá"), así que se comporta como uno: si
+ * la segunda escritura falla, la primera se revierte. Sin eso, un fallo a mitad dejaría el
+ * sobre donante recortado y el receptor igual — el usuario perdería presupuesto sin recibir
+ * nada, que es estrictamente peor que no haber hecho nada. Mismo criterio que el orquestador
+ * de transacciones enlazadas (linked-transaction-service.ts).
+ *
+ * `confirmedOutsideWindow` va en true en las dos patas: el usuario ya confirmó el movimiento
+ * con su tap, y si está fuera de la ventana los dos ajustes tienen que quedar registrados —
+ * son dos ediciones reales del presupuesto del mes.
+ */
+export async function moverPresupuestoEntreSobres(args: {
+  desdeCategoryId: string;
+  desdeName: string;
+  hastaCategoryId: string;
+  hastaName: string;
+  monto: number;
+  currency: string;
+  period: Period;
+}): Promise<{ ok: boolean; message?: string }> {
+  const { getBudgetTotals, setCategoryBudget } =
+    await import("@/modules/financial-base/services/budget-service");
+
+  const totals = await getBudgetTotals(args.period);
+  const desdeActual = totals.expenseByKey[args.desdeCategoryId]?.value ?? 0;
+  const hastaActual = totals.expenseByKey[args.hastaCategoryId]?.value ?? 0;
+
+  if (args.monto <= 0) return { ok: false, message: "El monto a mover tiene que ser positivo." };
+  if (args.monto > desdeActual) {
+    return { ok: false, message: `${args.desdeName} no tiene tanto presupuesto para ceder.` };
+  }
+
+  const period = args.period;
+  await setCategoryBudget({
+    categoryId: args.desdeCategoryId,
+    name: args.desdeName,
+    period,
+    amount: desdeActual - args.monto,
+    currency: args.currency,
+  });
+  try {
+    await setCategoryBudget({
+      categoryId: args.hastaCategoryId,
+      name: args.hastaName,
+      period,
+      amount: hastaActual + args.monto,
+      currency: args.currency,
+    });
+  } catch (err) {
+    // Compensación: devolver el donante a como estaba. Si ESTO también falla, se registra
+    // fuerte — quedó un presupuesto inconsistente y hace falta saberlo.
+    try {
+      await setCategoryBudget({
+        categoryId: args.desdeCategoryId,
+        name: args.desdeName,
+        period,
+        amount: desdeActual,
+        currency: args.currency,
+      });
+    } catch (rollbackErr) {
+      logger.error("moverPresupuesto: la compensación falló, presupuesto inconsistente", {
+        desde: args.desdeCategoryId,
+        hasta: args.hastaCategoryId,
+        monto: args.monto,
+        message: rollbackErr instanceof Error ? rollbackErr.message : "?",
+      });
+    }
+    throw err;
+  }
+
+  // Las dos patas son ediciones del presupuesto del mes: si la ventana está cerrada, las dos
+  // suman al contador de disciplina.
+  const ventana = await getVentana(period);
+  if (!ventana.abierta) {
+    await recordLateBudgetEdit(args.desdeCategoryId, period);
+    await recordLateBudgetEdit(args.hastaCategoryId, period);
+  }
+
+  return { ok: true };
 }
 
 // ── Estado en vivo para las superficies (pop-up) ────────────────────────────

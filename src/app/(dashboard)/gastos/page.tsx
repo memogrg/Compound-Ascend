@@ -7,6 +7,9 @@ import { IncomeExpenseSection } from "@/modules/financial-base/components/v2/sec
 import { createSavingsSobreAction } from "@/modules/control";
 import { PagoVinculadoButton } from "@/modules/control";
 import { userToday } from "@/lib/time/user-time";
+import { RitmoPanel } from "@/components/shared/ritmo-panel";
+import { getSenalesRitmo } from "@/lib/rhythm/rhythm-service";
+import { isCurrentMonth } from "@/modules/financial-base/engine/period";
 
 /**
  * El escáner de recibos de este tab (`ScanReceiptButton`) llama a una SERVER ACTION, y una server
@@ -79,9 +82,17 @@ export default async function Page({
     }
   }
 
+  // Avisos de ritmo: solo del mes EN CURSO. Proyectar "a este ritmo llegás a X" sobre un mes
+  // ya cerrado no es un aviso, es un dato de museo — y sobre uno futuro no hay ritmo todavía.
+  // Best-effort: un fallo acá no puede tumbar el tab de Gastos.
+  const ritmo = isCurrentMonth(jarsPeriod, asOf)
+    ? await getSenalesRitmo(jarsPeriod).catch(() => ({ senales: [], dia: 0 }))
+    : { senales: [], dia: 0 };
+
   return (
     <div className="grid">
       <EssentialExpenseSummary />
+      <RitmoPanel senales={ritmo.senales} dia={ritmo.dia} />
       <IncomeExpenseSection
         view={expenseView}
         kind="expense"
