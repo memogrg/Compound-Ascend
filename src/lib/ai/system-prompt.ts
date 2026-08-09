@@ -231,6 +231,21 @@ export type FinancialContext = {
   };
   /** Observaciones conductuales recientes (memoria conductual, Fase 4). */
   insights?: { kind: string; severity: string; title: string; body: string; action?: string }[];
+  /**
+   * DÓNDE RECORTAR: los dos lados del presupuesto, para contestar esa pregunta con datos.
+   *
+   * Va aparte de `insights` a propósito. Los insights se topean a los 4 más severos y un
+   * sobre ocioso es 'info' —el último de la fila—, así que casi nunca llegaría; y sin embargo
+   * es EXACTAMENTE la respuesta a "¿dónde puedo recortar?". Acá viajan siempre, listos para
+   * cuando la pregunta aparezca.
+   */
+  dondeRecortar?: {
+    /** Sobres con presupuesto apartado y casi sin uso: de acá se puede sacar. */
+    ociosos: { path: string; presupuesto: number; usadoEnVentana: number; meses: number }[];
+    /** Sobres que van más rápido que el calendario o ya se pasaron: acá hace falta. */
+    apretados: { path: string; gastado: number; presupuesto: number; proyeccion: number }[];
+    currency: string;
+  };
   /** Guía conductual recuperada de la Biblia para esta conversación (Fase 5c). */
   knowledge?: string[];
 };
@@ -564,6 +579,36 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     }
   }
 
+  // Dónde recortar: los dos lados del presupuesto (Fase C). Hechos crudos, sin conclusión —
+  // la conclusión la arma el asesor con lo que el usuario preguntó.
+  if (ctx.dondeRecortar) {
+    const dr = ctx.dondeRecortar;
+    if (dr.ociosos.length) {
+      facts.push(
+        `Sobres con presupuesto apartado y casi sin uso (de acá se puede sacar): ` +
+          dr.ociosos
+            .map(
+              (o) =>
+                `${o.path} — ${o.presupuesto} ${dr.currency}/mes apartados, ${o.usadoEnVentana} ${dr.currency} usados en ${o.meses} meses`,
+            )
+            .join("; ") +
+          ".",
+      );
+    }
+    if (dr.apretados.length) {
+      facts.push(
+        `Sobres que van rápido o ya se pasaron (acá hace falta): ` +
+          dr.apretados
+            .map(
+              (a) =>
+                `${a.path} — ${a.gastado} de ${a.presupuesto} ${dr.currency}, proyectado a ${a.proyeccion} ${dr.currency} a fin de mes`,
+            )
+            .join("; ") +
+          ".",
+      );
+    }
+  }
+
   // Vinculables: la IA puede proponer la transacción ya conectada a su entidad.
   const linkFacts: string[] = [];
   if (ctx.linkables?.debt.length) {
@@ -721,6 +766,17 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   )
     behaviorRules.push(
       "Está muy cerca de su Número de Independencia. Si pregunta por RETIRAR o vivir de su patrimonio, advertí el RIESGO DE SECUENCIA de retornos (la 'zona roja' de los primeros años de retiro) y ofrecé una mitigación concreta (estrategia de cubetas/buckets o retiros con barandas). Solo si viene al caso; breve.",
+    );
+
+  // Dónde recortar (Fase C): la regla de USO. Sin esto el modelo tiene los datos y no sabe
+  // que son la respuesta a esa pregunta — o peor, los recita sin que se los pidan.
+  if (ctx.dondeRecortar && (ctx.dondeRecortar.ociosos.length || ctx.dondeRecortar.apretados.length))
+    behaviorRules.push(
+      "DÓNDE RECORTAR (tenés los dos lados del presupuesto en los hechos de arriba):",
+      "- Usalos cuando pregunte dónde recortar, de dónde sacar plata, cómo cuadrar el mes o por qué no le alcanza. NO los menciones si preguntó otra cosa.",
+      "- La respuesta buena CRUZA los dos lados: de qué sobre ocioso sacar y a cuál apretado mandarlo. Una lista de sobres ociosos sin decir adónde va esa plata es media respuesta.",
+      "- Podés proponer el movimiento con una acción `move_budget` (from/to/amount) para que lo aplique de un tap. Los montos salen de los hechos, no los inventes.",
+      "- Un sobre ocioso NO es un error del usuario: puede estar apartado a propósito. Decilo como una oportunidad ('ahí hay margen disponible'), nunca como un descuido.",
     );
 
   // Memoria conductual (Fase 4): cómo usar las observaciones recientes.

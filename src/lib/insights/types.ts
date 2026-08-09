@@ -46,7 +46,10 @@ export type InsightKind =
   | "registro_diario"
   // Ritmo de gasto: el sobre va más rápido que el calendario. Preventivo — cuando SÍ se pasa
   // habla `sobre_sobregirado`, que es el que merece severidad 'accionar'.
-  | "ritmo_sobre";
+  | "ritmo_sobre"
+  // Sobre con presupuesto asignado y casi sin uso en los últimos meses. Severidad 'info': ni
+  // siquiera es un riesgo — es plata inmovilizada, y a veces a propósito.
+  | "sobre_ocioso";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {

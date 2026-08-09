@@ -123,49 +123,27 @@ export async function refreshInsights(): Promise<void> {
 }
 
 /**
- * Foto del mes en curso, compartida por los detectores que la necesitan.
+ * La foto del mes que comparten TODOS los detectores de sobres.
  *
- * `null` si no se pudo calcular (sin sesión, tabla vacía, fallo de FX): quien la recibe se
- * salta su bloque en vez de recalcular por su cuenta — recalcular acá es justamente lo que
- * se quiere evitar.
+ * Vive en lib/rhythm y está cacheada por request (`getFotoDelMes`), así que el
+ * context-engine del asesor —que corre en cada mensaje del chat— la reusa en vez de volver a
+ * leer presupuesto, gasto y categorías. Antes acá había un loader propio y eso hacía que la
+ * misma consulta se pagara dos veces por pasada.
+ *
+ * `null` si no se pudo calcular: quien la recibe se salta su bloque en vez de recalcular por
+ * su cuenta — recalcular es justamente lo que se quiere evitar.
  */
-type MesActual = {
-  period: import("@/modules/financial-base/types").Period;
-  dia: number;
-  todayIso: string;
-  currency: string;
-  /** Presupuesto y gasto real por sobre, ya en la moneda de visualización. */
-  sobres: { categoryId: string; path: string; budget: number; spent: number }[];
-} | null;
+type MesActual = Awaited<ReturnType<typeof import("@/lib/rhythm/rhythm-service").getFotoDelMes>>;
 
-/**
- * Carga presupuesto + real del mes UNA vez y arma la lista de sobres.
- *
- * `expenseByKey` ya trae la etiqueta del sobre, así que no hace falta leer el árbol de
- * categorías solo para nombrar — una consulta menos en un camino que corre desde el chat.
- */
 async function getMesActual(): Promise<MesActual> {
   try {
-    const { getBudgetTotals, getRealTotals } = await import("@/modules/financial-base");
+    const { getFotoDelMes } = await import("@/lib/rhythm/rhythm-service");
     const { userToday } = await import("@/lib/time/user-time");
     const { monthPeriod } = await import("@/modules/financial-base/engine/period");
-
     const todayIso = await userToday();
-    const period = monthPeriod(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7)));
-    const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
-
-    return {
-      period,
-      dia: Number(todayIso.slice(8, 10)) || 0,
-      todayIso,
-      currency: real.currency,
-      sobres: Object.entries(budget.expenseByKey).map(([categoryId, b]) => ({
-        categoryId,
-        path: b.label,
-        budget: b.value,
-        spent: real.expenseByKey[categoryId]?.value ?? 0,
-      })),
-    };
+    return await getFotoDelMes(
+      monthPeriod(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7))),
+    );
   } catch (err) {
     logger.warn("getMesActual fallido", { message: err instanceof Error ? err.message : "?" });
     return null;
@@ -351,16 +329,34 @@ async function detectMonthRhythm(mes: MesActual): Promise<DetectedInsight[]> {
     try {
       const { detectRitmoSobre } = await import("@/lib/rhythm/detectors");
       const { detectarRitmo } = await import("@/lib/rhythm/spend-pace");
-      const { lastDayOfMonth } = await import("@/modules/financial-base/engine/period");
       const { formatMoney } = await import("@/lib/format");
       const senales = detectarRitmo({
         sobres: mes.sobres,
         dia,
-        diasDelMes: lastDayOfMonth(year, month),
+        diasDelMes: mes.diasDelMes,
         currency: mes.currency,
       });
       if (senales.length > 0) {
         out.push(...detectRitmoSobre({ senales, dia, todayIso: today, fmt: formatMoney }));
+      }
+    } catch {
+      // best-effort
+    }
+
+    // Sobres OCIOSOS (Fase C). Sale de la MISMA foto: el gasto acumulado de la ventana ya
+    // viene en `mes.historico`. La clave del insight es mensual, así que aunque esta pasada
+    // corra dos veces al día el usuario ve una sola tarjeta.
+    try {
+      const { detectSobreOcioso } = await import("@/lib/rhythm/detectors");
+      const { detectarOciosos } = await import("@/lib/rhythm/idle-envelopes");
+      const { formatMoney } = await import("@/lib/format");
+      const ociosos = detectarOciosos({
+        sobres: mes.historico,
+        mesesVentana: mes.mesesHistoria,
+        currency: mes.currency,
+      });
+      if (ociosos.length > 0) {
+        out.push(...detectSobreOcioso({ ociosos, todayIso: today, fmt: formatMoney }));
       }
     } catch {
       // best-effort

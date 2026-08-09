@@ -14,6 +14,8 @@ import "server-only";
  * La disciplina, en cambio, es de la PERSONA: `budget_late_edits` guarda `user_id` de
  * quién editó tarde y cuenta por separado. El presupuesto es compartido; el hábito no.
  */
+import { cache } from "react";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { getActiveHouseholdId } from "@/lib/household/active";
@@ -21,6 +23,12 @@ import { logger } from "@/lib/logger";
 import { userToday, userHour } from "@/lib/time/user-time";
 import { lastDayOfMonth, monthPeriod } from "@/modules/financial-base/engine/period";
 import { detectarRitmo, type SenalRitmo } from "@/lib/rhythm/spend-pace";
+import {
+  detectarOciosos,
+  OCIOSO_MESES_VENTANA,
+  type SobreHistorico,
+  type SobreOcioso,
+} from "@/lib/rhythm/idle-envelopes";
 import {
   diaDe,
   enDiasDeCierre,
@@ -303,6 +311,128 @@ export async function getConteosCierre(period: Period): Promise<ConteosCierre> {
   }
 }
 
+// ── La foto del mes: UNA lectura, todos derivan de ella ─────────────────────
+
+/**
+ * Todo lo que los detectores de sobres necesitan saber del mes, en una sola estructura.
+ *
+ * ── POR QUÉ EXISTE ──────────────────────────────────────────────────────────
+ * Tres consumidores distintos —el detector de sobregiro, el de ritmo y el de ociosos— piden
+ * exactamente los mismos totales, y cada uno los pedía por su cuenta. Eso son tres
+ * `getBudgetTotals` + tres `getRealTotals`, con su conversión de moneda, sus tasas FX y su
+ * mapa de categorías, en un camino que corre en CADA mensaje del chat (el context-engine
+ * llama a `getActiveInsights`, que dispara `refreshInsights`).
+ *
+ * Y el costo no era lo peor: con tres lecturas independientes, dos avisos sobre el mismo
+ * sobre podían mostrar cifras distintas si algo cambiaba entre una y otra.
+ *
+ * `cache()` es de React y memoiza POR REQUEST, no entre requests: no hay riesgo de servirle
+ * a alguien la foto de otro, ni datos viejos en la siguiente navegación. Mismo patrón que
+ * `resolveUserTz` en lib/time/user-time.ts.
+ */
+export type FotoDelMes = {
+  period: Period;
+  dia: number;
+  todayIso: string;
+  diasDelMes: number;
+  currency: string;
+  /** Presupuesto y gasto del mes EN CURSO, por sobre. */
+  sobres: { categoryId: string; path: string; budget: number; spent: number }[];
+  /** Presupuesto mensual + gasto ACUMULADO de la ventana de ociosos, por sobre. */
+  historico: SobreHistorico[];
+  /** Meses de historia real disponibles, topeado a la ventana. 0 = cuenta nueva. */
+  mesesHistoria: number;
+};
+
+async function _getFotoDelMes(period: Period): Promise<FotoDelMes | null> {
+  const todayIso = await userToday();
+  try {
+    const { getBudgetTotals } = await import("@/modules/financial-base/services/budget-service");
+    const { getRealTotals } = await import("@/modules/financial-base/services/transaction-service");
+    const { listCategories } = await import("@/modules/financial-base/services/categories-service");
+    const { previousMonthPeriod } = await import("@/modules/financial-base/engine/period");
+
+    // Ventana de ociosos: período sintético que arranca `meses−1` atrás y termina en el fin
+    // del actual. Mismo truco que expense-range-service.ts para el segmented de 1m/3m/6m.
+    let spanStart = period;
+    for (let i = 0; i < OCIOSO_MESES_VENTANA - 1; i++) spanStart = previousMonthPeriod(spanStart);
+    const spanPeriod: Period = { ...period, from: spanStart.from };
+
+    const [budget, real, spanReal, cats, mesesHistoria] = await Promise.all([
+      getBudgetTotals(period),
+      getRealTotals(period),
+      getRealTotals(spanPeriod),
+      listCategories(),
+      mesesConHistoria(period, OCIOSO_MESES_VENTANA),
+    ]);
+
+    // El frasco (padre) solo lo necesita el detector de ociosos, para proponer fusionar entre
+    // hermanos. `expenseByKey` no lo trae.
+    const padreDe = new Map(cats.map((c) => [c.id, c.parentId ?? null]));
+
+    const entradas = Object.entries(budget.expenseByKey);
+    return {
+      period,
+      dia: diaDe(todayIso),
+      todayIso,
+      diasDelMes: lastDayOfMonth(period.year, period.month),
+      currency: real.currency,
+      sobres: entradas.map(([categoryId, b]) => ({
+        categoryId,
+        // `expenseByKey` ya trae la etiqueta: no hace falta el árbol solo para nombrar.
+        path: b.label,
+        budget: b.value,
+        spent: real.expenseByKey[categoryId]?.value ?? 0,
+      })),
+      historico: entradas.map(([categoryId, b]) => ({
+        categoryId,
+        path: b.label,
+        frascoId: padreDe.get(categoryId) ?? null,
+        budgetMensual: b.value,
+        gastoVentana: spanReal.expenseByKey[categoryId]?.value ?? 0,
+      })),
+      mesesHistoria,
+    };
+  } catch (err) {
+    logger.warn("getFotoDelMes fallido", { message: err instanceof Error ? err.message : "?" });
+    return null;
+  }
+}
+
+/** Dedup por request: la piden los tres detectores de sobres y el context-engine del asesor. */
+export const getFotoDelMes = cache(_getFotoDelMes);
+
+/**
+ * Cuántos meses de historia REAL tiene la cuenta, topeado a `tope`.
+ *
+ * Sin esto, una cuenta de mes y medio dividiría su gasto entre 3 y casi todos sus sobres
+ * parecerían ociosos — un aviso masivo y falso el primer mes de uso, que es exactamente cuando
+ * peor cae. El motor además exige ≥2 meses para pronunciarse.
+ */
+async function mesesConHistoria(period: Period, tope: number): Promise<number> {
+  try {
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+    const { householdMemberIds } = await import("@/lib/household/active");
+    const memberIds = await householdMemberIds(supabase, user.id);
+    const { data } = await supabase
+      .from("transactions")
+      .select("occurred_on")
+      .in("user_id", memberIds)
+      .order("occurred_on", { ascending: true })
+      .limit(1);
+    const primera = data?.[0]?.occurred_on;
+    if (!primera) return 0;
+    const y = Number(primera.slice(0, 4));
+    const m = Number(primera.slice(5, 7));
+    const meses = (period.year - y) * 12 + (period.month - m) + 1;
+    return Math.max(0, Math.min(tope, meses));
+  } catch {
+    // Ante la duda, 0: no declarar ociosos es mejor que declararlos mal.
+    return 0;
+  }
+}
+
 // ── Ritmo de gasto por sobre (Fase B) ───────────────────────────────────────
 
 /**
@@ -321,33 +451,18 @@ export async function getSenalesRitmo(period: Period): Promise<{
   dia: number;
   todayIso: string;
 }> {
-  const today = await userToday();
-  const dia = diaDe(today);
-  try {
-    const { getBudgetTotals } = await import("@/modules/financial-base/services/budget-service");
-    const { getRealTotals } = await import("@/modules/financial-base/services/transaction-service");
-    const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
-
-    const sobres = Object.entries(budget.expenseByKey).map(([categoryId, b]) => ({
-      categoryId,
-      // `expenseByKey` ya trae la etiqueta: no hace falta leer el árbol de categorías solo
-      // para nombrar (una consulta menos en un camino que corre desde el chat).
-      path: b.label,
-      budget: b.value,
-      spent: real.expenseByKey[categoryId]?.value ?? 0,
-    }));
-
-    const senales = detectarRitmo({
-      sobres,
-      dia,
-      diasDelMes: lastDayOfMonth(period.year, period.month),
-      currency: real.currency,
-    });
-    return { senales, dia, todayIso: today };
-  } catch (err) {
-    logger.warn("getSenalesRitmo fallido", { message: err instanceof Error ? err.message : "?" });
-    return { senales: [], dia, todayIso: today };
-  }
+  const foto = await getFotoDelMes(period);
+  if (!foto) return { senales: [], dia: diaDe(await userToday()), todayIso: await userToday() };
+  return {
+    senales: detectarRitmo({
+      sobres: foto.sobres,
+      dia: foto.dia,
+      diasDelMes: foto.diasDelMes,
+      currency: foto.currency,
+    }),
+    dia: foto.dia,
+    todayIso: foto.todayIso,
+  };
 }
 
 /**
@@ -432,6 +547,50 @@ export async function moverPresupuestoEntreSobres(args: {
   }
 
   return { ok: true };
+}
+
+// ── Sobres ociosos (Fase C) ─────────────────────────────────────────────────
+
+/**
+ * Presupuesto mensual + gasto acumulado de los últimos meses, por sobre.
+ *
+ * El gasto de la ventana sale de UNA consulta y no de N: se arma un período sintético que
+ * arranca `meses−1` atrás y termina en `period.to`, y `getRealTotals` lo agrega entero. Es el
+ * mismo truco que ya usa `expense-range-service.ts` para el segmented de 1m/3m/6m — se reusa
+ * en vez de reinventarlo para que las dos pantallas cuenten lo mismo.
+ *
+ * El presupuesto se toma del mes ACTUAL, no del promedio histórico: la pregunta es "lo que
+ * apartás hoy, ¿lo usás?". Promediar el presupuesto de tres meses respondería otra cosa y
+ * arrastraría meses que el usuario ya corrigió.
+ */
+export async function getSobresOciosos(period: Period): Promise<{
+  ociosos: SobreOcioso[];
+  todayIso: string;
+}> {
+  const foto = await getFotoDelMes(period);
+  if (!foto) return { ociosos: [], todayIso: await userToday() };
+  return {
+    ociosos: detectarOciosos({
+      sobres: foto.historico,
+      mesesVentana: foto.mesesHistoria,
+      currency: foto.currency,
+    }),
+    todayIso: foto.todayIso,
+  };
+}
+
+/**
+ * Fusiona un sobre ocioso dentro de otro (la salida "fusionar" del aviso).
+ *
+ * Delega en `mergeCategory`, que reasigna TODAS las referencias (transacciones, líneas de
+ * presupuesto, reglas) antes de borrar. Es DESTRUCTIVO e irreversible, por eso la superficie
+ * pide confirmación explícita y el motor solo lo propone entre hermanos del mismo frasco,
+ * donde la redundancia ya está sugerida por la estructura.
+ */
+export async function fusionarSobres(fromId: string, intoId: string): Promise<void> {
+  if (fromId === intoId) throw new Error("El sobre de origen y el de destino son el mismo.");
+  const { mergeCategory } = await import("@/modules/financial-base/services/categories-service");
+  await mergeCategory(fromId, intoId);
 }
 
 // ── Estado en vivo para las superficies (pop-up) ────────────────────────────
