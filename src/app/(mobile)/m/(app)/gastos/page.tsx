@@ -5,6 +5,8 @@ import { getExpenseJarsAsOf } from "@/modules/financial-base/services/expense-ja
 import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
 import { GastosManager } from "./gastos-manager";
+import { RitmoPanel } from "@/components/shared/ritmo-panel";
+import { getSenalesRitmo } from "@/lib/rhythm/rhythm-service";
 
 /** Total gastado/presupuestado de un frasco (para el % del header; el manager repite este cálculo del lado cliente). */
 function jarTotals(jar: Jar): { spent: number; budget: number } {
@@ -66,6 +68,11 @@ export default async function MobileGastos() {
   const currency = view.currency;
   const jars = await getExpenseJarsAsOf({ tree: view.tree, period, asOf, currency });
 
+  // Avisos de ritmo (paridad con la web). `period` acá SIEMPRE es el mes en curso
+  // (userCurrentPeriod), así que no hace falta el guardia de mes que sí lleva /gastos, donde
+  // el selector de fecha permite mirar meses pasados. Best-effort.
+  const ritmo = await getSenalesRitmo(period).catch(() => ({ senales: [], dia: 0 }));
+
   const totals = jars.reduce(
     (acc, j) => {
       const t = jarTotals(j);
@@ -112,6 +119,7 @@ export default async function MobileGastos() {
             headerPct != null ? <span className="badge neutral">{headerPct}%</span> : undefined
           }
         />
+        <RitmoPanel senales={ritmo.senales} dia={ritmo.dia} superficie="movil" />
         <GastosManager
           jars={jars}
           currency={currency}

@@ -20,6 +20,10 @@ export type AIActionType =
   | "create_price_alert"
   | "set_dca"
   | "adjust_budget"
+  // Mover presupuesto de un sobre a otro: la salida de "un tap" del aviso de ritmo. Es UN
+  // hecho para el usuario, así que es UNA acción y no dos `adjust_budget` que el usuario
+  // tendría que confirmar por separado (y que podrían quedar a medias entre sí).
+  | "move_budget"
   | "debt_extra_payment"
   | "create_transactions_batch";
 
@@ -29,6 +33,7 @@ const ACTION_TYPES: ReadonlySet<string> = new Set<AIActionType>([
   "create_price_alert",
   "set_dca",
   "adjust_budget",
+  "move_budget",
   "debt_extra_payment",
   "create_transactions_batch",
 ]);

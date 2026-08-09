@@ -9,19 +9,13 @@ import "server-only";
 import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
 import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
 import { listCategories } from "@/modules/financial-base/services/categories-service";
+import type { SobreRemaining } from "@/modules/financial-base/engine/sobre-remaining-copy";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
 
-export type SobreRemaining = {
-  /** "Frasco › Sobre" (o solo el sobre si no tiene frasco). */
-  path: string;
-  currency: string;
-  budget: number;
-  spent: number;
-  /** budget − spent; negativo = excedido. Solo significativo si hasBudget. */
-  remaining: number;
-  /** El sobre tiene presupuesto asignado este mes. */
-  hasBudget: boolean;
-};
+// El TIPO vive en el engine puro (sobre-remaining-copy.ts), junto al copy que lo consume:
+// este archivo es `server-only` y los componentes cliente de web y móvil necesitan la forma.
+// Antes se redeclaraba a mano en assistant-conversation.tsx — dos definiciones de lo mismo.
+export type { SobreRemaining } from "@/modules/financial-base/engine/sobre-remaining-copy";
 
 /**
  * `occurredOn` es "YYYY-MM-DD"; el periodo es el MES de esa fecha (así el gasto recién creado

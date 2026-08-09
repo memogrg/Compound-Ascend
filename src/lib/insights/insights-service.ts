@@ -107,11 +107,68 @@ export async function refreshInsights(): Promise<void> {
     } catch {
       // best-effort.
     }
-    detected.push(...(await detectDamageSignals(debts)));
-    detected.push(...(await detectMonthRhythm()));
+    // Presupuesto y real del mes, UNA sola vez. Los necesitan dos detectores distintos —los
+    // sobres sobregirados y el ritmo de gasto— y cada llamada arrastra conversión de moneda,
+    // tasas FX y el mapa de categorías. Calcularlos dos veces no solo duplicaba ese costo en
+    // un camino que corre desde el chat: también abría la puerta a que los dos avisos
+    // dijeran cifras distintas del mismo sobre si algo cambiaba entre una lectura y la otra.
+    const mes = await getMesActual();
+
+    detected.push(...(await detectDamageSignals(debts, mes)));
+    detected.push(...(await detectMonthRhythm(mes)));
     await syncInsights(detected);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
+  }
+}
+
+/**
+ * Foto del mes en curso, compartida por los detectores que la necesitan.
+ *
+ * `null` si no se pudo calcular (sin sesión, tabla vacía, fallo de FX): quien la recibe se
+ * salta su bloque en vez de recalcular por su cuenta — recalcular acá es justamente lo que
+ * se quiere evitar.
+ */
+type MesActual = {
+  period: import("@/modules/financial-base/types").Period;
+  dia: number;
+  todayIso: string;
+  currency: string;
+  /** Presupuesto y gasto real por sobre, ya en la moneda de visualización. */
+  sobres: { categoryId: string; path: string; budget: number; spent: number }[];
+} | null;
+
+/**
+ * Carga presupuesto + real del mes UNA vez y arma la lista de sobres.
+ *
+ * `expenseByKey` ya trae la etiqueta del sobre, así que no hace falta leer el árbol de
+ * categorías solo para nombrar — una consulta menos en un camino que corre desde el chat.
+ */
+async function getMesActual(): Promise<MesActual> {
+  try {
+    const { getBudgetTotals, getRealTotals } = await import("@/modules/financial-base");
+    const { userToday } = await import("@/lib/time/user-time");
+    const { monthPeriod } = await import("@/modules/financial-base/engine/period");
+
+    const todayIso = await userToday();
+    const period = monthPeriod(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7)));
+    const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
+
+    return {
+      period,
+      dia: Number(todayIso.slice(8, 10)) || 0,
+      todayIso,
+      currency: real.currency,
+      sobres: Object.entries(budget.expenseByKey).map(([categoryId, b]) => ({
+        categoryId,
+        path: b.label,
+        budget: b.value,
+        spent: real.expenseByKey[categoryId]?.value ?? 0,
+      })),
+    };
+  } catch (err) {
+    logger.warn("getMesActual fallido", { message: err instanceof Error ? err.message : "?" });
+    return null;
   }
 }
 
@@ -124,9 +181,9 @@ export async function refreshInsights(): Promise<void> {
  * LECTURA — nada de escrituras acá, porque refreshInsights también corre desde el context-engine
  * del asesor (ver CLAUDE.md).
  *
- * `debts` se recibe ya cargado para no volver a pedirlo.
+ * `debts` y `mes` se reciben ya cargados para no volver a pedirlos.
  */
-async function detectDamageSignals(debts: Debt[]): Promise<DetectedInsight[]> {
+async function detectDamageSignals(debts: Debt[], mes: MesActual): Promise<DetectedInsight[]> {
   const out: DetectedInsight[] = [];
 
   // Deuda cara por TASA (la de atraso ya la ve runDetectors). Sin IO: la lista ya está.
@@ -136,21 +193,10 @@ async function detectDamageSignals(debts: Debt[]): Promise<DetectedInsight[]> {
     // best-effort
   }
 
-  // Sobres pasados de presupuesto este mes (presupuesto vs real, por categoría).
+  // Sobres pasados de presupuesto este mes. Los sobres ya vienen armados en `mes`: el mismo
+  // arreglo que usa el detector de ritmo, para que las dos tarjetas no puedan discrepar.
   try {
-    const { getBudgetTotals, getRealTotals } = await import("@/modules/financial-base");
-    const { userCurrentPeriod } = await import("@/lib/time/user-time");
-    const period = await userCurrentPeriod();
-    const [budget, real] = await Promise.all([getBudgetTotals(period), getRealTotals(period)]);
-    // `expenseByKey` ya viene con el nombre del sobre: no hace falta leer el árbol de categorías
-    // solo para etiquetar (una consulta menos en un camino que corre desde el chat).
-    const sobres = Object.entries(budget.expenseByKey).map(([categoryId, b]) => ({
-      categoryId,
-      path: b.label,
-      budget: b.value,
-      spent: real.expenseByKey[categoryId]?.value ?? 0,
-    }));
-    out.push(...detectOverspentEnvelopes({ sobres, currency: real.currency }));
+    if (mes) out.push(...detectOverspentEnvelopes({ sobres: mes.sobres, currency: mes.currency }));
   } catch {
     // best-effort
   }
@@ -244,35 +290,30 @@ async function detectDamageSignals(debts: Debt[]): Promise<DetectedInsight[]> {
  * Todo LECTURA (esta función también corre desde el context-engine del asesor). Cada
  * bloque en su propio try/catch: los tres son independientes.
  */
-async function detectMonthRhythm(): Promise<DetectedInsight[]> {
+async function detectMonthRhythm(mes: MesActual): Promise<DetectedInsight[]> {
   const out: DetectedInsight[] = [];
+  if (!mes) return out;
   try {
-    const { userToday, userHour } = await import("@/lib/time/user-time");
-    const { diaDe, periodoDe, enDiasDeCierre } = await import("@/lib/rhythm/engine");
+    const { userHour } = await import("@/lib/time/user-time");
     const { detectVentanaPresupuesto, detectCierreMes, detectRegistroDiario } =
       await import("@/lib/rhythm/detectors");
-    const { getMonthConfig, getConteosCierre, contarMovimientosHoy, contarSobresConPresupuesto } =
+    const { getMonthConfig, getConteosCierre, contarMovimientosHoy } =
       await import("@/lib/rhythm/rhythm-service");
-    const { monthPeriod } = await import("@/modules/financial-base/engine/period");
 
-    const today = await userToday();
-    const { year, month } = periodoDe(today);
-    const dia = diaDe(today);
-    const period = monthPeriod(year, month);
+    const { period, dia, todayIso: today } = mes;
+    const { year, month } = period;
 
-    // Ventana de configuración.
+    // Ventana de configuración. El conteo de sobres con monto sale de `mes.sobres`, no de una
+    // consulta propia: ya está calculado y solo hace falta el número.
     try {
-      const [config, sobres] = await Promise.all([
-        getMonthConfig(period),
-        contarSobresConPresupuesto(period),
-      ]);
+      const config = await getMonthConfig(period);
       out.push(
         ...detectVentanaPresupuesto({
           dia,
           year,
           month,
           closedAt: config.closedAt,
-          sobresConPresupuesto: sobres,
+          sobresConPresupuesto: mes.sobres.filter((x) => x.budget > 0).length,
         }),
       );
     } catch {
@@ -282,6 +323,7 @@ async function detectMonthRhythm(): Promise<DetectedInsight[]> {
     // Cierre de mes. Los conteos son la parte cara (transacciones + metas + deudas +
     // presupuesto), así que ni se piden fuera de los días de cierre.
     try {
+      const { enDiasDeCierre } = await import("@/lib/rhythm/engine");
       if (enDiasDeCierre({ dia, year, month })) {
         const conteos = await getConteosCierre(period);
         out.push(...detectCierreMes({ dia, year, month, conteos }));
@@ -296,6 +338,30 @@ async function detectMonthRhythm(): Promise<DetectedInsight[]> {
     try {
       const [hora, movimientosHoy] = await Promise.all([userHour(), contarMovimientosHoy()]);
       out.push(...detectRegistroDiario({ todayIso: today, horaLocal: hora, movimientosHoy }));
+    } catch {
+      // best-effort
+    }
+
+    // Ritmo de gasto por sobre (Fase B). El tope semanal por sobre lo impone la clave del
+    // insight (la semana va dentro de related_id), no un contador acá.
+    //
+    // Se llama a `detectarRitmo` (motor puro) con los sobres YA cargados, en vez de a
+    // `getSenalesRitmo` —que volvería a pedir presupuesto y real—. Además de ahorrar la
+    // lectura, garantiza que el aviso de ritmo y el de sobregiro hablen de las mismas cifras.
+    try {
+      const { detectRitmoSobre } = await import("@/lib/rhythm/detectors");
+      const { detectarRitmo } = await import("@/lib/rhythm/spend-pace");
+      const { lastDayOfMonth } = await import("@/modules/financial-base/engine/period");
+      const { formatMoney } = await import("@/lib/format");
+      const senales = detectarRitmo({
+        sobres: mes.sobres,
+        dia,
+        diasDelMes: lastDayOfMonth(year, month),
+        currency: mes.currency,
+      });
+      if (senales.length > 0) {
+        out.push(...detectRitmoSobre({ senales, dia, todayIso: today, fmt: formatMoney }));
+      }
     } catch {
       // best-effort
     }

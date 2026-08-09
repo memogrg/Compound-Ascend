@@ -33,6 +33,7 @@ import {
   confirmPriceAlertAction,
   confirmSetDcaAction,
   confirmAdjustBudgetAction,
+  confirmMoveBudgetAction,
   confirmDebtExtraPaymentAction,
   confirmBatchTransactionsAction,
   loadChatHistoryAction,
@@ -73,6 +74,14 @@ import {
 import type { AIActionProposal } from "@/lib/ai/types";
 import type { ConfirmResult, BatchResult } from "@/modules/assistant/api/actions";
 import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
+// Copy del restante COMPARTIDO con el tab de Gastos, Transacciones y el movil: antes esto
+// estaba escrito dos veces aca mismo (sobreSuccessMessage y detalleSobre) y el tipo
+// redeclarado a mano. Ahora hay una sola definicion de cada cosa.
+import {
+  sobreSuccessText,
+  sobreDetailText,
+  type SobreRemaining,
+} from "@/modules/financial-base/engine/sobre-remaining-copy";
 import { renderMarkdown } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 
@@ -248,15 +257,10 @@ type DraftAlert = {
   currency: string;
 };
 
-/** Restante del sobre que devuelve confirmTransactionAction (solo gasto con sobre). */
-export type SobreRemaining = {
-  path: string;
-  currency: string;
-  budget: number;
-  spent: number;
-  remaining: number;
-  hasBudget: boolean;
-};
+// `SobreRemaining` ya NO se declara aca: se importa del engine puro
+// (financial-base/engine/sobre-remaining-copy). Se reexporta porque varias superficies lo
+// importaban desde este modulo.
+export type { SobreRemaining };
 
 /** Cita mostrada arriba de un mensaje. `missing` = el citado ya lo borró la retención. */
 type Quote = { id: string; excerpt: string; role: "user" | "assistant"; missing?: boolean };
@@ -307,13 +311,13 @@ const MAX_B64_CLIENTE = 7_000_000;
  */
 const DISCLAIMER = "My Agent C+ da información educativa, no asesoría financiera.";
 
-/** Mensaje de éxito: con restante del sobre si aplica, o el genérico si no. */
+/**
+ * Mensaje de exito: con restante del sobre si aplica, o el generico si no.
+ * Delgada sobre el helper compartido — se conserva el nombre porque lo usan varias
+ * superficies, pero el texto vive en un solo lugar.
+ */
 export function sobreSuccessMessage(s: SobreRemaining | null): string {
-  if (!s) return "✓ Transacción registrada.";
-  if (!s.hasBudget) return `✓ Registrado en ${s.path}. (Este sobre no tiene presupuesto asignado)`;
-  if (s.remaining < 0)
-    return `✓ Registrado en ${s.path}. Te pasaste por ${formatMoney(-s.remaining, s.currency)}.`;
-  return `✓ Registrado en ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
+  return sobreSuccessText(s, formatMoney);
 }
 
 /** Mapea action.payload → borrador de transacción. `today` = hoy en la zona del perfil. */
@@ -770,6 +774,11 @@ export function AssistantConversation({
                 <AdjustBudgetConfirmCard skin={s} p={m.action.payload} />
               </div>
             ) : null}
+            {m.action?.type === "move_budget" ? (
+              <div className={s.cardWrap}>
+                <MoveBudgetConfirmCard skin={s} p={m.action.payload} />
+              </div>
+            ) : null}
             {m.action?.type === "debt_extra_payment" ? (
               <div className={s.cardWrap}>
                 <DebtExtraPaymentConfirmCard skin={s} p={m.action.payload} />
@@ -1052,13 +1061,9 @@ export function TxnConfirmCard({
   );
 }
 
-/** Restante del sobre para el resumen del recibo (sin repetir el "✓ Registrado" de la línea 1). */
+/** Restante del sobre para el resumen del recibo (sin repetir el "✓ Registrado" de la linea 1). */
 function detalleSobre(s: SobreRemaining | null): string | null {
-  if (!s) return null;
-  if (!s.hasBudget) return `Sobre: ${s.path} (sin presupuesto asignado).`;
-  if (s.remaining < 0)
-    return `Sobre: ${s.path}. Te pasaste por ${formatMoney(-s.remaining, s.currency)}.`;
-  return `Sobre: ${s.path}. Te quedan ${formatMoney(s.remaining, s.currency)} de ${formatMoney(s.budget, s.currency)} este mes.`;
+  return sobreDetailText(s, formatMoney);
 }
 
 /**
@@ -1481,6 +1486,49 @@ function AdjustBudgetConfirmCard({ skin, p }: { skin: Skin; p: Record<string, un
         confirmAdjustBudgetAction({
           categoryId: pStr(p.categoryId),
           name: pStr(p.name),
+          amount: monto,
+          currency,
+          periodMonth: pNum(p.periodMonth),
+          periodYear: pNum(p.periodYear),
+        })
+      }
+    />
+  );
+}
+
+/**
+ * Mover presupuesto de un sobre a otro (la salida "un tap" del aviso de ritmo).
+ *
+ * Una sola tarjeta para las dos patas: para el usuario "saco de acá y pongo allá" es un solo
+ * hecho, y partirlo en dos confirmaciones dejaría abierta la posibilidad de recortar el
+ * donante sin acreditar al receptor. El servicio lo hace atómico-con-compensación.
+ *
+ * El detalle muestra CÓMO QUEDA cada sobre, no solo cuánto se mueve: mover ₡40.000 no dice
+ * nada por sí solo; "Comida 160.000 → 200.000" sí deja decidir.
+ */
+function MoveBudgetConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknown> }) {
+  const monto = pNum(p.amount);
+  const currency = pStr(p.currency, "CRC");
+  const desdePath = pStr(p.desdePath, pStr(p.desdeName, "un sobre"));
+  const hastaPath = pStr(p.hastaPath, pStr(p.hastaName, "otro sobre"));
+  const desdeActual = pNum(p.desdeActual);
+  const hastaActual = pNum(p.hastaActual);
+  return (
+    <AdviceConfirmCard
+      skin={skin}
+      eyebrow="Mover presupuesto"
+      amount={`${formatMoney(monto, currency)} → ${hastaPath}`}
+      detail={
+        `${desdePath}: ${formatMoney(desdeActual, currency)} → ${formatMoney(desdeActual - monto, currency)}` +
+        ` · ${hastaPath}: ${formatMoney(hastaActual, currency)} → ${formatMoney(hastaActual + monto, currency)}`
+      }
+      okText="✓ Presupuesto movido."
+      onConfirm={() =>
+        confirmMoveBudgetAction({
+          desdeCategoryId: pStr(p.desdeCategoryId),
+          desdeName: pStr(p.desdeName),
+          hastaCategoryId: pStr(p.hastaCategoryId),
+          hastaName: pStr(p.hastaName),
           amount: monto,
           currency,
           periodMonth: pNum(p.periodMonth),

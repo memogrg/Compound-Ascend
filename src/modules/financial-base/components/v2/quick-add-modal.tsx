@@ -5,7 +5,16 @@
  * transactions. Sirve para alta y edición. Teclado numérico nativo en móvil
  * (inputmode="decimal").
  */
-import { CURRENCY_SYMBOL, CURRENCY_OPTIONS, captureCurrencyDefault } from "@/lib/format";
+import {
+  CURRENCY_SYMBOL,
+  CURRENCY_OPTIONS,
+  captureCurrencyDefault,
+  formatMoney,
+} from "@/lib/format";
+import {
+  sobreRemainingText,
+  type SobreRemaining,
+} from "@/modules/financial-base/engine/sobre-remaining-copy";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
@@ -150,6 +159,10 @@ export function QuickAddModal({
       toast(
         editing ? "Transacción actualizada" : isGasto ? "Gasto registrado" : "Ingreso registrado",
       );
+      // El restante del sobre, con el mismo texto que el chat y el composer. Solo en el alta:
+      // al EDITAR, `editTransactionAction` no lo devuelve — y no se inventa.
+      const restante = sobreRemainingText((res as { sobre?: SobreRemaining }).sobre, formatMoney);
+      if (restante) toast(restante, "info");
       if (!mismoMes(date, hoy)) {
         toast(`Quedó en ${mesLegible(date)}, no en tu mes actual.`, "info");
       }

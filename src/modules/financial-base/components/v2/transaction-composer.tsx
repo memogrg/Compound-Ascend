@@ -30,6 +30,10 @@ import { CURRENCIES } from "@/modules/personal-profile/constants";
 import type { Account, TxnKind, LinkedKind } from "@/modules/financial-base/types";
 import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
 import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
+import {
+  sobreRemainingText,
+  type SobreRemaining,
+} from "@/modules/financial-base/engine/sobre-remaining-copy";
 import type { SuggestionEntry } from "@/modules/financial-base/services/suggestion-service";
 import type { TransactionTemplate } from "@/modules/financial-base/services/templates-service";
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
@@ -364,6 +368,14 @@ export function TransactionComposer({
               ? "Gasto registrado"
               : "Ingreso registrado",
       );
+      // "Te quedan X de Y en {sobre} este mes". El dato ya venía en la respuesta y no se
+      // mostraba: es la única pregunta que el usuario tiene justo después de registrar.
+      // Mismo helper que usa el chat — un solo texto para todas las superficies.
+      //
+      // El acceso va tipado a mano porque `res` es la unión de dos acciones y solo una de
+      // ellas (`addTransactionAction`) trae `sobre`; una transferencia nunca lo tiene.
+      const restante = sobreRemainingText((res as { sobre?: SobreRemaining }).sobre, formatMoney);
+      if (restante) toast(restante, "info");
       // Aprendizaje: si categorizaste un comercio y no había sugerencia exacta,
       // ofrece regla (con vínculo incluido: la próxima vez se auto-vincula).
       const m = merchant.trim();

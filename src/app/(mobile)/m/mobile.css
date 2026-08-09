@@ -4108,3 +4108,40 @@ body:has(.m-shell[data-theme="dark"]) {
     animation: none;
   }
 }
+
+/* ── Tarjeta de ritmo de gasto (móvil) ────────────────────────────────────────
+   Mismo componente que la web (components/shared/ritmo-sobre-card.tsx) con otra piel.
+   Solo se redefine lo que difiere: los botones son m-btn (a lo ancho, objetivo táctil
+   de 44px) y por eso las salidas se apilan en vez de fluir en línea. */
+.m-shell .ritmo-card {
+  border-left: 3px solid var(--warning);
+  padding: 13px 15px 12px;
+}
+.m-shell .ritmo-card + .ritmo-card {
+  margin-top: 10px;
+}
+.m-shell .ritmo-card-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.m-shell .ritmo-card-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+.m-shell .ritmo-card-salidas {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.m-shell .ritmo-card-salidas .ritmo-card-body {
+  margin: 0;
+}
+.m-shell .ritmo-card-done {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--success);
+  padding: 10px 0;
+}

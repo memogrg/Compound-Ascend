@@ -75,6 +75,8 @@ export async function resolveActionProposal(
         return await resolveSetDca(action, ctx);
       case "adjust_budget":
         return await resolveAdjustBudget(action, ctx);
+      case "move_budget":
+        return await resolveMoveBudget(action, ctx);
       case "debt_extra_payment":
         return await resolveDebtExtraPayment(action, ctx);
       default:
@@ -167,6 +169,75 @@ async function resolveAdjustBudget(
       path: pathOf(sobre),
       amount,
       currentAmount: actual,
+      currency: totals?.currency ?? ctx.currency,
+      periodMonth: period.month,
+      periodYear: period.year,
+    },
+    summary: action.summary,
+  };
+}
+
+/**
+ * move_budget — mover presupuesto de un sobre a otro dentro del mes en curso.
+ *
+ * La salida "un tap" del aviso de ritmo, y también lo que el asesor propone cuando el usuario
+ * pregunta "¿de dónde saco?". Se resuelve como UNA acción y no como dos `adjust_budget`
+ * porque para el usuario es un solo hecho: confirmar dos tarjetas por separado permitiría
+ * quedarse a mitad —recortando el donante sin acreditar al receptor—, que es peor que no
+ * haber hecho nada.
+ *
+ * Los dos sobres y sus presupuestos vigentes salen de los datos REALES; el modelo solo aporta
+ * los nombres y el monto, y el monto se topea a lo que el donante puede ceder. Proponer mover
+ * plata que no existe sería una cifra imposible con cara de consejo.
+ */
+async function resolveMoveBudget(
+  action: AIActionProposal,
+  ctx: ResolveContext,
+): Promise<AIActionProposal | null> {
+  const p = action.payload;
+  const pedido = num(p.amount ?? p.monto);
+  if (pedido === null || pedido <= 0) return null;
+
+  const desdeNeedle = str(p.from) ?? str(p.desde) ?? str(p.fromCategory);
+  const hastaNeedle = str(p.to) ?? str(p.hasta) ?? str(p.toCategory);
+  if (!desdeNeedle || !hastaNeedle) return null;
+
+  const { listSobresForKind, getBudgetTotals } = await import("@/modules/financial-base");
+  const { userCurrentPeriod } = await import("@/lib/time/user-time");
+  const sobres = await listSobresForKind("gasto");
+  const pathOf = (s: { sobre: string; frasco: string | null }) =>
+    s.frasco ? `${s.frasco} › ${s.sobre}` : s.sobre;
+  // El nombre puede venir como "Vivir › Restaurantes" o solo "Restaurantes": se prueban los dos.
+  const hoja = (n: string) => (n.includes("›") ? (n.split("›").pop() ?? n) : n);
+  const buscar = (n: string) =>
+    bestMatch(n, sobres, pathOf) ?? bestMatch(hoja(n), sobres, (s) => s.sobre);
+
+  const desde = buscar(desdeNeedle);
+  const hasta = buscar(hastaNeedle);
+  // Mover un sobre a sí mismo no es una operación: es un no-op con cara de consejo.
+  if (!desde || !hasta || desde.id === hasta.id) return null;
+
+  const period = await userCurrentPeriod();
+  const totals = await getBudgetTotals(period).catch(() => null);
+  const desdeActual = totals?.expenseByKey?.[desde.id]?.value ?? 0;
+  const hastaActual = totals?.expenseByKey?.[hasta.id]?.value ?? 0;
+
+  // Topeado a lo que el donante tiene. Si no tiene nada, no hay acción que proponer.
+  const monto = Math.min(pedido, desdeActual);
+  if (monto <= 0) return null;
+
+  return {
+    type: "move_budget",
+    payload: {
+      desdeCategoryId: desde.id,
+      desdeName: desde.sobre,
+      desdePath: pathOf(desde),
+      desdeActual,
+      hastaCategoryId: hasta.id,
+      hastaName: hasta.sobre,
+      hastaPath: pathOf(hasta),
+      hastaActual,
+      amount: monto,
       currency: totals?.currency ?? ctx.currency,
       periodMonth: period.month,
       periodYear: period.year,

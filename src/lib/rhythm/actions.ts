@@ -57,6 +57,74 @@ export async function dismissRhythmNudgeAction(kind: string): Promise<{ ok: bool
   }
 }
 
+// No hay una acción para LEER las señales de ritmo: las dos pantallas de Gastos (web y
+// móvil) son server components y ya las cargan con `getSenalesRitmo` para pasárselas a
+// `RitmoPanel`. Pedirlas otra vez desde el cliente sería un viaje de más y un parpadeo —
+// las tarjetas aparecerían medio segundo después, empujando los frascos hacia abajo.
+
+/**
+ * Aplica la salida "mover" de un aviso de ritmo, en un tap.
+ *
+ * Los ids y el monto llegan del cliente, así que se revalidan contra el presupuesto REAL en
+ * el servicio (que topea el monto a lo que el donante puede ceder). Reusa exactamente el
+ * mismo camino que la tarjeta del chat (`confirmMoveBudgetAction`): un solo lugar donde vive
+ * la regla de cómo se mueve presupuesto.
+ */
+export async function aplicarMoverPresupuestoAction(args: {
+  desdeCategoryId: string;
+  desdeName: string;
+  hastaCategoryId: string;
+  hastaName: string;
+  amount: number;
+  currency: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const { userToday } = await import("@/lib/time/user-time");
+    const today = await userToday();
+    const { confirmMoveBudgetAction } = await import("@/modules/assistant/api/actions");
+    const res = await confirmMoveBudgetAction({
+      ...args,
+      periodMonth: Number(today.slice(5, 7)),
+      periodYear: Number(today.slice(0, 4)),
+    });
+    return { ok: res.ok, message: res.message };
+  } catch (err) {
+    logger.error("aplicarMoverPresupuesto fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos mover el presupuesto." };
+  }
+}
+
+/**
+ * Descarta el aviso de ritmo de UN sobre por lo que queda de la semana.
+ *
+ * Marca el insight como descartado por su clave (`ritmo:{categoryId}:{semana}`). Como la
+ * semana está en la clave, el descarte caduca solo el lunes — no hace falta un trabajo de
+ * limpieza ni un campo de expiración.
+ */
+export async function descartarAvisoRitmoAction(categoryId: string): Promise<{ ok: boolean }> {
+  try {
+    const { requireUser } = await import("@/lib/auth/session");
+    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
+    const { userToday } = await import("@/lib/time/user-time");
+    const { semanaISO } = await import("@/lib/rhythm/spend-pace");
+
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+    const relatedId = `ritmo:${categoryId}:${semanaISO(await userToday())}`;
+    await supabase
+      .from("user_insights")
+      .update({ status: "descartado" })
+      .eq("user_id", user.id)
+      .eq("kind", "ritmo_sobre")
+      .eq("related_id", relatedId);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
 /**
  * Cierra (o reabre) la configuración del mes en curso. Cerrar antes del día 5 es válido:
  * es decir "ya está, así queda el mes". Reabrir existe porque cerrar por accidente el
