@@ -60,6 +60,28 @@ export const adjustBudgetInputSchema = z.object({
 });
 export type AdjustBudgetInput = z.infer<typeof adjustBudgetInputSchema>;
 
+/**
+ * Mover presupuesto entre dos sobres del mismo período (salida "un tap" del aviso de ritmo).
+ * `.refine` para que mover un sobre a sí mismo no llegue nunca al servicio: sería un no-op
+ * que igual dispararía dos escrituras y dos entradas en el contador de ediciones tardías.
+ */
+export const moveBudgetInputSchema = z
+  .object({
+    desdeCategoryId: z.string().uuid(),
+    desdeName: z.string().trim().min(1).max(120),
+    hastaCategoryId: z.string().uuid(),
+    hastaName: z.string().trim().min(1).max(120),
+    amount: z.number().positive(),
+    currency: z.string().length(3),
+    periodMonth: z.number().int().min(1).max(12),
+    periodYear: z.number().int().min(2000).max(3000),
+  })
+  .refine((v) => v.desdeCategoryId !== v.hastaCategoryId, {
+    message: "El sobre de origen y el de destino tienen que ser distintos.",
+    path: ["hastaCategoryId"],
+  });
+export type MoveBudgetInput = z.infer<typeof moveBudgetInputSchema>;
+
 export const debtExtraPaymentInputSchema = z.object({
   debtId: z.string().uuid(),
   amount: z.number().positive(),

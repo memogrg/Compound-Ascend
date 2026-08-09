@@ -2342,6 +2342,53 @@ input[type="radio"] {
   }
 }
 
+/* ── Tarjeta de ritmo de gasto ─────────────────────────────────────────────
+   Acento de ATENCIÓN (--warn), no de error (--neg): el sobre todavía está dentro de
+   su presupuesto y esto es una proyección. El rojo queda reservado para cuando ya se
+   pasó (sobre_sobregirado); gastarlo antes le quita significado. */
+.ritmo-card {
+  border-left: 3px solid var(--warn);
+  padding: 13px 15px 12px;
+}
+.ritmo-card + .ritmo-card {
+  margin-top: 10px;
+}
+.ritmo-card-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--ink);
+}
+.ritmo-card-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+.ritmo-card-salidas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ritmo-card-salidas .btn {
+  font-size: 12.5px;
+  padding: 7px 12px;
+}
+/* El número de "bajar el ritmo" ocupa toda la fila: es información para decidir, no una
+   acción, y ponerlo en línea con los botones lo haría parecer uno. */
+.ritmo-card-salidas .ritmo-card-body {
+  flex-basis: 100%;
+  margin: 0;
+}
+.ritmo-card-done {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--pos);
+  padding: 10px 0;
+}
+
 .obs-card {
   display: flex;
   gap: 12px;

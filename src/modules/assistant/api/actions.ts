@@ -11,6 +11,7 @@ import {
   priceAlertInputSchema,
   setDcaInputSchema,
   adjustBudgetInputSchema,
+  moveBudgetInputSchema,
   debtExtraPaymentInputSchema,
   batchTransactionsInputSchema,
 } from "@/modules/assistant/schemas";
@@ -241,7 +242,13 @@ export async function confirmAdjustBudgetAction(raw: unknown): Promise<ConfirmRe
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     const { setEnvelopeBudgetAction } = await import("@/modules/financial-base");
-    const res = await setEnvelopeBudgetAction(parsed.data);
+    // `confirmedOutsideWindow: true` porque el tap de "Confirmar" en la tarjeta ES la
+    // confirmación explícita que pide la ventana de configuración. Sin esto,
+    // setEnvelopeBudgetAction devolvería `needsConfirmation` y la tarjeta del chat fallaría
+    // con el aviso de la ventana — un callejón sin salida, porque la tarjeta no tiene dónde
+    // pedir una segunda confirmación. El ajuste igual queda registrado en el contador si el
+    // mes está fuera de ventana: es una edición tardía real.
+    const res = await setEnvelopeBudgetAction({ ...parsed.data, confirmedOutsideWindow: true });
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo ajustar el presupuesto." };
     revalidatePath("/gastos");
     revalidatePath("/mi-base-financiera");
@@ -251,6 +258,42 @@ export async function confirmAdjustBudgetAction(raw: unknown): Promise<ConfirmRe
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos ajustar el presupuesto." };
+  }
+}
+
+/**
+ * Confirma MOVER presupuesto de un sobre a otro (salida "un tap" del aviso de ritmo).
+ *
+ * El movimiento es atómico-con-compensación en el servicio
+ * (`moverPresupuestoEntreSobres`): si la segunda escritura falla, la primera se revierte.
+ */
+export async function confirmMoveBudgetAction(raw: unknown): Promise<ConfirmResult> {
+  const parsed = moveBudgetInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos." };
+  }
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const { moverPresupuestoEntreSobres } = await import("@/lib/rhythm/rhythm-service");
+    const { monthPeriod } = await import("@/modules/financial-base/engine/period");
+    const res = await moverPresupuestoEntreSobres({
+      desdeCategoryId: parsed.data.desdeCategoryId,
+      desdeName: parsed.data.desdeName,
+      hastaCategoryId: parsed.data.hastaCategoryId,
+      hastaName: parsed.data.hastaName,
+      monto: parsed.data.amount,
+      currency: parsed.data.currency,
+      period: monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
+    });
+    if (!res.ok) return { ok: false, message: res.message ?? "No se pudo mover el presupuesto." };
+    revalidatePath("/gastos");
+    revalidatePath("/mi-base-financiera");
+    return { ok: true };
+  } catch (err) {
+    logger.error("confirmMoveBudget fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos mover el presupuesto." };
   }
 }
 

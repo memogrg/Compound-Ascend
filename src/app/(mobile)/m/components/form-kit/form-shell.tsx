@@ -33,6 +33,7 @@ export function FormShell<T>({
   submitLabel = "Guardar",
   pendingLabel = "Guardando…",
   successMessage = "Listo",
+  successDetail,
   onSuccess,
   children,
   validate,
@@ -42,6 +43,18 @@ export function FormShell<T>({
   submitLabel?: string;
   pendingLabel?: string;
   successMessage?: string;
+  /**
+   * Segundo toast, informativo, derivado del RESULTADO de la acción. Para lo que solo se sabe
+   * después de escribir — hoy: "te quedan X de Y en {sobre} este mes".
+   *
+   * Es una función y no un string porque el dato viene en la respuesta, no del formulario. El
+   * `ActionResult` que llega puede traer campos extra según la acción (`addTransactionAction`
+   * agrega `sobre`), así que la función los lee con un cast: el form-kit es genérico y no
+   * puede conocer el resultado de cada acción del app.
+   *
+   * Devolver null = sin segundo toast. Nunca reemplaza a `successMessage`: se suma.
+   */
+  successDetail?: (res: ActionResult) => string | null;
   onSuccess?: () => void;
   children: React.ReactNode;
   /**
@@ -63,6 +76,8 @@ export function FormShell<T>({
   onSuccessRef.current = onSuccess;
   const successMsgRef = useRef(successMessage);
   successMsgRef.current = successMessage;
+  const successDetailRef = useRef(successDetail);
+  successDetailRef.current = successDetail;
 
   const [state, dispatch, pending] = useActionState<ActionResult, T>(
     async (_prev, payload) => action(payload),
@@ -74,6 +89,10 @@ export function FormShell<T>({
     submittedRef.current = false;
     if (state.ok) {
       toast.show(successMsgRef.current, "success");
+      // El detalle va DESPUÉS de la confirmación y como "info": primero se confirma el hecho,
+      // después se da el dato. Al revés, el dato tapa la confirmación.
+      const detalle = successDetailRef.current?.(state) ?? null;
+      if (detalle) toast.show(detalle, "info");
       router.refresh();
       onSuccessRef.current?.();
     } else if (state.message) {

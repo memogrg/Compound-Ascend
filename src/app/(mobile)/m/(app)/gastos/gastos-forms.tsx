@@ -15,6 +15,11 @@ import type { Account, Period } from "@/modules/financial-base/types";
 import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
 import { EssentialCheck } from "@/components/shared/essential-check";
 import { formatMoney } from "@/lib/format";
+// "Te quedan X de Y en {sobre} este mes" — el MISMO texto que el chat y la web.
+import {
+  sobreRemainingText,
+  type SobreRemaining,
+} from "@/modules/financial-base/engine/sobre-remaining-copy";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import { getRhythmStateAction } from "@/lib/rhythm/actions";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -113,6 +118,9 @@ export function AddSpendForm({
       values={values}
       submitLabel="Registrar gasto"
       successMessage="Gasto registrado"
+      successDetail={(res) =>
+        sobreRemainingText((res as { sobre?: SobreRemaining }).sobre, formatMoney)
+      }
       onSuccess={onSuccess}
       validate={() =>
         isManualEntryClassified({ kind: "gasto", categoryId })

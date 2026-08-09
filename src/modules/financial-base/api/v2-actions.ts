@@ -66,6 +66,8 @@ import {
   registerPassiveIncomeWithStub,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
+import { getSobreRemaining } from "@/modules/financial-base/services/sobre-remaining";
+import type { SobreRemaining } from "@/modules/financial-base/engine/sobre-remaining-copy";
 import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import {
   createTransaction,
@@ -412,7 +414,23 @@ export async function registerPassiveIncomeWithStubAction(raw: unknown): Promise
 }
 
 // ---------- Transacciones (lo real) ----------
-export async function addTransactionAction(raw: unknown): Promise<ActionResult> {
+/**
+ * Alta de una transacción.
+ *
+ * Devuelve el RESTANTE del sobre cuando el movimiento es un gasto categorizado. Hasta ahora
+ * solo lo hacía `confirmTransactionAction` (el camino del chat), así que registrar el mismo
+ * gasto desde el tab de Gastos o desde Transacciones no decía cuánto quedaba — el dato existía
+ * y no se mostraba. Es la mitad útil del registro: sin él, "✓ guardado" no responde la única
+ * pregunta que el usuario tiene en ese momento.
+ *
+ * Va DESPUÉS de la escritura y es best-effort: `getSobreRemaining` lee fresco, así que el
+ * restante ya descuenta lo recién registrado. Si falla, se devuelve `ok` igual y la superficie
+ * muestra el mensaje genérico — nunca se pierde una transacción por no poder calcular un dato
+ * informativo.
+ */
+export async function addTransactionAction(
+  raw: unknown,
+): Promise<ActionResult & { sobre?: SobreRemaining }> {
   const parsed = txnInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
@@ -441,7 +459,14 @@ export async function addTransactionAction(raw: unknown): Promise<ActionResult> 
     revalidatePath("/deudas");
     revalidatePath("/ahorro");
 
-    return { ok: true };
+    let sobre: SobreRemaining | undefined;
+    if (parsed.data.kind === "gasto" && parsed.data.categoryId) {
+      sobre =
+        (await getSobreRemaining(parsed.data.categoryId, parsed.data.occurredOn).catch(
+          () => null,
+        )) ?? undefined;
+    }
+    return { ok: true, sobre };
   } catch (err) {
     logger.error("addTransaction fallido", { message: err instanceof Error ? err.message : "?" });
     const msg =
