@@ -22,6 +22,10 @@ const STYLE: Record<string, { color: string; icon: IconName }> = {
 const KIND_HREF: Record<string, string> = {
   perfil_revision: "/mi-perfil-financiero",
   fondo_paz: "/patrimonio/proteccion",
+  // Ritmo del mes: el ritual se cumple donde están los sobres y los movimientos.
+  ventana_presupuesto: "/gastos",
+  cierre_mes: "/transacciones",
+  registro_diario: "/transacciones",
 };
 
 export function BellNotifications() {

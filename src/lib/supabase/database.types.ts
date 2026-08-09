@@ -821,6 +821,53 @@ export type UserInsightRow = Timestamps &
     status: string;
   };
 
+// ── El ritmo del mes (migración 20260813000001) ─────────────────────────────
+// Las tres son de SCOPE HOGAR salvo notification_log (por usuario: cada miembro
+// tiene su correo, su zona horaria y sus preferencias de canal).
+
+/**
+ * Estado de la configuración de UN mes. `closed_at` null = todavía abierta.
+ * Único por (household_id, año, mes), o por (user_id, año, mes) en modo solo
+ * — dos índices PARCIALES, porque los NULL no colisionan en un unique normal.
+ */
+export type BudgetMonthConfigRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  period_year: number;
+  period_month: number;
+  closed_at: string | null;
+  closed_by: string | null;
+};
+
+/**
+ * Contador de ediciones de presupuesto FUERA de la ventana, por sobre y por
+ * persona. Señal de disciplina para el asesor, nunca un bloqueo.
+ */
+export type BudgetLateEditRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  period_year: number;
+  period_month: number;
+  category_id: string;
+  attempts: number;
+  last_attempt_at: string | null;
+};
+
+/**
+ * Idempotencia de los crons de ritmo. `sent_on` es el día EN LA ZONA DEL
+ * USUARIO (el cron lo resuelve antes de escribir), no el del servidor.
+ */
+export type NotificationLogRow = Timestamps & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  kind: string;
+  channel: string;
+  sent_on: string;
+};
+
 export type InsurancePolicyRow = Timestamps &
   Audited & {
     /** Flag "esencial" para el número de seguridad (migración 20260727000001). */
@@ -1060,6 +1107,9 @@ export interface Database {
       investment_transactions: UserTable<InvestmentTransactionRow>;
       insurance_policies: UserTable<InsurancePolicyRow>;
       user_insights: UserTable<UserInsightRow>;
+      budget_month_config: UserTable<BudgetMonthConfigRow>;
+      budget_late_edits: UserTable<BudgetLateEditRow>;
+      notification_log: UserTable<NotificationLogRow>;
       liquidity_ledger: UserTable<LiquidityLedgerRow>;
       profile_snapshots: UserTable<ProfileSnapshotRow>;
       market_price_cache: TableShape<

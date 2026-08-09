@@ -43,6 +43,10 @@ const RELATED_HREF: Record<string, string> = {
 const KIND_HREF: Record<string, string> = {
   perfil_revision: "/m/mi-perfil-financiero",
   fondo_paz: "/m/proteccion",
+  // Ritmo del mes (paridad con la web; rutas /m).
+  ventana_presupuesto: "/m/gastos",
+  cierre_mes: "/m/transacciones",
+  registro_diario: "/m/transacciones",
 };
 
 /** Ruta del insight: por entidad (relatedKind) o, si no, por tipo (kind). */

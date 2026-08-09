@@ -1,0 +1,62 @@
+# Recordatorio diario de registro — barrido CADA HORA (sin Vercel Pro).
+#
+# POR QUÉ NO ESTÁ EN vercel.json. Los otros dos crons del ritmo (ventana y cierre) sí viven
+# ahí: son diarios. Éste tiene que correr cada hora, y este proyecto rechaza el deploy con un
+# cron sub-diario — comprobado empíricamente: con los 11 crons diarios Vercel despliega, y al
+# agregar uno `0 * * * *` la deployment falla. Mismo motivo por el que existen
+# price-alerts.yml (cada 5 min) y email-ingest-poll.yml (cada 15 min).
+#
+# POR QUÉ CADA HORA. El aviso es "¿tenés algún gasto de hoy para registrar?" a las 19:00 de la
+# ZONA DEL PERFIL de cada usuario. Vercel corre en UTC, así que un cron diario le acertaría a
+# una sola zona. Corriendo cada hora, el endpoint filtra a quien tenga las 19:00 en ese momento
+# (`hourInTz`, ver lib/rhythm/cron-service.ts) y a cada quien le llega a SUS 19:00.
+#
+# Las 23 pasadas que no le tocan a nadie son baratas: el chequeo de hora va primero y descarta
+# a casi todos sin tocar la base.
+#
+# IDEMPOTENCIA. No la garantiza este workflow sino el índice único de `notification_log`
+# (user_id, kind, channel, sent_on), con `sent_on` resuelto en la zona del usuario. Se puede
+# reinvocar a mano sin miedo a duplicar correos.
+#
+# CONFIG: solo `CRON_SECRET` (Settings → Secrets and variables → Actions → Secrets), el MISMO
+# valor que el env CRON_SECRET de Vercel. Ya existe: lo usan los otros dos workflows.
+#
+# Caveats honestos (los mismos de price-alerts.yml):
+#   · El cron de GitHub puede retrasarse varios minutos. Un retraso que cruce la hora hace que
+#     un usuario reciba el aviso a las 20:00 en vez de las 19:00, no que lo pierda: la ventana
+#     in-app (`mostrarNudgeDiario`) va de las 19:00 en adelante, y el correo se manda igual en
+#     la pasada de las 20:00 si la de las 19:00 llegó tarde.
+#   · GitHub PAUSA los crons programados tras ~60 días SIN actividad en el repo. Un push los
+#     reactiva (o "Run workflow" a mano).
+#
+# ALTERNATIVA Vercel Pro: si algún día pagan Pro, agregá en vercel.json
+#   { "path": "/api/rhythm/diario", "schedule": "0 * * * *" }
+# y BORRÁ este workflow.
+
+name: rhythm-daily-reminder
+
+on:
+  schedule:
+    - cron: "0 * * * *" # cada hora en punto (UTC); el endpoint filtra por la zona de cada perfil
+  workflow_dispatch: {} # disparo manual para pruebas
+
+# Sin permisos de escritura: solo hace una petición HTTP saliente.
+permissions:
+  contents: read
+
+# Una corrida a la vez. Sin esto, una pasada lenta podría solaparse con la siguiente y
+# duplicar el trabajo (los correos no se duplican —lo impide notification_log— pero el
+# recorrido de usuarios sí se pagaría dos veces).
+concurrency:
+  group: rhythm-daily-reminder
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recordatorio de registro a quien tenga las 19:00 en su zona
+        run: |
+          curl --fail-with-body -sS -X POST \
+            "https://carteraplus.vercel.app/api/rhythm/diario" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"

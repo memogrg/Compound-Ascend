@@ -1,0 +1,85 @@
+"use server";
+
+/**
+ * Server Actions del RITMO DEL MES. Viven en lib/ y no en un módulo porque las tres
+ * superficies que las consumen cruzan módulos: el pop-up se monta en el layout (web y
+ * móvil), el aviso de ventana en el tab de Gastos y el cierre en Transacciones.
+ * Precedente: lib/auth/actions.ts.
+ *
+ * Todas devuelven en vez de lanzar: un fallo del ritmo jamás debe romper la pantalla en
+ * la que aparece. Es un acompañante, no una función crítica.
+ */
+import { logger } from "@/lib/logger";
+import { monthPeriod } from "@/modules/financial-base/engine/period";
+
+export type RhythmSnapshot = {
+  /** null si no se pudo resolver (sin sesión, Supabase sin configurar, error). */
+  state: import("@/lib/rhythm/rhythm-service").RhythmState | null;
+  /** Preferencia in-app del usuario: si está apagada, ninguna superficie muestra nada. */
+  inApp: boolean;
+};
+
+/** Estado en vivo del ritmo para el pop-up. Nunca lanza. */
+export async function getRhythmStateAction(): Promise<RhythmSnapshot> {
+  try {
+    const { isSupabaseConfigured, getUser } = await import("@/lib/auth/session");
+    const user = isSupabaseConfigured() ? await getUser() : null;
+    if (!user) return { state: null, inApp: true };
+
+    // La misma puerta que respeta la campana: apagar los avisos in-app los apaga TODOS,
+    // no solo los de la campana. Un pop-up que sobrevive al interruptor es un bug.
+    const { getNotificationPrefs } = await import("@/lib/notifications/preferences");
+    const prefs = await getNotificationPrefs(user.id);
+    if (!prefs.inApp) return { state: null, inApp: false };
+
+    const { getRhythmState } = await import("@/lib/rhythm/rhythm-service");
+    return { state: await getRhythmState(), inApp: true };
+  } catch (err) {
+    logger.warn("getRhythmStateAction fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { state: null, inApp: true };
+  }
+}
+
+/** Silencia un aviso in-app por el resto del día (la X del pop-up). */
+export async function dismissRhythmNudgeAction(kind: string): Promise<{ ok: boolean }> {
+  try {
+    // Lista blanca: `kind` viene del cliente y termina en una fila de notification_log.
+    if (kind !== "ventana_presupuesto" && kind !== "cierre_mes" && kind !== "registro_diario") {
+      return { ok: false };
+    }
+    const { silenciarNudgeHoy } = await import("@/lib/rhythm/rhythm-service");
+    await silenciarNudgeHoy(kind);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/**
+ * Cierra (o reabre) la configuración del mes en curso. Cerrar antes del día 5 es válido:
+ * es decir "ya está, así queda el mes". Reabrir existe porque cerrar por accidente el
+ * día 2 no puede costar tres días de ventana.
+ */
+export async function setMonthConfigClosedAction(
+  closed: boolean,
+): Promise<{ ok: boolean; message?: string }> {
+  try {
+    const { userToday } = await import("@/lib/time/user-time");
+    const today = await userToday();
+    const period = monthPeriod(Number(today.slice(0, 4)), Number(today.slice(5, 7)));
+    const { setMonthConfigClosed } = await import("@/lib/rhythm/rhythm-service");
+    await setMonthConfigClosed(period, closed);
+
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/gastos");
+    revalidatePath("/m/gastos");
+    return { ok: true };
+  } catch (err) {
+    logger.error("setMonthConfigClosed fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos guardar el estado de la configuración." };
+  }
+}

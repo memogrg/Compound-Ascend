@@ -8,6 +8,7 @@ import { CurrencyProvider } from "@/components/layout/currency-context";
 import { ToastProvider } from "../components/form-kit/toast";
 import { AppLockOverlay } from "../components/app-lock-overlay";
 import { WidgetSnapshotWriter } from "../components/widget-snapshot-writer";
+import { MobileRhythmNudge } from "../components/mobile-rhythm-nudge";
 
 /**
  * Layout de las pantallas AUTENTICADAS del móvil. Usa la sesión existente
@@ -66,6 +67,9 @@ export default async function MobileAppLayout({ children }: { children: React.Re
           <WidgetSnapshotWriter />
           {/* Captura silenciosa de la zona horaria del dispositivo (una vez, si no hay guardada). */}
           <TimezoneSync savedTz={savedTz} />
+          {/* Ritmo del mes: ventana de configuración, cierre y recordatorio de registro.
+          Un aviso a la vez, descartable, y se auto-oculta cuando no hay nada que decir. */}
+          <MobileRhythmNudge />
           {children}
         </ToastProvider>
       </CurrencyProvider>

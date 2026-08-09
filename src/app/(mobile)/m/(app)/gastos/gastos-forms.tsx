@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 
 import {
@@ -16,6 +16,7 @@ import { isManualEntryClassified } from "@/modules/financial-base/engine/classif
 import { EssentialCheck } from "@/components/shared/essential-check";
 import { formatMoney } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
+import { getRhythmStateAction } from "@/lib/rhythm/actions";
 import { Icon, type IconName } from "@/components/ui/icon";
 // Reutiliza la MISMA paleta que el fork de la web (tokens globales del design system).
 import { CAT_COLORS } from "@/modules/financial-base/components/v2/expense-jars/category-kebab";
@@ -328,7 +329,17 @@ export function CreateSobreForm({
   );
 }
 
-// ── Editar presupuesto de un sobre (gate de 3 checks + líneas derivadas) ────
+// ── Editar presupuesto de un sobre (ventana de configuración + líneas derivadas) ────
+//
+// Paridad con budget-warning-modal.tsx de la web, en voz es-MX ("tú"):
+//  · VENTANA ABIERTA (días 1-5) → se edita directo, sin checks. Es el momento previsto
+//    para configurar; poner fricción ahí sería castigar a quien lo hace bien.
+//  · VENTANA CERRADA → los 3 checks de siempre + la línea de que queda registrado.
+//    Nunca se bloquea del todo: la vida cambia a mitad de mes.
+//
+// La ventana la decide el SERVIDOR (setEnvelopeBudgetAction); esto solo pinta la
+// pantalla correcta de entrada. Si la lectura falla se asume CERRADA — el camino
+// conservador—, porque saltarse el gate por un error dejaría ediciones sin registrar.
 const CHECKS = [
   "Entiendo que este presupuesto debió configurarse antes de iniciar el período.",
   "Entiendo que modificarlo afectará la precisión de mis métricas y análisis.",
@@ -346,6 +357,7 @@ export function BudgetEditForm({
   period: Period;
   onSuccess: () => void;
 }) {
+  const [ventana, setVentana] = useState<{ abierta: boolean; dias: number } | null>(null);
   const [checks, setChecks] = useState<[boolean, boolean, boolean]>([false, false, false]);
   // NATIVO, no `envelope.budget`: ese está convertido a la moneda de visualización, y
   // guardarlo bajo la etiqueta de la moneda del sobre metería el número en la unidad
@@ -357,6 +369,22 @@ export function BudgetEditForm({
   const [cur, setCur] = useState(envelope.currency);
   const allChecked = checks[0] && checks[1] && checks[2];
 
+  useEffect(() => {
+    let vivo = true;
+    getRhythmStateAction()
+      .then((snap) => {
+        if (!vivo) return;
+        const v = snap.state?.ventana;
+        setVentana({ abierta: Boolean(v?.abierta), dias: v?.diasRestantes ?? 0 });
+      })
+      .catch(() => {
+        if (vivo) setVentana({ abierta: false, dias: 0 });
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   const setCheck = (i: number, v: boolean) =>
     setChecks((prev) => {
       const next = [...prev] as [boolean, boolean, boolean];
@@ -364,6 +392,7 @@ export function BudgetEditForm({
       return next;
     });
 
+  const abierta = ventana?.abierta === true;
   const values = {
     categoryId: envelope.id,
     name: envelope.name,
@@ -371,27 +400,55 @@ export function BudgetEditForm({
     currency: cur,
     periodMonth: period.month,
     periodYear: period.year,
+    // Llegar al formulario con la ventana cerrada implica haber marcado los 3 checks.
+    confirmedOutsideWindow: !abierta,
   };
+
+  if (!ventana) {
+    return (
+      <div className="muted" style={{ fontSize: 13, padding: "6px 0" }}>
+        Cargando…
+      </div>
+    );
+  }
 
   return (
     <>
-      <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginBottom: 12 }}>
-        El presupuesto debería fijarse antes de que arranque el mes. Confirma que entiendes esto
-        para poder ajustarlo a mitad de período.
-      </div>
-      <div style={{ display: "grid", gap: 4, marginBottom: 8 }}>
-        {CHECKS.map((c, i) => (
-          <Toggle
-            key={i}
-            name={`check${i}`}
-            label={c}
-            value={checks[i]!}
-            onChange={(v) => setCheck(i, v)}
-          />
-        ))}
-      </div>
+      {abierta ? (
+        <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginBottom: 12 }}>
+          Estás dentro de la ventana de configuración
+          {ventana.dias === 1
+            ? " (hoy es el último día)"
+            : ventana.dias > 1
+              ? ` (te quedan ${ventana.dias} días)`
+              : ""}
+          : ajusta lo que necesites, sin registro.
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 8 }}>
+            La ventana para configurar este mes fue del día 1 al 5. Puedes modificarlo igual —{" "}
+            <strong>esto queda registrado</strong>.
+          </div>
+          <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+            No es un castigo: llevamos la cuenta para distinguir un cambio real en tus
+            circunstancias de un sobre que quedó mal calibrado desde el principio.
+          </div>
+          <div style={{ display: "grid", gap: 4, marginBottom: 8 }}>
+            {CHECKS.map((c, i) => (
+              <Toggle
+                key={i}
+                name={`check${i}`}
+                label={c}
+                value={checks[i]!}
+                onChange={(v) => setCheck(i, v)}
+              />
+            ))}
+          </div>
+        </>
+      )}
 
-      {allChecked ? (
+      {abierta || allChecked ? (
         <FormShell
           action={setEnvelopeBudgetAction}
           values={values}
