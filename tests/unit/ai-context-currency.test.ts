@@ -61,20 +61,42 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+/**
+ * Timeout explícito (20 s) en vez del default de 5 s.
+ *
+ * Este test NO es lento por sí mismo: en aislamiento corre en ~1,5 s. Lo que lo hacía caer de
+ * forma intermitente es que `buildFinancialContext` resuelve una docena de bloques best-effort
+ * con `await import()`, y en la corrida completa esa transformación de módulos compite con los
+ * otros ~240 archivos. El default de 5 s deja de alcanzar según la carga de la máquina.
+ *
+ * El motivo por el que se sube en vez de dejarlo así: un test que falla una de cada cuatro
+ * corridas entrena a leer el rojo como ruido. Ya pasó — durante la entrega del "ritmo del mes"
+ * este archivo cayó cuatro veces, y las dos que señalaban un problema REAL (lecturas duplicadas
+ * de presupuesto en el camino del chat) se confundieron con las dos que eran solo carga.
+ *
+ * Si vuelve a caer con 20 s, eso SÍ es señal: significa que algo nuevo encareció de verdad el
+ * contexto del asesor, que corre en cada mensaje. No subirlo más — investigar.
+ */
+const TIMEOUT_MS = 20_000;
+
 describe("buildFinancialContext · moneda de visualización (no principal)", () => {
-  it("primary=CRC + display=USD → ctx.currency='USD' y montos en USD (getBaseSummary sin AuthContext)", async () => {
-    const ctx = await buildFinancialContext();
+  it(
+    "primary=CRC + display=USD → ctx.currency='USD' y montos en USD (getBaseSummary sin AuthContext)",
+    async () => {
+      const ctx = await buildFinancialContext();
 
-    expect(ctx.currency).toBe("USD"); // la de VISUALIZACIÓN, no la principal
-    expect(ctx.incomeMonthly).toBe(1_000_000); // getBaseSummary sin ctx → ya viene en display
-    expect(ctx.expenseMonthly).toBe(600_000);
-    expect(ctx.freeCashflow).toBe(400_000);
+      expect(ctx.currency).toBe("USD"); // la de VISUALIZACIÓN, no la principal
+      expect(ctx.incomeMonthly).toBe(1_000_000); // getBaseSummary sin ctx → ya viene en display
+      expect(ctx.expenseMonthly).toBe(600_000);
+      expect(ctx.freeCashflow).toBe(400_000);
 
-    // Consultó la moneda de VISUALIZACIÓN para ctx.currency.
-    expect(getDisplayCurrency).toHaveBeenCalled();
-    // getBaseSummary se llamó SIN AuthContext → sus indicadores ya salen en la moneda de display.
-    expect(getBaseSummary).toHaveBeenCalledTimes(1);
-    const arg = getBaseSummary.mock.calls[0]![0] as { userId?: string } | undefined;
-    expect(arg).toBeUndefined();
-  });
+      // Consultó la moneda de VISUALIZACIÓN para ctx.currency.
+      expect(getDisplayCurrency).toHaveBeenCalled();
+      // getBaseSummary se llamó SIN AuthContext → sus indicadores ya salen en la moneda de display.
+      expect(getBaseSummary).toHaveBeenCalledTimes(1);
+      const arg = getBaseSummary.mock.calls[0]![0] as { userId?: string } | undefined;
+      expect(arg).toBeUndefined();
+    },
+    TIMEOUT_MS,
+  );
 });
