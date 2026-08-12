@@ -3,6 +3,7 @@ import "server-only";
 /** Servicio del Módulo 3 (respeta RLS). */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   getActiveHouseholdId,
   householdMemberIds,
@@ -106,10 +107,9 @@ function rowToDebt(r: DebtRow): Debt {
   };
 }
 
-export async function listGoals(): Promise<SavingsGoal[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function listGoals(ctx?: AuthContext): Promise<SavingsGoal[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("savings_goals")
     .select("*")
@@ -118,10 +118,9 @@ export async function listGoals(): Promise<SavingsGoal[]> {
   return (data ?? []).map(rowToGoal);
 }
 
-export async function listDebts(): Promise<Debt[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function listDebts(ctx?: AuthContext): Promise<Debt[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("debts")
     .select("*")
@@ -131,10 +130,9 @@ export async function listDebts(): Promise<Debt[]> {
 }
 
 /** Crea una meta/sobre y devuelve su id (el id sirve para un aporte inicial). */
-export async function createGoal(input: GoalInput): Promise<string> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+export async function createGoal(input: GoalInput, ctx?: AuthContext): Promise<string> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   // Un sobre es acumulador: sin meta ni recurrencia.
   const isSobre = input.kind === "sobre";
   // Categoría (frasco): la llevan Meta y Sobre; solo Defensa queda sin categoría.
@@ -151,10 +149,10 @@ export async function createGoal(input: GoalInput): Promise<string> {
   const { data, error } = await supabase
     .from("savings_goals")
     .insert({
-      user_id: user.id,
+      user_id: userId,
       household_id,
-      created_by: user.id,
-      last_edited_by: user.id,
+      created_by: userId,
+      last_edited_by: userId,
       name: input.name,
       goal_type: input.goalType ?? null,
       kind: input.kind,
@@ -207,12 +205,11 @@ function debtColumns(input: DebtInputForm) {
   };
 }
 
-export async function createDebt(input: DebtInputForm): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+export async function createDebt(input: DebtInputForm, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   const { error } = await supabase.from("debts").insert({
-    user_id: user.id,
+    user_id: userId,
     household_id,
     is_current: true,
     ...debtColumns(input),
@@ -330,13 +327,12 @@ function rowToDebtPayment(
   };
 }
 
-export async function getDebt(id: string): Promise<Debt | null> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function getDebt(id: string, ctx?: AuthContext): Promise<Debt | null> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   // Lectura de DISPLAY: alcance de hogar (todos los miembros la ven, igual que
   // #425). La autorización de ESCRITURA no vive acá — la da householdWriteScope
   // + RLS en la función que muta (addDebtPayment, updateDebt, deleteDebt).
-  const memberIds = await householdMemberIds(supabase, user.id);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data, error } = await supabase
     .from("debts")
     .select("*")
@@ -369,12 +365,13 @@ export async function listDebtPayments(debtId: string): Promise<DebtPayment[]> {
 }
 
 /** Fechas de pago reportadas en el mes calendario actual, agrupadas por deuda. */
-export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, string[]>> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function listDebtPaymentDatesThisMonth(
+  ctx?: AuthContext,
+): Promise<Record<string, string[]>> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   // Primer día del mes actual EN LA ZONA DEL USUARIO (period.from = "YYYY-MM-01").
-  const { from: monthStart } = await userCurrentPeriod();
+  const { from: monthStart } = await userCurrentPeriod(ctx);
   const { data } = await supabase
     .from("debt_payments")
     .select("debt_id,occurred_on")
@@ -392,12 +389,13 @@ export async function listDebtPaymentDatesThisMonth(): Promise<Record<string, st
  * moneda NATIVA de su deuda: `debt_payments` no tiene columna de moneda, así que su `amount` es
  * implícitamente la de la deuda (ver la guarda del #474 en `addDebtPayment`).
  */
-export async function listDebtPaymentsByDebt(): Promise<
+export async function listDebtPaymentsByDebt(
+  ctx?: AuthContext,
+): Promise<
   Record<string, { paymentDate: string; amount: number; extraAmount: number; kind: PaymentKind }[]>
 > {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("debt_payments")
     .select("debt_id,occurred_on,amount,extra_amount,kind")
@@ -423,12 +421,11 @@ export async function listDebtPaymentsByDebt(): Promise<
  * Fase 1: el pago pasa por el orquestador — nace también como transacción
  * vinculada (gasto, linked_kind='debt') y debt_payments guarda su id.
  */
-export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function addDebtPayment(input: DebtPaymentInput, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
-  const debt = await getDebt(input.debtId);
+  const debt = await getDebt(input.debtId, ctx);
   if (!debt) throw new Error("Deuda no encontrada");
   // Autorización de escritura: registrar un pago MODIFICA la deuda del hogar.
   // Un editor puede sobre cualquier deuda del hogar; un no-editor solo sobre la
@@ -452,12 +449,12 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
   const total = input.amount + input.extraAmount;
 
   // household: cubre el hueco del sub-PR household de main (no tocó este insert).
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   const paymentRow = {
-    user_id: user.id,
+    user_id: userId,
     household_id,
-    created_by: user.id,
-    last_edited_by: user.id,
+    created_by: userId,
+    last_edited_by: userId,
     debt_id: input.debtId,
     occurred_on: input.paymentDate,
     amount: input.amount,
@@ -478,8 +475,9 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
         paymentDate: input.paymentDate,
         amount: input.amount,
         extraAmount: input.extraAmount,
-        categoryId: await getSystemCategoryId("deudas"),
+        categoryId: await getSystemCategoryId("deudas", ctx),
       }),
+      ctx,
     );
     const { error } = await supabase.rpc("record_debt_payment", {
       p_txn: txnRow,
@@ -511,7 +509,7 @@ export async function addDebtPayment(input: DebtPaymentInput): Promise<void> {
     const { error: upErr } = await supabase
       .from("debts")
       .update({
-        last_edited_by: user.id,
+        last_edited_by: userId,
         current_payment: decision.monthlyPayment,
         balance: Math.max(0, debt.balance - input.extraAmount),
       })
@@ -576,10 +574,9 @@ export async function addGoalContribution(input: {
    *  si viene y NO coincide con la de la meta, se rechaza en vez de guardar el importe tal
    *  cual bajo otra unidad. Ver la nota de `monedaVinculadaEsCoherente`. */
   currency?: string;
-}): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+}, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   const { data: goalRow, error: gErr } = await supabase
     .from("savings_goals")
@@ -592,7 +589,7 @@ export async function addGoalContribution(input: {
     // Distingue "no existe" de "es de otro miembro del hogar": con el
     // alcance de hogar la fila SE VE en pantalla, así que un "no
     // encontrada" pelado parecería un bug.
-    if (await existsInHousehold(supabase, user.id, "savings_goals", input.goalId)) {
+    if (await existsInHousehold(supabase, userId, "savings_goals", input.goalId)) {
       throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
     }
     throw new Error("Meta no encontrada");
@@ -618,18 +615,19 @@ export async function addGoalContribution(input: {
       // Sin categoría fija: el tipo de meta varía; linked_kind='goal' basta.
       categoryId: null,
     }),
+    ctx,
   );
 
   const { error } = await supabase
     .from("savings_goals")
     .update({
-      last_edited_by: user.id,
+      last_edited_by: userId,
       current_amount: Number(goalRow.current_amount) + input.amount,
     })
     .eq("id", input.goalId)
     .in("user_id", scope);
   if (error) {
-    await deleteLinkedTransaction(txnId);
+    await deleteLinkedTransaction(txnId, ctx);
     throw new Error(error.message);
   }
 }
@@ -779,10 +777,9 @@ export async function withdrawFromGoal(input: {
   amount: number;
   withdrawalDate: string;
   note?: string;
-}): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+}, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   const { data: goalRow, error: gErr } = await supabase
     .from("savings_goals")
@@ -795,7 +792,7 @@ export async function withdrawFromGoal(input: {
     // Distingue "no existe" de "es de otro miembro del hogar": con el
     // alcance de hogar la fila SE VE en pantalla, así que un "no
     // encontrada" pelado parecería un bug.
-    if (await existsInHousehold(supabase, user.id, "savings_goals", input.goalId)) {
+    if (await existsInHousehold(supabase, userId, "savings_goals", input.goalId)) {
       throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
     }
     throw new Error("Meta no encontrada");
@@ -813,18 +810,19 @@ export async function withdrawFromGoal(input: {
       amount: input.amount,
       note: input.note,
     }),
+    ctx,
   );
 
   const { error } = await supabase
     .from("savings_goals")
     .update({
-      last_edited_by: user.id,
+      last_edited_by: userId,
       current_amount: Math.max(0, Number(goalRow.current_amount) - input.amount),
     })
     .eq("id", input.goalId)
     .in("user_id", scope);
   if (error) {
-    await deleteLinkedTransaction(txnId);
+    await deleteLinkedTransaction(txnId, ctx);
     throw new Error(error.message);
   }
 }
@@ -843,10 +841,9 @@ export async function spendFromGoal(input: {
   spendDate: string;
   categoryId: string | null;
   note?: string;
-}): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+}, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   const { data: goalRow, error: gErr } = await supabase
     .from("savings_goals")
@@ -859,7 +856,7 @@ export async function spendFromGoal(input: {
     // Distingue "no existe" de "es de otro miembro del hogar": con el
     // alcance de hogar la fila SE VE en pantalla, así que un "no
     // encontrada" pelado parecería un bug.
-    if (await existsInHousehold(supabase, user.id, "savings_goals", input.goalId)) {
+    if (await existsInHousehold(supabase, userId, "savings_goals", input.goalId)) {
       throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
     }
     throw new Error("Meta no encontrada");
@@ -879,23 +876,24 @@ export async function spendFromGoal(input: {
       categoryId: input.categoryId,
       note: input.note,
     }),
+    ctx,
   );
 
   const nextCurrent = Math.max(0, Number(goalRow.current_amount) - input.amount);
   const nextTarget = Math.max(0, Number(goalRow.target_amount) - input.amount);
   const { error } = await supabase
     .from("savings_goals")
-    .update({ last_edited_by: user.id, current_amount: nextCurrent, target_amount: nextTarget })
+    .update({ last_edited_by: userId, current_amount: nextCurrent, target_amount: nextTarget })
     .eq("id", input.goalId)
     .in("user_id", scope);
   if (error) {
-    await deleteLinkedTransaction(txnId);
+    await deleteLinkedTransaction(txnId, ctx);
     throw new Error(error.message);
   }
 }
 
-async function getDiscipline(userId: string): Promise<number | undefined> {
-  const supabase = await createSupabaseServerClient();
+async function getDiscipline(userId: string, ctx?: AuthContext): Promise<number | undefined> {
+  const { db: supabase } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("behavior_profiles")
     .select("discipline")
@@ -917,15 +915,15 @@ export type ControlSummary = {
 };
 
 /** Carga todo y calcula el diagnóstico de control. */
-export async function getControlSummary(): Promise<ControlSummary> {
-  const user = await requireUser();
+export async function getControlSummary(ctx?: AuthContext): Promise<ControlSummary> {
+  const { userId } = await resolveAuth(ctx);
   const { getIndexRates } = await import("@/modules/control/services/index-rates");
   const [goals, debts, base, currency, discipline, rates, indexRates] = await Promise.all([
-    listGoals(),
-    listDebts(),
-    getBaseSummary(),
-    getDisplayCurrency(),
-    getDiscipline(user.id),
+    listGoals(ctx),
+    listDebts(ctx),
+    getBaseSummary(ctx),
+    getDisplayCurrency(ctx),
+    getDiscipline(userId, ctx),
     getFxRates(),
     getIndexRates(),
   ]);

@@ -12,6 +12,7 @@ import {
   listDebtPaymentsByDebt,
 } from "@/modules/control/services/control-service";
 import { recomputeFromPayments } from "@/modules/control/engine/amortization";
+import type { AuthContext } from "@/lib/auth/auth-context";
 import { getBaseSummary } from "@/modules/financial-base";
 import { getDisplayCurrency } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";
@@ -79,14 +80,15 @@ export interface DebtsOverview {
 
 export async function getDebtsOverview(
   indexRates: Record<string, number> = {},
+  ctx?: AuthContext,
 ): Promise<DebtsOverview> {
   const [debts, base, currency, rates, paidThisMonthMap, paymentsByDebt] = await Promise.all([
-    listDebts(),
-    getBaseSummary(),
-    getDisplayCurrency(),
+    listDebts(ctx),
+    getBaseSummary(ctx),
+    getDisplayCurrency(ctx),
     getFxRates(),
-    listDebtPaymentDatesThisMonth(),
-    listDebtPaymentsByDebt(),
+    listDebtPaymentDatesThisMonth(ctx),
+    listDebtPaymentsByDebt(ctx),
   ]);
 
   const conv = (n: number, from: string) => convertCurrency(n, from, currency, rates);

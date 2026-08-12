@@ -120,6 +120,7 @@ describe("spendFromGoal · gastar del frasco", () => {
     await expect(
       spendFromGoal({ goalId: "g1", amount: 20000, spendDate: "2026-07-10", categoryId: "c-ropa" }),
     ).rejects.toThrow("boom");
-    expect(h.del).toHaveBeenCalledWith("txn-1");
+    // 2º arg = ctx (undefined en el camino de sesión; el servicio ahora acepta AuthContext).
+    expect(h.del).toHaveBeenCalledWith("txn-1", undefined);
   });
 });

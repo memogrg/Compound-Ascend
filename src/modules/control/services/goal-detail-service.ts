@@ -15,8 +15,7 @@ import { householdMemberIds } from "@/lib/household/active";
  * de apertura (meta creada con acumulado inicial), se muestra como primera fila.
  * Montos normalizados a la moneda de la meta.
  */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getCategoryNameMap } from "@/modules/financial-base";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -72,11 +71,10 @@ function extractNote(description: string | null): string | null {
   return note || null;
 }
 
-export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function getGoalDetail(goalId: string, ctx?: AuthContext): Promise<GoalDetailVM | null> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
 
-  const memberIds = await householdMemberIds(supabase, user.id);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data: goal } = await supabase
     .from("savings_goals")
     .select("id,name,currency,current_amount,target_amount,default_category_id,kind")
@@ -100,7 +98,7 @@ export async function getGoalDetail(goalId: string): Promise<GoalDetailVM | null
       .in("user_id", memberIds)
       .eq("goal_id", goalId)
       .order("reset_on", { ascending: true }),
-    getCategoryNameMap(),
+    getCategoryNameMap(ctx),
     getFxRates(),
   ]);
 
