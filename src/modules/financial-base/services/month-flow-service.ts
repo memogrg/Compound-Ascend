@@ -11,7 +11,7 @@ import "server-only";
  * como gasto; (2) el titular usa sólo CONFIRMADAS y los pendientes van aparte.
  * El discriminador dividendo-vs-venta usa el ledger de `dividends`.
  */
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { listTransactions } from "@/modules/financial-base/services/transaction-service";
@@ -30,9 +30,9 @@ import type { Period, Transaction } from "@/modules/financial-base/types";
  * venta en `ingreso/holding`). Se acota a los candidatos del periodo; RLS acota
  * al hogar. Sin candidatos no hay query.
  */
-async function getDividendTxnIds(candidateIds: string[]): Promise<Set<string>> {
+async function getDividendTxnIds(candidateIds: string[], ctx?: AuthContext): Promise<Set<string>> {
   if (candidateIds.length === 0) return new Set();
-  const supabase = await createSupabaseServerClient();
+  const { db: supabase } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("dividends")
     .select("transaction_id")
@@ -43,20 +43,20 @@ async function getDividendTxnIds(candidateIds: string[]): Promise<Set<string>> {
 }
 
 /** Flujo del mes canónico del periodo (ver engine/month-flow.ts para la definición). */
-export async function getMonthFlow(period: Period): Promise<MonthFlow> {
+export async function getMonthFlow(period: Period, ctx?: AuthContext): Promise<MonthFlow> {
   const [txns, currency, rates, budget, base] = await Promise.all([
-    listTransactions(period), // SIN capar: el titular debe ser exacto
-    getDisplayCurrency(),
+    listTransactions(period, {}, undefined, ctx), // SIN capar: el titular debe ser exacto
+    getDisplayCurrency(ctx),
     getFxRates(),
-    getBudgetTotals(period),
-    getBaseSummary(), // plan (computeBaseIndicators)
+    getBudgetTotals(period, ctx),
+    getBaseSummary(ctx), // plan (computeBaseIndicators)
   ]);
 
   // Candidatos del caso ambiguo: ingreso vinculado a holding (dividendo o venta).
   const candidateIds = txns
     .filter((t) => t.kind === "ingreso" && (t.linkedKind ?? "none") === "holding")
     .map((t) => t.id);
-  const dividendTxnIds = await getDividendTxnIds(candidateIds);
+  const dividendTxnIds = await getDividendTxnIds(candidateIds, ctx);
 
   const rows: MonthFlowRow[] = txns.map((t: Transaction) => ({
     flow: classifyTxnFlow(t, dividendTxnIds),

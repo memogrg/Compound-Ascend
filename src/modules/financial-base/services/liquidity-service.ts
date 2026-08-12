@@ -130,16 +130,15 @@ export async function getClosingLiquidity(
 }
 
 /** Fija (o reescribe) el saldo inicial. Idempotente: una sola fila 'apertura'. */
-export async function setOpeningBalance(amount: number): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const household_id = await getActiveHouseholdId(supabase, user.id);
-  const currency = await getDisplayCurrency();
+export async function setOpeningBalance(amount: number, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const household_id = await getActiveHouseholdId(supabase, userId);
+  const currency = await getDisplayCurrency(ctx);
 
   const { data: existing } = await supabase
     .from("liquidity_ledger")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("reason", "apertura")
     .maybeSingle();
 
@@ -151,7 +150,7 @@ export async function setOpeningBalance(amount: number): Promise<void> {
     return;
   }
   await supabase.from("liquidity_ledger").insert({
-    user_id: user.id,
+    user_id: userId,
     household_id,
     delta: amount,
     currency,
@@ -185,33 +184,35 @@ export async function reconcileBalance(realBalance: number): Promise<void> {
  * aportar); transferencia/ajuste → 0. Delta 0 borra la fila para no dejar un
  * delta huérfano si la transacción cambió de tipo o dejó de mover cash.
  */
-export async function recordTransactionDelta(args: {
-  transactionId: string;
-  kind: TxnKind;
-  amount: number;
-  currency: string;
-  occurredOn: string;
-  /** Off-budget: un consumo de frasco (false) es neutro en liquidez. */
-  countsInBudget?: boolean;
-}): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function recordTransactionDelta(
+  args: {
+    transactionId: string;
+    kind: TxnKind;
+    amount: number;
+    currency: string;
+    occurredOn: string;
+    /** Off-budget: un consumo de frasco (false) es neutro en liquidez. */
+    countsInBudget?: boolean;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const delta = liquidityDelta(args);
 
   if (delta === 0) {
     await supabase
       .from("liquidity_ledger")
       .delete()
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("transaction_id", args.transactionId);
     return;
   }
 
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   const { data: existing } = await supabase
     .from("liquidity_ledger")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("transaction_id", args.transactionId)
     .maybeSingle();
 
@@ -223,7 +224,7 @@ export async function recordTransactionDelta(args: {
     return;
   }
   await supabase.from("liquidity_ledger").insert({
-    user_id: user.id,
+    user_id: userId,
     household_id,
     delta,
     currency: args.currency,
@@ -234,7 +235,7 @@ export async function recordTransactionDelta(args: {
 }
 
 /** Cambio de liquidez del periodo (para el checkpoint/ritual del mes). */
-export async function getPeriodLiquidityChange(period: Period): Promise<number> {
-  const { rows } = await loadRows();
+export async function getPeriodLiquidityChange(period: Period, ctx?: AuthContext): Promise<number> {
+  const { rows } = await loadRows(ctx);
   return periodNetChange(rows, { year: period.year, month: period.month });
 }

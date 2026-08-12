@@ -87,15 +87,14 @@ export async function listExpenses(ctx?: AuthContext): Promise<ExpenseItem[]> {
   return (data ?? []).map(rowToExpense);
 }
 
-export async function createIncome(input: IncomeInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+export async function createIncome(input: IncomeInput, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   await supabase.from("income_sources").insert({
-    user_id: user.id,
+    user_id: userId,
     household_id,
-    created_by: user.id,
-    last_edited_by: user.id,
+    created_by: userId,
+    last_edited_by: userId,
     name: input.name,
     income_type: input.incomeType,
     category: input.category ?? null,
@@ -110,15 +109,14 @@ export async function createIncome(input: IncomeInput): Promise<void> {
   });
 }
 
-export async function createExpense(input: ExpenseInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+export async function createExpense(input: ExpenseInput, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   await supabase.from("expense_items").insert({
-    user_id: user.id,
+    user_id: userId,
     household_id,
-    created_by: user.id,
-    last_edited_by: user.id,
+    created_by: userId,
+    last_edited_by: userId,
     name: input.name,
     nature: input.nature,
     amount: input.amount,
@@ -250,7 +248,7 @@ async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
 
   // V2 (best-effort, no bloquea ni rompe a los 5 consumidores si falla).
   try {
-    const v2 = await computeV2Totals(primary, rates);
+    const v2 = await computeV2Totals(primary, rates, ctx);
     Object.assign(summary, v2);
     // Las monedas de las transacciones del mes también entraron en realIncome/realExpense.
     summary.monedasVistas = [...new Set([...summary.monedasVistas, ...v2.monedasVistas])].sort();
@@ -265,16 +263,16 @@ async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
 async function computeV2Totals(
   displayCurrency: string,
   rates: Record<string, number>,
+  ctx?: AuthContext,
 ): Promise<
   Pick<
     BaseSummary,
     "budgetIncome" | "realIncome" | "budgetExpense" | "realExpense" | "variances" | "monedasVistas"
   >
 > {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
-  const p = await userCurrentPeriod();
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
+  const p = await userCurrentPeriod(ctx);
 
   const [bi, tx] = await Promise.all([
     supabase
