@@ -14,6 +14,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUser, isSupabaseConfigured } from "@/lib/auth/session";
+import { now as simNow } from "@/lib/time/clock";
 
 export const runtime = "nodejs";
 
@@ -69,7 +70,7 @@ async function handle(req: Request) {
     if (isCronRequest(req)) {
       // Cron (todos los usuarios, sin sesión): el mes cerrado se ancla en UTC — es un
       // job de sistema que corre a una hora fija de UTC, no la vista de un usuario.
-      const now = new Date();
+      const now = simNow();
       const closed = previousMonthPeriod(monthPeriod(now.getFullYear(), now.getMonth() + 1));
       const { generateSnapshotsForAllUsers } =
         await import("@/modules/financial-base/services/snapshot-service");

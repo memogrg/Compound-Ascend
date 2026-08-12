@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import type { Period } from "@/modules/financial-base/types";
+import { now } from "@/lib/time/clock";
 import {
   TZ_COOKIE,
   isValidTimeZone,
@@ -87,17 +88,17 @@ async function _resolveUserTz(ctx?: AuthContext): Promise<string> {
 /** Dedup por request (React cache): se resuelve una sola vez aunque lo pidan N servicios. */
 export const resolveUserTz = cache(_resolveUserTz);
 
-/** "YYYY-MM-DD" de HOY en la zona del usuario. */
+/** "YYYY-MM-DD" de HOY en la zona del usuario. `now()` = reloj virtual si el sim lo fija, real si no. */
 export async function userToday(ctx?: AuthContext): Promise<string> {
-  return todayISOInTz(await resolveUserTz(ctx));
+  return todayISOInTz(await resolveUserTz(ctx), now());
 }
 
 /** Periodo del MES ACTUAL en la zona del usuario. Reemplaza a `monthPeriod(now.get*…)`. */
 export async function userCurrentPeriod(ctx?: AuthContext): Promise<Period> {
-  return currentPeriodInTz(await resolveUserTz(ctx));
+  return currentPeriodInTz(await resolveUserTz(ctx), now());
 }
 
 /** Hora (0-23) AHORA en la zona del usuario (para saludos por franja del día). */
 export async function userHour(ctx?: AuthContext): Promise<number> {
-  return hourInTz(await resolveUserTz(ctx));
+  return hourInTz(await resolveUserTz(ctx), now());
 }

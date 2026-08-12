@@ -7,6 +7,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { now as simNow } from "@/lib/time/clock";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { logger } from "@/lib/logger";
 import {
@@ -77,7 +78,7 @@ export async function refreshInsights(): Promise<void> {
     // Import dinámico para no acoplar lib/insights con el módulo control.
     const { listGoals, listDebts } = await import("@/modules/control/services/control-service");
     const [goals, debts] = await Promise.all([listGoals(), listDebts()]);
-    const detected = runDetectors({ goals, debts });
+    const detected = runDetectors({ goals, debts }, simNow());
     const spend = await getDisfruteSpend();
     if (spend) detected.push(...detectDisfruteSpike(spend));
     try {
@@ -708,5 +709,5 @@ export async function restoreDismissedInsights(): Promise<void> {
 /** Puro y testeable: ¿la última corrida está vieja (o no existe)? */
 export function isStale(last: Date | null, maxAgeHours = 12): boolean {
   if (!last) return true;
-  return Date.now() - last.getTime() > maxAgeHours * 60 * 60 * 1000;
+  return simNow().getTime() - last.getTime() > maxAgeHours * 60 * 60 * 1000;
 }

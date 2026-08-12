@@ -5,6 +5,7 @@ import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfoli
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
+import { now as simNow } from "@/lib/time/clock";
 import {
   getActiveHouseholdId,
   householdMemberIds,
@@ -133,7 +134,7 @@ export async function registerPurchaseExpense(args: {
       holdingId: args.holdingId,
       label: args.label,
       currency: args.currency,
-      purchaseDate: args.purchaseDate ?? new Date().toISOString().slice(0, 10),
+      purchaseDate: args.purchaseDate ?? simNow().toISOString().slice(0, 10),
       amount: args.amount,
       verb: args.verb,
       categoryId: await getSystemCategoryId("inversiones"),
@@ -179,7 +180,7 @@ async function recordPurchaseTx(
     amount: qty * price,
     quantity: qty,
     currency: input.currency,
-    occurred_on: input.purchaseDate ?? new Date().toISOString().slice(0, 10),
+    occurred_on: input.purchaseDate ?? simNow().toISOString().slice(0, 10),
   });
   if (error) console.error(`[recordPurchaseTx] falló (${holdingId}): ${error.message}`);
 }
