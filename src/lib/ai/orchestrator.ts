@@ -6,6 +6,7 @@ import "server-only";
  * Las acciones nunca se ejecutan aquí; requieren confirmación del usuario.
  */
 import { getServerEnv } from "@/lib/env";
+import { now as simNow } from "@/lib/time/clock";
 import { StubProvider, type AIProvider, type ChatMessage } from "@/lib/ai/provider";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import { parseAction, type AIChatResponse } from "@/lib/ai/types";
@@ -233,10 +234,10 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
   const meta = { currency: toolContext.currency, fxUnavailable: toolContext.fxUnavailable };
   const run: AiToolExecutor = async (name, args) => {
     if (name === "simular_pago_deuda") {
-      return simulateDebtPayoff(toolContext.debts, args, new Date(), meta);
+      return simulateDebtPayoff(toolContext.debts, args, simNow(), meta);
     }
     if (name === "comparar_estrategias_deuda") {
-      return compareDebtStrategies(toolContext.debts, args, new Date(), meta);
+      return compareDebtStrategies(toolContext.debts, args, simNow(), meta);
     }
     if (name === "analizar_pago_minimo") {
       // Trampa del mínimo + tasa efectiva sobre las deudas reales (moneda principal).

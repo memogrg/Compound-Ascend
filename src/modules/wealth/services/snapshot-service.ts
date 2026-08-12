@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { now as simNow } from "@/lib/time/clock";
 import { logger } from "@/lib/logger";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { computePortfolioAnalytics } from "@/modules/wealth/engine/portfolio-engine";
@@ -81,7 +82,7 @@ export async function generateAndSaveSnapshot(
   try {
     const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
     const supabase = createServiceRoleClient();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = simNow().toISOString().slice(0, 10);
 
     const { data, error } = await supabase
       .from("portfolio_snapshots")
@@ -120,7 +121,7 @@ export async function maybeGenerateSnapshot(
   try {
     const { createServiceRoleClient } = await import("@/lib/supabase/service-role");
     const supabase = createServiceRoleClient();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = simNow().toISOString().slice(0, 10);
 
     // Verifica si ya existe snapshot de hoy antes de intentar insertar.
     const { data: existing } = await supabase
@@ -256,7 +257,7 @@ async function netWorthDelUsuario(
 
 function periodCutoff(period: SnapshotPeriod): string | null {
   if (period === "all") return null;
-  const d = new Date();
+  const d = simNow();
   switch (period) {
     case "1M":
       d.setMonth(d.getMonth() - 1);

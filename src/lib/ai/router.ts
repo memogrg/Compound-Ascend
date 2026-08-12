@@ -1,4 +1,5 @@
 import "server-only";
+import { now as simNow } from "@/lib/time/clock";
 
 /**
  * Router de IA por complejidad (R1). Abarata las CONSULTAS de dato: los intents comunes se
@@ -1597,7 +1598,7 @@ async function resolveFetchIntent(
     if (intent === "ultimos_movimientos") {
       const { listTransactions } = await import("@/modules/financial-base");
       // Ventana de 60 días para no depender del día del mes; las 5 más recientes.
-      const now = new Date();
+      const now = simNow();
       const to = now.toISOString().slice(0, 10);
       const fromD = new Date(now);
       fromD.setDate(fromD.getDate() - 60);
@@ -1846,7 +1847,7 @@ async function resolveMarketQuery(
         scenario.currency,
         wantsAth,
         hasPosition,
-        freshnessNote(h?.asOf, Date.now()),
+        freshnessNote(h?.asOf, simNow().getTime()),
       ),
     );
   } catch (err) {

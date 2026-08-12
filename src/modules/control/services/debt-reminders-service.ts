@@ -1,4 +1,5 @@
 import "server-only";
+import { now as simNow } from "@/lib/time/clock";
 
 /**
  * Servicio del cron de recordatorios de pago de deudas. Usa SERVICE ROLE
@@ -21,7 +22,7 @@ export interface DueReminder {
 }
 
 /** Deudas con pago próximo a vencer sin recordatorio enviado hoy. */
-export async function getDueReminders(today: Date = new Date()): Promise<DueReminder[]> {
+export async function getDueReminders(today: Date = simNow()): Promise<DueReminder[]> {
   const supabase = createServiceRoleClient();
   const todayIso = today.toISOString().slice(0, 10);
   const monthStart = `${todayIso.slice(0, 7)}-01`;
@@ -89,7 +90,7 @@ export async function getDueReminders(today: Date = new Date()): Promise<DueRemi
 }
 
 /** Marca la deuda como recordada hoy (idempotente; evita reenvíos). */
-export async function markReminded(debtId: string, today: Date = new Date()): Promise<void> {
+export async function markReminded(debtId: string, today: Date = simNow()): Promise<void> {
   const supabase = createServiceRoleClient();
   await supabase
     .from("debts")

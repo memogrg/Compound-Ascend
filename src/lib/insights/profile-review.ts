@@ -1,4 +1,5 @@
 import "server-only";
+import { now as simNow } from "@/lib/time/clock";
 
 /**
  * Recordatorio semestral de revisión del perfil financiero (Palanca de retención).
@@ -62,7 +63,7 @@ export function selectResolvable(
 type StaleRow = { user_id: string; updated_at: string };
 
 /** Corre el recordatorio para TODOS los usuarios (Vercel Cron mensual). Best-effort. */
-export async function remindStaleProfiles(now: Date = new Date()): Promise<{
+export async function remindStaleProfiles(now: Date = simNow()): Promise<{
   stale: number;
   created: number;
   resolved: number;

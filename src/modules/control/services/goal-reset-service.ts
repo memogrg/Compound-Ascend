@@ -1,4 +1,5 @@
 import "server-only";
+import { now as simNow } from "@/lib/time/clock";
 
 /**
  * Servicio del cron de reinicio de frascos recurrentes. Usa SERVICE ROLE (omite
@@ -12,7 +13,7 @@ import { computeReset, type Recurrence } from "@/modules/control/engine/recurren
 import { logger } from "@/lib/logger";
 
 /** Reinicia los frascos recurrentes vencidos. Devuelve cuántos reinició. */
-export async function rollDueGoalPeriods(today: Date = new Date()): Promise<{ reset: number }> {
+export async function rollDueGoalPeriods(today: Date = simNow()): Promise<{ reset: number }> {
   const supabase = createServiceRoleClient();
   const todayIso = today.toISOString().slice(0, 10);
 
