@@ -3,6 +3,7 @@ import "server-only";
 /** CRUD + agregados de presupuesto por mes (budget_items). Respeta RLS. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   getActiveHouseholdId,
   householdMemberIds,
@@ -66,10 +67,9 @@ async function assertManualItem(id: string): Promise<void> {
   }
 }
 
-export async function listBudgetItems(period: Period): Promise<BudgetItem[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function listBudgetItems(period: Period, ctx?: AuthContext): Promise<BudgetItem[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("budget_items")
     .select("*")
@@ -80,16 +80,15 @@ export async function listBudgetItems(period: Period): Promise<BudgetItem[]> {
   return (data ?? []).map(rowToBudgetItem);
 }
 
-export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function createBudgetItem(input: BudgetItemInput, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   // household: las líneas manuales comparten hogar igual que las derivadas.
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   await supabase.from("budget_items").insert({
-    user_id: user.id,
+    user_id: userId,
     household_id,
-    created_by: user.id,
-    last_edited_by: user.id,
+    created_by: userId,
+    last_edited_by: userId,
     type: input.type,
     category_id: input.categoryId ?? null,
     name: input.name,
@@ -110,9 +109,15 @@ export async function createBudgetItem(input: BudgetItemInput): Promise<void> {
  * duplicar las categorías que ya tienen presupuesto este mes. Devuelve cuántas
  * copió. Las líneas derivadas (deuda/meta/etc.) no se copian: se regeneran solas.
  */
-export async function copyPreviousMonthExpenseBudget(period: Period): Promise<number> {
+export async function copyPreviousMonthExpenseBudget(
+  period: Period,
+  ctx?: AuthContext,
+): Promise<number> {
   const prev = previousMonthPeriod(period);
-  const [prevItems, curItems] = await Promise.all([listBudgetItems(prev), listBudgetItems(period)]);
+  const [prevItems, curItems] = await Promise.all([
+    listBudgetItems(prev, ctx),
+    listBudgetItems(period, ctx),
+  ]);
   const present = new Set(
     curItems.filter((i) => i.type === "expense").map((i) => i.categoryId ?? "∅"),
   );
@@ -120,16 +125,19 @@ export async function copyPreviousMonthExpenseBudget(period: Period): Promise<nu
     (i) => i.type === "expense" && i.sourceKind === "manual" && !present.has(i.categoryId ?? "∅"),
   );
   for (const it of toCopy) {
-    await createBudgetItem({
-      type: "expense",
-      categoryId: it.categoryId,
-      name: it.name,
-      amount: it.amount,
-      currency: it.currency,
-      frequency: it.frequency,
-      periodMonth: period.month,
-      periodYear: period.year,
-    });
+    await createBudgetItem(
+      {
+        type: "expense",
+        categoryId: it.categoryId,
+        name: it.name,
+        amount: it.amount,
+        currency: it.currency,
+        frequency: it.frequency,
+        periodMonth: period.month,
+        periodYear: period.year,
+      },
+      ctx,
+    );
   }
   return toCopy.length;
 }
@@ -457,32 +465,37 @@ export async function deleteIncomeSourcesByHolding(holdingId: string): Promise<v
  * pasar de 100% (sobre-recepción). La transacción nace con el nombre de la
  * fuente como merchantOrSource para la composición/listados.
  */
-export async function receivePartialIncome(args: {
-  budgetItemId: string;
-  amount: number;
-  date: string;
-}): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function receivePartialIncome(
+  args: {
+    budgetItemId: string;
+    amount: number;
+    date: string;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const { data: line } = await supabase
     .from("budget_items")
     .select("name,currency,type")
     .eq("id", args.budgetItemId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   if (!line || line.type !== "income") {
     throw new Error("La fuente de ingreso ya no existe o no te pertenece.");
   }
-  await createTransaction({
-    kind: "ingreso",
-    amount: args.amount,
-    currency: line.currency,
-    occurredOn: args.date,
-    merchantOrSource: line.name,
-    status: "confirmed",
-    origin: "manual",
-    incomeSourceId: args.budgetItemId,
-  });
+  await createTransaction(
+    {
+      kind: "ingreso",
+      amount: args.amount,
+      currency: line.currency,
+      occurredOn: args.date,
+      merchantOrSource: line.name,
+      status: "confirmed",
+      origin: "manual",
+      incomeSourceId: args.budgetItemId,
+    },
+    ctx,
+  );
 }
 
 /**
@@ -529,12 +542,12 @@ export type BudgetTotals = {
 };
 
 /** Totales de presupuesto del periodo, normalizados a la moneda de visualización. */
-export async function getBudgetTotals(period: Period): Promise<BudgetTotals> {
+export async function getBudgetTotals(period: Period, ctx?: AuthContext): Promise<BudgetTotals> {
   const [items, currency, rates, catMap] = await Promise.all([
-    listBudgetItems(period),
-    getDisplayCurrency(),
+    listBudgetItems(period, ctx),
+    getDisplayCurrency(ctx),
     getFxRates(),
-    getCategoryNameMap(),
+    getCategoryNameMap(ctx),
   ]);
 
   let budgetIncome = 0;

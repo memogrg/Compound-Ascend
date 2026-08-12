@@ -55,11 +55,13 @@ describe("buildTransactionRow · auto-asignación (cascada 3-3)", () => {
     h.auto.mockResolvedValue({ categoryId: "c-comida", source: "historial" });
     const { row } = await buildTransactionRow(baseInput());
     expect(row.category_id).toBe("c-comida");
-    // Se llamó con el comercio y kind, SIN userId (sesión → RLS).
+    // Se llamó con el comercio y kind, y con el userId ya resuelto por resolveAuth
+    // (en el camino de sesión === el usuario de la sesión; se pasa explícito para que
+    // el mismo servicio sirva al simulador con un AuthContext inyectado).
     const arg = h.auto.mock.calls[0]![0] as { merchant: string; kind: string; userId?: string };
     expect(arg.merchant).toBe("Starbucks");
     expect(arg.kind).toBe("gasto");
-    expect(arg.userId).toBeUndefined();
+    expect(arg.userId).toBe("u1");
   });
 
   it("sin regla y sin señal fuerte → sigue null (Por clasificar)", async () => {

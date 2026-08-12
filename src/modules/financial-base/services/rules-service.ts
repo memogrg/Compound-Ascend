@@ -4,6 +4,7 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import type { TransactionRuleRow } from "@/lib/supabase/database.types";
 import type { RuleInput } from "@/modules/financial-base/schemas";
 
@@ -34,14 +35,13 @@ function rowToRule(r: TransactionRuleRow): TransactionRule {
   };
 }
 
-export async function listRules(): Promise<TransactionRule[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function listRules(ctx?: AuthContext): Promise<TransactionRule[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   // Mayor prioridad primero; a igual prioridad, la más reciente.
   const { data } = await supabase
     .from("transaction_rules")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("priority", { ascending: false })
     .order("created_at", { ascending: false });
   return (data ?? []).map(rowToRule);
@@ -195,9 +195,10 @@ export function pickMatchingRule(
 export async function findMatchingRule(
   merchant: string | null | undefined,
   type: "income" | "expense",
+  ctx?: AuthContext,
 ): Promise<TransactionRule | null> {
   if (!merchant) return null;
-  return pickMatchingRule(await listRules(), merchant, type);
+  return pickMatchingRule(await listRules(ctx), merchant, type);
 }
 
 /**

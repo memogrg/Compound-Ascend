@@ -14,6 +14,7 @@ import {
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 
 export type LinkableEntity = {
   id: string;
@@ -62,11 +63,11 @@ export const LINKED_KIND_MISSING_MSG: Record<keyof typeof LINKED_KIND_TABLE, str
 export async function assertLinkableEntity(
   kind: keyof typeof LINKED_KIND_TABLE,
   id: string,
+  ctx?: AuthContext,
 ): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const table = LINKED_KIND_TABLE[kind];
-  const scope = await householdWriteScope(supabase, user.id);
+  const scope = await householdWriteScope(supabase, userId);
   const { data, error } = await supabase
     .from(table)
     .select("id")
@@ -77,7 +78,7 @@ export async function assertLinkableEntity(
   if (!data) {
     // Existe en el hogar pero fuera de mi alcance de escritura → soy no-editor
     // intentando vincular a una entidad del hogar. Mensaje claro, no genérico.
-    if (await existsInHousehold(supabase, user.id, table, id)) {
+    if (await existsInHousehold(supabase, userId, table, id)) {
       throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
     }
     throw new Error(LINKED_KIND_MISSING_MSG[kind]);

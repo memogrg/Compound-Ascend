@@ -16,6 +16,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   getActiveHouseholdId,
   isActiveHouseholdEditor,
@@ -171,9 +172,8 @@ export async function getCategoryPersonalization(): Promise<CategoryPersonalizat
  * SIN resolver overrides. Para etiquetar agregados/históricos (incluye inactivas y
  * bases ocultas), donde ocultar rompería la resolución de nombres pasados.
  */
-export async function listRawCategories(): Promise<Category[]> {
-  await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function listRawCategories(ctx?: AuthContext): Promise<Category[]> {
+  const { db: supabase } = await resolveAuth(ctx);
   return fetchRawCategories(supabase);
 }
 
@@ -196,8 +196,8 @@ export async function listCategories(): Promise<Category[]> {
  * Mapa id → nombre AMPLIO (incluye inactivas, fusionadas y bases ocultas) para
  * etiquetar agregados históricos por categoría. NO resuelve overrides a propósito.
  */
-export async function getCategoryNameMap(): Promise<Record<string, string>> {
-  const cats = await listRawCategories();
+export async function getCategoryNameMap(ctx?: AuthContext): Promise<Record<string, string>> {
+  const cats = await listRawCategories(ctx);
   const map: Record<string, string> = {};
   for (const c of cats) map[c.id] = c.name;
   return map;

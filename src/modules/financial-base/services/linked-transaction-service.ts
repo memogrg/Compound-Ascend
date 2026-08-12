@@ -19,6 +19,7 @@ import { monedaVinculadaEsCoherente } from "@/modules/financial-base/engine/expe
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId, householdWriteScope } from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import {
@@ -33,9 +34,12 @@ import type { LinkedTxnInput } from "@/modules/financial-base/engine/linked";
  * Crea la transacción vinculada y devuelve su id. Valida el input con el
  * mismo schema que el resto del módulo (defaults incluidos).
  */
-export async function registerLinkedTransaction(input: LinkedTxnInput): Promise<string> {
+export async function registerLinkedTransaction(
+  input: LinkedTxnInput,
+  ctx?: AuthContext,
+): Promise<string> {
   const parsed = txnInputSchema.parse(input);
-  const { id } = await createTransaction(parsed);
+  const { id } = await createTransaction(parsed, ctx);
   return id;
 }
 
@@ -44,9 +48,12 @@ export async function registerLinkedTransaction(input: LinkedTxnInput): Promise<
  * resuelve la fila de la transacción. Para flujos atómicos donde una RPC
  * transaccional inserta la transacción y su ledger en una sola operación.
  */
-export async function buildLinkedTransactionRow(input: LinkedTxnInput): Promise<TransactionInsert> {
+export async function buildLinkedTransactionRow(
+  input: LinkedTxnInput,
+  ctx?: AuthContext,
+): Promise<TransactionInsert> {
   const parsed = txnInputSchema.parse(input);
-  const { row } = await buildTransactionRow(parsed);
+  const { row } = await buildTransactionRow(parsed, ctx);
   return row;
 }
 
@@ -71,11 +78,10 @@ export async function propagateLinkedTransaction(args: {
    *  guardaría un importe multiplicado sin dejar rastro. */
   currency?: string;
   occurredOn: string;
-}): Promise<void> {
+}, ctx?: AuthContext): Promise<void> {
   if (!args.linkedId || args.kind !== "gasto") return;
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   if (args.linkedKind === "debt") {
     // Desglose cuota vs abono extra (Fase 7): si el pago supera la cuota
@@ -110,12 +116,12 @@ export async function propagateLinkedTransaction(args: {
     });
 
     // household: el ledger especializado comparte hogar igual que la transacción.
-    const household_id = await getActiveHouseholdId(supabase, user.id);
+    const household_id = await getActiveHouseholdId(supabase, userId);
     const { error } = await supabase.from("debt_payments").insert({
-      user_id: user.id,
+      user_id: userId,
       household_id,
-      created_by: user.id,
-      last_edited_by: user.id,
+      created_by: userId,
+      last_edited_by: userId,
       debt_id: args.linkedId,
       occurred_on: args.occurredOn,
       amount: split.amount,
@@ -144,7 +150,7 @@ export async function propagateLinkedTransaction(args: {
     const { error } = await supabase
       .from("savings_goals")
       .update({
-        last_edited_by: user.id,
+        last_edited_by: userId,
         current_amount: Number(goal.current_amount) + args.amount,
       })
       .eq("id", args.linkedId)
@@ -212,13 +218,15 @@ export async function linkExistingTransaction(args: {
 }
 
 /** Rollback compensatorio: borra la transacción creada por el orquestador. */
-export async function deleteLinkedTransaction(transactionId: string): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function deleteLinkedTransaction(
+  transactionId: string,
+  ctx?: AuthContext,
+): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
   await supabase.from("transactions").delete().eq("id", transactionId).in("user_id", scope);
   await logHouseholdDeletion(supabase, {
-    userId: user.id,
+    userId,
     table: "transactions",
     rowId: transactionId,
   });
@@ -259,11 +267,10 @@ export async function reverseLinkedTransaction(args: {
   occurredOn: string;
   /** Off-budget: distingue un consumo del frasco de un aporte (ambos son gasto). */
   countsInBudget?: boolean;
-}): Promise<void> {
+}, ctx?: AuthContext): Promise<void> {
   if (!args.linkedId) return;
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   if (args.linkedKind === "debt") {
     const { data: pay, error: pErr } = await supabase
@@ -297,7 +304,7 @@ export async function reverseLinkedTransaction(args: {
       const { error } = await supabase
         .from("savings_goals")
         .update({
-          last_edited_by: user.id,
+          last_edited_by: userId,
           current_amount: Number(goal.current_amount) + args.amount,
           target_amount: Number(goal.target_amount) + args.amount,
         })
@@ -312,7 +319,7 @@ export async function reverseLinkedTransaction(args: {
     const next = Math.max(0, Number(goal.current_amount) + delta);
     const { error } = await supabase
       .from("savings_goals")
-      .update({ last_edited_by: user.id, current_amount: next })
+      .update({ last_edited_by: userId, current_amount: next })
       .eq("id", args.linkedId)
       .in("user_id", scope);
     if (error) throw new Error(error.message);
@@ -327,8 +334,8 @@ export async function reverseLinkedTransaction(args: {
  * Best-effort: si no existe devuelve null y la transacción queda sin categoría
  * (el vínculo linked_kind/linked_id sigue contando la historia).
  */
-export async function getSystemCategoryId(key: string): Promise<string | null> {
-  const supabase = await createSupabaseServerClient();
+export async function getSystemCategoryId(key: string, ctx?: AuthContext): Promise<string | null> {
+  const { db: supabase } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("expense_categories")
     .select("id")

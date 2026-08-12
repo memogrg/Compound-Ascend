@@ -7,6 +7,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   getActiveHouseholdId,
   householdMemberIds,
@@ -58,15 +59,17 @@ function rowToTransaction(r: TransactionRow): Transaction {
 }
 
 /** Resuelve el nombre de la cuenta para denormalizar account_label. */
-async function accountLabelFor(accountId: string | null | undefined): Promise<string | null> {
+async function accountLabelFor(
+  accountId: string | null | undefined,
+  ctx?: AuthContext,
+): Promise<string | null> {
   if (!accountId) return null;
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("accounts")
     .select("name")
     .eq("id", accountId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   return data?.name ?? null;
 }
@@ -75,10 +78,10 @@ export async function listTransactions(
   period: Period,
   filters: TxnFilters = {},
   limit?: number,
+  ctx?: AuthContext,
 ): Promise<Transaction[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   let q = supabase
     .from("transactions")
     .select("*")
@@ -115,10 +118,10 @@ export type LinkedMovement = {
 export async function listLinkedMovements(
   period: Period,
   linkedKinds: Array<"goal" | "debt">,
+  ctx?: AuthContext,
 ): Promise<LinkedMovement[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("transactions")
     .select("kind,amount,currency,linked_kind,counts_in_budget")
@@ -161,9 +164,11 @@ export type BuiltTransactionRow = {
   linkedId: string | null;
 };
 
-export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransactionRow> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function buildTransactionRow(
+  input: TxnInput,
+  ctx?: AuthContext,
+): Promise<BuiltTransactionRow> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
 
   // Auto-categorización por reglas: si falta categoría/cuenta/vínculo y hay
   // comercio, aplica la primera regla que haga match (determinista, sin IA).
@@ -181,6 +186,7 @@ export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransac
     const rule = await findMatchingRule(
       input.merchantOrSource,
       input.kind === "gasto" ? "expense" : "income",
+      ctx,
     );
     if (rule) {
       categoryId = categoryId ?? rule.suggestedCategoryId;
@@ -195,6 +201,7 @@ export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransac
           await assertLinkableEntity(
             rule.linkedKind as Exclude<NonNullable<TxnInput["linkedKind"]>, "none">,
             rule.linkedId,
+            ctx,
           );
           linkedKind = rule.linkedKind as NonNullable<TxnInput["linkedKind"]>;
           linkedId = rule.linkedId;
@@ -212,6 +219,7 @@ export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransac
         await import("@/modules/financial-base/services/ai-categorize");
       const auto = await resolveAutoCategory({
         supabase,
+        userId,
         merchant: input.merchantOrSource,
         kind: input.kind,
       });
@@ -226,7 +234,7 @@ export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransac
   if (input.linkedKind && input.linkedKind !== "none" && input.linkedId) {
     const { assertLinkableEntity } =
       await import("@/modules/financial-base/services/linkable-entities-service");
-    await assertLinkableEntity(input.linkedKind, input.linkedId);
+    await assertLinkableEntity(input.linkedKind, input.linkedId, ctx);
   }
   // Un kind sin id no es un vínculo: se normaliza a 'none'.
   if (linkedKind !== "none" && !linkedId) linkedKind = "none";
@@ -237,19 +245,19 @@ export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransac
     const { data: def } = await supabase
       .from("accounts")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("is_default", true)
       .maybeSingle();
     accountId = def?.id ?? null;
   }
 
-  const accountLabel = await accountLabelFor(accountId);
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const accountLabel = await accountLabelFor(accountId, ctx);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   const row: TransactionInsert = {
-    user_id: user.id,
+    user_id: userId,
     household_id,
-    created_by: user.id,
-    last_edited_by: user.id,
+    created_by: userId,
+    last_edited_by: userId,
     kind: input.kind,
     description: input.description ?? null,
     merchant_or_source: input.merchantOrSource ?? null,
@@ -282,22 +290,28 @@ export async function buildTransactionRow(input: TxnInput): Promise<BuiltTransac
  * Crea una transacción (camino normal, no atómico con un ledger). Resuelve la
  * fila con `buildTransactionRow` y la inserta.
  */
-export async function createTransaction(input: TxnInput): Promise<CreatedTransaction> {
-  const supabase = await createSupabaseServerClient();
-  const { row, linkedKind, linkedId } = await buildTransactionRow(input);
+export async function createTransaction(
+  input: TxnInput,
+  ctx?: AuthContext,
+): Promise<CreatedTransaction> {
+  const { db: supabase } = await resolveAuth(ctx);
+  const { row, linkedKind, linkedId } = await buildTransactionRow(input, ctx);
   const { data, error } = await supabase.from("transactions").insert(row).select("id").single();
   if (error) throw new Error(error.message);
 
   // Saco de Liquidez: registra el delta de esta transacción. Best-effort: un
   // fallo aquí no debe romper el registro (la transacción ya se persistió).
-  await recordLiquidityDelta({
-    transactionId: data.id,
-    kind: input.kind,
-    amount: input.amount,
-    currency: input.currency,
-    occurredOn: input.occurredOn,
-    countsInBudget: row.counts_in_budget ?? true,
-  });
+  await recordLiquidityDelta(
+    {
+      transactionId: data.id,
+      kind: input.kind,
+      amount: input.amount,
+      currency: input.currency,
+      occurredOn: input.occurredOn,
+      countsInBudget: row.counts_in_budget ?? true,
+    },
+    ctx,
+  );
 
   return { id: data.id, linkedKind, linkedId };
 }
@@ -321,10 +335,13 @@ export async function setTransactionCategory(id: string, categoryId: string | nu
 export const LINKED_TXN_EDIT_BLOCKED =
   "Esta transacción está vinculada a otra sección (deuda, meta o inversión). Edítala desde su pantalla de origen para mantener todo sincronizado.";
 
-export async function updateTransaction(id: string, input: TxnInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function updateTransaction(
+  id: string,
+  input: TxnInput,
+  ctx?: AuthContext,
+): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   // Integridad: las transacciones VINCULADAS no se editan en crudo aquí. Cambiar el
   // monto/fecha desincronizaría su ledger de origen (debt_payments, current_amount).
@@ -342,15 +359,15 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
   // Sin esto el update de abajo afecta 0 filas (lo acota user_id) y la acción
   // parece haber funcionado. Con el alcance de hogar el miembro VE la fila, así
   // que el silencio se lee como bug: mejor decir por qué no se puede.
-  if (!existing && (await existsInHousehold(supabase, user.id, "transactions", id))) {
+  if (!existing && (await existsInHousehold(supabase, userId, "transactions", id))) {
     throw new Error(HOUSEHOLD_READ_ONLY_MESSAGE);
   }
 
-  const accountLabel = await accountLabelFor(input.accountId);
+  const accountLabel = await accountLabelFor(input.accountId, ctx);
   await supabase
     .from("transactions")
     .update({
-      last_edited_by: user.id,
+      last_edited_by: userId,
       kind: input.kind,
       description: input.description ?? null,
       merchant_or_source: input.merchantOrSource ?? null,
@@ -371,39 +388,44 @@ export async function updateTransaction(id: string, input: TxnInput): Promise<vo
   // un kind sin delta (transferencia/ajuste) o a un consumo de frasco off-budget,
   // recordTransactionDelta borra la fila. (Las vinculadas ya se bloquearon arriba,
   // así que aquí countsInBudget es true; se pasa por coherencia con la regla.)
-  await recordLiquidityDelta({
-    transactionId: id,
-    kind: input.kind,
-    amount: input.amount,
-    currency: input.currency,
-    occurredOn: input.occurredOn,
-    countsInBudget: input.countsInBudget ?? true,
-  });
+  await recordLiquidityDelta(
+    {
+      transactionId: id,
+      kind: input.kind,
+      amount: input.amount,
+      currency: input.currency,
+      occurredOn: input.occurredOn,
+      countsInBudget: input.countsInBudget ?? true,
+    },
+    ctx,
+  );
 }
 
 /** Engancha el ledger de liquidez (import dinámico) sin romper el registro. */
-async function recordLiquidityDelta(args: {
-  transactionId: string;
-  kind: TxnKind;
-  amount: number;
-  currency: string;
-  occurredOn: string;
-  /** Off-budget: un consumo de frasco (false) no debe restar liquidez. */
-  countsInBudget?: boolean;
-}): Promise<void> {
+async function recordLiquidityDelta(
+  args: {
+    transactionId: string;
+    kind: TxnKind;
+    amount: number;
+    currency: string;
+    occurredOn: string;
+    /** Off-budget: un consumo de frasco (false) no debe restar liquidez. */
+    countsInBudget?: boolean;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
   try {
     const { recordTransactionDelta } =
       await import("@/modules/financial-base/services/liquidity-service");
-    await recordTransactionDelta(args);
+    await recordTransactionDelta(args, ctx);
   } catch {
     // Liquidez best-effort: la reconciliación 1-toque corrige cualquier desfase.
   }
 }
 
-export async function deleteTransaction(id: string): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function deleteTransaction(id: string, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   // Integridad: si la transacción está VINCULADA (pago de deuda, aporte/retiro de
   // meta, …), revierte primero su ledger de origen para no dejarlo huérfano (un
@@ -418,21 +440,24 @@ export async function deleteTransaction(id: string): Promise<void> {
   if (txn && (txn.linked_kind ?? "none") !== "none") {
     const { reverseLinkedTransaction } =
       await import("@/modules/financial-base/services/linked-transaction-service");
-    await reverseLinkedTransaction({
-      transactionId: id,
-      kind: txn.kind,
-      linkedKind: txn.linked_kind as string,
-      linkedId: txn.linked_id,
-      amount: Number(txn.amount),
-      occurredOn: txn.occurred_on,
-      countsInBudget: txn.counts_in_budget,
-    });
+    await reverseLinkedTransaction(
+      {
+        transactionId: id,
+        kind: txn.kind,
+        linkedKind: txn.linked_kind as string,
+        linkedId: txn.linked_id,
+        amount: Number(txn.amount),
+        occurredOn: txn.occurred_on,
+        countsInBudget: txn.counts_in_budget,
+      },
+      ctx,
+    );
   }
 
   // Borra la transacción. Idempotente: en deudas la RPC de reversión ya la borró
   // junto al debt_payment, así que este delete queda como no-op.
   await supabase.from("transactions").delete().eq("id", id).in("user_id", scope);
-  await logHouseholdDeletion(supabase, { userId: user.id, table: "transactions", rowId: id });
+  await logHouseholdDeletion(supabase, { userId, table: "transactions", rowId: id });
 }
 
 export async function duplicateTransaction(id: string): Promise<void> {
@@ -635,12 +660,12 @@ export type RealTotals = {
 };
 
 /** Totales reales del periodo (desde transactions), normalizados a la moneda de visualización. */
-export async function getRealTotals(period: Period): Promise<RealTotals> {
+export async function getRealTotals(period: Period, ctx?: AuthContext): Promise<RealTotals> {
   const [txns, currency, rates, catMap] = await Promise.all([
-    listTransactions(period),
-    getDisplayCurrency(),
+    listTransactions(period, {}, undefined, ctx),
+    getDisplayCurrency(ctx),
     getFxRates(),
-    getCategoryNameMap(),
+    getCategoryNameMap(ctx),
   ]);
 
   let realIncome = 0;
