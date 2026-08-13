@@ -182,12 +182,11 @@ export async function listRawCategories(ctx?: AuthContext): Promise<Category[]> 
  * aplicados: bases ocultas quitadas, forks reemplazando al original (adoptando su
  * subárbol), huérfanos descartados. IDENTIDAD cuando el hogar no tiene overrides.
  */
-export async function listCategories(): Promise<Category[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function listCategories(ctx?: AuthContext): Promise<Category[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const [raw, overrides] = await Promise.all([
     fetchRawCategories(supabase),
-    loadScopeOverrides(supabase, user.id),
+    loadScopeOverrides(supabase, userId),
   ]);
   return resolveCategoryOverrides(raw, overrides);
 }

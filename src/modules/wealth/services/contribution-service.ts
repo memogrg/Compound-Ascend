@@ -1,6 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { householdMemberIds, householdWriteScope } from "@/lib/household/active";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
@@ -167,11 +168,10 @@ export type OpenContribution = {
 };
 
 /** Aportes abiertos (auto/pendiente) del mes en curso, para el render de la brecha. */
-export async function listOpenContributions(): Promise<OpenContribution[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
-  const period = await userCurrentPeriod();
+export async function listOpenContributions(ctx?: AuthContext): Promise<OpenContribution[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
+  const period = await userCurrentPeriod(ctx);
   const { data, error } = await supabase
     .from("holding_contributions")
     .select("id, holding_id, amount, unit_price, currency, status")

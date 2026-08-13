@@ -20,6 +20,7 @@ import {
   previousMonthPeriod,
 } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
+import type { AuthContext } from "@/lib/auth/auth-context";
 import { convertCurrency } from "@/lib/fx";
 import { getControlSummary, getDebtsOverview } from "@/modules/control";
 import {
@@ -52,8 +53,8 @@ import {
 const safe = <T>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
 
 /** Datos de las 9 fichas del carrusel del home. Cada ficha es `null` si su fuente falló. */
-export async function getHomeCardsData(): Promise<HomeCards> {
-  const period = await userCurrentPeriod();
+export async function getHomeCardsData(ctx?: AuthContext): Promise<HomeCards> {
+  const period = await userCurrentPeriod(ctx);
 
   // Las 3 lecturas NUEVAS del "vs mes" (movimientos vinculados del periodo + snapshots del
   // portafolio) van en el MISMO Promise.all: corren en paralelo con todo lo demás, así el
@@ -74,19 +75,19 @@ export async function getHomeCardsData(): Promise<HomeCards> {
     snapshots,
     currency,
   ] = await Promise.all([
-    safe(getMonthFlow(period)),
-    safe(getRealTotals(period)),
-    safe(getBudgetTotals(period)),
-    safe(getBaseSummary()),
-    safe(getControlSummary()),
-    safe(getDebtsOverview()),
-    safe(getPortfolioReport()),
-    safe(getWealthSummary()),
-    safe(getRichLifeSummary({ precios: "cache" })),
-    safe(getPatrimonioReport()),
-    safe(listLinkedMovements(period, ["goal", "debt"])),
-    safe(getSnapshotHistory("3M")),
-    getDisplayCurrency(),
+    safe(getMonthFlow(period, ctx)),
+    safe(getRealTotals(period, ctx)),
+    safe(getBudgetTotals(period, ctx)),
+    safe(getBaseSummary(ctx)),
+    safe(getControlSummary(ctx)),
+    safe(getDebtsOverview({}, ctx)),
+    safe(getPortfolioReport(ctx)),
+    safe(getWealthSummary(ctx)),
+    safe(getRichLifeSummary({ precios: "cache" }, ctx)),
+    safe(getPatrimonioReport(ctx)),
+    safe(listLinkedMovements(period, ["goal", "debt"], ctx)),
+    safe(getSnapshotHistory("3M", ctx)),
+    getDisplayCurrency(ctx),
   ]);
 
   // "Vs mes anterior" (Delta 3). Todo se normaliza a la moneda de display; el mes de flujo

@@ -491,8 +491,9 @@ export async function aggregateNetWorth(
  */
 export async function getRichLifeSummary(
   opts: { precios?: "vivo" | "cache" } = {},
+  ctx?: AuthContext,
 ): Promise<RichLifeSummary> {
-  const agg = await aggregateNetWorth(undefined, opts);
+  const agg = await aggregateNetWorth(ctx, opts);
   const input: RichLifeInput = {
     assets: agg.assets,
     liabilities: agg.liabilities,
