@@ -53,3 +53,30 @@ Determinismo: toda la corrida sale de una sola semilla.
 > Regla de oro: **SIEMPRE `SUPABASE_TEST_*`, NUNCA producción.** Además, `setup.ts`
 > apunta el env plano de Supabase al proyecto de PRUEBAS, de modo que ni una
 > creación accidental de cliente sin `ctx` pueda alcanzar producción.
+
+## Librería de personas + motor conductual (F2 · `sim/library/`)
+
+Generaliza de 1 persona guionada a una **librería diversa** conducida por un
+**motor conductual**, corriendo cada persona por una ventana de mes (día a día).
+La rebanada vertical de F1c (`vertical-slice.test.ts`) queda intacta.
+
+- **`persona-types.ts`**: `PersonaSpec` = identidad/demografía + setup financiero +
+  5 **rasgos** conductuales 0–1 (impulsividad de gasto, tendencia a ahorrar,
+  aversión al riesgo, cumplimiento de presupuesto, sensibilidad a emergencias).
+- **`personas/`** (split 3+4 · esta entrega trae 3): `control-excelente`,
+  `sobreendeudado`, `ingreso-muy-bajo`. Rasgos fijos por arquetipo, montos
+  derivados de la semilla. (Faltan 4 en un follow-up.)
+- **`behavior-engine.ts`** `decideDayEvents(persona, state, mes, día, rng)`:
+  traduce rasgos + estado en **eventos reales** (ingreso en día de pago, gastos
+  fijos + discrecionales, aporte/consumo/retiro de meta, pago de deuda mínimo vs
+  extra, compra de inversión **no cotizada**, emergencia compuesta = gasto grande
+  + retiro de ahorro, hito vital = multiplicador de ingreso). Determinista por
+  semilla; los holdings son no cotizados (el cotizado + DCA es F3).
+- **`runner.ts`** `runPersona`/`runLibrary` — parametrizado por **`months`**
+  (default 1). Las **expectativas se acumulan del stream real de eventos**, así los
+  invariantes de F1c (reusados) siguen exactos; agrega adherencia de presupuesto e
+  integridad de vinculadas **dinámica** (conteos del mes). Al **cierre de mes**
+  refresca y **loguea los insights** de la persona (info, sin validar coherencia
+  todavía).
+- **Correr**: `npm run sim` corre TODAS (F1c + librería). `SIM_ONLY=<key>` una sola;
+  `SIM_MONTHS=<n>` amplía la ventana.
