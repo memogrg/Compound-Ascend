@@ -18,6 +18,7 @@ import { cache } from "react";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { logger } from "@/lib/logger";
 import { userToday, userHour } from "@/lib/time/user-time";
@@ -68,11 +69,10 @@ export type MonthConfig = {
 };
 
 /** Config del mes del hogar (o del usuario en modo solo). Sin fila = nunca se cerró. */
-export async function getMonthConfig(period: Period): Promise<MonthConfig> {
+export async function getMonthConfig(period: Period, ctx?: AuthContext): Promise<MonthConfig> {
   try {
-    const user = await requireUser();
-    const supabase = await createSupabaseServerClient();
-    const householdId = await getActiveHouseholdId(supabase, user.id);
+    const { db: supabase, userId } = await resolveAuth(ctx);
+    const householdId = await getActiveHouseholdId(supabase, userId);
     let q = supabase
       .from("budget_month_config")
       .select("closed_at, closed_by")
@@ -81,7 +81,7 @@ export async function getMonthConfig(period: Period): Promise<MonthConfig> {
     // Espeja el índice parcial que ancla la fila: por hogar, o por usuario en modo solo.
     q = householdId
       ? q.eq("household_id", householdId)
-      : q.eq("user_id", user.id).is("household_id", null);
+      : q.eq("user_id", userId).is("household_id", null);
     const { data } = await q.maybeSingle();
     return { closedAt: data?.closed_at ?? null, closedBy: data?.closed_by ?? null };
   } catch (err) {
@@ -218,13 +218,12 @@ export async function getLateEditCounts(period: Period): Promise<LateEditCount[]
 // ── Datos para los detectores ───────────────────────────────────────────────
 
 /** Cuántos movimientos registró el usuario HOY (en su zona). Apaga el recordatorio. */
-export async function contarMovimientosHoy(): Promise<number> {
+export async function contarMovimientosHoy(ctx?: AuthContext): Promise<number> {
   try {
-    const user = await requireUser();
-    const supabase = await createSupabaseServerClient();
+    const { db: supabase, userId } = await resolveAuth(ctx);
     const { householdMemberIds } = await import("@/lib/household/active");
-    const memberIds = await householdMemberIds(supabase, user.id);
-    const today = await userToday();
+    const memberIds = await householdMemberIds(supabase, userId);
+    const today = await userToday(ctx);
     // `created_at` no: la pregunta es "¿registraste algo de hoy?", y cargar el almuerzo
     // de ayer a las 8pm también cuenta como haber hecho el ritual. `occurred_on` es la
     // fecha del hecho, que es lo que el usuario tiene en la cabeza.
@@ -254,7 +253,7 @@ export type ConteosCierre = {
  * como transacciones enlazadas (`linked_kind`/`linked_id`, ver el orquestador en
  * linked-transaction-service.ts), así que no hace falta consultar sus ledgers aparte.
  */
-export async function getConteosCierre(period: Period): Promise<ConteosCierre> {
+export async function getConteosCierre(period: Period, ctx?: AuthContext): Promise<ConteosCierre> {
   const vacio: ConteosCierre = {
     metasSinAporte: 0,
     deudasSinPago: 0,
@@ -269,11 +268,11 @@ export async function getConteosCierre(period: Period): Promise<ConteosCierre> {
     const { listGoals, listDebts } = await import("@/modules/control/services/control-service");
 
     const [txns, goals, debts, budget, real] = await Promise.all([
-      listTransactions(period),
-      listGoals(),
-      listDebts(),
-      getBudgetTotals(period),
-      getRealTotals(period),
+      listTransactions(period, {}, undefined, ctx),
+      listGoals(ctx),
+      listDebts(ctx),
+      getBudgetTotals(period, ctx),
+      getRealTotals(period, ctx),
     ]);
 
     const conAporte = new Set(
@@ -344,8 +343,8 @@ export type FotoDelMes = {
   mesesHistoria: number;
 };
 
-async function _getFotoDelMes(period: Period): Promise<FotoDelMes | null> {
-  const todayIso = await userToday();
+async function _getFotoDelMes(period: Period, ctx?: AuthContext): Promise<FotoDelMes | null> {
+  const todayIso = await userToday(ctx);
   try {
     const { getBudgetTotals } = await import("@/modules/financial-base/services/budget-service");
     const { getRealTotals } = await import("@/modules/financial-base/services/transaction-service");
@@ -359,11 +358,11 @@ async function _getFotoDelMes(period: Period): Promise<FotoDelMes | null> {
     const spanPeriod: Period = { ...period, from: spanStart.from };
 
     const [budget, real, spanReal, cats, mesesHistoria] = await Promise.all([
-      getBudgetTotals(period),
-      getRealTotals(period),
-      getRealTotals(spanPeriod),
-      listCategories(),
-      mesesConHistoria(period, OCIOSO_MESES_VENTANA),
+      getBudgetTotals(period, ctx),
+      getRealTotals(period, ctx),
+      getRealTotals(spanPeriod, ctx),
+      listCategories(ctx),
+      mesesConHistoria(period, OCIOSO_MESES_VENTANA, ctx),
     ]);
 
     // El frasco (padre) solo lo necesita el detector de ociosos, para proponer fusionar entre
@@ -409,12 +408,11 @@ export const getFotoDelMes = cache(_getFotoDelMes);
  * parecerían ociosos — un aviso masivo y falso el primer mes de uso, que es exactamente cuando
  * peor cae. El motor además exige ≥2 meses para pronunciarse.
  */
-async function mesesConHistoria(period: Period, tope: number): Promise<number> {
+async function mesesConHistoria(period: Period, tope: number, ctx?: AuthContext): Promise<number> {
   try {
-    const user = await requireUser();
-    const supabase = await createSupabaseServerClient();
+    const { db: supabase, userId } = await resolveAuth(ctx);
     const { householdMemberIds } = await import("@/lib/household/active");
-    const memberIds = await householdMemberIds(supabase, user.id);
+    const memberIds = await householdMemberIds(supabase, userId);
     const { data } = await supabase
       .from("transactions")
       .select("occurred_on")

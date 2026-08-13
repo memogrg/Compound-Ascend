@@ -7,6 +7,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { now as simNow } from "@/lib/time/clock";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { logger } from "@/lib/logger";
@@ -71,20 +72,20 @@ const RITUAL_KIND = "ritual_patrimonio";
  * Orquestador on-demand: si la última corrida está vieja, recalcula los insights
  * a partir de los datos de control y los sincroniza. Best-effort: nunca rompe.
  */
-export async function refreshInsights(): Promise<void> {
+export async function refreshInsights(ctx?: AuthContext): Promise<void> {
   try {
-    const last = await getInsightsFreshness();
+    const last = await getInsightsFreshness(ctx);
     if (!isStale(last)) return; // guardia de frescura
     // Import dinámico para no acoplar lib/insights con el módulo control.
     const { listGoals, listDebts } = await import("@/modules/control/services/control-service");
-    const [goals, debts] = await Promise.all([listGoals(), listDebts()]);
+    const [goals, debts] = await Promise.all([listGoals(ctx), listDebts(ctx)]);
     const detected = runDetectors({ goals, debts }, simNow());
-    const spend = await getDisfruteSpend();
+    const spend = await getDisfruteSpend(ctx);
     if (spend) detected.push(...detectDisfruteSpike(spend));
     try {
       const { listOpenContributions } =
         await import("@/modules/wealth/services/contribution-service");
-      const contribs = await listOpenContributions();
+      const contribs = await listOpenContributions(ctx);
       detected.push(...detectOpenContributions(contribs));
     } catch {
       // best-effort: si falla, no bloquea el resto de los insights.
@@ -93,7 +94,7 @@ export async function refreshInsights(): Promise<void> {
       // Recordatorio del fondo de paz (F2). best-effort.
       const { getDefenseFundsReport, monthsCovered } = await import("@/modules/wealth");
       const { detectPeaceFundGap } = await import("@/lib/insights/detectors");
-      const plan = await getDefenseFundsReport();
+      const plan = await getDefenseFundsReport(ctx);
       const essentialMonthly = plan.peace.months > 0 ? plan.peace.target / plan.peace.months : 0;
       detected.push(
         ...detectPeaceFundGap({
@@ -113,11 +114,11 @@ export async function refreshInsights(): Promise<void> {
     // tasas FX y el mapa de categorías. Calcularlos dos veces no solo duplicaba ese costo en
     // un camino que corre desde el chat: también abría la puerta a que los dos avisos
     // dijeran cifras distintas del mismo sobre si algo cambiaba entre una lectura y la otra.
-    const mes = await getMesActual();
+    const mes = await getMesActual(ctx);
 
-    detected.push(...(await detectDamageSignals(debts, mes)));
-    detected.push(...(await detectMonthRhythm(mes)));
-    await syncInsights(detected);
+    detected.push(...(await detectDamageSignals(debts, mes, ctx)));
+    detected.push(...(await detectMonthRhythm(mes, ctx)));
+    await syncInsights(detected, ctx);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });
   }
@@ -136,14 +137,15 @@ export async function refreshInsights(): Promise<void> {
  */
 type MesActual = Awaited<ReturnType<typeof import("@/lib/rhythm/rhythm-service").getFotoDelMes>>;
 
-async function getMesActual(): Promise<MesActual> {
+async function getMesActual(ctx?: AuthContext): Promise<MesActual> {
   try {
     const { getFotoDelMes } = await import("@/lib/rhythm/rhythm-service");
     const { userToday } = await import("@/lib/time/user-time");
     const { monthPeriod } = await import("@/modules/financial-base/engine/period");
-    const todayIso = await userToday();
+    const todayIso = await userToday(ctx);
     return await getFotoDelMes(
       monthPeriod(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7))),
+      ctx,
     );
   } catch (err) {
     logger.warn("getMesActual fallido", { message: err instanceof Error ? err.message : "?" });
@@ -162,7 +164,11 @@ async function getMesActual(): Promise<MesActual> {
  *
  * `debts` y `mes` se reciben ya cargados para no volver a pedirlos.
  */
-async function detectDamageSignals(debts: Debt[], mes: MesActual): Promise<DetectedInsight[]> {
+async function detectDamageSignals(
+  debts: Debt[],
+  mes: MesActual,
+  ctx?: AuthContext,
+): Promise<DetectedInsight[]> {
   const out: DetectedInsight[] = [];
 
   // Deuda cara por TASA (la de atraso ya la ve runDetectors). Sin IO: la lista ya está.
@@ -183,7 +189,7 @@ async function detectDamageSignals(debts: Debt[], mes: MesActual): Promise<Detec
   // Tasa de ahorro del mes (misma cifra que ve el usuario en su base financiera).
   try {
     const { getBaseSummary, getDisplayCurrency } = await import("@/modules/financial-base");
-    const [base, currency] = await Promise.all([getBaseSummary(), getDisplayCurrency()]);
+    const [base, currency] = await Promise.all([getBaseSummary(ctx), getDisplayCurrency(ctx)]);
     out.push(
       ...detectLowSavingsRate({
         savingsRate: base.indicators.savingsRate,
@@ -199,7 +205,7 @@ async function detectDamageSignals(debts: Debt[], mes: MesActual): Promise<Detec
   // Fondo de EMERGENCIA incompleto (el de paz ya se detecta arriba, y exige este cubierto).
   try {
     const { getDefenseFundsReport } = await import("@/modules/wealth");
-    const plan = await getDefenseFundsReport();
+    const plan = await getDefenseFundsReport(ctx);
     out.push(
       ...detectEmergencyFundGap({
         covered: plan.emergency.covered,
@@ -217,7 +223,7 @@ async function detectDamageSignals(debts: Debt[], mes: MesActual): Promise<Detec
   try {
     const { getPortfolioReport } = await import("@/modules/wealth/services/portfolio-service");
     const { concentrationByAsset } = await import("@/modules/wealth/engine/portfolio-engine");
-    const report = await getPortfolioReport();
+    const report = await getPortfolioReport(ctx);
     const a = report.analytics;
     out.push(
       ...detectConcentration({
@@ -233,7 +239,7 @@ async function detectDamageSignals(debts: Debt[], mes: MesActual): Promise<Detec
       // criterio que el context-engine. getYoYInflation ya devuelve una proporción (0..1).
       const { getPrimaryCurrency } = await import("@/modules/financial-base");
       const { getYoYInflation } = await import("@/lib/economic-indicators/insights");
-      const primary = await getPrimaryCurrency();
+      const primary = await getPrimaryCurrency(ctx);
       const infl = await getYoYInflation(primary === "CRC" ? "IPC" : "US_CPI");
       if (infl != null)
         out.push(
@@ -269,7 +275,7 @@ async function detectDamageSignals(debts: Debt[], mes: MesActual): Promise<Detec
  * Todo LECTURA (esta función también corre desde el context-engine del asesor). Cada
  * bloque en su propio try/catch: los tres son independientes.
  */
-async function detectMonthRhythm(mes: MesActual): Promise<DetectedInsight[]> {
+async function detectMonthRhythm(mes: MesActual, ctx?: AuthContext): Promise<DetectedInsight[]> {
   const out: DetectedInsight[] = [];
   if (!mes) return out;
   try {
@@ -285,7 +291,7 @@ async function detectMonthRhythm(mes: MesActual): Promise<DetectedInsight[]> {
     // Ventana de configuración. El conteo de sobres con monto sale de `mes.sobres`, no de una
     // consulta propia: ya está calculado y solo hace falta el número.
     try {
-      const config = await getMonthConfig(period);
+      const config = await getMonthConfig(period, ctx);
       out.push(
         ...detectVentanaPresupuesto({
           dia,
@@ -304,7 +310,7 @@ async function detectMonthRhythm(mes: MesActual): Promise<DetectedInsight[]> {
     try {
       const { enDiasDeCierre } = await import("@/lib/rhythm/engine");
       if (enDiasDeCierre({ dia, year, month })) {
-        const conteos = await getConteosCierre(period);
+        const conteos = await getConteosCierre(period, ctx);
         out.push(...detectCierreMes({ dia, year, month, conteos }));
       }
     } catch {
@@ -315,7 +321,7 @@ async function detectMonthRhythm(mes: MesActual): Promise<DetectedInsight[]> {
     // guardia de frescura, así que la superficie fiel es el pop-up en vivo
     // (getRhythmState). Acá igual se emite para que quede registro en "Qué noté".
     try {
-      const [hora, movimientosHoy] = await Promise.all([userHour(), contarMovimientosHoy()]);
+      const [hora, movimientosHoy] = await Promise.all([userHour(ctx), contarMovimientosHoy(ctx)]);
       out.push(...detectRegistroDiario({ todayIso: today, horaLocal: hora, movimientosHoy }));
     } catch {
       // best-effort
@@ -374,7 +380,7 @@ async function detectMonthRhythm(mes: MesActual): Promise<DetectedInsight[]> {
  * Gasto del "frasco de jugar" (categoría 'disfrute' + descendientes): total del
  * mes actual vs promedio de los 3 meses previos. null si no hay categoría disfrute.
  */
-async function getDisfruteSpend(): Promise<{
+async function getDisfruteSpend(ctx?: AuthContext): Promise<{
   current: number;
   priorAvg: number;
   categoryId: string;
@@ -384,7 +390,7 @@ async function getDisfruteSpend(): Promise<{
     await import("@/modules/financial-base/services/transaction-service");
   const { previousMonthPeriod } = await import("@/modules/financial-base/engine/period");
 
-  const cats = await listCategories();
+  const cats = await listCategories(ctx);
   const root = cats.find((c) => c.key === "disfrute");
   if (!root) return null;
 
@@ -402,14 +408,14 @@ async function getDisfruteSpend(): Promise<{
   }
 
   const sumFor = async (period: ReturnType<typeof previousMonthPeriod>): Promise<number> => {
-    const txns = await listTransactions(period, { kind: "gasto" });
+    const txns = await listTransactions(period, { kind: "gasto" }, undefined, ctx);
     return txns
       .filter((t) => t.categoryId && ids.has(t.categoryId))
       .reduce((acc, t) => acc + t.amount, 0);
   };
 
   const { userCurrentPeriod } = await import("@/lib/time/user-time");
-  const cur = await userCurrentPeriod();
+  const cur = await userCurrentPeriod(ctx);
   const p1 = previousMonthPeriod(cur);
   const p2 = previousMonthPeriod(p1);
   const p3 = previousMonthPeriod(p2);
@@ -428,10 +434,9 @@ async function getDisfruteSpend(): Promise<{
  * el Marco Patrimonial y lo deja activo en user_insights para "Qué noté". Reusa
  * getPatrimonioReport por sesión; guardia diaria; uno activo a la vez. Best-effort.
  */
-export async function refreshDailyPatrimonioInsight(): Promise<void> {
+export async function refreshDailyPatrimonioInsight(ctx?: AuthContext): Promise<void> {
   try {
-    const user = await requireUser();
-    const supabase = await createSupabaseServerClient();
+    const { db: supabase, userId } = await resolveAuth(ctx);
 
     // Guardia diaria: si ya se generó un ritual fresco (<20 h), no regenerar.
     // Sin filtrar por status: un ritual descartado también cuenta como "el del
@@ -440,7 +445,7 @@ export async function refreshDailyPatrimonioInsight(): Promise<void> {
     const { data: last } = await supabase
       .from("user_insights")
       .select("updated_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("kind", RITUAL_KIND)
       .order("updated_at", { ascending: false })
       .limit(1)
@@ -448,20 +453,20 @@ export async function refreshDailyPatrimonioInsight(): Promise<void> {
     if (!isStale(last?.updated_at ? new Date(last.updated_at) : null, 20)) return;
 
     const { getPatrimonioReport, buildDailyPatrimonioInsight } = await import("@/modules/wealth");
-    const { report, level, diagnosis } = await getPatrimonioReport();
+    const { report, level, diagnosis } = await getPatrimonioReport(ctx);
     const detected = buildDailyPatrimonioInsight(report, level, diagnosis);
-    const household_id = await getActiveHouseholdId(supabase, user.id);
+    const household_id = await getActiveHouseholdId(supabase, userId);
 
     // Uno activo a la vez: como related_id es null, el upsert no dedupea; cerramos
     // el ritual previo y luego insertamos el nuevo.
     await supabase
       .from("user_insights")
       .update({ status: "resuelto" })
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("kind", RITUAL_KIND)
       .eq("status", "activo");
     await supabase.from("user_insights").insert({
-      user_id: user.id,
+      user_id: userId,
       household_id,
       kind: detected.kind,
       severity: detected.severity,
@@ -566,16 +571,15 @@ export async function generateDailyRitualForAllUsers(): Promise<{
 }
 
 /** Insights activos, priorizados por severidad y luego por recencia. */
-export async function getActiveInsights(limit = 5): Promise<Insight[]> {
+export async function getActiveInsights(limit = 5, ctx?: AuthContext): Promise<Insight[]> {
   // Auto-activación: cualquier lectura refresca si está viejo (best-effort).
-  await refreshInsights();
-  await refreshDailyPatrimonioInsight();
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+  await refreshInsights(ctx);
+  await refreshDailyPatrimonioInsight(ctx);
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("user_insights")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("status", "activo");
   const rows = (data ?? []).map(rowToInsight);
   rows.sort(
@@ -587,13 +591,12 @@ export async function getActiveInsights(limit = 5): Promise<Insight[]> {
 }
 
 /** Última actualización de insights del usuario (guardia de frescura para 4b). */
-export async function getInsightsFreshness(): Promise<Date | null> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function getInsightsFreshness(ctx?: AuthContext): Promise<Date | null> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("user_insights")
     .select("updated_at")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -604,10 +607,9 @@ export async function getInsightsFreshness(): Promise<Date | null> {
  * Sincroniza los insights detectados: upsert por (user_id, kind, related_id) y
  * marca 'resuelto' los activos cuyo (kind, related_id) ya no aparece en `detected`.
  */
-export async function syncInsights(detected: DetectedInsight[]): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+export async function syncInsights(detected: DetectedInsight[], ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const household_id = await getActiveHouseholdId(supabase, userId);
 
   if (detected.length > 0) {
     // El upsert fija status 'activo': si incluyera keys descartadas las
@@ -616,13 +618,13 @@ export async function syncInsights(detected: DetectedInsight[]): Promise<void> {
     const { data: dismissed } = await supabase
       .from("user_insights")
       .select("kind, related_id")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .eq("status", "descartado");
     const dismissedKeys = new Set((dismissed ?? []).map((d) => keyOf(d.kind, d.related_id)));
     const rows = detected
       .filter((d) => !dismissedKeys.has(keyOf(d.kind, d.relatedId)))
       .map((d) => ({
-        user_id: user.id,
+        user_id: userId,
         household_id,
         kind: d.kind,
         severity: d.severity,
@@ -654,7 +656,7 @@ export async function syncInsights(detected: DetectedInsight[]): Promise<void> {
   const { data: actives } = await supabase
     .from("user_insights")
     .select("id, kind, related_id")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("status", "activo");
   const present = new Set(detected.map((d) => keyOf(d.kind, d.relatedId)));
   const toResolve = (actives ?? [])

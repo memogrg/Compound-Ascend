@@ -8,6 +8,7 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { householdMemberIds } from "@/lib/household/active";
 import { getPrimaryCurrency } from "@/modules/financial-base";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -31,13 +32,12 @@ export type DefenseFundsReport = DefenseFundsPlan & {
 };
 
 /** Meses del fondo de paz del usuario (preferencia PERSONAL). Default 3 si no hay valor. */
-export async function getPeaceMonths(): Promise<number> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function getPeaceMonths(ctx?: AuthContext): Promise<number> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const { data } = await supabase
     .from("user_settings")
     .select("peace_fund_months")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   const n = data?.peace_fund_months;
   return typeof n === "number" ? n : PEACE_MONTHS_DEFAULT;
@@ -55,20 +55,21 @@ export async function setPeaceMonths(months: number): Promise<number> {
 }
 
 /** Plan dimensionado de los fondos de emergencia y paz, en la moneda PRINCIPAL del usuario. */
-export async function getDefenseFundsReport(): Promise<DefenseFundsReport> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function getDefenseFundsReport(ctx?: AuthContext): Promise<DefenseFundsReport> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const [members, currency, rates, peaceMonths] = await Promise.all([
-    householdMemberIds(supabase, user.id),
-    getPrimaryCurrency(),
+    householdMemberIds(supabase, userId),
+    getPrimaryCurrency(ctx),
     getFxRates(),
-    getPeaceMonths(),
+    getPeaceMonths(ctx),
   ]);
 
   // Esencial SIN los aportes a los propios fondos de defensa, en la moneda principal.
-  const essential = await getEssentialMonthlyExpense({ currency, excludeDefenseFunds: true }).catch(
-    () => null,
-  );
+  const essential = await getEssentialMonthlyExpense({
+    currency,
+    excludeDefenseFunds: true,
+    ctx,
+  }).catch(() => null);
   const essentialMonthly = essential?.total ?? 0;
 
   // Acumulado por fondo (metas savings_goals defensa:fondo_*), convertido a la moneda principal.
