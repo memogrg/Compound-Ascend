@@ -13,6 +13,7 @@ import { parseDesiredLifestyle } from "@/modules/wealth/services/lifestyle-servi
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { monthlyize, getPrimaryCurrency, type Frequency } from "@/modules/financial-base";
 import { aggregateNetWorth } from "@/modules/rich-life";
+import { getCurrentDebtBalances } from "@/modules/control";
 import { sumAssetsByClass, isBadDebt } from "@/modules/wealth/engine/patrimonio-mappers";
 import type { EssentialBreakdown } from "@/modules/wealth/engine/essential-expense";
 import type { CommitmentBreakdown } from "@/modules/wealth/engine/total-commitment";
@@ -69,10 +70,10 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   const assetsByClass = sumAssetsByClass(agg.assets);
   const totalLiabilities = agg.liabilities.reduce((s, l) => s + l.balance, 0);
 
-  const [debtRows, invRows, goalRows, profileRow] = await Promise.all([
+  const [debtRows, invRows, goalRows, profileRow, debtBalances] = await Promise.all([
     db
       .from("debts")
-      .select("classification,apr,min_payment,current_payment,balance,currency")
+      .select("id,classification,apr,min_payment,current_payment,balance,currency")
       .in("user_id", memberIds),
     db.from("investments").select("contribution,contribution_frequency").in("user_id", memberIds),
     db
@@ -81,14 +82,20 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
       .in("user_id", memberIds),
     // Perfil PERSONAL del usuario (no del hogar): edad + estilo de vida deseado.
     db.from("personal_profiles").select("age,extra").eq("user_id", userId).maybeSingle(),
+    // Saldo VIGENTE canónico por deuda (ancla − pagos), para filtrar por saldo vivo.
+    getCurrentDebtBalances(ctx),
   ]);
+  const currentBalanceById = new Map(debtBalances.map((d) => [d.id, d.currentBalance]));
 
   // Pago mensual de deuda MALA (Fuga #3): cuota actual (o mínima) de las deudas
   // caras/críticas con saldo vivo, normalizada a la moneda de display.
   const badDebtMonthlyPayment = (debtRows.data ?? [])
     .filter(
+      // Saldo VIGENTE (ancla − pagos), no el ancla cruda: una deuda saldada por sus
+      // pagos ya no cuenta su cuota. Mismo número canónico que Deudas/Patrimonio.
       (d) =>
-        Number(d.balance) > 0 && isBadDebt(d.classification, d.apr === null ? null : Number(d.apr)),
+        (currentBalanceById.get(d.id) ?? 0) > 0 &&
+        isBadDebt(d.classification, d.apr === null ? null : Number(d.apr)),
     )
     .reduce(
       (s, d) =>

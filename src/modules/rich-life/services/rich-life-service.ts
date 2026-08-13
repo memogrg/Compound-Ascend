@@ -17,6 +17,7 @@ import {
   getLiquidityBalance,
 } from "@/modules/financial-base";
 import { computeProtection, computePortfolio } from "@/modules/wealth";
+import { getCurrentDebtBalances } from "@/modules/control";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { mapInvestmentLiquidity, savingsLiquidity } from "@/modules/rich-life/engine/asset-mapping";
 import { convertCurrency } from "@/lib/fx";
@@ -236,7 +237,7 @@ export async function aggregateNetWorth(
   const [
     assetRows,
     liabRows,
-    debtRows,
+    debtBalances,
     invRows,
     policyRows,
     profileRow,
@@ -248,10 +249,9 @@ export async function aggregateNetWorth(
   ] = await Promise.all([
     db.from("assets").select("*").in("user_id", memberIds),
     db.from("liabilities").select("*").in("user_id", memberIds),
-    db
-      .from("debts")
-      .select("id,name,balance,classification,apr,delinquency,currency")
-      .in("user_id", memberIds),
+    // Saldo VIGENTE canónico (ancla − pagos), la MISMA función que usa Deudas.
+    // Antes se leía `debts.balance` crudo (el ancla) y el neto caía al pagar.
+    getCurrentDebtBalances(ctx),
     db.from("investments").select("*").in("user_id", memberIds),
     db
       .from("insurance_policies")
@@ -388,8 +388,8 @@ export async function aggregateNetWorth(
     balance: Number(r.balance),
     currency: r.currency,
   }));
-  const debtLiabs: Liability[] = (debtRows.data ?? [])
-    .filter((d) => Number(d.balance) > 0)
+  const debtLiabs: Liability[] = debtBalances
+    .filter((d) => d.currentBalance > 0)
     .map((d) => ({
       id: "debt-" + d.id,
       name: d.name,
@@ -398,8 +398,9 @@ export async function aggregateNetWorth(
         : d.classification === "estrategica"
           ? "patrimonial"
           : "consumo") as LiabilityClass,
-      balance: Number(d.balance),
-      // Bug C: la deuda se etiqueta con su moneda REAL (antes display, sin convertir).
+      // Saldo VIGENTE (ancla − pagos), canónico: antes leía el ancla cruda y el
+      // neto caía al pagar. Moneda REAL de la deuda (se convierte a display luego).
+      balance: d.currentBalance,
       currency: d.currency,
     }));
   const liabilities = [...explicitLiabs, ...debtLiabs];
@@ -428,9 +429,9 @@ export async function aggregateNetWorth(
     premiumFrequency: p.premium_frequency,
     currency,
   }));
-  const hasCriticalDebt = (debtRows.data ?? []).some(
+  const hasCriticalDebt = debtBalances.some(
     (d) =>
-      Number(d.balance) > 0 &&
+      d.currentBalance > 0 &&
       (Number(d.apr ?? 0) >= 30 || (d.delinquency && d.delinquency !== "no")),
   );
   const investments: Investment[] = (invRows.data ?? []).map((r) => ({

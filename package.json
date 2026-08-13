@@ -13,7 +13,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:eval": "vitest run tests/evals"
+    "test:eval": "vitest run tests/evals",
+    "sim": "vitest run --config sim/vitest.config.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^9.1.2",
@@ -51,6 +52,7 @@
     "@types/nodemailer": "^7.0.12",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9.11.1",
@@ -59,7 +61,8 @@
     "prettier": "^3.9.6",
     "tailwindcss": "^4.0.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "ws": "^8.21.3"
   },
   "overrides": {
     "postcss": "^8.5.15"

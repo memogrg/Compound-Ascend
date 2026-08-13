@@ -48,6 +48,9 @@ function fakeDb() {
         select: () => builder,
         eq: () => builder,
         in: () => builder,
+        // El saldo vigente canónico (getCurrentDebtBalances → listDebts /
+        // listDebtPaymentsByDebt) ordena por fecha; el fake debe modelar `.order`.
+        order: () => builder,
         maybeSingle: async () => ({ data: (data as unknown[])[0] ?? null }),
         then: (resolve: (v: { data: unknown[] }) => void) => resolve({ data: data as unknown[] }),
       };
