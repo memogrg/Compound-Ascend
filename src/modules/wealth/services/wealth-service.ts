@@ -5,6 +5,7 @@ import { logHouseholdDeletion } from "@/lib/household/activity-log";
 /** Servicio del Módulo 4 (respeta RLS). Cruza Base, Control y Perfil. */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   getBaseSummary,
   getDisplayCurrency,
@@ -67,10 +68,9 @@ function rowToPolicy(r: InsurancePolicyRow): InsurancePolicy {
   };
 }
 
-export async function listInvestments(): Promise<Investment[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function listInvestments(ctx?: AuthContext): Promise<Investment[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("investments")
     .select("*")
@@ -79,10 +79,9 @@ export async function listInvestments(): Promise<Investment[]> {
   return (data ?? []).map(rowToInvestment);
 }
 
-export async function listPolicies(): Promise<InsurancePolicy[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function listPolicies(ctx?: AuthContext): Promise<InsurancePolicy[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("insurance_policies")
     .select("*")
@@ -101,10 +100,9 @@ export async function listPolicies(): Promise<InsurancePolicy[]> {
  * La moneda la impone la póliza (misma guarda que la venta de inversión): un importe que la
  * contradiga se rechaza en vez de guardarse contra una referencia equivocada.
  */
-export async function payPolicyPremium(input: PolicyPremiumInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function payPolicyPremium(input: PolicyPremiumInput, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
 
   const { data: row, error } = await supabase
     .from("insurance_policies")
@@ -129,8 +127,9 @@ export async function payPolicyPremium(input: PolicyPremiumInput): Promise<void>
       currency: policy.currency,
       paymentDate: input.paymentDate,
       amount: input.amount,
-      categoryId: await getSystemCategoryId("seguros"),
+      categoryId: await getSystemCategoryId("seguros", ctx),
     }),
+    ctx,
   );
 }
 
@@ -153,13 +152,12 @@ export async function createInvestment(input: InvestmentInput): Promise<void> {
 }
 
 /** Crea una póliza y devuelve su id (el id permite vincular una meta de ahorro). */
-export async function createPolicy(input: PolicyInput): Promise<string> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function createPolicy(input: PolicyInput, ctx?: AuthContext): Promise<string> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
   const { data, error } = await supabase
     .from("insurance_policies")
     .insert({
-      user_id: user.id,
+      user_id: userId,
       policy_type: input.policyType,
       provider: input.provider ?? null,
       coverage: input.coverage ?? null,
@@ -279,17 +277,16 @@ export type WealthSummary = {
   currency: string;
 };
 
-export async function getWealthSummary(): Promise<WealthSummary> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function getWealthSummary(ctx?: AuthContext): Promise<WealthSummary> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
 
-  const memberIds = await householdMemberIds(supabase, user.id);
+  const memberIds = await householdMemberIds(supabase, userId);
   const [investments, policies, holdings, base, currency, rates] = await Promise.all([
-    listInvestments(),
-    listPolicies(),
-    listHoldings(),
-    getBaseSummary(),
-    getDisplayCurrency(),
+    listInvestments(ctx),
+    listPolicies(ctx),
+    listHoldings(ctx),
+    getBaseSummary(ctx),
+    getDisplayCurrency(ctx),
     getFxRates(),
   ]);
 
@@ -297,9 +294,9 @@ export async function getWealthSummary(): Promise<WealthSummary> {
     supabase
       .from("personal_profiles")
       .select("dependents_count")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle(),
-    supabase.from("risk_profiles").select("risk_class").eq("user_id", user.id).maybeSingle(),
+    supabase.from("risk_profiles").select("risk_class").eq("user_id", userId).maybeSingle(),
     // Metas y deudas: datos del HOGAR (display). Los perfiles de arriba siguen
     // por user_id — son 1 fila por persona y .maybeSingle() reventaría con dos.
     supabase.from("savings_goals").select("name,current_amount,goal_type").in("user_id", memberIds),
@@ -322,7 +319,9 @@ export async function getWealthSummary(): Promise<WealthSummary> {
       (Number(d.apr ?? 0) >= 30 || (d.delinquency && d.delinquency !== "no")),
   );
 
-  const ctx = {
+  // Contexto para los motores (readiness/protección). Renombrado desde `ctx` para no
+  // colisionar con el AuthContext inyectable; es un objeto de cómputo, no de auth.
+  const engineCtx = {
     freeCashflow: base.indicators.freeCashflow,
     hasEmergencyFund,
     hasPeaceFund,
@@ -343,8 +342,8 @@ export async function getWealthSummary(): Promise<WealthSummary> {
       p.premium == null ? p.premium : convertCurrency(p.premium, p.currency, currency, rates),
   }));
 
-  const readiness = computeReadiness(ctx, investments);
-  const protection = computeProtection(ctx, policiesForEngine);
+  const readiness = computeReadiness(engineCtx, investments);
+  const protection = computeProtection(engineCtx, policiesForEngine);
   const portfolio = computePortfolio(investments);
   const balance = computeBalance(readiness, protection, investments.length > 0);
   const prices = await getLivePrices(investments);

@@ -120,14 +120,17 @@ const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
  * (linked_kind='holding', categoría 'inversiones'). Devuelve el id de la
  * transacción para poder compensar si la escritura del holding falla.
  */
-export async function registerPurchaseExpense(args: {
-  holdingId: string;
-  label: string;
-  currency: string;
-  purchaseDate: string | null | undefined;
-  amount: number;
-  verb: "Compra" | "Aporte" | "Prima" | "Adelanto";
-}): Promise<string | null> {
+export async function registerPurchaseExpense(
+  args: {
+    holdingId: string;
+    label: string;
+    currency: string;
+    purchaseDate: string | null | undefined;
+    amount: number;
+    verb: "Compra" | "Aporte" | "Prima" | "Adelanto";
+  },
+  ctx?: AuthContext,
+): Promise<string | null> {
   if (args.amount <= 0) return null;
   const id = await registerLinkedTransaction(
     holdingPurchaseToTxn({
@@ -137,18 +140,18 @@ export async function registerPurchaseExpense(args: {
       purchaseDate: args.purchaseDate ?? simNow().toISOString().slice(0, 10),
       amount: args.amount,
       verb: args.verb,
-      categoryId: await getSystemCategoryId("inversiones"),
+      categoryId: await getSystemCategoryId("inversiones", ctx),
     }),
+    ctx,
   );
   // Defensivo: garantizar el vínculo al holding. Aunque holdingPurchaseToTxn ya lo
   // setea, blindamos por si createTransaction lo normaliza a 'none' en algún flujo.
   if (id) {
-    const user = await requireUser();
-    const supabase = await createSupabaseServerClient();
-    const scope = await householdWriteScope(supabase, user.id);
+    const { db: supabase, userId } = await resolveAuth(ctx);
+    const scope = await householdWriteScope(supabase, userId);
     await supabase
       .from("transactions")
-      .update({ last_edited_by: user.id, linked_kind: "holding", linked_id: args.holdingId })
+      .update({ last_edited_by: userId, linked_kind: "holding", linked_id: args.holdingId })
       .eq("id", id)
       .in("user_id", scope);
   }
@@ -301,10 +304,9 @@ export async function getPositionForSymbol(
     : null;
 }
 
-export async function createHolding(input: HoldingInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function createHolding(input: HoldingInput, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
   const symbol = resolveSymbol(input);
   const label = input.label?.trim() || null;
 
@@ -336,19 +338,22 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     // la entidad ya existe); si el update falla, se compensa borrándolo.
     let txnId: string | null = null;
     if (input.registerExpense) {
-      txnId = await registerPurchaseExpense({
-        holdingId: existing.id,
-        label: label ?? symbol,
-        currency: input.currency,
-        purchaseDate: input.purchaseDate,
-        amount: purchaseExpenseAmount({
-          isRental,
-          quantity: input.quantity,
-          averageCost: input.averageCost,
-          currentValueManual: input.currentValueManual,
-        }),
-        verb: "Aporte",
-      });
+      txnId = await registerPurchaseExpense(
+        {
+          holdingId: existing.id,
+          label: label ?? symbol,
+          currency: input.currency,
+          purchaseDate: input.purchaseDate,
+          amount: purchaseExpenseAmount({
+            isRental,
+            quantity: input.quantity,
+            averageCost: input.averageCost,
+            currentValueManual: input.currentValueManual,
+          }),
+          verb: "Aporte",
+        },
+        ctx,
+      );
     }
 
     const prevQty = Number(existing.quantity ?? 0);
@@ -361,7 +366,7 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     const { error } = await supabase
       .from("investment_holdings")
       .update({
-        last_edited_by: user.id,
+        last_edited_by: userId,
         quantity: newQty,
         average_cost: newAvg,
         cost_basis: newQty * newAvg,
@@ -371,22 +376,22 @@ export async function createHolding(input: HoldingInput): Promise<void> {
       .eq("id", existing.id)
       .in("user_id", scope);
     if (error) {
-      if (txnId) await deleteLinkedTransaction(txnId);
+      if (txnId) await deleteLinkedTransaction(txnId, ctx);
       throw new Error(error.message);
     }
-    await recordPurchaseTx(supabase, user.id, existing.id, input);
+    await recordPurchaseTx(supabase, userId, existing.id, input);
     return;
   }
 
   // household: cubre el hueco del sub-PR household de main (no tocó este insert).
-  const household_id = await getActiveHouseholdId(supabase, user.id);
+  const household_id = await getActiveHouseholdId(supabase, userId);
   const { data: created, error } = await supabase
     .from("investment_holdings")
     .insert({
-      user_id: user.id,
+      user_id: userId,
       household_id,
-      created_by: user.id,
-      last_edited_by: user.id,
+      created_by: userId,
+      last_edited_by: userId,
       investment_id: input.investmentId ?? null,
       label,
       symbol,
@@ -406,25 +411,28 @@ export async function createHolding(input: HoldingInput): Promise<void> {
     .single();
   if (error) throw new Error(error.message);
 
-  if (canMerge && created) await recordPurchaseTx(supabase, user.id, created.id, input);
+  if (canMerge && created) await recordPurchaseTx(supabase, userId, created.id, input);
 
   // Compra nueva: el holding existe primero (la transacción lo referencia);
   // si el gasto vinculado falla, se compensa borrando el holding recién creado.
   if (input.registerExpense && created) {
     try {
-      await registerPurchaseExpense({
-        holdingId: created.id,
-        label: label ?? symbol,
-        currency: input.currency,
-        purchaseDate: input.purchaseDate,
-        amount: purchaseExpenseAmount({
-          isRental,
-          quantity: input.quantity,
-          averageCost: input.averageCost,
-          currentValueManual: input.currentValueManual,
-        }),
-        verb: "Compra",
-      });
+      await registerPurchaseExpense(
+        {
+          holdingId: created.id,
+          label: label ?? symbol,
+          currency: input.currency,
+          purchaseDate: input.purchaseDate,
+          amount: purchaseExpenseAmount({
+            isRental,
+            quantity: input.quantity,
+            averageCost: input.averageCost,
+            currentValueManual: input.currentValueManual,
+          }),
+          verb: "Compra",
+        },
+        ctx,
+      );
     } catch (err) {
       await supabase.from("investment_holdings").delete().eq("id", created.id).in("user_id", scope);
       throw err;
@@ -445,10 +453,12 @@ export async function createHolding(input: HoldingInput): Promise<void> {
  * La moneda la impone el holding (misma guarda que la venta): un importe que la contradiga se
  * rechaza en vez de guardarse contra una referencia equivocada.
  */
-export async function contributeToHolding(input: HoldingContributionInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function contributeToHolding(
+  input: HoldingContributionInput,
+  ctx?: AuthContext,
+): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
 
   const { data: row, error: hErr } = await supabase
     .from("investment_holdings")
@@ -472,17 +482,20 @@ export async function contributeToHolding(input: HoldingContributionInput): Prom
   if (plan.kind === "quoted") {
     // Encuentra ESTA posición por su clave (symbol+tipo+moneda+etiqueta), promedia el costo,
     // registra el historial y el gasto vinculado con su propio rollback compensatorio.
-    await createHolding({
-      assetType: holding.assetType,
-      symbol: holding.symbol ?? undefined,
-      label: holding.label ?? undefined,
-      currency: holding.currency,
-      quantity: plan.quantity,
-      averageCost: plan.unitPrice,
-      purchaseDate: occurredOn,
-      broker: holding.broker ?? undefined,
-      registerExpense: true,
-    });
+    await createHolding(
+      {
+        assetType: holding.assetType,
+        symbol: holding.symbol ?? undefined,
+        label: holding.label ?? undefined,
+        currency: holding.currency,
+        quantity: plan.quantity,
+        averageCost: plan.unitPrice,
+        purchaseDate: occurredOn,
+        broker: holding.broker ?? undefined,
+        registerExpense: true,
+      },
+      ctx,
+    );
     return;
   }
 
@@ -491,18 +504,21 @@ export async function contributeToHolding(input: HoldingContributionInput): Prom
   const newAvg = holding.quantity > 0 ? plan.newInvested / holding.quantity : plan.newInvested;
 
   // El gasto nace primero (la entidad ya existe); si el UPDATE falla, se compensa borrándolo.
-  const txnId = await registerPurchaseExpense({
-    holdingId: holding.id,
-    label: holding.label ?? symbol,
-    currency: holding.currency,
-    purchaseDate: occurredOn,
-    amount: plan.addedAmount,
-    verb: "Aporte",
-  });
+  const txnId = await registerPurchaseExpense(
+    {
+      holdingId: holding.id,
+      label: holding.label ?? symbol,
+      currency: holding.currency,
+      purchaseDate: occurredOn,
+      amount: plan.addedAmount,
+      verb: "Aporte",
+    },
+    ctx,
+  );
   const { error } = await supabase
     .from("investment_holdings")
     .update({
-      last_edited_by: user.id,
+      last_edited_by: userId,
       average_cost: newAvg,
       cost_basis: plan.newInvested,
       current_value_manual: plan.newValue,
@@ -510,13 +526,13 @@ export async function contributeToHolding(input: HoldingContributionInput): Prom
     .eq("id", holding.id)
     .in("user_id", scope);
   if (error) {
-    if (txnId) await deleteLinkedTransaction(txnId);
+    if (txnId) await deleteLinkedTransaction(txnId, ctx);
     throw new Error(error.message);
   }
   // Historial (best-effort, como recordPurchaseTx): compra del importe, sin cantidad — un
   // certificado no tiene unidades —, para que el aporte aparezca en el detalle igual que uno
   // cotizado.
-  await recordManualContributionTx(supabase, user.id, holding.id, {
+  await recordManualContributionTx(supabase, userId, holding.id, {
     amount: plan.addedAmount,
     currency: holding.currency,
     occurredOn,

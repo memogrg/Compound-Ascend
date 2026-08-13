@@ -5,7 +5,6 @@ import "server-only";
  * cálculo y analytics completos. Todos los montos se normalizan a la moneda
  * principal del usuario antes de pasarse al motor.
  */
-import { requireUser } from "@/lib/auth/session";
 import {
   getMarketPrice,
   getCryptoPricesBatch,
@@ -379,15 +378,15 @@ function normalizeDividendAmounts(
   }));
 }
 
-export async function getPortfolioReport(): Promise<PortfolioReport> {
-  await requireUser();
+export async function getPortfolioReport(ctx?: AuthContext): Promise<PortfolioReport> {
+  await resolveAuth(ctx);
 
   const [holdings, dividends, currency, rates, wealthSummary] = await Promise.all([
-    listHoldings(),
-    listDividends(),
-    getPrimaryCurrency(),
+    listHoldings(ctx),
+    listDividends(undefined, ctx),
+    getPrimaryCurrency(ctx),
     getFxRates(),
-    getWealthSummary(),
+    getWealthSummary(ctx),
   ]);
 
   const normalizedHoldings = normalizeHoldings(holdings, currency, rates);
