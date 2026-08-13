@@ -11,6 +11,7 @@ import { monedaDelMovimientoEsCoherente } from "@/modules/wealth/engine/portfoli
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   registerLinkedTransaction,
   deleteLinkedTransaction,
@@ -50,10 +51,9 @@ function rowToDividend(r: {
   };
 }
 
-export async function listDividends(holdingId?: string): Promise<Dividend[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function listDividends(holdingId?: string, ctx?: AuthContext): Promise<Dividend[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   let query = supabase
     .from("dividends")
     .select("id,holding_id,payment_date,amount,currency,yield_pct,frequency,income_id")

@@ -8,8 +8,8 @@ import { householdMemberIds } from "@/lib/household/active";
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { now as simNow } from "@/lib/time/clock";
 import { logger } from "@/lib/logger";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -42,11 +42,13 @@ function rowToSnapshot(r: {
 }
 
 /** Devuelve snapshots del portafolio filtrados por período. */
-export async function getSnapshotHistory(period: SnapshotPeriod): Promise<PortfolioSnapshot[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function getSnapshotHistory(
+  period: SnapshotPeriod,
+  ctx?: AuthContext,
+): Promise<PortfolioSnapshot[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
 
-  const memberIds = await householdMemberIds(supabase, user.id);
+  const memberIds = await householdMemberIds(supabase, userId);
   const cutoff = periodCutoff(period);
   let query = supabase
     .from("portfolio_snapshots")
