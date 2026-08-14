@@ -63,9 +63,10 @@ La rebanada vertical de F1c (`vertical-slice.test.ts`) queda intacta.
 - **`persona-types.ts`**: `PersonaSpec` = identidad/demografía + setup financiero +
   5 **rasgos** conductuales 0–1 (impulsividad de gasto, tendencia a ahorrar,
   aversión al riesgo, cumplimiento de presupuesto, sensibilidad a emergencias).
-- **`personas/`** (split 3+4 · esta entrega trae 3): `control-excelente`,
-  `sobreendeudado`, `ingreso-muy-bajo`. Rasgos fijos por arquetipo, montos
-  derivados de la semilla. (Faltan 4 en un follow-up.)
+- **`personas/`** (librería completa · 7 arquetipos): `control-excelente`,
+  `sobreendeudado`, `ingreso-muy-bajo`, `ingresos-irregulares`,
+  `familia-metas-educacion`, `comprador-vivienda`, `inversionista-activo`. Rasgos
+  fijos por arquetipo, montos derivados de la semilla; holdings no cotizados.
 - **`behavior-engine.ts`** `decideDayEvents(persona, state, mes, día, rng)`:
   traduce rasgos + estado en **eventos reales** (ingreso en día de pago, gastos
   fijos + discrecionales, aporte/consumo/retiro de meta, pago de deuda mínimo vs
