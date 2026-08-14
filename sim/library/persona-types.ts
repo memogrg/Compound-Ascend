@@ -109,6 +109,15 @@ export interface MonthTally {
   debtMovs: number;
   goalMovs: number;
   jarSpends: number;
+  // Net amounts for the vs-mes evolution chips (F3a).
+  /** Goal contributions this month (+ savings). */
+  goalContribAmount: number;
+  /** Goal withdrawals this month (− savings, returned to liquidity). */
+  goalWithdrawAmount: number;
+  /** Off-budget jar consumption this month (− savings). */
+  goalSpendAmount: number;
+  /** Debt payments this month. */
+  debtPayAmount: number;
 }
 
 export function emptyMonthTally(): MonthTally {
@@ -120,5 +129,9 @@ export function emptyMonthTally(): MonthTally {
     debtMovs: 0,
     goalMovs: 0,
     jarSpends: 0,
+    goalContribAmount: 0,
+    goalWithdrawAmount: 0,
+    goalSpendAmount: 0,
+    debtPayAmount: 0,
   };
 }
