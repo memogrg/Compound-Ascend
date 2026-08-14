@@ -126,11 +126,17 @@ export async function validateGoal(
     approx(movementsSum, gd.currentAmount, 0.01),
     `Σmov=${round2(movementsSum)} acumulado=${round2(gd.currentAmount)}`,
   );
+  // Sin movimientos (meta creada pero el mes no la tocó — estado válido, p.ej. una
+  // persona demasiado pobre para aportar) pasa trivialmente: no hay "último" saldo
+  // corrido que reconciliar, y la consistencia 0 = acumulado ya la cubre el check
+  // anterior. Con movimientos, el saldo corrido debe cerrar en el acumulado.
   push(
     log,
     "meta · saldo corrido cierra en el acumulado",
-    last ? approx(last.balance, gd.currentAmount, 0.01) : false,
-    last ? `último=${round2(last.balance)} acumulado=${round2(gd.currentAmount)}` : "sin movimientos",
+    last ? approx(last.balance, gd.currentAmount, 0.01) : true,
+    last
+      ? `último=${round2(last.balance)} acumulado=${round2(gd.currentAmount)}`
+      : "sin movimientos (trivial: 0 = acumulado)",
   );
 }
 

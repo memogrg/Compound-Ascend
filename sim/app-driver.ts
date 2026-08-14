@@ -21,8 +21,9 @@ import {
   addDebtPayment,
   addGoalContribution,
   spendFromGoal,
+  withdrawFromGoal,
 } from "@/modules/control/services/control-service";
-import { createHolding } from "@/modules/wealth/services/holdings-service";
+import { createHolding, contributeToHolding } from "@/modules/wealth/services/holdings-service";
 import type { EventLog } from "./event-log";
 
 export class AppDriver {
@@ -167,8 +168,9 @@ export class AppDriver {
   }
 
   /** Creates a NON-quoted holding (certificado): valued at its manual value, no
-   *  live price fetch, no linked purchase txn (registerExpense off). */
-  async addHolding(label: string, value: number): Promise<void> {
+   *  live price fetch, no linked purchase txn (registerExpense off). Reads the id
+   *  back (the write returns void) so the motor can contribute to it later. */
+  async addHolding(label: string, value: number): Promise<string> {
     await createHolding(
       {
         assetType: "certificado",
@@ -181,7 +183,17 @@ export class AppDriver {
       },
       this.ctx,
     );
-    this.log.record("setup", `inversión no cotizada "${label}"`, this.day, { value });
+    const { data, error } = await this.ctx.db
+      .from("investment_holdings")
+      .select("id")
+      .eq("user_id", this.ctx.userId)
+      .eq("label", label)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) throw new Error(`no encontré la inversión "${label}": ${error?.message ?? "sin fila"}`);
+    this.log.record("setup", `inversión no cotizada "${label}"`, this.day, { value, id: data.id });
+    return data.id;
   }
 
   // ---- EVENTS ----
@@ -191,7 +203,7 @@ export class AppDriver {
     this.log.record("event", "ingreso recibido (receivePartialIncome)", this.day, { amount, dateISO });
   }
 
-  async spend(amount: number, dateISO: string): Promise<void> {
+  async spend(amount: number, dateISO: string, label = "Gasto"): Promise<void> {
     await createTransaction(
       {
         kind: "gasto",
@@ -200,11 +212,11 @@ export class AppDriver {
         occurredOn: dateISO,
         status: "confirmed",
         origin: "manual",
-        merchantOrSource: "Supermercado",
+        merchantOrSource: label,
       },
       this.ctx,
     );
-    this.log.record("event", "gasto (createTransaction)", this.day, { amount, dateISO });
+    this.log.record("event", `gasto · ${label} (createTransaction)`, this.day, { amount, dateISO });
   }
 
   async payDebt(debtId: string, amount: number, dateISO: string): Promise<void> {
@@ -236,5 +248,24 @@ export class AppDriver {
       this.ctx,
     );
     this.log.record("event", "consumo de frasco (spendFromGoal)", this.day, { amount, dateISO });
+  }
+
+  /** Withdraw from a goal back to liquidity (ingreso linked goal = capital_in). */
+  async withdrawGoal(goalId: string, amount: number, dateISO: string): Promise<void> {
+    await withdrawFromGoal(
+      { goalId, amount, withdrawalDate: dateISO, note: "Retiro para emergencia" },
+      this.ctx,
+    );
+    this.log.record("event", "retiro de meta (withdrawFromGoal)", this.day, { amount, dateISO });
+  }
+
+  /** Contribute to an EXISTING non-quoted holding (no unitPrice → manual value
+   *  rises by the amount; capital_out expense to liquidity). */
+  async contributeInvestment(holdingId: string, amount: number, dateISO: string): Promise<void> {
+    await contributeToHolding(
+      { holdingId, amount, currency: this.currency, occurredOn: dateISO },
+      this.ctx,
+    );
+    this.log.record("event", "aporte a inversión (contributeToHolding)", this.day, { amount, dateISO });
   }
 }
