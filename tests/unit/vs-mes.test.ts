@@ -34,8 +34,33 @@ describe("buildPatrimonioVsMes", () => {
   it("sin histórico (velocity null) → null", () => {
     expect(buildPatrimonioVsMes({ netWorth: 1000, wealthVelocity: null })).toBeNull();
   });
-  it("previo ≤ 0 → null (sin base con sentido)", () => {
-    expect(buildPatrimonioVsMes({ netWorth: 100, wealthVelocity: 200 })).toBeNull(); // previo -100
+  it("previo NEGATIVO que mejora (velocity > 0) → ▲ up/verde, NO desaparece", () => {
+    // netWorth 100, velocity 200 → previo −100; base |−100|=100 → +200%.
+    expect(buildPatrimonioVsMes({ netWorth: 100, wealthVelocity: 200 })).toEqual({
+      format: "percent",
+      value: 2,
+      dir: "up",
+      tone: "pos",
+      label: "vs mes ant.",
+    });
+  });
+  it("previo NEGATIVO que empeora (velocity < 0) → ▼ down/rojo", () => {
+    // netWorth −300, velocity −100 → previo −200; base 200 → −50%.
+    expect(buildPatrimonioVsMes({ netWorth: -300, wealthVelocity: -100 })).toMatchObject({
+      dir: "down",
+      tone: "neg",
+      value: 0.5,
+    });
+  });
+  it("base ≈ 0 → degrada a MONTO conservando flecha + tono (nunca ÷0)", () => {
+    // netWorth 50, velocity 50 → previo 0 < piso → amount +50, ▲ up/verde.
+    expect(buildPatrimonioVsMes({ netWorth: 50, wealthVelocity: 50 })).toEqual({
+      format: "amount",
+      value: 50,
+      dir: "up",
+      tone: "pos",
+      label: "vs mes ant.",
+    });
   });
 });
 

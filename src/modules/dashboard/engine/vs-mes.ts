@@ -48,6 +48,12 @@ function pctVsMes(deltaPct: number, label: string): VsMes {
 // ---------------------------------------------------------------------------
 // Patrimonio — ±% del neto vs mes anterior (wealthVelocity ya = neto − previo)
 // ---------------------------------------------------------------------------
+/**
+ * Piso para decidir "base ≈ 0": si |neto del mes anterior| cae por debajo, el % pierde
+ * sentido (÷ casi 0) y se muestra el cambio en MONTO, conservando flecha + tono.
+ */
+const NETWORTH_BASE_FLOOR = 1;
+
 export function buildPatrimonioVsMes(input: {
   netWorth: number;
   /** RichLifeIndicators.wealthVelocity: null cuando no hay snapshot previo (sin_historico). */
@@ -55,9 +61,17 @@ export function buildPatrimonioVsMes(input: {
 }): VsMes {
   const { netWorth, wealthVelocity } = input;
   if (wealthVelocity == null) return null; // sin histórico → sin chip
-  const prev = netWorth - wealthVelocity;
-  if (prev <= 0) return null; // sin base positiva no hay % con sentido
-  return pctVsMes(wealthVelocity / prev, "vs mes ant.");
+  // Flecha + color SIEMPRE del signo de la velocidad (mejora/empeora), sin importar el
+  // signo de la base: un neto NEGATIVO que mejora debe mostrar ▲ verde y uno que empeora
+  // ▼ rojo. Antes, con neto previo ≤ 0 el chip desaparecía y el sobreendeudado / de ingreso
+  // muy bajo no veía su tendencia. NO se toca aggregateNetWorth ni wealthVelocity: sólo la
+  // presentación. La magnitud usa |base| para no invertir el signo ni dividir por 0.
+  const base = Math.abs(netWorth - wealthVelocity); // |neto del mes anterior|
+  if (base < NETWORTH_BASE_FLOOR) {
+    // Base ≈ 0: sin % con sentido → cambio en monto (misma flecha + tono).
+    return amountVsMes(wealthVelocity, "vs mes ant.", false);
+  }
+  return pctVsMes(wealthVelocity / base, "vs mes ant.");
 }
 
 // ---------------------------------------------------------------------------
