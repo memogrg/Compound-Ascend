@@ -1,16 +1,19 @@
 /**
- * Generalized library runner (F2). For each persona: create a synthetic user,
- * seed its financial base, run the behavioral engine over `months` virtual months
- * day by day (executing REAL app events via the driver under withSimClock),
- * validate the core invariants after each jar spend and at every month close, and
- * always tear the user down. Deterministic per persona seed.
+ * Generalized library runner (F2 + F3a). For each persona: create a synthetic
+ * user, seed its financial base, run the behavioral engine over `months` virtual
+ * months (default 6) day by day — advancing the virtual clock month to month and
+ * carrying state — validate the core invariants at every month close, and always
+ * tear the user down. Deterministic per persona seed.
  *
  * Expectations are accumulated FROM the executed event stream (not a script), so
- * the invariants stay exact whatever the motor decides.
+ * the invariants stay exact whatever the motor decides. F3a adds, at each close:
+ * writing the month's net_worth_snapshot via the REAL ctx-aware writer, then the
+ * evolution checks (wealthVelocity trajectory + ahorros/deudas/patrimonio vs-mes).
  */
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import { getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 import { getLiquidityBalance } from "@/modules/financial-base/services/liquidity-service";
+import { generateNetWorthSnapshot } from "@/modules/rich-life/services/net-worth-snapshot-service";
 import type { AuthContext } from "@/lib/auth/auth-context";
 import type { Period } from "@/modules/financial-base/types";
 import { createSimUser } from "../harness";
@@ -32,6 +35,7 @@ import {
   validateLinkedIntegrityDynamic,
   logInsights,
 } from "./validators";
+import { validateEvolution } from "./evolution-validators";
 import {
   emptyMonthTally,
   type MonthTally,
@@ -114,6 +118,7 @@ async function executeEvent(
       tally.operatingExpense += ev.amount;
       tally.budgetAwareSpend += ev.amount;
       tally.debtMovs += 1;
+      tally.debtPayAmount += ev.amount;
       break;
     case "goalContribution":
       if (!state.ids.goalId) break;
@@ -123,6 +128,7 @@ async function executeEvent(
       tally.capitalOut += ev.amount;
       tally.budgetAwareSpend += ev.amount;
       tally.goalMovs += 1;
+      tally.goalContribAmount += ev.amount;
       break;
     case "goalSpend": {
       if (!state.ids.goalId) break;
@@ -134,6 +140,7 @@ async function executeEvent(
       state.goalCurrent -= ev.amount;
       tally.goalMovs += 1;
       tally.jarSpends += 1;
+      tally.goalSpendAmount += ev.amount;
       break;
     }
     case "goalWithdraw":
@@ -142,6 +149,7 @@ async function executeEvent(
       state.liquidity += ev.amount;
       state.goalCurrent -= ev.amount;
       tally.goalMovs += 1;
+      tally.goalWithdrawAmount += ev.amount;
       break;
     case "investmentBuy":
       if (!state.ids.holdingId) break;
@@ -163,7 +171,7 @@ export async function runPersona(
   persona: PersonaSpec,
   opts: { nowStamp: number; months?: number },
 ): Promise<PersonaResult> {
-  const months = opts.months ?? 1;
+  const months = opts.months ?? 6;
   const log = new EventLog();
   log.record(
     "info",
@@ -196,6 +204,10 @@ export async function runPersona(
       incomeMultiplier: 1,
     };
 
+    // Net worth at the previous month's close, for the trajectory check. null until
+    // the first month has a snapshot the app can read as "previous".
+    let prevNetWorth: number | null = null;
+
     for (let m = 0; m < months; m++) {
       const tally = emptyMonthTally();
 
@@ -214,6 +226,15 @@ export async function runPersona(
         const label = `cierre mes ${m + 1}`;
         log.record("phase", `CIERRE · ${label}`, m * 100 + DAYS_PER_MONTH);
         const period = await userCurrentPeriod(ctx);
+
+        // Write this month's net_worth_snapshot via the REAL ctx-aware writer (the
+        // one the cron/screen uses), so the app's time-series (wealthVelocity,
+        // patrimonio vs-mes) exists for the evolution checks and for next month's
+        // "previous". `precios:"cache"` avoids the network (holdings are non-quoted).
+        await generateNetWorthSnapshot({ year: period.year, month: period.month }, ctx, {
+          precios: "cache",
+        });
+
         await validateMonthFlow(
           ctx,
           period,
@@ -240,6 +261,20 @@ export async function runPersona(
           log,
         );
         await validateLiquidity(ctx, state.liquidity, log, label);
+        log.record("phase", `EVOLUCIÓN · ${label}`, m * 100 + DAYS_PER_MONTH);
+        prevNetWorth = await validateEvolution(
+          ctx,
+          period,
+          {
+            monthIndex: m,
+            prevNetWorth,
+            goalNet: tally.goalContribAmount - tally.goalWithdrawAmount - tally.goalSpendAmount,
+            debtPaid: tally.debtPayAmount,
+            hasGoal: state.ids.goalId !== null,
+            hasDebt: state.ids.debtId !== null,
+          },
+          log,
+        );
         await logInsights(ctx, log, label);
       });
     }

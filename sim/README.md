@@ -80,4 +80,25 @@ La rebanada vertical de F1c (`vertical-slice.test.ts`) queda intacta.
   refresca y **loguea los insights** de la persona (info, sin validar coherencia
   todavía).
 - **Correr**: `npm run sim` corre TODAS (F1c + librería). `SIM_ONLY=<key>` una sola;
-  `SIM_MONTHS=<n>` amplía la ventana.
+  `SIM_MONTHS=<n>` fija la ventana (default 6).
+
+## Evolución multi-mes (F3a · `sim/library/evolution-validators.ts`)
+
+El runner corre **N meses** (default 6): avanza el reloj virtual mes a mes
+(`onMonthDay(m,d)`), lleva el estado, resetea el tally por mes y valida al cierre
+de CADA mes. Al cierre, además de los invariantes núcleo:
+
+- Escribe el `net_worth_snapshots` del mes con el **writer real ctx-aware**
+  `generateNetWorthSnapshot(periodoVirtual, ctx, {precios:"cache"})` — el mismo del
+  cron/pantalla; `ctx.db` (TEST/RLS), sin tocar app, sin red.
+- **Trayectoria**: `wealthVelocity == neto(m) − neto(m−1)` (la serie del app ata su
+  velocidad a los deltas reales; null en el mes 0).
+- **Serie no congelada**: una fila de snapshot por mes cerrado.
+- **vs-mes**: `ahorros = aportes − retiros − consumos`, `deudas = adquirido −
+  pagado` (adquirido por `created_at` real de la deuda), `patrimonio` coherente con
+  la velocidad. `inversiones vs-mes` va con F3a-DCA.
+
+**Diferido a F3a-DCA** (su propio delta, con seam de app): `monthly_snapshots` y
+`portfolio_snapshots` (sin writer sin sesión/ctx-aware), y todo el **DCA**
+(`ensureMonthlyContributions` es session-only → necesita seam `ctx?`) + mock de
+precio (`priceCache` en memoria).
