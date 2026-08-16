@@ -261,6 +261,7 @@ export async function runPersona(
           log,
         );
         await validateLiquidity(ctx, state.liquidity, log, label);
+        log.record("phase", `EVOLUCIÓN · ${label}`, m * 100 + DAYS_PER_MONTH);
         prevNetWorth = await validateEvolution(
           ctx,
           period,

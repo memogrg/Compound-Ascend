@@ -40,10 +40,21 @@ export interface EvolutionInputs {
   hasDebt: boolean;
 }
 
+/** Error message extractor — surfaces read failures loudly instead of silently. */
+function msg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 /**
  * Runs the evolution checks for one month close and RETURNS the current net worth
  * (the runner carries it as `prevNetWorth` for the next month). Assumes the
  * month's net_worth_snapshot has already been written.
+ *
+ * Robustness: the trajectory reads (getRichLifeSummary + the snapshot query — the
+ * same reliable reads the core net-worth check uses) and the vs-mes reads
+ * (getHomeCardsData, first exercised here) live in SEPARATE try/catch blocks. Any
+ * read that throws becomes a VISIBLE failing check with the error — the evolution
+ * checks can never silently vanish, and one block's failure can't hide the other.
  */
 export async function validateEvolution(
   ctx: AuthContext,
@@ -51,83 +62,94 @@ export async function validateEvolution(
   inp: EvolutionInputs,
   log: EventLog,
 ): Promise<number> {
-  const rl = await getRichLifeSummary({ precios: "cache" }, ctx);
-  const nw = rl.snapshot.indicators.netWorth;
-  const wv = rl.snapshot.indicators.wealthVelocity; // number | null
+  let nw = inp.prevNetWorth ?? 0;
+  let wv: number | null = null;
 
-  // Snapshot series: exactly one row per closed month (periods YYYY-MM-01), i.e.
-  // the writer runs every month and the unique (user, period) does NOT freeze it.
-  const { data: snaps } = await ctx.db
-    .from("net_worth_snapshots")
-    .select("period")
-    .eq("user_id", ctx.userId)
-    .order("period", { ascending: true });
-  const rows = snaps ?? [];
-  push(
-    log,
-    "evolución · un snapshot de patrimonio por mes (serie no congelada)",
-    rows.length === inp.monthIndex + 1,
-    `filas=${rows.length} esperado=${inp.monthIndex + 1} periodos=[${rows.map((r) => r.period).join(", ")}]`,
-  );
+  // --- Trajectory + snapshot series (reliable reads: same as the core check) ---
+  try {
+    const rl = await getRichLifeSummary({ precios: "cache" }, ctx);
+    nw = rl.snapshot.indicators.netWorth;
+    wv = rl.snapshot.indicators.wealthVelocity;
 
-  // Trajectory: the app's wealthVelocity must equal the real month-over-month
-  // change (netWorth(m) − netWorth(m−1)); null on month 0 (no prior snapshot).
-  if (inp.monthIndex >= 1 && inp.prevNetWorth !== null) {
+    const { data: snaps, error } = await ctx.db
+      .from("net_worth_snapshots")
+      .select("period")
+      .eq("user_id", ctx.userId)
+      .order("period", { ascending: true });
+    if (error) throw new Error(`net_worth_snapshots: ${error.message}`);
+    const rows = snaps ?? [];
     push(
       log,
-      "evolución · velocidad patrimonial = neto(m) − neto(m−1)",
-      wv !== null && approx(wv, nw - inp.prevNetWorth, 1),
-      `wv=${wv === null ? "null" : round2(wv)} Δreal=${round2(nw - inp.prevNetWorth)}`,
+      "evolución · un snapshot de patrimonio por mes (serie no congelada)",
+      rows.length === inp.monthIndex + 1,
+      `filas=${rows.length} esperado=${inp.monthIndex + 1} periodos=[${rows.map((r) => r.period).join(", ")}]`,
     );
+
+    // Trajectory: the app's wealthVelocity must equal the real month-over-month
+    // change (netWorth(m) − netWorth(m−1)); null on month 0 (no prior snapshot).
+    if (inp.monthIndex >= 1 && inp.prevNetWorth !== null) {
+      push(
+        log,
+        "evolución · velocidad patrimonial = neto(m) − neto(m−1)",
+        wv !== null && approx(wv, nw - inp.prevNetWorth, 1),
+        `wv=${wv === null ? "null" : round2(wv)} Δreal=${round2(nw - inp.prevNetWorth)}`,
+      );
+    }
+  } catch (e) {
+    push(log, "evolución · trayectoria (la lectura lanzó)", false, msg(e));
   }
 
-  const home = await getHomeCardsData(ctx);
+  // --- vs-mes chips (getHomeCardsData is first exercised here in the sim) ---
+  try {
+    const home = await getHomeCardsData(ctx);
 
-  // Ahorros vs-mes: signed net = aportes − retiros − consumos del mes.
-  if (inp.hasGoal) {
-    const chipNet = signedChip(home.ahorros?.vsMes);
-    push(
-      log,
-      "evolución · vs-mes ahorros = aportes − retiros − consumos del mes",
-      approx(chipNet, inp.goalNet, 1),
-      `chip=${round2(chipNet)} esperado=${round2(inp.goalNet)}`,
-    );
-  }
+    // Ahorros vs-mes: signed net = aportes − retiros − consumos del mes.
+    if (inp.hasGoal) {
+      const chipNet = signedChip(home.ahorros?.vsMes);
+      push(
+        log,
+        "evolución · vs-mes ahorros = aportes − retiros − consumos del mes",
+        approx(chipNet, inp.goalNet, 1),
+        `chip=${round2(chipNet)} esperado=${round2(inp.goalNet)}`,
+      );
+    }
 
-  // Deudas vs-mes: signed netChange = adquirido − pagado. `adquirido` filtra por la
-  // fecha de ALTA real de la deuda (created_at de BD, NO el reloj virtual), así que
-  // se computa desde los datos reales, no se asume 0.
-  if (inp.hasDebt) {
-    const ctrl = await getControlSummary(ctx);
-    const adquirido = ctrl.debts
-      .filter(
-        (d) =>
-          d.createdAt &&
-          d.createdAt.slice(0, 10) >= period.from &&
-          d.createdAt.slice(0, 10) <= period.to,
-      )
-      .reduce((s, d) => s + (d.originalAmount ?? d.balance), 0);
-    const expected = adquirido - inp.debtPaid;
-    const chipNet = signedChip(home.deudas?.vsMes);
-    push(
-      log,
-      "evolución · vs-mes deudas = adquirido − pagado del mes",
-      approx(chipNet, expected, 1),
-      `chip=${round2(chipNet)} esperado=${round2(expected)} (adquirido=${round2(adquirido)} pagado=${round2(inp.debtPaid)})`,
-    );
-  }
+    // Deudas vs-mes: signed netChange = adquirido − pagado. `adquirido` filtra por la
+    // fecha de ALTA real de la deuda (created_at de BD, NO el reloj virtual), así que
+    // se computa desde los datos reales, no se asume 0.
+    if (inp.hasDebt) {
+      const ctrl = await getControlSummary(ctx);
+      const adquirido = ctrl.debts
+        .filter(
+          (d) =>
+            d.createdAt &&
+            d.createdAt.slice(0, 10) >= period.from &&
+            d.createdAt.slice(0, 10) <= period.to,
+        )
+        .reduce((s, d) => s + (d.originalAmount ?? d.balance), 0);
+      const expected = adquirido - inp.debtPaid;
+      const chipNet = signedChip(home.deudas?.vsMes);
+      push(
+        log,
+        "evolución · vs-mes deudas = adquirido − pagado del mes",
+        approx(chipNet, expected, 1),
+        `chip=${round2(chipNet)} esperado=${round2(expected)} (adquirido=${round2(adquirido)} pagado=${round2(inp.debtPaid)})`,
+      );
+    }
 
-  // Patrimonio vs-mes: es el render de wealthVelocity → su dirección debe coincidir
-  // con el signo de la velocidad (magnitud ya cubierta por la trayectoria).
-  if (inp.monthIndex >= 1 && wv !== null && Math.abs(wv) > 0.5) {
-    const chip = home.patrimonio?.vsMes ?? null;
-    const ok = chip !== null && (wv > 0 ? chip.dir === "up" : chip.dir === "down");
-    push(
-      log,
-      "evolución · vs-mes patrimonio coherente con la velocidad",
-      ok,
-      `dir=${chip?.dir ?? "null"} wv=${round2(wv)}`,
-    );
+    // Patrimonio vs-mes: render de wealthVelocity → su dirección coincide con el signo.
+    if (inp.monthIndex >= 1 && wv !== null && Math.abs(wv) > 0.5) {
+      const chip = home.patrimonio?.vsMes ?? null;
+      const ok = chip !== null && (wv > 0 ? chip.dir === "up" : chip.dir === "down");
+      push(
+        log,
+        "evolución · vs-mes patrimonio coherente con la velocidad",
+        ok,
+        `dir=${chip?.dir ?? "null"} wv=${round2(wv)}`,
+      );
+    }
+  } catch (e) {
+    push(log, "evolución · vs-mes (la lectura lanzó)", false, msg(e));
   }
 
   return nw;
