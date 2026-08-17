@@ -196,6 +196,49 @@ export class AppDriver {
     return data.id;
   }
 
+  /** Creates a QUOTED, RECURRING holding (etf) for the DCA case: is_recurring +
+   *  monthly_contribution make `ensureMonthlyContributions` pick it up. Its market
+   *  value uses the live price (mocked via priceCache in the DCA runner), so keep
+   *  the price seeded. `registerExpense` off → the initial position is a starting
+   *  asset (no cash event). Reads the id back. */
+  async addRecurringQuotedHolding(
+    label: string,
+    symbol: string,
+    quantity: number,
+    unitCost: number,
+    monthlyContribution: number,
+  ): Promise<string> {
+    await createHolding(
+      {
+        assetType: "etf",
+        label,
+        symbol,
+        quantity,
+        averageCost: unitCost,
+        currency: this.currency,
+        isRecurring: true,
+        monthlyContribution,
+        registerExpense: false,
+      },
+      this.ctx,
+    );
+    const { data, error } = await this.ctx.db
+      .from("investment_holdings")
+      .select("id")
+      .eq("user_id", this.ctx.userId)
+      .eq("label", label)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) throw new Error(`no encontré el holding DCA "${label}": ${error?.message ?? "sin fila"}`);
+    this.log.record("setup", `holding cotizado recurrente "${label}" (${symbol})`, this.day, {
+      quantity,
+      monthlyContribution,
+      id: data.id,
+    });
+    return data.id;
+  }
+
   // ---- EVENTS ----
 
   async receiveIncome(budgetItemId: string, amount: number, dateISO: string): Promise<void> {
