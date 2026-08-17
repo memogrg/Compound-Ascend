@@ -44,5 +44,9 @@ supabase/.branches
 /test-results
 /playwright-report
 
+# Cert E2E (Fase 2): evidencia generada + estado de sesión — nunca se versionan
+/audit/evidence/
+/audit/.auth/
+
 # Bundle de diseño (no versionar)
 design-handoff/
