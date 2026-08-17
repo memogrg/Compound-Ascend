@@ -8,7 +8,7 @@
  * auth cookie is the observable that proves which DB the dev server used.
  */
 import { test as setup, expect, type BrowserContext } from "@playwright/test";
-import { assertTestDb, TEST, PROD_SUPABASE_URL, projectRef } from "./lib/env";
+import { assertTestDb, TEST, PROD_SUPABASE_URL, projectRef, isLocalSupabase } from "./lib/env";
 import { IPHONE } from "./lib/devices";
 import { createCertUser } from "./lib/seed";
 import { writeContext, WEB_STORAGE, MOBILE_STORAGE, AUTH_DIR, ensureDir } from "./lib/context";
@@ -27,10 +27,23 @@ async function assertAuthedAgainstTest(
   context: BrowserContext,
   testRef: string,
   prodRef: string,
+  testIsLocal: boolean,
 ): Promise<void> {
   const names = await authKeyNames(context);
+  const hasSession = names.some((n) => n.startsWith("sb-") && n.includes("auth-token"));
+  // Local / single-instance setup (dev + test share one local Supabase): there is NO distinct hosted
+  // prod to guard against — the dev server can only reach the local DB. Proving a session exists is
+  // enough to confirm the real-UI login worked.
+  if (testIsLocal || !prodRef || testRef === prodRef) {
+    expect(
+      hasSession,
+      `El navegador debía tener una sesión Supabase (login local). Claves: ${names.join(", ") || "(ninguna)"}`,
+    ).toBeTruthy();
+    return;
+  }
+  // Distinct hosted prod: prove the session is TEST and NOT prod.
   const hasTest = names.some((n) => n.startsWith(`sb-${testRef}-`));
-  const hasProd = Boolean(prodRef) && names.some((n) => n.startsWith(`sb-${prodRef}-`));
+  const hasProd = names.some((n) => n.startsWith(`sb-${prodRef}-`));
   expect(
     hasTest,
     `El navegador debía autenticarse contra TEST (cookie sb-${testRef}-*). Claves: ${names.join(", ") || "(ninguna)"}`,
@@ -56,7 +69,7 @@ setup("guard + seed + logins reales (web + móvil) + storageState", async ({ pag
 
   // 1) WEB login on the default (desktop) context.
   await loginWeb(page, { email: user.email, password: user.password });
-  await assertAuthedAgainstTest(page.context(), testRef, prodRef);
+  await assertAuthedAgainstTest(page.context(), testRef, prodRef, isLocalSupabase(TEST.url));
   await page.context().storageState({ path: WEB_STORAGE });
 
   // 2) MOBILE login on an emulated iPhone context.
@@ -64,7 +77,7 @@ setup("guard + seed + logins reales (web + móvil) + storageState", async ({ pag
   try {
     const mpage = await mctx.newPage();
     await loginMobile(mpage, { email: user.email, password: user.password });
-    await assertAuthedAgainstTest(mctx, testRef, prodRef);
+    await assertAuthedAgainstTest(mctx, testRef, prodRef, isLocalSupabase(TEST.url));
     await mctx.storageState({ path: MOBILE_STORAGE });
   } finally {
     await mctx.close();

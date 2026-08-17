@@ -61,6 +61,20 @@ export function projectRef(url: string): string {
 }
 
 /**
+ * A loopback / local Supabase (Docker `supabase start`) is never a hosted PROD project, so it is
+ * inherently safe. Solo-dev setups point both `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_TEST_URL` at
+ * the same local instance; the same-project guard must not treat that as "test == prod".
+ */
+export function isLocalSupabase(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Fail-fast: refuse to run unless the three TEST creds exist AND the TEST url is a
  * DIFFERENT project than prod. Called at the very top of the setup spec, before any
  * user is created or any page is opened.
@@ -81,9 +95,15 @@ export function assertTestDb(): void {
         `El harness solo corre contra SUPABASE_TEST_* (nunca prod).`,
     );
   }
-  if (PROD_SUPABASE_URL && projectRef(TEST.url) === projectRef(PROD_SUPABASE_URL)) {
+  // A local Supabase (127.0.0.1 / localhost) can never be a hosted prod project → inherently safe,
+  // even when dev and test share the same local URL. Only abort when TEST is a HOSTED url matching prod.
+  if (
+    PROD_SUPABASE_URL &&
+    !isLocalSupabase(TEST.url) &&
+    projectRef(TEST.url) === projectRef(PROD_SUPABASE_URL)
+  ) {
     throw new Error(
-      `[cert] SUPABASE_TEST_URL apunta al MISMO proyecto que NEXT_PUBLIC_SUPABASE_URL (prod). ` +
+      `[cert] SUPABASE_TEST_URL apunta al MISMO proyecto HOSTED que NEXT_PUBLIC_SUPABASE_URL (prod). ` +
         `Abortado: el harness nunca debe tocar producción.`,
     );
   }
