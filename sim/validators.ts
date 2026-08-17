@@ -140,8 +140,21 @@ export async function validateGoal(
   );
 }
 
-/** Net worth identity: neto = activos − pasivos, y neto = liquidez + metas + inversiones − deudas. */
-export async function validateNetWorth(ctx: AuthContext, log: EventLog): Promise<void> {
+/** The net-worth numbers validateNetWorth already reads — returned so the reporter
+ *  can capture a clean monthly series with NO extra round-trips. */
+export interface NetWorthNumbers {
+  netWorth: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  liquidity: number;
+  goals: number;
+  debts: number;
+  portfolio: number;
+}
+
+/** Net worth identity: neto = activos − pasivos, y neto = liquidez + metas + inversiones − deudas.
+ *  Returns the numbers it read (for the F4 monthly series). */
+export async function validateNetWorth(ctx: AuthContext, log: EventLog): Promise<NetWorthNumbers> {
   const [rl, liq, ctrl, debtsOv, port] = await Promise.all([
     getRichLifeSummary({ precios: "cache" }, ctx),
     getLiquidityBalance(ctx),
@@ -173,6 +186,16 @@ export async function validateNetWorth(ctx: AuthContext, log: EventLog): Promise
     approx(ind.netWorth, composed, 1),
     `neto=${round2(ind.netWorth)} = liquidez ${round2(liq.balance)} + metas ${round2(goalsTotal)} + inversiones ${round2(portfolioValue)} − deudas ${round2(debtsTotal)} = ${round2(composed)}`,
   );
+
+  return {
+    netWorth: ind.netWorth,
+    totalAssets: ind.totalAssets,
+    totalLiabilities: ind.totalLiabilities,
+    liquidity: liq.balance,
+    goals: goalsTotal,
+    debts: debtsTotal,
+    portfolio: portfolioValue,
+  };
 }
 
 /** Linked integrity: every money event has its txn + specialized row; no orphans. */

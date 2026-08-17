@@ -23,6 +23,7 @@ import { TEST_ENV } from "../../env";
 import { validateLiquidity, validateNetWorth } from "../../validators";
 import { buildInversionistaDca } from "./dca-persona";
 import { seedPrice } from "./price-mock";
+import type { MonthPoint } from "../../report/types";
 import {
   validateDcaContributions,
   validateDcaMerge,
@@ -38,10 +39,12 @@ const DCA_SEED = 0xdca5eed;
 
 export interface DcaResult {
   persona: string;
+  displayName: string;
   log: EventLog;
   failures: number;
   checks: number;
   email: string;
+  series: MonthPoint[];
 }
 
 /**
@@ -102,6 +105,7 @@ export async function runDcaPersona(opts: { nowStamp: number; months?: number })
     // grows quantity by monthlyContribution/mockPrice.
     let expLiquidity = persona.openingBalance;
     let expQuantity = persona.initialQuantity;
+    const series: MonthPoint[] = [];
 
     for (let m = 0; m < months; m++) {
       // Salary on payday.
@@ -127,6 +131,9 @@ export async function runDcaPersona(opts: { nowStamp: number; months?: number })
         // Auto-DCA (simulates the Patrimonio/dashboard load). Registers this month's
         // contribution: merge + linked gasto + holding_contributions row.
         await ensureMonthlyContributions(ctx);
+        log.record("event", "auto-DCA (ensureMonthlyContributions)", m * 100 + DAYS_PER_MONTH, {
+          fn: "ensureMonthlyContributions",
+        });
         expLiquidity -= persona.monthlyContribution;
         expQuantity += persona.monthlyContribution / persona.mockPrice;
 
@@ -151,10 +158,21 @@ export async function runDcaPersona(opts: { nowStamp: number; months?: number })
           rl.snapshot.indicators.netWorth,
           currency,
         );
+        log.record("event", "snapshots (net worth + portfolio)", m * 100 + DAYS_PER_MONTH, {
+          fn: "snapshots",
+        });
 
         // Core identities.
         await validateLiquidity(ctx, expLiquidity, log, label);
-        await validateNetWorth(ctx, log);
+        const nw = await validateNetWorth(ctx, log);
+        series.push({
+          month: m + 1,
+          netWorth: nw.netWorth,
+          liquidity: nw.liquidity,
+          portfolio: nw.portfolio,
+          goals: nw.goals,
+          debts: nw.debts,
+        });
 
         // DCA invariants (1–4).
         await validateDcaContributions(ctx, ids.holdingId, m + 1, persona.mockPrice, log);
@@ -170,10 +188,12 @@ export async function runDcaPersona(opts: { nowStamp: number; months?: number })
 
     return {
       persona: persona.key,
+      displayName: "Inversionista DCA (cotizado)",
       log,
       failures: log.failures.length,
       checks: log.checks.length,
       email: sim.email,
+      series,
     };
   } finally {
     await sim.teardown();

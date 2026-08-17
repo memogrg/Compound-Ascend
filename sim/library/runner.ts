@@ -36,6 +36,7 @@ import {
   logInsights,
 } from "./validators";
 import { validateEvolution } from "./evolution-validators";
+import type { MonthPoint } from "../report/types";
 import {
   emptyMonthTally,
   type MonthTally,
@@ -59,6 +60,8 @@ export interface PersonaResult {
   failures: number;
   checks: number;
   email: string;
+  /** Clean monthly figures for the F4 report (captured from validateNetWorth). */
+  series: MonthPoint[];
 }
 
 /** Deterministic, distinct seed per persona key (FNV-1a ⊕ base). */
@@ -207,6 +210,8 @@ export async function runPersona(
     // Net worth at the previous month's close, for the trajectory check. null until
     // the first month has a snapshot the app can read as "previous".
     let prevNetWorth: number | null = null;
+    // Clean monthly series for the report (captured from validateNetWorth's reads).
+    const series: MonthPoint[] = [];
 
     for (let m = 0; m < months; m++) {
       const tally = emptyMonthTally();
@@ -234,6 +239,9 @@ export async function runPersona(
         await generateNetWorthSnapshot({ year: period.year, month: period.month }, ctx, {
           precios: "cache",
         });
+        log.record("event", "snapshot de patrimonio", m * 100 + DAYS_PER_MONTH, {
+          fn: "snapshots",
+        });
 
         await validateMonthFlow(
           ctx,
@@ -248,7 +256,16 @@ export async function runPersona(
         );
         await validateBudgetReconciliation(ctx, period, tally.budgetAwareSpend, log);
         if (state.ids.goalId) await validateGoal(ctx, state.ids.goalId, state.goalCurrent, log);
-        await validateNetWorth(ctx, log);
+        // Capture the month point from the numbers validateNetWorth already read (no extra reads).
+        const nw = await validateNetWorth(ctx, log);
+        series.push({
+          month: m + 1,
+          netWorth: nw.netWorth,
+          liquidity: nw.liquidity,
+          portfolio: nw.portfolio,
+          goals: nw.goals,
+          debts: nw.debts,
+        });
         await validateLinkedIntegrityDynamic(
           ctx,
           period,
@@ -286,6 +303,7 @@ export async function runPersona(
       failures: log.failures.length,
       checks: log.checks.length,
       email: sim.email,
+      series,
     };
   } finally {
     await sim.teardown();

@@ -235,6 +235,7 @@ export class AppDriver {
       quantity,
       monthlyContribution,
       id: data.id,
+      fn: "addRecurringQuotedHolding",
     });
     return data.id;
   }
@@ -243,7 +244,11 @@ export class AppDriver {
 
   async receiveIncome(budgetItemId: string, amount: number, dateISO: string): Promise<void> {
     await receivePartialIncome({ budgetItemId, amount, date: dateISO }, this.ctx);
-    this.log.record("event", "ingreso recibido (receivePartialIncome)", this.day, { amount, dateISO });
+    this.log.record("event", "ingreso recibido (receivePartialIncome)", this.day, {
+      amount,
+      dateISO,
+      fn: "receiveIncome",
+    });
   }
 
   async spend(amount: number, dateISO: string, label = "Gasto"): Promise<void> {
@@ -259,7 +264,11 @@ export class AppDriver {
       },
       this.ctx,
     );
-    this.log.record("event", `gasto · ${label} (createTransaction)`, this.day, { amount, dateISO });
+    this.log.record("event", `gasto · ${label} (createTransaction)`, this.day, {
+      amount,
+      dateISO,
+      fn: "createTransaction",
+    });
   }
 
   async payDebt(debtId: string, amount: number, dateISO: string): Promise<void> {
@@ -274,7 +283,11 @@ export class AppDriver {
       },
       this.ctx,
     );
-    this.log.record("event", "pago de deuda (addDebtPayment)", this.day, { amount, dateISO });
+    this.log.record("event", "pago de deuda (addDebtPayment)", this.day, {
+      amount,
+      dateISO,
+      fn: "addDebtPayment",
+    });
   }
 
   async contributeGoal(goalId: string, amount: number, dateISO: string): Promise<void> {
@@ -282,7 +295,11 @@ export class AppDriver {
       { goalId, amount, contributionDate: dateISO, currency: this.currency },
       this.ctx,
     );
-    this.log.record("event", "aporte a meta (addGoalContribution)", this.day, { amount, dateISO });
+    this.log.record("event", "aporte a meta (addGoalContribution)", this.day, {
+      amount,
+      dateISO,
+      fn: "addGoalContribution",
+    });
   }
 
   async spendGoal(goalId: string, amount: number, dateISO: string): Promise<void> {
@@ -290,7 +307,11 @@ export class AppDriver {
       { goalId, amount, spendDate: dateISO, categoryId: null, note: "Consumo del frasco" },
       this.ctx,
     );
-    this.log.record("event", "consumo de frasco (spendFromGoal)", this.day, { amount, dateISO });
+    this.log.record("event", "consumo de frasco (spendFromGoal)", this.day, {
+      amount,
+      dateISO,
+      fn: "spendFromGoal",
+    });
   }
 
   /** Withdraw from a goal back to liquidity (ingreso linked goal = capital_in). */
@@ -299,7 +320,11 @@ export class AppDriver {
       { goalId, amount, withdrawalDate: dateISO, note: "Retiro para emergencia" },
       this.ctx,
     );
-    this.log.record("event", "retiro de meta (withdrawFromGoal)", this.day, { amount, dateISO });
+    this.log.record("event", "retiro de meta (withdrawFromGoal)", this.day, {
+      amount,
+      dateISO,
+      fn: "withdrawFromGoal",
+    });
   }
 
   /** Contribute to an EXISTING non-quoted holding (no unitPrice → manual value
@@ -309,6 +334,10 @@ export class AppDriver {
       { holdingId, amount, currency: this.currency, occurredOn: dateISO },
       this.ctx,
     );
-    this.log.record("event", "aporte a inversión (contributeToHolding)", this.day, { amount, dateISO });
+    this.log.record("event", "aporte a inversión (contributeToHolding)", this.day, {
+      amount,
+      dateISO,
+      fn: "contributeToHolding",
+    });
   }
 }
