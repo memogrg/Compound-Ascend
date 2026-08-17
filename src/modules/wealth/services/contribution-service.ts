@@ -27,10 +27,13 @@ const MARKET_TYPE: Partial<Record<string, MarketAssetType>> = {
  * doble merge), luego mergea al precio en vivo y crea el gasto del mes. Best-effort
  * por holding: una falla no bloquea a las demás.
  */
-export async function ensureMonthlyContributions(): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const period = await userCurrentPeriod();
+export async function ensureMonthlyContributions(ctx?: AuthContext): Promise<void> {
+  // ctx-aware (patrón F1a, igual que listOpenContributions más abajo): sin ctx se
+  // comporta EXACTO como hoy (sesión + cookies); con ctx usa {db, userId} inyectado
+  // (cron/simulador) sin sesión. El período sale de userCurrentPeriod(ctx) → now()
+  // (reloj virtual), así el aporte cae en el mes que corre el simulador.
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const period = await userCurrentPeriod(ctx);
   const periodYear = period.year;
   const periodMonth = period.month;
 
@@ -39,7 +42,7 @@ export async function ensureMonthlyContributions(): Promise<void> {
     .select(
       "id, symbol, asset_type, currency, label, quantity, average_cost, monthly_contribution, household_id",
     )
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("is_recurring", true)
     .in("asset_type", ["etf", "accion", "cripto"])
     .gt("monthly_contribution", 0);
@@ -59,7 +62,7 @@ export async function ensureMonthlyContributions(): Promise<void> {
         .from("holding_contributions")
         .insert({
           holding_id: h.id,
-          user_id: user.id,
+          user_id: userId,
           household_id: h.household_id,
           period_year: periodYear,
           period_month: periodMonth,
@@ -107,21 +110,24 @@ export async function ensureMonthlyContributions(): Promise<void> {
         .from("investment_holdings")
         .update({ quantity: newQty, average_cost: newAvg, cost_basis: newQty * newAvg })
         .eq("id", h.id)
-        .eq("user_id", user.id);
+        .eq("user_id", userId);
       if (updErr) {
         console.error(`[ensureMonthlyContributions] merge falló (${h.id}): ${updErr.message}`);
         continue;
       }
 
       // Gasto del mes = el aporte (monto fijo).
-      const expenseId = await registerPurchaseExpense({
-        holdingId: h.id,
-        label: h.label ?? h.symbol,
-        currency: h.currency,
-        purchaseDate: `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`,
-        amount: Number(h.monthly_contribution),
-        verb: "Aporte",
-      });
+      const expenseId = await registerPurchaseExpense(
+        {
+          holdingId: h.id,
+          label: h.label ?? h.symbol,
+          currency: h.currency,
+          purchaseDate: `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`,
+          amount: Number(h.monthly_contribution),
+          verb: "Aporte",
+        },
+        ctx,
+      );
 
       await supabase
         .from("holding_contributions")
