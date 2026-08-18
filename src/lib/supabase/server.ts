@@ -7,11 +7,22 @@ import "server-only";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/database.types";
+import { getSimAuthContext } from "@/lib/auth/sim-auth";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 export async function createSupabaseServerClient() {
-  const cookieStore = await cookies();
+  // Precedencia: la sesión por COOKIE (request scope real) SIEMPRE gana. `cookies()` lanza
+  // fuera de un request scope; SOLO ahí (headless/test) se cae al AuthContext ambiente del
+  // ALS (withSimAuth). En prod siempre hay request scope → el ALS se ignora → byte-idéntico.
+  let cookieStore: Awaited<ReturnType<typeof cookies>>;
+  try {
+    cookieStore = await cookies();
+  } catch (err) {
+    const sim = getSimAuthContext();
+    if (sim) return sim.db;
+    throw err;
+  }
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
