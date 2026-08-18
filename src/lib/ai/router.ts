@@ -53,8 +53,10 @@ export type RoutedQuery = {
   lane: RouterLane;
 };
 
-/** Modelo chico: mismo adaptador Gemini, solo cambia el string (sin integración nueva). */
-const LITE_MODEL = "gemini-2.5-flash-lite";
+/** Modelo chico: mismo adaptador Gemini, solo cambia el string (sin integración nueva).
+ *  gemini-2.5-flash-lite quedó deprecado (404 "no longer available to new users"); se alinea
+ *  al mismo flash-lite ya probado en el chat (CHAT_MODEL = gemini-3.1-flash-lite). */
+const LITE_MODEL = "gemini-3.1-flash-lite";
 
 type Intent =
   // Números patrimoniales — los TRES, distintos (todos "capital al 8% que cubre X gasto"):
