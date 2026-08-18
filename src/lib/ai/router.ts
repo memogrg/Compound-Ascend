@@ -22,7 +22,7 @@ import {
 } from "@/lib/ai/statement-parse";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
-import { detectCreateAction } from "@/lib/ai/action-lane";
+import { detectCreateAction, esOrdenDeAltaDeMovimiento } from "@/lib/ai/action-lane";
 import { userToday } from "@/lib/time/user-time";
 import { projectInvestment } from "@/lib/ai/tools";
 import {
@@ -289,6 +289,55 @@ export function extractSobreMencionado(text: string): string | null {
     return null;
   }
   if (TERMINO_STOP.test(t)) return null;
+  return t;
+}
+
+/** Cola temporal pegada al nombre ("restaurantes DEL MES PASADO" → "restaurantes"). */
+const COLA_TEMPORAL =
+  /\s+(?:de|del|en|durante)?\s*(?:hoy|ayer|esta semana|la semana pasada|semana pasada|este mes|el mes pasado|mes pasado|este a[nñ]o|el a[nñ]o pasado|a[nñ]o pasado|[uú]ltimos?\s+\d+\s+d[ií]as)\b.*$/i;
+
+/**
+ * "¿QUÉ GASTOS ESTÁN REPORTADOS PARA {sobre} ESTE MES?" — la forma en que se pregunta por el
+ * contenido de un sobre cuando NO se usa un verbo de gasto ("gasté en…") ni la forma adyacente
+ * "gastos DE {sobre}" que ya cubre `extractSobreMencionado`.
+ *
+ * Sin este carril la pregunta caía en `gasto_mes` —"qué gastos" matchea `qu[eé]\s+gast[eéoó]`— y
+ * contestaba el total del mes ENTERO ("tu gasto mensual en sobres ronda $3.132") a una pregunta
+ * acotada a un sobre. El total no está mal calculado: está contestando otra cosa.
+ *
+ * Devuelve el candidato en crudo; quién decide si el sobre existe es el servicio, que lo resuelve
+ * contra los sobres REALES del usuario (`matchSobre`). Acá no puede haber lista de nombres.
+ */
+const REPORTADOS_SUSTANTIVO =
+  /\b(?:qu[eé]|cu[aá]les)\s+(?:gastos?|movimientos?|transacciones?|compras?|consumos?)\b/i;
+/** El verbo que convierte la pregunta en "listame lo que hay ahí dentro". */
+const REPORTADOS_VERBO =
+  /\b(?:hay|tengo|ten[eé]s|est[aá]n|van|aparecen?|se\s+(?:han\s+)?(?:reportad|registrad|carg))|\b(?:reportad|registrad|cargad|anotad)\w*/i;
+
+export function extractSobreReportado(text: string): string | null {
+  if (!REPORTADOS_SUSTANTIVO.test(text) || !REPORTADOS_VERBO.test(text)) return null;
+  const m = text.match(/\b(?:en|de|del|para|dentro\s+de)\s+([^,.?!¿¡]+)/i);
+  let t = m?.[1]?.trim();
+  if (!t) return null;
+  // Artículos y la palabra "sobre/frasco" delante del nombre ("para el sobre de restaurantes").
+  // Van PRIMERO: con "la semana pasada" la cola temporal se comía "semana pasada" y dejaba un
+  // "la" suelto, que pasaba todos los filtros de abajo y se iba como nombre de sobre.
+  const ARTICULO = /^(?:el|la|los|las|mi|mis|un|una|sobres?|frascos?|de|del)\s+/i;
+  while (ARTICULO.test(t)) t = t.replace(ARTICULO, "").trim();
+  t = t
+    .replace(COLA_TEMPORAL, "")
+    .replace(new RegExp(`\\s+(?:de|del|en|durante)?\\s*${MESES_RE.source}\\b.*$`, "i"), "")
+    .replace(/\s+(?:de|del|en|a|con|para|desde|hasta|durante)$/i, "")
+    .trim();
+  while (ARTICULO.test(t)) t = t.replace(ARTICULO, "").trim();
+  if (t.length < 3 || TERMINO_STOP.test(t)) return null;
+  // Lo que quedó ES el periodo, no un sobre ("qué gastos hay de julio", "…de la semana pasada").
+  if (
+    new RegExp(`^${MESES_RE.source}`, "i").test(t) ||
+    /^(?:hoy|ayer|anteayer|(?:esta\s+)?semana|(?:este\s+)?mes|(?:este\s+)?a[nñ]o)\b/i.test(t)
+  ) {
+    return null;
+  }
   return t;
 }
 
@@ -594,6 +643,18 @@ export function matchIntent(
     return { intent: "consulta_transacciones_varios", params: {} };
   }
 
+  // ── ORDEN DE ALTA: el carril de ACCIÓN gana sobre CUALQUIER carril de consulta. Va acá arriba
+  //    —y no al final, junto a `detectCreateAction`— porque el problema no era que la acción no
+  //    supiera parsear, sino que nunca llegaba a intentarlo: "Agrega un gasto a transporte de
+  //    vehículo de 37747 el día 2 de agosto" trae la palabra "gasto" y un mes, así que el carril
+  //    D (consulta_transacciones con periodo) lo tomaba y respondía "no tenés gastos en transporte
+  //    de vehículo de 37747 el día 2 registrados" — un ALTA contestada como búsqueda.
+  //
+  //    Devolver null es exactamente lo que hace falta: `tryRouteQuery` cae al carril de acción y
+  //    la ruta del chat arma la propuesta. La condición es estricta (imperativo o hecho consumado
+  //    + monto, sin pregunta ni lenguaje de análisis), así que ninguna consulta real entra acá.
+  if (esOrdenDeAltaDeMovimiento(t)) return null;
+
   // Pregunta COMPUESTA ("¿cuánto gasto y cuánto ahorro al mes?"): dos consultas distintas en una. Un
   // carril determinista respondería SOLO una mitad (la auditoría lo cazó) → ESCALAR al LLM, que las
   // cubre juntas. Requiere DOS "cuánto" unidos por "y" (no atrapa un "¿y cuánto…?" de arrastre solo).
@@ -773,6 +834,28 @@ export function matchIntent(
   //    y "vs" y mandaría "¿gasté más este mes que el pasado?" al LLM sin datos— y antes de
   //    gasto_categoria/gasto_mes, que son golosos y responderían el agregado del mes en curso a
   //    una pregunta que pide OTRO periodo. Todos devuelven cifras reales del libro diario.
+
+  // A0) "¿QUÉ GASTOS ESTÁN REPORTADOS PARA {sobre} ESTE MES?" — pregunta acotada a UN sobre sin
+  //     verbo de gasto. Va antes que todo el libro diario (y que gasto_mes, que se la comía y
+  //     contestaba el total del mes) porque el filtro por sobre es lo que la pregunta pide.
+  //     "este mes" a secas sigue devolviendo null en extractPeriodo, así que acá el default
+  //     explícito es "mes": el mes en curso, que es lo que se preguntó.
+  {
+    const sobre = extractSobreReportado(t);
+    if (sobre) {
+      return {
+        intent: "consulta_transacciones",
+        params: {
+          periodo: extractPeriodo(t) ?? "mes",
+          tipo: /\bingres/i.test(t) ? "ingreso" : "gasto",
+          agrupacion: "ninguna",
+          sobre,
+          // Preguntar por un sobre concreto es pedir SUS movimientos, no una muestra de diez.
+          tope: 300,
+        },
+      };
+    }
+  }
 
   // A) Picos por fecha: "¿qué días/fechas gasto más?", "¿en qué fechas gasto más?".
   if (
