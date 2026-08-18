@@ -18,7 +18,10 @@ import { logger } from "@/lib/logger";
 
 // Modelo de VISIÓN/recibos (alto volumen, salida estructurada): flash barato, fijo — NO usa el
 // modelo de chat. También es el default del constructor de GeminiProvider.
-const VISION_MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash quedó deprecado (404 en runtime para esta key, igual que 2.5-flash-lite en el
+// router). Verificado por ListModels + prueba generateContent con imagen: gemini-3.5-flash
+// responde 200 (finishReason=STOP) a texto+imagen → accesible y multimodal. Pin EXPLÍCITO (sin *-latest).
+const VISION_MODEL = "gemini-3.5-flash";
 const MODEL = VISION_MODEL;
 // Modelo de CHAT/asesoría: rápido y barato (menos IA-503, menos costo). Es el default cuando no
 // hay GEMINI_MODEL en el entorno; env sigue pudiendo overridearlo. OJO: antes el env tenía un
@@ -43,7 +46,7 @@ const THINKING_OFF = { thinkingBudget: 0 };
 // Solo los modelos flash/lite permiten DESACTIVAR el thinking (thinkingBudget:0). Los de
 // razonamiento (p. ej. *-pro) lo REQUIEREN activo y rechazan el override → para ellos devolvemos
 // undefined (que JSON.stringify descarta) y usan su thinking por defecto. Tanto la visión
-// (gemini-2.5-flash) como el chat (gemini-3.1-flash-lite) matchean /flash|lite/ → thinking OFF,
+// (gemini-3.5-flash) como el chat (gemini-3.1-flash-lite) matchean /flash|lite/ → thinking OFF,
 // que es lo que queremos para ambos (rápido y barato; el thinking no aporta ni a asesoría
 // conversacional ni a extracción de recibos).
 export function thinkingConfigFor(model: string): typeof THINKING_OFF | undefined {
