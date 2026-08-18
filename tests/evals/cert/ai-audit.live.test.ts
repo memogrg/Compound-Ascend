@@ -7,6 +7,11 @@
  *   RUN_LIVE_EVALS=1 EVAL_JUDGE=1 npm run ai-audit
  * (needs GEMINI_API_KEY + SUPABASE_TEST_*). Cost is tunable: AI_AUDIT_N, AI_AUDIT_PERSONAS.
  */
+// El juez -pro (gemini-3.1-pro-preview) es lento y timeouteaba a 20s, invalidando parte de
+// la rúbrica. Aquí NO hay maxDuration de Vercel, así que subimos el timeout a 60s (respeta un
+// override explícito). Debe ir ANTES de crear cualquier GeminiProvider (lee la env al cargar).
+process.env.GEMINI_TIMEOUT_MS ??= "60000";
+
 import { describe, it, expect } from "vitest";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

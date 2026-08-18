@@ -15,7 +15,7 @@ export default defineConfig({
   test: {
     root: repoRoot,
     environment: "node",
-    include: ["tests/evals/cert/ai-audit.live.test.ts"],
+    include: ["tests/evals/cert/ai-audit.live.test.ts", "tests/evals/cert/verify-historial.spec.ts"],
     setupFiles: [fileURLToPath(new URL("../../../sim/setup.ts", import.meta.url))],
     globals: true,
     fileParallelism: false,

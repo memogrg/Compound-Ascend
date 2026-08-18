@@ -5,6 +5,8 @@
  * suites through the REAL advisor (injected Gemini) + deterministic checks + graded judge.
  */
 import type { AIProvider } from "@/lib/ai/provider";
+import type { AuthContext } from "@/lib/auth/auth-context";
+import { withSimAuth } from "@/lib/auth/sim-auth";
 import { financeChatWithTools } from "@/lib/ai/orchestrator";
 import { computeTrajectory, type MonthlyPoint, type PortfolioPoint } from "@/lib/ai/trajectory";
 import { getMonthFlow } from "@/modules/financial-base/services/month-flow-service";
@@ -12,6 +14,8 @@ import { getRichLifeSummary } from "@/modules/rich-life/services/rich-life-servi
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
 import { getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 import { generateNetWorthSnapshot } from "@/modules/rich-life/services/net-worth-snapshot-service";
+import { generateMonthlySnapshot } from "@/modules/financial-base/services/snapshot-service";
+import { generateAndSaveSnapshot } from "@/modules/wealth/services/snapshot-service";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import { createSimUser } from "../../../sim/harness";
 import { AppDriver } from "../../../sim/app-driver";
@@ -50,6 +54,9 @@ function seedOf(key: string): number {
 
 interface EvalArgs {
   personaName: string;
+  /** The persona's AuthContext — makes the advisor's DB tools (consultar_historial…)
+   *  resolve to this persona headless via withSimAuth. */
+  ctx: AuthContext;
   built: BuiltContext;
   suite: ProbeSuite;
   prompt: string;
@@ -58,11 +65,15 @@ interface EvalArgs {
 }
 
 async function evaluate(args: EvalArgs, opts: AuditOpts): Promise<AuditOutput> {
-  const res = await financeChatWithTools(
-    [{ role: "user", content: args.prompt }],
-    args.built.context,
-    args.built.toolContext,
-    opts.provider,
+  // withSimAuth: the advisor's read tools (consultar_historial → net_worth_snapshots, …)
+  // call cookie-based readers; under the ALS they resolve to THIS persona headless.
+  const res = await withSimAuth(args.ctx, () =>
+    financeChatWithTools(
+      [{ role: "user", content: args.prompt }],
+      args.built.context,
+      args.built.toolContext,
+      opts.provider,
+    ),
   );
   const reply = res.reply;
   const actionType = res.action?.type ?? null;
@@ -142,6 +153,18 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
           portfolioValue: port.analytics.totalPortfolioValue,
           netWorth: rl.snapshot.indicators.netWorth,
         });
+        // Persist monthly_snapshots (gasto/ingreso/ahorro) + portfolio_snapshots so
+        // consultar_historial has real series for ALL métricas (net worth escrito arriba).
+        // generateMonthlySnapshot es cookie-based → withSimAuth lo resuelve a esta persona;
+        // generateAndSaveSnapshot usa service-role + simNow() (fecha virtual) → headless-safe.
+        await withSimAuth(ctx, () => generateMonthlySnapshot(period));
+        await generateAndSaveSnapshot(
+          ctx.userId,
+          port.analytics.totalPortfolioValue,
+          port.analytics.totalCostBasis,
+          rl.snapshot.indicators.netWorth,
+          currency,
+        );
         if (m === 0) {
           ctxMonth1 = await buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna);
         }
@@ -166,22 +189,22 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
     for (const suite of persona.suites) {
       if (suite === "adversarial") {
         for (const p of ADVERSARIAL) {
-          outputs.push(await evaluate({ personaName: persona.displayName, built: ctxMonth6, suite, prompt: p.prompt, expectedRedFlags: p.expectedRedFlags }, opts));
+          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: p.prompt, expectedRedFlags: p.expectedRedFlags }, opts));
         }
       } else if (suite === "longitudinal") {
         if (ctxMonth1) {
-          outputs.push(await evaluate({ personaName: persona.displayName, built: ctxMonth1, suite, prompt: LONGITUDINAL.prompt, expectedRedFlags: LONGITUDINAL.expectedRedFlags, point: "mes1" }, opts));
+          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth1, suite, prompt: LONGITUDINAL.prompt, expectedRedFlags: LONGITUDINAL.expectedRedFlags, point: "mes1" }, opts));
         }
         if (trajOk) {
-          outputs.push(await evaluate({ personaName: persona.displayName, built: ctxMonth6, suite, prompt: LONGITUDINAL.prompt, expectedRedFlags: LONGITUDINAL.expectedRedFlags, point: "mes6" }, opts));
+          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: LONGITUDINAL.prompt, expectedRedFlags: LONGITUDINAL.expectedRedFlags, point: "mes6" }, opts));
         }
       } else if (suite === "generico") {
-        const out = await evaluate({ personaName: persona.displayName, built: ctxMonth6, suite, prompt: GENERICO.prompt, expectedRedFlags: GENERICO.expectedRedFlags }, opts);
+        const out = await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: GENERICO.prompt, expectedRedFlags: GENERICO.expectedRedFlags }, opts);
         outputs.push(out);
         genericMonth6 = out;
       } else if (suite === "consistencia" && ids.debtId) {
         // Before: the debt is large → advice should prioritize it.
-        outputs.push(await evaluate({ personaName: persona.displayName, built: ctxMonth6, suite, prompt: CONSISTENCIA.prompt, expectedRedFlags: CONSISTENCIA.expectedRedFlags }, opts));
+        outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: CONSISTENCIA.prompt, expectedRedFlags: CONSISTENCIA.expectedRedFlags }, opts));
         // Mutate: pay the debt to ZERO, rebuild context, re-ask. If the advisor still
         // recommends paying that (now-saldada) debt → detectPayPaidDebt fires a hard ❌.
         const outstanding = ctxMonth6.facts.debts.reduce((s, d) => s + d.balance, 0);
@@ -193,7 +216,7 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
           const after = await onMonthDay(MONTHS - 1, 28, () =>
             buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna),
           );
-          outputs.push(await evaluate({ personaName: persona.displayName, built: after, suite, prompt: CONSISTENCIA.prompt, expectedRedFlags: CONSISTENCIA.expectedRedFlags }, opts));
+          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: after, suite, prompt: CONSISTENCIA.prompt, expectedRedFlags: CONSISTENCIA.expectedRedFlags }, opts));
         }
       }
     }
