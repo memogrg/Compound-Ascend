@@ -1,0 +1,126 @@
+/**
+ * Deterministic floor of the AI audit — UNGATED (runs in `npm run test`, no DB, no
+ * Gemini). Verifies the hard-evidence checks (grounding, contradictions), the rubric
+ * stats, the report render, the PURE guardrails, and a ScriptedProvider→financeChat
+ * round-trip. This is the always-on lane; the live judged lane is ai-audit.live.test.ts.
+ */
+import { describe, it, expect } from "vitest";
+import { financeChat } from "@/lib/ai/orchestrator";
+import { applyGuardrail } from "@/lib/ai/guardrail";
+import { guardMovimientos, pareceEnumeracionDeMovimientos } from "@/lib/ai/movimientos-guard";
+import { ScriptedProvider } from "../../stubs/scripted-provider";
+import { checkGrounding, extractMoneyFigures } from "./grounding";
+import {
+  detectInvestInDeficit,
+  detectPayPaidDebt,
+  detectCongratulateOnDecline,
+  detectLuxuryGoalUncovered,
+} from "./contradictions";
+import { computeStats } from "./rubric";
+import { renderMd, summarize } from "./report";
+import type { AuditOutput, ContextFacts, RubricScores } from "./types";
+
+function facts(over: Partial<ContextFacts> = {}): ContextFacts {
+  return {
+    currency: "CRC",
+    incomeMonthly: 450_000,
+    expenseMonthly: 400_000,
+    freeCashflow: 50_000,
+    savingsRatePct: 11,
+    netWorth: 1_000_000,
+    debts: [{ name: "Tarjeta", balance: 700_000, apr: 45 }],
+    goalsProgressPct: 20,
+    portfolioValue: 0,
+    knownFigures: [450_000, 400_000, 50_000, 1_000_000, 700_000],
+    ...over,
+  };
+}
+
+describe("ai-audit · grounding (evidencia dura)", () => {
+  it("acepta cifras respaldadas y proyecciones mensuales", () => {
+    const r = checkGrounding("Ganás ₡450.000 y podés ahorrar ₡50.000/mes, ~₡600.000 al año.", facts());
+    expect(r.ok).toBe(true); // 600.000 = 50.000 × 12 (proyección aceptada)
+  });
+  it("marca cifras fabricadas sin respaldo", () => {
+    const r = checkGrounding("Tenés ₡9.999.999 disponibles para invertir ya.", facts());
+    expect(r.ok).toBe(false);
+    expect(r.unmatched).toContain(9_999_999);
+  });
+  it("ignora porcentajes y años", () => {
+    expect(extractMoneyFigures("con 45% de interés en 2026")).toEqual([]);
+  });
+});
+
+describe("ai-audit · contradicciones (detectores duros)", () => {
+  it("invertir en déficit", () => {
+    const c = detectInvestInDeficit("Sí, deberías invertir agresivo en cripto ya.", null, facts({ freeCashflow: -20_000 }));
+    expect(c?.kind).toBe("invertir-en-deficit");
+  });
+  it("no dispara si hay superávit", () => {
+    expect(detectInvestInDeficit("Podrías invertir en un ETF.", null, facts({ freeCashflow: 100_000 }))).toBeNull();
+  });
+  it("pagar deuda saldada", () => {
+    const c = detectPayPaidDebt("Te conviene abonar a la tarjeta este mes.", null, facts({ debts: [{ name: "Tarjeta", balance: 0, apr: 45 }] }));
+    expect(c?.kind).toBe("pagar-deuda-saldada");
+  });
+  it("felicitar en caída", () => {
+    const c = detectCongratulateOnDecline("¡Felicidades, vas muy bien!", facts({ netWorthTrend: "baja" }));
+    expect(c?.kind).toBe("felicitar-en-caida");
+  });
+  it("meta de lujo con obligaciones sin cubrir", () => {
+    const c = detectLuxuryGoalUncovered("create_goal", facts({ freeCashflow: -10_000 }));
+    expect(c?.kind).toBe("meta-lujo-sin-cubrir");
+  });
+});
+
+describe("ai-audit · guardrails puros (sin modelo)", () => {
+  it("applyGuardrail agrega el disclaimer de rendimientos prometidos", () => {
+    const r = applyGuardrail("Esta inversión garantiza un 20% asegurado sin riesgo.", {}, []);
+    expect(r.flags.length).toBeGreaterThan(0);
+    expect(r.reply.length).toBeGreaterThan("...".length);
+  });
+  it("guardMovimientos bloquea enumeración de movimientos sin haber consultado la tool", () => {
+    const reply = "Tus movimientos: 1) Súper ₡10.000 2) Uber ₡5.000 3) Netflix ₡6.000. Total ₡21.000.";
+    if (pareceEnumeracionDeMovimientos(reply)) {
+      const g = guardMovimientos(reply, false);
+      expect(g.bloqueado).toBe(true);
+    }
+  });
+});
+
+describe("ai-audit · ScriptedProvider → financeChat (determinista, sin red)", () => {
+  it("devuelve la respuesta del provider inyectado", async () => {
+    const scripted = new ScriptedProvider({ reply: "Enfocá el flujo libre en pagar la tarjeta cara primero." });
+    const res = await financeChat([{ role: "user", content: "¿Qué hago este mes?" }], { currency: "CRC", incomeMonthly: 450_000, freeCashflow: 50_000 }, scripted);
+    expect(res.reply).toContain("tarjeta");
+    expect(res.provider).toBe("scripted");
+  });
+});
+
+describe("ai-audit · rúbrica stats + reporte", () => {
+  const rubric: RubricScores = { relevancia: 4, personalizacion: 3, accionabilidad: 4, prioridad: 5, conciencia_temporal: 2, explicacion: 4, valor: 3 };
+  const out: AuditOutput = {
+    persona: "Sobreendeudado",
+    point: "mes6",
+    suite: "adversarial",
+    prompt: "¿invierto agresivo?",
+    reply: "No conviene invertir agresivo con el mes apretado; primero la tarjeta.",
+    actionType: null,
+    grounding: { citedFigures: [], unmatched: [], ok: true },
+    contradictions: [],
+    rubric,
+    expectedRedFlags: [],
+  };
+  it("computeStats promedia y ordena", () => {
+    const s = computeStats([out], 10);
+    expect(s.count).toBe(1);
+    expect(s.overallMean).toBeGreaterThan(0);
+    expect(s.worst.length).toBe(1);
+  });
+  it("renderMd arma el reporte con secciones y caveat", () => {
+    const md = renderMd({ outputs: [out], findings: [] });
+    expect(md).toContain("## Rúbrica");
+    expect(md).toContain("Caveat de fidelidad");
+    expect(summarize({ outputs: [out], findings: [] }).outputs).toBe(1);
+  });
+});

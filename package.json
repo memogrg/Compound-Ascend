@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:eval": "vitest run tests/evals",
-    "sim": "vitest run --config sim/vitest.config.ts"
+    "sim": "vitest run --config sim/vitest.config.ts",
+    "ai-audit": "vitest run --config tests/evals/cert/vitest.config.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^9.1.2",
