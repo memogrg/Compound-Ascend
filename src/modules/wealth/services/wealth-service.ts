@@ -100,7 +100,10 @@ export async function listPolicies(ctx?: AuthContext): Promise<InsurancePolicy[]
  * La moneda la impone la póliza (misma guarda que la venta de inversión): un importe que la
  * contradiga se rechaza en vez de guardarse contra una referencia equivocada.
  */
-export async function payPolicyPremium(input: PolicyPremiumInput, ctx?: AuthContext): Promise<void> {
+export async function payPolicyPremium(
+  input: PolicyPremiumInput,
+  ctx?: AuthContext,
+): Promise<void> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const memberIds = await householdMemberIds(supabase, userId);
 

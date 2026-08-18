@@ -71,7 +71,10 @@ function extractNote(description: string | null): string | null {
   return note || null;
 }
 
-export async function getGoalDetail(goalId: string, ctx?: AuthContext): Promise<GoalDetailVM | null> {
+export async function getGoalDetail(
+  goalId: string,
+  ctx?: AuthContext,
+): Promise<GoalDetailVM | null> {
   const { db: supabase, userId } = await resolveAuth(ctx);
 
   const memberIds = await householdMemberIds(supabase, userId);

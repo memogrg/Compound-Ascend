@@ -566,15 +566,18 @@ export async function deleteDebtPayment(paymentId: string): Promise<void> {
  * vinculada (gasto, linked_kind='goal') y sube current_amount de la meta.
  * No existe ledger propio de aportes — la transacción ES el histórico.
  */
-export async function addGoalContribution(input: {
-  goalId: string;
-  amount: number;
-  contributionDate: string;
-  /** Moneda del importe capturado. Opcional por compatibilidad con los llamadores viejos;
-   *  si viene y NO coincide con la de la meta, se rechaza en vez de guardar el importe tal
-   *  cual bajo otra unidad. Ver la nota de `monedaVinculadaEsCoherente`. */
-  currency?: string;
-}, ctx?: AuthContext): Promise<void> {
+export async function addGoalContribution(
+  input: {
+    goalId: string;
+    amount: number;
+    contributionDate: string;
+    /** Moneda del importe capturado. Opcional por compatibilidad con los llamadores viejos;
+     *  si viene y NO coincide con la de la meta, se rechaza en vez de guardar el importe tal
+     *  cual bajo otra unidad. Ver la nota de `monedaVinculadaEsCoherente`. */
+    currency?: string;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const scope = await householdWriteScope(supabase, userId);
 
@@ -772,12 +775,15 @@ export async function getDebtPaymentContext(debtId: string): Promise<{
  * Retiro de una meta (Fase 4 · flujos inversos): crea el ingreso vinculado
  * (linked_kind='goal') y baja current_amount (sin pasar de 0).
  */
-export async function withdrawFromGoal(input: {
-  goalId: string;
-  amount: number;
-  withdrawalDate: string;
-  note?: string;
-}, ctx?: AuthContext): Promise<void> {
+export async function withdrawFromGoal(
+  input: {
+    goalId: string;
+    amount: number;
+    withdrawalDate: string;
+    note?: string;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const scope = await householdWriteScope(supabase, userId);
 
@@ -835,13 +841,16 @@ export async function withdrawFromGoal(input: {
  * por el mismo monto (la brecha meta−acumulado se conserva). Rollback de la
  * transacción si el update de la meta falla.
  */
-export async function spendFromGoal(input: {
-  goalId: string;
-  amount: number;
-  spendDate: string;
-  categoryId: string | null;
-  note?: string;
-}, ctx?: AuthContext): Promise<void> {
+export async function spendFromGoal(
+  input: {
+    goalId: string;
+    amount: number;
+    spendDate: string;
+    categoryId: string | null;
+    note?: string;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const scope = await householdWriteScope(supabase, userId);
 

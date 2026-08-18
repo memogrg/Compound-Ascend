@@ -19,7 +19,12 @@ import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { effectiveApr, buildRateNote } from "@/modules/control/services/index-rates";
 import { computeDueStatus } from "@/modules/control/engine/due-dates";
-import type { Debt, DebtRateType, DebtRateIndex, DebtClassification } from "@/modules/control/types";
+import type {
+  Debt,
+  DebtRateType,
+  DebtRateIndex,
+  DebtClassification,
+} from "@/modules/control/types";
 
 export interface DebtVM {
   id: string;
