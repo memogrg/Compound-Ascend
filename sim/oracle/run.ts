@@ -123,9 +123,12 @@ async function compareScenario(
         metric: "portafolio · sin doble conteo (invested event-sourced = cost_basis)",
         persona,
         oracle: p.invested,
+        // Dinero → tolerancia de dinero (±1 CRC), no ±0.01: la deriva sub-peso del
+        // promedio ponderado del DCA (quantity=Σ amount/price acumula error flotante) no
+        // es doble conteo. Un doble-merge real (≥ un aporte entero) se atrapa igual con ±1.
         app: M.round2(port.analytics.totalCostBasis),
-        tolerance: CENT_EPS,
-        note: `trap si se sumaran los ledgers = ${p.doubleCountTrap}`,
+        tolerance: MONEY_EPS,
+        note: `deriva sub-peso del promedio ponderado DCA; trap si se sumaran los ledgers = ${p.doubleCountTrap}`,
       }),
     );
   }
@@ -146,7 +149,8 @@ async function compareScenario(
   );
 
   // z2 · two flow definitions: operatingFlow (excl. capital) vs real (incl. capital).
-  const flow = M.oracleFlow(raw);
+  // Scoped to `period` — the same window getMonthFlow reports (else prior months leak in).
+  const flow = M.oracleFlow(raw, period);
   ds.push(
     compareCharacterization({
       metric: "flujo · operativo (app) vs real incl. capital (oracle) (z2)",

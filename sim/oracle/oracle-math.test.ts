@@ -56,6 +56,7 @@ describe("oracle · metrics puras", () => {
   });
 
   it("flujo operativo excluye capital; freeCashflowReal lo incluye (zona 2)", () => {
+    const PERIOD = { from: "2026-01-01", to: "2026-01-31" };
     const r = raw({
       txns: [
         txn({ kind: "ingreso", amount: 1000, linked_kind: "none" }),
@@ -63,13 +64,30 @@ describe("oracle · metrics puras", () => {
         txn({ kind: "gasto", amount: 200, linked_kind: "goal", linked_id: "g1" }), // capital-out
       ],
     });
-    const f = oracleFlow(r);
+    const f = oracleFlow(r, PERIOD);
     expect(f.operatingIncome).toBe(1000);
     expect(f.operatingExpense).toBe(300); // capital-out excluido
     expect(f.operatingFlow).toBe(700);
     expect(f.freeCashflowReal).toBe(500); // 1000 − (300 + 200 capital)
     // La diferencia entre ambos = el capital (zona 2).
     expect(f.operatingFlow - f.freeCashflowReal).toBe(200);
+  });
+
+  it("flujo SOLO cuenta el periodo reportado (regresión: sumaba todos los meses)", () => {
+    const PERIOD = { from: "2026-02-01", to: "2026-02-28" };
+    const r = raw({
+      txns: [
+        txn({ kind: "ingreso", amount: 800, occurred_on: "2026-01-05" }), // mes anterior → fuera
+        txn({ kind: "gasto", amount: 300, occurred_on: "2026-01-10" }), // fuera
+        txn({ kind: "ingreso", amount: 800, occurred_on: "2026-02-05" }), // dentro
+        txn({ kind: "gasto", amount: 300, occurred_on: "2026-02-10" }), // dentro
+      ],
+    });
+    const f = oracleFlow(r, PERIOD);
+    // Solo febrero: 800 − 300 = 500 (NO 1600 − 600 = 1000 de sumar ambos meses).
+    expect(f.operatingIncome).toBe(800);
+    expect(f.operatingExpense).toBe(300);
+    expect(f.operatingFlow).toBe(500);
   });
 
   it("tasa de ahorro: oracle (asignaciones) vs app (acredita sobrante) — zona 1", () => {
@@ -208,6 +226,15 @@ describe("oracle · comparador y veredictos", () => {
     const d = compareCharacterization({ metric: "tasa ahorro", persona: "x", oracle: 0.1, app: 0.6, tolerance: RATIO_EPS, expectedModelDiff: 0.5 });
     expect(d.verdict).toBe("characterization");
     expect(d.note).toContain("modelo conocido");
+  });
+
+  it("caracterización ratio: residual crudo cero NO marca posible bug (fix z1 redondeo)", () => {
+    // z1: oracle 0, app 0.125, esperado 0.125 → residual crudo 0. Con round2(delta) daba
+    // round2(0.125)=0.13 vs 0.125 = 0.01 > tol → falso "posible bug". Ahora usa el crudo.
+    const d = compareCharacterization({ metric: "tasa ahorro", persona: "x", oracle: 0, app: 0.125, tolerance: RATIO_EPS, expectedModelDiff: 0.125 });
+    expect(d.verdict).toBe("characterization");
+    expect(d.note).toContain("modelo conocido");
+    expect(d.note).not.toContain("posible bug");
   });
 
   it("caracterización: Δ > modelo → nota de posible bug (pero no bloquea)", () => {

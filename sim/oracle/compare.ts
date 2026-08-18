@@ -52,17 +52,22 @@ export function compareCharacterization(input: CompareInput): Discrepancy {
   if (base) return base;
   const oracle = input.oracle as number;
   const app = input.app as number;
-  const delta = round2(app - oracle);
+  const rawDelta = app - oracle;
+  const delta = round2(rawDelta);
   const expected = input.expectedModelDiff ?? null;
   let note: string;
   if (expected === null) {
     note = input.note ?? "oracle vs app (sin modelo esperado práctico)";
   } else {
-    const residual = round2(delta - expected);
+    // Residual sobre valores CRUDOS, no sobre el delta ya redondeado a 2 decimales: para
+    // ratios de 3 decimales (tasa de ahorro), round2(0.125)=0.13 vs esperado 0.125 daba un
+    // residual falso de 0.01. La decisión usa el crudo; el residual se muestra redondeado fino.
+    const rawResidual = rawDelta - expected;
+    const shownResidual = Math.round(rawResidual * 1000) / 1000;
     note =
-      Math.abs(residual) <= input.tolerance
+      Math.abs(rawResidual) <= input.tolerance
         ? `Δ coincide con el modelo conocido (esperado=${expected})`
-        : `Δ EXCEDE el modelo conocido (esperado=${expected}, residual=${residual}) — posible bug`;
+        : `Δ EXCEDE el modelo conocido (esperado=${expected}, residual=${shownResidual}) — posible bug`;
     if (input.note) note = `${input.note} · ${note}`;
   }
   return {

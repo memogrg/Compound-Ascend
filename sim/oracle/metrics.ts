@@ -12,7 +12,7 @@
  *    quantity/average_cost (that would reuse the app's weighted-average merge).
  *  - Goal saved: Σ signed linked 'goal' transactions — not savings_goals.current_amount.
  */
-import type { InitialPosition, PriceBook, RawData } from "./types";
+import type { InitialPosition, PriceBook, RawData, RawTxn } from "./types";
 
 export const round2 = (n: number): number => Math.round(n * 100) / 100;
 
@@ -46,9 +46,13 @@ export interface FlowParts {
 }
 
 /** Operating flow excludes capital (holding/goal) and off-budget rows; freeCashflowReal
- *  includes capital-out gastos. The gap between them IS fragile zone 2. */
-export function oracleFlow(raw: RawData): FlowParts {
-  const confirmed = raw.txns.filter(isConfirmed);
+ *  includes capital-out gastos. The gap between them IS fragile zone 2. Scoped to the
+ *  SAME period the app's getMonthFlow reports (occurred_on within [from, to] inclusive)
+ *  — getMonthFlow loads listTransactions(period), so an unscoped sum over the whole run
+ *  would over-count every prior month. */
+export function oracleFlow(raw: RawData, period: { from: string; to: string }): FlowParts {
+  const inPeriod = (t: RawTxn): boolean => t.occurred_on >= period.from && t.occurred_on <= period.to;
+  const confirmed = raw.txns.filter((t) => isConfirmed(t) && inPeriod(t));
   const opIncome = sum(
     confirmed.filter((t) => t.kind === "ingreso" && !CAPITAL_LINKS.has(t.linked_kind)),
     (t) => t.amount,
