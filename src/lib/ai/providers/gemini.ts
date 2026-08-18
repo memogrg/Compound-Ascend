@@ -33,7 +33,11 @@ const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // había calibrado para un modelo que en realidad no existía. Presupuesto de retry por llamada:
 // MAX_ATTEMPTS(2) × 20s + 1 backoff(~0,4-0,6s) ≈ 40,6s < maxDuration(60) → la función NUNCA muere
 // a mitad de una secuencia de reintentos (con 3 intentos serían ~61,6s > 60, por eso bajamos a 2).
-const TIMEOUT_MS = 20000;
+// Default 20s (prod): calibrado con maxDuration(60) de Vercel arriba — NO subirlo en prod.
+// Override SOLO para entornos sin ese límite (auditoría/headless local, juez -pro lento) vía
+// GEMINI_TIMEOUT_MS. Se lee en tiempo de LLAMADA (no al cargar el módulo) para no depender del
+// orden de imports; sin la env, el default preserva el comportamiento de prod byte a byte.
+const timeoutMs = (): number => Number(process.env.GEMINI_TIMEOUT_MS) || 20000;
 // Reintentos para hipos transitorios del proveedor (5xx/429 y errores de red). 2 = 1 intento + 1
 // reintento: cabe holgado en maxDuration=60 (ver cálculo arriba); 3.1-flash-lite es rápido → un
 // 2º reintento rara vez cambia el resultado.
@@ -169,7 +173,7 @@ async function postJsonWithRetry(url: string, body: unknown, model: string): Pro
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const isLast = attempt === MAX_ATTEMPTS - 1;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs());
     try {
       let res: Response;
       try {
@@ -185,7 +189,7 @@ async function postJsonWithRetry(url: string, body: unknown, model: string): Pro
           logger.error("[gemini] timeout", {
             model,
             endpoint: safeEndpoint(url),
-            ms: TIMEOUT_MS,
+            ms: timeoutMs(),
             attempt,
           });
           throw providerError({ reason: "timeout" }, model);
