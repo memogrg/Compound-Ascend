@@ -25,6 +25,7 @@ export {
 export {
   createTransaction,
   listTransactions,
+  listTransactionsOnDate,
   listLinkedMovements,
   deleteTransaction,
 } from "./services/transaction-service";

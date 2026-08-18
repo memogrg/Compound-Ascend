@@ -101,6 +101,29 @@ export async function listTransactions(
   return (data ?? []).map(rowToTransaction);
 }
 
+/**
+ * Movimientos ya registrados de UNA fecha y un tipo — la lectura de la guarda anti-duplicado.
+ *
+ * Va acotada al día y a las columnas que se comparan a propósito: corre justo antes de CADA alta
+ * confirmada (chat, recibo y lote), así que tiene que costar lo mismo que no estar. `listTransactions`
+ * traería `*` y todo un periodo para responder una pregunta de una fila.
+ */
+export async function listTransactionsOnDate(
+  occurredOn: string,
+  kind: TxnKind,
+  ctx?: AuthContext,
+): Promise<Transaction[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
+  const { data } = await supabase
+    .from("transactions")
+    .select("*")
+    .in("user_id", memberIds)
+    .eq("occurred_on", occurredOn)
+    .eq("kind", kind);
+  return (data ?? []).map(rowToTransaction);
+}
+
 /** Movimiento vinculado del periodo, en bruto (cada uno en SU moneda). Para los deltas "vs mes". */
 export type LinkedMovement = {
   linkedKind: "goal" | "debt";

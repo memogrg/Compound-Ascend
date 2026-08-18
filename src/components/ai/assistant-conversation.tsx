@@ -62,6 +62,7 @@ import {
 } from "@/lib/ai/batch-rows";
 import {
   draftFromExtract,
+  draftFromAction,
   validarRecibo,
   necesitaConfirmarMoneda,
   etiquetaConfirmarMoneda,
@@ -277,8 +278,22 @@ type ChatMsg = {
   /** Mensaje al que este responde. */
   quote?: Quote;
   action?: AIActionProposal | null;
+  /**
+   * Estado de la propuesta de este turno. La propuesta PERTENECE al turno que la generó:
+   *
+   *  - `abierta`   — se puede revisar y confirmar.
+   *  - `cerrada`   — el usuario mandó otro mensaje: la propuesta vieja deja de estar viva. Sin
+   *                  esto, una tarjeta de dos turnos atrás seguía a un tap de registrar un gasto
+   *                  que el usuario ya había dejado pasar.
+   *  - `consumida` — ya se registró. Es la idempotencia POR PROPUESTA: la tarjeta no vuelve al
+   *                  estado editable ni admite un segundo "Confirmar" (hoy seguía viva después
+   *                  de registrar, y el segundo tap creaba el movimiento otra vez).
+   */
+  actionState?: "abierta" | "cerrada" | "consumida";
   /** Borrador EDITABLE que viene del escáner de recibos (no de la IA). */
   receipt?: ReceiptDraft;
+  /** Mismo ciclo de vida que `actionState`, para el borrador del escáner. */
+  receiptState?: "abierta" | "cerrada" | "consumida";
 };
 
 const LINK_LABEL: Record<string, string> = {
@@ -320,32 +335,9 @@ export function sobreSuccessMessage(s: SobreRemaining | null): string {
   return sobreSuccessText(s, formatMoney);
 }
 
-/** Mapea action.payload → borrador de transacción. `today` = hoy en la zona del perfil. */
-function txnFromAction(
-  action: AIActionProposal,
-  fallbackCurrency: string,
-  today: string,
-): DraftTxn {
-  const p = action.payload as Record<string, unknown>;
-  const VALID = new Set(["debt", "goal", "holding", "policy", "rental"]);
-  const linkedKind =
-    typeof p.linkedKind === "string" && VALID.has(p.linkedKind)
-      ? (p.linkedKind as DraftTxn["linkedKind"])
-      : null;
-  return {
-    kind: (p.kind as "ingreso" | "gasto") ?? "gasto",
-    description: String(p.description ?? action.summary ?? "Transacción"),
-    amount: Number(p.amount ?? 0),
-    currency: String(p.currency ?? fallbackCurrency),
-    occurredOn: String(p.date ?? p.occurredOn ?? today),
-    source: "chat",
-    categoryId: typeof p.categoryId === "string" ? p.categoryId : null,
-    categoryPath: typeof p.categoryPath === "string" ? p.categoryPath : null,
-    linkedKind,
-    linkedId: linkedKind && typeof p.linkedId === "string" ? p.linkedId : null,
-    linkedName: linkedKind && typeof p.linkedName === "string" ? p.linkedName : null,
-  };
-}
+// El mapeo de una propuesta `create_transaction` a borrador editable vive en `draftFromAction`
+// (lib/ai/receipt-draft), junto al del recibo: es la MISMA tarjeta, así que es el mismo borrador.
+// La versión local de solo-lectura que había acá era la otra mitad de "dos tarjetas".
 
 /** Mapea action.payload → borrador de meta. */
 function goalFromAction(action: AIActionProposal, fallbackCurrency: string): DraftGoal {
@@ -525,6 +517,16 @@ export function AssistantConversation({
     void send(input);
   };
 
+  /**
+   * Ciclo de vida de la propuesta de un turno. Vive en el hilo y no dentro de la tarjeta a
+   * propósito: si viviera dentro, un re-montaje la devolvería al estado editable y "ya se
+   * registró" se perdería — que es exactamente lo que dejaba confirmar dos veces.
+   */
+  const marcarAccion = (id: number, estado: "cerrada" | "consumida") =>
+    setMessages((m) => m.map((x) => (x.id === id ? { ...x, actionState: estado } : x)));
+  const marcarRecibo = (id: number, estado: "cerrada" | "consumida") =>
+    setMessages((m) => m.map((x) => (x.id === id ? { ...x, receiptState: estado } : x)));
+
   const sendTranscript = async () => {
     if (sendingTranscript) return;
     setSendingTranscript(true);
@@ -557,8 +559,19 @@ export function AssistantConversation({
     // Se guarda el id local del mensaje para poder colgarle después su dbId: sin eso el mensaje
     // recién enviado no sería citable hasta recargar el hilo.
     const localId = nextId();
+    // LA PROPUESTA PERTENECE A SU TURNO. Al mandar un mensaje nuevo, la propuesta pendiente
+    // anterior se CIERRA: no se re-adjunta ni queda a un tap de registrar algo que el usuario ya
+    // dejó pasar. Lo ya consumido se respeta (no se "reabre" ni se pisa su resumen).
+    //
+    // El borrador del RECIBO no se cierra: no lo propone el modelo (no puede reaparecer solo) y
+    // es un formulario que el usuario puede estar completando — cerrarlo por escribir en el chat
+    // le borraría lo que acaba de corregir.
     setMessages((m) => [
-      ...m,
+      ...m.map((prev) =>
+        prev.action && (prev.actionState ?? "abierta") === "abierta"
+          ? { ...prev, actionState: "cerrada" as const }
+          : prev,
+      ),
       { id: localId, role: "user", text: q, ...(cita ? { quote: cita } : {}) },
     ]);
     setSending(true);
@@ -747,9 +760,22 @@ export function AssistantConversation({
                 </button>
               </div>
             ) : null}
-            {m.action?.type === "create_transaction" ? (
+            {/* La MISMA tarjeta editable del recibo: monto, fecha, comercio, moneda y sobre se
+                corrigen antes de confirmar. Antes acá había una de solo-lectura que solo dejaba
+                tocar el sobre — con la fecha fija, un gasto mal fechado no tenía arreglo desde
+                el chat. `cerrada` = la propuesta era de un turno anterior y ya no se ofrece. */}
+            {m.action?.type === "create_transaction" &&
+            (m.actionState ?? "abierta") !== "cerrada" ? (
               <div className={s.cardWrap}>
-                <TxnConfirmCard skin={s} draft={txnFromAction(m.action, currency, today())} />
+                <ReceiptConfirmCard
+                  skin={s}
+                  title="Acción propuesta"
+                  draft={draftFromAction(m.action, { hoy: today(), captureCurrency: currency })}
+                  hoy={today()}
+                  consumed={m.actionState === "consumida"}
+                  onRegistered={() => marcarAccion(m.id, "consumida")}
+                  onCancel={() => marcarAccion(m.id, "cerrada")}
+                />
               </div>
             ) : null}
             {m.action?.type === "create_goal" ? (
@@ -791,7 +817,13 @@ export function AssistantConversation({
             ) : null}
             {m.receipt ? (
               <div className={s.cardWrap}>
-                <ReceiptConfirmCard skin={s} draft={m.receipt} hoy={today()} />
+                <ReceiptConfirmCard
+                  skin={s}
+                  draft={m.receipt}
+                  hoy={today()}
+                  consumed={m.receiptState === "consumida"}
+                  onRegistered={() => marcarRecibo(m.id, "consumida")}
+                />
               </div>
             ) : null}
           </div>
@@ -964,6 +996,7 @@ export function TxnConfirmCard({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicado, setDuplicado] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "ok" | "cancel">("idle");
   const [sobre, setSobre] = useState<SobreRemaining | null>(null);
   // Sobre elegido (arranca en el sugerido por la IA / el elegido en el form manual); "" = Sin sobre.
@@ -978,11 +1011,22 @@ export function TxnConfirmCard({
     [],
   );
 
-  const confirm = async () => {
+  /** `forzar` = ya vio el aviso de "esto ya parece registrado" y eligió registrarlo igual. */
+  const confirm = async (forzar = false) => {
+    if (phase === "ok") return; // idempotencia: una propuesta se registra una sola vez
     setPending(true);
     setError(null);
-    const res = await confirmTransactionAction({ ...draft, categoryId: categoryId || null });
+    const res = await confirmTransactionAction({
+      ...draft,
+      categoryId: categoryId || null,
+      allowDuplicate: forzar,
+    });
     setPending(false);
+    if (res.duplicate) {
+      setDuplicado(res.message ?? "Esto ya parece registrado — ¿lo registro igual?");
+      return;
+    }
+    setDuplicado(null);
     if (res.ok) {
       setSobre(res.sobre ?? null);
       setPhase("ok");
@@ -1049,11 +1093,24 @@ export function TxnConfirmCard({
         </div>
       ) : null}
       {error ? <div className={skin.error}>{error}</div> : null}
+      {duplicado ? (
+        <div className="ac-rc-warn" role="alert">
+          {duplicado}
+          <button
+            type="button"
+            className="ac-rc-chip"
+            onClick={() => void confirm(true)}
+            disabled={pending}
+          >
+            Registrarlo igual
+          </button>
+        </div>
+      ) : null}
       <div className={skin.actions}>
         <button className={skin.btnSecondary} onClick={cancel} disabled={pending}>
           Cancelar
         </button>
-        <button className={skin.btnPrimary} onClick={confirm} disabled={pending}>
+        <button className={skin.btnPrimary} onClick={() => void confirm()} disabled={pending}>
           {pending ? "Guardando…" : "Confirmar"}
         </button>
       </div>
@@ -1067,16 +1124,21 @@ function detalleSobre(s: SobreRemaining | null): string | null {
 }
 
 /**
- * RECIBO ESCANEADO — la tarjeta de confirmación del escáner, ENTERA editable.
+ * ALTA REVISABLE — la tarjeta ENTERA editable. La usan el escáner de recibos Y el chat.
  *
  * Es la última defensa antes de escribir, y hasta ahora solo dejaba tocar el sobre: monto, moneda,
  * comercio y fecha se registraban tal como los hubiera leído el OCR. Un tiquete de ₡4.100 sin
  * moneda impresa entraba como $4.100 (la principal del usuario) con fecha de dos años atrás, sin
  * un solo aviso — y el "✓ registrado" tampoco decía dónde había quedado.
  *
- * Ahora los cuatro campos se editan, precargados con lo del OCR, y se registra EXACTAMENTE lo que
+ * Ahora los cuatro campos se editan, precargados con lo leído, y se registra EXACTAMENTE lo que
  * queda en la tarjeta (`aPayloadRecibo`). Las reglas —qué moneda proponer, qué fecha es
  * sospechosa, qué avisar— son puras y viven en `lib/ai/receipt-draft`.
+ *
+ * Y la usa TAMBIÉN la propuesta del chat (`create_transaction`), que tenía una tarjeta propia de
+ * solo-lectura: mostraba el sobre y nada más, así que una fecha o un monto mal entendidos no
+ * tenían arreglo sin registrar y corregir después. Ahora hay UNA tarjeta; lo único que cambia es
+ * el título y de dónde salió el borrador.
  *
  * La comparte el chat de las tres superficies (panel web, /asistente y móvil): solo cambia la piel.
  */
@@ -1085,16 +1147,27 @@ export function ReceiptConfirmCard({
   hoy,
   title = "Recibo escaneado",
   skin = WEB_SKIN,
+  consumed = false,
   onCancel,
   onConfirmed,
+  onRegistered,
 }: {
   draft: ReceiptDraft;
   /** Hoy en la zona del PERFIL (la misma que usa el servidor), no la del navegador. */
   hoy: string;
   title?: string;
   skin?: Skin;
+  /**
+   * La propuesta ya se registró (lo sabe el hilo, no la tarjeta). Idempotencia POR PROPUESTA: sin
+   * esto, un re-montaje devolvía la tarjeta al estado editable y el segundo "Confirmar" creaba el
+   * movimiento otra vez.
+   */
+  consumed?: boolean;
   onCancel?: () => void;
+  /** "Listo" del resumen. Solo se dibuja el botón si el llamador lo pasa. */
   onConfirmed?: () => void;
+  /** Se registró: el hilo marca la propuesta como consumida. Distinto de cerrar la tarjeta. */
+  onRegistered?: () => void;
 }) {
   // Los id de los campos se generan por instancia: en el hilo del chat pueden convivir dos
   // recibos escaneados, y con id fijos los <label> del segundo apuntarían a los campos del
@@ -1113,8 +1186,15 @@ export function ReceiptConfirmCard({
     periodo: string | null;
     sobre: string | null;
   } | null>(null);
+  // Aviso de la guarda anti-duplicado: no es un error, es "¿lo registro igual?". Se guarda aparte
+  // de `error` porque la salida es un botón de confirmación explícita, no un reintento a ciegas.
+  const [duplicado, setDuplicado] = useState<string | null>(null);
 
-  const editar = (cambio: Partial<ReceiptDraft>) => setD((prev) => ({ ...prev, ...cambio }));
+  const editar = (cambio: Partial<ReceiptDraft>) => {
+    // Tocar cualquier campo invalida el aviso de duplicado: ya no es el mismo movimiento.
+    setDuplicado(null);
+    setD((prev) => ({ ...prev, ...cambio }));
+  };
 
   const err = validarRecibo(d, hoy);
   const ver = intento; // los errores aparecen recién al intentar confirmar
@@ -1123,18 +1203,26 @@ export function ReceiptConfirmCard({
   const montoPrevio = parsearMonto(d.amountText) ?? 0;
   const aviso = avisoFecha(d.occurredOn, hoy, { flag: d.dateFlag, leida: d.dateRead });
 
-  const confirmar = async () => {
+  /** `forzar` = el usuario ya vio el aviso de duplicado y eligió registrarlo igual. */
+  const confirmar = async (forzar = false) => {
     setIntento(true);
+    // Ya consumida: no hay segundo registro posible aunque el botón llegue a taparse.
+    if (consumed || phase === "ok") return;
     if (Object.keys(err).length > 0 || !monedaOk) return;
     setPending(true);
     setError(null);
     const payload = aPayloadRecibo(d);
-    const res = await confirmTransactionAction(payload);
+    const res = await confirmTransactionAction({ ...payload, allowDuplicate: forzar });
     setPending(false);
+    if (res.duplicate) {
+      setDuplicado(res.message ?? "Esto ya parece registrado — ¿lo registro igual?");
+      return;
+    }
     if (!res.ok) {
       setError(res.message ?? "No se pudo guardar.");
       return;
     }
+    onRegistered?.();
     // Se muestra lo que QUEDÓ registrado (monto + moneda + fecha + sobre) y, si cayó fuera del
     // mes en curso, se dice explícitamente: si no, el usuario lo busca en sus movimientos y no
     // está. Nunca auto-cierra — este resumen es el que permite notar que el OCR se equivocó.
@@ -1152,7 +1240,10 @@ export function ReceiptConfirmCard({
   };
 
   if (phase === "cancel") return null;
-  if (phase === "ok" && hecho) {
+  // `consumed` sin `hecho` = la propuesta se registró y la tarjeta se re-montó (perdió su
+  // resumen). Se muestra el estado consumido igual: lo que NO puede volver es el botón.
+  if (consumed && !hecho) return <div className={skin.done}>✓ Ya lo registré.</div>;
+  if ((phase === "ok" || consumed) && hecho) {
     return (
       <div className={skin.done}>
         {hecho.titulo}
@@ -1177,8 +1268,11 @@ export function ReceiptConfirmCard({
     <div className={`${skin.card} ac-rc-card`}>
       <div className={skin.eyebrow}>{title}</div>
       {/* Resumen arriba: el importe grande es lo primero que se lee, y recién debajo van los
-          campos. El signo lo pone formatMoney (cero neutro: "₡0", no "−₡0"). */}
-      <div className={skin.amount}>{formatMoney(-montoPrevio, d.currency)}</div>
+          campos. El signo lo pone formatMoney (cero neutro: "₡0", no "−₡0"); el que decide si va
+          en negativo es el TIPO — un recibo siempre es gasto, pero el chat propone ingresos. */}
+      <div className={skin.amount}>
+        {formatMoney(d.kind === "ingreso" ? montoPrevio : -montoPrevio, d.currency)}
+      </div>
 
       {/*
         UNA sola rejilla para TODOS los campos, no un input suelto + una sub-rejilla para dos de
@@ -1296,16 +1390,43 @@ export function ReceiptConfirmCard({
           {/* `ac-rc-field` también acá: sin ella el combobox quedaba con otra altura y otro
               radio que el resto, que es la mitad de la sensación de "campos desparejos". */}
           <SobreCombobox
-            kind="gasto"
+            kind={d.kind}
             value={d.categoryId ?? ""}
             onChange={(v) => editar({ categoryId: v || null })}
             disabled={pending}
+            {...(d.categoryPath ? { suggestedPath: d.categoryPath } : {})}
             inputClassName={`${skin.sobreInput ?? "sel"} ac-rc-field`}
           />
         </div>
       </div>
 
+      {/* Vínculo propuesto (deuda/meta/…): se muestra, no se edita. Cambiarlo acá desarmaría la
+          propagación al ledger especializado, que se resuelve en el servidor. */}
+      {d.linkedKind && d.linkedId ? (
+        <div className={skin.tagWrap}>
+          <span className={skin.tag}>
+            Vinculada a {LINK_LABEL[d.linkedKind] ?? "entidad"}
+            {d.linkedName ? `: ${d.linkedName}` : ""}
+          </span>
+        </div>
+      ) : null}
+
       {error ? <div className={skin.error}>{error}</div> : null}
+      {/* GUARDA ANTI-DUPLICADO. No bloquea: dice lo que encontró y deja la decisión, que es
+          justamente lo que faltaba para que registrar dos veces no fuera silencioso. */}
+      {duplicado ? (
+        <div className="ac-rc-warn" role="alert">
+          {duplicado}
+          <button
+            type="button"
+            className="ac-rc-chip"
+            onClick={() => void confirmar(true)}
+            disabled={pending}
+          >
+            Registrarlo igual
+          </button>
+        </div>
+      ) : null}
       <div className={skin.actions}>
         <button
           className={skin.btnSecondary}
@@ -1317,7 +1438,7 @@ export function ReceiptConfirmCard({
         >
           Cancelar
         </button>
-        <button className={skin.btnPrimary} onClick={confirmar} disabled={pending}>
+        <button className={skin.btnPrimary} onClick={() => void confirmar()} disabled={pending}>
           {pending ? "Guardando…" : "Confirmar"}
         </button>
       </div>
@@ -1588,6 +1709,10 @@ function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknow
   const [error, setError] = useState<string | null>(null);
   const [intento, setIntento] = useState(false);
   const [hecho, setHecho] = useState<BatchResult | null>(null);
+  // Filas que la guarda frenó por parecer ya registradas, y cuántas SÍ entraron en la pasada
+  // anterior (el resumen final tiene que sumar las dos tandas, no solo la última).
+  const [duplicadas, setDuplicadas] = useState<string[]>([]);
+  const [creadasAntes, setCreadasAntes] = useState(0);
 
   const editar = (uid: string, cambio: Partial<BatchRowDraft>) =>
     setRows((rs) => rs.map((r) => (r.uid === uid ? { ...r, ...cambio } : r)));
@@ -1595,17 +1720,37 @@ function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknow
 
   const { conError } = resumenValidacion(rows);
 
-  const confirmar = async () => {
+  /**
+   * `forzar` = las filas que quedaron son las que la guarda anti-duplicado frenó y el usuario
+   * eligió registrar igual.
+   */
+  const confirmar = async (forzar = false) => {
     // Primero se marcan los errores; recién cuando no queda ninguno se registra. Sin esto, la
     // tarjeta mostraría los campos en rojo desde que abre, antes de que el usuario toque nada.
     setIntento(true);
     if (conError > 0 || rows.length === 0) return;
     setPending(true);
     setError(null);
-    const res = await confirmBatchTransactionsAction({ rows: aPayload(rows) });
+    const enviadas = rows;
+    const res = await confirmBatchTransactionsAction({
+      rows: aPayload(enviadas),
+      allowDuplicates: forzar,
+    });
     setPending(false);
-    if (res.creadas > 0 || res.fallidas.length > 0) setHecho(res);
-    else setError(res.message ?? "No se pudo registrar el lote.");
+    // Las que ya parecían registradas NO se crearon: quedan en la tarjeta (y solo ellas) para
+    // que el usuario decida. Las demás ya entraron, así que salen del lote — reenviarlas las
+    // duplicaría de verdad.
+    if (res.duplicadas.length > 0) {
+      const repetidas = new Set(res.duplicadas.map((dp) => dp.index));
+      setRows(enviadas.filter((_, i) => repetidas.has(i)));
+      setCreadasAntes((n) => n + res.creadas);
+      setDuplicadas(res.duplicadas.map((dp) => dp.description));
+      return;
+    }
+    setDuplicadas([]);
+    if (res.creadas > 0 || res.fallidas.length > 0) {
+      setHecho({ ...res, creadas: res.creadas + creadasAntes });
+    } else setError(res.message ?? "No se pudo registrar el lote.");
   };
 
   if (rows.length === 0 && !hecho) return null;
@@ -1740,12 +1885,39 @@ function BatchTxnConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknow
         </div>
       ) : null}
       {error ? <div className={skin.error}>{error}</div> : null}
+      {/* Las que ya parecían registradas: las demás YA entraron; estas esperan una decisión. */}
+      {duplicadas.length > 0 ? (
+        <div className="ac-rc-warn" role="alert">
+          {creadasAntes > 0 ? `Registré ${creadasAntes}. ` : ""}
+          {duplicadas.length === 1
+            ? `«${duplicadas[0]}» ya parece registrada — ¿la registro igual?`
+            : `Estas ${duplicadas.length} ya parecen registradas — ¿las registro igual?`}
+        </div>
+      ) : null}
       <div className={skin.actions}>
-        <button className={skin.btnSecondary} onClick={() => setRows([])} disabled={pending}>
-          Cancelar
+        <button
+          className={skin.btnSecondary}
+          onClick={() => {
+            // Descartar las repetidas no puede borrar el rastro de las que SÍ entraron antes.
+            if (creadasAntes > 0) {
+              setHecho({ ok: true, creadas: creadasAntes, fallidas: [], duplicadas: [] });
+            }
+            setRows([]);
+          }}
+          disabled={pending}
+        >
+          {duplicadas.length > 0 ? "Dejarlas fuera" : "Cancelar"}
         </button>
-        <button className={skin.btnPrimary} onClick={confirmar} disabled={pending}>
-          {pending ? "Registrando…" : `Registrar ${rows.length}`}
+        <button
+          className={skin.btnPrimary}
+          onClick={() => void confirmar(duplicadas.length > 0)}
+          disabled={pending}
+        >
+          {pending
+            ? "Registrando…"
+            : duplicadas.length > 0
+              ? `Registrar ${rows.length} igual`
+              : `Registrar ${rows.length}`}
         </button>
       </div>
     </div>

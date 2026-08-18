@@ -33,6 +33,7 @@ import { loadRetainedChat, appendChatMessages, loadQuotedContext } from "@/lib/a
 import { capHistory } from "@/lib/ai/history";
 import { annotateReply, buildQuotedContext, pareceReferenciaACitado } from "@/lib/ai/chat-quote";
 import { pareceBloqueDeEstado, pareceIntencionDeConciliar } from "@/lib/ai/statement-parse";
+import { propuestaPerteneceAlTurno } from "@/lib/ai/propuesta-turno";
 
 export const runtime = "nodejs";
 // El chat (contexto + embedding de la Biblia + tool-loop de gemini-3.5-flash) puede
@@ -249,6 +250,16 @@ export async function POST(req: Request) {
       result = await financeChatWithTools(messages, ctx, toolContext);
     }
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
+
+    // ── LA PROPUESTA ES DEL TURNO QUE LA PIDIÓ. El turno anterior sigue en la ventana de
+    //    historial, y con un "te propongo registrar…" a la vista el modelo re-emite el bloque
+    //    ```action``` en la respuesta siguiente: se preguntaba por supermercados y salía la
+    //    tarjeta del gasto de transporte de antes, lista para registrarlo por segunda vez.
+    //    Se cae la TARJETA, no la respuesta: el texto se entrega igual.
+    if (result.action && !propuestaPerteneceAlTurno(userMessage, result.action.type)) {
+      logger.info("assistant.chat.propuesta_descartada", { tipo: result.action.type });
+      result.action = null;
+    }
 
     // Enriquecer una propuesta de gasto/ingreso con el SOBRE sugerido (hoja REAL del usuario),
     // para que la card lo muestre preseleccionado y editable ("Frasco › Sobre"). La IA sugiere
