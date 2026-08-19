@@ -32,8 +32,20 @@ const holdings = vi.fn(async () => [
 vi.mock("@/modules/wealth/services/holdings-service", () => ({ listHoldings: () => holdings() }));
 
 const debts = vi.fn(async () => [
-  { id: "33333333-3333-4333-8333-333333333333", name: "Tarjeta BAC", balance: 800_000, apr: 45, currency: "CRC" },
-  { id: "44444444-4444-4444-8444-444444444444", name: "Préstamo personal", balance: 2_000_000, apr: 18, currency: "CRC" },
+  {
+    id: "33333333-3333-4333-8333-333333333333",
+    name: "Tarjeta BAC",
+    balance: 800_000,
+    apr: 45,
+    currency: "CRC",
+  },
+  {
+    id: "44444444-4444-4444-8444-444444444444",
+    name: "Préstamo personal",
+    balance: 2_000_000,
+    apr: 18,
+    currency: "CRC",
+  },
 ]);
 vi.mock("@/modules/control/services/control-service", () => ({ listDebts: () => debts() }));
 
@@ -41,7 +53,13 @@ const sobres = vi.fn(async () => [
   { id: "55555555-5555-4555-8555-555555555555", sobre: "Restaurantes", frasco: "Vivir" },
   { id: "66666666-6666-4666-8666-666666666666", sobre: "Súper", frasco: "Vivir" },
 ]);
-const budgetTotals = vi.fn(async () => ({
+/** Tipado a mano para que un test pueda inyectar `nativeByKey` con `mockResolvedValueOnce`. */
+type Totales = {
+  currency: string;
+  expenseByKey: Record<string, { label: string; value: number }>;
+  nativeByKey?: Record<string, { label: string; value: number; currency: string; mixed?: boolean }>;
+};
+const budgetTotals = vi.fn(async (): Promise<Totales> => ({
   currency: "CRC",
   expenseByKey: {
     "55555555-5555-4555-8555-555555555555": { label: "Restaurantes", value: 100_000 },
@@ -92,7 +110,9 @@ describe("set_dca · fijar el aporte mensual de una inversión", () => {
   });
 
   it("una posición que NO tiene → se descarta (no se inventa un id)", async () => {
-    expect(await resolve({ type: "set_dca", payload: { symbol: "TSLA", monthlyContribution: 100 } })).toBeNull();
+    expect(
+      await resolve({ type: "set_dca", payload: { symbol: "TSLA", monthlyContribution: 100 } }),
+    ).toBeNull();
   });
 
   it("sin monto no hay acción", async () => {
@@ -102,7 +122,11 @@ describe("set_dca · fijar el aporte mensual de una inversión", () => {
   it("IGNORA un holdingId que venga del modelo: el id sale de la búsqueda", async () => {
     const out = await resolve({
       type: "set_dca",
-      payload: { holdingId: "99999999-9999-4999-8999-999999999999", symbol: "VOO", monthlyContribution: 200 },
+      payload: {
+        holdingId: "99999999-9999-4999-8999-999999999999",
+        symbol: "VOO",
+        monthlyContribution: 200,
+      },
     });
     expect(out?.payload.holdingId).toBe("11111111-1111-4111-8111-111111111111");
   });
@@ -133,7 +157,10 @@ describe("adjust_budget · subir o bajar el presupuesto de un sobre", () => {
   });
 
   it("un sobre sin presupuesto arranca de 0, no de una cifra inventada", async () => {
-    const out = await resolve({ type: "adjust_budget", payload: { name: "Súper", amount: 200_000 } });
+    const out = await resolve({
+      type: "adjust_budget",
+      payload: { name: "Súper", amount: 200_000 },
+    });
     expect(out?.payload.currentAmount).toBe(0);
   });
 
@@ -187,7 +214,13 @@ describe("debt_extra_payment · abono extra a capital", () => {
 
   it("sin nombre pero con UNA sola deuda, esa es", async () => {
     debts.mockResolvedValueOnce([
-      { id: "77777777-7777-4777-8777-777777777777", name: "Única", balance: 500_000, apr: 30, currency: "CRC" },
+      {
+        id: "77777777-7777-4777-8777-777777777777",
+        name: "Única",
+        balance: 500_000,
+        apr: 30,
+        currency: "CRC",
+      },
     ]);
     const out = await resolve({ type: "debt_extra_payment", payload: { amount: 100_000 } });
     expect(out?.payload.debtId).toBe("77777777-7777-4777-8777-777777777777");
@@ -218,6 +251,89 @@ describe("el resto no se toca", () => {
     holdings.mockRejectedValueOnce(new Error("db caída"));
     expect(
       await resolve({ type: "set_dca", payload: { symbol: "VOO", monthlyContribution: 200 } }),
+    ).toBeNull();
+  });
+});
+
+/**
+ * LA MONEDA DEL SOBRE en las tarjetas de acción. Acá no era solo un problema de lectura: la
+ * `currency` del payload viaja a `setEnvelopeBudgetAction`, que la ESCRIBE en
+ * `budget_items.currency`. Con la app en dólares, ajustar desde el chat un sobre configurado en
+ * colones lo re-denominaba a USD en silencio y le multiplicaba el presupuesto por la tasa.
+ */
+describe("moneda nativa del sobre en adjust_budget / move_budget", () => {
+  const REST = "55555555-5555-4555-8555-555555555555";
+  const SUPER = "66666666-6666-4666-8666-666666666666";
+
+  it("adjust_budget usa la moneda y el monto CONFIGURADOS, no los de visualización", async () => {
+    budgetTotals.mockResolvedValueOnce({
+      currency: "USD", // visualización
+      expenseByKey: { [REST]: { label: "Restaurantes", value: 890 } },
+      nativeByKey: { [REST]: { label: "Restaurantes", value: 445_000, currency: "CRC" } },
+    });
+    const out = await resolve({
+      type: "adjust_budget",
+      payload: { name: "Restaurantes", amount: 500_000 },
+    });
+    expect(out?.payload).toMatchObject({ currency: "CRC", currentAmount: 445_000 });
+  });
+
+  it("un presupuesto MIXTO no tiene moneda propia: cae a la de visualización", async () => {
+    budgetTotals.mockResolvedValueOnce({
+      currency: "USD",
+      expenseByKey: { [REST]: { label: "Restaurantes", value: 890 } },
+      nativeByKey: {
+        [REST]: { label: "Restaurantes", value: 445_300, currency: "CRC", mixed: true },
+      },
+    });
+    const out = await resolve({
+      type: "adjust_budget",
+      payload: { name: "Restaurantes", amount: 1_000 },
+    });
+    expect(out?.payload).toMatchObject({ currency: "USD", currentAmount: 890 });
+  });
+
+  it("move_budget entre sobres de la MISMA moneda: monto y moneda nativos", async () => {
+    budgetTotals.mockResolvedValueOnce({
+      currency: "USD",
+      expenseByKey: {
+        [REST]: { label: "Restaurantes", value: 890 },
+        [SUPER]: { label: "Súper", value: 400 },
+      },
+      nativeByKey: {
+        [REST]: { label: "Restaurantes", value: 445_000, currency: "CRC" },
+        [SUPER]: { label: "Súper", value: 200_000, currency: "CRC" },
+      },
+    });
+    const out = await resolve({
+      type: "move_budget",
+      payload: { from: "Restaurantes", to: "Súper", amount: 50_000 },
+    });
+    expect(out?.payload).toMatchObject({
+      currency: "CRC",
+      amount: 50_000,
+      desdeActual: 445_000,
+      hastaActual: 200_000,
+    });
+  });
+
+  it("move_budget entre MONEDAS DISTINTAS se descarta: sería una conversión disfrazada", async () => {
+    budgetTotals.mockResolvedValueOnce({
+      currency: "USD",
+      expenseByKey: {
+        [REST]: { label: "Restaurantes", value: 890 },
+        [SUPER]: { label: "Súper", value: 400 },
+      },
+      nativeByKey: {
+        [REST]: { label: "Restaurantes", value: 445_000, currency: "CRC" },
+        [SUPER]: { label: "Súper", value: 400, currency: "USD" },
+      },
+    });
+    expect(
+      await resolve({
+        type: "move_budget",
+        payload: { from: "Restaurantes", to: "Súper", amount: 50_000 },
+      }),
     ).toBeNull();
   });
 });

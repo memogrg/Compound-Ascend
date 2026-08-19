@@ -157,7 +157,14 @@ async function resolveAdjustBudget(
 
   const period = await userCurrentPeriod();
   const totals = await getBudgetTotals(period).catch(() => null);
-  const actual = totals?.expenseByKey?.[sobre.id]?.value ?? 0;
+  // La moneda del SOBRE, no la de visualización. Acá no era solo un problema de lectura: esta
+  // moneda viaja a `setEnvelopeBudgetAction`, que la ESCRIBE en `budget_items.currency` — así
+  // que ajustar desde el chat un sobre configurado en ₡, con la app en $, lo re-denominaba a
+  // dólares en silencio y multiplicaba su presupuesto por la tasa.
+  const nativo = totals?.nativeByKey?.[sobre.id];
+  const currency = nativo && !nativo.mixed ? nativo.currency : (totals?.currency ?? ctx.currency);
+  const actual =
+    nativo && !nativo.mixed ? nativo.value : (totals?.expenseByKey?.[sobre.id]?.value ?? 0);
   // Proponer exactamente lo que ya tiene no es una acción, es ruido.
   if (Math.round(actual) === Math.round(amount)) return null;
 
@@ -169,7 +176,7 @@ async function resolveAdjustBudget(
       path: pathOf(sobre),
       amount,
       currentAmount: actual,
-      currency: totals?.currency ?? ctx.currency,
+      currency,
       periodMonth: period.month,
       periodYear: period.year,
     },
@@ -219,8 +226,24 @@ async function resolveMoveBudget(
 
   const period = await userCurrentPeriod();
   const totals = await getBudgetTotals(period).catch(() => null);
-  const desdeActual = totals?.expenseByKey?.[desde.id]?.value ?? 0;
-  const hastaActual = totals?.expenseByKey?.[hasta.id]?.value ?? 0;
+  // Los dos sobres en SU moneda (mismo motivo que en adjust_budget: esta cifra se escribe).
+  const nativoDe = (id: string) => {
+    const n = totals?.nativeByKey?.[id];
+    return n && !n.mixed
+      ? { value: n.value, currency: n.currency }
+      : {
+          value: totals?.expenseByKey?.[id]?.value ?? 0,
+          currency: totals?.currency ?? ctx.currency,
+        };
+  };
+  const desdeNativo = nativoDe(desde.id);
+  const hastaNativo = nativoDe(hasta.id);
+  // Mover entre sobres de MONEDAS DISTINTAS no es mover presupuesto: es una conversión con una
+  // tasa adentro, y ni la tarjeta ni `moverPresupuestoEntreSobres` tienen dónde declararla. Se
+  // cae la acción y queda el texto del consejo, que es lo honesto.
+  if (desdeNativo.currency !== hastaNativo.currency) return null;
+  const desdeActual = desdeNativo.value;
+  const hastaActual = hastaNativo.value;
 
   // Topeado a lo que el donante tiene. Si no tiene nada, no hay acción que proponer.
   const monto = Math.min(pedido, desdeActual);
@@ -238,7 +261,7 @@ async function resolveMoveBudget(
       hastaPath: pathOf(hasta),
       hastaActual,
       amount: monto,
-      currency: totals?.currency ?? ctx.currency,
+      currency: desdeNativo.currency,
       periodMonth: period.month,
       periodYear: period.year,
     },
