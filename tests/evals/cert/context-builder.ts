@@ -10,7 +10,7 @@
  */
 import type { AuthContext } from "@/lib/auth/auth-context";
 import type { FinancialContext, ToolContext } from "@/lib/ai/orchestrator";
-import type { Trajectory } from "@/lib/ai/trajectory";
+import type { Trajectory, MonthlyPoint, PortfolioPoint } from "@/lib/ai/trajectory";
 import { getBaseSummary, getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 import { getRichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
 import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service";
@@ -41,6 +41,10 @@ export async function buildSimContext(
   ctx: AuthContext,
   trajectory: Trajectory | undefined,
   dna: PersonaDna,
+  /** Serie longitudinal REAL disponible al asesor (mismos puntos de computeTrajectory /
+   *  net_worth_snapshots que exponen los tools). Se funden en knownFigures para que las
+   *  cifras históricas bien-fundadas no den falso positivo de grounding. */
+  history?: { monthly: MonthlyPoint[]; portfolio: PortfolioPoint[] },
 ): Promise<BuiltContext> {
   const [currency, base, rl, port, ctrl, debtsOv, patr] = await Promise.all([
     getPrimaryCurrency(ctx),
@@ -134,6 +138,13 @@ export async function buildSimContext(
     pr.investableWealth,
     ...debts.map((d) => d.balance),
     ...ctrl.goals.flatMap((g) => [g.currentAmount, g.targetAmount]),
+    // Longitudinal: los valores REALES mes-a-mes que el asesor legítimamente tuvo vía
+    // consultar_historial (net_worth_snapshots/portfolio_snapshots) y sobre los que corre
+    // computeTrajectory. Sin esto, toda cifra histórica bien-fundada (patrimonio/portafolio/
+    // flujo de meses anteriores) daba falso positivo. Fuente = datos reales sembrados, no el
+    // texto del asesor (el check sigue independiente: no se grada al asesor contra sí mismo).
+    ...(history?.monthly ?? []).flatMap((m) => [m.income, m.expense, Math.abs(m.freeCashflow)]),
+    ...(history?.portfolio ?? []).flatMap((p) => [p.portfolioValue, p.netWorth]),
   ]
     .map((n) => Math.round(Math.abs(n)))
     .filter((n) => n > 0);

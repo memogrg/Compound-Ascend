@@ -49,6 +49,31 @@ describe("ai-audit · grounding (evidencia dura)", () => {
   it("ignora porcentajes y años", () => {
     expect(extractMoneyFigures("con 45% de interés en 2026")).toEqual([]);
   });
+
+  // Fidelidad del checker (hueco de alcance longitudinal): sin la serie mes-a-mes en
+  // knownFigures, una cifra histórica REAL (patrimonio de un mes anterior) daba falso
+  // positivo. Con los puntos reales sembrados adentro, se funda — SIN defang: una cifra
+  // inventada (netWorth×7, múltiplo NO curado) sigue marcándose.
+  it("funda cifras históricas reales sin defang (netWorth×7 sigue marcándose)", () => {
+    const pastNetWorth = "hace unos meses tu patrimonio rondaba los ₡830.000";
+    // Bug: sin la serie longitudinal, 830.000 no matchea el snapshot actual → falso positivo.
+    expect(checkGrounding(pastNetWorth, facts()).ok).toBe(false);
+
+    // Fix: knownFigures ampliado con la serie REAL (net_worth_snapshots + portfolio_snapshots).
+    const withHistory = facts({
+      knownFigures: [
+        450_000, 400_000, 50_000, 1_000_000, 700_000, // snapshot actual
+        830_000, 860_000, 910_000, 950_000, 980_000, 1_000_000, // patrimonio mes1..mes6
+        610_000, 640_000, 680_000, 720_000, 760_000, 800_000, // portafolio mes1..mes6
+      ],
+    });
+    expect(checkGrounding(pastNetWorth, withHistory).ok).toBe(true); // 830.000 es un punto real
+
+    // Anti-defang: 7.000.000 = netWorth×7 (7 ∉ MULTIPLIERS y no está en la serie real) → SIGUE marcándose.
+    const fake = checkGrounding("proyecto que tu patrimonio llegue a ₡7.000.000 en breve", withHistory);
+    expect(fake.ok).toBe(false);
+    expect(fake.unmatched).toContain(7_000_000);
+  });
 });
 
 describe("ai-audit · contradicciones (detectores duros)", () => {

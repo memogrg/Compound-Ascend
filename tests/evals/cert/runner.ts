@@ -167,13 +167,13 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
           currency,
         );
         if (m === 0) {
-          ctxMonth1 = await buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna);
+          ctxMonth1 = await buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, { monthly, portfolio });
         }
       });
     }
 
     const ctxMonth6 = await onMonthDay(MONTHS - 1, 28, () =>
-      buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna),
+      buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, { monthly, portfolio }),
     );
 
     // SPOT-CHECK: month6 trajectory must be non-empty before scoring longitudinal.
@@ -215,7 +215,7 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
             await driver.payDebt(ids.debtId!, outstanding, virtualMonthDayISO(MONTHS - 1, 27));
           });
           const after = await onMonthDay(MONTHS - 1, 28, () =>
-            buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna),
+            buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, { monthly, portfolio }),
           );
           outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: after, suite, prompt: CONSISTENCIA.prompt, expectedRedFlags: CONSISTENCIA.expectedRedFlags }, opts));
         }
