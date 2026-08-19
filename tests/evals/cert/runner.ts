@@ -155,9 +155,10 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
         });
         // Persist monthly_snapshots (gasto/ingreso/ahorro) + portfolio_snapshots so
         // consultar_historial has real series for ALL métricas (net worth escrito arriba).
-        // generateMonthlySnapshot es cookie-based → withSimAuth lo resuelve a esta persona;
+        // generateMonthlySnapshot recibe ctx explícito → threadea a getRealTotals/getBudgetTotals
+        // → getDisplayCurrency(ctx), sin tocar el cookies() crudo (headless-safe, determinista);
         // generateAndSaveSnapshot usa service-role + simNow() (fecha virtual) → headless-safe.
-        await withSimAuth(ctx, () => generateMonthlySnapshot(period));
+        await generateMonthlySnapshot(period, ctx);
         await generateAndSaveSnapshot(
           ctx.userId,
           port.analytics.totalPortfolioValue,
