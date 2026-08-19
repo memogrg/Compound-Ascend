@@ -38,7 +38,11 @@ export {
 } from "./engine/pago-vinculado";
 export type { PagoContext, PagoKind, PagoErrores, Desglose } from "./engine/pago-vinculado";
 export { goalInputSchema } from "./schemas";
-export { getDebtsOverview, getCurrentDebtBalances, currentDebtBalance } from "./services/debts-service";
+export {
+  getDebtsOverview,
+  getCurrentDebtBalances,
+  currentDebtBalance,
+} from "./services/debts-service";
 export type { DebtBalance } from "./services/debts-service";
 export { getDebtDetail } from "./services/debt-detail-service";
 export { getIndexRates, effectiveApr, buildRateNote } from "./services/index-rates";

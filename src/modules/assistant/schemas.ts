@@ -17,6 +17,12 @@ export const transactionInputSchema = z
     // El usuario la ve y confirma; nunca se ejecuta sola.
     linkedKind: z.enum(["debt", "goal", "holding", "policy", "rental"]).nullable().optional(),
     linkedId: z.string().uuid().nullable().optional(),
+    /**
+     * "Ya lo revisé, registralo igual": la segunda pasada tras el aviso de la guarda
+     * anti-duplicado. Nace en false a propósito — el default seguro es avisar, y solo un tap
+     * explícito del usuario lo pone en true.
+     */
+    allowDuplicate: z.boolean().optional(),
   })
   .refine((d) => !d.linkedKind || !!d.linkedId, {
     message: "Un vínculo necesita la entidad (linkedId).",
@@ -115,6 +121,8 @@ export const batchTransactionsInputSchema = z.object({
     // Tope duro: un estado de cuenta pegado son decenas de filas, no cientos. Sin tope, un pegado
     // accidental dispararía cientos de inserts detrás de un solo tap.
     .max(60),
+  /** Igual que en el alta individual: la segunda pasada tras el aviso de duplicados. */
+  allowDuplicates: z.boolean().optional(),
 });
 export type BatchTransactionsInput = z.infer<typeof batchTransactionsInputSchema>;
 

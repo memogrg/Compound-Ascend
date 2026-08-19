@@ -8,6 +8,7 @@
  * (action = null, reply con la pregunta corta). Nunca respondemos "no puedo crear …".
  */
 import type { AIChatResponse, AIActionProposal } from "@/lib/ai/types";
+import { extractFechaNatural, fechaLegible } from "@/lib/ai/fecha-natural";
 
 export type KnownHolding = { symbol: string | null; name: string; assetType?: string };
 
@@ -102,7 +103,7 @@ const EXPENSE_ANALYSIS_RE =
  * al LLM —que igual sabe registrar—, mientras que un falso negativo le contesta al usuario
  * con una pregunta absurda. Ante duda, escalá.
  */
-function isQuestion(t: string): boolean {
+export function isQuestion(t: string): boolean {
   if (/[¿?]/.test(t)) return true;
   // Cierre con lookahead y no \b, por lo mismo que arriba (á/é/í no son \w en JS).
   return /^\s*(?:d[oó]nde|c[oó]mo|cu[aá]l|cu[aá]nt\w*|cu[aá]ndo|qu[eé]|por qu[eé]|para qu[eé]|puedo|podr[ií]a|se puede|me conviene)(?!\p{L})/iu.test(
@@ -130,6 +131,52 @@ function extractName(text: string): string | null {
 }
 
 /**
+ * ¿Es una ORDEN de dar de alta un movimiento, con su monto?
+ *
+ * Es la señal que le da PRECEDENCIA al carril de ACCIÓN sobre todos los de consulta. Sin esto,
+ * "Agrega un gasto a transporte de vehículo de 37747 el día 2 de agosto" se contestaba como
+ * búsqueda ("no tenés gastos en …"): el mensaje trae la palabra "gasto" y el mes, así que
+ * `consulta_transacciones` lo matcheaba primero y `detectCreateAction` —que corre DESPUÉS— no
+ * llegaba a verlo nunca. Un alta contestada como consulta es el peor de los dos errores: el
+ * usuario cree que registró y no registró nada.
+ *
+ * Las tres condiciones son las mismas que usa la rama de GASTO, así que esto no puede abrirle la
+ * puerta a nada que el carril luego no proponga: pregunta → no; lenguaje de análisis → no; sin
+ * monto → no (ahí la ambigüedad es real y el LLM decide mejor).
+ */
+export function esOrdenDeAltaDeMovimiento(text: string, hoy?: string): boolean {
+  const t = text.trim();
+  if (isQuestion(t) || EXPENSE_ANALYSIS_RE.test(t)) return false;
+  return pideAltaDeMovimiento(t, hoy);
+}
+
+/**
+ * Las señales de un alta CON monto, sin mirar si la frase es una pregunta.
+ *
+ * Se separa de `esOrdenDeAltaDeMovimiento` porque hay un caso donde la pregunta SÍ pide un alta:
+ * "¿me registrás un gasto de 5000 en el súper?". Para dar precedencia sobre los carriles de
+ * consulta eso no alcanza (una pregunta se responde), pero para decidir si una propuesta
+ * PERTENECE al turno sí: ahí lo que importa es que el usuario pidió registrar algo.
+ */
+export function pideAltaDeMovimiento(text: string, hoy?: string): boolean {
+  const t = text.trim();
+  if (!(EXPENSE_FACT_RE.test(t) || (EXPENSE_ORDER_RE.test(t) && EXPENSE_NOUN_RE.test(t)))) {
+    return false;
+  }
+  return montoSinFecha(t, hoy ?? "9999-12-31") !== null;
+}
+
+/**
+ * Monto del mensaje IGNORANDO el fragmento que es una fecha. "…de 37747 el día 2 de agosto" tiene
+ * dos números y solo uno es plata: sin sacar la fecha primero, "el 2 de agosto de 2026" aportaba
+ * un "2" que en otras frases ("el 15, gasté 3000") ganaba por venir antes.
+ */
+function montoSinFecha(t: string, hoy: string): number | null {
+  const fecha = extractFechaNatural(t, hoy);
+  return extractMoney(fecha ? t.replace(fecha.texto, " ") : t);
+}
+
+/**
  * Detecta un intent de CREAR y arma la propuesta (o pide el dato faltante). null si no es un create.
  */
 export function detectCreateAction(text: string, opts: ActionLaneOptions): AIChatResponse | null {
@@ -144,7 +191,10 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
     return null;
   }
   const pregunta = isQuestion(t);
-  const money = extractMoney(t);
+  // La FECHA se lee ANTES que el monto y su fragmento se saca del texto: el "2" de "el día 2 de
+  // agosto" no es plata, y en "el 15, gasté 3000" ganaba por venir primero.
+  const fecha = extractFechaNatural(t, opts.today);
+  const money = extractMoney(fecha ? t.replace(fecha.texto, " ") : t);
 
   // 1) ALERTA DE PRECIO — "alerta/avisame … {símbolo} … {precio}". La dirección la infiere el
   //    servidor con el precio actual (createInvestmentAlert); acá solo símbolo + objetivo. Se
@@ -211,12 +261,29 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
     !EXPENSE_ANALYSIS_RE.test(t) &&
     (EXPENSE_FACT_RE.test(t) || (EXPENSE_ORDER_RE.test(t) && EXPENSE_NOUN_RE.test(t)))
   ) {
-    const desc = extractExpenseDesc(t) ?? "Gasto";
+    const desc = extractExpenseDesc(fecha ? t.replace(fecha.texto, " ") : t) ?? "Gasto";
     if (money === null) {
       return say(`¿De cuánto fue el gasto${desc !== "Gasto" ? ` en ${desc}` : ""}?`, null);
     }
+    // FECHA: la que dijo el usuario; hoy solo si no dijo ninguna. Si dijo una y no se pudo
+    // interpretar, se cae a hoy pero se DICE y el texto original viaja a la tarjeta (`dateText`),
+    // que lo repite junto al campo editable. Ignorarla en silencio mandaba el gasto a otro mes.
+    const occurredOn = fecha?.iso ?? opts.today;
+    const cuando =
+      fecha?.iso != null
+        ? ` el ${fechaLegible(fecha.iso)}`
+        : fecha
+          ? ` con fecha de hoy (${fechaLegible(opts.today)})`
+          : "";
+    const aviso = fecha
+      ? fecha.iso != null
+        ? ""
+        : fecha.motivo === "futura"
+          ? ` La fecha que dijiste («${fecha.texto}») es futura, así que no la usé — corregila abajo si hace falta.`
+          : ` No entendí la fecha que dijiste («${fecha.texto}») — corregila abajo si hace falta.`
+      : "";
     return say(
-      `Te propongo registrar un gasto de ${formatMoneyPlain(money, opts.currency)} en "${desc}". Confirmá abajo.`,
+      `Te propongo registrar un gasto de ${formatMoneyPlain(money, opts.currency)} en "${desc}"${cuando}.${aviso} Confirmá abajo.`,
       {
         type: "create_transaction",
         payload: {
@@ -224,7 +291,8 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
           description: desc,
           amount: money,
           currency: opts.currency,
-          occurredOn: opts.today,
+          occurredOn,
+          ...(fecha && fecha.iso === null ? { dateText: fecha.texto } : {}),
         },
         summary: `Gasto ${desc}`,
       },
@@ -234,15 +302,28 @@ export function detectCreateAction(text: string, opts: ActionLaneOptions): AICha
   return null;
 }
 
-/** Descripción del gasto: primer "en/de/para/por X" que NO sea el monto. Preferí "en X". */
+/**
+ * Descripción del gasto: primer "en/de/para/por/a X" que NO sea el monto. Preferí "en X".
+ *
+ * "a" entró a la lista por "Agrega un gasto A TRANSPORTE de vehículo…": sin ella el destino del
+ * gasto no se leía y la descripción salía del "de" siguiente ("vehículo de 37747"). Va última en
+ * la alternancia para no ganarle a las preposiciones más específicas.
+ *
+ * El candidato se limpia del monto que pueda haber quedado pegado al final ("transporte de
+ * vehículo de 37747" → "transporte de vehículo"): el importe ya se leyó aparte y repetirlo en la
+ * descripción es lo que hacía que el texto de la propuesta se viera como una búsqueda fallida.
+ */
 function extractExpenseDesc(text: string): string | null {
   const all = [
     ...text.matchAll(
-      /\b(?:en|de|para|por)\s+(?:el\s+|la\s+|un\s+|una\s+|mi\s+)?([\p{L}][\p{L}\p{N} '-]{1,40}?)\s*(?:$|[.,;!?])/giu,
+      /\b(?:en|de|para|por|a)\s+(?:el\s+|la\s+|un\s+|una\s+|mi\s+)?([\p{L}][\p{L}\p{N} '-]{1,40}?)\s*(?:$|[.,;!?])/giu,
     ),
   ];
   for (const m of all) {
-    const cand = m[1]?.trim();
+    const cand = m[1]
+      ?.replace(/\s+(?:de|por|en|a)?\s*\d[\d.,]*$/i, "")
+      .replace(/\s+(?:de|del|por|en|a|con|para|desde|hasta)$/i, "")
+      .trim();
     if (cand && !/^\d[\d.,]*$/.test(cand)) return cand;
   }
   return null;

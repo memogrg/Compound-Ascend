@@ -67,18 +67,21 @@ export async function buildLinkedTransactionRow(
  * ledger completo (extra, modos, income_sources) y llaman a
  * registerLinkedTransaction; propagar aquí también lo duplicaría.
  */
-export async function propagateLinkedTransaction(args: {
-  transactionId: string;
-  kind: string;
-  linkedKind: string;
-  linkedId: string | null;
-  amount: number;
-  /** Moneda de la transacción que se propaga. Se valida contra la de la entidad: el
-   *  ledger vinculado (debt_payments) no tiene columna de moneda, así que capturar en otra
-   *  guardaría un importe multiplicado sin dejar rastro. */
-  currency?: string;
-  occurredOn: string;
-}, ctx?: AuthContext): Promise<void> {
+export async function propagateLinkedTransaction(
+  args: {
+    transactionId: string;
+    kind: string;
+    linkedKind: string;
+    linkedId: string | null;
+    amount: number;
+    /** Moneda de la transacción que se propaga. Se valida contra la de la entidad: el
+     *  ledger vinculado (debt_payments) no tiene columna de moneda, así que capturar en otra
+     *  guardaría un importe multiplicado sin dejar rastro. */
+    currency?: string;
+    occurredOn: string;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
   if (!args.linkedId || args.kind !== "gasto") return;
   const { db: supabase, userId } = await resolveAuth(ctx);
   const scope = await householdWriteScope(supabase, userId);
@@ -257,17 +260,20 @@ export async function deleteLinkedTransaction(
  *
  * Idempotente y defensivo: si el registro de origen ya no existe, no falla.
  */
-export async function reverseLinkedTransaction(args: {
-  transactionId: string;
-  /** kind de la transacción ('gasto' | 'ingreso' | …): fija el sentido en metas. */
-  kind: string;
-  linkedKind: string;
-  linkedId: string | null;
-  amount: number;
-  occurredOn: string;
-  /** Off-budget: distingue un consumo del frasco de un aporte (ambos son gasto). */
-  countsInBudget?: boolean;
-}, ctx?: AuthContext): Promise<void> {
+export async function reverseLinkedTransaction(
+  args: {
+    transactionId: string;
+    /** kind de la transacción ('gasto' | 'ingreso' | …): fija el sentido en metas. */
+    kind: string;
+    linkedKind: string;
+    linkedId: string | null;
+    amount: number;
+    occurredOn: string;
+    /** Off-budget: distingue un consumo del frasco de un aporte (ambos son gasto). */
+    countsInBudget?: boolean;
+  },
+  ctx?: AuthContext,
+): Promise<void> {
   if (!args.linkedId) return;
   const { db: supabase, userId } = await resolveAuth(ctx);
   const scope = await householdWriteScope(supabase, userId);

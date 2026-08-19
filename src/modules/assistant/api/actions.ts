@@ -16,8 +16,15 @@ import {
   batchTransactionsInputSchema,
 } from "@/modules/assistant/schemas";
 import { createTransaction } from "@/modules/assistant/services/transaction-service";
-import { listSobresForKind, getSobreRemaining } from "@/modules/financial-base";
+import {
+  listSobresForKind,
+  getSobreRemaining,
+  listTransactionsOnDate,
+} from "@/modules/financial-base";
 import type { SobreOption, SobreRemaining } from "@/modules/financial-base";
+import { buscarDuplicado, mensajeDuplicado } from "@/lib/ai/duplicate-guard";
+import type { AltaCandidata, MovimientoRegistrado } from "@/lib/ai/duplicate-guard";
+import { fechaLegible } from "@/lib/ai/fecha-natural";
 import { createGoal, goalInputSchema } from "@/modules/control";
 import { createInvestmentAlert } from "@/modules/wealth";
 import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
@@ -31,8 +38,45 @@ import {
 import { sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
 
-/** `sobre` viaja solo para un GASTO con sobre → mensaje de restante en el chat. */
-export type ConfirmResult = { ok: boolean; message?: string; sobre?: SobreRemaining };
+/**
+ * `sobre` viaja solo para un GASTO con sobre → mensaje de restante en el chat.
+ * `duplicate` NO es un error: es "esto ya parece registrado, ¿lo registro igual?". La tarjeta lo
+ * distingue del fallo real porque ofrece reintentar con `allowDuplicate`.
+ */
+export type ConfirmResult = {
+  ok: boolean;
+  message?: string;
+  sobre?: SobreRemaining;
+  duplicate?: boolean;
+};
+
+/**
+ * El movimiento ya registrado que este alta duplicaría, o null. Best-effort: si la lectura falla
+ * NO se bloquea el alta — la guarda es una ayuda, y quedarse sin registrar por un error de red
+ * sería peor que el duplicado que evita.
+ */
+async function duplicadoDe(cand: AltaCandidata): Promise<MovimientoRegistrado | null> {
+  try {
+    const delDia = await listTransactionsOnDate(cand.occurredOn, cand.kind);
+    return buscarDuplicado(
+      cand,
+      delDia.map((t) => ({
+        id: t.id,
+        kind: t.kind as "gasto" | "ingreso",
+        amount: t.amount,
+        currency: t.currency,
+        occurredOn: t.occurredOn,
+        categoryId: t.categoryId,
+        description: t.merchantOrSource ?? t.description ?? "",
+      })),
+    );
+  } catch (err) {
+    logger.warn("guarda anti-duplicado no pudo leer el día", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return null;
+  }
+}
 
 /**
  * Sobres (hojas) del usuario para el selector de la card de confirmación, con su frasco para
@@ -56,6 +100,20 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
   }
   if (!isSupabaseConfigured()) {
     return { ok: false, message: "Conecta Supabase para guardar la transacción." };
+  }
+  // GUARDA ANTI-DUPLICADO. Antes de escribir, se mira si ya hay un movimiento equivalente (mismo
+  // monto, misma fecha, mismo sobre y comercio parecido). No se bloquea: se avisa y se pide una
+  // confirmación explícita, que vuelve con `allowDuplicate`. Cubre las dos formas de duplicar —
+  // confirmar dos veces la MISMA propuesta y registrar por chat algo que ya entró por el recibo.
+  if (!parsed.data.allowDuplicate) {
+    const dup = await duplicadoDe(parsed.data);
+    if (dup) {
+      return {
+        ok: false,
+        duplicate: true,
+        message: mensajeDuplicado(fechaLegible(dup.occurredOn)),
+      };
+    }
   }
   try {
     await createTransaction(parsed.data);
@@ -142,11 +200,19 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
   }
 }
 
-/** Resultado del alta en lote: cuántas entraron y cuáles no (con su motivo). */
+/**
+ * Resultado del alta en lote: cuántas entraron, cuáles no (con su motivo) y cuáles se FRENARON
+ * por parecer ya registradas.
+ *
+ * Las duplicadas van aparte de las fallidas porque no fallaron: están esperando un "registralas
+ * igual". Viajan con su `index` en el arreglo enviado para que la tarjeta pueda reenviar
+ * exactamente esas filas y no las que ya entraron.
+ */
 export type BatchResult = {
   ok: boolean;
   creadas: number;
   fallidas: { description: string; message: string }[];
+  duplicadas: { index: number; description: string; message: string }[];
   message?: string;
 };
 
@@ -169,16 +235,45 @@ export async function confirmBatchTransactionsAction(raw: unknown): Promise<Batc
       ok: false,
       creadas: 0,
       fallidas: [],
+      duplicadas: [],
       message: parsed.error.issues[0]?.message ?? "Datos inválidos.",
     };
   }
   if (!isSupabaseConfigured()) {
-    return { ok: false, creadas: 0, fallidas: [], message: "Conecta Supabase para guardar." };
+    return {
+      ok: false,
+      creadas: 0,
+      fallidas: [],
+      duplicadas: [],
+      message: "Conecta Supabase para guardar.",
+    };
   }
 
   const fallidas: BatchResult["fallidas"] = [];
+  const duplicadas: BatchResult["duplicadas"] = [];
   let creadas = 0;
-  for (const row of parsed.data.rows) {
+  for (const [index, row] of parsed.data.rows.entries()) {
+    // Misma guarda que el alta individual, fila por fila. La duplicada se SALTA (no se registra
+    // ni se pierde): vuelve en `duplicadas` para que el usuario decida sobre ella, mientras las
+    // demás entran. Frenar el lote entero por una fila repetida obligaría a rehacer el pegado.
+    if (!parsed.data.allowDuplicates) {
+      const dup = await duplicadoDe({
+        kind: row.kind,
+        amount: row.amount,
+        currency: row.currency,
+        occurredOn: row.occurredOn,
+        categoryId: row.categoryId ?? null,
+        description: row.description,
+      });
+      if (dup) {
+        duplicadas.push({
+          index,
+          description: row.description,
+          message: mensajeDuplicado(fechaLegible(dup.occurredOn)),
+        });
+        continue;
+      }
+    }
     try {
       await createTransaction({
         kind: row.kind,
@@ -204,7 +299,7 @@ export async function confirmBatchTransactionsAction(raw: unknown): Promise<Batc
     revalidatePath("/mi-base-financiera");
     revalidatePath("/dashboard");
   }
-  return { ok: creadas > 0, creadas, fallidas };
+  return { ok: creadas > 0, creadas, fallidas, duplicadas };
 }
 
 /**

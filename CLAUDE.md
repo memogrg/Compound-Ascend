@@ -89,6 +89,25 @@ Three clients with different privilege levels — use the right one:
 
 `src/lib/ai/provider.ts` defines the `AIProvider` interface — Gemini is the real implementation (`GEMINI_MODEL`, default `gemini-3.5-flash`; vision uses `gemini-2.5-flash`); `StubProvider` is used in tests. The orchestrator in `src/modules/assistant/` builds a Spanish-language system prompt with the user's financial context. AI responses return text + a proposed action object; actions are **never auto-executed** — they're surfaced for user confirmation.
 
+Four rules govern that confirmation path:
+
+- **The action lane beats every query lane.** `matchIntent` (`router.ts`) returns `null` for an
+  imperative alta with an amount (`esOrdenDeAltaDeMovimiento`, `action-lane.ts`), so the deterministic
+  action lane gets it. Otherwise "agregá un gasto … de 37747 el día 2 de agosto" is answered as a
+  search — the word "gasto" plus a month name matches `consulta_transacciones` first.
+- **A proposal belongs to the turn that asked for it** (`propuesta-turno.ts`). The previous turn stays
+  in the model's history window, so it re-emits the `create_transaction` block on the next answer;
+  a `create_transaction`/`create_transactions_batch` born from a *question* is dropped server-side,
+  and the client closes any still-open proposal when a new message is sent.
+- **One editable card.** Chat proposals and scanned receipts share `ReceiptConfirmCard` over the same
+  `ReceiptDraft` (`receipt-draft.ts`): amount, date, merchant, currency and sobre are all editable, and
+  `aPayloadRecibo` registers exactly what's on the card. Dates said in words are parsed by
+  `fecha-natural.ts` against the **profile** timezone; one that can't be parsed is reported, never
+  silently replaced by today.
+- **Anti-duplicate guard before any write** (`duplicate-guard.ts`): same amount + date + sobre and a
+  similar merchant ⇒ ask instead of writing. It never blocks — it asks for explicit confirmation
+  (`allowDuplicate`), and it covers chat, receipt and batch alike.
+
 ### Insights (the bell / campana)
 
 `src/lib/insights/` powers the dashboard notification bell. Pure `detect*` functions in `detectors.ts` each turn some slice of user data into `DetectedInsight`s (kind + severity + optional `relatedKind`/`relatedId`). `refreshInsights()` runs them behind a **freshness guard** (only if the last run is stale) and hands the result to `syncInsights()`, which **reconciles by `(kind, related_id)`**: a detector that stops emitting an insight marks the persisted row `resuelto` automatically — this is how an insight self-clears once the underlying condition is fixed. `getActiveInsights()` triggers a refresh on read. Keep side-effectful work (merges, expense writes) **out of `refreshInsights()`** — it also runs from the AI context-engine; do such work in the page load instead (see the DCA gap below).

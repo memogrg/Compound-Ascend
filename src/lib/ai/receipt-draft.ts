@@ -25,7 +25,14 @@
  * EDITADOS y el extractor no vuelve a intervenir.
  */
 import { fechaValida, parsearMonto } from "@/lib/ai/batch-rows";
+import { fechaLegible, mesLegible } from "@/lib/ai/fecha-natural";
 import { formatMoney, currencySymbol } from "@/lib/format";
+import type { AIActionProposal } from "@/lib/ai/types";
+
+// El nombre del mes y la fecha legible viven en `fecha-natural` (que es quien también los
+// PARSEA): una sola tabla de meses para leer y para escribir. Se reexportan porque varias
+// superficies los importaban desde acá.
+export { fechaLegible, mesLegible };
 
 /** Lo que devuelve `extractReceipt` (los campos que llegan al borrador). */
 export type ReceiptExtract = {
@@ -42,10 +49,13 @@ export type ReceiptExtract = {
 /**
  * De dónde salió la moneda del borrador:
  *  - `recibo`    — la declaró el recibo (₡ o $ impresos). No hay nada que confirmar.
+ *  - `usuario`   — no viene de un OCR: es la moneda de CAPTURA del usuario (la propuesta del
+ *                  chat). Tampoco hay nada que confirmar — no hubo lectura que pudiera fallar—,
+ *                  pero el selector sigue estando por si el gasto fue en otra.
  *  - `pais`      — se dedujo de la zona horaria del perfil. Hay que confirmarla.
  *  - `principal` — no se pudo deducir; se usó la principal del usuario. Hay que confirmarla.
  */
-export type CurrencyOrigin = "recibo" | "pais" | "principal";
+export type CurrencyOrigin = "recibo" | "usuario" | "pais" | "principal";
 
 /**
  * Zona IANA del perfil → moneda de curso legal del país.
@@ -139,11 +149,15 @@ export function etiquetaConfirmarMoneda(currency: string): string {
  *  - `invalida`  — el modelo devolvió algo que no es una fecha real (2026-02-31 y similares).
  *  - `futura`    — posterior a hoy: un recibo no puede ser del futuro.
  *  - `absurda`   — tan vieja que es basura de OCR, no un recibo viejo.
+ *  - `no-entendida` — el usuario DIJO una fecha en el chat y no se pudo interpretar
+ *                  ("el 32 de agosto"). No es un caso de OCR: es lo que impide que una fecha
+ *                  dicha se ignore en silencio.
  *
- * Los cuatro últimos NO se registran: el borrador cae a hoy y lo dice. `otro-mes` sí se conserva,
+ * Los cinco últimos NO se registran: el borrador cae a hoy y lo dice. `otro-mes` sí se conserva,
  * porque descartar una fecha correcta es tan malo como aceptar una incorrecta.
  */
-export type DateFlag = "ok" | "otro-mes" | "faltante" | "invalida" | "futura" | "absurda";
+export type DateFlag =
+  "ok" | "otro-mes" | "faltante" | "invalida" | "futura" | "absurda" | "no-entendida";
 
 /**
  * Corte de "esto ya no es un recibo viejo, es una lectura rota". Cinco años: por debajo puede
@@ -152,21 +166,6 @@ export type DateFlag = "ok" | "otro-mes" | "faltante" | "invalida" | "futura" | 
  * números de factura tomados por fecha).
  */
 const ANTIGUEDAD_ABSURDA_DIAS = 365 * 5;
-
-const MESES = [
-  "enero",
-  "febrero",
-  "marzo",
-  "abril",
-  "mayo",
-  "junio",
-  "julio",
-  "agosto",
-  "septiembre",
-  "octubre",
-  "noviembre",
-  "diciembre",
-];
 
 function aUTC(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);
@@ -181,19 +180,6 @@ function diasEntre(a: string, b: string): number {
 /** ¿Las dos fechas caen en el mismo mes calendario? */
 export function mismoMes(a: string, b: string): boolean {
   return a.slice(0, 7) === b.slice(0, 7);
-}
-
-/** «agosto 2024» — el mes de una fecha ISO, para decirle al usuario DÓNDE quedó el movimiento. */
-export function mesLegible(iso: string): string {
-  const mes = MESES[Number(iso.slice(5, 7)) - 1];
-  return mes ? `${mes} ${iso.slice(0, 4)}` : iso;
-}
-
-/** «26 de agosto de 2024» — la fecha completa para el resumen de lo registrado. */
-export function fechaLegible(iso: string): string {
-  if (!fechaValida(iso)) return iso;
-  const mes = MESES[Number(iso.slice(5, 7)) - 1];
-  return `${Number(iso.slice(8, 10))} de ${mes} de ${iso.slice(0, 4)}`;
 }
 
 /**
@@ -231,6 +217,12 @@ export function avisoFecha(
     return { texto: `Esta fecha es de ${mesLegible(actual)} — ¿es correcta?`, tono: "aviso" };
   // Ya está en el mes en curso: solo queda contar que la del recibo se descartó, si se descartó.
   if (actual !== hoy) return null;
+  // La fecha DICHA en el chat que no se pudo leer: se nombra tal cual la escribió el usuario.
+  if (origen.flag === "no-entendida")
+    return {
+      texto: `No entendí la fecha${origen.leida ? ` «${origen.leida}»` : ""}; se usó la de hoy. Corregila si no es esa.`,
+      tono: "aviso",
+    };
   if (origen.flag === "faltante")
     return { texto: "No detecté la fecha en el recibo; se usó la de hoy.", tono: "aviso" };
   if (origen.flag === "invalida" || origen.flag === "absurda")
@@ -253,6 +245,10 @@ export function avisoFecha(
 /**
  * Recibo en edición. `amountText` es texto y no número a propósito (igual que en el alta en lote):
  * mientras se escribe, el campo pasa por estados que no son un número válido ("", "4.", "-").
+ *
+ * Ya no es solo del recibo: es el borrador de CUALQUIER alta que el usuario revisa antes de
+ * confirmar (recibo escaneado y propuesta del chat). Por eso viajan `kind`, `source` y el vínculo:
+ * son lo único que distinguía a las dos tarjetas, y tenerlos acá es lo que permite que haya UNA.
  */
 export type ReceiptDraft = {
   description: string;
@@ -260,10 +256,18 @@ export type ReceiptDraft = {
   currency: string;
   currencyOrigin: CurrencyOrigin;
   occurredOn: string;
-  /** Fecha tal como la leyó el OCR, aunque se haya descartado. */
+  /** Fecha tal como la leyó el OCR (o como la dijo el usuario), aunque se haya descartado. */
   dateRead: string | null;
   dateFlag: DateFlag;
   categoryId: string | null;
+  /** Sobre sugerido en formato "Frasco › Sobre", para preseleccionarlo en el combo. */
+  categoryPath?: string | null;
+  kind: "gasto" | "ingreso";
+  source: "receipt" | "chat";
+  /** Vínculo propuesto (deuda/meta/…): se muestra y viaja tal cual; no es editable. */
+  linkedKind?: "debt" | "goal" | "holding" | "policy" | "rental" | null;
+  linkedId?: string | null;
+  linkedName?: string | null;
 };
 
 const MAX_DESC = 160;
@@ -298,6 +302,51 @@ export function draftFromExtract(
     dateRead: extract.date ?? null,
     dateFlag: flag,
     categoryId: null,
+    kind: "gasto",
+    source: "receipt",
+  };
+}
+
+/**
+ * Propuesta del CHAT (`create_transaction`) → el MISMO borrador editable del recibo.
+ *
+ * Existe para que no haya dos tarjetas. La del chat solo dejaba tocar el sobre: monto, fecha y
+ * comercio se registraban tal como los hubiera entendido el parseo, y una fecha mal leída mandaba
+ * el gasto a otro mes sin que se pudiera corregir sin borrarlo y rehacerlo.
+ *
+ * La fecha ya viene resuelta por el carril de acción (`occurredOn`); `dateFlag`/`dateRead` traen
+ * el rastro de lo que el usuario DIJO, para poder avisar cuando no se entendió.
+ */
+export function draftFromAction(
+  action: AIActionProposal,
+  opts: { hoy: string; captureCurrency: string },
+): ReceiptDraft {
+  const p = action.payload as Record<string, unknown>;
+  const VINCULOS = new Set(["debt", "goal", "holding", "policy", "rental"]);
+  const linkedKind =
+    typeof p.linkedKind === "string" && VINCULOS.has(p.linkedKind)
+      ? (p.linkedKind as ReceiptDraft["linkedKind"])
+      : null;
+  const dicha = typeof p.dateText === "string" && p.dateText.trim() ? p.dateText.trim() : null;
+  const leida = String(p.date ?? p.occurredOn ?? "");
+  const { date, flag } = evaluarFecha(leida, opts.hoy);
+  return {
+    description: String(p.description ?? action.summary ?? ""),
+    amountText: montoATexto(Number(p.amount ?? 0)),
+    currency: String(p.currency ?? opts.captureCurrency),
+    currencyOrigin: "usuario",
+    occurredOn: date,
+    // `dateText` solo llega cuando el usuario dijo una fecha que NO se pudo interpretar: ahí lo
+    // que hay que mostrarle es su propia frase, no un ISO que él nunca escribió.
+    dateRead: dicha ?? (leida || null),
+    dateFlag: dicha ? "no-entendida" : flag,
+    categoryId: typeof p.categoryId === "string" ? p.categoryId : null,
+    categoryPath: typeof p.categoryPath === "string" ? p.categoryPath : null,
+    kind: p.kind === "ingreso" ? "ingreso" : "gasto",
+    source: "chat",
+    linkedKind,
+    linkedId: linkedKind && typeof p.linkedId === "string" ? p.linkedId : null,
+    linkedName: linkedKind && typeof p.linkedName === "string" ? p.linkedName : null,
   };
 }
 
@@ -326,9 +375,12 @@ export function validarRecibo(d: ReceiptDraft, hoy: string): ReceiptErrors {
   return e;
 }
 
-/** ¿Falta que el usuario confirme la moneda? Solo si NO la declaró el recibo. */
+/**
+ * ¿Falta que el usuario confirme la moneda? Solo cuando se ADIVINÓ. Si la declaró el recibo o
+ * es la moneda de captura del propio usuario (chat), no hubo lectura que pudiera fallar.
+ */
 export function necesitaConfirmarMoneda(d: ReceiptDraft): boolean {
-  return d.currencyOrigin !== "recibo";
+  return d.currencyOrigin !== "recibo" && d.currencyOrigin !== "usuario";
 }
 
 /**
@@ -336,22 +388,27 @@ export function necesitaConfirmarMoneda(d: ReceiptDraft): boolean {
  * lo que el usuario ve en la tarjeta es lo que se registra.
  */
 export function aPayloadRecibo(d: ReceiptDraft): {
-  kind: "gasto";
+  kind: "gasto" | "ingreso";
   description: string;
   amount: number;
   currency: string;
   occurredOn: string;
   categoryId: string | null;
-  source: "receipt";
+  source: "receipt" | "chat";
+  linkedKind?: "debt" | "goal" | "holding" | "policy" | "rental";
+  linkedId?: string;
 } {
   return {
-    kind: "gasto",
+    kind: d.kind,
     description: d.description.trim(),
     amount: parsearMonto(d.amountText) ?? 0,
     currency: d.currency,
     occurredOn: d.occurredOn,
     categoryId: d.categoryId,
-    source: "receipt",
+    source: d.source,
+    // El vínculo viaja solo si está COMPLETO: `transactionInputSchema` rechaza un linkedKind
+    // sin su linkedId.
+    ...(d.linkedKind && d.linkedId ? { linkedKind: d.linkedKind, linkedId: d.linkedId } : {}),
   };
 }
 
