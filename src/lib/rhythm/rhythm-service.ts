@@ -334,9 +334,21 @@ export type FotoDelMes = {
   dia: number;
   todayIso: string;
   diasDelMes: number;
+  /** Moneda de VISUALIZACIÓN. Solo para los agregados; cada sobre trae la suya. */
   currency: string;
-  /** Presupuesto y gasto del mes EN CURSO, por sobre. */
-  sobres: { categoryId: string; path: string; budget: number; spent: number }[];
+  /**
+   * Presupuesto y gasto del mes EN CURSO, por sobre, en la moneda en que el sobre fue
+   * CONFIGURADO (ver `engine/sobre-moneda.ts`). `pesoBudget` es el mismo presupuesto convertido
+   * a `currency`, y existe solo para pesar el sobre contra el total.
+   */
+  sobres: {
+    categoryId: string;
+    path: string;
+    budget: number;
+    spent: number;
+    currency: string;
+    pesoBudget: number;
+  }[];
   /** Presupuesto mensual + gasto ACUMULADO de la ventana de ociosos, por sobre. */
   historico: SobreHistorico[];
   /** Meses de historia real disponibles, topeado a la ventana. 0 = cuenta nueva. */
@@ -350,6 +362,9 @@ async function _getFotoDelMes(period: Period, ctx?: AuthContext): Promise<FotoDe
     const { getRealTotals } = await import("@/modules/financial-base/services/transaction-service");
     const { listCategories } = await import("@/modules/financial-base/services/categories-service");
     const { previousMonthPeriod } = await import("@/modules/financial-base/engine/period");
+    const { montosDelSobre } = await import("@/modules/financial-base/engine/sobre-moneda");
+    const { getFxRates } = await import("@/lib/market-data/fx-rates");
+    const { convertCurrency } = await import("@/lib/fx");
 
     // Ventana de ociosos: período sintético que arranca `meses−1` atrás y termina en el fin
     // del actual. Mismo truco que expense-range-service.ts para el segmented de 1m/3m/6m.
@@ -357,12 +372,13 @@ async function _getFotoDelMes(period: Period, ctx?: AuthContext): Promise<FotoDe
     for (let i = 0; i < OCIOSO_MESES_VENTANA - 1; i++) spanStart = previousMonthPeriod(spanStart);
     const spanPeriod: Period = { ...period, from: spanStart.from };
 
-    const [budget, real, spanReal, cats, mesesHistoria] = await Promise.all([
+    const [budget, real, spanReal, cats, mesesHistoria, rates] = await Promise.all([
       getBudgetTotals(period, ctx),
       getRealTotals(period, ctx),
       getRealTotals(spanPeriod, ctx),
       listCategories(ctx),
       mesesConHistoria(period, OCIOSO_MESES_VENTANA, ctx),
+      getFxRates().catch(() => ({}) as Record<string, number>),
     ]);
 
     // El frasco (padre) solo lo necesita el detector de ociosos, para proponer fusionar entre
@@ -376,13 +392,30 @@ async function _getFotoDelMes(period: Period, ctx?: AuthContext): Promise<FotoDe
       todayIso,
       diasDelMes: lastDayOfMonth(period.year, period.month),
       currency: real.currency,
-      sobres: entradas.map(([categoryId, b]) => ({
-        categoryId,
-        // `expenseByKey` ya trae la etiqueta: no hace falta el árbol solo para nombrar.
-        path: b.label,
-        budget: b.value,
-        spent: real.expenseByKey[categoryId]?.value ?? 0,
-      })),
+      sobres: entradas.map(([categoryId, b]) => {
+        // MISMA regla que el restante del sobre: el presupuesto y el gasto se muestran en la
+        // moneda en que el sobre fue configurado, y un gasto en otra moneda se convierte a ella
+        // para descontarlo. Un aviso de ritmo que dice "$200 de $445" sobre un sobre en colones
+        // es tan ilegible como el restante que lo decía.
+        const m = montosDelSobre({
+          categoryId,
+          nativo: budget.nativeByKey?.[categoryId],
+          budgetEnVisualizacion: b.value,
+          displayCurrency: real.currency,
+          gastos: real.expenseTxns ?? [],
+          convert: (amount, from, to) => convertCurrency(amount, from, to, rates),
+        });
+        return {
+          categoryId,
+          // `expenseByKey` ya trae la etiqueta: no hace falta el árbol solo para nombrar.
+          path: b.label,
+          budget: m.budget,
+          spent: m.spent,
+          currency: m.currency,
+          // El peso relativo SÍ cruza monedas: va con el valor ya convertido.
+          pesoBudget: b.value,
+        };
+      }),
       historico: entradas.map(([categoryId, b]) => ({
         categoryId,
         path: b.label,

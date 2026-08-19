@@ -24,7 +24,10 @@
  * que pase, que es cuando todavía sirve de algo.
  */
 
-/** Restante de un sobre para el mes de una transacción, en moneda de visualización. */
+/**
+ * Restante de un sobre para el mes de una transacción, en la moneda en que el sobre fue
+ * CONFIGURADO (ver `engine/sobre-moneda.ts`). Todas las cifras van en `currency`.
+ */
 export type SobreRemaining = {
   /** "Frasco › Sobre" (o solo el sobre si no tiene frasco). */
   path: string;
@@ -35,7 +38,37 @@ export type SobreRemaining = {
   remaining: number;
   /** El sobre tiene presupuesto asignado este mes. */
   hasBudget: boolean;
+  /**
+   * Monedas de gasto que hubo que convertir a la del sobre para descontarlas. Vacío/ausente =
+   * no hay ninguna tasa metida en las cifras.
+   */
+  convertidasDesde?: string[];
+  /** El presupuesto mezcla monedas: no hay una propia y se cayó a la de visualización. */
+  presupuestoMixto?: boolean;
 };
+
+/**
+ * La coletilla que hace honesta a la cifra cuando adentro hay una conversión. `null` cuando todo
+ * se registró en la moneda del sobre, que es el caso normal — y ahí no hay nada que aclarar.
+ *
+ * Va SIEMPRE al final y entre paréntesis, nunca intercalada: la frase principal usa un solo
+ * símbolo de moneda de principio a fin. Mezclar "₡" y "$" en la misma oración es exactamente lo
+ * que vuelve ilegible un saldo.
+ */
+export function notaDeConversion(s: SobreRemaining | null | undefined): string | null {
+  if (!s) return null;
+  if (s.presupuestoMixto)
+    return "(convertido a tu moneda de visualización: el sobre mezcla monedas)";
+  const desde = s.convertidasDesde ?? [];
+  if (desde.length === 0) return null;
+  return `(incluye gasto convertido desde ${desde.join(" y ")})`;
+}
+
+/** Pega la nota de conversión a una frase ya armada, si hace falta. */
+function conNota(texto: string, s: SobreRemaining): string {
+  const nota = notaDeConversion(s);
+  return nota ? `${texto} ${nota}` : texto;
+}
 
 /**
  * Formateador de moneda inyectado (normalmente `formatMoney`). Se inyecta para que este
@@ -50,8 +83,12 @@ type Fmt = (amount: number, currency: string) => string;
 export function sobreRemainingText(s: SobreRemaining | null | undefined, fmt: Fmt): string | null {
   if (!s) return null;
   if (!s.hasBudget) return `${s.path} · sin presupuesto asignado este mes`;
-  if (s.remaining < 0) return `${s.path} · te pasaste por ${fmt(-s.remaining, s.currency)}`;
-  return `${s.path} · te quedan ${fmt(s.remaining, s.currency)} de ${fmt(s.budget, s.currency)} este mes`;
+  if (s.remaining < 0)
+    return conNota(`${s.path} · te pasaste por ${fmt(-s.remaining, s.currency)}`, s);
+  return conNota(
+    `${s.path} · te quedan ${fmt(s.remaining, s.currency)} de ${fmt(s.budget, s.currency)} este mes`,
+    s,
+  );
 }
 
 /**
@@ -62,9 +99,15 @@ export function sobreSuccessText(s: SobreRemaining | null | undefined, fmt: Fmt)
   if (!s) return "✓ Transacción registrada.";
   if (!s.hasBudget) return `✓ Registrado en ${s.path}. (Este sobre no tiene presupuesto asignado)`;
   if (s.remaining < 0) {
-    return `✓ Registrado en ${s.path}. Te pasaste por ${fmt(-s.remaining, s.currency)}.`;
+    return conNota(
+      `✓ Registrado en ${s.path}. Te pasaste por ${fmt(-s.remaining, s.currency)}.`,
+      s,
+    );
   }
-  return `✓ Registrado en ${s.path}. Te quedan ${fmt(s.remaining, s.currency)} de ${fmt(s.budget, s.currency)} este mes.`;
+  return conNota(
+    `✓ Registrado en ${s.path}. Te quedan ${fmt(s.remaining, s.currency)} de ${fmt(s.budget, s.currency)} este mes.`,
+    s,
+  );
 }
 
 /**
@@ -74,6 +117,10 @@ export function sobreSuccessText(s: SobreRemaining | null | undefined, fmt: Fmt)
 export function sobreDetailText(s: SobreRemaining | null | undefined, fmt: Fmt): string | null {
   if (!s) return null;
   if (!s.hasBudget) return `Sobre: ${s.path} (sin presupuesto asignado).`;
-  if (s.remaining < 0) return `Sobre: ${s.path}. Te pasaste por ${fmt(-s.remaining, s.currency)}.`;
-  return `Sobre: ${s.path}. Te quedan ${fmt(s.remaining, s.currency)} de ${fmt(s.budget, s.currency)} este mes.`;
+  if (s.remaining < 0)
+    return conNota(`Sobre: ${s.path}. Te pasaste por ${fmt(-s.remaining, s.currency)}.`, s);
+  return conNota(
+    `Sobre: ${s.path}. Te quedan ${fmt(s.remaining, s.currency)} de ${fmt(s.budget, s.currency)} este mes.`,
+    s,
+  );
 }

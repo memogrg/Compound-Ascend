@@ -12,6 +12,7 @@ import {
   sobreRemainingText,
   sobreSuccessText,
   sobreDetailText,
+  notaDeConversion,
   type SobreRemaining,
 } from "@/modules/financial-base/engine/sobre-remaining-copy";
 
@@ -125,5 +126,63 @@ describe("las tres formas cuentan la misma historia", () => {
       expect(t).not.toContain("CRC0");
       expect(t.toLowerCase()).not.toContain("te quedan");
     }
+  });
+});
+
+/**
+ * LA MONEDA DEL SOBRE en el copy compartido. Las cinco superficies (chat, Gastos, Transacciones,
+ * recibo y lote) pasan por estas tres funciones, así que un solo cambio en el servicio tiene que
+ * verse en las cinco — y la nota de conversión tiene que ir SIEMPRE al final, nunca intercalada:
+ * dos símbolos de moneda en la misma frase es exactamente lo que la vuelve ilegible.
+ */
+describe("moneda del sobre y nota de conversión", () => {
+  // Agrupado a mano y no con `toLocaleString`: el separador de miles del ICU cambia entre
+  // versiones de Node y el test pasaría a medir eso en vez de la moneda, que es lo que importa.
+  const miles = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const fmtReal = (n: number, c: string) => (c === "CRC" ? `₡${miles(n)}` : `$${miles(n)}`);
+  const enColones = {
+    path: "Alimentación › Restaurantes",
+    currency: "CRC",
+    budget: 445_000,
+    spent: 100_000,
+    remaining: 345_000,
+    hasBudget: true,
+    convertidasDesde: [],
+    presupuestoMixto: false,
+  };
+
+  it("un sobre en ₡ se dice en ₡ (la app puede estar en $): nunca aparece un símbolo ajeno", () => {
+    for (const texto of [
+      sobreRemainingText(enColones, fmtReal),
+      sobreSuccessText(enColones, fmtReal),
+      sobreDetailText(enColones, fmtReal),
+    ]) {
+      expect(texto).toContain("₡345.000");
+      expect(texto).toContain("₡445.000");
+      expect(texto).not.toContain("$");
+    }
+  });
+
+  it("con gasto convertido, la nota va AL FINAL y entre paréntesis", () => {
+    const s = { ...enColones, convertidasDesde: ["USD"] };
+    const texto = sobreSuccessText(s, fmtReal);
+    expect(texto).toMatch(/\(incluye gasto convertido desde USD\)$/);
+    // La frase principal sigue teniendo un solo símbolo.
+    expect(texto.slice(0, texto.indexOf("("))).not.toContain("$");
+  });
+
+  it("sin conversiones NO se agrega ninguna coletilla", () => {
+    expect(sobreSuccessText(enColones, fmtReal)).not.toContain("(");
+    expect(notaDeConversion(enColones)).toBeNull();
+  });
+
+  it("presupuesto mixto: se dice que la cifra está convertida", () => {
+    const s = { ...enColones, presupuestoMixto: true };
+    expect(notaDeConversion(s)).toMatch(/convertido a tu moneda de visualización/);
+  });
+
+  it("un sobre excedido también arrastra la nota", () => {
+    const s = { ...enColones, spent: 500_000, remaining: -55_000, convertidasDesde: ["USD"] };
+    expect(sobreRemainingText(s, fmtReal)).toMatch(/\(incluye gasto convertido desde USD\)$/);
   });
 });

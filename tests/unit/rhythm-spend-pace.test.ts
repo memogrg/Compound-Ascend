@@ -330,3 +330,138 @@ describe("semanaISO · el tope de un aviso por sobre por semana", () => {
     expect(semanaISO("2027-01-04")).toBe("2027-W01");
   });
 });
+
+/**
+ * LA MONEDA DEL SOBRE también en los avisos de ritmo. Es el mismo bug que el restante: un sobre
+ * configurado en ₡445.000 avisaba "llevás $200 de $445" porque la señal tomaba la moneda de
+ * VISUALIZACIÓN. Y las salidas no pueden mover plata entre monedas distintas: sería una
+ * conversión con una tasa adentro, y el texto quedaría con dos símbolos en la misma frase.
+ */
+describe("moneda del sobre en las señales de ritmo", () => {
+  const dia = 10;
+  const diasDelMes = 30;
+
+  it("la señal sale en la moneda del SOBRE, no en la de visualización", () => {
+    const senales = detectarRitmo({
+      dia,
+      diasDelMes,
+      currency: "USD", // visualización
+      sobres: [
+        {
+          categoryId: "s-rest",
+          path: "Vivir › Restaurantes",
+          budget: 445_000,
+          spent: 300_000,
+          currency: "CRC",
+          pesoBudget: 890,
+        },
+      ],
+    });
+    expect(senales).toHaveLength(1);
+    expect(senales[0]?.currency).toBe("CRC");
+    expect(senales[0]?.budget).toBe(445_000);
+    expect(senales[0]?.spent).toBe(300_000);
+  });
+
+  it("sin `currency` en el sobre se cae a la de visualización (comportamiento anterior)", () => {
+    const senales = detectarRitmo({
+      dia,
+      diasDelMes,
+      currency: "CRC",
+      sobres: [
+        { categoryId: "s-rest", path: "Vivir › Restaurantes", budget: 100_000, spent: 70_000 },
+      ],
+    });
+    expect(senales[0]?.currency).toBe("CRC");
+  });
+
+  it("el PESO relativo sí cruza monedas: usa `pesoBudget` convertido", () => {
+    // Sin `pesoBudget`, el sobre en dólares ($500) parecería un 0,1% del total al lado del de
+    // colones (₡500.000) y nunca pasaría el peso mínimo, aunque valen lo mismo.
+    const senales = detectarRitmo({
+      dia,
+      diasDelMes,
+      currency: "CRC",
+      sobres: [
+        {
+          categoryId: "s-usd",
+          path: "Vivir › Suscripciones",
+          budget: 500,
+          spent: 400,
+          currency: "USD",
+          pesoBudget: 250_000,
+        },
+        {
+          categoryId: "s-crc",
+          path: "Vivir › Súper",
+          budget: 250_000,
+          spent: 50_000,
+          currency: "CRC",
+          pesoBudget: 250_000,
+        },
+      ],
+    });
+    expect(senales.map((s) => s.categoryId)).toContain("s-usd");
+  });
+
+  it("solo dona un sobre de la MISMA moneda: nunca se propone mover ₡ a un sobre en $", () => {
+    const senales = detectarRitmo({
+      dia,
+      diasDelMes,
+      currency: "CRC",
+      sobres: [
+        // Apretado, en dólares.
+        {
+          categoryId: "s-usd",
+          path: "Vivir › Suscripciones",
+          budget: 500,
+          spent: 400,
+          currency: "USD",
+          pesoBudget: 250_000,
+        },
+        // Con holgura, pero en COLONES: no puede donarle al de arriba.
+        {
+          categoryId: "s-crc",
+          path: "Vivir › Súper",
+          budget: 250_000,
+          spent: 10_000,
+          currency: "CRC",
+          pesoBudget: 250_000,
+        },
+      ],
+    });
+    const apretado = senales.find((s) => s.categoryId === "s-usd");
+    expect(apretado).toBeDefined();
+    expect(apretado?.salidas.some((x) => x.tipo === "mover")).toBe(false);
+    // Las otras dos salidas siguen ahí: la señal nunca queda sin salida.
+    expect(apretado?.salidas.map((x) => x.tipo)).toEqual(["bajar_ritmo", "dejarlo"]);
+  });
+
+  it("con un donante de la misma moneda, la salida `mover` sí aparece", () => {
+    const senales = detectarRitmo({
+      dia,
+      diasDelMes,
+      currency: "CRC",
+      sobres: [
+        {
+          categoryId: "s-a",
+          path: "Vivir › Restaurantes",
+          budget: 100_000,
+          spent: 80_000,
+          currency: "CRC",
+          pesoBudget: 100_000,
+        },
+        {
+          categoryId: "s-b",
+          path: "Vivir › Súper",
+          budget: 200_000,
+          spent: 10_000,
+          currency: "CRC",
+          pesoBudget: 200_000,
+        },
+      ],
+    });
+    const apretado = senales.find((s) => s.categoryId === "s-a");
+    expect(apretado?.salidas.some((x) => x.tipo === "mover")).toBe(true);
+  });
+});

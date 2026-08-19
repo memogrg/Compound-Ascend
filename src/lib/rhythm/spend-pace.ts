@@ -44,13 +44,26 @@ export const RITMO_MARGEN_PUNTOS = 20;
  */
 export const RITMO_PESO_MINIMO = 0.05;
 
-/** Un sobre para el motor de ritmo: presupuesto y gasto real del mes, misma moneda. */
+/**
+ * Un sobre para el motor de ritmo: presupuesto y gasto real del mes, en la moneda en que el
+ * sobre fue CONFIGURADO (`currency`) — no en la de visualización. Un sobre de ₡445.000 avisaba
+ * "llevás $200 de $445" y esas cifras el usuario no las escribió en ningún lado.
+ *
+ * `pesoBudget` es el MISMO presupuesto pero convertido a la moneda de visualización, y existe
+ * solo para pesar el sobre contra el total (`RITMO_PESO_MINIMO`). Comparar ₡ contra $ sin
+ * convertir haría que un sobre en dólares pareciera insignificante al lado de uno en colones.
+ * Es la excepción que confirma la regla: agregar cruza monedas, mostrar no.
+ */
 export type SobrePace = {
   categoryId: string;
   /** "Frasco › Sobre" para el copy. */
   path: string;
   budget: number;
   spent: number;
+  /** Moneda de configuración del sobre. Ausente = la de visualización (`input.currency`). */
+  currency?: string;
+  /** `budget` en moneda de visualización, SOLO para el peso relativo. Ausente = `budget`. */
+  pesoBudget?: number;
 };
 
 /** Una salida accionable concreta. `tipo` decide qué botón se pinta. */
@@ -123,7 +136,10 @@ export function detectarRitmo(input: {
   if (input.dia < 2 || input.diasDelMes <= 0) return [];
 
   const pctTranscurrido = input.dia / input.diasDelMes;
-  const totalBudget = input.sobres.reduce((acc, s) => acc + Math.max(0, s.budget), 0);
+  // El peso SÍ cruza monedas (es un agregado), así que se pesa con `pesoBudget` — el
+  // presupuesto convertido — y no con el nativo, que en ₡ y en $ no es comparable.
+  const peso = (s: SobrePace): number => Math.max(0, s.pesoBudget ?? s.budget);
+  const totalBudget = input.sobres.reduce((acc, s) => acc + peso(s), 0);
   const diasRestantes = Math.max(0, input.diasDelMes - input.dia);
 
   const relevante = (s: SobrePace): boolean => {
@@ -131,7 +147,7 @@ export function detectarRitmo(input: {
     // Sin presupuesto total (cuenta recién armada) no se puede pesar: se acepta cualquier
     // sobre con monto en vez de quedarse mudo.
     if (totalBudget <= 0) return true;
-    return s.budget / totalBudget >= pesoMin;
+    return peso(s) / totalBudget >= pesoMin;
   };
 
   const senales: SenalRitmo[] = [];
@@ -148,7 +164,9 @@ export function detectarRitmo(input: {
     senales.push({
       categoryId: s.categoryId,
       path: s.path,
-      currency: input.currency,
+      // La moneda del SOBRE, no la de visualización: todas las cifras de esta señal
+      // (spent, budget, proyección, salidas) están en ella.
+      currency: s.currency ?? input.currency,
       budget: s.budget,
       spent: s.spent,
       pctGastado,
@@ -170,17 +188,25 @@ export function detectarRitmo(input: {
     apretados,
     pctTranscurrido,
     relevante,
+    defaultCurrency: input.currency,
   });
 
   for (const senal of senales) {
-    senal.salidas = construirSalidas({ senal, donantes, currency: input.currency });
+    // Solo donan los sobres de la MISMA moneda. Mover ₡ a un sobre en $ es una conversión con
+    // una tasa adentro, y el texto quedaría con dos símbolos en la misma frase ("Mover $80 de
+    // Supermercado" cuando Supermercado está en colones). Si no hay donante compatible, quedan
+    // las otras dos salidas — que son igual de válidas.
+    senal.salidas = construirSalidas({
+      senal,
+      donantes: donantes.filter((d) => d.currency === senal.currency),
+    });
   }
 
   return senales.sort((a, b) => b.puntosAdelante - a.puntosAdelante);
 }
 
 /** Sobre con holgura: va POR DEBAJO del calendario y le sobra plata. */
-type Donante = { categoryId: string; path: string; holgura: number };
+type Donante = { categoryId: string; path: string; holgura: number; currency: string };
 
 /**
  * Sobres que pueden ceder presupuesto, de mayor a menor holgura.
@@ -195,6 +221,7 @@ function candidatosDonantes(args: {
   apretados: Set<string>;
   pctTranscurrido: number;
   relevante: (s: SobrePace) => boolean;
+  defaultCurrency: string;
 }): Donante[] {
   const out: Donante[] = [];
   for (const s of args.sobres) {
@@ -208,17 +235,18 @@ function candidatosDonantes(args: {
     const proyeccion = args.pctTranscurrido > 0 ? s.spent / args.pctTranscurrido : 0;
     const holgura = s.budget - Math.max(proyeccion, s.spent);
     if (holgura <= 0) continue;
-    out.push({ categoryId: s.categoryId, path: s.path, holgura });
+    out.push({
+      categoryId: s.categoryId,
+      path: s.path,
+      holgura,
+      currency: s.currency ?? args.defaultCurrency,
+    });
   }
   return out.sort((a, b) => b.holgura - a.holgura);
 }
 
 /** Las tres salidas, en orden: la que resuelve, la que ajusta y la que acepta. */
-function construirSalidas(args: {
-  senal: SenalRitmo;
-  donantes: Donante[];
-  currency: string;
-}): SalidaRitmo[] {
+function construirSalidas(args: { senal: SenalRitmo; donantes: Donante[] }): SalidaRitmo[] {
   const { senal } = args;
   const salidas: SalidaRitmo[] = [];
 

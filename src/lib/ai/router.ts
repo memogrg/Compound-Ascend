@@ -1545,8 +1545,9 @@ async function resolveFetchIntent(
           `Encontré ${sug.categoryPath ?? "tu sobre"} pero no pude leer su presupuesto ahora. Probá de nuevo en un momento.`,
         );
       }
-      // El monto se compara en la MONEDA DEL SOBRE (rem.currency = visualización). Si el usuario dio
-      // otra ("₡8.000" con display USD), se CONVIERTE antes de comparar — nunca ₡8.000 tratado como $8.000.
+      // El monto se compara en la MONEDA DEL SOBRE — la que el usuario CONFIGURÓ, que no tiene por
+      // qué ser la de visualización. Si dio otra ("₡8.000" en un sobre en dólares), se CONVIERTE
+      // antes de comparar: nunca ₡8.000 tratado como $8.000. La respuesta sale toda en rem.currency.
       let amount: number | null = null;
       if (amt) {
         if (!amt.moneda || amt.moneda === rem.currency) amount = amt.monto;

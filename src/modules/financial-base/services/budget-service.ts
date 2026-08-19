@@ -23,6 +23,7 @@ import {
 } from "@/modules/financial-base/services/transaction-service";
 import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
+import { acumularNativo } from "@/modules/financial-base/engine/sobre-moneda";
 import type { BudgetItem, BudgetType, IncomeType, Period } from "@/modules/financial-base/types";
 import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
 import type {
@@ -530,7 +531,17 @@ export async function copyPreviousMonthIncome(period: Period): Promise<number> {
 }
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;
-export type NativeKeyedTotals = Record<string, { label: string; value: number; currency: string }>;
+/**
+ * Presupuesto por sobre en su moneda de CONFIGURACIÓN (sin convertir). `mixed` marca el sobre
+ * cuyas líneas están en más de una moneda: ahí `value` es una suma de peras con manzanas y no
+ * se puede mostrar con un símbolo — quien lo consuma tiene que caer a la de visualización y
+ * decirlo (ver `engine/sobre-moneda.ts`). Antes esto no se detectaba: se sumaba igual y se
+ * etiquetaba con la moneda de la ÚLTIMA línea leída.
+ */
+export type NativeKeyedTotals = Record<
+  string,
+  { label: string; value: number; currency: string; mixed?: boolean }
+>;
 export type BudgetTotals = {
   budgetIncome: number;
   budgetExpense: number;
@@ -567,11 +578,13 @@ export async function getBudgetTotals(period: Period, ctx?: AuthContext): Promis
       const key = it.categoryId ?? `name:${it.name.trim().toLowerCase()}`;
       const label = it.categoryId ? (catMap[it.categoryId] ?? it.name) : it.name;
       expenseByKey[key] = { label, value: (expenseByKey[key]?.value ?? 0) + value };
-      nativeByKey[key] = {
+      // La acumulación nativa (y la detección de "este sobre mezcla monedas") vive en el motor
+      // puro: es una regla, no un detalle de esta query, y así se prueba sin tocar Supabase.
+      nativeByKey[key] = acumularNativo(nativeByKey[key], {
         label,
-        value: (nativeByKey[key]?.value ?? 0) + it.amount, // nativo, sin convertir
+        amount: it.amount,
         currency: it.currency,
-      };
+      });
     }
   }
 
