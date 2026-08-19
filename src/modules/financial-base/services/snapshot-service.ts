@@ -10,6 +10,7 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/session";
+import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
 import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
 import { convertCurrency } from "@/lib/fx";
@@ -21,15 +22,22 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** Calcula y persiste (upsert) el snapshot del periodo dado para el usuario activo. */
-export async function generateMonthlySnapshot(period: Period): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const [real, budget] = await Promise.all([getRealTotals(period), getBudgetTotals(period)]);
+/**
+ * Calcula y persiste (upsert) el snapshot del periodo dado para el usuario activo.
+ * Con `ctx` (cron/headless bajo la ALS): usa el cliente/usuario del ctx y lo threadea
+ * a los totales — así ninguna rama cae al `cookies()` crudo de `getDisplayCurrency`.
+ * Sin `ctx` (request scope): `resolveAuth` se comporta byte-idéntico (requireUser + cookies).
+ */
+export async function generateMonthlySnapshot(period: Period, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const [real, budget] = await Promise.all([
+    getRealTotals(period, ctx),
+    getBudgetTotals(period, ctx),
+  ]);
 
   await supabase.from("monthly_snapshots").upsert(
     {
-      user_id: user.id,
+      user_id: userId,
       period: `${period.year}-${pad(period.month)}-01`,
       income_monthly: Math.round(real.realIncome),
       expense_monthly: Math.round(real.realExpense),
