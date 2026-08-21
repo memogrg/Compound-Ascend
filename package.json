@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:eval": "vitest run tests/evals",
     "sim": "vitest run --config sim/vitest.config.ts",
-    "cert:e2e": "playwright test --config audit/cert/playwright.cert.config.ts"
+    "cert:e2e": "playwright test --config audit/cert/playwright.cert.config.ts",
+    "cert:e2e:live": "playwright test --config audit/cert/playwright.cert.live.config.ts"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^9.1.2",

@@ -179,6 +179,54 @@ export async function findExpenseRow(
   };
 }
 
+/**
+ * The transaction a CONFIRMED receipt/chat proposal wrote (origin='scanned' for a receipt,
+ * 'ai_assisted' for a chat proposal). Matched by user + the description the user confirmed on
+ * the ReceiptConfirmCard — which the write path stores in BOTH merchant_or_source and
+ * description (transaction-service.ts), so match either. Carries the columns the #6a gate needs:
+ * amount/currency NATIVE (never coerced/converted), occurred_on, category (sobre), origin,
+ * linked_kind (must be 'none' — a plain expense, not a linked ledger op) and household.
+ */
+export interface ReceiptTxnRow {
+  amount: number;
+  currency: string;
+  occurredOn: string;
+  categoryId: string | null;
+  origin: string | null;
+  linkedKind: string | null;
+  householdId: string | null;
+  label: string | null;
+}
+export async function findReceiptTxn(
+  admin: SupabaseClient,
+  userId: string,
+  description: string,
+): Promise<ReceiptTxnRow | null> {
+  const { data } = await admin
+    .from("transactions")
+    .select(
+      "amount, currency, occurred_on, category_id, origin, linked_kind, household_id, merchant_or_source, description, kind",
+    )
+    .eq("user_id", userId)
+    .eq("kind", "gasto")
+    .limit(50);
+  const row = (data ?? []).find(
+    (r: { merchant_or_source: string | null; description: string | null }) =>
+      r.merchant_or_source === description || r.description === description,
+  );
+  if (!row) return null;
+  return {
+    amount: Number(row.amount),
+    currency: String(row.currency),
+    occurredOn: String(row.occurred_on),
+    categoryId: (row.category_id as string | null) ?? null,
+    origin: (row.origin as string | null) ?? null,
+    linkedKind: (row.linked_kind as string | null) ?? "none",
+    householdId: (row.household_id as string | null) ?? null,
+    label: (row.merchant_or_source as string | null) ?? (row.description as string | null) ?? null,
+  };
+}
+
 /** DNA persisted by the onboarding wizard (profiles + personal_profiles). */
 export interface ProfileConfirmation {
   onboardingCompleted: boolean;

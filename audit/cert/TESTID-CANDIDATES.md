@@ -62,6 +62,32 @@ la precarga nativa) — cambiarla haría que el servicio rechace el pago (guarda
 `debt_payments.amount` NATIVO (service-role); el gate de display FX usa la conversión real de la app
 (`getDebtsOverview`), robusto a la tasa.
 
+## Cluster 3 — IA por UI (recibo + asesor, Fase 5/6)
+
+Selectores frágiles de `receipt-scan.spec.ts` / `advisor-chat.spec.ts` (y el live gated
+`live/receipt-scan.live.spec.ts`), centralizados en `pods/ai-shared.ts` — el componente
+`assistant-conversation.tsx` (ReceiptConfirmCard + chat) es **compartido** por web `/asistente`
+y móvil `/m/asistente`, así que su POM vive en un solo archivo:
+
+| Elemento | Selector actual (POM) | `data-testid` propuesto | Archivo |
+|---|---|---|---|
+| Recibo · input de archivo (oculto) | `input[aria-label="Escanear recibo con la cámara"]` (`setInputFiles` directo; el botón visible solo abre el picker) | `receipt-file-input` | `assistant-conversation.tsx` |
+| ReceiptConfirmCard (contenedor) | `.ac-rc-card` | `receipt-card` | `assistant-conversation.tsx` |
+| Card · campos | `getByLabel("Comercio"/"Fecha"/"Monto"/"Moneda")` (label htmlFor) · sobre = `getByRole("combobox",{name:"Sobre"})` | `receipt-{comercio,fecha,monto,moneda,sobre}` | `assistant-conversation.tsx` · `sobre-combobox.tsx` |
+| Card · chip confirmar moneda | `getByRole("button",{name:/^Sí, es/})` (obligatorio: monedaOk=false si la moneda se adivina; confirmar() hace return si no) | `receipt-currency-confirm` | `assistant-conversation.tsx` |
+| Card · Confirmar / Cancelar | `.ac-rc-card getByRole("button",{name:"Confirmar"\|"Cancelar"})` (texto+clase; "Confirmar" lo comparten Goal/PriceAlert cards) | `receipt-confirm` / `receipt-cancel` | `assistant-conversation.tsx` |
+| Card · éxito post-confirm | `getByText(/✓ Registrado\|✓ Ya lo registré/)` | `receipt-done` | `assistant-conversation.tsx` |
+| Sobre · listbox (artefacto Playwright, NO bug de producto) | el producto SÍ cierra al elegir/Escape/blur (`choose()→close()`); el click sintético de Playwright sobre el `<li role=option>` custom (bajo `<ul onMouseDown preventDefault>`) no asienta el cierre → el helper cierra por blur-a-Comercio | `sobre-listbox` | `sobre-combobox.tsx` |
+| Chat · input | `getByRole("textbox",{name:"Mensaje para My Agent C+"})` | `chat-input` | `assistant-conversation.tsx` |
+| Chat · enviar | web = Enter · móvil = `getByRole("button",{name:"Enviar"})` (móvil Enter = salto de línea) | `chat-send` | `assistant-conversation.tsx` |
+| Chat · burbuja de respuesta | `.coach-bubble` (web) / `.m-bubble` (móvil) — **usuario y asistente comparten la clase** (se distinguen por la fila `.msgMe`); el asistente es la ÚLTIMA burbuja | `chat-bubble` (+ `data-role`) | `assistant-conversation.tsx` |
+
+Nota de determinismo/config (no son selectores): el run por defecto fuerza el **StubProvider**
+inyectando `GEMINI_API_KEY:""` en `webServer.env`; los routes `/api/assistant/*` validan el env
+completo vía `getServerEnv()` (`corsHeaders`/`assertTrustedOrigin`), así que la config inyecta
+`APP_ENV:"development"` (el `"test"` previo NO está en `appEnvSchema` → 500) y `ALLOWED_ORIGINS`
+del puerto 3100. La visión real va por el config **gated** aparte (`cert:e2e:live`).
+
 ## Nota
 
 Los elementos con handle accesible **estable** (botones "Registrar ingreso",

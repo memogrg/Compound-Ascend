@@ -7,6 +7,12 @@
 import { expect, type Page } from "@playwright/test";
 import type { Journey, MoneyInput, OnboardingInput } from "./journey";
 import { isVisibleSoon, VISIBLE_TIMEOUT } from "./util";
+import {
+  uploadReceipt,
+  fillAndConfirmReceipt,
+  readPrefillAndConfirmReceipt,
+  askAdvisorOnPage,
+} from "./ai-shared";
 
 /** CRC/es grouping: 12345 → "12.345" (dot thousands), for matching money on screen. */
 function grouped(amount: number): string {
@@ -153,5 +159,41 @@ export class WebJourney implements Journey {
     await modal.locator('.inp-money input[type="number"]').first().fill(String(amount));
     await modal.getByRole("button", { name: /Registrar pago|Guardar/ }).click();
     await modal.waitFor({ state: "hidden", timeout: VISIBLE_TIMEOUT });
+  }
+
+  // ── IA por UI (journey #6) · web /asistente ─────────────────────────────────
+  async scanReceiptConfirm(input: {
+    imagePath: string;
+    merchant: string;
+    amount: number;
+    currency: string;
+    pickSobre?: boolean;
+  }): Promise<{ occurredOn: string; sobrePicked: boolean }> {
+    const page = this.page;
+    await page.goto("/asistente");
+    await page.waitForLoadState("networkidle");
+    const card = await uploadReceipt(page, input.imagePath);
+    return fillAndConfirmReceipt(page, card, input);
+  }
+
+  async scanReceiptLive(imagePath: string): Promise<{
+    prefillMerchant: string;
+    prefillAmount: string;
+    merchant: string;
+    occurredOn: string;
+  }> {
+    const page = this.page;
+    await page.goto("/asistente");
+    await page.waitForLoadState("networkidle");
+    const card = await uploadReceipt(page, imagePath);
+    return readPrefillAndConfirmReceipt(page, card);
+  }
+
+  async askAdvisor(message: string): Promise<{ status: number; reply: string; bubbleText: string }> {
+    const page = this.page;
+    await page.goto("/asistente");
+    await page.waitForLoadState("networkidle");
+    // Web sends on Enter; the assistant bubble class is `.coach-bubble`.
+    return askAdvisorOnPage(page, message, { send: "enter", bubbleSel: ".coach-bubble" });
   }
 }

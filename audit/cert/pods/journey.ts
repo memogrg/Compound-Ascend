@@ -63,4 +63,53 @@ export interface Journey {
    * guard). `amount` is in the debt's native currency.
    */
   payDebt(debt: { id: string; name: string }, input: { amount: number }): Promise<void>;
+
+  // ── Cluster 3 · IA por UI (journey #6) ──────────────────────────────────────
+  /**
+   * #6a RECIBO (stub run): upload a receipt image → the scan opens the editable
+   * ReceiptConfirmCard WITHOUT error → OVERWRITE the fields with the confirmed values →
+   * confirm. With the StubProvider the extract is empty, so the card opens blank and WE
+   * supply every value — the write is what the test controls (aPayloadRecibo takes the
+   * EDITED values; the OCR never re-intervenes). Writes to `transactions` (origin='scanned').
+   *
+   * The currency-confirm chip ("Sí, es …") is an OBLIGATORY step: the guessed-currency card
+   * starts with `monedaOk=false`, and `confirmar()` returns SILENTLY while it's false — a
+   * green that never wrote. The POM clicks it before Confirmar.
+   *
+   * Returns the date the card carried (read from the field, tz-safe) + whether a real sobre
+   * was picked, so the spec asserts occurred_on and (softly) the category.
+   */
+  scanReceiptConfirm(input: {
+    imagePath: string;
+    merchant: string;
+    amount: number;
+    currency: string;
+    pickSobre?: boolean;
+  }): Promise<{ occurredOn: string; sobrePicked: boolean }>;
+
+  /**
+   * #6a RECIBO (gated LIVE run, web-desktop only): upload a legible synthetic receipt and let
+   * the REAL vision model pre-populate the card. Returns the PRE-FILL (merchant + amount the
+   * model extracted, read BEFORE any edit) so the spec SOFT-asserts they ~match, then confirms
+   * (filling a fallback amount only if the model missed it) and returns the written date.
+   */
+  scanReceiptLive(imagePath: string): Promise<{
+    prefillMerchant: string;
+    prefillAmount: string;
+    merchant: string;
+    occurredOn: string;
+  }>;
+
+  /**
+   * #6b ASESOR: type a message → send (web: Enter · mobile: the "Enviar" button) → wait for the
+   * chat round-trip. Returns the API status + reply text (from `POST /api/assistant/chat`, the
+   * provider-agnostic gate: 200 + non-empty, works for stub OR live) plus `bubbleText`, the text
+   * of the LAST chat bubble once it settled to the assistant's answer (user + assistant share the
+   * bubble class, so "new assistant bubble" = the last bubble ≠ the sent message). Never writes.
+   */
+  askAdvisor(message: string): Promise<{
+    status: number;
+    reply: string;
+    bubbleText: string;
+  }>;
 }

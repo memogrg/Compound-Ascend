@@ -80,8 +80,24 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_URL: TEST.url,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: TEST.anonKey,
       SUPABASE_SERVICE_ROLE_KEY: TEST.serviceKey,
-      APP_ENV: "test",
+      // NOT "test": appEnvSchema only allows development|staging|production, and the AI routes call
+      // getServerEnv() (via corsHeaders/assertTrustedOrigin) which validates the FULL server env —
+      // an invalid APP_ENV 500s every /api/assistant/* call. "development" is the correct non-prod
+      // value (nothing in src/ keys off "test"; consumers only check === "production").
+      APP_ENV: "development",
       PORT: String(PORT),
+      // The AI API routes (/api/assistant/*) enforce assertTrustedOrigin against ALLOWED_ORIGINS
+      // (default localhost:3000); the harness dev server is on 3100, so a same-origin POST would
+      // 403 without this. The server-action journeys never hit a CORS-guarded route — the receipt
+      // scan + chat do. (Not prod-relevant: prod sets its own ALLOWED_ORIGINS.)
+      ALLOWED_ORIGINS: BASE_URL,
+      // AI DETERMINISM: force the StubProvider for the whole default run. `getProvider()`
+      // (lib/ai/orchestrator.ts) falls to StubProvider when GEMINI_API_KEY is absent — so an
+      // empty key here overrides whatever the machine's .env.local holds and makes the AI
+      // journeys (receipt scan, advisor chat) 100% deterministic and network-free. The env
+      // schema pins AI_PROVIDER to "gemini", so the key — not the provider name — is the lever.
+      // The REAL-vision path is exercised separately by the gated live config (never here).
+      GEMINI_API_KEY: "",
     },
   },
 });

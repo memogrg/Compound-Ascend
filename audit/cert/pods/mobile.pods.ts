@@ -8,6 +8,12 @@
 import { type Page } from "@playwright/test";
 import type { Journey, MoneyInput, OnboardingInput } from "./journey";
 import { isVisibleSoon, VISIBLE_TIMEOUT } from "./util";
+import {
+  uploadReceipt,
+  fillAndConfirmReceipt,
+  readPrefillAndConfirmReceipt,
+  askAdvisorOnPage,
+} from "./ai-shared";
 
 /** CRC/es grouping: 12345 → "12.345" (dot thousands), for matching money on screen. */
 function grouped(amount: number): string {
@@ -202,5 +208,46 @@ export class MobileJourney implements Journey {
     await sheet.getByPlaceholder("0").first().fill(String(amount));
     await sheet.getByRole("button", { name: "Registrar pago" }).click();
     await sheet.waitFor({ state: "hidden", timeout: VISIBLE_TIMEOUT });
+  }
+
+  // ── IA por UI (journey #6) · móvil /m/asistente ─────────────────────────────
+  // Same shared ReceiptConfirmCard + chat markup as web (only the skin differs); /m/asistente
+  // is NOT under the /m/(app) layout, so the rhythm nudge isn't mounted — dismissNudge is a
+  // defensive no-op here.
+  async scanReceiptConfirm(input: {
+    imagePath: string;
+    merchant: string;
+    amount: number;
+    currency: string;
+    pickSobre?: boolean;
+  }): Promise<{ occurredOn: string; sobrePicked: boolean }> {
+    const page = this.page;
+    await page.goto("/m/asistente");
+    await page.waitForLoadState("networkidle");
+    await dismissNudge(page);
+    const card = await uploadReceipt(page, input.imagePath);
+    return fillAndConfirmReceipt(page, card, input);
+  }
+
+  async scanReceiptLive(imagePath: string): Promise<{
+    prefillMerchant: string;
+    prefillAmount: string;
+    merchant: string;
+    occurredOn: string;
+  }> {
+    const page = this.page;
+    await page.goto("/m/asistente");
+    await page.waitForLoadState("networkidle");
+    await dismissNudge(page);
+    const card = await uploadReceipt(page, imagePath);
+    return readPrefillAndConfirmReceipt(page, card);
+  }
+
+  async askAdvisor(message: string): Promise<{ status: number; reply: string; bubbleText: string }> {
+    const page = this.page;
+    await page.goto("/m/asistente");
+    await page.waitForLoadState("networkidle");
+    // Mobile Enter = newline → MUST send via the "Enviar" button; bubble class is `.m-bubble`.
+    return askAdvisorOnPage(page, message, { send: "button", bubbleSel: ".m-bubble" });
   }
 }
