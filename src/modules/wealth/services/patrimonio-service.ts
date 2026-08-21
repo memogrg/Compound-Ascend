@@ -64,7 +64,9 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
   const agg = await aggregateNetWorth(ctx);
   const { db, userId } = await resolveAuth(ctx);
   const memberIds = await householdMemberIds(db, userId);
-  const [rates, primaryCurrency] = await Promise.all([getFxRates(), getPrimaryCurrency()]);
+  // ctx threaded: sin ctx = sesión (idéntico a prod); con ctx = service-role/userId inyectados.
+  // getPrimaryCurrency es cache(_getPrimaryCurrency): pasar ctx lo mete en la clave del cache.
+  const [rates, primaryCurrency] = await Promise.all([getFxRates(), getPrimaryCurrency(ctx)]);
   const currency = agg.currency;
 
   const assetsByClass = sumAssetsByClass(agg.assets);
