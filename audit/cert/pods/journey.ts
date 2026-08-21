@@ -12,6 +12,19 @@ export interface MoneyInput {
   currency: string;
 }
 
+/** Data the onboarding wizard captures that we set + assert (DNA, not money amounts). */
+export interface OnboardingInput {
+  /** Plain text input in step 1 → persists to profiles.display_name. */
+  displayName: string;
+  /**
+   * Nucleus OptionCard to click in step 1 (its label) → personal_profiles.financial_nucleus.
+   * A robust, clickable card (getByRole button) — the DNA datum that proves the wizard
+   * captured a behavioral choice, not just the free-text name. (The goal step is RankedChips
+   * and the wizard's finish only writes goal NAMES, no target_amount — left out as fragile.)
+   */
+  nucleusLabel: string;
+}
+
 export interface Journey {
   readonly surface: "web" | "mobile";
   /** Land on the home surface (web /dashboard · mobile /m). */
@@ -30,4 +43,16 @@ export interface Journey {
    * number-vs-oracle validation is Fase 4/5.
    */
   readMonthFlow(): Promise<string | null>;
+
+  // ── Cluster 1 · Onboarding (journey #1) ─────────────────────────────────────
+  /** After a fresh (not-onboarded) login: did the app's gate land us on the wizard? */
+  onboardingGateReached(): Promise<boolean>;
+  /** Drive the DNA wizard to completion (start guided → set displayName → finish). */
+  completeOnboarding(input: OnboardingInput): Promise<void>;
+  /** Home renders usable content and does NOT bounce back to the onboarding wizard. */
+  dashboardRenders(): Promise<boolean>;
+
+  // ── Cluster 1 · Money loop (journey #2) ─────────────────────────────────────
+  /** After creating an expense: does its jar/frasco show the consumption (amount reflected)? */
+  expenseReflectedInJar(amount: number): Promise<boolean>;
 }

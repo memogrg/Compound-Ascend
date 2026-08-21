@@ -6,8 +6,13 @@
  * the .m-qlabel text — every such case is a data-testid candidate (TESTID-CANDIDATES.md).
  */
 import { type Page } from "@playwright/test";
-import type { Journey, MoneyInput } from "./journey";
+import type { Journey, MoneyInput, OnboardingInput } from "./journey";
 import { isVisibleSoon, VISIBLE_TIMEOUT } from "./util";
+
+/** CRC/es grouping: 12345 → "12.345" (dot thousands), for matching money on screen. */
+function grouped(amount: number): string {
+  return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
 
 /**
  * The month-rhythm nudge (`m-rhythm-nudge`, role=status) is mounted on EVERY /m/(app) screen and
@@ -113,5 +118,54 @@ export class MobileJourney implements Journey {
       .innerText()
       .then((t) => t.replace(/\s+/g, " ").trim())
       .catch(() => null);
+  }
+
+  // ── Onboarding (journey #1) ─────────────────────────────────────────────────
+  // Web asserts the /dashboard→/bienvenida redirect; the /m wizard lives at
+  // /m/perfil-financiero, so here "gate reached" = the wizard is reachable + renders
+  // step 1 for a not-onboarded user (its auto-redirect behavior is noted in the report).
+  async onboardingGateReached(): Promise<boolean> {
+    await this.page.goto("/m/perfil-financiero");
+    await this.page.waitForLoadState("networkidle");
+    return isVisibleSoon(this.page, "¿Cómo quieres que te llamemos?");
+  }
+
+  async completeOnboarding({ displayName, nucleusLabel }: OnboardingInput): Promise<void> {
+    const page = this.page;
+    if (!page.url().includes("/m/perfil-financiero")) await page.goto("/m/perfil-financiero");
+    await page.waitForLoadState("networkidle");
+    // Step 1 · DNA we assert: displayName (text) + financial_nucleus (m-opt card, robust).
+    await page.getByPlaceholder("Memo, Caro…").fill(displayName, { timeout: VISIBLE_TIMEOUT });
+    // Non-exact: the m-opt card's accessible name includes its glyph; substring is robust.
+    await page.getByRole("button", { name: nucleusLabel }).first().click({ timeout: VISIBLE_TIMEOUT });
+    // Advance until "Finalizar" (all steps optional), then finish.
+    for (let i = 0; i < 20; i++) {
+      const finalizar = page.getByRole("button", { name: "Finalizar" });
+      if (await finalizar.isVisible().catch(() => false)) {
+        await finalizar.click();
+        break;
+      }
+      await page.getByRole("button", { name: "Siguiente" }).click();
+      await page.waitForTimeout(250);
+    }
+    await page.getByText(/Generando tu perfil/).waitFor({ state: "hidden", timeout: 30_000 }).catch(() => {});
+    await page.waitForLoadState("networkidle").catch(() => {});
+  }
+
+  async dashboardRenders(): Promise<boolean> {
+    const page = this.page;
+    await page.goto("/m");
+    await page.waitForLoadState("networkidle");
+    if (page.url().includes("perfil-financiero") || page.url().includes("bienvenida")) return false;
+    // Mobile home shows the month-flow pillar too; fall back to any /m app chrome.
+    return (await isVisibleSoon(page, "Flujo del mes")) || (await isVisibleSoon(page, "Inicio"));
+  }
+
+  // ── Money loop (journey #2) ─────────────────────────────────────────────────
+  async expenseReflectedInJar(amount: number): Promise<boolean> {
+    await this.page.goto("/m/gastos");
+    await this.page.waitForLoadState("networkidle");
+    await dismissNudge(this.page);
+    return isVisibleSoon(this.page, grouped(amount));
   }
 }

@@ -42,8 +42,17 @@ export function certAdmin(): SupabaseClient {
  * Create + seed a fresh synthetic user in the TEST project. `runId` keeps the email
  * unique per run so reruns never collide. Returns the ids the journeys need for the
  * service-role confirmation reads.
+ *
+ * `opts.onboarding` (default true): seed the profile as onboarding-completed so the
+ * real-UI login lands on /dashboard. Pass `false` for the onboarding journey — the user
+ * is left NOT onboarded so the app's gate redirects it to the wizard (/bienvenida), and
+ * the wizard itself writes the DNA + flips onboarding_completed (asserted afterwards).
  */
-export async function createCertUser(runId: string): Promise<CertUser> {
+export async function createCertUser(
+  runId: string,
+  opts: { onboarding?: boolean } = {},
+): Promise<CertUser> {
+  const onboarding = opts.onboarding ?? true;
   const admin = certAdmin();
   const email = `cert-${runId}@example.com`;
 
@@ -74,11 +83,15 @@ export async function createCertUser(runId: string): Promise<CertUser> {
   if (upd.error) throw new Error(`[cert] user_settings.update falló: ${upd.error.message}`);
 
   // Onboarding done → /dashboard renders instead of redirecting to /bienvenida.
-  const prof = await admin
-    .from("profiles")
-    .update({ onboarding_completed: true, display_name: "Cert Bot" })
-    .eq("id", userId);
-  if (prof.error) throw new Error(`[cert] profiles.update falló: ${prof.error.message}`);
+  // For the onboarding journey we DON'T set this (nor display_name): the wizard writes
+  // both, and we assert the wizard's values afterwards (proof the DNA persisted).
+  if (onboarding) {
+    const prof = await admin
+      .from("profiles")
+      .update({ onboarding_completed: true, display_name: "Cert Bot" })
+      .eq("id", userId);
+    if (prof.error) throw new Error(`[cert] profiles.update falló: ${prof.error.message}`);
+  }
 
   const householdId = await resolveHouseholdId(admin, userId);
 
@@ -163,4 +176,61 @@ export async function findExpenseRow(
     household_id: row.household_id ?? null,
     label: row.merchant_or_source ?? row.description ?? null,
   };
+}
+
+/** DNA persisted by the onboarding wizard (profiles + personal_profiles). */
+export interface ProfileConfirmation {
+  onboardingCompleted: boolean;
+  displayName: string | null;
+  profileCompletion: number | null;
+  financialNucleus: string | null;
+}
+
+/**
+ * Read what the onboarding wizard wrote: `profiles` (onboarding flag + name + completion)
+ * and the `personal_profiles` DNA row (financial_nucleus). Used by the onboarding journey
+ * to prove the DATA persisted — not just the boolean flag.
+ */
+export async function findProfile(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<ProfileConfirmation | null> {
+  const { data: prof } = await admin
+    .from("profiles")
+    .select("onboarding_completed, display_name, profile_completion")
+    .eq("id", userId)
+    .limit(1);
+  const p = prof?.[0];
+  if (!p) return null;
+  const { data: pp } = await admin
+    .from("personal_profiles")
+    .select("financial_nucleus")
+    .eq("user_id", userId)
+    .limit(1);
+  return {
+    onboardingCompleted: Boolean(p.onboarding_completed),
+    displayName: p.display_name ?? null,
+    profileCompletion: p.profile_completion == null ? null : Number(p.profile_completion),
+    financialNucleus: pp?.[0]?.financial_nucleus ?? null,
+  };
+}
+
+/**
+ * Sum of confirmed expenses (transactions, kind gasto) for the user in the CURRENT month
+ * — the same period the dashboard's "Flujo del mes" derives from. Used as the BD gate that
+ * the expense is REFLECTED in the period total (not the ambiguous scraped number).
+ */
+export async function periodExpenseTotal(
+  admin: SupabaseClient,
+  userId: string,
+  monthStartISO: string,
+): Promise<number> {
+  const { data } = await admin
+    .from("transactions")
+    .select("amount, kind, occurred_on")
+    .eq("user_id", userId)
+    .eq("kind", "gasto")
+    .gte("occurred_on", monthStartISO)
+    .limit(500);
+  return (data ?? []).reduce((s: number, r: { amount: number }) => s + Number(r.amount), 0);
 }

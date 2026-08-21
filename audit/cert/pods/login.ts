@@ -59,3 +59,45 @@ export async function loginMobile(page: Page, creds: Credentials): Promise<void>
     }
   }
 }
+
+/**
+ * Login for a NOT-onboarded user: `loginWeb` waits for /dashboard, but a fresh user is
+ * redirected by the onboarding gate to /bienvenida — so here we only wait to LEAVE /login
+ * (either destination is fine). The onboarding journey then drives the wizard explicitly.
+ */
+export async function loginFreshWeb(page: Page, creds: Credentials): Promise<void> {
+  await page.goto("/login");
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("Correo").fill(creds.email);
+  await page.locator("#password").fill(creds.password);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    try {
+      await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
+      return;
+    } catch {
+      if (attempt === 2) throw new Error("[cert] login web (fresh) no navegó tras 3 intentos");
+      await page.waitForTimeout(1000);
+    }
+  }
+}
+
+/** Mobile variant of loginFreshWeb: waits to leave /m/login (dashboard or wizard). */
+export async function loginFreshMobile(page: Page, creds: Credentials): Promise<void> {
+  await page.goto("/m/login");
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("Correo").fill(creds.email);
+  await page.getByLabel("Contraseña").fill(creds.password);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.getByRole("button", { name: "Iniciar sesión" }).click();
+    try {
+      await page.waitForURL((url) => url.pathname.startsWith("/m") && !url.pathname.startsWith("/m/login"), {
+        timeout: 20_000,
+      });
+      return;
+    } catch {
+      if (attempt === 2) throw new Error("[cert] login móvil (fresh) no navegó tras 3 intentos");
+      await page.waitForTimeout(1000);
+    }
+  }
+}

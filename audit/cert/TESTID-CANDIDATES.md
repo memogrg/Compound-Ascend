@@ -26,6 +26,24 @@ Cada fila indica el selector frágil actual (centralizado en un único punto del
 | Trigger SheetSelect (subcategoría, sobre) | `.m-qfield:has(.m-qlabel:has-text("…")) button.m-sheetselect` | `sheetselect-<name>` | `fields.tsx` (SheetSelect) · `gastos-forms.tsx` (SobreField) |
 | Opción de lista (`.m-opt`) en pickers/SheetSelect | `dialog.locator(".m-opt").first()` | `opt-<value>` | `fields.tsx`, `gastos-forms.tsx`, `income-manager.tsx` |
 
+## Cluster 1 — Onboarding + loop de dinero (Fase 5/6)
+
+Selectores frágiles nuevos introducidos por los journeys `onboarding.spec.ts` y
+`money-loop.spec.ts` (centralizados en `web.pods.ts` / `mobile.pods.ts`):
+
+| Elemento | Selector actual (POM) | `data-testid` propuesto | Archivo |
+|---|---|---|---|
+| StartChoice · "Guíame paso a paso" | `getByRole("button", { name: /Guíame paso a paso/ })` | `onboarding-start-guided` | `personal-profile/components/start-choice.tsx` |
+| Wizard · nombre (paso 1) | `getByPlaceholder("Memo, Caro…")` | `onboarding-display-name` | `wizard.tsx` (web) · `mobile-profile-wizard.tsx` (móvil) |
+| Wizard · núcleo financiero (paso 1) | `getByRole("button", { name: "Personal" })` (OptionCard `.opt`/`.m-opt`, por label de copy) | `onboarding-nucleus-<value>` | `primitives.tsx` (web `OptionCards`) · `wizard-fields.tsx` (móvil) |
+| Wizard · avanzar/finalizar | `getByRole("button", { name: /^Continuar/ })` · `"Siguiente"` · `"Finalizar"` | `onboarding-next` / `onboarding-finish` | `wizard.tsx` footer · `mobile-profile-wizard.tsx` footer |
+| Consumo del frasco (gastado) | `getByText(grouped(amount))` (monto agrupado, ej. "7.777") | `jar-spent` (en la fila del frasco/sobre) | `financial-base/components/v2/expense-jars/jar-row.tsx` |
+
+Nota de fidelidad: el gate de "Flujo del mes" NO se scrapea (número-vs-oracle = Fase 4/5);
+el reflejo del gasto en el período se asegura por BD (`periodExpenseTotal`), no por el número
+en pantalla. El consumo del frasco se matchea por el **monto agrupado** en la fila — el
+`data-testid` `jar-spent` lo haría inmune al formato/copy.
+
 ## Nota
 
 Los elementos con handle accesible **estable** (botones "Registrar ingreso",
