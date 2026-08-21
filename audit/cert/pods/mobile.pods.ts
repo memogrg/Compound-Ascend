@@ -168,4 +168,39 @@ export class MobileJourney implements Journey {
     await dismissNudge(this.page);
     return isVisibleSoon(this.page, grouped(amount));
   }
+
+  // ── Debt payment (journey #3) ───────────────────────────────────────────────
+  async payDebt(debt: { id: string; name: string }, { amount }: { amount: number }): Promise<void> {
+    const page = this.page;
+    // A prior payment's router.refresh() may still be navigating (webkit is strict about a
+    // concurrent goto → "interrupted by another navigation"). Let it settle, then navigate
+    // with a one-shot retry so the second payment isn't racing the first's refresh.
+    await page.waitForLoadState("networkidle").catch(() => {});
+    for (let i = 0; ; i++) {
+      try {
+        await page.goto("/m/deudas");
+        break;
+      } catch (e) {
+        if (i >= 2) throw e;
+        await page.waitForTimeout(400);
+      }
+    }
+    await page.waitForLoadState("networkidle");
+    await dismissNudge(page);
+    // Scope "Reportar pago" to THIS debt's row (the list renders one button per debt): the
+    // smallest container that holds both the debt name and the button. testid candidate.
+    const row = page
+      .locator("div")
+      .filter({ hasText: debt.name })
+      .filter({ has: page.getByRole("button", { name: "Reportar pago" }) })
+      .last();
+    await row.getByRole("button", { name: "Reportar pago" }).click({ timeout: VISIBLE_TIMEOUT });
+    const sheet = page.getByRole("dialog", { name: "Reportar pago" });
+    await sheet.waitFor({ state: "visible", timeout: VISIBLE_TIMEOUT });
+    // Amount only (MoneyField, placeholder "0"). Currency preloaded NATIVE — never changed
+    // (the mobile form's own comment flags that preloading the converted value is the #437 P0).
+    await sheet.getByPlaceholder("0").first().fill(String(amount));
+    await sheet.getByRole("button", { name: "Registrar pago" }).click();
+    await sheet.waitFor({ state: "hidden", timeout: VISIBLE_TIMEOUT });
+  }
 }

@@ -136,4 +136,22 @@ export class WebJourney implements Journey {
     // envelope's cumulative spent equals this expense → the grouped amount shows on screen.
     return isVisibleSoon(this.page, grouped(amount));
   }
+
+  // ── Debt payment (journey #3) ───────────────────────────────────────────────
+  async payDebt(debt: { id: string; name: string }, { amount }: { amount: number }): Promise<void> {
+    const page = this.page;
+    // The debt detail page's PRIMARY "Reportar pago" (btn-primary) — unambiguous vs the schedule
+    // table's per-row "Pagar" buttons. Its ReportPaymentModal captures in the debt's NATIVE
+    // currency (no currency selector; submit uses vm.nativa.currency) — the #437-correct path.
+    await page.goto(`/deudas/${debt.id}`);
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "Reportar pago" }).first().click({ timeout: VISIBLE_TIMEOUT });
+    const modal = page.getByRole("dialog", { name: "Reportar pago" });
+    await modal.waitFor({ state: "visible", timeout: VISIBLE_TIMEOUT });
+    // "Monto de la cuota" — the first money input; overwrite the preloaded cuota. Leave the
+    // "Pago extra" input empty so the whole payment lands as the ordinary amount.
+    await modal.locator('.inp-money input[type="number"]').first().fill(String(amount));
+    await modal.getByRole("button", { name: /Registrar pago|Guardar/ }).click();
+    await modal.waitFor({ state: "hidden", timeout: VISIBLE_TIMEOUT });
+  }
 }

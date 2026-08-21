@@ -11,6 +11,7 @@
  * Untyped client on purpose: this is test-only plumbing (like scripts/seed-e2e-user.mjs),
  * kept free of any `@/*` app import so the Playwright process never loads server-only code.
  */
+import { execFileSync } from "node:child_process";
 import WebSocket from "ws";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { TEST } from "./env";
@@ -233,4 +234,126 @@ export async function periodExpenseTotal(
     .gte("occurred_on", monthStartISO)
     .limit(500);
   return (data ?? []).reduce((s: number, r: { amount: number }) => s + Number(r.amount), 0);
+}
+
+// ── Cluster 2 · Debt payment (journey #3) ─────────────────────────────────────
+
+/** Debts to seed for a cert user (server-side, via the app's createDebt service). */
+export interface DebtSeed {
+  name: string;
+  balance: number;
+  minPayment: number;
+  currency: string;
+}
+export interface SeededDebt {
+  id: string;
+  currency: string;
+  balance: number;
+}
+/** What the app computes for a debt (native + converted-to-display), read via getDebtsOverview. */
+export interface DebtOverviewRow {
+  id: string;
+  name: string;
+  nativeBalance: number;
+  convertedBalance: number;
+}
+
+// Paths relative to the repo root — the cwd the harness assumes (see audit/cert/README.md).
+// No import.meta.url: it would flip this module to ESM and break Playwright's CJS loader.
+const FIXTURE = "audit/cert/lib/debt-fixture.ts";
+const FIXTURE_TSCONFIG = "audit/cert/seed.tsconfig.json";
+
+/**
+ * Run the server-side debt fixture (createDebt / getDebtsOverview / getRealTotals) OUT of the
+ * Playwright process, via tsx with the server-only-stub tsconfig — the same headless path the
+ * sim uses. `server-only` can't load in the Playwright runner, so app services live behind this
+ * child process. Returns the last JSON line printed (the app's logger may interleave others).
+ */
+function runFixture(mode: "seed" | "read", email: string, password: string, debts?: DebtSeed[]): unknown {
+  const out = execFileSync("npx", ["tsx", "--tsconfig", FIXTURE_TSCONFIG, FIXTURE, mode], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      SUPABASE_TEST_URL: TEST.url,
+      SUPABASE_TEST_ANON_KEY: TEST.anonKey,
+      SUPABASE_TEST_SERVICE_ROLE_KEY: TEST.serviceKey,
+      CERT_EMAIL: email,
+      CERT_PASSWORD: password,
+      ...(debts ? { CERT_DEBTS: JSON.stringify(debts) } : {}),
+    },
+  });
+  const jsonLine = out
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("{") && l.includes('"debts"'))
+    .pop();
+  if (!jsonLine) throw new Error(`[cert] debt-fixture ${mode}: sin JSON en la salida`);
+  return JSON.parse(jsonLine);
+}
+
+/** Seed debts via the app's createDebt(ctx) — server-side, never a raw INSERT. */
+export function seedDebtsViaService(
+  email: string,
+  password: string,
+  debts: DebtSeed[],
+): Record<string, SeededDebt> {
+  return (runFixture("seed", email, password, debts) as { debts: Record<string, SeededDebt> }).debts;
+}
+
+/** Read the app-computed debt balances (native + converted) + the period real expense. */
+export function readDebtsViaService(
+  email: string,
+  password: string,
+): { debts: DebtOverviewRow[]; periodRealExpense: number } {
+  return runFixture("read", email, password) as { debts: DebtOverviewRow[]; periodRealExpense: number };
+}
+
+/** debt_payment rows for a debt — amount is in the debt's NATIVE currency (no currency column). */
+export interface DebtPaymentRow {
+  amount: number;
+  extraAmount: number;
+  transactionId: string | null;
+  occurredOn: string;
+}
+export async function findDebtPayments(admin: SupabaseClient, debtId: string): Promise<DebtPaymentRow[]> {
+  const { data } = await admin
+    .from("debt_payments")
+    .select("amount, extra_amount, transaction_id, occurred_on")
+    .eq("debt_id", debtId);
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    amount: Number(r.amount),
+    extraAmount: Number(r.extra_amount ?? 0),
+    transactionId: (r.transaction_id as string | null) ?? null,
+    occurredOn: String(r.occurred_on),
+  }));
+}
+
+/** The linked expense the debt payment created (linked_kind='debt', linked_id=the debt). */
+export interface LinkedTxnRow {
+  amount: number;
+  currency: string;
+  linkedKind: string | null;
+  linkedId: string | null;
+  householdId: string | null;
+}
+export async function findLinkedDebtTxn(
+  admin: SupabaseClient,
+  userId: string,
+  debtId: string,
+): Promise<LinkedTxnRow | null> {
+  const { data } = await admin
+    .from("transactions")
+    .select("amount, currency, linked_kind, linked_id, household_id")
+    .eq("user_id", userId)
+    .eq("linked_id", debtId)
+    .limit(1);
+  const r = data?.[0];
+  if (!r) return null;
+  return {
+    amount: Number(r.amount),
+    currency: String(r.currency),
+    linkedKind: (r.linked_kind as string | null) ?? null,
+    linkedId: (r.linked_id as string | null) ?? null,
+    householdId: (r.household_id as string | null) ?? null,
+  };
 }

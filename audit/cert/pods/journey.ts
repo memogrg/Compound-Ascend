@@ -55,4 +55,12 @@ export interface Journey {
   // ── Cluster 1 · Money loop (journey #2) ─────────────────────────────────────
   /** After creating an expense: does its jar/frasco show the consumption (amount reflected)? */
   expenseReflectedInJar(amount: number): Promise<boolean>;
+
+  // ── Cluster 2 · Debt payment (journey #3) ───────────────────────────────────
+  /**
+   * Register a payment on a debt through the UI. The currency is the debt's own (the form
+   * preloads it) — we NEVER change it (the service rejects a cross-currency payment, the #437
+   * guard). `amount` is in the debt's native currency.
+   */
+  payDebt(debt: { id: string; name: string }, input: { amount: number }): Promise<void>;
 }

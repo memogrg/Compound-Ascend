@@ -44,6 +44,24 @@ el reflejo del gasto en el período se asegura por BD (`periodExpenseTotal`), no
 en pantalla. El consumo del frasco se matchea por el **monto agrupado** en la fila — el
 `data-testid` `jar-spent` lo haría inmune al formato/copy.
 
+## Cluster 2 — Pago de deuda (Fase 5/6)
+
+Selectores frágiles nuevos de `debt-payment.spec.ts` (la SIEMBRA de las 2 deudas NO usa selectores:
+va server-side vía `createDebt(ctx)` en `debt-fixture.ts`, corrido por tsx con el stub de
+`server-only` — el mismo path headless del sim):
+
+| Elemento | Selector actual (POM) | `data-testid` propuesto | Archivo |
+|---|---|---|---|
+| Ficha deuda · "Reportar pago" (primario) | `getByRole("button", { name: "Reportar pago" })` | `debt-report-payment` | `control/components/debt-detail.tsx` (web) · `deudas/debt-manager.tsx` (móvil) |
+| Web · ReportPaymentModal · monto | `dialog[name="Reportar pago"] .inp-money input[type=number]` (el 1º = "Monto de la cuota") | `debt-payment-amount` | `debt-detail.tsx` (ReportPaymentModal) |
+| Móvil · fila de deuda (scope del pago) | `div.filter({hasText: name}).filter({has: "Reportar pago"}).last()` | `debt-row-<id>` en la `MDataRow`/`SwipeRow` | `content-kit/data-row.tsx` · `deudas/debt-manager.tsx` |
+| Móvil · PaymentForm · monto | `dialog[name="Reportar pago"] getByPlaceholder("0")` (MoneyField) | `debt-payment-amount-m` | `deudas/PaymentForm` · `form-kit/fields.tsx` |
+
+Nota FX: la moneda del pago **no se toca** (web ReportPaymentModal es nativa fija sin selector; móvil
+la precarga nativa) — cambiarla haría que el servicio rechace el pago (guarda #437). El gate duro es
+`debt_payments.amount` NATIVO (service-role); el gate de display FX usa la conversión real de la app
+(`getDebtsOverview`), robusto a la tasa.
+
 ## Nota
 
 Los elementos con handle accesible **estable** (botones "Registrar ingreso",
