@@ -346,10 +346,19 @@ export const DISPLAY_CURRENCY_COOKIE = "ca_display_currency";
 async function _getDisplayCurrency(ctx?: AuthContext): Promise<string> {
   // Sin sesión (cron): no hay cookie de override → se usa la moneda primaria.
   if (ctx) return getPrimaryCurrency(ctx);
-  const store = await cookies();
-  const override = store.get(DISPLAY_CURRENCY_COOKIE)?.value;
-  if (override && (SUPPORTED_CURRENCIES as readonly string[]).includes(override)) {
-    return override;
+  // El switch rápido vive en la cookie del request. `cookies()` lanza FUERA de un
+  // request scope (headless/test bajo la ALS); ahí no hay override que aplicar → se
+  // cae a la moneda primaria (misma rama default que con ctx; getPrimaryCurrency ya
+  // resuelve headless por la ALS, sin `cookies()` crudo). En prod SIEMPRE hay request
+  // scope → override aplicado como siempre → byte-idéntico.
+  try {
+    const store = await cookies();
+    const override = store.get(DISPLAY_CURRENCY_COOKIE)?.value;
+    if (override && (SUPPORTED_CURRENCIES as readonly string[]).includes(override)) {
+      return override;
+    }
+  } catch {
+    // Sin request scope: sin cookie de override → moneda primaria.
   }
   return getPrimaryCurrency();
 }
