@@ -248,8 +248,11 @@ export const CONSULTAR_HISTORIAL_TOOL: AiToolDecl = {
     "Consulta la EVOLUCIÓN histórica real del usuario a partir de sus snapshots: patrimonio neto, " +
     "valor del portafolio, o gasto/ingreso/ahorro mensual. Devuelve la serie por mes más la " +
     "variación (monto y %). Usala cuando pregunte cómo cambió algo, cómo viene, si mejoró o " +
-    "empeoró, o para comparar con el mes o el año pasado. Si no hay suficientes snapshots la " +
-    "herramienta lo dice — NUNCA respondas que no tenés acceso a su historial. Si devuelve " +
+    "empeoró, o para comparar con el mes o el año pasado. Antes de hablar de su evolución llamá " +
+    "SIEMPRE a esta herramienta primero (no respondas de memoria ni digas que no podés acceder a " +
+    "su historial). Si devuelve menos de 2 puntos reales, decí con naturalidad que todavía no hay " +
+    "suficiente historial y respondé con los datos ACTUALES — NUNCA inventes una tendencia; con ≥2 " +
+    "puntos, citá esas cifras reales. Si devuelve " +
     "`monedasMezcladas`, la serie cruza monedas distintas: repetí esa aclaración y NO afirmes " +
     "la variación (restar ₡ con $ no significa nada). Solo lee.",
   parameters: {

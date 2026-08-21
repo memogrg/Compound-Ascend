@@ -54,6 +54,8 @@ import {
 } from "@/lib/ai/router";
 import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
 import { guardMovimientos, TOOLS_DE_MOVIMIENTOS } from "@/lib/ai/movimientos-guard";
+import { guardTendencia } from "@/lib/ai/tendencia-guard";
+import { formatMoney } from "@/lib/format";
 
 export type { FinancialContext };
 export type { MatchedIntent };
@@ -514,6 +516,8 @@ export async function financeChatWithTools(
   const knowledge = await buildKnowledge(messages, ctx);
   /** Herramientas que EFECTIVAMENTE corrieron en este turno (la llena `registrarUso`). */
   const usadas = new Set<string>();
+  /** ¿`consultar_historial` trajo ≥2 puntos reales este turno? (respaldo para citar historia). */
+  const hist: TurnHistorial = { conDatos: false };
   const result = await provider.chatWithTools({
     system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
     messages: capHistory(messages),
@@ -532,7 +536,7 @@ export async function financeChatWithTools(
       CONSULTAR_DETALLE_TOOL,
     ],
     // Se registra QUÉ herramientas corrieron: es el dato que habilita (o no) enumerar movimientos.
-    execute: registrarUso(buildToolExecutor(toolContext), usadas),
+    execute: registrarUso(buildToolExecutor(toolContext), usadas, hist),
   });
   const parsed = parseAction(result.text);
 
@@ -542,20 +546,41 @@ export async function financeChatWithTools(
   // puertas distintas (un sustantivo faltante en el ruteo, una cita que apagaba los carriles, una
   // ambigüedad sin salida): en todos, el LLM terminaba inventando comercios y montos.
   const consultoTool = TOOLS_DE_MOVIMIENTOS.some((t) => usadas.has(t));
-  const g = guardMovimientos(parsed.reply, consultoTool);
-  if (g.bloqueado) {
+  const gMov = guardMovimientos(parsed.reply, consultoTool);
+  if (gMov.bloqueado) {
     logger.warn("assistant.movimientos_bloqueados", {
       // Sin el texto: puede traer cifras del usuario. Alcanza con saber que pasó y con qué tools.
       tools: [...usadas].join(",") || "ninguna",
       largo: parsed.reply.length,
     });
   }
+  // RED DETERMINISTA sobre la TRAYECTORIA (hallazgo Fase 10): si la respuesta afirma evolución con
+  // cifras/‏% en marco temporal y no hay respaldo ESTE turno (tool con <2 puntos para el dinero,
+  // ctx.trajectory undefined para el %), no sale. A mes6 (tool ≥2 pts + trajectory definida) pasa
+  // intacta y sigue citando su historia real. Encadena sobre gMov.reply (una respuesta ya
+  // reemplazada por el guard de movimientos no es longitudinal, así que este no la re-toca).
+  const resumenActual =
+    ctx.netWorth != null && ctx.currency
+      ? `tu patrimonio neto es ${formatMoney(ctx.netWorth, ctx.currency)}`
+      : undefined;
+  const gTend = guardTendencia(
+    gMov.reply,
+    { conDatos: hist.conDatos, trajectoryDefined: ctx.trajectory !== undefined },
+    resumenActual,
+  );
+  if (gTend.bloqueado) {
+    logger.warn("assistant.tendencia_bloqueada", {
+      tools: [...usadas].join(",") || "ninguna",
+      largo: parsed.reply.length,
+    });
+  }
+  const bloqueado = gMov.bloqueado || gTend.bloqueado;
 
   return {
     ...guardReply(
       // Una respuesta bloqueada tampoco puede arrastrar una ACCIÓN propuesta: se armó sobre datos
       // que no existen.
-      g.bloqueado ? { reply: g.reply, action: null } : parsed,
+      bloqueado ? { reply: gTend.reply, action: null } : parsed,
       ctx,
       provider.name,
       priorAssistantReplies(messages),
@@ -567,11 +592,32 @@ export async function financeChatWithTools(
   };
 }
 
-/** Envuelve el ejecutor para anotar el nombre de cada herramienta que se llegó a correr. */
-function registrarUso(run: AiToolExecutor, usadas: Set<string>): AiToolExecutor {
+/** Trayectoria observada este turno: ¿`consultar_historial` devolvió ≥2 puntos reales? */
+type TurnHistorial = { conDatos: boolean };
+
+/** Envuelve el ejecutor para anotar qué herramientas corrieron y si `consultar_historial` trajo
+ *  ≥2 puntos reales (respaldo que consume el guard de tendencia). */
+function registrarUso(
+  run: AiToolExecutor,
+  usadas: Set<string>,
+  hist: TurnHistorial,
+): AiToolExecutor {
   return async (name, args) => {
     usadas.add(name);
-    return run(name, args);
+    const out = await run(name, args);
+    // `consultar_historial` con ≥2 puntos reales ⟺ payload.insuficiente === null. Es el respaldo
+    // que habilita citar cifras históricas (lo consume el guard de tendencia, igual que `usadas` al
+    // de movimientos). El detalle de la serie no se guarda: alcanza con saber si hay respaldo.
+    if (
+      name === "consultar_historial" &&
+      out !== null &&
+      typeof out === "object" &&
+      "insuficiente" in out &&
+      (out as { insuficiente: unknown }).insuficiente === null
+    ) {
+      hist.conDatos = true;
+    }
+    return out;
   };
 }
 

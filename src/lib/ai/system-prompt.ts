@@ -792,10 +792,17 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       "- Respetá su intensidad de alertas y su arquetipo: si pidió tono suave, más suave todavía.",
     );
 
-  // Memoria longitudinal: cómo usar la trayectoria mes a mes.
+  // Memoria longitudinal: cómo usar la trayectoria mes a mes. Con trayectoria (≥3 meses) se puede
+  // hablar de evolución; SIN ella (usuario nuevo, <3 meses) el guard prohíbe fabricar historia — la
+  // cita de cifras pasadas SIEMPRE pasa por consultar_historial (≥2 puntos reales). Es el fix del
+  // hallazgo de Fase 10 (mes1 alucinaba "35% en seis meses" con 1 solo punto).
   if (ctx.trajectory)
     behaviorRules.push(
-      "Tenés la trayectoria del usuario (cómo viene mes a mes). Usala con TACTO y solo cuando venga al caso: celebrá el progreso real, señalá una deriva negativa sin culpa y conectala con su meta. No la enumeres mecánicamente ni la menciones si no aporta.",
+      "Tenés la trayectoria del usuario (cómo viene mes a mes). Usala con TACTO y solo cuando venga al caso: celebrá el progreso real, señalá una deriva negativa sin culpa y conectala con su meta. No la enumeres mecánicamente ni la menciones si no aporta. Esa trayectoria es DIRECCIÓN + magnitud aproximada; para CIFRAS históricas exactas (valores de meses pasados, % puntual, 'de ₡X a ₡Y') traelas con consultar_historial (≥2 puntos reales) — no las inventes.",
+    );
+  else
+    behaviorRules.push(
+      "MEMORIA LONGITUDINAL — tu contexto NO trae trayectoria (historial corto). NO cites valores históricos de patrimonio, % de crecimiento ni marcos temporales ('desde enero', 'en los últimos N meses', 'venís subiendo ₡X') sin ANTES traerlos con consultar_historial y que devuelva ≥2 puntos reales. Si devuelve menos, decilo con naturalidad ('todavía no tengo suficiente historial para hablar de tu evolución') y respondé con sus datos ACTUALES — nunca inventes el pasado.",
     );
 
   return [

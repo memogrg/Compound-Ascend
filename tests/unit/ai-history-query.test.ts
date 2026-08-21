@@ -184,7 +184,11 @@ describe("declaración de la herramienta", () => {
     expect(CONSULTAR_HISTORIAL_TOOL.parameters.required).toEqual(["metrica"]);
   });
 
-  it("le prohíbe al modelo responder que no tiene acceso", () => {
-    expect(CONSULTAR_HISTORIAL_TOOL.description).toContain("no tenés acceso");
+  it("exige llamar al tool, prohíbe 'no puedo acceder' y reconcilia con <2 puntos = insuficiente", () => {
+    const d = CONSULTAR_HISTORIAL_TOOL.description;
+    expect(d).toContain("SIEMPRE"); // debe consultar la herramienta antes de hablar de evolución
+    expect(d).toContain("no podés acceder"); // no puede puntear con "no tengo acceso"
+    // Reconciliado con el guard temporal: <2 puntos → decirlo, no inventar tendencia.
+    expect(d).toContain("todavía no hay suficiente historial");
   });
 });
