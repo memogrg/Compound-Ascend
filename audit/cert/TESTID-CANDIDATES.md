@@ -88,6 +88,29 @@ completo vía `getServerEnv()` (`corsHeaders`/`assertTrustedOrigin`), así que l
 `APP_ENV:"development"` (el `"test"` previo NO está en `appEnvSchema` → 500) y `ALLOWED_ORIGINS`
 del puerto 3100. La visión real va por el config **gated** aparte (`cert:e2e:live`).
 
+## Cluster 4 — Alta de holding (Fase 5/6)
+
+Selectores frágiles de `holding-buy.spec.ts` (wizard 2-pasos, mismo `addHoldingAction` en las 2
+superficies; POM en `web.pods.ts`/`mobile.pods.ts`). El alta ES la acción del journey (sin seed);
+el SOFT de net worth se lee headless con `holding-fixture.ts` (tsx + server-only stub, patrón
+debt-fixture). **`/m/inversiones`, NO `/m/patrimonio`** (esta última es activos/pasivos de net worth).
+
+| Elemento | Selector actual (POM) | `data-testid` propuesto | Archivo |
+|---|---|---|---|
+| Abrir wizard (web/móvil) | `getByRole("button",{name:"Agregar inversión"}).first()` (móvil = FAB/empty-state) | `add-holding-open` | `add-holding-wizard.tsx` · `inversiones-manager.tsx` |
+| Paso 1 · categoría (web) | `getByRole("combobox",{name:"Tipo de inversión · Crecimiento"}).selectOption("cripto")` (option value = category key) | `holding-category-<nature>` | `add-holding-wizard.tsx` (CategoryGroup) |
+| Paso 1 · categoría (móvil) | `getByRole("button",{name:"Cripto y activos digitales"})` (`.m-opt`, texto = label) | `holding-category-<key>` | `inversiones-forms.tsx` (Step1) |
+| Wizard (contenedor, título cambia en paso 2) | `getByRole("dialog").filter({has: button "Guardar"})` (el sheet anidado "Moneda" no tiene Guardar) | `holding-wizard` | `add-holding-wizard.tsx` · `inversiones-forms.tsx` |
+| Campos paso 2 (web) | `.fld:has(.fld-label:has-text("Nombre"/"Monto invertido"/"Moneda"/"Símbolo"/"Precio de compra")) input\|select` (label sin htmlFor; varios `placeholder="0"`) | `holding-<field>` | `add-holding-wizard.tsx` (Step2) |
+| Campos paso 2 (móvil) | `[name="name"]`/`[name="symbol"]` (TextInput) · `.m-qfield:has(.m-qlabel:has-text("Monto invertido"/"Precio de compra")) input` (MoneyField, `.m-qlabel` es div) | `holding-<field>` | `inversiones-forms.tsx` · `form-kit/fields.tsx` |
+| Moneda (móvil, SheetSelect) | `.m-qfield:has(.m-qlabel:has-text("Moneda")) button.m-sheetselect` → dialog "Moneda" → `button /Dólar estadounidense/` | `holding-currency` + `cur-opt-USD` | `form-kit/fields.tsx` (SheetSelect) |
+| registerExpense (OBLIGATORIO) | web: `getByText("La compré ahora")` (radio label) · móvil: `getByRole("button",{name:/La compré ahora/})` (`.m-opt`) — default OFF; sin esto NO hay txn vinculada | `holding-register-expense` | `add-holding-wizard.tsx:1132` · `inversiones-forms.tsx:765` |
+| Guardar | `getByRole("button",{name:"Guardar"})` (disabled hasta canSave) | `holding-save` | `add-holding-wizard.tsx` · `inversiones-forms.tsx` |
+
+Nota determinismo: el precio en vivo (`/api/market-price`) solo **pre-llena** el precio si está
+vacío → el POM llena el precio explícito (100) → `quantity`/`average_cost` deterministas aunque
+market-data falle. El símbolo cripto (BTC) ejercita el path keyless (Binance/CoinGecko) para el SOFT.
+
 ## Nota
 
 Los elementos con handle accesible **estable** (botones "Registrar ingreso",

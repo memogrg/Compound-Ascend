@@ -196,4 +196,46 @@ export class WebJourney implements Journey {
     // Web sends on Enter; the assistant bubble class is `.coach-bubble`.
     return askAdvisorOnPage(page, message, { send: "enter", bubbleSel: ".coach-bubble" });
   }
+
+  // ── Holding purchase (journey #5) · web /patrimonio ─────────────────────────
+  async buyHolding(input: {
+    category: string;
+    name: string;
+    symbol: string;
+    invested: number;
+    unitPrice: number;
+    currency: string;
+    categoryLabel: string;
+  }): Promise<void> {
+    const page = this.page;
+    await page.goto("/patrimonio");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "Agregar inversión" }).first().click();
+    // Step 1: pick the category. Crypto is a GROWTH category → the "Crecimiento" <select>; the
+    // option value is the category key (selectOption by value, label-independent). Advances to step 2.
+    await page
+      .getByRole("combobox", { name: "Tipo de inversión · Crecimiento" })
+      .selectOption(input.category, { timeout: VISIBLE_TIMEOUT });
+    // Step 2: the wizard dialog is the only dialog carrying a "Guardar" button (a nested currency
+    // sheet won't) — filter by it so the locator survives the title changing to the category label.
+    const wiz = page.getByRole("dialog").filter({ has: page.getByRole("button", { name: "Guardar" }) });
+    // Labels are <label class="fld-label"> with no htmlFor → scope by the .fld wrapper (testid candidates).
+    const field = (label: string) => wiz.locator(`.fld:has(.fld-label:has-text("${label}"))`);
+    await field("Nombre").locator("input.inp").fill(input.name);
+    // Set the currency FIRST (default is the user's primary CRC) so the money prefix + live-price
+    // comparison use USD; the payload reads it at submit regardless.
+    await field("Moneda").locator("select.sel").selectOption(input.currency);
+    await field("Monto invertido").locator(".inp-money input").fill(String(input.invested));
+    await field("Símbolo").locator("input.inp").fill(input.symbol);
+    // Fill the price EXPLICITLY (overrides any debounced live-price prefill → deterministic average_cost).
+    await field("Precio de compra").locator(".inp-money input").fill(String(input.unitPrice));
+    // registerExpense = ON (MANDATORY): the radio label whose text starts "La compré ahora…".
+    await wiz.getByText("La compré ahora", { exact: false }).click();
+    await wiz.getByRole("button", { name: "Guardar" }).click();
+    // Wait for the SUCCESS toast — it fires only after addHoldingAction resolves ok (the holding is
+    // persisted by then). NOT a dialog-hidden wait: the Save button flips to "Guardando…", so a
+    // locator filtered by name "Guardar" would match nothing and a hidden-wait would pass vacuously
+    // while the async save is still in flight (racing the DB read).
+    await page.getByText("Posición agregada").waitFor({ state: "visible", timeout: VISIBLE_TIMEOUT });
+  }
 }

@@ -309,6 +309,7 @@ export interface DebtOverviewRow {
 // Paths relative to the repo root — the cwd the harness assumes (see audit/cert/README.md).
 // No import.meta.url: it would flip this module to ESM and break Playwright's CJS loader.
 const FIXTURE = "audit/cert/lib/debt-fixture.ts";
+const HOLDING_FIXTURE = "audit/cert/lib/holding-fixture.ts";
 const FIXTURE_TSCONFIG = "audit/cert/seed.tsconfig.json";
 
 /**
@@ -404,4 +405,140 @@ export async function findLinkedDebtTxn(
     linkedId: (r.linked_id as string | null) ?? null,
     householdId: (r.household_id as string | null) ?? null,
   };
+}
+
+// ── Cluster 4 · Holding purchase (journey #5) ─────────────────────────────────
+
+/** The investment_holdings row, in the holding's NATIVE currency (quantity/average_cost/cost_basis
+ *  are what buildHoldingPayload derived from the user's inputs — no market price involved). */
+export interface HoldingRow {
+  id: string;
+  quantity: number;
+  averageCost: number;
+  costBasis: number;
+  currency: string;
+  assetType: string;
+  symbol: string;
+  householdId: string | null;
+}
+export async function findHolding(
+  admin: SupabaseClient,
+  userId: string,
+  symbol: string,
+): Promise<HoldingRow | null> {
+  const { data } = await admin
+    .from("investment_holdings")
+    .select("id, quantity, average_cost, cost_basis, currency, asset_type, symbol, household_id")
+    .eq("user_id", userId)
+    .eq("symbol", symbol)
+    .limit(1);
+  const r = data?.[0];
+  if (!r) return null;
+  return {
+    id: String(r.id),
+    quantity: Number(r.quantity),
+    averageCost: Number(r.average_cost),
+    costBasis: Number(r.cost_basis),
+    currency: String(r.currency),
+    assetType: String(r.asset_type),
+    symbol: String(r.symbol),
+    householdId: (r.household_id as string | null) ?? null,
+  };
+}
+
+/** The investment_transactions 'compra' row (DCA history) — amount = qty×price, native currency. */
+export interface HoldingPurchaseTxRow {
+  txType: string;
+  amount: number;
+  quantity: number | null;
+  currency: string;
+  householdId: string | null;
+}
+export async function findHoldingPurchaseTx(
+  admin: SupabaseClient,
+  holdingId: string,
+): Promise<HoldingPurchaseTxRow | null> {
+  const { data } = await admin
+    .from("investment_transactions")
+    .select("tx_type, amount, quantity, currency, household_id")
+    .eq("holding_id", holdingId)
+    .eq("tx_type", "compra")
+    .limit(1);
+  const r = data?.[0];
+  if (!r) return null;
+  return {
+    txType: String(r.tx_type),
+    amount: Number(r.amount),
+    quantity: r.quantity == null ? null : Number(r.quantity),
+    currency: String(r.currency),
+    householdId: (r.household_id as string | null) ?? null,
+  };
+}
+
+/** The linked expense the purchase created (linked_kind='holding', linked_id=the holding). */
+export interface LinkedHoldingTxnRow {
+  amount: number;
+  currency: string;
+  linkedKind: string | null;
+  linkedId: string | null;
+  kind: string;
+  householdId: string | null;
+}
+export async function findLinkedHoldingTxn(
+  admin: SupabaseClient,
+  userId: string,
+  holdingId: string,
+): Promise<LinkedHoldingTxnRow | null> {
+  const { data } = await admin
+    .from("transactions")
+    .select("amount, currency, linked_kind, linked_id, kind, household_id")
+    .eq("user_id", userId)
+    .eq("linked_id", holdingId)
+    .eq("linked_kind", "holding")
+    .limit(1);
+  const r = data?.[0];
+  if (!r) return null;
+  return {
+    amount: Number(r.amount),
+    currency: String(r.currency),
+    linkedKind: (r.linked_kind as string | null) ?? null,
+    linkedId: (r.linked_id as string | null) ?? null,
+    kind: String(r.kind),
+    householdId: (r.household_id as string | null) ?? null,
+  };
+}
+
+/**
+ * The app-computed investments value in the PRIMARY currency (CRC), via getPortfolioMarketValues
+ * headless (holding-fixture, tsx + server-only stub). Market-dependent (live price → cost fallback)
+ * → the SOFT net-worth gate; the HARD table reads above never depend on it.
+ */
+export interface PortfolioRead {
+  totalCRC: number;
+  currency: string;
+  holdingsCount: number;
+}
+export function readPortfolioViaService(email: string, password: string): PortfolioRead {
+  const out = execFileSync(
+    "npx",
+    ["tsx", "--tsconfig", FIXTURE_TSCONFIG, HOLDING_FIXTURE, "portfolio"],
+    {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        SUPABASE_TEST_URL: TEST.url,
+        SUPABASE_TEST_ANON_KEY: TEST.anonKey,
+        SUPABASE_TEST_SERVICE_ROLE_KEY: TEST.serviceKey,
+        CERT_EMAIL: email,
+        CERT_PASSWORD: password,
+      },
+    },
+  );
+  const line = out
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("{") && l.includes('"portfolio"'))
+    .pop();
+  if (!line) throw new Error("[cert] holding-fixture portfolio: sin JSON en la salida");
+  return (JSON.parse(line) as { portfolio: PortfolioRead }).portfolio;
 }

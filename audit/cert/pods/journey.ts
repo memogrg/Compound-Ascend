@@ -112,4 +112,23 @@ export interface Journey {
     reply: string;
     bubbleText: string;
   }>;
+
+  // ── Cluster 4 · Holding purchase (journey #5) ───────────────────────────────
+  /**
+   * Buy an investment holding through the UI (web /patrimonio modal wizard · mobile
+   * /m/inversiones bottom-sheet wizard — NOT /m/patrimonio, which is net-worth assets). Picks a
+   * QUOTED category (crypto), fills name/invested/currency/symbol/unitPrice and sets "La compré
+   * ahora" (registerExpense = ON). That toggle is MANDATORY: default OFF writes only the holding +
+   * DCA history; ON also creates the linked 'holding' transaction (the money-event seam). The
+   * derived payload is deterministic: invested/unitPrice → quantity, unitPrice → average_cost.
+   */
+  buyHolding(input: {
+    category: string;
+    name: string;
+    symbol: string;
+    invested: number;
+    unitPrice: number;
+    currency: string;
+    categoryLabel: string;
+  }): Promise<void>;
 }

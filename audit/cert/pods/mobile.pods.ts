@@ -250,4 +250,47 @@ export class MobileJourney implements Journey {
     // Mobile Enter = newline → MUST send via the "Enviar" button; bubble class is `.m-bubble`.
     return askAdvisorOnPage(page, message, { send: "button", bubbleSel: ".m-bubble" });
   }
+
+  // ── Holding purchase (journey #5) · móvil /m/inversiones ────────────────────
+  // /m/inversiones is the holding-alta surface — NOT /m/patrimonio (net-worth assets/liabilities).
+  async buyHolding(input: {
+    category: string;
+    name: string;
+    symbol: string;
+    invested: number;
+    unitPrice: number;
+    currency: string;
+    categoryLabel: string;
+  }): Promise<void> {
+    const page = this.page;
+    await page.goto("/m/inversiones");
+    await page.waitForLoadState("networkidle");
+    await dismissNudge(page);
+    // FAB / empty-state both read "Agregar inversión" on a fresh account → opens the wizard sheet.
+    await page.getByRole("button", { name: "Agregar inversión" }).first().click();
+    // Step 1: category by its label button (crypto). Advances to step 2.
+    await page.getByRole("button", { name: input.categoryLabel }).click({ timeout: VISIBLE_TIMEOUT });
+    // The wizard sheet is the dialog carrying "Guardar" (the nested "Moneda" sheet won't) → filter
+    // by it so the locator survives the sheet title changing to the category label at step 2.
+    const wiz = page.getByRole("dialog").filter({ has: page.getByRole("button", { name: "Guardar" }) });
+    // Form-kit labels are <div class="m-qlabel"> (not <label>) → scope by the .m-qfield wrapper.
+    const mfield = (label: string) => wiz.locator(`.m-qfield:has(.m-qlabel:has-text("${label}"))`);
+    await wiz.locator('input[name="name"]').fill(input.name);
+    await mfield("Monto invertido").locator("input").fill(String(input.invested));
+    // Currency SheetSelect → opens a nested BottomSheet "Moneda"; pick the USD option by its label.
+    await mfield("Moneda").locator("button.m-sheetselect").click();
+    await page
+      .getByRole("dialog", { name: "Moneda" })
+      .getByRole("button", { name: /Dólar estadounidense/ })
+      .click();
+    await wiz.locator('input[name="symbol"]').fill(input.symbol);
+    await mfield("Precio de compra").locator("input").fill(String(input.unitPrice));
+    // registerExpense = ON (MANDATORY): the m-opt button "La compré ahora…".
+    await wiz.getByRole("button", { name: /La compré ahora/ }).click();
+    await wiz.getByRole("button", { name: "Guardar" }).click();
+    // Success toast — fires only after the async save resolves ok. NOT a dialog-hidden wait: the
+    // Save button flips to "Guardando…" so a name-"Guardar"-filtered locator would match nothing and
+    // a hidden-wait would pass vacuously while the save is still in flight.
+    await page.getByText("Posición agregada").waitFor({ state: "visible", timeout: VISIBLE_TIMEOUT });
+  }
 }
