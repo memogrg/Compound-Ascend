@@ -121,8 +121,17 @@ export class AppDriver {
     this.log.record("setup", `línea de presupuesto (gasto) "${name}"`, this.day, { amount });
   }
 
-  /** Creates a debt (write returns void) and reads its id back. */
-  async addDebt(name: string, balance: number, minPayment: number): Promise<string> {
+  /**
+   * Creates a debt (write returns void) and reads its id back. `currency` defaults to the run's
+   * primary; pass a DIFFERENT one (Fase 3 FX cohort) to seed a foreign-currency debt whose balance
+   * the app must convert to primary in net worth — additive, so existing callers are unchanged.
+   */
+  async addDebt(
+    name: string,
+    balance: number,
+    minPayment: number,
+    currency: string = this.currency,
+  ): Promise<string> {
     await createDebt(
       {
         name,
@@ -132,7 +141,7 @@ export class AppDriver {
         // apr 0: a payment reduces the balance by its full amount (no interest),
         // keeping the debt side of the net-worth identity deterministic.
         apr: 0,
-        currency: this.currency,
+        currency,
       },
       this.ctx,
     );
@@ -170,7 +179,7 @@ export class AppDriver {
   /** Creates a NON-quoted holding (certificado): valued at its manual value, no
    *  live price fetch, no linked purchase txn (registerExpense off). Reads the id
    *  back (the write returns void) so the motor can contribute to it later. */
-  async addHolding(label: string, value: number): Promise<string> {
+  async addHolding(label: string, value: number, currency: string = this.currency): Promise<string> {
     await createHolding(
       {
         assetType: "certificado",
@@ -178,7 +187,7 @@ export class AppDriver {
         quantity: 1,
         averageCost: value,
         currentValueManual: value,
-        currency: this.currency,
+        currency,
         registerExpense: false,
       },
       this.ctx,
