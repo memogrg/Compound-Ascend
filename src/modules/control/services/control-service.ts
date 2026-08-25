@@ -946,15 +946,20 @@ export type ControlSummary = {
 export async function getControlSummary(ctx?: AuthContext): Promise<ControlSummary> {
   const { userId } = await resolveAuth(ctx);
   const { getIndexRates } = await import("@/modules/control/services/index-rates");
-  const [goals, debts, base, currency, discipline, rates, indexRates] = await Promise.all([
-    listGoals(ctx),
-    listDebts(ctx),
-    getBaseSummary(ctx),
-    getDisplayCurrency(ctx),
-    getDiscipline(userId, ctx),
-    getFxRates(),
-    getIndexRates(),
-  ]);
+  // Dinámico para evitar el ciclo estático control-service ↔ debts-service (debts-service importa
+  // listDebts de acá). Da el saldo VIVO canónico por deuda (mismo que usa el asesor).
+  const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
+  const [goals, debts, base, currency, discipline, rates, indexRates, liveBalances] =
+    await Promise.all([
+      listGoals(ctx),
+      listDebts(ctx),
+      getBaseSummary(ctx),
+      getDisplayCurrency(ctx),
+      getDiscipline(userId, ctx),
+      getFxRates(),
+      getIndexRates(),
+      getCurrentDebtBalances(ctx),
+    ]);
 
   // Canónico: solo el fondo FORMAL de emergencia (goal_type), no por nombre.
   const hasEmergencyFund = goals.some(
@@ -973,9 +978,14 @@ export async function getControlSummary(ctx?: AuthContext): Promise<ControlSumma
     currentAmount: convertCurrency(g.currentAmount, g.currency, currency, rates),
     monthlyContribution: convertCurrency(g.monthlyContribution, g.currency, currency, rates),
   }));
+  // Saldo VIVO por deuda (ancla − pagos), NO el ancla de alta: una deuda saldada (≤0) no debe
+  // contar como activa/crítica ni entrar al plan/alertas/estrategia del diagnóstico (P2, mismo
+  // linaje que el asesor). `summary.debts` sigue crudo abajo: buildDeudasVsMes lo usa como monto
+  // de ALTA del mes (flujo), donde el ancla es lo correcto.
+  const liveById = new Map(liveBalances.map((d) => [d.id, d.currentBalance]));
   const debtsForEngine = debts.map((d) => ({
     ...d,
-    balance: convertCurrency(d.balance, d.currency, currency, rates),
+    balance: convertCurrency(liveById.get(d.id) ?? d.balance, d.currency, currency, rates),
     minPayment: convertCurrency(d.minPayment, d.currency, currency, rates),
     currentPayment: convertCurrency(d.currentPayment, d.currency, currency, rates),
   }));
