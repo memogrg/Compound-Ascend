@@ -19,7 +19,9 @@ interface FakeBuilder {
 }
 
 function findRow(filters: Record<string, unknown>): Row | null {
-  return [...store.values()].find((r) => Object.entries(filters).every(([k, v]) => r[k] === v)) ?? null;
+  return (
+    [...store.values()].find((r) => Object.entries(filters).every(([k, v]) => r[k] === v)) ?? null
+  );
 }
 
 function makeDb() {
@@ -163,30 +165,53 @@ describe("confirmIngestEmail", () => {
 import { lookupOwnerByForwarder } from "@/lib/ingestion/email/forwarder-lookup";
 
 type EqCall = [string, unknown];
-function lookupFake(row: { user_id: string; household_id: string | null } | null) {
+// El lookup hace 2 queries: email_ingest_links (el dueño) y user_settings (su tz). El fake enruta
+// por tabla para poder devolver una tz distinta y verificar que fluye hasta el EmailOwner.
+function lookupFake(
+  row: { user_id: string; household_id: string | null } | null,
+  settings: { timezone: string | null } | null = null,
+) {
   const eqCalls: EqCall[] = [];
-  const b = {
-    select: () => b,
-    eq: (c: string, v: unknown) => {
-      eqCalls.push([c, v]);
-      return b;
-    },
-    in: () => b,
-    limit: () => b,
-    maybeSingle: async () => ({ data: row, error: null }),
+  const make = (data: unknown) => {
+    const b = {
+      select: () => b,
+      eq: (c: string, v: unknown) => {
+        eqCalls.push([c, v]);
+        return b;
+      },
+      in: () => b,
+      limit: () => b,
+      maybeSingle: async () => ({ data, error: null }),
+    };
+    return b;
   };
-  return { client: { from: () => b }, eqCalls };
+  const client = {
+    from: (table: string) => (table === "user_settings" ? make(settings) : make(row)),
+  };
+  return { client, eqCalls };
 }
 
 describe("lookupOwnerByForwarder · solo verificados", () => {
-  it("filtra verified=true y devuelve el dueño", async () => {
+  it("filtra verified=true y devuelve el dueño (tz null si no hay user_settings)", async () => {
     const { client, eqCalls } = lookupFake({ user_id: "u1", household_id: "h1" });
     const owner = await lookupOwnerByForwarder(
       client as unknown as Parameters<typeof lookupOwnerByForwarder>[0],
       ["memo@gmail.com"],
     );
-    expect(owner).toEqual({ userId: "u1", householdId: "h1" });
+    expect(owner).toEqual({ userId: "u1", householdId: "h1", timezone: null });
     expect(eqCalls).toContainEqual(["verified", true]);
+  });
+
+  it("adjunta la tz guardada del usuario (para fechar la propuesta en su zona, #90)", async () => {
+    const { client } = lookupFake(
+      { user_id: "u1", household_id: "h1" },
+      { timezone: "America/Costa_Rica" },
+    );
+    const owner = await lookupOwnerByForwarder(
+      client as unknown as Parameters<typeof lookupOwnerByForwarder>[0],
+      ["memo@gmail.com"],
+    );
+    expect(owner).toEqual({ userId: "u1", householdId: "h1", timezone: "America/Costa_Rica" });
   });
 
   it("candidatos vacíos → null sin query", async () => {

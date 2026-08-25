@@ -9,6 +9,7 @@ import "server-only";
  */
 import type { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { EmailOwner } from "@/lib/ingestion/email/imap-poller";
+import { isValidTimeZone } from "@/lib/time/user-time-core";
 
 export async function lookupOwnerByForwarder(
   supabase: ReturnType<typeof createServiceRoleClient>,
@@ -23,5 +24,13 @@ export async function lookupOwnerByForwarder(
     .limit(1)
     .maybeSingle();
   if (error || !data) return null;
-  return { userId: data.user_id, householdId: data.household_id };
+  // Tz del usuario para fechar la propuesta en su zona (consistente con #90) cuando el parser no
+  // extrae fecha del correo. Best-effort: sin tz válida guardada, el fallback usa la zona default.
+  const { data: settings } = await supabase
+    .from("user_settings")
+    .select("timezone")
+    .eq("user_id", data.user_id)
+    .maybeSingle();
+  const timezone = isValidTimeZone(settings?.timezone) ? settings.timezone : null;
+  return { userId: data.user_id, householdId: data.household_id, timezone };
 }
