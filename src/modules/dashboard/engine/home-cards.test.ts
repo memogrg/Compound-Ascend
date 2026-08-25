@@ -231,13 +231,18 @@ describe("selectLibertad", () => {
 });
 
 describe("deriveFundFlags", () => {
-  it("detecta fondos por goalType o por nombre, sólo si están fondeados (>0)", () => {
+  it("detecta fondos SOLO por goal_type formal, sólo si están fondeados (>0)", () => {
     expect(
       deriveFundFlags([
         { goalType: "defensa:fondo_emergencia", name: "X", currentAmount: 100 },
-        { goalType: null, name: "Fondo de paz", currentAmount: 50 },
+        { goalType: "defensa:fondo_paz", name: "Mi paz", currentAmount: 50 },
       ]),
     ).toEqual({ hasEmergencyFund: true, hasPeaceFund: true });
+    // Un goal genérico llamado como un fondo pero SIN goal_type formal → ya NO cuenta.
+    expect(deriveFundFlags([{ goalType: null, name: "Fondo de paz", currentAmount: 50 }])).toEqual({
+      hasEmergencyFund: false,
+      hasPeaceFund: false,
+    });
     // Registrado pero en 0 → no cuenta.
     expect(
       deriveFundFlags([{ goalType: "defensa:fondo_emergencia", name: "X", currentAmount: 0 }]),
@@ -246,15 +251,23 @@ describe("deriveFundFlags", () => {
 });
 
 describe("deriveFundAmounts", () => {
-  it("suma saldos por goalType o por nombre; ignora metas no-defensa y saldo 0", () => {
+  it("suma solo por goal_type formal; ignora name-match, no-defensa y saldo 0", () => {
     expect(
       deriveFundAmounts([
         { goalType: "defensa:fondo_emergencia", name: "Colchón", currentAmount: 900_000 },
-        { goalType: null, name: "Fondo de paz", currentAmount: 300_000 },
+        { goalType: "defensa:fondo_paz", name: "Mi paz", currentAmount: 300_000 },
+        // Goal genérico llamado como un fondo pero SIN goal_type formal → ya NO cuenta
+        // (delta 2: criterio canónico = solo el fondo formal).
+        { goalType: null, name: "Fondo de emergencia", currentAmount: 500_000 },
         { goalType: "seguridad", name: "Otra meta", currentAmount: 500_000 },
         { goalType: "defensa:fondo_paz", name: "Paz 0", currentAmount: 0 },
       ]),
     ).toEqual({ emergencia: 900_000, paz: 300_000 });
+  });
+  it("un goal genérico llamado 'emergencia' (sin goal_type formal) NO cuenta como fondo", () => {
+    expect(
+      deriveFundAmounts([{ goalType: null, name: "Fondo de emergencia", currentAmount: 200_000 }]),
+    ).toEqual({ emergencia: 0, paz: 0 });
   });
   it("sin metas de defensa → 0/0", () => {
     expect(

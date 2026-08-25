@@ -306,15 +306,13 @@ export async function getWealthSummary(ctx?: AuthContext): Promise<WealthSummary
     supabase.from("debts").select("apr,delinquency,balance").in("user_id", memberIds),
   ]);
 
+  // Canónico: solo el fondo FORMAL (goal_type), consistente con deriveFundAmounts y
+  // getDefenseFundsReport. Un goal genérico llamado "emergencia" ya no cuenta.
   const hasEmergencyFund = (goals ?? []).some(
-    (g) =>
-      (g.goal_type === "defensa:fondo_emergencia" || /emergencia/i.test(g.name ?? "")) &&
-      Number(g.current_amount) > 0,
+    (g) => g.goal_type === "defensa:fondo_emergencia" && Number(g.current_amount) > 0,
   );
   const hasPeaceFund = (goals ?? []).some(
-    (g) =>
-      (g.goal_type === "defensa:fondo_paz" || /\bpaz\b/i.test(g.name ?? "")) &&
-      Number(g.current_amount) > 0,
+    (g) => g.goal_type === "defensa:fondo_paz" && Number(g.current_amount) > 0,
   );
   const hasCriticalDebt = (debts ?? []).some(
     (d) =>

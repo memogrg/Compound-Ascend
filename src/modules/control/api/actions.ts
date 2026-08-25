@@ -25,6 +25,7 @@ import {
   withdrawFromGoal,
   spendFromGoal,
   listGoals,
+  convertGoalToEmergencyFund,
 } from "@/modules/control/services/control-service";
 import type { PagoContext } from "@/modules/control/engine/pago-vinculado";
 import { getDebtsOverview, type DebtVM } from "@/modules/control/services/debts-service";
@@ -589,6 +590,26 @@ export async function removeDebtAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/**
+ * Nudge de delta 2: el usuario convierte con 1 tap una meta llamada "emergencia" en el fondo
+ * de emergencia FORMAL (goal_type). El tap ES el consentimiento; nunca se auto-migra.
+ */
+export async function convertGoalToEmergencyFundAction(goalId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await convertGoalToEmergencyFund(goalId);
+    revalidatePath("/patrimonio/proteccion");
+    revalidatePath("/dashboard");
+    revalidatePath("/mi-rich-life");
+    return { ok: true };
+  } catch (err) {
+    logger.error("convertGoalToEmergencyFund fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No se pudo convertir la meta." };
   }
 }
 
