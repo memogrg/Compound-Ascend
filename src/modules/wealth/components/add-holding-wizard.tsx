@@ -13,6 +13,7 @@ import { HelpTip } from "@/components/shared/help-tip";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { formatMoney, currencySymbol, captureCurrencyDefault } from "@/lib/format";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
@@ -236,9 +237,8 @@ export function AddHoldingModal({
   const [termYears, setTermYears] = useState(
     prefill?.termYears != null ? String(prefill.termYears) : "",
   );
-  const [startDate, setStartDate] = useState(
-    prefill?.purchaseDate ?? new Date().toISOString().slice(0, 10),
-  );
+  const today = useCaptureToday();
+  const [startDate, setStartDate] = useState(prefill?.purchaseDate ?? today());
 
   // ── Inmueble de renta (propiedad_alquiler): subtipo + costos operativos ──
   const [subtype, setSubtype] = useState<"alquiler" | "airbnb">(

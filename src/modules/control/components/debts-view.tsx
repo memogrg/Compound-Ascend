@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { formatMoney, formatPercent } from "@/lib/format";
 import { PerformanceChart } from "@/components/charts/lazy";
 import { AddControlButton, ControlDialog } from "./control-actions";
@@ -647,7 +648,7 @@ function RegisterPaymentModal({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useCaptureToday();
   const rawOf = (id: string) => raw.find((x) => x.id === id) ?? null;
   const cuotaOf = (id: string) => {
     const d = rawOf(id);
@@ -659,7 +660,7 @@ function RegisterPaymentModal({
     const c = cuotaOf(debts[0]!.id);
     return c ? String(c) : "";
   });
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(today());
   const [pending, setPending] = useState(false);
 
   const monedaDeuda = rawOf(debtId)?.currency ?? currency;

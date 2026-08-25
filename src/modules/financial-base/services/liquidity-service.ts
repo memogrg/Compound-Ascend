@@ -12,7 +12,8 @@ import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getActiveHouseholdId } from "@/lib/household/active";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import { getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
+import { userToday } from "@/lib/time/user-time";
 import {
   computeLiquidityBalance,
   liquidityDelta,
@@ -35,7 +36,7 @@ async function loadRows(
       .from("liquidity_ledger")
       .select("delta, currency, reason, occurred_on")
       .eq("user_id", userId),
-    getDisplayCurrency(ctx),
+    getPrimaryCurrency(ctx),
     getFxRates(),
   ]);
   const raw = (data ?? []) as LedgerSlice[];
@@ -79,7 +80,7 @@ export async function getLiquidityAfterByTxn(
       .eq("user_id", userId)
       .order("occurred_on", { ascending: true })
       .order("created_at", { ascending: true }),
-    getDisplayCurrency(ctx),
+    getPrimaryCurrency(ctx),
     getFxRates(),
   ]);
   const rows = (data ?? []) as Pick<
@@ -115,7 +116,7 @@ export async function getClosingLiquidity(
       .from("liquidity_ledger")
       .select("delta, currency, reason, occurred_on")
       .eq("user_id", userId),
-    getDisplayCurrency(ctx),
+    getPrimaryCurrency(ctx),
     getFxRates(),
   ]);
   const rows = (
@@ -133,7 +134,7 @@ export async function getClosingLiquidity(
 export async function setOpeningBalance(amount: number, ctx?: AuthContext): Promise<void> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const household_id = await getActiveHouseholdId(supabase, userId);
-  const currency = await getDisplayCurrency(ctx);
+  const currency = await getPrimaryCurrency(ctx);
 
   const { data: existing } = await supabase
     .from("liquidity_ledger")
@@ -156,6 +157,7 @@ export async function setOpeningBalance(amount: number, ctx?: AuthContext): Prom
     currency,
     reason: "apertura",
     transaction_id: null,
+    occurred_on: await userToday(ctx),
   });
 }
 
@@ -174,6 +176,7 @@ export async function reconcileBalance(realBalance: number): Promise<void> {
     currency,
     reason: "ajuste",
     transaction_id: null,
+    occurred_on: await userToday(),
   });
 }
 

@@ -9,12 +9,8 @@ import { MoneyField } from "@/components/forms/money-field";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { addTransferAction } from "@/modules/financial-base/api/v2-actions";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import type { Account } from "@/modules/financial-base/types";
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export function TransferButton({ accounts }: { accounts: Account[] }) {
   const [open, setOpen] = useState(false);
@@ -38,12 +34,13 @@ function TransferModal({ accounts, onClose }: { accounts: Account[]; onClose: ()
   const router = useRouter();
   const toast = useToast();
   const captureCurrency = useCaptureCurrency();
+  const today = useCaptureToday();
   const [fromId, setFromId] = useState(accounts[0]?.id ?? "");
   const [toId, setToId] = useState(accounts[1]?.id ?? "");
   const [amount, setAmount] = useState("");
   // Moneda del traslado: default a la principal (estable), no a la de visualización.
   const [currency, setCurrency] = useState(captureCurrency);
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

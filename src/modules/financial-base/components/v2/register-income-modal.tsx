@@ -25,6 +25,7 @@ import {
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import type { CategoryNode, Category } from "@/modules/financial-base/services/categories-service";
 import { isManualEntryClassified } from "@/modules/financial-base/engine/classify";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 
 type PassiveSubtype = "" | "renta" | "dividendos";
 
@@ -54,11 +55,6 @@ const FREQUENCIES: { value: string; label: string }[] = [
 const RECURRENCE_TIP =
   "Las fuentes marcadas como recurrentes son las únicas que se copian cuando traes los ingresos del mes anterior al mes actual.";
 
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 type Leaf = Pick<Category, "id" | "name" | "parentId" | "isSystem">;
 
 export function RegisterIncomeModal({
@@ -76,10 +72,11 @@ export function RegisterIncomeModal({
 
   const [name, setName] = useState(item?.name ?? "");
   const captureCurrency = useCaptureCurrency();
+  const today = useCaptureToday();
   const [curr, setCurr] = useState(item?.currency ?? captureCurrency);
   const [amount, setAmount] = useState(item ? String(item.amount) : "");
   const [date, setDate] = useState(
-    item ? `${item.periodYear}-${String(item.periodMonth).padStart(2, "0")}-01` : todayISO(),
+    item ? `${item.periodYear}-${String(item.periodMonth).padStart(2, "0")}-01` : today(),
   );
   const [incomeType, setIncomeTypeRaw] = useState<IncomeType>(item?.incomeType ?? "activo");
   const [categoryId, setCategoryId] = useState<string>(item?.categoryId ?? "");
