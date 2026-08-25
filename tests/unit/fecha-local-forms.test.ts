@@ -50,6 +50,7 @@ describe("#90(b) · regresión: los forms web tocados no usan el default UTC", (
     "src/modules/financial-base/components/v2/transaction-composer.tsx",
     "src/modules/wealth/components/holding-detail-modal.tsx",
     "src/modules/wealth/components/add-holding-wizard.tsx",
+    "src/modules/wealth/components/portfolio-view.tsx",
   ];
 
   it.each(FORMS)("%s — sin default UTC y usando useCaptureToday", (rel) => {
