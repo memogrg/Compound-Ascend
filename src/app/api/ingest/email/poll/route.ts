@@ -162,6 +162,21 @@ async function handle(req: Request) {
       await client.close().catch(() => {});
     }
   } catch (err) {
+    // #53 · diagnosabilidad: el error de imapflow trae la causa REAL en campos propios —no en
+    // `.message`, que es el genérico "Command failed"—. Se loguean aparte para que un fallo de
+    // ingesta deje de estar ciego (p. ej. serverResponseCode "AUTHENTICATIONFAILED" = App Password
+    // muerto). No cambia el comportamiento del endpoint: sigue devolviendo 500 vía toSafeResponse.
+    const e = err as {
+      serverResponseCode?: unknown;
+      responseText?: unknown;
+      authenticationFailed?: unknown;
+    };
+    logger.error("email-ingest: fallo del poll IMAP", {
+      message: err instanceof Error ? err.message : String(err),
+      serverResponseCode: e.serverResponseCode,
+      responseText: e.responseText,
+      authenticationFailed: e.authenticationFailed,
+    });
     const { status, body } = toSafeResponse(err);
     return NextResponse.json(body, { status, headers: cors });
   }
