@@ -159,11 +159,11 @@ describe("txnInputSchema", () => {
     occurredOn: "2026-06-01",
   };
 
-  it("caso válido aplica defaults (currency, status, origin)", () => {
+  it("aplica defaults status/origin; currency queda sin fijar (delta 3: se resuelve a la primaria en el servicio, ya no hay default CRC)", () => {
     const r = txnInputSchema.safeParse(valid);
     expect(r.success).toBe(true);
     if (r.success) {
-      expect(r.data.currency).toBe("CRC");
+      expect(r.data.currency).toBeUndefined();
       expect(r.data.status).toBe("confirmed");
       expect(r.data.origin).toBe("manual");
     }

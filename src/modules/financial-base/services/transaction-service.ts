@@ -18,7 +18,10 @@ import {
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
-import { getDisplayCurrency } from "@/modules/financial-base/services/base-service";
+import {
+  getDisplayCurrency,
+  getPrimaryCurrency,
+} from "@/modules/financial-base/services/base-service";
 import { getCategoryNameMap } from "@/modules/financial-base/services/categories-service";
 import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
 import type { RealTxnLine } from "@/modules/financial-base/engine/expense-jars";
@@ -166,6 +169,8 @@ export type CreatedTransaction = {
   /** Vínculo final tras aplicar reglas (puede diferir del input). */
   linkedKind: NonNullable<TxnInput["linkedKind"]>;
   linkedId: string | null;
+  /** Moneda EFECTIVA con la que se guardó (resuelta a la principal si el input la omitió). */
+  currency: string;
 };
 
 /** Crea la transacción y devuelve id + vínculo final (post-reglas). */
@@ -185,6 +190,8 @@ export type BuiltTransactionRow = {
   row: TransactionInsert;
   linkedKind: CreatedTransaction["linkedKind"];
   linkedId: string | null;
+  /** Moneda resuelta (input o principal). */
+  currency: string;
 };
 
 export async function buildTransactionRow(
@@ -192,6 +199,9 @@ export async function buildTransactionRow(
   ctx?: AuthContext,
 ): Promise<BuiltTransactionRow> {
   const { db: supabase, userId } = await resolveAuth(ctx);
+  // Delta 3: moneda EFECTIVA = la del input o, si se omitió, la PRINCIPAL del usuario (nunca un
+  // CRC hard-coded). getPrimaryCurrency es ctx-aware y cache-wrapped por request.
+  const currency = input.currency ?? (await getPrimaryCurrency(ctx));
 
   // Auto-categorización por reglas: si falta categoría/cuenta/vínculo y hay
   // comercio, aplica la primera regla que haga match (determinista, sin IA).
@@ -285,7 +295,7 @@ export async function buildTransactionRow(
     description: input.description ?? null,
     merchant_or_source: input.merchantOrSource ?? null,
     amount: input.amount,
-    currency: input.currency,
+    currency,
     occurred_on: input.occurredOn,
     category_id: categoryId,
     account_id: accountId,
@@ -306,7 +316,7 @@ export async function buildTransactionRow(
     // que ya se contaron en otro lado (p.ej. consumo de un frasco de ahorro).
     counts_in_budget: input.countsInBudget ?? true,
   };
-  return { row, linkedKind, linkedId };
+  return { row, linkedKind, linkedId, currency };
 }
 
 /**
@@ -318,7 +328,7 @@ export async function createTransaction(
   ctx?: AuthContext,
 ): Promise<CreatedTransaction> {
   const { db: supabase } = await resolveAuth(ctx);
-  const { row, linkedKind, linkedId } = await buildTransactionRow(input, ctx);
+  const { row, linkedKind, linkedId, currency } = await buildTransactionRow(input, ctx);
   const { data, error } = await supabase.from("transactions").insert(row).select("id").single();
   if (error) throw new Error(error.message);
 
@@ -329,14 +339,14 @@ export async function createTransaction(
       transactionId: data.id,
       kind: input.kind,
       amount: input.amount,
-      currency: input.currency,
+      currency,
       occurredOn: input.occurredOn,
       countsInBudget: row.counts_in_budget ?? true,
     },
     ctx,
   );
 
-  return { id: data.id, linkedKind, linkedId };
+  return { id: data.id, linkedKind, linkedId, currency };
 }
 
 /**
@@ -365,6 +375,7 @@ export async function updateTransaction(
 ): Promise<void> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const scope = await householdWriteScope(supabase, userId);
+  const currency = input.currency ?? (await getPrimaryCurrency(ctx));
 
   // Integridad: las transacciones VINCULADAS no se editan en crudo aquí. Cambiar el
   // monto/fecha desincronizaría su ledger de origen (debt_payments, current_amount).
@@ -395,7 +406,7 @@ export async function updateTransaction(
       description: input.description ?? null,
       merchant_or_source: input.merchantOrSource ?? null,
       amount: input.amount,
-      currency: input.currency,
+      currency,
       occurred_on: input.occurredOn,
       category_id: input.categoryId ?? null,
       account_id: input.accountId ?? null,
@@ -416,7 +427,7 @@ export async function updateTransaction(
       transactionId: id,
       kind: input.kind,
       amount: input.amount,
-      currency: input.currency,
+      currency,
       occurredOn: input.occurredOn,
       countsInBudget: input.countsInBudget ?? true,
     },
@@ -580,6 +591,7 @@ export async function splitTransaction(
 export async function createTransfer(input: TransferInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const currency = input.currency ?? (await getPrimaryCurrency());
   const { data: accs } = await supabase
     .from("accounts")
     .select("id,name")
@@ -596,7 +608,7 @@ export async function createTransfer(input: TransferInput): Promise<void> {
     description: input.note ?? null,
     merchant_or_source: `${nameOf(input.fromAccountId)} → ${nameOf(input.toAccountId)}`,
     amount: input.amount,
-    currency: input.currency,
+    currency,
     occurred_on: input.occurredOn,
     category_id: null,
     account_id: input.fromAccountId,
@@ -614,6 +626,8 @@ export async function importTransactions(rows: CsvTxnInput[]): Promise<number> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const household_id = await getActiveHouseholdId(supabase, user.id);
+  // CSV: cada fila puede traer su moneda; si no, cae a la PRINCIPAL del usuario (no CRC).
+  const primary = await getPrimaryCurrency();
   const payload = rows.map((r) => ({
     user_id: user.id,
     household_id,
@@ -623,7 +637,7 @@ export async function importTransactions(rows: CsvTxnInput[]): Promise<number> {
     description: r.description ?? null,
     merchant_or_source: r.description ?? null,
     amount: r.amount,
-    currency: r.currency,
+    currency: r.currency ?? primary,
     occurred_on: r.occurredOn,
     category_id: null,
     account_id: null,

@@ -446,7 +446,7 @@ export async function addTransactionAction(
           linkedKind: created.linkedKind,
           linkedId: created.linkedId,
           amount: parsed.data.amount,
-          currency: parsed.data.currency,
+          currency: created.currency,
           occurredOn: parsed.data.occurredOn,
         });
       } catch (propErr) {

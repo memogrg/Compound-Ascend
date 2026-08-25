@@ -313,10 +313,11 @@ const goalContributionSchema = z.object({
   goalId: z.string().uuid(),
   amount: z.number().positive("Debe ser mayor a 0"),
   contributionDate: z.string().min(8).max(10).refine(notFutureDate, { message: NOT_FUTURE_MSG }),
-  /** Moneda del importe capturado. Opcional: los llamadores viejos no la mandaban y el aporte
-   *  siempre se guarda en la de la meta. Cuando viene y no coincide, el servicio la rechaza —
-   *  guardarla igual metería el importe multiplicado por el tipo de cambio. */
-  currency: z.string().length(3).optional(),
+  /** Moneda del importe capturado. REQUERIDA (delta 3, B1): antes opcional y el guard
+   *  `monedaVinculadaEsCoherente` se saltaba en `undefined`. Todos los callers ya la mandan
+   *  (los forms desde `goal.currency`), así que exigirla le da dientes al guard SIEMPRE: un
+   *  aporte en otra moneda se rechaza en vez de guardarse multiplicado por el tipo de cambio. */
+  currency: z.string().length(3),
 });
 
 /** Aporte a meta: sube current_amount y crea la transacción vinculada. */
