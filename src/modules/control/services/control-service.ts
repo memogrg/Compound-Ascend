@@ -81,6 +81,9 @@ function rowToDebt(r: DebtRow): Debt {
     name: r.name,
     createdAt: r.created_at,
     debtType: r.debt_type,
+    // ANCLA inmutable de alta (record_debt_payment NUNCA la decrementa), NO el saldo vivo. Para el
+    // saldo ACTUAL usá getCurrentDebtBalances()/currentDebtBalance() (ancla − pagos). Filtrar o
+    // recomendar sobre este campo hace que una deuda saldada siga apareciendo como debida (P2).
     balance: Number(r.balance),
     minPayment: Number(r.min_payment ?? 0),
     currentPayment: Number(r.current_payment ?? 0),

@@ -31,23 +31,29 @@ const holdings = vi.fn(async () => [
 ]);
 vi.mock("@/modules/wealth/services/holdings-service", () => ({ listHoldings: () => holdings() }));
 
+// El resolver lee el saldo VIVO canónico (getCurrentDebtBalances), no el ancla de alta (P2
+// deuda-saldada). El fixture entrega `currentBalance` derivado; el filtro ≤0 vive en el resolver.
 const debts = vi.fn(async () => [
   {
     id: "33333333-3333-4333-8333-333333333333",
     name: "Tarjeta BAC",
-    balance: 800_000,
+    currentBalance: 800_000,
     apr: 45,
     currency: "CRC",
+    minPayment: 25_000,
   },
   {
     id: "44444444-4444-4444-8444-444444444444",
     name: "Préstamo personal",
-    balance: 2_000_000,
+    currentBalance: 2_000_000,
     apr: 18,
     currency: "CRC",
+    minPayment: 80_000,
   },
 ]);
-vi.mock("@/modules/control/services/control-service", () => ({ listDebts: () => debts() }));
+vi.mock("@/modules/control/services/debts-service", () => ({
+  getCurrentDebtBalances: () => debts(),
+}));
 
 const sobres = vi.fn(async () => [
   { id: "55555555-5555-4555-8555-555555555555", sobre: "Restaurantes", frasco: "Vivir" },
@@ -217,9 +223,10 @@ describe("debt_extra_payment · abono extra a capital", () => {
       {
         id: "77777777-7777-4777-8777-777777777777",
         name: "Única",
-        balance: 500_000,
+        currentBalance: 500_000,
         apr: 30,
         currency: "CRC",
+        minPayment: 20_000,
       },
     ]);
     const out = await resolve({ type: "debt_extra_payment", payload: { amount: 100_000 } });

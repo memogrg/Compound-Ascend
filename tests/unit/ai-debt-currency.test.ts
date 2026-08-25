@@ -45,11 +45,19 @@ vi.mock("@/lib/market-data/fx-rates", () => ({
   },
 }));
 
-// Deudas del usuario (lo único que este test alimenta de verdad).
-type FakeDebt = { id: string; name: string; balance: number; minPayment: number; apr: number | null; currency: string };
+// Deudas del usuario (lo único que este test alimenta de verdad). El contexto lee el saldo VIVO
+// canónico (getCurrentDebtBalances → currentBalance), NO el ancla de alta (P2 deuda-saldada).
+type FakeDebt = {
+  id: string;
+  name: string;
+  currentBalance: number;
+  minPayment: number;
+  apr: number | null;
+  currency: string;
+};
 let DEBTS: FakeDebt[] = [];
-vi.mock("@/modules/control/services/control-service", () => ({
-  listDebts: async () => DEBTS,
+vi.mock("@/modules/control/services/debts-service", () => ({
+  getCurrentDebtBalances: async () => DEBTS,
 }));
 
 // Bloques best-effort que pegan a red: se saltan al instante (test hermético).
@@ -68,7 +76,7 @@ import { buildFinancialContext } from "@/lib/ai/context-engine";
 const debt = (over: Partial<FakeDebt> = {}): FakeDebt => ({
   id: "d1",
   name: "Deuda",
-  balance: 1_000_000,
+  currentBalance: 1_000_000,
   minPayment: 50_000,
   apr: 20,
   currency: "CRC",
@@ -84,8 +92,8 @@ beforeEach(() => {
 describe("buildFinancialContext · deudas en la moneda de cada deuda", () => {
   it("tarjeta USD + préstamo CRC → DOS subtotales, nunca la suma cruda", async () => {
     DEBTS = [
-      debt({ id: "d1", name: "Tarjeta", balance: 2_000, currency: "USD", apr: 45 }),
-      debt({ id: "d2", name: "Préstamo", balance: 3_000_000, currency: "CRC", apr: 18 }),
+      debt({ id: "d1", name: "Tarjeta", currentBalance: 2_000, currency: "USD", apr: 45 }),
+      debt({ id: "d2", name: "Préstamo", currentBalance: 3_000_000, currency: "CRC", apr: 18 }),
     ];
     const ctx = await buildFinancialContext();
 
@@ -100,8 +108,8 @@ describe("buildFinancialContext · deudas en la moneda de cada deuda", () => {
 
   it("con tasas, el total convertido está presente y es coherente (2.000 USD = 1.000.000 CRC)", async () => {
     DEBTS = [
-      debt({ id: "d1", name: "Tarjeta", balance: 2_000, currency: "USD" }),
-      debt({ id: "d2", name: "Préstamo", balance: 3_000_000, currency: "CRC" }),
+      debt({ id: "d1", name: "Tarjeta", currentBalance: 2_000, currency: "USD" }),
+      debt({ id: "d2", name: "Préstamo", currentBalance: 3_000_000, currency: "CRC" }),
     ];
     const ctx = await buildFinancialContext();
     expect(ctx.debtTotalConvertido).toEqual({ monto: 4_000_000, moneda: "CRC" });
@@ -110,8 +118,8 @@ describe("buildFinancialContext · deudas en la moneda de cada deuda", () => {
   it("sin tasas → no hay total convertido, y ninguna cifra queda mal etiquetada", async () => {
     ratesDisponibles = false;
     DEBTS = [
-      debt({ id: "d1", name: "Tarjeta", balance: 2_000, currency: "USD" }),
-      debt({ id: "d2", name: "Préstamo", balance: 3_000_000, currency: "CRC" }),
+      debt({ id: "d1", name: "Tarjeta", currentBalance: 2_000, currency: "USD" }),
+      debt({ id: "d2", name: "Préstamo", currentBalance: 3_000_000, currency: "CRC" }),
     ];
     const ctx = await buildFinancialContext();
 
@@ -125,7 +133,10 @@ describe("buildFinancialContext · deudas en la moneda de cada deuda", () => {
 
   it("una sola moneda → un solo subtotal (y el convertido no necesita tasas)", async () => {
     ratesDisponibles = false;
-    DEBTS = [debt({ balance: 850_000, currency: "CRC" }), debt({ id: "d2", balance: 150_000, currency: "CRC" })];
+    DEBTS = [
+      debt({ currentBalance: 850_000, currency: "CRC" }),
+      debt({ id: "d2", currentBalance: 150_000, currency: "CRC" }),
+    ];
     const ctx = await buildFinancialContext();
 
     expect(ctx.debtTotals).toEqual([{ monto: 1_000_000, moneda: "CRC" }]);
@@ -134,8 +145,8 @@ describe("buildFinancialContext · deudas en la moneda de cada deuda", () => {
 
   it("la deuda de mayor APR viaja con su moneda (comparar tasas entre monedas engaña)", async () => {
     DEBTS = [
-      debt({ id: "d1", name: "Tarjeta", balance: 2_000, currency: "USD", apr: 45 }),
-      debt({ id: "d2", name: "Préstamo", balance: 3_000_000, currency: "CRC", apr: 18 }),
+      debt({ id: "d1", name: "Tarjeta", currentBalance: 2_000, currency: "USD", apr: 45 }),
+      debt({ id: "d2", name: "Préstamo", currentBalance: 3_000_000, currency: "CRC", apr: 18 }),
     ];
     const ctx = await buildFinancialContext();
     expect(ctx.topDebtName).toBe("Tarjeta");
@@ -144,7 +155,7 @@ describe("buildFinancialContext · deudas en la moneda de cada deuda", () => {
   });
 
   it("saldo 0 no cuenta como deuda activa", async () => {
-    DEBTS = [debt({ balance: 0 })];
+    DEBTS = [debt({ currentBalance: 0 })];
     const ctx = await buildFinancialContext();
     expect(ctx.debtCount).toBeUndefined();
     expect(ctx.debtTotals).toBeUndefined();
