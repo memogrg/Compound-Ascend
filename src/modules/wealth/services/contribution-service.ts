@@ -7,7 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getMarketPrice, type AssetType as MarketAssetType } from "@/lib/market-data";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import { convertCurrency } from "@/lib/fx";
-import { registerPurchaseExpense } from "./holdings-service";
+import { registerPurchaseExpense, recordContributionPurchaseTx } from "./holdings-service";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import {
   selectPlansToCharge,
@@ -117,12 +117,13 @@ export async function ensureMonthlyContributions(ctx?: AuthContext): Promise<voi
       }
 
       // Gasto del mes = el aporte (monto fijo).
+      const purchaseDate = `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`;
       const expenseId = await registerPurchaseExpense(
         {
           holdingId: h.id,
           label: h.label ?? h.symbol,
           currency: h.currency,
-          purchaseDate: `${periodYear}-${String(periodMonth).padStart(2, "0")}-01`,
+          purchaseDate,
           amount: Number(h.monthly_contribution),
           verb: "Aporte",
         },
@@ -133,6 +134,20 @@ export async function ensureMonthlyContributions(ctx?: AuthContext): Promise<voi
         .from("holding_contributions")
         .update({ unit_price: price, transaction_id: expenseId })
         .eq("id", reserved.id);
+
+      // Historial DCA (#655): el aporte automático también deja su compra en investment_transactions,
+      // con las unidades del mes — igual que una compra manual. Best-effort, historial PURO (no toca
+      // el promedio). Idempotente por la reserva de arriba: este cuerpo corre una sola vez por
+      // (holding, periodo), así que re-correr no duplica.
+      await recordContributionPurchaseTx(supabase, {
+        userId,
+        householdId: h.household_id,
+        holdingId: h.id,
+        amount: Number(h.monthly_contribution),
+        quantity: qty,
+        currency: h.currency,
+        occurredOn: purchaseDate,
+      });
     } catch (err) {
       console.error(`[ensureMonthlyContributions] error en holding ${h.id}:`, err);
     }

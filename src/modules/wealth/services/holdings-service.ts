@@ -188,6 +188,42 @@ async function recordPurchaseTx(
   if (error) console.error(`[recordPurchaseTx] falló (${holdingId}): ${error.message}`);
 }
 
+/**
+ * Registra un aporte AUTOMÁTICO (auto-DCA) en investment_transactions (historial DCA), con las
+ * unidades compradas al precio del mes — misma forma que recordPurchaseTx, para que el aporte
+ * recurrente aparezca en el historial de compras igual que uno manual (#655). Best-effort: loguea
+ * si falla, no rompe el aporte. Historial PURO: NO toca el promedio del holding (CLAUDE.md). El
+ * household_id se pasa explícito (el del holding), invariante RLS.
+ */
+export async function recordContributionPurchaseTx(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  args: {
+    userId: string;
+    householdId: string | null;
+    holdingId: string;
+    amount: number;
+    quantity: number;
+    currency: string;
+    occurredOn: string;
+  },
+): Promise<void> {
+  if (!(args.amount > 0) || !(args.quantity > 0)) return; // solo compras cuantificables
+  const { error } = await supabase.from("investment_transactions").insert({
+    user_id: args.userId,
+    household_id: args.householdId,
+    created_by: args.userId,
+    last_edited_by: args.userId,
+    holding_id: args.holdingId,
+    tx_type: "compra",
+    amount: args.amount,
+    quantity: args.quantity,
+    currency: args.currency,
+    occurred_on: args.occurredOn,
+  });
+  if (error)
+    console.error(`[recordContributionPurchaseTx] falló (${args.holdingId}): ${error.message}`);
+}
+
 /** Columnas de renta / valor manual compartidas por insert y update. */
 function rentalColumns(input: HoldingInput) {
   return {
