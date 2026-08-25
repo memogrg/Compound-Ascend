@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth/session";
 import type { Account, AccountKind } from "@/modules/financial-base/types";
 import type { AccountInput } from "@/modules/financial-base/schemas";
 import type { AccountRow } from "@/lib/supabase/database.types";
+import { getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 
 function rowToAccount(r: AccountRow): Account {
   return {
@@ -40,6 +41,7 @@ export async function getDefaultAccount(): Promise<Account | null> {
 export async function createAccount(input: AccountInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const currency = input.currency ?? (await getPrimaryCurrency());
   if (input.isDefault) {
     await supabase.from("accounts").update({ is_default: false }).eq("user_id", user.id);
   }
@@ -47,7 +49,7 @@ export async function createAccount(input: AccountInput): Promise<void> {
     user_id: user.id,
     name: input.name,
     kind: input.kind,
-    currency: input.currency,
+    currency,
     is_default: input.isDefault,
   });
 }
@@ -56,6 +58,7 @@ export async function updateAccount(id: string, input: AccountInput): Promise<vo
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
+  const currency = input.currency ?? (await getPrimaryCurrency());
   if (input.isDefault) {
     await supabase
       .from("accounts")
@@ -68,7 +71,7 @@ export async function updateAccount(id: string, input: AccountInput): Promise<vo
       last_edited_by: user.id,
       name: input.name,
       kind: input.kind,
-      currency: input.currency,
+      currency,
       is_default: input.isDefault,
     })
     .eq("id", id)

@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/auth/session";
 import type { TransactionTemplateRow } from "@/lib/supabase/database.types";
 import type { TemplateInput } from "@/modules/financial-base/schemas";
 import type { TxnKind } from "@/modules/financial-base/types";
+import { getPrimaryCurrency } from "@/modules/financial-base/services/base-service";
 
 export type TransactionTemplate = {
   id: string;
@@ -60,12 +61,13 @@ export async function listTemplates(): Promise<TransactionTemplate[]> {
 export async function createTemplate(input: TemplateInput): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
+  const currency = input.currency ?? (await getPrimaryCurrency());
   await supabase.from("transaction_templates").insert({
     user_id: user.id,
     name: input.name,
     kind: input.kind,
     amount: input.amount ?? null,
-    currency: input.currency,
+    currency,
     category_id: input.categoryId ?? null,
     account_id: input.accountId ?? null,
     merchant_or_source: input.merchantOrSource ?? null,
@@ -79,6 +81,7 @@ export async function updateTemplate(id: string, input: TemplateInput): Promise<
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const scope = await householdWriteScope(supabase, user.id);
+  const currency = input.currency ?? (await getPrimaryCurrency());
   await supabase
     .from("transaction_templates")
     .update({
@@ -86,7 +89,7 @@ export async function updateTemplate(id: string, input: TemplateInput): Promise<
       name: input.name,
       kind: input.kind,
       amount: input.amount ?? null,
-      currency: input.currency,
+      currency,
       category_id: input.categoryId ?? null,
       account_id: input.accountId ?? null,
       merchant_or_source: input.merchantOrSource ?? null,
