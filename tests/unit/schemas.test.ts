@@ -9,17 +9,16 @@ import {
   txnInputSchema,
   budgetItemInputSchema,
   categoryInputSchema,
+  incomeInputSchema,
+  expenseInputSchema,
+  incomeSourceInputSchema,
 } from "@/modules/financial-base/schemas";
 
 const UUID = "9b2f8a1e-5c34-4d6f-8a2b-1c3d5e7f9a0b";
 const OTHER_UUID = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 
 /** Verifica que safeParse falla y que algún issue apunta al path esperado. */
-function expectFailAt(
-  schema: z.ZodTypeAny,
-  input: unknown,
-  path: (string | number)[],
-): void {
+function expectFailAt(schema: z.ZodTypeAny, input: unknown, path: (string | number)[]): void {
   const r = schema.safeParse(input);
   expect(r.success).toBe(false);
   if (!r.success) {
@@ -289,5 +288,62 @@ describe("validación de fechas no futuras", () => {
     const base = { assetType: "etf", quantity: 1, averageCost: 100, currency: "USD" };
     expect(holdingInputSchema.safeParse({ ...base, purchaseDate: isoPast }).success).toBe(true);
     expectFailAt(holdingInputSchema, { ...base, purchaseDate: isoFuture }, ["purchaseDate"]);
+  });
+});
+
+/**
+ * #3 (P3) · un MOVIMIENTO de ₡0 no es un movimiento → ingreso y gasto exigen amount > 0. NO se
+ * tocan budgetItem (0 = "quitar presupuesto") ni incomeSource (0 = fuente variable/comisión
+ * placeholder) — 0 es legítimo ahí; se guardan con un test de no-regresión.
+ */
+describe("schemas · amount > 0 en movimientos (ingreso/gasto), 0 legítimo en presupuesto/fuente", () => {
+  const income = {
+    name: "Salario",
+    incomeType: "activo" as const,
+    amount: 100,
+    currency: "CRC",
+    frequency: "mensual" as const,
+  };
+  const expense = {
+    name: "Súper",
+    nature: "esencial" as const,
+    amount: 100,
+    currency: "CRC",
+    frequency: "mensual" as const,
+  };
+  const budgetItem = {
+    type: "expense" as const,
+    name: "Comida",
+    amount: 0,
+    currency: "CRC",
+    periodMonth: 8,
+    periodYear: 2026,
+  };
+  const incomeSource = {
+    name: "Comisión",
+    amount: 0,
+    currency: "CRC",
+    occurredOn: "2026-08-01",
+    incomeType: "pasivo" as const,
+  };
+
+  it("ingreso: rechaza amount 0 y negativo, acepta > 0", () => {
+    expectFailAt(incomeInputSchema, { ...income, amount: 0 }, ["amount"]);
+    expectFailAt(incomeInputSchema, { ...income, amount: -5 }, ["amount"]);
+    expect(incomeInputSchema.safeParse({ ...income, amount: 100 }).success).toBe(true);
+  });
+
+  it("gasto: rechaza amount 0 y negativo, acepta > 0", () => {
+    expectFailAt(expenseInputSchema, { ...expense, amount: 0 }, ["amount"]);
+    expectFailAt(expenseInputSchema, { ...expense, amount: -5 }, ["amount"]);
+    expect(expenseInputSchema.safeParse({ ...expense, amount: 100 }).success).toBe(true);
+  });
+
+  it("no-regresión: presupuesto de sobre SIGUE aceptando 0 (= quitar presupuesto)", () => {
+    expect(budgetItemInputSchema.safeParse({ ...budgetItem, amount: 0 }).success).toBe(true);
+  });
+
+  it("no-regresión: fuente de ingreso SIGUE aceptando 0 (= variable/placeholder)", () => {
+    expect(incomeSourceInputSchema.safeParse({ ...incomeSource, amount: 0 }).success).toBe(true);
   });
 });
