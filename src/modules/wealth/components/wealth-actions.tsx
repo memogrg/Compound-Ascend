@@ -448,7 +448,7 @@ function Money({
   error,
   defaultValue,
 }: {
-  label: string;
+  label: React.ReactNode;
   name: string;
   currency: string;
   error?: string;
@@ -578,19 +578,21 @@ function PremiumForm({
         ) : null}
         <div className="fld-2">
           <Money
-            label="Monto de la prima"
+            label={
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                Monto de la prima
+                <HelpTip
+                  text={`Se registra como gasto vinculado a ${label}, en ${policy.currency}.`}
+                />
+              </span>
+            }
             name="amount"
             currency={policy.currency}
             error={errors.amount}
             defaultValue={policy.premium ?? undefined}
           />
           <div className="fld">
-            <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              Fecha
-              <HelpTip
-                text={`Se registra como gasto vinculado a ${label}, en ${policy.currency}.`}
-              />
-            </label>
+            <label className="fld-label">Fecha</label>
             <input
               className="inp"
               type="date"
