@@ -15,6 +15,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { CURRENCY_SYMBOL, formatMoney, formatPercent } from "@/lib/format";
 import { RegisterIncomeModal } from "@/modules/financial-base/components/v2/register-income-modal";
 import {
@@ -39,11 +40,6 @@ const RECURRENT_FRACTION: Record<string, number> = {
   quincenal: 0.5,
 };
 
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function suggestedAmount(it: BudgetItem, received: number): number {
   const frac = it.recurringItemId ? RECURRENT_FRACTION[it.frequency] : undefined;
   if (frac) return Math.round(it.amount * frac * 100) / 100;
@@ -62,6 +58,7 @@ export function IncomeSources({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const today = useCaptureToday();
   const [editing, setEditing] = useState<BudgetItem | null>(null);
   const [, startTransition] = useTransition();
 
@@ -81,7 +78,7 @@ export function IncomeSources({
           name: `${it.name} (copia)`,
           amount: it.amount,
           currency: it.currency,
-          occurredOn: todayISO(),
+          occurredOn: today(),
           incomeType: it.incomeType ?? "activo",
           recurrent: Boolean(it.recurringItemId),
           frequency: it.frequency,
@@ -114,8 +111,7 @@ export function IncomeSources({
               received={received[it.id] ?? 0}
               onReceive={(amount) =>
                 run(
-                  () =>
-                    receivePartialIncomeAction({ budgetItemId: it.id, amount, date: todayISO() }),
+                  () => receivePartialIncomeAction({ budgetItemId: it.id, amount, date: today() }),
                   "Recibido registrado",
                 )
               }

@@ -13,7 +13,7 @@ import {
 } from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
-import { userCurrentPeriod } from "@/lib/time/user-time";
+import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import { monedaDelPagoEsCoherente } from "@/modules/control/engine/debt-strategy";
 import {
   registerLinkedTransaction,
@@ -144,7 +144,7 @@ export async function createGoal(input: GoalInput, ctx?: AuthContext): Promise<s
     targetAmount: targetAmount ?? 0,
     periodAmount: input.periodAmount,
     targetDate: input.targetDate,
-    todayISO: todayISO(),
+    todayISO: await userToday(ctx),
   });
   const { data, error } = await supabase
     .from("savings_goals")
@@ -247,7 +247,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
     targetAmount: targetAmount ?? 0,
     periodAmount: input.periodAmount,
     targetDate: input.targetDate,
-    todayISO: todayISO(),
+    todayISO: await userToday(),
   });
   const keepSchedule =
     recurrence !== "ninguna" &&
@@ -1051,8 +1051,4 @@ function futureISO(monthsAhead: number): string {
   const d = new Date();
   d.setMonth(d.getMonth() + monthsAhead);
   return d.toISOString().slice(0, 10);
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
 }

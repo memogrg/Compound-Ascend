@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { useRouter } from "next/navigation";
 import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { formatMoney, formatPercent, formatMonthYear, currencySymbol } from "@/lib/format";
@@ -128,7 +129,8 @@ export function HoldingDetailModal({
   const [linkedDebt, setLinkedDebt] = useState<LinkableDebt | null>(null);
   const [valuations, setValuations] = useState<HoldingValuation[]>([]);
   const [paidUntil, setPaidUntil] = useState<PlanPeriod | null>(null);
-  const [valDate, setValDate] = useState(new Date().toISOString().slice(0, 10));
+  const today = useCaptureToday();
+  const [valDate, setValDate] = useState(today());
   const [valAmount, setValAmount] = useState("");
   const [savingVal, setSavingVal] = useState(false);
   const [advOpen, setAdvOpen] = useState(false);
@@ -782,7 +784,8 @@ function SaleSection({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [qty, setQty] = useState("");
-  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const today = useCaptureToday();
+  const [saleDate, setSaleDate] = useState(() => today());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -958,7 +961,8 @@ function DividendForm({
     "anual",
   );
   const [amount, setAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const today = useCaptureToday();
+  const [paymentDate, setPaymentDate] = useState(() => today());
   const [divCurrency, setDivCurrency] = useState(holding.currency);
   const [pending, setPending] = useState(false);
 
@@ -1097,7 +1101,7 @@ function DividendForm({
             className="inp"
             type="date"
             value={paymentDate}
-            max={new Date().toISOString().slice(0, 10)}
+            max={today()}
             onChange={(e) => setPaymentDate(e.target.value)}
           />
         </div>
@@ -1132,7 +1136,7 @@ function RentalSection({
   onChange: () => void;
 }) {
   const toast = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useCaptureToday();
   const cfgFreq = holding.rentalFrequency ?? "mensual";
   const annualRent = (holding.rentalIncome ?? 0) * (RENTAL_FREQ_PER_YEAR[cfgFreq] ?? 12);
   const rentYield = currentValue > 0 ? annualRent / currentValue : 0;
@@ -1141,7 +1145,7 @@ function RentalSection({
   const [amount, setAmount] = useState(
     holding.rentalIncome != null ? String(holding.rentalIncome) : "",
   );
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(today());
   const [freq, setFreq] = useState<
     "semanal" | "mensual" | "trimestral" | "semestral" | "anual" | "al_vencimiento"
   >(cfgFreq);
@@ -1248,7 +1252,7 @@ function RentalSection({
               className="inp"
               type="date"
               value={date}
-              max={today}
+              max={today()}
               onChange={(e) => setDate(e.target.value)}
             />
           </div>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { notFutureDate, NOT_FUTURE_MSG } from "@/lib/validation";
+import { userToday } from "@/lib/time/user-time";
 import {
   goalInputSchema,
   debtInputSchema,
@@ -99,7 +100,7 @@ export async function createSavingsSobreAction(raw: unknown): Promise<ActionResu
       await addGoalContribution({
         goalId,
         amount: initial,
-        contributionDate: new Date().toISOString().slice(0, 10),
+        contributionDate: await userToday(),
       });
     }
     revalidatePath("/control-financiero");

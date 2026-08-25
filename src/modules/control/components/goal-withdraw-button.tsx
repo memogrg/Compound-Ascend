@@ -16,18 +16,15 @@ import { useToast } from "@/components/ui/toast";
 import { formatMoney, currencySymbol } from "@/lib/format";
 import { withdrawGoalAction } from "@/modules/control/api/actions";
 import type { SavingsGoal } from "@/modules/control/types";
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+import { useCaptureToday } from "@/components/tz/timezone-context";
 
 export function GoalWithdrawButton({ goal }: { goal: SavingsGoal }) {
   const router = useRouter();
   const toast = useToast();
+  const today = useCaptureToday();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

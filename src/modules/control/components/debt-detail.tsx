@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { PerformanceChart } from "@/components/charts/lazy";
 import { formatMoney, currencySymbol } from "@/lib/format";
 // Recibe la deuda CRUDA a propósito: si alguien le pasa un VM convertido, el test de
@@ -99,7 +100,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
     return [head, ...rest];
   }, [vm]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useCaptureToday();
   const [pay, setPay] = useState<{ amount: number; date: string } | null>(null);
   const [extraPay, setExtraPay] = useState(false);
   const [editPayment, setEditPayment] = useState<string | null>(null);
@@ -137,7 +138,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
             </button>
             <button
               className="btn btn-primary"
-              onClick={() => setPay({ amount: vm.monthlyPayment || 0, date: today })}
+              onClick={() => setPay({ amount: vm.monthlyPayment || 0, date: today() })}
             >
               Reportar pago
             </button>
@@ -292,7 +293,7 @@ export function DebtDetail({ vm }: { vm: DebtDetailVM }) {
                         type="button"
                         className="btn btn-secondary"
                         style={{ padding: "3px 9px", fontSize: 11 }}
-                        onClick={() => setPay({ amount: r.payment, date: r.date ?? today })}
+                        onClick={() => setPay({ amount: r.payment, date: r.date ?? today() })}
                       >
                         Pagar
                       </button>
@@ -653,7 +654,7 @@ function ReportPaymentModal({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useCaptureToday();
   // Estado string para permitir vacío (no un "0" pegado imposible de borrar);
   // se coacciona a número solo al enviar (vacío → 0).
   /**
@@ -676,7 +677,7 @@ function ReportPaymentModal({
   const cuotaNativa = cuotaPrecargada(vm.nativa);
   const initAmount = editing?.amount ?? cuotaNativa.amount;
   const [amount, setAmount] = useState<string>(initAmount ? String(initAmount) : "");
-  const [date, setDate] = useState(editing?.paymentDate ?? preset?.date ?? today);
+  const [date, setDate] = useState(editing?.paymentDate ?? preset?.date ?? today());
   const [extra, setExtra] = useState<string>(
     editing?.extraAmount ? String(editing.extraAmount) : "",
   );
@@ -830,9 +831,9 @@ function ReportPaymentModal({
 function ExtraordinaryPaymentModal({ vm, onClose }: { vm: DebtDetailVM; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useCaptureToday();
   const [amount, setAmount] = useState<string>("");
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(today());
   const [pending, setPending] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
