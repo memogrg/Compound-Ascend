@@ -306,13 +306,12 @@ export async function deleteGoal(id: string): Promise<void> {
  * re-deriva recurrencia: cambia únicamente el tipo, para que este lector y los demás cuenten
  * la meta como el fondo formal.
  */
-export async function convertGoalToEmergencyFund(id: string): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function convertGoalToEmergencyFund(id: string, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
   await supabase
     .from("savings_goals")
-    .update({ goal_type: "defensa:fondo_emergencia", last_edited_by: user.id })
+    .update({ goal_type: "defensa:fondo_emergencia", last_edited_by: userId })
     .eq("id", id)
     .in("user_id", scope);
 }
