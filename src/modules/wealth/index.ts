@@ -20,6 +20,7 @@ export {
   buildDemoWealthSummary,
   createPolicy,
   deletePolicy,
+  investmentsInCurrency,
 } from "./services/wealth-service";
 export type { PolicyInput } from "./schemas";
 export { addPolicyAction, setPeaceMonthsAction } from "./api/actions";

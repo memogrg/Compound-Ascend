@@ -585,6 +585,9 @@ export type InvestmentRow = Timestamps &
     fees: number | null;
     understanding: number | null;
     dca_broker: string | null;
+    // Moneda del monto invertido (migración 20260825000001 · delta 3b #437). Nullable: filas
+    // legacy previas al backfill; create/update siempre la escriben resuelta a la principal.
+    currency: string | null;
   };
 
 export type InvestmentHoldingRow = Timestamps &
