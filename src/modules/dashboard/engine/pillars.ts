@@ -210,9 +210,12 @@ function buildPillars({
     accent: "var(--c-savings)",
     soft: "color-mix(in srgb, var(--c-savings) 16%, transparent)",
     value: formatPercent(ind.savingsRate),
+    // "Respaldo de liquidez" = runway derivado (liquidez ÷ gasto), NO el fondo de emergencia
+    // formal (ese vive en Protección con su objetivo). Tope de display a 12+: un runway mayor
+    // se lee absurdo (p. ej. 57.6 meses) y no aporta más que "holgado".
     meta:
       months != null
-        ? `Respaldo: ${months.toFixed(1)} meses de gastos`
+        ? `Respaldo de liquidez: ${months >= 12 ? "12+" : months.toFixed(1)} meses`
         : `Provisión anual ${formatMoney(ind.annualCoverage, currency)}/mes`,
     ratio: clamp01(ind.savingsRate / 0.2),
     barColor: "var(--c-savings)",

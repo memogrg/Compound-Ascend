@@ -483,18 +483,20 @@ export type HomeCards = {
 type FundGoal = { goalType?: string | null; name?: string | null; currentAmount: number };
 
 /**
- * Saldos de los fondos de defensa desde las metas (mismo criterio que wealth-service): por
- * `goalType` canónico o por nombre, y sólo lo ya ahorrado (`currentAmount > 0`). Suma todas
- * las metas que matchean cada fondo. Fuente única del criterio; los flags se derivan de aquí.
+ * Saldos de los fondos de defensa desde las metas. Criterio CANÓNICO: solo el fondo FORMAL
+ * (`goal_type` = defensa:fondo_*), y sólo lo ya ahorrado (`currentAmount > 0`). Un goal
+ * genérico llamado "emergencia" NO cuenta (antes sí, por regex de nombre) — así este lector y
+ * `getDefenseFundsReport` (que filtra por goal_type) dicen lo mismo, sin la contradicción
+ * "monto protegido ₡200k" vs "alerta ₡0". La app ofrece convertir ese goal en formal (1 tap).
  */
 export function deriveFundAmounts(goals: FundGoal[]): { emergencia: number; paz: number } {
-  const sumOf = (type: string, rx: RegExp) =>
+  const sumOf = (type: string) =>
     goals
-      .filter((g) => (g.goalType === type || rx.test(g.name ?? "")) && g.currentAmount > 0)
+      .filter((g) => g.goalType === type && g.currentAmount > 0)
       .reduce((s, g) => s + g.currentAmount, 0);
   return {
-    emergencia: sumOf("defensa:fondo_emergencia", /emergencia/i),
-    paz: sumOf("defensa:fondo_paz", /\bpaz\b/i),
+    emergencia: sumOf("defensa:fondo_emergencia"),
+    paz: sumOf("defensa:fondo_paz"),
   };
 }
 

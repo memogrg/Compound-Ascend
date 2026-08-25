@@ -300,6 +300,22 @@ export async function deleteGoal(id: string): Promise<void> {
   await logHouseholdDeletion(supabase, { userId: user.id, table: "savings_goals", rowId: id });
 }
 
+/**
+ * Convierte una meta genérica en el fondo de emergencia FORMAL (solo setea `goal_type`). El
+ * usuario lo confirma con 1 tap desde Protección (nudge de delta 2); NUNCA se auto-migra. No
+ * re-deriva recurrencia: cambia únicamente el tipo, para que este lector y los demás cuenten
+ * la meta como el fondo formal.
+ */
+export async function convertGoalToEmergencyFund(id: string, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
+  await supabase
+    .from("savings_goals")
+    .update({ goal_type: "defensa:fondo_emergencia", last_edited_by: userId })
+    .eq("id", id)
+    .in("user_id", scope);
+}
+
 export async function deleteDebt(id: string): Promise<void> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -937,7 +953,10 @@ export async function getControlSummary(ctx?: AuthContext): Promise<ControlSumma
     getIndexRates(),
   ]);
 
-  const hasEmergencyFund = goals.some((g) => /emergencia|paz/i.test(g.name) && g.currentAmount > 0);
+  // Canónico: solo el fondo FORMAL de emergencia (goal_type), no por nombre.
+  const hasEmergencyFund = goals.some(
+    (g) => g.goalType === "defensa:fondo_emergencia" && g.currentAmount > 0,
+  );
   const stress = debts.length
     ? Math.round(debts.reduce((s, d) => s + (d.stress ?? 5), 0) / debts.length)
     : undefined;

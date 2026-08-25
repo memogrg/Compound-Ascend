@@ -29,6 +29,12 @@ export type DefenseFundsReport = DefenseFundsPlan & {
   /** ¿Existe una meta de defensa registrada por fondo? (registrado ≠ acumulado>0: puede estar en 0). */
   emergencyRegistered: boolean;
   peaceRegistered: boolean;
+  /**
+   * Goal genérico llamado "emergencia" (con saldo, NO formal) que se puede convertir en el
+   * fondo formal con 1 tap. `null` si ya hay fondo formal o no hay candidato. Nunca se
+   * auto-migra: es el usuario quien confirma con el tap.
+   */
+  emergencyCandidate: { id: string; name: string } | null;
 };
 
 /** Meses del fondo de paz del usuario (preferencia PERSONAL). Default 3 si no hay valor. */
@@ -88,6 +94,22 @@ export async function getDefenseFundsReport(ctx?: AuthContext): Promise<DefenseF
 
   // Registrado = existe la meta (aunque su acumulado sea 0). Distingue "no lo tenés" de "en 0".
   const hasType = (type: string) => (goals ?? []).some((g) => g.goal_type === type);
+  const emergencyRegistered = hasType("defensa:fondo_emergencia");
+
+  // Nudge (delta 2): un goal genérico llamado "emergencia" que NO es el fondo formal. Solo si
+  // aún no hay fondo formal, para ofrecer convertirlo con 1 tap (nunca auto-migramos el tipo).
+  let emergencyCandidate: { id: string; name: string } | null = null;
+  if (!emergencyRegistered) {
+    const { data: named } = await supabase
+      .from("savings_goals")
+      .select("id,name,goal_type,current_amount")
+      .in("user_id", members)
+      .ilike("name", "%emergencia%");
+    const cand = (named ?? []).find(
+      (g) => g.goal_type !== "defensa:fondo_emergencia" && Number(g.current_amount) > 0,
+    );
+    emergencyCandidate = cand ? { id: cand.id, name: cand.name ?? "" } : null;
+  }
 
   const plan = computeDefenseFunds({
     emergencyTarget: emergencyTargetIn(currency, rates),
@@ -99,7 +121,8 @@ export async function getDefenseFundsReport(ctx?: AuthContext): Promise<DefenseF
   return {
     ...plan,
     currency,
-    emergencyRegistered: hasType("defensa:fondo_emergencia"),
+    emergencyRegistered,
     peaceRegistered: hasType("defensa:fondo_paz"),
+    emergencyCandidate,
   };
 }
