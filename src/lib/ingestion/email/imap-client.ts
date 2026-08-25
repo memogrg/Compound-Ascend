@@ -104,6 +104,9 @@ export async function createImapClient(): Promise<ImapClient> {
           recipients,
           subject: msg.envelope?.subject ?? null,
           text: msg.source ? await extractBodyText(msg.source) : "",
+          // envelope.date (cabecera Date del correo) como instante ISO. Fallback de occurred_on
+          // cuando el cuerpo no trae fecha parseable (imapflow lo entrega como Date).
+          receivedAt: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
         });
       }
       return out;
