@@ -23,7 +23,8 @@ export const investmentInputSchema = z.object({
   symbol: z.string().trim().max(12).optional(),
   investedAmount: z.number().nonnegative(),
   contribution: z.number().nonnegative().default(0),
-  currency: z.string().length(3),
+  // Delta 3b: opcional → el servicio resuelve `?? getPrimaryCurrency` (patrón A, sin CRC hard-coded).
+  currency: z.string().length(3).optional(),
   horizon: z.string().max(20).optional(),
   perceivedRisk: z.enum(["bajo", "medio", "alto", "no_se"]).optional(),
   liquidity: z.enum(["rapida", "penalidad", "largo_plazo", "no_se"]).optional(),

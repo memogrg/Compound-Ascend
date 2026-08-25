@@ -9,6 +9,7 @@ import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import {
   getBaseSummary,
   getDisplayCurrency,
+  getPrimaryCurrency,
   registerLinkedTransaction,
   getSystemCategoryId,
   policyPremiumToTxn,
@@ -46,11 +47,30 @@ function rowToInvestment(r: InvestmentRow): Investment {
     symbol: r.symbol,
     investedAmount: Number(r.invested_amount),
     contribution: Number(r.contribution ?? 0),
-    currency: "CRC",
+    // Delta 3b: la moneda real de la columna (antes se falseaba "CRC"). El `?? "CRC"` es un
+    // último recurso inerte: post-backfill toda fila la tiene y create/update siempre la escriben.
+    currency: r.currency ?? "CRC",
     horizon: r.horizon,
     perceivedRisk: r.perceived_risk as Investment["perceivedRisk"],
     liquidity: r.liquidity as Investment["liquidity"],
   };
+}
+
+/**
+ * Delta 3b: copia de la lista con los importes CONVERTIDOS a `currency` (patrón assetsForEngine).
+ * Para darle al motor puro `computePortfolio` un total que NO mezcle monedas; la lista CRUDA (cada
+ * inversión en su moneda) se conserva aparte para el display por fila.
+ */
+export function investmentsInCurrency(
+  investments: Investment[],
+  currency: string,
+  rates: Record<string, number>,
+): Investment[] {
+  return investments.map((inv) => ({
+    ...inv,
+    investedAmount: convertCurrency(inv.investedAmount, inv.currency, currency, rates),
+    contribution: convertCurrency(inv.contribution, inv.currency, currency, rates),
+  }));
 }
 
 function rowToPolicy(r: InsurancePolicyRow): InsurancePolicy {
@@ -136,16 +156,19 @@ export async function payPolicyPremium(
   );
 }
 
-export async function createInvestment(input: InvestmentInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
+export async function createInvestment(input: InvestmentInput, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  // Delta 3b (#437): la moneda se persiste (antes se descartaba). Resuelta a la PRINCIPAL si el
+  // input la omite — nunca CRC hard-coded (patrón A).
+  const currency = input.currency ?? (await getPrimaryCurrency(ctx));
   const { error } = await supabase.from("investments").insert({
-    user_id: user.id,
+    user_id: userId,
     asset_type: input.assetType,
     name: input.name,
     symbol: input.symbol ?? null,
     invested_amount: input.investedAmount,
     contribution: input.contribution,
+    currency,
     horizon: input.horizon ?? null,
     perceived_risk: input.perceivedRisk ?? null,
     liquidity: input.liquidity ?? null,
@@ -177,19 +200,24 @@ export async function createPolicy(input: PolicyInput, ctx?: AuthContext): Promi
   return data!.id;
 }
 
-export async function updateInvestment(id: string, input: InvestmentInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
+export async function updateInvestment(
+  id: string,
+  input: InvestmentInput,
+  ctx?: AuthContext,
+): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
+  const currency = input.currency ?? (await getPrimaryCurrency(ctx));
   const { error } = await supabase
     .from("investments")
     .update({
-      last_edited_by: user.id,
+      last_edited_by: userId,
       asset_type: input.assetType,
       name: input.name,
       symbol: input.symbol ?? null,
       invested_amount: input.investedAmount,
       contribution: input.contribution,
+      currency,
       horizon: input.horizon ?? null,
       perceived_risk: input.perceivedRisk ?? null,
       liquidity: input.liquidity ?? null,
@@ -345,7 +373,9 @@ export async function getWealthSummary(ctx?: AuthContext): Promise<WealthSummary
 
   const readiness = computeReadiness(engineCtx, investments);
   const protection = computeProtection(engineCtx, policiesForEngine);
-  const portfolio = computePortfolio(investments);
+  // Delta 3b: el total del portafolio se computa sobre importes convertidos (no mezcla monedas);
+  // `investments` cruda sigue yendo al summary para el display por fila en su propia moneda.
+  const portfolio = computePortfolio(investmentsInCurrency(investments, currency, rates));
   const balance = computeBalance(readiness, protection, investments.length > 0);
   const prices = await getLivePrices(investments);
 

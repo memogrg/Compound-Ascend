@@ -16,7 +16,7 @@ import {
   getPrimaryCurrency,
   getLiquidityBalance,
 } from "@/modules/financial-base";
-import { computeProtection, computePortfolio } from "@/modules/wealth";
+import { computeProtection, computePortfolio, investmentsInCurrency } from "@/modules/wealth";
 import { getCurrentDebtBalances } from "@/modules/control";
 import { buildRichLifeSnapshot } from "@/modules/rich-life/engine/rich-life-engine";
 import { mapInvestmentLiquidity, savingsLiquidity } from "@/modules/rich-life/engine/asset-mapping";
@@ -159,22 +159,20 @@ const INVESTMENT_CLASS: Record<string, AssetClass> = {
 const STANDALONE_KEY = "_standalone";
 
 /**
- * Valor de UNA inversión y su moneda. El market value (holdings ligados por id)
- * y el `invested_amount` de fallback vienen ambos en moneda PRINCIPAL, así que el
- * activo se etiqueta con esa moneda para que `assetsForEngine` lo convierta bien.
- * NO usa el bucket `_standalone`: ese se cuenta una sola vez aparte (evita que el
- * holding suelto se difunda/duplique en cada inversión sin match).
+ * Valor de UNA inversión y su moneda. El market value (holdings ligados por id) viene
+ * NORMALIZADO a la principal; el fallback (`invested_amount`) viene en la moneda NATIVA de la
+ * inversión (delta 3b #437) → se etiqueta con ella para que `assetsForEngine` lo convierta bien.
+ * NO usa el bucket `_standalone`: ese se cuenta una sola vez aparte (evita que el holding suelto
+ * se difunda/duplique en cada inversión sin match).
  */
 export function resolveInvestmentValue(
-  investment: { id: string; investedAmount: number },
+  investment: { id: string; investedAmount: number; currency: string },
   marketByInvestmentId: Record<string, number>,
   primaryCurrency: string,
 ): { value: number; currency: string } {
   const marketValue = marketByInvestmentId[investment.id];
-  return {
-    value: marketValue !== undefined ? marketValue : investment.investedAmount,
-    currency: primaryCurrency,
-  };
+  if (marketValue !== undefined) return { value: marketValue, currency: primaryCurrency };
+  return { value: investment.investedAmount, currency: investment.currency };
 }
 
 export type RichLifeSummary = {
@@ -309,10 +307,14 @@ export async function aggregateNetWorth(
   }));
   const investmentAssets: Asset[] = (invRows.data ?? []).map((r) => {
     const cls = INVESTMENT_CLASS[r.asset_type] ?? "inversion";
-    // Valor de mercado (holding ligado por id) o el monto invertido; ambos en
-    // moneda PRINCIPAL. No usa el bucket _standalone (se cuenta aparte, abajo).
+    // Market value (holding ligado por id) en la principal, o el monto invertido en la moneda
+    // NATIVA de la inversión (delta 3b). No usa el bucket _standalone (se cuenta aparte, abajo).
     const { value, currency: valueCurrency } = resolveInvestmentValue(
-      { id: r.id, investedAmount: Number(r.invested_amount) },
+      {
+        id: r.id,
+        investedAmount: Number(r.invested_amount),
+        currency: r.currency ?? primaryCurrency,
+      },
       marketValues,
       primaryCurrency,
     );
@@ -440,7 +442,8 @@ export async function aggregateNetWorth(
     name: r.name,
     investedAmount: Number(r.invested_amount),
     contribution: Number(r.contribution ?? 0),
-    currency,
+    // Delta 3b: la moneda NATIVA de la inversión (antes se tageaba con la de display, mezclando).
+    currency: r.currency ?? currency,
   }));
   const protection = computeProtection(
     {
@@ -457,7 +460,8 @@ export async function aggregateNetWorth(
     },
     policies,
   );
-  const portfolio = computePortfolio(investments);
+  // Delta 3b: convertir a la moneda común antes del motor puro (no mezclar monedas en el total).
+  const portfolio = computePortfolio(investmentsInCurrency(investments, currency, rates));
 
   // El motor agrega patrimonio: normalizamos valores a la moneda principal.
   const assetsForEngine = assets.map((a) => ({
