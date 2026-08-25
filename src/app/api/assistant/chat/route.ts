@@ -15,7 +15,7 @@ import {
 import { matchIntent } from "@/lib/ai/router";
 import { buildFinancialContext } from "@/lib/ai/context-engine";
 import { scopeForIntent, type ToolNeed } from "@/lib/ai/lazy-context";
-import { listDebts, listGoals } from "@/modules/control";
+import { getCurrentDebtBalances, listGoals } from "@/modules/control";
 import { getDisplayCurrency } from "@/modules/financial-base";
 import { getPatrimonioReport } from "@/modules/wealth/services/patrimonio-service";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -64,7 +64,21 @@ async function buildToolContext(need: ToolNeed, userId?: string): Promise<ToolCo
     };
     if (need.debts) {
       try {
-        toolContext.debts = normalizeDebtsForTool(await listDebts(), display, rates);
+        // Saldo VIVO (ancla − pagos), NO el ancla de alta: las herramientas de estrategia no deben
+        // contar una deuda saldada (≤0) en el payoff ni en la comparación (P2 deuda-saldada).
+        const liveDebts = (await getCurrentDebtBalances()).filter((d) => d.currentBalance > 0);
+        toolContext.debts = normalizeDebtsForTool(
+          liveDebts.map((d) => ({
+            id: d.id,
+            name: d.name,
+            balance: d.currentBalance,
+            minPayment: d.minPayment,
+            apr: d.apr,
+            currency: d.currency,
+          })),
+          display,
+          rates,
+        );
       } catch {
         toolContext.debts = [];
       }

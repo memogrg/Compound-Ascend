@@ -118,6 +118,9 @@ export interface DebtBalance {
   /** Stored APR (for bad-debt / critical-debt classification), not the effective one. */
   apr: number | null;
   delinquency: Debt["delinquency"];
+  /** Minimum payment (native currency). Carried so the AI's debt tools read the live balance
+   *  AND the min payment from this single canonical source, never the stale alta anchor. */
+  minPayment: number;
 }
 
 /**
@@ -136,6 +139,7 @@ export async function getCurrentDebtBalances(ctx?: AuthContext): Promise<DebtBal
     classification: d.classification ?? null,
     apr: d.apr ?? null,
     delinquency: d.delinquency ?? null,
+    minPayment: d.minPayment,
   }));
 }
 

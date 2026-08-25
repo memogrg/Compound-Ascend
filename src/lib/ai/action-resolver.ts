@@ -282,8 +282,10 @@ async function resolveDebtExtraPayment(
   const pedido = num(p.amount ?? p.extraAmount);
   if (pedido === null) return null;
 
-  const { listDebts } = await import("@/modules/control/services/control-service");
-  const debts = (await listDebts()).filter((d) => d.balance > 0);
+  const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
+  // Saldo VIVO, no el ancla de alta: una deuda saldada (≤0) no es candidata de abono, y el tope se
+  // calcula sobre lo que REALMENTE se debe (P2 deuda-saldada).
+  const debts = (await getCurrentDebtBalances()).filter((d) => d.currentBalance > 0);
   if (debts.length === 0) return null;
 
   const needle = str(p.name) ?? str(p.debtName);
@@ -295,14 +297,14 @@ async function resolveDebtExtraPayment(
       : null;
   if (!debt) return null;
 
-  const amount = Math.min(pedido, debt.balance);
+  const amount = Math.min(pedido, debt.currentBalance);
   return {
     type: "debt_extra_payment",
     payload: {
       debtId: debt.id,
       name: debt.name,
       amount,
-      balance: debt.balance,
+      balance: debt.currentBalance,
       apr: debt.apr ?? null,
       currency: debt.currency || ctx.currency,
       paymentDate: ctx.today,

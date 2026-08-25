@@ -26,10 +26,19 @@ vi.mock("@/lib/ai/context-engine", () => ({
   buildFinancialContext: async () => ({ currency: "CRC" }),
 }));
 vi.mock("@/server/observability/alerts", () => ({ alert: vi.fn() }));
+// La route arma el toolContext con el saldo VIVO (getCurrentDebtBalances), no el ancla (P2).
 vi.mock("@/modules/control", () => ({
-  listDebts: async () => [
-    { id: "d1", name: "Tarjeta USD", balance: 1000, minPayment: 50, apr: 30, currency: "USD" },
+  getCurrentDebtBalances: async () => [
+    {
+      id: "d1",
+      name: "Tarjeta USD",
+      currentBalance: 1000,
+      minPayment: 50,
+      apr: 30,
+      currency: "USD",
+    },
   ],
+  listGoals: async () => [],
 }));
 vi.mock("@/lib/market-data/fx-rates", () => ({
   getFxRates: async () => ({ USD: 1, CRC: 500 }),
@@ -58,7 +67,11 @@ vi.mock("@/lib/ai/orchestrator", async (importActual) => {
 
 import { POST } from "@/app/api/assistant/chat/route";
 
-type CapturedToolContext = { currency: string; fxUnavailable?: boolean; debts: { balance: number }[] };
+type CapturedToolContext = {
+  currency: string;
+  fxUnavailable?: boolean;
+  debts: { balance: number }[];
+};
 
 beforeEach(() => {
   vi.clearAllMocks();

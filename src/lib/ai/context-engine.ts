@@ -179,13 +179,15 @@ export async function buildFinancialContext(
   // más un préstamo de ₡3.000.000 salían como "3.002.000". Ahora son subtotales, más el total
   // convertido SOLO si hay tasas para todas las monedas.
   try {
-    const { listDebts } = await import("@/modules/control/services/control-service");
+    const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
     const { subtotales, convertirTotal } = await import("@/lib/ai/money");
-    const debts = (await listDebts()).filter((d) => d.balance > 0);
+    // Saldo VIVO (ancla − pagos), NO el ancla de alta: una deuda saldada (≤0) no debe contar en el
+    // total ni asomar como candidata de abono en el contexto del asesor (P2 deuda-saldada).
+    const debts = (await getCurrentDebtBalances()).filter((d) => d.currentBalance > 0);
     if (debts.length > 0) {
       ctx.debtCount = debts.length;
       ctx.debtTotals = subtotales(
-        debts.map((d) => ({ monto: Math.round(d.balance), moneda: d.currency })),
+        debts.map((d) => ({ monto: Math.round(d.currentBalance), moneda: d.currency })),
       );
       const convertido = convertirTotal(ctx.debtTotals, ctx.currency, rates);
       if (convertido) ctx.debtTotalConvertido = convertido;
