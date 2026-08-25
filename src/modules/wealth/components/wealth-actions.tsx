@@ -15,10 +15,13 @@ import {
   addPolicyAction,
   editInvestmentAction,
   editPolicyAction,
+  payPolicyPremiumAction,
   type ActionResult,
 } from "@/modules/wealth/api/actions";
 import type { Investment, InsurancePolicy } from "@/modules/wealth/types";
 import { currencySymbol } from "@/lib/format";
+import { useCaptureToday } from "@/components/tz/timezone-context";
+import { premiumActionPayload } from "@/modules/wealth/engine/premium-payload";
 
 type Mode = "investment" | "policy";
 
@@ -485,5 +488,149 @@ function Foot({ pending, onCancel }: { pending: boolean; onCancel: () => void })
         {pending ? "Guardando…" : "Guardar"}
       </button>
     </div>
+  );
+}
+
+/**
+ * Botón "Pagar prima" en la fila de una póliza (paridad con el móvil `PremiumForm`). Registra el
+ * pago de la prima como gasto vinculado; la lógica (txn vinculada + liquidez−) vive en
+ * `payPolicyPremiumAction` → `payPolicyPremium`, el mismo camino del móvil.
+ */
+export function PayPremiumButton({ item, label }: { item: InsurancePolicy; label: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        className="icon-btn"
+        style={{ width: 30, height: 30 }}
+        aria-label="Pagar prima"
+        title="Pagar prima"
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="expense" />
+      </button>
+      {open ? (
+        <PayPremiumDialog policy={item} label={label} onClose={() => setOpen(false)} />
+      ) : null}
+    </>
+  );
+}
+
+function PayPremiumDialog({
+  policy,
+  label,
+  onClose,
+}: {
+  policy: InsurancePolicy;
+  label: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const done = () => {
+    toast("Prima registrada");
+    onClose();
+    router.refresh();
+  };
+  return (
+    <Modal title="Pagar prima" sub="Registrá el pago de la prima del mes." onClose={onClose}>
+      <PremiumForm policy={policy} label={label} onDone={done} />
+    </Modal>
+  );
+}
+
+/**
+ * Espejo web del `PremiumForm` móvil: monto (default = la prima, editable) + fecha. La MONEDA es la
+ * de la póliza (fija, no editable) — la valida el servidor. Llama `payPolicyPremiumAction` tal cual.
+ */
+function PremiumForm({
+  policy,
+  label,
+  onDone,
+}: {
+  policy: InsurancePolicy;
+  label: string;
+  onDone: () => void;
+}) {
+  const { pending, errors, message, run } = useSubmit(payPolicyPremiumAction);
+  const todayISO = useCaptureToday();
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    run(
+      premiumActionPayload(policy, {
+        amount: Number(fd.get("amount") ?? 0) || undefined,
+        paymentDate: String(fd.get("paymentDate") ?? "") || todayISO(),
+        label,
+      }),
+      onDone,
+      form,
+    );
+  };
+  return (
+    <form onSubmit={onSubmit}>
+      <div className="modal-body">
+        {message ? (
+          <div className="auth-msg warn" role="alert">
+            {message}
+          </div>
+        ) : null}
+        <div className="fld-2">
+          <Money
+            label="Monto de la prima"
+            name="amount"
+            currency={policy.currency}
+            error={errors.amount}
+            defaultValue={policy.premium ?? undefined}
+          />
+          <div className="fld">
+            <label className="fld-label" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              Fecha
+              <HelpTip
+                text={`Se registra como gasto vinculado a ${label}, en ${policy.currency}.`}
+              />
+            </label>
+            <input
+              className="inp"
+              type="date"
+              name="paymentDate"
+              defaultValue={todayISO()}
+              aria-invalid={errors.paymentDate ? true : undefined}
+            />
+            {errors.paymentDate ? (
+              <span className="auth-err" role="alert">
+                {errors.paymentDate}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <Foot pending={pending} onCancel={onDone} />
+    </form>
+  );
+}
+
+/** Ícono "?" con tooltip (mismo patrón que la referencia de fondeo): la explicación va en hover. */
+function HelpTip({ text }: { text: string }) {
+  return (
+    <span
+      className="tip tip-wrap"
+      data-tip={text}
+      style={{
+        width: 15,
+        height: 15,
+        borderRadius: "50%",
+        border: "1px solid var(--line)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 10,
+        color: "var(--muted)",
+        cursor: "help",
+      }}
+    >
+      ?
+    </span>
   );
 }
