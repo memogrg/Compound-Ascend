@@ -79,6 +79,18 @@ export function renderMd(res: AuditResult, opts: { generatedAt?: string } = {}):
   for (const o of res.outputs) L.push(outputRow(o));
   L.push("");
 
+  // Evidencia sin truncar: texto COMPLETO de los outputs con bandera dura (contradicción o
+  // grounding). Permite clasificar recomendación-fantasma real vs falso-positivo del regex.
+  const flagged = res.outputs.filter((o) => o.contradictions.length || !o.grounding.ok);
+  if (flagged.length) {
+    L.push("## Texto completo · outputs marcados", "");
+    for (const o of flagged) {
+      const flags = o.contradictions.map((c) => `❌ ${c.kind}`).join(", ") || (o.grounding.ok ? "" : "⚠ grounding");
+      L.push(`### ${o.persona} · ${o.suite}/${o.point} — ${flags}`, "");
+      L.push("> " + o.reply.replace(/\s+/g, " ").trim(), "");
+    }
+  }
+
   L.push("## Hallazgos", "");
   const kinds: FindingKind[] = ["contradiccion", "grounding", "generico", "temporal", "app-finding"];
   for (const k of kinds) {
