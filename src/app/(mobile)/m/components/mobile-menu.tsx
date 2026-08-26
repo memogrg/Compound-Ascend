@@ -52,7 +52,15 @@ const MENU: MenuGroup[] = [
     ],
   },
   { label: "Perfil", items: [{ name: "Mi Perfil Financiero", href: "/m/mi-perfil-financiero" }] },
-  { label: "Configuración", items: [{ name: "Configuración", href: "/m/perfil" }] },
+  {
+    label: "Configuración",
+    items: [
+      // Entrada ESTABLE a los cuatro asistentes (paridad con el sidebar web):
+      // el hub del Inicio no puede ser el único camino para volver a editar.
+      { name: "Mi configuración", href: "/m/configurar" },
+      { name: "Ajustes de la cuenta", href: "/m/perfil" },
+    ],
+  },
 ];
 
 export function MobileMenu() {

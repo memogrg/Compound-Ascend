@@ -30,7 +30,7 @@ export {
   LINKED_JAR_KEYS,
 } from "./engine/suggestions";
 export type { Suggestion, BudgetBalance, NextMove } from "./engine/suggestions";
-export { SetupHub } from "./components/setup-hub";
+export { SetupHub, SetupHubFull } from "./components/setup-hub";
 export { SetupWizard } from "./components/setup-wizard";
 export type { SetupStepDef, SetupSkin } from "./components/setup-wizard";
 export { PresupuestoWizard } from "./components/wizards/presupuesto-wizard";

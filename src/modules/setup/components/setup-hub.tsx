@@ -6,19 +6,28 @@ import { setupOverall } from "@/modules/setup/engine/progress";
 import type { SetupWizardProgress } from "@/modules/setup/types";
 
 /**
- * HUB de configuración: la tarjeta del panel con los cuatro asistentes.
+ * HUB de configuración: el acceso a los cuatro asistentes.
  *
- * El estado de cada uno viene del progreso DERIVADO del dato real, así que la
- * tarjeta no puede desincronizarse de la app: si el usuario carga una deuda en
- * /deudas, Control pasa a "en curso" en el siguiente render sin que nadie
- * marque nada.
+ * El estado de cada uno viene del progreso DERIVADO del dato real, así que no
+ * puede desincronizarse de la app: si el usuario carga una deuda en /deudas,
+ * Control pasa a "en curso" en el siguiente render sin que nadie marque nada.
  *
- * Cuando los cuatro están listos NO desaparece: se colapsa a un acceso discreto.
- * El asistente también sirve para MODIFICAR la configuración, y esconderlo del
- * todo obligaría a buscar la pantalla exacta de cada dato.
+ * ── EL ACCESO NO DESAPARECE NUNCA ───────────────────────────────────────────
+ * El asistente no es solo el alta inicial: también es la puerta para MODIFICAR.
+ * Terminar la configuración es justamente cuando se vuelve a entrar a cambiar
+ * un monto, así que "ya terminaste" no puede significar "ya no podés volver".
  *
- * Sin estado de cliente: `<details>` da el colapso y `Link` la navegación, así
- * que el hub se renderiza en el servidor con el resto del panel.
+ * Con algo incompleto → tarjeta grande con el progreso y el detalle por paso.
+ * Con todo listo → tira compacta y PERMANENTE: "Ajustar mi configuración" más
+ * los cuatro con su ✓, cada uno enlazando a su asistente. Antes esa tira vivía
+ * dentro de un `<details>`: los enlaces existían, pero había que descubrir el
+ * desplegable para verlos. Un acceso que hay que adivinar no es un acceso.
+ *
+ * De todos modos esta tarjeta NO es el único camino: `/configurar` (y
+ * `/m/configurar`) son la entrada estable desde la navegación.
+ *
+ * Sin estado de cliente: solo `Link`, así que se renderiza en el servidor con
+ * el resto de la pantalla.
  */
 export function SetupHub({
   progress,
@@ -32,20 +41,24 @@ export function SetupHub({
 
   if (allReady) {
     return (
-      <details className="setup-hub setup-hub-collapsed">
-        <summary>
+      <section className="setup-hub setup-hub-compact" aria-labelledby="setup-hub-title">
+        <div className="setup-hub-compact-head">
           <span className="setup-hub-check">
             <Icon name="check" width={2.6} />
           </span>
-          <span>Tu configuración está completa</span>
-          <span className="setup-hub-hint">Modificar</span>
-        </summary>
-        <div className="setup-hub-grid">
+          <h3 id="setup-hub-title" className="setup-hub-compact-title">
+            Ajustar mi configuración
+          </h3>
+        </div>
+        <div className="setup-hub-chips">
           {progress.map((p) => (
-            <SetupHubItem key={p.id} p={p} href={href(p)} />
+            <Link key={p.id} href={href(p)} className="setup-hub-chip">
+              <Icon name="check" width={3} />
+              {p.title}
+            </Link>
           ))}
         </div>
-      </details>
+      </section>
     );
   }
 
@@ -68,6 +81,28 @@ export function SetupHub({
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * Los cuatro SIEMPRE en tarjeta grande, sin la variante compacta. Es lo que
+ * pinta la pantalla `/configurar`: quien entró ahí ya pidió ver la
+ * configuración, así que esconderle el detalle no ayuda.
+ */
+export function SetupHubFull({
+  progress,
+  mobile = false,
+}: {
+  progress: SetupWizardProgress[];
+  mobile?: boolean;
+}) {
+  const href = (p: SetupWizardProgress) => (mobile ? p.mobileHref : p.href);
+  return (
+    <div className="setup-hub-grid">
+      {progress.map((p) => (
+        <SetupHubItem key={p.id} p={p} href={href(p)} />
+      ))}
+    </div>
   );
 }
 

@@ -6691,32 +6691,56 @@ select.ac-rc-field {
   color: var(--accent);
   margin-top: 2px;
 }
-/* Todo listo: el hub NO desaparece, se vuelve un acceso discreto para modificar. */
-.setup-hub-collapsed {
+/* Todo listo: el hub NO desaparece — se vuelve una tira compacta y PERMANENTE.
+   Los cuatro accesos se ven sin desplegar nada: cuando vivían dentro de un
+   <details>, existían pero había que descubrir el toggle, y un acceso que hay
+   que adivinar no es un acceso. */
+.setup-hub-compact {
   padding: 12px 16px;
-}
-.setup-hub-collapsed > summary {
   display: flex;
   align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  list-style: none;
+  gap: 14px;
+  flex-wrap: wrap;
 }
-.setup-hub-collapsed > summary::-webkit-details-marker {
-  display: none;
+.setup-hub-compact-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.setup-hub-compact-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
 }
 .setup-hub-check {
   display: inline-flex;
   color: var(--accent);
 }
-.setup-hub-hint {
+.setup-hub-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-left: auto;
-  font-size: 11.5px;
-  font-weight: 700;
+}
+.setup-hub-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease;
+}
+.setup-hub-chip svg {
   color: var(--accent);
 }
-.setup-hub-collapsed[open] > summary {
-  margin-bottom: 14px;
+.setup-hub-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
