@@ -110,3 +110,17 @@ describe("buildSystemPrompt · brechas de protección (hecho neutral)", () => {
     expect(buildSystemPrompt(base)).not.toContain("Brechas de protección");
   });
 });
+
+describe("buildSystemPrompt · SEÑAL PRIORITARIA (hecho del Priority Engine)", () => {
+  it("renderiza la señal prioritaria cuando está presente", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      señalPrioritaria: "Tu Tarjeta Oro al 40% te cuesta ~26667 CRC/mes — es lo más caro.",
+    });
+    expect(out).toContain("lo más grave de tu cuadro ahora"); // el HECHO (la regla siempre menciona la señal)
+    expect(out).toContain("Tarjeta Oro al 40%");
+  });
+  it("sin señal no agrega el HECHO (la regla de conducta sí la menciona)", () => {
+    expect(buildSystemPrompt(base)).not.toContain("lo más grave de tu cuadro ahora");
+  });
+});
