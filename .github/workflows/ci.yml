@@ -47,6 +47,12 @@ jobs:
   # Atrapa migraciones que rompen el apply-en-fresco ANTES de mergear (p.ej. el
   # `min(uuid)` de #311, que en prod se registró sin ejecutarse pero reventaba en
   # fresco). Independiente de `ci` para dar feedback en paralelo.
+  #
+  # LÍMITE CONOCIDO: comprueba que la cadena APLIQUE, no que el esquema FUNCIONE.
+  # Una función que se define pero nunca se ejecuta (un backfill sobre una tabla
+  # vacía) pasa por acá sin ser probada — así se coló el bug de los referidos.
+  # Quien cubre ese hueco es el job `e2e`, que sí crea un usuario.
+  #
   # NOTA: marcar este check como REQUERIDO en branch protection para que bloquee.
   migrations:
     name: Migraciones aplican en BD fresca
@@ -80,13 +86,31 @@ jobs:
           supabase start
           supabase db reset
 
+  # Guard BLOQUEANTE: levanta la app contra un Supabase real, crea un usuario y
+  # navega. Es el ÚNICO job que EJERCITA el esquema en vez de solo aplicarlo, y
+  # por eso ve cosas que los demás no pueden ver.
+  #
+  # Se promovió a bloqueante tras el incidente de los referidos
+  # (20260826000001): una migración dejó `handle_new_user` lanzando y NINGÚN
+  # usuario podía registrarse. `npm run test` pasó (no toca la BD) y
+  # "Migraciones aplican en BD fresca" pasó también, porque en una base vacía la
+  # función del backfill se DEFINE pero nunca se EJECUTA. Este job fue el único
+  # que lo vio — y su `continue-on-error: true` hizo que el workflow reportara
+  # SUCCESS con el job en failure, que es la peor combinación posible: un guard
+  # que mira para otro lado.
+  #
+  # Estabilidad al promoverlo: 9 de las 10 corridas previas en verde, y la única
+  # falla fue ese bug real, no un flake. Playwright ya reintenta 1 vez en CI
+  # (playwright.config.ts).
+  #
+  # NOTA: que este check REALMENTE impida el merge exige marcarlo como requerido
+  # en branch protection (Settings → Branches → main). Sin eso queda en rojo pero
+  # GitHub permite mergear igual. Aplica lo mismo al job `migrations`.
   e2e:
-    name: E2E smoke (no bloqueante por ahora)
+    name: E2E smoke
     runs-on: ubuntu-latest
     needs: ci
     if: github.event_name == 'pull_request'
-    # Promover a requerido (quitar esta línea) cuando se confirme estable.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
 
