@@ -148,50 +148,52 @@ function CsvImportModal({ onClose, accounts }: { onClose: () => void; accounts: 
           </select>
         </div>
 
-        {accounts.length > 0 ? (
-          <div className="fld" style={{ marginTop: 12 }}>
-            <label
-              className="fld-label"
-              htmlFor="csv-account"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        {/* Cuenta: se renderiza SIEMPRE (como "Moneda por defecto"), no gated por accounts.length.
+            Con 0 cuentas nombradas (feature opcional) la única opción es "Sin cuenta específica"
+            (account_id null, como antes de este PR); con cuentas, default = la predeterminada. */}
+        <div className="fld" style={{ marginTop: 12 }}>
+          <label
+            className="fld-label"
+            htmlFor="csv-account"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            Cuenta
+            <span
+              className="tip"
+              data-tip="A qué cuenta caen las filas importadas. Podés reasignarlas al revisarlas."
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 15,
+                height: 15,
+                borderRadius: "50%",
+                border: "1px solid var(--line)",
+                color: "var(--muted)",
+                fontSize: 10,
+                fontWeight: 700,
+                flex: "none",
+              }}
             >
-              Cuenta
-              <span
-                className="tip"
-                data-tip="Las filas importadas se asignan a esta cuenta. Podés reasignarlas al revisarlas."
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 15,
-                  height: 15,
-                  borderRadius: "50%",
-                  border: "1px solid var(--line)",
-                  color: "var(--muted)",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  flex: "none",
-                }}
-              >
-                ?
-              </span>
-            </label>
-            <select
-              id="csv-account"
-              className="sel"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              aria-label="Cuenta de las filas importadas"
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                  {a.isDefault ? " (predeterminada)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
+              ?
+            </span>
+          </label>
+          <select
+            id="csv-account"
+            className="sel"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            aria-label="Cuenta de las filas importadas"
+          >
+            <option value="">Sin cuenta específica</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.isDefault ? " (predeterminada)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {rows.length > 0 ? (
           <>
