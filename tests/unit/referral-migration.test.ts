@@ -19,6 +19,57 @@ function read(...parts: string[]): string {
 }
 
 const SQL = read("supabase", "migrations", "20260826000001_referrals.sql");
+const FIX = read("supabase", "migrations", "20260826000002_referrals_search_path_fix.sql");
+
+/**
+ * REGRESIÓN — el bug que rompió el alta de usuarios.
+ *
+ * `handle_new_user` es SECURITY DEFINER con `set search_path = public`. Una
+ * función llamada desde ahí HEREDA ese search_path si no declara el suyo, y
+ * `gen_random_bytes` es de pgcrypto, que en Supabase vive en `extensions`.
+ * Resultado: el generador no encontraba la función, el trigger lanzaba y el
+ * INSERT en auth.users se revertía entero. Ningún usuario podía registrarse.
+ *
+ * Ni la suite ni el job de "migraciones aplican en BD fresca" lo vieron: en una
+ * base vacía el backfill no recorre filas, así que la función se DEFINE pero
+ * nunca se EJECUTA. Lo cazó el E2E smoke, que sí crea un usuario.
+ */
+describe("regresión: los generadores no dependen del search_path del llamador", () => {
+  /** Funciones que usan pgcrypto y por tanto necesitan `extensions` en su search_path. */
+  const GENERADORES = ["gen_referral_code", "gen_unique_referral_code"];
+
+  it("cada generador declara su propio search_path con extensions", () => {
+    for (const nombre of GENERADORES) {
+      const i = FIX.indexOf(`function public.${nombre}()`);
+      expect(i, `${nombre} no está en el hotfix`).toBeGreaterThan(-1);
+      const cuerpo = FIX.slice(i, FIX.indexOf("$$;", i));
+      expect(cuerpo, `${nombre} sin search_path`).toMatch(/set search_path = public, extensions/);
+    }
+  });
+
+  it("toda función que use pgcrypto declara extensions en su search_path", () => {
+    // La regla general, no solo estos dos casos: si alguien agrega otra función
+    // con gen_random_bytes y se olvida del search_path, vuelve el mismo bug.
+    const ultimaDefinicion = new Map<string, string>();
+    for (const sql of [SQL, FIX]) {
+      const re = /create or replace function (public\.\w+)\(([\s\S]*?)\$\$;/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(sql))) ultimaDefinicion.set(m[1]!, m[2]!);
+    }
+    const culpables = [...ultimaDefinicion]
+      .filter(([, cuerpo]) => /gen_random_bytes/.test(cuerpo))
+      .filter(([, cuerpo]) => !/set search_path[^\n]*extensions/.test(cuerpo))
+      .map(([nombre]) => nombre);
+    expect(culpables).toEqual([]);
+  });
+
+  it("el hotfix se verifica a sí mismo simulando el contexto del trigger", () => {
+    // Fija search_path = public (lo que impone handle_new_user) y llama al
+    // generador: si volviera el bug, la migración falla en vez de quedar a medias.
+    expect(FIX).toContain("set_config('search_path', 'public', true)");
+    expect(FIX).toContain("raise exception");
+  });
+});
 
 describe("higiene del directorio de migraciones", () => {
   it("solo hay UN archivo con esta versión", () => {
