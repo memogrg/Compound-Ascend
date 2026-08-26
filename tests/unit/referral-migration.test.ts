@@ -20,6 +20,50 @@ function read(...parts: string[]): string {
 
 const SQL = read("supabase", "migrations", "20260826000001_referrals.sql");
 const FIX = read("supabase", "migrations", "20260826000002_referrals_search_path_fix.sql");
+const DEFAULTS = read("supabase", "migrations", "20260826000003_referral_code_default.sql");
+
+/**
+ * REGRESIÓN 2 — el upsert sobre `profiles` que dejó de funcionar.
+ *
+ * 000001 dejó `referral_code` NOT NULL y SIN default. El trigger lo pone en el
+ * alta, así que ese camino quedó cubierto; cualquier OTRO que inserte en
+ * `profiles` sin nombrar la columna, no. Y falla incluso cuando la fila ya
+ * existe: en `insert ... on conflict do update`, Postgres valida la tupla
+ * PROPUESTA antes de detectar el conflicto, así que el patrón normal de
+ * "asegurá esta fila" quedó roto para toda la tabla.
+ *
+ * Se vio en el seed del E2E: 23502 descartado en silencio →
+ * onboarding_completed en false → /dashboard redirigía a /bienvenida → el smoke
+ * fallaba cinco pasos después con un mensaje sin relación.
+ */
+describe("regresión: insertar en profiles sin referral_code no puede fallar", () => {
+  it("la columna tiene DEFAULT, no solo el trigger", () => {
+    expect(DEFAULTS).toMatch(
+      /alter column referral_code set default public\.gen_unique_referral_code\(\)/,
+    );
+  });
+
+  it("la migración se verifica a sí misma reproduciendo el insert que rompía", () => {
+    expect(DEFAULTS).toContain("insert into public.profiles (id, display_name, onboarding_completed)");
+    expect(DEFAULTS).toContain("raise exception");
+    // Y no deja rastro: la verificación se revierte.
+    expect(DEFAULTS).toContain("rollback_de_verificacion");
+  });
+
+  it("el seed del E2E no vuelve a descartar el error del perfil", () => {
+    // El defecto de fondo no era el upsert, era el error ignorado: el seed decía
+    // "listo" con el perfil sin marcar.
+    const seed = read("scripts", "seed-e2e-user.mjs");
+    expect(seed).toContain("profileError");
+    expect(seed).toMatch(/if \(profileError\)[\s\S]*process\.exit\(1\)/);
+  });
+
+  it("el seed usa update: el perfil ya existe, el insert del upsert solo estorbaba", () => {
+    const seed = read("scripts", "seed-e2e-user.mjs");
+    expect(seed).not.toMatch(/\.upsert\(/);
+    expect(seed).toMatch(/\.update\(\{[^}]*onboarding_completed: true/);
+  });
+});
 
 /**
  * REGRESIÓN — el bug que rompió el alta de usuarios.

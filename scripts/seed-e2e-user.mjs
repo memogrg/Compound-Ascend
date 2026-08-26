@@ -57,10 +57,27 @@ if (!userId) {
 }
 
 // Marca onboarding completo para que /dashboard no redirija a /bienvenida.
-await admin.from("profiles").upsert(
-  { id: userId, display_name: "E2E Bot", onboarding_completed: true },
-  { onConflict: "id" },
-);
+//
+// UPDATE y no upsert: el perfil SIEMPRE existe ya (lo crea el trigger
+// handle_new_user al insertar en auth.users), así que el insert del upsert no
+// aporta nada y sí arrastra un problema — tiene que satisfacer todas las
+// columnas NOT NULL de la tabla aunque la fila exista, porque Postgres valida la
+// tupla propuesta antes de detectar el conflicto. Cuando `profiles` ganó
+// `referral_code NOT NULL`, ese upsert empezó a devolver 23502.
+//
+// Y el error se COMPRUEBA: antes se descartaba, así que el seed decía "listo",
+// onboarding_completed quedaba en false, /dashboard redirigía a /bienvenida y el
+// smoke fallaba cinco pasos después con un mensaje que no tenía nada que ver
+// ("Flujo del mes" no visible). Un seed que miente cuesta más que uno que falla.
+const { error: profileError } = await admin
+  .from("profiles")
+  .update({ display_name: "E2E Bot", onboarding_completed: true })
+  .eq("id", userId);
+
+if (profileError) {
+  console.error("No se pudo marcar el perfil E2E:", profileError.message);
+  process.exit(1);
+}
 
 // Los datos financieros mínimos (un ingreso, para que el dashboard tenga datos)
 // se siembran por SQL como superusuario en el workflow: ni service_role ni
