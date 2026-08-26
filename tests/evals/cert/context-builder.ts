@@ -19,7 +19,7 @@ import { getControlSummary } from "@/modules/control/services/control-service";
 import { getDebtsOverview } from "@/modules/control/services/debts-service";
 import { getDefenseFundsReport } from "@/modules/wealth/services/fund-sizing-service";
 import { detectLowSavingsRate } from "@/lib/insights/detectors";
-import { debtLevers, goalLevers, protectionLevers } from "@/lib/ai/context-levers";
+import { debtLevers, goalLevers, protectionLevers, prioritySignal } from "@/lib/ai/context-levers";
 import { userToday } from "@/lib/time/user-time";
 import type { ContextFacts } from "./types";
 
@@ -144,6 +144,12 @@ export async function buildSimContext(
     goalsMoreCount: goalLeverResult.moreCount || undefined,
     protectionGaps: patr.protectionGaps.length ? protectionLevers(patr.protectionGaps) : undefined,
     activePolicies: patr.protectionGaps.length ? patr.activePolicies : undefined,
+    // SEÑAL PRIORITARIA: reusa el mismo Priority Engine canónico (ctrl.diagnosis) que producción.
+    señalPrioritaria: prioritySignal({
+      diagnosis: ctrl.diagnosis,
+      debts: debtLeverResult.debts,
+      insights,
+    }),
   };
 
   const toolContext: ToolContext = {
