@@ -11,6 +11,7 @@ import { DemoBanner } from "@/components/shared/demo-banner";
 import { Observations, type Observation } from "@/modules/dashboard/components/observations";
 import { ensureMonthlyContributions } from "@/modules/wealth/services/contribution-service";
 import { SurplusDecision, getSurplusDecision } from "@/modules/wealth";
+import { SetupHub, getSetupProgress } from "@/modules/setup";
 
 /** Datos del panel en streaming: el shell pinta de inmediato con skeletons. */
 async function DashboardContent() {
@@ -60,6 +61,10 @@ async function DashboardContent() {
   // no tumba el Centro de mando. Se ubica DESPUÉS del panel (overview primero, luego el deep-dive).
   const surplus = await getSurplusDecision().catch(() => null);
 
+  // Hub de configuración: estado de los cuatro asistentes DERIVADO del dato real
+  // (sin banderas). Best-effort: si la lectura falla, el panel sigue sin la tarjeta.
+  const setupProgress = await getSetupProgress().catch(() => []);
+
   return (
     <>
       {/* Orden del Centro de mando: ① saludo · ② notificaciones · ③ excedente · ④ el resto. */}
@@ -75,6 +80,7 @@ async function DashboardContent() {
         </div>
       ) : null}
       <Observations observations={observations} />
+      {setupProgress.length > 0 ? <SetupHub progress={setupProgress} /> : null}
       {surplus && surplus.fundsCovered && surplus.monthlySurplus > 0 ? (
         <SurplusDecision report={surplus} />
       ) : null}

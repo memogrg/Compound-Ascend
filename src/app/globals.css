@@ -6179,3 +6179,544 @@ select.ac-rc-field {
 .ac-done .ac-rc-warn {
   margin-top: 8px;
 }
+
+/* ============================================================================
+   ASISTENTES DE CONFIGURACIÓN (módulo `setup`)
+   ----------------------------------------------------------------------------
+   Los cuatro asistentes reusan el chasis del wizard de perfil (.wiz, .step-*,
+   .wiz-foot) y agregan solo lo que ese chasis no tenía: listas de lo que YA
+   existe, filas de monto con su sugerencia, y la tarjeta del hub del panel.
+   El móvil monta el MISMO componente con su piel (ver mobile.css).
+   ========================================================================== */
+
+.setup-wiz .setup-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setup-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.setup-step-done,
+.setup-step-optional {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.setup-step-done {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.setup-step-optional {
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* Lo que YA existe */
+.setup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.setup-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.setup-list-main {
+  flex: 1;
+  min-width: 0;
+}
+.setup-list-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.setup-list-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.setup-list-value {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.setup-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.setup-lock {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.setup-empty {
+  padding: 16px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.setup-total {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.setup-total strong {
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.setup-note {
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Sugerencias con SUS números */
+.setup-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.setup-suggestion-cta {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.setup-suggestion-cta:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Alta en línea */
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.setup-form-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.setup-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 9px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.setup-add:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.setup-add-open {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 14px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.setup-add-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.setup-add-close {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+}
+.setup-inline-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.setup-row-action {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.setup-row-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.setup-row-action.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.setup-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Montos por sobre / por posición */
+.setup-money {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.setup-money-cur {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  min-width: 30px;
+}
+.setup-amount-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.setup-amount-row.locked {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  opacity: 0.72;
+}
+.setup-amount-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.setup-amount-jar {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border);
+}
+.setup-amount-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.setup-amount-input .inp {
+  max-width: 180px;
+}
+.setup-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* Frascos y sobres */
+.setup-jar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.setup-jar-head {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+.chip-sel.chip-add {
+  border-style: dashed;
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Fondos de defensa */
+.setup-fund {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.setup-fund-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+.setup-fund-head strong.ok {
+  color: var(--accent);
+}
+.setup-fund-gap {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* Resumen y cierre */
+.setup-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.setup-summary-cell {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.setup-summary-cell span {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+.setup-summary-cell strong {
+  font-family: var(--font-mono);
+  font-size: 19px;
+}
+.setup-summary-cell.danger strong {
+  color: var(--danger);
+}
+.setup-summary-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.setup-closing-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+/* Hub del panel */
+.setup-hub {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.setup-hub-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.setup-hub-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+.setup-hub-title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+}
+.setup-hub-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.setup-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+.setup-hub-item {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 140ms ease;
+}
+.setup-hub-item:hover {
+  border-color: var(--accent);
+}
+.setup-hub-item.listo {
+  background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+}
+.setup-hub-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.setup-hub-icon {
+  display: inline-flex;
+  color: var(--accent);
+}
+.setup-hub-item-name {
+  font-weight: 700;
+  font-size: 14px;
+  flex: 1;
+}
+.setup-hub-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.setup-hub-badge.ok {
+  color: var(--accent);
+  font-weight: 700;
+}
+.setup-hub-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.setup-hub-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.setup-hub-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  flex: none;
+}
+.setup-hub-steps li.done .setup-hub-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.setup-hub-step-label {
+  font-weight: 600;
+  color: var(--text);
+}
+.setup-hub-step-detail {
+  margin-left: auto;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+}
+.setup-hub-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 2px;
+}
+/* Todo listo: el hub NO desaparece, se vuelve un acceso discreto para modificar. */
+.setup-hub-collapsed {
+  padding: 12px 16px;
+}
+.setup-hub-collapsed > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  list-style: none;
+}
+.setup-hub-collapsed > summary::-webkit-details-marker {
+  display: none;
+}
+.setup-hub-check {
+  display: inline-flex;
+  color: var(--accent);
+}
+.setup-hub-hint {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.setup-hub-collapsed[open] > summary {
+  margin-bottom: 14px;
+}
