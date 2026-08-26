@@ -4145,3 +4145,83 @@ body:has(.m-shell[data-theme="dark"]) {
   color: var(--success);
   padding: 10px 0;
 }
+
+/* ============================================================================
+   ASISTENTES DE CONFIGURACIÓN — piel móvil
+   ----------------------------------------------------------------------------
+   El componente es el MISMO que el de la web (`SetupWizard` con skin="mobile");
+   acá solo se ajusta la piel. Las reglas base viven en globals.css: esto es lo
+   que cambia en móvil, no una segunda copia.
+
+   `--card` no existe entre los tokens de `.m-shell` (el móvil llama `--surface`
+   a esa superficie), así que se mapea una vez y todas las reglas compartidas
+   toman el color correcto en claro y en oscuro.
+   ========================================================================== */
+.m-shell .setup-wiz,
+.m-shell .setup-hub {
+  --card: var(--surface);
+}
+
+.m-shell .setup-wiz .setup-step {
+  gap: 12px;
+}
+.m-shell .setup-wiz .m-wz-body {
+  margin-top: 14px;
+}
+.m-shell .setup-title-row {
+  gap: 8px;
+}
+/* El título del paso ya es .m-wz-title (28px del diseño): no se re-estiliza. */
+.m-shell .setup-list-row,
+.m-shell .setup-amount-row,
+.m-shell .setup-add-open,
+.m-shell .setup-fund,
+.m-shell .setup-summary-cell {
+  border-radius: var(--r-md);
+}
+/* En una pantalla angosta el monto va abajo del nombre, no al lado. */
+.m-shell .setup-amount-input {
+  width: 100%;
+}
+.m-shell .setup-amount-input .inp {
+  max-width: none;
+  flex: 1;
+}
+.m-shell .setup-list-row {
+  flex-wrap: wrap;
+}
+.m-shell .setup-list-actions {
+  width: 100%;
+  justify-content: flex-end;
+}
+.m-shell .setup-summary {
+  grid-template-columns: 1fr;
+}
+.m-shell .setup-suggestion-cta {
+  margin-left: 0;
+}
+
+/* La navegación del asistente reusa .m-wznav; solo se agrega el "Después". */
+.m-shell .setup-wiz .m-wznav {
+  gap: 8px;
+}
+.m-shell .setup-wiz .m-wznav .m-btn {
+  flex: 1;
+}
+
+/* Hub: una tarjeta por fila, como el resto del home móvil. */
+.m-shell .setup-hub {
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  margin-bottom: 0;
+}
+.m-shell .setup-hub-grid {
+  grid-template-columns: 1fr;
+}
+.m-shell .setup-hub-title {
+  font-size: 17px;
+}
+.m-shell .setup-hub-steps li {
+  font-size: 11px;
+}

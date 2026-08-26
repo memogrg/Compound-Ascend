@@ -23,6 +23,7 @@ import {
 import { MHomeCardError } from "../components/home-cards/card-shell";
 import { MobileHeader } from "../components/mobile-header";
 import { HomeAddLauncher } from "../components/home-add-launcher";
+import { SetupHub, getSetupProgress } from "@/modules/setup";
 
 /**
  * Pantalla de Inicio del móvil (/m) — "centro de mando" del diseño
@@ -109,6 +110,10 @@ export default async function MobileHome() {
       }).catch(() => [])
     : [];
 
+  // Hub de configuración (paridad con el panel web): mismo motor, mismo estado
+  // derivado del dato real. Best-effort: sin sesión o si falla, no se pinta.
+  const setupProgress = preview ? [] : await getSetupProgress().catch(() => []);
+
   return (
     <div className="m-scroll">
       <div className="m-pad">
@@ -134,6 +139,13 @@ export default async function MobileHome() {
         )}
         {/* Header sticky de cristal unificado (variant home): logo + saludo + chat/campana/menú. */}
         <MobileHeader variant="home" greeting={greeting(await userHour())} name={data.name} />
+
+        {/* Hub de los cuatro asistentes. Se colapsa solo cuando todo está listo. */}
+        {setupProgress.length > 0 ? (
+          <div style={{ marginBottom: 14 }}>
+            <SetupHub progress={setupProgress} mobile />
+          </div>
+        ) : null}
 
         {/* El "Flujo del mes" ya no va como strip suelto: es la PRIMERA ficha del carrusel
             (misma cifra que este strip mostraba), así no se repite el número. */}

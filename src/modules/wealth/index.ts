@@ -21,7 +21,12 @@ export {
   createPolicy,
   deletePolicy,
   investmentsInCurrency,
+  listPolicies,
 } from "./services/wealth-service";
+// Estilo de vida deseado (insumo del número de Libertad): lo lee el asistente de
+// Crecimiento para mostrar lo YA configurado en vez de arrancar vacío.
+export { getDesiredMonthlyLifestyle } from "./services/lifestyle-service";
+export type { DesiredLifestyle } from "./services/lifestyle-service";
 export type { PolicyInput } from "./schemas";
 export { addPolicyAction, setPeaceMonthsAction } from "./api/actions";
 export { DefenseFunds } from "./components/defense-funds";
