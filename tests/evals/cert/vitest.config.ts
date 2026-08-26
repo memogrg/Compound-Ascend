@@ -19,7 +19,9 @@ export default defineConfig({
     setupFiles: [fileURLToPath(new URL("../../../sim/setup.ts", import.meta.url))],
     globals: true,
     fileParallelism: false,
-    testTimeout: 1_800_000,
+    // 80 min: el audit juzgado creció (5 personas + suites confrontacion/highlights = ~35 outputs
+    // × juez -pro ×3 + rescate). A 30 min timeouteaba a mitad de camino sin escribir el reporte.
+    testTimeout: 4_800_000,
     hookTimeout: 120_000,
   },
   resolve: {

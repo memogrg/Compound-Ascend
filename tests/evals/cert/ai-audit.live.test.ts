@@ -51,6 +51,8 @@ describe.skipIf(!GATED)("Auditoría de IA · asesor real (gated)", () => {
 
       expect(res.outputs.length).toBeGreaterThan(0);
     },
-    1_800_000,
+    // 80 min: el timeout per-test del it() OVERRIDEA el config; con las suites confrontacion/
+    // highlights (~35 outputs × juez -pro ×3 + rescate) el run supera los 30 min.
+    4_800_000,
   );
 });
