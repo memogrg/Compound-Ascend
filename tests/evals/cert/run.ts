@@ -84,7 +84,11 @@ export async function runAiAudit(opts: RunAuditOpts): Promise<AuditResult> {
   // Deterministic findings from every output.
   for (const o of outputs) {
     for (const c of o.contradictions) {
-      findings.push({ kind: "contradiccion", persona: o.persona, detail: `[${o.suite}] ${c.kind}: ${c.detail}` });
+      findings.push({
+        kind: "contradiccion",
+        persona: o.persona,
+        detail: `[${o.suite}] ${c.kind}: ${c.detail}`,
+      });
     }
     if (!o.grounding.ok) {
       findings.push({
@@ -95,7 +99,7 @@ export async function runAiAudit(opts: RunAuditOpts): Promise<AuditResult> {
     }
     if (o.suite === "longitudinal" && o.point === "mes6") {
       const temporal = o.rubric?.conciencia_temporal;
-      if (temporal !== undefined && temporal < 2.5) {
+      if (typeof temporal === "number" && temporal < 2.5) {
         findings.push({
           kind: "temporal",
           persona: o.persona,

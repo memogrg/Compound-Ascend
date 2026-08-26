@@ -13,7 +13,10 @@ import type { AuthContext } from "@/lib/auth/auth-context";
 import type { Period } from "@/modules/financial-base/types";
 import { setOpeningBalance } from "@/modules/financial-base/services/liquidity-service";
 import { createIncome, createExpense } from "@/modules/financial-base/services/base-service";
-import { createBudgetItem, receivePartialIncome } from "@/modules/financial-base/services/budget-service";
+import {
+  createBudgetItem,
+  receivePartialIncome,
+} from "@/modules/financial-base/services/budget-service";
 import { createTransaction } from "@/modules/financial-base/services/transaction-service";
 import {
   createDebt,
@@ -40,7 +43,10 @@ export class AppDriver {
 
   async openingBalance(amount: number): Promise<void> {
     await setOpeningBalance(amount, this.ctx);
-    this.log.record("setup", "saldo inicial (apertura)", this.day, { amount, currency: this.currency });
+    this.log.record("setup", "saldo inicial (apertura)", this.day, {
+      amount,
+      currency: this.currency,
+    });
   }
 
   async addIncomeSource(name: string, amountMonthly: number): Promise<void> {
@@ -100,8 +106,12 @@ export class AppDriver {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error || !data) throw new Error(`no encontré la línea de ingreso "${name}": ${error?.message ?? "sin fila"}`);
-    this.log.record("setup", `línea de presupuesto (ingreso) "${name}"`, this.day, { amount, id: data.id });
+    if (error || !data)
+      throw new Error(`no encontré la línea de ingreso "${name}": ${error?.message ?? "sin fila"}`);
+    this.log.record("setup", `línea de presupuesto (ingreso) "${name}"`, this.day, {
+      amount,
+      id: data.id,
+    });
     return data.id;
   }
 
@@ -122,16 +132,18 @@ export class AppDriver {
   }
 
   /** Creates a debt (write returns void) and reads its id back. */
-  async addDebt(name: string, balance: number, minPayment: number): Promise<string> {
+  async addDebt(name: string, balance: number, minPayment: number, apr = 0): Promise<string> {
     await createDebt(
       {
         name,
         balance,
         minPayment,
         currentPayment: minPayment,
-        // apr 0: a payment reduces the balance by its full amount (no interest),
-        // keeping the debt side of the net-worth identity deterministic.
-        apr: 0,
+        // apr defaults to 0: a payment reduces the balance by its full amount (no interest),
+        // keeping the debt side of the net-worth identity deterministic for the oracle/sim
+        // personas. Pass apr>0 ONLY for read-only audit personas that never replay the debt to
+        // zero (a high APR is what makes a "deuda cara" proactivity signal real).
+        apr,
         currency: this.currency,
       },
       this.ctx,
@@ -144,7 +156,8 @@ export class AppDriver {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error || !data) throw new Error(`no encontré la deuda "${name}": ${error?.message ?? "sin fila"}`);
+    if (error || !data)
+      throw new Error(`no encontré la deuda "${name}": ${error?.message ?? "sin fila"}`);
     this.log.record("setup", `deuda "${name}"`, this.day, { balance, minPayment, id: data.id });
     return data.id;
   }
@@ -191,7 +204,8 @@ export class AppDriver {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error || !data) throw new Error(`no encontré la inversión "${label}": ${error?.message ?? "sin fila"}`);
+    if (error || !data)
+      throw new Error(`no encontré la inversión "${label}": ${error?.message ?? "sin fila"}`);
     this.log.record("setup", `inversión no cotizada "${label}"`, this.day, { value, id: data.id });
     return data.id;
   }
@@ -230,7 +244,8 @@ export class AppDriver {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error || !data) throw new Error(`no encontré el holding DCA "${label}": ${error?.message ?? "sin fila"}`);
+    if (error || !data)
+      throw new Error(`no encontré el holding DCA "${label}": ${error?.message ?? "sin fila"}`);
     this.log.record("setup", `holding cotizado recurrente "${label}" (${symbol})`, this.day, {
       quantity,
       monthlyContribution,
@@ -243,7 +258,10 @@ export class AppDriver {
 
   async receiveIncome(budgetItemId: string, amount: number, dateISO: string): Promise<void> {
     await receivePartialIncome({ budgetItemId, amount, date: dateISO }, this.ctx);
-    this.log.record("event", "ingreso recibido (receivePartialIncome)", this.day, { amount, dateISO });
+    this.log.record("event", "ingreso recibido (receivePartialIncome)", this.day, {
+      amount,
+      dateISO,
+    });
   }
 
   async spend(amount: number, dateISO: string, label = "Gasto"): Promise<void> {
@@ -309,6 +327,9 @@ export class AppDriver {
       { holdingId, amount, currency: this.currency, occurredOn: dateISO },
       this.ctx,
     );
-    this.log.record("event", "aporte a inversión (contributeToHolding)", this.day, { amount, dateISO });
+    this.log.record("event", "aporte a inversión (contributeToHolding)", this.day, {
+      amount,
+      dateISO,
+    });
   }
 }

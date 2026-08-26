@@ -17,6 +17,7 @@ import { getPortfolioReport } from "@/modules/wealth/services/portfolio-service"
 import { getPatrimonioReport } from "@/modules/wealth/services/patrimonio-service";
 import { getControlSummary } from "@/modules/control/services/control-service";
 import { getDebtsOverview } from "@/modules/control/services/debts-service";
+import { getDefenseFundsReport } from "@/modules/wealth/services/fund-sizing-service";
 import { detectLowSavingsRate } from "@/lib/insights/detectors";
 import type { ContextFacts } from "./types";
 
@@ -59,7 +60,11 @@ export async function buildSimContext(
   const ind = base.indicators;
   const netWorth = rl.snapshot.indicators.netWorth;
   const pr = patr.report;
-  const debts = debtsOv.debts.map((d) => ({ name: d.name, balance: round2(d.balance), apr: d.apr }));
+  const debts = debtsOv.debts.map((d) => ({
+    name: d.name,
+    balance: round2(d.balance),
+    apr: d.apr,
+  }));
   const topDebt = [...debtsOv.debts].sort((a, b) => b.balance - a.balance)[0];
   const goalsWithTarget = ctrl.goals.filter((g) => g.targetAmount > 0);
   const goalsProgressPct = goalsWithTarget.length
@@ -70,6 +75,10 @@ export async function buildSimContext(
       )
     : 0;
   const portfolioValue = round2(port.analytics.totalPortfolioValue);
+
+  // Defense-fund gaps for the JUDGE digest (not the advisor context — that's the next step).
+  // Best-effort: a read failure degrades the digest, never the whole build.
+  const defense = await getDefenseFundsReport(ctx).catch(() => null);
 
   const insights = detectLowSavingsRate({
     savingsRate: ind.savingsRate,
@@ -167,7 +176,13 @@ export async function buildSimContext(
     `Moneda: ${currency}`,
     `Ingreso mensual: ${round(ind.incomeMonthly)} · Gasto mensual: ${round(ind.expenseMonthly)} · Flujo libre: ${round(ind.freeCashflow)} · Tasa de ahorro: ${Math.round(ind.savingsRate * 100)}%`,
     `Patrimonio neto: ${round(netWorth)} · Portafolio: ${portfolioValue} (retorno ${round2(port.analytics.totalReturnPct * 100)}%)`,
-    `Deudas (${debtsOv.debts.length}): ${debts.map((d) => `${d.name} ${d.balance}@${d.apr}%`).join(", ") || "ninguna"}`,
+    // Ladder de deuda POR-DEUDA (saldo vivo + APR + mínimo): base para que el juez pueda castigar
+    // el silencio ante una deuda cara en proactividad, en vez de puntuar a ojo.
+    `Deudas (${debtsOv.debts.length}): ${debtsOv.debts.map((d) => `${d.name} saldo ${round2(d.balance)} @${d.apr}% mín ${round2(d.minPayment)}`).join(" · ") || "ninguna"}`,
+    // Brechas de los fondos de defensa (emergencia/paz): la otra señal dura de proactividad.
+    defense
+      ? `Fondos de defensa: emergencia ${round(defense.emergency.current)}/${round(defense.emergency.target)} (brecha ${round(defense.emergency.gap)}${defense.emergency.covered ? ", CUBIERTO" : ""}) · paz ${round(defense.peace.current)}/${round(defense.peace.target)} (brecha ${round(defense.peace.gap)}) · fondo activo: ${defense.activeFund}`
+      : "Fondos de defensa: sin datos",
     `Metas: ${ctrl.goals.length} (progreso ${goalsProgressPct}%)`,
     `Números @8% — seguridad ${round(pr.numeroDeSeguridad)} · independencia ${round(pr.numeroDeIndependencia)} · libertad ${pr.numeroDeLibertad == null ? "s/d" : round(pr.numeroDeLibertad)}`,
     trajectory

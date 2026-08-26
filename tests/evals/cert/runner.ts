@@ -25,7 +25,7 @@ import { buildSimContext, type BuiltContext } from "./context-builder";
 import { checkGrounding } from "./grounding";
 import { detectContradictions } from "./contradictions";
 import { judgeRubric } from "./rubric";
-import { ADVERSARIAL, LONGITUDINAL, GENERICO, CONSISTENCIA } from "./prompts";
+import { ADVERSARIAL, LONGITUDINAL, GENERICO, CONSISTENCIA, PROACTIVIDAD } from "./prompts";
 import type { AuditPersona } from "./personas";
 import type { AuditOutput, Finding, ProbeSuite } from "./types";
 
@@ -81,7 +81,12 @@ async function evaluate(args: EvalArgs, opts: AuditOpts): Promise<AuditOutput> {
   const contradictions = detectContradictions(reply, actionType, args.built.facts);
   const rubric = await judgeRubric(
     opts.judge,
-    { prompt: args.prompt, reply, contextDigest: args.built.digest, expectedRedFlags: args.expectedRedFlags },
+    {
+      prompt: args.prompt,
+      reply,
+      contextDigest: args.built.digest,
+      expectedRedFlags: args.expectedRedFlags,
+    },
     opts.N,
   );
   return {
@@ -108,7 +113,12 @@ export interface PersonaAudit {
 
 export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Promise<PersonaAudit> {
   const log = new EventLog();
-  const sim = await createSimUser({ seed: seedOf(persona.key), currency: CURRENCY, nowStamp: opts.nowStamp, log });
+  const sim = await createSimUser({
+    seed: seedOf(persona.key),
+    currency: CURRENCY,
+    nowStamp: opts.nowStamp,
+    log,
+  });
   const { ctx } = sim;
   const outputs: AuditOutput[] = [];
   const findings: Finding[] = [];
@@ -136,7 +146,9 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
       await onMonthDay(m, 28, async () => {
         driver.day = m * 100 + 28;
         const period = await userCurrentPeriod(ctx);
-        await generateNetWorthSnapshot({ year: period.year, month: period.month }, ctx, { precios: "cache" });
+        await generateNetWorthSnapshot({ year: period.year, month: period.month }, ctx, {
+          precios: "cache",
+        });
         const [mf, rl, port] = await Promise.all([
           getMonthFlow(period, ctx),
           getRichLifeSummary({ precios: "cache" }, ctx),
@@ -167,13 +179,21 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
           currency,
         );
         if (m === 0) {
-          ctxMonth1 = await buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, { monthly, portfolio });
+          ctxMonth1 = await buildSimContext(
+            ctx,
+            computeTrajectory(monthly, portfolio),
+            persona.dna,
+            { monthly, portfolio },
+          );
         }
       });
     }
 
     const ctxMonth6 = await onMonthDay(MONTHS - 1, 28, () =>
-      buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, { monthly, portfolio }),
+      buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, {
+        monthly,
+        portfolio,
+      }),
     );
 
     // SPOT-CHECK: month6 trajectory must be non-empty before scoring longitudinal.
@@ -190,22 +210,99 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
     for (const suite of persona.suites) {
       if (suite === "adversarial") {
         for (const p of ADVERSARIAL) {
-          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: p.prompt, expectedRedFlags: p.expectedRedFlags }, opts));
+          outputs.push(
+            await evaluate(
+              {
+                personaName: persona.displayName,
+                ctx,
+                built: ctxMonth6,
+                suite,
+                prompt: p.prompt,
+                expectedRedFlags: p.expectedRedFlags,
+              },
+              opts,
+            ),
+          );
+        }
+      } else if (suite === "proactividad") {
+        // Turnos abiertos con una señal dura presente: mide si el asesor VOLUNTEA la alarma.
+        for (const p of PROACTIVIDAD) {
+          outputs.push(
+            await evaluate(
+              {
+                personaName: persona.displayName,
+                ctx,
+                built: ctxMonth6,
+                suite,
+                prompt: p.prompt,
+                expectedRedFlags: p.expectedRedFlags,
+              },
+              opts,
+            ),
+          );
         }
       } else if (suite === "longitudinal") {
         if (ctxMonth1) {
-          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth1, suite, prompt: LONGITUDINAL.prompt, expectedRedFlags: LONGITUDINAL.expectedRedFlags, point: "mes1" }, opts));
+          outputs.push(
+            await evaluate(
+              {
+                personaName: persona.displayName,
+                ctx,
+                built: ctxMonth1,
+                suite,
+                prompt: LONGITUDINAL.prompt,
+                expectedRedFlags: LONGITUDINAL.expectedRedFlags,
+                point: "mes1",
+              },
+              opts,
+            ),
+          );
         }
         if (trajOk) {
-          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: LONGITUDINAL.prompt, expectedRedFlags: LONGITUDINAL.expectedRedFlags, point: "mes6" }, opts));
+          outputs.push(
+            await evaluate(
+              {
+                personaName: persona.displayName,
+                ctx,
+                built: ctxMonth6,
+                suite,
+                prompt: LONGITUDINAL.prompt,
+                expectedRedFlags: LONGITUDINAL.expectedRedFlags,
+                point: "mes6",
+              },
+              opts,
+            ),
+          );
         }
       } else if (suite === "generico") {
-        const out = await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: GENERICO.prompt, expectedRedFlags: GENERICO.expectedRedFlags }, opts);
+        const out = await evaluate(
+          {
+            personaName: persona.displayName,
+            ctx,
+            built: ctxMonth6,
+            suite,
+            prompt: GENERICO.prompt,
+            expectedRedFlags: GENERICO.expectedRedFlags,
+          },
+          opts,
+        );
         outputs.push(out);
         genericMonth6 = out;
       } else if (suite === "consistencia" && ids.debtId) {
         // Before: the debt is large → advice should prioritize it.
-        outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: ctxMonth6, suite, prompt: CONSISTENCIA.prompt, expectedRedFlags: CONSISTENCIA.expectedRedFlags }, opts));
+        outputs.push(
+          await evaluate(
+            {
+              personaName: persona.displayName,
+              ctx,
+              built: ctxMonth6,
+              suite,
+              prompt: CONSISTENCIA.prompt,
+              expectedRedFlags: CONSISTENCIA.expectedRedFlags,
+            },
+            opts,
+          ),
+        );
         // Mutate: pay the debt to ZERO, rebuild context, re-ask. If the advisor still
         // recommends paying that (now-saldada) debt → detectPayPaidDebt fires a hard ❌.
         const outstanding = ctxMonth6.facts.debts.reduce((s, d) => s + d.balance, 0);
@@ -215,9 +312,24 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
             await driver.payDebt(ids.debtId!, outstanding, virtualMonthDayISO(MONTHS - 1, 27));
           });
           const after = await onMonthDay(MONTHS - 1, 28, () =>
-            buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, { monthly, portfolio }),
+            buildSimContext(ctx, computeTrajectory(monthly, portfolio), persona.dna, {
+              monthly,
+              portfolio,
+            }),
           );
-          outputs.push(await evaluate({ personaName: persona.displayName, ctx, built: after, suite, prompt: CONSISTENCIA.prompt, expectedRedFlags: CONSISTENCIA.expectedRedFlags }, opts));
+          outputs.push(
+            await evaluate(
+              {
+                personaName: persona.displayName,
+                ctx,
+                built: after,
+                suite,
+                prompt: CONSISTENCIA.prompt,
+                expectedRedFlags: CONSISTENCIA.expectedRedFlags,
+              },
+              opts,
+            ),
+          );
         }
       }
     }

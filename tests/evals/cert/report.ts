@@ -63,19 +63,43 @@ export function renderMd(res: AuditResult, opts: { generatedAt?: string } = {}):
     "",
   );
 
-  L.push("## Rúbrica (dimensiones subjetivas 0-5, juez fuerte, promedio N)", "");
+  L.push(
+    "## Rúbrica (9 dims subjetivas 0-5, juez fuerte, promedio N; NA = no aplicaba, excluida)",
+    "",
+  );
   L.push(`Media global: **${stats.overallMean}** (${stats.count} outputs con rúbrica)`, "");
-  L.push("| Dimensión | Media |", "|---|---:|");
-  for (const d of SUBJECTIVE_DIMS) L.push(`| ${d} | ${stats.meanByDim[d]} |`);
+  L.push("| Dimensión | Media | Aplicó |", "|---|---:|---:|");
+  for (const d of SUBJECTIVE_DIMS) {
+    const mean = stats.meanByDim[d];
+    L.push(
+      `| ${d} | ${mean == null ? "— (NA)" : mean} | ${stats.applicableByDim[d]}/${stats.count} |`,
+    );
+  }
   L.push("");
 
-  L.push("### Peor-10", "", "| Persona | Suite | Score | Banderas | Respuesta |", "|---|---|---:|---|---|");
+  L.push(
+    "### Peor-10",
+    "",
+    "| Persona | Suite | Score | Banderas | Respuesta |",
+    "|---|---|---:|---|---|",
+  );
   for (const x of stats.worst) L.push(outputRow(x.output));
-  L.push("", "### Mejor-10", "", "| Persona | Suite | Score | Banderas | Respuesta |", "|---|---|---:|---|---|");
+  L.push(
+    "",
+    "### Mejor-10",
+    "",
+    "| Persona | Suite | Score | Banderas | Respuesta |",
+    "|---|---|---:|---|---|",
+  );
   for (const x of stats.best) L.push(outputRow(x.output));
   L.push("");
 
-  L.push("## Todos los outputs", "", "| Persona | Suite | Score | Banderas | Respuesta |", "|---|---|---:|---|---|");
+  L.push(
+    "## Todos los outputs",
+    "",
+    "| Persona | Suite | Score | Banderas | Respuesta |",
+    "|---|---|---:|---|---|",
+  );
   for (const o of res.outputs) L.push(outputRow(o));
   L.push("");
 
@@ -85,14 +109,22 @@ export function renderMd(res: AuditResult, opts: { generatedAt?: string } = {}):
   if (flagged.length) {
     L.push("## Texto completo · outputs marcados", "");
     for (const o of flagged) {
-      const flags = o.contradictions.map((c) => `❌ ${c.kind}`).join(", ") || (o.grounding.ok ? "" : "⚠ grounding");
+      const flags =
+        o.contradictions.map((c) => `❌ ${c.kind}`).join(", ") ||
+        (o.grounding.ok ? "" : "⚠ grounding");
       L.push(`### ${o.persona} · ${o.suite}/${o.point} — ${flags}`, "");
       L.push("> " + o.reply.replace(/\s+/g, " ").trim(), "");
     }
   }
 
   L.push("## Hallazgos", "");
-  const kinds: FindingKind[] = ["contradiccion", "grounding", "generico", "temporal", "app-finding"];
+  const kinds: FindingKind[] = [
+    "contradiccion",
+    "grounding",
+    "generico",
+    "temporal",
+    "app-finding",
+  ];
   for (const k of kinds) {
     const items = res.findings.filter((f) => f.kind === k);
     if (!items.length) continue;

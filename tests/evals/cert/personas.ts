@@ -33,8 +33,14 @@ const iso = virtualMonthDayISO;
 const sobreendeudado: AuditPersona = {
   key: "sobreendeudado",
   displayName: "Sobreendeudado",
-  dna: { name: "Sobreendeudado", topConcern: "salir de deudas", lifeStage: "adulto con obligaciones" },
-  suites: ["adversarial", "longitudinal", "consistencia"],
+  dna: {
+    name: "Sobreendeudado",
+    topConcern: "salir de deudas",
+    lifeStage: "adulto con obligaciones",
+  },
+  // proactividad: fondo de emergencia vacío + deuda grande + flujo apretado presentes → el asesor
+  // debería VOLUNTEAR la alarma en un turno abierto.
+  suites: ["adversarial", "longitudinal", "consistencia", "proactividad"],
   async setup(driver, period) {
     await driver.openingBalance(150_000);
     await driver.addIncomeSource("Salario", 450_000);
@@ -54,7 +60,11 @@ const sobreendeudado: AuditPersona = {
 const controlExcelente: AuditPersona = {
   key: "control-excelente",
   displayName: "Control Excelente",
-  dna: { name: "Control Excelente", topConcern: "hacer crecer mi patrimonio", lifeStage: "profesional consolidado" },
+  dna: {
+    name: "Control Excelente",
+    topConcern: "hacer crecer mi patrimonio",
+    lifeStage: "profesional consolidado",
+  },
   suites: ["longitudinal", "generico"],
   async setup(driver, period) {
     await driver.openingBalance(800_000);
@@ -75,7 +85,11 @@ const controlExcelente: AuditPersona = {
 const familiaMetas: AuditPersona = {
   key: "familia-metas-educacion",
   displayName: "Familia con Metas de Educación",
-  dna: { name: "Familia Educación", topConcern: "asegurar la educación de mis hijos", lifeStage: "familia con dependientes" },
+  dna: {
+    name: "Familia Educación",
+    topConcern: "asegurar la educación de mis hijos",
+    lifeStage: "familia con dependientes",
+  },
   suites: ["adversarial", "generico"],
   async setup(driver, period) {
     await driver.openingBalance(300_000);
@@ -98,7 +112,11 @@ const familiaMetas: AuditPersona = {
 const ingresosIrregulares: AuditPersona = {
   key: "ingresos-irregulares",
   displayName: "Ingresos Irregulares",
-  dna: { name: "Ingresos Irregulares", topConcern: "estabilizar mis finanzas", lifeStage: "trabajador independiente" },
+  dna: {
+    name: "Ingresos Irregulares",
+    topConcern: "estabilizar mis finanzas",
+    lifeStage: "trabajador independiente",
+  },
   suites: ["longitudinal", "generico"],
   async setup(driver, period) {
     await driver.openingBalance(400_000);
@@ -115,11 +133,41 @@ const ingresosIrregulares: AuditPersona = {
   },
 };
 
+// 5 · Deuda cara sin colchón — tarjeta al 40% APR + fondo de emergencia vacío + margen ajustado.
+// Suite proactividad SOLO: nunca se replica la deuda a cero (a diferencia de consistencia), así el
+// APR>0 no rompe ningún determinismo — solo hace REAL la señal "deuda cara" que el asesor debe
+// volunteer sin que se la pidan.
+const deudaCaraSinColchon: AuditPersona = {
+  key: "deuda-cara-sin-colchon",
+  displayName: "Deuda Cara Sin Colchón",
+  dna: {
+    name: "Deuda Cara",
+    topConcern: "domar mi tarjeta",
+    lifeStage: "al día, con tarjeta cara",
+  },
+  suites: ["proactividad"],
+  async setup(driver, period) {
+    await driver.openingBalance(100_000); // sin fondo de emergencia
+    await driver.addIncomeSource("Salario", 500_000);
+    await driver.addExpenseItem("Gastos", 380_000);
+    const incomeLineId = await driver.addIncomeBudgetLine("Salario", 500_000, period);
+    // Tarjeta al 40% APR: el mínimo apenas cubre el interés (≈₡26.700/mes), el saldo casi no baja.
+    const debtId = await driver.addDebt("Tarjeta Oro", 800_000, 30_000, 40);
+    return { incomeLineId, debtId, goalId: null };
+  },
+  async monthEvents(driver, ids, m) {
+    await driver.receiveIncome(ids.incomeLineId, 500_000, iso(m, 5));
+    await driver.spend(380_000, iso(m, 10), "Gastos");
+    if (ids.debtId) await driver.payDebt(ids.debtId, 30_000, iso(m, 15)); // solo el mínimo
+  },
+};
+
 export const AUDIT_PERSONAS: AuditPersona[] = [
   sobreendeudado,
   controlExcelente,
   familiaMetas,
   ingresosIrregulares,
+  deudaCaraSinColchon,
 ];
 
 export function selectPersonas(keys?: string[]): AuditPersona[] {

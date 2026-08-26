@@ -5,21 +5,46 @@
  *  - a graded 0-5 LLM judge for the SUBJECTIVE dimensions only.
  */
 
-/** The seven SUBJECTIVE dimensions scored 0-5 by the judge (objective ones are
- *  covered by deterministic checks instead). */
+/**
+ * The NINE SUBJECTIVE dimensions scored 0-5 by the judge (the objective axes —
+ * grounding, contradicciones — stay a deterministic gate APART, never a dimension).
+ * They encode the "EXIGENTE Y CÁLIDO" charter: guía · consulta cuando faltan datos ·
+ * acciona cuantificado · alarmas proactivas · highlights · confronta firme+cálido ·
+ * grounded. Five are ALWAYS scored; the four in CONDITIONAL_DIMS may be "NA" when the
+ * turn doesn't call for them (a clarifying question is EXCELLENT on consulta_apropiada
+ * and N/A on accionabilidad — this is what fixes the old artifact that punished it).
+ */
 export const SUBJECTIVE_DIMS = [
   "relevancia",
   "personalizacion",
-  "accionabilidad",
   "prioridad",
+  "accionabilidad",
+  "consulta_apropiada",
+  "proactividad",
+  "confrontacion_calida",
   "conciencia_temporal",
-  "explicacion",
-  "valor",
+  "explicacion_y_tono",
 ] as const;
 export type SubjectiveDim = (typeof SUBJECTIVE_DIMS)[number];
-export type RubricScores = Record<SubjectiveDim, number>;
 
-export type ProbeSuite = "adversarial" | "longitudinal" | "consistencia" | "generico";
+/** The four CONDITIONAL dims: the judge returns "NA" when the turn doesn't warrant them,
+ *  and "NA" is EXCLUDED from the composite (not scored 0). Everything else is always scored. */
+export const CONDITIONAL_DIMS = [
+  "accionabilidad",
+  "consulta_apropiada",
+  "proactividad",
+  "confrontacion_calida",
+] as const satisfies readonly SubjectiveDim[];
+export function isConditionalDim(d: SubjectiveDim): boolean {
+  return (CONDITIONAL_DIMS as readonly string[]).includes(d);
+}
+
+/** A dimension's value: an integer 0-5, or "NA" (only valid for CONDITIONAL_DIMS). */
+export type DimScore = number | "NA";
+export type RubricScores = Record<SubjectiveDim, DimScore>;
+
+export type ProbeSuite =
+  "adversarial" | "longitudinal" | "consistencia" | "generico" | "proactividad";
 
 /** The facts a deterministic checker needs — the persona's REAL numbers. */
 export interface ContextFacts {
@@ -40,10 +65,7 @@ export interface ContextFacts {
 
 export interface Contradiction {
   kind:
-    | "invertir-en-deficit"
-    | "pagar-deuda-saldada"
-    | "felicitar-en-caida"
-    | "meta-lujo-sin-cubrir";
+    "invertir-en-deficit" | "pagar-deuda-saldada" | "felicitar-en-caida" | "meta-lujo-sin-cubrir";
   detail: string;
 }
 
@@ -71,12 +93,7 @@ export interface AuditOutput {
   expectedRedFlags: string[];
 }
 
-export type FindingKind =
-  | "contradiccion"
-  | "grounding"
-  | "generico"
-  | "temporal"
-  | "app-finding";
+export type FindingKind = "contradiccion" | "grounding" | "generico" | "temporal" | "app-finding";
 
 export interface Finding {
   kind: FindingKind;
