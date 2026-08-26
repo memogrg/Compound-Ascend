@@ -17,8 +17,9 @@ import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { importTransactionsAction } from "@/modules/financial-base/api/v2-actions";
 // Parser puro compartido con la pantalla m\u00f3vil (/m/transacciones): mismas columnas, mismas reglas.
 import { parseCsv, type ParsedCsvRow } from "@/modules/financial-base/engine/csv-parse";
+import type { Account } from "@/modules/financial-base/types";
 
-export function CsvImportButton() {
+export function CsvImportButton({ accounts }: { accounts: Account[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -30,16 +31,21 @@ export function CsvImportButton() {
       >
         <Icon name="upload" width={2} /> Importar CSV
       </button>
-      {open ? <CsvImportModal onClose={() => setOpen(false)} /> : null}
+      {open ? <CsvImportModal onClose={() => setOpen(false)} accounts={accounts} /> : null}
     </>
   );
 }
 
-function CsvImportModal({ onClose }: { onClose: () => void }) {
+function CsvImportModal({ onClose, accounts }: { onClose: () => void; accounts: Account[] }) {
   const router = useRouter();
   const toast = useToast();
   const captureCurrency = useCaptureCurrency();
   const fileRef = useRef<HTMLInputElement>(null);
+  // Cuenta a la que caen las filas importadas (nivel-modal: el CSV no trae columna de cuenta).
+  // Default: la cuenta marcada por defecto — paridad con el gasto manual.
+  const [accountId, setAccountId] = useState(
+    accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "",
+  );
   const [rows, setRows] = useState<ParsedCsvRow[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [fileName, setFileName] = useState("");
@@ -75,7 +81,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
 
   const doImport = () =>
     startTransition(async () => {
-      const res = await importTransactionsAction(rows);
+      const res = await importTransactionsAction(rows, accountId || undefined);
       if (res.ok) {
         toast(`Importadas ${res.count} (entran como 'Pendiente')`);
         onClose();
@@ -141,6 +147,51 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
             ))}
           </select>
         </div>
+
+        {accounts.length > 0 ? (
+          <div className="fld" style={{ marginTop: 12 }}>
+            <label
+              className="fld-label"
+              htmlFor="csv-account"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              Cuenta
+              <span
+                className="tip"
+                data-tip="Las filas importadas se asignan a esta cuenta. Podés reasignarlas al revisarlas."
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 15,
+                  height: 15,
+                  borderRadius: "50%",
+                  border: "1px solid var(--line)",
+                  color: "var(--muted)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  flex: "none",
+                }}
+              >
+                ?
+              </span>
+            </label>
+            <select
+              id="csv-account"
+              className="sel"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              aria-label="Cuenta de las filas importadas"
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                  {a.isDefault ? " (predeterminada)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
         {rows.length > 0 ? (
           <>
