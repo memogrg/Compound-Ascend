@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { isValidReferralCode, normalizeReferralCode } from "@/lib/referrals/code";
+import { REFERRAL_COOKIE, referralCookieOptions } from "@/lib/referrals/cookie";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -26,6 +28,30 @@ function isPublic(pathname: string): boolean {
 }
 
 /**
+ * Captura `?ref=CODE` en una cookie.
+ *
+ * Vive en el middleware —y no en la página de signup— por dos razones. La
+ * primera es técnica: un Server Component no puede escribir cookies durante el
+ * render, y el middleware sí, sobre la respuesta. La segunda es de cobertura:
+ * acá el código se captura ENTRE en la ruta que entre (web `/signup`, móvil
+ * `/m/signup` o la landing), sin repetir la lógica en cada una.
+ *
+ * Solo escribe si el código tiene forma válida: así un `?ref=` con basura no
+ * pisa una atribución legítima previa.
+ */
+function captureReferral(request: NextRequest, response: NextResponse): void {
+  const raw = request.nextUrl.searchParams.get("ref");
+  if (!raw) return;
+  const code = normalizeReferralCode(raw);
+  if (!isValidReferralCode(code)) return;
+  response.cookies.set(
+    REFERRAL_COOKIE,
+    code,
+    referralCookieOptions(process.env.NODE_ENV === "production"),
+  );
+}
+
+/**
  * Refresca la sesión y aplica protección de rutas.
  * Si Supabase no está configurado (env vacío en dev), deja pasar todo.
  */
@@ -33,7 +59,9 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {
-    return NextResponse.next({ request });
+    const passthrough = NextResponse.next({ request });
+    captureReferral(request, passthrough);
+    return passthrough;
   }
 
   let response = NextResponse.next({ request });
@@ -64,7 +92,9 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/login";
     redirect.searchParams.set("next", pathname);
-    return NextResponse.redirect(redirect);
+    const res = NextResponse.redirect(redirect);
+    captureReferral(request, res);
+    return res;
   }
 
   if (user && AUTH_PAGES.includes(pathname)) {
@@ -74,5 +104,6 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     return NextResponse.redirect(redirect);
   }
 
+  captureReferral(request, response);
   return response;
 }

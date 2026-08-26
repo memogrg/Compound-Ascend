@@ -4239,3 +4239,26 @@ body:has(.m-shell[data-theme="dark"]) {
   flex: 1 1 auto;
   justify-content: center;
 }
+
+/* ── Referidos: piel móvil (mismo componente, skin="mobile") ──────────────── */
+.m-shell .ref-card {
+  --card: var(--surface);
+  gap: 12px;
+}
+/* En pantalla angosta el QR va centrado y arriba; el código, debajo. */
+.m-shell .ref-qr-wrap {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.m-shell .ref-qr {
+  width: 190px;
+  height: 190px;
+}
+.m-shell .ref-actions .m-btn {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.m-shell .ref-feedback {
+  text-align: center;
+}
