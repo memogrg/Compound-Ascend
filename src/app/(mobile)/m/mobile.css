@@ -4225,3 +4225,17 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .setup-hub-steps li {
   font-size: 11px;
 }
+/* Acceso compacto (todo listo): en una pantalla angosta el título va arriba y
+   los cuatro chips abajo, a lo ancho — no apretados contra el borde derecho. */
+.m-shell .setup-hub-compact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.m-shell .setup-hub-chips {
+  margin-left: 0;
+}
+.m-shell .setup-hub-chip {
+  flex: 1 1 auto;
+  justify-content: center;
+}

@@ -18,6 +18,10 @@ async function DashboardContent() {
   const data = await getDashboardData();
 
   if (!data.health.hasData) {
+    // Sin datos es exactamente cuando los asistentes sirven de más, así que el
+    // estado vacío también los ofrece: antes esta rama devolvía ANTES del hub y
+    // dejaba al usuario nuevo sin ninguna puerta hacia ellos.
+    const emptyProgress = await getSetupProgress().catch(() => []);
     return (
       <div className="grid">
         <div className="page-title" style={{ fontSize: 26 }}>
@@ -28,15 +32,16 @@ async function DashboardContent() {
           description="Aún no hay datos suficientes. Completa tu Perfil Financiero y tu Base Financiera y aquí verás tu flujo de caja, tu salud financiera y tu próxima mejor acción."
           action={
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-              <Link className="btn btn-primary" href="/mi-perfil-financiero">
-                Empezar mi perfil
+              <Link className="btn btn-primary" href="/configurar">
+                Configurar mi sistema
               </Link>
-              <Link className="btn btn-secondary" href="/mi-base-financiera">
-                Agregar ingresos y gastos
+              <Link className="btn btn-secondary" href="/mi-perfil-financiero">
+                Empezar mi perfil
               </Link>
             </div>
           }
         />
+        {emptyProgress.length > 0 ? <SetupHub progress={emptyProgress} /> : null}
       </div>
     );
   }

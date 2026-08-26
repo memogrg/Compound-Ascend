@@ -123,6 +123,15 @@ export default async function MobilePerfil() {
             subtitle="Completa o edita tu perfil"
             chevron
           />
+          {/* Acceso a los cuatro asistentes (paridad con Ajustes web): Configuración
+              es donde se busca "cambiar algo", así que el camino a modificar la
+              configuración vive acá y no solo en el hub del Inicio. */}
+          <MDataRow
+            href="/m/configurar"
+            title="Mi configuración"
+            subtitle="Presupuesto, Control, Defensa y Crecimiento"
+            chevron
+          />
           {/* Uso de IA: es una métrica de verdad → MDataRow + barra MProgress (no una rejilla inventada). */}
           <MDataRow
             title={`Plan ${PLAN_LABEL[acc.plan]}`}

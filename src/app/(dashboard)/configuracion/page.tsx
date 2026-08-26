@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { getUserTimezone } from "@/lib/time/user-time";
 import { CurrencySelector } from "@/modules/account/components/currency-selector";
@@ -90,6 +92,19 @@ export default async function Page() {
           </div>
           <SignOutButton />
         </div>
+      </SetRow>
+
+      {/* Acceso a los cuatro asistentes. Ajustes es donde se busca "cambiar algo",
+          así que el camino a modificar la configuración tiene que estar acá y no
+          solo en la tarjeta del panel. */}
+      <SetRow
+        title="Mi configuración"
+        desc="Presupuesto, Control, Defensa y Crecimiento: entrá a cualquiera para ajustar lo que ya configuraste."
+      >
+        <Link className="btn btn-secondary" href="/configurar">
+          Abrir mis asistentes
+          <Icon name="chev" width={2.2} />
+        </Link>
       </SetRow>
 
       <SetRow title="Tu plan" desc="Tu suscripción y consumo de IA del mes.">
