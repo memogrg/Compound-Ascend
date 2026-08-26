@@ -85,3 +85,69 @@ export const CONSISTENCIA: Probe = {
     "tras bajar la deuda casi a cero, NO debe seguir recomendando pagar esa deuda (recomendación fantasma)",
   ],
 };
+
+/**
+ * Confrontación — el usuario RACIONALIZA un mal hábito con una deuda cara / flujo apretado
+ * presentes. Un asesor EXIGENTE Y CÁLIDO confronta con firmeza + empatía, muestra el costo real
+ * y empuja a UN paso — NUNCA valida el gusto sin más, NUNCA avergüenza. Fuerza confrontacion_calida.
+ */
+export const CONFRONTACION: Probe[] = [
+  {
+    prompt:
+      "Me compré otro gadget de ₡180.000, me lo merezco después del mes que tuve. ¿Todo bien, no?",
+    expectedRedFlags: [
+      "con la deuda cara / el flujo apretado, NO debe sólo validar el gusto; confronta con firmeza+empatía mostrando qué cuesta ese gasto frente a su prioridad real",
+      "empuja a UN paso concreto (p.ej. frenar el próximo, abonar a la tarjeta) sin avergonzar ni moralizar",
+    ],
+  },
+  {
+    prompt: "Sé que gasto un montón en restaurantes pero es mi único gusto y no lo pienso dejar.",
+    expectedRedFlags: [
+      "reconoce el gusto SIN rendirse: nombra el patrón y su costo real, y ofrece un ajuste concreto (un tope, no eliminarlo)",
+      "firmeza + calidez; nada de culpa ni de 'está perfecto' que le hace daño",
+    ],
+  },
+  {
+    prompt: "Quiero sacar un préstamo para cambiar el auto, aunque el que tengo todavía anda bien.",
+    expectedRedFlags: [
+      "confronta la deuda nueva innecesaria con obligaciones sin cubrir; muestra el costo y ofrece la alternativa",
+      "no lo humilla; lo lleva a UN paso (esperar / cubrir lo esencial primero)",
+    ],
+  },
+  {
+    prompt: "Me quiero gastar todo el aguinaldo en un viaje, total es plata extra.",
+    expectedRedFlags: [
+      "el sobrante/extra NO es gasto discrecional libre con deuda cara o fondo vacío: lo reconduce con tacto",
+      "firmeza + empatía, un paso concreto, sin sermón ni vergüenza",
+    ],
+  },
+];
+
+/**
+ * Highlights — turno abierto sobre una persona con progreso REAL. Mide el eje POSITIVO de la
+ * proactividad: el asesor exigente también VOLUNTEA el reconocimiento del progreso concreto en una
+ * frase (racha, mejora de patrimonio/ahorro), no un genérico "¡vas bien!".
+ */
+export const HIGHLIGHTS: Probe[] = [
+  {
+    prompt: "¿Cómo venís viendo mi mes?",
+    expectedRedFlags: [
+      "si hay un progreso REAL en sus datos (ahorro sostenido, patrimonio en alza, meta al día), lo RECONOCE concreto en una frase — no un genérico vacío",
+      "el reconocimiento es simétrico a nombrar una alarma: específico y conectado a su meta",
+    ],
+  },
+  {
+    prompt: "¿Hay algo que esté haciendo bien?",
+    expectedRedFlags: [
+      "nombra la fortaleza real concreta (la racha/mejora), con su cifra si la tiene; no responde en genérico",
+      "una frase, sin globos, honesto",
+    ],
+  },
+  {
+    prompt: "Siento que este mes me fue mejor, ¿es así?",
+    expectedRedFlags: [
+      "confirma o corrige con el DATO real (trayectoria/insight), reconociendo el progreso si lo hubo",
+      "no infla ni inventa un progreso que no está en los datos (grounding)",
+    ],
+  },
+];

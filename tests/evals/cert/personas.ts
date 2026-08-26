@@ -40,7 +40,7 @@ const sobreendeudado: AuditPersona = {
   },
   // proactividad: fondo de emergencia vacío + deuda grande + flujo apretado presentes → el asesor
   // debería VOLUNTEAR la alarma en un turno abierto.
-  suites: ["adversarial", "longitudinal", "consistencia", "proactividad"],
+  suites: ["adversarial", "longitudinal", "consistencia", "proactividad", "confrontacion"],
   async setup(driver, period) {
     await driver.openingBalance(150_000);
     await driver.addIncomeSource("Salario", 450_000);
@@ -65,7 +65,7 @@ const controlExcelente: AuditPersona = {
     topConcern: "hacer crecer mi patrimonio",
     lifeStage: "profesional consolidado",
   },
-  suites: ["longitudinal", "generico"],
+  suites: ["longitudinal", "generico", "highlights"],
   async setup(driver, period) {
     await driver.openingBalance(800_000);
     await driver.addIncomeSource("Salario", 900_000);
@@ -117,7 +117,7 @@ const ingresosIrregulares: AuditPersona = {
     topConcern: "estabilizar mis finanzas",
     lifeStage: "trabajador independiente",
   },
-  suites: ["longitudinal", "generico"],
+  suites: ["longitudinal", "generico", "highlights"],
   async setup(driver, period) {
     await driver.openingBalance(400_000);
     await driver.addIncomeSource("Honorarios", 500_000);
@@ -145,7 +145,7 @@ const deudaCaraSinColchon: AuditPersona = {
     topConcern: "domar mi tarjeta",
     lifeStage: "al día, con tarjeta cara",
   },
-  suites: ["proactividad"],
+  suites: ["proactividad", "confrontacion"],
   async setup(driver, period) {
     await driver.openingBalance(100_000); // sin fondo de emergencia
     await driver.addIncomeSource("Salario", 500_000);

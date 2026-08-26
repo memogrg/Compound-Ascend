@@ -25,7 +25,15 @@ import { buildSimContext, type BuiltContext } from "./context-builder";
 import { checkGrounding } from "./grounding";
 import { detectContradictions } from "./contradictions";
 import { judgeRubric } from "./rubric";
-import { ADVERSARIAL, LONGITUDINAL, GENERICO, CONSISTENCIA, PROACTIVIDAD } from "./prompts";
+import {
+  ADVERSARIAL,
+  LONGITUDINAL,
+  GENERICO,
+  CONSISTENCIA,
+  PROACTIVIDAD,
+  CONFRONTACION,
+  HIGHLIGHTS,
+} from "./prompts";
 import type { AuditPersona } from "./personas";
 import type { AuditOutput, Finding, ProbeSuite } from "./types";
 
@@ -227,6 +235,25 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
       } else if (suite === "proactividad") {
         // Turnos abiertos con una señal dura presente: mide si el asesor VOLUNTEA la alarma.
         for (const p of PROACTIVIDAD) {
+          outputs.push(
+            await evaluate(
+              {
+                personaName: persona.displayName,
+                ctx,
+                built: ctxMonth6,
+                suite,
+                prompt: p.prompt,
+                expectedRedFlags: p.expectedRedFlags,
+              },
+              opts,
+            ),
+          );
+        }
+      } else if (suite === "confrontacion" || suite === "highlights") {
+        // Racionalización de mal hábito (confrontacion) / progreso real (highlights): probe-arrays
+        // de mes6, como proactividad. Suben la muestra de confrontacion_calida y proactividad-positivo.
+        const probes = suite === "confrontacion" ? CONFRONTACION : HIGHLIGHTS;
+        for (const p of probes) {
           outputs.push(
             await evaluate(
               {
