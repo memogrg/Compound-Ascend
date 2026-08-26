@@ -9,7 +9,7 @@ import type { Trajectory } from "@/lib/ai/trajectory";
 import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
 import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
-import type { DebtLever, GoalLever } from "@/lib/ai/context-levers";
+import type { DebtLever, GoalLever, ProtectionGapLever } from "@/lib/ai/context-levers";
 
 /** Una porción de concentración: etiqueta, monto en la moneda base y peso (0-1). */
 export type ConcentracionSlice = { label: string; valor: number; pct: number };
@@ -239,6 +239,13 @@ export type FinancialContext = {
   interventionStyle?: string;
   futureImage?: string;
   desiredFeelings?: string[];
+  /**
+   * Brechas de PROTECCIÓN (coberturas esenciales sin cubrir: vida / invalidez / gastos mayores /
+   * fondos de defensa), del motor computeProtection. Con esto el asesor puede nombrar el hueco real
+   * ("no tenés invalidez y vivís de tu ingreso") en vez de solo la percepción auto-reportada.
+   */
+  protectionGaps?: ProtectionGapLever[];
+  activePolicies?: number;
   /** Entidades a las que una transacción propuesta puede vincularse. */
   linkables?: {
     debt: { id: string; name: string }[];
@@ -505,6 +512,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     });
     facts.push(
       `Tus metas${ctx.goalsMoreCount ? ` (top ${ctx.goals.length} por atraso; +${ctx.goalsMoreCount} más)` : ""} — objetivo, fecha y ritmo actual vs el que la fecha necesita:\n${lines.join("\n")}`,
+    );
+  }
+  // Brechas de protección (hecho neutral): coberturas esenciales sin cubrir + pólizas activas.
+  if (ctx.protectionGaps && ctx.protectionGaps.length > 0) {
+    const lines = ctx.protectionGaps.map((g) => `  · ${g.type} [${g.severity}]: ${g.description}`);
+    facts.push(
+      `Brechas de protección — coberturas esenciales que hoy NO tenés${ctx.activePolicies !== undefined ? ` (${ctx.activePolicies} ${ctx.activePolicies === 1 ? "póliza activa" : "pólizas activas"})` : ""}:\n${lines.join("\n")}`,
     );
   }
 

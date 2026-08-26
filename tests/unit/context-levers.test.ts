@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { debtLevers, goalLevers, monthsBetween } from "@/lib/ai/context-levers";
+import { debtLevers, goalLevers, monthsBetween, protectionLevers } from "@/lib/ai/context-levers";
 
 const d = (over: Partial<Parameters<typeof debtLevers>[0][number]> = {}) => ({
   name: "Deuda",
@@ -123,5 +123,21 @@ describe("goalLevers", () => {
       TODAY,
     );
     expect(goals.map((x) => x.name)).toEqual(["Atrasada", "AlDia"]);
+  });
+});
+
+describe("protectionLevers", () => {
+  it("mapea type/severity/description y DESCARTA recommendation (copy de UI)", () => {
+    const gaps = [
+      {
+        type: "Seguro de invalidez",
+        severity: "alto" as const,
+        description: "vivís de tu ingreso",
+        recommendation: "cotizá ya",
+      },
+    ];
+    expect(protectionLevers(gaps)).toEqual([
+      { type: "Seguro de invalidez", severity: "alto", description: "vivís de tu ingreso" },
+    ]);
   });
 });

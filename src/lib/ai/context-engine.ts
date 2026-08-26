@@ -18,7 +18,7 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
-import { debtLevers, goalLevers } from "@/lib/ai/context-levers";
+import { debtLevers, goalLevers, protectionLevers } from "@/lib/ai/context-levers";
 
 /**
  * PRIVACIDAD (cuenta compartida): las lecturas FINANCIERAS de este motor abarcan
@@ -422,6 +422,11 @@ export async function buildFinancialContext(
           deudas: pconv(b.byOrigin.debts),
           seguros: pconv(b.byOrigin.policies),
         };
+      }
+      // Brechas de protección (reusa agg.protection ya computado; los gaps son texto, sin conversión).
+      if (p.protectionGaps.length > 0) {
+        ctx.protectionGaps = protectionLevers(p.protectionGaps);
+        ctx.activePolicies = p.activePolicies;
       }
       // "Número de libertad" (estilo deseado): solo si el usuario lo definió; si es
       // null se OMITE (nada de fallback silencioso).

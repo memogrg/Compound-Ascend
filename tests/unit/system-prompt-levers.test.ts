@@ -92,3 +92,21 @@ describe("buildSystemPrompt · ladder de metas (hecho neutral)", () => {
     expect(out).toContain("(vencida)");
   });
 });
+
+describe("buildSystemPrompt · brechas de protección (hecho neutral)", () => {
+  it("lista las coberturas sin cubrir con severidad + pólizas activas", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      protectionGaps: [
+        { type: "Seguro de invalidez", severity: "alto", description: "vivís de tu ingreso" },
+      ],
+      activePolicies: 2,
+    });
+    expect(out).toContain("Brechas de protección");
+    expect(out).toContain("Seguro de invalidez [alto]: vivís de tu ingreso");
+    expect(out).toContain("2 pólizas activas");
+  });
+  it("sin protectionGaps no agrega el bloque", () => {
+    expect(buildSystemPrompt(base)).not.toContain("Brechas de protección");
+  });
+});

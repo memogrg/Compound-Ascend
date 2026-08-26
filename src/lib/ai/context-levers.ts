@@ -135,3 +135,20 @@ export function goalLevers(
   mapped.sort((a, b) => shortfall(b) - shortfall(a));
   return { goals: mapped.slice(0, topN), moreCount: Math.max(0, mapped.length - topN) };
 }
+
+/** One protection gap as a lever: what's uncovered + how severe + why it matters. */
+export type ProtectionGapLever = {
+  type: string;
+  severity: "alto" | "medio" | "bajo";
+  description: string;
+};
+
+/**
+ * Protection gaps from computeProtection, narrowed to the advisor's factual context: type +
+ * severity + description. Drops `recommendation` (UI sales copy, not the advisor's to echo).
+ */
+export function protectionLevers(
+  gaps: { type: string; severity: "alto" | "medio" | "bajo"; description: string }[],
+): ProtectionGapLever[] {
+  return gaps.map((g) => ({ type: g.type, severity: g.severity, description: g.description }));
+}
