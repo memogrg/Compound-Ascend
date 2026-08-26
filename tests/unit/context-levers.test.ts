@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { debtLevers } from "@/lib/ai/context-levers";
+import { debtLevers, goalLevers, monthsBetween } from "@/lib/ai/context-levers";
 
 const d = (over: Partial<Parameters<typeof debtLevers>[0][number]> = {}) => ({
   name: "Deuda",
@@ -60,5 +60,68 @@ describe("debtLevers", () => {
       currency: "USD",
       apr: 18,
     });
+  });
+});
+
+describe("monthsBetween (timezone-safe, sobre ISO)", () => {
+  it("meses enteros exactos", () => {
+    expect(monthsBetween("2026-01-01", "2027-01-01")).toBe(12);
+    expect(monthsBetween("2026-01-01", "2026-01-01")).toBe(0);
+  });
+  it("no cuenta el mes en curso hasta cumplir el día", () => {
+    expect(monthsBetween("2026-01-15", "2026-04-10")).toBe(2); // 3 meses cal, pero 10<15 → 2
+    expect(monthsBetween("2026-01-15", "2026-04-20")).toBe(3);
+  });
+  it("negativo si toISO ya pasó; NaN si es inválida", () => {
+    expect(monthsBetween("2026-06-01", "2026-01-01")).toBe(-5);
+    expect(Number.isNaN(monthsBetween("2026-06-01", "no-fecha"))).toBe(true);
+  });
+});
+
+describe("goalLevers", () => {
+  const g = (over: Partial<Parameters<typeof goalLevers>[0][number]> = {}) => ({
+    name: "Meta",
+    targetAmount: 1_200_000,
+    currentAmount: 0,
+    monthlyContribution: 50_000,
+    targetDate: "2027-01-01" as string | null,
+    currency: "CRC",
+    ...over,
+  });
+  const TODAY = "2026-01-01"; // 12 meses a 2027-01-01
+
+  it("monthlyRequired = ceil(gap / meses restantes); onTrack compara con el aporte", () => {
+    const { goals } = goalLevers([g({ monthlyContribution: 50_000 })], TODAY);
+    expect(goals[0]!.monthlyRequired).toBe(100_000); // 1.2M / 12
+    expect(goals[0]!.onTrack).toBe(false); // 50k < 100k
+    expect(goalLevers([g({ monthlyContribution: 120_000 })], TODAY).goals[0]!.onTrack).toBe(true);
+  });
+  it("sin targetDate → monthlyRequired y onTrack undefined (no hay ritmo objetivo)", () => {
+    const { goals } = goalLevers([g({ targetDate: null })], TODAY);
+    expect(goals[0]!.monthlyRequired).toBeUndefined();
+    expect(goals[0]!.onTrack).toBeUndefined();
+  });
+  it("fecha vencida → vencida=true, monthlyRequired = todo el faltante", () => {
+    const { goals } = goalLevers([g({ targetDate: "2025-06-01", currentAmount: 200_000 })], TODAY);
+    expect(goals[0]!.vencida).toBe(true);
+    expect(goals[0]!.monthlyRequired).toBe(1_000_000); // 1.2M − 200k
+    expect(goals[0]!.onTrack).toBe(false);
+  });
+  it("filtra sobres (targetAmount ≤ 0) — no son palanca", () => {
+    const { goals } = goalLevers(
+      [g({ name: "Meta" }), g({ name: "Sobre", targetAmount: 0 })],
+      TODAY,
+    );
+    expect(goals.map((x) => x.name)).toEqual(["Meta"]);
+  });
+  it("ordena por atraso (shortfall) desc", () => {
+    const { goals } = goalLevers(
+      [
+        g({ name: "AlDia", monthlyContribution: 100_000 }), // req 100k, shortfall 0
+        g({ name: "Atrasada", monthlyContribution: 10_000 }), // req 100k, shortfall 90k
+      ],
+      TODAY,
+    );
+    expect(goals.map((x) => x.name)).toEqual(["Atrasada", "AlDia"]);
   });
 });

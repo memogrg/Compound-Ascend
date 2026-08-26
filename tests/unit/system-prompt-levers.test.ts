@@ -44,3 +44,51 @@ describe("buildSystemPrompt · ladder de deuda (hecho neutral)", () => {
     expect(buildSystemPrompt(base)).not.toContain("saldo vivo, APR, mínimo");
   });
 });
+
+describe("buildSystemPrompt · ladder de metas (hecho neutral)", () => {
+  it("renderiza objetivo, fecha y ritmo actual vs requerido con el rótulo", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      goals: [
+        {
+          name: "Viaje",
+          target: 1_200_000,
+          currency: "CRC",
+          targetDate: "2027-01-01",
+          monthlyActual: 50_000,
+          monthlyRequired: 100_000,
+          onTrack: false,
+        },
+      ],
+    });
+    expect(out).toContain("Viaje");
+    expect(out).toContain("objetivo 1200000 CRC");
+    expect(out).toContain("fecha 2027-01-01");
+    expect(out).toContain("ritmo 50000/100000 CRC/mes (atrasada)");
+  });
+  it("meta sin fecha → muestra aporte, no ritmo", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      goals: [{ name: "Libertad", target: 5_000_000, currency: "CRC", monthlyActual: 200_000 }],
+    });
+    expect(out).toContain("aporte 200000 CRC/mes (sin fecha objetivo)");
+  });
+  it("meta vencida se rotula vencida", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      goals: [
+        {
+          name: "Tarde",
+          target: 100_000,
+          currency: "CRC",
+          targetDate: "2025-06-01",
+          monthlyActual: 0,
+          monthlyRequired: 100_000,
+          vencida: true,
+          onTrack: false,
+        },
+      ],
+    });
+    expect(out).toContain("(vencida)");
+  });
+});

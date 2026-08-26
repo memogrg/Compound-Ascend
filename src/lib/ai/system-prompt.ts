@@ -9,7 +9,7 @@ import type { Trajectory } from "@/lib/ai/trajectory";
 import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
 import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
-import type { DebtLever } from "@/lib/ai/context-levers";
+import type { DebtLever, GoalLever } from "@/lib/ai/context-levers";
 
 /** Una porción de concentración: etiqueta, monto en la moneda base y peso (0-1). */
 export type ConcentracionSlice = { label: string; valor: number; pct: number };
@@ -144,6 +144,13 @@ export type FinancialContext = {
   debtsMoreCount?: number;
   goalCount?: number;
   goalsProgressPct?: number;
+  /**
+   * Metas POR-ENTIDAD (objetivo + fecha + ritmo actual vs ritmo requerido + onTrack), top-N por
+   * atraso. Es lo que falta para decir "vas a ₡X/mes pero necesitás ₡Y para llegar en la fecha";
+   * el agregado (goalsProgressPct) no distingue una meta al día de otra atrasada.
+   */
+  goals?: GoalLever[];
+  goalsMoreCount?: number;
   /**
    * Sobres del usuario, en moneda de visualización. "Sobre" abarca DOS tipos:
    *  - `expense`: sobres de GASTO mensual (hojas favoritas) por frasco, con presupuesto.
@@ -483,6 +490,21 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.goalCount !== undefined) {
     facts.push(
       `Metas de ahorro: ${ctx.goalCount}${ctx.goalsProgressPct !== undefined ? ` (avance ${(ctx.goalsProgressPct * 100).toFixed(0)}%)` : ""}.`,
+    );
+  }
+  // Ladder POR-META (hecho neutral): objetivo, fecha, y ritmo actual vs el requerido por la fecha.
+  // Los rótulos (al día / atrasada / vencida) son descriptivos, no una instrucción de qué hacer.
+  if (ctx.goals && ctx.goals.length > 0) {
+    const lines = ctx.goals.map((g) => {
+      const fecha = g.targetDate ? `, fecha ${g.targetDate}` : "";
+      const ritmo =
+        g.monthlyRequired !== undefined
+          ? `, ritmo ${g.monthlyActual}/${g.monthlyRequired} ${g.currency}/mes (${g.vencida ? "vencida" : g.onTrack ? "al día" : "atrasada"})`
+          : `, aporte ${g.monthlyActual} ${g.currency}/mes (sin fecha objetivo)`;
+      return `  · ${g.name}: objetivo ${g.target} ${g.currency}${fecha}${ritmo}.`;
+    });
+    facts.push(
+      `Tus metas${ctx.goalsMoreCount ? ` (top ${ctx.goals.length} por atraso; +${ctx.goalsMoreCount} más)` : ""} — objetivo, fecha y ritmo actual vs el que la fecha necesita:\n${lines.join("\n")}`,
     );
   }
 
