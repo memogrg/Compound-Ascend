@@ -65,6 +65,10 @@ export const NAV: NavGroup[] = [
         icon: "profile",
         href: "/mi-perfil-financiero",
       },
+      // Entrada ESTABLE a los cuatro asistentes de configuración. Vive en la
+      // navegación —y no solo en la tarjeta del panel— porque el asistente
+      // también sirve para MODIFICAR: quien ya terminó necesita volver.
+      { id: "setup", name: "Mi configuración", icon: "gear", href: "/configurar" },
     ],
   },
 ];

@@ -9,6 +9,7 @@ import type { Trajectory } from "@/lib/ai/trajectory";
 import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
 import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
+import type { DebtLever, GoalLever, ProtectionGapLever } from "@/lib/ai/context-levers";
 
 /** Una porción de concentración: etiqueta, monto en la moneda base y peso (0-1). */
 export type ConcentracionSlice = { label: string; valor: number; pct: number };
@@ -134,8 +135,22 @@ export type FinancialContext = {
   topDebtApr?: number;
   /** Moneda de la deuda más cara: sin ella, comparar APR entre monedas engaña. */
   topDebtCurrency?: string;
+  /**
+   * Deudas POR-ENTIDAD (saldo vivo + APR + mínimo + costo mensual del interés), top-N por
+   * costo de interés. Es la munición del "tu tarjeta al 40% te cuesta ₡X/mes": el agregado
+   * (debtTotals/topDebt*) no alcanza para nombrar la 2ª/3ª deuda con su número real.
+   */
+  debts?: DebtLever[];
+  debtsMoreCount?: number;
   goalCount?: number;
   goalsProgressPct?: number;
+  /**
+   * Metas POR-ENTIDAD (objetivo + fecha + ritmo actual vs ritmo requerido + onTrack), top-N por
+   * atraso. Es lo que falta para decir "vas a ₡X/mes pero necesitás ₡Y para llegar en la fecha";
+   * el agregado (goalsProgressPct) no distingue una meta al día de otra atrasada.
+   */
+  goals?: GoalLever[];
+  goalsMoreCount?: number;
   /**
    * Sobres del usuario, en moneda de visualización. "Sobre" abarca DOS tipos:
    *  - `expense`: sobres de GASTO mensual (hojas favoritas) por frasco, con presupuesto.
@@ -224,6 +239,13 @@ export type FinancialContext = {
   interventionStyle?: string;
   futureImage?: string;
   desiredFeelings?: string[];
+  /**
+   * Brechas de PROTECCIÓN (coberturas esenciales sin cubrir: vida / invalidez / gastos mayores /
+   * fondos de defensa), del motor computeProtection. Con esto el asesor puede nombrar el hueco real
+   * ("no tenés invalidez y vivís de tu ingreso") en vez de solo la percepción auto-reportada.
+   */
+  protectionGaps?: ProtectionGapLever[];
+  activePolicies?: number;
   /** Entidades a las que una transacción propuesta puede vincularse. */
   linkables?: {
     debt: { id: string; name: string }[];
@@ -451,6 +473,17 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       `Deuda con el APR más alto: ${ctx.topDebtName}${ctx.topDebtApr !== undefined ? ` (APR ${ctx.topDebtApr}%${ctx.topDebtCurrency ? `, en ${ctx.topDebtCurrency}` : ""})` : ""}.`,
     );
   }
+  // Ladder POR-DEUDA (hecho neutral, espejo de las posiciones): saldo vivo, APR, mínimo y el
+  // costo mensual del interés. Sin conclusión ni instrucción — el asesor decide qué hacer con esto.
+  if (ctx.debts && ctx.debts.length > 0) {
+    const lines = ctx.debts.map(
+      (d) =>
+        `  · ${d.name}: saldo ${d.liveBalance} ${d.currency}${d.apr != null ? ` @${d.apr}%` : ""}, mínimo ${d.minPayment} ${d.currency}${d.monthlyInterestCost > 0 ? `, interés ~${d.monthlyInterestCost} ${d.currency}/mes` : ""}.`,
+    );
+    facts.push(
+      `Tus deudas${ctx.debtsMoreCount ? ` (top ${ctx.debts.length} por costo de interés; +${ctx.debtsMoreCount} más)` : ""} — saldo vivo, APR, mínimo y lo que te cuesta el interés cada mes:\n${lines.join("\n")}`,
+    );
+  }
   // Caveat SOLO con deudas en más de una moneda: un 20% en colones y un 20% en dólares no cuestan
   // lo mismo (inflación y tipo de cambio entran en la cuenta), así que "la más cara" por APR
   // nominal puede engañar. Una frase, no un párrafo (manda la concisión dura).
@@ -464,6 +497,28 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.goalCount !== undefined) {
     facts.push(
       `Metas de ahorro: ${ctx.goalCount}${ctx.goalsProgressPct !== undefined ? ` (avance ${(ctx.goalsProgressPct * 100).toFixed(0)}%)` : ""}.`,
+    );
+  }
+  // Ladder POR-META (hecho neutral): objetivo, fecha, y ritmo actual vs el requerido por la fecha.
+  // Los rótulos (al día / atrasada / vencida) son descriptivos, no una instrucción de qué hacer.
+  if (ctx.goals && ctx.goals.length > 0) {
+    const lines = ctx.goals.map((g) => {
+      const fecha = g.targetDate ? `, fecha ${g.targetDate}` : "";
+      const ritmo =
+        g.monthlyRequired !== undefined
+          ? `, ritmo ${g.monthlyActual}/${g.monthlyRequired} ${g.currency}/mes (${g.vencida ? "vencida" : g.onTrack ? "al día" : "atrasada"})`
+          : `, aporte ${g.monthlyActual} ${g.currency}/mes (sin fecha objetivo)`;
+      return `  · ${g.name}: objetivo ${g.target} ${g.currency}${fecha}${ritmo}.`;
+    });
+    facts.push(
+      `Tus metas${ctx.goalsMoreCount ? ` (top ${ctx.goals.length} por atraso; +${ctx.goalsMoreCount} más)` : ""} — objetivo, fecha y ritmo actual vs el que la fecha necesita:\n${lines.join("\n")}`,
+    );
+  }
+  // Brechas de protección (hecho neutral): coberturas esenciales sin cubrir + pólizas activas.
+  if (ctx.protectionGaps && ctx.protectionGaps.length > 0) {
+    const lines = ctx.protectionGaps.map((g) => `  · ${g.type} [${g.severity}]: ${g.description}`);
+    facts.push(
+      `Brechas de protección — coberturas esenciales que hoy NO tenés${ctx.activePolicies !== undefined ? ` (${ctx.activePolicies} ${ctx.activePolicies === 1 ? "póliza activa" : "pólizas activas"})` : ""}:\n${lines.join("\n")}`,
     );
   }
 

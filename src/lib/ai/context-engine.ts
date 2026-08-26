@@ -18,6 +18,7 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
+import { debtLevers, goalLevers, protectionLevers } from "@/lib/ai/context-levers";
 
 /**
  * PRIVACIDAD (cuenta compartida): las lecturas FINANCIERAS de este motor abarcan
@@ -195,26 +196,49 @@ export async function buildFinancialContext(
       ctx.topDebtName = top.name;
       ctx.topDebtApr = top.apr ?? undefined;
       ctx.topDebtCurrency = top.currency;
+      // Ladder POR-DEUDA (mismo saldo vivo canónico): top-6 por costo de interés + moreCount.
+      const { debts: debtLeverList, moreCount } = debtLevers(
+        debts.map((d) => ({
+          name: d.name,
+          liveBalance: d.currentBalance,
+          apr: d.apr,
+          minPayment: d.minPayment,
+          currency: d.currency,
+        })),
+      );
+      ctx.debts = debtLeverList;
+      if (moreCount > 0) ctx.debtsMoreCount = moreCount;
     }
   } catch {
     // Control no disponible.
   }
 
-  // Metas: cuántas y avance agregado.
+  // Metas: agregado (cuántas + avance) + ladder POR-META (ritmo actual vs el que la fecha exige).
   try {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
-    const supabase = await createSupabaseServerClient();
-    // Financiero → alcance de hogar: las metas de la cuenta común son de todos.
-    const memberIds = await householdMemberIds(supabase, user.id);
-    const { data: goals } = await supabase
-      .from("savings_goals")
-      .select("current_amount,target_amount")
-      .in("user_id", memberIds);
-    if (goals && goals.length > 0) {
-      const target = goals.reduce((s, g) => s + Number(g.target_amount), 0);
-      const current = goals.reduce((s, g) => s + Number(g.current_amount), 0);
+    // listGoals ya es de alcance de HOGAR (householdMemberIds) y ctx-aware (sesión por cookie acá).
+    const { listGoals } = await import("@/modules/control/services/control-service");
+    const { userToday } = await import("@/lib/time/user-time");
+    const goals = await listGoals();
+    if (goals.length > 0) {
       ctx.goalCount = goals.length;
+      // Avance agregado: idéntico al previo (sobres tienen targetAmount 0 → no inflan el objetivo).
+      const target = goals.reduce((s, g) => s + g.targetAmount, 0);
+      const current = goals.reduce((s, g) => s + g.currentAmount, 0);
       if (target > 0) ctx.goalsProgressPct = current / target;
+      // Ladder: solo metas con objetivo (goalLevers filtra los sobres); ritmo fechado en la tz del usuario.
+      const { goals: goalLeverList, moreCount } = goalLevers(
+        goals.map((g) => ({
+          name: g.name,
+          targetAmount: g.targetAmount,
+          currentAmount: g.currentAmount,
+          monthlyContribution: g.monthlyContribution,
+          targetDate: g.targetDate,
+          currency: g.currency,
+        })),
+        await userToday(),
+      );
+      if (goalLeverList.length > 0) ctx.goals = goalLeverList;
+      if (moreCount > 0) ctx.goalsMoreCount = moreCount;
     }
   } catch {
     // Metas no disponibles.
@@ -398,6 +422,11 @@ export async function buildFinancialContext(
           deudas: pconv(b.byOrigin.debts),
           seguros: pconv(b.byOrigin.policies),
         };
+      }
+      // Brechas de protección (reusa agg.protection ya computado; los gaps son texto, sin conversión).
+      if (p.protectionGaps.length > 0) {
+        ctx.protectionGaps = protectionLevers(p.protectionGaps);
+        ctx.activePolicies = p.activePolicies;
       }
       // "Número de libertad" (estilo deseado): solo si el usuario lo definió; si es
       // null se OMITE (nada de fallback silencioso).

@@ -40,20 +40,52 @@ describe("computeProtection", () => {
   });
   it("score sube con coberturas", () => {
     const policies: InsurancePolicy[] = [
-      { id: "1", policyType: "medico", currency: "CRC", coverage: 1000, premium: 10, premiumFrequency: "mensual" },
+      {
+        id: "1",
+        policyType: "medico",
+        currency: "CRC",
+        coverage: 1000,
+        premium: 10,
+        premiumFrequency: "mensual",
+      },
       { id: "2", policyType: "incapacidad", currency: "CRC", coverage: 1000 },
     ];
     const diag = computeProtection(ctx({ dependents: 0 }), policies);
     expect(diag.activePolicies).toBe(2);
     expect(diag.annualPremium).toBe(120);
   });
+  it("cuenta invalidez como esencial: brecha sin incapacidad, cubierta con ella (denominador 5 → 100)", () => {
+    expect(computeProtection(ctx({}), []).gaps.some((g) => /invalidez/i.test(g.type))).toBe(true);
+    const cubierto = computeProtection(ctx({}), [
+      { id: "gm", policyType: "gastos_mayores", currency: "CRC", coverage: 1 },
+      { id: "v", policyType: "vida", currency: "CRC", coverage: 1 },
+      { id: "i", policyType: "incapacidad", currency: "CRC", coverage: 1 },
+    ]);
+    // 5/5 esenciales (gastos mayores, vida, invalidez, emergencia, paz) → score 100, sin brecha de invalidez.
+    expect(cubierto.gaps.some((g) => /invalidez/i.test(g.type))).toBe(false);
+    expect(cubierto.score).toBe(100);
+  });
 });
 
 describe("computePortfolio", () => {
   it("calcula distribución y diversificación", () => {
     const invs: Investment[] = [
-      { id: "1", assetType: "etf", name: "VOO", investedAmount: 1000, contribution: 100, currency: "CRC" },
-      { id: "2", assetType: "cripto", name: "BTC", investedAmount: 1000, contribution: 0, currency: "CRC" },
+      {
+        id: "1",
+        assetType: "etf",
+        name: "VOO",
+        investedAmount: 1000,
+        contribution: 100,
+        currency: "CRC",
+      },
+      {
+        id: "2",
+        assetType: "cripto",
+        name: "BTC",
+        investedAmount: 1000,
+        contribution: 0,
+        currency: "CRC",
+      },
     ];
     const pf = computePortfolio(invs);
     expect(pf.totalInvested).toBe(2000);
