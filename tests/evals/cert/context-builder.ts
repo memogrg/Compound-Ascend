@@ -19,6 +19,8 @@ import { getControlSummary } from "@/modules/control/services/control-service";
 import { getDebtsOverview } from "@/modules/control/services/debts-service";
 import { getDefenseFundsReport } from "@/modules/wealth/services/fund-sizing-service";
 import { detectLowSavingsRate } from "@/lib/insights/detectors";
+import { debtLevers, goalLevers, protectionLevers } from "@/lib/ai/context-levers";
+import { userToday } from "@/lib/time/user-time";
 import type { ContextFacts } from "./types";
 
 const round = (n: number): number => Math.round(n);
@@ -76,9 +78,33 @@ export async function buildSimContext(
     : 0;
   const portfolioValue = round2(port.analytics.totalPortfolioValue);
 
-  // Defense-fund gaps for the JUDGE digest (not the advisor context — that's the next step).
+  // Defense-fund gaps for the JUDGE digest (also feeds the advisor context below).
   // Best-effort: a read failure degrades the digest, never the whole build.
   const defense = await getDefenseFundsReport(ctx).catch(() => null);
+
+  // Palancas POR-ENTIDAD (Paso 2): las MISMAS que buildFinancialContext arma para el asesor,
+  // reconstruidas acá con los mismos mappers puros. Sin esto, el asesor del audit no vería el
+  // ladder/ritmo/brechas y no se podría medir el salto del contexto.
+  const debtLeverResult = debtLevers(
+    debtsOv.debts.map((d) => ({
+      name: d.name,
+      liveBalance: d.balance,
+      apr: d.apr,
+      minPayment: d.minPayment,
+      currency: d.currency,
+    })),
+  );
+  const goalLeverResult = goalLevers(
+    ctrl.goals.map((g) => ({
+      name: g.name,
+      targetAmount: g.targetAmount,
+      currentAmount: g.currentAmount,
+      monthlyContribution: g.monthlyContribution,
+      targetDate: g.targetDate,
+      currency: g.currency,
+    })),
+    await userToday(ctx),
+  );
 
   const insights = detectLowSavingsRate({
     savingsRate: ind.savingsRate,
@@ -111,6 +137,13 @@ export async function buildSimContext(
     insights: insights.length ? insights : undefined,
     topConcern: dna.topConcern,
     lifeStage: dna.lifeStage,
+    // Palancas por-entidad (Paso 2), idénticas al contexto de producción.
+    debts: debtLeverResult.debts.length ? debtLeverResult.debts : undefined,
+    debtsMoreCount: debtLeverResult.moreCount || undefined,
+    goals: goalLeverResult.goals.length ? goalLeverResult.goals : undefined,
+    goalsMoreCount: goalLeverResult.moreCount || undefined,
+    protectionGaps: patr.protectionGaps.length ? protectionLevers(patr.protectionGaps) : undefined,
+    activePolicies: patr.protectionGaps.length ? patr.activePolicies : undefined,
   };
 
   const toolContext: ToolContext = {
@@ -147,6 +180,10 @@ export async function buildSimContext(
     pr.investableWealth,
     ...debts.map((d) => d.balance),
     ...ctrl.goals.flatMap((g) => [g.currentAmount, g.targetAmount]),
+    // DERIVADOS de las palancas del Paso 2: sin esto, el asesor que cite "₡X/mes de interés" o
+    // el ritmo requerido de una meta daría FALSO POSITIVO de grounding (no están en las cifras crudas).
+    ...debtLeverResult.debts.map((d) => d.monthlyInterestCost),
+    ...goalLeverResult.goals.map((g) => g.monthlyRequired ?? 0),
     // Longitudinal: los valores REALES mes-a-mes que el asesor legítimamente tuvo vía
     // consultar_historial (net_worth_snapshots/portfolio_snapshots) y sobre los que corre
     // computeTrajectory. Sin esto, toda cifra histórica bien-fundada (patrimonio/portafolio/
