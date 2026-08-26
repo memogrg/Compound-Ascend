@@ -621,7 +621,10 @@ export async function createTransfer(input: TransferInput): Promise<void> {
 }
 
 /** Importación masiva (CSV): entran como pendientes de revisar. */
-export async function importTransactions(rows: CsvTxnInput[]): Promise<number> {
+export async function importTransactions(
+  rows: CsvTxnInput[],
+  accountId: string | null = null,
+): Promise<number> {
   if (rows.length === 0) return 0;
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -640,7 +643,7 @@ export async function importTransactions(rows: CsvTxnInput[]): Promise<number> {
     currency: r.currency ?? primary,
     occurred_on: r.occurredOn,
     category_id: null,
-    account_id: null,
+    account_id: accountId,
     account_label: null,
     status: "pending_review" as const,
     origin: "imported" as const,
