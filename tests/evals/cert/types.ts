@@ -44,7 +44,13 @@ export type DimScore = number | "NA";
 export type RubricScores = Record<SubjectiveDim, DimScore>;
 
 export type ProbeSuite =
-  "adversarial" | "longitudinal" | "consistencia" | "generico" | "proactividad";
+  | "adversarial"
+  | "longitudinal"
+  | "consistencia"
+  | "generico"
+  | "proactividad"
+  | "confrontacion"
+  | "highlights";
 
 /** The facts a deterministic checker needs — the persona's REAL numbers. */
 export interface ContextFacts {

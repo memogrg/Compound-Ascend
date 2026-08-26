@@ -16,9 +16,10 @@ import {
   detectCongratulateOnDecline,
   detectLuxuryGoalUncovered,
 } from "./contradictions";
-import { computeStats, compositeScore } from "./rubric";
+import { computeStats, compositeScore, judgeRubric } from "./rubric";
 import { renderMd, summarize } from "./report";
 import type { AuditOutput, ContextFacts, RubricScores } from "./types";
+import type { AIProvider, AIChatResult } from "@/lib/ai/provider";
 
 function facts(over: Partial<ContextFacts> = {}): ContextFacts {
   return {
@@ -232,5 +233,50 @@ describe("ai-audit · rúbrica stats + reporte (9 dims, NA excluida)", () => {
     expect(md).toContain("Caveat de fidelidad");
     expect(md).toContain("— (NA)"); // la dim que no aplicó se muestra como NA, no como 0
     expect(summarize({ outputs: [out], findings: [] }).outputs).toBe(1);
+  });
+});
+
+// Judge scriptado: falla (throw) las primeras `failFirst` llamadas, luego devuelve un JSON válido.
+const VALID_JUDGE_JSON =
+  '{"relevancia":4,"personalizacion":3,"prioridad":3,"accionabilidad":2,"consulta_apropiada":"NA","proactividad":2,"confrontacion_calida":"NA","conciencia_temporal":3,"explicacion_y_tono":3}';
+function scriptedJudge(failFirst: number): { provider: AIProvider; calls: () => number } {
+  let calls = 0;
+  const provider: AIProvider = {
+    name: "scripted-judge",
+    model: "scripted",
+    async chat(): Promise<AIChatResult> {
+      calls += 1;
+      if (calls <= failFirst) throw new Error("judge hiccup");
+      return { text: VALID_JUDGE_JSON, tokensIn: 0, tokensOut: 0 };
+    },
+    async vision(): Promise<AIChatResult> {
+      return { text: "", tokensIn: 0, tokensOut: 0 };
+    },
+  };
+  return { provider, calls: () => calls };
+}
+
+describe("ai-audit · judgeRubric rescate acotado (ScriptedJudge, sin sleeps)", () => {
+  const JINPUT = { prompt: "p", reply: "r", contextDigest: "d", expectedRedFlags: [] as string[] };
+  const NOSLEEP = { sleepMs: 0, rescueMs: 0 };
+
+  it("rescata cuando los 3 runs planeados fallan y el 4º tiene éxito → puntúa", async () => {
+    const { provider, calls } = scriptedJudge(3);
+    const r = await judgeRubric(provider, JINPUT, 3, NOSLEEP);
+    expect(r).not.toBeNull();
+    expect(r!.relevancia).toBe(4);
+    expect(calls()).toBe(4); // 3 planeados + 1 rescate (para en el primer éxito)
+  });
+  it("cap DURO: si todos fallan → null en runs+RESCUE_MAX intentos, sin bucle infinito", async () => {
+    const { provider, calls } = scriptedJudge(99);
+    const r = await judgeRubric(provider, JINPUT, 3, NOSLEEP);
+    expect(r).toBeNull();
+    expect(calls()).toBe(5); // 3 planeados + 2 de rescate = cap
+  });
+  it("sin rescate si un planeado ya tuvo éxito", async () => {
+    const { provider, calls } = scriptedJudge(0);
+    const r = await judgeRubric(provider, JINPUT, 3, NOSLEEP);
+    expect(r).not.toBeNull();
+    expect(calls()).toBe(3); // solo los planeados
   });
 });

@@ -93,13 +93,23 @@ export interface JudgeInput {
   expectedRedFlags: string[];
 }
 
-/** Average the rubric over `runs` judge calls; null if the judge is unavailable/all fail. */
+/** Reintentos de RESCATE si los `runs` planeados fallan TODOS (hipos del juez -pro de baja RPM):
+ *  hasta este tope de intentos extra, con backoff mayor, parando en el primer éxito. Cap duro =
+ *  runs + RESCUE_MAX, sin bucles infinitos. Sube la cobertura (outputs puntuados) sin costo desbordado. */
+const RESCUE_MAX = 2;
+const RESCUE_BACKOFF_MS = 2500;
+
+/** Average the rubric over `runs` judge calls (+ bounded rescue if all fail); null if all attempts fail.
+ *  `timing` permite 0 en tests para no dormir; en producción usa los defaults. */
 export async function judgeRubric(
   judge: AIProvider | undefined,
   input: JudgeInput,
   runs: number,
+  timing: { sleepMs?: number; rescueMs?: number } = {},
 ): Promise<RubricScores | null> {
   if (!judge) return null;
+  const sleepMs = timing.sleepMs ?? SLEEP_MS;
+  const rescueMs = timing.rescueMs ?? RESCUE_BACKOFF_MS;
   const user = [
     `PREGUNTA DEL USUARIO:\n${input.prompt}`,
     `\nCONTEXTO FINANCIERO REAL (resumen):\n${input.contextDigest}`,
@@ -117,7 +127,8 @@ export async function judgeRubric(
     naCount[d] = 0;
   }
   let n = 0;
-  for (let i = 0; i < runs; i++) {
+  // Un intento: acumula un set válido de puntajes (o lo ignora ante hipo del proveedor).
+  const attempt = async (): Promise<void> => {
     try {
       const res = await judge.chat({
         system: JUDGE_SYSTEM,
@@ -134,9 +145,18 @@ export async function judgeRubric(
         }
       }
     } catch {
-      // transient judge outage on the low-RPM -pro model → skip this run
+      // transient judge outage on the low-RPM -pro model → skip this attempt
     }
-    if (i < runs - 1) await sleep(SLEEP_MS);
+  };
+  // Intentos planeados.
+  for (let i = 0; i < runs; i++) {
+    await attempt();
+    if (i < runs - 1) await sleep(sleepMs);
+  }
+  // Rescate acotado: SOLO si los planeados fallaron todos; para apenas uno tiene éxito.
+  for (let r = 0; n === 0 && r < RESCUE_MAX; r++) {
+    await sleep(rescueMs);
+    await attempt();
   }
   if (n === 0) return null;
   const avg = {} as RubricScores;
