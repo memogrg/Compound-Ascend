@@ -18,7 +18,7 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
-import { debtLevers, goalLevers, protectionLevers } from "@/lib/ai/context-levers";
+import { debtLevers, goalLevers, protectionLevers, prioritySignal } from "@/lib/ai/context-levers";
 
 /**
  * PRIVACIDAD (cuenta compartida): las lecturas FINANCIERAS de este motor abarcan
@@ -794,6 +794,17 @@ export async function buildFinancialContext(
     } catch {
       // Indicadores económicos no disponibles: el contexto sigue.
     }
+
+  // SEÑAL PRIORITARIA: reusa el Priority Engine CANÓNICO (getControlSummary().diagnosis) para que el
+  // asesor nombre PRIMERO lo mismo que la app le muestra. Best-effort: sin engine, cae al insight.
+  try {
+    const { getControlSummary } = await import("@/modules/control/services/control-service");
+    const { diagnosis } = await getControlSummary();
+    const signal = prioritySignal({ diagnosis, debts: ctx.debts, insights: ctx.insights });
+    if (signal) ctx.señalPrioritaria = signal;
+  } catch {
+    // Control no disponible → sin señal prioritaria (el asesor evalúa igual desde el resto del cuadro).
+  }
 
   return ctx;
 }

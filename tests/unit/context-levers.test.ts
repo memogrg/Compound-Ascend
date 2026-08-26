@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { debtLevers, goalLevers, monthsBetween, protectionLevers } from "@/lib/ai/context-levers";
+import {
+  debtLevers,
+  goalLevers,
+  monthsBetween,
+  protectionLevers,
+  prioritySignal,
+} from "@/lib/ai/context-levers";
 
 const d = (over: Partial<Parameters<typeof debtLevers>[0][number]> = {}) => ({
   name: "Deuda",
@@ -139,5 +145,60 @@ describe("protectionLevers", () => {
     expect(protectionLevers(gaps)).toEqual([
       { type: "Seguro de invalidez", severity: "alto", description: "vivís de tu ingreso" },
     ]);
+  });
+});
+
+describe("prioritySignal (reusa el Priority Engine canónico)", () => {
+  const debt = {
+    name: "Tarjeta Oro",
+    liveBalance: 800_000,
+    apr: 40,
+    minPayment: 30_000,
+    currency: "CRC",
+    monthlyInterestCost: 26_667,
+  };
+
+  it("engine no-verde + nextBestAction de deuda → enriquece con el costo real de la deuda", () => {
+    const s = prioritySignal({
+      diagnosis: { semaforo: "rojo", nextBestAction: "Paga extra a tu deuda más cara." },
+      debts: [debt],
+    });
+    expect(s).toContain("Tarjeta Oro al 40%");
+    expect(s).toContain("26667");
+    expect(s).toContain("Paga extra a tu deuda más cara."); // conserva la decisión canónica
+  });
+  it("engine no-verde + prioridad NO-deuda (fondo) → devuelve el nextBestAction tal cual", () => {
+    const s = prioritySignal({
+      diagnosis: {
+        semaforo: "amarillo",
+        nextBestAction: "Automatiza un aporte a tu fondo de emergencia.",
+      },
+      debts: [],
+    });
+    expect(s).toBe("Automatiza un aporte a tu fondo de emergencia.");
+  });
+  it("engine VERDE → sin señal grave (undefined) salvo insight 'accionar'", () => {
+    expect(
+      prioritySignal({ diagnosis: { semaforo: "verde", nextBestAction: "Aumenta el aporte." } }),
+    ).toBeUndefined();
+  });
+  it("sin diagnóstico → fallback al insight 'accionar' (ya ordenado por severidad)", () => {
+    const s = prioritySignal({
+      insights: [
+        { severity: "info", title: "algo menor" },
+        {
+          severity: "accionar",
+          title: "Sobre Restaurantes sobregirado",
+          action: "ajustar presupuesto",
+        },
+      ],
+    });
+    expect(s).toBe("Sobre Restaurantes sobregirado — ajustar presupuesto");
+  });
+  it("sin diagnóstico y sin insight 'accionar' → undefined (lidera con highlight)", () => {
+    expect(
+      prioritySignal({ insights: [{ severity: "celebrar", title: "racha" }] }),
+    ).toBeUndefined();
+    expect(prioritySignal({})).toBeUndefined();
   });
 });

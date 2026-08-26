@@ -152,3 +152,38 @@ export function protectionLevers(
 ): ProtectionGapLever[] {
   return gaps.map((g) => ({ type: g.type, severity: g.severity, description: g.description }));
 }
+
+/**
+ * La ÚNICA señal más grave del cuadro del usuario, para que el asesor la nombre PRIMERO en una
+ * evaluación abierta (mata la blandura tipo "vas estable" ante un incendio). NO inventa un ranking:
+ * REUSA la decisión canónica del Priority Engine (`buildControlDiagnosis().nextBestAction`, cuyo
+ * `narrative` ya ordena déficit > deuda cara > fondo de emergencia > sano — la MISMA prioridad que
+ * la app le muestra al usuario). La enriquece con el costo real de la deuda más cara del contexto.
+ * Fallback documentado (solo si no hay diagnóstico del engine): el insight de severidad 'accionar'
+ * (que el context-engine ya ordena "lo accionable primero"). undefined = sin señal grave → highlight.
+ */
+export type PrioritySignalInput = {
+  /** El diagnóstico canónico del Priority Engine (getControlSummary().diagnosis). */
+  diagnosis?: { semaforo: string; nextBestAction: string };
+  debts?: DebtLever[];
+  insights?: { severity: string; title: string; action?: string }[];
+};
+
+export function prioritySignal(input: PrioritySignalInput): string | undefined {
+  const { diagnosis, debts, insights } = input;
+  // 1. CANÓNICO: si el semáforo del Priority Engine no es verde, su nextBestAction ES la prioridad.
+  if (diagnosis && diagnosis.semaforo !== "verde" && diagnosis.nextBestAction) {
+    const topDebt = (debts ?? [])
+      .filter((d) => d.monthlyInterestCost > 0)
+      .sort((a, b) => b.monthlyInterestCost - a.monthlyInterestCost)[0];
+    // Si la prioridad del engine es una deuda cara, enriquecer con su costo real/mes del contexto.
+    if (topDebt && /deuda|tarjeta|pag[áa]|abon/i.test(diagnosis.nextBestAction)) {
+      return `Tu ${topDebt.name} al ${topDebt.apr}% te cuesta ~${topDebt.monthlyInterestCost} ${topDebt.currency}/mes — es lo más caro. ${diagnosis.nextBestAction}`;
+    }
+    return diagnosis.nextBestAction;
+  }
+  // 2. Fallback: el insight 'accionar' de mayor severidad (ya ordenado por el context-engine).
+  const acc = (insights ?? []).find((i) => i.severity === "accionar");
+  if (acc) return `${acc.title}${acc.action ? ` — ${acc.action}` : ""}`;
+  return undefined; // sin señal grave → el asesor lidera con un highlight
+}
