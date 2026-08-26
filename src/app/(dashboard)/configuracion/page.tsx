@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { getAccountInfo } from "@/modules/account/services/account-service";
+import { ReferralCard } from "@/components/referrals/referral-card";
+import { getMyReferral } from "@/lib/referrals/service";
 import { getUserTimezone } from "@/lib/time/user-time";
 import { CurrencySelector } from "@/modules/account/components/currency-selector";
 import { TimezoneSelector } from "@/modules/account/components/timezone-selector";
@@ -81,6 +83,10 @@ export default async function Page() {
   }
   const emailConfigured = isEmailConfigured();
 
+  // Referidos: best-effort. Si la lectura falla, la sección no se pinta y el
+  // resto de Ajustes sigue funcionando.
+  const referral = isSupabaseConfigured() ? await getMyReferral() : null;
+
   return (
     <div className="set-sheet">
       <SetRow title="Tu cuenta" desc="Tu identidad en CARTERA+.">
@@ -106,6 +112,15 @@ export default async function Page() {
           <Icon name="chev" width={2.2} />
         </Link>
       </SetRow>
+
+      {referral ? (
+        <SetRow
+          title="Invitá a alguien"
+          desc="Tu código y tu QR. El QR solo lleva el código: nada de tus datos viaja en él."
+        >
+          <ReferralCard code={referral.code} count={referral.count} />
+        </SetRow>
+      ) : null}
 
       <SetRow title="Tu plan" desc="Tu suscripción y consumo de IA del mes.">
         <span className={`plan-chip${isPremium(acc.plan) ? " prem" : ""}`}>

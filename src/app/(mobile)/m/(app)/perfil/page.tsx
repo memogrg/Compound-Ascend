@@ -15,6 +15,8 @@ import {
 import { MSectionHeader, MContentCard, MDataRow, MProgress } from "../../components/content-kit";
 import { ConfiguracionManager } from "./configuracion-manager";
 import { BuildIdentity } from "./build-identity";
+import { ReferralCard } from "@/components/referrals/referral-card";
+import { getMyReferral } from "@/lib/referrals/service";
 
 /**
  * /m/perfil — identidad + ajustes agrupados (plan, moneda, WhatsApp, hogar, cuenta).
@@ -34,6 +36,8 @@ export default async function MobilePerfil() {
   const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
   const wa = await getMyLink().catch(() => null);
   const whatsappConfigured = isWhatsAppConfigured();
+  // Referidos (paridad con Ajustes web, mismo componente con la piel móvil).
+  const referral = isSupabaseConfigured() ? await getMyReferral() : null;
 
   // Datos extra para la gestión (best-effort: si algo falla, degradamos sin romper).
   let ingestEmails: IngestEmailRow[] = [];
@@ -140,6 +144,17 @@ export default async function MobilePerfil() {
             slot={<MProgress value={usePct} tone="success" height={8} />}
           />
         </MContentCard>
+
+        {/* Invitar: el mismo ReferralCard de la web con skin="mobile" — ahí está el
+            share nativo y la descarga del QR para mandarlo por WhatsApp. */}
+        {referral ? (
+          <>
+            <MSectionHeader title="Invita a alguien" />
+            <MContentCard style={{ marginBottom: 14 }}>
+              <ReferralCard code={referral.code} count={referral.count} skin="mobile" />
+            </MContentCard>
+          </>
+        ) : null}
 
         {/* Ajustes gestionables (moneda · WhatsApp · hogar · notificaciones · ingesta · borrar) */}
         <ConfiguracionManager

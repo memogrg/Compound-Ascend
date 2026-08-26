@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { attributeReferralFromCookie } from "@/lib/referrals/service";
 
 export const runtime = "nodejs";
 
@@ -59,6 +60,17 @@ async function handleCallbackExchange(url: URL, code: string, next: string) {
 
     return NextResponse.redirect(new URL("/login?error=auth", url.origin));
   }
+
+  // Atribución del referido: acá es donde converge TODO camino de alta (OAuth de
+  // Google y el enlace de confirmación por correo pasan por este mismo
+  // callback), y es el primer punto en el que la cuenta ya existe. La cookie
+  // sobrevivió el viaje a Google porque es `sameSite: lax`.
+  //
+  // `await` y no fire-and-forget: en serverless la respuesta termina el proceso
+  // y una promesa suelta se cancelaría a mitad. No puede lanzar —devuelve un
+  // resultado, nunca throw— así que no arriesga el login.
+  const attribution = await attributeReferralFromCookie();
+  if (attribution === "atribuido") logger.info("referido atribuido");
 
   return NextResponse.redirect(new URL(next, url.origin));
 }

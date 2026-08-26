@@ -43,6 +43,25 @@ export type ProfileRow = Timestamps & {
   avatar_url: string | null;
   onboarding_completed: boolean;
   profile_completion: number;
+  /**
+   * Código de invitación: 8 caracteres del alfabeto sin ambigüedades, aleatorio
+   * (migración 20260826000001). Público por diseño — se comparte en un QR.
+   */
+  referral_code: string;
+};
+
+/**
+ * Una fila por referido EFECTIVO. El contador es count(*): la fila es el hecho,
+ * no hay acumulador que se pueda desincronizar. UNIQUE en referred_user_id →
+ * un usuario se cuenta una sola vez. Escribe service-role; el usuario solo lee
+ * los suyos (migración 20260826000001).
+ */
+export type ReferralRow = {
+  id: string;
+  referrer_user_id: string;
+  referred_user_id: string;
+  status: "registrado" | "activo" | "anulado";
+  created_at: string;
 };
 
 export type UserSettingsRow = Timestamps & {
@@ -1076,6 +1095,13 @@ export interface Database {
         Partial<HouseholdActivityLogRow> & { table_name: string; row_id: string },
         never
       >;
+      // Referidos (migración 20260826000001). Escritura solo service-role: si el
+      // usuario pudiera insertar, se inventaría referidos.
+      referrals: TableShape<
+        ReferralRow,
+        Partial<ReferralRow> & { referrer_user_id: string; referred_user_id: string },
+        Partial<ReferralRow>
+      >;
       household_invitations: TableShape<
         HouseholdInvitationRow,
         Partial<HouseholdInvitationRow> & {
@@ -1193,6 +1219,10 @@ export interface Database {
       ensure_household: {
         Args: { p_name?: string | null };
         Returns: string;
+      };
+      resolve_referral_code: {
+        Args: { p_code: string };
+        Returns: string | null;
       };
       get_invitation_by_token: {
         Args: { p_token: string };
