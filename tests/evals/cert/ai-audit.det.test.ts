@@ -110,13 +110,38 @@ describe("ai-audit · contradicciones (detectores duros)", () => {
       detectInvestInDeficit("Podrías invertir en un ETF.", null, facts({ freeCashflow: 100_000 })),
     ).toBeNull();
   });
-  it("pagar deuda saldada", () => {
+  // ── Detector A · guarda DUAL: directivo real sigue ROJO, hedge comparativo PASA ──
+  const saldada = facts({ debts: [{ name: "Tarjeta", balance: 0, apr: 45 }] });
+  it("pagar deuda saldada · directivo real → dispara (ROJO)", () => {
+    const c = detectPayPaidDebt("Te conviene abonar a la tarjeta este mes.", null, saldada);
+    expect(c?.kind).toBe("pagar-deuda-saldada");
+  });
+  it("pagar deuda saldada · directivo imperativo → dispara (ROJO)", () => {
     const c = detectPayPaidDebt(
-      "Te conviene abonar a la tarjeta este mes.",
+      "Tu prioridad este mes es abonarle a tu tarjeta para bajarla.",
       null,
-      facts({ debts: [{ name: "Tarjeta", balance: 0, apr: 45 }] }),
+      saldada,
     );
     expect(c?.kind).toBe("pagar-deuda-saldada");
+  });
+  it("pagar deuda saldada · acción explícita debt_extra_payment → dispara (ROJO)", () => {
+    expect(detectPayPaidDebt("Listo.", "debt_extra_payment", saldada)?.kind).toBe(
+      "pagar-deuda-saldada",
+    );
+  });
+  it("falso-positivo A (corrida 1) · marco comparativo 'comparar…abonar…o invertir' → NO dispara", () => {
+    const reply =
+      "Como todavía no tenés cubiertos tus fondos de defensa (emergencia y paz), tu prioridad este mes es construir ese colchón. Ese dinero es lo que evitará que cualquier imprevisto te obligue a endeudarte más. Tu excedente mensual es de ₡50.000; te recomiendo destinarlo íntegramente a fortalecer tu estabilidad antes de considerar cualquier inversión. Una vez que tengas ese respaldo, podemos comparar con calma si te conviene más abonar a tus deudas o empezar a invertir.";
+    expect(detectPayPaidDebt(reply, null, saldada)).toBeNull();
+  });
+  it("falso-positivo B (corrida 2) · 'abonar o invertir' … 'nueva deuda' en otra oración → NO dispara", () => {
+    const reply =
+      "Todavía no estás en la etapa de elegir entre abonar o invertir, porque primero necesitamos blindar tu tranquilidad. Tu excedente mensual de ₡50.000 debería enfocarse en construir tus fondos de defensa (emergencia y paz), ya que ese colchón es lo único que evitará que cualquier imprevisto se convierta en una nueva deuda. Una vez que tengas cubiertos esos fondos, con gusto hacemos la comparación financiera para ver qué te conviene más. ¿Tenés claro cuánto necesitás para tu fondo de emergencia o querés que lo revisemos?";
+    expect(detectPayPaidDebt(reply, null, saldada)).toBeNull();
+  });
+  it("control · con deuda VIVA, recomendar pagarla NO es fantasma → NO dispara", () => {
+    const viva = facts({ debts: [{ name: "Tarjeta", balance: 500_000, apr: 45 }] });
+    expect(detectPayPaidDebt("Abonále a tu tarjeta este mes.", null, viva)).toBeNull();
   });
   it("felicitar en caída", () => {
     const c = detectCongratulateOnDecline(
