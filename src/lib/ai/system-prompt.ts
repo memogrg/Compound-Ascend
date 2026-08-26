@@ -9,6 +9,7 @@ import type { Trajectory } from "@/lib/ai/trajectory";
 import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
 import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
+import type { DebtLever } from "@/lib/ai/context-levers";
 
 /** Una porción de concentración: etiqueta, monto en la moneda base y peso (0-1). */
 export type ConcentracionSlice = { label: string; valor: number; pct: number };
@@ -134,6 +135,13 @@ export type FinancialContext = {
   topDebtApr?: number;
   /** Moneda de la deuda más cara: sin ella, comparar APR entre monedas engaña. */
   topDebtCurrency?: string;
+  /**
+   * Deudas POR-ENTIDAD (saldo vivo + APR + mínimo + costo mensual del interés), top-N por
+   * costo de interés. Es la munición del "tu tarjeta al 40% te cuesta ₡X/mes": el agregado
+   * (debtTotals/topDebt*) no alcanza para nombrar la 2ª/3ª deuda con su número real.
+   */
+  debts?: DebtLever[];
+  debtsMoreCount?: number;
   goalCount?: number;
   goalsProgressPct?: number;
   /**
@@ -449,6 +457,17 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.topDebtName) {
     facts.push(
       `Deuda con el APR más alto: ${ctx.topDebtName}${ctx.topDebtApr !== undefined ? ` (APR ${ctx.topDebtApr}%${ctx.topDebtCurrency ? `, en ${ctx.topDebtCurrency}` : ""})` : ""}.`,
+    );
+  }
+  // Ladder POR-DEUDA (hecho neutral, espejo de las posiciones): saldo vivo, APR, mínimo y el
+  // costo mensual del interés. Sin conclusión ni instrucción — el asesor decide qué hacer con esto.
+  if (ctx.debts && ctx.debts.length > 0) {
+    const lines = ctx.debts.map(
+      (d) =>
+        `  · ${d.name}: saldo ${d.liveBalance} ${d.currency}${d.apr != null ? ` @${d.apr}%` : ""}, mínimo ${d.minPayment} ${d.currency}${d.monthlyInterestCost > 0 ? `, interés ~${d.monthlyInterestCost} ${d.currency}/mes` : ""}.`,
+    );
+    facts.push(
+      `Tus deudas${ctx.debtsMoreCount ? ` (top ${ctx.debts.length} por costo de interés; +${ctx.debtsMoreCount} más)` : ""} — saldo vivo, APR, mínimo y lo que te cuesta el interés cada mes:\n${lines.join("\n")}`,
     );
   }
   // Caveat SOLO con deudas en más de una moneda: un 20% en colones y un 20% en dólares no cuestan

@@ -18,6 +18,7 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
+import { debtLevers } from "@/lib/ai/context-levers";
 
 /**
  * PRIVACIDAD (cuenta compartida): las lecturas FINANCIERAS de este motor abarcan
@@ -195,6 +196,18 @@ export async function buildFinancialContext(
       ctx.topDebtName = top.name;
       ctx.topDebtApr = top.apr ?? undefined;
       ctx.topDebtCurrency = top.currency;
+      // Ladder POR-DEUDA (mismo saldo vivo canónico): top-6 por costo de interés + moreCount.
+      const { debts: debtLeverList, moreCount } = debtLevers(
+        debts.map((d) => ({
+          name: d.name,
+          liveBalance: d.currentBalance,
+          apr: d.apr,
+          minPayment: d.minPayment,
+          currency: d.currency,
+        })),
+      );
+      ctx.debts = debtLeverList;
+      if (moreCount > 0) ctx.debtsMoreCount = moreCount;
     }
   } catch {
     // Control no disponible.
