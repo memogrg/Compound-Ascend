@@ -406,14 +406,19 @@ export async function confirmDebtExtraPaymentAction(raw: unknown): Promise<Confi
   }
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    const { reportPaymentAction } = await import("@/modules/control");
+    const { reportPaymentAction, getDebt } = await import("@/modules/control");
+    // B1 (#437): reportPaymentAction ahora EXIGE la moneda. Si la IA no la extrajo, resolvemos la
+    // NATIVA de la deuda (un abono es en la moneda de su deuda); si la extrajo distinta, el guard
+    // del servicio la rechaza. Nunca se omite.
+    const debt = await getDebt(parsed.data.debtId);
+    if (!debt) return { ok: false, message: "No encontré esa deuda." };
     const res = await reportPaymentAction({
       debtId: parsed.data.debtId,
       paymentDate: parsed.data.paymentDate,
       amount: 0,
       extraAmount: parsed.data.amount,
       kind: "extraordinario",
-      ...(parsed.data.currency ? { currency: parsed.data.currency } : {}),
+      currency: parsed.data.currency ?? debt.currency,
     });
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo registrar el abono." };
     return { ok: true };

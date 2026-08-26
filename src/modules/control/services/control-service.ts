@@ -13,7 +13,7 @@ import {
 } from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import { getBaseSummary, getDisplayCurrency } from "@/modules/financial-base";
-import { userCurrentPeriod } from "@/lib/time/user-time";
+import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import { monedaDelPagoEsCoherente } from "@/modules/control/engine/debt-strategy";
 import {
   registerLinkedTransaction,
@@ -81,6 +81,9 @@ function rowToDebt(r: DebtRow): Debt {
     name: r.name,
     createdAt: r.created_at,
     debtType: r.debt_type,
+    // ANCLA inmutable de alta (record_debt_payment NUNCA la decrementa), NO el saldo vivo. Para el
+    // saldo ACTUAL usá getCurrentDebtBalances()/currentDebtBalance() (ancla − pagos). Filtrar o
+    // recomendar sobre este campo hace que una deuda saldada siga apareciendo como debida (P2).
     balance: Number(r.balance),
     minPayment: Number(r.min_payment ?? 0),
     currentPayment: Number(r.current_payment ?? 0),
@@ -144,7 +147,7 @@ export async function createGoal(input: GoalInput, ctx?: AuthContext): Promise<s
     targetAmount: targetAmount ?? 0,
     periodAmount: input.periodAmount,
     targetDate: input.targetDate,
-    todayISO: todayISO(),
+    todayISO: await userToday(ctx),
   });
   const { data, error } = await supabase
     .from("savings_goals")
@@ -247,7 +250,7 @@ export async function updateGoal(id: string, input: GoalInput): Promise<void> {
     targetAmount: targetAmount ?? 0,
     periodAmount: input.periodAmount,
     targetDate: input.targetDate,
-    todayISO: todayISO(),
+    todayISO: await userToday(),
   });
   const keepSchedule =
     recurrence !== "ninguna" &&
@@ -298,6 +301,22 @@ export async function deleteGoal(id: string): Promise<void> {
   const scope = await householdWriteScope(supabase, user.id);
   await supabase.from("savings_goals").delete().eq("id", id).in("user_id", scope);
   await logHouseholdDeletion(supabase, { userId: user.id, table: "savings_goals", rowId: id });
+}
+
+/**
+ * Convierte una meta genérica en el fondo de emergencia FORMAL (solo setea `goal_type`). El
+ * usuario lo confirma con 1 tap desde Protección (nudge de delta 2); NUNCA se auto-migra. No
+ * re-deriva recurrencia: cambia únicamente el tipo, para que este lector y los demás cuenten
+ * la meta como el fondo formal.
+ */
+export async function convertGoalToEmergencyFund(id: string, ctx?: AuthContext): Promise<void> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const scope = await householdWriteScope(supabase, userId);
+  await supabase
+    .from("savings_goals")
+    .update({ goal_type: "defensa:fondo_emergencia", last_edited_by: userId })
+    .eq("id", id)
+    .in("user_id", scope);
 }
 
 export async function deleteDebt(id: string): Promise<void> {
@@ -927,17 +946,25 @@ export type ControlSummary = {
 export async function getControlSummary(ctx?: AuthContext): Promise<ControlSummary> {
   const { userId } = await resolveAuth(ctx);
   const { getIndexRates } = await import("@/modules/control/services/index-rates");
-  const [goals, debts, base, currency, discipline, rates, indexRates] = await Promise.all([
-    listGoals(ctx),
-    listDebts(ctx),
-    getBaseSummary(ctx),
-    getDisplayCurrency(ctx),
-    getDiscipline(userId, ctx),
-    getFxRates(),
-    getIndexRates(),
-  ]);
+  // Dinámico para evitar el ciclo estático control-service ↔ debts-service (debts-service importa
+  // listDebts de acá). Da el saldo VIVO canónico por deuda (mismo que usa el asesor).
+  const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
+  const [goals, debts, base, currency, discipline, rates, indexRates, liveBalances] =
+    await Promise.all([
+      listGoals(ctx),
+      listDebts(ctx),
+      getBaseSummary(ctx),
+      getDisplayCurrency(ctx),
+      getDiscipline(userId, ctx),
+      getFxRates(),
+      getIndexRates(),
+      getCurrentDebtBalances(ctx),
+    ]);
 
-  const hasEmergencyFund = goals.some((g) => /emergencia|paz/i.test(g.name) && g.currentAmount > 0);
+  // Canónico: solo el fondo FORMAL de emergencia (goal_type), no por nombre.
+  const hasEmergencyFund = goals.some(
+    (g) => g.goalType === "defensa:fondo_emergencia" && g.currentAmount > 0,
+  );
   const stress = debts.length
     ? Math.round(debts.reduce((s, d) => s + (d.stress ?? 5), 0) / debts.length)
     : undefined;
@@ -951,9 +978,14 @@ export async function getControlSummary(ctx?: AuthContext): Promise<ControlSumma
     currentAmount: convertCurrency(g.currentAmount, g.currency, currency, rates),
     monthlyContribution: convertCurrency(g.monthlyContribution, g.currency, currency, rates),
   }));
+  // Saldo VIVO por deuda (ancla − pagos), NO el ancla de alta: una deuda saldada (≤0) no debe
+  // contar como activa/crítica ni entrar al plan/alertas/estrategia del diagnóstico (P2, mismo
+  // linaje que el asesor). `summary.debts` sigue crudo abajo: buildDeudasVsMes lo usa como monto
+  // de ALTA del mes (flujo), donde el ancla es lo correcto.
+  const liveById = new Map(liveBalances.map((d) => [d.id, d.currentBalance]));
   const debtsForEngine = debts.map((d) => ({
     ...d,
-    balance: convertCurrency(d.balance, d.currency, currency, rates),
+    balance: convertCurrency(liveById.get(d.id) ?? d.balance, d.currency, currency, rates),
     minPayment: convertCurrency(d.minPayment, d.currency, currency, rates),
     currentPayment: convertCurrency(d.currentPayment, d.currency, currency, rates),
   }));
@@ -1051,8 +1083,4 @@ function futureISO(monthsAhead: number): string {
   const d = new Date();
   d.setMonth(d.getMonth() + monthsAhead);
   return d.toISOString().slice(0, 10);
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
 }

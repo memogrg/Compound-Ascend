@@ -64,14 +64,13 @@ export const debtPaymentInputSchema = z.object({
   extraMode: z.enum(["tiempo", "cuota"]).optional(),
   kind: z.enum(["ordinario", "extraordinario"]).default("ordinario"),
   /**
-   * Moneda en la que viene `amount`. Opcional por compatibilidad con quien no la manda,
-   * pero cuando llega, el servicio comprueba que sea la de la deuda y rechaza si no.
-   *
-   * Existe porque el importe y su etiqueta salían de sitios distintos: el formulario
-   * precargaba la cuota convertida a la moneda principal y el guardado la escribía con la
-   * moneda de la deuda. Ese desajuste no se podía expresar, así que se guardaba callado.
+   * Moneda en la que viene `amount`. REQUERIDA (delta 3, B1): antes era opcional y el guard
+   * #437 (`monedaDelPagoEsCoherente`) se saltaba en `undefined`, así que un importe en otra
+   * moneda podía guardarse callado como si fuera el de la deuda. Todos los callers ya la mandan
+   * (los forms desde la nativa de la deuda; los programáticos con `debt.currency` explícito), así
+   * que exigirla no rompe a nadie y le da dientes al guard SIEMPRE.
    */
-  currency: z.string().length(3).optional(),
+  currency: z.string().length(3),
 });
 
 export type GoalInput = z.infer<typeof goalInputSchema>;

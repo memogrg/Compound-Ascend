@@ -73,6 +73,9 @@ export function AccountsManager({ accounts, currency }: { accounts: Account[]; c
   const [fromId, setFromId] = useState("");
   const [toId, setToId] = useState("");
   const [amount, setAmount] = useState<number | undefined>(undefined);
+  // Delta 3 (C): moneda de la transferencia ELEGIBLE (paridad con el web transfer-modal); antes
+  // se mandaba fija sin selector. Default a la de la pantalla.
+  const [transferCur, setTransferCur] = useState(currency);
   const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
@@ -164,6 +167,7 @@ export function AccountsManager({ accounts, currency }: { accounts: Account[]; c
     setFromId(accounts[0]?.id ?? "");
     setToId(accounts[1]?.id ?? "");
     setAmount(undefined);
+    setTransferCur(currency);
     setDate(todayISO());
     setNote("");
     setTrError(null);
@@ -194,7 +198,7 @@ export function AccountsManager({ accounts, currency }: { accounts: Account[]; c
           fromAccountId: fromId,
           toAccountId: toId,
           amount,
-          currency,
+          currency: transferCur,
           occurredOn: date,
           note: note.trim() || undefined,
         }),
@@ -395,8 +399,16 @@ export function AccountsManager({ accounts, currency }: { accounts: Account[]; c
             name="amount"
             label="Monto"
             value={amount}
-            currency={currency}
+            currency={transferCur}
             onChange={setAmount}
+          />
+          <SheetSelect
+            name="currency"
+            label="Moneda"
+            value={transferCur}
+            options={CUR_OPTS}
+            sheetTitle="Elige la moneda"
+            onChange={setTransferCur}
           />
           <DateField name="occurredOn" label="Fecha" value={date} onChange={setDate} />
           <TextField

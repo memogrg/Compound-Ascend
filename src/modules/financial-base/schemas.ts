@@ -21,7 +21,7 @@ export const incomeInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(120),
   incomeType: z.enum(["activo", "pasivo", "extraordinario"]),
   category: z.string().max(60).optional(),
-  amount: z.number({ error: "Monto inválido" }).nonnegative("No puede ser negativo"),
+  amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
   currency: z.string().length(3),
   frequency,
   isFixed: z.boolean().default(true),
@@ -44,7 +44,7 @@ export const expenseInputSchema = z.object({
     "donacion",
     "miscelaneo",
   ]),
-  amount: z.number({ error: "Monto inválido" }).nonnegative("No puede ser negativo"),
+  amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
   currency: z.string().length(3),
   frequency,
   isFixed: z.boolean().default(true),
@@ -110,7 +110,7 @@ export const txnInputSchema = z
   .object({
     kind: z.enum(["ingreso", "gasto", "ajuste"]),
     amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
-    currency: z.string().length(3).default("CRC"),
+    currency: z.string().length(3).optional(),
     occurredOn: z.string().min(8).max(10), // YYYY-MM-DD
     categoryId: uuidOrNull.optional(),
     accountId: uuidOrNull.optional(),
@@ -142,7 +142,7 @@ export const txnInputSchema = z
 export const accountInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(80),
   kind: z.enum(["banco", "efectivo", "tarjeta", "otro"]).default("banco"),
-  currency: z.string().length(3).default("CRC"),
+  currency: z.string().length(3).optional(),
   isDefault: z.boolean().default(false),
 });
 
@@ -151,7 +151,7 @@ export const transferInputSchema = z
     fromAccountId: z.string().uuid("Elige la cuenta de origen"),
     toAccountId: z.string().uuid("Elige la cuenta de destino"),
     amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
-    currency: z.string().length(3).default("CRC"),
+    currency: z.string().length(3).optional(),
     occurredOn: z.string().min(8).max(10),
     note: z.string().max(280).optional(),
   })
@@ -165,7 +165,7 @@ export const csvTxnSchema = z.object({
   amount: z.number().positive(),
   occurredOn: z.string().min(8).max(10),
   description: z.string().max(200).optional(),
-  currency: z.string().length(3).default("CRC"),
+  currency: z.string().length(3).optional(),
 });
 
 export const ruleInputSchema = z.object({
@@ -232,7 +232,7 @@ export const templateInputSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre").max(80),
   kind: z.enum(["ingreso", "gasto", "transferencia"]).default("gasto"),
   amount: z.number({ error: "Monto inválido" }).positive().optional().nullable(),
-  currency: z.string().length(3).default("CRC"),
+  currency: z.string().length(3).optional(),
   categoryId: uuidOrNull.optional(),
   accountId: uuidOrNull.optional(),
   merchantOrSource: z.string().max(160).optional().nullable(),

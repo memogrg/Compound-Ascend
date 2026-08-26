@@ -11,6 +11,10 @@ import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/format";
 import { HelpTip } from "@/components/shared/help-tip";
 import { setPeaceMonthsAction } from "@/modules/wealth/api/actions";
+// Import DIRECTO de la server action (no del barrel @/modules/control, que arrastra server-only
+// y rompe el build de este client component; misma razón que en defense-funds-mobile.tsx).
+// eslint-disable-next-line no-restricted-imports
+import { convertGoalToEmergencyFundAction } from "@/modules/control/api/actions";
 import {
   PEACE_MONTHS_MIN,
   PEACE_MONTHS_MAX,
@@ -18,7 +22,11 @@ import {
   type FundSizing,
 } from "@/modules/wealth/engine/fund-sizing";
 
-type Report = DefenseFundsPlan & { currency: string };
+type Report = DefenseFundsPlan & {
+  currency: string;
+  /** Meta genérica "emergencia" (no formal) que el usuario puede convertir con 1 tap. */
+  emergencyCandidate?: { id: string; name: string } | null;
+};
 
 const EMERGENCY_HELP =
   "Colchón de arranque para un imprevisto puntual (una emergencia médica, un electrodoméstico roto). Recomendado $1.000. No se dimensiona por meses.";
@@ -133,6 +141,14 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
       router.refresh();
     });
 
+  const candidate = report.emergencyCandidate ?? null;
+  const onConvert = () =>
+    startTransition(async () => {
+      if (!candidate) return;
+      await convertGoalToEmergencyFundAction(candidate.id);
+      router.refresh();
+    });
+
   const mortgageNote =
     "Aunque saliste de deudas de consumo, tu hipoteca es una obligación fija que sigue si tu ingreso se detiene. " +
     `Por eso conviene tener ${peace.months} meses de reserva: para cubrir tus gastos esenciales y la cuota sin angustia. Es tu paz mental.`;
@@ -154,6 +170,26 @@ export function DefenseFunds({ report, mortgageCase }: { report: Report; mortgag
         currency={currency}
         priority
       />
+
+      {/* Nudge (delta 2): una meta llamada "emergencia" sin marcar como fondo formal. 1 tap la
+          convierte; nunca se auto-migra. */}
+      {candidate ? (
+        <div className="card card-pad" style={{ borderLeft: "3px solid var(--accent)" }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+            Tenés una meta llamada <strong>«{candidate.name}»</strong> que no está marcada como tu
+            fondo de emergencia formal, así que no cuenta como tal en el tablero. ¿La convertimos?
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={pending}
+            onClick={onConvert}
+            style={{ marginTop: 10 }}
+          >
+            {pending ? "Convirtiendo…" : "Convertir en fondo de emergencia"}
+          </button>
+        </div>
+      ) : null}
 
       <FundCard
         title="Fondo de paz"

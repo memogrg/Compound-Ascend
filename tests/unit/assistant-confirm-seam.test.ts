@@ -79,6 +79,8 @@ vi.mock("@/modules/control", async () => {
   const { z } = await import("zod");
   return {
     reportPaymentAction: (args: unknown) => reportPaymentAction(args),
+    // Delta 3 (B1): confirmDebtExtraPaymentAction resuelve la moneda NATIVA de la deuda.
+    getDebt: async () => ({ currency: "CRC" }),
     createGoal: async () => "g1",
     goalInputSchema: z.object({}).passthrough(),
   };
@@ -233,12 +235,12 @@ describe("confirmDebtExtraPaymentAction · abono extra a capital", () => {
     });
   });
 
-  it("omite `currency` cuando no viene, en vez de mandar undefined", async () => {
+  it("manda la moneda NATIVA de la deuda cuando la IA no la trae (B1: nunca omite)", async () => {
     await confirmDebtExtraPaymentAction(payload);
-    expect(reportPaymentAction.mock.calls[0]![0]).not.toHaveProperty("currency");
+    expect(reportPaymentAction.mock.calls[0]![0]).toMatchObject({ currency: "CRC" });
   });
 
-  it("la incluye cuando sí viene", async () => {
+  it("usa la que sí viene cuando la IA la extrajo", async () => {
     await confirmDebtExtraPaymentAction({ ...payload, currency: "USD" });
     expect(reportPaymentAction.mock.calls[0]![0]).toMatchObject({ currency: "USD" });
   });

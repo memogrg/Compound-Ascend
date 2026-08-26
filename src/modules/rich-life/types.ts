@@ -45,8 +45,8 @@ export type RichLifeIndicators = {
   netWorth: number;
   totalAssets: number;
   totalLiabilities: number;
-  assetLiabilityRatio: number;
-  debtToAssets: number; // 0-1
+  assetLiabilityRatio: number | null; // null = sin deudas (ratio infinito)
+  debtToAssets: number; // 0..∞ (>1 = sobreendeudado; sin cap a propósito)
   productiveAssetsPct: number; // 0-1
   liquidAssetsPct: number; // 0-1
   depreciablePct: number; // 0-1

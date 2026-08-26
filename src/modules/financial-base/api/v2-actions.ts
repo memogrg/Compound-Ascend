@@ -446,7 +446,7 @@ export async function addTransactionAction(
           linkedKind: created.linkedKind,
           linkedId: created.linkedId,
           amount: parsed.data.amount,
-          currency: parsed.data.currency,
+          currency: created.currency,
           occurredOn: parsed.data.occurredOn,
         });
       } catch (propErr) {
@@ -781,7 +781,10 @@ export async function addTransferAction(raw: unknown): Promise<ActionResult> {
 // ---------- Importación CSV ----------
 export type ImportResult = { ok: boolean; count: number; skipped: number; message?: string };
 
-export async function importTransactionsAction(rows: unknown[]): Promise<ImportResult> {
+export async function importTransactionsAction(
+  rows: unknown[],
+  accountId?: string,
+): Promise<ImportResult> {
   if (!isSupabaseConfigured())
     return { ok: false, count: 0, skipped: 0, message: "Conecta Supabase." };
   const valid: CsvTxnInput[] = [];
@@ -794,7 +797,10 @@ export async function importTransactionsAction(rows: unknown[]): Promise<ImportR
   if (valid.length === 0)
     return { ok: false, count: 0, skipped, message: "No se encontraron filas válidas." };
   try {
-    const count = await importTransactions(valid);
+    // accountId es la cuenta elegida en el modal (nivel-modal). Sin cuenta → null (comportamiento
+    // anterior). RLS + el FK validan la propiedad; un id no-string se descarta.
+    const account = typeof accountId === "string" && accountId ? accountId : null;
+    const count = await importTransactions(valid, account);
     revalidate();
     return { ok: count > 0, count, skipped };
   } catch {

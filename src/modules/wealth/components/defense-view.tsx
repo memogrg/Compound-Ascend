@@ -1,6 +1,6 @@
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
-import { EditWealthButton, WealthActions } from "./wealth-actions";
+import { EditWealthButton, PayPremiumButton, WealthActions } from "./wealth-actions";
 import { formatMoney } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
 import type { PolicyType } from "@/modules/wealth/types";
@@ -213,6 +213,9 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
                         </div>
                       ) : null}
                     </div>
+                    {pol.premium ? (
+                      <PayPremiumButton item={pol} label={POLICY_LABEL[pol.policyType]} />
+                    ) : null}
                     <EditWealthButton mode="policy" item={pol} currency={currency} />
                     <DeleteButton id={pol.id} kind="policy" />
                   </div>

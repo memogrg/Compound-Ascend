@@ -23,6 +23,7 @@ export type {
 export {
   getControlSummary,
   listDebts,
+  getDebt,
   listGoals,
   createGoal,
   listDebtPayments,

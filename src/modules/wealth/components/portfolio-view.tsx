@@ -15,6 +15,7 @@ import { PerformanceChart, type AreaPoint } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { useRouter } from "next/navigation";
 import { formatMoney, formatCompact, formatPercent, currencySymbol } from "@/lib/format";
 import { convertCurrency } from "@/lib/fx";
@@ -828,7 +829,7 @@ function InvRow({
 function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () => void }) {
   const router = useRouter();
   const toast = useToast();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = useCaptureToday();
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const [hist, setHist] = useState<{ date: string; value: number }[] | null>(null);
@@ -884,7 +885,7 @@ function ValuationModal({ holding, onClose }: { holding: Holding; onClose: () =>
         <div className="fld-2">
           <div className="fld">
             <label className="fld-label">Fecha de valoración</label>
-            <input className="inp" type="date" defaultValue={today} disabled />
+            <input className="inp" type="date" defaultValue={today()} disabled />
           </div>
           <div className="fld">
             <label className="fld-label">Valor de cuenta</label>

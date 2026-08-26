@@ -10,6 +10,7 @@ import {
   type RawImapMessage,
 } from "@/lib/ingestion/email/imap-poller";
 import { parseNotification } from "@/lib/ingestion/sources";
+import type { RawMovement } from "@/lib/ingestion/types";
 
 // Muestra real de notificación de compra con tarjeta de BAC (la usa el parser).
 const BAC_CARD = `Hola GUILLERMO, BAC Credomatic le informa.
@@ -116,6 +117,7 @@ describe("email ingestion · fetchUnseen", () => {
         recipients: [`Comms <${FLAT_INBOX}>`, "MEMOGRG@gmail.com", FLAT_INBOX],
         subject: "Compra",
         text: "cuerpo",
+        receivedAt: "2026-06-11T20:31:00.000Z",
       },
     ]);
     const [m] = await fetchUnseen(client);
@@ -125,6 +127,7 @@ describe("email ingestion · fetchUnseen", () => {
     // candidatos = destinatarios + From (este último para reenvío manual)
     expect(m!.recipients).toEqual([FLAT_INBOX, FORWARDER, BANK_FROM]);
     expect(m!.uid).toBe(7);
+    expect(m!.receivedAt).toBe("2026-06-11T20:31:00.000Z"); // envelope.date llega hasta el mensaje
   });
 
   it("reenvío manual: el From entra como candidato de identificación", async () => {
@@ -136,6 +139,7 @@ describe("email ingestion · fetchUnseen", () => {
         recipients: [FLAT_INBOX], // el To es solo el buzón de ingesta
         subject: "Fwd: Compra BAC",
         text: BAC_CARD,
+        receivedAt: null,
       },
     ]);
     const [m] = await fetchUnseen(client);
@@ -144,9 +148,33 @@ describe("email ingestion · fetchUnseen", () => {
 
   it("usa uid:<n> si no hay messageId y descarta correos sin remitente o cuerpo", async () => {
     const client = fakeClient([
-      { uid: 9, messageId: null, from: "x@y.com", recipients: [FORWARDER], subject: "s", text: "hola" },
-      { uid: 10, messageId: null, from: null, recipients: [FORWARDER], subject: "s", text: "hola" }, // sin from
-      { uid: 11, messageId: null, from: "z@y.com", recipients: [FORWARDER], subject: "s", text: "  " }, // sin cuerpo
+      {
+        uid: 9,
+        messageId: null,
+        from: "x@y.com",
+        recipients: [FORWARDER],
+        subject: "s",
+        text: "hola",
+        receivedAt: null,
+      },
+      {
+        uid: 10,
+        messageId: null,
+        from: null,
+        recipients: [FORWARDER],
+        subject: "s",
+        text: "hola",
+        receivedAt: null,
+      }, // sin from
+      {
+        uid: 11,
+        messageId: null,
+        from: "z@y.com",
+        recipients: [FORWARDER],
+        subject: "s",
+        text: "  ",
+        receivedAt: null,
+      }, // sin cuerpo
     ]);
     const out = await fetchUnseen(client);
     expect(out).toHaveLength(1);
@@ -155,7 +183,7 @@ describe("email ingestion · fetchUnseen", () => {
 });
 
 describe("email ingestion · processInboundEmails", () => {
-  const owner: EmailOwner = { userId: "u1", householdId: "h1" };
+  const owner: EmailOwner = { userId: "u1", householdId: "h1", timezone: null };
   const msg = (over: Partial<ImapMessage>): ImapMessage => ({
     id: "<m1@bac>",
     from: BANK_FROM,
@@ -163,6 +191,7 @@ describe("email ingestion · processInboundEmails", () => {
     subject: "Compra",
     text: BAC_CARD,
     uid: 1,
+    receivedAt: null,
     ...over,
   });
 
@@ -177,6 +206,7 @@ describe("email ingestion · processInboundEmails", () => {
         recipients: [FLAT_INBOX],
         subject: "Fwd: Compra BAC",
         text: BAC_CARD,
+        receivedAt: null,
       },
     ]);
     const messages = await fetchUnseen(client);
@@ -189,10 +219,7 @@ describe("email ingestion · processInboundEmails", () => {
     const { deps, proposals } = fakeDeps({ [FORWARDER]: owner });
     // Dos correos distintos (Message-ID distinto, así no choca el dedup por id) con
     // la MISMA notificación BAC → misma (cuenta, external_ref).
-    const messages = [
-      msg({ id: "<copia-A@bac>", uid: 1 }),
-      msg({ id: "<copia-B@bac>", uid: 2 }),
-    ];
+    const messages = [msg({ id: "<copia-A@bac>", uid: 1 }), msg({ id: "<copia-B@bac>", uid: 2 })];
     const summary = await processInboundEmails(messages, parseNotification, deps);
     expect(summary).toEqual({ procesados: 2, propuestos: 1, ignorados: 0, duplicados: 1 });
     expect(proposals).toHaveLength(1); // la compra entró una sola vez
@@ -239,5 +266,100 @@ describe("email ingestion · processInboundEmails", () => {
     expect(proposals).toHaveLength(0);
     expect(markedSeen).toEqual([3]); // se marca leído igual
     expect(processed.has("<m3@x>")).toBe(true);
+  });
+});
+
+describe("email ingestion · fecha faltante (fallback a la fecha de recepción)", () => {
+  // Movimiento reconocido por el parser pero SIN fecha (occurredOn ""): antes moría en el insert
+  // porque ingest_proposals.occurred_on es NOT NULL (bug: "invalid input syntax for type date").
+  const movimientoSinFecha: RawMovement = {
+    kind: "gasto",
+    amount: 11490,
+    currency: "CRC",
+    occurredOn: "",
+    merchant: "AUTO MERCADO",
+    description: "Compra",
+    sourceKind: "email_notification",
+    bankCode: "BAC",
+    confidence: 0.9,
+    externalRef: "ref-sin-fecha",
+    rawText: "cuerpo sin fecha",
+  };
+
+  /** Deps mínimas que CAPTURAN los movimientos entregados a saveProposals para inspeccionarlos. */
+  function capturingDeps(owner: EmailOwner) {
+    const capturado: RawMovement[] = [];
+    const deps: EmailIngestDeps = {
+      lookupOwner: async () => owner,
+      isProcessed: async () => false,
+      markProcessed: async () => {},
+      saveProposals: async (movements) => {
+        capturado.push(...movements);
+        return { inserted: movements.length, duplicated: 0 };
+      },
+      markSeen: async () => {},
+    };
+    return { deps, capturado };
+  }
+
+  const msgSinFecha = (over: Partial<ImapMessage>): ImapMessage => ({
+    id: "<sinfecha@bac>",
+    from: BANK_FROM,
+    recipients: [FLAT_INBOX, FORWARDER],
+    subject: "Compra",
+    text: "cuerpo sin fecha",
+    uid: 99,
+    receivedAt: null,
+    ...over,
+  });
+
+  it("email sin fecha parseable -> usa la fecha de RECEPCIÓN en la tz del usuario (no rompe el insert)", async () => {
+    // receivedAt = 25 ago 02:00Z. En Asia/Tokyo (UTC+9) es el 25; en UTC/CR sería el 24 → que dé
+    // "2026-08-25" prueba que se usa la tz DEL DUEÑO (no UTC ni la default), consistente con #90.
+    const { deps, capturado } = capturingDeps({
+      userId: "u1",
+      householdId: "h1",
+      timezone: "Asia/Tokyo",
+    });
+    const parseSinFecha = (): RawMovement[] => [movimientoSinFecha];
+    const summary = await processInboundEmails(
+      [msgSinFecha({ receivedAt: "2026-08-25T02:00:00.000Z" })],
+      parseSinFecha,
+      deps,
+    );
+    expect(summary.propuestos).toBe(1);
+    expect(capturado).toHaveLength(1);
+    expect(capturado[0]!.occurredOn).toBe("2026-08-25"); // fecha del email en Tokyo, NUNCA ""
+  });
+
+  it("sin tz guardada -> fecha del email en la zona por defecto (CR), tampoco vacía", async () => {
+    const { deps, capturado } = capturingDeps({ userId: "u1", householdId: "h1", timezone: null });
+    const parseSinFecha = (): RawMovement[] => [movimientoSinFecha];
+    await processInboundEmails(
+      [msgSinFecha({ receivedAt: "2026-08-25T02:00:00.000Z" })],
+      parseSinFecha,
+      deps,
+    );
+    // 02:00Z en America/Costa_Rica (UTC-6) = 20:00 del día anterior → 2026-08-24.
+    expect(capturado[0]!.occurredOn).toBe("2026-08-24");
+  });
+
+  it("si el parser SÍ trae fecha, no se pisa con la de recepción", async () => {
+    const { deps, capturado } = capturingDeps({
+      userId: "u1",
+      householdId: "h1",
+      timezone: "Asia/Tokyo",
+    });
+    const conFecha: RawMovement = {
+      ...movimientoSinFecha,
+      occurredOn: "2026-06-11",
+      externalRef: "ref-con-fecha",
+    };
+    await processInboundEmails(
+      [msgSinFecha({ receivedAt: "2026-08-25T02:00:00.000Z" })],
+      (): RawMovement[] => [conFecha],
+      deps,
+    );
+    expect(capturado[0]!.occurredOn).toBe("2026-06-11"); // la fecha extraída manda
   });
 });

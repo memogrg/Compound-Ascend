@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { notFutureDate, NOT_FUTURE_MSG } from "@/lib/validation";
+import { userToday } from "@/lib/time/user-time";
 import {
   goalInputSchema,
   debtInputSchema,
@@ -24,6 +25,7 @@ import {
   withdrawFromGoal,
   spendFromGoal,
   listGoals,
+  convertGoalToEmergencyFund,
 } from "@/modules/control/services/control-service";
 import type { PagoContext } from "@/modules/control/engine/pago-vinculado";
 import { getDebtsOverview, type DebtVM } from "@/modules/control/services/debts-service";
@@ -99,7 +101,7 @@ export async function createSavingsSobreAction(raw: unknown): Promise<ActionResu
       await addGoalContribution({
         goalId,
         amount: initial,
-        contributionDate: new Date().toISOString().slice(0, 10),
+        contributionDate: await userToday(),
       });
     }
     revalidatePath("/control-financiero");
@@ -311,10 +313,11 @@ const goalContributionSchema = z.object({
   goalId: z.string().uuid(),
   amount: z.number().positive("Debe ser mayor a 0"),
   contributionDate: z.string().min(8).max(10).refine(notFutureDate, { message: NOT_FUTURE_MSG }),
-  /** Moneda del importe capturado. Opcional: los llamadores viejos no la mandaban y el aporte
-   *  siempre se guarda en la de la meta. Cuando viene y no coincide, el servicio la rechaza —
-   *  guardarla igual metería el importe multiplicado por el tipo de cambio. */
-  currency: z.string().length(3).optional(),
+  /** Moneda del importe capturado. REQUERIDA (delta 3, B1): antes opcional y el guard
+   *  `monedaVinculadaEsCoherente` se saltaba en `undefined`. Todos los callers ya la mandan
+   *  (los forms desde `goal.currency`), así que exigirla le da dientes al guard SIEMPRE: un
+   *  aporte en otra moneda se rechaza en vez de guardarse multiplicado por el tipo de cambio. */
+  currency: z.string().length(3),
 });
 
 /** Aporte a meta: sube current_amount y crea la transacción vinculada. */
@@ -588,6 +591,26 @@ export async function removeDebtAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/**
+ * Nudge de delta 2: el usuario convierte con 1 tap una meta llamada "emergencia" en el fondo
+ * de emergencia FORMAL (goal_type). El tap ES el consentimiento; nunca se auto-migra.
+ */
+export async function convertGoalToEmergencyFundAction(goalId: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await convertGoalToEmergencyFund(goalId);
+    revalidatePath("/patrimonio/proteccion");
+    revalidatePath("/dashboard");
+    revalidatePath("/mi-rich-life");
+    return { ok: true };
+  } catch (err) {
+    logger.error("convertGoalToEmergencyFund fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No se pudo convertir la meta." };
   }
 }
 

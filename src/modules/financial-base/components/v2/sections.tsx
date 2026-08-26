@@ -815,7 +815,7 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
             accounts={view.accounts}
             currency={currency}
           />
-          <CsvImportButton />
+          <CsvImportButton accounts={view.accounts} />
           <TransferButton accounts={view.accounts} />
           <CategoryManagerButton
             tree={view.tree}

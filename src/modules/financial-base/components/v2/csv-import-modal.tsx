@@ -17,8 +17,9 @@ import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { importTransactionsAction } from "@/modules/financial-base/api/v2-actions";
 // Parser puro compartido con la pantalla m\u00f3vil (/m/transacciones): mismas columnas, mismas reglas.
 import { parseCsv, type ParsedCsvRow } from "@/modules/financial-base/engine/csv-parse";
+import type { Account } from "@/modules/financial-base/types";
 
-export function CsvImportButton() {
+export function CsvImportButton({ accounts }: { accounts: Account[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -30,16 +31,21 @@ export function CsvImportButton() {
       >
         <Icon name="upload" width={2} /> Importar CSV
       </button>
-      {open ? <CsvImportModal onClose={() => setOpen(false)} /> : null}
+      {open ? <CsvImportModal onClose={() => setOpen(false)} accounts={accounts} /> : null}
     </>
   );
 }
 
-function CsvImportModal({ onClose }: { onClose: () => void }) {
+function CsvImportModal({ onClose, accounts }: { onClose: () => void; accounts: Account[] }) {
   const router = useRouter();
   const toast = useToast();
   const captureCurrency = useCaptureCurrency();
   const fileRef = useRef<HTMLInputElement>(null);
+  // Cuenta a la que caen las filas importadas (nivel-modal: el CSV no trae columna de cuenta).
+  // Default: la cuenta marcada por defecto — paridad con el gasto manual.
+  const [accountId, setAccountId] = useState(
+    accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "",
+  );
   const [rows, setRows] = useState<ParsedCsvRow[]>([]);
   const [skipped, setSkipped] = useState(0);
   const [fileName, setFileName] = useState("");
@@ -75,7 +81,7 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
 
   const doImport = () =>
     startTransition(async () => {
-      const res = await importTransactionsAction(rows);
+      const res = await importTransactionsAction(rows, accountId || undefined);
       if (res.ok) {
         toast(`Importadas ${res.count} (entran como 'Pendiente')`);
         onClose();
@@ -137,6 +143,53 @@ function CsvImportModal({ onClose }: { onClose: () => void }) {
               <option key={o.code} value={o.code}>
                 {o.code}
                 {o.code === captureCurrency ? " (principal)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Cuenta: se renderiza SIEMPRE (como "Moneda por defecto"), no gated por accounts.length.
+            Con 0 cuentas nombradas (feature opcional) la única opción es "Sin cuenta específica"
+            (account_id null, como antes de este PR); con cuentas, default = la predeterminada. */}
+        <div className="fld" style={{ marginTop: 12 }}>
+          <label
+            className="fld-label"
+            htmlFor="csv-account"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            Cuenta
+            <span
+              className="tip"
+              data-tip="A qué cuenta caen las filas importadas. Podés reasignarlas al revisarlas."
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 15,
+                height: 15,
+                borderRadius: "50%",
+                border: "1px solid var(--line)",
+                color: "var(--muted)",
+                fontSize: 10,
+                fontWeight: 700,
+                flex: "none",
+              }}
+            >
+              ?
+            </span>
+          </label>
+          <select
+            id="csv-account"
+            className="sel"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            aria-label="Cuenta de las filas importadas"
+          >
+            <option value="">Sin cuenta específica</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+                {a.isDefault ? " (predeterminada)" : ""}
               </option>
             ))}
           </select>

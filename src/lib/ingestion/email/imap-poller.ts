@@ -10,6 +10,11 @@
  * entrega/confirmación es el Delta 2. Nada se confirma solo.
  */
 import type { RawMovement } from "@/lib/ingestion/types";
+import { todayISOInTz } from "@/lib/time/user-time-core";
+
+/** Zona por defecto cuando el correo no trae fecha parseable y el dueño no tiene tz guardada.
+ *  Los bancos que reenvían aquí son de Costa Rica → su fecha local es la sensata. */
+const DEFAULT_INGEST_TZ = "America/Costa_Rica";
 
 /** Correo crudo tal como lo entrega el cliente IMAP (antes de normalizar). */
 export interface RawImapMessage {
@@ -19,6 +24,7 @@ export interface RawImapMessage {
   recipients: string[]; // candidatos de destinatario original (To + cabeceras de reenvío)
   subject: string | null;
   text: string; // cuerpo en texto plano (el adaptador real lo extrae del MIME)
+  receivedAt: string | null; // fecha del correo (envelope.date) en ISO; fallback de occurred_on
 }
 
 /**
@@ -39,6 +45,7 @@ export interface ImapMessage {
   subject: string;
   text: string;
   uid: number; // se conserva para que el route marque \Seen tras procesar
+  receivedAt: string | null; // fecha del correo (envelope.date) en ISO; fallback de occurred_on
 }
 
 /** Extrae "user@dom.com" de una dirección tipo `Nombre <user@dom.com>` o cruda. */
@@ -106,6 +113,7 @@ export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
       subject: m.subject ?? "",
       text,
       uid: m.uid,
+      receivedAt: m.receivedAt,
     });
   }
   return out;
@@ -119,6 +127,7 @@ export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
 export interface EmailOwner {
   userId: string;
   householdId: string | null;
+  timezone: string | null; // tz del usuario (user_settings); fecha la propuesta en su zona (#90)
 }
 
 /**
@@ -149,6 +158,17 @@ export interface IngestSummary {
   propuestos: number; // propuestas insertadas en ingest_proposals
   ignorados: number; // ningún candidato de destinatario está en la allowlist
   duplicados: number; // correo ya procesado (por id) o propuesta repetida (cuenta, ref)
+}
+
+/**
+ * Fecha una propuesta cuyo parser NO extrajo fecha del correo (occurredOn ""): usa la fecha de
+ * RECEPCIÓN del email (receivedAt, de envelope.date) en la zona del usuario —consistente con #90—.
+ * Sin receivedAt (raro: correo sin cabecera Date), último recurso hoy en esa zona. Nunca devuelve
+ * "" → no rompe el insert (occurred_on es NOT NULL). La propuesta se REVISA antes de aplicarse.
+ */
+function fecharConReceivedAt(receivedAt: string | null, tz: string | null): string {
+  const zona = tz ?? DEFAULT_INGEST_TZ;
+  return todayISOInTz(zona, receivedAt ? new Date(receivedAt) : new Date());
 }
 
 /**
@@ -189,9 +209,17 @@ export async function processInboundEmails(
     // c) Parseo. Sin movimiento => no es notificación: se marca procesado y leído.
     const movements = parse(message.text);
     if (movements.length > 0) {
+      // Fecha faltante: si el parser no extrajo fecha (occurredOn ""), la propuesta moría en el
+      // insert (occurred_on es NOT NULL). Fallback central a la fecha de recepción del correo en
+      // la zona del usuario (no UTC-today → no reintroduce #90). Cubre todos los parsers.
+      const conFecha = movements.map((m) =>
+        m.occurredOn
+          ? m
+          : { ...m, occurredOn: fecharConReceivedAt(message.receivedAt, owner.timezone) },
+      );
       // d) Encolar propuestas. Los choques (cuenta, external_ref) — la misma compra
       //    llegada a 2 correos — cuentan como duplicados, no como propuestas.
-      const { inserted, duplicated } = await deps.saveProposals(movements, owner);
+      const { inserted, duplicated } = await deps.saveProposals(conFecha, owner);
       summary.propuestos += inserted;
       summary.duplicados += duplicated;
     }

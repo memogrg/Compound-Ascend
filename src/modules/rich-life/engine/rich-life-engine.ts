@@ -74,15 +74,20 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
     netWorth,
     totalAssets,
     totalLiabilities,
+    // Sin deudas el ratio A/P es infinito: se representa con `null` (serializable en JSON;
+    // `Infinity` se volvía `null` silencioso al cruzar un límite API). La UI lo pinta "∞".
     assetLiabilityRatio:
       totalLiabilities > 0
         ? Math.round((totalAssets / totalLiabilities) * 10) / 10
         : totalAssets > 0
-          ? Infinity
+          ? null
           : 0,
     debtToAssets: ratio(totalLiabilities, totalAssets),
     productiveAssetsPct: ratio(sum(productive), totalAssets),
-    liquidAssetsPct: ratio(sum(liquid), totalAssets),
+    // Clamp del numerador a ≥0: en sobregiro la liquidez entra como activo negativo y el
+    // porcentaje se iría bajo cero (contra su rango 0-1). El sobregiro se ve por el saldo
+    // real de liquidez, no por un % negativo. (Display-only: no alimenta el score.)
+    liquidAssetsPct: ratio(Math.max(0, sum(liquid)), totalAssets),
     depreciablePct: ratio(sum(depreciable), totalAssets),
     passiveIncomeCoverage,
     financialFreedomIndex: passiveIncomeCoverage,

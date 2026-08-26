@@ -93,7 +93,7 @@ export function RichLifeDashboard({
             <div>
               <div className="nw-k">Ratio A / P</div>
               <div className="nw-v">
-                {ind.assetLiabilityRatio === Infinity ? "∞" : `${ind.assetLiabilityRatio}×`}
+                {ind.assetLiabilityRatio === null ? "∞" : `${ind.assetLiabilityRatio}×`}
               </div>
             </div>
           </div>
@@ -101,13 +101,14 @@ export function RichLifeDashboard({
 
         <div className="card card-pad" style={{ display: "flex", alignItems: "center", gap: 22 }}>
           {(() => {
-            // Con datos reales: Índice Patrimonial + nivel aspiracional. Sin ellos
-            // (demo): Rich Life Score de siempre.
-            const ringValue = patrimonio ? patrimonio.report.indice : s.score.score;
-            const ringLabel = patrimonio ? "Índice" : "Rich Life";
-            const titleLabel = patrimonio ? "Índice Patrimonial" : "Rich Life Score";
-            const chipText = patrimonio ? patrimonio.level.name : s.score.state;
-            const reading = patrimonio ? patrimonio.level.reading : s.reading;
+            // Un solo headline en web y móvil: el Rich Life Score (mismo engine,
+            // computeRichLifeScore). El Índice Patrimonial vive como sub-métrica dentro de
+            // Patrimonio, no compitiendo como "el score".
+            const ringValue = s.score.score;
+            const ringLabel = "Rich Life";
+            const titleLabel = "Rich Life Score";
+            const chipText = s.score.state;
+            const reading = s.reading;
             return (
               <>
                 <div className="ring-wrap">
@@ -146,9 +147,7 @@ export function RichLifeDashboard({
                 <div>
                   <div className="label">
                     {titleLabel}
-                    {patrimonio ? (
-                      <TipQ text="Tu Índice Patrimonial (0-100) resume qué tan sólido y libre es tu patrimonio: combina cuánto trabaja para ti, tu liquidez, protección y calidad de deuda. Sube cuando aumentas patrimonio invertible y reduces deuda cara." />
-                    ) : null}
+                    <TipQ text="Tu Rich Life Score (0-100) resume tu salud financiera integral: patrimonio neto y su tendencia, flujo libre mensual, reducción de deuda crítica, activos que trabajan, liquidez, avance a tus metas, protección y diversificación." />
                   </div>
                   <div className="chip gold" style={{ marginTop: 8 }}>
                     {chipText}
@@ -402,6 +401,12 @@ function PatrimonioSections({
 
       {/* Cards §12 — el capital que trabaja ya lo muestra la escalera de hitos. */}
       <section className="cols-4">
+        <MetricCard
+          label="Índice Patrimonial"
+          value={`${r.indice}/100`}
+          note={p.level.name}
+          tip="Tu Índice Patrimonial (0-100) resume qué tan sólido y libre es tu patrimonio: combina cuánto trabaja para ti, tu liquidez, protección y calidad de deuda. Es una lente del patrimonio, distinta del Rich Life Score (tu salud financiera integral)."
+        />
         <MetricCard
           label="Años de Libertad"
           value={`${anios}`}

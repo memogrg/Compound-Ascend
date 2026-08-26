@@ -65,11 +65,16 @@ export async function createImapClient(): Promise<ImapClient> {
     throw new AppError("INTERNAL", undefined, "IMAP de ingesta no configurado");
   }
 
+  // Google muestra los App Passwords en grupos con espacios ("abcd efgh ijkl mnop") y la gente los
+  // pega tal cual; con espacios el LOGIN da AUTHENTICATIONFAILED. Stripeamos TODO whitespace para
+  // ser robustos con o sin espacios.
+  const pass = env.GMAIL_IMAP_APP_PASSWORD.replace(/\s/g, "");
+
   const flow = new ImapFlow({
     host: env.GMAIL_IMAP_HOST,
     port: 993,
     secure: true,
-    auth: { user: env.GMAIL_IMAP_USER, pass: env.GMAIL_IMAP_APP_PASSWORD },
+    auth: { user: env.GMAIL_IMAP_USER, pass },
     logger: false,
   });
 
@@ -99,6 +104,9 @@ export async function createImapClient(): Promise<ImapClient> {
           recipients,
           subject: msg.envelope?.subject ?? null,
           text: msg.source ? await extractBodyText(msg.source) : "",
+          // envelope.date (cabecera Date del correo) como instante ISO. Fallback de occurred_on
+          // cuando el cuerpo no trae fecha parseable (imapflow lo entrega como Date).
+          receivedAt: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
         });
       }
       return out;

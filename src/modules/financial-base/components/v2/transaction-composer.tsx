@@ -15,6 +15,7 @@
 import { CURRENCY_SYMBOL, formatMoney } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
+import { useCaptureToday } from "@/components/tz/timezone-context";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
@@ -54,11 +55,6 @@ const INCOME_SOURCES = [
   "Ingreso pasivo",
   "Extraordinario",
 ] as const;
-
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 /** Match client-side de sugerencias (réplica de matchSuggestion del servidor). */
 function matchSuggestion(text: string, index: SuggestionEntry[]): SuggestionEntry | null {
@@ -122,7 +118,8 @@ export function TransactionComposer({
     accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? "",
   );
   const [toAccountId, setToAccountId] = useState(accounts[1]?.id ?? "");
-  const [date, setDate] = useState(todayISO());
+  const today = useCaptureToday();
+  const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);

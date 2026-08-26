@@ -316,7 +316,7 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 500 }}>{inv.name}</div>
                       <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                        {formatMoney(inv.investedAmount, currency)}
+                        {formatMoney(inv.investedAmount, inv.currency)}
                         {live ? ` · precio: ${formatMoney(live.price, live.currency)}` : ""}
                       </div>
                     </div>
