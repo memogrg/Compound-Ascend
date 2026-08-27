@@ -53,6 +53,8 @@ const JUDGE_SYSTEM = [
   "    reconocimiento/highlight sin decisión pendiente. PERO si el turno SÍ debía cerrar con un paso (una",
   "    consulta de enfoque '¿en qué me concentro?', una recomendación, una CONFRONTACIÓN de un hábito), NO",
   "    es NA: un cierre sin horizonte es 3, sin acción concreta es 0-1. La confrontación NUNCA es NA acá.",
+  "    REGLA DURA: en un turno que AMERITA una acción, NUNCA devuelvas 'NA' — si no cerró con un paso,",
+  "    es 0-1 (cierre ausente), no una exclusión. 'NA' es SOLO para los turnos que no ameritan acción.",
   "- consulta_apropiada: faltaba un dato clave y hace UNA pregunta corta y correcta en vez de asumir.",
   '    Una pregunta aclaratoria bien puesta es EXCELENTE (5), no un defecto. "NA" si no faltaba ningún dato.',
   "- proactividad: los datos muestran un daño o una fortaleza real relevante y lo VOLUNTEA (alarma con",
@@ -190,6 +192,22 @@ export async function judgeRubric(
 function numericDims(o: AuditOutput): number[] {
   if (!o.rubric) return [];
   return SUBJECTIVE_DIMS.map((d) => o.rubric![d]).filter((v): v is number => typeof v === "number");
+}
+
+/**
+ * Política DETERMINISTA de accionabilidad (Paso 3.8/3.9): la decide lo que el turno AMERITA, no la
+ * discreción del juez (que sub-aplica el NA en ambas direcciones). Muta `rubric` in place.
+ *  · expectsAction === false (adversarial/highlights) → accionabilidad = "NA" (turno no-acción).
+ *  · turno accionable (expectsAction true/undefined) con NA-del-juez → 1 (cierre ausente): NUNCA se
+ *    excluye un turno que debía cerrar, así no infla el promedio.
+ * El resto (un score numérico del juez en un turno accionable) queda intacto.
+ */
+export function applyAccionabilidadPolicy(
+  rubric: RubricScores,
+  expectsAction: boolean | undefined,
+): void {
+  if (expectsAction === false) rubric.accionabilidad = "NA";
+  else if (rubric.accionabilidad === "NA") rubric.accionabilidad = 1;
 }
 
 /** Composite score of one output = mean of its APPLICABLE (non-NA) dims. null if no rubric. */

@@ -25,7 +25,7 @@ import { EventLog } from "../../../sim/event-log";
 import { buildSimContext, type BuiltContext } from "./context-builder";
 import { checkGrounding } from "./grounding";
 import { detectContradictions } from "./contradictions";
-import { judgeRubric } from "./rubric";
+import { judgeRubric, applyAccionabilidadPolicy } from "./rubric";
 import {
   ADVERSARIAL,
   LONGITUDINAL,
@@ -109,10 +109,9 @@ async function evaluate(args: EvalArgs, opts: AuditOpts): Promise<AuditOutput> {
     },
     opts.N,
   );
-  // NA DETERMINISTA (Paso 3.8): un turno que NO amerita acción (adversarial/highlights, marcado en el
-  // Probe) no se puntúa en accionabilidad — el juez sub-aplica el NA a escala, así que lo forzamos acá.
-  // Es sobre lo que el turno AMERITA, no la respuesta: los turnos que SÍ deben cerrar siguen puntuados.
-  if (args.expectsAction === false && rubric) rubric.accionabilidad = "NA";
+  // Accionabilidad DETERMINISTA por lo que el turno AMERITA (no la discreción del juez): NA para los
+  // no-acción (adversarial/highlights), score bajo para un accionable que el juez NA-eó. Ver rubric.ts.
+  if (rubric) applyAccionabilidadPolicy(rubric, args.expectsAction);
   return {
     persona: args.personaName,
     point: args.point ?? "mes6",
