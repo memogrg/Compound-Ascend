@@ -24,35 +24,51 @@ import { renderMd, renderConsole, summarize } from "./report";
 const GATED = RUN_LIVE && SIM_DB_READY;
 
 describe.skipIf(!GATED)("Auditoría de IA · asesor real (gated)", () => {
-  it(
-    "audita las personas profundas y escribe el reporte",
-    async () => {
-      const provider = makeModelProvider();
-      if (!provider) {
-        // RUN_LIVE set but no GEMINI_API_KEY → nothing to test against.
-        console.warn("[ai-audit] sin GEMINI_API_KEY → omitido");
-        return;
-      }
-      const judge = makeJudgeProvider(); // undefined if EVAL_JUDGE not set → rubric skipped
-      const N = Number(process.env.AI_AUDIT_N ?? 3) || 3;
-      const personas = process.env.AI_AUDIT_PERSONAS?.split(",").map((s) => s.trim()).filter(Boolean);
+  it("audita las personas profundas y escribe el reporte", async () => {
+    const provider = makeModelProvider();
+    if (!provider) {
+      // RUN_LIVE set but no GEMINI_API_KEY → nothing to test against.
+      console.warn("[ai-audit] sin GEMINI_API_KEY → omitido");
+      return;
+    }
+    const judge = makeJudgeProvider(); // undefined if EVAL_JUDGE not set → rubric skipped
+    const N = Number(process.env.AI_AUDIT_N ?? 3) || 3;
+    const personas = process.env.AI_AUDIT_PERSONAS?.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-      const res = await runAiAudit({ nowStamp: Date.now(), provider, judge, N, personas });
+    const res = await runAiAudit({ nowStamp: Date.now(), provider, judge, N, personas });
 
-      const md = renderMd(res, { generatedAt: new Date().toISOString() });
-      const outDir = join(fileURLToPath(new URL(".", import.meta.url)), "out");
-      writeFileSync(join(outDir, "ai-audit-report.md"), md, "utf8");
+    const md = renderMd(res, { generatedAt: new Date().toISOString() });
+    const outDir = join(fileURLToPath(new URL(".", import.meta.url)), "out");
+    writeFileSync(join(outDir, "ai-audit-report.md"), md, "utf8");
+    // Distribución por-output de accionabilidad (para ver si el promedio sube por 5s = horizonte
+    // usado, o por 4s = coasteo). El reporte solo trae el promedio; esto es el detalle por turno.
+    writeFileSync(
+      join(outDir, "accionabilidad-dist.json"),
+      JSON.stringify(
+        res.outputs.map((o) => ({
+          persona: o.persona,
+          suite: o.suite,
+          point: o.point,
+          accionabilidad: o.rubric?.accionabilidad ?? null,
+        })),
+        null,
+        2,
+      ),
+      "utf8",
+    );
 
-      const s = summarize(res);
-      console.log(`${renderConsole(res)} → tests/evals/cert/out/ai-audit-report.md`);
-      if (s.contradictions > 0 || s.grounding > 0) {
-        console.warn(`[ai-audit] ⚠️ EVIDENCIA DURA: ${s.contradictions} contradicciones, ${s.grounding} grounding — ver el reporte.`);
-      }
+    const s = summarize(res);
+    console.log(`${renderConsole(res)} → tests/evals/cert/out/ai-audit-report.md`);
+    if (s.contradictions > 0 || s.grounding > 0) {
+      console.warn(
+        `[ai-audit] ⚠️ EVIDENCIA DURA: ${s.contradictions} contradicciones, ${s.grounding} grounding — ver el reporte.`,
+      );
+    }
 
-      expect(res.outputs.length).toBeGreaterThan(0);
-    },
-    // 80 min: el timeout per-test del it() OVERRIDEA el config; con las suites confrontacion/
-    // highlights (~35 outputs × juez -pro ×3 + rescate) el run supera los 30 min.
-    5_400_000,
-  );
+    expect(res.outputs.length).toBeGreaterThan(0);
+  }, // 80 min: el timeout per-test del it() OVERRIDEA el config; con las suites confrontacion/
+  // highlights (~35 outputs × juez -pro ×3 + rescate) el run supera los 30 min.
+  5_400_000);
 });
