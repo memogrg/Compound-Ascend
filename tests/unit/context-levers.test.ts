@@ -6,6 +6,7 @@ import {
   protectionLevers,
   prioritySignal,
   expenseSobresLevers,
+  debtProjections,
 } from "@/lib/ai/context-levers";
 
 const d = (over: Partial<Parameters<typeof debtLevers>[0][number]> = {}) => ({
@@ -146,6 +147,43 @@ describe("protectionLevers", () => {
     expect(protectionLevers(gaps)).toEqual([
       { type: "Seguro de invalidez", severity: "alto", description: "vivís de tu ingreso" },
     ]);
+  });
+});
+
+describe("debtProjections (horizonte MENTOR del engine de amortización)", () => {
+  const tarjeta = {
+    name: "Tarjeta Oro",
+    liveBalance: 778_257,
+    apr: 40,
+    minPayment: 30_000,
+    currency: "CRC",
+  };
+  it("con extra positivo: saldás antes y ahorrás interés (del engine, no inventado)", () => {
+    const [p] = debtProjections([tarjeta], 120_000);
+    expect(p).toBeDefined();
+    expect(p!.name).toBe("Tarjeta Oro");
+    expect(p!.extra).toBe(120_000);
+    expect(p!.monthsSaved).toBeGreaterThan(0);
+    expect(p!.interestSaved).toBeGreaterThan(0);
+  });
+  it("extra 0 o negativo → no hay proyección (no hay extra que aplicar)", () => {
+    expect(debtProjections([tarjeta], 0)).toEqual([]);
+    expect(debtProjections([tarjeta], -50_000)).toEqual([]);
+  });
+  it("deuda saldada (≤0.5) → descartada", () => {
+    expect(debtProjections([{ ...tarjeta, liveBalance: 0 }], 120_000)).toEqual([]);
+  });
+  it("cuota que NO cubre el interés mensual → descartada (la base no amortizaría)", () => {
+    // interés mensual = 778257·40%/12 ≈ 25.942; una cuota de 20.000 no lo cubre.
+    expect(debtProjections([{ ...tarjeta, minPayment: 20_000 }], 120_000)).toEqual([]);
+  });
+  it("deuda a 0% APR: proyecta meses igual, interés ahorrado 0", () => {
+    const [p] = debtProjections(
+      [{ name: "T0", liveBalance: 700_000, apr: 0, minPayment: 50_000, currency: "CRC" }],
+      50_000,
+    );
+    expect(p!.monthsSaved).toBeGreaterThan(0);
+    expect(p!.interestSaved).toBe(0);
   });
 });
 

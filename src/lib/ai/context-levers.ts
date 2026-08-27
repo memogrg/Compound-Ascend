@@ -143,6 +143,63 @@ export type ProtectionGapLever = {
   description: string;
 };
 
+// Reuso del engine de amortización PURO (sin server-only) — import directo del engine, no del barrel,
+// para no arrastrar server-only a este módulo puro (lo consumen tests puros y el harness headless).
+import { compareExtra } from "@/modules/control/engine/amortization";
+
+/**
+ * Proyección MENTOR de una deuda: con `extra`/mes de más, cuántos meses antes se salda y cuánto
+ * interés se ahorra. Los números salen del ENGINE (amortización), NUNCA del modelo — es el horizonte
+ * grounded que convierte "aboná ₡X" en "aboná ₡X → salís N meses antes, ₡Y menos de interés".
+ */
+export type DebtProjection = {
+  name: string;
+  extra: number;
+  monthsSaved: number;
+  interestSaved: number;
+  currency: string;
+};
+
+/**
+ * Proyecciones por deuda a un `extra` mensual (el flujo libre del usuario). Descarta las no
+ * proyectables: sin extra, saldada, o cuota que no cubre el interés (la base no amortizaría). Ordena
+ * por interés ahorrado desc (lo que más mueve la aguja). Puro y testeable.
+ */
+export function debtProjections(
+  debts: {
+    name: string;
+    liveBalance: number;
+    apr: number | null;
+    minPayment: number;
+    currency: string;
+  }[],
+  extra: number,
+  topN = 3,
+): DebtProjection[] {
+  if (extra <= 0) return [];
+  const out: DebtProjection[] = [];
+  for (const d of debts) {
+    if (d.liveBalance <= 0.5 || d.minPayment <= 0) continue;
+    const apr = d.apr ?? 0;
+    const monthlyInterest = (d.liveBalance * apr) / 100 / 12;
+    if (d.minPayment <= monthlyInterest) continue; // la cuota no cubre el interés → base no amortiza
+    const cmp = compareExtra(
+      { balance: d.liveBalance, apr, monthlyPayment: d.minPayment },
+      extra,
+      30,
+    );
+    if (cmp.monthsSaved <= 0 && cmp.interestSaved <= 0) continue;
+    out.push({
+      name: d.name,
+      extra: Math.round(extra),
+      monthsSaved: cmp.monthsSaved,
+      interestSaved: Math.round(cmp.interestSaved),
+      currency: d.currency,
+    });
+  }
+  return out.sort((a, b) => b.interestSaved - a.interestSaved).slice(0, topN);
+}
+
 /** One expense sobre (leaf) as a lever: its name + real monthly spend. */
 export type ExpenseSobreLever = { name: string; monthly: number };
 
