@@ -9,6 +9,7 @@ import {
   debtProjections,
   fundEta,
   addMonthsISO,
+  detectMencionSobre,
 } from "@/lib/ai/context-levers";
 
 const d = (over: Partial<Parameters<typeof debtLevers>[0][number]> = {}) => ({
@@ -228,6 +229,32 @@ describe("debtProjections (horizonte MENTOR del engine de amortización)", () =>
     );
     expect(p!.monthsSaved).toBeGreaterThan(0);
     expect(p!.interestSaved).toBe(0);
+  });
+});
+
+describe("detectMencionSobre (context-salience — nombre exacto, sin sinónimos)", () => {
+  const sobres = [
+    { name: "Restaurantes", monthly: 80_000 },
+    { name: "Súper", monthly: 300_000 },
+  ];
+  it("matchea el sobre nombrado por su nombre exacto (sin acentos, case-insensitive)", () => {
+    expect(detectMencionSobre("gasto un montón en RESTAURANTES y no lo dejo", sobres)?.name).toBe(
+      "Restaurantes",
+    );
+    expect(detectMencionSobre("me voy al super de nuevo", sobres)?.name).toBe("Súper");
+  });
+  it("sin mención de un sobre → undefined (no inventa)", () => {
+    expect(detectMencionSobre("¿cómo voy este mes?", sobres)).toBeUndefined();
+  });
+  it("NO matchea sinónimos (solo el nombre del sobre)", () => {
+    expect(detectMencionSobre("gasto mucho en comer afuera", sobres)).toBeUndefined();
+  });
+  it("si nombra varios, devuelve el MÁS pesado (mueve más la aguja)", () => {
+    expect(detectMencionSobre("gasto en restaurantes y en el super", sobres)?.name).toBe("Súper");
+  });
+  it("sin sobres o mensaje vacío → undefined", () => {
+    expect(detectMencionSobre("restaurantes", undefined)).toBeUndefined();
+    expect(detectMencionSobre("", sobres)).toBeUndefined();
   });
 });
 

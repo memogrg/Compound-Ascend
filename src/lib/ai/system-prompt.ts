@@ -48,6 +48,9 @@ export type FinancialContext = {
   /** Top sobres de gasto por GASTO REAL mensual (name + monto), en ctx.currency. Para confrontar un
    *  gasto que el usuario racionaliza SIN dar el monto con la cifra REAL de ESE sobre. Best-effort. */
   expenseSobres?: ExpenseSobreLever[];
+  /** El sobre que el ÚLTIMO mensaje NOMBRA (detectMencionSobre): su ₡ es la cifra saliente del turno,
+   *  para que el asesor confronte con ESE monto y no con el total. Per-turno (lo pone el orquestador). */
+  focoSobre?: ExpenseSobreLever;
   /** Proyección MENTOR por deuda (con el flujo libre como extra): meses antes + interés ahorrado.
    *  Del ENGINE de amortización (grounded); el horizonte NUNCA lo inventa el modelo. Best-effort. */
   debtProjections?: DebtProjection[];
@@ -329,6 +332,10 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       `Gasto real por sobre (este mes, lo que gastó de verdad en cada uno): ${ctx.expenseSobres
         .map((s) => `${s.name} ${s.monthly} ${ctx.currency}`)
         .join(" · ")}.`,
+    );
+  if (ctx.focoSobre)
+    facts.push(
+      `FOCO DE ESTE TURNO: el usuario mencionó "${ctx.focoSobre.name}" = ${ctx.focoSobre.monthly} ${ctx.currency}/mes. ESA es la cifra a confrontar en este turno, NO su gasto total.`,
     );
   if (ctx.savingsRatePct !== undefined)
     facts.push(`Tasa de ahorro: ${ctx.savingsRatePct}% del ingreso.`);

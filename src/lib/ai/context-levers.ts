@@ -270,6 +270,35 @@ export function debtProjections(
 export type ExpenseSobreLever = { name: string; monthly: number };
 
 /**
+ * ¿El mensaje del usuario nombra un sobre de gasto de su contexto? Devuelve ESE sobre (el más pesado
+ * si nombra varios) para que el asesor confronte con SU cifra real, no con el gasto total (el reflejo
+ * que ni el dato ni la regla rompieron — Paso 3.9-#2 context-salience). Match por NOMBRE EXACTO del
+ * sobre como palabra (sin sinónimos: "restaurantes" matchea el sobre "Restaurantes", "comer afuera"
+ * NO). PURO, sin acentos, case-insensitive. undefined si no hay match.
+ */
+export function detectMencionSobre(
+  message: string,
+  sobres: ExpenseSobreLever[] | undefined,
+): ExpenseSobreLever | undefined {
+  if (!sobres || sobres.length === 0 || !message) return undefined;
+  const norm = (s: string) =>
+    ` ${s
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9ñ]+/g, " ")
+      .trim()} `;
+  const msg = norm(message);
+  // Más pesado primero: si nombra varios, confrontá con el que más mueve la aguja.
+  for (const s of [...sobres].sort((a, b) => b.monthly - a.monthly)) {
+    const name = norm(s.name).trim();
+    if (name.length < 3) continue; // nombres muy cortos → ruido
+    if (msg.includes(` ${name} `)) return s;
+  }
+  return undefined;
+}
+
+/**
  * Top expense sobres by real monthly spend (name + monto). Existe para que el asesor confronte un
  * gasto que el usuario racionaliza SIN dar el monto ("gasto un montón en restaurantes") con la cifra
  * REAL de ESE sobre — no con el gasto total. Ordena por monto desc, cap topN, descarta ≤0. Los montos

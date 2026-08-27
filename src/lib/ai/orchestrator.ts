@@ -56,6 +56,7 @@ import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
 import { guardMovimientos, TOOLS_DE_MOVIMIENTOS } from "@/lib/ai/movimientos-guard";
 import { guardTendencia } from "@/lib/ai/tendencia-guard";
 import { guardDeudaFantasma } from "@/lib/ai/deuda-fantasma-guard";
+import { detectMencionSobre } from "@/lib/ai/context-levers";
 import { formatMoney } from "@/lib/format";
 
 export type { FinancialContext };
@@ -478,6 +479,15 @@ export const TOOLS_PROMPT_LINE =
  * números calculados, no inventados. Sin toolContext (p. ej. WhatsApp) o sin soporte
  * del proveedor → idéntico a financeChat. La IA sigue PROPONIENDO, nunca ejecuta.
  */
+/** Contenido del ÚLTIMO mensaje del usuario (para la detección del FOCO). "" si no hay. */
+function lastUserMessage(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m && m.role === "user" && typeof m.content === "string") return m.content;
+  }
+  return "";
+}
+
 export async function financeChatWithTools(
   messages: ChatMessage[],
   ctx: FinancialContext,
@@ -515,12 +525,15 @@ export async function financeChatWithTools(
   }
 
   const knowledge = await buildKnowledge(messages, ctx);
+  // FOCO (context-salience): si el ÚLTIMO mensaje nombra un sobre del contexto, su ₡ es la cifra
+  // saliente del turno — así el asesor confronta con ESE monto y no con el total (Paso 3.9-#2).
+  const focoSobre = detectMencionSobre(lastUserMessage(messages), ctx.expenseSobres);
   /** Herramientas que EFECTIVAMENTE corrieron en este turno (la llena `registrarUso`). */
   const usadas = new Set<string>();
   /** ¿`consultar_historial` trajo ≥2 puntos reales este turno? (respaldo para citar historia). */
   const hist: TurnHistorial = { conDatos: false };
   const result = await provider.chatWithTools({
-    system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
+    system: `${buildSystemPrompt({ ...ctx, knowledge, focoSobre })}\n\n${TOOLS_PROMPT_LINE}`,
     messages: capHistory(messages),
     tools: [
       SIMULATE_DEBT_TOOL,
