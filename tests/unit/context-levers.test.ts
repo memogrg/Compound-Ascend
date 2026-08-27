@@ -5,6 +5,7 @@ import {
   monthsBetween,
   protectionLevers,
   prioritySignal,
+  expenseSobresLevers,
 } from "@/lib/ai/context-levers";
 
 const d = (over: Partial<Parameters<typeof debtLevers>[0][number]> = {}) => ({
@@ -145,6 +146,31 @@ describe("protectionLevers", () => {
     expect(protectionLevers(gaps)).toEqual([
       { type: "Seguro de invalidez", severity: "alto", description: "vivís de tu ingreso" },
     ]);
+  });
+});
+
+describe("expenseSobresLevers", () => {
+  it("ordena por gasto real desc, redondea y cap topN", () => {
+    const top = expenseSobresLevers(
+      [
+        { name: "Restaurantes", monthly: 120_000.4 },
+        { name: "Súper", monthly: 300_000 },
+        { name: "Transporte", monthly: 45_000 },
+      ],
+      2,
+    );
+    expect(top).toEqual([
+      { name: "Súper", monthly: 300_000 },
+      { name: "Restaurantes", monthly: 120_000 },
+    ]);
+  });
+  it("descarta sobres en 0 y de nombre vacío", () => {
+    const top = expenseSobresLevers([
+      { name: "Restaurantes", monthly: 80_000 },
+      { name: "Cero", monthly: 0 },
+      { name: "  ", monthly: 50_000 },
+    ]);
+    expect(top.map((s) => s.name)).toEqual(["Restaurantes"]);
   });
 });
 

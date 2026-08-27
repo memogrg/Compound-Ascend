@@ -55,6 +55,7 @@ import {
 import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
 import { guardMovimientos, TOOLS_DE_MOVIMIENTOS } from "@/lib/ai/movimientos-guard";
 import { guardTendencia } from "@/lib/ai/tendencia-guard";
+import { guardDeudaFantasma } from "@/lib/ai/deuda-fantasma-guard";
 import { formatMoney } from "@/lib/format";
 
 export type { FinancialContext };
@@ -565,7 +566,7 @@ export async function financeChatWithTools(
       : undefined;
   const gTend = guardTendencia(
     gMov.reply,
-    { conDatos: hist.conDatos, trajectoryDefined: ctx.trajectory !== undefined },
+    { conDatos: hist.conDatos, trajectoryDefined: ctx.trajectory !== undefined, serie: hist.serie },
     resumenActual,
   );
   if (gTend.bloqueado) {
@@ -574,13 +575,20 @@ export async function financeChatWithTools(
       largo: parsed.reply.length,
     });
   }
-  const bloqueado = gMov.bloqueado || gTend.bloqueado;
+  // RED DETERMINISTA sobre la recomendación FANTASMA de abonar a una deuda inexistente: si no hay
+  // deuda con saldo vivo y la respuesta igual da un directivo de abono en prosa, no sale (la acción
+  // estructurada ya se anula en el resolvedor; esto cubre la MENCIÓN). Encadena sobre gTend.reply.
+  const gDeuda = guardDeudaFantasma(gTend.reply, toolContext.debts);
+  if (gDeuda.bloqueado) {
+    logger.warn("assistant.deuda_fantasma_bloqueada", { deudas: toolContext.debts.length });
+  }
+  const bloqueado = gMov.bloqueado || gTend.bloqueado || gDeuda.bloqueado;
 
   return {
     ...guardReply(
       // Una respuesta bloqueada tampoco puede arrastrar una ACCIÓN propuesta: se armó sobre datos
       // que no existen.
-      bloqueado ? { reply: gTend.reply, action: null } : parsed,
+      bloqueado ? { reply: gDeuda.reply, action: null } : parsed,
       ctx,
       provider.name,
       priorAssistantReplies(messages),
@@ -592,8 +600,9 @@ export async function financeChatWithTools(
   };
 }
 
-/** Trayectoria observada este turno: ¿`consultar_historial` devolvió ≥2 puntos reales? */
-type TurnHistorial = { conDatos: boolean };
+/** Trayectoria observada este turno: ¿`consultar_historial` devolvió ≥2 puntos reales? + la serie
+ *  de valores reales (para que el guard de tendencia verifique las cifras citadas, no solo que exista). */
+type TurnHistorial = { conDatos: boolean; serie?: number[] };
 
 /** Envuelve el ejecutor para anotar qué herramientas corrieron y si `consultar_historial` trajo
  *  ≥2 puntos reales (respaldo que consume el guard de tendencia). */
@@ -616,6 +625,18 @@ function registrarUso(
       (out as { insuficiente: unknown }).insuficiente === null
     ) {
       hist.conDatos = true;
+      // Se guardan los VALORES de la serie real (además del booleano) para que el guard de tendencia
+      // pueda refutar cifras fabricadas aunque haya respaldo (≥2 puntos).
+      const serie = (out as { serie?: unknown }).serie;
+      if (Array.isArray(serie)) {
+        hist.serie = serie
+          .map((p) =>
+            p && typeof p === "object" && "valor" in p
+              ? Number((p as { valor: unknown }).valor)
+              : NaN,
+          )
+          .filter((n) => Number.isFinite(n));
+      }
     }
     return out;
   };

@@ -9,7 +9,12 @@ import type { Trajectory } from "@/lib/ai/trajectory";
 import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
 import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
-import type { DebtLever, GoalLever, ProtectionGapLever } from "@/lib/ai/context-levers";
+import type {
+  DebtLever,
+  GoalLever,
+  ProtectionGapLever,
+  ExpenseSobreLever,
+} from "@/lib/ai/context-levers";
 
 /** Una porción de concentración: etiqueta, monto en la moneda base y peso (0-1). */
 export type ConcentracionSlice = { label: string; valor: number; pct: number };
@@ -38,6 +43,9 @@ export type FinancialContext = {
   topExpenseCategory?: { name: string; monthly: number; pct: number };
   /** Sobre (hoja) de MAYOR presupuesto de gasto, YA en moneda de visualización (ctx.currency). */
   topGastoSobre?: { name: string; monthly: number };
+  /** Top sobres de gasto por GASTO REAL mensual (name + monto), en ctx.currency. Para confrontar un
+   *  gasto que el usuario racionaliza SIN dar el monto con la cifra REAL de ESE sobre. Best-effort. */
+  expenseSobres?: ExpenseSobreLever[];
   /** Trayectoria mes a mes (memoria longitudinal). Best-effort; undefined si es usuario nuevo. */
   trajectory?: Trajectory;
   /** Tasa de ahorro (ahorro/ingreso) en %, 0-100. Best-effort. */
@@ -307,6 +315,12 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   if (ctx.topExpenseCategory)
     facts.push(
       `Gasto más pesado: ${ctx.topExpenseCategory.name} (${ctx.topExpenseCategory.monthly} ${ctx.currency}, ${ctx.topExpenseCategory.pct}% del gasto total).`,
+    );
+  if (ctx.expenseSobres && ctx.expenseSobres.length > 0)
+    facts.push(
+      `Gasto real por sobre (este mes, lo que gastó de verdad en cada uno): ${ctx.expenseSobres
+        .map((s) => `${s.name} ${s.monthly} ${ctx.currency}`)
+        .join(" · ")}.`,
     );
   if (ctx.savingsRatePct !== undefined)
     facts.push(`Tasa de ahorro: ${ctx.savingsRatePct}% del ingreso.`);
@@ -908,6 +922,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "  · NO en cada mensaje. Si ya lo señalaste antes en esta conversación, no vuelvas salvo que él lo retome. Si le preguntó otra cosa y el tema no tiene relación, contestá lo que preguntó y callate lo demás.",
     "  · Nunca lo metas a la fuerza en una consulta ajena ni lo uses como excusa para ofrecer nada.",
     "- CONFRONTAR UN HÁBITO [NIVEL iv] (exigente Y cálido): si RACIONALIZA un mal hábito que se repite (un gasto discrecional grande con la tarjeta cara al tope, 'me lo merezco', 'es mi único gusto', un préstamo que no necesita), NO lo valides sin más ni lo dejes pasar. Confrontá con firmeza Y empatía: nombrá el hábito, mostrá lo que CUESTA de verdad frente a su prioridad real, y empujá a UN paso concreto (frenar el próximo, un tope, abonar a la tarjeta). NUNCA avergüences, NUNCA moralices, NUNCA un 'te lo merecés' sin el número al lado. Una vez, sin sermón — un amigo que te quiere te dice la verdad. Enunciar solo la cifra ('tu gasto ronda ₡X') NO es confrontar — es una no-respuesta: una racionalización ('gasto mucho en restaurantes pero no lo dejo') NO es una consulta de datos, así que SIEMPRE nombrá el hábito + su costo frente a su prioridad + UN paso. Así SUENA (no 'tu gasto ronda ₡X'): «Te escucho, los restaurantes son tu cable a tierra — pero son ~₡X/mes, y con tu tarjeta al 40% costándote ₡Y/mes, ese gusto te sale el doble. No te pido cortarlo: ponele un tope de ₡Z y el resto lo abonás. ¿Lo probamos este mes?»",
+    "  · GASTO SIN MONTO (nivel iv): si racionaliza un gasto NOMBRANDO una categoría pero SIN darte el monto ('gasto un montón en restaurantes, es mi único gusto'), tomá el costo REAL de ESE sobre de tu contexto («Gasto real por sobre») y confrontá con esa cifra (hábito + costo del sobre vs su prioridad + un paso). PROHIBIDO soltar el gasto TOTAL mensual pelado ('tu gasto ronda ₡400.000') como respuesta: no es el costo de ese gusto y no confronta. Si el sobre nombrado no está en tu contexto, confrontá con lo que SÍ tenés (la prioridad y su costo), sin inventar una cifra para ese sobre.",
     "",
     "USA TUS MÉTRICAS YA CALCULADAS:",
     "- Usa SIEMPRE las métricas que ya vienen en tu contexto (Índice Patrimonial, los tres Números, Años/Meses de colchón, cobertura, calidad). NUNCA las recalcules a partir del patrimonio neto y los gastos.",

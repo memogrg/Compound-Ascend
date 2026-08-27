@@ -143,6 +143,26 @@ export type ProtectionGapLever = {
   description: string;
 };
 
+/** One expense sobre (leaf) as a lever: its name + real monthly spend. */
+export type ExpenseSobreLever = { name: string; monthly: number };
+
+/**
+ * Top expense sobres by real monthly spend (name + monto). Existe para que el asesor confronte un
+ * gasto que el usuario racionaliza SIN dar el monto ("gasto un montón en restaurantes") con la cifra
+ * REAL de ESE sobre — no con el gasto total. Ordena por monto desc, cap topN, descarta ≤0. Los montos
+ * ya vienen en la moneda de visualización (getRealTotals usa getDisplayCurrency).
+ */
+export function expenseSobresLevers(
+  sobres: { name: string; monthly: number }[],
+  topN = 6,
+): ExpenseSobreLever[] {
+  return sobres
+    .filter((s) => s.monthly > 0 && s.name.trim().length > 0)
+    .map((s) => ({ name: s.name, monthly: Math.round(s.monthly) }))
+    .sort((a, b) => b.monthly - a.monthly)
+    .slice(0, topN);
+}
+
 /**
  * Protection gaps from computeProtection, narrowed to the advisor's factual context: type +
  * severity + description. Drops `recommendation` (UI sales copy, not the advisor's to echo).

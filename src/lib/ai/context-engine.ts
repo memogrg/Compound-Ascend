@@ -18,7 +18,13 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
-import { debtLevers, goalLevers, protectionLevers, prioritySignal } from "@/lib/ai/context-levers";
+import {
+  debtLevers,
+  goalLevers,
+  protectionLevers,
+  prioritySignal,
+  expenseSobresLevers,
+} from "@/lib/ai/context-levers";
 
 /**
  * PRIVACIDAD (cuenta compartida): las lecturas FINANCIERAS de este motor abarcan
@@ -116,6 +122,22 @@ export async function buildFinancialContext(
       };
     }
     ctx.savingsRatePct = Math.round(base.indicators.savingsRate * 100);
+    // Top sobres de gasto POR-HOJA (name + monto real mensual), para confrontar un gasto que el
+    // usuario racionaliza SIN monto con la cifra REAL de ESE sobre (no con el total). Best-effort;
+    // getRealTotals.expenseByKey ya viene en la moneda de visualización (getDisplayCurrency).
+    try {
+      const { getRealTotals } = await import("@/modules/financial-base");
+      const { userCurrentPeriod } = await import("@/lib/time/user-time");
+      const real = await getRealTotals(await userCurrentPeriod());
+      const sobres = Object.values(real.expenseByKey).map((v) => ({
+        name: v.label,
+        monthly: v.value,
+      }));
+      const top = expenseSobresLevers(sobres);
+      if (top.length > 0) ctx.expenseSobres = top;
+    } catch {
+      // Sin per-sobre: el resto del contexto sigue.
+    }
     // Fuentes de ingreso activas (para señalar concentración si es una sola).
     ctx.incomeSourceCount = base.incomes.filter((i) => i.amountMonthly > 0).length;
     // ¿Ingreso/gasto/flujo son cifras CONVERTIDAS? Sí si hubo más de una moneda de origen, o si la
