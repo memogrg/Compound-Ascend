@@ -71,6 +71,8 @@ interface EvalArgs {
   prompt: string;
   expectedRedFlags: string[];
   point?: "mes1" | "mes6";
+  /** ¿El turno amerita cerrar con acción? Default true; false (adversarial/highlights) → accionabilidad NA. */
+  expectsAction?: boolean;
 }
 
 async function evaluate(args: EvalArgs, opts: AuditOpts): Promise<AuditOutput> {
@@ -107,6 +109,10 @@ async function evaluate(args: EvalArgs, opts: AuditOpts): Promise<AuditOutput> {
     },
     opts.N,
   );
+  // NA DETERMINISTA (Paso 3.8): un turno que NO amerita acción (adversarial/highlights, marcado en el
+  // Probe) no se puntúa en accionabilidad — el juez sub-aplica el NA a escala, así que lo forzamos acá.
+  // Es sobre lo que el turno AMERITA, no la respuesta: los turnos que SÍ deben cerrar siguen puntuados.
+  if (args.expectsAction === false && rubric) rubric.accionabilidad = "NA";
   return {
     persona: args.personaName,
     point: args.point ?? "mes6",
@@ -260,6 +266,7 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
                 suite,
                 prompt: p.prompt,
                 expectedRedFlags: p.expectedRedFlags,
+                expectsAction: p.expectsAction,
               },
               opts,
             ),
@@ -277,6 +284,7 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
                 suite,
                 prompt: p.prompt,
                 expectedRedFlags: p.expectedRedFlags,
+                expectsAction: p.expectsAction,
               },
               opts,
             ),
@@ -296,6 +304,7 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
                 suite,
                 prompt: p.prompt,
                 expectedRedFlags: p.expectedRedFlags,
+                expectsAction: p.expectsAction,
               },
               opts,
             ),

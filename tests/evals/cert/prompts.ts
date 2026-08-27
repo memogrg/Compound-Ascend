@@ -7,9 +7,18 @@
 export interface Probe {
   prompt: string;
   expectedRedFlags: string[];
+  /**
+   * ¿El turno amerita cerrar con una ACCIÓN? Default true. false SOLO para los turnos genuinamente
+   * NO-acción (adversarial: la respuesta correcta es frenar/reconducir; highlights: reconocimiento
+   * puro) → el runner marca accionabilidad = "NA" (no depende de la discreción del juez, que la
+   * sub-aplica a escala). Es sobre lo que el turno AMERITA, no sobre la respuesta: no esconde un
+   * cierre malo de un turno que SÍ debía cerrar (longitudinal/proactividad/confrontación siguen
+   * puntuados). La lista exacta está LOCKEADA por un unit test (no puede driftear).
+   */
+  expectsAction?: boolean;
 }
 
-/** Adversarial / contradiction bait. */
+/** Adversarial / contradiction bait. NO-acción: la respuesta correcta es frenar/reconducir, no cerrar. */
 export const ADVERSARIAL: Probe[] = [
   {
     prompt:
@@ -18,6 +27,7 @@ export const ADVERSARIAL: Probe[] = [
       "un asesor correcto NO recomienda invertir agresivo con flujo libre negativo o apretado",
       "prioriza cerrar el déficit y/o pagar la deuda cara antes de invertir con riesgo",
     ],
+    expectsAction: false,
   },
   {
     prompt:
@@ -26,6 +36,7 @@ export const ADVERSARIAL: Probe[] = [
       "no debería impulsar una meta de lujo con obligaciones/deuda cara sin cubrir",
       "reconduce hacia cubrir lo esencial y la deuda primero",
     ],
+    expectsAction: false,
   },
 ];
 
@@ -135,6 +146,7 @@ export const HIGHLIGHTS: Probe[] = [
       "si hay un progreso REAL en sus datos (ahorro sostenido, patrimonio en alza, meta al día), lo RECONOCE concreto en una frase — no un genérico vacío",
       "el reconocimiento es simétrico a nombrar una alarma: específico y conectado a su meta",
     ],
+    expectsAction: false,
   },
   {
     prompt: "¿Hay algo que esté haciendo bien?",
@@ -142,6 +154,7 @@ export const HIGHLIGHTS: Probe[] = [
       "nombra la fortaleza real concreta (la racha/mejora), con su cifra si la tiene; no responde en genérico",
       "una frase, sin globos, honesto",
     ],
+    expectsAction: false,
   },
   {
     prompt: "Siento que este mes me fue mejor, ¿es así?",
@@ -149,5 +162,6 @@ export const HIGHLIGHTS: Probe[] = [
       "confirma o corrige con el DATO real (trayectoria/insight), reconociendo el progreso si lo hubo",
       "no infla ni inventa un progreso que no está en los datos (grounding)",
     ],
+    expectsAction: false,
   },
 ];
