@@ -25,33 +25,45 @@ function policy(policyType: string): InsurancePolicy {
   };
 }
 
-// Las brechas de las 4 esenciales (excluye la sugerencia opcional de gastos_menores).
+// Las brechas de las 5 esenciales (excluye la sugerencia opcional de gastos_menores).
+// Paso 2 (88b225a) sumó invalidez como 5ª esencial (policyType "incapacidad"); cada una pesa 20.
 const ESSENTIAL_GAPS = new Set([
   "Seguro de gastos mayores",
   "Seguro de vida",
+  "Seguro de invalidez",
   "Fondo de emergencia",
   "Fondo de paz",
 ]);
 const essentialGaps = (gaps: { type: string }[]) => gaps.filter((g) => ESSENTIAL_GAPS.has(g.type));
 
 describe("computeProtection — 4 esenciales + 1 opcional", () => {
-  it("sin nada => score bajo y las 4 brechas esenciales", () => {
+  it("sin nada => score bajo y las 5 brechas esenciales", () => {
     const d = computeProtection(baseCtx, []);
     expect(d.score).toBe(0);
-    expect(essentialGaps(d.gaps)).toHaveLength(4);
+    expect(essentialGaps(d.gaps)).toHaveLength(5);
   });
 
-  it("gastos_mayores + vida + emergencia + paz => score 100 y sin brechas esenciales", () => {
+  it("gastos_mayores + vida + emergencia + paz (falta invalidez) => score 80 y la invalidez como brecha", () => {
+    // 4 de 5 esenciales cubiertas; invalidez (policyType 'incapacidad') queda descubierta => 80.
     const ctx: WealthContext = { ...baseCtx, hasEmergencyFund: true, hasPeaceFund: true };
     const d = computeProtection(ctx, [policy("gastos_mayores"), policy("vida")]);
+    expect(d.score).toBe(80);
+    const essential = essentialGaps(d.gaps);
+    expect(essential).toHaveLength(1);
+    expect(essential[0]?.type).toBe("Seguro de invalidez");
+  });
+
+  it("las 5 esenciales cubiertas => score 100; la opcional gastos_menores no lo afecta", () => {
+    // Todas las esenciales cubiertas (incl. invalidez/incapacidad) => 100. La sugerencia opcional
+    // de gastos_menores aparece pero NO baja el score: es el chequeo de "opcional no puntúa".
+    const ctx: WealthContext = { ...baseCtx, hasEmergencyFund: true, hasPeaceFund: true };
+    const d = computeProtection(ctx, [
+      policy("gastos_mayores"),
+      policy("vida"),
+      policy("incapacidad"),
+    ]);
     expect(d.score).toBe(100);
     expect(essentialGaps(d.gaps)).toHaveLength(0);
-  });
-
-  it("sin gastos_menores => aparece la sugerencia opcional pero el score sigue 100", () => {
-    const ctx: WealthContext = { ...baseCtx, hasEmergencyFund: true, hasPeaceFund: true };
-    const d = computeProtection(ctx, [policy("gastos_mayores"), policy("vida")]);
-    expect(d.score).toBe(100);
     const optional = d.gaps.find((g) => g.type === "Gastos médicos menores (opcional)");
     expect(optional).toBeDefined();
     expect(optional?.severity).toBe("bajo");

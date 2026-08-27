@@ -21,11 +21,56 @@ const NOMBRES: Record<string, string> = {
 
 /** Gastos REALES de super en julio (los del caso) + uno de otro sobre que NO debe salir. */
 const TXNS = [
-  { id: "s1", kind: "gasto", amount: 45_300, currency: "CRC", occurredOn: "2026-07-05", merchantOrSource: "WALMART", description: null, categoryId: "cat-super" },
-  { id: "s2", kind: "gasto", amount: 18_750, currency: "CRC", occurredOn: "2026-07-12", merchantOrSource: "MAXIPALI", description: null, categoryId: "cat-super" },
-  { id: "s3", kind: "gasto", amount: 32_400, currency: "CRC", occurredOn: "2026-07-19", merchantOrSource: "KETOTICO", description: null, categoryId: "cat-super" },
-  { id: "s4", kind: "gasto", amount: 9_900, currency: "CRC", occurredOn: "2026-07-26", merchantOrSource: "AUTO MERCADO", description: null, categoryId: "cat-super" },
-  { id: "r1", kind: "gasto", amount: 12_000, currency: "CRC", occurredOn: "2026-07-11", merchantOrSource: "STARBUCKS", description: null, categoryId: "cat-rest" },
+  {
+    id: "s1",
+    kind: "gasto",
+    amount: 45_300,
+    currency: "CRC",
+    occurredOn: "2026-07-05",
+    merchantOrSource: "WALMART",
+    description: null,
+    categoryId: "cat-super",
+  },
+  {
+    id: "s2",
+    kind: "gasto",
+    amount: 18_750,
+    currency: "CRC",
+    occurredOn: "2026-07-12",
+    merchantOrSource: "MAXIPALI",
+    description: null,
+    categoryId: "cat-super",
+  },
+  {
+    id: "s3",
+    kind: "gasto",
+    amount: 32_400,
+    currency: "CRC",
+    occurredOn: "2026-07-19",
+    merchantOrSource: "KETOTICO",
+    description: null,
+    categoryId: "cat-super",
+  },
+  {
+    id: "s4",
+    kind: "gasto",
+    amount: 9_900,
+    currency: "CRC",
+    occurredOn: "2026-07-26",
+    merchantOrSource: "AUTO MERCADO",
+    description: null,
+    categoryId: "cat-super",
+  },
+  {
+    id: "r1",
+    kind: "gasto",
+    amount: 12_000,
+    currency: "CRC",
+    occurredOn: "2026-07-11",
+    merchantOrSource: "STARBUCKS",
+    description: null,
+    categoryId: "cat-rest",
+  },
 ];
 
 const listSobres = vi.fn(async () => SOBRES);
@@ -110,12 +155,13 @@ describe("guardrail: el LLM no puede inventar movimientos ni totales", () => {
   const prompt = buildSystemPrompt({ currency: "CRC" });
 
   it("le prohíbe enumerar transacciones de su cabeza", () => {
-    expect(prompt).toMatch(/NUNCA enumeres transacciones de tu cabeza/i);
-    expect(prompt).toMatch(/EXCLUSIVAMENTE de `consultar_transacciones`/i);
+    expect(prompt).toMatch(/NUNCA enumeres transacciones/i); // enumerar PROHIBIDO
+    expect(prompt).toMatch(/de tu cabeza/i); // …ni de memoria
+    expect(prompt).toMatch(/SIEMPRE por `consultar_transacciones`/i); // único camino = la herramienta
   });
 
   it("le prohíbe calcular totales por su cuenta", () => {
-    expect(prompt).toMatch(/NUNCA calcules un TOTAL/i);
+    expect(prompt).toMatch(/ni calcules un TOTAL de tu cabeza/i); // total de memoria PROHIBIDO
   });
 
   it("le da la salida explícita cuando no tiene datos", () => {
@@ -124,7 +170,7 @@ describe("guardrail: el LLM no puede inventar movimientos ni totales", () => {
   });
 
   it("le prohíbe completar con ejemplos plausibles", () => {
-    expect(prompt).toMatch(/NO se reconstruyen de memoria/i);
-    expect(prompt).toMatch(/devolvió 3 filas, mostrás 3 filas/i);
+    expect(prompt).toMatch(/Inventar una tabla de comercios y montos que el usuario nunca gastó/i); // anti-plausibles
+    expect(prompt).toMatch(/devolvió 3 filas mostrás 3/i); // fidelidad: 3→3
   });
 });
