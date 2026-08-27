@@ -141,6 +141,14 @@ describe("buildSystemPrompt · gasto real por sobre (hecho neutral para confront
   it("sin expenseSobres no agrega el HECHO (la regla de conducta sí lo menciona)", () => {
     expect(buildSystemPrompt(base)).not.toContain("lo que gastó de verdad en cada uno");
   });
+  it("FOCO: renderiza el sobre nombrado como la cifra saliente del turno", () => {
+    const out = buildSystemPrompt({ ...base, focoSobre: { name: "Restaurantes", monthly: 80000 } });
+    expect(out).toContain('FOCO DE ESTE TURNO: el usuario mencionó "Restaurantes" = 80000 CRC/mes');
+    expect(out).toContain("ESA es la cifra a confrontar en este turno, NO su gasto total");
+  });
+  it("sin focoSobre no agrega el FOCO", () => {
+    expect(buildSystemPrompt(base)).not.toContain("FOCO DE ESTE TURNO");
+  });
 });
 
 describe("buildSystemPrompt · proyección MENTOR de deuda (hecho neutral del engine)", () => {
