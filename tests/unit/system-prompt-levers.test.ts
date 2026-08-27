@@ -142,3 +142,42 @@ describe("buildSystemPrompt · gasto real por sobre (hecho neutral para confront
     expect(buildSystemPrompt(base)).not.toContain("lo que gastó de verdad en cada uno");
   });
 });
+
+describe("buildSystemPrompt · proyección MENTOR de deuda (hecho neutral del engine)", () => {
+  it("renderiza el horizonte (meses antes + interés ahorrado)", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      debtProjections: [
+        {
+          name: "Tarjeta Oro",
+          extra: 120000,
+          monthsSaved: 14,
+          interestSaved: 210000,
+          currency: "CRC",
+        },
+      ],
+    });
+    expect(out).toContain("ya calculada por el motor"); // texto del HECHO (la regla también menciona «Proyección de salida de deuda»)
+    expect(out).toContain("con ₡120000 CRC/mes extra saldás 14 meses antes");
+    expect(out).toContain("ahorrás ~210000 CRC de interés");
+  });
+  it("sin debtProjections no agrega el HECHO (la regla de conducta sí lo menciona)", () => {
+    expect(buildSystemPrompt(base)).not.toContain("ya calculada por el motor");
+  });
+});
+
+describe("buildSystemPrompt · reglas coach-mentor (Paso 3.6)", () => {
+  const out = buildSystemPrompt(base);
+  it("mapea el aporte al fondo de emergencia a create_goal (tap, no prosa)", () => {
+    expect(out).toContain("EL FONDO DE EMERGENCIA");
+    expect(out).toContain("PROPONÉ create_goal");
+  });
+  it("regla de horizonte MENTOR con grounding inviolable (no inventar el horizonte)", () => {
+    expect(out).toContain("HORIZONTE HACIA LA META");
+    expect(out).toContain("si NO está en tu contexto, NO lo inventes");
+  });
+  it("cierre por dominio: protección cierra con un paso, no un tap", () => {
+    expect(out).toContain("CIERRE POR DOMINIO");
+    expect(out).toContain("no hay botón para comprar un seguro");
+  });
+});

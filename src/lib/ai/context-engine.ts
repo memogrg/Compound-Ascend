@@ -24,6 +24,7 @@ import {
   protectionLevers,
   prioritySignal,
   expenseSobresLevers,
+  debtProjections,
 } from "@/lib/ai/context-levers";
 
 /**
@@ -230,6 +231,13 @@ export async function buildFinancialContext(
       );
       ctx.debts = debtLeverList;
       if (moreCount > 0) ctx.debtsMoreCount = moreCount;
+      // Capa MENTOR: proyección del horizonte con el flujo libre como extra. El número (meses/interés
+      // ahorrado) sale del ENGINE de amortización, no del modelo → horizonte grounded. Solo si hay
+      // flujo libre positivo (un extra que no existe no se proyecta).
+      if (ctx.freeCashflow !== undefined && ctx.freeCashflow > 0) {
+        const proj = debtProjections(debtLeverList, ctx.freeCashflow);
+        if (proj.length > 0) ctx.debtProjections = proj;
+      }
     }
   } catch {
     // Control no disponible.
