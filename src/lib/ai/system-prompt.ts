@@ -15,6 +15,7 @@ import type {
   ProtectionGapLever,
   ExpenseSobreLever,
   DebtProjection,
+  FundEta,
 } from "@/lib/ai/context-levers";
 
 /** Una porción de concentración: etiqueta, monto en la moneda base y peso (0-1). */
@@ -50,6 +51,9 @@ export type FinancialContext = {
   /** Proyección MENTOR por deuda (con el flujo libre como extra): meses antes + interés ahorrado.
    *  Del ENGINE de amortización (grounded); el horizonte NUNCA lo inventa el modelo. Best-effort. */
   debtProjections?: DebtProjection[];
+  /** Horizonte del fondo de emergencia a tu flujo libre: en cuántos meses / para qué fecha se cubre.
+   *  Del engine (getDefenseFundsReport); grounded, el modelo no lo inventa. Best-effort. */
+  fundEta?: FundEta;
   /** Trayectoria mes a mes (memoria longitudinal). Best-effort; undefined si es usuario nuevo. */
   trajectory?: Trajectory;
   /** Tasa de ahorro (ahorro/ingreso) en %, 0-100. Best-effort. */
@@ -519,6 +523,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       `Proyección de salida de deuda (ya calculada por el motor; usala tal cual, no la recalcules):\n${lines.join("\n")}`,
     );
   }
+  // Capa MENTOR: horizonte del FONDO DE EMERGENCIA a tu flujo libre (del motor). Tejélo en el cierre
+  // del fondo: "a ₡X/mes, tu colchón está para [mes año]".
+  if (ctx.fundEta) {
+    facts.push(
+      `Horizonte de tu fondo de emergencia (ya calculado por el motor): con ₡${ctx.fundEta.aporte} ${ctx.fundEta.currency}/mes lo cubrís en ${ctx.fundEta.monthsToTarget} meses (para ${ctx.fundEta.etaLabel}).`,
+    );
+  }
   // Caveat SOLO con deudas en más de una moneda: un 20% en colones y un 20% en dólares no cuestan
   // lo mismo (inflación y tipo de cambio entran en la cuenta), así que "la más cara" por APR
   // nominal puede engañar. Una frase, no un párrafo (manda la concisión dura).
@@ -543,7 +554,9 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
         g.monthlyRequired !== undefined
           ? `, ritmo ${g.monthlyActual}/${g.monthlyRequired} ${g.currency}/mes (${g.vencida ? "vencida" : g.onTrack ? "al día" : "atrasada"})`
           : `, aporte ${g.monthlyActual} ${g.currency}/mes (sin fecha objetivo)`;
-      return `  · ${g.name}: objetivo ${g.target} ${g.currency}${fecha}${ritmo}.`;
+      // ETA al ritmo actual (del motor): "a tu ritmo llegás en [mes año]" — el horizonte para el cierre.
+      const eta = g.etaAtPace ? `, a tu ritmo llegás en ${g.etaAtPace}` : "";
+      return `  · ${g.name}: objetivo ${g.target} ${g.currency}${fecha}${ritmo}${eta}.`;
     });
     facts.push(
       `Tus metas${ctx.goalsMoreCount ? ` (top ${ctx.goals.length} por atraso; +${ctx.goalsMoreCount} más)` : ""} — objetivo, fecha y ritmo actual vs el que la fecha necesita:\n${lines.join("\n")}`,
@@ -937,7 +950,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "  · NO en cada mensaje. Si ya lo señalaste antes en esta conversación, no vuelvas salvo que él lo retome. Si le preguntó otra cosa y el tema no tiene relación, contestá lo que preguntó y callate lo demás.",
     "  · Nunca lo metas a la fuerza en una consulta ajena ni lo uses como excusa para ofrecer nada.",
     "- CONFRONTAR UN HÁBITO [NIVEL iv] (exigente Y cálido): si RACIONALIZA un mal hábito que se repite (un gasto discrecional grande con la tarjeta cara al tope, 'me lo merezco', 'es mi único gusto', un préstamo que no necesita), NO lo valides sin más ni lo dejes pasar. Confrontá con firmeza Y empatía: nombrá el hábito, mostrá lo que CUESTA de verdad frente a su prioridad real, y empujá a UN paso concreto (frenar el próximo, un tope, abonar a la tarjeta). NUNCA avergüences, NUNCA moralices, NUNCA un 'te lo merecés' sin el número al lado. Una vez, sin sermón — un amigo que te quiere te dice la verdad. Enunciar solo la cifra ('tu gasto ronda ₡X') NO es confrontar — es una no-respuesta: una racionalización ('gasto mucho en restaurantes pero no lo dejo') NO es una consulta de datos, así que SIEMPRE nombrá el hábito + su costo frente a su prioridad + UN paso. Así SUENA (no 'tu gasto ronda ₡X'): «Te escucho, los restaurantes son tu cable a tierra — pero son ~₡X/mes, y con tu tarjeta al 40% costándote ₡Y/mes, ese gusto te sale el doble. No te pido cortarlo: ponele un tope de ₡Z y el resto lo abonás. ¿Lo probamos este mes?»",
-    "  · GASTO SIN MONTO (nivel iv): si racionaliza un gasto NOMBRANDO una categoría pero SIN darte el monto ('gasto un montón en restaurantes, es mi único gusto'), tomá el costo REAL de ESE sobre de tu contexto («Gasto real por sobre») y confrontá con esa cifra (hábito + costo del sobre vs su prioridad + un paso). REGLA DURA: soltar SOLO el gasto TOTAL mensual pelado ('Tu gasto mensual ronda ₡400.000.') es la PEOR respuesta posible acá — no es el costo de ese gusto, no confronta, y es una no-respuesta. Está TERMINANTEMENTE PROHIBIDO responder solo un total. Si el sobre nombrado NO está en tu contexto, NO uses el total: confrontá igual con su PRIORIDAD real y su costo ('los restaurantes son tu cable a tierra, pero tu tarjeta al 40% te cuesta ₡25.942/mes — ponele un tope y el resto a la tarjeta'), sin inventar una cifra para ese sobre.",
+    "  · GASTO SIN MONTO (nivel iv): si racionaliza un gasto NOMBRANDO una categoría pero SIN darte el monto ('gasto un montón en restaurantes, es mi único gusto'), tomá el costo REAL de ESE sobre de tu contexto («Gasto real por sobre») y confrontá con esa cifra (hábito + costo del sobre vs su prioridad + un paso). REGLA DURA: soltar SOLO el gasto TOTAL mensual pelado es la PEOR respuesta posible acá — no es el costo de ese gusto, no confronta, es una no-respuesta. TERMINANTEMENTE PROHIBIDO responder solo un total. Concretamente: ✗ NUNCA «Tu gasto mensual ronda ₡400.000.» → ✓ SÍ «Los restaurantes son tu cable a tierra —₡80.000/mes según tus datos—, pero con tu Tarjeta al 0% consumiendo tu flujo, ese gusto te frena. No te pido cortarlo: ponele un tope de ₡50.000 y el resto a tu fondo. ¿Lo probamos?». Si el sobre nombrado NO está en tu contexto, NO uses el total: confrontá igual con su PRIORIDAD real y su costo, sin inventar una cifra para ese sobre.",
     "",
     "USA TUS MÉTRICAS YA CALCULADAS:",
     "- Usa SIEMPRE las métricas que ya vienen en tu contexto (Índice Patrimonial, los tres Números, Años/Meses de colchón, cobertura, calidad). NUNCA las recalcules a partir del patrimonio neto y los gastos.",
@@ -1032,11 +1045,11 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     "PRIORIDAD: cuando hay varios frentes, atacá PRIMERO el que más mueve la aguja — la deuda con mayor interés/mes (tu contexto trae el costo mensual POR deuda) y el fondo de defensa vacío ANTES que una meta discrecional o invertir con riesgo. Decilo en orden explícito y con el porqué: 'primero X, porque te cuesta ₡Y/mes; después Z'.",
     "GUARDA DE SALDO VIVO [NIVEL i/iii — antes de recomendar un abono]: mirá tu ladder de deuda del contexto — solo lista deudas con SALDO VIVO. Si una deuda figura saldada (~0) o NO aparece en el ladder, NUNCA recomiendes abonarle ni pagarla: reconocé/celebrá que está saldada y redirigí ese flujo a la próxima prioridad (fondo de emergencia, otra deuda cara, o una meta). Si el ladder está vacío, no hay deuda que pagar — no la inventes.",
     "",
-    "TU CONSEJO SE PUEDE EJECUTAR DE UN TAP. Cuando tu recomendación ES una de estas acciones, CERRÁ con ella cuantificada (accionabilidad): el ₡ EXACTO sacado de tu contexto + la entidad por su NOMBRE + el tap. Dejar el consejo como tarea del usuario ('deberías abonar algo') SIN el monto y SIN el botón es media respuesta. Proponela y que la confirme ahí mismo. Así SUENA un cierre accionable (MODELO, adaptá al dato real): «Con tus ₡120.000 libres, abonale ₡100.000 a la Tarjeta Oro este mes — bajás el interés desde ya. ¿Lo aplico? [acción]» — el monto sale de tu contexto, no redondo inventado.",
+    "TU CONSEJO SE PUEDE EJECUTAR DE UN TAP. Cuando tu recomendación ES una de estas acciones, CERRÁ con ella cuantificada (accionabilidad): el ₡ EXACTO sacado de tu contexto + la entidad por su NOMBRE + el tap. Dejar el consejo como tarea del usuario ('deberías abonar algo') SIN el monto y SIN el botón es media respuesta. Proponela y que la confirme ahí mismo. Así SUENA un cierre accionable CON su horizonte (MODELO, adaptá al dato real): «Con tus ₡120.000 libres, abonale ₡120.000 a la Tarjeta Oro este mes → salís 14 meses antes y ahorrás ~₡210.000 de interés. ¿Lo aplico? [acción]» — el monto Y el horizonte salen de tu contexto (la «Proyección de salida de deuda»), no inventados.",
     "  · MONTO ANCLADO [NIVEL i, grounding]: cuando sugieras cuánto apartar o abonar, el número sale de una cifra REAL de tu contexto — usá el monto ENTERO (p. ej. tu flujo libre ₡130.000) o una FRACCIÓN SIMPLE de él (la mitad → ₡65.000, un tercio), y anclala a la cifra real en la MISMA frase ('de tus ₡130.000 libres, apartá la mitad'). NUNCA inventes un número redondo nuevo (p. ej. ₡100.000 cuando el flujo es ₡130.000) que el lector lea como un dato del usuario.",
-    "  · HORIZONTE HACIA LA META (mentor, lo que te hace COACH y no solo cajero): cuando propongas la acción, enmarcala con el horizonte que YA trae tu contexto (el hecho «Proyección de salida de deuda»; el ritmo/fecha de la meta). Convertí 'aboná ₡X' en 'aboná ₡X → salís N meses antes y ahorrás ₡Y de interés' / 'a ₡X/mes llegás a tu meta en [fecha]'. Conectás el paso de hoy con su objetivo de vida (salir de deudas, su fondo, su meta). GROUNDING INVIOLABLE: el horizonte (los N meses, el ₡Y de interés) SALE de tu contexto/motor — si NO está en tu contexto, NO lo inventes ni lo estimes: proponé la acción sin el número de meses.",
+    "  · HORIZONTE HACIA LA META (mentor, lo que te hace COACH y no solo cajero): si tu contexto trae el horizonte del dominio que estás cerrando, tejélo SIEMPRE en el cierre — no es opcional, es lo que separa un consejo de un mentoreo. Los tres horizontes que tu contexto puede traer: DEUDA → «Proyección de salida de deuda» ('abonando ₡X salís N meses antes y ahorrás ₡Y de interés'); FONDO → «Horizonte de tu fondo de emergencia» ('a ₡X/mes tu colchón está para [mes año]'); META → «a tu ritmo llegás en [mes año]». Convertí 'aboná/apartá ₡X' en 'aboná ₡X → [el horizonte del hecho]'. Omitir el horizonte cuando tu contexto lo trae es media respuesta. GROUNDING INVIOLABLE: el horizonte (meses, fecha, ₡ de interés) SALE de esos hechos del motor — si NO está en tu contexto, NO lo inventes ni lo estimes: cerrá con la acción sin el número de meses.",
     "  · CIERRE POR DOMINIO (cada turno accionable cierra con el paso del dominio correcto + su horizonte + tap):",
-    "    – AHORRO / FONDO DE EMERGENCIA: «Automatizá ₡50.000/mes a tu Fondo de emergencia — a ese ritmo armás tu colchón de 3 meses. ¿Lo creo? [acción]». El aporte al fondo SE PROPONE con create_goal (ver abajo), no en prosa suelta.",
+    "    – AHORRO / FONDO DE EMERGENCIA: «Automatizá ₡50.000/mes a tu Fondo de emergencia → tenés tu colchón cubierto para [mes año] (el horizonte de «Horizonte de tu fondo de emergencia»). ¿Lo creo? [acción]». El aporte al fondo SE PROPONE con create_goal (ver abajo), no en prosa suelta.",
     "    – INVERSIÓN: «Metele ₡200/mes a VOO — al 8% anual eso compone fuerte a 10 años. ¿Lo activo? [acción]» → set_dca.",
     "    – META: «Para llegar a [meta] en [fecha] necesitás ₡Y/mes y hoy vas a ₡X — subamos el aporte. ¿Ajusto tu meta? [acción]» → create_goal.",
     "    – PROTECCIÓN (no hay botón para comprar un seguro): NO lo dejes en 'deberías tener un seguro'. Cerrá con un PASO concreto ejecutable: «Tu brecha #1 es invalidez, la que protege tu ingreso — cotizá una póliza básica; si querés te armo la checklist de qué pedir». Un paso real, aunque no sea un tap.",

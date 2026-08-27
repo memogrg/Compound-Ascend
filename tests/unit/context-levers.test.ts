@@ -7,6 +7,8 @@ import {
   prioritySignal,
   expenseSobresLevers,
   debtProjections,
+  fundEta,
+  addMonthsISO,
 } from "@/lib/ai/context-levers";
 
 const d = (over: Partial<Parameters<typeof debtLevers>[0][number]> = {}) => ({
@@ -109,6 +111,18 @@ describe("goalLevers", () => {
     expect(goals[0]!.monthlyRequired).toBeUndefined();
     expect(goals[0]!.onTrack).toBeUndefined();
   });
+  it("etaAtPace: al ritmo actual, cuándo llega (independiente de la fecha objetivo)", () => {
+    // gap = 1.200.000 − 0 = 1.200.000; a 50.000/mes = 24 meses → enero 2028 desde enero 2026.
+    const { goals } = goalLevers([g({ currentAmount: 0, monthlyContribution: 50_000 })], TODAY);
+    expect(goals[0]!.monthsAtPace).toBe(24);
+    expect(goals[0]!.etaAtPace).toBe("enero 2028");
+  });
+  it("etaAtPace undefined si no hay aporte o ya está cubierta", () => {
+    expect(goalLevers([g({ monthlyContribution: 0 })], TODAY).goals[0]!.etaAtPace).toBeUndefined();
+    expect(
+      goalLevers([g({ currentAmount: 1_200_000 })], TODAY).goals[0]!.etaAtPace,
+    ).toBeUndefined();
+  });
   it("fecha vencida → vencida=true, monthlyRequired = todo el faltante", () => {
     const { goals } = goalLevers([g({ targetDate: "2025-06-01", currentAmount: 200_000 })], TODAY);
     expect(goals[0]!.vencida).toBe(true);
@@ -147,6 +161,36 @@ describe("protectionLevers", () => {
     expect(protectionLevers(gaps)).toEqual([
       { type: "Seguro de invalidez", severity: "alto", description: "vivís de tu ingreso" },
     ]);
+  });
+});
+
+describe("addMonthsISO (tz-safe, hacia adelante)", () => {
+  it("suma meses con rollover de año y devuelve 'mes año'", () => {
+    expect(addMonthsISO("2026-08-27", 0)).toBe("agosto 2026");
+    expect(addMonthsISO("2026-08-27", 5)).toBe("enero 2027");
+    expect(addMonthsISO("2026-01-15", 12)).toBe("enero 2027");
+  });
+  it("fecha inválida → ''", () => {
+    expect(addMonthsISO("no-fecha", 3)).toBe("");
+  });
+});
+
+describe("fundEta (horizonte del fondo a tu flujo libre, del engine)", () => {
+  it("ETA = ceil(gap/aporte) + etiqueta de fecha", () => {
+    // gap = 900.000 − 0 = 900.000; a 50.000/mes = 18 meses → feb 2028 desde ago 2026.
+    const e = fundEta({ current: 0, target: 900_000 }, 50_000, "2026-08-27", "CRC");
+    expect(e).toBeDefined();
+    expect(e!.monthsToTarget).toBe(18);
+    expect(e!.aporte).toBe(50_000);
+    expect(e!.etaLabel).toBe("febrero 2028");
+  });
+  it("fondo cubierto (gap ≤ 0) → undefined", () => {
+    expect(
+      fundEta({ current: 900_000, target: 900_000 }, 50_000, "2026-08-27", "CRC"),
+    ).toBeUndefined();
+  });
+  it("sin aporte (≤0) → undefined (no hay ritmo)", () => {
+    expect(fundEta({ current: 0, target: 900_000 }, 0, "2026-08-27", "CRC")).toBeUndefined();
   });
 });
 

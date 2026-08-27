@@ -166,6 +166,36 @@ describe("buildSystemPrompt · proyección MENTOR de deuda (hecho neutral del en
   });
 });
 
+describe("buildSystemPrompt · horizonte del fondo + ETA de meta (Paso 3.7)", () => {
+  it("renderiza el horizonte del fondo de emergencia", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      fundEta: { monthsToTarget: 18, etaLabel: "febrero 2028", aporte: 50000, currency: "CRC" },
+    });
+    expect(out).toContain("Horizonte de tu fondo de emergencia");
+    expect(out).toContain("con ₡50000 CRC/mes lo cubrís en 18 meses (para febrero 2028)");
+  });
+  it("renderiza la ETA de meta al ritmo actual en el ladder", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      goals: [
+        {
+          name: "Viaje",
+          target: 1200000,
+          currency: "CRC",
+          monthlyActual: 50000,
+          monthsAtPace: 24,
+          etaAtPace: "enero 2028",
+        },
+      ],
+    });
+    expect(out).toContain("a tu ritmo llegás en enero 2028");
+  });
+  it("sin fundEta no agrega el HECHO (la regla de conducta sí lo menciona)", () => {
+    expect(buildSystemPrompt(base)).not.toContain("lo cubrís en"); // texto del HECHO, no de la regla
+  });
+});
+
 describe("buildSystemPrompt · reglas coach-mentor (Paso 3.6)", () => {
   const out = buildSystemPrompt(base);
   it("mapea el aporte al fondo de emergencia a create_goal (tap, no prosa)", () => {

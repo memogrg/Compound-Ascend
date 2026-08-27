@@ -25,6 +25,7 @@ import {
   prioritySignal,
   expenseSobresLevers,
   debtProjections,
+  fundEta,
 } from "@/lib/ai/context-levers";
 
 /**
@@ -675,6 +676,27 @@ export async function buildFinancialContext(
         convertido: huboConversion,
         ...(huboConversion ? { monedaOrigen: primaryCurrency } : {}),
       };
+      // Capa MENTOR: horizonte del fondo de emergencia a TU FLUJO LIBRE (lo que realmente apartarías).
+      // ETA del ENGINE (target/current), grounded. Solo si hay flujo libre, no está cubierto y la moneda
+      // del fondo coincide con la de visualización (si no, no mezclo monedas en la cuenta de meses).
+      if (
+        ctx.freeCashflow !== undefined &&
+        ctx.freeCashflow > 0 &&
+        !ctx.defenseFunds.emergency.cubierto &&
+        ctx.defenseFunds.currency === ctx.currency
+      ) {
+        const { userToday } = await import("@/lib/time/user-time");
+        const eta = fundEta(
+          {
+            current: ctx.defenseFunds.emergency.actual,
+            target: ctx.defenseFunds.emergency.objetivo,
+          },
+          ctx.freeCashflow,
+          await userToday(),
+          ctx.currency,
+        );
+        if (eta) ctx.fundEta = eta;
+      }
       // Supersede: si el fondo de emergencia está registrado, hasEmergencyFund refleja lo REAL
       // (cubierto → "si"; parcial → "construyendo"), no el auto-reporte viejo. Así el guardrail y las
       // reglas dejan de tratar al usuario como "sin fondo".
