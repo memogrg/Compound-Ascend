@@ -51,7 +51,10 @@ const sobreendeudado: AuditPersona = {
   },
   async monthEvents(driver, ids, m) {
     await driver.receiveIncome(ids.incomeLineId, 450_000, iso(m, 5));
-    await driver.spend(400_000, iso(m, 10), "Gastos");
+    // 320k sin categoría + 80k en un SOBRE "Restaurantes" real (Paso 3.6-5): así la confrontación de
+    // restaurantes tiene el costo del sobre para citar, en vez de que el modelo suelte el total.
+    await driver.spend(320_000, iso(m, 10), "Gastos");
+    await driver.spendInSobre("Restaurantes", 80_000, iso(m, 11));
     if (ids.debtId) await driver.payDebt(ids.debtId, 50_000, iso(m, 15));
   },
 };

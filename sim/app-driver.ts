@@ -27,6 +27,7 @@ import {
   withdrawFromGoal,
 } from "@/modules/control/services/control-service";
 import { createHolding, contributeToHolding } from "@/modules/wealth/services/holdings-service";
+import { getActiveHouseholdId } from "@/lib/household/active";
 import type { EventLog } from "./event-log";
 
 export class AppDriver {
@@ -278,6 +279,52 @@ export class AppDriver {
       this.ctx,
     );
     this.log.record("event", `gasto · ${label} (createTransaction)`, this.day, { amount, dateISO });
+  }
+
+  /** Cache de ids de sobre creados (por nombre) para no duplicar la categoría entre meses. */
+  private readonly sobreIds = new Map<string, string>();
+
+  /**
+   * Crea (una vez) una categoría-sobre de gasto por su nombre y siembra un gasto CATEGORIZADO en ella.
+   * `spend` deja el gasto SIN categoría (va a "Sin categoría"); esto lo mete en un sobre real, para que
+   * `getRealTotals.expenseByKey` (y con eso `expenseSobres` del contexto) lo muestre por su nombre.
+   * Insert crudo vía ctx.db porque `createCategory` no es ctx-aware (sesión por cookie).
+   */
+  async spendInSobre(sobre: string, amount: number, dateISO: string): Promise<void> {
+    let categoryId = this.sobreIds.get(sobre);
+    if (!categoryId) {
+      const householdId = await getActiveHouseholdId(this.ctx.db, this.ctx.userId);
+      const { data, error } = await this.ctx.db
+        .from("expense_categories")
+        .insert({
+          user_id: this.ctx.userId,
+          household_id: householdId,
+          name: sobre,
+          category_type: "expense",
+          is_favorite: true,
+        })
+        .select("id")
+        .single();
+      if (error || !data) {
+        throw new Error(`no pude crear el sobre "${sobre}": ${error?.message ?? "sin fila"}`);
+      }
+      categoryId = data.id as string;
+      this.sobreIds.set(sobre, categoryId);
+    }
+    await createTransaction(
+      {
+        kind: "gasto",
+        amount,
+        currency: this.currency,
+        occurredOn: dateISO,
+        status: "confirmed",
+        origin: "manual",
+        merchantOrSource: sobre,
+        categoryId,
+      },
+      this.ctx,
+    );
+    this.log.record("event", `gasto categorizado · ${sobre}`, this.day, { amount, dateISO });
   }
 
   async payDebt(debtId: string, amount: number, dateISO: string): Promise<void> {

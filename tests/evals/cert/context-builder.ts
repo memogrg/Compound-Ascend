@@ -25,6 +25,7 @@ import {
   protectionLevers,
   prioritySignal,
   expenseSobresLevers,
+  debtProjections,
 } from "@/lib/ai/context-levers";
 import { getRealTotals } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
@@ -111,6 +112,10 @@ export async function buildSimContext(
       currency: d.currency,
     })),
   );
+  // Capa MENTOR (Paso 3.6): horizonte de salida de deuda con el flujo libre como extra, del engine
+  // de amortización (grounded, idéntico a producción). Solo con flujo libre positivo.
+  const debtProj =
+    ind.freeCashflow > 0 ? debtProjections(debtLeverResult.debts, ind.freeCashflow) : [];
   const goalLeverResult = goalLevers(
     ctrl.goals.map((g) => ({
       name: g.name,
@@ -160,6 +165,7 @@ export async function buildSimContext(
     goals: goalLeverResult.goals.length ? goalLeverResult.goals : undefined,
     goalsMoreCount: goalLeverResult.moreCount || undefined,
     expenseSobres: expenseSobres.length ? expenseSobres : undefined,
+    debtProjections: debtProj.length ? debtProj : undefined,
     protectionGaps: patr.protectionGaps.length ? protectionLevers(patr.protectionGaps) : undefined,
     activePolicies: patr.protectionGaps.length ? patr.activePolicies : undefined,
     // SEÑAL PRIORITARIA: reusa el mismo Priority Engine canónico (ctrl.diagnosis) que producción.
@@ -211,6 +217,9 @@ export async function buildSimContext(
     // Gasto real por sobre (Paso 3.5-d): el asesor confronta un gasto sin monto citando la cifra de
     // ESE sobre; sin esto en knownFigures, esa cita daría falso positivo de grounding.
     ...expenseSobres.map((s) => s.monthly),
+    // Horizonte MENTOR (Paso 3.6): el interés ahorrado que el asesor cita sale del engine; a
+    // knownFigures para que citarlo no sea falso positivo (el extra = flujo libre ya está).
+    ...debtProj.map((p) => p.interestSaved),
     // Longitudinal: los valores REALES mes-a-mes que el asesor legítimamente tuvo vía
     // consultar_historial (net_worth_snapshots/portfolio_snapshots) y sobre los que corre
     // computeTrajectory. Sin esto, toda cifra histórica bien-fundada (patrimonio/portafolio/
