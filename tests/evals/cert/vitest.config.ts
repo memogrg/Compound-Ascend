@@ -21,7 +21,7 @@ export default defineConfig({
     fileParallelism: false,
     // 80 min: el audit juzgado creció (5 personas + suites confrontacion/highlights = ~35 outputs
     // × juez -pro ×3 + rescate). A 30 min timeouteaba a mitad de camino sin escribir el reporte.
-    testTimeout: 4_800_000,
+    testTimeout: 5_400_000,
     hookTimeout: 120_000,
   },
   resolve: {

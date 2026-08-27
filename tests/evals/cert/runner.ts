@@ -8,6 +8,7 @@ import type { AIProvider } from "@/lib/ai/provider";
 import type { AuthContext } from "@/lib/auth/auth-context";
 import { withSimAuth } from "@/lib/auth/sim-auth";
 import { financeChatWithTools } from "@/lib/ai/orchestrator";
+import { resolveActionProposal } from "@/lib/ai/action-resolver";
 import { computeTrajectory, type MonthlyPoint, type PortfolioPoint } from "@/lib/ai/trajectory";
 import { getMonthFlow } from "@/modules/financial-base/services/month-flow-service";
 import { getRichLifeSummary } from "@/modules/rich-life/services/rich-life-service";
@@ -75,14 +76,23 @@ interface EvalArgs {
 async function evaluate(args: EvalArgs, opts: AuditOpts): Promise<AuditOutput> {
   // withSimAuth: the advisor's read tools (consultar_historial → net_worth_snapshots, …)
   // call cookie-based readers; under the ALS they resolve to THIS persona headless.
-  const res = await withSimAuth(args.ctx, () =>
-    financeChatWithTools(
+  const res = await withSimAuth(args.ctx, async () => {
+    const r = await financeChatWithTools(
       [{ role: "user", content: args.prompt }],
       args.built.context,
       args.built.toolContext,
       opts.provider,
-    ),
-  );
+    );
+    // Resolver la acción como en producción (chat/route.ts): el audit juzga la acción RESUELTA, no la
+    // cruda. resolveActionProposal es ctx-aware (authCtx) → un abono a una deuda saldada se anula
+    // headless, igual que en prod. `today` no afecta el tipo (solo el paymentDate de salida).
+    const action = await resolveActionProposal(r.action, {
+      currency: args.built.context.currency,
+      today: "2026-01-01",
+      authCtx: args.ctx,
+    });
+    return { ...r, action };
+  });
   const reply = res.reply;
   const actionType = res.action?.type ?? null;
   const grounding = checkGrounding(reply, args.built.facts);
@@ -145,6 +155,10 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
     const monthly: MonthlyPoint[] = [];
     const portfolio: PortfolioPoint[] = [];
     let ctxMonth1: BuiltContext | null = null;
+    // El turno longitudinal mes1 corre DENTRO del loop (en m=0, con 1 solo snapshot) para que
+    // consultar_historial se comporte como en un mes1 REAL (conDatos=false). Si no, la BD ya tendría
+    // los 6 snapshots al llegar al suite-loop y el gate se abriría (artefacto de fidelidad, Fase 10).
+    let mes1LongDone = false;
 
     for (let m = 0; m < MONTHS; m++) {
       await onMonthDay(m, 20, async () => {
@@ -193,6 +207,25 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
             persona.dna,
             { monthly, portfolio },
           );
+          // Con 1 snapshot en la BD (este es m=0), corré el turno longitudinal mes1 acá: así el guard
+          // de tendencia ve conDatos=false y bloquea una trayectoria fabricada, como en producción.
+          if (persona.suites.includes("longitudinal")) {
+            outputs.push(
+              await evaluate(
+                {
+                  personaName: persona.displayName,
+                  ctx,
+                  built: ctxMonth1,
+                  suite: "longitudinal",
+                  prompt: LONGITUDINAL.prompt,
+                  expectedRedFlags: LONGITUDINAL.expectedRedFlags,
+                  point: "mes1",
+                },
+                opts,
+              ),
+            );
+            mes1LongDone = true;
+          }
         }
       });
     }
@@ -269,7 +302,9 @@ export async function auditPersona(persona: AuditPersona, opts: AuditOpts): Prom
           );
         }
       } else if (suite === "longitudinal") {
-        if (ctxMonth1) {
+        if (ctxMonth1 && !mes1LongDone) {
+          // Fallback: el turno mes1 normalmente ya corrió en m=0 (con 1 snapshot). Solo llega acá si
+          // no se disparó allá; se deja por completitud, aunque acá la BD ya tenga los 6 snapshots.
           outputs.push(
             await evaluate(
               {

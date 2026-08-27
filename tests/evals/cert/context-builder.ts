@@ -19,7 +19,15 @@ import { getControlSummary } from "@/modules/control/services/control-service";
 import { getDebtsOverview } from "@/modules/control/services/debts-service";
 import { getDefenseFundsReport } from "@/modules/wealth/services/fund-sizing-service";
 import { detectLowSavingsRate } from "@/lib/insights/detectors";
-import { debtLevers, goalLevers, protectionLevers, prioritySignal } from "@/lib/ai/context-levers";
+import {
+  debtLevers,
+  goalLevers,
+  protectionLevers,
+  prioritySignal,
+  expenseSobresLevers,
+} from "@/lib/ai/context-levers";
+import { getRealTotals } from "@/modules/financial-base";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { userToday } from "@/lib/time/user-time";
 import type { ContextFacts } from "./types";
 
@@ -58,6 +66,15 @@ export async function buildSimContext(
     getDebtsOverview({}, ctx),
     getPatrimonioReport(ctx),
   ]);
+
+  // Top sobres de gasto REAL por-hoja (para confrontar un gasto sin monto con la cifra de ESE sobre),
+  // como en producción (context-engine usa getRealTotals). Best-effort; ya en moneda de visualización.
+  const realTotals = await getRealTotals(await userCurrentPeriod(ctx), ctx).catch(() => null);
+  const expenseSobres = realTotals
+    ? expenseSobresLevers(
+        Object.values(realTotals.expenseByKey).map((v) => ({ name: v.label, monthly: v.value })),
+      )
+    : [];
 
   const ind = base.indicators;
   const netWorth = rl.snapshot.indicators.netWorth;
@@ -142,6 +159,7 @@ export async function buildSimContext(
     debtsMoreCount: debtLeverResult.moreCount || undefined,
     goals: goalLeverResult.goals.length ? goalLeverResult.goals : undefined,
     goalsMoreCount: goalLeverResult.moreCount || undefined,
+    expenseSobres: expenseSobres.length ? expenseSobres : undefined,
     protectionGaps: patr.protectionGaps.length ? protectionLevers(patr.protectionGaps) : undefined,
     activePolicies: patr.protectionGaps.length ? patr.activePolicies : undefined,
     // SEÑAL PRIORITARIA: reusa el mismo Priority Engine canónico (ctrl.diagnosis) que producción.
@@ -190,6 +208,9 @@ export async function buildSimContext(
     // el ritmo requerido de una meta daría FALSO POSITIVO de grounding (no están en las cifras crudas).
     ...debtLeverResult.debts.map((d) => d.monthlyInterestCost),
     ...goalLeverResult.goals.map((g) => g.monthlyRequired ?? 0),
+    // Gasto real por sobre (Paso 3.5-d): el asesor confronta un gasto sin monto citando la cifra de
+    // ESE sobre; sin esto en knownFigures, esa cita daría falso positivo de grounding.
+    ...expenseSobres.map((s) => s.monthly),
     // Longitudinal: los valores REALES mes-a-mes que el asesor legítimamente tuvo vía
     // consultar_historial (net_worth_snapshots/portfolio_snapshots) y sobre los que corre
     // computeTrajectory. Sin esto, toda cifra histórica bien-fundada (patrimonio/portafolio/
