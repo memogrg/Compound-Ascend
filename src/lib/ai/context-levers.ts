@@ -50,6 +50,59 @@ export function debtLevers(
   return { debts: mapped.slice(0, topN), moreCount: Math.max(0, mapped.length - topN) };
 }
 
+const MESES_ES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+] as const;
+
+/** "YYYY-MM-DD" + n meses → etiqueta "mes año" (p. ej. "marzo 2027"). PURO, tz-safe (nunca `new Date`);
+ *  el horizonte se computa desde userToday. "" si la fecha base es inválida. */
+export function addMonthsISO(fromISO: string, n: number): string {
+  const [y, m] = fromISO.slice(0, 7).split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return "";
+  const total = y! * 12 + (m! - 1) + n;
+  const year = Math.floor(total / 12);
+  const month = ((total % 12) + 12) % 12; // 0-based, normalizado
+  return `${MESES_ES[month]} ${year}`;
+}
+
+/** Horizonte de un fondo de defensa: a `aporte`/mes, en cuántos meses se cubre el objetivo y para qué
+ *  fecha. `aporte` = el flujo libre (lo que el usuario realmente apartaría). Del engine (target/current
+ *  de getDefenseFundsReport), grounded. undefined si ya está cubierto o no hay aporte. */
+export type FundEta = {
+  monthsToTarget: number;
+  etaLabel: string;
+  aporte: number;
+  currency: string;
+};
+
+export function fundEta(
+  fund: { current: number; target: number },
+  aporte: number,
+  todayISO: string,
+  currency: string,
+): FundEta | undefined {
+  const gap = fund.target - fund.current;
+  if (gap <= 0 || aporte <= 0) return undefined;
+  const months = Math.ceil(gap / aporte);
+  return {
+    monthsToTarget: months,
+    etaLabel: addMonthsISO(todayISO, months),
+    aporte: Math.round(aporte),
+    currency,
+  };
+}
+
 /** One goal as a lever: target + deadline + actual pace vs the pace the deadline needs. */
 export type GoalLever = {
   name: string;
@@ -63,6 +116,10 @@ export type GoalLever = {
   onTrack?: boolean;
   /** La fecha objetivo ya pasó (o es este mes): monthlyRequired = todo el faltante. */
   vencida?: boolean;
+  /** Meses para llegar al objetivo AL RITMO ACTUAL (gap/monthlyActual). undefined si sin aporte o cubierta. */
+  monthsAtPace?: number;
+  /** Etiqueta "mes año" de esa ETA al ritmo actual. undefined si no aplica. */
+  etaAtPace?: string;
 };
 
 export type GoalLeverInput = {
@@ -120,6 +177,13 @@ export function goalLevers(
           }
         }
       }
+      // ETA al RITMO ACTUAL (independiente de la fecha objetivo): a lo que aporta hoy, cuándo llega.
+      let monthsAtPace: number | undefined;
+      let etaAtPace: string | undefined;
+      if (g.monthlyContribution > 0 && gap > 0) {
+        monthsAtPace = Math.ceil(gap / g.monthlyContribution);
+        etaAtPace = addMonthsISO(todayISO, monthsAtPace);
+      }
       return {
         name: g.name,
         target: Math.round(g.targetAmount),
@@ -129,6 +193,8 @@ export function goalLevers(
         monthlyRequired: monthlyRequired === undefined ? undefined : Math.round(monthlyRequired),
         onTrack,
         vencida,
+        monthsAtPace,
+        etaAtPace,
       };
     });
   const shortfall = (g: GoalLever): number => (g.monthlyRequired ?? 0) - g.monthlyActual;
