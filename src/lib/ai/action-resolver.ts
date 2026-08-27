@@ -20,6 +20,7 @@ import "server-only";
  * confirmación explícita.
  */
 import type { AIActionProposal } from "@/lib/ai/types";
+import type { AuthContext } from "@/lib/auth/auth-context";
 import { logger } from "@/lib/logger";
 
 /** Normaliza para comparar nombres: sin acentos, minúsculas, sin dobles espacios. */
@@ -57,6 +58,9 @@ export type ResolveContext = {
   currency: string;
   /** Hoy en la zona del perfil, YYYY-MM-DD. */
   today: string;
+  /** AuthContext explícito para lecturas headless (audit/tests): threadea a los servicios de dominio.
+   *  En producción va undefined → sesión por cookie, como siempre. */
+  authCtx?: AuthContext;
 };
 
 /**
@@ -106,7 +110,7 @@ async function resolveSetDca(
   if (monthly === null) return null;
 
   const { listHoldings } = await import("@/modules/wealth/services/holdings-service");
-  const holdings = await listHoldings();
+  const holdings = await listHoldings(ctx.authCtx);
   if (holdings.length === 0) return null;
 
   const needle = str(p.symbol) ?? str(p.label) ?? str(p.name);
@@ -285,7 +289,7 @@ async function resolveDebtExtraPayment(
   const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
   // Saldo VIVO, no el ancla de alta: una deuda saldada (≤0) no es candidata de abono, y el tope se
   // calcula sobre lo que REALMENTE se debe (P2 deuda-saldada).
-  const debts = (await getCurrentDebtBalances()).filter((d) => d.currentBalance > 0);
+  const debts = (await getCurrentDebtBalances(ctx.authCtx)).filter((d) => d.currentBalance > 0);
   if (debts.length === 0) return null;
 
   const needle = str(p.name) ?? str(p.debtName);

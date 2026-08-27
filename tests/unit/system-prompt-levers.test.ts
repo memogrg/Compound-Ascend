@@ -124,3 +124,21 @@ describe("buildSystemPrompt · SEÑAL PRIORITARIA (hecho del Priority Engine)", 
     expect(buildSystemPrompt(base)).not.toContain("lo más grave de tu cuadro ahora");
   });
 });
+
+describe("buildSystemPrompt · gasto real por sobre (hecho neutral para confrontar)", () => {
+  it("renderiza los sobres con su gasto real mensual", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      expenseSobres: [
+        { name: "Restaurantes", monthly: 120000 },
+        { name: "Súper", monthly: 300000 },
+      ],
+    });
+    expect(out).toContain("lo que gastó de verdad en cada uno"); // texto del HECHO (la regla también menciona «Gasto real por sobre»)
+    expect(out).toContain("Restaurantes 120000 CRC");
+    expect(out).toContain("Súper 300000 CRC");
+  });
+  it("sin expenseSobres no agrega el HECHO (la regla de conducta sí lo menciona)", () => {
+    expect(buildSystemPrompt(base)).not.toContain("lo que gastó de verdad en cada uno");
+  });
+});
