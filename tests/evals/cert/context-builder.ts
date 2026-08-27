@@ -26,6 +26,7 @@ import {
   prioritySignal,
   expenseSobresLevers,
   debtProjections,
+  fundEta,
 } from "@/lib/ai/context-levers";
 import { getRealTotals } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
@@ -116,6 +117,17 @@ export async function buildSimContext(
   // de amortización (grounded, idéntico a producción). Solo con flujo libre positivo.
   const debtProj =
     ind.freeCashflow > 0 ? debtProjections(debtLeverResult.debts, ind.freeCashflow) : [];
+  // Horizonte del fondo de emergencia a tu flujo libre (Paso 3.7), del engine — como en producción.
+  // Solo con flujo libre y fondo no cubierto. El aporte (=flujo libre) ya está en knownFigures.
+  const fundEtaResult =
+    defense && ind.freeCashflow > 0 && !defense.emergency.covered
+      ? fundEta(
+          { current: defense.emergency.current, target: defense.emergency.target },
+          ind.freeCashflow,
+          await userToday(ctx),
+          currency,
+        )
+      : undefined;
   const goalLeverResult = goalLevers(
     ctrl.goals.map((g) => ({
       name: g.name,
@@ -166,6 +178,7 @@ export async function buildSimContext(
     goalsMoreCount: goalLeverResult.moreCount || undefined,
     expenseSobres: expenseSobres.length ? expenseSobres : undefined,
     debtProjections: debtProj.length ? debtProj : undefined,
+    fundEta: fundEtaResult,
     protectionGaps: patr.protectionGaps.length ? protectionLevers(patr.protectionGaps) : undefined,
     activePolicies: patr.protectionGaps.length ? patr.activePolicies : undefined,
     // SEÑAL PRIORITARIA: reusa el mismo Priority Engine canónico (ctrl.diagnosis) que producción.
