@@ -177,10 +177,22 @@ describe("prioritySignal (reusa el Priority Engine canónico)", () => {
     });
     expect(s).toBe("Automatiza un aporte a tu fondo de emergencia.");
   });
-  it("engine VERDE → sin señal grave (undefined) salvo insight 'accionar'", () => {
+  it("engine VERDE sin alerta → undefined (sano de verdad)", () => {
     expect(
-      prioritySignal({ diagnosis: { semaforo: "verde", nextBestAction: "Aumenta el aporte." } }),
+      prioritySignal({
+        diagnosis: { semaforo: "verde", nextBestAction: "Aumenta el aporte.", alerts: [] },
+      }),
     ).toBeUndefined();
+  });
+  it("gate fix: VERDE pero con ALERTA (fondo vacío) → SÍ dispara el nextBestAction del engine", () => {
+    const s = prioritySignal({
+      diagnosis: {
+        semaforo: "verde",
+        nextBestAction: "Automatiza un aporte a tu fondo de emergencia.",
+        alerts: ["Tu fondo de emergencia aún no está construido; es tu primera red de seguridad."],
+      },
+    });
+    expect(s).toBe("Automatiza un aporte a tu fondo de emergencia.");
   });
   it("sin diagnóstico → fallback al insight 'accionar' (ya ordenado por severidad)", () => {
     const s = prioritySignal({

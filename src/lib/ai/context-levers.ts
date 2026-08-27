@@ -164,15 +164,21 @@ export function protectionLevers(
  */
 export type PrioritySignalInput = {
   /** El diagnóstico canónico del Priority Engine (getControlSummary().diagnosis). */
-  diagnosis?: { semaforo: string; nextBestAction: string };
+  diagnosis?: { semaforo: string; nextBestAction: string; alerts?: string[] };
   debts?: DebtLever[];
   insights?: { severity: string; title: string; action?: string }[];
 };
 
 export function prioritySignal(input: PrioritySignalInput): string | undefined {
   const { diagnosis, debts, insights } = input;
-  // 1. CANÓNICO: si el semáforo del Priority Engine no es verde, su nextBestAction ES la prioridad.
-  if (diagnosis && diagnosis.semaforo !== "verde" && diagnosis.nextBestAction) {
+  // 1. CANÓNICO: hay prioridad si el semáforo no es verde O el engine levantó una ALERTA (p.ej. fondo
+  //    de emergencia vacío — que el engine flaggea aunque el semáforo sea verde). Su nextBestAction
+  //    (del `narrative`) ES esa prioridad. Sin esto, un "verde-con-alerta" quedaba sin señal.
+  if (
+    diagnosis &&
+    diagnosis.nextBestAction &&
+    (diagnosis.semaforo !== "verde" || (diagnosis.alerts?.length ?? 0) > 0)
+  ) {
     const topDebt = (debts ?? [])
       .filter((d) => d.monthlyInterestCost > 0)
       .sort((a, b) => b.monthlyInterestCost - a.monthlyInterestCost)[0];
