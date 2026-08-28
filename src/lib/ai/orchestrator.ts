@@ -54,7 +54,11 @@ import {
   type MatchedIntent,
 } from "@/lib/ai/router";
 import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
-import { guardMovimientos, TOOLS_DE_MOVIMIENTOS } from "@/lib/ai/movimientos-guard";
+import {
+  guardMovimientos,
+  pareceConsultaDeLibroDiario,
+  TOOLS_DE_MOVIMIENTOS,
+} from "@/lib/ai/movimientos-guard";
 import { guardTendencia } from "@/lib/ai/tendencia-guard";
 import { guardDeudaFantasma } from "@/lib/ai/deuda-fantasma-guard";
 import { detectMencionSobre, type ExpenseSobreLever } from "@/lib/ai/context-levers";
@@ -536,6 +540,9 @@ export async function financeChatWithTools(
   // FOCO (context-salience): si el ÚLTIMO mensaje nombra un sobre del contexto, su ₡ es la cifra
   // saliente del turno — así el asesor confronta con ESE monto y no con el total (Paso 3.9-#2).
   const focoSobre = detectMencionSobre(lastUserMessage(messages), ctx.expenseSobres);
+  // ¿El turno es una consulta de LIBRO DIARIO? Si NO (p.ej. un check-in "¿cómo voy?"), el guard de
+  // movimientos NO debe clobberear una evaluación grounded por afirmar un "total" (ver movimientos-guard).
+  const esConsultaLibroDiario = pareceConsultaDeLibroDiario(lastUserMessage(messages));
   /** Herramientas que EFECTIVAMENTE corrieron en este turno (la llena `registrarUso`). */
   const usadas = new Set<string>();
   /** ¿`consultar_historial` trajo ≥2 puntos reales este turno? (respaldo para citar historia). */
@@ -581,7 +588,7 @@ export async function financeChatWithTools(
     // Movimientos: si enumera/afirma un total y en ESTE turno no corrió una tool de movimientos, no
     // sale. Cierra la clase de bug que entró tres veces (ruteo, cita que apagaba carriles, ambigüedad).
     const consultoTool = TOOLS_DE_MOVIMIENTOS.some((t) => usadasSet.has(t));
-    const gMov = guardMovimientos(p.reply, consultoTool);
+    const gMov = guardMovimientos(p.reply, consultoTool, esConsultaLibroDiario);
     if (gMov.bloqueado) {
       logger.warn("assistant.movimientos_bloqueados", {
         // Sin el texto: puede traer cifras del usuario. Alcanza con saber que pasó y con qué tools.
