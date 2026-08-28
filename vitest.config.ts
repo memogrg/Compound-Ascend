@@ -11,6 +11,9 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts", "src/**/*.test.ts"],
     globals: true,
+    // Bloquea el fetch a red EXTERNA (coingecko/fx/economic-indicators) → suite determinista, sin flaky
+    // por timeouts de red. Localhost se permite; los tests que necesitan fetch lo stubbean por su cuenta.
+    setupFiles: [fileURLToPath(new URL("./tests/setup/no-external-network.ts", import.meta.url))],
   },
   resolve: {
     alias: {
