@@ -17,6 +17,8 @@ import { ConfiguracionManager } from "./configuracion-manager";
 import { BuildIdentity } from "./build-identity";
 import { ReferralCard } from "@/components/referrals/referral-card";
 import { getMyReferral } from "@/lib/referrals/service";
+import { MemoryPanel } from "@/components/memory/memory-panel";
+import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
 
 /**
  * /m/perfil — identidad + ajustes agrupados (plan, moneda, WhatsApp, hogar, cuenta).
@@ -38,6 +40,15 @@ export default async function MobilePerfil() {
   const whatsappConfigured = isWhatsAppConfigured();
   // Referidos (paridad con Ajustes web, mismo componente con la piel móvil).
   const referral = isSupabaseConfigured() ? await getMyReferral() : null;
+  // Memoria del asesor (paridad con Ajustes web, mismo componente con la piel móvil).
+  let memoria: MemoryItem[] = [];
+  if (isSupabaseConfigured()) {
+    try {
+      memoria = await listMyMemoryAction();
+    } catch {
+      memoria = [];
+    }
+  }
 
   // Datos extra para la gestión (best-effort: si algo falla, degradamos sin romper).
   let ingestEmails: IngestEmailRow[] = [];
@@ -155,6 +166,17 @@ export default async function MobilePerfil() {
             </MContentCard>
           </>
         ) : null}
+
+        {/* Lo que el asesor recuerda de su vida: mismo MemoryPanel de la web con skin="mobile".
+            Va acá, junto al resto de sus datos, y no escondido dentro del chat. */}
+        <MSectionHeader title="Lo que recuerdo de ti" />
+        <MContentCard style={{ marginBottom: 14 }}>
+          <p className="mem-empty" style={{ marginBottom: 10 }}>
+            Lo que le contaste al asesor sobre tu vida y recuerda entre conversaciones. Nunca guarda
+            montos: esos se leen en vivo de tu cuenta.
+          </p>
+          <MemoryPanel items={memoria} skin="mobile" />
+        </MContentCard>
 
         {/* Ajustes gestionables (moneda · WhatsApp · hogar · notificaciones · ingesta · borrar) */}
         <ConfiguracionManager

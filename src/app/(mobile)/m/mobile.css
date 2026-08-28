@@ -4262,3 +4262,19 @@ body:has(.m-shell[data-theme="dark"]) {
 .m-shell .ref-feedback {
   text-align: center;
 }
+
+/* ── Memoria del asesor: piel móvil (mismo componente, skin="mobile") ─────── */
+.m-shell .mem-panel {
+  gap: 12px;
+}
+/* En pantalla angosta el texto va arriba y los botones abajo, a lo ancho: en
+   una fila de 360px los tres botones al lado del texto lo dejan en dos letras. */
+.m-shell .mem-row {
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--surface);
+}
+.m-shell .mem-actions .m-btn {
+  flex: 1 1 auto;
+  justify-content: center;
+}

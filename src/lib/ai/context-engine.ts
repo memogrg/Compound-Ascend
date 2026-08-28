@@ -885,5 +885,19 @@ export async function buildFinancialContext(
     // sin hilo, el asesor sigue evaluando desde el resto del contexto
   }
 
+  // MEMORIA DE HECHOS: lo que la persona contó de su VIDA en conversaciones anteriores (esposa,
+  // planes, reglas propias), que la retención de 7 días del chat borraba. Bloque "flavor": solo lo
+  // usa el system prompt del LLM — los carriles deterministas contestan cifras y no lo necesitan.
+  // Best-effort y acotado a MAX_MEMORY_INJECTED: sin memoria, el asesor responde igual.
+  if (scope.flavor)
+    try {
+      const { loadMemoryForContext } = await import("@/lib/ai/memory-store");
+      const { memoryLines } = await import("@/lib/ai/memory-facts");
+      const hechos = await loadMemoryForContext();
+      if (hechos.length > 0) ctx.userMemory = memoryLines(hechos);
+    } catch {
+      // sin memoria personal, el asesor sigue con el resto del contexto
+    }
+
   return ctx;
 }

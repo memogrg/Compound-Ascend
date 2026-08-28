@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { ReferralCard } from "@/components/referrals/referral-card";
+import { MemoryPanel } from "@/components/memory/memory-panel";
+import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
 import { getMyReferral } from "@/lib/referrals/service";
 import { getUserTimezone } from "@/lib/time/user-time";
 import { CurrencySelector } from "@/modules/account/components/currency-selector";
@@ -87,6 +89,17 @@ export default async function Page() {
   // resto de Ajustes sigue funcionando.
   const referral = isSupabaseConfigured() ? await getMyReferral() : null;
 
+  // Lo que el asesor recuerda de la vida del usuario. Best-effort: si la lectura falla la sección
+  // no se pinta y el resto de Ajustes sigue funcionando.
+  let memoria: MemoryItem[] = [];
+  if (isSupabaseConfigured()) {
+    try {
+      memoria = await listMyMemoryAction();
+    } catch {
+      memoria = [];
+    }
+  }
+
   return (
     <div className="set-sheet">
       <SetRow title="Tu cuenta" desc="Tu identidad en CARTERA+.">
@@ -121,6 +134,15 @@ export default async function Page() {
           <ReferralCard code={referral.code} count={referral.count} />
         </SetRow>
       ) : null}
+
+      {/* La memoria personal del asesor. Va en Ajustes y no escondida en el chat: es un dato del
+          usuario sobre sí mismo, y tiene que poder revisarlo y borrarlo donde revisa todo lo demás. */}
+      <SetRow
+        title="Lo que recuerdo de vos"
+        desc="Lo que le contaste al asesor sobre tu vida y él recuerda entre conversaciones. Podés corregirlo o borrarlo cuando quieras. Nunca guarda montos: esos se leen en vivo de tu cuenta."
+      >
+        <MemoryPanel items={memoria} />
+      </SetRow>
 
       <SetRow title="Tu plan" desc="Tu suscripción y consumo de IA del mes.">
         <span className={`plan-chip${isPremium(acc.plan) ? " prem" : ""}`}>

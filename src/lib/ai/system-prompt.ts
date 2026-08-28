@@ -178,6 +178,12 @@ export type FinancialContext = {
    * Resúmenes DETERMINISTAS (prioridad + acción), no texto del modelo. Ver `coaching-store`.
    */
   coachingThread?: { date: string; summary: string }[];
+  /**
+   * MEMORIA DE HECHOS: lo que el usuario contó de su VIDA en conversaciones anteriores (su pareja,
+   * sus planes, sus reglas propias). Persistente — sobrevive a la retención de 7 días del chat.
+   * NUNCA trae cifras: los montos se leen en vivo del resto de este contexto. Ver `memory-facts`.
+   */
+  userMemory?: string[];
   goalCount?: number;
   goalsProgressPct?: number;
   /**
@@ -615,6 +621,20 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
     facts.push(
       "REGLA DEL HILO (en un check-in / evaluación de estado — '¿cómo voy?'): ABRÍ enganchando con tu ÚLTIMO consejo y si el usuario lo aplicó o no, EN LA PRIMERA O SEGUNDA FRASE — 'La vez pasada te enfoqué en tu fondo; veo que el gasto lo sigue frenando, así que domemos eso primero' / 'El mes pasado acordamos abonar a la tarjeta; como no se movió, cambiemos el ángulo' / 'Seguimos con tu fondo: ya llevás dos meses apuntando ahí, sostengámoslo'. Construí SOBRE lo anterior; PROHIBIDO arrancar fresco repitiendo la misma nota como si fuera la primera vez que hablan. Los montos del hilo son cifras REALES ya recomendadas: referencialas sin recalcular. (Si el consejo de hoy es NUEVO y sin relación con lo previo, no lo fuerces — pero en un cuadro que no se movió, SIEMPRE hay hilo que tender.)",
+    );
+  }
+
+  // MEMORIA DE HECHOS: lo que sabés de su VIDA porque él te lo contó. Es lo que separa a alguien
+  // que lo conoce de un formulario. La regla de uso importa tanto como el dato: se usa cuando VIENE
+  // AL CASO, no se recita, y no se extiende con nada que no esté escrito acá.
+  if (ctx.userMemory && ctx.userMemory.length > 0) {
+    facts.push(
+      `LO QUE SABÉS DE ${ctx.name ? ctx.name.toUpperCase() : "ESTA PERSONA"} POR CONVERSACIONES ANTERIORES: ${ctx.userMemory
+        .map((f) => `— ${f}`)
+        .join(" ")}`,
+    );
+    facts.push(
+      "REGLA DE LA MEMORIA: usá esto con NATURALIDAD cuando venga al caso (nombrá a su pareja por su nombre, atá un consejo a un plan que ya te contó, respetá una regla propia que ya declaró). PROHIBIDO recitarlo, listarlo o abrir con un resumen de lo que recordás — no es un informe, es lo que sabés de él. PROHIBIDO también inventar, deducir o completar hechos que no estén EXACTAMENTE en esa lista: si no está ahí, no lo sabés. Y si algo de la lista contradice lo que te dice HOY, gana lo de hoy.",
     );
   }
 

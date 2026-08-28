@@ -6823,3 +6823,110 @@ select.ac-rc-field {
   font-weight: 600;
   color: var(--accent);
 }
+
+/* ============================================================================
+   MEMORIA DEL ASESOR — "Lo que recuerdo de vos"
+   ----------------------------------------------------------------------------
+   Un solo componente para web y móvil (MemoryPanel, skin="web"|"mobile"); acá
+   va la base y mobile.css ajusta la piel. La lista es de LECTURA primero: lo
+   que importa es que el usuario vea de un vistazo todo lo que el asesor sabe
+   de su vida, y que borrarlo esté siempre a un tap.
+   ========================================================================== */
+.mem-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mem-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mem-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+/* Archivado: sigue visible (para entender qué pasó con un dato) pero apagado. */
+.mem-row-off {
+  opacity: 0.55;
+}
+.mem-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 240px;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.mem-chip {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2, var(--bg));
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.mem-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.mem-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+.mem-empty,
+.mem-warn {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0;
+}
+.mem-error {
+  font-size: 13px;
+  color: var(--danger, #c0392b);
+  margin: 0;
+}
+.mem-archived {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mem-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.mem-clear {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.mem-danger {
+  color: var(--danger, #c0392b);
+  border-color: var(--danger, #c0392b);
+}

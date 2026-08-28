@@ -8,8 +8,13 @@ export {
   confirmBatchTransactionsAction,
   loadChatHistoryAction,
   emailTranscriptAction,
+  listMyMemoryAction,
+  updateMemoryFactAction,
+  forgetMemoryFactAction,
+  deleteMemoryFactAction,
+  clearMyMemoryAction,
 } from "./api/actions";
-export type { ConfirmResult } from "./api/actions";
+export type { ConfirmResult, MemoryItem } from "./api/actions";
 export {
   transactionInputSchema,
   priceAlertInputSchema,
