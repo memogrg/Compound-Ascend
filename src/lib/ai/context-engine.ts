@@ -859,16 +859,16 @@ export async function buildFinancialContext(
     // Control no disponible → sin señal prioritaria (el asesor evalúa igual desde el resto del cuadro).
   }
 
-  // PRÓXIMO NIVEL (Paso 3.12): la acción de OPTIMIZACIÓN para quien va BIEN. GATE conservador — solo si
-  // hay superávit (flujo libre > 0) Y NO hay deuda cara que atacar primero (sin `debtProjections`: una
-  // deuda que amortiza con el flujo YA es la prioridad, y su lever es ese). Así un usuario endeudado o
-  // sin superávit NO recibe este hecho → la regla de próximo-nivel no puede forzar una acción falsa
-  // (sabe celebrar). El fondo a medio cubrir NO lo bloquea: la regla secuencia (fondo + invertir el
-  // superávit). El aporte es el flujo libre; el capital inicial, el patrimonio invertible (best-effort).
+  // PRÓXIMO NIVEL (Paso 3.12): la acción de OPTIMIZACIÓN para quien va BIEN. GATE — solo si hay superávit
+  // (flujo libre > 0) Y NO hay deuda con INTERÉS REAL que atacar primero. Criterio: `monthlyInterestCost`
+  // (= saldo × apr/12; 0 cuando el apr es null/≤0). Una deuda 0%/sin costo NO bloquea el próximo nivel:
+  // una persona con solo deuda 0%, fondos cubiertos y flujo libre ES apta para invertir → el motor le DA
+  // la proyección (queda GROUNDED). Quien tiene deuda con interés real SÍ queda excluido: esa deuda es la
+  // prioridad sobre invertir, y su lever es ese. Así el asesor nunca tiene que inventar la proyección.
   if (
     ctx.freeCashflow !== undefined &&
     ctx.freeCashflow > 0 &&
-    (ctx.debtProjections === undefined || ctx.debtProjections.length === 0) &&
+    !(ctx.debts ?? []).some((d) => d.monthlyInterestCost > 0) &&
     ctx.currency
   ) {
     const nlp = nextLevelProjection(ctx.investableWealth ?? 0, ctx.freeCashflow, ctx.currency);
