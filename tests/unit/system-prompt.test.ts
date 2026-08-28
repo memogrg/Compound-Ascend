@@ -211,7 +211,8 @@ describe("buildSystemPrompt · perfil conductual", () => {
       insights: [{ kind: "sobre_sobregirado", severity: "accionar", title: "t", body: "b" }],
     });
     expect(prompt).toMatch(/MÁXIMO UNA por respuesta/);
-    expect(prompt).toMatch(/SOLO si es RELEVANTE a lo que preguntó/);
+    // Paso 3: el volunteo es OBLIGATORIO en turno abierto / señal 'accionar' (antes: "solo si relevante").
+    expect(prompt).toMatch(/VOLUNTEO OBLIGATORIO/);
     expect(prompt).toMatch(/NO REPITAS una que YA mencionaste/);
     expect(prompt).toMatch(/CERRALA OFRECIENDO ARREGLARLO/);
     // La excepción explícita: ante un "¿cómo voy?" sí trae la más importante.

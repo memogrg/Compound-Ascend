@@ -177,6 +177,24 @@ function montoSinFecha(t: string, hoy: string): number | null {
 }
 
 /**
+ * ¿El carril está PIDIENDO el monto de una meta DISCRECIONAL (Paso 3.13)? Cuando `detectCreateAction`
+ * intercepta "abrime una meta de ahorro para un viaje de lujo" y devuelve "¿De cuánto es la meta?" ANTES
+ * del LLM, un usuario con una prioridad sin cubrir queda facilitado en vez de confrontado. Este predicado
+ * (PURO) marca ese caso para que el router lo deje pasar al LLM (que reconduce con la regla del prompt).
+ * Criterio AMPLIO: cualquier meta que NO sea de DEFENSA (fondo/emergencia/colchón/deuda) es discrecional.
+ * NO decide si hay prioridad — eso lo chequea el router con `ctx.señalPrioritaria`.
+ */
+export function pideMontoDeMetaDiscrecional(
+  created: AIChatResponse | null,
+  message: string,
+): boolean {
+  if (!created || created.action !== null) return false; // ya propuso la meta (con monto) → no aplica
+  if (!/¿de cu[aá]nto es la meta/i.test(created.reply)) return false; // no está pidiendo el monto
+  const norm = message.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  return !/\b(fondo|emergencia|colch|deuda|tarjeta|prestamo)\b/.test(norm); // no es de defensa → discrecional
+}
+
+/**
  * Detecta un intent de CREAR y arma la propuesta (o pide el dato faltante). null si no es un create.
  */
 export function detectCreateAction(text: string, opts: ActionLaneOptions): AIChatResponse | null {

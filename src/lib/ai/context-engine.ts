@@ -18,6 +18,16 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
+import {
+  debtLevers,
+  goalLevers,
+  protectionLevers,
+  prioritySignal,
+  expenseSobresLevers,
+  debtProjections,
+  fundEta,
+  nextLevelProjection,
+} from "@/lib/ai/context-levers";
 
 /**
  * PRIVACIDAD (cuenta compartida): las lecturas FINANCIERAS de este motor abarcan
@@ -115,6 +125,22 @@ export async function buildFinancialContext(
       };
     }
     ctx.savingsRatePct = Math.round(base.indicators.savingsRate * 100);
+    // Top sobres de gasto POR-HOJA (name + monto real mensual), para confrontar un gasto que el
+    // usuario racionaliza SIN monto con la cifra REAL de ESE sobre (no con el total). Best-effort;
+    // getRealTotals.expenseByKey ya viene en la moneda de visualización (getDisplayCurrency).
+    try {
+      const { getRealTotals } = await import("@/modules/financial-base");
+      const { userCurrentPeriod } = await import("@/lib/time/user-time");
+      const real = await getRealTotals(await userCurrentPeriod());
+      const sobres = Object.values(real.expenseByKey).map((v) => ({
+        name: v.label,
+        monthly: v.value,
+      }));
+      const top = expenseSobresLevers(sobres);
+      if (top.length > 0) ctx.expenseSobres = top;
+    } catch {
+      // Sin per-sobre: el resto del contexto sigue.
+    }
     // Fuentes de ingreso activas (para señalar concentración si es una sola).
     ctx.incomeSourceCount = base.incomes.filter((i) => i.amountMonthly > 0).length;
     // ¿Ingreso/gasto/flujo son cifras CONVERTIDAS? Sí si hubo más de una moneda de origen, o si la
@@ -195,26 +221,56 @@ export async function buildFinancialContext(
       ctx.topDebtName = top.name;
       ctx.topDebtApr = top.apr ?? undefined;
       ctx.topDebtCurrency = top.currency;
+      // Ladder POR-DEUDA (mismo saldo vivo canónico): top-6 por costo de interés + moreCount.
+      const { debts: debtLeverList, moreCount } = debtLevers(
+        debts.map((d) => ({
+          name: d.name,
+          liveBalance: d.currentBalance,
+          apr: d.apr,
+          minPayment: d.minPayment,
+          currency: d.currency,
+        })),
+      );
+      ctx.debts = debtLeverList;
+      if (moreCount > 0) ctx.debtsMoreCount = moreCount;
+      // Capa MENTOR: proyección del horizonte con el flujo libre como extra. El número (meses/interés
+      // ahorrado) sale del ENGINE de amortización, no del modelo → horizonte grounded. Solo si hay
+      // flujo libre positivo (un extra que no existe no se proyecta).
+      if (ctx.freeCashflow !== undefined && ctx.freeCashflow > 0) {
+        const proj = debtProjections(debtLeverList, ctx.freeCashflow);
+        if (proj.length > 0) ctx.debtProjections = proj;
+      }
     }
   } catch {
     // Control no disponible.
   }
 
-  // Metas: cuántas y avance agregado.
+  // Metas: agregado (cuántas + avance) + ladder POR-META (ritmo actual vs el que la fecha exige).
   try {
-    const { createSupabaseServerClient } = await import("@/lib/supabase/server");
-    const supabase = await createSupabaseServerClient();
-    // Financiero → alcance de hogar: las metas de la cuenta común son de todos.
-    const memberIds = await householdMemberIds(supabase, user.id);
-    const { data: goals } = await supabase
-      .from("savings_goals")
-      .select("current_amount,target_amount")
-      .in("user_id", memberIds);
-    if (goals && goals.length > 0) {
-      const target = goals.reduce((s, g) => s + Number(g.target_amount), 0);
-      const current = goals.reduce((s, g) => s + Number(g.current_amount), 0);
+    // listGoals ya es de alcance de HOGAR (householdMemberIds) y ctx-aware (sesión por cookie acá).
+    const { listGoals } = await import("@/modules/control/services/control-service");
+    const { userToday } = await import("@/lib/time/user-time");
+    const goals = await listGoals();
+    if (goals.length > 0) {
       ctx.goalCount = goals.length;
+      // Avance agregado: idéntico al previo (sobres tienen targetAmount 0 → no inflan el objetivo).
+      const target = goals.reduce((s, g) => s + g.targetAmount, 0);
+      const current = goals.reduce((s, g) => s + g.currentAmount, 0);
       if (target > 0) ctx.goalsProgressPct = current / target;
+      // Ladder: solo metas con objetivo (goalLevers filtra los sobres); ritmo fechado en la tz del usuario.
+      const { goals: goalLeverList, moreCount } = goalLevers(
+        goals.map((g) => ({
+          name: g.name,
+          targetAmount: g.targetAmount,
+          currentAmount: g.currentAmount,
+          monthlyContribution: g.monthlyContribution,
+          targetDate: g.targetDate,
+          currency: g.currency,
+        })),
+        await userToday(),
+      );
+      if (goalLeverList.length > 0) ctx.goals = goalLeverList;
+      if (moreCount > 0) ctx.goalsMoreCount = moreCount;
     }
   } catch {
     // Metas no disponibles.
@@ -398,6 +454,11 @@ export async function buildFinancialContext(
           deudas: pconv(b.byOrigin.debts),
           seguros: pconv(b.byOrigin.policies),
         };
+      }
+      // Brechas de protección (reusa agg.protection ya computado; los gaps son texto, sin conversión).
+      if (p.protectionGaps.length > 0) {
+        ctx.protectionGaps = protectionLevers(p.protectionGaps);
+        ctx.activePolicies = p.activePolicies;
       }
       // "Número de libertad" (estilo deseado): solo si el usuario lo definió; si es
       // null se OMITE (nada de fallback silencioso).
@@ -616,6 +677,27 @@ export async function buildFinancialContext(
         convertido: huboConversion,
         ...(huboConversion ? { monedaOrigen: primaryCurrency } : {}),
       };
+      // Capa MENTOR: horizonte del fondo de emergencia a TU FLUJO LIBRE (lo que realmente apartarías).
+      // ETA del ENGINE (target/current), grounded. Solo si hay flujo libre, no está cubierto y la moneda
+      // del fondo coincide con la de visualización (si no, no mezclo monedas en la cuenta de meses).
+      if (
+        ctx.freeCashflow !== undefined &&
+        ctx.freeCashflow > 0 &&
+        !ctx.defenseFunds.emergency.cubierto &&
+        ctx.defenseFunds.currency === ctx.currency
+      ) {
+        const { userToday } = await import("@/lib/time/user-time");
+        const eta = fundEta(
+          {
+            current: ctx.defenseFunds.emergency.actual,
+            target: ctx.defenseFunds.emergency.objetivo,
+          },
+          ctx.freeCashflow,
+          await userToday(),
+          ctx.currency,
+        );
+        if (eta) ctx.fundEta = eta;
+      }
       // Supersede: si el fondo de emergencia está registrado, hasEmergencyFund refleja lo REAL
       // (cubierto → "si"; parcial → "construyendo"), no el auto-reporte viejo. Así el guardrail y las
       // reglas dejan de tratar al usuario como "sin fondo".
@@ -765,6 +847,33 @@ export async function buildFinancialContext(
     } catch {
       // Indicadores económicos no disponibles: el contexto sigue.
     }
+
+  // SEÑAL PRIORITARIA: reusa el Priority Engine CANÓNICO (getControlSummary().diagnosis) para que el
+  // asesor nombre PRIMERO lo mismo que la app le muestra. Best-effort: sin engine, cae al insight.
+  try {
+    const { getControlSummary } = await import("@/modules/control/services/control-service");
+    const { diagnosis } = await getControlSummary();
+    const signal = prioritySignal({ diagnosis, debts: ctx.debts, insights: ctx.insights });
+    if (signal) ctx.señalPrioritaria = signal;
+  } catch {
+    // Control no disponible → sin señal prioritaria (el asesor evalúa igual desde el resto del cuadro).
+  }
+
+  // PRÓXIMO NIVEL (Paso 3.12): la acción de OPTIMIZACIÓN para quien va BIEN. GATE conservador — solo si
+  // hay superávit (flujo libre > 0) Y NO hay deuda cara que atacar primero (sin `debtProjections`: una
+  // deuda que amortiza con el flujo YA es la prioridad, y su lever es ese). Así un usuario endeudado o
+  // sin superávit NO recibe este hecho → la regla de próximo-nivel no puede forzar una acción falsa
+  // (sabe celebrar). El fondo a medio cubrir NO lo bloquea: la regla secuencia (fondo + invertir el
+  // superávit). El aporte es el flujo libre; el capital inicial, el patrimonio invertible (best-effort).
+  if (
+    ctx.freeCashflow !== undefined &&
+    ctx.freeCashflow > 0 &&
+    (ctx.debtProjections === undefined || ctx.debtProjections.length === 0) &&
+    ctx.currency
+  ) {
+    const nlp = nextLevelProjection(ctx.investableWealth ?? 0, ctx.freeCashflow, ctx.currency);
+    if (nlp) ctx.nextLevelProjection = nlp;
+  }
 
   return ctx;
 }

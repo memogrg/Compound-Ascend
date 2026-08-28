@@ -55,6 +55,9 @@ import {
 import { capHistory, priorAssistantReplies } from "@/lib/ai/history";
 import { guardMovimientos, TOOLS_DE_MOVIMIENTOS } from "@/lib/ai/movimientos-guard";
 import { guardTendencia } from "@/lib/ai/tendencia-guard";
+import { guardDeudaFantasma } from "@/lib/ai/deuda-fantasma-guard";
+import { detectMencionSobre, type ExpenseSobreLever } from "@/lib/ai/context-levers";
+import { completarHorizonte, deflectoSobre, plantillaRestaurantes } from "@/lib/ai/completado";
 import { formatMoney } from "@/lib/format";
 
 export type { FinancialContext };
@@ -477,6 +480,15 @@ export const TOOLS_PROMPT_LINE =
  * números calculados, no inventados. Sin toolContext (p. ej. WhatsApp) o sin soporte
  * del proveedor → idéntico a financeChat. La IA sigue PROPONIENDO, nunca ejecuta.
  */
+/** Contenido del ÚLTIMO mensaje del usuario (para la detección del FOCO). "" si no hay. */
+function lastUserMessage(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m && m.role === "user" && typeof m.content === "string") return m.content;
+  }
+  return "";
+}
+
 export async function financeChatWithTools(
   messages: ChatMessage[],
   ctx: FinancialContext,
@@ -514,86 +526,181 @@ export async function financeChatWithTools(
   }
 
   const knowledge = await buildKnowledge(messages, ctx);
+  // FOCO (context-salience): si el ÚLTIMO mensaje nombra un sobre del contexto, su ₡ es la cifra
+  // saliente del turno — así el asesor confronta con ESE monto y no con el total (Paso 3.9-#2).
+  const focoSobre = detectMencionSobre(lastUserMessage(messages), ctx.expenseSobres);
   /** Herramientas que EFECTIVAMENTE corrieron en este turno (la llena `registrarUso`). */
   const usadas = new Set<string>();
   /** ¿`consultar_historial` trajo ≥2 puntos reales este turno? (respaldo para citar historia). */
   const hist: TurnHistorial = { conDatos: false };
+  // System + toolset se HOISTEAN: el regen de confrontación (Paso 3.10) los reusa idénticos.
+  const systemBase = `${buildSystemPrompt({ ...ctx, knowledge, focoSobre })}\n\n${TOOLS_PROMPT_LINE}`;
+  const toolset = [
+    SIMULATE_DEBT_TOOL,
+    COMPARE_DEBT_TOOL,
+    MIN_PAYMENT_TOOL,
+    PROJECT_INVESTMENT_TOOL,
+    FREEDOM_TOOL,
+    GOALS_TOOL,
+    YEARS_TO_FREEDOM_TOOL,
+    MARKET_DATA_TOOL,
+    SURPLUS_TOOL,
+    CONSULTAR_TRANSACCIONES_TOOL,
+    CONSULTAR_HISTORIAL_TOOL,
+    CONSULTAR_DETALLE_TOOL,
+  ];
   const result = await provider.chatWithTools({
-    system: `${buildSystemPrompt({ ...ctx, knowledge })}\n\n${TOOLS_PROMPT_LINE}`,
+    system: systemBase,
     messages: capHistory(messages),
-    tools: [
-      SIMULATE_DEBT_TOOL,
-      COMPARE_DEBT_TOOL,
-      MIN_PAYMENT_TOOL,
-      PROJECT_INVESTMENT_TOOL,
-      FREEDOM_TOOL,
-      GOALS_TOOL,
-      YEARS_TO_FREEDOM_TOOL,
-      MARKET_DATA_TOOL,
-      SURPLUS_TOOL,
-      CONSULTAR_TRANSACCIONES_TOOL,
-      CONSULTAR_HISTORIAL_TOOL,
-      CONSULTAR_DETALLE_TOOL,
-    ],
+    tools: toolset,
     // Se registra QUÉ herramientas corrieron: es el dato que habilita (o no) enumerar movimientos.
     execute: registrarUso(buildToolExecutor(toolContext), usadas, hist),
   });
   const parsed = parseAction(result.text);
 
-  // RED DETERMINISTA sobre los movimientos. Una instrucción en el prompt no es garantía: si la
-  // respuesta enumera transacciones o afirma un total y en ESTE turno no corrió ninguna tool de
-  // movimientos, la respuesta NO sale. Es el cierre de la clase de bug que entró tres veces por
-  // puertas distintas (un sustantivo faltante en el ruteo, una cita que apagaba los carriles, una
-  // ambigüedad sin salida): en todos, el LLM terminaba inventando comercios y montos.
-  const consultoTool = TOOLS_DE_MOVIMIENTOS.some((t) => usadas.has(t));
-  const gMov = guardMovimientos(parsed.reply, consultoTool);
-  if (gMov.bloqueado) {
-    logger.warn("assistant.movimientos_bloqueados", {
-      // Sin el texto: puede traer cifras del usuario. Alcanza con saber que pasó y con qué tools.
-      tools: [...usadas].join(",") || "ninguna",
-      largo: parsed.reply.length,
-    });
-  }
-  // RED DETERMINISTA sobre la TRAYECTORIA (hallazgo Fase 10): si la respuesta afirma evolución con
-  // cifras/‏% en marco temporal y no hay respaldo ESTE turno (tool con <2 puntos para el dinero,
-  // ctx.trajectory undefined para el %), no sale. A mes6 (tool ≥2 pts + trajectory definida) pasa
-  // intacta y sigue citando su historia real. Encadena sobre gMov.reply (una respuesta ya
-  // reemplazada por el guard de movimientos no es longitudinal, así que este no la re-toca).
+  // RED DETERMINISTA de SEGURIDAD (movimientos + trayectoria + deuda-fantasma). Se factoriza en un
+  // closure porque se aplica DOS veces: sobre la respuesta original y sobre una regeneración (Paso
+  // 3.10). Toma su propio (usadas, hist) → una regeneración se juzga por las tools que corrió ELLA,
+  // no por las del primer intento: regenerar no debilita la garantía de seguridad (nada de fail-open).
   const resumenActual =
     ctx.netWorth != null && ctx.currency
       ? `tu patrimonio neto es ${formatMoney(ctx.netWorth, ctx.currency)}`
       : undefined;
-  const gTend = guardTendencia(
-    gMov.reply,
-    { conDatos: hist.conDatos, trajectoryDefined: ctx.trajectory !== undefined },
-    resumenActual,
-  );
-  if (gTend.bloqueado) {
-    logger.warn("assistant.tendencia_bloqueada", {
-      tools: [...usadas].join(",") || "ninguna",
-      largo: parsed.reply.length,
-    });
+  const runSafetyGuards = (
+    p: AIChatResponse,
+    usadasSet: Set<string>,
+    h: TurnHistorial,
+  ): { bloqueado: boolean; reply: string } => {
+    // Movimientos: si enumera/afirma un total y en ESTE turno no corrió una tool de movimientos, no
+    // sale. Cierra la clase de bug que entró tres veces (ruteo, cita que apagaba carriles, ambigüedad).
+    const consultoTool = TOOLS_DE_MOVIMIENTOS.some((t) => usadasSet.has(t));
+    const gMov = guardMovimientos(p.reply, consultoTool);
+    if (gMov.bloqueado) {
+      logger.warn("assistant.movimientos_bloqueados", {
+        // Sin el texto: puede traer cifras del usuario. Alcanza con saber que pasó y con qué tools.
+        tools: [...usadasSet].join(",") || "ninguna",
+        largo: p.reply.length,
+      });
+    }
+    // Trayectoria (Fase 10): afirma evolución con cifras/% sin respaldo ESTE turno → no sale. Encadena
+    // sobre gMov.reply (una respuesta ya reemplazada por movimientos no es longitudinal).
+    const gTend = guardTendencia(
+      gMov.reply,
+      { conDatos: h.conDatos, trajectoryDefined: ctx.trajectory !== undefined, serie: h.serie },
+      resumenActual,
+    );
+    if (gTend.bloqueado) {
+      logger.warn("assistant.tendencia_bloqueada", {
+        tools: [...usadasSet].join(",") || "ninguna",
+        largo: p.reply.length,
+      });
+    }
+    // Deuda FANTASMA: sin deuda con saldo vivo y un directivo de abono en prosa → no sale (la acción
+    // estructurada ya se anula en el resolvedor; esto cubre la MENCIÓN). Encadena sobre gTend.reply.
+    const gDeuda = guardDeudaFantasma(gTend.reply, toolContext.debts);
+    if (gDeuda.bloqueado) {
+      logger.warn("assistant.deuda_fantasma_bloqueada", { deudas: toolContext.debts.length });
+    }
+    return {
+      bloqueado: gMov.bloqueado || gTend.bloqueado || gDeuda.bloqueado,
+      reply: gDeuda.reply,
+    };
+  };
+
+  const g1 = runSafetyGuards(parsed, usadas, hist);
+  // Una respuesta bloqueada tampoco arrastra su ACCIÓN propuesta (se armó sobre datos que no existen).
+  let surfaced: AIChatResponse = g1.bloqueado ? { reply: g1.reply, action: null } : parsed;
+  let tokensIn = result.tokensIn;
+  let tokensOut = result.tokensOut;
+
+  // COMPLETADO DETERMINISTA post-generación (Paso 3.10), SOLO sobre respuestas NO bloqueadas (nunca
+  // sobre un texto que un guard de seguridad ya reemplazó).
+  if (!g1.bloqueado) {
+    // (A) RESTAURANTES: si el turno nombró un sobre y la respuesta lo DEFLECTÓ (no citó su cifra), se
+    // garantiza la confrontación — regen 1× con restricción dura y, si aún deflecta, plantilla grounded.
+    if (focoSobre && deflectoSobre(surfaced.reply, focoSobre)) {
+      const gar = await garantizarConfrontacion(focoSobre, ctx, {
+        provider,
+        systemBase,
+        messages,
+        toolset,
+        toolContext,
+        runSafetyGuards,
+      });
+      surfaced = gar.response;
+      tokensIn += gar.tokensIn;
+      tokensOut += gar.tokensOut;
+    }
+    // (B) HORIZONTE: si el cierre recomienda una acción cuyo horizonte está en el contexto pero no
+    // quedó tejido, se agrega (grounded). Solo completa lo que falta; nunca toca lo que ya lo trae.
+    surfaced = completarHorizonte(surfaced, ctx);
   }
-  const bloqueado = gMov.bloqueado || gTend.bloqueado;
 
   return {
-    ...guardReply(
-      // Una respuesta bloqueada tampoco puede arrastrar una ACCIÓN propuesta: se armó sobre datos
-      // que no existen.
-      bloqueado ? { reply: gTend.reply, action: null } : parsed,
-      ctx,
-      provider.name,
-      priorAssistantReplies(messages),
-    ),
-    tokensIn: result.tokensIn,
-    tokensOut: result.tokensOut,
+    ...guardReply(surfaced, ctx, provider.name, priorAssistantReplies(messages)),
+    tokensIn,
+    tokensOut,
     provider: provider.name,
     lane: "reasoning",
   };
 }
 
-/** Trayectoria observada este turno: ¿`consultar_historial` devolvió ≥2 puntos reales? */
-type TurnHistorial = { conDatos: boolean };
+/** Args de `provider.chatWithTools` (para tipar el toolset reusado por el regen sin importar la unión). */
+type ChatWithToolsArgs = Parameters<NonNullable<AIProvider["chatWithTools"]>>[0];
+
+/**
+ * Garantía de CONFRONTACIÓN del sobre nombrado (Paso 3.10-A). Tier A: regenera UNA vez con una
+ * restricción dura de este turno y re-pasa los guards de seguridad (invariante intacto). Si el regen se
+ * bloquea o SIGUE deflectando, Tier B: plantilla determinista grounded (el piso garantizado). El
+ * provider es inyectable → testeable. Devuelve la respuesta final + los tokens del regen (contabilidad
+ * honesta).
+ */
+export async function garantizarConfrontacion(
+  foco: ExpenseSobreLever,
+  ctx: FinancialContext,
+  deps: {
+    provider: AIProvider;
+    systemBase: string;
+    messages: ChatMessage[];
+    toolset: ChatWithToolsArgs["tools"];
+    toolContext: ToolContext;
+    runSafetyGuards: (
+      p: AIChatResponse,
+      usadas: Set<string>,
+      h: TurnHistorial,
+    ) => { bloqueado: boolean; reply: string };
+  },
+): Promise<{ response: AIChatResponse; tokensIn: number; tokensOut: number }> {
+  const plantilla: AIChatResponse = { reply: plantillaRestaurantes(foco, ctx), action: null };
+  const restriccion =
+    `\n\nRESTRICCIÓN DURA DE ESTE TURNO: el usuario nombró "${foco.name}" = ₡${foco.monthly} ${ctx.currency ?? ""}/mes. ` +
+    `Tu respuesta DEBE (1) confrontar ESA cifra (₡${foco.monthly}), NO el gasto total; (2) proponer un tope concreto ` +
+    `para ${foco.name} + a dónde va lo que se libera; (3) cerrar con un paso. Prohibido responder con "tu gasto ronda ₡…total".`;
+  try {
+    // Regen con su PROPIO (usadas, hist): los guards lo juzgan por lo que corrió ELLA, no el 1er intento.
+    const usadas2 = new Set<string>();
+    const hist2: TurnHistorial = { conDatos: false };
+    const regen = await deps.provider.chatWithTools!({
+      system: `${deps.systemBase}${restriccion}`,
+      messages: capHistory(deps.messages),
+      tools: deps.toolset,
+      execute: registrarUso(buildToolExecutor(deps.toolContext), usadas2, hist2),
+    });
+    const parsed2 = parseAction(regen.text);
+    const g2 = deps.runSafetyGuards(parsed2, usadas2, hist2);
+    const cand: AIChatResponse = g2.bloqueado ? { reply: g2.reply, action: null } : parsed2;
+    // El regen gana SOLO si no se bloqueó y ya NO deflecta; si no, cae a la plantilla (tokens igual).
+    const response = !g2.bloqueado && !deflectoSobre(cand.reply, foco) ? cand : plantilla;
+    return { response, tokensIn: regen.tokensIn, tokensOut: regen.tokensOut };
+  } catch {
+    // Regen caído → Tier B directo (nunca degrada: la plantilla es determinista y grounded).
+    return { response: plantilla, tokensIn: 0, tokensOut: 0 };
+  }
+}
+
+/** Trayectoria observada este turno: ¿`consultar_historial` devolvió ≥2 puntos reales? + la serie
+ *  de valores reales (para que el guard de tendencia verifique las cifras citadas, no solo que exista). */
+type TurnHistorial = { conDatos: boolean; serie?: number[] };
 
 /** Envuelve el ejecutor para anotar qué herramientas corrieron y si `consultar_historial` trajo
  *  ≥2 puntos reales (respaldo que consume el guard de tendencia). */
@@ -616,6 +723,18 @@ function registrarUso(
       (out as { insuficiente: unknown }).insuficiente === null
     ) {
       hist.conDatos = true;
+      // Se guardan los VALORES de la serie real (además del booleano) para que el guard de tendencia
+      // pueda refutar cifras fabricadas aunque haya respaldo (≥2 puntos).
+      const serie = (out as { serie?: unknown }).serie;
+      if (Array.isArray(serie)) {
+        hist.serie = serie
+          .map((p) =>
+            p && typeof p === "object" && "valor" in p
+              ? Number((p as { valor: unknown }).valor)
+              : NaN,
+          )
+          .filter((n) => Number.isFinite(n));
+      }
     }
     return out;
   };
