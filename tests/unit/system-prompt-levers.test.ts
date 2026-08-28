@@ -204,6 +204,29 @@ describe("buildSystemPrompt · horizonte del fondo + ETA de meta (Paso 3.7)", ()
   });
 });
 
+describe("buildSystemPrompt · PRÓXIMO NIVEL (hecho neutral del engine, Paso 3.12)", () => {
+  it("renderiza la proyección de optimización (aporte → valor a N años + rendimiento)", () => {
+    const out = buildSystemPrompt({
+      ...base,
+      nextLevelProjection: {
+        aporte: 550000,
+        years: 10,
+        futureValue: 100000000,
+        interestEarned: 34000000,
+        currency: "CRC",
+      },
+    });
+    expect(out).toContain("Próximo nivel (ya calculado por el motor)");
+    expect(out).toContain(
+      "invirtiendo ₡550000 CRC/mes al 8% anual, en 10 años llegás a ₡100000000 CRC",
+    );
+    expect(out).toContain("34000000 CRC de rendimiento");
+  });
+  it("sin nextLevelProjection no agrega el HECHO", () => {
+    expect(buildSystemPrompt(base)).not.toContain("Próximo nivel (ya calculado por el motor)");
+  });
+});
+
 describe("buildSystemPrompt · reglas coach-mentor (Paso 3.6)", () => {
   const out = buildSystemPrompt(base);
   it("mapea el aporte al fondo de emergencia a create_goal (tap, no prosa)", () => {
