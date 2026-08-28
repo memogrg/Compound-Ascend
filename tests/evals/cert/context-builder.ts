@@ -27,6 +27,7 @@ import {
   expenseSobresLevers,
   debtProjections,
   fundEta,
+  nextLevelProjection,
 } from "@/lib/ai/context-levers";
 import { getRealTotals } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
@@ -128,6 +129,14 @@ export async function buildSimContext(
           currency,
         )
       : undefined;
+  // PRÓXIMO NIVEL (Paso 3.12): optimización para quien va BIEN — invertir el flujo libre → valor a 10
+  // años (engine projectInvestment). MISMO gate que el context-engine de producción: superávit y SIN
+  // deuda cara que atacar primero (debtProj vacío). El aporte (=flujo libre) ya está en knownFigures;
+  // los DERIVADOS (valor futuro + rendimiento) se agregan abajo para que citarlos no sea falso positivo.
+  const nextLevel =
+    ind.freeCashflow > 0 && debtProj.length === 0
+      ? nextLevelProjection(pr.investableWealth, ind.freeCashflow, currency)
+      : undefined;
   const goalLeverResult = goalLevers(
     ctrl.goals.map((g) => ({
       name: g.name,
@@ -179,6 +188,7 @@ export async function buildSimContext(
     expenseSobres: expenseSobres.length ? expenseSobres : undefined,
     debtProjections: debtProj.length ? debtProj : undefined,
     fundEta: fundEtaResult,
+    nextLevelProjection: nextLevel,
     protectionGaps: patr.protectionGaps.length ? protectionLevers(patr.protectionGaps) : undefined,
     activePolicies: patr.protectionGaps.length ? patr.activePolicies : undefined,
     // SEÑAL PRIORITARIA: reusa el mismo Priority Engine canónico (ctrl.diagnosis) que producción.
@@ -233,6 +243,9 @@ export async function buildSimContext(
     // Horizonte MENTOR (Paso 3.6): el interés ahorrado que el asesor cita sale del engine; a
     // knownFigures para que citarlo no sea falso positivo (el extra = flujo libre ya está).
     ...debtProj.map((p) => p.interestSaved),
+    // PRÓXIMO NIVEL (Paso 3.12): el valor futuro y el rendimiento a 10 años que el asesor cita salen
+    // del engine projectInvestment sobre cifras reales; a knownFigures para que no sean falso positivo.
+    ...(nextLevel ? [nextLevel.futureValue, nextLevel.interestEarned] : []),
     // Longitudinal: los valores REALES mes-a-mes que el asesor legítimamente tuvo vía
     // consultar_historial (net_worth_snapshots/portfolio_snapshots) y sobre los que corre
     // computeTrajectory. Sin esto, toda cifra histórica bien-fundada (patrimonio/portafolio/
