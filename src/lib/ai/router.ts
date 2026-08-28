@@ -22,7 +22,11 @@ import {
 } from "@/lib/ai/statement-parse";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import type { AIChatResponse } from "@/lib/ai/types";
-import { detectCreateAction, esOrdenDeAltaDeMovimiento } from "@/lib/ai/action-lane";
+import {
+  detectCreateAction,
+  esOrdenDeAltaDeMovimiento,
+  pideMontoDeMetaDiscrecional,
+} from "@/lib/ai/action-lane";
 import { userToday } from "@/lib/time/user-time";
 import { projectInvestment } from "@/lib/ai/tools";
 import {
@@ -183,6 +187,28 @@ const REASONING_CUES = new RegExp(`\\bc[oó]mo\\b|${REASONING_SIN_COMO.source}`,
 /** Meses en español, para reconocer "en marzo" como periodo. */
 const MESES_RE =
   /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)\b/i;
+
+/**
+ * Señales de RACIONALIZACIÓN / confrontación de un hábito ("es mi único gusto", "no lo dejo", "gasto
+ * un montón en X", "me lo merezco", "plata extra"). NO es una consulta de dato: es una CONFRONTACIÓN
+ * que debe ir al LLM + `garantizarConfrontacion` (Paso 3.11). Sin este guard, "Sé QUE GASTO un montón
+ * en restaurantes…" matchea el `qu[eé]\s+gast…` de `gasto_mes` (captura el "que" conjunción, no el
+ * "qué" interrogativo) y el router contesta el TOTAL del mes con una plantilla, sin confrontar.
+ * Estática (sin RegExp dinámico → sin ReDoS); alternación acotada por `\b`. Una consulta de dato PURA
+ * ("¿cuánto gasté en julio?") no trae estas frases, así que sigue yendo a su carril determinista.
+ */
+const RACIONALIZACION_RE = new RegExp(
+  [
+    "\\bmi\\s+[uú]nico\\s+gusto\\b",
+    "\\bno\\s+lo\\s+(?:pienso\\s+|voy\\s+a\\s+|quiero\\s+)?dej",
+    "\\bme\\s+lo\\s+merezco\\b|\\bme\\s+merezco\\b|\\bme\\s+lo\\s+merec",
+    "\\bgast[oó]\\s+(?:un\\s+mont[oó]n|de\\s+m[aá]s|mucho|much[ií]simo|demasiado)\\b",
+    "\\bes\\s+mi\\s+(?:gusto|cable\\s+a\\s+tierra|placer|vicio|capricho)\\b",
+    "\\bme\\s+(?:doy|di)\\s+(?:un|el|ese)\\s+gusto\\b",
+    "\\bplata\\s+extra\\b|\\btotal\\s+es\\s+plata\\b",
+  ].join("|"),
+  "iu",
+);
 
 /**
  * Marcador temporal EXPLÍCITO en la pregunta → el `periodo` que entiende
@@ -661,6 +687,14 @@ export function matchIntent(
   // carril determinista respondería SOLO una mitad (la auditoría lo cazó) → ESCALAR al LLM, que las
   // cubre juntas. Requiere DOS "cuánto" unidos por "y" (no atrapa un "¿y cuánto…?" de arrastre solo).
   if (/cu[aá]nto\b[\s\S]*?\by\s+cu[aá]nto\b/i.test(t)) return null;
+
+  // ── RACIONALIZACIÓN de un hábito (Paso 3.11): "gasto un montón en restaurantes, es mi único gusto".
+  //    NO es una consulta de dato: es una CONFRONTACIÓN. Escala al LLM (que trae las reglas de
+  //    confrontación) + `garantizarConfrontacion`, en vez de que `gasto_mes` conteste el TOTAL pelado
+  //    con una plantilla. Va DESPUÉS del carril de alta (una orden de alta explícita gana) y ANTES de
+  //    los carriles de dato golosos. Un mensaje MIXTO (cita una cifra Y racionaliza) también escala:
+  //    el LLM cita y confronta a la vez. Una consulta de dato PURA no trae estas frases → sigue su carril.
+  if (RACIONALIZACION_RE.test(t)) return null;
 
   // ── DETALLE POR DOMINIO (consulta_detalle). Va ANTES de cuota_deuda/metas/resumen_inversiones,
   //    que responden la FOTO (saldo, progreso, valor) cuando la pregunta es por el HISTORIAL de
@@ -2124,7 +2158,15 @@ export async function tryRouteQuery(
     })),
     today: await userToday(),
   });
-  if (created) return { response: created, tokensIn: 0, tokensOut: 0, lane: "template" };
+  if (created) {
+    // GUARDA DE META IMPRUDENTE (Paso 3.13): recolectar el monto de una meta DISCRECIONAL nueva cuando
+    // hay una prioridad sin cubrir (señal canónica del Priority Engine) es facilitar el daño. El carril
+    // determinista NO debe atropellar la confrontación (mismo patrón que el guard de racionalización de
+    // 3.11): devolvemos null → escala al LLM, que RECONDUCE con la «GUARDA DE META IMPRUDENTE» del prompt.
+    // Fail-safe: sin señalPrioritaria (best-effort no pobló) no dispara → conducta actual.
+    if (ctx.señalPrioritaria && pideMontoDeMetaDiscrecional(created, lastUser)) return null;
+    return { response: created, tokensIn: 0, tokensOut: 0, lane: "template" };
+  }
 
   // 2) Clasificador Flash-Lite (barato). Solo si no matchó patrón.
   const classified = await classifyWithLite(lastUser);
