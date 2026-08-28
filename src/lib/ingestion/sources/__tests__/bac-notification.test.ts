@@ -112,6 +112,21 @@ describe("BAC · plantilla 3 (SINPE debitado)", () => {
   });
 });
 
+describe("BAC · fallback sin fecha (#90)", () => {
+  // Parece BAC (tiene monto+moneda) pero no calza plantilla → parseFallback, confianza 0.5.
+  const FALLBACK = `BAC Credomatic le informa de un movimiento por USD 25.00 en su cuenta.`;
+
+  it("no trae fecha → occurredOn '' (el poller la feche con receivedAt en la zona del usuario, no UTC-today)", () => {
+    const [m] = parse(FALLBACK);
+    expect(m).toBeDefined();
+    expect(m!.confidence).toBe(0.5);
+    expect(m!.amount).toBe(25);
+    expect(m!.currency).toBe("USD");
+    // El fix de #90: "" en vez de new Date() UTC, para NO esquivar fecharConReceivedAt del poller.
+    expect(m!.occurredOn).toBe("");
+  });
+});
+
 describe("BAC · no-notificación y registro", () => {
   it("texto de consulta → [] (no interfiere con la IA de texto)", () => {
     expect(parse("¿cuánto gasté este mes?")).toEqual([]);

@@ -222,14 +222,15 @@ function parseFallback(text: string): RawMovement | null {
 
   const amount = crcUsd ? parseAmount(crcUsd[2]!) : parseAmount(word![1]!);
   const currency = crcUsd ? crcUsd[1]!.toUpperCase() : mapCurrencyWord(word![2]!);
-  // Sin fecha parseable: hoy (la fuente no la trae); el usuario confirma/edita.
-  const today = new Date().toISOString().slice(0, 10);
 
   return base({
     kind: "gasto",
     amount,
     currency,
-    occurredOn: today,
+    // Sin fecha parseable (la fuente no la trae): "" → el poller la feche con receivedAt en la zona
+    // del usuario (fecharConReceivedAt), como los otros parsers. NO UTC-today, que reintroduciría
+    // #90 al esquivar ese fallback central. La propuesta se revisa antes de aplicarse.
+    occurredOn: "",
     description: "Movimiento BAC (revisá los datos)",
     confidence: 0.5,
     cardLast4: cardLast4(text),
