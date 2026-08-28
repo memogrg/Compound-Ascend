@@ -17,6 +17,7 @@ import { getCurrentDebtBalances } from "@/modules/control";
 import { sumAssetsByClass, isBadDebt } from "@/modules/wealth/engine/patrimonio-mappers";
 import type { EssentialBreakdown } from "@/modules/wealth/engine/essential-expense";
 import type { CommitmentBreakdown } from "@/modules/wealth/engine/total-commitment";
+import type { ProtectionGap } from "@/modules/wealth/types";
 import {
   computePatrimonio,
   patrimonioLevel,
@@ -46,6 +47,13 @@ export type PatrimonioServiceResult = {
    * si la lectura falla o no hay sesión.
    */
   commitmentBreakdown: CommitmentBreakdown | null;
+  /**
+   * Brechas de protección (vida / invalidez / gastos mayores / fondos de defensa) del motor
+   * computeProtection, ya computadas dentro de agg.protection. Se surfacen para que el contexto
+   * del asesor pueda VOLUNTEAR el hueco. Coste cero: no recalcula ni agrega queries.
+   */
+  protectionGaps: ProtectionGap[];
+  activePolicies: number;
   currency: string;
 };
 
@@ -202,6 +210,8 @@ export async function getPatrimonioReport(ctx?: AuthContext): Promise<Patrimonio
     diagnosis: buildPatrimonioDiagnosis(report),
     essentialBreakdown,
     commitmentBreakdown,
+    protectionGaps: agg.protection.gaps,
+    activePolicies: agg.protection.activePolicies,
     currency,
   };
 }
