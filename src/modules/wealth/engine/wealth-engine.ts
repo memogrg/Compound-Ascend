@@ -117,6 +117,15 @@ export function computeProtection(
         "Detectamos una brecha; si quieres, revisamos opciones acordes a tu presupuesto.",
     },
     {
+      type: "Seguro de invalidez",
+      covered: have.has("incapacidad"),
+      severity: "alto",
+      description:
+        "Si una incapacidad te impidiera trabajar, tu ingreso se corta pero los gastos siguen; es la cobertura más desatendida para quien vive de su trabajo.",
+      recommendation:
+        "Detectamos una brecha; si quieres, revisamos opciones acordes a tu presupuesto.",
+    },
+    {
       type: "Fondo de emergencia",
       covered: ctx.hasEmergencyFund,
       severity: "alto",
