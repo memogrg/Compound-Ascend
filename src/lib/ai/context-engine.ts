@@ -26,6 +26,7 @@ import {
   expenseSobresLevers,
   debtProjections,
   fundEta,
+  nextLevelProjection,
 } from "@/lib/ai/context-levers";
 
 /**
@@ -856,6 +857,22 @@ export async function buildFinancialContext(
     if (signal) ctx.señalPrioritaria = signal;
   } catch {
     // Control no disponible → sin señal prioritaria (el asesor evalúa igual desde el resto del cuadro).
+  }
+
+  // PRÓXIMO NIVEL (Paso 3.12): la acción de OPTIMIZACIÓN para quien va BIEN. GATE conservador — solo si
+  // hay superávit (flujo libre > 0) Y NO hay deuda cara que atacar primero (sin `debtProjections`: una
+  // deuda que amortiza con el flujo YA es la prioridad, y su lever es ese). Así un usuario endeudado o
+  // sin superávit NO recibe este hecho → la regla de próximo-nivel no puede forzar una acción falsa
+  // (sabe celebrar). El fondo a medio cubrir NO lo bloquea: la regla secuencia (fondo + invertir el
+  // superávit). El aporte es el flujo libre; el capital inicial, el patrimonio invertible (best-effort).
+  if (
+    ctx.freeCashflow !== undefined &&
+    ctx.freeCashflow > 0 &&
+    (ctx.debtProjections === undefined || ctx.debtProjections.length === 0) &&
+    ctx.currency
+  ) {
+    const nlp = nextLevelProjection(ctx.investableWealth ?? 0, ctx.freeCashflow, ctx.currency);
+    if (nlp) ctx.nextLevelProjection = nlp;
   }
 
   return ctx;

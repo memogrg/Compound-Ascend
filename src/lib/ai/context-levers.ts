@@ -212,6 +212,9 @@ export type ProtectionGapLever = {
 // Reuso del engine de amortización PURO (sin server-only) — import directo del engine, no del barrel,
 // para no arrastrar server-only a este módulo puro (lo consumen tests puros y el harness headless).
 import { compareExtra } from "@/modules/control/engine/amortization";
+// Reuso del engine de proyección de inversión PURO (tools.ts no es server-only; sus deps —debt-strategy,
+// validity— también son puras) para el lever de PRÓXIMO NIVEL, sin recalcular el interés compuesto.
+import { projectInvestment } from "@/lib/ai/tools";
 
 /**
  * Proyección MENTOR de una deuda: con `extra`/mes de más, cuántos meses antes se salda y cuánto
@@ -264,6 +267,48 @@ export function debtProjections(
     });
   }
   return out.sort((a, b) => b.interestSaved - a.interestSaved).slice(0, topN);
+}
+
+/**
+ * PRÓXIMO NIVEL (Paso 3.12): para quien va BIEN y tiene superávit, la acción de OPTIMIZACIÓN grounded —
+ * invertir el flujo libre a un rendimiento conservador y ver a cuánto llega en `years` años. Reusa el
+ * engine PURO `projectInvestment` (interés compuesto); los inputs (capital invertible + flujo libre) son
+ * cifras REALES del contexto. NO decide CUÁNDO usarlo (el gate "sin alarma dura" lo aplica el
+ * context-engine): acá solo se computa el hecho si hay flujo que desplegar. undefined si no hay aporte.
+ */
+export type NextLevelProjection = {
+  aporte: number;
+  years: number;
+  futureValue: number;
+  interestEarned: number;
+  currency: string;
+};
+
+export function nextLevelProjection(
+  investable: number,
+  freeCashflow: number,
+  currency: string,
+  years = 10,
+  rendPct = 8,
+): NextLevelProjection | undefined {
+  if (freeCashflow <= 0) return undefined;
+  const p = projectInvestment(
+    {
+      monto_inicial: Math.max(0, investable),
+      aporte_mensual: freeCashflow,
+      anios: years,
+      rendimiento_anual_pct: rendPct,
+    },
+    currency,
+  );
+  if (p.valor_futuro <= 0) return undefined;
+  return {
+    aporte: Math.round(freeCashflow),
+    years,
+    futureValue: Math.round(p.valor_futuro),
+    interestEarned: Math.round(p.interes_ganado),
+    currency,
+  };
 }
 
 /** One expense sobre (leaf) as a lever: its name + real monthly spend. */

@@ -8,6 +8,7 @@ import {
   expenseSobresLevers,
   debtProjections,
   fundEta,
+  nextLevelProjection,
   addMonthsISO,
   detectMencionSobre,
 } from "@/lib/ai/context-levers";
@@ -347,5 +348,29 @@ describe("prioritySignal (reusa el Priority Engine canónico)", () => {
       prioritySignal({ insights: [{ severity: "celebrar", title: "racha" }] }),
     ).toBeUndefined();
     expect(prioritySignal({})).toBeUndefined();
+  });
+});
+
+describe("nextLevelProjection · próximo nivel (Paso 3.12, reusa projectInvestment)", () => {
+  it("con superávit computa el valor a 10 años + rendimiento (grounded del engine)", () => {
+    const out = nextLevelProjection(1_000_000, 550_000, "CRC");
+    expect(out).toBeDefined();
+    expect(out!.aporte).toBe(550_000);
+    expect(out!.years).toBe(10);
+    // 550k/mes × 120 = 66M aportado + 1M inicial → VF > total aportado; rendimiento > 0.
+    expect(out!.futureValue).toBeGreaterThan(67_000_000);
+    expect(out!.interestEarned).toBeGreaterThan(0);
+    // interés = VF − (inicial + aporte×120), coherente (no inventado).
+    expect(out!.interestEarned).toBe(out!.futureValue - (1_000_000 + 550_000 * 120));
+    expect(out!.currency).toBe("CRC");
+  });
+  it("sin flujo libre (aporte ≤ 0) → undefined (no fuerza acción falsa)", () => {
+    expect(nextLevelProjection(1_000_000, 0, "CRC")).toBeUndefined();
+    expect(nextLevelProjection(1_000_000, -5000, "CRC")).toBeUndefined();
+  });
+  it("sin capital inicial igual proyecta el stream de aportes", () => {
+    const out = nextLevelProjection(0, 100_000, "CRC");
+    expect(out).toBeDefined();
+    expect(out!.futureValue).toBeGreaterThan(100_000 * 120); // compone por encima de lo aportado
   });
 });
