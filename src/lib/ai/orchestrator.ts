@@ -10,6 +10,7 @@ import { now as simNow } from "@/lib/time/clock";
 import { StubProvider, type AIProvider, type ChatMessage } from "@/lib/ai/provider";
 import { createGeminiProvider } from "@/lib/ai/providers/gemini";
 import { parseAction, type AIChatResponse } from "@/lib/ai/types";
+import type { AuthContext } from "@/lib/auth/auth-context";
 import { applyGuardrail } from "@/lib/ai/guardrail";
 import { logger } from "@/lib/logger";
 
@@ -122,6 +123,12 @@ export type ToolContext = {
   investableWealth?: number;
   /** Metas de ahorro del usuario en moneda PRINCIPAL (best-effort; vacío/undefined → tool degrada). */
   goals?: GoalForTool[];
+  /**
+   * Seam ctx-inyectable para las herramientas que leen la BD (hoy `consultar_historial`). En prod
+   * queda `undefined` → los lectores caen a la sesión por cookies (BYTE-IDÉNTICO). El simulador,
+   * que no tiene cookie, inyecta su `AuthContext` acá para que el tool vea la serie real.
+   */
+  authCtx?: AuthContext;
 };
 
 /** Deuda cruda (de listDebts) con su moneda, antes de normalizar para la herramienta. */
@@ -332,7 +339,7 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
       // ("todavía no tengo suficiente historial"), nunca inventa una tendencia.
       try {
         const { consultarHistorial } = await import("@/lib/ai/history-query-service");
-        return await consultarHistorial(args, toolContext.currency);
+        return await consultarHistorial(args, toolContext.currency, toolContext.authCtx);
       } catch {
         return {
           error:

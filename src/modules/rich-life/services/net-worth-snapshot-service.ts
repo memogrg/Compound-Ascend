@@ -232,10 +232,14 @@ export async function ensureCurrentNetWorthSnapshot(summary: {
  * Deduplica por periodo (ver cabecera: las filas de los miembros del hogar contienen el
  * MISMO patrimonio agregado, sumarlas lo multiplicaría). Se prefiere la fila propia.
  */
-export async function getNetWorthHistory(): Promise<NetWorthSnapshotPoint[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  return readNetWorthHistory(supabase, user.id);
+/**
+ * Seam ctx-inyectable (patrón `resolveAuth`): sin `ctx` = sesión por cookies (RLS), BYTE-IDÉNTICO a
+ * prod; con `ctx` = cliente/usuario inyectados (sim/headless bajo la ALS). Habilita que
+ * `consultar_historial` lea la serie en el simulador, que no tiene sesión de cookie.
+ */
+export async function getNetWorthHistory(ctx?: AuthContext): Promise<NetWorthSnapshotPoint[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  return readNetWorthHistory(supabase, userId);
 }
 
 async function readNetWorthHistory(

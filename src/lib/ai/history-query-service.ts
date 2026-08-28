@@ -27,6 +27,7 @@ import {
   type Metrica,
   type SeriePunto,
 } from "@/lib/ai/history-query";
+import type { AuthContext } from "@/lib/auth/auth-context";
 
 export type ConsultarHistorialPayload = HistorialResult & { resumen_md: string };
 
@@ -36,11 +37,12 @@ const METRICAS: Metrica[] = ["patrimonio", "portafolio", "gasto", "ingreso", "ah
 async function serieMensual(
   metrica: "gasto" | "ingreso" | "ahorro",
   meses: number,
+  ctx?: AuthContext,
 ): Promise<SeriePunto[]> {
   const { getSnapshotHistory } = await import("@/modules/financial-base/services/snapshot-service");
   // Se piden algunos más de los que se van a mostrar: el motor recorta al final, y así
   // un mes sin snapshot no deja la serie corta.
-  const puntos = await getSnapshotHistory(Math.min(meses + 6, 60));
+  const puntos = await getSnapshotHistory(Math.min(meses + 6, 60), ctx);
   return puntos.map((p) => ({
     periodo: p.period.slice(0, 7),
     valor:
@@ -51,9 +53,10 @@ async function serieMensual(
 /** Serie mensual de `portfolio_snapshots` (diario → cierre de mes) + su moneda. */
 async function seriePortfolioSnapshots(
   metrica: "patrimonio" | "portafolio",
+  ctx?: AuthContext,
 ): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
   const { getSnapshotHistory } = await import("@/modules/wealth/services/snapshot-service");
-  const snaps = await getSnapshotHistory("all");
+  const snaps = await getSnapshotHistory("all", ctx);
   const puntos = snaps.map((s) => ({
     fecha: s.date,
     valor: metrica === "patrimonio" ? s.netWorth : s.portfolioValue,
@@ -67,10 +70,12 @@ async function seriePortfolioSnapshots(
 }
 
 /** Serie mensual de `net_worth_snapshots` (ya mensual) + la moneda con la que se escribió. */
-async function serieNetWorthSnapshots(): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
+async function serieNetWorthSnapshots(
+  ctx?: AuthContext,
+): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
   const { getNetWorthHistory } =
     await import("@/modules/rich-life/services/net-worth-snapshot-service");
-  const snaps = await getNetWorthHistory();
+  const snaps = await getNetWorthHistory(ctx);
   // colapsarAMensual sobre datos ya mensuales es identidad + orden + dedupe: barato y
   // deja una sola forma de construir la serie.
   const serie = colapsarAMensual(
@@ -87,13 +92,14 @@ async function serieNetWorthSnapshots(): Promise<{ serie: SeriePunto[]; moneda: 
  */
 async function seriePatrimonio(
   metrica: "patrimonio" | "portafolio",
+  ctx?: AuthContext,
 ): Promise<{ serie: SeriePunto[]; moneda: string | null }> {
-  if (metrica === "portafolio") return seriePortfolioSnapshots(metrica);
+  if (metrica === "portafolio") return seriePortfolioSnapshots(metrica, ctx);
 
-  const nw = await serieNetWorthSnapshots();
+  const nw = await serieNetWorthSnapshots(ctx);
   if (nw.serie.length >= 2) return nw;
 
-  const pf = await seriePortfolioSnapshots(metrica);
+  const pf = await seriePortfolioSnapshots(metrica, ctx);
   return pf.serie.length > nw.serie.length ? pf : nw;
 }
 
@@ -110,6 +116,7 @@ async function seriePatrimonio(
 export async function consultarHistorial(
   args: Record<string, unknown>,
   moneda: string,
+  ctx?: AuthContext,
 ): Promise<ConsultarHistorialPayload> {
   const metricaArg = typeof args.metrica === "string" ? (args.metrica as Metrica) : null;
   const metrica: Metrica = metricaArg && METRICAS.includes(metricaArg) ? metricaArg : "patrimonio";
@@ -122,11 +129,11 @@ export async function consultarHistorial(
   let monedaSerie = moneda;
 
   if (metrica === "patrimonio" || metrica === "portafolio") {
-    const r = await seriePatrimonio(metrica);
+    const r = await seriePatrimonio(metrica, ctx);
     serie = r.serie;
     if (r.moneda) monedaSerie = r.moneda;
   } else {
-    serie = await serieMensual(metrica, meses);
+    serie = await serieMensual(metrica, meses, ctx);
   }
 
   const resultado = construirHistorial(serie, { metrica, moneda: monedaSerie, meses });
