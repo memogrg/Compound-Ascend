@@ -29,6 +29,8 @@ import {
   monedaVinculadaEsCoherente,
 } from "@/modules/financial-base";
 import { buildControlDiagnosis } from "@/modules/control/engine/priority-engine";
+// Type-only (se borra en runtime): evita el ciclo con debts-service, que sí importa de aquí.
+import type { DebtBalance } from "@/modules/control/services/debts-service";
 import { deriveRecurrenceFields, type Recurrence } from "@/modules/control/engine/recurrence";
 import { montoOriginalAlAlta } from "@/modules/control/engine/debt-alta";
 import { convertCurrency } from "@/lib/fx";
@@ -942,19 +944,45 @@ export type ControlSummary = {
   fxRates: Record<string, number>;
 };
 
+/**
+ * Construye las deudas que consume el motor de diagnóstico con el saldo VIVO (ancla − pagos), NO el
+ * ancla de alta (`debts.balance`, que `record_debt_payment` nunca decrementa). Una deuda saldada
+ * (vivo ≤ 0) no debe contar como activa/crítica ni entrar en el plan de abono (P2 deuda-saldada,
+ * mismo linaje que PR #670, que arregló el asesor). Conserva el resto del `Debt` (apr, delinquency,
+ * clasificación, nombre…) y normaliza los montos a la moneda principal antes de calcular.
+ */
+export function deriveDebtsForEngine(
+  debts: Debt[],
+  liveBalances: DebtBalance[],
+  currency: string,
+  rates: Record<string, number>,
+): Debt[] {
+  const liveById = new Map(liveBalances.map((b) => [b.id, b.currentBalance]));
+  return debts.map((d) => ({
+    ...d,
+    balance: convertCurrency(liveById.get(d.id) ?? d.balance, d.currency, currency, rates),
+    minPayment: convertCurrency(d.minPayment, d.currency, currency, rates),
+    currentPayment: convertCurrency(d.currentPayment, d.currency, currency, rates),
+  }));
+}
+
 /** Carga todo y calcula el diagnóstico de control. */
 export async function getControlSummary(ctx?: AuthContext): Promise<ControlSummary> {
   const { userId } = await resolveAuth(ctx);
   const { getIndexRates } = await import("@/modules/control/services/index-rates");
-  const [goals, debts, base, currency, discipline, rates, indexRates] = await Promise.all([
-    listGoals(ctx),
-    listDebts(ctx),
-    getBaseSummary(ctx),
-    getDisplayCurrency(ctx),
-    getDiscipline(userId, ctx),
-    getFxRates(),
-    getIndexRates(),
-  ]);
+  // Dinámico para no crear ciclo estático con debts-service (importa listDebts de este módulo).
+  const { getCurrentDebtBalances } = await import("@/modules/control/services/debts-service");
+  const [goals, debts, liveBalances, base, currency, discipline, rates, indexRates] =
+    await Promise.all([
+      listGoals(ctx),
+      listDebts(ctx),
+      getCurrentDebtBalances(ctx),
+      getBaseSummary(ctx),
+      getDisplayCurrency(ctx),
+      getDiscipline(userId, ctx),
+      getFxRates(),
+      getIndexRates(),
+    ]);
 
   // Canónico: solo el fondo FORMAL de emergencia (goal_type), no por nombre.
   const hasEmergencyFund = goals.some(
@@ -973,12 +1001,9 @@ export async function getControlSummary(ctx?: AuthContext): Promise<ControlSumma
     currentAmount: convertCurrency(g.currentAmount, g.currency, currency, rates),
     monthlyContribution: convertCurrency(g.monthlyContribution, g.currency, currency, rates),
   }));
-  const debtsForEngine = debts.map((d) => ({
-    ...d,
-    balance: convertCurrency(d.balance, d.currency, currency, rates),
-    minPayment: convertCurrency(d.minPayment, d.currency, currency, rates),
-    currentPayment: convertCurrency(d.currentPayment, d.currency, currency, rates),
-  }));
+  // Saldo VIVO por deuda (ancla − pagos), no el ancla de alta: cierra el P2 deuda-saldada en el
+  // diagnóstico/estrategia (una deuda en ₡0 ya no cuenta como activa/crítica ni se recomienda abonar).
+  const debtsForEngine = deriveDebtsForEngine(debts, liveBalances, currency, rates);
 
   const diagnosis = buildControlDiagnosis(
     goalsForEngine,
