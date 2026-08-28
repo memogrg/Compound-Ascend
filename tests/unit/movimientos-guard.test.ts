@@ -10,6 +10,7 @@
 import { describe, it, expect } from "vitest";
 import {
   pareceEnumeracionDeMovimientos,
+  pareceConsultaDeLibroDiario,
   guardMovimientos,
   PEDIDO_DE_DATOS,
   TOOLS_DE_MOVIMIENTOS,
@@ -86,6 +87,53 @@ describe("guardMovimientos", () => {
     expect(PEDIDO_DE_DATOS).toMatch(/supermercado del mes pasado/i);
     // Y explica POR QUÉ, para que no parezca una negativa arbitraria.
     expect(PEDIDO_DE_DATOS).toMatch(/no quiero darte cifras de memoria/i);
+  });
+});
+
+describe("pareceConsultaDeLibroDiario — distingue consulta de libro diario de un check-in de estado", () => {
+  it("SÍ marca una consulta explícita de gasto/movimientos", () => {
+    for (const m of [
+      "¿cuánto gasté en julio?",
+      "mostrame mis gastos del mes pasado",
+      "mis transacciones de la semana",
+      "en qué gasté tanto",
+      "dame mis movimientos de restaurantes",
+      "cuánto llevo gastado este mes",
+      "gastos de supermercado en agosto",
+    ]) {
+      expect(pareceConsultaDeLibroDiario(m), m).toBe(true);
+    }
+  });
+
+  it("NO marca un check-in / pregunta de estado o enfoque", () => {
+    for (const m of [
+      "Ya llevamos 5 meses juntos. Hacé un balance de mi plan: ¿cómo vengo y cuál debería ser mi próximo foco?",
+      "¿cómo voy con mi plan?",
+      "¿en qué debería enfocar mi plata este mes?",
+      "Cerramos el primer mes juntos. ¿cuál debería ser mi foco financiero de acá en adelante?",
+      "¿qué opinás de mi situación?",
+    ]) {
+      expect(pareceConsultaDeLibroDiario(m), m).toBe(false);
+    }
+  });
+});
+
+describe("guardMovimientos — no clobberea una evaluación de estado grounded (fix de la deflección)", () => {
+  const STOCK = "Vas muy bien, Ana: llevás ₡630.000 de tu fondo (90% de la meta). Sigamos.";
+  it("en un turno de ESTADO (no libro diario), un 'total' grounded NO se bloquea", () => {
+    const g = guardMovimientos(STOCK, false, false);
+    expect(g.bloqueado).toBe(false);
+    expect(g.reply).toBe(STOCK);
+  });
+  it("en un turno de LIBRO DIARIO, ese mismo patrón de total SÍ se bloquea (defensa contra el total fabricado)", () => {
+    const g = guardMovimientos("Tus gastos de julio suman ₡554.553.", false, true);
+    expect(g.bloqueado).toBe(true);
+    expect(g.reply).toBe(PEDIDO_DE_DATOS);
+  });
+  it("una LISTA fabricada se bloquea SIEMPRE, aunque el turno no sea de libro diario", () => {
+    const g = guardMovimientos(TABLA, false, false);
+    expect(g.bloqueado).toBe(true);
+    expect(g.reply).toBe(PEDIDO_DE_DATOS);
   });
 });
 
