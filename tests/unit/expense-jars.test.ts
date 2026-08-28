@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildExpenseJars, type BudgetLine, type JarEntities, type KeyedTotals, type RealTxnLine } from "@/modules/financial-base/engine/expense-jars";
 import { mergeSuggestions, GROUP_SUGGESTIONS } from "@/modules/financial-base/engine/expense-suggestions";
+import { jarBudgetState } from "@/modules/financial-base/engine/expense-jars";
 import type { Category, CategoryNode } from "@/modules/financial-base/services/categories-service";
 
 function cat(over: Partial<Category>): Category {
@@ -781,5 +782,34 @@ describe("buildExpenseJars · huérfano de gasto vinculado expone linkedKind/lin
     const item = o.realItems[0]!;
     expect(item.linkedName).toBeNull();
     expect(item.linkedKind == null || item.linkedKind === "none").toBe(true);
+  });
+});
+
+// #90 · sub-bug B — un frasco/sobre normal sin línea de presupuesto (budget 0) es "sin presupuesto",
+// NO "gastado X de 0" (que implica sobregiro/estado raro). El engine expone el estado; los
+// componentes (jar-row, jar-normal-modal) lo pintan distinto: sin barra llena, sin "restante" negativo.
+describe("jarBudgetState (#90) · distingue 'sin presupuesto' de sobregiro", () => {
+  it("budget 0 con gasto → 'sin_presupuesto' (línea base 0 → NO leer como 'X de 0')", () => {
+    expect(jarBudgetState(0, 500)).toBe("sin_presupuesto");
+  });
+
+  it("budget 0 sin gasto → 'vacio' (sobre recién creado, sin plan ni gasto)", () => {
+    expect(jarBudgetState(0, 0)).toBe("vacio");
+  });
+
+  it("budget > gasto → 'normal'", () => {
+    expect(jarBudgetState(1000, 400)).toBe("normal");
+  });
+
+  it("gasto = budget → 'normal' (el límite exacto no es sobregiro)", () => {
+    expect(jarBudgetState(1000, 1000)).toBe("normal");
+  });
+
+  it("gasto > budget → 'excedido'", () => {
+    expect(jarBudgetState(1000, 1200)).toBe("excedido");
+  });
+
+  it("budget negativo (defensivo) → tratado como sin línea base, nunca 'excedido'", () => {
+    expect(jarBudgetState(-5, 100)).toBe("sin_presupuesto");
   });
 });

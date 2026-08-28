@@ -24,6 +24,20 @@ export type JarEnvelope = {
   nativeBudget: number; // en la moneda del sobre
   currency: string; // moneda del sobre
 };
+
+/**
+ * Estado de display de una barra gastado/presupuesto de un frasco/sobre NORMAL (#90). Un sobre sin
+ * línea de presupuesto tiene budget 0: eso NO es sobregiro ni "gastado X de 0" —es "sin presupuesto"
+ * (sin línea base contra la cual medir). Distinguirlo evita el "restante negativo"/"100%"/"de ₡0"
+ * engañosos. No aplica al path linked budget-aware (Deudas), que tiene su propia semántica de 0
+ * (cuota adelantada) y no usa esta función.
+ */
+export type JarBudgetState = "sin_presupuesto" | "vacio" | "normal" | "excedido";
+
+export function jarBudgetState(budget: number, spent: number): JarBudgetState {
+  if (budget <= 0) return spent > 0 ? "sin_presupuesto" : "vacio";
+  return spent > budget ? "excedido" : "normal";
+}
 /**
  * Elemento de un frasco vinculado. `amount` es el monto formateado (presupuesto
  * de la obligación). Cuando el frasco es budget-aware (p.ej. Deudas), trae además

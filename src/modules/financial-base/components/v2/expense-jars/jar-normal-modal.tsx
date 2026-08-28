@@ -19,6 +19,7 @@ import { EssentialCheck } from "@/components/shared/essential-check";
 import { BudgetWarningModal } from "@/modules/financial-base/components/v2/expense-jars/budget-warning-modal";
 import { PersonalizeKebab } from "@/modules/financial-base/components/v2/expense-jars/personalize-category";
 import type { Jar, JarEnvelope } from "@/modules/financial-base/engine/expense-jars";
+import { jarBudgetState } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 import type {
   Category,
@@ -67,6 +68,8 @@ export function JarNormalModal({
   const totalBudget = envelopes.reduce((s, e) => s + e.budget, 0);
   const usedPct = pct(totalSpent, totalBudget);
   const usedOver = totalBudget > 0 && totalSpent > totalBudget;
+  // Frasco sin línea de presupuesto (#90): no medir contra 0 (evita "X / ₡0" y "100% usado").
+  const headerNoBudget = totalBudget <= 0;
 
   // Marca de agua con ejemplos del grupo (se borra al escribir).
   const watermark =
@@ -145,12 +148,15 @@ export function JarNormalModal({
             <div className="v">
               {formatMoney(totalSpent, currency)}
               <span className="muted" style={{ fontSize: 13, fontWeight: 500 }}>
-                {" "}
-                / {formatMoney(totalBudget, currency)}
+                {headerNoBudget ? " · sin presupuesto" : ` / ${formatMoney(totalBudget, currency)}`}
               </span>
             </div>
           </div>
-          <span className={usedOver ? "env-pill over" : "env-pill"}>{usedPct}% usado</span>
+          {headerNoBudget ? (
+            <span className="env-pill muted">sin presupuesto</span>
+          ) : (
+            <span className={usedOver ? "env-pill over" : "env-pill"}>{usedPct}% usado</span>
+          )}
         </div>
 
         {/* Sobres */}
@@ -171,6 +177,10 @@ export function JarNormalModal({
               const remaining = eBudget - eSpent;
               const ePct =
                 eBudget > 0 ? Math.round((eSpent / eBudget) * 100) : eSpent > 0 ? 100 : 0;
+              // #90: sobre sin línea de presupuesto → estado "sin presupuesto" (sin línea base),
+              // no sobregiro. Sin "de ₡0", sin barra llena, sin "restante" negativo.
+              const eState = jarBudgetState(eBudget, eSpent);
+              const noBase = eState === "sin_presupuesto" || eState === "vacio";
               // Personalización del sobre: el "(general)" del grupo no se personaliza
               // (es el frasco). TODO sobre real (base de sistema, fork o del usuario) lo
               // tiene para editores del hogar.
@@ -239,7 +249,11 @@ export function JarNormalModal({
                   {/* gastado de presupuesto · ver movimientos */}
                   <div style={{ fontSize: 12, marginTop: 3 }}>
                     <span className="muted">
-                      {formatMoney(eSpent, eCur)} de {formatMoney(eBudget, eCur)}
+                      {eState === "vacio"
+                        ? "Sin presupuesto"
+                        : noBase
+                          ? `${formatMoney(eSpent, eCur)} gastado · sin presupuesto`
+                          : `${formatMoney(eSpent, eCur)} de ${formatMoney(eBudget, eCur)}`}
                     </span>
                     {" · "}
                     <Link
@@ -253,7 +267,7 @@ export function JarNormalModal({
                   <div className="bar-track" style={{ marginTop: 6 }}>
                     <div
                       className="bar-fill"
-                      style={{ width: `${pct(eSpent, eBudget)}%`, background: color }}
+                      style={{ width: `${noBase ? 0 : pct(eSpent, eBudget)}%`, background: color }}
                     />
                   </div>
                   <div
@@ -264,17 +278,23 @@ export function JarNormalModal({
                       fontSize: 11.5,
                     }}
                   >
-                    <span
-                      className={over ? undefined : "muted"}
-                      style={over ? { color: "var(--neg)" } : undefined}
-                    >
-                      {ePct}% gastado
-                    </span>
-                    <span style={over ? { color: "var(--neg)", fontWeight: 600 } : undefined}>
-                      {over
-                        ? `−${formatMoney(Math.abs(remaining), eCur)} excedido`
-                        : `${formatMoney(remaining, eCur)} restante`}
-                    </span>
+                    {noBase ? (
+                      <span className="muted">Definí un presupuesto para seguirlo</span>
+                    ) : (
+                      <>
+                        <span
+                          className={over ? undefined : "muted"}
+                          style={over ? { color: "var(--neg)" } : undefined}
+                        >
+                          {ePct}% gastado
+                        </span>
+                        <span style={over ? { color: "var(--neg)", fontWeight: 600 } : undefined}>
+                          {over
+                            ? `−${formatMoney(Math.abs(remaining), eCur)} excedido`
+                            : `${formatMoney(remaining, eCur)} restante`}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               );

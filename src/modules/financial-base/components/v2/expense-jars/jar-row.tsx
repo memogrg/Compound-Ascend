@@ -23,6 +23,7 @@ import {
 } from "@/modules/financial-base/components/v2/expense-jars/personalize-category";
 import { removeCategoryAction } from "@/modules/financial-base/api/v2-actions";
 import type { Jar } from "@/modules/financial-base/engine/expense-jars";
+import { jarBudgetState } from "@/modules/financial-base/engine/expense-jars";
 import type { Period } from "@/modules/financial-base/types";
 import type {
   Category,
@@ -314,7 +315,11 @@ export function JarRow({
   const over = totalBudget > 0 && totalSpent > totalBudget;
   const baseColor = override ?? jar.color;
   const color = over ? "var(--neg)" : baseColor;
-  const width = pct(totalSpent, totalBudget);
+  // #90: frasco sin línea de presupuesto → "sin presupuesto", no "restante" negativo ni barra
+  // llena. (No aplica al path linked budget-aware, que es otra rama arriba.)
+  const budgetState = jarBudgetState(totalBudget, totalSpent);
+  const noBudget = budgetState === "sin_presupuesto" || budgetState === "vacio";
+  const width = noBudget ? 0 : pct(totalSpent, totalBudget);
   const remaining = totalBudget - totalSpent;
   const n = jar.envelopes.length;
   // Lista descriptiva de subcategorías (no "Presupuestado $X").
@@ -392,10 +397,12 @@ export function JarRow({
             <span style={over ? { color: "var(--neg)" } : undefined}>
               {formatMoney(totalSpent, currency)} gastado
             </span>
-            <span>
-              {over
-                ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
-                : `${formatMoney(remaining, currency)} restante`}
+            <span className={noBudget ? "muted" : undefined}>
+              {noBudget
+                ? "sin presupuesto"
+                : over
+                  ? `excedido ${formatMoney(Math.abs(remaining), currency)}`
+                  : `${formatMoney(remaining, currency)} restante`}
             </span>
           </div>
         </div>
@@ -404,7 +411,9 @@ export function JarRow({
           style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}
         >
           <div style={{ textAlign: "right" }}>
-            <div className="big">{formatMoney(totalBudget, currency)}</div>
+            <div className="big" style={noBudget ? { color: "var(--muted)" } : undefined}>
+              {noBudget ? "—" : formatMoney(totalBudget, currency)}
+            </div>
             <div className="small">
               {n} {n === 1 ? "sobre" : "sobres"}
             </div>
