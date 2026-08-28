@@ -875,5 +875,15 @@ export async function buildFinancialContext(
     if (nlp) ctx.nextLevelProjection = nlp;
   }
 
+  // Hilo de coaching persistente: memoria longitudinal de la GUÍA (lo que ya se recomendó), separada
+  // del chat de 7 días → el asesor encadena mes a mes. Best-effort: sin hilo, sigue.
+  try {
+    const { loadCoachingThread } = await import("@/lib/ai/coaching-store");
+    const thread = await loadCoachingThread();
+    if (thread.length > 0) ctx.coachingThread = thread;
+  } catch {
+    // sin hilo, el asesor sigue evaluando desde el resto del contexto
+  }
+
   return ctx;
 }

@@ -987,6 +987,13 @@ export type AiConversationTurnRow = {
   created_at: string;
 };
 
+export type AiCoachingThreadRow = {
+  id: string;
+  user_id: string;
+  summary: string;
+  created_at: string;
+};
+
 export type ChatMessageRow = {
   id: string;
   user_id: string;
@@ -1199,6 +1206,8 @@ export interface Database {
       merchant_suggestion_cache: UserTable<MerchantSuggestionCacheRow>;
       // Memoria conversacional del asesor IA (chat web + WhatsApp). RLS dueño.
       ai_conversation_turns: UserTable<AiConversationTurnRow>;
+      // Hilo de coaching persistente (memoria longitudinal de la guía del asesor). RLS PERSONAL (dueño).
+      ai_coaching_thread: UserTable<AiCoachingThreadRow>;
       // Chat del asesor persistido por usuario para la UI (web + móvil). RLS PERSONAL (dueño).
       chat_messages: UserTable<ChatMessageRow>;
       // Informes de portafolio (carril "deep", deterministas). RLS PERSONAL (dueño).
