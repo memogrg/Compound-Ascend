@@ -114,3 +114,26 @@ export function parseAction(text: string): AIChatResponse {
 function isValidType(t: string): t is AIActionType {
   return ACTION_TYPES.has(t);
 }
+
+/**
+ * Tipos de fondo de defensa FORMAL que la acción `create_goal` del asesor puede declarar por
+ * INTENCIÓN (no se infiere del nombre). getDefenseFundsReport (fund-sizing) solo cuenta metas con
+ * uno de estos `goal_type`; una meta discrecional (viaje, carro) NUNCA los lleva.
+ */
+export type DefenseGoalType = "defensa:fondo_emergencia" | "defensa:fondo_paz";
+
+const DEFENSE_GOAL_TYPES: ReadonlySet<string> = new Set<DefenseGoalType>([
+  "defensa:fondo_emergencia",
+  "defensa:fondo_paz",
+]);
+
+/**
+ * Whitelist estricta del `goalType` que viaja en el payload de un `create_goal`. Devuelve el tipo
+ * SOLO si es uno de los dos fondos formales; cualquier otro valor (ausente, basura, o un tipo que
+ * no es de defensa) ⇒ undefined ⇒ meta genérica. Es la única puerta por la que el tipo declarado
+ * por el asesor entra al borrador de la tarjeta de confirmación.
+ */
+export function defenseGoalType(payload: Record<string, unknown>): DefenseGoalType | undefined {
+  const g = payload.goalType;
+  return typeof g === "string" && DEFENSE_GOAL_TYPES.has(g) ? (g as DefenseGoalType) : undefined;
+}

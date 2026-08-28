@@ -676,6 +676,12 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(
       `REGLA de los fondos de defensa: usá el estado REAL de arriba. Si un fondo dice REGISTRADO, NUNCA digas que el usuario "no tiene" ese fondo — reportá su acumulado/objetivo/progreso. Si está incompleto, decilo con la brecha y el aporte sugerido (no que "no existe"). Fondo activo ahora: ${df.activeFund === "emergency" ? "emergencia" : df.activeFund === "peace" ? "paz" : "ambos completos"}.`,
     );
+    facts.push(
+      `DISTINCIÓN colchón vs fondo formal (NUNCA los confundas ni los conflés en una misma frase): los «meses de colchón/independencia» miden el RUNWAY de tu liquidez TOTAL; estos fondos de defensa miden lo que tenés APARTADO como fondo FORMAL. Son complementarios, no contradictorios. Si un fondo dice NO registrado pero tu runway de liquidez es holgado (≥3 meses), NO digas "no tenés colchón" ni lo reportes en ₡0 como si estuvieras desprotegido: reconocé que tenés la liquidez y que lo que falta es APARTARLA como fondo formal, y ofrecé formalizarla (create_goal con su goalType). Al revés, tampoco cuentes el runway como si ya fuera el fondo formal.`,
+    );
+    facts.push(
+      `SALDO ACUMULADO (stock), no solo flujo del mes: cuando un fondo está REGISTRADO con saldo, reconocé el ACUMULADO como PROGRESO — «llevás ₡X de tu fondo (Y% de la meta)» — antes de pedir el próximo aporte. NUNCA lo enmarques como "no estás ahorrando / no aportaste" mirando solo el ritmo de ESTE mes: el saldo ya construido no desaparece porque un mes no aportara. Y cuando el fondo llega a COMPLETO, CELEBRÁ el hito explícitamente y subí al próximo nivel (invertir el flujo libre) — no sigas pidiendo aportes a un fondo ya lleno.`,
+    );
   } else if (ctx.hasEmergencyFund) {
     // Sin datos reales (WhatsApp/sin sesión) → cae al auto-reporte del onboarding.
     facts.push(
@@ -1061,6 +1067,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       ctx.currency +
       '","targetDate":"2036-07-01"},"summary":"texto corto"}',
     "```",
+    'FONDO DE DEFENSA — TIPO POR INTENCIÓN (estrecho): cuando el create_goal ES el fondo de emergencia o el fondo de paz —y SOLO en ese caso— agregá al payload "goalType":"defensa:fondo_emergencia" o "goalType":"defensa:fondo_paz". Así el sistema lo registra como tu fondo de defensa FORMAL y desde ese momento lo reconoce como tal (deja de verse "vacío"). En una meta DISCRECIONAL (viaje, carro, casa, capricho) NUNCA pongas goalType: esas van sin ese campo.',
     'Para una ALERTA DE PRECIO (avisar cuando un activo llegue a un precio), el bloque va así (la dirección la calcula el servidor con el precio actual; assetType es "cripto"|"etf"|"accion"):',
     "```action",
     '{"type":"create_price_alert","payload":{"symbol":"JUP","targetPrice":1,"assetType":"cripto","currency":"USD"},"summary":"Alerta JUP a $1"}',

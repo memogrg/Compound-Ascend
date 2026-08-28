@@ -72,7 +72,7 @@ import {
   type ReceiptDraft,
   type ReceiptExtract,
 } from "@/lib/ai/receipt-draft";
-import type { AIActionProposal } from "@/lib/ai/types";
+import { defenseGoalType, type AIActionProposal, type DefenseGoalType } from "@/lib/ai/types";
 import type { ConfirmResult, BatchResult } from "@/modules/assistant/api/actions";
 import { formatMoney, CURRENCY_OPTIONS } from "@/lib/format";
 // Copy del restante COMPARTIDO con el tab de Gastos, Transacciones y el movil: antes esto
@@ -249,6 +249,8 @@ type DraftGoal = {
   monthlyContribution: number;
   currency: string;
   targetDate: string | null;
+  /** Fondo de defensa formal declarado por el asesor (por intención). Ausente en metas discrecionales. */
+  goalType?: DefenseGoalType;
 };
 
 type DraftAlert = {
@@ -343,12 +345,16 @@ export function sobreSuccessMessage(s: SobreRemaining | null): string {
 function goalFromAction(action: AIActionProposal, fallbackCurrency: string): DraftGoal {
   const p = action.payload as Record<string, unknown>;
   const targetDate = typeof p.targetDate === "string" && p.targetDate.trim() ? p.targetDate : null;
+  // El tipo de fondo de defensa viaja por INTENCIÓN del asesor (whitelist estricta en types.ts);
+  // un valor ausente/basura o una meta discrecional quedan sin tipo ⇒ meta genérica.
+  const goalType = defenseGoalType(p);
   return {
     name: String(p.name ?? action.summary ?? "Meta"),
     targetAmount: Number(p.targetAmount ?? 0),
     monthlyContribution: Number(p.monthlyContribution ?? 0),
     currency: String(p.currency ?? fallbackCurrency),
     targetDate,
+    ...(goalType ? { goalType } : {}),
   };
 }
 
@@ -1461,6 +1467,7 @@ function GoalConfirmCard({ draft, skin }: { draft: DraftGoal; skin: Skin }) {
       monthlyContribution: draft.monthlyContribution,
       currency: draft.currency,
       ...(draft.targetDate ? { targetDate: draft.targetDate } : {}),
+      ...(draft.goalType ? { goalType: draft.goalType } : {}),
     });
     setPending(false);
     if (res.ok) setPhase("ok");
