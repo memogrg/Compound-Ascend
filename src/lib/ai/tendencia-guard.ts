@@ -21,6 +21,8 @@
  * y valores ACTUALES sin marco ("tu patrimonio hoy es ₡970.000"). Puro y sin IO: testeable a fondo.
  */
 
+import { near, parseNumberToken } from "@/lib/ai/money-figures";
+
 const MES =
   "enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre";
 
@@ -66,6 +68,55 @@ export function afirmaMagnitudHistorica(reply: string): boolean {
   return PCT.test(reply) && MARCO_RETRO.test(reply);
 }
 
+/** Un token de monto capturado dentro de una afirmación de trayectoria. */
+const TOK = "-?[₡$€]\\s?[\\d.,]+";
+/** "de ₡A a ₡B" → captura A y B. */
+const CAP_TRANSICION = new RegExp(`\\bde\\s+(${TOK})\\s+a\\s+(${TOK})`, "gi");
+/** verbo-de-cambio … ₡X (misma cláusula, ≤40 chars) → captura X ("mejoró en ₡250.000"). */
+const CAP_CAMBIO = new RegExp(`(?:${VERBO_CAMBIO.source})[^.!?;\\n]{0,40}?(${TOK})`, "gi");
+/** serie mes→monto → captura cada monto. */
+const CAP_MES_MONTO = new RegExp(`(?:${MES})\\b[^₡$€\\n]{0,20}(${TOK})`, "gi");
+
+/**
+ * Las cifras de dinero que forman parte de una AFIRMACIÓN de trayectoria (los extremos de "de A a B",
+ * el monto de un verbo-de-cambio, los montos de una serie mes→monto). NO todo monto del reply: un
+ * objetivo de meta o el patrimonio de hoy citados al pasar NO son parte del claim histórico, así que
+ * no se verifican contra la serie (evita el falso positivo que regresaría conciencia_temporal a mes6).
+ */
+export function cifrasDeTrayectoria(reply: string): number[] {
+  const out: number[] = [];
+  const push = (raw: string | undefined) => {
+    if (raw === undefined) return;
+    const n = parseNumberToken(raw);
+    if (n !== null && Math.abs(n) >= 10_000) out.push(Math.round(Math.abs(n)));
+  };
+  for (const m of reply.matchAll(CAP_TRANSICION)) {
+    push(m[1]);
+    push(m[2]);
+  }
+  // CAP_CAMBIO embebe VERBO_CAMBIO (que trae su propio grupo) → el monto es el ÚLTIMO grupo (m[2]).
+  for (const m of reply.matchAll(CAP_CAMBIO)) push(m[2]);
+  for (const m of reply.matchAll(CAP_MES_MONTO)) push(m[1]);
+  return out;
+}
+
+/**
+ * ¿Toda cifra que la respuesta afirma como TRAYECTORIA está respaldada por la serie REAL del turno?
+ * Respaldo = estar a tolerancia de un punto real (|valor|) O de una diferencia entre dos puntos (los
+ * "mejoró en ₡X" legítimos son deltas de la serie). Si una cifra del claim no tiene respaldo, el
+ * modelo la fabricó aunque haya historial real (≥2 puntos): cierra el hueco "cita cifras inventadas
+ * con historial real". Sin cifras específicas de trayectoria → nada que refutar (true).
+ */
+export function cifrasHistoricasRespaldadas(reply: string, serie: number[]): boolean {
+  const cifras = cifrasDeTrayectoria(reply);
+  if (cifras.length === 0) return true;
+  if (serie.length === 0) return false; // afirma montos de trayectoria sin ninguna serie real
+  const respaldos = serie.map((v) => Math.abs(v));
+  for (let i = 0; i < serie.length; i++)
+    for (let j = i + 1; j < serie.length; j++) respaldos.push(Math.abs(serie[i]! - serie[j]!));
+  return cifras.every((f) => respaldos.some((r) => near(f, r)));
+}
+
 export type GuardTendencia = { reply: string; bloqueado: boolean };
 
 /** Mensaje de reemplazo: honesto + pivotea a datos actuales (no un rechazo seco). */
@@ -86,10 +137,15 @@ export function mensajeSinHistorial(resumenActual?: string): string {
  */
 export function guardTendencia(
   reply: string,
-  gates: { conDatos: boolean; trajectoryDefined: boolean },
+  gates: { conDatos: boolean; trajectoryDefined: boolean; serie?: number[] },
   resumenActual?: string,
 ): GuardTendencia {
-  const dineroSinRespaldo = afirmaDineroHistorico(reply) && !gates.conDatos;
+  // Dinero histórico: el respaldo NO es solo "existen ≥2 puntos" (conDatos) — es que las cifras que la
+  // respuesta afirma como trayectoria COINCIDAN con la serie real. Así un usuario CON historial real
+  // que igual inventa las cifras ("de ₡800k a ₡550k" cuando la serie dice otra cosa) también se caza.
+  const dineroSinRespaldo =
+    afirmaDineroHistorico(reply) &&
+    (!gates.conDatos || !cifrasHistoricasRespaldadas(reply, gates.serie ?? []));
   const magnitudSinRespaldo = afirmaMagnitudHistorica(reply) && !gates.trajectoryDefined;
   if (!dineroSinRespaldo && !magnitudSinRespaldo) return { reply, bloqueado: false };
   return { reply: mensajeSinHistorial(resumenActual), bloqueado: true };
