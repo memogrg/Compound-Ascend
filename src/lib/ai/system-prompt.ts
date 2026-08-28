@@ -172,6 +172,12 @@ export type FinancialContext = {
    * Ausente = sin señal grave → lidera con un highlight. Ver `prioritySignal` (context-levers).
    */
   señalPrioritaria?: string;
+  /**
+   * Hilo de coaching: lo que el asesor YA le recomendó en turnos previos (persistente, sobrevive a la
+   * retención de 7 días del chat). Permite HILAR mes a mes en una relación de coaching longitudinal.
+   * Resúmenes DETERMINISTAS (prioridad + acción), no texto del modelo. Ver `coaching-store`.
+   */
+  coachingThread?: { date: string; summary: string }[];
   goalCount?: number;
   goalsProgressPct?: number;
   /**
@@ -598,6 +604,19 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     facts.push(
       `SEÑAL PRIORITARIA (lo más grave de tu cuadro ahora, según tu Priority Engine): ${ctx.señalPrioritaria}`,
     );
+
+  // HILO DE COACHING: lo que YA le recomendaste antes (memoria longitudinal, sobrevive al chat de 7 días).
+  // Con esto encadenás mes a mes en vez de arrancar fresco cada vez.
+  if (ctx.coachingThread && ctx.coachingThread.length > 0) {
+    facts.push(
+      `HILO DE COACHING (lo que YA le recomendaste, más viejo→más nuevo): ${ctx.coachingThread
+        .map((c) => `[${c.date}] ${c.summary}`)
+        .join("; ")}.`,
+    );
+    facts.push(
+      "REGLA DEL HILO (en un check-in / evaluación de estado — '¿cómo voy?'): ABRÍ enganchando con tu ÚLTIMO consejo y si el usuario lo aplicó o no, EN LA PRIMERA O SEGUNDA FRASE — 'La vez pasada te enfoqué en tu fondo; veo que el gasto lo sigue frenando, así que domemos eso primero' / 'El mes pasado acordamos abonar a la tarjeta; como no se movió, cambiemos el ángulo' / 'Seguimos con tu fondo: ya llevás dos meses apuntando ahí, sostengámoslo'. Construí SOBRE lo anterior; PROHIBIDO arrancar fresco repitiendo la misma nota como si fuera la primera vez que hablan. Los montos del hilo son cifras REALES ya recomendadas: referencialas sin recalcular. (Si el consejo de hoy es NUEVO y sin relación con lo previo, no lo fuerces — pero en un cuadro que no se movió, SIEMPRE hay hilo que tender.)",
+    );
+  }
 
   // Sobres — DOS tipos distintos (no confundir ni omitir): (a) sobres de GASTO mensual =
   // subcategorías favoritas dentro de frascos (Limpieza, Restaurantes); (b) sobres

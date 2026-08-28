@@ -177,6 +177,9 @@ export async function POST(req: Request) {
     //    está en el mensaje CITADO: se rutea sobre ese texto. Solo si el citado es del USUARIO —un
     //    mensaje del asesor no es un pedido, y ruteralo no tendría sentido.
     let result: Awaited<ReturnType<typeof financeChatWithTools>> | null = null;
+    // Para el hilo de coaching: la señal prioritaria vive en el `ctx` del fallback (scope interno); se
+    // captura acá afuera para persistir el resumen después de resolver la acción.
+    let señalPrioritaria: string | undefined;
     // El citado solo cuenta si es del USUARIO: un mensaje del asesor no es un pedido.
     const citado = quote?.quoted.role === "user" ? quote.quoted.content : undefined;
     let matched = user ? matchIntent(userMessage, citado) : null;
@@ -262,6 +265,7 @@ export async function POST(req: Request) {
         ? await buildToolContext({ debts: true, goals: true, numbers: true }, user.id)
         : undefined;
       result = await financeChatWithTools(messages, ctx, toolContext);
+      señalPrioritaria = ctx.señalPrioritaria; // para el hilo de coaching (abajo)
     }
     if (user) await recordUsage(user.id, result.tokensIn, result.tokensOut);
 
@@ -339,6 +343,23 @@ export async function POST(req: Request) {
       { role: "user", content: parsed.data.message, replyToMessageId: quote ? quoteRef : null },
       { role: "assistant", content: result.reply },
     ]);
+
+    // Hilo de coaching persistente: resumen DETERMINISTA (prioridad + acción YA resuelta) que sobrevive
+    // a la retención de 7 días del chat → el asesor encadena mes a mes en un check-in. BEST-EFFORT
+    // BLINDADO: todo (imports incluidos) va en try/catch, así un fallo del store NUNCA rompe la respuesta
+    // del chat; solo persiste en turnos de coaching (buildCoachingSummary devuelve null si no hay señal).
+    if (user) {
+      try {
+        const { buildCoachingSummary } = await import("@/lib/ai/coaching-summary");
+        const { appendCoachingSummary } = await import("@/lib/ai/coaching-store");
+        const resumen = buildCoachingSummary(señalPrioritaria, result.action ?? null);
+        if (resumen) await appendCoachingSummary(resumen);
+      } catch (err) {
+        logger.warn("coaching-thread persist falló", {
+          message: err instanceof Error ? err.message : "?",
+        });
+      }
+    }
 
     // Los ids vuelven para que la UI pueda CITAR el turno recién enviado sin recargar el hilo.
     return NextResponse.json(
