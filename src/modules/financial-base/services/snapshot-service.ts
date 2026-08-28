@@ -8,8 +8,6 @@ import { householdMemberIds } from "@/lib/household/active";
  * histórico se acumula con el uso, sin necesidad de cron/service-role.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import { getRealTotals } from "@/modules/financial-base/services/transaction-service";
 import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
@@ -155,11 +153,17 @@ export type SnapshotPoint = {
   freeCashflow: number;
 };
 
-/** Lee el histórico cacheado de snapshots (orden cronológico). */
-export async function getSnapshotHistory(monthsBack = 12): Promise<SnapshotPoint[]> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+/**
+ * Lee el histórico cacheado de snapshots (orden cronológico). Seam ctx-inyectable (patrón
+ * `resolveAuth`): sin `ctx` = sesión por cookies (RLS), BYTE-IDÉNTICO a prod; con `ctx` =
+ * cliente/usuario inyectados (sim/headless), para que `consultar_historial` lea la serie sin cookie.
+ */
+export async function getSnapshotHistory(
+  monthsBack = 12,
+  ctx?: AuthContext,
+): Promise<SnapshotPoint[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
   const { data } = await supabase
     .from("monthly_snapshots")
     .select("period,income_monthly,expense_monthly,free_cashflow,breakdown")
