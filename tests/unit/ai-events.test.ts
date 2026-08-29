@@ -49,8 +49,8 @@ describe("recordAiEvent · qué se escribe", () => {
     });
   });
 
-  it("evento de carril: lane, tokens y el largo del reply", async () => {
-    await recordAiEvent("u1", { kind: "lane", lane: "deep", tokensIn: 0, tokensOut: 0, replyLen: 2400 });
+  it("evento de carril: lane, tokens, el largo del reply y la latencia del turno", async () => {
+    await recordAiEvent("u1", { kind: "lane", lane: "deep", tokensIn: 0, tokensOut: 0, replyLen: 2400, ms: 1850 });
 
     expect(insert).toHaveBeenCalledWith({
       user_id: "u1",
@@ -59,12 +59,48 @@ describe("recordAiEvent · qué se escribe", () => {
       tokens_in: 0,
       tokens_out: 0,
       reply_len: 2400,
+      ms: 1850,
+    });
+  });
+
+  it("carril sin latencia → ms null (el turno se registra igual, sin inventar un 0)", async () => {
+    // Un 0 leería como "tardó nada" y hundiría el p50 del carril; null es "no se midió".
+    await recordAiEvent("u1", { kind: "lane", lane: "deep", tokensIn: 0, tokensOut: 0, replyLen: 2400 });
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ event: "lane", ms: null }));
+  });
+
+  it("guard: la CAUSA queda durable (el log de Vercel dura horas; esto es la tasa de honestidad)", async () => {
+    await recordAiEvent("u1", { kind: "guard", causa: "movimientos" });
+    expect(insert).toHaveBeenCalledWith({ user_id: "u1", event: "guard", name: "movimientos" });
+  });
+
+  it("acción: el prefijo separa las dos mitades de la tasa de acción sin emparejar filas", async () => {
+    // Una propuesta puede confirmarse minutos después, o al día siguiente: forzar el emparejamiento
+    // exacto haría el rollup dependiente del orden. Dos contadores distintos, una resta.
+    await recordAiEvent("u1", { kind: "action", tipo: "create_goal", confirmada: false });
+    expect(insert).toHaveBeenCalledWith({ user_id: "u1", event: "action", name: "propuesta:create_goal" });
+
+    await recordAiEvent("u1", { kind: "action", tipo: "create_goal", confirmada: true });
+    expect(insert).toHaveBeenCalledWith({ user_id: "u1", event: "action", name: "confirmada:create_goal" });
+  });
+
+  it("fallo del proveedor: la razón real, marcado ok=false", async () => {
+    // Sin la razón, "la IA anda mal" no se distingue de "nos rate-limitearon".
+    await recordAiEvent("u1", { kind: "provider_error", razon: "http_429" });
+    expect(insert).toHaveBeenCalledWith({
+      user_id: "u1",
+      event: "provider_error",
+      name: "http_429",
+      ok: false,
     });
   });
 
   it("NINGÚN campo de contenido llega a la tabla", async () => {
     await recordAiEvent("u1", { kind: "tool", name: "datos_de_mercado", ms: 90, ok: false, resumenLen: 500 });
     await recordAiEvent("u1", { kind: "lane", lane: "template", tokensIn: 10, tokensOut: 20, replyLen: 80 });
+    await recordAiEvent("u1", { kind: "guard", causa: "tendencia" });
+    await recordAiEvent("u1", { kind: "action", tipo: "debt_extra_payment", confirmada: true });
+    await recordAiEvent("u1", { kind: "provider_error", razon: "timeout" });
 
     for (const [row] of insert.mock.calls) {
       const claves = Object.keys(row as Record<string, unknown>);
