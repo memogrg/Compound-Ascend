@@ -6,6 +6,12 @@
  * la recuperación. El comportamiento keyword de biblia-knowledge se mantiene idéntico.
  */
 
+import {
+  FISCAL_CR_CHUNKS,
+  INVERSION_CHUNKS,
+  textoFiscalSembrable,
+} from "@/lib/ai/inversion-corpus";
+
 export type TopicChunk = { keys: string[]; chunk: string };
 
 /** Guía por emoción dominante del usuario (del arquetipo). */
@@ -124,13 +130,21 @@ export const PATRIMONIO_GUIDANCE: Record<string, string> = {
 export type BibliaSeedEntry = { tag: string; content: string };
 
 /**
- * Corpus curado aplanado para el sembrado semántico. tag: "tema" | "emocion" | "patrimonio".
+ * Corpus curado aplanado para el sembrado semántico.
+ * tag: "tema" | "emocion" | "patrimonio" | "inversion" | "fiscal".
  * Es la MISMA data que usa la recuperación keyword — el embedding se calcula al sembrar.
+ *
+ * Los de INVERSIÓN viven en `inversion-corpus` porque son otra cosa: conceptos técnicos y cifras
+ * fiscales con procedencia, frente a la guía CONDUCTUAL que es el resto de la Biblia. Los fiscales
+ * se siembran con su fuente y su fecha adentro del texto (`textoFiscalSembrable`): si el modelo va
+ * a citar una tarifa, tiene que poder citar de dónde salió en la misma frase.
  */
 export const BIBLIA_SEED_ENTRIES: BibliaSeedEntry[] = [
   ...TOPIC_CHUNKS.map((t) => ({ tag: "tema", content: t.chunk })),
   ...Object.values(EMOTION_RULES).map((content) => ({ tag: "emocion", content })),
   ...Object.values(PATRIMONIO_GUIDANCE).map((content) => ({ tag: "patrimonio", content })),
+  ...INVERSION_CHUNKS.map((c) => ({ tag: "inversion", content: c.chunk })),
+  ...FISCAL_CR_CHUNKS.map((c) => ({ tag: "fiscal", content: textoFiscalSembrable(c) })),
 ];
 
 const CHUNK_MAX = 1200; // cap por chunk (incluye el prefijo de encabezados)
