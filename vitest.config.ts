@@ -14,6 +14,14 @@ export default defineConfig({
     // Bloquea el fetch a red EXTERNA (coingecko/fx/economic-indicators) → suite determinista, sin flaky
     // por timeouts de red. Localhost se permite; los tests que necesitan fetch lo stubbean por su cuenta.
     setupFiles: [fileURLToPath(new URL("./tests/setup/no-external-network.ts", import.meta.url))],
+    // El default de vitest (5 s) es demasiado corto para esta suite y produce fallas FANTASMA: los
+    // ~10 tests que ejercitan el `buildFinancialContext` REAL (ai-debt-currency, context-engine-levers,
+    // ai-context-currency, security-menores, …) importan los barrels de dominio de verdad, y la
+    // PRIMERA transformación de ese grafo cuesta ~10-15 s en frío. El costo es del transform, no de
+    // una aserción lenta: es one-time por worker, así que cae sobre el test que toque importar
+    // primero — por eso el subconjunto que falla cambia entre corridas y en CI (caché caliente) no
+    // falla nunca. Subirlo NO tapa cuelgues: una promesa colgada no resuelve ni con 30 s ni con 5.
+    testTimeout: 30_000,
   },
   resolve: {
     alias: {
