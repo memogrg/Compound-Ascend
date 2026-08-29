@@ -135,10 +135,13 @@ async function buildToolContext(need: ToolNeed, userId?: string): Promise<ToolCo
 }
 
 export async function POST(req: Request) {
+  // Fuera del try a propósito: el catch necesita saber QUIÉN preguntó para poder atribuirle un
+  // fallo del proveedor. Declararlo adentro dejaría esa métrica ciega justo cuando importa.
+  let user: Awaited<ReturnType<typeof getUser>> = null;
   try {
     if (!assertTrustedOrigin(req)) throw new AppError("FORBIDDEN", "Origen no permitido.");
 
-    const user = await getUser();
+    user = await getUser();
     if (isSupabaseConfigured() && !user) throw new AppError("UNAUTHORIZED");
 
     const rlKey = user ? `ai-chat:${user.id}` : `ai-chat:${clientIp(req)}`;
@@ -154,6 +157,10 @@ export async function POST(req: Request) {
     if (user) await assertTokenBudget(user.id);
 
     const userMessage = parsed.data.message;
+    // Latencia del TURNO, medida donde la siente el usuario (después de validar, antes de rutear).
+    // Es lo que alimenta el p50/p95 por carril del tablero: medirla dentro del orquestador dejaría
+    // afuera el contexto y la resolución de la acción, que es tiempo que el usuario igual espera.
+    const turnoT0 = Date.now();
 
     // ── CITA: el usuario está respondiendo a un mensaje pasado. Se resuelve ACÁ, bajo RLS, y de
     //    eso salen tres cosas: el contexto extra para el modelo, el aviso si ya no existe y el
@@ -322,6 +329,9 @@ export async function POST(req: Request) {
     //    Se cae la TARJETA, no la respuesta: el texto se entrega igual.
     if (result.action && !propuestaPerteneceAlTurno(userMessage, result.action.type)) {
       logger.info("assistant.chat.propuesta_descartada", { tipo: result.action.type });
+      // Cuenta como guard: es la red que evita que una tarjeta de otro turno registre el gasto dos
+      // veces. Si esta causa sube, algo del ruteo se rompió — y sin el contador no se vería.
+      if (user) await recordAiEvent(user.id, { kind: "guard", causa: "propuesta_ajena" });
       result.action = null;
     }
 
@@ -379,7 +389,21 @@ export async function POST(req: Request) {
         tokensIn: result.tokensIn,
         tokensOut: result.tokensOut,
         replyLen: result.reply?.length ?? 0,
+        ms: Date.now() - turnoT0,
       });
+      // Guards que frenaron la respuesta: la tasa de "no sé con dato". Se registra por CAUSA
+      // (movimientos/tendencia/deuda_fantasma) — un total suelto no dice qué hay que arreglar.
+      for (const causa of result.guards ?? []) {
+        await recordAiEvent(user.id, { kind: "guard", causa });
+      }
+      // Acción PROPUESTA (la mitad de la tasa de acción; la otra la registra su confirm*Action).
+      if (result.action) {
+        await recordAiEvent(user.id, {
+          kind: "action",
+          tipo: result.action.type,
+          confirmada: false,
+        });
+      }
     }
 
     // Persistir el turno en el chat del usuario (best-effort; no bloquea la respuesta si falla).
@@ -435,9 +459,42 @@ export async function POST(req: Request) {
       { headers: corsHeaders(req.headers.get("origin")) },
     );
   } catch (err) {
+    // FALLO DEL PROVEEDOR con su CAUSA REAL. `gemini.ts` ya la normaliza (timeout / network /
+    // http+status) y la manda en el `detail` estructurado del AppError; lo único que faltaba era
+    // persistirla. Sin esto, "la IA anda mal" no se distingue de "nos rate-limitearon": son dos
+    // problemas distintos con dos arreglos distintos. Best-effort dentro del catch: nunca puede
+    // tapar el error original que el usuario tiene que recibir.
+    if (user) {
+      try {
+        const razon = razonDeFallo(err);
+        if (razon) await recordAiEvent(user.id, { kind: "provider_error", razon });
+      } catch {
+        // la telemetría del fallo no puede provocar otro fallo
+      }
+    }
     const { status, body } = toSafeResponse(err);
     return NextResponse.json(body, { status, headers: corsHeaders(req.headers.get("origin")) });
   }
+}
+
+/**
+ * Causa normalizada de un fallo de proveedor, o `null` si el error no es del proveedor (validación,
+ * límite de tokens, etc. — esos no son "la IA falló" y contarlos ahí ensuciaría la métrica).
+ *
+ * Lee el `detail` ESTRUCTURADO que arma `providerError()` en gemini.ts. Los HTTP se agrupan por
+ * familia (`http_5xx`) salvo los dos que significan algo distinto y accionable: 429 (nos están
+ * limitando) y 401/403 (la credencial murió).
+ */
+function razonDeFallo(err: unknown): string | null {
+  if (!(err instanceof AppError) || err.code !== "PROVIDER_ERROR") return null;
+  const d = (err.detail ?? {}) as { reason?: string; status?: number };
+  if (d.reason === "timeout" || d.reason === "network") return d.reason;
+  const s = d.status;
+  if (typeof s !== "number") return "desconocido";
+  if (s === 429) return "http_429";
+  if (s === 401 || s === 403) return "http_401";
+  if (s >= 500) return "http_5xx";
+  return `http_${s}`;
 }
 
 // buildContext() vive ahora en src/lib/ai/context-engine.ts (Fase 5):

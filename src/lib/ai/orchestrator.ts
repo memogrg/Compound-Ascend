@@ -507,7 +507,18 @@ export async function financeChatWithTools(
   // Seam de inyección (ADITIVO): mismo proveedor para el fallback sin tools.
   provider: AIProvider = getProvider(),
 ): Promise<
-  AIChatResponse & { tokensIn: number; tokensOut: number; provider: string; lane?: RouterLane }
+  AIChatResponse & {
+    tokensIn: number;
+    tokensOut: number;
+    provider: string;
+    lane?: RouterLane;
+    /**
+     * Causas de los guards que FRENARON esta respuesta ('movimientos' | 'tendencia' |
+     * 'deuda_fantasma'). Viajan al caller porque el que sabe QUIÉN preguntó es la ruta, no el
+     * orquestador: acá se detecta, allá se persiste (`recordAiEvent`). Vacío = no frenó nada.
+     */
+    guards?: string[];
+  }
 > {
   if (!toolContext || !provider.chatWithTools) {
     return financeChat(messages, ctx, provider);
@@ -580,6 +591,9 @@ export async function financeChatWithTools(
     ctx.netWorth != null && ctx.currency
       ? `tu patrimonio neto es ${formatMoney(ctx.netWorth, ctx.currency)}`
       : undefined;
+  // Causas acumuladas de los guards que frenaron algo en este turno. Se devuelven al caller para
+  // que las persista: es la "tasa de no sé con dato", la métrica de honestidad del tablero.
+  const causasGuard: string[] = [];
   const runSafetyGuards = (
     p: AIChatResponse,
     usadasSet: Set<string>,
@@ -590,6 +604,7 @@ export async function financeChatWithTools(
     const consultoTool = TOOLS_DE_MOVIMIENTOS.some((t) => usadasSet.has(t));
     const gMov = guardMovimientos(p.reply, consultoTool, esConsultaLibroDiario);
     if (gMov.bloqueado) {
+      causasGuard.push("movimientos");
       logger.warn("assistant.movimientos_bloqueados", {
         // Sin el texto: puede traer cifras del usuario. Alcanza con saber que pasó y con qué tools.
         tools: [...usadasSet].join(",") || "ninguna",
@@ -604,6 +619,7 @@ export async function financeChatWithTools(
       resumenActual,
     );
     if (gTend.bloqueado) {
+      causasGuard.push("tendencia");
       logger.warn("assistant.tendencia_bloqueada", {
         tools: [...usadasSet].join(",") || "ninguna",
         largo: p.reply.length,
@@ -613,6 +629,7 @@ export async function financeChatWithTools(
     // estructurada ya se anula en el resolvedor; esto cubre la MENCIÓN). Encadena sobre gTend.reply.
     const gDeuda = guardDeudaFantasma(gTend.reply, toolContext.debts);
     if (gDeuda.bloqueado) {
+      causasGuard.push("deuda_fantasma");
       logger.warn("assistant.deuda_fantasma_bloqueada", { deudas: toolContext.debts.length });
     }
     return {
@@ -656,6 +673,7 @@ export async function financeChatWithTools(
     tokensOut,
     provider: provider.name,
     lane: "reasoning",
+    guards: causasGuard,
   };
 }
 

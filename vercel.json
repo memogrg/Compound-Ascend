@@ -10,6 +10,7 @@
     { "path": "/api/profile/review-reminder", "schedule": "0 9 1 * *" },
     { "path": "/api/assistant/chat-retention", "schedule": "0 5 * * *" },
     { "path": "/api/rhythm/ventana", "schedule": "0 14 * * *" },
-    { "path": "/api/rhythm/cierre", "schedule": "0 14 * * *" }
+    { "path": "/api/rhythm/cierre", "schedule": "0 14 * * *" },
+    { "path": "/api/ai/metrics?rollup=1", "schedule": "30 6 * * *" }
   ]
 }

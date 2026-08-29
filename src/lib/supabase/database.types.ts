@@ -472,6 +472,48 @@ export type AiEventRow = {
   created_at: string;
 };
 
+/**
+ * Rollup DIARIO del tablero de calidad del agente. Métrica del PRODUCTO (sin user_id): se escribe
+ * y se lee solo con service-role. `guards`, `lat_por_carril` y `provider_errors` son mapas jsonb.
+ */
+export type AgentMetricsRow = {
+  day: string;
+  turnos: number;
+  turnos_det: number;
+  turnos_llm: number;
+  guards_total: number;
+  guards: Record<string, number>;
+  lat_p50: number | null;
+  lat_p95: number | null;
+  lat_por_carril: Record<string, { p50: number; p95: number; n: number }>;
+  tokens_in: number;
+  tokens_out: number;
+  costo_usd: number;
+  acciones_propuestas: number;
+  acciones_confirmadas: number;
+  provider_errors: Record<string, number>;
+  usuarios: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Una corrida del banco de auditoría (~130 preguntas + juez). Lo que permite comparar corridas. */
+export type AgentAuditRunRow = {
+  id: string;
+  stamp: string;
+  origen: string;
+  total: number;
+  pass: number;
+  score: number;
+  juez: Record<string, number>;
+  fallas: Record<string, number>;
+  fails_culpa: number;
+  lat_p50: number | null;
+  lat_p95: number | null;
+  modelo: string | null;
+  created_at: string;
+};
+
 export type AiUsageLedgerRow = Timestamps & {
   id: string;
   user_id: string;
@@ -1209,6 +1251,18 @@ export interface Database {
       ai_usage_ledger: UserTable<AiUsageLedgerRow>;
       // Eventos de IA (observabilidad). Escritura service-role; el usuario solo lee lo suyo.
       ai_events: UserTable<AiEventRow>;
+      // Tablero de calidad del agente. Métricas del PRODUCTO: sin user_id y sin políticas RLS —
+      // solo service-role (la ruta admin con CRON_SECRET) las alcanza.
+      agent_metrics: TableShape<
+        AgentMetricsRow,
+        Partial<AgentMetricsRow> & { day: string },
+        Partial<AgentMetricsRow>
+      >;
+      agent_audit_runs: TableShape<
+        AgentAuditRunRow,
+        Partial<AgentAuditRunRow> & { stamp: string; total: number; pass: number; score: number },
+        Partial<AgentAuditRunRow>
+      >;
       expense_categories: TableShape<
         ExpenseCategoryRow,
         Partial<ExpenseCategoryRow> & { name: string },

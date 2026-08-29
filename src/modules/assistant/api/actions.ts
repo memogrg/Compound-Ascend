@@ -94,6 +94,26 @@ export async function listSobresForKindAction(kind: "gasto" | "ingreso"): Promis
   }
 }
 
+/**
+ * Marca que el usuario CONFIRMÓ una acción. Es la otra mitad de la tasa de acción del tablero (la
+ * propuesta la registra la ruta de chat): juntas dicen cuántos consejos eran ejecutables de verdad
+ * y no solo texto lindo.
+ *
+ * Best-effort BLINDADO y sin `await` bloqueante del resultado del usuario: la telemetría nunca
+ * puede hacer fallar una confirmación que ya se ejecutó — el usuario vería "no se pudo" sobre algo
+ * que sí se guardó, que es el peor error posible acá.
+ */
+async function marcarConfirmada(tipo: string): Promise<void> {
+  try {
+    const user = await getUser();
+    if (!user) return;
+    const { recordAiEvent } = await import("@/lib/ai/events");
+    await recordAiEvent(user.id, { kind: "action", tipo, confirmada: true });
+  } catch {
+    // sin telemetría; la acción del usuario ya ocurrió y eso es lo que importa
+  }
+}
+
 export async function confirmTransactionAction(raw: unknown): Promise<ConfirmResult> {
   const parsed = transactionInputSchema.safeParse(raw);
   if (!parsed.success) {
@@ -132,6 +152,7 @@ export async function confirmTransactionAction(raw: unknown): Promise<ConfirmRes
       sobre =
         (await getSobreRemaining(parsed.data.categoryId, parsed.data.occurredOn)) ?? undefined;
     }
+    await marcarConfirmada("create_transaction");
     return sobre ? { ok: true, sobre } : { ok: true };
   } catch (err) {
     logger.error("confirmTransaction fallido", {
@@ -165,6 +186,7 @@ export async function confirmGoalAction(raw: unknown): Promise<ConfirmResult> {
     revalidatePath("/ahorro");
     revalidatePath("/dashboard");
     revalidatePath("/control-financiero");
+    await marcarConfirmada("create_goal");
     return { ok: true };
   } catch (err) {
     logger.error("confirmGoal fallido", { message: err instanceof Error ? err.message : "?" });
@@ -192,6 +214,7 @@ export async function confirmPriceAlertAction(raw: unknown): Promise<ConfirmResu
     revalidatePath("/patrimonio");
     revalidatePath("/patrimonio/indicadores");
     revalidatePath("/dashboard");
+    await marcarConfirmada("create_price_alert");
     return { ok: true };
   } catch (err) {
     logger.error("confirmPriceAlert fallido", {
@@ -300,6 +323,7 @@ export async function confirmBatchTransactionsAction(raw: unknown): Promise<Batc
     revalidatePath("/mi-base-financiera");
     revalidatePath("/dashboard");
   }
+  if (creadas > 0) await marcarConfirmada("create_transactions_batch");
   return { ok: creadas > 0, creadas, fallidas, duplicadas };
 }
 
@@ -318,6 +342,7 @@ export async function confirmSetDcaAction(raw: unknown): Promise<ConfirmResult> 
     const { setHoldingDcaAction } = await import("@/modules/wealth");
     const res = await setHoldingDcaAction(parsed.data.holdingId, parsed.data.monthlyContribution);
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo fijar el aporte." };
+    await marcarConfirmada("set_dca");
     return { ok: true };
   } catch (err) {
     logger.error("confirmSetDca fallido", { message: err instanceof Error ? err.message : "?" });
@@ -348,6 +373,7 @@ export async function confirmAdjustBudgetAction(raw: unknown): Promise<ConfirmRe
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo ajustar el presupuesto." };
     revalidatePath("/gastos");
     revalidatePath("/mi-base-financiera");
+    await marcarConfirmada("adjust_budget");
     return { ok: true };
   } catch (err) {
     logger.error("confirmAdjustBudget fallido", {
@@ -384,6 +410,7 @@ export async function confirmMoveBudgetAction(raw: unknown): Promise<ConfirmResu
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo mover el presupuesto." };
     revalidatePath("/gastos");
     revalidatePath("/mi-base-financiera");
+    await marcarConfirmada("move_budget");
     return { ok: true };
   } catch (err) {
     logger.error("confirmMoveBudget fallido", {
@@ -422,6 +449,7 @@ export async function confirmDebtExtraPaymentAction(raw: unknown): Promise<Confi
       currency: parsed.data.currency ?? debt.currency,
     });
     if (!res.ok) return { ok: false, message: res.message ?? "No se pudo registrar el abono." };
+    await marcarConfirmada("debt_extra_payment");
     return { ok: true };
   } catch (err) {
     logger.error("confirmDebtExtraPayment fallido", {
