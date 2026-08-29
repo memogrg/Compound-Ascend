@@ -96,6 +96,69 @@ export function AddPurchaseButton({ holding, currency }: { holding: Holding; cur
   );
 }
 
+/**
+ * #86 · "Aportar a una inversión" en el "+" top-level (paridad con el móvil; en web la compra/aporte
+ * solo vivía en la fila, `AddPurchaseButton`). Botón → picker de holding → reusa `AddHoldingModal`
+ * con `prefill` (idéntico a AddPurchaseButton), sin tocar el form. Null si no hay inversiones.
+ */
+export function AportarHoldingButton({
+  holdings,
+  currency,
+}: {
+  holdings: Holding[];
+  currency: string;
+}) {
+  const [picking, setPicking] = useState(false);
+  const [selId, setSelId] = useState(holdings[0]?.id ?? "");
+  const [contributeTo, setContributeTo] = useState<Holding | null>(null);
+  if (holdings.length === 0) return null;
+  const sel = holdings.find((h) => h.id === selId) ?? holdings[0]!;
+  return (
+    <>
+      <button className="btn btn-secondary" onClick={() => setPicking(true)}>
+        <Icon name="invest" width={2} /> Aportar a una inversión
+      </button>
+      {picking ? (
+        <Modal
+          title="Aportar a una inversión"
+          sub="Elige la inversión y registra el aporte o compra."
+          onClose={() => setPicking(false)}
+        >
+          <div className="modal-body">
+            <div className="fld">
+              <label className="fld-label">Inversión</label>
+              <select className="sel" value={sel.id} onChange={(e) => setSelId(e.target.value)}>
+                {holdings.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.label ?? h.symbol}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setContributeTo(sel);
+                setPicking(false);
+              }}
+            >
+              Continuar
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+      {contributeTo && (
+        <AddHoldingModal
+          currency={currency}
+          prefill={contributeTo}
+          onClose={() => setContributeTo(null)}
+        />
+      )}
+    </>
+  );
+}
+
 export function EditHoldingButton({ holding, currency }: { holding: Holding; currency: string }) {
   const [open, setOpen] = useState(false);
   return (
