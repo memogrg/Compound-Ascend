@@ -7,6 +7,11 @@
  * acá solo está la lógica de recuperación keyword (sin cambio de comportamiento).
  */
 import { EMOTION_RULES, TOPIC_CHUNKS, PATRIMONIO_GUIDANCE } from "@/lib/ai/biblia-corpus";
+import {
+  FISCAL_CR_CHUNKS,
+  INVERSION_CHUNKS,
+  textoFiscalSembrable,
+} from "@/lib/ai/inversion-corpus";
 
 /**
  * Quita acentos y pasa a minúsculas para que el match tolere "inversión",
@@ -33,12 +38,23 @@ export function bibliaEmotionRule(emotion?: string): string | null {
   return emotion && EMOTION_RULES[emotion] ? EMOTION_RULES[emotion]! : null;
 }
 
-/** Hasta 2 temas por keyword (includes() sobre texto normalizado), SIN la emoción. */
+/**
+ * Hasta 2 temas por keyword (includes() sobre texto normalizado), SIN la emoción.
+ *
+ * Recorre la guía conductual Y el corpus de inversión: el keyword es el FALLBACK de la recuperación
+ * semántica (sin API key, corpus sin embeber, 0 matches), y si no incluyera inversión, justo el
+ * corpus nuevo sería lo único que desaparece cuando el embedding no está disponible.
+ */
 export function selectBibliaTopicsKeyword(text?: string): string[] {
   const t = normalize(text ?? "");
   const out: string[] = [];
   let topics = 0;
-  for (const chunk of TOPIC_CHUNKS) {
+  const todos: { keys: string[]; chunk: string }[] = [
+    ...TOPIC_CHUNKS,
+    ...INVERSION_CHUNKS,
+    ...FISCAL_CR_CHUNKS.map((c) => ({ keys: c.keys, chunk: textoFiscalSembrable(c) })),
+  ];
+  for (const chunk of todos) {
     if (topics >= 2) break;
     if (chunk.keys.some((k) => t.includes(k))) {
       out.push(chunk.chunk);
