@@ -35,7 +35,8 @@ import {
 } from "@/lib/whatsapp/links-service";
 import { createTransactionForUser, createGoalForUser } from "@/lib/whatsapp/write-service";
 import { moveTransaction, parseMoveCommand } from "@/lib/whatsapp/recategorize-service";
-import { formatMoney, todayIso } from "@/lib/whatsapp/format";
+import { formatMoney } from "@/lib/whatsapp/format";
+import { userToday } from "@/lib/time/user-time";
 import { parseNotification } from "@/lib/ingestion/sources";
 import { toPendingAction, dedupKey } from "@/lib/ingestion/normalize";
 import {
@@ -376,9 +377,10 @@ async function handleText(
     }
   }
 
+  // Fecha en la zona del usuario (perfil vía service-role); sin authCtx → UTC como piso documentado.
   const action =
     result.action?.type === "create_transaction"
-      ? toTxnAction(result.action.payload, ctx.currency)
+      ? toTxnAction(result.action.payload, ctx.currency, await userToday(authCtx))
       : null;
 
   if (action) {
@@ -418,10 +420,13 @@ function toGoalAction(
   return { type: "goal", name, targetAmount, monthlyContribution, currency, targetDate };
 }
 
-/** Mapea el payload de la acción `create_transaction` a una PendingAction. */
+/** Mapea el payload de la acción `create_transaction` a una PendingAction.
+ *  `occurredOn` (tz-aware, resuelto por el caller vía userToday(authCtx)) se inyecta: el webhook no
+ *  tiene cookie de request, así que la fecha se resuelve del perfil, nunca del reloj UTC del server (#90). */
 function toTxnAction(
   payload: Record<string, unknown>,
   fallbackCurrency: string,
+  occurredOn: string,
 ): PendingAction | null {
   const amount = Number(payload.amount);
   if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -439,7 +444,7 @@ function toTxnAction(
     description,
     amount,
     currency,
-    occurredOn: todayIso(),
+    occurredOn,
     merchant: null,
     origin: "ai_assisted",
     source: "chat",
@@ -480,7 +485,10 @@ async function handleReceiptPhoto(
   }
 
   const currency = await getUserCurrency(link.userId);
-  const date = extract.date ?? todayIso();
+  // Fecha del recibo si el OCR la trae; si no, hoy en la zona del usuario (perfil vía service-role),
+  // nunca el reloj UTC del server (#90). El webhook no tiene cookie → resolvemos por authCtx.
+  const date =
+    extract.date ?? (await userToday({ db: createServiceRoleClient(), userId: link.userId }));
   const action: PendingAction = {
     kind: "gasto",
     description: extract.merchant ?? extract.category ?? "Gasto",

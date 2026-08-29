@@ -155,7 +155,10 @@ export function buildHoldingPayload(v: HoldingFormValues): HoldingInput {
     isRecurring: v.aportoCadaMes,
     monthlyContribution: v.aportoCadaMes ? parseFloat(v.aporteMensual) || undefined : undefined,
     registerExpense: v.registerExpense,
-    purchaseDate: new Date().toISOString().slice(0, 10),
+    // Fecha capturada tz-aware por el form (useCaptureToday → captureToday(tz)); NUNCA el reloj
+    // UTC del server, que a la noche en zonas negativas (p.ej. UTC-6) ya es "mañana" → fecharía la
+    // compra +1 día (#90). Vale para TODAS las categorías; el form la default-ea a hoy-local.
+    purchaseDate: v.startDate,
   };
 
   if (m.quoted) {
@@ -166,7 +169,7 @@ export function buildHoldingPayload(v: HoldingFormValues): HoldingInput {
     if (cat === "plan_inversion") {
       base.termYears = parseInt(v.termYears, 10) || undefined;
       base.maturityDate = v.maturityDate ? `${v.maturityDate}-01` : undefined;
-      if (v.startDate) base.purchaseDate = v.startDate;
+      // purchaseDate ya = v.startDate desde el base (arriba); sin sobrescritura redundante.
     }
     if (m.nature === "cashflow") {
       const inc = parseFloat(v.income) || 0;
