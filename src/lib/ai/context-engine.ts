@@ -899,5 +899,19 @@ export async function buildFinancialContext(
       // sin memoria personal, el asesor sigue con el resto del contexto
     }
 
+  // SEGUIMIENTO de lo ya recomendado, verificado contra los datos reales. Bloque "flavor": es
+  // material de coaching, no una cifra que un carril determinista necesite. Best-effort, y además
+  // PERSISTE lo que resuelve (una recomendación cumplida no se vuelve a celebrar).
+  if (scope.flavor)
+    try {
+      const { seguimientoParaContexto } = await import("@/lib/ai/coaching-followup-service");
+      const { userToday } = await import("@/lib/time/user-time");
+      const hoy = await userToday().catch(() => new Date().toISOString().slice(0, 10));
+      const lineas = await seguimientoParaContexto(hoy, ctx.currency);
+      if (lineas.length > 0) ctx.seguimiento = lineas;
+    } catch {
+      // sin seguimiento, el asesor aconseja igual (solo pierde la celebración)
+    }
+
   return ctx;
 }

@@ -396,10 +396,27 @@ export async function POST(req: Request) {
     // del chat; solo persiste en turnos de coaching (buildCoachingSummary devuelve null si no hay señal).
     if (user) {
       try {
-        const { buildCoachingSummary } = await import("@/lib/ai/coaching-summary");
+        const { buildCoachingSummary, seguimientoDeAccion } =
+          await import("@/lib/ai/coaching-summary");
         const { appendCoachingSummary } = await import("@/lib/ai/coaching-store");
         const resumen = buildCoachingSummary(señalPrioritaria, result.action ?? null);
-        if (resumen) await appendCoachingSummary(resumen);
+        if (resumen) {
+          // SEGUIMIENTO: además del texto, se guarda la acción estructurada + la LÍNEA BASE de la
+          // entidad hoy. Es lo que después deja decir "hiciste el aporte que hablamos" con el monto
+          // real, en vez de recomendar al vacío sin saber nunca si le hicieron caso.
+          const seg = seguimientoDeAccion(result.action ?? null);
+          let baseline: number | null = null;
+          if (seg) {
+            try {
+              const { baselineDeEntidad } = await import("@/lib/ai/coaching-followup-service");
+              baseline = await baselineDeEntidad(seg.actionType, seg.actionRef);
+            } catch {
+              // sin línea base: la recomendación entra igual y el motor la deja abierta (nunca
+              // celebra un avance que no puede verificar).
+            }
+          }
+          await appendCoachingSummary(resumen, undefined, seg ? { ...seg, baseline } : null);
+        }
       } catch (err) {
         logger.warn("coaching-thread persist falló", {
           message: err instanceof Error ? err.message : "?",

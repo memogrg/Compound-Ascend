@@ -184,6 +184,12 @@ export type FinancialContext = {
    * NUNCA trae cifras: los montos se leen en vivo del resto de este contexto. Ver `memory-facts`.
    */
   userMemory?: string[];
+  /**
+   * SEGUIMIENTO: qué pasó con lo que ya le recomendaste, VERIFICADO contra sus datos reales (la meta
+   * avanzó, la deuda bajó, el DCA quedó configurado). Cierra el loop del asesor. Ver
+   * `coaching-followup`. Vacío/ausente = no hay nada verificado que decir, y entonces no se dice.
+   */
+  seguimiento?: string[];
   goalCount?: number;
   goalsProgressPct?: number;
   /**
@@ -621,6 +627,16 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
     );
     facts.push(
       "REGLA DEL HILO (en un check-in / evaluación de estado — '¿cómo voy?'): ABRÍ enganchando con tu ÚLTIMO consejo y si el usuario lo aplicó o no, EN LA PRIMERA O SEGUNDA FRASE — 'La vez pasada te enfoqué en tu fondo; veo que el gasto lo sigue frenando, así que domemos eso primero' / 'El mes pasado acordamos abonar a la tarjeta; como no se movió, cambiemos el ángulo' / 'Seguimos con tu fondo: ya llevás dos meses apuntando ahí, sostengámoslo'. Construí SOBRE lo anterior; PROHIBIDO arrancar fresco repitiendo la misma nota como si fuera la primera vez que hablan. Los montos del hilo son cifras REALES ya recomendadas: referencialas sin recalcular. (Si el consejo de hoy es NUEVO y sin relación con lo previo, no lo fuerces — pero en un cuadro que no se movió, SIEMPRE hay hilo que tender.)",
+    );
+  }
+
+  // SEGUIMIENTO DE LO RECOMENDADO. La diferencia entre un asesor y un generador de consejos es que
+  // el asesor MIRA si le hicieron caso. Va ARRIBA de la memoria y del hilo porque, cuando hay algo
+  // cumplido, es lo primero que corresponde decir.
+  if (ctx.seguimiento && ctx.seguimiento.length > 0) {
+    facts.push(`SEGUIMIENTO DE LO QUE YA LE RECOMENDASTE: ${ctx.seguimiento.join(" · ")}`);
+    facts.push(
+      "REGLA DEL SEGUIMIENTO: estas líneas están VERIFICADAS contra sus datos reales, no son suposiciones. Si algo se CUMPLIÓ, reconocelo PRIMERO y por su nombre, con la cifra ('hiciste el aporte que hablamos: tu colchón ya cubre X meses') — es lo que demuestra que lo venís siguiendo y no arrancás de cero. Si algo NO se movió, retomalo SIN UN GRAMO DE REPROCHE: nombrá el hecho, no la persona, y ofrecé un paso más chico. PROHIBIDO cualquier forma de regaño, decepción o 'te lo dije'. Y PROHIBIDO celebrar algo que no esté en esta lista: si no está acá, no está verificado y no pasó.",
     );
   }
 
