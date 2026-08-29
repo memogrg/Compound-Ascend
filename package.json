@@ -59,7 +59,7 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.4",
     "@vitest/coverage-v8": "^4.1.10",
-    "eslint": "^9.11.1",
+    "eslint": "^10.9.0",
     "eslint-config-next": "^16.2.11",
     "postcss": "^8.5.15",
     "prettier": "^3.9.6",
