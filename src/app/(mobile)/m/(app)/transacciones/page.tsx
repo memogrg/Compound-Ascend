@@ -29,6 +29,7 @@ import {
 } from "../../components/content-kit";
 
 import { MobileTxnList } from "./mobile-txn-list";
+import { MonthNav } from "./month-nav";
 import { RevisionInbox } from "./revision-inbox";
 import { RulesManager } from "./rules-manager";
 import { AccountsManager } from "./accounts-manager";
@@ -45,8 +46,13 @@ import { MobileHeader } from "../../components/mobile-header";
  */
 export const dynamic = "force-dynamic"; // datos por sesión
 
-export default async function MobileTransacciones() {
-  const view = await loadBaseView();
+export default async function MobileTransacciones({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
+  const sp = await searchParams;
+  const view = await loadBaseView(sp.period);
 
   if (!view) {
     return (
@@ -81,6 +87,11 @@ export default async function MobileTransacciones() {
   // Frascos para el selector de categoría (sobre) del registro de gastos (misma
   // orquestación que /m/gastos; excluye los frascos vinculados).
   const jarsPeriod = await userCurrentPeriod();
+  // No navegar más allá del mes ACTUAL (jarsPeriod = mes actual del usuario, tz-aware). Es una
+  // comparación de dos Period ya construidos (año/mes), sin aritmética de fechas propia.
+  const canGoNext =
+    period.year < jarsPeriod.year ||
+    (period.year === jarsPeriod.year && period.month < jarsPeriod.month);
   const jars = await getExpenseJarsAsOf({
     tree: view.tree,
     period: jarsPeriod,
@@ -139,15 +150,14 @@ export default async function MobileTransacciones() {
       <div className="m-pad">
         {/* Mismo caso que Mi Base Financiera: sin la barra de pestañas se quedó sin
             ninguna salida a Inicio. El logo C+ es el destino; una flecha mentiría. */}
-        <MobileHeader
-          variant="inner"
-          home
-          eyebrow={`Movimientos · ${period.label}`}
-          title="Transacciones"
-        />
+        <MobileHeader variant="inner" home eyebrow="Movimientos" title="Transacciones" />
         <div className="muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>
           Todos tus movimientos del periodo.
         </div>
+
+        {/* Navegador de mes (paridad con el PeriodSelector web): cambia ?period= y el server
+            re-consulta. El marcador de cierre (buildMonthMarker) sigue al período elegido solo. */}
+        <MonthNav period={period} canNext={canGoNext} />
 
         {/* Franja de resumen (misma que la web: saldo neto, ingresos, gastos, movimientos).
             La celda mide ~106px útiles a 320px → mAmount con umbral corto: antes usaba

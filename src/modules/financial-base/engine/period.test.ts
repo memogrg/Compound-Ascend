@@ -1,5 +1,45 @@
 import { describe, it, expect } from "vitest";
-import { isCurrentMonth, buildMonthMarker } from "@/modules/financial-base/engine/period";
+import {
+  isCurrentMonth,
+  buildMonthMarker,
+  nextMonthPeriod,
+  previousMonthPeriod,
+  monthPeriod,
+} from "@/modules/financial-base/engine/period";
+
+// #104 · el navegador de mes usa next/previousMonthPeriod para moverse; deben manejar el salto de año
+// y ser inversos exactos (ida y vuelta = mismo período).
+describe("nextMonthPeriod (#104)", () => {
+  it("mes normal → mes+1 mismo año, con from/to/label coherentes", () => {
+    const p = nextMonthPeriod(monthPeriod(2026, 7));
+    expect({ year: p.year, month: p.month }).toEqual({ year: 2026, month: 8 });
+    expect(p.from).toBe("2026-08-01");
+    expect(p.to).toBe("2026-08-31");
+    expect(p.label).toBe("ago 2026");
+  });
+
+  it("diciembre → enero del año SIGUIENTE", () => {
+    const p = nextMonthPeriod(monthPeriod(2026, 12));
+    expect({ year: p.year, month: p.month }).toEqual({ year: 2027, month: 1 });
+  });
+
+  it("enero (previousMonthPeriod) → diciembre del año ANTERIOR", () => {
+    const p = previousMonthPeriod(monthPeriod(2026, 1));
+    expect({ year: p.year, month: p.month }).toEqual({ year: 2025, month: 12 });
+  });
+
+  it("next∘previous = identidad (ida y vuelta), incluido el borde de año", () => {
+    for (const [y, m] of [
+      [2026, 7],
+      [2026, 1],
+      [2026, 12],
+    ] as const) {
+      const base = monthPeriod(y, m);
+      const roundTrip = previousMonthPeriod(nextMonthPeriod(base));
+      expect({ year: roundTrip.year, month: roundTrip.month }).toEqual({ year: y, month: m });
+    }
+  });
+});
 
 describe("isCurrentMonth", () => {
   it("mismo año-mes que hoy → true", () => {
