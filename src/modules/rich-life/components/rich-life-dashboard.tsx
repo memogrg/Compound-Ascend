@@ -128,7 +128,7 @@ export function RichLifeDashboard({
                       fill="none"
                       stroke="var(--gold)"
                       strokeWidth="5"
-                      strokeLinecap={ringValue >= 100 ? "butt" : "round"}
+                      strokeLinecap="butt"
                       pathLength={100}
                       strokeDasharray={`${ringValue} 100`}
                       strokeDashoffset="25"

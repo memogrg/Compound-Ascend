@@ -209,7 +209,7 @@ function HealthCard({ health }: { health: HealthScore }) {
               fill="none"
               stroke="var(--accent)"
               strokeWidth="4"
-              strokeLinecap={health.score >= 100 ? "butt" : "round"}
+              strokeLinecap="butt"
               pathLength={100}
               strokeDasharray={`${health.score} 100`}
               strokeDashoffset="25"

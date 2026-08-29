@@ -730,7 +730,7 @@ function Ring({ value }: { value: number }) {
           fill="none"
           stroke="var(--pos)"
           strokeWidth="4"
-          strokeLinecap={value >= 100 ? "butt" : "round"}
+          strokeLinecap="butt"
           pathLength={100}
           strokeDasharray={`${value} 100`}
           strokeDashoffset="25"
