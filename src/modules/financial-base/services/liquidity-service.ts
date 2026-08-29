@@ -3,7 +3,7 @@ import "server-only";
 /**
  * Servicio del Saco de Liquidez ("Tu Liquidez"). Respeta RLS (cliente de sesión).
  * Fuente de verdad: el ledger de movimientos reales; el saldo es SUM(delta),
- * normalizado a la moneda de visualización. Los deltas por transacción se
+ * normalizado a la moneda PRINCIPAL (getPrimaryCurrency), no a la de visualización. Los deltas por transacción se
  * enganchan desde transaction-service (createTransaction/updateTransaction).
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -26,7 +26,7 @@ import type { LiquidityLedgerRow } from "@/lib/supabase/database.types";
 
 type LedgerSlice = Pick<LiquidityLedgerRow, "delta" | "currency" | "reason" | "occurred_on">;
 
-/** Filas del ledger del usuario, ya normalizadas a la moneda de display. */
+/** Filas del ledger del usuario, ya normalizadas a la moneda PRINCIPAL (getPrimaryCurrency). */
 async function loadRows(
   ctx?: AuthContext,
 ): Promise<{ rows: LiquidityRow[]; currency: string; raw: LedgerSlice[] }> {
@@ -65,7 +65,7 @@ export async function getLiquidityBalance(ctx?: AuthContext): Promise<{
 /**
  * Saldo de liquidez ACUMULADO tras cada transacción que movió el saco ("liquidez
  * después"), para la hoja de Transacciones. UNA consulta del ledger del usuario +
- * UNA pasada: normaliza a la moneda de display, ordena cronológicamente y acumula.
+ * UNA pasada: normaliza a la moneda PRINCIPAL (getPrimaryCurrency), ordena cronológicamente y acumula.
  * Los movimientos neutros (consumo de frasco / transferencia / ajuste) no tienen
  * fila en el ledger → no entran al mapa (la UI muestra "no cambia tu liquidez").
  */
@@ -98,7 +98,7 @@ export async function getLiquidityAfterByTxn(
 
 /**
  * Liquidez al CIERRE de un periodo (Trazabilidad Fase C): el saldo hasta
- * `period.to` (inclusive), normalizado a la moneda de display. La apertura cuenta
+ * `period.to` (inclusive), normalizado a la moneda PRINCIPAL (getPrimaryCurrency). La apertura cuenta
  * SIEMPRE como base; el resto (transaccion/ajuste) sólo si ocurrió en/antes de
  * `period.to` (la regla vive en `sumClosingBalance`). Por eso se cargan TODAS las
  * filas (sin filtrar por fecha en la query): la apertura está fechada "hoy" y
