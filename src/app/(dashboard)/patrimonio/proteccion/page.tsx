@@ -2,7 +2,7 @@ import Link from "next/link";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getWealthSummary, buildDemoWealthSummary } from "@/modules/wealth/services/wealth-service";
 import { DefenseView } from "@/modules/wealth/components/defense-view";
-import { WealthActions } from "@/modules/wealth/components/wealth-actions";
+import { WealthActions, PagarPrimaButton } from "@/modules/wealth/components/wealth-actions";
 import { DefenseFunds, getDefenseFundsReport, detectLongTermObligation } from "@/modules/wealth";
 import { listDebts } from "@/modules/control";
 import { Icon } from "@/components/ui/icon";
@@ -52,6 +52,8 @@ export default async function Page() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {/* Pagar prima a una existente PRIMERO, luego crear (#86, paridad con el móvil). */}
+          <PagarPrimaButton policies={summary.policies} />
           <WealthActions mode="policy" currency={summary.currency} deepLinkKey="policy" />
           <Link className="btn btn-secondary" href="/patrimonio">
             <Icon name="invest" width={2} /> Crecimiento
