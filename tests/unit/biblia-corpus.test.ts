@@ -6,20 +6,27 @@ import {
   PATRIMONIO_GUIDANCE,
   chunkDocument,
 } from "@/lib/ai/biblia-corpus";
+import { INVERSION_CHUNKS, FISCAL_CR_CHUNKS } from "@/lib/ai/inversion-corpus";
 
 describe("BIBLIA_SEED_ENTRIES", () => {
-  it("no está vacío y cubre las 3 fuentes con sus tags", () => {
+  it("no está vacío y cubre las 5 fuentes con sus tags", () => {
+    // El conteo se DERIVA de las fuentes, nunca se escribe a mano: así agregar un concepto al
+    // corpus no rompe el test por un número desactualizado, pero olvidarse de aplanarlo sí.
     expect(BIBLIA_SEED_ENTRIES.length).toBe(
       TOPIC_CHUNKS.length +
         Object.keys(EMOTION_RULES).length +
-        Object.keys(PATRIMONIO_GUIDANCE).length,
+        Object.keys(PATRIMONIO_GUIDANCE).length +
+        INVERSION_CHUNKS.length +
+        FISCAL_CR_CHUNKS.length,
     );
     const tags = new Set(BIBLIA_SEED_ENTRIES.map((e) => e.tag));
-    expect(tags).toEqual(new Set(["tema", "emocion", "patrimonio"]));
+    expect(tags).toEqual(new Set(["tema", "emocion", "patrimonio", "inversion", "fiscal"]));
     const byTag = (t: string) => BIBLIA_SEED_ENTRIES.filter((e) => e.tag === t).length;
     expect(byTag("tema")).toBe(TOPIC_CHUNKS.length);
     expect(byTag("emocion")).toBe(Object.keys(EMOTION_RULES).length);
     expect(byTag("patrimonio")).toBe(Object.keys(PATRIMONIO_GUIDANCE).length);
+    expect(byTag("inversion")).toBe(INVERSION_CHUNKS.length);
+    expect(byTag("fiscal")).toBe(FISCAL_CR_CHUNKS.length);
   });
 
   it("toda entrada tiene contenido no vacío", () => {
