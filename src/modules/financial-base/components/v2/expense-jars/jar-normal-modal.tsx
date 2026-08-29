@@ -401,7 +401,7 @@ export function JarNormalModal({
               </div>
               <span
                 className="tip"
-                data-tip="Moneda en que defines el presupuesto de este sobre. Por defecto, tu moneda de visualización."
+                data-tip="Moneda en que defines el presupuesto de este sobre. Por defecto, tu moneda principal — no la de visualización del topbar."
                 style={{
                   width: 16,
                   height: 16,
