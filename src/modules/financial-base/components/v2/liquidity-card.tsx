@@ -9,7 +9,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, currencySymbol } from "@/lib/format";
 import { MoneyField } from "@/components/forms/money-field";
 import {
   setOpeningBalanceAction,
@@ -87,35 +87,42 @@ export function LiquidityCard({
             {formatMoney(balance, currency)}
           </div>
           {adjusting ? (
-            <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-              <input
-                type="number"
-                inputMode="decimal"
-                className="inp"
-                placeholder="Tu saldo real hoy"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                style={{ flex: "1 1 140px" }}
-              />
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => submit("adjust")}
-                disabled={pending}
-              >
-                Guardar
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setAdjusting(false);
-                  setValue("");
-                }}
-                disabled={pending}
-              >
-                Cancelar
-              </button>
+            <div style={{ marginTop: 12 }}>
+              {/* El ajuste (reconcile) es en la PRINCIPAL (v1, #87): se dice explícito para que el
+                  usuario sepa en qué moneda teclear (la misma del saldo grande de arriba). */}
+              <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>
+                Tu saldo real hoy, en {currencySymbol(currency)}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className="inp"
+                  placeholder="0"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  style={{ flex: "1 1 140px" }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => submit("adjust")}
+                  disabled={pending}
+                >
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setAdjusting(false);
+                    setValue("");
+                  }}
+                  disabled={pending}
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           ) : (
             <button

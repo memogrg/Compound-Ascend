@@ -15,6 +15,7 @@ import {
   CUR_OPTS,
 } from "../../components/form-kit";
 import { MSummaryCard, mAmount } from "../../components/content-kit";
+import { currencySymbol } from "@/lib/format";
 
 /**
  * Gestión de liquidez en /m/mi-base-financiera, replicando la LiquidityCard web con el
@@ -89,7 +90,11 @@ export function LiquidityManager({
         >
           <MoneyField
             name="amount"
-            label={hasOpening ? "Tu saldo real hoy" : "¿Cuánto tienes líquido hoy?"}
+            label={
+              hasOpening
+                ? `Tu saldo real hoy, en ${currencySymbol(currency)}`
+                : "¿Cuánto tienes líquido hoy?"
+            }
             value={amount}
             onChange={setAmount}
             currency={hasOpening ? currency : cur}
