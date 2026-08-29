@@ -130,11 +130,19 @@ export async function getClosingLiquidity(
   return { balance: sumClosingBalance(rows, period.to, currency, rates), currency };
 }
 
-/** Fija (o reescribe) el saldo inicial. Idempotente: una sola fila 'apertura'. */
-export async function setOpeningBalance(amount: number, ctx?: AuthContext): Promise<void> {
+/**
+ * Fija (o reescribe) el saldo inicial. Idempotente: una sola fila 'apertura'.
+ * `currency` = la moneda en que el usuario declara su saldo (el ledger es multi-moneda: `loadRows`
+ * la convierte a la principal al leer, #87). Si no se pasa, default = la principal del usuario.
+ */
+export async function setOpeningBalance(
+  amount: number,
+  currency?: string,
+  ctx?: AuthContext,
+): Promise<void> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const household_id = await getActiveHouseholdId(supabase, userId);
-  const currency = await getPrimaryCurrency(ctx);
+  const cur = currency ?? (await getPrimaryCurrency(ctx));
 
   const { data: existing } = await supabase
     .from("liquidity_ledger")
@@ -146,7 +154,7 @@ export async function setOpeningBalance(amount: number, ctx?: AuthContext): Prom
   if (existing?.id) {
     await supabase
       .from("liquidity_ledger")
-      .update({ delta: amount, currency })
+      .update({ delta: amount, currency: cur })
       .eq("id", existing.id);
     return;
   }
@@ -154,7 +162,7 @@ export async function setOpeningBalance(amount: number, ctx?: AuthContext): Prom
     user_id: userId,
     household_id,
     delta: amount,
-    currency,
+    currency: cur,
     reason: "apertura",
     transaction_id: null,
     occurred_on: await userToday(ctx),

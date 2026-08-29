@@ -21,6 +21,7 @@ import {
   reconcileBalance,
 } from "@/modules/financial-base/services/liquidity-service";
 import { isSupabaseConfigured } from "@/lib/auth/session";
+import { SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { logger } from "@/lib/logger";
 
 export type ActionResult = { ok: boolean; fieldErrors?: Record<string, string>; message?: string };
@@ -119,13 +120,22 @@ const openingSchema = z.number().min(0, "El saldo no puede ser negativo.");
 const reconcileSchema = z.number().min(0, "El saldo no puede ser negativo.");
 
 /** Fija el saldo inicial de liquidez (estado vacío). */
-export async function setOpeningBalanceAction(amount: number): Promise<ActionResult> {
+export async function setOpeningBalanceAction(
+  amount: number,
+  currency?: string,
+): Promise<ActionResult> {
   const parsed = openingSchema.safeParse(amount);
   if (!parsed.success)
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Monto no válido." };
+  // Moneda opcional del saldo declarado: solo si es soportada; cualquier otra → undefined
+  // (el servicio cae a la principal). El ledger es multi-moneda y loadRows la convierte (#87).
+  const cur =
+    currency && (SUPPORTED_CURRENCIES as readonly string[]).includes(currency)
+      ? currency
+      : undefined;
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    await setOpeningBalance(parsed.data);
+    await setOpeningBalance(parsed.data, cur);
     revalidatePath("/mi-base-financiera");
     return { ok: true };
   } catch (err) {

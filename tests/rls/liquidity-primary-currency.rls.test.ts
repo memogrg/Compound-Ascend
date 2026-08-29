@@ -59,7 +59,7 @@ describe.skipIf(!ready)("#87(b) · liquidez en la moneda principal (USD) contra 
   });
 
   it("setOpeningBalance graba la 'apertura' en USD en la BD", async () => {
-    await setOpeningBalance(1000, ctx);
+    await setOpeningBalance(1000, undefined, ctx);
     const { data } = await admin
       .from("liquidity_ledger")
       .select("delta, currency, reason")
