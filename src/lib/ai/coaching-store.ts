@@ -15,13 +15,42 @@ const MAX_COACHING = 6;
 
 export type CoachingEntry = { date: string; summary: string };
 
+/**
+ * La parte ESTRUCTURADA de la recomendación, para poder verificar después si se cumplió. El resumen
+ * en texto sigue siendo lo que se re-inyecta al prompt; esto es lo que se cruza con los datos.
+ *
+ * `baseline` es el valor de la entidad HOY (acumulado de la meta, saldo de la deuda). Se captura al
+ * recomendar porque después ya no se puede reconstruir: sin él no se distingue "avanzó por el
+ * consejo" de "ya venía avanzando", y celebrar lo segundo suena a que el asesor no está mirando.
+ */
+export type SeguimientoRecomendacion = {
+  actionType: string;
+  actionRef: string;
+  actionAmount?: number | null;
+  baseline?: number | null;
+};
+
 /** Persiste un resumen de coaching (best-effort: no rompe el turno si el insert falla). */
-export async function appendCoachingSummary(summary: string, ctx?: AuthContext): Promise<void> {
+export async function appendCoachingSummary(
+  summary: string,
+  ctx?: AuthContext,
+  seguimiento?: SeguimientoRecomendacion | null,
+): Promise<void> {
   const s = summary.trim();
   if (!s) return;
   try {
     const { db, userId } = await resolveAuth(ctx);
-    const { error } = await db.from("ai_coaching_thread").insert({ user_id: userId, summary: s });
+    const { error } = await db.from("ai_coaching_thread").insert({
+      user_id: userId,
+      summary: s,
+      // Sin acción resuelta la fila entra igual (el hilo la sigue re-inyectando como texto), pero
+      // marcada 'sin_seguimiento': no hay nada que verificar y no debe quedar abierta para siempre.
+      action_type: seguimiento?.actionType ?? null,
+      action_ref: seguimiento?.actionRef ?? null,
+      action_amount: seguimiento?.actionAmount ?? null,
+      action_baseline: seguimiento?.baseline ?? null,
+      follow_status: seguimiento ? "abierta" : "sin_seguimiento",
+    });
     if (error) throw new Error(error.message);
   } catch (err) {
     logger.warn("appendCoachingSummary falló", {

@@ -992,6 +992,15 @@ export type AiCoachingThreadRow = {
   user_id: string;
   summary: string;
   created_at: string;
+  // Seguimiento de la recomendación (20260829000001). Nullables: las filas anteriores a esa
+  // migración siguen siendo válidas y simplemente no se siguen.
+  action_type: string | null;
+  action_ref: string | null;
+  action_amount: number | null;
+  /** Valor de la entidad al recomendar: sin esta línea base no hay delta que verificar. */
+  action_baseline: number | null;
+  follow_status: string; // 'abierta' | 'cumplida' | 'vencida' | 'sin_seguimiento'
+  resolved_at: string | null;
 };
 
 /**

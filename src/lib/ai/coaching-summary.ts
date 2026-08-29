@@ -56,3 +56,57 @@ export function buildCoachingSummary(
   if (parts.length === 0) return null;
   return parts.join(" · ").slice(0, 200);
 }
+
+/**
+ * La parte ESTRUCTURADA de la acción recomendada: qué entidad, cuánto, y —cuando el caller lo
+ * conoce— cuánto valía esa entidad hoy. Es lo que después permite verificar si se cumplió.
+ *
+ * Sale de la acción YA RESUELTA (`resolveActionProposal`), donde el id es real y el monto salió del
+ * motor: nunca del texto del modelo. `null` para las acciones que todavía no tienen una señal limpia
+ * de "se hizo" (ajustar/mover presupuesto) — preferimos no seguir algo que no podemos verificar.
+ */
+export function seguimientoDeAccion(
+  action: ResolvedAction,
+): { actionType: string; actionRef: string; actionAmount: number | null } | null {
+  if (!action) return null;
+  const p = action.payload;
+  const id = (k: string): string | null =>
+    typeof p[k] === "string" && p[k] ? (p[k] as string) : null;
+  const monto = (k: string): number | null =>
+    typeof p[k] === "number" && Number.isFinite(p[k]) ? (p[k] as number) : null;
+
+  switch (action.type) {
+    case "create_goal": {
+      const ref = id("goalId");
+      return ref
+        ? {
+            actionType: "create_goal",
+            actionRef: ref,
+            actionAmount: monto("monthlyContribution") ?? monto("amount"),
+          }
+        : null;
+    }
+    case "debt_extra_payment": {
+      const ref = id("debtId");
+      return ref
+        ? {
+            actionType: "debt_extra_payment",
+            actionRef: ref,
+            actionAmount: monto("amount") ?? monto("extraAmount"),
+          }
+        : null;
+    }
+    case "set_dca": {
+      const ref = id("holdingId");
+      return ref
+        ? {
+            actionType: "set_dca",
+            actionRef: ref,
+            actionAmount: monto("monthlyContribution") ?? monto("amount"),
+          }
+        : null;
+    }
+    default:
+      return null;
+  }
+}
