@@ -59,6 +59,13 @@ export function previousMonthPeriod(p: Period): Period {
   return monthPeriod(y, m);
 }
 
+/** Periodo del mes siguiente al dado (espejo de previousMonthPeriod; maneja el salto de año). */
+export function nextMonthPeriod(p: Period): Period {
+  const m = p.month === 12 ? 1 : p.month + 1;
+  const y = p.month === 12 ? p.year + 1 : p.year;
+  return monthPeriod(y, m);
+}
+
 /**
  * Parsea "YYYY-MM" (o vacío) a periodo; si el param no es válido, cae a `fallback`.
  *
