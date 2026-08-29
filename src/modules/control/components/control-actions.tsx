@@ -23,9 +23,59 @@ import {
   type ExpenseJarOption,
 } from "@/modules/control/api/actions";
 import { pmt } from "@/modules/control/engine/amortization";
+import { PagoVinculadoButton } from "@/modules/control/components/pago-vinculado-button";
 import type { SavingsGoal, Debt } from "@/modules/control/types";
 
 type Kind = "goal" | "debt";
+
+/**
+ * #86 · "Aportar a un ahorro" en el "+" top-level (paridad con el móvil y con Deudas web, que ya
+ * expone "Registrar pago" junto a "Agregar deuda"). Botón → picker de meta → reusa el
+ * `PagoVinculadoButton` EXISTENTE (misma acción `addGoalContributionAction`, sin tocar su lógica).
+ * Null si no hay metas: el "+" cae directo a crear, como la regla de la fila vacía.
+ */
+export function AportarMetaButton({ goals }: { goals: Pick<SavingsGoal, "id" | "name">[] }) {
+  const [picking, setPicking] = useState(false);
+  const [selId, setSelId] = useState(goals[0]?.id ?? "");
+  if (goals.length === 0) return null;
+  const sel = goals.find((g) => g.id === selId) ?? goals[0]!;
+  return (
+    <>
+      <button className="btn btn-secondary" onClick={() => setPicking(true)}>
+        <Icon name="savings" width={2} /> Aportar a un ahorro
+      </button>
+      {picking ? (
+        <Modal
+          title="Aportar a un ahorro"
+          sub="Elige el ahorro y registra el aporte."
+          onClose={() => setPicking(false)}
+        >
+          <div className="modal-body">
+            <div className="fld">
+              <label className="fld-label">Ahorro</label>
+              <select className="sel" value={sel.id} onChange={(e) => setSelId(e.target.value)}>
+                {goals.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* El aporte reusa el botón/modal de la fila (sin cambios): abre su propio diálogo. */}
+            <PagoVinculadoButton
+              key={sel.id}
+              kind="meta"
+              id={sel.id}
+              name={sel.name}
+              tone="primary"
+              onDone={() => setPicking(false)}
+            />
+          </div>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
 
 /** Botón de alta (objetivo / deuda) que abre su propio diálogo. Reutilizable
  * en la toolbar y en los estados vacíos accionables. */
@@ -70,15 +120,20 @@ export function AddControlButton({
 export function ControlActions({
   currency = "CRC",
   fxRates,
+  goals = [],
 }: {
   currency?: string;
   /** Aceptado por compatibilidad con la página; las deudas viven en /deudas. */
   indexRates?: Record<string, number>;
   /** Tasas en vivo para mostrar el equivalente al capturar en otra moneda. */
   fxRates?: Record<string, number>;
+  /** Metas para el "+" contextual "Aportar a un ahorro" (#86). Vacío → solo crear. */
+  goals?: Pick<SavingsGoal, "id" | "name">[];
 }) {
   return (
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {/* Aportar PRIMERO (es lo que se hace cada mes), luego crear — como Deudas web y la fila. */}
+      <AportarMetaButton goals={goals} />
       <AddControlButton kind="goal" currency={currency} fxRates={fxRates} variant="btn-primary" />
     </div>
   );

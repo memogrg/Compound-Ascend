@@ -43,6 +43,7 @@ export default async function Page() {
           currency={summary.currency}
           indexRates={summary.indexRates}
           fxRates={summary.fxRates}
+          goals={summary.goals}
         />
       </div>
 
