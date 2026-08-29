@@ -2,7 +2,12 @@ import { DonutChart, type DonutDatum } from "@/components/charts/lazy";
 import { Icon } from "@/components/ui/icon";
 import { DeleteButton } from "./delete-button";
 import { EditWealthButton } from "./wealth-actions";
-import { AddHoldingButton, AddPurchaseButton, EditHoldingButton } from "./add-holding-wizard";
+import {
+  AddHoldingButton,
+  AddPurchaseButton,
+  AportarHoldingButton,
+  EditHoldingButton,
+} from "./add-holding-wizard";
 import { HoldingDetailButton } from "./holding-detail-modal";
 import { formatMoney, formatCompact, formatPercent } from "@/lib/format";
 import type { WealthSummary } from "@/modules/wealth/services/wealth-service";
@@ -282,7 +287,11 @@ export function GrowthView({ summary }: { summary: WealthSummary }) {
               <div className="card-sub">{holdings.length + investments.length} activo(s)</div>
             </div>
             {(holdings.length > 0 || investments.length > 0) && (
-              <AddHoldingButton currency={currency} deepLinkKey="holding" />
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {/* Aportar a una existente PRIMERO, luego crear (#86, paridad con el móvil). */}
+                <AportarHoldingButton holdings={holdings} currency={currency} />
+                <AddHoldingButton currency={currency} deepLinkKey="holding" />
+              </div>
             )}
           </div>
 

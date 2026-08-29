@@ -516,6 +516,63 @@ export function PayPremiumButton({ item, label }: { item: InsurancePolicy; label
   );
 }
 
+/**
+ * #86 · "Pagar prima" en el "+" top-level (paridad con el móvil; en web solo vivía en la fila,
+ * `PayPremiumButton`). Botón → picker de póliza → reusa `PayPremiumDialog` EXISTENTE (misma acción
+ * `payPolicyPremiumAction`), sin tocar el form. Solo pólizas con prima; null si no hay ninguna.
+ */
+export function PagarPrimaButton({ policies }: { policies: InsurancePolicy[] }) {
+  const payable = policies.filter((p) => p.premium);
+  const [picking, setPicking] = useState(false);
+  const [selId, setSelId] = useState(payable[0]?.id ?? "");
+  const [payFor, setPayFor] = useState<InsurancePolicy | null>(null);
+  const labelOf = (p: InsurancePolicy) =>
+    POLICY_TYPES.find(([v]) => v === p.policyType)?.[1] ?? p.policyType;
+  if (payable.length === 0) return null;
+  const sel = payable.find((p) => p.id === selId) ?? payable[0]!;
+  return (
+    <>
+      <button className="btn btn-secondary" onClick={() => setPicking(true)}>
+        <Icon name="expense" width={2} /> Pagar prima
+      </button>
+      {picking ? (
+        <Modal
+          title="Pagar prima"
+          sub="Elige la póliza y registra el pago de la prima."
+          onClose={() => setPicking(false)}
+        >
+          <div className="modal-body">
+            <div className="fld">
+              <label className="fld-label">Póliza</label>
+              <select className="sel" value={sel.id} onChange={(e) => setSelId(e.target.value)}>
+                {payable.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {labelOf(p)}
+                    {p.provider ? ` · ${p.provider}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setPayFor(sel);
+                setPicking(false);
+              }}
+            >
+              Continuar
+            </button>
+          </div>
+        </Modal>
+      ) : null}
+      {payFor && (
+        <PayPremiumDialog policy={payFor} label={labelOf(payFor)} onClose={() => setPayFor(null)} />
+      )}
+    </>
+  );
+}
+
 function PayPremiumDialog({
   policy,
   label,
