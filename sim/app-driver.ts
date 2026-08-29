@@ -39,7 +39,7 @@ export class AppDriver {
   // ---- SETUP writes ----
 
   async openingBalance(amount: number): Promise<void> {
-    await setOpeningBalance(amount, this.ctx);
+    await setOpeningBalance(amount, undefined, this.ctx);
     this.log.record("setup", "saldo inicial (apertura)", this.day, { amount, currency: this.currency });
   }
 

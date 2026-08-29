@@ -75,7 +75,7 @@ describe("#87(a) · la liquidez se escribe en la moneda PRINCIPAL, no en la de v
     const open = H.makeDb();
     const ctx: AuthContext = { db: open.db, userId: "u_1" };
 
-    await setOpeningBalance(1000, ctx);
+    await setOpeningBalance(1000, undefined, ctx);
 
     const rows = open.inserted.liquidity_ledger ?? [];
     expect(rows).toHaveLength(1);

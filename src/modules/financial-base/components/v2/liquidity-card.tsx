@@ -9,7 +9,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, currencySymbol } from "@/lib/format";
+import { MoneyField } from "@/components/forms/money-field";
 import {
   setOpeningBalanceAction,
   reconcileBalanceAction,
@@ -32,6 +33,9 @@ export function LiquidityCard({
   const [pending, startTransition] = useTransition();
   const [adjusting, setAdjusting] = useState(false);
   const [value, setValue] = useState("");
+  // Moneda del saldo inicial declarado. Default = la principal (el prop `currency` ya es la
+  // principal: el saco se lee normalizado a ella). El ajuste (reconcile) sigue en principal (#87).
+  const [curr, setCurr] = useState(currency);
 
   const submit = (mode: "opening" | "adjust") =>
     startTransition(async () => {
@@ -42,7 +46,7 @@ export function LiquidityCard({
       }
       const res =
         mode === "opening"
-          ? await setOpeningBalanceAction(amount)
+          ? await setOpeningBalanceAction(amount, curr)
           : await reconcileBalanceAction(amount);
       if (res.ok) {
         toast(mode === "opening" ? "Saldo inicial guardado." : "Saldo ajustado.");
@@ -83,35 +87,42 @@ export function LiquidityCard({
             {formatMoney(balance, currency)}
           </div>
           {adjusting ? (
-            <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-              <input
-                type="number"
-                inputMode="decimal"
-                className="inp"
-                placeholder="Tu saldo real hoy"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                style={{ flex: "1 1 140px" }}
-              />
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => submit("adjust")}
-                disabled={pending}
-              >
-                Guardar
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => {
-                  setAdjusting(false);
-                  setValue("");
-                }}
-                disabled={pending}
-              >
-                Cancelar
-              </button>
+            <div style={{ marginTop: 12 }}>
+              {/* El ajuste (reconcile) es en la PRINCIPAL (v1, #87): se dice explícito para que el
+                  usuario sepa en qué moneda teclear (la misma del saldo grande de arriba). */}
+              <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 6 }}>
+                Tu saldo real hoy, en {currencySymbol(currency)}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className="inp"
+                  placeholder="0"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  style={{ flex: "1 1 140px" }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => submit("adjust")}
+                  disabled={pending}
+                >
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setAdjusting(false);
+                    setValue("");
+                  }}
+                  disabled={pending}
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           ) : (
             <button
@@ -126,28 +137,25 @@ export function LiquidityCard({
         </>
       ) : (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 14, color: "var(--ink)", marginBottom: 8 }}>
-            ¿Cuánto tienes líquido hoy?
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="inp"
-              placeholder={`Monto en ${currency}`}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              style={{ flex: "1 1 160px" }}
-            />
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => submit("opening")}
-              disabled={pending}
-            >
-              Guardar
-            </button>
-          </div>
+          <MoneyField
+            amount={value}
+            onAmount={setValue}
+            currency={curr}
+            onCurrency={setCurr}
+            defaultCurrency={currency}
+            label="¿Cuánto tienes líquido hoy?"
+            tip="La moneda de tu saldo líquido. Por defecto, tu moneda principal — no la de visualización del topbar."
+            placeholder="0"
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ marginTop: 10 }}
+            onClick={() => submit("opening")}
+            disabled={pending}
+          >
+            Guardar
+          </button>
         </div>
       )}
     </div>

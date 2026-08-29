@@ -7,8 +7,15 @@ import {
   reconcileBalanceAction,
 } from "@/modules/financial-base/api/actions";
 
-import { BottomSheet, FormShell, MoneyField } from "../../components/form-kit";
+import {
+  BottomSheet,
+  FormShell,
+  MoneyField,
+  SheetSelect,
+  CUR_OPTS,
+} from "../../components/form-kit";
 import { MSummaryCard, mAmount } from "../../components/content-kit";
+import { currencySymbol } from "@/lib/format";
 
 /**
  * Gestión de liquidez en /m/mi-base-financiera, replicando la LiquidityCard web con el
@@ -27,14 +34,21 @@ export function LiquidityManager({
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState<number | undefined>(hasOpening ? balance : undefined);
+  // Moneda del saldo inicial declarado (#87). Default = la principal (el prop `currency` ya es la
+  // principal: el saco se lee normalizado a ella). Solo se elige en la apertura; el ajuste
+  // (reconcile) sigue en principal.
+  const [cur, setCur] = useState(currency);
 
   const openSheet = () => {
     setAmount(hasOpening ? balance : undefined);
     setOpen(true);
   };
 
-  // Ambas actions toman (amount: number) → ActionResult; misma firma para FormShell.
-  const action = hasOpening ? reconcileBalanceAction : setOpeningBalanceAction;
+  // Apertura: pasa la moneda elegida a setOpeningBalanceAction. Ajuste: reconcile en principal.
+  // Ambas encajan en (amount: number) → ActionResult para FormShell.
+  const action = hasOpening
+    ? reconcileBalanceAction
+    : (amt: number) => setOpeningBalanceAction(amt, cur);
 
   return (
     <>
@@ -76,11 +90,25 @@ export function LiquidityManager({
         >
           <MoneyField
             name="amount"
-            label={hasOpening ? "Tu saldo real hoy" : "¿Cuánto tienes líquido hoy?"}
+            label={
+              hasOpening
+                ? `Tu saldo real hoy, en ${currencySymbol(currency)}`
+                : "¿Cuánto tienes líquido hoy?"
+            }
             value={amount}
             onChange={setAmount}
-            currency={currency}
+            currency={hasOpening ? currency : cur}
           />
+          {hasOpening ? null : (
+            <SheetSelect
+              name="currency"
+              label="Moneda"
+              value={cur}
+              onChange={setCur}
+              options={CUR_OPTS}
+              sheetTitle="Moneda"
+            />
+          )}
         </FormShell>
       </BottomSheet>
     </>
