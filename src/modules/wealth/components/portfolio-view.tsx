@@ -34,7 +34,7 @@ import {
   adjustContributionPriceAction,
 } from "@/modules/wealth/api/actions";
 import type { OpenContribution } from "@/modules/wealth/services/contribution-service";
-import { AddHoldingButton, AddHoldingModal } from "./add-holding-wizard";
+import { AddHoldingButton, AportarHoldingButton, AddHoldingModal } from "./add-holding-wizard";
 import { HoldingDetailModal } from "./holding-detail-modal";
 import { AlertManager, type AlertHolding } from "./alert-manager";
 import { CompoundCalculator } from "./compound-calculator";
@@ -409,6 +409,9 @@ function PortfolioPanel({
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <PeriodSeg value={tablePeriod} onChange={setTablePeriod} label="Periodo de la tabla" />
+            {/* #86 (regresión #98): "Aportar a una inversión" también en la página REAL
+                (portfolio-view), no solo en el fallback demo (growth-view). */}
+            <AportarHoldingButton holdings={report.holdings} currency={currency} />
             <AddHoldingButton currency={currency} />
           </div>
         </div>

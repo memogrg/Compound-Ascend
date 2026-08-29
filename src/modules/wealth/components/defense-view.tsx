@@ -63,7 +63,7 @@ export function DefenseView({ summary }: { summary: WealthSummary }) {
                 fill="none"
                 stroke="var(--c-protect)"
                 strokeWidth="4"
-                strokeLinecap={score >= 100 ? "butt" : "round"}
+                strokeLinecap="butt"
                 pathLength={100}
                 strokeDasharray={`${score} 100`}
                 strokeDashoffset="25"

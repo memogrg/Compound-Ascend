@@ -78,7 +78,7 @@ export function ControlDashboard({
                 fill="none"
                 stroke={sem.color}
                 strokeWidth="4"
-                strokeLinecap={d.scoreControl >= 100 ? "butt" : "round"}
+                strokeLinecap="butt"
                 pathLength={100}
                 strokeDasharray={`${d.scoreControl} 100`}
                 strokeDashoffset="25"

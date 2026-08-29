@@ -203,7 +203,7 @@ export function ProfileSummary({
                       fill="none"
                       stroke="var(--pos)"
                       strokeWidth="4"
-                      strokeLinecap={diagnosis.completion >= 100 ? "butt" : "round"}
+                      strokeLinecap="butt"
                       pathLength={100}
                       strokeDasharray={`${diagnosis.completion} 100`}
                       strokeDashoffset="25"
