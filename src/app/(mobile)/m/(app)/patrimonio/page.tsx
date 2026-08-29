@@ -2,7 +2,7 @@ import { getRichLifeSummary, ensureCurrentNetWorthSnapshot } from "@/modules/ric
 import { getSnapshotHistory, ensureTodaySnapshot } from "@/modules/wealth";
 import { MobileHeader } from "../../components/mobile-header";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
-import { formatMoney, formatCompact } from "@/lib/format";
+import { formatMoney, formatCompact, currencySymbol } from "@/lib/format";
 import { MDonut, type MSlice } from "../../components/m-donut";
 import { MScrubChart, type MPoint } from "../../components/m-scrub-chart";
 import {
@@ -69,6 +69,11 @@ export default async function MobilePatrimonio() {
   // getPortfolioMarketValues + rates) → se muestran en crudo, sin reconvertir.
   const nw = ind.netWorth;
   const nwDir = nw > 0 ? 1 : nw < 0 ? -1 : 0;
+  // Al menos un activo o pasivo en OTRA moneda que la de visualización → el patrimonio neto suma
+  // convertidos; se rotula (las filas del manager siguen nativas). Mismo criterio que el portafolio. (#89)
+  const hasForeign =
+    allAssets.some((a) => a.currency !== currency) ||
+    liabilities.some((l) => l.currency !== currency);
   const vel = ind.wealthVelocity;
   const velDir = vel == null ? 0 : vel > 0 ? 1 : vel < 0 ? -1 : 0;
   const score = snapshot.score;
@@ -94,9 +99,14 @@ export default async function MobilePatrimonio() {
             ) : undefined
           }
           sub={
-            nwDir < 0
-              ? "Debes más de lo que tienes. Reducir pasivos es la prioridad."
-              : `Lo que tienes (${formatMoney(ind.totalAssets, currency)}) menos lo que debes (${formatMoney(ind.totalLiabilities, currency)}).`
+            <>
+              {nwDir < 0
+                ? "Debes más de lo que tienes. Reducir pasivos es la prioridad."
+                : `Lo que tienes (${formatMoney(ind.totalAssets, currency)}) menos lo que debes (${formatMoney(ind.totalLiabilities, currency)}).`}
+              {hasForeign
+                ? ` · Convertido a ${currencySymbol(currency)}; cada activo y pasivo en su moneda.`
+                : ""}
+            </>
           }
           // Con menos de 2 puntos no hay línea que dibujar, pero callar deja el hero con un
           // hueco que parece un fallo de carga. Se dice lo que pasa —y que se arregla solo—

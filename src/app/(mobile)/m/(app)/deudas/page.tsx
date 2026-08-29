@@ -11,7 +11,7 @@ import {
   type DebtPayment,
 } from "@/modules/control";
 import type { DebtInput } from "@/modules/control/engine/debt-strategy";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent, currencySymbol } from "@/lib/format";
 import {
   MSummaryCard,
   MSectionHeader,
@@ -82,6 +82,9 @@ export default async function MobileDeudas() {
   // salen de conv(...) en debts-service), así que aquí se suma en crudo: convertir otra
   // vez sería el error. Esto NO es como Ahorro, donde la meta guarda su moneda nativa.
   const total = debts.reduce((s, d) => s + d.balance, 0);
+  // Al menos una deuda en OTRA moneda que la de visualización → el total suma convertidos; se
+  // rotula (las filas del manager siguen nativas). Sobre el CRUDO (moneda nativa), como las filas. (#89)
+  const hasForeign = raw.some((d) => d.currency !== currency);
   // Avance global = lo pagado sobre lo pedido. Solo cuentan las deudas que guardan su
   // monto original: sin él no se sabe qué se pagó, y meterlas falsearía el porcentaje.
   const conOriginal = debts.filter((d) => d.originalAmount && d.originalAmount > 0);
@@ -145,9 +148,14 @@ export default async function MobileDeudas() {
             ) : undefined
           }
           sub={
-            totalOriginal > 0
-              ? `Llevas ${formatMoney(pagado, currency)} pagados de ${formatMoney(totalOriginal, currency)} que pediste.`
-              : `${debts.length} ${debts.length === 1 ? "deuda activa" : "deudas activas"}.`
+            <>
+              {totalOriginal > 0
+                ? `Llevas ${formatMoney(pagado, currency)} pagados de ${formatMoney(totalOriginal, currency)} que pediste.`
+                : `${debts.length} ${debts.length === 1 ? "deuda activa" : "deudas activas"}.`}
+              {hasForeign
+                ? ` · Total convertido a ${currencySymbol(currency)}; cada deuda en su moneda.`
+                : ""}
+            </>
           }
           slot={
             totalOriginal > 0 ? (

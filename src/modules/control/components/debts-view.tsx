@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureToday } from "@/components/tz/timezone-context";
-import { formatMoney, formatPercent } from "@/lib/format";
+import { formatMoney, formatPercent, currencySymbol } from "@/lib/format";
 import { PerformanceChart } from "@/components/charts/lazy";
 import { AddControlButton, ControlDialog } from "./control-actions";
 import { removeDebtAction, reportPaymentAction } from "@/modules/control/api/actions";
@@ -188,6 +188,10 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
   // Deudas crudas por id (para precargar el form de edición sin perder campos
   // que el VM no expone: currentPayment, delinquency, stress, notes).
   const rawById = useMemo(() => new Map(overview.raw.map((d) => [d.id, d])), [overview.raw]);
+  // Al menos una deuda en OTRA moneda que la de visualización → "Deuda total" suma importes
+  // convertidos; se rotula (las FILAS siguen en su moneda nativa). Mismo criterio que el portafolio
+  // (portfolio-view: some(currency !== display)). (#89)
+  const debtsHasForeign = overview.raw.some((d) => d.currency !== currency);
   const noDecimals = ["CRC", "COP", "MXN"].includes(currency);
   const step = noDecimals ? 25000 : 50;
   // Extra por defecto = sobrante mensual del usuario (ajustable con ±).
@@ -293,6 +297,11 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
               <div className="num-xl" style={{ fontSize: 38, color: "var(--neg)", marginTop: 8 }}>
                 {formatMoney(totals.totalDebt, currency)}
               </div>
+              {debtsHasForeign ? (
+                <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted)" }}>
+                  Convertido a {currencySymbol(currency)} · cada deuda se ve en su moneda
+                </div>
+              ) : null}
               <div
                 className="row"
                 style={{
