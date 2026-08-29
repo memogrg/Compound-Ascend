@@ -29,6 +29,7 @@ import { toSafeResponse, AppError } from "@/lib/errors";
 import { alert } from "@/server/observability/alerts";
 import { logger } from "@/lib/logger";
 import type { ChatMessage } from "@/lib/ai/provider";
+import type { AIActionProposal } from "@/lib/ai/types";
 import { loadRetainedChat, appendChatMessages, loadQuotedContext } from "@/lib/ai/chat-store";
 import { capHistory } from "@/lib/ai/history";
 import { annotateReply, buildQuotedContext, pareceReferenciaACitado } from "@/lib/ai/chat-quote";
@@ -177,12 +178,57 @@ export async function POST(req: Request) {
     //    está en el mensaje CITADO: se rutea sobre ese texto. Solo si el citado es del USUARIO —un
     //    mensaje del asesor no es un pedido, y ruteralo no tendría sentido.
     let result: Awaited<ReturnType<typeof financeChatWithTools>> | null = null;
+
+    // ── "OLVIDÁ ESO": carril DETERMINISTA de baja de memoria, antes que cualquier otro. Es un
+    //    pedido sobre lo que el asesor SABE, no sobre plata, y mandarlo al LLM sería pedirle que
+    //    decida qué borrar. Acá se resuelve el hecho contra la memoria REAL del usuario y se
+    //    propone `forget_memory` con su texto a la vista: el archivado ocurre recién al confirmar.
+    //    0 tokens. Best-effort: si la memoria no se puede leer, el mensaje sigue su camino normal.
+    let forget: { action: AIActionProposal | null; reply: string } | null = null;
+    if (user) {
+      try {
+        const { detectarPedidoDeOlvido, resolverOlvido } = await import("@/lib/ai/memory-facts");
+        const pedido = detectarPedidoDeOlvido(userMessage);
+        if (pedido) {
+          const { loadActiveMemory } = await import("@/lib/ai/memory-store");
+          const hecho = resolverOlvido(pedido.target, await loadActiveMemory());
+          forget = hecho
+            ? {
+                action: {
+                  type: "forget_memory",
+                  payload: { id: hecho.id, fact: hecho.fact },
+                  summary: "Olvidar este dato",
+                },
+                reply: "Claro. Confirmame y dejo de recordarlo.",
+              }
+            : {
+                // Sin hecho que calce NO se adivina cuál borrar: se dice y se ofrece la lista completa.
+                action: null,
+                reply:
+                  "No encontré ese dato entre lo que recuerdo de vos. Podés ver y borrar todo lo que sé en Configuración › Lo que recuerdo de vos.",
+              };
+        }
+      } catch {
+        // sin memoria disponible, el mensaje sigue por los carriles normales
+      }
+    }
+    if (forget) {
+      result = {
+        reply: forget.reply,
+        action: forget.action,
+        tokensIn: 0,
+        tokensOut: 0,
+        lane: "template",
+        provider: "deterministic",
+      } as Awaited<ReturnType<typeof financeChatWithTools>>;
+    }
+
     // Para el hilo de coaching: la señal prioritaria vive en el `ctx` del fallback (scope interno); se
     // captura acá afuera para persistir el resumen después de resolver la acción.
     let señalPrioritaria: string | undefined;
     // El citado solo cuenta si es del USUARIO: un mensaje del asesor no es un pedido.
     const citado = quote?.quoted.role === "user" ? quote.quoted.content : undefined;
-    let matched = user ? matchIntent(userMessage, citado) : null;
+    let matched = !result && user ? matchIntent(userMessage, citado) : null;
     // Referencia sin intención explícita ("¿y esto?"): se rutea el citado como si fuera el pedido.
     if (!matched && user && citado && pareceReferenciaACitado(userMessage)) {
       matched = matchIntent(citado);

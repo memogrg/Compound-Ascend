@@ -37,6 +37,7 @@ import {
 } from "@/lib/ai/chat-store";
 import { sendEmail } from "@/lib/email/send";
 import { logger } from "@/lib/logger";
+import type { MemoryCategory } from "@/lib/ai/memory-facts";
 
 /**
  * `sobre` viaja solo para un GASTO con sobre → mensaje de restante en el chat.
@@ -483,5 +484,99 @@ export async function emailTranscriptAction(): Promise<ConfirmResult> {
   } catch (err) {
     logger.error("emailTranscript fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos enviar el transcript." };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEMORIA DE HECHOS — control del usuario
+//
+// Es SU memoria: tiene que poder verla, corregirla, archivarla y borrarla entera. Todas estas
+// acciones corren bajo la sesión (RLS de dueño en `user_memory`), así que nadie puede tocar la
+// memoria de otro ni siquiera del mismo hogar. Ninguna llama al LLM.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un recuerdo tal como lo ve la pantalla de Ajustes. */
+export type MemoryItem = {
+  id: string;
+  fact: string;
+  category: MemoryCategory;
+  status: "activa" | "archivada";
+  updatedAt: string;
+};
+
+/** Lo que el asesor recuerda del usuario: activos primero, archivados después. */
+export async function listMyMemoryAction(): Promise<MemoryItem[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { listMemoryForUser } = await import("@/lib/ai/memory-store");
+  const facts = await listMemoryForUser();
+  return facts.map((f) => ({
+    id: f.id,
+    fact: f.fact,
+    category: f.category,
+    status: f.status,
+    updatedAt: f.updatedAt,
+  }));
+}
+
+/** Corrige el texto de un recuerdo (el extractor entendió mal, o cambió el detalle). */
+export async function updateMemoryFactAction(id: string, fact: string): Promise<ConfirmResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (!id) return { ok: false, message: "Recuerdo inválido." };
+  try {
+    const { updateFactText } = await import("@/lib/ai/memory-store");
+    await updateFactText(id, fact);
+    revalidatePath("/configuracion");
+    return { ok: true };
+  } catch (err) {
+    // El mensaje de la guarda de cifras es informativo y va tal cual al usuario.
+    return { ok: false, message: err instanceof Error ? err.message : "No pudimos guardarlo." };
+  }
+}
+
+/**
+ * Archiva un recuerdo: deja de inyectarse al asesor, pero sigue visible en Ajustes por si el
+ * usuario quiere entender qué pasó con él. Es lo que ejecuta la tarjeta de "olvidá eso" del chat.
+ */
+export async function forgetMemoryFactAction(raw: unknown): Promise<ConfirmResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  const id = typeof raw === "string" ? raw : ((raw as { id?: unknown } | null)?.id ?? "");
+  if (typeof id !== "string" || !id) return { ok: false, message: "Recuerdo inválido." };
+  try {
+    const { archiveFact } = await import("@/lib/ai/memory-store");
+    await archiveFact(id);
+    revalidatePath("/configuracion");
+    return { ok: true };
+  } catch (err) {
+    logger.error("forgetMemoryFact fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos olvidarlo." };
+  }
+}
+
+/** Borra un recuerdo de verdad (fila fuera). */
+export async function deleteMemoryFactAction(id: string): Promise<ConfirmResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  if (!id) return { ok: false, message: "Recuerdo inválido." };
+  try {
+    const { deleteFact } = await import("@/lib/ai/memory-store");
+    await deleteFact(id);
+    revalidatePath("/configuracion");
+    return { ok: true };
+  } catch (err) {
+    logger.error("deleteMemoryFact fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos borrarlo." };
+  }
+}
+
+/** "Borrar toda mi memoria": el asesor vuelve a no saber nada personal. Irreversible. */
+export async function clearMyMemoryAction(): Promise<ConfirmResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    const { clearMemory } = await import("@/lib/ai/memory-store");
+    await clearMemory();
+    revalidatePath("/configuracion");
+    return { ok: true };
+  } catch (err) {
+    logger.error("clearMyMemory fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos borrar tu memoria." };
   }
 }

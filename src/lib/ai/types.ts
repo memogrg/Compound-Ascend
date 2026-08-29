@@ -25,7 +25,11 @@ export type AIActionType =
   // tendría que confirmar por separado (y que podrían quedar a medias entre sí).
   | "move_budget"
   | "debt_extra_payment"
-  | "create_transactions_batch";
+  | "create_transactions_batch"
+  // "olvidá eso": archivar un hecho de la memoria personal. No mueve plata, pero borra algo que el
+  // usuario dijo, así que pasa por la MISMA confirmación explícita — con el hecho a la vista en la
+  // tarjeta, para que vea exactamente qué se va a olvidar antes de tocar nada.
+  | "forget_memory";
 
 const ACTION_TYPES: ReadonlySet<string> = new Set<AIActionType>([
   "create_transaction",
@@ -36,6 +40,7 @@ const ACTION_TYPES: ReadonlySet<string> = new Set<AIActionType>([
   "move_budget",
   "debt_extra_payment",
   "create_transactions_batch",
+  "forget_memory",
 ]);
 
 export type AIActionProposal = {

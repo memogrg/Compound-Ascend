@@ -994,6 +994,21 @@ export type AiCoachingThreadRow = {
   created_at: string;
 };
 
+/**
+ * Memoria de HECHOS del usuario: lo que contó al pasar y el asesor recuerda para siempre.
+ * PERSONAL (sin household_id, a propósito). Nada financiero-numérico entra acá.
+ */
+export type UserMemoryRow = {
+  id: string;
+  user_id: string;
+  fact: string;
+  category: string; // 'familia' | 'meta_vida' | 'preferencia' | 'trabajo' | 'salud' | 'otro'
+  source: string; // 'chat'
+  status: string; // 'activa' | 'archivada'
+  created_at: string;
+  updated_at: string;
+};
+
 export type ChatMessageRow = {
   id: string;
   user_id: string;
@@ -1208,6 +1223,8 @@ export interface Database {
       ai_conversation_turns: UserTable<AiConversationTurnRow>;
       // Hilo de coaching persistente (memoria longitudinal de la guía del asesor). RLS PERSONAL (dueño).
       ai_coaching_thread: UserTable<AiCoachingThreadRow>;
+      // Memoria de hechos del usuario (lo que contó al pasar). RLS PERSONAL (dueño), sin hogar.
+      user_memory: UserTable<UserMemoryRow>;
       // Chat del asesor persistido por usuario para la UI (web + móvil). RLS PERSONAL (dueño).
       chat_messages: UserTable<ChatMessageRow>;
       // Informes de portafolio (carril "deep", deterministas). RLS PERSONAL (dueño).

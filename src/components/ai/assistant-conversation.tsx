@@ -36,6 +36,7 @@ import {
   confirmMoveBudgetAction,
   confirmDebtExtraPaymentAction,
   confirmBatchTransactionsAction,
+  forgetMemoryFactAction,
   loadChatHistoryAction,
   emailTranscriptAction,
 } from "@/modules/assistant/api/actions";
@@ -821,6 +822,13 @@ export function AssistantConversation({
                 <BatchTxnConfirmCard skin={s} p={m.action.payload} />
               </div>
             ) : null}
+            {/* "Olvidá eso": el hecho se muestra ENTERO antes de confirmar. Borrar algo que la
+                persona contó de su vida merece la misma confirmación explícita que mover plata. */}
+            {m.action?.type === "forget_memory" ? (
+              <div className={s.cardWrap}>
+                <ForgetMemoryConfirmCard skin={s} p={m.action.payload} />
+              </div>
+            ) : null}
             {m.receipt ? (
               <div className={s.cardWrap}>
                 <ReceiptConfirmCard
@@ -1522,6 +1530,7 @@ function AdviceConfirmCard({
   detail,
   okText,
   onConfirm,
+  amountAsName = false,
 }: {
   skin: Skin;
   eyebrow: string;
@@ -1529,6 +1538,8 @@ function AdviceConfirmCard({
   detail: string;
   okText: string;
   onConfirm: () => Promise<ConfirmResult>;
+  /** El destacado es TEXTO, no una cifra: usa la tipografía de nombre, que envuelve en varias líneas. */
+  amountAsName?: boolean;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1549,7 +1560,7 @@ function AdviceConfirmCard({
   return (
     <div className={skin.card}>
       <div className={skin.eyebrow}>{eyebrow}</div>
-      <div className={skin.amount}>{amount}</div>
+      <div className={amountAsName ? skin.amountName : skin.amount}>{amount}</div>
       <div className={skin.sub}>{detail}</div>
       {error ? <div className={skin.error}>{error}</div> : null}
       <div className={skin.actions}>
@@ -1689,6 +1700,29 @@ function DebtExtraPaymentConfirmCard({ skin, p }: { skin: Skin; p: Record<string
           currency,
         })
       }
+    />
+  );
+}
+
+/**
+ * Baja de un recuerdo de la memoria personal del asesor ("olvidá eso").
+ *
+ * El id ya viene RESUELTO por el servidor contra la memoria real del usuario, así que la tarjeta
+ * solo muestra y confirma. Se muestra el hecho COMPLETO: lo que se olvida tiene que estar a la
+ * vista, porque a diferencia de un gasto mal registrado, esto no se puede volver a deducir de los
+ * datos. Archiva, no borra: sigue visible en Configuración por si el usuario se arrepiente.
+ */
+function ForgetMemoryConfirmCard({ skin, p }: { skin: Skin; p: Record<string, unknown> }) {
+  const fact = pStr(p.fact, "este dato");
+  return (
+    <AdviceConfirmCard
+      skin={skin}
+      eyebrow="Dejar de recordar"
+      amount={fact}
+      detail="Deja de usarse en el chat. Podés verlo y borrarlo del todo en Configuración."
+      okText="✓ Listo, ya no lo recuerdo."
+      amountAsName
+      onConfirm={() => forgetMemoryFactAction(pStr(p.id))}
     />
   );
 }

@@ -55,6 +55,7 @@ const setHoldingDcaAction = vi.fn(async (_id: string, _monto: number): Promise<R
 }));
 const moverPresupuestoEntreSobres = vi.fn(async (_args: unknown): Promise<Res> => ({ ok: true }));
 const reportPaymentAction = vi.fn(async (_args: unknown): Promise<Res> => ({ ok: true }));
+const archiveFact = vi.fn(async (_id: string): Promise<void> => undefined);
 
 vi.mock("@/modules/financial-base", () => ({
   setEnvelopeBudgetAction: (raw: unknown) => setEnvelopeBudgetAction(raw),
@@ -97,11 +98,23 @@ vi.mock("@/lib/ai/chat-store", () => ({
 }));
 vi.mock("@/lib/email/send", () => ({ sendEmail: async () => ({ ok: true }) }));
 
+// Memoria personal: `forgetMemoryFactAction` delega en el store, igual que las de consejo delegan
+// en sus módulos. Se mockea el MÓDULO del que sale el símbolo (`memory-store`), que es lo que
+// `actions.ts` importa dinámicamente.
+vi.mock("@/lib/ai/memory-store", () => ({
+  archiveFact: (id: string) => archiveFact(id),
+  listMemoryForUser: async () => [],
+  updateFactText: async () => undefined,
+  deleteFact: async () => undefined,
+  clearMemory: async () => undefined,
+}));
+
 import {
   confirmAdjustBudgetAction,
   confirmMoveBudgetAction,
   confirmSetDcaAction,
   confirmDebtExtraPaymentAction,
+  forgetMemoryFactAction,
 } from "@/modules/assistant/api/actions";
 
 const UUID_A = "11111111-1111-4111-8111-111111111111";
@@ -243,6 +256,33 @@ describe("confirmDebtExtraPaymentAction · abono extra a capital", () => {
   it("usa la que sí viene cuando la IA la extrajo", async () => {
     await confirmDebtExtraPaymentAction({ ...payload, currency: "USD" });
     expect(reportPaymentAction.mock.calls[0]![0]).toMatchObject({ currency: "USD" });
+  });
+});
+
+describe("forgetMemoryFactAction · 'olvidá eso' llega a archivar de verdad", () => {
+  it("archiva el hecho que la tarjeta tenía a la vista", async () => {
+    const res = await forgetMemoryFactAction({ id: "mem-1" });
+    expect(res.ok).toBe(true);
+    expect(archiveFact).toHaveBeenCalledWith("mem-1");
+  });
+
+  it("acepta también el id suelto (es como lo manda la tarjeta del chat)", async () => {
+    const res = await forgetMemoryFactAction("mem-2");
+    expect(res.ok).toBe(true);
+    expect(archiveFact).toHaveBeenCalledWith("mem-2");
+  });
+
+  it("sin id no toca el store", async () => {
+    const res = await forgetMemoryFactAction({});
+    expect(res.ok).toBe(false);
+    expect(archiveFact).not.toHaveBeenCalled();
+  });
+
+  it("si el store LANZA, devuelve error legible en vez de colgar la tarjeta", async () => {
+    archiveFact.mockRejectedValueOnce(new Error("boom"));
+    const res = await forgetMemoryFactAction({ id: "mem-3" });
+    expect(res.ok).toBe(false);
+    expect(res.message).toBeTruthy();
   });
 });
 

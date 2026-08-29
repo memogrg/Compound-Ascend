@@ -40,11 +40,19 @@ describe("retentionWindowLabel · el texto sigue a la constante", () => {
 
 describe("retentionNoticeText · aviso al usuario", () => {
   it("con la retención vigente promete una semana", () => {
-    expect(retentionNoticeText()).toBe(
+    expect(retentionNoticeText()).toContain(
       "Tu historial de chat se guarda por 1 semana; los mensajes más viejos se borran solos.",
     );
   });
   it("subir la retención cambia el texto solo (nada que editar a mano)", () => {
     expect(retentionNoticeText(30)).toContain("30 días");
+  });
+  it("dice también qué SOBREVIVE a la purga y dónde se borra", () => {
+    // La primera frase dejó de ser toda la verdad cuando apareció `user_memory`: los hechos
+    // personales que se cuentan en el chat NO se borran con los mensajes. Prometer que todo
+    // desaparece en una semana sería falso, así que el mismo aviso tiene que decirlo.
+    const aviso = retentionNoticeText();
+    expect(aviso).toMatch(/datos personales/i);
+    expect(aviso).toMatch(/Configuración/);
   });
 });

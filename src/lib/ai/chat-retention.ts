@@ -42,7 +42,15 @@ export function retentionWindowLabel(days: number = CHAT_RETENTION_DAYS): string
 /**
  * Aviso persistente en la conversación. Impersonal a propósito ("se guarda"/"se borran"):
  * sirve igual para el voseo de la web y el "tú" del móvil, sin duplicar copy.
+ *
+ * La segunda frase existe porque la primera dejó de ser toda la verdad: los HECHOS personales que
+ * se cuentan en el chat (familia, planes, reglas propias) se guardan aparte y NO se borran con los
+ * mensajes (`user_memory`). Prometer que todo desaparece en una semana sería falso, así que el
+ * mismo aviso dice qué sobrevive y dónde se ve y se borra.
  */
 export function retentionNoticeText(days: number = CHAT_RETENTION_DAYS): string {
-  return `Tu historial de chat se guarda por ${retentionWindowLabel(days)}; los mensajes más viejos se borran solos.`;
+  return (
+    `Tu historial de chat se guarda por ${retentionWindowLabel(days)}; los mensajes más viejos se borran solos. ` +
+    "Los datos personales que compartas acá (tu familia, tus planes) se recuerdan aparte: se pueden ver y borrar en Configuración."
+  );
 }
