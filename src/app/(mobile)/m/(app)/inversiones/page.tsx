@@ -1,4 +1,5 @@
 import { getPortfolioReport } from "@/modules/wealth";
+import { allocationByNature } from "@/modules/wealth/engine/portfolio-engine";
 import {
   ensureMonthlyContributions,
   listOpenContributions,
@@ -17,14 +18,14 @@ import { InversionesManager } from "./inversiones-manager";
 
 /**
  * /m/inversiones — "Inversiones". Reutiliza el barrel wealth (getPortfolioReport:
- * valor de portafolio, rendimiento, distribución por clase, holdings con
+ * valor de portafolio, rendimiento, distribución por naturaleza, holdings con
  * desempeño, dividendos). Sin reimplementar cálculos. Piel del diseño
  * (data-screen="inversiones"), es-MX tono "tú", tema claro.
  */
 export const dynamic = "force-dynamic"; // datos por sesión + precios en vivo
 
 // El anillo de composición NO usa --s3: es el mismo rojo que --danger, y aquí las
-// porciones son clases de activo, no pérdidas. Va el neutro cálido de series.
+// porciones son naturalezas, no pérdidas. Va el neutro cálido de series.
 const RING_COLORS = ["var(--s1)", "var(--s2)", "var(--s-neutral)", "var(--s4)", "var(--s5)"];
 
 export default async function MobileInversiones() {
@@ -39,7 +40,11 @@ export default async function MobileInversiones() {
   const a = report.analytics;
   const currency = report.currency;
 
-  const slices: MSlice[] = Object.values(a.allocation)
+  // #98: por NATURALEZA (Flujo de caja / Crecimiento), no por el bucket coarse de clase
+  // de activo, cuyo "Acciones" es un cajón de sastre (incluye CDP/bono/pensión) y etiquetaba
+  // un certificado como "Acciones 100%". `allocationByNature` cubre todos los holdings
+  // (naturaleza explícita → derivada de categoría → 'growth'), sin descartar ninguno.
+  const slices: MSlice[] = allocationByNature(a.holdingsWithPerformance)
     .filter((s) => s.value > 0)
     .map((s, i) => ({
       label: s.label,
@@ -137,10 +142,10 @@ export default async function MobileInversiones() {
           </>
         )}
 
-        {/* Distribución por clase — MDonut INTERACTIVO (R5): su lógica y props no se tocan. */}
+        {/* Distribución por naturaleza — MDonut INTERACTIVO (R5): su lógica y props no se tocan. */}
         {slices.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <MSectionHeader title="Distribución por clase" />
+            <MSectionHeader title="Distribución por naturaleza" />
             {/* centerValue en COMPACTO a propósito: el centro del donut es diminuto y el
                 gráfico R5 se diseñó con formatCompact; mAmount dejaría exacto un número
                 que ahí se desbordaría. No lo cambies a mAmount. */}
