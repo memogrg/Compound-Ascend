@@ -133,9 +133,11 @@ export default async function MobileInversiones() {
                 label="Posiciones"
                 value={String(holdings.length)}
                 sub={
+                  // #98: cuenta las NATURALEZAS presentes (mismo `slices` que la dona), no el
+                  // bucket coarse de clase de activo cuyo "Acciones" era un cajón de sastre.
                   slices.length > 0
-                    ? `${slices.length} ${slices.length === 1 ? "clase" : "clases"}`
-                    : "de activo"
+                    ? `${slices.length} ${slices.length === 1 ? "naturaleza" : "naturalezas"}`
+                    : "sin clasificar"
                 }
               />
             </MMetricGrid>
