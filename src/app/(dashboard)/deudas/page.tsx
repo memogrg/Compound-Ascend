@@ -25,15 +25,20 @@ export default async function Page() {
       const draft = await getDraft();
       if (Object.keys(draft).length > 0) {
         const diag = buildDiagnosis(draft);
+        // El saldo debe ser el VIVO (ancla − pagos) del view-model, no `raw.balance`
+        // (el ancla de alta): con el ancla, una deuda ya saldada (saldo vivo ≤ 0) seguía
+        // pasando el filtro `balance>0` del engine y encabezaba la recomendación (#98).
+        // `delinquency` no vive en el VM → se une desde `raw` por id.
+        const delinquencyById = new Map(overview.raw.map((d) => [d.id, d.delinquency]));
         advice = buildDebtAdvice({
           archetypeLabel: diag.archetypeLabel,
           tone: diag.reading?.companionship.tone,
           dominantValue: draft.dineroPrimero?.[0]?.replace(/_/g, " "),
-          debts: overview.raw.map((d) => ({
+          debts: overview.debts.map((d) => ({
             name: d.name,
             balance: d.balance,
             apr: d.apr,
-            delinquency: d.delinquency,
+            delinquency: delinquencyById.get(d.id) ?? null,
           })),
         });
       }

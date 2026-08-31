@@ -221,7 +221,9 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
       0,
     );
     const dti = incomeMonthly > 0 ? monthlyPayments / incomeMonthly : null;
-    const highestApr = debts.reduce((m, d) => Math.max(m, d.apr), 0);
+    // "TAE más alta" sobre las ACTIVAS (saldo vivo > 0): una deuda saldada con tasa alta
+    // no es tu tasa más cara vigente (#98). Alimenta también el badge "más alta" por fila.
+    const highestApr = debts.filter((d) => d.balance > 0).reduce((m, d) => Math.max(m, d.apr), 0);
     const avgApr = totalDebt > 0 ? debts.reduce((s, d) => s + d.balance * d.apr, 0) / totalDebt : 0;
     const interestThisYear = debts.reduce(
       (s, d) => s + (summaries.get(d.id)?.interestNext12 ?? 0),
@@ -488,7 +490,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
         </div>
         {ordered.map((d, i) => {
           const s = summaries.get(d.id)!;
-          const isHighest = d.apr === totals.highestApr && totals.highestApr > 0;
+          const isHighest = d.balance > 0 && d.apr === totals.highestApr && totals.highestApr > 0;
           const raw = rawById.get(d.id);
           // Fila = moneda de la deuda. El VM trae los montos convertidos a la de display (para
           // los totales y el motor); si la deuda está en OTRA moneda, la fila muestra sus
@@ -518,7 +520,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                     {d.debtType ?? "Deuda"}
                     {d.bank ? ` · ${d.bank}` : ""}
                     {d.rateType === "variable" ? " · variable" : ""}
-                    {i === 0 ? " · pagar primero" : ""}
+                    {i === 0 && d.balance > 0 ? " · pagar primero" : ""}
                   </div>
                   {d.dueSoon && d.nextDue ? (
                     <div

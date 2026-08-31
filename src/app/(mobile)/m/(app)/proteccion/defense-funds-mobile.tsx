@@ -179,7 +179,16 @@ export function DefenseFundsMobile({
             value={peace.months}
             disabled={pending}
             onChange={(e) => onMonths(Number(e.target.value))}
-            style={{ width: "auto", display: "inline-block", padding: "4px 8px" }}
+            // Solo top/bottom/left: el `padding-right` (hueco del chevron) lo pone .m-select.
+            // Con `padding: 4px 8px` el atajo pisaba ese hueco y el chevron caía sobre el
+            // texto ("mes⌄s"). #98
+            style={{
+              width: "auto",
+              display: "inline-block",
+              paddingTop: 4,
+              paddingBottom: 4,
+              paddingLeft: 8,
+            }}
           >
             {Array.from(
               { length: PEACE_MONTHS_MAX - PEACE_MONTHS_MIN + 1 },

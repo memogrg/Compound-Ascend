@@ -21,6 +21,20 @@ describe("debt-strategy", () => {
   it("bola de nieve ordena por saldo asc", () => {
     expect(orderDebts(debts, "bola_nieve").map((d) => d.id)).toEqual(["c", "a", "b"]);
   });
+  it("excluye deudas saldadas (₡0) del orden de ataque (#98)", () => {
+    const withPaid: DebtInput[] = [
+      { id: "paid", name: "Saldada", balance: 0, apr: 45, minPayment: 0 },
+      ...debts,
+    ];
+    // Ni en bola de nieve (menor saldo primero) la saldada encabeza el orden…
+    const sn = orderDebts(withPaid, "bola_nieve").map((d) => d.id);
+    expect(sn).not.toContain("paid");
+    expect(sn[0]).toBe("c");
+    // …ni en avalancha (mayor tasa primero) pese a su APR alto.
+    const av = orderDebts(withPaid, "avalancha").map((d) => d.id);
+    expect(av).not.toContain("paid");
+    expect(av[0]).toBe("a");
+  });
   it("simula y paga toda la deuda en tiempo finito", () => {
     const sim = simulateStrategy(debts, "avalancha", 200);
     expect(sim.feasible).toBe(true);
@@ -80,18 +94,25 @@ describe("priority-engine", () => {
   });
 
   it("deuda cara => decisión prioriza la deuda", () => {
-    const d = buildControlDiagnosis(
-      [],
-      [debt({ apr: 40, balance: 2000 })],
-      { freeCashflow: 300, hasEmergencyFund: true },
-    );
+    const d = buildControlDiagnosis([], [debt({ apr: 40, balance: 2000 })], {
+      freeCashflow: 300,
+      hasEmergencyFund: true,
+    });
     expect(d.decision.toLowerCase()).toContain("deuda");
     expect(d.debtMethod).toBeDefined();
   });
 
   it("situación sana => score alto y verde", () => {
     const d = buildControlDiagnosis(
-      [goal({ name: "Casa", priority: "alta", targetAmount: 1200, monthlyContribution: 200, targetDate: futureISO(6) })],
+      [
+        goal({
+          name: "Casa",
+          priority: "alta",
+          targetAmount: 1200,
+          monthlyContribution: 200,
+          targetDate: futureISO(6),
+        }),
+      ],
       [debt({ apr: 8, balance: 500 })],
       { freeCashflow: 500, hasEmergencyFund: true, stress: 3 },
     );
