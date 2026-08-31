@@ -26,7 +26,9 @@ const MAX_MONTHS = 600;
 
 /** Orden de ataque según método. */
 export function orderDebts(debts: DebtInput[], method: DebtMethod): DebtInput[] {
-  const list = [...debts];
+  // Una deuda saldada (saldo ≤ 0) no entra al orden de ATAQUE: ya no se paga. Sin
+  // esto, en bola de nieve una deuda en ₡0 quedaba #1 "pagar primero" (#98).
+  const list = debts.filter((d) => d.balance > 0);
   if (method === "avalancha") return list.sort((a, b) => b.apr - a.apr);
   if (method === "bola_nieve") return list.sort((a, b) => a.balance - b.balance);
   // híbrido: primero las 2 deudas más pequeñas (impulso), luego por tasa.

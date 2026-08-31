@@ -518,7 +518,7 @@ export function DebtsView({ overview }: { overview: DebtsOverview }) {
                     {d.debtType ?? "Deuda"}
                     {d.bank ? ` · ${d.bank}` : ""}
                     {d.rateType === "variable" ? " · variable" : ""}
-                    {i === 0 ? " · pagar primero" : ""}
+                    {i === 0 && d.balance > 0 ? " · pagar primero" : ""}
                   </div>
                   {d.dueSoon && d.nextDue ? (
                     <div
