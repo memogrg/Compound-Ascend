@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { LandingFx } from "@/components/marketing/landing-fx";
 import { Phone3DLazy } from "@/components/marketing/phone-3d/phone-3d-lazy";
-import { HERO_TRACK_ATTR } from "@/components/marketing/hero-progress";
 import "./landing.css";
 
 /**
@@ -154,54 +153,57 @@ export function Landing() {
         </div>
       </header>
 
-      {/* ── HERO: el track es alto y la escena va sticky adentro; atravesarlo gira el teléfono ── */}
-      <div className="hero-track" id="top" {...{ [HERO_TRACK_ATTR]: "" }}>
-        <div className="hero">
-          <div className="hero-copy">
-            <span className="eyebrow">
-              <span className="dot" />
-              Tu asesor financiero con IA
+      {/* ── HERO: columna en flujo normal. El teléfono es un bloque más, nunca una capa
+             encima del copy ni de los botones. La aurora sí va detrás, sin capturar clics. ── */}
+      <section className="hero" id="top">
+        <div className="aurora" aria-hidden="true">
+          <div className="aur a1" />
+          <div className="aur a2" />
+          <div className="aur a3" />
+        </div>
+
+        <div className="wrap hero-col">
+          <span className="eyebrow">
+            <span className="dot" />
+            Tu asesor financiero con IA
+          </span>
+
+          <h1>
+            <span className="hline">
+              <span>Tu dinero,</span>
             </span>
-            <h1>
-              <span className="hline">
-                <span>Tu dinero,</span>
+            <span className="hline">
+              <span>
+                con <em className="g">dirección.</em>
               </span>
-              <span className="hline">
-                <span>
-                  con <span className="g">dirección.</span>
-                </span>
-              </span>
-            </h1>
-            <p className="sub">
-              CARTERA+ ordena tu dinero, elimina tus deudas, hace crecer tu patrimonio y protege lo
-              que ya lograste — un paso a la vez, hacia tu rich life real.
-            </p>
-            <div className="cta-row">
-              <Link className="btn btn-lg btn-pri" href={REGISTRO}>
-                Prueba CARTERA+
-              </Link>
-              <a className="lnk" href="#fundamentos" style={{ alignSelf: "center" }}>
-                Cómo funciona ›
-              </a>
-            </div>
-            <div className="trust">
-              Prueba de 14 días · Cancela cuando quieras · Tus datos son solo tuyos.
-            </div>
+            </span>
+          </h1>
+
+          <p className="sub">
+            CARTERA+ ordena tu dinero, elimina tus deudas, hace crecer tu patrimonio y protege lo
+            que ya lograste — un paso a la vez, hacia tu rich life real.
+          </p>
+
+          {/* La caja fija el hueco del teléfono antes de que cargue la escena: el canvas vive
+              adentro y el layout no salta cuando aparece (CLS 0). */}
+          <div className="phone-box">
+            <Phone3DLazy />
           </div>
 
-          <div className="stage">
-            <div className="aurora">
-              <div className="aur a1" />
-              <div className="aur a2" />
-            </div>
-            <Phone3DLazy />
-            <div className="ground" />
-            <div className="back-caption" id="lp-back-caption">
-              Por detrás, también es <b>CARTERA+</b> · alpine green, sin ruido.
-            </div>
+          <div className="cta-row">
+            <Link className="btn btn-lg btn-pri" href={REGISTRO}>
+              Prueba CARTERA+
+            </Link>
+            <a className="lnk" href="#fundamentos">
+              Cómo funciona ›
+            </a>
+          </div>
+
+          <div className="trust">
+            Prueba de 14 días · Cancela cuando quieras · Tus datos son solo tuyos.
           </div>
         </div>
-      </div>
+      </section>
 
       {/* ── FUNDAMENTOS ── */}
       <section id="fundamentos">
