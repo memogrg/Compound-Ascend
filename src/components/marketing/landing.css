@@ -29,8 +29,10 @@
     sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* `clip` y NO `hidden`: `hidden` convierte a .lp en contenedor de scroll y rompería el
-     `position: sticky` del hero, que es el corazón de la animación. */
+  /* `clip` y NO `hidden`: `hidden` convertiría a .lp en contenedor de scroll, con dos efectos
+     colaterales que no queremos (rompe cualquier `position: sticky` que se agregue adentro y
+     secuestra el scroll de la página). `clip` recorta el desborde horizontal de la aurora sin
+     crear contenedor. */
   overflow-x: clip;
 }
 
@@ -149,31 +151,24 @@
   text-decoration: underline;
 }
 
-/* ---------- hero pineado: el scroll gira el teléfono ---------- */
-.lp .hero-track {
-  height: 280vh;
-  position: relative;
-}
+/* ---------- hero: columna en flujo normal ----------
+   El teléfono NO va absoluto sobre la sección: es un bloque más de la columna, así nunca puede
+   quedar por detrás del copy ni cruzarse con los botones. Lo único absoluto es la aurora, que va
+   detrás y no captura clics. */
 .lp .hero {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  height: 100dvh;
-  overflow: hidden;
+  position: relative;
+  padding: 104px 0 76px;
+}
+.lp .hero-col {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-/* `--lp-fade` lo escribe la isla de efectos a partir del avance del hero: 0 arriba, 1 cuando el
-   copy ya se fue. Va por variable y no por estilos inline para que el desvanecido siga siendo CSS. */
-.lp .hero-copy {
+  gap: 22px;
   text-align: center;
-  padding-top: 96px;
-  position: relative;
-  z-index: 3;
-  opacity: calc(1 - var(--lp-fade, 0));
-  transform: translateY(calc(var(--lp-fade, 0) * -40px));
 }
+
 .lp .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -181,7 +176,7 @@
   font-size: 13px;
   color: var(--mut);
   letter-spacing: 0.02em;
-  margin-bottom: 14px;
+  animation: lp-pop 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .lp .eyebrow .dot {
   width: 6px;
@@ -189,13 +184,35 @@
   border-radius: 50%;
   background: var(--green);
 }
+@keyframes lp-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .lp h1 {
   font-size: clamp(38px, 6.4vw, 68px);
   line-height: 1.04;
   letter-spacing: -0.025em;
   font-weight: 600;
 }
-.lp h1 .g {
+/* "dirección" va en serif itálica, no en la sans del resto: es el único quiebre tipográfico del
+   título y es lo que le da el aire editorial. Peso 400 porque una serif itálica a 600 se ve
+   pesada al lado de la sans. */
+.lp h1 em.g {
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   color: var(--green);
 }
 /* Las líneas del título suben desde abajo de su propia caja: el overflow oculto es lo que hace
@@ -227,75 +244,54 @@
     opacity: 1;
   }
 }
+
 .lp .sub {
   max-width: 560px;
-  margin: 16px auto 0;
+  margin: 0 auto;
   color: var(--mut);
   font-size: clamp(16px, 2vw, 19px);
   line-height: 1.5;
   letter-spacing: -0.01em;
 }
-.lp .cta-row {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 24px;
-  flex-wrap: wrap;
-}
-.lp .trust {
-  margin-top: 14px;
-  font-size: 12.5px;
-  color: var(--mut);
-}
 
-/* ---------- escena del teléfono ---------- */
-.lp .stage {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+/* ---------- la caja del teléfono ----------
+   Alto y ancho fijos por CSS: el hueco existe desde el primer pintado, así que cuando la escena
+   termina de cargar el canvas lo rellena sin mover nada de abajo (CLS 0). El `max-width` en vw es
+   lo que impide que en 390px se desborde o se pegue a los bordes. */
+.lp .phone-box {
+  width: 100%;
+  max-width: min(92vw, 380px);
+  height: min(72vh, 640px);
+  margin: 6px auto 0;
 }
-/* El canvas ocupa el hueco desde el primer render, tenga o no WebGL: así el layout no salta
-   cuando el componente carga (CLS 0). Aparece con un fundido cuando la escena ya está armada. */
 .lp .lp-gl {
-  position: absolute;
-  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  display: block;
   opacity: 0;
-  transition: opacity 0.8s;
+  transition: opacity 0.5s ease;
 }
 .lp .lp-gl.on {
   opacity: 1;
 }
-.lp .back-caption {
-  position: absolute;
-  bottom: 3.5vh;
-  left: 0;
-  right: 0;
-  text-align: center;
-  z-index: 3;
-  font-size: 15px;
+
+.lp .cta-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.lp .trust {
+  font-size: 12.5px;
   color: var(--mut);
-  opacity: 0;
-  transform: translateY(10px);
-  transition:
-    opacity 0.4s,
-    transform 0.4s;
-}
-.lp .back-caption b {
-  color: var(--ink);
-}
-.lp .back-caption.show {
-  opacity: 1;
-  transform: none;
 }
 
-/* aurora detrás del teléfono */
+/* ---------- aurora: lo único absoluto del hero ---------- */
 .lp .aurora {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 0;
   pointer-events: none;
   overflow: hidden;
 }
@@ -309,7 +305,7 @@
   width: 52vw;
   height: 34vh;
   left: 8vw;
-  top: 26vh;
+  top: 22vh;
   background: radial-gradient(
     closest-side,
     rgba(55, 132, 81, 0.55),
@@ -322,7 +318,7 @@
   width: 46vw;
   height: 30vh;
   right: 6vw;
-  top: 44vh;
+  top: 42vh;
   background: radial-gradient(
     closest-side,
     rgba(43, 125, 106, 0.45),
@@ -330,6 +326,20 @@
     transparent
   );
   animation: lp-drift2 30s ease-in-out infinite;
+}
+.lp .aur.a3 {
+  width: 40vw;
+  height: 26vh;
+  left: 26vw;
+  bottom: 6vh;
+  opacity: 0.3;
+  background: radial-gradient(
+    closest-side,
+    rgba(55, 132, 81, 0.34),
+    rgba(43, 125, 106, 0.14),
+    transparent
+  );
+  animation: lp-drift3 27s ease-in-out infinite;
 }
 @keyframes lp-drift1 {
   0%,
@@ -349,23 +359,14 @@
     transform: translate(-5vw, 3vh) rotate(-10deg) scale(1.08);
   }
 }
-
-/* Sombra de contacto: se dibuja aunque no haya WebGL, así el hueco del teléfono nunca se ve vacío. */
-.lp .ground {
-  position: absolute;
-  bottom: 5vh;
-  left: 50%;
-  width: min(46vw, 420px);
-  height: 44px;
-  z-index: 1;
-  transform: translateX(-50%);
-  background: radial-gradient(
-    50% 50% at 50% 50%,
-    rgba(20, 28, 20, 0.28),
-    rgba(20, 28, 20, 0.09) 55%,
-    transparent 75%
-  );
-  filter: blur(7px);
+@keyframes lp-drift3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(3vw, -3vh) scale(1.1);
+  }
 }
 
 /* ---------- secciones ---------- */
@@ -710,8 +711,8 @@
   .lp .grid4 {
     grid-template-columns: 1fr;
   }
-  .lp .hero-copy {
-    padding-top: 84px;
+  .lp .hero {
+    padding-top: 90px;
   }
   .lp .cta-row {
     flex-direction: column;
@@ -738,19 +739,6 @@
   .lp .reveal {
     opacity: 1;
     transform: none;
-  }
-  .lp .hero-copy {
-    opacity: 1;
-    transform: none;
-  }
-  /* Sin recorrido no hay giro que seguir: el hero deja de estar pineado y la página se lee normal. */
-  .lp .hero-track {
-    height: auto;
-  }
-  .lp .hero {
-    position: relative;
-    height: auto;
-    min-height: 100vh;
   }
   :root:has(.lp) {
     scroll-behavior: auto;

@@ -7,20 +7,21 @@
  * React no compraría nada y sumaría dos dependencias grandes al bundle de la landing.
  *
  * `three` viene de node_modules, NUNCA de un CDN: la CSP del sitio es `script-src 'self'`
- * (src/lib/security/headers.ts), así que el importmap a jsdelivr del diseño original quedaría
- * bloqueado en producción — y en local funcionaría igual, que es la peor combinación posible.
+ * (src/lib/security/headers.ts), así que un importmap a un CDN quedaría bloqueado en producción —
+ * y en local funcionaría igual, que es la peor combinación posible.
  *
- * LO QUE MANDA EL ÁNGULO ES EL SCROLL. El hero es un track alto con la escena `sticky` adentro; al
- * atravesarlo, el teléfono gira de −8° a −180° y termina mostrando la trasera alpine green. El
- * vaivén por tiempo solo existe arriba de todo (`1 − heroP*3`), para que la pieza no se vea muerta
- * antes de que el usuario empiece a bajar.
+ * EL ÁNGULO LO MANDA EL TIEMPO, no el scroll. Un ciclo de 26 s: un vaivén corto que deja leer la
+ * pantalla y después UNA vuelta completa que muestra la trasera alpine green. La vuelta cierra en
+ * −368°, que es −8° más un giro entero: el ciclo empieza donde terminó y no se ve el corte.
+ *
+ * La escena vive DENTRO de su caja del hero, en el flujo normal de la página. No se superpone al
+ * copy ni a los botones: el teléfono es un bloque más de la columna, como en el artboard.
  */
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { subscribeHeroProgress } from "@/components/marketing/hero-progress";
 import { dibujarPantalla } from "@/components/marketing/phone-3d/screen-texture";
 
 /** Medidas del cuerpo: ancho, alto, grosor, radio de esquina y el bisel del borde. */
@@ -30,24 +31,62 @@ const T = 0.36;
 const R = 0.54;
 const BEV = 0.085;
 
-/** Período del vaivén de giro, en segundos. Solo se nota arriba del hero. */
-const IDLE_GIRO_SEG = 9;
-/** Período del flote vertical, en segundos. Deliberadamente distinto al de giro: si coincidieran,
- *  los dos movimientos se sincronizarían y se leerían como un solo rebote mecánico. */
-const IDLE_FLOTE_SEG = 6.5;
+/**
+ * Los hitos del ciclo: [instante 0..1, grados]. Primero un vaivén corto —el teléfono se asoma de un
+ * lado y del otro sin llegar a girar— y recién después la vuelta entera.
+ *
+ * El último hito es −368° y no −360° a propósito: son los −8° del arranque más una vuelta completa,
+ * así el final del ciclo coincide exactamente con su principio y el salto no se ve.
+ */
+const HITOS: readonly (readonly [number, number])[] = [
+  [0, -8],
+  [0.13, -36],
+  [0.26, -8],
+  [0.39, -34],
+  [0.52, -10],
+  [0.76, -188],
+  [1, -368],
+];
+
+/** Período del flote vertical, en segundos. Distinto al del ciclo para que los dos movimientos no
+ *  se sincronicen y se lean como un solo rebote mecánico. */
+const FLOTE_SEG = 6.5;
 
 /** Ángulo fijo en reduced-motion: un tres cuartos que muestra frente y canto, sin movimiento. */
 const ANGULO_QUIETO = -25;
 
+/** Suavizado de cada tramo: arranca y frena despacio, así el giro no se ve motorizado. */
+const suavizar = (t: number): number => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+/** El ángulo en grados para un avance `u` del ciclo (0..1), interpolando entre hitos. */
+function anguloEn(u: number): number {
+  for (let i = 1; i < HITOS.length; i += 1) {
+    const previo = HITOS[i - 1];
+    const actual = HITOS[i];
+    if (!previo || !actual) break;
+    if (u <= actual[0]) {
+      const [t0, a0] = previo;
+      const [t1, a1] = actual;
+      return a0 + (a1 - a0) * suavizar((u - t0) / (t1 - t0));
+    }
+  }
+  return HITOS[HITOS.length - 1]?.[1] ?? ANGULO_QUIETO;
+}
+
 export type Phone3DProps = {
   /** Congela la animación sin desmontar la escena (deja el último frame dibujado). */
   paused?: boolean;
+  /** Duración del ciclo completo (vaivén + vuelta), en segundos. */
+  cycleSeconds?: number;
 };
 
-export function Phone3D({ paused = false }: Phone3DProps) {
+export function Phone3D({ paused = false, cycleSeconds = 26 }: Phone3DProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  // Por ref y no como dependencia del efecto: cambiar el ciclo no tiene por qué desarmar la escena.
+  const cicloRef = useRef(cycleSeconds);
+  cicloRef.current = cycleSeconds > 0 ? cycleSeconds : 26;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -71,14 +110,14 @@ export function Phone3D({ paused = false }: Phone3DProps) {
     };
     consultaMovimiento.addEventListener("change", alCambiarMovimiento);
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
-    camera.position.set(0, 0.1, 13.4);
+    camera.position.set(0, 0.15, 13.2);
 
     // Entorno para los reflejos: sin él, el metal del marco y el vidrio de los lentes se ven planos.
     const pmrem = new THREE.PMREMGenerator(renderer);
@@ -346,17 +385,32 @@ export function Phone3D({ paused = false }: Phone3DProps) {
     boton(0.52, 0.3, -1);
     boton(0.86, 0.55, 1);
 
-    let heroP = 0;
-    const desuscribir = subscribeHeroProgress((p) => {
-      heroP = p;
-    });
-
-    /** El ángulo del teléfono en grados: el scroll manda, el tiempo solo mece arriba de todo. */
-    const anguloEn = (t: number): number => {
-      const porScroll = -8 - heroP * 172;
-      const vaiven = Math.sin((t / IDLE_GIRO_SEG) * Math.PI * 2) * 9 * Math.max(0, 1 - heroP * 3);
-      return porScroll + vaiven;
-    };
+    // Sombra de contacto: un plano en el piso con un degradado radial. Va en la escena y NO en el
+    // rig, así se queda quieta mientras el teléfono gira encima — si girara con él, se leería como
+    // una mancha pegada al aparato en vez de como su sombra.
+    let sombraTex: THREE.CanvasTexture | null = null;
+    {
+      const cv = document.createElement("canvas");
+      cv.width = 256;
+      cv.height = 256;
+      const g = cv.getContext("2d");
+      if (g) {
+        const rad = g.createRadialGradient(128, 128, 10, 128, 128, 120);
+        rad.addColorStop(0, "rgba(18,26,18,0.34)");
+        rad.addColorStop(0.55, "rgba(18,26,18,0.12)");
+        rad.addColorStop(1, "rgba(18,26,18,0)");
+        g.fillStyle = rad;
+        g.fillRect(0, 0, 256, 256);
+        sombraTex = new THREE.CanvasTexture(cv);
+        const sombra = new THREE.Mesh(
+          new THREE.PlaneGeometry(4.6, 1.6),
+          new THREE.MeshBasicMaterial({ map: sombraTex, transparent: true, depthWrite: false }),
+        );
+        sombra.rotation.x = -Math.PI / 2;
+        sombra.position.y = -3.62;
+        scene.add(sombra);
+      }
+    }
 
     canvas.classList.add("on");
 
@@ -367,16 +421,11 @@ export function Phone3D({ paused = false }: Phone3DProps) {
       if (pausedRef.current) return;
 
       const t = clock.getElapsedTime();
-      rig.rotation.y = THREE.MathUtils.degToRad(sinMovimiento ? ANGULO_QUIETO : anguloEn(t));
+      const avance = (t % cicloRef.current) / cicloRef.current;
+      rig.rotation.y = THREE.MathUtils.degToRad(sinMovimiento ? ANGULO_QUIETO : anguloEn(avance));
       rig.rotation.x = THREE.MathUtils.degToRad(4.5);
       rig.rotation.z = THREE.MathUtils.degToRad(-1.5);
-      rig.position.y = sinMovimiento ? 0 : Math.sin((t / IDLE_FLOTE_SEG) * Math.PI * 2) * 0.09;
-
-      // El teléfono asoma desde abajo del copy a medida que arranca el recorrido, y crece un pelo.
-      const subida = Math.min(1, heroP / 0.45);
-      const suave = 1 - Math.pow(1 - subida, 3);
-      rig.position.y += -3.15 * (1 - suave);
-      rig.scale.setScalar(0.92 + suave * 0.07);
+      rig.position.y = sinMovimiento ? 0 : Math.sin((t / FLOTE_SEG) * Math.PI * 2) * 0.09;
 
       renderer.render(scene, camera);
     };
@@ -388,8 +437,9 @@ export function Phone3D({ paused = false }: Phone3DProps) {
       const h = cont.clientHeight;
       if (w === 0 || h === 0) return;
       renderer.setSize(w, h, false);
-      // En pantallas angostas la cámara se aleja: si no, el teléfono se sale por los costados.
-      camera.position.z = w < 560 ? 15.2 : 13.4;
+      // La cámara no se mueve con el ancho: el `fov` es VERTICAL, así que el alto visible (≈7,07 u)
+      // no depende del aspecto, y el cuerpo mide 6,30 u. El teléfono entra siempre, y la caja del
+      // hero ya lo acota por CSS — mover la cámara acá solo desincronizaría el encuadre.
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     };
@@ -402,7 +452,6 @@ export function Phone3D({ paused = false }: Phone3DProps) {
     return () => {
       cancelAnimationFrame(rafId);
       ro.disconnect();
-      desuscribir();
       consultaMovimiento.removeEventListener("change", alCambiarMovimiento);
       // Cada geometría y material se libera una sola vez aunque estén compartidos entre mallas.
       const geos = new Set<THREE.BufferGeometry>();
@@ -418,6 +467,7 @@ export function Phone3D({ paused = false }: Phone3DProps) {
       geos.forEach((g) => g.dispose());
       mats.forEach((m) => m.dispose());
       screenTex?.dispose();
+      sombraTex?.dispose();
       entorno.dispose();
       pmrem.dispose();
       renderer.dispose();
