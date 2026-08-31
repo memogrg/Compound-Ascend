@@ -22,6 +22,42 @@ function pct(n: number): string {
   return `${Math.round(n * 100)}%`;
 }
 
+/**
+ * Rellena `arr` hasta `target` tomando de `fillers`, SIN repetir ninguna línea ya
+ * presente. Antes esto era `while (arr.length < n) arr.push(MISMA_CADENA)`, que
+ * renderizaba la misma frase 2-3 veces cuando no había suficientes ítems reales
+ * (perfil sano ⇒ ninguna acción condicional dispara). #98: la "Lectura de tu Base
+ * Financiera" repetía idéntica la acción de relleno. La card oculta el bloque vacío,
+ * así que quedarse corto es preferible a duplicar.
+ */
+function padDistinct(arr: string[], target: number, fillers: readonly string[]): void {
+  for (const f of fillers) {
+    if (arr.length >= target) break;
+    if (!arr.includes(f)) arr.push(f);
+  }
+}
+
+// Fillers DISTINTOS (el primero conserva la copia original). #98
+const BASE_INSIGHT_FILLERS = [
+  "Tu base luce estable; sigue registrando para afinar las lecturas.",
+  "Cuantos más movimientos registres, más precisa será tu lectura mensual.",
+  "Revisa tus categorías para detectar gastos que puedas optimizar.",
+] as const;
+const BASE_ACTION_FILLERS = [
+  "Mantén el hábito de registrar cada gasto: lo que se mide, mejora.",
+  "Revisa tu presupuesto al inicio del mes y ajústalo a tu realidad.",
+  "Define una meta de ahorro y automatízala apenas entra tu ingreso.",
+] as const;
+const CAPSULE_INSIGHT_FILLERS = [
+  "Sigue registrando para afinar la lectura.",
+  "Con más movimientos, la lectura del mes se vuelve más precisa.",
+  "Revisa tus categorías para ver dónde ajustar.",
+] as const;
+const CAPSULE_ACTION_FILLERS = [
+  "Mantén el hábito de registrar.",
+  "Revisa tu presupuesto y ajústalo a tu realidad.",
+] as const;
+
 /** Lectura principal (Mi Base Financiera). */
 export function buildBaseReading(input: ReadingInput): FinancialReading {
   const { totals, financialPressure, incomeComposition, currencyFormat } = input;
@@ -99,11 +135,9 @@ export function buildBaseReading(input: ReadingInput): FinancialReading {
       "Ajusta una o dos categorías para ampliar tu flujo libre y darte margen de maniobra.";
   }
 
-  // Rellenos por si faltan (siempre 3).
-  while (insights.length < 3)
-    insights.push("Tu base luce estable; sigue registrando para afinar las lecturas.");
-  while (actions.length < 3)
-    actions.push("Mantén el hábito de registrar cada gasto: lo que se mide, mejora.");
+  // Rellenos por si faltan (hasta 3, sin duplicar). #98
+  padDistinct(insights, 3, BASE_INSIGHT_FILLERS);
+  padDistinct(actions, 3, BASE_ACTION_FILLERS);
 
   const diagnosis =
     free > 0
@@ -154,8 +188,8 @@ export function buildCapsule(kind: "income" | "expense", input: ReadingInput): F
     );
     actions.push("Marca tus gastos recurrentes para anticipar el mes siguiente.");
   }
-  while (insights.length < 3) insights.push("Sigue registrando para afinar la lectura.");
-  while (actions.length < 2) actions.push("Mantén el hábito de registrar.");
+  padDistinct(insights, 3, CAPSULE_INSIGHT_FILLERS);
+  padDistinct(actions, 2, CAPSULE_ACTION_FILLERS);
 
   return {
     title: kind === "income" ? "Lectura de tus ingresos" : "Lectura de tus gastos",
