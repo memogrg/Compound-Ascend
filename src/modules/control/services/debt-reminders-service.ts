@@ -6,6 +6,19 @@ import { now as simNow } from "@/lib/time/clock";
  * (omite RLS) porque recorre las deudas de todos los usuarios; SOLO se invoca
  * desde la ruta protegida con CRON_SECRET. Decide qué deudas vencen pronto
  * (≤ umbral días) y no se han pagado este mes ni recordado hoy.
+ *
+ * ── POR QUÉ ACÁ EL DÍA EN UTC ALCANZA (a diferencia de goal-reset-service) ────
+ * `last_reminded_on` (y el `today` que llega a `computeDueStatus`) se calculan en
+ * UTC a propósito, no por descuido. La diferencia con el reinicio de frascos —que
+ * SÍ se resuelve por zona— es que acá `last_reminded_on` NO es un dato del usuario
+ * sino una llave de deduplicación: solo evita reenviar el mismo aviso dentro de la
+ * misma corrida diaria (el cron es diario, 13:00 UTC — ver vercel.json). Y el aviso
+ * es difuso por diseño: "tu cuota vence en ≤2 días". Con una ventana de 2 días y una
+ * única pasada diaria, un corte de día en UTC vs. la zona local no cambia a quién se
+ * le escribe ni cuándo, salvo en los bordes extremos de zona (UTC+12…+14), donde a lo
+ * sumo desplaza el aviso dentro de esa misma ventana de tolerancia. Si algún día esto
+ * pasa a ser por-zona/horario fino (como el recordatorio diario del ritmo), habría que
+ * resolver la zona por usuario igual que en goal-reset-service.
  */
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { computeDueStatus } from "@/modules/control/engine/due-dates";
