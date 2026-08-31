@@ -880,6 +880,13 @@ body:has(.m-shell[data-theme="dark"]) {
   font-size: 26px;
   letter-spacing: -0.02em;
 }
+/* #98: el título del header (.h-title.m-hd-title) gana el tamaño responsive a .h-title
+   (26px fijo, que ganaba por orden de fuente) y permite partir una palabra larga para
+   envolver a 2 líneas en vez de recortarse a "Transaccio…" / "Portafolio de…". */
+.m-shell .h-title.m-hd-title {
+  font-size: clamp(17px, 4.6vw, 24px);
+  overflow-wrap: anywhere;
+}
 .m-shell .display {
   font-family: var(--font-display);
   font-weight: 700;
