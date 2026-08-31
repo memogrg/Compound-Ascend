@@ -35,14 +35,26 @@ const EMERGENCY: Record<string, string> = {
   no_se: "No sé cuánto debería tener",
 };
 
+/**
+ * Último recurso de presentación: si un valor no está en su diccionario de opciones
+ * (dato huérfano tras renombrar/quitar una opción, un valor importado, o de una versión
+ * previa del wizard) NUNCA mostramos la clave cruda snake_case en la UI — la volvemos
+ * legible: "salir_de_deudas" → "Salir de deudas". #98
+ */
+function humanize(value: string): string {
+  const s = value.replace(/_/g, " ").trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
 function pick(options: Option[], value?: string): string | null {
   if (!value) return null;
-  return options.find((o) => o.value === value)?.label ?? value;
+  return options.find((o) => o.value === value)?.label ?? humanize(value);
 }
 /** Coerce SIEMPRE con asRanked: tolera datos pre-migración (campo single como string) sin
  *  romper — `"x".map` tiraría TypeError. La presentación nunca asume la forma del dato. */
 function pickMany(options: Option[], values?: unknown): string[] {
-  return asRanked(values).map((v) => options.find((o) => o.value === v)?.label ?? v);
+  return asRanked(values).map(
+    (v) => options.find((o) => o.value === v)?.label ?? humanize(String(v)),
+  );
 }
 /** Paleta de 3 tonos de verde para el donut de arquetipos (top 3). */
 const ARCH_COLORS = [
