@@ -517,7 +517,7 @@ export function IncomeExpenseSection({
     <div className="grid">
       <div className="tab-toolbar">
         <div className="hint">Tus gastos por categoría, comparados con tu presupuesto del mes.</div>
-        <ExpenseRangeControl current={range ?? "1m"} />
+        <ExpenseRangeControl current={range ?? "3m"} />
       </div>
 
       <SummaryStrip cards={summary} />
@@ -585,7 +585,7 @@ export function IncomeExpenseSection({
 //    composición · Área "Ingreso" (fuentes con barra buffer) · insight. ──
 function IncomeSection({ view }: { view: V2View }) {
   const { budget, real, currency, rates, history, period } = view;
-  const range = view.range ?? "1m";
+  const range = view.range ?? "3m";
   const incomeItems = budget.items.filter((b) => b.type === "income");
 
   // Fantasma-fix (Parte 1): cuadros y barras SOLO desde fuentes manuales no

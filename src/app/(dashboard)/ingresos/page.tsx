@@ -9,9 +9,10 @@ export default async function Page({
   searchParams: Promise<{ period?: string; range?: string }>;
 }) {
   const sp = await searchParams;
-  // El tab de Ingresos siempre pasa un rango (default "1m"); las demás rutas
-  // omiten el rango y conservan la ventana mensual/6-meses por defecto.
-  const view = await loadBaseView(sp.period, sp.range ?? "1m");
+  // El tab de Ingresos siempre pasa un rango (default "3m"); las demás rutas
+  // omiten el rango y conservan la ventana mensual/6-meses por defecto. #98: con
+  // "1m" el histórico era un único punto y caía a "no hay suficiente historial".
+  const view = await loadBaseView(sp.period, sp.range ?? "3m");
 
   if (!view) {
     return (

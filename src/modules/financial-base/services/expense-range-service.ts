@@ -38,9 +38,10 @@ export type ExpenseRangeView = {
   history: HistoryPoint[];
 };
 
-/** Normaliza el ?range crudo; cae a "1m" si no es válido. */
+/** Normaliza el ?range crudo; cae a "3m" si no es válido. #98: 1m mostraba un solo
+ *  punto y el histórico caía a "no hay suficiente historial" pese a haber datos. */
 export function parseExpenseRange(raw: string | undefined | null): ExpenseRange {
-  return (EXPENSE_RANGES as readonly string[]).includes(raw ?? "") ? (raw as ExpenseRange) : "1m";
+  return (EXPENSE_RANGES as readonly string[]).includes(raw ?? "") ? (raw as ExpenseRange) : "3m";
 }
 
 /** Cuántos meses cubre el rango, contando hacia atrás desde `period` (incluido). */
