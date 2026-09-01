@@ -13,6 +13,10 @@ import { toSafeResponse } from "@/lib/errors";
  * marcador del log es frágil: el logger arma la entrada como { ts, level, message, ...meta },
  * así que un `message` en el meta borraría el "[gemini] …" y dejaría el log huérfano en
  * Vercel — justo lo que este cambio venía a evitar.
+ *
+ * SIN timeout por test: tres de estos llevaban `15000` sueltos (de cuando el default eran 5 s) y
+ * ese override GANA sobre el `testTimeout: 30_000` global, así que solo servían para ACORTAR el
+ * margen de los casos que ejercitan reintentos. El global los cubre mejor.
  */
 const chatArgs = { system: "s", messages: [{ role: "user" as const, content: "hola" }] };
 
@@ -46,7 +50,11 @@ describe("superficie de error de Gemini", () => {
     expect(body.error.message).toContain("credencial");
 
     const log = JSON.parse(logs.find((l) => l.includes("non-2xx"))!);
-    expect(log).toMatchObject({ message: "[gemini] non-2xx", status: 401, model: "gemini-3.5-flash" });
+    expect(log).toMatchObject({
+      message: "[gemini] non-2xx",
+      status: 401,
+      model: "gemini-3.5-flash",
+    });
     expect(log.bodySnippet).toContain("API key not valid"); // el motivo de Google, en el log
     expect(JSON.stringify(log)).not.toContain("key=k"); // la key, nunca
   });
@@ -60,7 +68,7 @@ describe("superficie de error de Gemini", () => {
     const { body } = await fallo(noOk(429, '{"error":{"status":"RESOURCE_EXHAUSTED"}}'));
     expect(body.error.message).toContain("(IA-429)");
     expect(body.error.message).toContain("límite");
-  }, 15000);
+  });
 
   it("400: solicitud rechazada", async () => {
     const { body } = await fallo(noOk(400));
@@ -70,7 +78,7 @@ describe("superficie de error de Gemini", () => {
   it("5xx: se trata como demora", async () => {
     const { body } = await fallo(noOk(503));
     expect(body.error.message).toContain("(IA-503)");
-  }, 15000);
+  });
 
   it("status sin caso propio: genérico + status crudo para rastrearlo", async () => {
     const { body } = await fallo(noOk(404));
@@ -83,7 +91,7 @@ describe("superficie de error de Gemini", () => {
     expect(body.error.message).toContain("(IA-NET)");
     expect(logs.some((l) => l.includes("[gemini] network"))).toBe(true);
     expect(logs.some((l) => l.includes("TypeError: fetch failed"))).toBe(true);
-  }, 15000);
+  });
 
   it("timeout: no reintenta y deja su línea", async () => {
     const { body } = await fallo(
@@ -99,6 +107,11 @@ describe("superficie de error de Gemini", () => {
 
   it("el detail viaja estructurado: el caller decide sin parsear cadenas", async () => {
     const { err } = await fallo(noOk(401));
-    expect(err.detail).toMatchObject({ provider: "gemini", model: "gemini-3.5-flash", reason: "http", status: 401 });
+    expect(err.detail).toMatchObject({
+      provider: "gemini",
+      model: "gemini-3.5-flash",
+      reason: "http",
+      status: 401,
+    });
   });
 });
