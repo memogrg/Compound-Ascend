@@ -1,0 +1,272 @@
+/* ============================================================
+   Calculadora de préstamos (piel de escritorio) + los subtabs
+   del panel de Deudas. Todo scopeado bajo .dcalc / .dbx para no
+   pisar clases globales. Solo tokens var(--*) de globals.css.
+   ============================================================ */
+
+/* ---- Subtabs del panel de Deudas (Plan / Calculadora) ---- */
+.dbx .subtabs {
+  display: flex;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px;
+  width: fit-content;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.dbx .subtab {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 9px 15px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition:
+    background 0.15s,
+    color 0.15s;
+  white-space: nowrap;
+}
+.dbx .subtab:hover {
+  color: var(--ink-2);
+}
+.dbx .subtab.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--e1);
+}
+
+/* ---- Cuerpo de la calculadora ---- */
+.dcalc {
+  display: grid;
+  gap: 16px;
+}
+
+/* ---- Formulario ---- */
+.dcalc-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.dcalc-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+/* El plazo lleva su unidad pegada: cambiar de años a meses no debería mover el campo. */
+.dcalc-plazo {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.dcalc-plazo .inp {
+  min-width: 0;
+  flex: 1;
+}
+
+/* ---- Resumen ---- */
+.dcalc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+.dcalc-kpi-n {
+  font-size: 27px;
+  margin-top: 6px;
+  /* Los importes del resumen cambian con cada tecla: en tabular no bailan de ancho. */
+  font-variant-numeric: tabular-nums;
+}
+/* `.neg` es de una sola clase y pierde contra `.num-xl`; acá se le da la especificidad que
+   necesita, porque en esa tarjeta el color ES el mensaje: son intereses, no patrimonio. */
+.dcalc-kpi-n.neg {
+  color: var(--neg);
+}
+.dcalc-kpi-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ---- Tablas ---- */
+.dcalc-tabla-wrap {
+  /* La tabla se desborda por su cuenta: en móvil se arrastra a lo ancho sin llevarse la
+     página entera con ella. */
+  overflow-x: auto;
+  margin-top: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+.dcalc-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 560px;
+}
+.dcalc-tabla th,
+.dcalc-tabla td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.dcalc-tabla thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 700;
+}
+/* Los números van a la derecha y en monoespaciada: así las columnas se comparan de un vistazo. */
+.dcalc-tabla .n {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.dcalc-tabla tbody tr:hover {
+  background: var(--surface-2);
+}
+.dcalc-tabla tfoot th,
+.dcalc-tabla tfoot td {
+  font-weight: 700;
+  border-top: 2px solid var(--line);
+  border-bottom: 0;
+}
+
+.dcalc-year > th {
+  padding: 0;
+}
+.dcalc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.dcalc-caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  color: var(--muted);
+  transition: transform 0.15s;
+  flex: none;
+}
+.dcalc-caret.open {
+  transform: rotate(90deg);
+}
+.dcalc-year-meses {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+/* Los meses se leen como detalle del año, no como filas del mismo rango. */
+.dcalc-month {
+  background: var(--surface-2);
+}
+.dcalc-month > th {
+  padding-left: 32px;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
+}
+.dcalc-month td {
+  font-size: 12px;
+}
+
+/* ---- Comparación de plazos ---- */
+.dcalc-sub-h {
+  margin-top: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.dcalc-cmp-base th,
+.dcalc-cmp-base td {
+  color: var(--muted);
+}
+.dcalc-mas,
+.dcalc-menos {
+  display: block;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.dcalc-mas {
+  color: var(--warn);
+}
+.dcalc-menos {
+  color: var(--pos);
+  font-weight: 700;
+}
+.dcalc-mini {
+  padding: 6px 11px;
+  font-size: 12px;
+}
+
+/* ---- Lecturas ---- */
+.dcalc-insights {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.dcalc-insight {
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+}
+.dcalc-insight.t-warn {
+  border-left-color: var(--warn);
+}
+.dcalc-insight.t-good {
+  border-left-color: var(--pos);
+}
+.dcalc-insight.t-info {
+  border-left-color: var(--line);
+}
+.dcalc-insight-t {
+  font-weight: 700;
+  font-size: 13.5px;
+}
+.dcalc-insight-b {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* ---- Acciones ---- */
+.dcalc-acciones {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.dcalc-btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .dcalc-kpi-n {
+    font-size: 23px;
+  }
+  .dcalc-acciones {
+    align-items: stretch;
+  }
+}

@@ -22,7 +22,9 @@ import {
   montoFilaDeuda,
 } from "@/modules/control/engine/debt-strategy";
 import { buildSchedule, type AmortizationInput } from "@/modules/control/engine/amortization";
+import { DebtCalculator } from "./debt-calculator";
 import type { DebtsOverview, DebtVM } from "@/modules/control/services/debts-service";
+import "./debt-calculator.css";
 
 const METHOD_LABEL: Record<DebtMethod, string> = {
   avalancha: "Avalancha",
@@ -183,7 +185,70 @@ function strategyCurve(
   return curve;
 }
 
+type Subtab = "plan" | "calculadora";
+
+const SUBTABS: { id: Subtab; label: string }[] = [
+  { id: "plan", label: "Plan de pago" },
+  { id: "calculadora", label: "Calculadora" },
+];
+
+/**
+ * Panel de Deudas: el plan sobre las deudas que YA tiene y la calculadora para simular una que
+ * todavía no tomó.
+ *
+ * Los subtabs viven ACÁ ARRIBA y no dentro del plan a propósito: `DebtsPlan` corta temprano
+ * cuando no hay ninguna deuda registrada, y la calculadora es justamente lo más útil en ese
+ * caso — si el selector viviera adentro, quedaría del otro lado de ese return y sería
+ * inalcanzable para quien todavía no se endeudó.
+ */
 export function DebtsView({ overview }: { overview: DebtsOverview }) {
+  const [subtab, setSubtab] = useState<Subtab>("plan");
+
+  // Contexto real para la lectura de capacidad de la calculadora: lo que ya paga por mes sale de
+  // sus deudas vigentes, igual que el DTI del panel.
+  const context = useMemo(
+    () => ({
+      incomeMonthly: overview.incomeMonthly,
+      freeCashflow: overview.freeCashflow,
+      existingDebtPayments: overview.debts.reduce(
+        (s, d) => s + (d.monthlyPayment > 0 ? d.monthlyPayment : d.minPayment),
+        0,
+      ),
+    }),
+    [overview.incomeMonthly, overview.freeCashflow, overview.debts],
+  );
+
+  return (
+    <div className="dbx">
+      <div className="subtabs" role="tablist" aria-label="Secciones de Deudas">
+        {SUBTABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={subtab === t.id}
+            className={subtab === t.id ? "subtab on" : "subtab"}
+            onClick={() => setSubtab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {subtab === "plan" ? (
+        <DebtsPlan overview={overview} />
+      ) : (
+        <DebtCalculator
+          currency={overview.currency}
+          context={context}
+          indexRates={overview.indexRates}
+        />
+      )}
+    </div>
+  );
+}
+
+function DebtsPlan({ overview }: { overview: DebtsOverview }) {
   const { currency, incomeMonthly, debts, freeCashflow, indexRates } = overview;
   // Deudas crudas por id (para precargar el form de edición sin perder campos
   // que el VM no expone: currentPayment, delinquency, stress, notes).

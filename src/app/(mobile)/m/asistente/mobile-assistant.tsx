@@ -24,10 +24,13 @@ const GREETING =
 export function MobileAssistant({
   primaryCurrency,
   timezone,
+  initialDraft,
 }: {
   primaryCurrency: string;
   /** Zona del perfil; null = todavía sin capturar → se usa la del dispositivo. */
   timezone: string | null;
+  /** Pregunta ya redactada que llega por `?consulta=` (calculadora de préstamos). */
+  initialDraft?: string;
 }) {
   return (
     <div className="m-chat">
@@ -60,6 +63,7 @@ export function MobileAssistant({
         captureCurrency={primaryCurrency}
         timezone={timezone}
         scanner
+        initialDraft={initialDraft}
       />
     </div>
   );

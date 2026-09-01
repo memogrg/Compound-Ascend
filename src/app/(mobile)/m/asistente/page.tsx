@@ -16,7 +16,12 @@ import { MobileAssistant } from "./mobile-assistant";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Asistente IA · CARTERA+" };
 
-export default async function MobileAsistente() {
+export default async function MobileAsistente({
+  searchParams,
+}: {
+  searchParams: Promise<{ consulta?: string }>;
+}) {
+  const { consulta } = await searchParams;
   const user = await getUser();
   if (!user) redirect("/m/login");
 
@@ -27,5 +32,11 @@ export default async function MobileAsistente() {
     getPrimaryCurrency(),
     knownUserTz().catch(() => null),
   ]);
-  return <MobileAssistant primaryCurrency={primaryCurrency} timezone={timezone} />;
+  return (
+    <MobileAssistant
+      primaryCurrency={primaryCurrency}
+      timezone={timezone}
+      initialDraft={consulta}
+    />
+  );
 }

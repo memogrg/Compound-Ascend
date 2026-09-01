@@ -23,6 +23,7 @@ import {
   mAmount,
 } from "../../components/content-kit";
 import { DebtManager, type DebtItem } from "./debt-manager";
+import { DebtCalculatorMobile } from "./debt-calculator-mobile";
 
 /**
  * /m/deudas — "Deudas y Préstamos": deuda total, estrategia de pago (avalancha/bola de
@@ -73,6 +74,17 @@ export default async function MobileDeudas() {
               con items=[]. Ahora el mensaje vive en un solo sitio: el del manager, que es
               el que además tiene el FAB para crear la primera. */}
           <DebtManager items={[]} raw={raw} paymentsByDebt={paymentsByDebt} currency={currency} />
+
+          {/* Sin deudas registradas la calculadora es lo más útil de la pantalla: se abre sola. */}
+          <DebtCalculatorMobile
+            currency={currency}
+            context={{
+              incomeMonthly: ov.incomeMonthly,
+              freeCashflow: ov.freeCashflow,
+              existingDebtPayments: 0,
+            }}
+            defaultOpen
+          />
         </div>
       </div>
     );
@@ -267,6 +279,17 @@ export default async function MobileDeudas() {
           }
         />
         <DebtManager items={items} raw={raw} paymentsByDebt={paymentsByDebt} currency={currency} />
+
+        {/* Simular un préstamo NUEVO. Plegada: con deudas encima, el plan manda. La capacidad se
+            mide contra las cuotas que ya paga (minMes), no contra cero. */}
+        <DebtCalculatorMobile
+          currency={currency}
+          context={{
+            incomeMonthly: ov.incomeMonthly,
+            freeCashflow: ov.freeCashflow,
+            existingDebtPayments: minMes,
+          }}
+        />
       </div>
     </div>
   );

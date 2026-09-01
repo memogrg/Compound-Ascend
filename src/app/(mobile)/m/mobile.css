@@ -4285,3 +4285,140 @@ body:has(.m-shell[data-theme="dark"]) {
   flex: 1 1 auto;
   justify-content: center;
 }
+
+/* ============================================================
+   Calculadora de préstamos (/m/deudas) — sección plegable.
+   La lógica es el mismo hook que en escritorio; esto es solo piel.
+   ============================================================ */
+
+/* Enlace-botón discreto: "Simular" / "Ocultar" / "Usar este plazo". */
+.m-shell .m-dcalc-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.m-shell .m-dcalc-h {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+/* La tabla se arrastra sola: nunca empuja la página a lo ancho. */
+.m-shell .m-dcalc-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -14px;
+  padding: 0 14px;
+}
+.m-shell .m-dcalc-tabla {
+  width: 100%;
+  min-width: 460px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.m-shell .m-dcalc-tabla th,
+.m-shell .m-dcalc-tabla td {
+  padding: 7px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.m-shell .m-dcalc-tabla thead th {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+/* Números a la derecha y monoespaciados: las columnas se comparan de un vistazo. */
+.m-shell .m-dcalc-tabla .n {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.m-shell .m-dcalc-tabla th[scope="row"] {
+  font-weight: 700;
+}
+.m-shell .m-dcalc-mes {
+  background: var(--surface-2);
+}
+.m-shell .m-dcalc-mes th[scope="row"] {
+  padding-left: 22px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.m-shell .m-dcalc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+}
+.m-shell .m-dcalc-caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+.m-shell .m-dcalc-caret.open {
+  transform: rotate(90deg);
+}
+
+/* Lecturas deterministas */
+.m-shell .m-dcalc-ins {
+  border-left: 3px solid var(--border);
+  padding: 8px 0 8px 10px;
+  margin-top: 8px;
+}
+.m-shell .m-dcalc-ins.t-warn {
+  border-left-color: var(--warning);
+}
+.m-shell .m-dcalc-ins.t-good {
+  border-left-color: var(--success);
+}
+.m-shell .m-dcalc-ins-t {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.m-shell .m-dcalc-ins-b {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+/* Comparación de plazos */
+.m-shell .m-dcalc-cmp {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.m-shell .m-dcalc-cmp:last-child {
+  border-bottom: 0;
+}
+
+.m-shell .m-dcalc-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.m-shell .m-dcalc-btns > * {
+  flex: 1 1 auto;
+  justify-content: center;
+}
