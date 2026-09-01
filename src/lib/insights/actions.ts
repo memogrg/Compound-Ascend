@@ -69,6 +69,12 @@ const ACTIONS: Record<InsightKind, InsightAction> = {
     label: "mover ese presupuesto al sobre que sí se usa, o fusionar los dos sobres",
     route: "/gastos",
   },
+  // No hay nada que el usuario pueda "arreglar" acá: la acción es mirar el portafolio sabiendo
+  // que los precios están viejos.
+  feed_precios_stale: {
+    label: "revisar el portafolio teniendo en cuenta que los precios están desactualizados",
+    route: "/patrimonio",
+  },
 };
 
 /** Acción sugerida para un kind. `undefined` para un kind desconocido (no inventa una salida). */

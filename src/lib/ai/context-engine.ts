@@ -383,6 +383,9 @@ export async function buildFinancialContext(
         ctx.investmentValue = mapped.investmentValue;
         ctx.investmentPL = mapped.investmentPL;
         ctx.investmentValueBase = mapped.totalPrimario.valor;
+        // El desglose por fuente del valor: lo consume el lane determinista Y la etiqueta del
+        // prompt. Sin él, los agregados de arriba no dicen de qué están hechos.
+        ctx.valuacion = mapped.valuacion;
         // Valor del portafolio: subtotales por moneda + el total convertido a la de visualización,
         // que solo existe si hay tasas para todas las monedas involucradas (si no, undefined).
         ctx.portfolioValue = subtotales(mapped.investmentValue);

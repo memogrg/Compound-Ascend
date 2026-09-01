@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { resumirValuacion } from "@/lib/ai/valuacion-portafolio";
 
 // Router de complejidad (R1): las CONSULTAS de dato se resuelven con el motor determinista
 // (ToolContext) + plantilla (0 tokens) o el clasificador Flash-Lite (barato); el RAZONAMIENTO
@@ -231,6 +232,36 @@ describe("terminología · 'listá mis metas' enumera; 'cuáles son mis sobres' 
   });
 });
 
+/**
+ * Arma el desglose por fuente igual que producción (`resumirValuacion`), en vez de escribirlo a
+ * mano: si cambia la forma del desglose, estos fixtures se enteran.
+ */
+function valuacionDe(
+  pos: {
+    fuente: "mercado" | "manual" | "sin_precio";
+    invested: number;
+    value: number;
+    moneda: string;
+    mesesSinTocar?: number;
+    valorIgualCosto?: boolean;
+  }[],
+) {
+  return resumirValuacion(
+    pos.map((p, i) => ({
+      name: `pos${i}`,
+      fuente: p.fuente,
+      invested: p.invested,
+      value: p.value,
+      pl: p.value - p.invested,
+      monedaFila: p.moneda,
+      invertidoPrimario: p.invested,
+      valorPrimario: p.value,
+      mesesSinTocar: p.mesesSinTocar ?? null,
+      valorIgualCosto: p.valorIgualCosto ?? false,
+    })),
+  );
+}
+
 describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", () => {
   it("normalizeSlang mapea el slang de dinero a un token canónico", () => {
     expect(normalizeSlang("¿en qué se me va la guita?")).toMatch(/dinero/i);
@@ -311,6 +342,12 @@ describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", ()
       investmentInvested: [{ monto: 1_000_000, moneda: "CRC" }],
       investmentValue: [{ monto: 1_250_000, moneda: "CRC" }],
       investmentPL: [{ monto: 250_000, moneda: "CRC" }],
+      // El desglose por fuente ahora es OBLIGATORIO para que el lane conteste: sin él escala al
+      // modelo en vez de caer al texto viejo, que afirmaba un resultado sin saber de qué estaba
+      // hecho. Acá todo es de mercado, así que el resumen se lee como siempre.
+      valuacion: valuacionDe([
+        { fuente: "mercado", invested: 1_000_000, value: 1_250_000, moneda: "CRC" },
+      ]),
     } as FinancialContext;
     expect(answerFromContext("ahorro_mensual", {}, tc, ctxInv)?.reply).toContain("90.000");
     expect(answerFromContext("dca_mensual", {}, tc, ctxInv)?.reply).toContain("45.000");
@@ -337,11 +374,83 @@ describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", ()
         { monto: 240, moneda: "USD" },
       ],
       portfolioValueConvertido: { monto: 45_620_000, moneda: "CRC" },
+      valuacion: valuacionDe([
+        { fuente: "mercado", invested: 40_000_000, value: 45_000_000, moneda: "CRC" },
+        { fuente: "mercado", invested: 1_000, value: 1_240, moneda: "USD" },
+      ]),
     } as FinancialContext;
     const r = answerFromContext("resumen_inversiones", {}, tc, ctxMix);
     expect(r?.reply).toContain("₡45.000.000");
     expect(r?.reply).toContain("$1.240"); // la parte que cotiza en dólares se REPORTA en dólares
     expect(r?.reply).toMatch(/equivale a ₡45\.620\.000/); // el total convertido, marcado como tal
+  });
+
+  it("resumen_inversiones NO funde el resultado de mercado con lo valuado a mano", () => {
+    // La cartera del reporte, en chico: la cripto abajo, un plan marcado a mano muy arriba.
+    const ctxMezcla = {
+      ...CTX,
+      investmentInvested: [{ monto: 400_000, moneda: "USD" }],
+      investmentValue: [{ monto: 410_000, moneda: "USD" }],
+      investmentPL: [{ monto: 10_000, moneda: "USD" }],
+      valuacion: valuacionDe([
+        { fuente: "mercado", invested: 337_000, value: 323_000, moneda: "USD" },
+        { fuente: "manual", invested: 63_000, value: 87_000, moneda: "USD" },
+      ]),
+    } as FinancialContext;
+    const r = answerFromContext("resumen_inversiones", {}, tc, ctxMezcla);
+    // El resultado afirmado es el de MERCADO (−14.000), no el fundido (+10.000).
+    expect(r?.reply).toContain("−$14.000");
+    expect(r?.reply).not.toContain("+$10.000");
+    expect(r?.reply).toMatch(/valuadas por vos, no por el mercado/);
+  });
+
+  it("resumen_inversiones con placeholders: avisa y NO afirma resultado sobre ellos", () => {
+    const ctxSinPrecio = {
+      ...CTX,
+      investmentInvested: [{ monto: 100_000, moneda: "USD" }],
+      investmentValue: [{ monto: 105_000, moneda: "USD" }],
+      investmentPL: [{ monto: 5_000, moneda: "USD" }],
+      portfolioValueConvertido: { monto: 55_000_000, moneda: "CRC" },
+      valuacion: valuacionDe([
+        { fuente: "mercado", invested: 90_000, value: 95_000, moneda: "USD" },
+        { fuente: "sin_precio", invested: 10_000, value: 10_000, moneda: "USD" },
+      ]),
+    } as FinancialContext;
+    const r = answerFromContext("resumen_inversiones", {}, tc, ctxSinPrecio);
+    expect(r?.reply).toMatch(/no tiene precio ahora mismo/);
+    expect(r?.reply).toMatch(/muestro lo invertido/);
+    // El resultado que se afirma es el de las 90.000 con precio (+5.000), y las sin precio no
+    // aportan un 0 disfrazado.
+    expect(r?.reply).toContain("+$5.000");
+    // Con placeholders adentro, el total convertido NO se publica: se apoyaría en ellos.
+    expect(r?.reply).not.toMatch(/equivale a/);
+  });
+
+  it("mayoría sin precio: cambia el tono a 'no puedo valuar' y no da un valor", () => {
+    const ctxCaido = {
+      ...CTX,
+      investmentInvested: [{ monto: 100_000, moneda: "USD" }],
+      investmentValue: [{ monto: 100_000, moneda: "USD" }],
+      investmentPL: [{ monto: 0, moneda: "USD" }],
+      valuacion: valuacionDe([
+        { fuente: "sin_precio", invested: 80_000, value: 80_000, moneda: "USD" },
+        { fuente: "mercado", invested: 20_000, value: 20_000, moneda: "USD" },
+      ]),
+    } as FinancialContext;
+    const r = answerFromContext("resumen_inversiones", {}, tc, ctxCaido);
+    expect(r?.reply).toMatch(/No puedo valuar tu portafolio ahora mismo/);
+    expect(r?.reply).toMatch(/Lo que invertiste es/);
+    expect(r?.reply).not.toMatch(/cotizadas valen/);
+  });
+
+  it("sin desglose por fuente el lane ESCALA: no vuelve al texto que afirmaba de más", () => {
+    const ctxViejo = {
+      ...CTX,
+      investmentInvested: [{ monto: 1_000_000, moneda: "CRC" }],
+      investmentValue: [{ monto: 1_250_000, moneda: "CRC" }],
+      investmentPL: [{ monto: 250_000, moneda: "CRC" }],
+    } as FinancialContext;
+    expect(answerFromContext("resumen_inversiones", {}, tc, ctxViejo)).toBeNull();
   });
 
   it("falta_meta y meta_cercana usan tc.goals (Fondo emergencia 40% > Viaje 15%)", () => {

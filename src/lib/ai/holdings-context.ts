@@ -10,6 +10,13 @@
  */
 import { holdingDisplayCurrency } from "@/modules/wealth/engine/quote-currency";
 import { subtotales, type Monto } from "@/lib/ai/money";
+import {
+  mesesDesde,
+  resumirValuacion,
+  type FuenteValor,
+  type PosicionValuada,
+  type ValuacionPortafolio,
+} from "@/lib/ai/valuacion-portafolio";
 
 export type HoldingPerf = {
   symbol?: string | null;
@@ -23,6 +30,10 @@ export type HoldingPerf = {
   returnPct: number;
   currency: string;
   priceUnavailable: boolean;
+  /** Valor escrito a mano por el usuario (no cotizadas). Null/undefined = no la valuó él. */
+  currentValueManual?: number | null;
+  /** Última vez que se tocó la fila; alimenta la pregunta por las manuales dormidas. */
+  updatedAt?: string | null;
 };
 
 export type HoldingContext = {
@@ -51,6 +62,11 @@ export type HoldingContext = {
    */
   valorPrimario: number;
   priceUnavailable: boolean;
+  /**
+   * De dónde sale el valor de ESTA fila: del mercado, de lo que escribió el usuario, o de ningún
+   * lado (cotizable sin precio → su "valor" es el costo). Sin esto, los tres se leen igual.
+   */
+  fuente: FuenteValor;
 };
 
 export type HoldingsContext = {
@@ -64,6 +80,11 @@ export type HoldingsContext = {
   investmentPL: Monto[];
   /** Totales del MOTOR en moneda primaria (homogéneos): base comparable para porcentajes. */
   totalPrimario: { invertido: Monto; valor: Monto; pl: Monto };
+  /**
+   * El desglose por FUENTE del valor. Es lo que impide que un resultado de mercado y una marca
+   * escrita a mano terminen sumados en un mismo titular.
+   */
+  valuacion: ValuacionPortafolio;
 };
 
 /**
@@ -82,7 +103,24 @@ export type MapHoldingsOptions = {
   /** Sin conversor, cada fila queda en la moneda primaria (bien etiquetada, no mal rotulada). */
   convertir?: MontoConverter;
   max?: number;
+  /** "Ahora" inyectable: la antigüedad de una valuación manual se fija en tests, no con el reloj. */
+  ahora?: number;
 };
+
+/**
+ * De dónde viene el valor de una posición.
+ *  - `sin_precio`: el motor la marcó `priceUnavailable` → su valor es el costo, como placeholder.
+ *  - `manual`: el usuario escribió el valor (certificado, préstamo, inmueble, plan).
+ *  - `mercado`: precio del feed.
+ * El orden importa: `priceUnavailable` manda sobre todo lo demás.
+ */
+export function fuenteDelValor(h: {
+  priceUnavailable: boolean;
+  currentValueManual?: number | null;
+}): FuenteValor {
+  if (h.priceUnavailable) return "sin_precio";
+  return h.currentValueManual != null ? "manual" : "mercado";
+}
 
 /**
  * Top-N posiciones por valor + agregados. `totalCostBasis`/`totalProfitLoss` son los del motor (en
@@ -96,11 +134,32 @@ export function mapHoldingsForContext(
   opts: MapHoldingsOptions,
 ): HoldingsContext | null {
   if (perf.length === 0) return null;
-  const { monedaPrimaria, convertir, max = MAX_HOLDINGS_IN_CONTEXT } = opts;
+  const { monedaPrimaria, convertir, max = MAX_HOLDINGS_IN_CONTEXT, ahora = Date.now() } = opts;
   const sorted = [...perf].sort((a, b) => b.currentValue - a.currentValue);
   const todas = sorted.map((h) => toContext(h, monedaPrimaria, convertir));
 
+  // El desglose por fuente se arma sobre TODAS las posiciones (no solo las listadas): el detalle
+  // se recorta por tamaño del prompt, la honestidad del agregado no.
+  const valuadas: PosicionValuada[] = todas.map((h, i) => {
+    const orig = sorted[i]!;
+    return {
+      name: h.name,
+      fuente: h.fuente,
+      invested: h.invested,
+      value: h.value,
+      pl: h.pl,
+      monedaFila: h.monedaFila,
+      invertidoPrimario: Math.round(orig.costBasis),
+      valorPrimario: h.valorPrimario,
+      mesesSinTocar: mesesDesde(orig.updatedAt, ahora),
+      // "Valuada" de verdad = el usuario puso un número distinto del costo. Si escribió el costo
+      // (o lo dejó como vino), nadie está valuando esa posición.
+      valorIgualCosto: h.fuente === "manual" && Math.abs(orig.currentValue - orig.costBasis) < 0.01,
+    };
+  });
+
   return {
+    valuacion: resumirValuacion(valuadas),
     holdings: todas.slice(0, max),
     ...(sorted.length > max ? { holdingsMoreCount: sorted.length - max } : {}),
     monedaPrimaria,
@@ -135,6 +194,7 @@ function toContext(
     currency: h.currency,
     valorPrimario: Math.round(h.currentValue),
     priceUnavailable: h.priceUnavailable,
+    fuente: fuenteDelValor(h),
   };
   const precioPrimario = h.priceUnavailable || h.currentPrice == null ? null : h.currentPrice;
   const enPrimaria: HoldingContext = {

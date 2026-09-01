@@ -364,3 +364,57 @@ export function detectOpenContributions(contributions: OpenContribution[]): Dete
   }
   return out;
 }
+
+/** A partir de cuánto sin refrescar el store de precios deja de ser un retraso y pasa a ser una falla. */
+export const HORAS_FEED_STALE = 24;
+
+/**
+ * El feed de precios se quedó viejo.
+ *
+ * NO es un problema del usuario, es nuestro — pero mientras dure, la valuación del portafolio y
+ * todo lo que el asesor diga sobre ella se apoyan en precios de hace días. Que aparezca en la
+ * campana es la diferencia entre enterarse ahora y enterarse cuando una respuesta salga mal: el
+ * `FINNHUB_TOKEN` del recolector devolvió 401 durante más de diez días y nadie se enteró, porque
+ * el workflow salía verde y los ETF seguían frescos de rebote (el camino en vivo de la app los
+ * escribía al abrir Patrimonio).
+ *
+ * Puro: recibe la antigüedad ya calculada. `null` en `horasDesdeUltimoPrecio` = no hay NINGÚN
+ * precio en el store para posiciones cotizadas, que es el caso peor y también se avisa.
+ */
+export function detectStaleMarketFeed(input: {
+  /** Cuántas posiciones cotizadas (cripto/acción/ETF) tiene el usuario. */
+  posicionesCotizadas: number;
+  /** Horas desde el precio MÁS RECIENTE del store para esas posiciones. null = ninguno. */
+  horasDesdeUltimoPrecio: number | null;
+  /** Cuántas de esas posiciones no tienen precio fresco. */
+  posicionesSinPrecioFresco: number;
+  umbralHoras?: number;
+}): DetectedInsight[] {
+  const umbral = input.umbralHoras ?? HORAS_FEED_STALE;
+  // Sin posiciones cotizadas no hay feed que vigilar.
+  if (input.posicionesCotizadas <= 0) return [];
+  const horas = input.horasDesdeUltimoPrecio;
+  if (horas !== null && horas < umbral) return [];
+
+  const cuando =
+    horas === null
+      ? "No tenemos ningún precio guardado"
+      : horas >= 48
+        ? `Los precios más recientes que tenemos son de hace ${Math.floor(horas / 24)} días`
+        : `Los precios más recientes que tenemos son de hace ${Math.floor(horas)} horas`;
+
+  return [
+    {
+      kind: "feed_precios_stale",
+      severity: "observar",
+      title: "Los precios de tus inversiones están desactualizados",
+      body:
+        `${cuando}, así que el valor de ${input.posicionesSinPrecioFresco} de tus ${input.posicionesCotizadas} ` +
+        "posiciones cotizadas no está al día. Es una falla nuestra, no tuya: lo estamos viendo. " +
+        "Mientras tanto, tomá el valor del portafolio con esa reserva.",
+      metric: horas ?? undefined,
+      // Sin relatedId: es UNA sola tarjeta para todo el feed, no una por posición. El reconciliador
+      // por (kind, related_id) la marca resuelta sola en cuanto vuelven los precios.
+    },
+  ];
+}
