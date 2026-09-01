@@ -24,7 +24,7 @@ const CHIPS = [
   "¿Voy bien para mi Rich Life?",
 ];
 
-export function AssistantTab() {
+export function AssistantTab({ initialDraft }: { initialDraft?: string }) {
   return (
     <div className="ac-page">
       <div className="ac-page-top">
@@ -36,7 +36,13 @@ export function AssistantTab() {
           <div className="ac-page-sub">Tu asesor financiero</div>
         </div>
       </div>
-      <AssistantConversation variant="page" greeting={GREETING} chips={CHIPS} scanner />
+      <AssistantConversation
+        variant="page"
+        greeting={GREETING}
+        chips={CHIPS}
+        scanner
+        initialDraft={initialDraft}
+      />
     </div>
   );
 }

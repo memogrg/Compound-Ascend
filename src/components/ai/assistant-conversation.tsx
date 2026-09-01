@@ -395,6 +395,13 @@ type Props = {
   transcript?: boolean;
   /** Escáner de recibos dentro de la barra de entrada. */
   scanner?: boolean;
+  /**
+   * Texto con el que arranca el campo de entrada, SIN enviarlo. Lo usa quien llega desde otra
+   * pantalla con una pregunta ya redactada (p. ej. la calculadora de préstamos manda su
+   * escenario por `?consulta=`). Queda como borrador editable: el usuario lo lee, lo ajusta si
+   * quiere y decide él si lo manda — mandarlo solo sería gastarle una consulta sin permiso.
+   */
+  initialDraft?: string;
 };
 
 export function AssistantConversation({
@@ -405,6 +412,7 @@ export function AssistantConversation({
   chips = [],
   transcript = true,
   scanner = false,
+  initialDraft = "",
 }: Props) {
   const s = SKIN_BY_VARIANT[variant];
   // La PRINCIPAL, no la de visualización: es la moneda con la que se captura.
@@ -423,7 +431,7 @@ export function AssistantConversation({
   const [messages, setMessages] = useState<ChatMsg[]>([
     { id: 0, role: "assistant", text: greeting },
   ]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialDraft);
   const [sending, setSending] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [transcriptMsg, setTranscriptMsg] = useState<string | null>(null);

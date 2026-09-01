@@ -47,6 +47,23 @@ export {
 export type { DebtBalance } from "./services/debts-service";
 export { getDebtDetail } from "./services/debt-detail-service";
 export { getIndexRates, effectiveApr, buildRateNote } from "./services/index-rates";
+export {
+  simulateLoan,
+  shorterTermOptions,
+  buildDebtSimInsights,
+  escenarioParaAsesor,
+  isSimulable,
+} from "./engine/debt-sim-insights";
+export type {
+  LoanSimInput,
+  LoanSim,
+  LoanYear,
+  ShorterTerm,
+  SimContext,
+  SimInsight,
+  SimInsightKind,
+  Voz,
+} from "./engine/debt-sim-insights";
 export { ControlDashboard } from "./components/control-dashboard";
 export { PagoVinculadoButton } from "./components/pago-vinculado-button";
 export { ControlActions } from "./components/control-actions";

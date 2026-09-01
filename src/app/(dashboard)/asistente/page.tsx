@@ -12,6 +12,15 @@ import { AssistantTab } from "./assistant-tab";
  */
 export const metadata: Metadata = { title: "Asistente · CARTERA+" };
 
-export default function Page() {
-  return <AssistantTab />;
+/**
+ * `?consulta=` deja el chat con una pregunta ya escrita en el campo, sin enviarla: es como llega
+ * el escenario de la calculadora de préstamos. El usuario la lee, la edita y decide si la manda.
+ */
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ consulta?: string }>;
+}) {
+  const { consulta } = await searchParams;
+  return <AssistantTab initialDraft={consulta} />;
 }

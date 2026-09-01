@@ -179,10 +179,32 @@ export function EditControlButton({
   );
 }
 
+/**
+ * Campos con los que se puede SEMBRAR un alta de deuda sin que sea una edición. Lo usa la
+ * calculadora de préstamos: el usuario simuló un crédito, decidió tomarlo y quiere registrarlo
+ * con esos mismos números. Pasar `item` no serviría — activa el modo edición y llamaría a
+ * `editDebtAction` sobre una deuda que todavía no existe.
+ */
+export type DebtPrefill = Partial<
+  Pick<
+    Debt,
+    | "name"
+    | "balance"
+    | "originalAmount"
+    | "currency"
+    | "apr"
+    | "termMonths"
+    | "currentPayment"
+    | "minPayment"
+    | "insurance"
+  >
+>;
+
 export function ControlDialog({
   kind,
   currency,
   item,
+  prefill,
   indexRates,
   fxRates,
   onClose,
@@ -190,6 +212,8 @@ export function ControlDialog({
   kind: Kind;
   currency: string;
   item?: SavingsGoal | Debt;
+  /** Alta sembrada (solo deudas). Se ignora cuando hay `item`: eso ya es una edición. */
+  prefill?: DebtPrefill;
   indexRates?: Record<string, number>;
   fxRates?: Record<string, number>;
   onClose: () => void;
@@ -233,6 +257,7 @@ export function ControlDialog({
           onDone={done}
           onCancel={onClose}
           item={item as Debt | undefined}
+          prefill={prefill}
           indexRates={indexRates}
           fxRates={fxRates}
         />
@@ -840,6 +865,7 @@ function DebtForm({
   onDone,
   onCancel,
   item,
+  prefill,
   indexRates,
   fxRates,
 }: {
@@ -847,19 +873,24 @@ function DebtForm({
   onDone: () => void;
   onCancel: () => void;
   item?: Debt;
+  prefill?: DebtPrefill;
   indexRates?: Record<string, number>;
   fxRates?: Record<string, number>;
 }) {
   const action = item ? (raw: unknown) => editDebtAction(item.id, raw) : addDebtAction;
   const { pending, errors, message, run } = useFormSubmit(action);
+  // `seed` solo siembra VALORES iniciales; quien decide si esto es alta o edición sigue siendo
+  // `item` (arriba, en `action`). Así una deuda simulada puede llenar el formulario sin que el
+  // submit intente actualizar una fila que todavía no existe.
+  const seed: DebtPrefill | undefined = item ?? prefill;
   const captureCurrency = useCaptureCurrency();
-  const [cur, setCur] = useState<string>(item?.currency ?? captureCurrency);
+  const [cur, setCur] = useState<string>(seed?.currency ?? captureCurrency);
   const [rateType, setRateType] = useState<"fija" | "variable">(item?.rateType ?? "fija");
 
-  const totalTerm = item?.termMonths ?? 0;
+  const totalTerm = seed?.termMonths ?? 0;
   // Estado controlado de los campos que alimentan la cuota sugerida / TAE en vivo.
-  const [balance, setBalance] = useState<string>(item?.balance != null ? String(item.balance) : "");
-  const [apr, setApr] = useState<string>(item?.apr != null ? String(item.apr) : "");
+  const [balance, setBalance] = useState<string>(seed?.balance != null ? String(seed.balance) : "");
+  const [apr, setApr] = useState<string>(seed?.apr != null ? String(seed.apr) : "");
   const [rateIndex, setRateIndex] = useState<string>(item?.rateIndex ?? "prime");
   const [rateSpread, setRateSpread] = useState<string>(
     item?.rateSpread != null ? String(item.rateSpread) : "",
@@ -877,7 +908,7 @@ function DebtForm({
     totalTerm % 12 ? String(totalTerm % 12) : "",
   );
   const [currentPayment, setCurrentPayment] = useState<string>(
-    item?.currentPayment != null ? String(item.currentPayment) : "",
+    seed?.currentPayment != null ? String(seed.currentPayment) : "",
   );
 
   // Valor actual del índice y TAE efectiva en vivo (Punto 1.4).
@@ -941,7 +972,7 @@ function DebtForm({
             <input
               className="inp"
               name="name"
-              defaultValue={item?.name ?? ""}
+              defaultValue={seed?.name ?? ""}
               placeholder="Tarjeta, préstamo…"
               required
               aria-invalid={errors.name ? true : undefined}
@@ -998,7 +1029,7 @@ function DebtForm({
             label="Monto original"
             name="originalAmount"
             currency={cur}
-            defaultValue={item?.originalAmount ?? undefined}
+            defaultValue={seed?.originalAmount ?? undefined}
           />
           <Money
             label="Saldo actual"
@@ -1178,7 +1209,7 @@ function DebtForm({
             label="Pago mínimo"
             name="minPayment"
             currency={cur}
-            defaultValue={item?.minPayment}
+            defaultValue={seed?.minPayment}
           />
         </div>
 
@@ -1215,7 +1246,7 @@ function DebtForm({
             label="Seguro mensual (opcional)"
             name="insurance"
             currency={cur}
-            defaultValue={item?.insurance ?? undefined}
+            defaultValue={seed?.insurance ?? undefined}
           />
         </div>
 
