@@ -184,12 +184,6 @@ export function Landing() {
             que ya lograste — un paso a la vez, hacia tu rich life real.
           </p>
 
-          {/* La caja fija el hueco del teléfono antes de que cargue la escena: el canvas vive
-              adentro y el layout no salta cuando aparece (CLS 0). */}
-          <div className="phone-box">
-            <Phone3DLazy />
-          </div>
-
           <div className="cta-row">
             <Link className="btn btn-lg btn-pri" href={REGISTRO}>
               Prueba CARTERA+
@@ -201,6 +195,14 @@ export function Landing() {
 
           <div className="trust">
             Prueba de 14 días · Cancela cuando quieras · Tus datos son solo tuyos.
+          </div>
+
+          {/* El teléfono va DESPUÉS de la acción, no antes: con la caja de hasta 640 px en medio,
+              el botón nacía debajo del fold en cualquier laptop. Primero la promesa, después el
+              botón, y recién ahí la prueba — que además queda cortada por el borde inferior y
+              eso mismo invita a bajar. */}
+          <div className="phone-box">
+            <Phone3DLazy />
           </div>
         </div>
       </section>

@@ -144,7 +144,8 @@
   background: var(--soft);
 }
 .lp .lnk {
-  color: #0066cc;
+  /* Toma el verde de marca, no el azul de sistema: era el único elemento azul de la página. */
+  color: var(--green);
   font-size: 15px;
 }
 .lp .lnk:hover {
@@ -259,10 +260,12 @@
    termina de cargar el canvas lo rellena sin mover nada de abajo (CLS 0). El `max-width` en vw es
    lo que impide que en 390px se desborde o se pegue a los bordes. */
 .lp .phone-box {
+  /* `margin-top` propio y no el `gap` de la columna: el teléfono se despega de la zona de acción
+     más que el resto de los bloques entre sí, para que se lea como pieza aparte. */
   width: 100%;
   max-width: min(92vw, 380px);
   height: min(72vh, 640px);
-  margin: 6px auto 0;
+  margin: 14px auto 0;
 }
 .lp .lp-gl {
   display: block;
