@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { getAccountInfo } from "@/modules/account/services/account-service";
+import { getAccountInfo, getAccountDeletionInfo } from "@/modules/account/services/account-service";
+import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
 import { ReferralCard } from "@/components/referrals/referral-card";
 import { MemoryPanel } from "@/components/memory/memory-panel";
 import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
@@ -58,6 +59,7 @@ function SetRow({
  */
 export default async function Page() {
   const acc = await getAccountInfo();
+  const del = await getAccountDeletionInfo();
   const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
   const usagePct =
     acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
@@ -250,6 +252,13 @@ export default async function Page() {
           <UpgradePrompt />
         </div>
       ) : null}
+
+      <SetRow
+        title="Zona de peligro"
+        desc="Borrado permanente de tu cuenta. Descargá tus datos antes; no se puede deshacer."
+      >
+        <DeleteAccountButton isOwnerWithMembers={del.isOwnerWithMembers} />
+      </SetRow>
     </div>
   );
 }
