@@ -34,6 +34,7 @@ import {
   removeIngestEmail,
 } from "@/modules/account/services/ingest-email-service";
 import { logger } from "@/lib/logger";
+import { errorDetail } from "@/lib/errors";
 
 export type AccountActionResult = { ok: boolean; message?: string };
 
@@ -291,14 +292,19 @@ export async function deleteAccountAction(input: {
     // Compuerta: verifica el OTP propio (hash + TTL + intentos). Gatea de verdad.
     const okOtp = await verifyDeletionOtp(userId, parsed.data.otp);
     if (!okOtp) return { ok: false, message: "Código inválido o expirado." };
-  } catch {
+  } catch (err) {
+    // #53: el detalle real va a los logs del servidor; el usuario ve algo genérico.
+    logger.error("deleteAccount: verificación falló", { detail: errorDetail(err) });
     return { ok: false, message: "Sesión no válida." };
   }
 
   try {
     await deleteAccountCore(userId); // admin.deleteUser va AL FINAL adentro
   } catch (err) {
-    logger.error("deleteAccount fallido", { message: err instanceof Error ? err.message : "?" });
+    // #53: NO enmascarar. deleteAccountCore lanza AppError con el error real en
+    // `.detail` (p.ej. "admin.deleteUser: permission denied for table transactions");
+    // logueá eso, no el `.message` amable. Nunca llega al cliente.
+    logger.error("deleteAccount fallido", { detail: errorDetail(err) });
     return { ok: false, message: "No pudimos completar el borrado. Tu cuenta sigue activa." };
   }
 

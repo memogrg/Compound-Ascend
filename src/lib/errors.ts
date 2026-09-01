@@ -59,6 +59,23 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * #53: extrae el detalle REAL de un error para los logs del SERVIDOR. En un
+ * AppError el mensaje real vive en `.detail` — su `.message`/`.userMessage` es el
+ * texto amable para el usuario (para INTERNAL, un genérico "algo salió mal"), así
+ * que loguear `.message` ENMASCARA la causa. Nunca se envía al cliente.
+ */
+export function errorDetail(err: unknown): string {
+  if (err instanceof AppError) {
+    const d = err.detail;
+    if (typeof d === "string" && d.length > 0) return `${err.code}: ${d}`;
+    if (d != null) return `${err.code}: ${JSON.stringify(d)}`;
+    return `${err.code}: ${err.userMessage}`;
+  }
+  if (err instanceof Error) return `${err.name}: ${err.message}`;
+  return String(err);
+}
+
 export type SafeErrorBody = {
   error: { code: ErrorCode; message: string };
 };
