@@ -82,6 +82,18 @@ export function HouseholdMembers({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Empty-state (#82 D6): sin miembros = sin hogar (nuevo, o disuelto tras un
+          borrado). Invitá a alguien (crea tu hogar) o pedí una invitación para unirte. */}
+      {members.length === 0 ? (
+        <div className="card card-pad" style={{ display: "grid", gap: 6, justifyItems: "start" }}>
+          <div className="card-title">Todavía no compartís un hogar</div>
+          <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+            Invitá a alguien por correo (abajo) para <strong>crear tu hogar</strong>, o pedí que te
+            compartan una invitación para <strong>unirte</strong> a uno.
+          </p>
+        </div>
+      ) : null}
+
       {/* Miembros activos */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {members.map((m) => (

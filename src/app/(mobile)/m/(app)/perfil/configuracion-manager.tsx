@@ -53,6 +53,7 @@ import {
 import { MSectionHeader, MContentCard, MDataRow, MChip } from "../../components/content-kit";
 import { AppLockToggle } from "../../components/app-lock-toggle";
 import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/app-lock";
+import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
 type SheetId = "currency" | "timezone" | "theme" | "whatsapp" | "household" | "password" | null;
@@ -290,6 +291,20 @@ export function ConfiguracionManager({
         >
           Borrar todos mis datos
         </button>
+      </MContentCard>
+
+      {/* #82 · Borrar la CUENTA (distinto de "borrar datos"): re-auth por OTP +
+          "BORRAR"; en nativo, además gate biométrico (#64). */}
+      <MContentCard>
+        <DeleteAccountButton
+          variant="mobile"
+          onBeforeDelete={async () => {
+            if (!isNativeApp()) return true;
+            const avail = await checkBiometryAvailable();
+            if (!avail.available) return true; // sin biometría no bloquea (igual que #64)
+            return (await verifyIdentity()).ok;
+          }}
+        />
       </MContentCard>
 
       {/* Hoja: moneda */}

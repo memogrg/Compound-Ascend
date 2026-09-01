@@ -149,3 +149,29 @@ export async function clearAllFinancialData(): Promise<void> {
   // Quita la marca de demo del perfil.
   await supabase.from("personal_profiles").update({ extra: {} }).eq("user_id", user.id);
 }
+
+/**
+ * Contexto para la zona de peligro (#82): si el usuario es DUEÑO de un hogar con
+ * otros miembros activos, borrar su cuenta arrastra TODA la data del hogar → copy
+ * más fuerte. Lee con el cliente de sesión (RLS ve su propio hogar).
+ */
+export async function getAccountDeletionInfo(): Promise<{ isOwnerWithMembers: boolean }> {
+  const user = await getUser();
+  if (!user) return { isOwnerWithMembers: false };
+  const supabase = await createSupabaseServerClient();
+  const { data: mine } = await supabase
+    .from("household_members")
+    .select("household_id, role")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+  if (!mine?.household_id || mine.role !== "owner") return { isOwnerWithMembers: false };
+  const { count } = await supabase
+    .from("household_members")
+    .select("*", { count: "exact", head: true })
+    .eq("household_id", mine.household_id)
+    .eq("status", "active")
+    .neq("user_id", user.id);
+  return { isOwnerWithMembers: (count ?? 0) > 0 };
+}
