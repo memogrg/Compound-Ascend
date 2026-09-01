@@ -13,7 +13,10 @@ import { TZ_COOKIE } from "@/lib/time/user-time";
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from "@/lib/notifications/preferences";
 import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base";
 import { SUPPORTED_CURRENCIES } from "@/lib/fx";
-import { isSupabaseConfigured, getUser } from "@/lib/auth/session";
+import { isSupabaseConfigured, getUser, requireUser } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { deleteAccountCore } from "@/modules/account/services/account-deletion-service";
+import { exportHouseholdWorkbook } from "@/modules/account/services/account-export-service";
 import {
   isEmailConfigured,
   emailProviderName,
@@ -223,6 +226,90 @@ export async function clearAllDataAction(): Promise<AccountActionResult> {
     logger.error("clearAllData fallido", { message: err instanceof Error ? err.message : "?" });
     return { ok: false, message: "No pudimos borrar los datos." };
   }
+}
+
+// ---------- Borrado de cuenta (#82) ----------
+
+/** Paso 1: envía un OTP de re-verificación al correo (universal: password y Google). */
+export async function requestAccountDeletionOtpAction(): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  try {
+    await requireUser();
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.auth.reauthenticate();
+    if (error) return { ok: false, message: "No pudimos enviar el código. Intentá de nuevo." };
+    return { ok: true, message: "Te enviamos un código a tu correo." };
+  } catch {
+    return { ok: false, message: "Sesión no válida." };
+  }
+}
+
+export type ExportResult = { ok: boolean; filename?: string; base64?: string; message?: string };
+
+/** Paso 2: genera el .xlsx de la data del hogar para descargar ANTES de borrar. */
+export async function exportHouseholdDataAction(): Promise<ExportResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  try {
+    const user = await requireUser();
+    const buf = await exportHouseholdWorkbook(user.id);
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      ok: true,
+      filename: `cartera-plus-datos-${stamp}.xlsx`,
+      base64: buf.toString("base64"),
+    };
+  } catch (err) {
+    logger.error("exportHouseholdData fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos generar el export." };
+  }
+}
+
+/** Paso 3: borrado REAL. Verifica "BORRAR" + OTP, ejecuta el core, cierra sesión. */
+export async function deleteAccountAction(input: {
+  confirmText: string;
+  otp: string;
+}): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  const parsed = z
+    .object({ confirmText: z.string(), otp: z.string().min(4).max(12) })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Datos incompletos." };
+  if (parsed.data.confirmText.trim().toUpperCase() !== "BORRAR") {
+    return { ok: false, message: 'Escribí "BORRAR" para confirmar.' };
+  }
+
+  let userId: string;
+  try {
+    const user = await requireUser();
+    userId = user.id;
+    // Re-verificación: consumir el nonce del OTP (prueba de identidad, universal).
+    const supabase = await createSupabaseServerClient();
+    const { error: reauthErr } = await supabase.auth.updateUser({
+      nonce: parsed.data.otp,
+      data: { _deletion_reauth_at: new Date().toISOString() },
+    });
+    if (reauthErr) return { ok: false, message: "Código inválido o expirado." };
+  } catch {
+    return { ok: false, message: "Sesión no válida." };
+  }
+
+  try {
+    await deleteAccountCore(userId); // admin.deleteUser va AL FINAL adentro
+  } catch (err) {
+    logger.error("deleteAccount fallido", { message: err instanceof Error ? err.message : "?" });
+    return { ok: false, message: "No pudimos completar el borrado. Tu cuenta sigue activa." };
+  }
+
+  // La cuenta ya no existe: cerrar sesión (best-effort).
+  try {
+    const supabase = await createSupabaseServerClient();
+    await supabase.auth.signOut();
+  } catch {
+    /* la sesión queda inválida igual */
+  }
+  return { ok: true };
 }
 
 // ---------- Ingesta por correo: onboarding self-serve ----------
