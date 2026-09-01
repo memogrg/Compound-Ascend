@@ -46,3 +46,16 @@ supabase/.branches
 
 # Bundle de diseño (no versionar)
 design-handoff/
+
+# Artefactos regenerables de sesiones/QA (limpieza pre-Apple, #98) — no versionar
+/fix*.png
+/mob-*.png
+/verify-*.png
+/web-*.png
+.playwright-mcp/
+sim/population/out/
+tests/evals/cert/out/
+audit/ux-review/
+
+# Cuarentena de borrado: el puente con la máquina no puede hacer rm, mueve acá.
+_to_delete/
