@@ -4,6 +4,8 @@
  * Zona de peligro — borrado de cuenta (#82). Flujo: aviso fuerte → escribir
  * "BORRAR" → enviar OTP al correo → ingresar OTP → descargar export .xlsx →
  * borrar. En móvil nativo, `onBeforeDelete` inyecta el gate biométrico (#64).
+ * `variant` adapta las clases: "web" (btn/card/inp) o "mobile" (m-btn/m-inp,
+ * sin card interno porque va dentro de un MContentCard).
  */
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -14,6 +16,7 @@ import {
 } from "@/modules/account/api/actions";
 
 type Step = "idle" | "confirm" | "otp";
+type Variant = "web" | "mobile";
 
 function downloadBase64(filename: string, base64: string): void {
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -30,10 +33,12 @@ function downloadBase64(filename: string, base64: string): void {
 
 export function DeleteAccountButton({
   isOwnerWithMembers = false,
+  variant = "web",
   onBeforeDelete,
 }: {
   /** Copy más fuerte: al ser dueño con miembros, se borra TODA la data del hogar. */
   isOwnerWithMembers?: boolean;
+  variant?: Variant;
   /** Gate extra antes de borrar (biometría en móvil nativo). Debe resolver true para continuar. */
   onBeforeDelete?: () => Promise<boolean>;
 }) {
@@ -45,6 +50,16 @@ export function DeleteAccountButton({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  const m = variant === "mobile";
+  const cls = {
+    wrap: m ? "" : "card card-pad",
+    inp: m ? "m-inp" : "inp",
+    ghost: m ? "m-btn m-btn-block" : "btn btn-ghost",
+    primary: m ? "m-btn m-btn-block m-btn-primary" : "btn btn-primary",
+    danger: m ? "m-btn m-btn-block m-btn-danger" : "btn",
+  };
+  const wrapStyle = m ? undefined : { borderColor: "var(--neg)" as const };
 
   const reset = () => {
     setStep("idle");
@@ -106,20 +121,14 @@ export function DeleteAccountButton({
 
   if (step === "idle") {
     return (
-      <div className="card card-pad" style={{ borderColor: "var(--neg)" }}>
-        <div className="card-title" style={{ color: "var(--neg)" }}>
-          Borrar mi cuenta
-        </div>
+      <div className={cls.wrap} style={wrapStyle}>
+        <div style={{ fontWeight: 700, color: "var(--neg)", fontSize: 15 }}>Borrar mi cuenta</div>
         <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, marginTop: 6 }}>
           {isOwnerWithMembers
             ? "Sos el titular del hogar: se borrará TODA la data del hogar (los movimientos de todos los miembros) y tu cuenta. Los demás miembros conservan su cuenta pero pierden los datos compartidos. Es irreversible."
             : "Tus movimientos quedan en el hogar; se borra tu cuenta y tu perfil. Es irreversible."}
         </p>
-        <button
-          className="btn btn-ghost"
-          style={{ marginTop: 12, color: "var(--neg)", borderColor: "var(--neg)" }}
-          onClick={() => setStep("confirm")}
-        >
+        <button className={cls.danger} style={{ marginTop: 12 }} onClick={() => setStep("confirm")}>
           Borrar mi cuenta…
         </button>
       </div>
@@ -127,10 +136,8 @@ export function DeleteAccountButton({
   }
 
   return (
-    <div className="card card-pad" style={{ borderColor: "var(--neg)" }}>
-      <div className="card-title" style={{ color: "var(--neg)" }}>
-        Confirmá el borrado
-      </div>
+    <div className={cls.wrap} style={wrapStyle}>
+      <div style={{ fontWeight: 700, color: "var(--neg)", fontSize: 15 }}>Confirmá el borrado</div>
 
       {step === "confirm" && (
         <>
@@ -138,7 +145,7 @@ export function DeleteAccountButton({
             Escribí <strong>BORRAR</strong> para continuar. Te enviaremos un código a tu correo.
           </p>
           <input
-            className="inp"
+            className={cls.inp}
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder="BORRAR"
@@ -153,15 +160,15 @@ export function DeleteAccountButton({
             Ingresá el código que enviamos a tu correo. Descargá tus datos antes de borrar.
           </p>
           <input
-            className="inp"
+            className={cls.inp}
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
             placeholder="Código de 6 dígitos"
             inputMode="numeric"
           />
           <button
-            className="btn btn-ghost"
-            style={{ marginTop: 10, width: "100%", justifyContent: "center" }}
+            className={cls.ghost}
+            style={{ marginTop: 10 }}
             onClick={doExport}
             disabled={busy}
           >
@@ -177,18 +184,17 @@ export function DeleteAccountButton({
       )}
       {error && <div style={{ fontSize: 12, color: "var(--neg)", marginTop: 8 }}>{error}</div>}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-        <button className="btn btn-ghost" onClick={reset} disabled={busy}>
+      <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+        <button className={cls.ghost} onClick={reset} disabled={busy}>
           Cancelar
         </button>
         {step === "confirm" ? (
-          <button className="btn btn-primary" onClick={sendOtp} disabled={busy}>
+          <button className={cls.primary} onClick={sendOtp} disabled={busy}>
             {busy ? "Enviando…" : "Enviar código"}
           </button>
         ) : (
           <button
-            className="btn"
-            style={{ background: "var(--neg)", color: "#fff" }}
+            className={cls.danger}
             onClick={doDelete}
             disabled={busy || !otp || !exported}
             title={!exported ? "Descargá tus datos primero" : undefined}

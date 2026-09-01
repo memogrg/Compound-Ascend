@@ -64,6 +64,16 @@ export type ReferralRow = {
   created_at: string;
 };
 
+// Compuerta OTP del borrado de cuenta (#82, migración 20260901000002).
+// Solo la escribe/lee el service-role; guarda el HASH del código, nunca el código.
+export type AccountDeletionOtpRow = {
+  user_id: string;
+  code_hash: string;
+  expires_at: string;
+  attempts: number;
+  created_at: string;
+};
+
 export type UserSettingsRow = Timestamps & {
   user_id: string;
   theme: "light" | "dark";
@@ -1175,6 +1185,16 @@ export interface Database {
         Partial<ReferralRow> & { referrer_user_id: string; referred_user_id: string },
         Partial<ReferralRow>
       >;
+      // Borrado de cuenta (#82). Service-role-only; upsert por user_id.
+      account_deletion_otps: TableShape<
+        AccountDeletionOtpRow,
+        Partial<AccountDeletionOtpRow> & {
+          user_id: string;
+          code_hash: string;
+          expires_at: string;
+        },
+        Partial<AccountDeletionOtpRow>
+      >;
       household_invitations: TableShape<
         HouseholdInvitationRow,
         Partial<HouseholdInvitationRow> & {
@@ -1371,6 +1391,16 @@ export interface Database {
       match_biblia_chunks: {
         Args: { query_embedding: number[]; match_count: number; min_similarity: number };
         Returns: { content: string; tag: string; similarity: number }[];
+      };
+      // Borrado de cuenta (#82, migración 20260901000001). SECURITY DEFINER,
+      // service-role-only. Devuelven un log (op, filas afectadas) por operación.
+      purge_household: {
+        Args: { p_household: string };
+        Returns: { op: string; affected: number }[];
+      };
+      reassign_member_rows: {
+        Args: { p_member: string; p_owner: string };
+        Returns: { op: string; affected: number }[];
       };
     };
     Enums: {

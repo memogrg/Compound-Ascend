@@ -18,6 +18,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { deleteAccountCore } from "@/modules/account/services/account-deletion-service";
 import { exportHouseholdWorkbook } from "@/modules/account/services/account-export-service";
 import {
+  issueDeletionOtp,
+  verifyDeletionOtp,
+} from "@/modules/account/services/account-otp-service";
+import {
   isEmailConfigured,
   emailProviderName,
   verifyEmailConnection,
@@ -230,14 +234,14 @@ export async function clearAllDataAction(): Promise<AccountActionResult> {
 
 // ---------- Borrado de cuenta (#82) ----------
 
-/** Paso 1: envía un OTP de re-verificación al correo (universal: password y Google). */
+/** Paso 1: genera y envía un OTP propio al correo (compuerta real, universal). */
 export async function requestAccountDeletionOtpAction(): Promise<AccountActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
   try {
-    await requireUser();
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.auth.reauthenticate();
-    if (error) return { ok: false, message: "No pudimos enviar el código. Intentá de nuevo." };
+    const user = await requireUser();
+    if (!user.email) return { ok: false, message: "Tu cuenta no tiene correo para verificar." };
+    const r = await issueDeletionOtp(user.id, user.email);
+    if (!r.ok) return { ok: false, message: "No pudimos enviar el código. Intentá de nuevo." };
     return { ok: true, message: "Te enviamos un código a tu correo." };
   } catch {
     return { ok: false, message: "Sesión no válida." };
@@ -284,13 +288,9 @@ export async function deleteAccountAction(input: {
   try {
     const user = await requireUser();
     userId = user.id;
-    // Re-verificación: consumir el nonce del OTP (prueba de identidad, universal).
-    const supabase = await createSupabaseServerClient();
-    const { error: reauthErr } = await supabase.auth.updateUser({
-      nonce: parsed.data.otp,
-      data: { _deletion_reauth_at: new Date().toISOString() },
-    });
-    if (reauthErr) return { ok: false, message: "Código inválido o expirado." };
+    // Compuerta: verifica el OTP propio (hash + TTL + intentos). Gatea de verdad.
+    const okOtp = await verifyDeletionOtp(userId, parsed.data.otp);
+    if (!okOtp) return { ok: false, message: "Código inválido o expirado." };
   } catch {
     return { ok: false, message: "Sesión no válida." };
   }

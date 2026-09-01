@@ -193,7 +193,7 @@ export default async function Page() {
         <EmailTester />
       </SetRow>
 
-      {household && household.members.length > 0 ? (
+      {household ? (
         <SetRow
           title="Miembros del hogar"
           desc="Quiénes comparten la cuenta. Invitá o quitá personas; el total (incluido el titular) depende de tu plan."

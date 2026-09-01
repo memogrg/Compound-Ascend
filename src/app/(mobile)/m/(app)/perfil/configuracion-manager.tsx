@@ -297,6 +297,7 @@ export function ConfiguracionManager({
           "BORRAR"; en nativo, además gate biométrico (#64). */}
       <MContentCard>
         <DeleteAccountButton
+          variant="mobile"
           onBeforeDelete={async () => {
             if (!isNativeApp()) return true;
             const avail = await checkBiometryAvailable();
