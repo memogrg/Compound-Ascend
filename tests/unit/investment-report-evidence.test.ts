@@ -29,6 +29,7 @@ const holding = (over: Partial<Holding> = {}): Holding => ({
   monedaFila: "USD",
   valorPrimario: over.value ?? 1_500_000,
   priceUnavailable: false,
+  fuente: "mercado" as const,
   ...over,
 });
 

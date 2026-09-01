@@ -14,6 +14,7 @@ import { now as simNow } from "@/lib/time/clock";
  * Vive DENTRO de financeChatWithTools → cubre web y WhatsApp (ambos pasan por ahí).
  */
 import { formatMoney } from "@/lib/format";
+import { frasesValuacion } from "@/lib/ai/valuacion-portafolio";
 import { pareceTodosLosCandidatos } from "@/lib/ai/sobre-match";
 import {
   pareceBloqueDeEstado,
@@ -1443,31 +1444,38 @@ export function answerFromContext(
     return say(`Aportás ~${money(metas)} al mes a tus metas de ahorro.`);
   }
 
-  // INVERSIONES — resumen: invertido, valor actual y ganancia/pérdida. Cada cifra va con SU moneda
-  // (los activos cotizados se leen en USD aunque la app esté en colones): son SUBTOTALES por moneda,
-  // nunca un total que sume monedas distintas. El total convertido solo si el contexto lo trae.
+  // INVERSIONES — resumen. Cada cifra va con SU moneda (los cotizados se leen en USD aunque la app
+  // esté en colones): SUBTOTALES por moneda, nunca un total que sume monedas distintas.
+  //
+  // HONESTIDAD (lo que este lane hacía mal): sumaba en un solo "resultado sobre lo invertido" el
+  // P&L de mercado, las valuaciones que el usuario escribió a mano y los PLACEHOLDERS de las
+  // posiciones sin precio. Con eso una cartera con la cripto en −44% llegó a reportarse en +$1.013,
+  // porque una marca manual de +$25.981 tapaba la caída. Ahora los grupos van separados y el de
+  // "sin precio" no publica resultado: lo arma `valuacion-portafolio`, que es puro y testeado.
   if (intent === "resumen_inversiones") {
     const inv = ctx?.investmentInvested ?? [];
     const val = ctx?.investmentValue ?? [];
-    const pl = ctx?.investmentPL ?? [];
+    const v = ctx?.valuacion;
     if (val.length === 0 && inv.length === 0) return null;
-    const subs = (ms: { monto: number; moneda: string }[]) =>
-      ms.map((m) => formatMoney(m.monto, m.moneda)).join(" + ");
-    const parts: string[] = [];
-    if (val.length) parts.push(`Tu portafolio vale ${subs(val)}`);
-    if (inv.length) parts.push(`invertiste ${subs(inv)}`);
-    if (pl.length) {
-      const detalle = pl
-        .map((m) => `${m.monto >= 0 ? "+" : "−"}${formatMoney(Math.abs(m.monto), m.moneda)}`)
-        .join(" ");
-      parts.push(`tu resultado sobre lo invertido es ${detalle}`);
-    }
+
+    // Sin desglose (contexto viejo o incompleto) NO se cae al texto anterior: ese es justo el que
+    // afirmaba de más. Se escala al modelo, que sí ve las etiquetas del prompt.
+    if (!v) return null;
+
+    const frases = frasesValuacion(v, {
+      fmt: (m) => formatMoney(m.monto, m.moneda),
+      voz: "vos",
+    });
+    if (frases.length === 0) return null;
+
+    // El total convertido solo tiene sentido si de verdad se pudo valuar todo: con posiciones sin
+    // precio sería un total apoyado en placeholders.
     const conv = ctx?.portfolioValueConvertido;
     const extra =
-      conv && val.length > 1
+      conv && val.length > 1 && !v.haySinPrecio && !v.mayoriaSinPrecio
         ? ` En ${conv.moneda}, el valor total equivale a ${formatMoney(conv.monto, conv.moneda)}.`
         : "";
-    return say(parts.join("; ") + "." + extra);
+    return say(frases.join(". ") + "." + extra);
   }
 
   // DCA mensual (aporte recurrente): compromisoDesglose.dca.

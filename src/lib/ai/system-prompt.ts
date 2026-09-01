@@ -8,6 +8,7 @@
 import type { Trajectory } from "@/lib/ai/trajectory";
 import { formatRanking } from "@/modules/personal-profile/engine/ranking";
 import { montoStr, subtotalesStr, type Monto } from "@/lib/ai/money";
+import { etiquetaContexto, type ValuacionPortafolio } from "@/lib/ai/valuacion-portafolio";
 import type { HoldingContext as HoldingRow } from "@/lib/ai/holdings-context";
 import type {
   DebtLever,
@@ -87,6 +88,12 @@ export type FinancialContext = {
   investmentPL?: Monto[];
   /** Valor total en la moneda PRIMARIA del motor: base homogénea para porcentajes/participaciones. */
   investmentValueBase?: Monto;
+  /**
+   * De qué está hecho ese valor: cuánto lo pone el mercado, cuánto lo escribió el usuario a mano y
+   * cuánto no se pudo valuar. Sin esto, los agregados de arriba se leen como si todos vinieran del
+   * mercado — que es exactamente el error que producía "+$1.013" sobre una cartera en baja.
+   */
+  valuacion?: ValuacionPortafolio;
   /**
    * CONCENTRACIÓN del portafolio — la definición CANÓNICA, del motor (concentrations()), sobre
    * TODAS las posiciones y en la moneda base. Es la única del repo: el informe la consume, no la
@@ -406,6 +413,13 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
             ? ` El valor actual equivale a ${montoStr(ctx.portfolioValueConvertido)} convertido.`
             : ""),
       );
+    // La etiqueta viaja PEGADA a los agregados: si va lejos, el modelo los afirma igual. Dice qué
+    // parte del total la pone el mercado, qué parte la escribió el usuario y qué parte es
+    // placeholder — con la instrucción explícita de no presentarlas como lo mismo.
+    if (ctx.valuacion) {
+      const etiqueta = etiquetaContexto(ctx.valuacion);
+      if (etiqueta) facts.push(`AVISO sobre esas cifras de inversiones: ${etiqueta}.`);
+    }
     const lines = ctx.holdings.map((h) => {
       const tag = h.symbol
         ? `${h.symbol}${h.name && h.name !== h.symbol ? ` (${h.name})` : ""}`

@@ -71,6 +71,7 @@ export function rowToHolding(r: {
   annual_rate_pct?: number | null;
   maturity_date?: string | null;
   term_years?: number | null;
+  updated_at?: string | null;
 }): Holding {
   return {
     id: r.id,
@@ -83,6 +84,7 @@ export function rowToHolding(r: {
     broker: r.broker,
     currency: r.currency,
     label: r.label,
+    updatedAt: r.updated_at ?? null,
     currentValueManual: r.current_value_manual == null ? null : Number(r.current_value_manual),
     rentalIncome: r.rental_income == null ? null : Number(r.rental_income),
     rentalFrequency: (r.rental_frequency ?? null) as Holding["rentalFrequency"],
@@ -111,7 +113,7 @@ export function rowToHolding(r: {
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date,term_years";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,updated_at,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date,term_years";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 

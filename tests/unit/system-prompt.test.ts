@@ -510,6 +510,7 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
         monedaFila: "USD", // …pero cotiza (y se reporta) en dólares
         valorPrimario: 560000,
         priceUnavailable: false,
+        fuente: "mercado" as const,
       },
     ],
   };
@@ -574,7 +575,7 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
     const prompt = buildSystemPrompt({
       currency: "CRC",
       holdings: [
-        { symbol: "XYZ", name: "XYZ", assetType: "cripto", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", monedaFila: "USD", valorPrimario: 500_000, priceUnavailable: true },
+        { symbol: "XYZ", name: "XYZ", assetType: "cripto", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", monedaFila: "USD", valorPrimario: 500_000, priceUnavailable: true, fuente: "sin_precio" as const },
       ],
     });
     expect(prompt).toContain("precio actual no disponible");

@@ -185,6 +185,12 @@ export type Holding = {
   broker?: string | null;
   currency: string;
   label?: string | null;
+  /**
+   * Última vez que la fila se tocó. Lo usa el asesor para preguntar por las posiciones valuadas
+   * A MANO que llevan mucho anotadas en lo que costaron: sin fecha no se puede distinguir "la
+   * revisó ayer y sigue valiendo eso" de "nadie la mira desde hace dos años".
+   */
+  updatedAt?: string | null;
   // ── Activos de renta / no cotizados (migración 0018) ──
   /** Valor actual puesto a mano (no cotizados: inmueble, negocio, otro). */
   currentValueManual?: number | null;

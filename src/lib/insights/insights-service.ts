@@ -118,6 +118,46 @@ export async function refreshInsights(ctx?: AuthContext): Promise<void> {
 
     detected.push(...(await detectDamageSignals(debts, mes, ctx)));
     detected.push(...(await detectMonthRhythm(mes, ctx)));
+
+    // ── Salud del feed de precios ──
+    // Va acá y no en la valuación porque es una lectura de estado, no un efecto: mira qué tan
+    // viejo está el store para las posiciones cotizadas de ESTE usuario. Best-effort, como el
+    // resto: si falla, el resto de los insights sale igual.
+    try {
+      const { detectStaleMarketFeed } = await import("@/lib/insights/detectors");
+      const { resumirFrescura } = await import("@/lib/market-data/freshness");
+      const { listHoldings } = await import("@/modules/wealth/services/holdings-service");
+      const holdings = await listHoldings(ctx);
+      const cotizadas = holdings
+        .filter((h) => ["etf", "accion", "cripto"].includes(h.assetType))
+        .map((h) => ({ symbol: h.symbol, assetType: h.assetType as string }));
+      if (cotizadas.length > 0) {
+        const { db } = await resolveAuth(ctx);
+        const { data } = await db
+          .from("market_price_cache")
+          .select("symbol,asset_type,fetched_at")
+          .in("symbol", [...new Set(cotizadas.map((h) => h.symbol.toUpperCase()))]);
+        const frescura = resumirFrescura({
+          filas: data ?? [],
+          cotizadas,
+          ahora: Date.now(),
+        });
+        if (frescura.stale) {
+          // El log es para NOSOTROS (el insight es para el usuario): un feed caído es un
+          // incidente de producto, y sin esta línea solo se descubre cuando una respuesta
+          // sale mal — que es exactamente como se descubrió la última vez.
+          logger.warn("market-data: store stale para un usuario", {
+            posicionesCotizadas: frescura.posicionesCotizadas,
+            sinPrecioFresco: frescura.posicionesSinPrecioFresco,
+            horasDesdeUltimoPrecio: frescura.horasDesdeUltimoPrecio,
+          });
+        }
+        detected.push(...detectStaleMarketFeed(frescura));
+      }
+    } catch {
+      // best-effort: sin salud del feed, el resto de los insights sale igual.
+    }
+
     await syncInsights(detected, ctx);
   } catch (err) {
     logger.warn("refreshInsights fallido", { message: err instanceof Error ? err.message : "?" });

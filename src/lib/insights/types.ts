@@ -49,7 +49,12 @@ export type InsightKind =
   | "ritmo_sobre"
   // Sobre con presupuesto asignado y casi sin uso en los últimos meses. Severidad 'info': ni
   // siquiera es un riesgo — es plata inmovilizada, y a veces a propósito.
-  | "sobre_ocioso";
+  | "sobre_ocioso"
+  // El feed de precios lleva más de un día sin refrescar las posiciones cotizadas. NO es un
+  // problema del usuario: es nuestro. Va a la campana igual porque mientras dure, la valuación
+  // del portafolio (y lo que el asesor diga sobre ella) está apoyada en precios viejos, y eso
+  // el usuario tiene derecho a saberlo antes de decidir algo con esos números.
+  | "feed_precios_stale";
 
 /** Lo que produce un detector (puro, sin IO ni estado de persistencia). */
 export type DetectedInsight = {

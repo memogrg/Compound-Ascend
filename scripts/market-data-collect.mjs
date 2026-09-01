@@ -250,9 +250,11 @@ async function main() {
   }
 
   // ACCIONES/ETF: Finnhub por símbolo.
+  let stockValid = 0;
   for (const t of stockTargets) {
     const h = await stockHighlight(t.symbol);
     if (!h) continue;
+    if (isValidPrice(h.price)) stockValid += 1;
     const row = buildRow(t.symbol, t.marketType, h.price, "USD", "finnhub", h.high, h.highDate, null, "52w");
     if (row && (await sbUpsert(row))) written += 1;
   }
@@ -261,13 +263,31 @@ async function main() {
   for (const sample of ["BTC", "KMNO"]) {
     if (markets[sample]) console.log(`  ${sample}: price=${markets[sample].price} ath=${markets[sample].ath}`);
   }
-  console.log(`market-data.collect → written=${written} cryptoValid=${cryptoValid}`);
+  console.log(
+    `market-data.collect → written=${written} cryptoValid=${cryptoValid} stockValid=${stockValid}`,
+  );
 
-  // AUTOVERIFICACIÓN: si había cripto objetivo pero NINGUNA trajo precio válido, el fetch desde el
-  // runner falló (o CoinGecko cambió) → fallamos ruidosamente en vez de dejar el store viejo en silencio.
+  // AUTOVERIFICACIÓN. Si había objetivos de un tipo y NINGUNO trajo precio válido, ese proveedor
+  // está caído para nosotros → fallamos ruidosamente en vez de dejar el store viejo en silencio.
+  //
+  // La verificación de ACCIONES no existía, y costó caro: el FINNHUB_TOKEN del Action devolvía 401
+  // desde (al menos) el 2026-08-23 y el workflow salió `success` en TODAS las corridas, porque solo
+  // se miraba la cripto. Los ETF quedaron sin recolectar más de diez días sin una sola señal; solo
+  // seguían frescos de rebote, porque el camino en vivo de la app (persist.ts, con OTRO token) los
+  // escribe cuando alguien abre Patrimonio. Un tipo de activo entero puede morir en silencio: por
+  // eso cada tipo verifica el suyo.
+  const fallos = [];
   if (cryptoSymbols.length > 0 && cryptoValid === 0) {
-    die(`Había ${cryptoSymbols.length} cripto objetivo y NINGUNA trajo precio válido — CoinGecko no respondió desde el runner.`);
+    fallos.push(
+      `${cryptoSymbols.length} cripto objetivo y NINGUNA trajo precio válido — CoinGecko no respondió desde el runner`,
+    );
   }
+  if (stockTargets.length > 0 && stockValid === 0) {
+    fallos.push(
+      `${stockTargets.length} acciones/ETF objetivo y NINGUNA trajo precio válido — revisá FINNHUB_TOKEN (un 401 en el log de arriba = token inválido o vencido)`,
+    );
+  }
+  if (fallos.length > 0) die(fallos.join(" · "));
 }
 
 main().catch((err) => die(err?.message ?? String(err)));
