@@ -1,0 +1,64 @@
+/** Verificación de la cuenta demo: corre los MOTORES REALES sobre lo sembrado en prod. */
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { createClient } from "@supabase/supabase-js";
+import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
+import { computeHealthScore } from "@/modules/financial-base/engine/health";
+import { recomputeFromPayments } from "@/modules/control/engine/amortization";
+
+const env: Record<string, string> = {};
+for (const l of readFileSync(".env.prod.local", "utf8").split("\n")) {
+  const m = l.match(/^([A-Z0-9_]+)=(.*)$/);
+  if (m) env[m[1]] = m[2].trim().replace(/^["']|["']$/g, "");
+}
+const db = createClient(env.NEXT_PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+const UID = "1727c50e-d945-4649-aa3e-0f894bd7dda2";
+
+describe("cuenta demo — Familia Ramírez Solano", () => {
+  it("indicadores y score de salud con los motores reales", async () => {
+    const { data: inc } = await db.from("income_sources").select("*").eq("user_id", UID);
+    const { data: exp } = await db.from("expense_items").select("*").eq("user_id", UID);
+    const incomes = (inc ?? []).map((r: any) => ({
+      incomeType: r.income_type, amountMonthly: Number(r.amount_monthly_base),
+      includeInBudget: r.include_in_budget, currency: r.currency,
+    })) as any;
+    const expenses = (exp ?? []).map((r: any) => ({
+      nature: r.nature, amountMonthly: Number(r.amount_monthly_base), frequency: r.frequency,
+    })) as any;
+    const ind = computeBaseIndicators(incomes, expenses);
+    const health = computeHealthScore(ind, ind.investmentRate);
+    console.log("INDICADORES", {
+      ingreso: ind.incomeMonthly, gasto: ind.expenseMonthly, libre: ind.freeCashflow,
+      ahorro: ind.savingsRate, inversion: ind.investmentRate, deuda: ind.debtWeight,
+      esenciales: ind.essentialsWeight, presion: ind.financialPressure,
+    });
+    console.log("SALUD", health.score, health.grade, health.bars.map((b) => `${b.label}: ${b.display}`));
+    expect(ind.freeCashflow).toBeGreaterThan(0);
+    expect(health.score).toBeGreaterThan(70);
+  });
+
+  it("saldos vivos de deuda que verá la pantalla de Deudas", async () => {
+    const { data: debts } = await db.from("debts").select("*").eq("user_id", UID);
+    const { data: pays } = await db.from("debt_payments").select("*").eq("user_id", UID);
+    for (const d of debts ?? []) {
+      const ps = (pays ?? []).filter((p: any) => p.debt_id === d.id).map((p: any) => ({
+        amount: Number(p.amount), paymentDate: p.occurred_on, kind: p.kind,
+        extraAmount: Number(p.extra_amount ?? 0),
+      }));
+      const r = recomputeFromPayments({
+        balance: Number(d.balance), apr: Number(d.apr ?? 0), termMonths: d.term_months,
+        monthlyPayment: Number(d.current_payment) > 0 ? Number(d.current_payment) : null,
+        insurance: Number(d.insurance ?? 0), extraMonthly: Number(d.extra_monthly ?? 0),
+        startDate: d.start_date, originalAmount: d.original_amount == null ? null : Number(d.original_amount),
+      } as any, ps as any);
+      console.log(`DEUDA ${d.name}: saldo ${Math.round(r.currentBalance).toLocaleString("es-CR")}`
+        + ` | capital pagado ${Math.round(r.paidPrincipal).toLocaleString("es-CR")}`
+        + ` | intereses ${Math.round(r.paidInterest).toLocaleString("es-CR")}`
+        + ` | avance ${(r.progressPct * 100).toFixed(1)}% | libre en ${r.projectedPayoffMonths} meses (${r.projectedPayoffDate})`);
+      expect(r.currentBalance).toBeLessThan(Number(d.balance) + 1);
+    }
+    const tarjeta = (debts ?? []).find((d: any) => d.debt_type === "tarjeta")!;
+    const ps = (pays ?? []).filter((p: any) => p.debt_id === tarjeta.id);
+    expect(ps.length).toBeGreaterThan(0);
+  });
+});
