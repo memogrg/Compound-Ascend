@@ -69,6 +69,13 @@ beforeEach(() => {
   h.members = ["A", "B"];
 });
 
+/**
+ * SIN timeout por test a propósito. Estos cuatro llevaban `20000` a mano y ese override GANA sobre
+ * el `testTimeout: 30_000` de vitest.config.ts, así que el archivo quedó fuera del arreglo del
+ * flake de arranque en frío: cuando el worker paga por primera vez la transformación de los
+ * barrels de dominio (10-15 s), 20 s no alcanzan y estos tests caían en CI sin que hubiera nada
+ * roto. Solos corren en ~6 s. Si alguno necesitara más margen que el global, subí el global.
+ */
 describe("buildFinancialContext · alcance de hogar (E4)", () => {
   it("hogar de 2 → savings_goals por .in vía listGoals (financiero compartido)", async () => {
     await buildFinancialContext();
@@ -76,7 +83,7 @@ describe("buildFinancialContext · alcance de hogar (E4)", () => {
     // mismo spy, así seguimos verificando el .in(householdMemberIds) REAL sobre savings_goals —
     // el scoping por hogar sigue aseverado end-to-end, no solo la delegación.
     expect(filterByTable["savings_goals"]).toBe("in");
-  }, 20000);
+  });
 
   it("los perfiles PERSONALES siguen por .eq(user), nunca .in", async () => {
     await buildFinancialContext();
@@ -90,16 +97,16 @@ describe("buildFinancialContext · alcance de hogar (E4)", () => {
     ]) {
       if (filterByTable[t] !== undefined) expect(filterByTable[t]).toBe("eq");
     }
-  }, 20000);
+  });
 
   it("hogar de 2 → householdShared=true", async () => {
     const ctx = await buildFinancialContext();
     expect(ctx.householdShared).toBe(true);
-  }, 20000);
+  });
 
   it("modo solo (1 miembro) → householdShared NO se marca (comportamiento intacto)", async () => {
     h.members = ["A"];
     const ctx = await buildFinancialContext();
     expect(ctx.householdShared).toBeUndefined();
-  }, 20000);
+  });
 });
