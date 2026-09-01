@@ -121,6 +121,15 @@ begin
 end;
 $$;
 
+-- Helper INTERNO: solo lo invocan los wrappers SEC DEFINER (backfill_owner_household,
+-- ensure_household) corriendo como postgres. NUNCA debe ser invocable directo por un
+-- cliente: valida por ARGUMENTOS (no por auth.uid()), así que expuesto a anon/authenticated
+-- es acceso roto (mover las filas huérfanas de OTRO usuario a tu hogar). En Supabase el
+-- `revoke from public` NO alcanza: anon/authenticated tienen EXECUTE por DEFAULT PRIVILEGES
+-- como grants explícitos → hay que revocarles explícito (mismo fix que #82).
+revoke all on function public.backfill_household_rows(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.backfill_household_rows(uuid, uuid) to service_role;
+
 -- ------------------------------------------------------------
 -- Backfill del usuario autenticado sobre su hogar activo.
 --
