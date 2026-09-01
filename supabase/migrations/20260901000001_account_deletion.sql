@@ -177,9 +177,14 @@ end;
 $$;
 
 -- Solo el service-role (deleteAccountAction) las invoca; nunca clientes anon/auth.
-revoke all on function public.household_purgeable_tables() from public;
-revoke all on function public.purge_household(uuid) from public;
-revoke all on function public.reassign_member_rows(uuid, uuid) from public;
+-- OJO (Supabase): anon/authenticated reciben EXECUTE por DEFAULT PRIVILEGES como grants
+-- EXPLÍCITOS, así que `revoke ... from public` NO los quita — hay que revocarles a ellos
+-- de forma explícita (igual que la tabla OTP hace `revoke ... from anon, authenticated`).
+-- Sin esto, purge_household/reassign_member_rows quedan invocables por PostgREST desde
+-- cualquier cliente (la anon key viaja en el bundle): un alta de acceso roto destructivo.
+revoke all on function public.household_purgeable_tables() from public, anon, authenticated;
+revoke all on function public.purge_household(uuid) from public, anon, authenticated;
+revoke all on function public.reassign_member_rows(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.household_purgeable_tables() to service_role;
 grant execute on function public.purge_household(uuid) to service_role;
 grant execute on function public.reassign_member_rows(uuid, uuid) to service_role;
