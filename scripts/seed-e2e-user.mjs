@@ -24,7 +24,9 @@ if (!url || !serviceKey || !password) {
 
 if (!/^https?:\/\//i.test(url)) {
   // Causa típica: el valor llegó con comillas literales desde GITHUB_ENV (issue #94).
-  console.error(`SUPABASE_URL inválida (debe empezar con http(s)://). Recibido: ${JSON.stringify(url)}`);
+  console.error(
+    `SUPABASE_URL inválida (debe empezar con http(s)://). Recibido: ${JSON.stringify(url)}`,
+  );
   process.exit(1);
 }
 
@@ -69,9 +71,14 @@ if (!userId) {
 // onboarding_completed quedaba en false, /dashboard redirigía a /bienvenida y el
 // smoke fallaba cinco pasos después con un mensaje que no tenía nada que ver
 // ("Flujo del mes" no visible). Un seed que miente cuesta más que uno que falla.
+// El `plan` va acá por la misma razón que `onboarding_completed`: desde que
+// existe el muro de suscripción, una cuenta en `ninguno` no llega al panel —
+// el middleware la manda a /suscripcion y el smoke muere en "Flujo del mes"
+// sin decir por qué. Se siembra en `max` porque el recorrido toca funciones de
+// todos los niveles, y un usuario que de verdad usa la app tiene plan.
 const { error: profileError } = await admin
   .from("profiles")
-  .update({ display_name: "E2E Bot", onboarding_completed: true })
+  .update({ display_name: "E2E Bot", onboarding_completed: true, plan: "max" })
   .eq("id", userId);
 
 if (profileError) {
