@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getAccountInfo, getAccountDeletionInfo } from "@/modules/account/services/account-service";
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
+import { ExportDataButton } from "@/modules/account/components/export-data-button";
 import { ReferralCard } from "@/components/referrals/referral-card";
 import { MemoryPanel } from "@/components/memory/memory-panel";
 import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
@@ -252,6 +253,13 @@ export default async function Page() {
           <UpgradePrompt />
         </div>
       ) : null}
+
+      <SetRow
+        title="Tus datos"
+        desc="Descargá una copia completa de tu información cuando querás. Es tuya y te la llevás."
+      >
+        <ExportDataButton />
+      </SetRow>
 
       <SetRow
         title="Zona de peligro"

@@ -54,6 +54,7 @@ import { MSectionHeader, MContentCard, MDataRow, MChip } from "../../components/
 import { AppLockToggle } from "../../components/app-lock-toggle";
 import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/app-lock";
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
+import { ExportDataButton } from "@/modules/account/components/export-data-button";
 
 type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
 type SheetId = "currency" | "timezone" | "theme" | "whatsapp" | "household" | "password" | null;
@@ -269,6 +270,13 @@ export function ConfiguracionManager({
         <EmailTestRow />
       </MContentCard>
       <AppLockToggle />
+
+      {/* Portabilidad — ARRIBA de la zona de peligro y fuera de ella: bajarse una
+          copia de los propios datos no puede exigir pasar por el flujo de borrado. */}
+      <MSectionHeader title="Tus datos" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <ExportDataButton variant="mobile" />
+      </MContentCard>
 
       {/* Zona de peligro — separada y en tono de peligro; su ConfirmDialog de 2 pasos intacto. */}
       <MSectionHeader title="Zona de peligro" />
