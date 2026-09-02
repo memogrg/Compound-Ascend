@@ -15,7 +15,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function HouseholdInvites({
   emails,
   onChange,
-  plan = "free",
+  plan = "ninguno",
 }: {
   emails: string[];
   onChange: (emails: string[]) => void;

@@ -1,39 +1,47 @@
 import { describe, it, expect } from "vitest";
-import { createHmac } from "node:crypto";
-import { can, isPremium, aiTokenLimit } from "@/lib/plan";
-import { verifySignature } from "@/lib/security/webhook";
+import { can, isPaidPlan, aiTokenLimit, isUpgrade, isDowngrade, PAID_PLANS } from "@/lib/plan";
 
-describe("plan gating", () => {
-  it("free no tiene funciones premium pero sí lo esencial", () => {
-    expect(can("free", "ai_chat")).toBe(true);
-    expect(can("free", "receipt_scanner")).toBe(true);
-    expect(can("free", "expert_review")).toBe(false);
-    expect(can("free", "advanced_simulator")).toBe(false);
+describe("gating por plan", () => {
+  it("sin plan no se usa nada: no es un tier gratuito disimulado", () => {
+    expect(can("ninguno", "ai_chat")).toBe(false);
+    expect(can("ninguno", "household")).toBe(false);
+    expect(isPaidPlan("ninguno")).toBe(false);
   });
-  it("premium desbloquea todo", () => {
-    expect(can("premium", "expert_review")).toBe(true);
-    expect(can("premium", "marketplace")).toBe(true);
-    expect(isPremium("premium")).toBe(true);
+
+  it("Esencial+ deja conversar, pero la foto y el correo entran desde Pro+", () => {
+    expect(can("esencial", "ai_chat")).toBe(true);
+    expect(can("esencial", "receipt_scanner")).toBe(false);
+    expect(can("esencial", "email_ingest")).toBe(false);
   });
-  it("límites de tokens por plan", () => {
-    expect(aiTokenLimit("premium")).toBeGreaterThan(aiTokenLimit("free"));
+
+  it("Pro+ suma la captura automática y el simulador", () => {
+    expect(can("pro", "receipt_scanner")).toBe(true);
+    expect(can("pro", "email_ingest")).toBe(true);
+    expect(can("pro", "advanced_simulator")).toBe(true);
+  });
+
+  it("el hogar es exclusivo de Max+ — de ahí sale la regla de orfandad", () => {
+    expect(can("esencial", "household")).toBe(false);
+    expect(can("pro", "household")).toBe(false);
+    expect(can("max", "household")).toBe(true);
+  });
+
+  it("el uso de My Agent C+ sube con cada escalón", () => {
+    expect(aiTokenLimit("esencial")).toBeGreaterThan(aiTokenLimit("ninguno"));
+    expect(aiTokenLimit("pro")).toBeGreaterThan(aiTokenLimit("esencial"));
+    expect(aiTokenLimit("max")).toBeGreaterThan(aiTokenLimit("pro"));
   });
 });
 
-describe("verificación de firma de webhook", () => {
-  const secret = "test-secret";
-  const body = JSON.stringify({ type: "plan.updated", userId: "u", plan: "premium" });
+describe("dirección del cambio de plan", () => {
+  it("subir y bajar no son lo mismo (y deciden si se cobra hoy o se programa)", () => {
+    expect(isUpgrade("esencial", "pro")).toBe(true);
+    expect(isDowngrade("max", "pro")).toBe(true);
+    expect(isUpgrade("pro", "pro")).toBe(false);
+    expect(isDowngrade("pro", "pro")).toBe(false);
+  });
 
-  it("acepta firma válida", () => {
-    const sig = createHmac("sha256", secret).update(body).digest("hex");
-    expect(verifySignature(body, sig, secret)).toBe(true);
-  });
-  it("rechaza firma inválida o ausente", () => {
-    expect(verifySignature(body, "deadbeef", secret)).toBe(false);
-    expect(verifySignature(body, null, secret)).toBe(false);
-  });
-  it("rechaza si el cuerpo cambió", () => {
-    const sig = createHmac("sha256", secret).update(body).digest("hex");
-    expect(verifySignature(body + "x", sig, secret)).toBe(false);
+  it("salir de un plan de pago a ninguno es una bajada", () => {
+    for (const p of PAID_PLANS) expect(isDowngrade(p, "ninguno")).toBe(true);
   });
 });

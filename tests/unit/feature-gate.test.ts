@@ -1,13 +1,14 @@
 /**
- * Gating premium en servidor: la UI puede ocultar, pero la autorización real es
- * `assertFeature`. Free no entra a features premium; premium sí; ai_chat (común
- * a ambos) nunca bloquea.
+ * Gating por plan en servidor: la UI puede ocultar, pero la autorización real
+ * es `assertFeature`. Sin plan no entra a nada; Esencial+ conversa pero no llega
+ * a lo de Pro+; Max+ tiene todo. Sin fila de perfil se cae a 'ninguno', que es
+ * el default SEGURO: ante la duda, no se regala acceso.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-let planValue: "free" | "premium" | null = "free";
+let planValue: "ninguno" | "esencial" | "pro" | "max" | null = "esencial";
 
 vi.mock("@/lib/auth/session", () => ({
   requireUser: vi.fn(async () => ({ id: "user-1" })),
@@ -32,29 +33,43 @@ import { assertFeature, getUserPlan } from "@/lib/auth/feature-gate";
 import { AppError } from "@/lib/errors";
 
 beforeEach(() => {
-  planValue = "free";
+  planValue = "esencial";
 });
 
-describe("assertFeature (gating premium en servidor)", () => {
-  it("free: bloquea una feature premium con 403", async () => {
-    planValue = "free";
+describe("assertFeature (gating por plan en servidor)", () => {
+  it("Esencial+: bloquea con 403 lo que no incluye", async () => {
+    planValue = "esencial";
     await expect(assertFeature("expert_review")).rejects.toMatchObject({ status: 403 });
     await expect(assertFeature("expert_review")).rejects.toBeInstanceOf(AppError);
   });
 
-  it("free: NO bloquea ai_chat (común a ambos planes)", async () => {
-    planValue = "free";
+  it("Esencial+: NO bloquea ai_chat, que está en todos los planes de pago", async () => {
+    planValue = "esencial";
     await expect(assertFeature("ai_chat")).resolves.toBeUndefined();
   });
 
-  it("premium: permite la feature premium", async () => {
-    planValue = "premium";
-    await expect(assertFeature("expert_review")).resolves.toBeUndefined();
+  it("Pro+: la foto del recibo y el correo entran acá, no antes", async () => {
+    planValue = "pro";
+    await expect(assertFeature("receipt_scanner")).resolves.toBeUndefined();
+    await expect(assertFeature("email_ingest")).resolves.toBeUndefined();
+    // El hogar sigue siendo de Max+: es lo que hace que bajar deje huérfanos.
+    await expect(assertFeature("household")).rejects.toMatchObject({ status: 403 });
   });
 
-  it("sin perfil: cae a 'free' (seguro) y bloquea premium", async () => {
+  it("Max+: permite todo", async () => {
+    planValue = "max";
+    await expect(assertFeature("expert_review")).resolves.toBeUndefined();
+    await expect(assertFeature("household")).resolves.toBeUndefined();
+  });
+
+  it("sin suscripción: ni siquiera el chat", async () => {
+    planValue = "ninguno";
+    await expect(assertFeature("ai_chat")).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("sin perfil: cae a 'ninguno' (seguro) y bloquea", async () => {
     planValue = null;
-    expect(await getUserPlan()).toBe("free");
+    expect(await getUserPlan()).toBe("ninguno");
     await expect(assertFeature("marketplace")).rejects.toMatchObject({ status: 403 });
   });
 });

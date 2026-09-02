@@ -6930,3 +6930,146 @@ select.ac-rc-field {
   color: var(--danger, #c0392b);
   border-color: var(--danger, #c0392b);
 }
+
+/* ═══ Página de suscripción ═══════════════════════════════════════════════
+   Las tres tarjetas de plan. La jerarquía la lleva Pro+ —es el que queremos
+   que la mayoría compre— así que es la única con borde de acento y badge;
+   las otras dos quedan calladas. El medidor de tres tramos es lo que hace
+   entender en tres segundos por qué el precio sube, sin leer quince viñetas. */
+.planes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+@media (max-width: 1000px) {
+  .planes-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+/* Pro+ es el ancla. Se levanta con acento, no con tamaño: una tarjeta más
+   grande rompe la fila y obliga a las otras dos a estirarse en vano. */
+.plan-card:has(.plan-badge) {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--accent) inset,
+    var(--e2);
+}
+.plan-card.es-actual {
+  background: var(--surface-2);
+}
+
+.plan-badge {
+  position: absolute;
+  top: -10px;
+  left: 24px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* El bloque que de verdad diferencia los planes. */
+.agente-nivel {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.agente-nivel .ov {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+
+.medidor3 {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+}
+.medidor3 span {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.medidor3 span.on {
+  background: var(--accent);
+}
+
+.plan-ben {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+/* La marca de verificación va como pseudo-elemento: una lista de beneficios
+   con viñetas de navegador se lee como texto, no como lo que suma el plan. */
+.plan-ben li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+}
+.plan-ben li::before {
+  content: "✓";
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* En las dos tarjetas secundarias el botón es fantasma, y sin borde no se lee
+   como botón: queda como un renglón de texto centrado. Se le devuelve el
+   contorno solo acá, sin tocar .btn-ghost del resto de la app. */
+.plan-card button {
+  width: 100%;
+  justify-content: center;
+}
+.plan-card .btn-ghost {
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+.plan-card .btn-ghost:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* El renglón del upsell existe en las tres tarjetas aunque solo Max+ lo use:
+   si no, los paneles de My Agent C+ arrancan a distinta altura y la fila deja
+   de leerse como un objeto. */
+.plan-nota {
+  min-height: 1.35em;
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.plan-card button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

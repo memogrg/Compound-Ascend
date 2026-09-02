@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getAccountInfo, getAccountDeletionInfo } from "@/modules/account/services/account-service";
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
+import { ExportDataButton } from "@/modules/account/components/export-data-button";
 import { ReferralCard } from "@/components/referrals/referral-card";
 import { MemoryPanel } from "@/components/memory/memory-panel";
 import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
@@ -30,7 +31,7 @@ import { isEmailConfigured } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { getMyLink } from "@/lib/whatsapp/links-service";
 import { isWhatsAppConfigured } from "@/lib/whatsapp";
-import { PLAN_LABEL, isPremium } from "@/lib/plan";
+import { PLAN_LABEL, isPaidPlan } from "@/lib/plan";
 
 /** Fila de la hoja de configuración: encabezado (título + descripción) | cuerpo. */
 function SetRow({
@@ -147,7 +148,7 @@ export default async function Page() {
       </SetRow>
 
       <SetRow title="Tu plan" desc="Tu suscripción y consumo de IA del mes.">
-        <span className={`plan-chip${isPremium(acc.plan) ? " prem" : ""}`}>
+        <span className={`plan-chip${isPaidPlan(acc.plan) ? " prem" : ""}`}>
           {PLAN_LABEL[acc.plan]}
         </span>
         <div className="usage-lb">
@@ -247,11 +248,18 @@ export default async function Page() {
         </p>
       </SetRow>
 
-      {!isPremium(acc.plan) ? (
+      {acc.plan !== "max" ? (
         <div style={{ marginTop: 12 }}>
-          <UpgradePrompt />
+          <UpgradePrompt plan={acc.plan} />
         </div>
       ) : null}
+
+      <SetRow
+        title="Tus datos"
+        desc="Descargá una copia completa de tu información cuando querás. Es tuya y te la llevás."
+      >
+        <ExportDataButton />
+      </SetRow>
 
       <SetRow
         title="Zona de peligro"
