@@ -8,12 +8,12 @@ import "server-only";
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 
-export const NOTIFICATION_CHANNELS = ["email", "whatsapp", "push", "inApp"] as const;
+export const NOTIFICATION_CHANNELS = ["email", "push", "inApp"] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 export type NotificationPrefs = Record<NotificationChannel, boolean>;
 
 /** Todos los canales encendidos por defecto. */
-const DEFAULTS: NotificationPrefs = { email: true, whatsapp: true, push: true, inApp: true };
+const DEFAULTS: NotificationPrefs = { email: true, push: true, inApp: true };
 
 function isChannel(k: string): k is NotificationChannel {
   return (NOTIFICATION_CHANNELS as readonly string[]).includes(k);

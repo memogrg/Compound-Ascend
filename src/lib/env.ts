@@ -73,16 +73,6 @@ const serverSchema = z.object({
   // Firma HMAC de los tokens de baja de correo (ruta pública). Si falta, la baja
   // por enlace se degrada con un error controlado (no crashea).
   UNSUBSCRIBE_SECRET: optionalStr,
-  // WhatsApp (Twilio). Si faltan, la integración se omite con gracia.
-  TWILIO_ACCOUNT_SID: optionalStr,
-  TWILIO_AUTH_TOKEN: optionalStr, // también firma los webhooks (X-Twilio-Signature)
-  TWILIO_WHATSAPP_NUMBER: optionalStr, // E.164, p. ej. +14155238886 (sandbox)
-  // WhatsApp (Meta Cloud API). Si están presentes, se prefiere sobre Twilio.
-  WHATSAPP_PHONE_NUMBER_ID: optionalStr, // ID del número (WhatsApp > API Setup)
-  WHATSAPP_ACCESS_TOKEN: optionalStr, // token permanente (System User)
-  WHATSAPP_VERIFY_TOKEN: optionalStr, // string propio para verificar el webhook (GET)
-  WHATSAPP_APP_SECRET: optionalStr, // firma X-Hub-Signature-256
-  WHATSAPP_API_VERSION: optionalStr, // p. ej. v21.0 (default si ausente)
   // Ingesta por correo (IMAP). Buzón donde los usuarios reenvían sus correos de
   // banco. Si GMAIL_IMAP_USER/PASSWORD faltan, el poller se omite con gracia.
   // Usar App Password de Google (NO la contraseña normal de la cuenta).

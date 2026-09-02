@@ -17,7 +17,6 @@ type Row = {
 const ROWS: Row[] = [
   { key: "inApp", label: "En la app", hint: "Avisos del día en “Qué noté”." },
   { key: "email", label: "Correo", hint: "Resumen semanal por correo." },
-  { key: "whatsapp", label: "WhatsApp", hint: "Resumen semanal (si vinculaste tu WhatsApp)." },
   {
     key: "push",
     label: "Notificaciones push",

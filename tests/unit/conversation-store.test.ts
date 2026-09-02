@@ -110,14 +110,14 @@ describe("conversation-store · appendTurns", () => {
   it("nunca lanza: si el insert falla, resuelve igual (best-effort)", async () => {
     h.insertError = { message: "boom" };
     await expect(
-      appendTurns(undefined, [{ role: "user", content: "x", channel: "whatsapp" }]),
+      appendTurns(undefined, [{ role: "user", content: "x", channel: "web" }]),
     ).resolves.toBeUndefined();
   });
 
   it("nunca lanza: si el cliente falla, resuelve igual", async () => {
     h.throwOnFrom = true;
     await expect(
-      appendTurns(undefined, [{ role: "user", content: "x", channel: "whatsapp" }]),
+      appendTurns(undefined, [{ role: "user", content: "x", channel: "web" }]),
     ).resolves.toBeUndefined();
   });
 });
