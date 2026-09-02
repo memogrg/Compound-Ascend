@@ -1,7 +1,7 @@
 /**
  * Regresión del pack de seguridad menor (auditoría TOP #10):
- *  - Webhooks (payment / whatsapp) con rate-limit: la firma sigue siendo la
- *    defensa real; esto corta el costo de CPU de intentos masivos.
+ *  - Webhook de pagos con rate-limit: la firma sigue siendo la defensa real;
+ *    esto corta el costo de CPU de intentos masivos.
  *  - /api/assistant/chat emite headers CORS también en la respuesta de éxito
  *    (antes solo validaba origen sin reflejar los headers).
  */
@@ -26,16 +26,12 @@ vi.mock("@/lib/rate-limit", () => ({
 vi.mock("@/lib/env", () => ({
   getServerEnv: () => ({
     PAYMENT_WEBHOOK_SECRET: "whsec",
-    TWILIO_AUTH_TOKEN: "tok",
     ALLOWED_ORIGINS: "https://app.ejemplo.com",
   }),
 }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 vi.mock("@/lib/security/webhook", () => ({ verifySignature: vi.fn(() => false) }));
 vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: vi.fn() }));
-vi.mock("@/lib/whatsapp/twilio-signature", () => ({ verifyTwilioSignature: vi.fn(() => false) }));
-vi.mock("@/lib/whatsapp", () => ({ getWhatsAppProvider: vi.fn() }));
-vi.mock("@/lib/whatsapp/router", () => ({ routeInbound: vi.fn() }));
 
 // assistant/chat: todo mockeado para llegar al return de éxito.
 vi.mock("@/lib/ai/orchestrator", () => ({
@@ -54,7 +50,6 @@ vi.mock("@/lib/auth/session", () => ({
 vi.mock("@/server/observability/alerts", () => ({ alert: vi.fn() }));
 
 import { POST as paymentWebhook } from "@/app/api/webhooks/payment/route";
-import { POST as whatsappWebhook } from "@/app/api/whatsapp/webhook/route";
 import { POST as chat } from "@/app/api/assistant/chat/route";
 
 beforeEach(() => {
@@ -77,14 +72,6 @@ describe("webhooks con rate-limit", () => {
     );
     expect(res.status).toBe(403);
     expect(rateLimitMock).toHaveBeenCalledWith("webhook:pay:9.9.9.9", expect.anything());
-  });
-
-  it("whatsapp: 429 al exceder el límite", async () => {
-    rateLimitOk = false;
-    const res = await whatsappWebhook(
-      new Request("http://localhost/api/whatsapp/webhook", { method: "POST", body: "a=b" }),
-    );
-    expect(res.status).toBe(429);
   });
 });
 

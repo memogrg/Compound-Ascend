@@ -1,8 +1,6 @@
 import { getAccountInfo } from "@/modules/account/services/account-service";
 import { getUserTimezone } from "@/lib/time/user-time";
 import { MobileHeader } from "../../components/mobile-header";
-import { getMyLink } from "@/lib/whatsapp/links-service";
-import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { signOutAction } from "@/lib/auth/actions";
 import { PLAN_LABEL } from "@/lib/plan";
 import { isSupabaseConfigured } from "@/lib/auth/session";
@@ -21,9 +19,9 @@ import { MemoryPanel } from "@/components/memory/memory-panel";
 import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
 
 /**
- * /m/perfil — identidad + ajustes agrupados (plan, moneda, WhatsApp, hogar, cuenta).
- * Reutiliza la MISMA lógica de la web: getAccountInfo (identidad/plan/uso IA/moneda),
- * getMyLink (WhatsApp) y la Server Action signOutAction (cerrar sesión).
+ * /m/perfil — identidad + ajustes agrupados (plan, moneda, hogar, cuenta).
+ * Reutiliza la MISMA lógica de la web: getAccountInfo (identidad/plan/uso IA/moneda)
+ * y la Server Action signOutAction (cerrar sesión).
  * Piel del diseño (data-screen="configuracion"), es-MX tono "tú", tema claro.
  */
 export const dynamic = "force-dynamic"; // datos por sesión
@@ -36,8 +34,6 @@ function tk(n: number): string {
 export default async function MobilePerfil() {
   const acc = await getAccountInfo();
   const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
-  const wa = await getMyLink().catch(() => null);
-  const whatsappConfigured = isWhatsAppConfigured();
   // Referidos (paridad con Ajustes web, mismo componente con la piel móvil).
   const referral = isSupabaseConfigured() ? await getMyReferral() : null;
   // Memoria del asesor (paridad con Ajustes web, mismo componente con la piel móvil).
@@ -157,7 +153,7 @@ export default async function MobilePerfil() {
         </MContentCard>
 
         {/* Invitar: el mismo ReferralCard de la web con skin="mobile" — ahí está el
-            share nativo y la descarga del QR para mandarlo por WhatsApp. */}
+            share nativo y la descarga del QR para compartirlo. */}
         {referral ? (
           <>
             <MSectionHeader title="Invita a alguien" />
@@ -178,13 +174,11 @@ export default async function MobilePerfil() {
           <MemoryPanel items={memoria} skin="mobile" />
         </MContentCard>
 
-        {/* Ajustes gestionables (moneda · WhatsApp · hogar · notificaciones · ingesta · borrar) */}
+        {/* Ajustes gestionables (moneda · hogar · notificaciones · ingesta · borrar) */}
         <ConfiguracionManager
           currency={acc.currency}
           timezone={savedTz}
           notifications={acc.notifications}
-          wa={wa}
-          whatsappConfigured={whatsappConfigured}
           ingestEmails={ingestEmails}
           household={household}
           emailConfigured={emailConfigured}

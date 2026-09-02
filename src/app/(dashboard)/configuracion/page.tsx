@@ -11,7 +11,6 @@ import { CurrencySelector } from "@/modules/account/components/currency-selector
 import { TimezoneSelector } from "@/modules/account/components/timezone-selector";
 import { NotificationPrefs } from "@/modules/account/components/notification-prefs";
 import { EmailTester } from "@/modules/account/components/email-tester";
-import { WhatsAppLink } from "@/modules/account/components/whatsapp-link";
 import { IngestEmails } from "@/modules/account/components/ingest-emails";
 import { INGEST_TARGET, INGEST_HELP } from "@/modules/account/constants";
 import {
@@ -28,8 +27,6 @@ import {
 } from "@/modules/personal-profile";
 import { isEmailConfigured } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/auth/session";
-import { getMyLink } from "@/lib/whatsapp/links-service";
-import { isWhatsAppConfigured } from "@/lib/whatsapp";
 import { PLAN_LABEL, isPremium } from "@/lib/plan";
 
 /** Fila de la hoja de configuración: encabezado (título + descripción) | cuerpo. */
@@ -63,8 +60,6 @@ export default async function Page() {
   const savedTz = isSupabaseConfigured() ? await getUserTimezone().catch(() => null) : null;
   const usagePct =
     acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
-  const whatsappLink = isSupabaseConfigured() ? await getMyLink() : null;
-  const whatsappConfigured = isWhatsAppConfigured();
 
   // Correos del banco (onboarding de ingesta). Best-effort: si falla, lista vacía.
   let ingestEmails: IngestEmailRow[] = [];
@@ -201,13 +196,6 @@ export default async function Page() {
           <HouseholdMembers view={household} emailConfigured={emailConfigured} />
         </SetRow>
       ) : null}
-
-      <SetRow
-        title="Asistente de WhatsApp"
-        desc="Registra gastos por foto o texto y consulta tu presupuesto desde WhatsApp. Tu número se vincula a tu familia solo tras confirmar un código."
-      >
-        <WhatsAppLink initial={whatsappLink} configured={whatsappConfigured} />
-      </SetRow>
 
       <SetRow
         title={
