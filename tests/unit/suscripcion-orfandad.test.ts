@@ -82,6 +82,9 @@ import {
   aplicarCambiosVencidos,
 } from "@/modules/account/services/subscription-service";
 
+/** El titular. Función y no variable: `perfiles` se recrea en cada beforeEach. */
+const titular = (): Perfil => perfiles[0]!;
+
 const AYER = new Date(Date.now() - 86_400_000).toISOString();
 const EN_UN_MES = new Date(Date.now() + 30 * 86_400_000).toISOString();
 
@@ -118,13 +121,13 @@ describe("bajada programada", () => {
   });
 
   it("no se programa una SUBIDA por acá: eso se cobra y se aplica de una", async () => {
-    perfiles[0].plan = "esencial";
+    titular().plan = "esencial";
     const r = await programarBajada("titular", "max");
     expect(r.ok).toBe(false);
   });
 
   it("sin fecha de vencimiento no se inventa una", async () => {
-    perfiles[0].period_end = null;
+    titular().period_end = null;
     const r = await programarBajada("titular", "pro");
     expect(r.ok).toBe(false);
   });
@@ -149,7 +152,7 @@ describe("orfandad al bajar de Max+", () => {
   });
 
   it("subir de plan nunca desaloja a nadie", async () => {
-    perfiles[0].plan = "pro";
+    titular().plan = "pro";
     const r = await aplicarPlan("titular", "max");
     expect(r.huerfanos).toBe(0);
     expect(miembros.every((m) => m.status !== "removed")).toBe(true);
@@ -164,8 +167,8 @@ describe("orfandad al bajar de Max+", () => {
 
 describe("el cron aplica lo vencido", () => {
   it("solo toca lo que ya venció, y arrastra la orfandad", async () => {
-    perfiles[0].plan_pending = "pro";
-    perfiles[0].plan_effective_at = AYER;
+    titular().plan_pending = "pro";
+    titular().plan_effective_at = AYER;
 
     const r = await aplicarCambiosVencidos();
 
@@ -176,8 +179,8 @@ describe("el cron aplica lo vencido", () => {
   });
 
   it("un cambio que todavía no vence no se aplica", async () => {
-    perfiles[0].plan_pending = "pro";
-    perfiles[0].plan_effective_at = EN_UN_MES;
+    titular().plan_pending = "pro";
+    titular().plan_effective_at = EN_UN_MES;
 
     const r = await aplicarCambiosVencidos();
 

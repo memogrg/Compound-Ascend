@@ -11,6 +11,7 @@
  * haya tope) y nunca «tokens» (lenguaje técnico interno).
  */
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   PAID_PLANS,
   PLAN_LABEL,
@@ -25,6 +26,7 @@ import {
 import { elegirPlanAction } from "@/modules/account/api/subscription-actions";
 
 export function PlanesPicker({ actual }: { actual: Plan }) {
+  const router = useRouter();
   const [pendiente, empezar] = useTransition();
   const [nota, setNota] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +44,14 @@ export function PlanesPicker({ actual }: { actual: Plan }) {
         return;
       }
       // Subida o alta: Stripe. Bajada: no hay URL, solo el aviso de cuándo entra.
-      if (r.url) window.location.href = r.url;
-      else setNota(r.message ?? "Listo.");
+      if (r.url) {
+        window.location.href = r.url;
+        return;
+      }
+      setNota(r.message ?? "Listo.");
+      // Sin esto, la tarjeta de arriba sigue mostrando el estado viejo y el
+      // cambio programado no aparece hasta que la persona recarga a mano.
+      router.refresh();
     });
   };
 
@@ -70,13 +78,9 @@ export function PlanesPicker({ actual }: { actual: Plan }) {
                   / mes
                 </span>
               </p>
-              {plan === "max" ? (
-                <p className="muted" style={{ fontSize: 12.5, margin: "0 0 14px" }}>
-                  Solo $13 más que Pro+
-                </p>
-              ) : (
-                <div style={{ height: 14 }} />
-              )}
+              {/* El renglón va siempre, aunque solo Max+ lo llene: así los tres
+                  paneles de My Agent C+ arrancan a la misma altura. */}
+              <p className="plan-nota">{plan === "max" ? "Solo $13 más que Pro+" : " "}</p>
 
               {/* El bloque que de verdad diferencia. */}
               <div className="agente-nivel">
