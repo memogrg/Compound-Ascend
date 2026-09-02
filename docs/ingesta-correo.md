@@ -396,8 +396,9 @@ gratis y sin tocar el apex.
 
 ### 9.1 Subdominio en Google Workspace
 
-1. Consola de administración → **Cuenta → Dominios → Gestionar dominios → Añadir un dominio** →
-   **dominio secundario** → `in.aitechumbrella.com`.
+1. Consola de administración → **Cuenta → Dominios → Administrar dominios → Agregar un dominio** →
+   **Dominio secundario** → `in.aitechumbrella.com` → **Agregar dominio y comenzar la verificación**.
+   Al terminar, volver a **Administrar dominios** y pulsar **Activar Gmail** en el subdominio.
    Es gratis: se paga por usuario creado en él, y no vamos a crear ninguno. **Secundario, no alias**:
    un alias replicaría todos los usuarios existentes en el subdominio y el catch-all dejaría de ser
    uniforme.
@@ -407,33 +408,46 @@ gratis y sin tocar el apex.
 
 DNS Settings → **Custom Records** → añadir:
 
-| Nombre | Tipo | Prioridad | Servidor |
+| Alojamiento (Host) | Tipo | Prioridad | Datos |
 |---|---|---|---|
-| `in` | MX | 1 | `smtp.google.com` |
+| `in` | MX | 10 | `smtp.google.com` |
+
+Ruta: **account.squarespace.com/domains** → el dominio → **DNS** → **Registros personalizados** →
+**Agregar registro**. En «Alojamiento» va solo `in`, no el dominio completo.
 
 **No tocar el MX del apex.** El correo de la empresa sigue igual.
 
 ### 9.3 Regla de enrutamiento (el catch-all)
 
-Consola → **Apps → Google Workspace → Gmail → Enrutamiento → Añadir otra regla**:
+Consola → **Apps → Google Workspace → Gmail → Enrutamiento** (*Routing* — NO «Enrutamiento
+predeterminado» ni «Hosts», que son pantallas distintas) → **Configurar** / **Agregar otra regla**:
 
 - Nombre: `ingesta-catchall`.
-- Mensajes afectados: **solo Entrantes**.
-- **Filtro de sobre** → *Afectar a los destinatarios del sobre* → **Coincidencia de patrón** →
-  `.*@in\.aitechumbrella\.com$` ← esto confina el catch-all al subdominio; el apex conserva su
-  comportamiento normal de rebote.
-- Acción: **Modificar mensaje** → *Cambiar destinatario del sobre* → **Reemplazar destinatario** →
-  `communications@aitechumbrella.com`.
-- ⚠️ **Marcar «Add X-Gm-Original-To header»**. **Es el paso que sostiene todo el diseño.** Sin él, el
-  destinatario original se pierde al reescribir el sobre y la dirección única queda irrecuperable:
-  en un auto-forward el `To:` trae la dirección del propio usuario, no la nuestra.
-- Tipos de cuenta: **cuentas inactivas y no reconocidas** (desmarcar usuario activo y grupo).
-- Hasta 24 h en propagar.
+- **Selecciona cuándo se aplica esta acción** (*Select when this action is applied*): solo
+  **Mensajes entrantes**.
+- **Filtro de sobre** → **Solo afectar a destinatarios específicos del sobre** →
+  **Coincidencia de patrones** → `(?i)^.*@in\.aitechumbrella\.com$`
+  (el campo espera una expresión regular estilo RE2; `(?i)` la hace insensible a mayúsculas). Esto
+  confina el catch-all al subdominio; el apex conserva su comportamiento normal de rebote.
+- Acción **Modificar mensaje** → **Cambiar destinatario del sobre** → **Reemplazar la dirección de
+  correo electrónico completa del destinatario** → `communications@aitechumbrella.com`.
+- ⚠️ Dentro de **Modificar mensaje**, marcar **«Agregar encabezado X-Gm-Original-To»**
+  (*Add X-Gm-Original-To header*; si no aparece arriba, está en la lista **Avanzado**).
+  **Es el paso que sostiene todo el diseño.** Sin él, el destinatario original se pierde al reescribir
+  el sobre y la dirección única queda irrecuperable: en un auto-forward el `To:` trae la dirección del
+  propio usuario, no la nuestra.
+- Tipos de cuenta: **Todas las cuentas inactivas y no reconocidas** (desmarcar *Cuenta de usuario* y
+  *Cuenta de grupo*).
+- Hasta 24 h en propagar, normalmente minutos.
 
 ### 9.4 Variable en Vercel
 
-`INGEST_ADDRESS_DOMAIN = in.aitechumbrella.com` (producción). Con eso la app empieza a repartir
-direcciones.
+`INGEST_ADDRESS_DOMAIN = in.aitechumbrella.com` en **Settings → Environment Variables** (el campo se
+llama **Name**, no «Key»), entorno **Production**. **Hay que redesplegar**: las variables nuevas no se
+aplican a despliegues existentes. **Deployments → ⋯ → Redeploy → y confirmar otra vez «Redeploy» en la
+ventana** (son dos clics; quedarse en el menú no hace nada).
+
+Runbook clic por clic para quien lo ejecute: artifact «Encender la ingesta por correo».
 
 ### 9.5 Los dos límites que hay que tener presentes
 
