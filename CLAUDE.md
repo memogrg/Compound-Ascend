@@ -40,12 +40,12 @@ Business logic lives in `src/modules/`, divided into 8 self-contained modules:
 | `control` | `/control-financiero` (Ahorro), `/deudas` | Priority Engine, goals, debt strategy |
 | `wealth` | `/patrimonio`, `/patrimonio/proteccion`, `/patrimonio/indicadores` | Investments & insurance |
 | `rich-life` | `/mi-rich-life` | Net worth & Rich Life Score |
-| `account` | `/configuracion` | Account, plan, household invitations, WhatsApp link |
+| `account` | `/configuracion` | Account, plan, household invitations |
 | `assistant` | API only | AI chat + receipt scanner |
 
-WhatsApp lives outside modules (`src/lib/whatsapp/` + `/api/whatsapp/webhook`); household helpers in `src/lib/household/`. The messaging provider is abstracted behind `WhatsAppProvider` (`provider.ts`): **Meta WhatsApp Cloud API** (`meta.ts`) is the active provider for both inbound (webhook verifies `X-Hub-Signature-256` via `meta-signature.ts`) and outbound. The legacy Twilio implementation (`twilio.ts` / `twilio-signature.ts`) is retained only as a rollback path and is no longer wired into the webhook — see issue #114 for its removal.
+Household helpers live in `src/lib/household/`. Gasto logging and the advisor conversation live in the web and mobile apps.
 
-Email receipt ingestion is a second external-input path (`src/lib/ingestion/`): an IMAP poller (`ingestion/email/imap-poller.ts`) parses forwarded bank/card emails into `ingest_proposals` the user reviews. Like the WhatsApp webhook it has no user session, so it writes with the **service-role** client and its rows surface for categorisation rather than being auto-applied.
+Email receipt ingestion is the app's external, session-less input path (`src/lib/ingestion/`): an IMAP poller (`ingestion/email/imap-poller.ts`) parses forwarded bank/card emails into `ingest_proposals` the user reviews. It has no user session, so it writes with the **service-role** client and its rows surface for categorisation rather than being auto-applied.
 
 Each module follows this internal layout:
 ```
@@ -74,7 +74,7 @@ A money event is a single fact: when control/wealth record a payment, dividend, 
 
 ### Household
 
-Every INSERT into user-data tables must include `household_id` via `getActiveHouseholdId()` (`src/lib/household/active.ts`) — otherwise the row is invisible to the rest of the household (RLS filters by it). There's a guard test in `tests/unit/household-propagation.test.ts`. WhatsApp writes use the service-role client directly (the webhook has no user session) and bypass the central pipeline; its transactions are born `linked_kind='none'` and surface in reconciliation once the user categorizes them.
+Every INSERT into user-data tables must include `household_id` via `getActiveHouseholdId()` (`src/lib/household/active.ts`) — otherwise the row is invisible to the rest of the household (RLS filters by it). There's a guard test in `tests/unit/household-propagation.test.ts`. Email-ingestion writes use the service-role client directly (no user session) and bypass the central pipeline; its transactions are born `linked_kind='none'` and surface in reconciliation once the user categorizes them.
 
 ### Supabase clients
 
