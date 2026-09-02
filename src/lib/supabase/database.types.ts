@@ -1107,6 +1107,7 @@ export type EmailIngestLinkRow = Audited & {
   verified: boolean; // solo se procesan remitentes verificados (migración 0031)
   verify_code_hash: string | null; // sha256 del código de verificación; null tras verificar
   verify_expires_at: string | null; // vigencia del código
+  verified_at: string | null; // cuándo se probó la propiedad (migración 20260902000001)
   created_at: string;
 };
 

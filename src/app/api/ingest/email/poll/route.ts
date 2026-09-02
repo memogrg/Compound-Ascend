@@ -142,12 +142,20 @@ async function handle(req: Request) {
       if (new URL(req.url).searchParams.get("debug")) {
         const samples = [];
         for (const m of messages.slice(0, 10)) {
-          const owner = await deps.lookupOwner(m.recipients);
+          const porDestinatario = await deps.lookupOwner(m.recipients);
+          const porRemitente =
+            porDestinatario.status === "none" && m.senderCandidates.length
+              ? await deps.lookupOwner(m.senderCandidates)
+              : null;
           samples.push({
             from: m.from,
             subject: m.subject,
             recipients: m.recipients,
-            matched: Boolean(owner),
+            // Qué cabecera resolvió al dueño, y si el From vino autenticado: es lo
+            // que hay que mirar al certificar un proveedor nuevo (Gmail, Outlook…).
+            fromAutenticado: m.senderCandidates.length > 0,
+            porDestinatario: porDestinatario.status,
+            porRemitente: porRemitente?.status ?? null,
           });
         }
         return NextResponse.json(

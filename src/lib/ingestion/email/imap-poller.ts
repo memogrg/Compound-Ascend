@@ -5,9 +5,24 @@
  * aquí no se importa imapflow. Esto permite probar `fetchUnseen` y
  * `processInboundEmails` con un cliente y dependencias falsas, sin red ni BD.
  *
- * Este delta NO entrega nada al usuario: solo identifica al remitente, deduplica,
- * parsea y deja la propuesta en cola (ingest_proposals, status 'pending'). La
- * entrega/confirmación es el Delta 2. Nada se confirma solo.
+ * Nada se confirma solo: el poller identifica al dueño, deduplica, parsea y deja
+ * la propuesta en cola (ingest_proposals, 'pending'). La confirmación es del usuario.
+ *
+ * IDENTIFICAR AL DUEÑO ES LA PARTE DELICADA. Un correo lo escribe quien lo manda,
+ * así que sus cabeceras son afirmaciones, no pruebas. Por eso hay dos niveles:
+ *
+ *   1. Destinatarios (To/Cc + cabeceras de reenvío). Es lo que funciona con el
+ *      auto-forward, donde el From es del banco.
+ *   2. El remitente, PERO solo si el correo viene autenticado (DKIM o SPF
+ *      alineados con esa dirección). Cubre el reenvío manual —donde el usuario
+ *      queda en el From— sin aceptar un From falsificado: quien manda un correo
+ *      diciendo `From: victima@gmail.com` desde su propio servidor no pasa DKIM
+ *      de gmail.com y no se le acepta la identidad.
+ *
+ * Y ante duda, no se adivina: si los candidatos apuntan a DOS cuentas distintas,
+ * el correo se deja sin procesar (`ambiguos`) en vez de caer en una al azar.
+ * La solución definitiva es la dirección de ingesta única por usuario (el
+ * destinatario pasa a SER la identidad); esto es el blindaje del camino actual.
  */
 import type { RawMovement } from "@/lib/ingestion/types";
 import { todayISOInTz } from "@/lib/time/user-time-core";
@@ -25,6 +40,7 @@ export interface RawImapMessage {
   subject: string | null;
   text: string; // cuerpo en texto plano (el adaptador real lo extrae del MIME)
   receivedAt: string | null; // fecha del correo (envelope.date) en ISO; fallback de occurred_on
+  fromAuthenticated: boolean; // DKIM/SPF del buzón receptor respaldan ese From
 }
 
 /**
@@ -41,7 +57,8 @@ export interface ImapClient {
 export interface ImapMessage {
   id: string; // messageId, o `uid:<n>` si el correo no trae Message-ID
   from: string; // remitente en minúsculas, solo la dirección
-  recipients: string[]; // candidatos de destinatario original, en minúsculas, sin duplicados
+  recipients: string[]; // candidatos de destinatario, en minúsculas, sin duplicados
+  senderCandidates: string[]; // el From, SOLO si vino autenticado; si no, vacío
   subject: string;
   text: string;
   uid: number; // se conserva para que el route marque \Seen tras procesar
@@ -55,31 +72,34 @@ function extractAddress(addr: string | null): string {
   return (angle ? angle[1]! : addr).trim().toLowerCase();
 }
 
-// Cabeceras que pueden cargar el DESTINATARIO ORIGINAL de un correo reenviado por
-// Gmail. Se barren varias porque su presencia exacta varía según el reenvío; se
-// matchea contra cualquier candidato. Regex estático (sin ReDoS).
+// Cabeceras que pueden cargar el DESTINATARIO ORIGINAL de un correo reenviado.
+// Se barren varias porque su presencia exacta varía según el proveedor y el modo
+// de reenvío. Regex estático (sin ReDoS).
 const RECIPIENT_HEADER_RE =
   /^(to|cc|delivered-to|x-forwarded-for|x-forwarded-to|x-original-to|x-gm-original-to)$/i;
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
-/**
- * Extrae las direcciones de email de las cabeceras de destinatario de un bloque de
- * cabeceras crudo (el header block de un RFC822). Despliega líneas plegadas
- * (continuación con espacio/tab inicial). Devuelve direcciones en minúsculas, sin
- * duplicados. Puro: testeable sin red.
- */
-export function extractRecipientCandidates(rawHeaders: string): string[] {
-  // Unfolding: una línea que empieza con espacio/tab continúa la cabecera anterior.
-  const unfolded: string[] = [];
+/** Despliega las líneas plegadas de un bloque de cabeceras (RFC 5322 unfolding). */
+function unfold(rawHeaders: string): string[] {
+  const out: string[] = [];
   for (const line of rawHeaders.split(/\r?\n/)) {
-    if (/^[ \t]/.test(line) && unfolded.length) {
-      unfolded[unfolded.length - 1] += " " + line.trim();
+    if (/^[ \t]/.test(line) && out.length) {
+      out[out.length - 1] += " " + line.trim();
     } else {
-      unfolded.push(line);
+      out.push(line);
     }
   }
+  return out;
+}
+
+/**
+ * Extrae las direcciones de email de las cabeceras de destinatario de un bloque de
+ * cabeceras crudo. Devuelve direcciones en minúsculas, sin duplicados.
+ * Puro: testeable sin red.
+ */
+export function extractRecipientCandidates(rawHeaders: string): string[] {
   const out = new Set<string>();
-  for (const line of unfolded) {
+  for (const line of unfold(rawHeaders)) {
     const colon = line.indexOf(":");
     if (colon < 0) continue;
     if (!RECIPIENT_HEADER_RE.test(line.slice(0, colon).trim())) continue;
@@ -90,13 +110,46 @@ export function extractRecipientCandidates(rawHeaders: string): string[] {
 }
 
 /**
+ * ¿El buzón receptor respalda que este correo lo mandó de verdad esa dirección?
+ *
+ * Lee la cabecera `Authentication-Results` que estampa NUESTRO servidor de correo
+ * al recibir (no la del emisor, y NUNCA `ARC-Authentication-Results`, que es la
+ * afirmación de un tercero) y acepta el From si:
+ *   · `dkim=pass` con `header.d`/`header.i` del mismo dominio del From, o
+ *   · `spf=pass` con `smtp.mailfrom` igual a la dirección del From.
+ *
+ * Un correo falsificado (`From: victima@gmail.com` mandado desde otro servidor) no
+ * consigue ninguna de las dos. Puro: testeable sin red.
+ */
+export function fromIsAuthenticated(rawHeaders: string, from: string): boolean {
+  const addr = extractAddress(from);
+  const domain = addr.split("@")[1];
+  if (!addr || !domain) return false;
+
+  for (const line of unfold(rawHeaders)) {
+    const colon = line.indexOf(":");
+    if (colon < 0) continue;
+    if (line.slice(0, colon).trim().toLowerCase() !== "authentication-results") continue;
+    const value = line.slice(colon + 1).toLowerCase();
+
+    if (/\bdkim=pass\b/.test(value)) {
+      const d = value.match(/header\.d=([a-z0-9.-]+)/);
+      const i = value.match(/header\.i=@?([a-z0-9.-]+)/);
+      const signer = d?.[1] ?? i?.[1];
+      if (signer && (signer === domain || domain.endsWith("." + signer))) return true;
+    }
+    if (/\bspf=pass\b/.test(value)) {
+      const mailfrom = value.match(/smtp\.mailfrom=([^\s;()]+)/);
+      if (mailfrom?.[1] && mailfrom[1].replace(/^<|>$/g, "") === addr) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Trae los correos no leídos del buzón y los normaliza a `ImapMessage`. NO marca
  * nada como leído: eso queda para el route, tras procesar con éxito. Descarta
  * correos sin remitente o sin cuerpo (no hay nada que parsear).
- *
- * Los candidatos de identificación incluyen los destinatarios (To + cabeceras de
- * reenvío) Y el remitente (From): en un reenvío MANUAL el usuario queda en From,
- * así que sumarlo permite identificarlo igual. `from` se sigue exponiendo aparte.
  */
 export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
   const raw = await client.listUnseen();
@@ -105,11 +158,13 @@ export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
     const from = extractAddress(m.from);
     const text = m.text ?? "";
     if (!from || !text.trim()) continue;
-    const recipients = (m.recipients ?? []).map(extractAddress).filter(Boolean);
+    const recipients = [...new Set((m.recipients ?? []).map(extractAddress).filter(Boolean))];
     out.push({
       id: m.messageId ?? `uid:${m.uid}`,
       from,
-      recipients: [...new Set([...recipients, from])], // + From para reenvío manual
+      recipients,
+      // El From solo cuenta como identidad si el correo vino autenticado.
+      senderCandidates: m.fromAuthenticated ? [from] : [],
       subject: m.subject ?? "",
       text,
       uid: m.uid,
@@ -131,13 +186,22 @@ export interface EmailOwner {
 }
 
 /**
+ * Resultado de resolver al dueño. `ambiguous` NO es un detalle: es la diferencia
+ * entre no hacer nada y meterle el gasto de alguien a otra persona.
+ */
+export type OwnerLookup =
+  | { status: "found"; owner: EmailOwner }
+  | { status: "none" }
+  | { status: "ambiguous"; cuentas: number };
+
+/**
  * Puertos que el route implementa con service-role + IMAP. Inyectarlos mantiene
  * la orquestación pura y testeable sin BD.
  */
 export interface EmailIngestDeps {
-  /** Resuelve el dueño por destinatario original: el primer candidato cuyo
-   *  forwarder_email esté en la allowlist. null => ningún candidato conocido. */
-  lookupOwner(candidates: string[]): Promise<EmailOwner | null>;
+  /** Resuelve el dueño por candidatos. Devuelve `ambiguous` si apuntan a más de
+   *  una cuenta: el poller entonces no procesa, no adivina. */
+  lookupOwner(candidates: string[]): Promise<OwnerLookup>;
   /** ¿Este correo (por id) ya se procesó? (processed_events). */
   isProcessed(eventId: string): Promise<boolean>;
   /** Registra el correo como procesado (processed_events). */
@@ -154,10 +218,12 @@ export interface EmailIngestDeps {
 
 /** Resumen de una corrida del poller. */
 export interface IngestSummary {
-  procesados: number; // forwarder conocido y consumido (parseado + marcado)
+  procesados: number; // dueño resuelto y correo consumido (parseado + marcado)
   propuestos: number; // propuestas insertadas en ingest_proposals
-  ignorados: number; // ningún candidato de destinatario está en la allowlist
+  ignorados: number; // ningún candidato está en la allowlist
   duplicados: number; // correo ya procesado (por id) o propuesta repetida (cuenta, ref)
+  ambiguos: number; // candidatos de DOS cuentas distintas: no se procesa, se alerta
+  sinParsear: number; // dueño conocido pero ningún parser supo leer el correo
 }
 
 /**
@@ -172,33 +238,54 @@ function fecharConReceivedAt(receivedAt: string | null, tz: string | null): stri
 }
 
 /**
+ * Resuelve al dueño en dos niveles: primero por destinatario (auto-forward),
+ * y solo si ahí no hay nada, por el remitente autenticado (reenvío manual).
+ * Una ambigüedad en el primer nivel corta: no se baja al segundo a buscar suerte.
+ */
+async function resolverDueno(message: ImapMessage, deps: EmailIngestDeps): Promise<OwnerLookup> {
+  const porDestinatario = await deps.lookupOwner(message.recipients);
+  if (porDestinatario.status !== "none") return porDestinatario;
+  if (message.senderCandidates.length === 0) return { status: "none" };
+  return deps.lookupOwner(message.senderCandidates);
+}
+
+/**
  * Procesa los correos no leídos ya normalizados. Por cada correo:
- *  a) identifica al dueño por el DESTINATARIO ORIGINAL: alguno de los candidatos
- *     (To + cabeceras de reenvío) debe coincidir con un forwarder_email de la
- *     allowlist; si ninguno coincide, lo ignora.
+ *  a) resuelve al dueño (destinatario → remitente autenticado); si es ambiguo o
+ *     desconocido, NO lo procesa ni lo marca leído.
  *  b) dedup: si su id ya está en processed_events, lo salta.
- *  c) parsea con parseNotification (inyectado); si no hay movimiento, lo marca
- *     procesado igual y sigue (no es una notificación de banco).
+ *  c) parsea con parseNotification (inyectado); si no hay movimiento, lo cuenta
+ *     como `sinParsear` (banco que todavía no sabemos leer) y lo cierra igual.
  *  d) inserta las propuestas en 'pending' (idempotente por external_ref).
  *  e) registra processed_events(id) y marca el correo como leído.
- * No confirma ni crea transacciones: solo deja propuestas en cola.
  */
 export async function processInboundEmails(
   messages: ImapMessage[],
   parse: (text: string) => RawMovement[],
   deps: EmailIngestDeps,
 ): Promise<IngestSummary> {
-  const summary: IngestSummary = { procesados: 0, propuestos: 0, ignorados: 0, duplicados: 0 };
+  const summary: IngestSummary = {
+    procesados: 0,
+    propuestos: 0,
+    ignorados: 0,
+    duplicados: 0,
+    ambiguos: 0,
+    sinParsear: 0,
+  };
 
   for (const message of messages) {
-    // a) Identificación por destinatario original (con auto-forward el From es del
-    //    banco). Sin candidato conocido => ignorar (sin marcar leído ni procesado,
-    //    por si luego se agrega su forwarder a la allowlist y reenvía de nuevo).
-    const owner = await deps.lookupOwner(message.recipients);
-    if (!owner) {
+    // a) Identificación. Sin dueño claro no se toca el correo: se deja sin leer
+    //    por si luego se agrega su reenviador a la allowlist y hay que releerlo.
+    const lookup = await resolverDueno(message, deps);
+    if (lookup.status === "ambiguous") {
+      summary.ambiguos += 1;
+      continue;
+    }
+    if (lookup.status === "none") {
       summary.ignorados += 1;
       continue;
     }
+    const owner = lookup.owner;
 
     // b) Dedup por id de correo.
     if (await deps.isProcessed(message.id)) {
@@ -206,7 +293,7 @@ export async function processInboundEmails(
       continue;
     }
 
-    // c) Parseo. Sin movimiento => no es notificación: se marca procesado y leído.
+    // c) Parseo.
     const movements = parse(message.text);
     if (movements.length > 0) {
       // Fecha faltante: si el parser no extrajo fecha (occurredOn ""), la propuesta moría en el
@@ -222,6 +309,10 @@ export async function processInboundEmails(
       const { inserted, duplicated } = await deps.saveProposals(conFecha, owner);
       summary.propuestos += inserted;
       summary.duplicados += duplicated;
+    } else {
+      // El dueño reenvió algo que ningún parser reconoce: hoy es un banco sin
+      // plantilla. Se cuenta para que deje de ser una pérdida invisible.
+      summary.sinParsear += 1;
     }
 
     // e) Cerrar el correo: procesado + leído.
