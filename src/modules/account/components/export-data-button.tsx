@@ -51,13 +51,10 @@ export function ExportDataButton({ variant = "web" }: { variant?: Variant }) {
         {busy ? "Preparando tu archivo…" : "Descargar mis datos (.xlsx)"}
       </button>
 
-      <p
-        className="muted"
-        style={{ fontSize: 12.5, lineHeight: 1.55, margin: "10px 0 0" }}
-      >
-        Un archivo de Excel con una hoja por tema: movimientos, presupuesto, deudas,
-        inversiones, metas, seguros y perfil. Si compartís hogar, incluye el hogar
-        completo y cada movimiento lleva su autor.
+      <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.55, margin: "10px 0 0" }}>
+        Un archivo de Excel con una hoja por tema: movimientos, presupuesto, deudas, inversiones,
+        metas, seguros y perfil. Si compartís hogar, incluye el hogar completo y cada movimiento
+        lleva su autor.
       </p>
 
       {done ? (
