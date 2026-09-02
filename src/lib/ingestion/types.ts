@@ -1,16 +1,12 @@
 /**
- * Capa de ingesta de movimientos desacoplada de la fuente: WhatsApp, correo,
- * estado de cuenta, recibo (OCR) o agregador producen todos el MISMO shape
- * (RawMovement) que luego aterriza en el pipeline de transacciones. Puro: solo
- * tipos, sin IO ni "server-only".
+ * Capa de ingesta de movimientos desacoplada de la fuente: correo, notificación
+ * de banco, estado de cuenta, recibo (OCR) o agregador producen todos el MISMO
+ * shape (RawMovement) que luego aterriza en el pipeline de transacciones. Puro:
+ * solo tipos, sin IO ni "server-only".
  */
 
 export type IngestionSourceKind =
-  | "whatsapp_notification"
-  | "email_notification"
-  | "statement_import"
-  | "receipt_ocr"
-  | "aggregator";
+  "bank_notification" | "email_notification" | "statement_import" | "receipt_ocr" | "aggregator";
 
 /** Movimiento crudo normalizado por una fuente, antes de aterrizar como transacción. */
 export interface RawMovement {
@@ -33,3 +29,22 @@ export interface IngestionSource<TInput> {
   readonly kind: IngestionSourceKind;
   parse(input: TInput): RawMovement[];
 }
+
+/**
+ * Propuesta de transacción pendiente de confirmación (recibo escaneado, chat con
+ * el asesor o propuesta de ingesta por banco). `proposalId`/`cardLabel` solo vienen
+ * de la cola `ingest_proposals`. La confirma el usuario en la app (web/móvil); el
+ * mapeo puro `RawMovement → PendingAction` vive en `normalize.ts`.
+ */
+export type PendingAction = {
+  kind: "gasto" | "ingreso";
+  description: string;
+  amount: number;
+  currency: string;
+  occurredOn: string; // YYYY-MM-DD
+  merchant?: string | null;
+  origin: "scanned" | "ai_assisted" | "manual" | "notification" | "imported";
+  source: "receipt" | "chat" | "notification" | "email";
+  proposalId?: string; // fila de ingest_proposals que originó la propuesta
+  cardLabel?: string | null; // etiqueta de tarjeta resuelta (último-4 → nombre)
+};

@@ -1,17 +1,15 @@
 /**
  * Normalizador puro de la capa de ingesta: convierte un RawMovement (shape común
- * de cualquier fuente) al PendingAction que ya consume el webhook, y produce una
- * clave de deduplicación estable. Sin IO. `import type` mantiene esto libre de
- * "server-only" (links-service lo es; aquí solo usamos su TIPO).
+ * de cualquier fuente) al PendingAction que confirma el usuario en la app, y
+ * produce una clave de deduplicación estable. Sin IO ni "server-only".
  */
 import { createHash } from "node:crypto";
-import type { PendingAction } from "@/lib/whatsapp/links-service";
-import type { RawMovement } from "@/lib/ingestion/types";
+import type { PendingAction, RawMovement } from "@/lib/ingestion/types";
 
 /**
  * Mapea un RawMovement al shape PendingAction. La ingesta marca origin="imported"
- * y source="email" (alineado con review-flow): son valores aceptados por los CHECK
- * de `transactions` (origin/source), así que la transacción confirmada persiste.
+ * y source="email": son valores aceptados por los CHECK de `transactions`
+ * (origin/source), así que la transacción confirmada persiste.
  */
 export function toPendingAction(m: RawMovement): PendingAction {
   return {

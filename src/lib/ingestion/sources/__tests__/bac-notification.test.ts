@@ -64,7 +64,7 @@ describe("BAC · plantilla 1 (compra con tarjeta)", () => {
     expect(m!.externalRef).toBe("35689751");
     expect(m!.confidence).toBe(0.95);
     expect(m!.bankCode).toBe("BAC");
-    expect(m!.sourceKind).toBe("whatsapp_notification");
+    expect(m!.sourceKind).toBe("bank_notification");
   });
 
   it("USD: gasto, monto decimal, referencia larga", () => {
