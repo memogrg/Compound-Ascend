@@ -51,7 +51,7 @@ async function getPlan(
   userId: string,
 ): Promise<Plan> {
   const { data } = await supabase.from("profiles").select("plan").eq("id", userId).maybeSingle();
-  return (data?.plan ?? "free") as Plan;
+  return (data?.plan ?? "ninguno") as Plan;
 }
 
 /**

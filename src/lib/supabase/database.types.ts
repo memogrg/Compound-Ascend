@@ -11,7 +11,7 @@
  * `never`). Con `type` el tipado del cliente funciona correctamente.
  */
 
-export type Plan = "free" | "premium";
+export type Plan = "ninguno" | "esencial" | "pro" | "max";
 export type HouseholdType = "solo" | "pareja" | "familia" | "socios";
 export type HouseholdRole = "owner" | "adult" | "member" | "viewer";
 export type MemberStatus = "active" | "invited" | "removed";
@@ -48,6 +48,20 @@ export type ProfileRow = Timestamps & {
    * (migración 20260826000001). Público por diseño — se comparte en un QR.
    */
   referral_code: string;
+
+  // ── Suscripción (migración 20260902120000) ──────────────────────────────
+  // Todas las escribe SOLO el servidor: el trigger `protect_profile_plan`
+  // bloquea al rol `authenticated` en `plan` y en cada una de estas.
+  /** Plan al que se baja cuando venza el período pagado. null = sin cambio. */
+  plan_pending: Plan | null;
+  /** Momento en que `plan_pending` reemplaza a `plan`. Lo lee el cron. */
+  plan_effective_at: string | null;
+  /** Fin del período ya pagado, según Stripe. */
+  period_end: string | null;
+  /** Fin de los 14 días de prueba: ahí cae el primer cobro. */
+  trial_ends_at: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
 };
 
 /**

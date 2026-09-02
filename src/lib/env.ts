@@ -69,6 +69,10 @@ const serverSchema = z.object({
   SLACK_ALERT_WEBHOOK_URL: optionalStr, // https://hooks.slack.com/services/...
   TURNSTILE_SECRET_KEY: optionalStr,
   PAYMENT_WEBHOOK_SECRET: optionalStr,
+  // Stripe. Si faltan, la app corre igual pero sin cobro: la página de
+  // suscripción lo dice en vez de romperse con un checkout que no existe.
+  STRIPE_SECRET_KEY: optionalStr, // sk_live_... / sk_test_...
+  STRIPE_WEBHOOK_SECRET: optionalStr, // whsec_... del endpoint de Stripe
   CRON_SECRET: optionalStr,
   // Firma HMAC de los tokens de baja de correo (ruta pública). Si falta, la baja
   // por enlace se degrada con un error controlado (no crashea).

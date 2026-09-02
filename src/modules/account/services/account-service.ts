@@ -54,9 +54,9 @@ export async function getAccountInfo(): Promise<AccountInfo> {
     return {
       email,
       name,
-      plan: "free",
+      plan: "ninguno",
       tokensUsed: 0,
-      tokenLimit: aiTokenLimit("free"),
+      tokenLimit: aiTokenLimit("ninguno"),
       currency: "CRC",
       notifications: mergeNotificationPrefs(null),
       configured: false,
@@ -78,7 +78,7 @@ export async function getAccountInfo(): Promise<AccountInfo> {
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
-  const plan = (profile?.plan ?? "free") as Plan;
+  const plan = (profile?.plan ?? "ninguno") as Plan;
   return {
     email,
     name: profile?.display_name ?? name,
