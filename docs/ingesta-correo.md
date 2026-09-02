@@ -379,3 +379,84 @@ credencial del correo del usuario. Si se toma ese camino (Yahoo e iCloud, donde 
 va cifrada con llave de KMS —nunca al alcance del código de aplicación con la service-role— y con el
 flujo de re-autenticación construido **antes** de lanzarlo: la contraseña se revoca sola cuando el
 usuario cambia su clave principal, y si no hay aviso, el usuario solo ve que "dejó de funcionar".
+
+---
+
+## 9. Puesta en marcha de la dirección única (configuración de una sola vez)
+
+El código ya está: si `INGEST_ADDRESS_DOMAIN` está definido, cada cuenta recibe su dirección
+`u<token>@<dominio>` la primera vez que abre Configuración, y el poller la resuelve por
+`X-Gm-Original-To`. Si la variable falta, la app no ofrece direcciones únicas y queda el carril
+heredado — no se rompe nada. Falta la parte de infraestructura, que son 15 minutos:
+
+**Por qué así.** El DNS de `aitechumbrella.com` está en Squarespace y el correo en Google Workspace.
+Cloudflare Email Routing —que sería lo ideal— **solo sirve subdominios delegados por NS en cuentas
+Enterprise**, así que queda descartado sin mover el dominio entero. Google Workspace hace lo mismo
+gratis y sin tocar el apex.
+
+### 9.1 Subdominio en Google Workspace
+
+1. Consola de administración → **Cuenta → Dominios → Gestionar dominios → Añadir un dominio** →
+   **dominio secundario** → `in.aitechumbrella.com`.
+   Es gratis: se paga por usuario creado en él, y no vamos a crear ninguno. **Secundario, no alias**:
+   un alias replicaría todos los usuarios existentes en el subdominio y el catch-all dejaría de ser
+   uniforme.
+2. Si pide verificación, el TXT va en Squarespace (normalmente se hereda del dominio padre).
+
+### 9.2 MX en Squarespace
+
+DNS Settings → **Custom Records** → añadir:
+
+| Nombre | Tipo | Prioridad | Servidor |
+|---|---|---|---|
+| `in` | MX | 1 | `smtp.google.com` |
+
+**No tocar el MX del apex.** El correo de la empresa sigue igual.
+
+### 9.3 Regla de enrutamiento (el catch-all)
+
+Consola → **Apps → Google Workspace → Gmail → Enrutamiento → Añadir otra regla**:
+
+- Nombre: `ingesta-catchall`.
+- Mensajes afectados: **solo Entrantes**.
+- **Filtro de sobre** → *Afectar a los destinatarios del sobre* → **Coincidencia de patrón** →
+  `.*@in\.aitechumbrella\.com$` ← esto confina el catch-all al subdominio; el apex conserva su
+  comportamiento normal de rebote.
+- Acción: **Modificar mensaje** → *Cambiar destinatario del sobre* → **Reemplazar destinatario** →
+  `communications@aitechumbrella.com`.
+- ⚠️ **Marcar «Add X-Gm-Original-To header»**. **Es el paso que sostiene todo el diseño.** Sin él, el
+  destinatario original se pierde al reescribir el sobre y la dirección única queda irrecuperable:
+  en un auto-forward el `To:` trae la dirección del propio usuario, no la nuestra.
+- Tipos de cuenta: **cuentas inactivas y no reconocidas** (desmarcar usuario activo y grupo).
+- Hasta 24 h en propagar.
+
+### 9.4 Variable en Vercel
+
+`INGEST_ADDRESS_DOMAIN = in.aitechumbrella.com` (producción). Con eso la app empieza a repartir
+direcciones.
+
+### 9.5 Los dos límites que hay que tener presentes
+
+- **Tope de recepción del buzón: 60/min, 3.600/hora, 86.400/día, y Google dice que no se puede subir.**
+  Al pasarse, **rebota** el correo nuevo durante ~24 h; no lo encola. Un buzón para todos es un cuello
+  de botella: hay que modelar el volumen antes de crecer, y el plan B documentado es mover la ingesta
+  a un webhook (SendGrid Inbound Parse o Mailgun), que además entrega el destinatario real del sobre
+  sin reescrituras.
+- **Gmail deduplica por `Message-ID` dentro de un mismo buzón.** Si dos usuarios reenvían el MISMO
+  mensaje (mismo `Message-ID`), Gmail colapsa uno y se pierde ese evento. Para avisos de banco es
+  improbable —son distintos por usuario—, pero es otra razón para el webhook a futuro.
+
+### 9.6 La confirmación de reenvío de Gmail
+
+Cuando el usuario configure el reenvío, Google manda a **su** dirección de ingesta un correo de
+`forwarding-noreply@google.com`, asunto `Gmail Forwarding Confirmation (#NNNNNNNN)…`, con un código y
+un enlace `https://mail-settings.google.com/mail/vf-<token>`.
+
+**No se puede auto-confirmar desde el servidor:** el enlace abre una pantalla con un botón *Confirm*,
+no es un GET idempotente, y no hay endpoint documentado. Lo que sí se puede —y es el siguiente
+delta— es **detectar ese correo, resolver al usuario por `X-Gm-Original-To` y mostrarle el enlace
+dentro de la app**: «Confirmá el reenvío», un clic, sin salir a buscar nada. Ojo: el enlace gemelo con
+prefijo `uf-` **cancela** el reenvío; nunca ofrecer ese.
+
+Caso especial: los usuarios del propio `aitechumbrella.com` no reciben confirmación —Google la omite
+cuando el destino es un subdominio del mismo dominio— así que su reenvío queda activo de una.

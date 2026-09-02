@@ -8,15 +8,15 @@ Se configura una vez, toma unos 6 minutos y necesitás una computadora para el p
 
 ---
 
-## Paso 1 · Registrá tu correo en CARTERA+
+## Paso 1 · Copiá tu dirección de ingesta
 
 1. Entrá a **Configuración → Correos del banco**.
-2. Escribí la dirección **donde recibís los avisos de tu banco** y tocá **Enviar código**.
-3. Te llega un código de 6 dígitos a esa dirección. Copialo y tocá **Confirmar**.
-4. El correo queda con la etiqueta **Verificado**.
+2. Ahí está **tu dirección de ingesta**: algo como `uq7bk3mnp2@in.aitechumbrella.com`.
+3. Tocá **Copiar**.
 
-> **Si el código no llega:** revisá Spam o Promociones. Vence en 15 minutos; si se te pasó, pedí uno nuevo.
-> Solo procesamos correos que vengan de una dirección verificada por vos: por eso este paso no se puede saltar.
+> Esa dirección es tuya y solo tuya. Todo lo que reenviés ahí entra a tu cuenta y a ninguna otra, sin
+> que tengas que verificar nada. **No la compartas** y no la teclees a mano: copiala, porque un
+> carácter cambiado manda tus avisos a un buzón que no existe y no te enterarías.
 
 ---
 
@@ -33,20 +33,18 @@ te enterás. Se arregla en un minuto:
 
 ## Paso 3 · Configurá el reenvío
 
-Elegí tu proveedor. Reenviá a esta dirección:
-
-**`communications@aitechumbrella.com`**
+Elegí tu proveedor. Reenviá **a tu dirección de ingesta**, la que copiaste en el paso 1.
 
 ### Gmail (personal o de trabajo)
 
 Desde una computadora, no desde la app del celular.
 
 1. **Configuración (engranaje) → Ver toda la configuración → Reenvío y correo POP/IMAP**.
-2. **Agregar una dirección de reenvío** → pegá la dirección de arriba → **Siguiente → Continuar → Aceptar**.
-3. Gmail pide confirmar esa dirección y manda un código a nuestro buzón. **Respondé al correo de verificación
-   que te mandamos en el paso 1 y te lo pasamos en el momento** (durante el piloto lo hacemos a mano; pronto
-   va a ser automático).
-4. Volvé a la misma pestaña y recargá la página.
+2. **Agregar una dirección de reenvío** → pegá tu dirección de ingesta → **Siguiente → Continuar → Aceptar**.
+3. Gmail manda un correo de confirmación a esa dirección. Como la dirección es tuya, **ese correo llega
+   a CARTERA+ y te lo mostramos en la app**: entrá a Configuración → Correos del banco y tocá
+   **Confirmar el reenvío**.
+4. Volvé a la misma pestaña de Gmail y recargá la página.
 5. Ahora, para reenviar **solo los avisos del banco** y no todo tu correo: buscá un aviso del banco →
    **⋮ → Filtrar mensajes como estos** → **Crear filtro** → marcá **Reenviarlo a** y elegí la dirección →
    **Crear filtro**.
@@ -62,7 +60,7 @@ Desde una computadora, no desde la app del celular.
 1. **Configuración (engranaje) → Correo → Reglas → Agregar regla**.
 2. Nombre: `Avisos del banco`.
 3. Condición: **De** → escribí el correo desde el que te escribe tu banco.
-4. Acción: **Redirigir a** → pegá la dirección de arriba.
+4. Acción: **Redirigir a** → pegá tu dirección de ingesta.
    *Elegí "Redirigir a", no "Reenviar a": el reenvío llega como si lo mandaras vos y perdemos el dato del banco.*
 5. **Guardar**.
 
@@ -76,7 +74,7 @@ Desde una computadora, no desde la app del celular.
 
 1. Entrá a **icloud.com/mail** desde una computadora.
 2. **Configuración → Reglas → Añadir (+)**.
-3. Condición: **De** → el correo de tu banco. Acción: reenviar a la dirección de arriba.
+3. Condición: **De** → el correo de tu banco. Acción: reenviar a tu dirección de ingesta.
 4. **NO** marques *"Eliminar mensajes después de reenviarlos"*: perderías tu propia copia.
 
 > Las reglas de iCloud pueden tardar hasta 15 minutos en empezar a aplicarse.
@@ -93,7 +91,8 @@ Funciona siempre y sirve de rescate en cualquier proveedor:
 
 1. Abrí el aviso del banco.
 2. Tocá **Reenviar**.
-3. Mandalo a `communications@aitechumbrella.com` **desde el mismo correo que verificaste** en el Paso 1.
+3. Mandalo a **tu dirección de ingesta**, la del paso 1. Da igual desde cuál de tus correos lo mandes:
+   lo que identifica tu cuenta es la dirección a la que llega, no desde dónde sale.
 
 ---
 
@@ -121,8 +120,10 @@ La primera vez te vamos a preguntar de cuál tarjeta es. A partir de ahí la rec
 
 Recorré esta lista en orden:
 
-1. **¿El correo dice "Verificado"** en Configuración → Correos del banco? Si dice "Pendiente", falta el código.
-2. **¿Reenviaste desde la dirección verificada?** Si tenés varias cuentas, tiene que salir de esa misma.
+1. **¿Copiaste bien la dirección?** Volvé a Configuración → Correos del banco y compará carácter por
+   carácter con la que pusiste en tu proveedor. Es la causa número uno.
+2. **¿Quedó confirmado el reenvío en Gmail?** Si Gmail sigue pidiendo confirmación, el aviso está en la
+   app esperándote.
 3. **¿El aviso del banco te llegó a Spam?** Entonces Gmail no lo reenvió. Volvé al Paso 2.
 4. **¿Tu banco es de los que ya leemos?** Hoy leemos los avisos de **BAC**. Estamos escribiendo los de BNCR,
    BCR y los demás. Si reenviás uno que todavía no sabemos leer, no se pierde: nos sirve para agregarlo.
@@ -141,8 +142,9 @@ No. Solo llega lo que vos reenviás. Por eso recomendamos el filtro por remitent
 total: así ni siquiera pasa por nosotros nada que no sea un aviso de movimiento.
 
 **¿Otro usuario puede ver mis gastos?**
-No. Cada movimiento queda amarrado a tu cuenta (o a la de tu familia, si compartís una) y solo lo ven quienes
-vos autorizaste. Un correo que no venga de una dirección verificada por vos no se procesa: se ignora.
+No. Tu dirección de ingesta es única e irrepetible, así que lo que llega a ella entra a tu cuenta (o a la de
+tu familia, si compartís una) y a ninguna otra. Un correo que no llegue a una dirección conocida no se
+procesa: se ignora.
 
 **¿Se registra algo sin que yo lo apruebe?**
 No. Todo llega como propuesta y espera tu confirmación.
@@ -155,4 +157,9 @@ Cuando quieras. Quitá el correo en Configuración → Correos del banco y borr�
 proveedor. Lo que ya registraste se queda con vos.
 
 **¿Necesito la computadora?**
-Para Gmail sí, una sola vez. El reenvío manual funciona desde el celular sin problema.
+Para configurar el reenvío automático en Gmail sí, una sola vez: Google no deja hacerlo desde la app del
+celular. El reenvío manual funciona desde el celular sin problema.
+
+**¿Puedo cambiar mi dirección de ingesta?**
+Sí. Si alguna vez creés que se filtró, escribinos y te damos una nueva: la vieja deja de funcionar en el
+acto y no se le asigna a nadie más.
