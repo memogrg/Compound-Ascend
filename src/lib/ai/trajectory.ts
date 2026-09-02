@@ -4,7 +4,7 @@
  * tendencias: dirección (sube/baja/estable) + magnitud. Determinista, sin IO ni fechas.
  *
  * Si hay menos de MIN_MONTHS meses de historia → devuelve `undefined` (no inventamos tendencias
- * para usuarios nuevos). El caller (web/WhatsApp) mapea sus filas a estos shapes mínimos.
+ * para usuarios nuevos). El caller (web/sin sesión) mapea sus filas a estos shapes mínimos.
  */
 
 /** Punto mensual (de monthly_snapshots), en orden cronológico ascendente. */

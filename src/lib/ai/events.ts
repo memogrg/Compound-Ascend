@@ -79,7 +79,7 @@ const int = (n: number | undefined): number | null =>
   typeof n === "number" && Number.isFinite(n) ? Math.max(0, Math.round(n)) : null;
 
 /**
- * Persiste un evento. Sin userId no se llama (WhatsApp/cron sin sesión siguen solo con el log).
+ * Persiste un evento. Sin userId no se llama (cron/ingesta sin sesión siguen solo con el log).
  * Cualquier fallo se loguea y se sigue: la telemetría nunca degrada la respuesta del usuario.
  */
 export async function recordAiEvent(userId: string, e: AiEvent): Promise<void> {

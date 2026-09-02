@@ -12,7 +12,7 @@
  *
  * IDENTIDAD (misma referencia y orden) cuando no hay overrides efectivos → cero
  * regresión para el 99% de usuarios sin personalización. Sin efectos, testeable a
- * mano; la reutilizan el servicio de sesión y los caminos service-role (WhatsApp).
+ * mano; la reutilizan el servicio de sesión y los caminos service-role (cron/ingesta).
  */
 
 export type OverrideLite = {

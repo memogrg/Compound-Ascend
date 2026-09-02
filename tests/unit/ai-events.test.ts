@@ -139,7 +139,7 @@ describe("recordAiEvent · nunca rompe la respuesta del chat", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("sin userId (WhatsApp/cron sin sesión) no persiste: solo queda el log", async () => {
+  it("sin userId (cron/ingesta sin sesión) no persiste: solo queda el log", async () => {
     await recordAiEvent("", { kind: "tool", name: "x", ms: 1, ok: true });
     expect(insert).not.toHaveBeenCalled();
   });

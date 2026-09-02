@@ -2,7 +2,7 @@
  * Motor puro del DESGLOSE de patrimonio para el asesor. Agrupa los activos (ya normalizados
  * a la moneda principal por aggregateNetWorth) por `assetClass` y deriva cuánto está
  * INVERTIDO, cuánto LÍQUIDO/ahorros y cuánto en OTROS, más las clases principales por monto.
- * Determinista, sin IO. Lo consumen ambos canales (WhatsApp y web) sobre el MISMO set de
+ * Determinista, sin IO. Lo consumen la ruta web y los caminos sin sesión sobre el MISMO set de
  * activos, para dar el mismo desglose ("cuánto ya invertido / cuánto en ahorros / cómo
  * distribuido") sin recalcular de memoria.
  *

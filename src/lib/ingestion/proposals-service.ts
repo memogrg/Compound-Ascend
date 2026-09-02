@@ -2,7 +2,7 @@ import "server-only";
 
 /**
  * Lectura/escritura de la cola de propuestas (ingest_proposals) para la entrega
- * REACTIVA por WhatsApp. Service-role (el webhook no tiene sesión de usuario). La
+ * en la bandeja "Por revisar" (web/móvil). Service-role (sin sesión de usuario). La
  * propiedad es por cuenta = hogar si existe, si no el usuario (mismo criterio que
  * el índice de dedup). Resuelve la etiqueta de tarjeta vía account_cards.
  */

@@ -837,7 +837,7 @@ export async function TransaccionesSection({ view }: { view: V2View }) {
         monthMarker={monthMarker}
       />
 
-      {/* Por clasificar: movimientos sin sobre (WhatsApp/ingesta sin regla). */}
+      {/* Por clasificar: movimientos sin sobre (ingesta del banco sin regla que matchee). */}
       <PorClasificarCard
         items={uncategorized}
         categories={selectableCategoryLeaves(view.categories)}

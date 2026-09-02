@@ -2,7 +2,7 @@
 
 /**
  * Vista "Por clasificar": movimientos que entraron sin sobre (categoryId=null), p. ej.
- * por WhatsApp o ingesta sin regla que matchee. El usuario asigna el sobre en 1 tap y,
+ * por ingesta del banco sin regla que matchee. El usuario asigna el sobre en 1 tap y,
  * opcional, crea la regla para que la próxima del mismo comercio caiga sola. Calcada de
  * ReconciliationCard: colapsable, filas densas, solo UI (la lógica vive en la action).
  */
@@ -19,7 +19,7 @@ import {
 import type { Transaction } from "@/modules/financial-base/types";
 
 const HELP =
-  "Movimientos que entraron sin sobre (p. ej. por WhatsApp). Asignalos para que cuenten en tu presupuesto.";
+  "Movimientos que entraron sin sobre (p. ej. un recibo escaneado o un aviso del banco). Asignalos para que cuenten en tu presupuesto.";
 
 export function PorClasificarCard({
   items,

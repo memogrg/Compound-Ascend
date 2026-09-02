@@ -24,10 +24,10 @@ export type { CommitmentBreakdown };
  * pasa la PRINCIPAL del reporte, para no meter el override de display en el número); por defecto la
  * de visualización.
  *
- * `opts.ctx` permite leerlo SIN sesión (cron / webhook de WhatsApp) con el cliente service-role,
+ * `opts.ctx` permite leerlo SIN sesión (cron / ingesta) con el cliente service-role,
  * igual que aggregateNetWorth. Sin él, esas rutas no podían calcular el compromiso y el reporte
  * caía a la lista base `expense_items` — que para quien presupuesta con sobres vale 0, así que
- * WhatsApp reportaba números distintos a los de la web para el MISMO usuario.
+ * el camino sin sesión reportaba números distintos a los de la web para el MISMO usuario.
  */
 export async function getTotalMonthlyCommitment(opts?: {
   currency?: string;

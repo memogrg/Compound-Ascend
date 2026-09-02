@@ -57,7 +57,7 @@ describe("normalización", () => {
     expect(isValidReferralCode("abcd2345")).toBe(true);
   });
 
-  it("acepta espacios alrededor (pegado desde WhatsApp)", () => {
+  it("acepta espacios alrededor (pegado desde otra app)", () => {
     expect(isValidReferralCode("  ABCD2345 ")).toBe(true);
   });
 

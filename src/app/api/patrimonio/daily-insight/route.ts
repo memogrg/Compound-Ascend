@@ -2,7 +2,7 @@
  * GET/POST /api/patrimonio/daily-insight — ritual diario patrimonial server-side.
  * Por cada usuario: getPatrimonioReportForUser → buildDailyPatrimonioInsight →
  * persiste el insight en user_insights (aparece en "Qué noté"). NO envía por
- * WhatsApp/correo/notificación todavía (eso es 5b-3).
+ * por correo/notificación todavía (eso es 5b-3).
  *
  *  - GET (Vercel Cron): header X-Cron-Secret = CRON_SECRET o Authorization: Bearer
  *    <CRON_SECRET>. Recorre TODOS los usuarios (service-role), best-effort.

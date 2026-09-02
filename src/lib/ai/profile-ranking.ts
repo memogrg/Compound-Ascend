@@ -1,8 +1,8 @@
 /**
  * Vuelca al FinancialContext los campos RANKEADOS del borrador de perfil, serializados como
  * "primaria: X · secundaria: Y · terciaria: Z" (o el único valor). UN solo lugar: lo usan
- * tanto la ruta web (context-engine) como la de WhatsApp (wa-profile-context) para que la IA
- * reciba la MISMA jerarquía por ambos canales, sin divergir. Puro, sin IO.
+ * tanto la ruta web (context-engine) como los caminos sin sesión para que la IA
+ * reciba la MISMA jerarquía por ambas rutas, sin divergir. Puro, sin IO.
  */
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import {

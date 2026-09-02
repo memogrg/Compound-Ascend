@@ -48,7 +48,7 @@ function asStrings(v: unknown): string[] {
  * metas, sobres) SIEMPRE corren (definen currency/rates y son lecturas rápidas). Los caros se gatean
  * para el CONTEXTO PEREZOSO: una consulta que el router resuelve determinista no debe pagar el
  * portafolio (precios de mercado en vivo — el costo dominante) ni el patrimonio ni los bloques
- * "flavor" (solo para el LLM). Default = todo (backward-compat: WhatsApp y el fallback LLM no cambian).
+ * "flavor" (solo para el LLM). Default = todo (backward-compat: los caminos sin sesión y el fallback LLM no cambian).
  */
 export type ContextScope = {
   patrimonio?: boolean; // getPatrimonioReport: números, compromiso*, mesesDeColchon, investableWealth
@@ -75,7 +75,7 @@ export async function buildFinancialContext(
 
   let ctx: FinancialContext = { name, currency: "CRC" };
   // El chat usa la moneda de VISUALIZACIÓN del usuario (la que ve en toda la app; cookie
-  // ca_display_currency, con fallback a la principal cuando no hay sesión — p. ej. WhatsApp/cron). TODO
+  // ca_display_currency, con fallback a la principal cuando no hay sesión — p. ej. cron/ingesta). TODO
   // el contexto queda en ESA moneda: los servicios que devuelven en la principal se convierten con
   // `rates` a `ctx.currency`. Así el asesor nunca mezcla "ingreso ₡X" con "te quedan $Y".
   let rates: Record<string, number> | undefined;
@@ -307,7 +307,7 @@ export async function buildFinancialContext(
       ctx.netWorth = Math.round(summary.snapshot.indicators.netWorth);
       // Respaldo REAL (meses de independencia): señal dura para el guardrail R3 (fondo de paz).
       ctx.emergencyMonths = Math.round(summary.snapshot.indicators.monthsOfIndependence);
-      // Desglose invertido/líquido/otros sobre el MISMO set agregado (paridad con WhatsApp).
+      // Desglose invertido/líquido/otros sobre el MISMO set agregado (paridad con la ruta sin sesión).
       ctx.wealthBreakdown = computeWealthBreakdown(summary.allAssets);
     } catch {
       // Rich Life no disponible.
@@ -626,7 +626,7 @@ export async function buildFinancialContext(
           }
           // Campos RANKEADOS (lifeStage, preocupación, pérdidas, dinero primero, Rich Life,
           // futuro, intervención): serializados como "primaria/secundaria/terciaria". Mismo
-          // helper que WhatsApp → sin divergencia. Sobrescribe la primaria de columnas.
+          // helper compartido con la ruta sin sesión → sin divergencia. Sobrescribe la primaria de columnas.
           applyRankedProfile(ctx, draft as Record<string, unknown>);
         }
       } catch {

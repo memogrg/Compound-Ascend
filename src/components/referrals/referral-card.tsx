@@ -54,7 +54,7 @@ export function ReferralCard({
     if (!url) return;
     let alive = true;
     // Margen 1 y nivel M: el QR va a leerse desde una pantalla de teléfono a
-    // 20 cm o desde una captura reenviada por WhatsApp, no desde un cartel.
+    // 20 cm o desde una captura reenviada por chat, no desde un cartel.
     QRCode.toDataURL(url, { width: 512, margin: 1, errorCorrectionLevel: "M" })
       .then((dataUrl) => {
         if (alive) setQr(dataUrl);
@@ -152,7 +152,7 @@ export function ReferralCard({
           </button>
         ) : null}
         {qr ? (
-          // Descarga del PNG: es lo que se manda por WhatsApp cuando compartir
+          // Descarga del PNG: es lo que se comparte cuando compartir
           // un link no alcanza (grupos, impresión, un local físico).
           <a
             className={mobile ? "m-btn m-btn-secondary" : "btn btn-secondary"}

@@ -11,7 +11,7 @@ import { now as simNow } from "@/lib/time/clock";
  * (escala al razonamiento). La cifra SIEMPRE sale del motor; el modelo chico solo clasifica —
  * jamás inventa un número.
  *
- * Vive DENTRO de financeChatWithTools → cubre web y WhatsApp (ambos pasan por ahí).
+ * Vive DENTRO de financeChatWithTools → cubre web y los caminos sin sesión (ambos pasan por ahí).
  */
 import { formatMoney } from "@/lib/format";
 import { frasesValuacion } from "@/lib/ai/valuacion-portafolio";
@@ -95,7 +95,7 @@ type Intent =
   // "cuánto (me queda) libre pa gastar / cuánto me sobra / flujo libre" → flujo libre (ctx.freeCashflow),
   // NO el saldo de liquidez (que daba ₡0):
   | "flujo_libre"
-  // R2 — requieren lectura fresca (session-based → web; WhatsApp escala):
+  // R2 — requieren lectura fresca (session-based → web; sin sesión escala):
   | "saldo_liquidez"
   // "cuánto me queda en/de {sobre(s)}" → restante por sobre (getSobreRemaining), soporta varios:
   | "saldo_sobre"
@@ -1555,7 +1555,7 @@ export function answerFromContext(
 /**
  * Resuelve los intents R2 que requieren LECTURA fresca (no están en ctx). Import dinámico para
  * no acoplar la DB al camino puro de patrones/plantillas. Session-based (`requireUser`): en web
- * funciona; en WhatsApp (service-role, sin sesión) el fetch lanza → se captura → null → escala.
+ * funciona; sin sesión (service-role) el fetch lanza → se captura → null → escala.
  * Devuelve la cifra REAL del ledger; jamás inventa.
  */
 async function resolveFetchIntent(
@@ -1782,7 +1782,7 @@ type FullPosition = {
 
 /**
  * Lee la posición COMPLETA del usuario en un símbolo (cantidad + invertido + moneda), de las
- * holdings completas con scope de hogar — NO del top-N compacto. Best-effort: sin sesión (WhatsApp)
+ * holdings completas con scope de hogar — NO del top-N compacto. Best-effort: sin sesión (cron/ingesta)
  * o ante cualquier fallo → null (el carril sigue sin la posición). Import dinámico (server-only).
  */
 async function getFullPosition(symbol: string): Promise<FullPosition | null> {
@@ -1909,7 +1909,7 @@ async function resolveMarketQuery(
     // La POSICIÓN puede no estar en ctx.holdings (top-N compacto): posiciones chicas o con precio
     // $0 (bug del $0) quedan fuera y sin ellas no se calcula el escenario. Si el símbolo no está en
     // el top-N, se lee la posición COMPLETA por símbolo (scope de hogar). Best-effort: sin sesión
-    // (WhatsApp) o sin posición → undefined y el carril sigue mostrando solo el dato de mercado.
+    // (sin sesión) o sin posición → undefined y el carril sigue mostrando solo el dato de mercado.
     let cantidad = holding?.quantity;
     let invertido = holding?.invested;
     // OJO: ctx.holdings.invested (top-N del context-engine) ya está en la moneda PRINCIPAL (cur), NO

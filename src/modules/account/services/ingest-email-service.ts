@@ -3,8 +3,8 @@ import "server-only";
 /**
  * Onboarding self-serve de la ingesta por correo: el usuario registra el correo
  * donde recibe avisos del banco (forwarder_email) y prueba la propiedad con un
- * código de 6 dígitos enviado a ESA dirección (mismo espíritu que el OTP de
- * WhatsApp). El poller solo procesa filas verified=true.
+ * código de 6 dígitos enviado a ESA dirección, con el mismo espíritu que un OTP.
+ * El poller solo procesa filas verified=true.
  *
  * Lecturas/escrituras con cliente de SESIÓN → respetan RLS (el dueño gestiona sus
  * propias filas). El código se guarda HASHEADO (sha256), nunca en claro.

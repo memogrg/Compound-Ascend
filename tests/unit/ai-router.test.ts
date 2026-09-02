@@ -15,7 +15,7 @@ vi.mock("@/lib/ai/providers/gemini", () => ({
 }));
 
 // Barrel de financial-base: lo consume el resolver de fetch (saldo / movimientos) vía import
-// dinámico. En WhatsApp (sin sesión) estas fns lanzarían → el router escala.
+// dinámico. Sin sesión, estas fns lanzarían → el router escala.
 const getLiquidityBalance = vi.fn();
 const listTransactions = vi.fn();
 const getEnvelopesSummary = vi.fn();
@@ -683,7 +683,7 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
     expect(routed?.response.reply).toContain("Sueldo");
   });
 
-  it("sin sesión (WhatsApp): la lectura lanza → null (escala al razonamiento)", async () => {
+  it("sin sesión: la lectura lanza → null (escala al razonamiento)", async () => {
     getLiquidityBalance.mockRejectedValue(new Error("no session"));
     const routed = await tryRouteQuery(ask("¿cuál es mi saldo?"), CTX, tc);
     expect(routed).toBeNull();
@@ -718,7 +718,7 @@ describe("Mejora 3 · carril fetch (sobres agrupados por frasco, determinista)",
     expect(routed?.response.reply).toContain("Frasco Vivienda");
   });
 
-  it("sin sesión (WhatsApp): la lectura lanza → null (escala)", async () => {
+  it("sin sesión: la lectura lanza → null (escala)", async () => {
     getEnvelopesSummary.mockRejectedValue(new Error("no session"));
     const routed = await tryRouteQuery(ask("listá mis frascos"), CTX, tc);
     expect(routed).toBeNull();

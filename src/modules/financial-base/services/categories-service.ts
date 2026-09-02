@@ -106,7 +106,7 @@ async function fetchRawCategories(supabase: Client): Promise<Category[]> {
 
 /**
  * Overrides de un scope EXPLÍCITO (hogar si lo hay, si no el usuario en modo solo).
- * Reutilizable por sesión (RLS) y por caminos service-role (WhatsApp/ingesta), que
+ * Reutilizable por sesión (RLS) y por caminos service-role (ingesta), que
  * ya conocen su scope. Vacío → la resolución es identidad.
  */
 export async function getScopeOverrides(
@@ -263,7 +263,7 @@ export async function getCategoryPath(id: string): Promise<string> {
  *   - si está forkeada → la copia (`fork_id`),
  *   - si está oculta sin fork → null (no debe usarse: ya no es visible),
  *   - si no tiene override → la misma id (identidad).
- * Reutilizable por sesión (RLS) y por caminos service-role (WhatsApp/ingesta), que
+ * Reutilizable por sesión (RLS) y por caminos service-role (ingesta), que
  * pasan el scope explícito. Best-effort: un fallo de lectura devuelve la id original.
  */
 export async function resolveOverrideTarget(
