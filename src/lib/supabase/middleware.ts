@@ -14,7 +14,18 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 // debe interceptarlo hacia /login (rompería el flujo de auth del móvil). Ninguna ruta
 // web existente empieza con "/m/" ni es exactamente "/m" (p. ej. "/mi-perfil…" no
 // coincide), así que este prefijo no afecta a la web.
-const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth", "/invitacion", "/m"];
+// `/v2` es la vitrina del landing nuevo mientras convive con el viejo: es una página de
+// marketing, así que tiene que verse sin sesión igual que la raíz. Cuando el v2 reemplace
+// a `/`, este prefijo se va con la ruta.
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/signup",
+  "/reset-password",
+  "/auth",
+  "/invitacion",
+  "/m",
+  "/v2",
+];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
 
