@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseAction } from "@/lib/ai/types";
 import { isWithinLimit, PLAN_TOKEN_LIMITS } from "@/lib/ai/limits";
+import { aiTokenLimit } from "@/lib/plan";
 import { transactionInputSchema } from "@/modules/assistant/schemas";
 
 describe("parseAction", () => {
@@ -65,6 +66,18 @@ describe("límites de tokens", () => {
     expect(esencial).toBeGreaterThan(ninguno);
     expect(pro).toBeGreaterThan(esencial);
     expect(max).toBeGreaterThan(pro);
+  });
+
+  // Regresión de Sentry CARTERAPLUS-6: la migración de planes entró a producción
+  // antes que el código que entendía los valores nuevos, el mapa devolvió undefined
+  // y `undefined.toLocaleString()` tumbó /configuracion 17 veces. El plan sale de
+  // una columna de texto: el `as Plan` del service no lo verifica nadie.
+  it("un plan que no existe no revienta: cupo 0 y chat cerrado", () => {
+    expect(aiTokenLimit("premium")).toBe(0); // valor del sistema de planes viejo
+    expect(aiTokenLimit("")).toBe(0);
+    expect(isWithinLimit("premium", 0)).toBe(false);
+    // Y sigue devolviendo un número, que es lo que .toLocaleString() necesita.
+    expect(typeof aiTokenLimit("loquesea")).toBe("number");
   });
 
   // El cupo es el techo del costo de IA de un usuario, así que su precio máximo
