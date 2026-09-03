@@ -211,6 +211,8 @@ export type NetWorthAggregate = {
   explicitAssets: Asset[]; // solo activos manuales (tabla `assets`)
   explicitLiabilities: Liability[]; // solo pasivos manuales (tabla `liabilities`)
   previousNetWorth: number | null; // patrimonio del último periodo CERRADO (net_worth_snapshots)
+  /** Δ entre los dos últimos cierres consecutivos. Único Δ de un mes completo. */
+  closedWealthDelta: number | null;
 };
 
 export async function aggregateNetWorth(
@@ -239,7 +241,7 @@ export async function aggregateNetWorth(
     invRows,
     policyRows,
     profileRow,
-    prevSnap,
+    cierresSnap,
     marketValues,
     liquidityBucket,
     goalRows,
@@ -256,7 +258,9 @@ export async function aggregateNetWorth(
       .select("policy_type,coverage,premium,premium_frequency")
       .in("user_id", memberIds),
     db.from("personal_profiles").select("dependents_count").eq("user_id", userId).maybeSingle(),
-    // Patrimonio del ÚLTIMO periodo CERRADO (de ahí sale `wealthVelocity`). Esta
+    // Los DOS últimos periodos CERRADOS. Del primero sale `wealthVelocity` (neto de hoy
+    // − ese cierre, un mes a medias) y de la resta de ambos el VEREDICTO, que sí necesita
+    // dos meses completos. Esta
     // lectura estuvo muerta hasta que el cron mensual empezó a escribir la tabla
     // (`net-worth-snapshot-service`); ahora que además las pantallas registran el mes
     // EN CURSO, hay que excluirlo con `lt`: si no, "lo anterior" sería la fila de hoy
@@ -267,8 +271,7 @@ export async function aggregateNetWorth(
       .eq("user_id", userId)
       .lt("period", periodoActual.from)
       .order("period", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(2),
     tryGetPortfolioMarketValues(ctx, opts),
     // Fase 1 · Patrimonio líquido real: saco de liquidez + metas de ahorro.
     getLiquidityBalance(ctx),
@@ -290,6 +293,11 @@ export async function aggregateNetWorth(
       .eq("period_month", periodoActual.month)
       .eq("period_year", periodoActual.year),
   ]);
+
+  // Los dos últimos cierres, del más reciente al más viejo.
+  const cierres = cierresSnap.data ?? [];
+  const ultimoCierre = cierres[0] ?? null;
+  const penultimoCierre = cierres[1] ?? null;
 
   // Compromiso mensual total, en la moneda del agregado. Se lee una sola vez acá para
   // que rich-life y patrimonio compartan EXACTAMENTE el mismo denominador.
@@ -486,8 +494,31 @@ export async function aggregateNetWorth(
     currency,
     explicitAssets,
     explicitLiabilities: explicitLiabs,
-    previousNetWorth: prevSnap.data ? Number(prevSnap.data.net_worth) : null,
+    previousNetWorth: ultimoCierre ? Number(ultimoCierre.net_worth) : null,
+    // Δ entre los dos últimos cierres, sólo si son meses CONSECUTIVOS: con un hueco
+    // (agosto contra marzo) el "Δ mensual" serían cinco meses disfrazados de uno.
+    closedWealthDelta:
+      ultimoCierre &&
+      penultimoCierre &&
+      mesesConsecutivos(penultimoCierre.period, ultimoCierre.period)
+        ? Number(ultimoCierre.net_worth) - Number(penultimoCierre.net_worth)
+        : null,
   };
+}
+
+/**
+ * ¿`b` es el mes inmediatamente siguiente a `a`? Ambos vienen como fecha del primer día
+ * del periodo ("2026-08-01"). Se compara en meses absolutos para que diciembre→enero
+ * cuente y no dependa de zonas horarias.
+ */
+function mesesConsecutivos(a: string, b: string): boolean {
+  const abs = (p: string) => {
+    const [y, m] = p.split("-").map(Number);
+    return y !== undefined && m !== undefined ? y * 12 + m : NaN;
+  };
+  const x = abs(a);
+  const y = abs(b);
+  return Number.isFinite(x) && Number.isFinite(y) && y - x === 1;
 }
 
 /**
@@ -509,6 +540,7 @@ export async function getRichLifeSummary(
     protectionScore: agg.protection.score,
     diversification: agg.portfolio.diversification,
     previous: agg.previousNetWorth !== null ? { netWorth: agg.previousNetWorth } : null,
+    closedWealthDelta: agg.closedWealthDelta,
     currency: agg.currency,
   };
   const snapshot = buildRichLifeSnapshot(input);
@@ -581,6 +613,7 @@ export function buildDemoRichLifeSummary(): RichLifeSummary {
     protectionScore: 75,
     diversification: "media",
     previous: { netWorth: 29_500_000 },
+    closedWealthDelta: 420_000, // demo: dos cierres seguidos → veredicto "más rico"
     currency,
   };
   return {

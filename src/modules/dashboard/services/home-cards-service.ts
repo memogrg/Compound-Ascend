@@ -144,6 +144,7 @@ export async function getHomeCardsData(ctx?: AuthContext): Promise<HomeCards> {
     ? buildPatrimonioVsMes({
         netWorth: richLife.snapshot.indicators.netWorth,
         wealthVelocity: richLife.snapshot.indicators.wealthVelocity,
+        velocityIsPartial: richLife.snapshot.indicators.velocityIsPartial,
       })
     : null;
 

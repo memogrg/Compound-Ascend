@@ -17,6 +17,7 @@ import {
   type EssentialBreakdown,
 } from "@/modules/wealth/engine/essential-expense";
 import { isDefenseFundGoalType } from "@/modules/wealth/engine/fund-sizing";
+import { resolveBudgetPeriod } from "@/lib/budget/resolve-budget-period";
 
 export type { EssentialBreakdown };
 
@@ -43,7 +44,12 @@ export async function getEssentialMonthlyExpense(opts?: {
   const [members, rates] = await Promise.all([householdMemberIds(supabase, userId), getFxRates()]);
   const targetCurrency = opts?.currency ?? (await getDisplayCurrency(opts?.ctx));
 
-  const period = await userCurrentPeriod(opts?.ctx);
+  // MISMO mes que el compromiso total (resolveBudgetPeriod): el actual si ya tiene sobres,
+  // si no el último que los tenga. Que ambos números citen el mismo periodo es parte del
+  // arreglo — si cada uno escogiera el suyo, el número de seguridad y el de independencia
+  // hablarían de meses distintos.
+  const actual = await userCurrentPeriod(opts?.ctx);
+  const period = await resolveBudgetPeriod(supabase, members, actual);
   const [budgetRows, debtRows, goalRows, policyRows] = await Promise.all([
     // Presupuesto del mes: solo líneas de gasto de sobres esenciales. El engine
     // filtra por source_kind (regla #1); traemos source_kind para eso.
@@ -106,7 +112,7 @@ export async function getEssentialMonthlyExpense(opts?: {
       name: p.policy_type ?? p.provider ?? undefined,
     }));
 
-  return computeEssentialMonthly({
+  const breakdown = computeEssentialMonthly({
     displayCurrency: targetCurrency,
     rates,
     budgetLines,
@@ -114,4 +120,5 @@ export async function getEssentialMonthlyExpense(opts?: {
     goals,
     policies,
   });
+  return { ...breakdown, budgetPeriod: period };
 }

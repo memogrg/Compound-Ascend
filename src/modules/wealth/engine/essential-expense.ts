@@ -20,6 +20,7 @@
  *     paga vía ese ahorro). La prima excluida se reporta para que se entienda.
  */
 import { convertCurrency } from "@/lib/fx";
+import type { BudgetPeriod } from "@/lib/budget/budget-period";
 
 /** Línea de presupuesto de un sobre esencial (con su origen, para la regla #1). */
 export type EssentialBudgetLine = {
@@ -51,6 +52,9 @@ export type EssentialBreakdown = {
   };
   /** Primas excluidas por la regla #2 (para mostrarlas tachadas con su motivo). */
   excludedPolicies: EssentialExcludedPolicy[];
+  /** Mes del presupuesto con que se calcularon los sobres (ver `resolveBudgetPeriod`).
+   *  Lo llena el service; el motor es puro y no sabe de periodos. */
+  budgetPeriod?: BudgetPeriod | null;
 };
 
 /** Solo estas fuentes cuentan como "sobre real"; las derivadas van por su entidad. */

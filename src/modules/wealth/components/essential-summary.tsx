@@ -12,6 +12,7 @@ import { getEssentialMonthlyExpense } from "@/modules/wealth/services/essential-
 import { getDisplayCurrency } from "@/modules/financial-base";
 import type { EssentialBreakdown } from "@/modules/wealth/engine/essential-expense";
 import { formatMoney } from "@/lib/format";
+import { avisoPresupuesto } from "@/lib/budget/budget-period";
 
 export async function EssentialExpenseSummary({
   data: dataProp,
@@ -31,6 +32,10 @@ export async function EssentialExpenseSummary({
     }
   }
   if (!data || data.total <= 0) return null;
+
+  // Si el número salió del presupuesto de otro mes, se dice. Antes se caía al mes anterior
+  // en silencio y el usuario no tenía cómo saber por qué le cambió la cifra.
+  const aviso = avisoPresupuesto(data.budgetPeriod);
 
   const rows: { label: string; value: number }[] = [
     { label: "Sobres", value: data.byOrigin.sobres },
@@ -63,6 +68,11 @@ export async function EssentialExpenseSummary({
           </span>
         ))}
       </div>
+      {aviso ? (
+        <div className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>
+          {aviso}
+        </div>
+      ) : null}
       {data.excludedPolicies.length > 0 ? (
         <ul
           className="muted"

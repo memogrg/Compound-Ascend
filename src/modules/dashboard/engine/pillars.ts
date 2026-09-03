@@ -11,7 +11,7 @@ import type { RichLifeSummary } from "@/modules/rich-life";
 import type { WealthSummary } from "@/modules/wealth";
 import { formatMoney, formatPercent } from "@/lib/format";
 
-export type PanelTrend = "mas_rico" | "estable" | "mas_pobre" | "sin_historico";
+export type PanelTrend = "mas_rico" | "estable" | "mas_pobre" | "en_curso" | "sin_historico";
 
 export type NorteVM = {
   trend: PanelTrend;
@@ -89,6 +89,7 @@ const TREND_LABEL: Record<PanelTrend, string> = {
   mas_rico: "Te hiciste más rico",
   estable: "Patrimonio estable",
   mas_pobre: "Te hiciste más pobre",
+  en_curso: "Mes en curso",
   sin_historico: "Aún sin histórico",
 };
 
@@ -132,8 +133,8 @@ function buildNorte({ ind, currency, control, richLife }: PanelInputs): NorteVM 
     velocity == null
       ? "Registra tu patrimonio para ver tu velocidad mes a mes."
       : velocity >= 0
-        ? `Tu patrimonio creció ${formatMoney(velocity, currency)} este mes.`
-        : `Tu patrimonio bajó ${formatMoney(Math.abs(velocity), currency)} este mes.`;
+        ? `Tu patrimonio subió ${formatMoney(velocity, currency)} en lo que va del mes.`
+        : `Tu patrimonio bajó ${formatMoney(Math.abs(velocity), currency)} en lo que va del mes.`;
 
   const freedomText =
     freedomPct > 0

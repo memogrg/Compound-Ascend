@@ -21,7 +21,12 @@ export type Liability = {
   currency: string;
 };
 
-export type RichTrend = "mas_rico" | "estable" | "mas_pobre" | "sin_historico";
+/**
+ * Veredicto patrimonial. `en_curso` = hay histórico pero el mes todavía no cierra, así
+ * que NO se puede decir "más rico" ni "más pobre" todavía; `sin_historico` = no hay con
+ * qué comparar. Son cosas distintas y la UI las pinta distinto.
+ */
+export type RichTrend = "mas_rico" | "estable" | "mas_pobre" | "en_curso" | "sin_historico";
 
 export type RichLifeInput = {
   assets: Asset[];
@@ -36,8 +41,13 @@ export type RichLifeInput = {
   freeCashflow: number;
   protectionScore: number; // 0-100
   diversification: "baja" | "media" | "alta";
-  /** Snapshot del mes anterior, si existe, para tendencia/velocidad. */
+  /** Cierre del ÚLTIMO mes cerrado, si existe. Contra él se mide `wealthVelocity`.
+   *  Ojo: el neto de arriba es de HOY, así que ese Δ es de un mes A MEDIAS. */
   previous?: { netWorth: number } | null;
+  /** Δ del patrimonio neto entre los DOS últimos meses cerrados y CONSECUTIVOS. Es el
+   *  único Δ que compara periodos completos, así que de acá —y sólo de acá— sale el
+   *  veredicto "más rico / más pobre". null = todavía no hay dos cierres seguidos. */
+  closedWealthDelta?: number | null;
   currency: string;
 };
 
@@ -53,7 +63,10 @@ export type RichLifeIndicators = {
   passiveIncomeCoverage: number; // 0-1 (ingreso pasivo / gastos)
   financialFreedomIndex: number; // 0-1+
   monthsOfIndependence: number;
-  wealthVelocity: number | null; // Δ patrimonio neto mensual
+  wealthVelocity: number | null; // Δ patrimonio neto contra el último cierre
+  /** true = `wealthVelocity` es "en lo que va del mes", no un mes completo. La UI tiene
+   *  que rotularlo así: el 2 de septiembre son dos días de movimiento, no un mes. */
+  velocityIsPartial: boolean;
   trend: RichTrend;
 };
 

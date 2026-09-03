@@ -15,6 +15,7 @@ import {
   type MTone,
 } from "../../components/content-kit";
 import { DefineLifestyleSheet } from "./define-lifestyle-sheet";
+import { avisoPresupuesto } from "@/lib/budget/budget-period";
 
 /**
  * /m/libertad — Escalera de hitos (Seguridad → Independencia → Libertad), paridad
@@ -239,6 +240,7 @@ function Escalera({
             <MDataRow
               dense
               title="Gasto esencial mensual"
+              subtitle={avisoPresupuesto(essential.budgetPeriod) ?? undefined}
               value={mAmount(essential.total, currency, 10)}
             />
             {(
