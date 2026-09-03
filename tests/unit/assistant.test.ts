@@ -55,6 +55,28 @@ describe("límites de tokens", () => {
     // Sin suscripción el límite es cero: nada pasa, ni el primer mensaje.
     expect(isWithinLimit("ninguno", 0)).toBe(false);
   });
+
+  // Al subir el cupo de un plan es fácil olvidar el de arriba y dejar que el plan
+  // caro compre MENOS que el barato. Pasó al subir Esencial a 2 M teniendo Pro en
+  // 1,5 M. Esto no se puede volver a colar sin que el test lo grite.
+  it("la escalera es estrictamente creciente: pagar más nunca da menos", () => {
+    const { ninguno, esencial, pro, max } = PLAN_TOKEN_LIMITS;
+    expect(ninguno).toBe(0);
+    expect(esencial).toBeGreaterThan(ninguno);
+    expect(pro).toBeGreaterThan(esencial);
+    expect(max).toBeGreaterThan(pro);
+  });
+
+  // El cupo es el techo del costo de IA de un usuario, así que su precio máximo
+  // es calculable: entrada a $0,25 el millón (gemini-3.1-flash-lite) y el 99 % del
+  // consumo es entrada. Si alguien multiplica un cupo sin mirar el margen, acá se ve.
+  it("ningún cupo puede costar más del 10 % del precio de su plan", () => {
+    const PRECIO = { esencial: 17, pro: 34, max: 47 } as const;
+    const costoTecho = (tokens: number) => (tokens * 0.9931 * 0.25 + tokens * 0.0069 * 1.5) / 1e6;
+    for (const plan of ["esencial", "pro", "max"] as const) {
+      expect(costoTecho(PLAN_TOKEN_LIMITS[plan]) / PRECIO[plan]).toBeLessThan(0.1);
+    }
+  });
 });
 
 describe("validación de transacción (confirmación)", () => {
@@ -93,12 +115,23 @@ describe("validación de transacción (confirmación)", () => {
   });
 
   it("acepta el sobre elegido (categoryId uuid o null) y rechaza un id no-uuid", () => {
-    const base = { kind: "gasto", description: "Café", amount: 1500, currency: "CRC", occurredOn: "2026-06-01" };
+    const base = {
+      kind: "gasto",
+      description: "Café",
+      amount: 1500,
+      currency: "CRC",
+      occurredOn: "2026-06-01",
+    };
     expect(
-      transactionInputSchema.safeParse({ ...base, categoryId: "8126a25b-0873-44a4-8321-53de492cfe4a" }).success,
+      transactionInputSchema.safeParse({
+        ...base,
+        categoryId: "8126a25b-0873-44a4-8321-53de492cfe4a",
+      }).success,
     ).toBe(true);
     expect(transactionInputSchema.safeParse({ ...base, categoryId: null }).success).toBe(true);
-    expect(transactionInputSchema.safeParse({ ...base, categoryId: "frasco-alimentacion" }).success).toBe(false);
+    expect(
+      transactionInputSchema.safeParse({ ...base, categoryId: "frasco-alimentacion" }).success,
+    ).toBe(false);
   });
 
   it("acepta el vínculo propuesto por la IA (Fase 5) y rechaza ids inválidos", () => {
@@ -148,7 +181,7 @@ describe("system prompt con vinculables (Fase 5 · context engine)", () => {
     expect(prompt).toContain("Tarjeta BAC [8126a25b-0873-44a4-8321-53de492cfe4a]");
     expect(prompt).toContain("Fondo de emergencia [c1924069-e29e-4e81-b463-c39cfaf42d56]");
     expect(prompt).toContain("Patrimonio neto: 12000000 CRC");
-    expect(prompt).toContain('linkedKind');
+    expect(prompt).toContain("linkedKind");
     expect(prompt).toContain("NUNCA afirmes que ya ejecutaste la acción");
   });
 });
