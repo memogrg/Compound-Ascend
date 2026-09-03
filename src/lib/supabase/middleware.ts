@@ -14,7 +14,18 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 // debe interceptarlo hacia /login (rompería el flujo de auth del móvil). Ninguna ruta
 // web existente empieza con "/m/" ni es exactamente "/m" (p. ej. "/mi-perfil…" no
 // coincide), así que este prefijo no afecta a la web.
-const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth", "/invitacion", "/m"];
+// `/faqs` es pública: quien todavía no se registró tiene que poder leerla
+// entera antes de decidir. Sin esto el middleware la manda a /login y la página
+// que existe para resolver dudas se vuelve inalcanzable justo para quien las tiene.
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/signup",
+  "/reset-password",
+  "/auth",
+  "/invitacion",
+  "/faqs",
+  "/m",
+];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
 
