@@ -37,12 +37,12 @@ export function FaqsMotion() {
          clic más para ver si acertó.
          ═══════════════════════════════════════════════════════════════════════════ */
       (function () {
-        var caja = document.getElementById("q");
-        var conteo = document.getElementById("conteo");
-        var nada = document.getElementById("nada");
-        var qas = [].slice.call(document.querySelectorAll(".qa"));
-        var grupos = [].slice.call(document.querySelectorAll(".grupo"));
-        var indice = document.getElementById("indice");
+        const caja = document.getElementById("q");
+        const conteo = document.getElementById("conteo");
+        const nada = document.getElementById("nada");
+        const qas = [].slice.call(document.querySelectorAll(".qa"));
+        const grupos = [].slice.call(document.querySelectorAll(".grupo"));
+        const indice = document.getElementById("indice");
         if (!caja) return;
 
         // Se normaliza para que «dolares» encuentre «dólares».
@@ -53,11 +53,11 @@ export function FaqsMotion() {
           q.dataset.txt = limpiar(q.textContent);
         });
 
-        var total = qas.length;
+        const total = qas.length;
         conteo.textContent = total + " preguntas";
 
         function filtrar() {
-          var t = limpiar(caja.value.trim());
+          const t = limpiar(caja.value.trim());
           if (!t) {
             qas.forEach(function (q) {
               q.classList.remove("oculta");
@@ -71,9 +71,9 @@ export function FaqsMotion() {
             conteo.textContent = total + " preguntas";
             return;
           }
-          var vistos = 0;
+          let vistos = 0;
           qas.forEach(function (q) {
-            var hay = q.dataset.txt.indexOf(t) > -1;
+            const hay = q.dataset.txt.indexOf(t) > -1;
             q.classList.toggle("oculta", !hay);
             q.open = hay; // abrir la coincidencia, no solo mostrarla
             if (hay) vistos++;
@@ -91,15 +91,15 @@ export function FaqsMotion() {
 
         /* El tema activo en el índice, con IntersectionObserver y no con `scroll`:
            no corre nada en el hilo principal en cada cuadro. */
-        var enlaces = [].slice.call(indice.querySelectorAll("a"));
-        var porId = {};
+        const enlaces = [].slice.call(indice.querySelectorAll("a"));
+        const porId = {};
         enlaces.forEach(function (a) {
           porId[a.getAttribute("href").slice(1)] = a;
         });
         new ObservadorVigilado(
           function (ent) {
             ent.forEach(function (e) {
-              var a = porId[e.target.id];
+              const a = porId[e.target.id];
               if (!a) return;
               if (e.isIntersecting) {
                 enlaces.forEach(function (x) {
@@ -118,7 +118,7 @@ export function FaqsMotion() {
                 enlaces.forEach(function (x) {
                   x.classList.remove("act");
                 });
-                var a = porId[g.id];
+                const a = porId[g.id];
                 if (a) a.classList.add("act");
               },
               { rootMargin: "-88px 0px -72% 0px", threshold: 0 },

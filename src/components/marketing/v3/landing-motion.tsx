@@ -69,9 +69,9 @@ export function LandingMotion() {
          centinela de 1 px y no con el evento `scroll`: así no corre nada en el hilo principal en
          cada cuadro mientras alguien baja. */
       (function () {
-        var hdr = document.querySelector(".hdr");
+        const hdr = document.querySelector(".hdr");
         if (!hdr) return;
-        var centinela = document.createElement("div");
+        const centinela = document.createElement("div");
         centinela.style.cssText =
           "position:absolute;top:0;left:0;width:1px;height:1px;pointer-events:none";
         document.body.prepend(centinela);
@@ -127,11 +127,11 @@ export function LandingMotion() {
            solo cada dos segundos.
          ═══════════════════════════════════════════════════════════════════════════ */
       (function () {
-        var rot = document.getElementById("rot");
-        var medidor = document.getElementById("medidor");
+        const rot = document.getElementById("rot");
+        const medidor = document.getElementById("medidor");
         if (!rot || !medidor) return;
 
-        var FRASES = [
+        const FRASES = [
           "con <em>estrategia.</em>",
           "con <em>claridad.</em>",
           "con <em>dirección.</em>",
@@ -139,14 +139,14 @@ export function LandingMotion() {
           "con <em>visión.</em>",
           "<em>un paso adelante.</em>",
         ];
-        var ULTIMA = FRASES.length - 1;
+        const ULTIMA = FRASES.length - 1;
 
         if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
           rot.innerHTML = '<span class="pal">' + FRASES[ULTIMA] + "</span>";
           return;
         }
 
-        var i = 0,
+        let i = 0,
           aLaVista = true,
           andando = false;
 
@@ -165,7 +165,7 @@ export function LandingMotion() {
             return;
           }
           andando = true;
-          var sig = (i + 1) % FRASES.length;
+          const sig = (i + 1) % FRASES.length;
 
           rot.classList.remove("entra");
           rot.classList.add("sale");
@@ -205,7 +205,7 @@ export function LandingMotion() {
         });
 
         // el ancho depende del tamaño de letra, que es fluido
-        var t;
+        let t;
         addEventListener(
           "resize",
           function () {
@@ -239,12 +239,12 @@ export function LandingMotion() {
            cara, ₡300.000 sin asignar. Si cambian allá, cambian acá.
          ═══════════════════════════════════════════════════════════════════════════ */
       (function () {
-        var hilo = document.getElementById("hilo");
-        var campo = document.getElementById("campo");
-        var btn = document.getElementById("enviar");
+        const hilo = document.getElementById("hilo");
+        const campo = document.getElementById("campo");
+        const btn = document.getElementById("enviar");
         if (!hilo || !campo || !btn) return;
 
-        var GUION = [
+        const GUION = [
           { de: "yo", t: "¿Qué debería hacer con los ₡300.000 que me sobraron este mes?" },
           {
             de: "ia",
@@ -287,9 +287,9 @@ export function LandingMotion() {
           },
         ];
 
-        var ISO = '<svg viewBox="0 0 64 64" aria-hidden="true"><use href="#iso"/></svg>';
-        var quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
-        var aLaVista = false,
+        const ISO = '<svg viewBox="0 0 64 64" aria-hidden="true"><use href="#iso"/></svg>';
+        const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        let aLaVista = false,
           corriendo = false,
           cancelar = false;
 
@@ -309,7 +309,7 @@ export function LandingMotion() {
         }
 
         function el(clase, html) {
-          var d = document.createElement("div");
+          const d = document.createElement("div");
           d.className = clase;
           if (html != null) d.innerHTML = html;
           hilo.appendChild(d);
@@ -323,7 +323,7 @@ export function LandingMotion() {
         /* La burbuja del asesor va con el ícono de la app al lado: sin la tarjeta
            alrededor, ese disco es lo único que dice de quién es el mensaje. */
         function burbujaIA(turno) {
-          var h = turno.t
+          let h = turno.t
             .map(function (x) {
               return "<p>" + x + "</p>";
             })
@@ -371,10 +371,10 @@ export function LandingMotion() {
           return new Promise(function (res) {
             campo.innerHTML =
               '<span class="tira"><span id="tec"></span><i class="cursor"></i></span>';
-            var tira = campo.querySelector(".tira");
-            var tec = campo.querySelector("#tec");
-            var ancho = campo.clientWidth - 40;
-            var i = 0;
+            const tira = campo.querySelector(".tira");
+            const tec = campo.querySelector("#tec");
+            const ancho = campo.clientWidth - 40;
+            let i = 0;
             var paso = setInterval(function () {
               if (cancelar) {
                 clearInterval(paso);
@@ -383,7 +383,7 @@ export function LandingMotion() {
               i += 1;
               tec.textContent = t.slice(0, i);
               // el texto se corre a la izquierda para que el cursor no se salga del campo
-              var sobra = tira.scrollWidth - ancho;
+              const sobra = tira.scrollWidth - ancho;
               tira.style.transform = sobra > 0 ? "translateX(-" + sobra + "px)" : "none";
               if (i >= t.length) {
                 clearInterval(paso);
@@ -402,7 +402,7 @@ export function LandingMotion() {
         }
 
         function pensando(ms) {
-          var p = el(
+          const p = el(
             "fila-ia",
             '<span class="ava">' + ISO + '</span><div class="puntos"><i></i><i></i><i></i></div>',
           );
@@ -433,8 +433,8 @@ export function LandingMotion() {
           /* El hilo viejo se borra al ENVIAR el primer mensaje, no al arrancar el ciclo: así la
              conversación anterior sigue en pantalla mientras se teclea la nueva y no hay ni un
              instante en blanco. */
-          var primero = true;
-          var cadena = Promise.resolve();
+          let primero = true;
+          let cadena = Promise.resolve();
           GUION.forEach(function (turno) {
             cadena = cadena.then(function () {
               if (cancelar) return;
@@ -455,7 +455,7 @@ export function LandingMotion() {
                   });
               }
               // el asesor tarda más cuando la respuesta es más larga
-              var largo =
+              const largo =
                 turno.t.join(" ").length + (turno.ops ? 120 : 0) + (turno.cierre ? 60 : 0);
               return pensando(Math.min(1800, 700 + largo * 3)).then(function () {
                 burbujaIA(turno);
@@ -519,11 +519,11 @@ export function LandingMotion() {
          diciembre: −14.480 → +173.920, 1.850.000 → 0, 25,5M → 34,4M.
          ═══════════════════════════════════════════════════════════════════════════ */
       (function () {
-        var caja = document.getElementById("linea");
-        var svg = document.getElementById("grafo");
+        const caja = document.getElementById("linea");
+        const svg = document.getElementById("grafo");
         if (!caja || !svg) return;
 
-        var MES = [
+        const MES = [
           "Enero",
           "Febrero",
           "Marzo",
@@ -537,7 +537,7 @@ export function LandingMotion() {
           "Noviembre",
           "Diciembre",
         ];
-        var COR = [
+        const COR = [
           "Ene",
           "Feb",
           "Mar",
@@ -554,15 +554,15 @@ export function LandingMotion() {
 
         // flujo libre del mes: arranca en rojo, cruza a positivo en marzo y pega un
         // salto en octubre, cuando la cuota de la tarjeta deja de existir
-        var FLUJO = [
+        const FLUJO = [
           -14480, -6200, 8400, 24900, 41300, 58700, 74100, 92600, 110400, 138900, 157200, 173920,
         ];
         // la deuda cara se extingue en octubre
-        var DEUDA = [
+        const DEUDA = [
           1850000, 1706000, 1548000, 1379000, 1198000, 1004000, 797000, 576000, 341000, 0, 0, 0,
         ];
         // patrimonio neto, en millones
-        var PATRI = [25.5, 26.1, 26.8, 27.6, 28.4, 29.3, 30.2, 31.1, 32.0, 32.9, 33.7, 34.4];
+        const PATRI = [25.5, 26.1, 26.8, 27.6, 28.4, 29.3, 30.2, 31.1, 32.0, 32.9, 33.7, 34.4];
 
         /* La proporción del lienzo cambia con el ancho: con el viewBox de escritorio
            (720×168 ≈ 4,3:1) el gráfico en un teléfono queda de 80 px de alto y los
@@ -570,8 +570,8 @@ export function LandingMotion() {
            sola letra — el nombre completo ya lo dice la lectura de arriba.
            El margen derecho tampoco puede ser mínimo: el punto de diciembre y su
            aguja quedaban pegados al canto de la tarjeta. */
-        var W, H, IZQ, DER, ARR, ABA, x0, x1, y0, y1, yCero, movil;
-        var MAX = 190000,
+        let W, H, IZQ, DER, ARR, ABA, x0, x1, y0, y1, yCero, movil;
+        const MAX = 190000,
           MIN = -30000;
         function medir() {
           movil = innerWidth < 768;
@@ -597,21 +597,21 @@ export function LandingMotion() {
 
         /* ── el dibujo ── */
         function ns(t, a) {
-          var e = document.createElementNS("http://www.w3.org/2000/svg", t);
-          for (var k in a) e.setAttribute(k, a[k]);
+          const e = document.createElementNS("http://www.w3.org/2000/svg", t);
+          for (const k in a) e.setAttribute(k, a[k]);
           return e;
         }
-        var rec, rotulos, aguja, punto;
+        let rec, rotulos, aguja, punto;
         function construir() {
           svg.textContent = "";
           svg.setAttribute("viewBox", "0 0 " + W + " " + H);
 
-          var curva = "",
+          let curva = "",
             i;
           for (i = 0; i < 12; i++) {
             curva += (i ? " L" : "M") + X(i).toFixed(1) + " " + Y(FLUJO[i]).toFixed(1);
           }
-          var area =
+          const area =
             curva +
             " L" +
             X(11).toFixed(1) +
@@ -623,10 +623,10 @@ export function LandingMotion() {
             yCero.toFixed(1) +
             " Z";
 
-          var defs = ns("defs");
+          const defs = ns("defs");
           // El degradado corta justo en la línea del cero: lo que queda debajo se ve
           // rojo y lo que queda encima, verde. Un solo relleno, dos lecturas.
-          var g = ns("linearGradient", {
+          const g = ns("linearGradient", {
             id: "gflujo",
             gradientUnits: "userSpaceOnUse",
             x1: 0,
@@ -634,7 +634,7 @@ export function LandingMotion() {
             x2: 0,
             y2: y1,
           });
-          var c = (yCero - y0) / (y1 - y0);
+          const c = (yCero - y0) / (y1 - y0);
           [
             [0, "rgba(55,132,81,.26)"],
             [c, "rgba(55,132,81,.04)"],
@@ -646,20 +646,20 @@ export function LandingMotion() {
             );
           });
           defs.appendChild(g);
-          var clip = ns("clipPath", { id: "ccorte" });
+          const clip = ns("clipPath", { id: "ccorte" });
           rec = ns("rect", { x: 0, y: 0, width: 0, height: H });
           clip.appendChild(rec);
           defs.appendChild(clip);
           svg.appendChild(defs);
 
           svg.appendChild(ns("line", { class: "cero", x1: x0, y1: yCero, x2: x1, y2: yCero }));
-          var capa = ns("g", { "clip-path": "url(#ccorte)" });
+          const capa = ns("g", { "clip-path": "url(#ccorte)" });
           capa.appendChild(ns("path", { d: area, fill: "url(#gflujo)" }));
           capa.appendChild(ns("path", { class: "curva", d: curva }));
           svg.appendChild(capa);
 
-          for (var j = 0; j < 12; j++) {
-            var t = ns("text", {
+          for (let j = 0; j < 12; j++) {
+            const t = ns("text", {
               class: "rotulo" + (movil ? " chico" : ""),
               x: X(j),
               y: H - 8,
@@ -690,24 +690,24 @@ export function LandingMotion() {
           return (n < 0 ? "−₡" : "+₡") + miles(Math.abs(Math.round(n)));
         }
 
-        var elMes = document.getElementById("lmes");
-        var elFlu = document.getElementById("lflujo");
-        var elDeu = document.getElementById("ldeuda");
-        var elPat = document.getElementById("lpatri");
-        var hitos = [].slice.call(caja.querySelectorAll(".hito"));
+        const elMes = document.getElementById("lmes");
+        const elFlu = document.getElementById("lflujo");
+        const elDeu = document.getElementById("ldeuda");
+        const elPat = document.getElementById("lpatri");
+        const hitos = [].slice.call(caja.querySelectorAll(".hito"));
 
         function interp(arr, t) {
-          var i = Math.min(10, Math.floor(t)),
+          const i = Math.min(10, Math.floor(t)),
             f = t - i;
           return arr[i] + (arr[i + 1] - arr[i]) * f;
         }
 
-        var ultimo = 0;
+        let ultimo = 0;
         function pintar(t) {
           ultimo = t;
-          var i = Math.round(t);
-          var fx = X(0) + ((X(11) - X(0)) * t) / 11;
-          var fv = interp(FLUJO, t);
+          const i = Math.round(t);
+          const fx = X(0) + ((X(11) - X(0)) * t) / 11;
+          const fv = interp(FLUJO, t);
           rec.setAttribute("width", fx + 3);
           aguja.setAttribute("x1", fx);
           aguja.setAttribute("x2", fx);
@@ -717,12 +717,12 @@ export function LandingMotion() {
           elMes.textContent = MES[i];
           elFlu.textContent = conSigno(fv);
           elFlu.className = fv < 0 ? "neg" : "ok";
-          var dv = interp(DEUDA, t);
+          const dv = interp(DEUDA, t);
           elDeu.textContent = colon(dv);
           elDeu.className = dv === 0 ? "ok" : "";
           elPat.textContent = "₡" + interp(PATRI, t).toFixed(1).replace(".", ",") + "M";
 
-          for (var k = 0; k < rotulos.length; k++) {
+          for (let k = 0; k < rotulos.length; k++) {
             rotulos[k].classList.toggle("act", +rotulos[k].getAttribute("data-i") === i);
           }
           hitos.forEach(function (h) {
@@ -730,24 +730,24 @@ export function LandingMotion() {
           });
         }
 
-        var quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (quieto) {
           pintar(11);
           return;
         }
 
         pintar(0);
-        var corrio = false;
+        let corrio = false;
         function correr() {
           if (corrio) return;
           corrio = true;
-          var DUR = 6000,
+          const DUR = 6000,
             ini = null;
           function paso(ts) {
             if (ini === null) ini = ts;
-            var p = Math.min(1, (ts - ini) / DUR);
+            const p = Math.min(1, (ts - ini) / DUR);
             // arranca despacio y frena al final: el año se siente recorrido, no barrido
-            var e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+            const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
             pintar(e * 11);
             if (p < 1) requestAnimationFrame(paso);
           }
@@ -766,7 +766,7 @@ export function LandingMotion() {
 
         // Al girar el teléfono cambia la proporción del lienzo: se rehace y se
         // repinta donde iba (o al final, si la animación ya terminó).
-        var reloj,
+        let reloj,
           eraMovil = movil;
         addEventListener(
           "resize",
@@ -804,24 +804,24 @@ export function LandingMotion() {
          `prefers-reduced-motion` se pinta la frase final y no se anima nada.
          ═══════════════════════════════════════════════════════════════════════════ */
       (function () {
-        var g = document.getElementById("gira");
+        const g = document.getElementById("gira");
         if (!g) return;
 
-        var FRASES = [
+        const FRASES = [
           "Falta <em>entenderla.</em>",
           "Falta <em>analizarla.</em>",
           "Falta <em>conectarla.</em>",
           "Falta <em>proyectarla.</em>",
           "Ahora construí <em>lo que sigue.</em>",
         ];
-        var FIN = FRASES.length - 1;
+        const FIN = FRASES.length - 1;
 
         if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
           g.innerHTML = FRASES[FIN];
           return;
         }
 
-        var i = 0,
+        let i = 0,
           aLaVista = false,
           andando = false,
           tmp;
@@ -833,7 +833,7 @@ export function LandingMotion() {
           }
           andando = true;
           // la frase de cierre se queda mucho más: es la que tiene que quedar
-          var espera = i === FIN ? 6500 : 2600;
+          const espera = i === FIN ? 6500 : 2600;
           tmp = setTimeout(function () {
             g.classList.add("va"); // se va
             setTimeout(function () {

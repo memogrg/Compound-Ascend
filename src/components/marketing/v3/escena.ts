@@ -18,12 +18,12 @@ import * as THREE from "three";
 
 export function montarTelefono(op) {
   op = op || {};
-  var stage = op.stage,
+  const stage = op.stage,
     cv = op.canvas;
-  var TEMA = op.tema || "claro"; // 'claro' | 'oscuro'
-  var TELON = op.telon !== false; // telón de papel dentro de la escena
-  var DIST = op.distancia || 13.8; // distancia de la cámara
-  var capL = { textContent: "" },
+  const TEMA = op.tema || "claro"; // 'claro' | 'oscuro'
+  const TELON = op.telon !== false; // telón de papel dentro de la escena
+  const DIST = op.distancia || 13.8; // distancia de la cámara
+  const capL = { textContent: "" },
     capFps = { textContent: "" },
     diag = { textContent: "" };
   function bail(w) {
@@ -32,15 +32,15 @@ export function montarTelefono(op) {
     if (op.alFallar) op.alFallar(w);
   }
 
-  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var mem = navigator.deviceMemory;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const mem = navigator.deviceMemory;
   if (typeof THREE === "undefined") return bail("three.js no cargó");
   if (!document.createElement("canvas").getContext("webgl2"))
     return bail("sin WebGL2 → imagen estática");
   if (mem !== undefined && mem < 4) return bail("deviceMemory " + mem + "GB → imagen estática");
 
   /* ── medidas y ciclo: los del componente de producción ── */
-  var W = 3.04,
+  const W = 3.04,
     H = 6.3,
     T = 0.36,
     R = 0.54,
@@ -54,12 +54,12 @@ export function montarTelefono(op) {
    movimiento no se repite a ojo, no tiene arranques ni frenadas visibles, y no hay un
    instante en que el aparato «llegue» a ningún lado. Un objeto sostenido en la mano se
    mueve así; una animación con hitos se nota. */
-  var CENTRO = -10,
+  const CENTRO = -10,
     AMP_1 = 15,
     AMP_2 = 7,
     PER_1 = 13,
     PER_2 = 8.3;
-  var FLOTE_SEG = 6.5,
+  const FLOTE_SEG = 6.5,
     ANGULO_QUIETO = -18;
   function anguloEn(t) {
     return (
@@ -73,7 +73,7 @@ export function montarTelefono(op) {
     return 4.5 + 2.2 * Math.sin((t * Math.PI * 2) / 10.5 + 0.6);
   }
 
-  var renderer;
+  let renderer;
   try {
     renderer = new THREE.WebGLRenderer({
       canvas: cv,
@@ -84,25 +84,25 @@ export function montarTelefono(op) {
   } catch (e) {
     return bail("no se pudo crear el contexto WebGL");
   }
-  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
   renderer.setPixelRatio(DPR);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.12;
 
-  var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
   camera.position.set(0, 0.15, DIST);
 
   /* Entorno de estudio. El componente usa RoomEnvironment (un addon que no viene
    en el build UMD), así que acá va un equirectangular procedural con la misma
    idea: claro arriba, oscuro abajo y dos cajas de luz que dibujan el filo. */
   (function () {
-    var e = document.createElement("canvas");
+    const e = document.createElement("canvas");
     e.width = 256;
     e.height = 128;
-    var c = e.getContext("2d");
-    var g = c.createLinearGradient(0, 0, 0, 128);
+    const c = e.getContext("2d");
+    const g = c.createLinearGradient(0, 0, 0, 128);
     if (TEMA === "oscuro") {
       /* Estudio nocturno: la luz baja de arriba y el suelo casi no devuelve nada,
        así el aluminio dibuja un filo brillante contra el fondo oscuro. */
@@ -128,42 +128,42 @@ export function montarTelefono(op) {
     c.beginPath();
     c.ellipse(62, 100, 54, 12, 0, 0, 7);
     c.fill();
-    var tex = new THREE.CanvasTexture(e);
+    const tex = new THREE.CanvasTexture(e);
     tex.mapping = THREE.EquirectangularReflectionMapping;
-    var pm = new THREE.PMREMGenerator(renderer);
+    const pm = new THREE.PMREMGenerator(renderer);
     pm.compileEquirectangularShader();
     scene.environment = pm.fromEquirectangular(tex).texture;
     tex.dispose();
     pm.dispose();
   })();
 
-  var luzPrincipal = new THREE.DirectionalLight(0xffffff, 1.1);
+  const luzPrincipal = new THREE.DirectionalLight(0xffffff, 1.1);
   luzPrincipal.position.set(4, 6, 6);
   scene.add(luzPrincipal);
-  var luzRelleno = new THREE.DirectionalLight(0xdfe8df, 0.35);
+  const luzRelleno = new THREE.DirectionalLight(0xdfe8df, 0.35);
   luzRelleno.position.set(-5, -2, 4);
   scene.add(luzRelleno);
   /* Luz de contra, fría y desde atrás a la izquierda. Es el aporte más grande al realismo:
    dibuja un filo encendido en el canto de aluminio que separa el aparato del fondo. Sin
    ella el teléfono se funde con el crema y se lee como un dibujo. */
-  var luzFilo = new THREE.DirectionalLight(0xe8f0ff, 0.85);
+  const luzFilo = new THREE.DirectionalLight(0xe8f0ff, 0.85);
   luzFilo.position.set(-6, 3, -5);
   scene.add(luzFilo);
   /* Un rebote cálido bajísimo desde el piso, para que la parte baja no quede muerta. */
-  var luzPiso = new THREE.DirectionalLight(0xfff2df, 0.18);
+  const luzPiso = new THREE.DirectionalLight(0xfff2df, 0.18);
   luzPiso.position.set(1, -6, 2);
   scene.add(luzPiso);
 
   /* micro-rugosidad: un valor constante es la firma del CGI */
   function mapaRugosidad(amp, veta, rep) {
-    var c = document.createElement("canvas");
+    const c = document.createElement("canvas");
     c.width = c.height = 256;
-    var g = c.getContext("2d"),
+    const g = c.getContext("2d"),
       img = g.createImageData(256, 256),
       d = img.data;
-    for (var i = 0; i < 65536; i++) {
-      var y = (i / 256) | 0;
-      var v = Math.max(
+    for (let i = 0; i < 65536; i++) {
+      const y = (i / 256) | 0;
+      const v = Math.max(
         0,
         Math.min(255, 128 + (Math.random() - 0.5) * amp * 255 + Math.sin(y * veta) * amp * 90),
       );
@@ -171,14 +171,14 @@ export function montarTelefono(op) {
       d[i * 4 + 3] = 255;
     }
     g.putImageData(img, 0, 0);
-    var t = new THREE.CanvasTexture(c);
+    const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.repeat.set(rep, rep * 2);
     return t;
   }
 
   /* materiales del componente de producción (sin `sheen`, que en r128 es un Color) */
-  var frameMat = new THREE.MeshPhysicalMaterial({
+  const frameMat = new THREE.MeshPhysicalMaterial({
     color: 0x8b968a,
     metalness: 0.92,
     roughness: 0.28,
@@ -186,7 +186,7 @@ export function montarTelefono(op) {
     clearcoatRoughness: 0.25,
     roughnessMap: mapaRugosidad(0.2, 2.6, 3),
   });
-  var backMat = new THREE.MeshPhysicalMaterial({
+  const backMat = new THREE.MeshPhysicalMaterial({
     color: 0x4e5c4a,
     metalness: 0.12,
     roughness: 0.42,
@@ -194,21 +194,21 @@ export function montarTelefono(op) {
     clearcoatRoughness: 0.32,
     roughnessMap: mapaRugosidad(0.13, 0.8, 2),
   });
-  var plateauMat = new THREE.MeshPhysicalMaterial({
+  const plateauMat = new THREE.MeshPhysicalMaterial({
     color: 0x475545,
     metalness: 0.14,
     roughness: 0.48,
     clearcoat: 0.4,
     clearcoatRoughness: 0.4,
   });
-  var ringMat = new THREE.MeshPhysicalMaterial({
+  const ringMat = new THREE.MeshPhysicalMaterial({
     color: 0xb9c4b4,
     metalness: 0.95,
     roughness: 0.22,
     clearcoat: 0.8,
     clearcoatRoughness: 0.2,
   });
-  var lensGlassMat = new THREE.MeshPhysicalMaterial({
+  const lensGlassMat = new THREE.MeshPhysicalMaterial({
     color: 0x0a1018,
     metalness: 0.2,
     roughness: 0.04,
@@ -216,34 +216,34 @@ export function montarTelefono(op) {
     clearcoatRoughness: 0.05,
     envMapIntensity: 3,
   });
-  var lensInnerMat = new THREE.MeshPhysicalMaterial({
+  const lensInnerMat = new THREE.MeshPhysicalMaterial({
     color: 0x0a0c14,
     metalness: 0.4,
     roughness: 0.15,
     envMapIntensity: 1.2,
   });
-  var darkMat = new THREE.MeshStandardMaterial({
+  const darkMat = new THREE.MeshStandardMaterial({
     color: 0x101410,
     roughness: 0.55,
     metalness: 0.2,
   });
 
-  var phone = new THREE.Group(),
+  const phone = new THREE.Group(),
     rig = new THREE.Group();
   rig.add(phone);
   scene.add(rig);
 
   /* Textura del objetivo: se dibuja una vez y la comparten los tres lentes. */
-  var _lenteTex = null;
+  let _lenteTex = null;
   function texturaLente() {
     if (_lenteTex) return _lenteTex;
-    var c = document.createElement("canvas");
+    const c = document.createElement("canvas");
     c.width = c.height = 256;
-    var g = c.getContext("2d"),
+    const g = c.getContext("2d"),
       C = 128;
 
     // pozo del barril: casi negro al centro, apenas más claro en el borde
-    var pozo = g.createRadialGradient(C, C, 4, C, C, 126);
+    const pozo = g.createRadialGradient(C, C, 4, C, C, 126);
     pozo.addColorStop(0, "#020406");
     pozo.addColorStop(0.55, "#070b12");
     pozo.addColorStop(0.88, "#121a26");
@@ -263,14 +263,14 @@ export function montarTelefono(op) {
     });
 
     // recubrimiento antirreflejo: verde de un lado, violeta del otro
-    var verde = g.createRadialGradient(96, 104, 2, 96, 104, 74);
+    const verde = g.createRadialGradient(96, 104, 2, 96, 104, 74);
     verde.addColorStop(0, "rgba(92,190,140,.30)");
     verde.addColorStop(1, "rgba(92,190,140,0)");
     g.fillStyle = verde;
     g.beginPath();
     g.arc(C, C, 122, 0, 7);
     g.fill();
-    var violeta = g.createRadialGradient(168, 158, 2, 168, 158, 62);
+    const violeta = g.createRadialGradient(168, 158, 2, 168, 158, 62);
     violeta.addColorStop(0, "rgba(150,120,210,.22)");
     violeta.addColorStop(1, "rgba(150,120,210,0)");
     g.fillStyle = violeta;
@@ -282,7 +282,7 @@ export function montarTelefono(op) {
     g.save();
     g.translate(92, 88);
     g.rotate(-0.6);
-    var brillo = g.createRadialGradient(0, 0, 0, 0, 0, 26);
+    const brillo = g.createRadialGradient(0, 0, 0, 0, 0, 26);
     brillo.addColorStop(0, "rgba(255,255,255,.92)");
     brillo.addColorStop(0.35, "rgba(226,238,255,.35)");
     brillo.addColorStop(1, "rgba(255,255,255,0)");
@@ -292,7 +292,7 @@ export function montarTelefono(op) {
     g.fill();
     g.restore();
     // y un segundo reflejo diminuto, el de la fuente secundaria
-    var b2 = g.createRadialGradient(158, 176, 0, 158, 176, 9);
+    const b2 = g.createRadialGradient(158, 176, 0, 158, 176, 9);
     b2.addColorStop(0, "rgba(255,255,255,.55)");
     b2.addColorStop(1, "rgba(255,255,255,0)");
     g.fillStyle = b2;
@@ -314,7 +314,7 @@ export function montarTelefono(op) {
   }
 
   function siluetaRedondeada(w, h, r) {
-    var s = new THREE.Shape(),
+    const s = new THREE.Shape(),
       x = -w / 2,
       y = -h / 2;
     s.moveTo(x + r, y);
@@ -331,7 +331,7 @@ export function montarTelefono(op) {
   /* RoundedBoxGeometry tampoco está en el UMD: para los botones basta una
    extrusión de la misma silueta redondeada, que además es coherente. */
   function cajaRedondeada(w, h, d, r) {
-    var g = new THREE.ExtrudeGeometry(siluetaRedondeada(w, h, r), {
+    const g = new THREE.ExtrudeGeometry(siluetaRedondeada(w, h, r), {
       depth: d - 0.02,
       bevelEnabled: true,
       bevelThickness: 0.01,
@@ -345,7 +345,7 @@ export function montarTelefono(op) {
 
   /* cuerpo */
   (function () {
-    var geo = new THREE.ExtrudeGeometry(siluetaRedondeada(W - 2 * BEV, H - 2 * BEV, R - BEV), {
+    const geo = new THREE.ExtrudeGeometry(siluetaRedondeada(W - 2 * BEV, H - 2 * BEV, R - BEV), {
       depth: T - 2 * BEV,
       bevelEnabled: true,
       bevelThickness: BEV,
@@ -358,13 +358,13 @@ export function montarTelefono(op) {
   })();
   /* trasera alpine green */
   (function () {
-    var geo = new THREE.ExtrudeGeometry(siluetaRedondeada(W - 0.1, H - 0.1, R - 0.06), {
+    const geo = new THREE.ExtrudeGeometry(siluetaRedondeada(W - 0.1, H - 0.1, R - 0.06), {
       depth: 0.012,
       bevelEnabled: false,
       curveSegments: 36,
     });
     geo.center();
-    var v = new THREE.Mesh(geo, backMat);
+    const v = new THREE.Mesh(geo, backMat);
     v.position.z = -(T / 2 - 0.02);
     v.rotation.y = Math.PI;
     phone.add(v);
@@ -390,31 +390,31 @@ export function montarTelefono(op) {
    dos de esas cifras (fondo 1.520.000/3.500.000 = 43%, sobre 160.400/250.000 =
    64%, patrimonio 25,5M→34,4M = +34,9%). Nada inventado para que cuadre bonito.
    ══════════════════════════════════════════════════════════════════════════ */
-  var SS =
+  const SS =
     Math.min(window.devicePixelRatio || 1, 3) >= 2 && (navigator.deviceMemory || 4) >= 8 ? 3 : 2;
-  var PW = 284,
+  const PW = 284,
     PH = 610; // espacio lógico de diseño
-  var SW = 540,
+  const SW = 540,
     SH = 1160; // el mapeo UV de la geometría sigue igual
-  var ESC = (SW * SS) / PW; // 540·SS px de ancho repartidos en 284 unidades
+  const ESC = (SW * SS) / PW; // 540·SS px de ancho repartidos en 284 unidades
 
-  var sc = document.createElement("canvas");
+  const sc = document.createElement("canvas");
   sc.width = SW * SS;
   sc.height = SH * SS;
-  var sx = sc.getContext("2d");
+  const sx = sc.getContext("2d");
   sx.setTransform(ESC, 0, 0, ESC, 0, 0);
 
-  var PANELS = ["Centro de mando", "Tus deudas", "My Agent C+"];
+  const PANELS = ["Centro de mando", "Tus deudas", "My Agent C+"];
 
   /* Paleta: la del design system v2, la misma del producto. */
-  var VERDE = "#378451",
+  const VERDE = "#378451",
     AGUA = "#2b7d6a",
     AMBAR = "#b07a2e",
     ROJO = "#c34f4b";
-  var TINTA = "#1e1c16",
+  const TINTA = "#1e1c16",
     MUTE = "#625e57",
     TENUE = "#8b877e";
-  var PAPEL = "#f7f6f2",
+  const PAPEL = "#f7f6f2",
     LINEA = "#eceae3",
     RIEL = "#eeece5";
 
@@ -456,7 +456,7 @@ export function montarTelefono(op) {
     sx.stroke();
   }
   function barra(x, y, w, pct, color, alto) {
-    var a = alto || 4.5;
+    const a = alto || 4.5;
     sx.fillStyle = RIEL;
     rr(sx, x, y, w, a, a / 2);
     sx.fill();
@@ -469,19 +469,19 @@ export function montarTelefono(op) {
   /* Curva con relleno degradado: es lo que hace que un gráfico se vea de producto
    caro y no de hoja de cálculo. */
   function curva(pts, x0, y0, w, h, color, base, prog) {
-    var n = pts.length,
+    const n = pts.length,
       lim = Math.max(2, Math.ceil(n * Math.min(1, prog)));
-    var px = function (i) {
+    const px = function (i) {
       return x0 + (w * i) / (n - 1);
     };
-    var py = function (i) {
+    const py = function (i) {
       return y0 + h - h * pts[i];
     };
     sx.beginPath();
-    for (var i = 0; i < lim; i++) {
+    for (let i = 0; i < lim; i++) {
       i ? sx.lineTo(px(i), py(i)) : sx.moveTo(px(i), py(i));
     }
-    var g = sx.createLinearGradient(0, y0, 0, base);
+    const g = sx.createLinearGradient(0, y0, 0, base);
     g.addColorStop(0, color.replace("rgb", "rgba").replace(")", ",.22)"));
     g.addColorStop(1, color.replace("rgb", "rgba").replace(")", ",0)"));
     sx.save();
@@ -492,7 +492,7 @@ export function montarTelefono(op) {
     sx.fill();
     sx.restore();
     sx.beginPath();
-    for (var j = 0; j < lim; j++) {
+    for (let j = 0; j < lim; j++) {
       j ? sx.lineTo(px(j), py(j)) : sx.moveTo(px(j), py(j));
     }
     sx.strokeStyle = color;
@@ -509,7 +509,7 @@ export function montarTelefono(op) {
     sx.lineWidth = 1;
     rr(sx, 16, 556, 252, 34, 11);
     sx.stroke();
-    for (var i = 0; i < 4; i++) {
+    for (let i = 0; i < 4; i++) {
       sx.fillStyle = i === activo ? VERDE : "#dcd9d0";
       rr(sx, 44 + i * 56, 566, 14, 14, 4.5);
       sx.fill();
@@ -532,7 +532,7 @@ export function montarTelefono(op) {
     sx.fillStyle = "#000";
     rr(sx, 94, 10, 96, 26, 13);
     sx.fill();
-    var lente = sx.createRadialGradient(172, 22, 1, 172, 23, 5.5);
+    const lente = sx.createRadialGradient(172, 22, 1, 172, 23, 5.5);
     lente.addColorStop(0, "#3a4a6b");
     lente.addColorStop(0.5, "#10131c");
     lente.addColorStop(1, "#000");
@@ -549,7 +549,7 @@ export function montarTelefono(op) {
     /* anillo del fondo de emergencia: 43% y en ÁMBAR, porque está por debajo de la
      meta — el color dice el estado sin una palabra */
     tarjeta(70, 88);
-    var pct = 0.43 * Math.min(1, Math.max(0, t * 1.3));
+    const pct = 0.43 * Math.min(1, Math.max(0, t * 1.3));
     sx.strokeStyle = "#e9e7e0";
     sx.lineWidth = 6.5;
     sx.beginPath();
@@ -565,7 +565,7 @@ export function montarTelefono(op) {
     TX("43%", 60, 118, 15, TINTA, 700);
     TX("fondo", 60, 128, 6.5, MUTE);
     sx.textAlign = "left";
-    var kpi = function (y, et, va, color) {
+    const kpi = function (y, et, va, color) {
       TX(et, 100, y, 9.5, MUTE);
       TD(va, 258, y, 9.5, color || TINTA, 700, true);
     };
@@ -575,7 +575,7 @@ export function montarTelefono(op) {
 
     /* sobres */
     tarjeta(168, 96);
-    var sobre = function (y, et, val, pct2, color) {
+    const sobre = function (y, et, val, pct2, color) {
       TX(et, 28, y, 9.5, MUTE);
       TD(val, 256, y, 9.5, TINTA, 700, true);
       barra(28, y + 5, 228, pct2 * Math.min(1, Math.max(0, (t - 0.15) * 1.5)), color);
@@ -631,7 +631,7 @@ export function montarTelefono(op) {
 
     TX("ORDEN DE ATAQUE · AVALANCHA", 28, 172, 8, TENUE, 700, true);
 
-    var fila = function (y, n, nombre, tasa, activa) {
+    const fila = function (y, n, nombre, tasa, activa) {
       tarjeta(y, 40);
       sx.fillStyle = activa ? VERDE : "#e6e4dd";
       rr(sx, 28, y + 11, 18, 18, 6);
@@ -778,7 +778,14 @@ export function montarTelefono(op) {
     else panelAsesor(t);
 
     /* viñeta suave: un panel real no es un blanco parejo de borde a borde */
-    var vg = sx.createRadialGradient(PW * 0.5, PH * 0.42, PW * 0.25, PW * 0.5, PH * 0.5, PH * 0.62);
+    const vg = sx.createRadialGradient(
+      PW * 0.5,
+      PH * 0.42,
+      PW * 0.25,
+      PW * 0.5,
+      PH * 0.5,
+      PH * 0.62,
+    );
     vg.addColorStop(0, "rgba(255,255,255,0)");
     vg.addColorStop(0.72, "rgba(24,22,18,.020)");
     vg.addColorStop(1, "rgba(24,22,18,.055)");
@@ -799,28 +806,28 @@ export function montarTelefono(op) {
     dibujarIsla();
   }
 
-  var screenTex = null,
+  let screenTex = null,
     sheenMesh = null,
     barraMesh = null,
     sombraMesh = null;
   (function () {
-    var bezGeo = new THREE.ExtrudeGeometry(siluetaRedondeada(W - 0.14, H - 0.14, R - 0.08), {
+    const bezGeo = new THREE.ExtrudeGeometry(siluetaRedondeada(W - 0.14, H - 0.14, R - 0.08), {
       depth: 0.008,
       bevelEnabled: false,
       curveSegments: 36,
     });
     bezGeo.center();
-    var bezel = new THREE.Mesh(
+    const bezel = new THREE.Mesh(
       bezGeo,
       new THREE.MeshStandardMaterial({ color: 0x060707, roughness: 0.4, metalness: 0.1 }),
     );
     bezel.position.z = T / 2 + 0.001;
     phone.add(bezel);
 
-    var scrGeo = new THREE.ShapeGeometry(siluetaRedondeada(2.84, 6.1, 0.45), 72);
-    var uv = scrGeo.attributes.uv,
+    const scrGeo = new THREE.ShapeGeometry(siluetaRedondeada(2.84, 6.1, 0.45), 72);
+    const uv = scrGeo.attributes.uv,
       pos = scrGeo.attributes.position;
-    for (var i = 0; i < uv.count; i++)
+    for (let i = 0; i < uv.count; i++)
       uv.setXY(i, (pos.getX(i) + 1.42) / 2.84, (pos.getY(i) + 3.05) / 6.1);
     uv.needsUpdate = true;
 
@@ -837,7 +844,7 @@ export function montarTelefono(op) {
     screenTex.magFilter = THREE.LinearFilter;
     /* Sin iluminar: un panel encendido EMITE. Con material físico las luces lo
      lavan y el texto deja de leerse. El reflejo vive en las dos capas de arriba. */
-    var scr = new THREE.Mesh(
+    const scr = new THREE.Mesh(
       scrGeo,
       new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }),
     );
@@ -845,11 +852,11 @@ export function montarTelefono(op) {
     phone.add(scr);
 
     /* huellas + velo, con opacidad por ángulo */
-    var hc = document.createElement("canvas");
+    const hc = document.createElement("canvas");
     hc.width = 256;
     hc.height = 512;
-    var hg = hc.getContext("2d");
-    var lg = hg.createLinearGradient(0, 0, 256, 512);
+    const hg = hc.getContext("2d");
+    const lg = hg.createLinearGradient(0, 0, 256, 512);
     lg.addColorStop(0, "rgba(255,255,255,0)");
     lg.addColorStop(0.32, "rgba(255,255,255,.62)");
     lg.addColorStop(0.44, "rgba(255,255,255,.08)");
@@ -857,11 +864,11 @@ export function montarTelefono(op) {
     lg.addColorStop(0.76, "rgba(255,255,255,0)");
     hg.fillStyle = lg;
     hg.fillRect(0, 0, 256, 512);
-    for (var k = 0; k < 30; k++) {
-      var hx = 26 + Math.random() * 200,
+    for (let k = 0; k < 30; k++) {
+      const hx = 26 + Math.random() * 200,
         hy = 50 + Math.random() * 420,
         rad = 12 + Math.random() * 26;
-      var sg = hg.createRadialGradient(hx, hy, 0, hx, hy, rad);
+      const sg = hg.createRadialGradient(hx, hy, 0, hx, hy, rad);
       sg.addColorStop(0, "rgba(255,255,255,.09)");
       sg.addColorStop(0.7, "rgba(255,255,255,.03)");
       sg.addColorStop(1, "rgba(255,255,255,0)");
@@ -884,11 +891,11 @@ export function montarTelefono(op) {
     phone.add(sheenMesh);
 
     /* barra de estudio: se refleja y BARRE según el ángulo, no según el reloj */
-    var bc = document.createElement("canvas");
+    const bc = document.createElement("canvas");
     bc.width = 64;
     bc.height = 512;
-    var bg = bc.getContext("2d");
-    var bl = bg.createLinearGradient(0, 0, 0, 512);
+    const bg = bc.getContext("2d");
+    const bl = bg.createLinearGradient(0, 0, 0, 512);
     bl.addColorStop(0, "rgba(255,255,255,0)");
     bl.addColorStop(0.3, "rgba(255,255,255,0)");
     bl.addColorStop(0.4, "rgba(255,255,255,.30)");
@@ -900,7 +907,7 @@ export function montarTelefono(op) {
     bl.addColorStop(1, "rgba(255,255,255,0)");
     bg.fillStyle = bl;
     bg.fillRect(0, 0, 64, 512);
-    var barraTex = new THREE.CanvasTexture(bc);
+    const barraTex = new THREE.CanvasTexture(bc);
     barraTex.wrapS = barraTex.wrapT = THREE.RepeatWrapping;
     barraMesh = new THREE.Mesh(
       scrGeo.clone(),
@@ -918,8 +925,8 @@ export function montarTelefono(op) {
 
   /* módulo de cámara — del componente de producción */
   (function () {
-    var mod = new THREE.Group();
-    var pGeo = new THREE.ExtrudeGeometry(siluetaRedondeada(1.3, 1.3, 0.33), {
+    const mod = new THREE.Group();
+    const pGeo = new THREE.ExtrudeGeometry(siluetaRedondeada(1.3, 1.3, 0.33), {
       depth: 0.05,
       bevelEnabled: true,
       bevelThickness: 0.035,
@@ -930,15 +937,18 @@ export function montarTelefono(op) {
     pGeo.center();
     mod.add(new THREE.Mesh(pGeo, plateauMat));
     function lente(x, y) {
-      var u = new THREE.Group();
-      var aro = new THREE.Mesh(new THREE.CylinderGeometry(0.265, 0.28, 0.085, 48), ringMat);
+      const u = new THREE.Group();
+      const aro = new THREE.Mesh(new THREE.CylinderGeometry(0.265, 0.28, 0.085, 48), ringMat);
       aro.rotation.x = Math.PI / 2;
       u.add(aro);
-      var barril = new THREE.Mesh(new THREE.CylinderGeometry(0.215, 0.215, 0.06, 48), lensInnerMat);
+      const barril = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.215, 0.215, 0.06, 48),
+        lensInnerMat,
+      );
       barril.rotation.x = Math.PI / 2;
       barril.position.z = 0.035;
       u.add(barril);
-      var vidrio = new THREE.Mesh(
+      const vidrio = new THREE.Mesh(
         new THREE.SphereGeometry(0.19, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
         lensGlassMat,
       );
@@ -951,7 +961,7 @@ export function montarTelefono(op) {
        concéntricos que dan profundidad, un tinte de RECUBRIMIENTO (verde y
        violeta, de las capas antirreflejo) y un reflejo chico y nítido — no un
        punto grande y plano en el centro. */
-      var iris = new THREE.Mesh(
+      const iris = new THREE.Mesh(
         new THREE.CircleGeometry(0.135, 48),
         new THREE.MeshBasicMaterial({ map: texturaLente(), transparent: true, toneMapped: false }),
       );
@@ -963,7 +973,7 @@ export function montarTelefono(op) {
     mod.add(lente(-0.3, 0.3));
     mod.add(lente(-0.3, -0.3));
     mod.add(lente(0.3, 0));
-    var flash = new THREE.Mesh(
+    const flash = new THREE.Mesh(
       new THREE.CylinderGeometry(0.085, 0.085, 0.03, 32),
       new THREE.MeshPhysicalMaterial({
         color: 0xf3e9bd,
@@ -977,11 +987,11 @@ export function montarTelefono(op) {
     flash.rotation.x = Math.PI / 2;
     flash.position.set(0.3, 0.44, 0.045);
     mod.add(flash);
-    var lidar = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.03, 32), lensInnerMat);
+    const lidar = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.03, 32), lensInnerMat);
     lidar.rotation.x = Math.PI / 2;
     lidar.position.set(0.3, -0.44, 0.045);
     mod.add(lidar);
-    var mic = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.03, 16), darkMat);
+    const mic = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.03, 16), darkMat);
     mic.rotation.x = Math.PI / 2;
     mic.position.set(0.52, 0.44, 0.04);
     mod.add(mic);
@@ -993,7 +1003,7 @@ export function montarTelefono(op) {
   /* botones laterales */
   (function () {
     function boton(largo, y, lado) {
-      var b = new THREE.Mesh(cajaRedondeada(0.11, largo, 0.11, 0.045), frameMat);
+      const b = new THREE.Mesh(cajaRedondeada(0.11, largo, 0.11, 0.045), frameMat);
       b.position.set(lado * (W / 2), y, 0);
       phone.add(b);
     }
@@ -1005,18 +1015,18 @@ export function montarTelefono(op) {
 
   /* sombra de contacto (en la escena, no en el rig) */
   (function () {
-    var c = document.createElement("canvas");
+    const c = document.createElement("canvas");
     c.width = c.height = 256;
-    var g = c.getContext("2d");
-    var rad = g.createRadialGradient(128, 128, 10, 128, 128, 120);
-    var s0 = TEMA === "oscuro" ? 0.5 : 0.34,
+    const g = c.getContext("2d");
+    const rad = g.createRadialGradient(128, 128, 10, 128, 128, 120);
+    const s0 = TEMA === "oscuro" ? 0.5 : 0.34,
       s1 = TEMA === "oscuro" ? 0.18 : 0.12;
     rad.addColorStop(0, "rgba(18,26,18," + s0 + ")");
     rad.addColorStop(0.55, "rgba(18,26,18," + s1 + ")");
     rad.addColorStop(1, "rgba(18,26,18,0)");
     g.fillStyle = rad;
     g.fillRect(0, 0, 256, 256);
-    var s = new THREE.Mesh(
+    const s = new THREE.Mesh(
       new THREE.PlaneGeometry(4.6, 1.6),
       new THREE.MeshBasicMaterial({
         map: new THREE.CanvasTexture(c),
@@ -1035,10 +1045,10 @@ export function montarTelefono(op) {
    y el teléfono flota sobre el fondo de la página, sin caja que lo encierre. */
   if (TELON)
     (function () {
-      var c = document.createElement("canvas");
+      const c = document.createElement("canvas");
       c.width = c.height = 512;
-      var g = c.getContext("2d");
-      var rg = g.createRadialGradient(256, 96, 30, 256, 300, 460);
+      const g = c.getContext("2d");
+      const rg = g.createRadialGradient(256, 96, 30, 256, 300, 460);
       rg.addColorStop(0, "#fbfaf6");
       rg.addColorStop(0.46, "#f4f2ec");
       rg.addColorStop(1, "#e6e2d8");
@@ -1046,7 +1056,7 @@ export function montarTelefono(op) {
       g.fillRect(0, 0, 512, 512);
       g.strokeStyle = "rgba(30,28,22,.05)";
       g.lineWidth = 1;
-      for (var gx = 0; gx <= 512; gx += 32) {
+      for (let gx = 0; gx <= 512; gx += 32) {
         g.beginPath();
         g.moveTo(gx + 0.5, 0);
         g.lineTo(gx + 0.5, 512);
@@ -1056,12 +1066,12 @@ export function montarTelefono(op) {
         g.lineTo(512, gx + 0.5);
         g.stroke();
       }
-      var fade = g.createRadialGradient(256, 250, 60, 256, 256, 300);
+      const fade = g.createRadialGradient(256, 250, 60, 256, 256, 300);
       fade.addColorStop(0, "rgba(244,242,236,0)");
       fade.addColorStop(1, "rgba(240,237,229,.9)");
       g.fillStyle = fade;
       g.fillRect(0, 0, 512, 512);
-      var telon = new THREE.Mesh(
+      const telon = new THREE.Mesh(
         new THREE.PlaneGeometry(70, 70),
         new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), depthWrite: false }),
       );
@@ -1070,7 +1080,7 @@ export function montarTelefono(op) {
     })();
 
   function resize() {
-    var w = stage.clientWidth,
+    const w = stage.clientWidth,
       h = stage.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
@@ -1080,11 +1090,11 @@ export function montarTelefono(op) {
   resize();
   window.addEventListener("resize", resize);
 
-  var pt = { x: 0, y: 0, tx: 0, ty: 0 };
+  const pt = { x: 0, y: 0, tx: 0, ty: 0 };
   window.addEventListener(
     "pointermove",
     function (e) {
-      var r = stage.getBoundingClientRect();
+      const r = stage.getBoundingClientRect();
       pt.tx = ((e.clientX - r.left) / r.width - 0.5) * 2;
       pt.ty = ((e.clientY - r.top) / r.height - 0.5) * 2;
     },
@@ -1100,7 +1110,7 @@ export function montarTelefono(op) {
     { passive: true },
   );
 
-  var running = true,
+  let running = true,
     panel = 0,
     panelT = 0,
     redibujar = true,
@@ -1120,7 +1130,7 @@ export function montarTelefono(op) {
       redibujar = true;
     });
 
-  var t0 = performance.now(),
+  const t0 = performance.now(),
     tPrev = t0,
     frames = 0,
     fpsT = performance.now(),
@@ -1132,17 +1142,17 @@ export function montarTelefono(op) {
       frames = 0;
       return;
     }
-    var t = (now - t0) / 1000;
+    const t = (now - t0) / 1000;
     // Delta REAL. Antes esto avanzaba 1/60 por cuadro: al caer los fps el reloj
     // del panel se congelaba, la condición "sigo en la animación de entrada"
     // nunca terminaba, y el lienzo se re-subía en cada cuadro. Cuanto más lento
     // iba, más trabajo se daba. Un lazo de realimentación de manual.
-    var dt = Math.min(0.1, (now - tPrev) / 1000);
+    const dt = Math.min(0.1, (now - tPrev) / 1000);
     tPrev = now;
 
     frames++;
     if (now - fpsT > 900) {
-      var fps = (frames * 1000) / (now - fpsT);
+      const fps = (frames * 1000) / (now - fpsT);
       frames = 0;
       fpsT = now;
       capFps.textContent = Math.round(fps) + " fps";
@@ -1164,7 +1174,7 @@ export function montarTelefono(op) {
       }
     }
 
-    var ang = reduced ? ANGULO_QUIETO : anguloEn(t);
+    const ang = reduced ? ANGULO_QUIETO : anguloEn(t);
     pt.x += (pt.tx - pt.x) * 0.045;
     pt.y += (pt.ty - pt.y) * 0.045;
     rig.rotation.y = THREE.MathUtils.degToRad(ang) + pt.x * 0.16;
@@ -1175,8 +1185,8 @@ export function montarTelefono(op) {
     /* Con la vuelta entera el ángulo barría 360°; ahora vive en unos 38°, así que los mismos
      multiplicadores dejaban el cristal apagado. Se suben para que el reflejo siga BARRIENDO
      de verdad dentro del rango corto — es lo que delata que hay vidrio y no una calcomanía. */
-    var frente = Math.max(0, Math.cos(rig.rotation.y));
-    var oblicuo = frente * Math.abs(Math.sin(rig.rotation.y));
+    const frente = Math.max(0, Math.cos(rig.rotation.y));
+    const oblicuo = frente * Math.abs(Math.sin(rig.rotation.y));
     sheenMesh.material.opacity = 0.02 * frente + 0.3 * oblicuo;
     barraMesh.material.map.offset.y = -rig.rotation.y * 1.9 + 0.16;
     barraMesh.material.map.repeat.y = 1.35;
