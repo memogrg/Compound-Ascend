@@ -45,7 +45,7 @@ export function Faqs() {
 
       <header className="hdr">
         <div className="wrap hd">
-          <a className="lp-brand" href="/A" aria-label="CARTERA+">
+          <a className="lp-brand" href="/" aria-label="CARTERA+">
             <svg className="mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
               <path
                 d="M45 18.5 A 19 19 0 1 0 45 45.5"
@@ -65,8 +65,8 @@ export function Faqs() {
             </span>
           </a>
           <nav className="lp-nav">
-            <a href="/A#como">Cómo funciona</a>
-            <a href="/A#planes">Planes</a>
+            <a href="/#como">Cómo funciona</a>
+            <a href="/#planes">Planes</a>
             <a href="/faqs" className="act">
               FAQs
             </a>
