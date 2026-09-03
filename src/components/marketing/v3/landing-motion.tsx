@@ -741,8 +741,10 @@ export function LandingMotion() {
         function correr() {
           if (corrio) return;
           corrio = true;
-          const DUR = 6000,
-            ini = null;
+          // Declaraciones separadas: `ini` SÍ se reasigna en cada cuadro, así
+          // que no puede compartir el `const` de la duración.
+          const DUR = 6000;
+          let ini = null;
           function paso(ts) {
             if (ini === null) ini = ts;
             const p = Math.min(1, (ts - ini) / DUR);

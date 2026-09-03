@@ -1130,8 +1130,10 @@ export function montarTelefono(op) {
       redibujar = true;
     });
 
-  const t0 = performance.now(),
-    tPrev = t0,
+  // Solo `t0` es constante: marca el arranque del ciclo. Las otras cuatro se
+  // reasignan en cada cuadro, así que van aparte y con `let`.
+  const t0 = performance.now();
+  let tPrev = t0,
     frames = 0,
     fpsT = performance.now(),
     judged = false;
