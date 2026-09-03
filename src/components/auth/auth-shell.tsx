@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Icon } from "@/components/ui/icon";
 
@@ -20,12 +21,15 @@ export function AuthShell({
   return (
     <div className="auth-wrap">
       <div className="auth-shell">
-        <div className="auth-brand">
+        {/* El logotipo es un enlace y hay una salida explícita. Estas pantallas eran un
+            callejón: ni el logo ni ningún texto llevaba a la landing, y desde /login la
+            única forma de volver a la página principal era escribir la URL. */}
+        <Link href="/" className="auth-brand" aria-label="Volver a la página principal de CARTERA+">
           <BrandMark />
           <div className="brand-name">
             CARTERA<span className="ascend">+</span>
           </div>
-        </div>
+        </Link>
 
         <div className="auth-card">
           <div className="auth-head">
@@ -45,9 +49,13 @@ export function AuthShell({
         {showTrust ? (
           <div className="auth-trust">
             <Icon name="defense" />
-            <span>Tus datos financieros están protegidos y solo tú puedes acceder a ellos.</span>
+            <span>Tus datos financieros están protegidos y solo vos podés acceder a ellos.</span>
           </div>
         ) : null}
+
+        <Link href="/" className="auth-volver">
+          ← Volver a CARTERA+
+        </Link>
       </div>
     </div>
   );

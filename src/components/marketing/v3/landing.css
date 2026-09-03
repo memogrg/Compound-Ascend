@@ -183,6 +183,85 @@
 .lp .lp-nav a:hover {
   color: var(--ink);
 }
+/* Menú móvil: oculto en escritorio, donde los enlaces van sueltos en el nav. */
+.lp .lp-menu {
+  display: none;
+  position: relative;
+}
+.lp .lp-menu summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: #fff;
+}
+.lp .lp-menu summary::-webkit-details-marker {
+  display: none;
+}
+/* Tres rayas que se vuelven una X: la de arriba y la de abajo giran ±45° y se
+   encuentran en el centro; la del medio se apaga. Con una sola diagonal (lo que
+   salía antes) el estado abierto parecía una barra inclinada, no un cerrar. */
+.lp .lp-menu-barra {
+  width: 14px;
+  height: 10px;
+  position: relative;
+}
+.lp .lp-menu-barra::before,
+.lp .lp-menu-barra::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1.5px solid currentColor;
+  transition:
+    transform 0.18s ease,
+    top 0.18s ease;
+}
+.lp .lp-menu-barra::before {
+  top: 0;
+  box-shadow: 0 4.25px 0 0 currentColor; /* la raya del medio */
+}
+.lp .lp-menu-barra::after {
+  top: 8.5px;
+}
+.lp .lp-menu[open] .lp-menu-barra::before {
+  top: 4.25px;
+  transform: rotate(45deg);
+  box-shadow: none;
+}
+.lp .lp-menu[open] .lp-menu-barra::after {
+  top: 4.25px;
+  transform: rotate(-45deg);
+}
+.lp .lp-menu-lista {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 12px 32px rgba(29, 29, 31, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+}
+.lp .lp-menu-lista a {
+  padding: 11px 12px;
+  border-radius: 9px;
+  color: var(--ink);
+  font-size: 15px;
+}
+.lp .lp-menu-lista a:hover {
+  background: var(--soft);
+}
 .lp .lp-btn {
   display: inline-flex;
   align-items: center;
@@ -2509,11 +2588,20 @@
   }
 }
 @media (max-width: 767px) {
-  .lp .lp-nav a:not(.lp-btn) {
+  /* Los enlaces sueltos y el botón verde se van del nav (el verde vive en la barra fija
+     de abajo); el menú aparece. `:not(.lp-menu-lista a)` deja vivos los enlaces DENTRO
+     del menú, que también son `.lp-nav a`. */
+  .lp .lp-nav > a:not(.lp-btn) {
     display: none;
   }
-  .lp .lp-nav .btn-green {
+  /* Los dos botones del nav se van: el verde vive en la barra fija de abajo y
+     «Iniciar sesión» dentro del menú. Con los dos en el header a 390 px, el texto
+     se partía en dos líneas y el header quedaba apretado contra el logotipo. */
+  .lp .lp-nav > .lp-btn {
     display: none;
+  }
+  .lp .lp-menu {
+    display: block;
   }
   .lp section {
     padding: 64px 0;
