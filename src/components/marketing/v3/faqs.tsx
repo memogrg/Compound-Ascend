@@ -944,6 +944,23 @@ export function Faqs() {
                 </details>
 
                 <details className="qa">
+                  <summary>¿Cuántas veces puedo preguntarle al mes?</summary>
+                  <div className="lp-r">
+                    <p>
+                      Alrededor de <strong>100 consultas al mes en Esencial</strong>, unas{" "}
+                      <strong>250 en Pro</strong> y unas <strong>500 en Max</strong>. Son cifras
+                      aproximadas a propósito: una pregunta corta consume menos que una que obliga a
+                      revisar todo tu patrimonio, así que el número real se mueve según lo que
+                      preguntés.
+                    </p>
+                    <p>
+                      Para dimensionarlo: en Esencial son unas tres consultas por día, todos los
+                      días del mes. No es un plan pensado para que estés midiendo cuánto te queda.
+                    </p>
+                  </div>
+                </details>
+
+                <details className="qa">
                   <summary>¿Puede hacer cambios en mi cuenta sin que yo sepa?</summary>
                   <div className="lp-r">
                     <p>
