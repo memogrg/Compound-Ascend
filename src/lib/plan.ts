@@ -142,12 +142,27 @@ export const HOUSEHOLD_MEMBER_LIMITS: Record<Plan, number> = {
   max: 3,
 };
 
-export function householdMemberLimit(plan: Plan): number {
-  return HOUSEHOLD_MEMBER_LIMITS[plan];
+/**
+ * ── POR QUÉ ESTAS DOS FUNCIONES ACEPTAN `string` ────────────────────────────
+ * El plan viene de `profiles.plan`: una columna de texto. El `as Plan` que hace
+ * account-service es una PROMESA que nadie verifica en runtime, y el día que se
+ * rompió costó caro: la migración a tres tiers entró a producción antes que el
+ * código que entendía los valores nuevos, así que la base decía "max" mientras
+ * el mapa desplegado todavía tenía `free` y `premium`. El índice devolvió
+ * `undefined`, `undefined.toLocaleString()` explotó, y /configuracion se cayó 17
+ * veces (Sentry CARTERAPLUS-6).
+ *
+ * El tipo no puede impedirlo porque la base de datos no está bajo el sistema de
+ * tipos. Lo que sí se puede es decidir cómo se degrada: un plan desconocido cae
+ * al mínimo —cupo 0, un solo miembro— que bloquea de más pero no tumba la
+ * página. Una pantalla de ajustes que no abre es peor que un chat cerrado.
+ */
+export function householdMemberLimit(plan: Plan | (string & {})): number {
+  return HOUSEHOLD_MEMBER_LIMITS[plan as Plan] ?? HOUSEHOLD_MEMBER_LIMITS.ninguno;
 }
 
-export function aiTokenLimit(plan: Plan): number {
-  return PLAN_TOKEN_LIMITS[plan];
+export function aiTokenLimit(plan: Plan | (string & {})): number {
+  return PLAN_TOKEN_LIMITS[plan as Plan] ?? PLAN_TOKEN_LIMITS.ninguno;
 }
 
 /**

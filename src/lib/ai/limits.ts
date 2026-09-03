@@ -41,6 +41,11 @@ export const PLAN_TOKEN_LIMITS = {
 
 export type PlanConLimite = keyof typeof PLAN_TOKEN_LIMITS;
 
-export function isWithinLimit(plan: PlanConLimite, tokensUsed: number): boolean {
-  return tokensUsed < PLAN_TOKEN_LIMITS[plan];
+/**
+ * `plan` acepta `string` por lo mismo que `aiTokenLimit` (ver @/lib/plan): el
+ * valor sale de la base, no del sistema de tipos. Un plan desconocido no tiene
+ * cupo — se bloquea, no se abre por defecto.
+ */
+export function isWithinLimit(plan: PlanConLimite | (string & {}), tokensUsed: number): boolean {
+  return tokensUsed < (PLAN_TOKEN_LIMITS[plan as PlanConLimite] ?? 0);
 }
