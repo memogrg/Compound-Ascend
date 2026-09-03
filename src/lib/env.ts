@@ -96,6 +96,12 @@ const serverSchema = z.object({
   ),
   GMAIL_IMAP_USER: optionalStr, // correo del buzón de ingesta
   GMAIL_IMAP_APP_PASSWORD: optionalStr, // App Password (16 chars) de Google
+  // Dominio de las direcciones de ingesta ÚNICAS por cuenta
+  // (u<token>@in.aitechumbrella.com). Requiere que ese subdominio entregue todo
+  // su correo al buzón de arriba (catch-all de Google Workspace con la casilla
+  // «Add X-Gm-Original-To header» activada). Si falta, la app no ofrece
+  // direcciones únicas y solo queda el carril heredado de la dirección plana.
+  INGEST_ADDRESS_DOMAIN: optionalStr,
 });
 
 type ClientEnv = z.infer<typeof clientSchema>;

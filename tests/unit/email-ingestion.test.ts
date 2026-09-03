@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  extractEnvelopeCandidates,
   extractRecipientCandidates,
   fetchUnseen,
   fromIsAuthenticated,
@@ -46,6 +47,7 @@ function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<str
   const markedSeen: number[] = [];
   const seenRefs = new Set<string>(); // claves (cuenta, external_ref) ya insertadas
   const deps: EmailIngestDeps = {
+    lookupByAddress: async () => ({ status: "none" }) as const,
     lookupOwner: async (candidates) => {
       for (const c of candidates) {
         const owner = allowlist[c];
@@ -116,6 +118,7 @@ describe("email ingestion · fetchUnseen", () => {
         uid: 7,
         messageId: "<abc@mail>",
         fromAuthenticated: false,
+        envelopeTo: [],
         from: "BAC Credomatic <notificacion@notificacionesbaccr.com>",
         recipients: [`Comms <${FLAT_INBOX}>`, "MEMOGRG@gmail.com", FLAT_INBOX],
         subject: "Compra",
@@ -141,6 +144,7 @@ describe("email ingestion · fetchUnseen", () => {
         uid: 21,
         messageId: "<manual@gmail>",
         fromAuthenticated: true, // el buzón validó DKIM/SPF de gmail.com
+        envelopeTo: [],
         from: `Memo <${FORWARDER}>`, // en reenvío manual, el usuario queda en From
         recipients: [FLAT_INBOX], // el To es solo el buzón de ingesta
         subject: "Fwd: Compra BAC",
@@ -159,6 +163,7 @@ describe("email ingestion · fetchUnseen", () => {
         uid: 23,
         messageId: "<spoof@atacante>",
         fromAuthenticated: false, // ni DKIM ni SPF respaldan ese From
+        envelopeTo: [],
         from: `Memo <${FORWARDER}>`, // se hace pasar por la víctima
         recipients: [FLAT_INBOX],
         subject: "Fwd: Compra BAC",
@@ -176,6 +181,7 @@ describe("email ingestion · fetchUnseen", () => {
         uid: 9,
         messageId: null,
         fromAuthenticated: false,
+        envelopeTo: [],
         from: "x@y.com",
         recipients: [FORWARDER],
         subject: "s",
@@ -186,6 +192,7 @@ describe("email ingestion · fetchUnseen", () => {
         uid: 10,
         messageId: null,
         fromAuthenticated: false,
+        envelopeTo: [],
         from: null,
         recipients: [FORWARDER],
         subject: "s",
@@ -196,6 +203,7 @@ describe("email ingestion · fetchUnseen", () => {
         uid: 11,
         messageId: null,
         fromAuthenticated: false,
+        envelopeTo: [],
         from: "z@y.com",
         recipients: [FORWARDER],
         subject: "s",
@@ -220,6 +228,7 @@ describe("email ingestion · processInboundEmails", () => {
     uid: 1,
     receivedAt: null,
     senderCandidates: [],
+    envelopeTo: [],
     ...over,
   });
 
@@ -231,6 +240,7 @@ describe("email ingestion · processInboundEmails", () => {
         uid: 22,
         messageId: "<manual2@gmail>",
         fromAuthenticated: true,
+        envelopeTo: [],
         from: FORWARDER,
         recipients: [FLAT_INBOX],
         subject: "Fwd: Compra BAC",
@@ -363,6 +373,7 @@ describe("email ingestion · fecha faltante (fallback a la fecha de recepción)"
   function capturingDeps(owner: EmailOwner) {
     const capturado: RawMovement[] = [];
     const deps: EmailIngestDeps = {
+      lookupByAddress: async () => ({ status: "none" }) as const,
       lookupOwner: async () => ({ status: "found", owner }) as const,
       isProcessed: async () => false,
       markProcessed: async () => {},
@@ -384,6 +395,7 @@ describe("email ingestion · fecha faltante (fallback a la fecha de recepción)"
     uid: 99,
     receivedAt: null,
     senderCandidates: [],
+    envelopeTo: [],
     ...over,
   });
 
@@ -451,6 +463,7 @@ describe("email ingestion · aislamiento entre cuentas", () => {
     const markedSeen: number[] = [];
     const processed = new Set<string>();
     const deps: EmailIngestDeps = {
+      lookupByAddress: async () => ({ status: "none" }) as const,
       lookupOwner: async () => lookup,
       isProcessed: async (id) => processed.has(id),
       markProcessed: async (id) => {
@@ -472,6 +485,7 @@ describe("email ingestion · aislamiento entre cuentas", () => {
     from: BANK_FROM,
     recipients: [FLAT_INBOX, FORWARDER, "otra@persona.com"],
     senderCandidates: [],
+    envelopeTo: [],
     subject: "Compra",
     text: BAC_CARD,
     uid: 42,
@@ -531,5 +545,96 @@ describe("email ingestion · fromIsAuthenticated", () => {
 
   it("sin cabecera de autenticación -> no autenticado", () => {
     expect(fromIsAuthenticated("Subject: x\r\nTo: alguien@x.com", FORWARDER)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dirección de ingesta única: el destinatario ES la identidad (nivel 0).
+// ---------------------------------------------------------------------------
+describe("email ingestion · dirección de ingesta única", () => {
+  const DIR = "uq7bk3mnp2@in.aitechumbrella.com";
+  const owner: EmailOwner = { userId: "uA", householdId: null, timezone: null };
+
+  it("extractEnvelopeCandidates saca X-Gm-Original-To (lo estampa el receptor)", () => {
+    const h = [
+      "Delivered-To: communications@aitechumbrella.com",
+      `X-Gm-Original-To: ${DIR}`,
+      "To: memogrg@gmail.com",
+      "Subject: Compra",
+    ].join("\r\n");
+    expect(extractEnvelopeCandidates(h)).toEqual(["communications@aitechumbrella.com", DIR]);
+    // El To NO entra aquí: lo pone el emisor, se mira en el nivel de abajo.
+    expect(extractEnvelopeCandidates(h)).not.toContain("memogrg@gmail.com");
+  });
+
+  /** Deps con los dos niveles separados, para probar la prioridad. */
+  function depsNiveles(porDireccion: OwnerLookup, porForwarder: OwnerLookup) {
+    const usados: string[] = [];
+    const proposals: RawMovement[] = [];
+    const deps: EmailIngestDeps = {
+      lookupByAddress: async (c) => {
+        usados.push(`dir:${c.join(",")}`);
+        return c.length ? porDireccion : { status: "none" };
+      },
+      lookupOwner: async (c) => {
+        usados.push(`fwd:${c.join(",")}`);
+        return c.length ? porForwarder : { status: "none" };
+      },
+      isProcessed: async () => false,
+      markProcessed: async () => {},
+      saveProposals: async (m) => {
+        proposals.push(...m);
+        return { inserted: m.length, duplicated: 0 };
+      },
+      markSeen: async () => {},
+    };
+    return { deps, usados, proposals };
+  }
+
+  const conSobre = (over: Partial<ImapMessage> = {}): ImapMessage => ({
+    id: "<dir@bac>",
+    from: BANK_FROM,
+    recipients: [FLAT_INBOX],
+    envelopeTo: [DIR],
+    senderCandidates: [],
+    subject: "Compra",
+    text: BAC_CARD,
+    uid: 77,
+    receivedAt: null,
+    ...over,
+  });
+
+  it("la dirección del sobre resuelve SIN reenviador verificado (cero configuración)", async () => {
+    // El forwarder es desconocido a propósito: con dirección única no hace falta.
+    const { deps, proposals, usados } = depsNiveles({ status: "found", owner }, { status: "none" });
+    const summary = await processInboundEmails([conSobre()], parseNotification, deps);
+    expect(summary.propuestos).toBe(1);
+    expect(proposals).toHaveLength(1);
+    // Resolvió en el primer nivel: ni siquiera consultó la allowlist heredada.
+    expect(usados).toEqual([`dir:${DIR}`]);
+  });
+
+  it("dos direcciones de ingesta de cuentas distintas -> ambiguo, y NO degrada al nivel de abajo", async () => {
+    const { deps, proposals, usados } = depsNiveles(
+      { status: "ambiguous", cuentas: 2 },
+      { status: "found", owner }, // si degradara, este resolvería y sería un error
+    );
+    const summary = await processInboundEmails([conSobre()], parseNotification, deps);
+    expect(summary.ambiguos).toBe(1);
+    expect(summary.procesados).toBe(0);
+    expect(proposals).toHaveLength(0);
+    expect(usados).toEqual([`dir:${DIR}`]);
+  });
+
+  it("sin dirección de ingesta cae al carril heredado del reenviador verificado", async () => {
+    const { deps, proposals, usados } = depsNiveles({ status: "none" }, { status: "found", owner });
+    const summary = await processInboundEmails(
+      [conSobre({ envelopeTo: [], recipients: [FLAT_INBOX, FORWARDER] })],
+      parseNotification,
+      deps,
+    );
+    expect(summary.propuestos).toBe(1);
+    expect(proposals).toHaveLength(1);
+    expect(usados.some((u) => u.startsWith("fwd:"))).toBe(true);
   });
 });

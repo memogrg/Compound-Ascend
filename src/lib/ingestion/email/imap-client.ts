@@ -10,6 +10,7 @@ import { simpleParser } from "mailparser";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import {
+  extractEnvelopeCandidates,
   extractRecipientCandidates,
   fromIsAuthenticated,
   type ImapClient,
@@ -105,6 +106,9 @@ export async function createImapClient(): Promise<ImapClient> {
           messageId: msg.envelope?.messageId ?? null,
           from,
           recipients,
+          // Lo que estampó el receptor al entregar: con el catch-all del
+          // subdominio, aquí viaja la dirección de ingesta única de la cuenta.
+          envelopeTo: headers ? extractEnvelopeCandidates(headers) : [],
           // ¿Nuestro buzón validó DKIM/SPF para ese From? Sin esto, el remitente
           // es una afirmación del que manda y no puede valer como identidad.
           fromAuthenticated: Boolean(from) && fromIsAuthenticated(headers, from!),

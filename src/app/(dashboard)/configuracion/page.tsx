@@ -14,6 +14,8 @@ import { NotificationPrefs } from "@/modules/account/components/notification-pre
 import { EmailTester } from "@/modules/account/components/email-tester";
 import { WhatsAppLink } from "@/modules/account/components/whatsapp-link";
 import { IngestEmails } from "@/modules/account/components/ingest-emails";
+import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
+import { getOrCreateIngestAddress } from "@/modules/account/services/ingest-address-service";
 import { INGEST_TARGET, INGEST_HELP } from "@/modules/account/constants";
 import {
   listMyIngestEmails,
@@ -69,11 +71,19 @@ export default async function Page() {
 
   // Correos del banco (onboarding de ingesta). Best-effort: si falla, lista vacía.
   let ingestEmails: IngestEmailRow[] = [];
+  // Dirección única de la cuenta: se crea sola la primera vez que se abre esta
+  // pantalla. null si el dominio de ingesta no está configurado todavía.
+  let ingestAddress: string | null = null;
   if (isSupabaseConfigured()) {
     try {
       ingestEmails = await listMyIngestEmails();
     } catch {
       ingestEmails = [];
+    }
+    try {
+      ingestAddress = await getOrCreateIngestAddress();
+    } catch {
+      ingestAddress = null;
     }
   }
 
@@ -224,13 +234,21 @@ export default async function Page() {
           </>
         }
         desc={
-          <>
-            Configurá en tu correo un reenvío de los avisos de tu banco a{" "}
-            <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el que
-            reenviás.
-          </>
+          ingestAddress ? (
+            <>
+              Configurá en tu correo un reenvío de los avisos de tu banco a tu dirección de ingesta.
+              Con eso basta: no hay que registrar nada más.
+            </>
+          ) : (
+            <>
+              Configurá en tu correo un reenvío de los avisos de tu banco a{" "}
+              <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el
+              que reenviás.
+            </>
+          )
         }
       >
+        {ingestAddress ? <IngestAddressCard address={ingestAddress} /> : null}
         <IngestEmails initial={ingestEmails} />
       </SetRow>
 

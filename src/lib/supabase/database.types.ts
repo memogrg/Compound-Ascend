@@ -1125,6 +1125,18 @@ export type EmailIngestLinkRow = Audited & {
   created_at: string;
 };
 
+/** Dirección de ingesta única por cuenta (migración 20260902000002). El
+ *  destinatario ES la identidad: se resuelve por X-Gm-Original-To. Escritura
+ *  solo desde el servidor (sin grant para anon/authenticated). */
+export type IngestAddressRow = Audited & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  address: string; // u<token>@<dominio de ingesta>
+  created_at: string;
+  revoked_at: string | null; // rotación: deja de resolver y nunca se reasigna
+};
+
 export type IngestProposalStatus = "pending" | "confirmed" | "discarded";
 
 /** Cola de propuestas de ingesta por confirmar (migración 0027). */
@@ -1313,6 +1325,7 @@ export interface Database {
       >;
       // Ingesta por correo (migración 0027). El poller usa service-role.
       email_ingest_links: UserTable<EmailIngestLinkRow>;
+      ingest_addresses: UserTable<IngestAddressRow>;
       ingest_proposals: UserTable<IngestProposalRow>;
       account_cards: UserTable<AccountCardRow>;
       // Caché de sugerencias de sobre por (usuario, comercio) (migración 0032).

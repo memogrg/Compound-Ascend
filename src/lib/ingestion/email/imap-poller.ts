@@ -9,10 +9,15 @@
  * la propuesta en cola (ingest_proposals, 'pending'). La confirmación es del usuario.
  *
  * IDENTIFICAR AL DUEÑO ES LA PARTE DELICADA. Un correo lo escribe quien lo manda,
- * así que sus cabeceras son afirmaciones, no pruebas. Por eso hay dos niveles:
+ * así que sus cabeceras son afirmaciones, no pruebas. Por eso hay tres niveles,
+ * del más fuerte al más débil:
  *
- *   1. Destinatarios (To/Cc + cabeceras de reenvío). Es lo que funciona con el
- *      auto-forward, donde el From es del banco.
+ *   0. La DIRECCIÓN DE INGESTA ÚNICA de la cuenta, leída de `X-Gm-Original-To`
+ *      —cabecera que estampa el receptor al entregar el catch-all, no el emisor—.
+ *      Es el camino bueno: la dirección ES la identidad, es única por índice y es
+ *      un secreto que solo conoce su dueño. Aquí no hay nada que adivinar.
+ *   1. Destinatarios (To/Cc + cabeceras de reenvío) contra la allowlist de
+ *      reenviadores verificados. Carril heredado de la dirección plana.
  *   2. El remitente, PERO solo si el correo viene autenticado (DKIM o SPF
  *      alineados con esa dirección). Cubre el reenvío manual —donde el usuario
  *      queda en el From— sin aceptar un From falsificado: quien manda un correo
@@ -21,8 +26,6 @@
  *
  * Y ante duda, no se adivina: si los candidatos apuntan a DOS cuentas distintas,
  * el correo se deja sin procesar (`ambiguos`) en vez de caer en una al azar.
- * La solución definitiva es la dirección de ingesta única por usuario (el
- * destinatario pasa a SER la identidad); esto es el blindaje del camino actual.
  */
 import type { RawMovement } from "@/lib/ingestion/types";
 import { todayISOInTz } from "@/lib/time/user-time-core";
@@ -37,6 +40,7 @@ export interface RawImapMessage {
   messageId: string | null; // header Message-ID; clave de idempotencia preferida
   from: string | null; // dirección del remitente (puede venir con nombre)
   recipients: string[]; // candidatos de destinatario original (To + cabeceras de reenvío)
+  envelopeTo: string[]; // destinatario de SOBRE estampado por el receptor (X-Gm-Original-To)
   subject: string | null;
   text: string; // cuerpo en texto plano (el adaptador real lo extrae del MIME)
   receivedAt: string | null; // fecha del correo (envelope.date) en ISO; fallback de occurred_on
@@ -58,6 +62,7 @@ export interface ImapMessage {
   id: string; // messageId, o `uid:<n>` si el correo no trae Message-ID
   from: string; // remitente en minúsculas, solo la dirección
   recipients: string[]; // candidatos de destinatario, en minúsculas, sin duplicados
+  envelopeTo: string[]; // lo que estampó el receptor: la señal más fuerte de identidad
   senderCandidates: string[]; // el From, SOLO si vino autenticado; si no, vacío
   subject: string;
   text: string;
@@ -103,6 +108,28 @@ export function extractRecipientCandidates(rawHeaders: string): string[] {
     const colon = line.indexOf(":");
     if (colon < 0) continue;
     if (!RECIPIENT_HEADER_RE.test(line.slice(0, colon).trim())) continue;
+    const matches = line.slice(colon + 1).match(EMAIL_RE);
+    if (matches) for (const m of matches) out.add(m.toLowerCase());
+  }
+  return [...out];
+}
+
+// Cabeceras que estampa el RECEPTOR al entregar (no el emisor). `X-Gm-Original-To`
+// es la que añade la regla de enrutamiento de Google Workspace cuando reescribe el
+// destinatario del catch-all: trae la dirección de ingesta original.
+const ENVELOPE_HEADER_RE = /^(x-gm-original-to|delivered-to|x-original-to)$/i;
+
+/**
+ * Direcciones estampadas por el receptor. Es la señal más fuerte que tenemos:
+ * el que manda el correo no puede fabricarlas (las suyas quedan en To/Cc, que se
+ * miran aparte y con menos confianza). Puro: testeable sin red.
+ */
+export function extractEnvelopeCandidates(rawHeaders: string): string[] {
+  const out = new Set<string>();
+  for (const line of unfold(rawHeaders)) {
+    const colon = line.indexOf(":");
+    if (colon < 0) continue;
+    if (!ENVELOPE_HEADER_RE.test(line.slice(0, colon).trim())) continue;
     const matches = line.slice(colon + 1).match(EMAIL_RE);
     if (matches) for (const m of matches) out.add(m.toLowerCase());
   }
@@ -159,10 +186,12 @@ export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
     const text = m.text ?? "";
     if (!from || !text.trim()) continue;
     const recipients = [...new Set((m.recipients ?? []).map(extractAddress).filter(Boolean))];
+    const envelopeTo = [...new Set((m.envelopeTo ?? []).map(extractAddress).filter(Boolean))];
     out.push({
       id: m.messageId ?? `uid:${m.uid}`,
       from,
       recipients,
+      envelopeTo,
       // El From solo cuenta como identidad si el correo vino autenticado.
       senderCandidates: m.fromAuthenticated ? [from] : [],
       subject: m.subject ?? "",
@@ -199,8 +228,12 @@ export type OwnerLookup =
  * la orquestación pura y testeable sin BD.
  */
 export interface EmailIngestDeps {
-  /** Resuelve el dueño por candidatos. Devuelve `ambiguous` si apuntan a más de
-   *  una cuenta: el poller entonces no procesa, no adivina. */
+  /** Resuelve el dueño por DIRECCIÓN DE INGESTA única (nivel 0). Sin verificación
+   *  de por medio: la dirección es el secreto que la app le dio a esa cuenta. */
+  lookupByAddress(candidates: string[]): Promise<OwnerLookup>;
+  /** Resuelve el dueño por reenviador verificado (carril heredado). Devuelve
+   *  `ambiguous` si los candidatos apuntan a más de una cuenta: el poller
+   *  entonces no procesa, no adivina. */
   lookupOwner(candidates: string[]): Promise<OwnerLookup>;
   /** ¿Este correo (por id) ya se procesó? (processed_events). */
   isProcessed(eventId: string): Promise<boolean>;
@@ -238,15 +271,27 @@ function fecharConReceivedAt(receivedAt: string | null, tz: string | null): stri
 }
 
 /**
- * Resuelve al dueño en dos niveles: primero por destinatario (auto-forward),
- * y solo si ahí no hay nada, por el remitente autenticado (reenvío manual).
- * Una ambigüedad en el primer nivel corta: no se baja al segundo a buscar suerte.
+ * Resuelve al dueño de lo más fuerte a lo más débil, y se detiene en el primer
+ * nivel que dice algo. Una ambigüedad NO se degrada al siguiente nivel a buscar
+ * suerte: corta ahí mismo.
+ *
+ *   0. dirección de ingesta en la cabecera del receptor  (identidad, no indicio)
+ *   1. dirección de ingesta vista en cualquier otra cabecera
+ *   2. reenviador verificado entre los destinatarios     (carril heredado)
+ *   3. reenviador verificado en el From autenticado      (reenvío manual)
  */
 async function resolverDueno(message: ImapMessage, deps: EmailIngestDeps): Promise<OwnerLookup> {
-  const porDestinatario = await deps.lookupOwner(message.recipients);
-  if (porDestinatario.status !== "none") return porDestinatario;
-  if (message.senderCandidates.length === 0) return { status: "none" };
-  return deps.lookupOwner(message.senderCandidates);
+  const niveles: Array<() => Promise<OwnerLookup>> = [
+    () => deps.lookupByAddress(message.envelopeTo),
+    () => deps.lookupByAddress(message.recipients),
+    () => deps.lookupOwner(message.recipients),
+    () => deps.lookupOwner(message.senderCandidates),
+  ];
+  for (const nivel of niveles) {
+    const out = await nivel();
+    if (out.status !== "none") return out;
+  }
+  return { status: "none" };
 }
 
 /**

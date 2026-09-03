@@ -39,6 +39,7 @@ import type { HouseholdMembersView } from "@/modules/personal-profile";
 import { testEmailAction, type EmailTestResult } from "@/modules/account/api/actions";
 import { updatePasswordAction } from "@/lib/auth/actions";
 import { INGEST_TARGET } from "@/modules/account/constants";
+import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
 import type { NotificationChannel, NotificationPrefs } from "@/lib/notifications/preferences";
 import type { IngestEmailRow } from "@/modules/account/services/ingest-email-service";
 
@@ -95,6 +96,7 @@ export function ConfiguracionManager({
   wa,
   whatsappConfigured,
   ingestEmails,
+  ingestAddress,
   household,
   emailConfigured,
 }: {
@@ -104,6 +106,7 @@ export function ConfiguracionManager({
   wa: WaLink;
   whatsappConfigured: boolean;
   ingestEmails: IngestEmailRow[];
+  ingestAddress: string | null;
   household: HouseholdMembersView | null;
   emailConfigured: boolean;
 }) {
@@ -235,10 +238,20 @@ export function ConfiguracionManager({
       {/* Correos del banco (ingesta) — formulario/lista propios (form-kit): se conservan. */}
       <MSectionHeader title="Correos del banco" />
       <MContentCard style={{ marginBottom: 14 }}>
-        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
-          Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y
-          registra aquí el correo desde el que reenvías.
-        </p>
+        {ingestAddress ? (
+          <>
+            <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
+              Reenviá los avisos de tu banco a tu dirección de ingesta. Con eso basta: no hay que
+              registrar nada más.
+            </p>
+            <IngestAddressCard address={ingestAddress} />
+          </>
+        ) : (
+          <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
+            Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y
+            registra aquí el correo desde el que reenvías.
+          </p>
+        )}
         <IngestSection emails={ingestEmails} />
       </MContentCard>
 
