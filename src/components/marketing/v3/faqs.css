@@ -49,7 +49,16 @@
   vertical-align: -0.21em;
   flex: 0 0 auto;
 }
+/* `font-style: normal` NO SOBRA: es lo que impide que el logotipo se incline.
+   La marca aparece dentro de frases en serif itálica (los remates de los pilares, el
+   cierre), y sin esta línea heredaba la itálica del padre — CARTERA+ salía torcido
+   mientras el `+` se veía derecho, porque su propia regla sí lo reseteaba. Un logotipo
+   no se inclina nunca, aunque la frase que lo contiene sí.
+
+   Misma lección que las rayas de los rótulos: hay que DECLARAR lo que no se quiere
+   heredar. Una hoja solo defiende lo que escribe. */
 .lp .cw {
+  font-style: normal;
   white-space: nowrap;
   font-family: Sora, system-ui, sans-serif;
   font-weight: 600;
