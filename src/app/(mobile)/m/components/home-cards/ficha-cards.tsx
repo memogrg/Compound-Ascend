@@ -367,6 +367,7 @@ const TREND: Record<RichTrend, { label: string; tone: MTone } | null> = {
   mas_rico: { label: "Más rico", tone: "success" },
   estable: { label: "Estable", tone: "neutral" },
   mas_pobre: { label: "Más pobre", tone: "danger" },
+  en_curso: null, // mes sin cerrar: sin chip, no un veredicto a medias
   sin_historico: null,
 };
 

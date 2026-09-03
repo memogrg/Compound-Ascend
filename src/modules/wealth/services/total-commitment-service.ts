@@ -12,6 +12,7 @@ import { householdMemberIds } from "@/lib/household/active";
 import { getDisplayCurrency, monthlyize, type Frequency } from "@/modules/financial-base";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import { getFxRates } from "@/lib/market-data/fx-rates";
+import { resolveBudgetPeriod } from "@/lib/budget/resolve-budget-period";
 import {
   computeTotalCommitment,
   type CommitmentBreakdown,
@@ -37,7 +38,11 @@ export async function getTotalMonthlyCommitment(opts?: {
   const [members, rates] = await Promise.all([householdMemberIds(supabase, userId), getFxRates()]);
   const targetCurrency = opts?.currency ?? (await getDisplayCurrency(opts?.ctx));
 
-  const period = await userCurrentPeriod(opts?.ctx);
+  // Mes del presupuesto: el actual si ya tiene sobres, si no el último que los tenga. Sin
+  // esto, el día 1 de cada mes los sobres valían 0 y el compromiso —y con él el gasto de
+  // referencia y el número de independencia— se desplomaba sin que el usuario tocara nada.
+  const actual = await userCurrentPeriod(opts?.ctx);
+  const period = await resolveBudgetPeriod(supabase, members, actual);
   const [budgetRows, debtRows, goalRows, policyRows, holdingRows] = await Promise.all([
     // Presupuesto del mes: TODAS las líneas de gasto (sin filtro esencial). El engine cuenta solo
     // los sobres propios (manual/recurring); las derivadas van por su entidad (regla #1).
@@ -102,7 +107,7 @@ export async function getTotalMonthlyCommitment(opts?: {
     .filter((h) => Number(h.monthly_contribution ?? 0) > 0)
     .map((h) => ({ monthly: Number(h.monthly_contribution), currency: h.currency }));
 
-  return computeTotalCommitment({
+  const breakdown = computeTotalCommitment({
     displayCurrency: targetCurrency,
     rates,
     budgetLines,
@@ -111,4 +116,5 @@ export async function getTotalMonthlyCommitment(opts?: {
     debts,
     policies,
   });
+  return { ...breakdown, budgetPeriod: period };
 }

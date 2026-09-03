@@ -131,6 +131,8 @@ export type FinancialContext = {
     deudas: number;
     seguros: number;
   };
+  /** Aviso cuando los sobres salieron del presupuesto de OTRO mes (ver avisoPresupuesto). */
+  compromisoAviso?: string;
   numeroDeLibertad?: number; // capital para el estilo de vida DESEADO (al 8%); ausente si no lo definió
   añosDeLibertad?: number; // años que cubre el patrimonio invertible
   mesesDeColchon?: number; // liquidez / gasto mensual (meses de colchón, no libertad)
@@ -482,7 +484,8 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       : "";
     facts.push(
       `Compromiso mensual TOTAL (base de la Independencia, "tu estilo de vida actual"): ${ctx.compromisoMensual} ${ctx.currency}${partes}. ` +
-        `Esto YA incluye el presupuesto de sobres, los aportes a metas y el DCA de inversiones: NO le pidas al usuario "registrar su gasto mensual" ni digas que no tenés su gasto — usá esta cifra. El Número de Independencia sale de acá (× 12 ÷ 0,08).`,
+        `Esto YA incluye el presupuesto de sobres, los aportes a metas y el DCA de inversiones: NO le pidas al usuario "registrar su gasto mensual" ni digas que no tenés su gasto — usá esta cifra. El Número de Independencia sale de acá (× 12 ÷ 0,08).` +
+        (ctx.compromisoAviso ? ` OJO: ${ctx.compromisoAviso} Decilo si citás la cifra.` : ""),
     );
   }
   if (ctx.numeroDeLibertad !== undefined)

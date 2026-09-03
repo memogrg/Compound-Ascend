@@ -71,12 +71,20 @@ export async function getDueReminders(today: Date = simNow()): Promise<DueRemind
   });
   if (candidates.length === 0) return [];
 
-  // Resuelve el correo de cada usuario (admin API), cacheado por userId.
+  // Resuelve el correo de cada usuario (admin API) y su preferencia de canal, cacheados
+  // por userId. Lo segundo faltaba: este cron mandaba el recordatorio aunque el usuario
+  // hubiera apagado "Correo" en configuración — el resumen semanal y las alertas de
+  // precio sí lo respetaban, este no. Apagar un canal tiene que apagarlo de verdad.
   const emailByUser = new Map<string, string | null>();
+  const { getNotificationPrefs } = await import("@/lib/notifications/preferences");
   for (const userId of new Set(candidates.map((d) => d.user_id))) {
     try {
-      const { data } = await supabase.auth.admin.getUserById(userId);
-      emailByUser.set(userId, data.user?.email ?? null);
+      const [{ data }, prefs] = await Promise.all([
+        supabase.auth.admin.getUserById(userId),
+        getNotificationPrefs(userId, { db: supabase, userId }),
+      ]);
+      // Canal apagado → sin correo. El llamador ya trata `email: null` como "saltar".
+      emailByUser.set(userId, prefs.email ? (data.user?.email ?? null) : null);
     } catch {
       emailByUser.set(userId, null);
     }

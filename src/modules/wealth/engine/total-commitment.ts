@@ -23,6 +23,7 @@ import type {
   EssentialPolicy,
   EssentialExcludedPolicy,
 } from "@/modules/wealth/engine/essential-expense";
+import type { BudgetPeriod } from "@/lib/budget/budget-period";
 
 export type CommitmentBreakdown = {
   /** Total mensual del compromiso, en moneda de visualización. */
@@ -36,6 +37,10 @@ export type CommitmentBreakdown = {
   };
   /** Primas excluidas por la regla #2 (financiadas vía un ahorro). */
   excludedPolicies: EssentialExcludedPolicy[];
+  /** Mes del presupuesto con que se calcularon los sobres. `isFallback` = el mes en curso
+   *  todavía no tiene presupuesto y se usó el último que sí lo tiene; la UI lo dice. Lo
+   *  llena el service (el motor es puro y no sabe de periodos). */
+  budgetPeriod?: BudgetPeriod | null;
 };
 
 /** Solo estas fuentes cuentan como "sobre real"; las derivadas van por su entidad (regla #1). */

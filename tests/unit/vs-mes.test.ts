@@ -52,6 +52,14 @@ describe("buildPatrimonioVsMes", () => {
       value: 0.5,
     });
   });
+  it("mes sin cerrar → el rótulo dice 'en el mes', no 'vs mes ant.'", () => {
+    // Mismo número, otra promesa: comparar el neto de hoy contra el cierre anterior no
+    // es un mes cumplido.
+    expect(
+      buildPatrimonioVsMes({ netWorth: 1100, wealthVelocity: 100, velocityIsPartial: true }),
+    ).toMatchObject({ value: 0.1, dir: "up", label: "en el mes" });
+  });
+
   it("base ≈ 0 → degrada a MONTO conservando flecha + tono (nunca ÷0)", () => {
     // netWorth 50, velocity 50 → previo 0 < piso → amount +50, ▲ up/verde.
     expect(buildPatrimonioVsMes({ netWorth: 50, wealthVelocity: 50 })).toEqual({

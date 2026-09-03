@@ -11,6 +11,8 @@ const TREND: Record<RichTrend, { label: string; cls: string; delta: string }> = 
   mas_rico: { label: "Te estás haciendo más rico", cls: "var(--pos)", delta: "up" },
   estable: { label: "Patrimonio estable", cls: "var(--muted)", delta: "flat" },
   mas_pobre: { label: "Te estás haciendo más pobre", cls: "var(--neg)", delta: "down" },
+  // El mes no ha cerrado: hay histórico, pero todavía no hay veredicto que dar.
+  en_curso: { label: "Mes en curso", cls: "var(--muted)", delta: "flat" },
   sin_historico: { label: "Tu punto de partida", cls: "var(--muted)", delta: "flat" },
 };
 
@@ -68,7 +70,8 @@ export function RichLifeDashboard({
                 }}
               >
                 {ind.wealthVelocity >= 0 ? "+" : ""}
-                {formatMoney(ind.wealthVelocity, currency)}/mes
+                {formatMoney(ind.wealthVelocity, currency)}
+                {ind.velocityIsPartial ? " en lo que va del mes" : "/mes"}
               </span>
             ) : null}
           </div>

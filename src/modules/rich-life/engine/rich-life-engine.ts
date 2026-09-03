@@ -63,11 +63,22 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
   // Fuente única (mesesDeColchon): mismo cálculo que patrimonio-engine.
   const monthsOfIndependence = mesesDeColchon(sum(liquid), gastoReferencia);
 
-  let trend: RichTrend = "sin_historico";
+  // `netWorth` sale de los saldos de HOY y `previous` es el CIERRE del mes pasado, así que
+  // su resta es siempre un mes a medias: el 2 de septiembre son dos días de gasto, no un
+  // mes. La cifra es real y se muestra —rotulada "en lo que va del mes"— pero el VEREDICTO
+  // ya no sale de ahí: salía "te estás haciendo más pobre" cada inicio de mes por el gasto
+  // normal de los primeros días. El veredicto exige dos meses cerrados y consecutivos
+  // (`closedWealthDelta`); sin ellos el estado honesto es "en curso", no un juicio.
   let wealthVelocity: number | null = null;
-  if (input.previous) {
-    wealthVelocity = netWorth - input.previous.netWorth;
-    trend = wealthVelocity > 0 ? "mas_rico" : wealthVelocity < 0 ? "mas_pobre" : "estable";
+  if (input.previous) wealthVelocity = netWorth - input.previous.netWorth;
+  const velocityIsPartial = wealthVelocity !== null;
+
+  const closed = input.closedWealthDelta ?? null;
+  let trend: RichTrend = "sin_historico";
+  if (closed !== null) {
+    trend = closed > 0 ? "mas_rico" : closed < 0 ? "mas_pobre" : "estable";
+  } else if (wealthVelocity !== null) {
+    trend = "en_curso";
   }
 
   return {
@@ -93,6 +104,7 @@ export function computeRichLifeIndicators(input: RichLifeInput): RichLifeIndicat
     financialFreedomIndex: passiveIncomeCoverage,
     monthsOfIndependence,
     wealthVelocity,
+    velocityIsPartial,
     trend,
   };
 }

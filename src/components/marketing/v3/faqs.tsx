@@ -655,6 +655,12 @@ export function Faqs() {
                       tomar decisiones sin apuro —cambiar de trabajo, aguantar un mal trimestre,
                       decir que no— en vez de solo sobrevivir un imprevisto.
                     </p>
+                    <p>
+                      Son <strong>de 3 a 6 meses de tu gasto esencial</strong> —vos elegís cuántos—
+                      y se arma <em>después</em> del fondo de emergencia, no en paralelo. La app lo
+                      dimensiona con tu gasto real y te dice cuánto falta y de cuánto tendría que
+                      ser el aporte para cerrarlo.
+                    </p>
                   </div>
                 </details>
 

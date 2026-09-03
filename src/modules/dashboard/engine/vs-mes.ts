@@ -58,8 +58,13 @@ export function buildPatrimonioVsMes(input: {
   netWorth: number;
   /** RichLifeIndicators.wealthVelocity: null cuando no hay snapshot previo (sin_historico). */
   wealthVelocity: number | null;
+  /** RichLifeIndicators.velocityIsPartial: el neto es de HOY contra el cierre del mes
+   *  pasado, así que el chip NO puede decir "vs mes ant." —no es un mes cumplido— sino
+   *  "en el mes". Mismo número, rótulo honesto. */
+  velocityIsPartial?: boolean;
 }): VsMes {
   const { netWorth, wealthVelocity } = input;
+  const label = input.velocityIsPartial ? "en el mes" : "vs mes ant.";
   if (wealthVelocity == null) return null; // sin histórico → sin chip
   // Flecha + color SIEMPRE del signo de la velocidad (mejora/empeora), sin importar el
   // signo de la base: un neto NEGATIVO que mejora debe mostrar ▲ verde y uno que empeora
@@ -69,9 +74,9 @@ export function buildPatrimonioVsMes(input: {
   const base = Math.abs(netWorth - wealthVelocity); // |neto del mes anterior|
   if (base < NETWORTH_BASE_FLOOR) {
     // Base ≈ 0: sin % con sentido → cambio en monto (misma flecha + tono).
-    return amountVsMes(wealthVelocity, "vs mes ant.", false);
+    return amountVsMes(wealthVelocity, label, false);
   }
-  return pctVsMes(wealthVelocity / base, "vs mes ant.");
+  return pctVsMes(wealthVelocity / base, label);
 }
 
 // ---------------------------------------------------------------------------

@@ -80,13 +80,41 @@ describe("computeRichLifeIndicators", () => {
     expect(ind.passiveIncomeCoverage).toBeCloseTo(0.2);
   });
 
-  it("detecta tendencia con histórico", () => {
-    const richer = computeRichLifeIndicators(base({ previous: { netWorth: 7000 } }));
-    expect(richer.trend).toBe("mas_rico");
-    expect(richer.wealthVelocity).toBe(1000);
+  // El neto es de HOY: compararlo contra el cierre del mes pasado da un mes A MEDIAS.
+  // Esa cifra se muestra, pero no puede emitir veredicto — era el bug que ponía
+  // "te estás haciendo más pobre" el día 2 por el gasto normal de la primera semana.
+  it("con un solo cierre: da la cifra parcial pero NO da veredicto", () => {
+    const ind = computeRichLifeIndicators(base({ previous: { netWorth: 9000 } }));
+    expect(ind.wealthVelocity).toBe(-1000);
+    expect(ind.velocityIsPartial).toBe(true);
+    expect(ind.trend).toBe("en_curso");
+  });
 
-    const poorer = computeRichLifeIndicators(base({ previous: { netWorth: 9000 } }));
+  it("sin histórico: ni cifra ni veredicto", () => {
+    const ind = computeRichLifeIndicators(base());
+    expect(ind.wealthVelocity).toBeNull();
+    expect(ind.velocityIsPartial).toBe(false);
+    expect(ind.trend).toBe("sin_historico");
+  });
+
+  it("el veredicto sale de dos meses CERRADOS, no de la cifra parcial", () => {
+    // La velocidad parcial va en rojo (−1000) y aun así el veredicto es "más rico":
+    // son dos preguntas distintas y el mes cerrado es el que manda.
+    const richer = computeRichLifeIndicators(
+      base({ previous: { netWorth: 9000 }, closedWealthDelta: 500 }),
+    );
+    expect(richer.wealthVelocity).toBe(-1000);
+    expect(richer.trend).toBe("mas_rico");
+
+    const poorer = computeRichLifeIndicators(
+      base({ previous: { netWorth: 7000 }, closedWealthDelta: -500 }),
+    );
     expect(poorer.trend).toBe("mas_pobre");
+
+    const flat = computeRichLifeIndicators(
+      base({ previous: { netWorth: 7000 }, closedWealthDelta: 0 }),
+    );
+    expect(flat.trend).toBe("estable");
   });
 });
 

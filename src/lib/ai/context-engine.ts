@@ -18,6 +18,7 @@ import { householdMemberIds } from "@/lib/household/active";
 import type { FinancialContext } from "@/lib/ai/orchestrator";
 import { convertCurrency } from "@/lib/fx";
 import { computeWealthBreakdown } from "@/lib/ai/wealth-breakdown";
+import { avisoPresupuesto } from "@/lib/budget/budget-period";
 import {
   debtLevers,
   goalLevers,
@@ -457,6 +458,9 @@ export async function buildFinancialContext(
           deudas: pconv(b.byOrigin.debts),
           seguros: pconv(b.byOrigin.policies),
         };
+        // Si los sobres salieron del presupuesto de otro mes, el asesor tiene que poder
+        // decirlo en vez de dar la cifra como si fuera de este mes.
+        ctx.compromisoAviso = avisoPresupuesto(b.budgetPeriod) ?? undefined;
       }
       // Brechas de protección (reusa agg.protection ya computado; los gaps son texto, sin conversión).
       if (p.protectionGaps.length > 0) {

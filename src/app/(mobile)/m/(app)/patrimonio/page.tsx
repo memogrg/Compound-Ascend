@@ -94,7 +94,8 @@ export default async function MobilePatrimonio() {
             vel != null && velDir !== 0 ? (
               <MChip tone={velDir > 0 ? "success" : "danger"}>
                 {velDir > 0 ? "+" : "−"}
-                {mAmount(Math.abs(vel), currency, 7)} mes
+                {mAmount(Math.abs(vel), currency, 7)}
+                {ind.velocityIsPartial ? " en el mes" : " mes"}
               </MChip>
             ) : undefined
           }
