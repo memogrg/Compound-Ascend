@@ -83,7 +83,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                 <a href="/login" className="lp-btn lp-btn-ghost">
                   Iniciar sesión
                 </a>
-                <a href="/signup" className="lp-btn btn-green">
+                <a href="/empezar?plan=pro" className="lp-btn btn-green">
                   Probá 14 días
                 </a>
               </>
@@ -140,7 +140,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
               conecta tus movimientos, decisiones y objetivos financieros para decirte no solo dónde
               estás, sino qué hacer después.
             </p>
-            <a className="lp-btn btn-green btn-lg" href="/signup">
+            <a className="lp-btn btn-green btn-lg" href="/empezar?plan=pro">
               Quiero estar un paso adelante
             </a>
             <p className="fine">14 días de prueba · Diseñado para Costa Rica</p>
@@ -362,7 +362,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
             </p>
 
             <div className="paso-cta reveal">
-              <a className="lp-btn lp-btn-ghost" href="/signup">
+              <a className="lp-btn lp-btn-ghost" href="/empezar?plan=pro">
                 Probalo con tus propios números
               </a>
               <p className="fine">14 días · No se cobra hasta el día 15</p>
@@ -692,7 +692,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
             </p>
 
             <div className="paso-cta reveal">
-              <a className="lp-btn lp-btn-ghost" href="/signup">
+              <a className="lp-btn lp-btn-ghost" href="/empezar?plan=pro">
                 Empezar mi camino
               </a>
               <p className="fine">14 días · No se cobra hasta el día 15</p>
@@ -909,7 +909,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
             </p>
 
             <div className="paso-cta reveal">
-              <a className="lp-btn lp-btn-ghost" href="/signup">
+              <a className="lp-btn lp-btn-ghost" href="/empezar?plan=pro">
                 Ver qué pasa con mis números
               </a>
               <p className="fine">14 días · No se cobra hasta el día 15</p>
@@ -1040,7 +1040,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
               Entendé dónde estás. Sabé qué sigue. Construí hacia donde querés llegar.
             </p>
             <div className="acto reveal">
-              <a className="lp-btn btn-green btn-lg" href="/signup">
+              <a className="lp-btn btn-green btn-lg" href="/empezar?plan=pro">
                 Empezar con{" "}
                 <span className="cw cw-inv">
                   CARTERA<i>+</i>
@@ -1136,7 +1136,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                 </p>
                 <a
                   className="lp-btn lp-btn-ghost"
-                  href="/signup?plan=esencial"
+                  href="/empezar?plan=esencial"
                   style={{ height: "48px" }}
                 >
                   Empezar con Esencial+
@@ -1185,7 +1185,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                 <p className="remata">
                   Para quien no solo quiere ver sus números. Quiere saber qué hacer con ellos.
                 </p>
-                <a className="lp-btn btn-green" href="/signup?plan=pro" style={{ height: "48px" }}>
+                <a className="lp-btn btn-green" href="/empezar?plan=pro" style={{ height: "48px" }}>
                   Probar Pro+ por 14 días
                 </a>
               </div>
@@ -1232,7 +1232,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                 </p>
                 <a
                   className="lp-btn lp-btn-ghost"
-                  href="/signup?plan=max"
+                  href="/empezar?plan=max"
                   style={{ height: "48px" }}
                 >
                   Quiero Max+
@@ -1264,7 +1264,7 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
                 </span>{" "}
                 te ayudará a entender qué sigue.
               </p>
-              <a className="lp-btn btn-green btn-lg" href="/signup">
+              <a className="lp-btn btn-green btn-lg" href="/empezar?plan=pro">
                 Probar{" "}
                 <span className="cw cw-inv">
                   CARTERA<i>+</i>
@@ -1346,7 +1346,10 @@ export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
       </footer>
 
       <div className="cta-fijo">
-        <a className="lp-btn btn-green btn-lg" href={conSesion ? "/dashboard" : "/signup"}>
+        <a
+          className="lp-btn btn-green btn-lg"
+          href={conSesion ? "/dashboard" : "/empezar?plan=pro"}
+        >
           <span className="disco">
             <svg className="cm">
               <use href="#iso" />

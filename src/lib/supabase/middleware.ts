@@ -17,6 +17,11 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 // `/faqs` es pública: quien todavía no se registró tiene que poder leerla
 // entera antes de decidir. Sin esto el middleware la manda a /login y la página
 // que existe para resolver dudas se vuelve inalcanzable justo para quien las tiene.
+// `/empezar` es la puerta de adquisición (cuenta → pago → listo). Pública porque
+// quien llega no tiene cuenta todavía; su propio page.tsx decide qué mostrar si
+// ya hay sesión. NO va en AUTH_PAGES: con sesión y sin plan es justo donde hay
+// que estar (modo «reanudar pago»), y /empezar/pagar necesita la sesión viva
+// para abrir Stripe a nombre del usuario.
 const PUBLIC_PREFIXES = [
   "/login",
   "/signup",
@@ -24,6 +29,7 @@ const PUBLIC_PREFIXES = [
   "/auth",
   "/invitacion",
   "/faqs",
+  "/empezar",
   "/m",
 ];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
@@ -36,7 +42,12 @@ const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
  * borrado de cuenta. Encerrar a alguien sin dejarlo llevarse su información
  * sería usar sus propios datos como rehén.
  */
-const RUTAS_SIN_PLAN = ["/suscripcion", "/configuracion"];
+// `/bienvenida` también: es el `success_url` de Stripe. Quien vuelve del pago
+// llega con `?session_id=` y el plan TODAVÍA en «ninguno» —el webhook puede
+// tardar segundos— y es la propia página la que cumple el checkout. Sin esta
+// excepción el muro lo mandaba a /empezar antes de que pudiera confirmarse el
+// pago que acababa de hacer. La página se defiende sola si no hay session_id.
+const RUTAS_SIN_PLAN = ["/suscripcion", "/configuracion", "/bienvenida"];
 
 function SIN_PLAN_PERMITIDO(pathname: string): boolean {
   return RUTAS_SIN_PLAN.some((p) => pathname === p || pathname.startsWith(p + "/"));
@@ -137,10 +148,14 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     const { data } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
     // Sin fila de perfil todavía (recién registrado) no se bloquea: el alta la
     // termina el propio flujo de registro.
+    // Va a /empezar y no a /suscripcion: /empezar en modo «reanudar» es una sola
+    // pantalla con un solo botón hacia Stripe, mientras que /suscripcion es la
+    // página de gestión de quien ya paga. A quien nunca terminó de pagar hay que
+    // darle el camino más corto, no el panel de cambiar de plan.
     if (data && data.plan === "ninguno") {
       const redirect = request.nextUrl.clone();
-      redirect.pathname = "/suscripcion";
-      redirect.search = "";
+      redirect.pathname = "/empezar";
+      redirect.search = "?reanudar=1";
       return NextResponse.redirect(redirect);
     }
   }
