@@ -202,3 +202,23 @@ The expense panel renders jars (`financial-base/components/v2/expense-jars/` + p
 ### Localisation
 
 All user-facing text, UI copy, AI prompts, and error messages are in **Spanish**. Code identifiers, comments, and this file are in English.
+
+**Voice: Costa Rican voseo, everywhere the user reads.** The landing, FAQs and the subscription path speak with «vos» («Probá», «Elegí», «¿Ya tenés cuenta?»). The auth screens (`/login`, `/signup`, `/reset-password`) still carry some «tú» copy («Crea tu cuenta», «¿Ya tienes cuenta?») — that is a known inconsistency being removed; never add more «tú».
+
+### Brand rules (non-negotiable)
+
+- **The CARTERA+ wordmark is never italic.** `.cw` declares `font-style: normal` in both marketing stylesheets. When the wordmark sits inside an italic phrase, the phrase stays italic and the wordmark stays upright.
+- The `+` in the wordmark is green (`--green: #378451`); on green backgrounds use `.cw-inv` (white).
+- One isotype: the green «C+» (`#iso` symbol in `landing.tsx`). The auth screens' black rounded «C» (`BrandMark`) is a legacy inconsistency slated for phase 4 of the acquisition plan.
+
+### Marketing CSS (`src/components/marketing/v3/`) — the collision lesson, learned three times
+
+The landing and FAQs are prefixed `.lp` and ship their own stylesheets, but they render inside the root layout, which imports `globals.css` **and Tailwind**. Three separate bugs came from the same cause:
+
+- **A stylesheet only defends what it declares.** Prefixing protects the properties `landing.css` sets, not the ones it leaves at their default — those get filled by whatever else is loaded. `globals.css` set `flex-direction: column` on `.nav` (broke the header); the italic parent set `font-style` on the wordmark; Tailwind set `text-decoration` on the eyebrows.
+- **Never name a landing class after a Tailwind utility.** `className="overline"` matched Tailwind's `.overline` utility (`text-decoration-line: overline`) and drew a line above every section label. The rule is not written in any repo file — Tailwind generates it — so grepping `globals.css` finds nothing. The eyebrow class is `lp-rotulo` on purpose. Audit against Tailwind's plain-word utilities (`block`, `hidden`, `italic`, `underline`, `overline`, `truncate`, `uppercase`, `container`, `border`, `shadow`, `ring`, `transition`, `filter`, `blur`, `invert`, …) before adding a class.
+- **Declare what must not be inherited** on brand and heading elements: `font-style`, `text-decoration`, `flex-direction`, `letter-spacing`. Cheap to write, expensive to discover by screenshot.
+
+### Acquisition flow (phase plan, Sept 2026)
+
+Reference: the "Plan de adquisición" artifact. Decisions taken: the paid path does **not** require email confirmation before Stripe (the account is created confirmed server-side; payment verifies the email — Stripe prefills and locks it, and sends the receipt); the web subscription page is `/empezar`; Pro is preselected when no plan is chosen; logout lands on `/` (the landing), and `/` never redirects a logged-in user (header shows «Ir a mi panel»).
