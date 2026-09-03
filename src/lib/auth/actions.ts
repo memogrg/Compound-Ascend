@@ -210,7 +210,13 @@ export async function signOutAction(next?: string | FormData): Promise<void> {
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   // `next` llega como string cuando se hace bind/llamada directa (móvil → "/m/login"); como
-  // FormData cuando es la acción de un <form> web → cae al fallback "/login". safeRelative solo
-  // admite rutas internas (evita open-redirects a URLs absolutas/externas).
-  redirect(safeRelative(typeof next === "string" ? next : null, "/login"));
+  // FormData cuando es la acción de un <form> web → cae al fallback. safeRelative solo admite
+  // rutas internas (evita open-redirects a URLs absolutas/externas).
+  //
+  // El fallback web es la LANDING, no /login. Cerrar sesión te dejaba en una pantalla de
+  // login sin ningún enlace de vuelta —ni el logotipo era un link—, y como / expulsaba a
+  // quien tuviera sesión, la página principal quedaba inalcanzable. La landing es la puerta
+  // con las dos acciones: volver a entrar, o registrarse. Es también el default de Rails y
+  // Laravel; YNAB manda al login, pero su login sí tiene por dónde salir.
+  redirect(safeRelative(typeof next === "string" ? next : null, "/"));
 }

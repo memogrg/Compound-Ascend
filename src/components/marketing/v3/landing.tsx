@@ -15,7 +15,7 @@ import { LandingMotion } from "./landing-motion";
  * La página cuenta una historia y en este orden: tensión → mecanismo → guía →
  * destino → prueba → confianza → precio → objeciones → cierre.
  */
-export function Landing() {
+export function Landing({ conSesion = false }: { conSesion?: boolean } = {}) {
   return (
     <div className="lp">
       {/* Isotipo CARTERA+ como símbolo reutilizable. Es EXACTAMENTE el de
@@ -74,12 +74,35 @@ export function Landing() {
             <a href="#como">Cómo funciona</a>
             <a href="#planes">Planes</a>
             <a href="/faqs">FAQs</a>
-            <a href="/login" className="lp-btn lp-btn-ghost">
-              Iniciar sesión
-            </a>
-            <a href="/signup" className="lp-btn btn-green">
-              Probá 14 días
-            </a>
+            {conSesion ? (
+              <a href="/dashboard" className="lp-btn btn-green">
+                Ir a mi panel
+              </a>
+            ) : (
+              <>
+                <a href="/login" className="lp-btn lp-btn-ghost">
+                  Iniciar sesión
+                </a>
+                <a href="/signup" className="lp-btn btn-green">
+                  Probá 14 días
+                </a>
+              </>
+            )}
+            {/* Menú móvil. Un <details> nativo: sin JS, sin estado, accesible por teclado.
+                A menos de 768 px los tres enlaces del nav se ocultan; antes se ocultaban
+                sin dejar nada, y desde un teléfono no se llegaba a las FAQs por el header. */}
+            <details className="lp-menu">
+              <summary aria-label="Abrir menú">
+                <span className="lp-menu-barra" aria-hidden="true"></span>
+                <span className="lp-menu-txt">Menú</span>
+              </summary>
+              <div className="lp-menu-lista">
+                <a href="#como">Cómo funciona</a>
+                <a href="#planes">Planes</a>
+                <a href="/faqs">FAQs</a>
+                {conSesion ? null : <a href="/login">Iniciar sesión</a>}
+              </div>
+            </details>
           </nav>
         </div>
       </header>
@@ -1323,13 +1346,13 @@ export function Landing() {
       </footer>
 
       <div className="cta-fijo">
-        <a className="lp-btn btn-green btn-lg" href="/signup">
+        <a className="lp-btn btn-green btn-lg" href={conSesion ? "/dashboard" : "/signup"}>
           <span className="disco">
             <svg className="cm">
               <use href="#iso" />
             </svg>
           </span>
-          Probá 14 días
+          {conSesion ? "Ir a mi panel" : "Probá 14 días"}
         </a>
       </div>
       <LandingMotion />
