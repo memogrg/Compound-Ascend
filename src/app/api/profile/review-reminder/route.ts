@@ -2,7 +2,7 @@
  * GET/POST /api/profile/review-reminder — recordatorio semestral de revisión del perfil.
  * Por cada usuario cuyo perfil lleva ≥6 meses sin actualizarse, genera un insight en la
  * campana ("revisá tu perfil") reusando user_insights. Idempotente (no re-notifica en la
- * misma ventana) y auto-resuelve al usuario que ya revisó. Sin email/WhatsApp.
+ * misma ventana) y auto-resuelve al usuario que ya revisó. Sin email.
  *
  *  - GET (Vercel Cron mensual): header X-Cron-Secret = CRON_SECRET o Authorization: Bearer
  *    <CRON_SECRET>. Recorre TODOS los usuarios (service-role).

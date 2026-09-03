@@ -514,7 +514,7 @@ describe("orchestrator · buildToolExecutor / financeChatWithTools", () => {
     expect(recordAiEvent).toHaveBeenCalledWith("u1", expect.objectContaining({ ok: false }));
   });
 
-  it("sin userId (WhatsApp/cron) NO se persiste: el carril sigue igual", async () => {
+  it("sin userId (cron/ingesta) NO se persiste: el carril sigue igual", async () => {
     recordAiEvent.mockClear();
     const exec = buildToolExecutor({ debts: DEBTS, currency: "CRC" });
     await exec("simular_pago_deuda", { aporte_extra_mensual: 100_000 });

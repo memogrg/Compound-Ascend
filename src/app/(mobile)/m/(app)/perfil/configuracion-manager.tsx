@@ -6,7 +6,6 @@
  * de personal-profile) sin duplicar lógica. Todo con el Form Kit móvil (BottomSheet / Toggle /
  * ConfirmDialog / TextField) + es-MX, tema claro.
  *  - Moneda principal → updateCurrencyAction
- *  - WhatsApp → linkWhatsAppAction (muestra OTP + instrucciones) / revokeWhatsAppAction
  *  - Notificaciones → updateNotificationPrefAction (optimista, revierte si falla)
  *  - Hogar (ver/invitar/revocar/quitar miembros, cupo por plan) → household actions
  *  - Correos del banco → requestIngestEmailAction / confirmIngestEmailAction / removeIngestEmailAction
@@ -22,8 +21,6 @@ import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
   updateCurrencyAction,
   saveUserTimezone,
-  linkWhatsAppAction,
-  revokeWhatsAppAction,
   updateNotificationPrefAction,
   requestIngestEmailAction,
   confirmIngestEmailAction,
@@ -57,8 +54,7 @@ import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/a
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
 import { ExportDataButton } from "@/modules/account/components/export-data-button";
 
-type WaLink = { status: "pending" | "active" | "revoked"; phone: string | null } | null;
-type SheetId = "currency" | "timezone" | "theme" | "whatsapp" | "household" | "password" | null;
+type SheetId = "currency" | "timezone" | "theme" | "household" | "password" | null;
 
 /** Etiquetas del selector de apariencia. "Sistema" primero: es el valor por defecto y el
  *  que la mayoría deja puesto. */
@@ -77,7 +73,6 @@ const NOTIF_ROWS: {
 }[] = [
   { key: "inApp", label: "En la app", hint: 'Avisos del día en "Qué noté".' },
   { key: "email", label: "Correo", hint: "Resumen semanal por correo." },
-  { key: "whatsapp", label: "WhatsApp", hint: "Resumen semanal (si vinculaste tu WhatsApp)." },
   {
     key: "push",
     label: "Notificaciones push",
@@ -93,8 +88,6 @@ export function ConfiguracionManager({
   currency,
   timezone,
   notifications,
-  wa,
-  whatsappConfigured,
   ingestEmails,
   ingestAddress,
   household,
@@ -103,8 +96,6 @@ export function ConfiguracionManager({
   currency: string;
   timezone: string | null;
   notifications: NotificationPrefs;
-  wa: WaLink;
-  whatsappConfigured: boolean;
   ingestEmails: IngestEmailRow[];
   ingestAddress: string | null;
   household: HouseholdMembersView | null;
@@ -113,7 +104,6 @@ export function ConfiguracionManager({
   const [sheet, setSheet] = useState<SheetId>(null);
   const { mode: themeMode, setMode: setThemeMode } = useThemeMode();
   const [danger, setDanger] = useState<0 | 1 | 2>(0);
-  const waLinked = wa?.status === "active";
 
   return (
     <>
@@ -205,33 +195,6 @@ export function ConfiguracionManager({
           chevron
           onClick={() => setSheet("household")}
           ariaLabel="Gestionar tu hogar"
-        />
-      </MContentCard>
-
-      {/* Conexiones — WhatsApp (glifo propio → leading). El estado vinculado va en verde. */}
-      <MSectionHeader title="Conexiones" />
-      <MContentCard style={{ marginBottom: 14 }}>
-        <MDataRow
-          leading={
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.9}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ width: 19, height: 19 }}
-            >
-              <path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6A8.5 8.5 0 1 1 21 11.5Z" />
-            </svg>
-          }
-          title="WhatsApp"
-          subtitle={
-            waLinked ? <span className="pos">Vinculado · {wa?.phone ?? ""}</span> : "No vinculado"
-          }
-          chevron
-          onClick={() => setSheet("whatsapp")}
-          ariaLabel="Asistente de WhatsApp"
         />
       </MContentCard>
 
@@ -364,15 +327,6 @@ export function ConfiguracionManager({
         <p className="muted" style={{ fontSize: 12, marginTop: 10, lineHeight: 1.45 }}>
           Con «Sistema», la app sigue el modo claro u oscuro de tu iPhone.
         </p>
-      </BottomSheet>
-
-      {/* Hoja: WhatsApp */}
-      <BottomSheet
-        open={sheet === "whatsapp"}
-        onClose={() => setSheet(null)}
-        title="Asistente de WhatsApp"
-      >
-        <WhatsAppSheet wa={wa} configured={whatsappConfigured} onDone={() => setSheet(null)} />
       </BottomSheet>
 
       {/* Hoja: hogar */}
@@ -658,111 +612,6 @@ function TimezoneSheet({ current, onDone }: { current: string | null; onDone: ()
           </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-/** Vincular (muestra OTP + instrucciones) / desvincular WhatsApp. */
-function WhatsAppSheet({
-  wa,
-  configured,
-  onDone,
-}: {
-  wa: WaLink;
-  configured: boolean;
-  onDone: () => void;
-}) {
-  const router = useRouter();
-  const toast = useToast();
-  const [pending, start] = useTransition();
-  const [otp, setOtp] = useState<{
-    code: string;
-    botNumber: string | null;
-    expiresInMin: number;
-  } | null>(null);
-  const isActive = wa?.status === "active";
-
-  const generate = () =>
-    start(async () => {
-      const r = await linkWhatsAppAction();
-      if (r.ok && r.otp) {
-        setOtp({ code: r.otp, botNumber: r.botNumber ?? null, expiresInMin: r.expiresInMin ?? 10 });
-      } else {
-        toast.show(r.message ?? "No pudimos generar el código.", "error");
-      }
-    });
-
-  const revoke = () =>
-    start(async () => {
-      const r = await revokeWhatsAppAction();
-      if (r.ok) {
-        toast.show("WhatsApp desvinculado", "success");
-        onDone();
-        router.refresh();
-      } else {
-        toast.show(r.message ?? "No pudimos desvincular.", "error");
-      }
-    });
-
-  return (
-    <div style={{ display: "grid", gap: 12 }}>
-      {isActive ? (
-        <>
-          <div className="ss pos" style={{ fontSize: 13.5 }}>
-            Vinculado{wa?.phone ? ` · ${wa.phone}` : ""}
-          </div>
-          <button
-            type="button"
-            className="m-btn m-btn-block m-btn-secondary"
-            onClick={revoke}
-            disabled={pending}
-          >
-            {pending ? "Desvinculando…" : "Desvincular WhatsApp"}
-          </button>
-        </>
-      ) : otp ? (
-        <div>
-          <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>
-            Envía este código por WhatsApp al número <strong>{otp.botNumber ?? "del bot"}</strong>:
-          </div>
-          <div
-            className="mono"
-            style={{
-              fontSize: 30,
-              fontWeight: 800,
-              letterSpacing: "0.14em",
-              textAlign: "center",
-              margin: "14px 0 6px",
-              color: "var(--accent)",
-            }}
-          >
-            {otp.code}
-          </div>
-          <div className="muted" style={{ fontSize: 12, textAlign: "center", lineHeight: 1.5 }}>
-            Expira en {otp.expiresInMin} minutos. Al recibirlo, te confirmaremos por WhatsApp.
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
-            Registra gastos por foto o texto y consulta tu presupuesto desde WhatsApp. Tu número se
-            vincula solo tras confirmar un código.
-          </div>
-          <button
-            type="button"
-            className="m-btn m-btn-block m-btn-primary"
-            onClick={generate}
-            disabled={pending}
-          >
-            {pending ? "Generando…" : "Vincular WhatsApp"}
-          </button>
-        </>
-      )}
-      {!configured ? (
-        <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
-          La integración de WhatsApp aún no está configurada en el servidor.
-        </div>
-      ) : null}
     </div>
   );
 }

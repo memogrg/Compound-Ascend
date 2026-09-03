@@ -4,7 +4,7 @@
  * Onboarding de la ingesta por correo. El usuario configura en su correo un reenvío
  * de los avisos del banco a la dirección de ingesta y registra aquí el correo desde
  * el que reenvía; la propiedad se prueba con un código de 6 dígitos enviado a esa
- * dirección. Calca el flujo de whatsapp-link.tsx (código → verificación).
+ * dirección. Flujo de dos pasos (código → verificación).
  * Cuerpo de su set-row (el título/descripción viven en la página).
  */
 import { useState, useTransition } from "react";

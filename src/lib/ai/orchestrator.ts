@@ -314,7 +314,7 @@ export function buildToolExecutor(toolContext: ToolContext): AiToolExecutor {
     }
     if (name === "consultar_transacciones") {
       // Libro diario REAL (rango/tipo/sobre/comercio + agregación). Lectura con sesión: en
-      // WhatsApp no hay, así que devuelve un error explicable en vez de una cifra inventada.
+      // sin sesión no hay, así que devuelve un error explicable en vez de una cifra inventada.
       try {
         const { consultarTransacciones } = await import("@/lib/ai/transactions-query-service");
         return await consultarTransacciones(args, toolContext.currency);
@@ -488,7 +488,7 @@ export const TOOLS_PROMPT_LINE =
 /**
  * Como financeChat, pero habilita function-calling cuando hay `toolContext` (chat web
  * con sesión) y el proveedor lo soporta: la IA invoca motores de SOLO lectura y da
- * números calculados, no inventados. Sin toolContext (p. ej. WhatsApp) o sin soporte
+ * números calculados, no inventados. Sin toolContext (p. ej. cron/ingesta) o sin soporte
  * del proveedor → idéntico a financeChat. La IA sigue PROPONIENDO, nunca ejecuta.
  */
 /** Contenido del ÚLTIMO mensaje del usuario (para la detección del FOCO). "" si no hay. */
@@ -526,7 +526,7 @@ export async function financeChatWithTools(
 
   // Router de complejidad (R1): intenta el carril BARATO (patrones/Flash-Lite → motor + plantilla,
   // 0 tokens o clasificación mínima). Ante duda escala al razonamiento (abajo). Como esto vive
-  // dentro de financeChatWithTools, cubre web y WhatsApp por igual. Best-effort: si falla, sigue.
+  // dentro de financeChatWithTools, cubre web y los caminos sin sesión por igual. Best-effort: si falla, sigue.
   try {
     const routed = await tryRouteQuery(messages, ctx, toolContext);
     if (routed) {

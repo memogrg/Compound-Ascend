@@ -4,7 +4,6 @@ const { sendEmail, getNotificationPrefs } = vi.hoisted(() => ({
   sendEmail: vi.fn(async (_p: { to: string; subject: string; html: string }) => ({ ok: true })),
   getNotificationPrefs: vi.fn(async () => ({
     email: true,
-    whatsapp: true,
     push: true,
     inApp: true,
   })),
@@ -39,13 +38,13 @@ beforeEach(() => {
 
 describe("sendWeeklyDigestForUser · salvaguardas", () => {
   it("NO envía si la pref email está apagada", async () => {
-    getNotificationPrefs.mockResolvedValue({ email: false, whatsapp: true, push: true, inApp: true });
+    getNotificationPrefs.mockResolvedValue({ email: false, push: true, inApp: true });
     await sendWeeklyDigestForUser(UID);
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
   it("envía con footer de baja (token) cuando email ON y hay correo", async () => {
-    getNotificationPrefs.mockResolvedValue({ email: true, whatsapp: true, push: true, inApp: true });
+    getNotificationPrefs.mockResolvedValue({ email: true, push: true, inApp: true });
     await sendWeeklyDigestForUser(UID);
     expect(sendEmail).toHaveBeenCalledTimes(1);
     const arg = sendEmail.mock.calls[0]![0];
@@ -55,7 +54,7 @@ describe("sendWeeklyDigestForUser · salvaguardas", () => {
   });
 
   it("NO envía si falta la URL base (baja rota)", async () => {
-    getNotificationPrefs.mockResolvedValue({ email: true, whatsapp: true, push: true, inApp: true });
+    getNotificationPrefs.mockResolvedValue({ email: true, push: true, inApp: true });
     delete process.env.NEXT_PUBLIC_APP_URL;
     await sendWeeklyDigestForUser(UID);
     expect(sendEmail).not.toHaveBeenCalled();

@@ -9,7 +9,7 @@ const movement = (over: Partial<RawMovement> = {}): RawMovement => ({
   occurredOn: "2026-06-26",
   merchant: "Automercado",
   description: "Compra supermercado",
-  sourceKind: "whatsapp_notification",
+  sourceKind: "bank_notification",
   bankCode: "BAC",
   confidence: 0.9,
   externalRef: null,

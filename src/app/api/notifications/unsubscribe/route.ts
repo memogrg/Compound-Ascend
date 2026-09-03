@@ -14,7 +14,6 @@ export const runtime = "nodejs";
 
 const CHANNEL_LABEL: Record<NotificationChannel, string> = {
   email: "correos",
-  whatsapp: "WhatsApp",
   push: "notificaciones push",
   inApp: "avisos en la app",
 };

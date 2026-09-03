@@ -12,13 +12,11 @@ describe("mergeNotificationPrefs · defaults ON", () => {
   it("null/undefined → todo encendido", () => {
     expect(mergeNotificationPrefs(null)).toEqual({
       email: true,
-      whatsapp: true,
       push: true,
       inApp: true,
     });
     expect(mergeNotificationPrefs(undefined)).toEqual({
       email: true,
-      whatsapp: true,
       push: true,
       inApp: true,
     });
@@ -27,15 +25,19 @@ describe("mergeNotificationPrefs · defaults ON", () => {
   it("clave presente se respeta; ausente → ON", () => {
     expect(mergeNotificationPrefs({ email: false })).toEqual({
       email: false,
-      whatsapp: true,
       push: true,
       inApp: true,
     });
   });
 
-  it("valores no-booleanos y claves desconocidas se ignoran (caen al default)", () => {
-    const out = mergeNotificationPrefs({ email: "no" as unknown as boolean, foo: true, push: false });
-    expect(out).toEqual({ email: true, whatsapp: true, push: false, inApp: true });
+  it("valores no-booleanos y claves desconocidas (p. ej. whatsapp legado) se ignoran", () => {
+    const out = mergeNotificationPrefs({
+      email: "no" as unknown as boolean,
+      whatsapp: true, // canal retirado: se ignora sin romper prefs guardadas
+      foo: true,
+      push: false,
+    });
+    expect(out).toEqual({ email: true, push: false, inApp: true });
   });
 });
 
@@ -58,7 +60,7 @@ describe("token de baja HMAC", () => {
   });
 
   it("rechaza con secret distinto", () => {
-    const token = signUnsubscribeToken(UID, "whatsapp", SECRET);
+    const token = signUnsubscribeToken(UID, "email", SECRET);
     expect(verifyUnsubscribeToken(token, "otro-secret")).toBeNull();
   });
 

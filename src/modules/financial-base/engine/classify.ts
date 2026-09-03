@@ -1,7 +1,7 @@
 /**
  * Clasificación de movimientos sin sobre (vista "Por clasificar"). Puro y testeable.
  *
- * Los gastos/ingresos que entran por WhatsApp o ingesta sin regla que matchee quedan
+ * Los gastos/ingresos que entran por ingesta sin regla que matchee quedan
  * con categoryId=null → no caen en ningún frasco y la conciliación los ignora. Estos
  * helpers los detectan y arman las hojas de categoría seleccionables por naturaleza.
  */

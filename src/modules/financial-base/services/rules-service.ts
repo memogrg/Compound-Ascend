@@ -203,7 +203,7 @@ export async function findMatchingRule(
 
 /**
  * Igual que findMatchingRule pero para el WEBHOOK (service-role, sin sesión): lee
- * las reglas ACTIVAS de `userId` y aplica el matching puro. Así WhatsApp/ingesta
+ * las reglas ACTIVAS de `userId` y aplica el matching puro. Así la ingesta
  * auto-categorizan usando las reglas que el usuario crea en "Por clasificar"/web.
  */
 export async function findMatchingRuleForUser(

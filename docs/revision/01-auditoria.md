@@ -49,6 +49,8 @@ que no regrese.
 - `formatMoney` duplicado: `lib/format.ts` (Intl.NumberFormat, 31+ usos) vs
   `lib/whatsapp/format.ts` (toLocaleString, mismo mapa de 7 símbolos). Decisión a
   tomar en Fase 2: aislar WhatsApp a propósito (documentarlo) o re-exportar de lib.
+  → **RESUELTO** (retiro de WhatsApp, 2026-09-02): `lib/whatsapp/format.ts` se borró
+  junto con el canal; queda solo `lib/format.ts` como gramática numérica única.
 - Mapas de símbolos de moneda (`SYM`) re-declarados en ≥3 componentes
   (budget-warning-modal, add-spend-modal/jar-normal-modal, currency-switch) — unificar
   en `lib/format.ts` es mecánico.
@@ -77,6 +79,8 @@ cuando hay sesión y mucho más estricto para anónimos).
   aceptan también `Authorization: Bearer` — unificar el helper.
 - Webhooks (`payment`, `whatsapp`) sin rate-limit propio: la verificación de firma es
   fuerte, pero permite intentos ilimitados (CPU). Añadir `rateLimit` por IP.
+  → **RESUELTO** (2026-09-02): `payment` tiene rate-limit por IP (ver
+  `security-menores.test.ts`); el webhook de WhatsApp se eliminó con el canal.
 
 ### BAJO
 - `assistant/chat` y `scan-receipt` validan origen (`assertTrustedOrigin`) pero no

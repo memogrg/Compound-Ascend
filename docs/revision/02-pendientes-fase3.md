@@ -10,6 +10,8 @@
 2. **`formatMoney` duplicado en WhatsApp** (`lib/whatsapp/format.ts`): copia
    aislada a propósito (módulo sin dependencias). Decidir: documentar el
    aislamiento como regla o re-exportar desde `lib/format`.
+   → **RESUELTO** (retiro de WhatsApp, 2026-09-02): `lib/whatsapp/format.ts` eliminado
+   con el canal; `lib/format.ts` queda como la única gramática numérica.
 3. **Arrays de monedas en selects con órdenes distintos**: `add-spend-modal.tsx`
    (CRC,USD,EUR,GBP,MXN,COP) vs `jar-normal-modal.tsx` (CRC,USD,EUR,MXN,COP,GBP)
    vs `CODES` de currency-switch. Unificar orden = cambio visible de UI → F5.

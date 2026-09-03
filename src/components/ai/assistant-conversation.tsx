@@ -509,7 +509,7 @@ export function AssistantConversation({
   /**
    * En la WEB el Enter envía (es un chat de escritorio, con teclado y modificadores a mano).
    * En MÓVIL no: el Enter del teclado virtual hace salto de línea y se envía con el botón, que es
-   * lo que hacen WhatsApp y Telegram en teléfono. Ahí no hay Ctrl ni Shift cómodos, y un Enter que
+   * lo que hacen las apps de chat en teléfono. Ahí no hay Ctrl ni Shift cómodos, y un Enter que
    * envía convierte cualquier intento de escribir dos renglones en dos mensajes cortados.
    */
   const enterEnvia = variant !== "mobile";

@@ -1,17 +1,26 @@
+/**
+ * Cobertura del motor de reglas compartido (`rules-service.ts`): matcher puro
+ * `pickMatchingRule` + lector service-role `findMatchingRuleForUser`.
+ *
+ * Portado del test de autocategorización del canal retirado:
+ * `pickMatchingRule` sigue vivo (lo usa `findMatchingRule`, que consume
+ * `transaction-service` en el alta de la app), y su única cobertura estaba en ese
+ * archivo. `findMatchingRuleForUser` (variante sin sesión) quedó sin llamador al
+ * borrar `write-service`, pero se conserva para el flujo de registro sin sesión de
+ * la app (móvil/ingesta), igual que `ingestion/normalize.ts`.
+ */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Estado compartido por los mocks (service-role fake). Hoisted para que el factory
-// de vi.mock lo vea.
+// Estado compartido por los mocks (service-role fake). Hoisted para el factory de vi.mock.
 const h = vi.hoisted(() => ({
   rules: [] as Record<string, unknown>[],
   categoryName: "Comida" as string | null,
-  insertSpy: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 
-// Fake del cliente service-role: builder "thenable" para las queries de lectura
-// (transaction_rules / expense_categories) e insert que captura la fila escrita.
+// Fake del cliente service-role: builder "thenable" para las lecturas
+// (transaction_rules / expense_categories) que usa findMatchingRuleForUser.
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => {
     const builder = (result: unknown) => {
@@ -31,15 +40,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
         if (table === "transaction_rules") return builder({ data: h.rules, error: null });
         if (table === "expense_categories")
           return builder({ data: h.categoryName ? { name: h.categoryName } : null, error: null });
-        // category_overrides: sin override → resolveOverrideTarget deja el id igual.
-        if (table === "category_overrides") return builder({ data: null, error: null });
-        // transactions
-        return {
-          insert: (row: Record<string, unknown>) => {
-            h.insertSpy(row);
-            return Promise.resolve({ error: null });
-          },
-        };
+        return builder({ data: null, error: null });
       },
     };
   },
@@ -50,8 +51,6 @@ import {
   findMatchingRuleForUser,
   type TransactionRule,
 } from "@/modules/financial-base/services/rules-service";
-import { createTransactionForUser } from "@/lib/whatsapp/write-service";
-import type { PendingAction } from "@/lib/whatsapp/links-service";
 
 // Fila cruda (snake_case) tal cual la devuelve Supabase para transaction_rules.
 const ruleRow = (over: Record<string, unknown>) => ({
@@ -71,22 +70,9 @@ const ruleRow = (over: Record<string, unknown>) => ({
   ...over,
 });
 
-const action = (over: Partial<PendingAction>): PendingAction => ({
-  kind: "gasto",
-  description: "Café",
-  amount: 3500,
-  currency: "CRC",
-  occurredOn: "2026-06-29",
-  merchant: "Starbucks Centro",
-  origin: "notification",
-  source: "email",
-  ...over,
-});
-
 beforeEach(() => {
   h.rules = [];
   h.categoryName = "Comida";
-  h.insertSpy.mockClear();
 });
 
 // ---------------------------------------------------------------------------
@@ -151,7 +137,11 @@ describe("pickMatchingRule", () => {
 describe("findMatchingRuleForUser", () => {
   it("lee las reglas del usuario y devuelve la categoría que matchea", async () => {
     h.rules = [
-      ruleRow({ merchant_pattern: "starbucks", suggested_category_id: "cat-comida", type: "expense" }),
+      ruleRow({
+        merchant_pattern: "starbucks",
+        suggested_category_id: "cat-comida",
+        type: "expense",
+      }),
     ];
     const r = await findMatchingRuleForUser("u1", "Compra Starbucks Centro", "expense");
     expect(r?.suggestedCategoryId).toBe("cat-comida");
@@ -159,32 +149,5 @@ describe("findMatchingRuleForUser", () => {
   it("sin regla que matchee → null", async () => {
     h.rules = [ruleRow({ merchant_pattern: "uber", type: "expense" })];
     expect(await findMatchingRuleForUser("u1", "Starbucks", "expense")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// createTransactionForUser (auto-categorización al insertar)
-// ---------------------------------------------------------------------------
-describe("createTransactionForUser", () => {
-  it("inserta con el category_id de la regla que matchea y devuelve el nombre del sobre", async () => {
-    h.rules = [
-      ruleRow({ merchant_pattern: "starbucks", suggested_category_id: "cat-comida", type: "expense" }),
-    ];
-    h.categoryName = "Comida";
-    const res = await createTransactionForUser("u1", "hh1", action({ merchant: "Starbucks Centro" }));
-    expect(res.ok).toBe(true);
-    expect(res.categoryName).toBe("Comida");
-    expect(h.insertSpy).toHaveBeenCalledTimes(1);
-    const row = h.insertSpy.mock.calls[0]![0] as Record<string, unknown>;
-    expect(row.category_id).toBe("cat-comida");
-  });
-
-  it("sin regla que matchee → inserta category_id null y sin nombre de sobre", async () => {
-    h.rules = [];
-    const res = await createTransactionForUser("u1", null, action({ merchant: "Desconocido" }));
-    expect(res.ok).toBe(true);
-    expect(res.categoryName).toBeNull();
-    const row = h.insertSpy.mock.calls[0]![0] as Record<string, unknown>;
-    expect(row.category_id).toBeNull();
   });
 });

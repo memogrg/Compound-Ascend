@@ -4,10 +4,11 @@
 > y contra la base de datos viva (`llaqonigsazoieyfhdea`) el **2 de septiembre de 2026**.
 > Documento hermano: `docs/guia-conectar-correo.md` (la guía que ve el usuario).
 >
-> **Ojo con la decisión del 2 sep 2026:** WhatsApp sale del producto. `src/lib/ingestion/review-flow.ts`
-> muere con él y la confirmación queda solo en la bandeja "Por revisar" (web y móvil). Antes de borrar
-> `src/lib/whatsapp/` hay que mover `formatMoney` y los tipos `PendingAction`/`GoalPending`, que la ingesta
-> por correo usa.
+> **Retiro de WhatsApp (2 sep 2026 — ya hecho):** WhatsApp salió del producto; la ingesta por correo es
+> ahora la ÚNICA vía externa sin sesión. `src/lib/ingestion/review-flow.ts` se eliminó con el canal y la
+> confirmación de propuestas vive solo en la bandeja "Por revisar" (web y móvil). El tipo `PendingAction`
+> que usa la ingesta vive ahora en `src/lib/ingestion/types.ts` (ya no en `lib/whatsapp/`) y `formatMoney`
+> se importa de `@/lib/format`; `GoalPending`/`StoredPending` eran solo del canal y se fueron con él.
 
 ---
 

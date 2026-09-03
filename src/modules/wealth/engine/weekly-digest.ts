@@ -1,7 +1,7 @@
 /**
  * Digest patrimonial semanal (puro, sin IO). Arma {subject, html, text} a partir
- * del reporte. Aspiracional §13, nunca humillante. El `text` plano se reusa en
- * WhatsApp (5b-3c). El `html` NO incluye el footer de baja: el enlace (con token)
+ * del reporte. Aspiracional §13, nunca humillante. El `text` plano queda como salida
+ * alternativa. El `html` NO incluye el footer de baja: el enlace (con token)
  * lo añade la capa de envío, manteniendo este builder puro y sin URLs.
  */
 import { formatMoney } from "@/lib/format";

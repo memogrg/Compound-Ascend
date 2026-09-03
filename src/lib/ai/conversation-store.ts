@@ -1,12 +1,12 @@
 import "server-only";
 
 /**
- * Memoria conversacional unificada del asesor IA (chat web + WhatsApp). Capa PERSISTENTE por
- * usuario en ai_conversation_turns. Acota el consumo de tokens con un tope de turnos (MAX_TURNS)
+ * Memoria conversacional del asesor IA (chat web). Capa PERSISTENTE por usuario en
+ * ai_conversation_turns. Acota el consumo de tokens con un tope de turnos (MAX_TURNS)
  * y una ventana de tiempo (WINDOW_MIN). Best-effort: si el store falla, el chat sigue sin memoria.
  *
- * Auth: resolveAuth(ctx) — sesión (RLS) si ctx undefined; service-role (webhook) con userId
- * explícito si se inyecta ctx. Con service-role SIEMPRE se filtra/inserta por userId.
+ * Auth: resolveAuth(ctx) — sesión (RLS) si ctx undefined; service-role (sin sesión: cron/ingesta)
+ * con userId explícito si se inyecta ctx. Con service-role SIEMPRE se filtra/inserta por userId.
  */
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
 import type { ChatMessage } from "@/lib/ai/provider";
@@ -17,7 +17,7 @@ const MAX_TURNS = 10;
 /** Ventana de tiempo: solo turnos de los últimos WINDOW_MIN minutos. */
 const WINDOW_MIN = 120;
 
-export type ConversationChannel = "web" | "whatsapp";
+export type ConversationChannel = "web";
 type TurnRole = "user" | "assistant";
 
 /**

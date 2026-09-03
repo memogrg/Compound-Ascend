@@ -1,8 +1,8 @@
 /**
- * Fuente de ingesta: notificaciones de BAC (reenviadas por WhatsApp o correo). El
- * mismo banco manda dos layouts: etiqueta y valor en la MISMA línea (WhatsApp) o en
- * líneas SEPARADAS (correo, p. ej. "Comercio:\nHELADOS MOYO"). `fieldAfterLabel`
- * tolera ambos. Parser PURO; no custodia credenciales: solo lee el texto.
+ * Fuente de ingesta: notificaciones de BAC (reenviadas por correo). El mismo banco
+ * manda dos layouts: etiqueta y valor en la MISMA línea o en líneas SEPARADAS (p. ej.
+ * "Comercio:\nHELADOS MOYO"). `fieldAfterLabel` tolera ambos. Parser PURO; no
+ * custodia credenciales: solo lee el texto.
  *
  * Plantillas: compra con tarjeta y SINPE (recibido/debitado). Fallback de baja
  * confianza como última red. Si no parece de BAC, devuelve [].
@@ -68,7 +68,7 @@ function fieldAfterLabel(text: string, label: string): string | null {
     const idx = lines[i]!.toLowerCase().indexOf(needle);
     if (idx < 0) continue;
     const inline = lines[i]!.slice(idx + label.length).trim();
-    if (inline) return inline; // valor en la misma línea (WhatsApp)
+    if (inline) return inline; // valor en la misma línea (layout inline)
     for (let j = i + 1; j < lines.length; j++) {
       const v = lines[j]!.trim();
       if (v) return v; // valor en la línea siguiente (correo)
@@ -105,7 +105,7 @@ function base(over: Partial<RawMovement>): RawMovement {
     occurredOn: "",
     merchant: null,
     description: "",
-    sourceKind: "whatsapp_notification",
+    sourceKind: "bank_notification",
     bankCode: BANK,
     confidence: 0,
     externalRef: null,
@@ -239,7 +239,7 @@ function parseFallback(text: string): RawMovement | null {
 }
 
 export const bacNotificationSource: IngestionSource<string> = {
-  kind: "whatsapp_notification",
+  kind: "bank_notification",
   parse(text: string): RawMovement[] {
     if (!text) return [];
     const m =

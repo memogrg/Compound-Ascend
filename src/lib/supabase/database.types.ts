@@ -128,21 +128,6 @@ export type HouseholdActivityLogRow = {
   created_at: string;
 };
 
-export type WhatsAppLinkStatus = "pending" | "active" | "revoked";
-
-export type WhatsAppLinkRow = Timestamps & {
-  id: string;
-  user_id: string;
-  household_id: string | null;
-  phone_e164: string | null;
-  status: WhatsAppLinkStatus;
-  otp_code: string | null;
-  otp_expires_at: string | null;
-  pending_action: Json | null;
-  verified_at: string | null;
-  last_seen_at: string | null;
-};
-
 export type InvitationStatus = "pending" | "accepted" | "revoked";
 
 export type HouseholdInvitationRow = Timestamps & {
@@ -1043,11 +1028,11 @@ export type MerchantSuggestionCacheRow = {
   created_at: string;
 };
 
-/** Memoria conversacional del asesor IA (chat web + WhatsApp). */
+/** Memoria conversacional del asesor IA (chat web). */
 export type AiConversationTurnRow = {
   id: string;
   user_id: string;
-  channel: string; // 'web' | 'whatsapp'
+  channel: string; // 'web'
   role: string; // 'user' | 'assistant'
   content: string;
   created_at: string;
@@ -1231,7 +1216,6 @@ export interface Database {
         },
         Partial<HouseholdInvitationRow>
       >;
-      whatsapp_links: UserTable<WhatsAppLinkRow>;
       personal_profiles: UserTable<PersonalProfileRow>;
       risk_profiles: UserTable<RiskProfileRow>;
       behavior_profiles: UserTable<BehaviorProfileRow>;
@@ -1330,7 +1314,7 @@ export interface Database {
       account_cards: UserTable<AccountCardRow>;
       // Caché de sugerencias de sobre por (usuario, comercio) (migración 0032).
       merchant_suggestion_cache: UserTable<MerchantSuggestionCacheRow>;
-      // Memoria conversacional del asesor IA (chat web + WhatsApp). RLS dueño.
+      // Memoria conversacional del asesor IA (chat web). RLS dueño.
       ai_conversation_turns: UserTable<AiConversationTurnRow>;
       // Hilo de coaching persistente (memoria longitudinal de la guía del asesor). RLS PERSONAL (dueño).
       ai_coaching_thread: UserTable<AiCoachingThreadRow>;

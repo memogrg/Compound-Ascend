@@ -752,7 +752,7 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
       `SALDO ACUMULADO (stock), no solo flujo del mes: cuando un fondo está REGISTRADO con saldo, reconocé el ACUMULADO como PROGRESO — «llevás ₡X de tu fondo (Y% de la meta)» — antes de pedir el próximo aporte. NUNCA lo enmarques como "no estás ahorrando / no aportaste" mirando solo el ritmo de ESTE mes: el saldo ya construido no desaparece porque un mes no aportara. Y cuando el fondo llega a COMPLETO, CELEBRÁ el hito explícitamente y subí al próximo nivel (invertir el flujo libre) — no sigas pidiendo aportes a un fondo ya lleno.`,
     );
   } else if (ctx.hasEmergencyFund) {
-    // Sin datos reales (WhatsApp/sin sesión) → cae al auto-reporte del onboarding.
+    // Sin datos reales (sin sesión) → cae al auto-reporte del onboarding.
     facts.push(
       `Fondo de emergencia (auto-reporte del onboarding): ${ctx.hasEmergencyFund.replaceAll("_", " ")}.`,
     );
