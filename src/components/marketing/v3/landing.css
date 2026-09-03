@@ -1,0 +1,2592 @@
+/* ═══ CARTERA+ · página completa ═══════════════════════════════════════════
+   Paleta y logotipo REALES: los tokens salen de src/components/marketing/
+   landing.css (--ink #1d1d1f, --mut #6e6e73, --soft #f5f5f7, --line #e8e8ed,
+   --green #378451, fondo blanco) y la marca es el mismo SVG de landing.tsx.
+   La aurora es la de la página que está en vivo, no una versión mía.
+
+   Lo único que se suma es Instrument Serif para los titulares. La página en
+   vivo ya hacía el quiebre serif-itálica en «dirección» con Georgia; esto es
+   el mismo recurso con una serif de verdad, extendido a los títulos de sección.
+
+   La página cuenta UNA historia y en este orden:
+   tensión → mecanismo → guía → destino → prueba → confianza → precio →
+   objeciones → cierre. Antes saltaba directo a las funciones y por eso no se
+   entendía qué hace la aplicación.
+   ══════════════════════════════════════════════════════════════════════════ */
+.lp {
+  --ink: #1d1d1f;
+  --mut: #6e6e73;
+  --soft: #f5f5f7;
+  --line: #e8e8ed;
+  --green: #378451;
+  --green-deep: #2c6e43;
+  --green-soft: rgba(55, 132, 81, 0.1);
+}
+.lp,
+.lp * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.lp {
+  background: #fff;
+  color: var(--ink);
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+.lp a {
+  color: inherit;
+  text-decoration: none;
+}
+.lp .serif {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+}
+.lp .wrap {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+.lp .mono {
+  font-family: "Space Mono", ui-monospace, monospace;
+}
+
+/* ── barra ── */
+/* Cabecera de vidrio. Arriba del todo es TRANSPARENTE — el hero se ve completo y la barra no
+   corta la composición. Al bajar un píxel se enciende el esmerilado: el contenido que pasa por
+   detrás se ve difuminado y con el color saturado, que es lo que hace que se lea como vidrio
+   de verdad y no como un rectángulo blanco translúcido. `-webkit-` incluido: Safari todavía lo
+   necesita, y sin él la barra queda opaca justo en el navegador donde más se nota. */
+.lp .hdr {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition:
+    background 0.32s ease,
+    border-color 0.32s ease,
+    box-shadow 0.32s ease;
+}
+.lp .hdr.vidrio {
+  background: rgba(255, 255, 255, 0.55);
+  -webkit-backdrop-filter: saturate(190%) blur(24px);
+  backdrop-filter: saturate(190%) blur(24px);
+  border-bottom-color: rgba(29, 29, 31, 0.07);
+  box-shadow: 0 8px 30px -20px rgba(29, 29, 31, 0.35);
+}
+.lp .hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+}
+.lp .lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+.lp .lp-brand .mark {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.lp .lp-brand .wm {
+  display: inline;
+}
+.lp .lp-brand .p {
+  color: var(--green);
+}
+
+/* ── la marca, en línea con el texto ───────────────────────────────────────
+   Regla de marca: cada vez que se escribe el nombre o se nombra al agente, se
+   escribe con el isotipo delante y el + en verde. Nunca «CARTERA+» en texto
+   plano. El isotipo se dimensiona en `em`, así que crece con el titular y se
+   achica con el pie sin tocar una sola regla más. */
+/* En texto corrido va SOLO el logotipo en letras. El isotipo delante del nombre
+   es redundante: se reserva para donde el nombre no está escrito al lado —
+   la cabecera, el nodo donde convergen los hilos y el avatar del chat. */
+.lp .cm {
+  width: 1.12em;
+  height: 1.12em;
+  display: inline-block;
+  vertical-align: -0.21em;
+  flex: 0 0 auto;
+}
+.lp .cw {
+  white-space: nowrap;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.lp .cw i {
+  font-style: normal;
+  color: var(--green);
+}
+/* Dentro de un titular en serif el nombre sigue siendo Sora: es un logotipo, no
+   una palabra. Pero a cuerpo completo en un h2 de 58 px el bloque de Sora
+   aplasta la línea serif: baja un cuarto y recupera el equilibrio. */
+.lp h2 .cw,
+.lp h3 .cw {
+  letter-spacing: -0.03em;
+}
+.lp h2 .cw {
+  font-size: 0.76em;
+  vertical-align: 0.03em;
+}
+/* Sobre verde el + no puede ir en verde: se pierde. Va en blanco con el resto. */
+.lp .cw-inv,
+.lp .cw-inv i {
+  color: #fff;
+}
+/* La barra fija de móvil es angosta: ahí no cabe el logotipo completo, va el isotipo
+   solo, dentro de un disco blanco para que conserve sus dos colores sobre el verde. */
+.lp .disco {
+  background: #fff;
+  border-radius: 50%;
+  width: 1.5em;
+  height: 1.5em;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.lp .disco .cm {
+  width: 1em;
+  height: 1em;
+  vertical-align: 0;
+}
+.lp .lp-nav {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  font-size: 14.5px;
+  color: var(--mut);
+}
+.lp .lp-nav a:hover {
+  color: var(--ink);
+}
+.lp .lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34em;
+  border-radius: 980px;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition:
+    background 0.18s ease,
+    transform 0.16s ease,
+    box-shadow 0.18s ease;
+}
+.lp .lp-btn:active {
+  transform: scale(0.98);
+}
+.lp .btn-green {
+  background: var(--green);
+  color: #fff;
+  height: 38px;
+  padding: 0 20px;
+  font-size: 14.5px;
+}
+.lp .btn-green:hover {
+  background: var(--green-deep);
+}
+.lp .btn-lg {
+  height: 54px;
+  padding: 0 34px;
+  font-size: 17px;
+  box-shadow: 0 14px 30px -18px rgba(55, 132, 81, 0.9);
+}
+.lp .lp-btn-ghost {
+  border: 1px solid var(--line);
+  height: 38px;
+  padding: 0 18px;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.lp .lp-btn-ghost:hover {
+  border-color: #c9c9cf;
+}
+
+/* ── tipografía de sección ── */
+.lp h1 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(40px, 5.6vw, 78px);
+  line-height: 0.99;
+  letter-spacing: -0.024em;
+  text-wrap: balance;
+}
+.lp h1 em {
+  font-style: italic;
+  color: var(--green-deep);
+}
+.lp h2 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(32px, 4.4vw, 58px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.lp h2 em {
+  font-style: italic;
+  color: var(--green-deep);
+}
+.lp h3 {
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+.lp .overline {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+.lp .overline > i {
+  display: inline-block;
+  vertical-align: middle;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 10px;
+}
+/* El cintillo del agente es el nombre del producto dentro del producto: se le da
+   un punto más de cuerpo y el + en verde, para que no se pierda como una etiqueta más. */
+.lp .overline.agente {
+  font-size: 12.5px;
+  letter-spacing: 0.19em;
+  color: var(--ink);
+}
+.lp .overline.agente b {
+  font-weight: 400;
+  color: var(--green);
+}
+.lp .lead {
+  font-size: clamp(17px, 1.4vw, 20px);
+  color: var(--mut);
+  line-height: 1.55;
+}
+.lp .p {
+  color: var(--mut);
+}
+.lp .fine {
+  font-size: 13px;
+  color: #8e8e93;
+}
+
+/* ── secciones ── */
+.lp section {
+  padding: 110px 0;
+}
+.lp .soft {
+  background: var(--soft);
+}
+.lp .sec-head {
+  max-width: 44rem;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lp .sec-head.center {
+  margin-inline: auto;
+  text-align: center;
+  align-items: center;
+}
+.lp .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp .reveal.lp-on {
+  opacity: 1;
+  transform: none;
+}
+
+/* ── 01 hero ── */
+.lp .hero {
+  position: relative;
+  padding: 30px 0 18px;
+  text-align: center;
+  min-height: calc(100svh - 60px);
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+}
+.lp .aurora {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.lp .aur {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.42;
+}
+.lp .aur.a1 {
+  width: 52vw;
+  height: 34vh;
+  left: 8vw;
+  top: 16vh;
+  background: radial-gradient(
+    closest-side,
+    rgba(55, 132, 81, 0.55),
+    rgba(43, 125, 106, 0.25),
+    transparent
+  );
+  animation: d1 24s ease-in-out infinite;
+}
+.lp .aur.a2 {
+  width: 44vw;
+  height: 30vh;
+  right: 6vw;
+  top: 6vh;
+  background: radial-gradient(
+    closest-side,
+    rgba(55, 132, 81, 0.38),
+    rgba(120, 170, 110, 0.18),
+    transparent
+  );
+  animation: d2 30s ease-in-out infinite;
+}
+.lp .aur.a3 {
+  width: 38vw;
+  height: 26vh;
+  left: 32vw;
+  top: 34vh;
+  background: radial-gradient(closest-side, rgba(43, 125, 106, 0.3), transparent);
+  animation: d1 36s ease-in-out infinite reverse;
+}
+@keyframes d1 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4vw, -3vh, 0) scale(1.12);
+  }
+}
+@keyframes d2 {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-3vw, 4vh, 0) scale(1.08);
+  }
+}
+.lp .hero .in {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+.lp .hline {
+  display: block;
+  overflow: hidden;
+  padding: 0.04em 0.1em 0.1em;
+}
+/* La segunda línea NO puede llevar overflow:hidden — la palabra que rota sube y baja al
+   cambiar, y ahí se recortaría. Entra con un fundido en vez de con la máscara. */
+.lp .hline2 {
+  display: block;
+  position: relative;
+  padding: 0.04em 0.1em 0.1em;
+  animation: asoma 1s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+@keyframes asoma {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* El ancho de `.rot` se anima: sin eso, la línea centrada pega un brinco cada vez que
+   cambia la palabra. Con la transición, el centro se desliza. */
+.lp .rot {
+  display: inline-block;
+  white-space: nowrap;
+  transition: width 0.52s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp .rot .pal {
+  display: inline-block;
+  transition:
+    opacity 0.34s ease,
+    transform 0.34s cubic-bezier(0.4, 0, 1, 1),
+    filter 0.34s ease;
+}
+.lp .rot.sale .pal {
+  opacity: 0;
+  transform: translateY(-0.26em);
+  filter: blur(4px);
+}
+.lp .rot.entra .pal {
+  animation: llega 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes llega {
+  from {
+    opacity: 0;
+    transform: translateY(0.3em);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+/* Medidor invisible: mide el ancho de la frase siguiente antes de escribirla, para poder
+   animar el ancho. Va DENTRO del h1 para heredar tamaño y familia exactos. */
+.lp .medidor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Texto estable para lectores de pantalla: el titular que rota va oculto para ellos, así no
+   anuncian un encabezado que cambia solo cada dos segundos. */
+.lp .sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.lp .hline > span {
+  display: inline-block;
+  animation: up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.lp .hline:nth-child(2) > span {
+  animation-delay: 0.12s;
+}
+@keyframes up {
+  from {
+    transform: translateY(110%);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.lp .hero .lead {
+  max-width: 34em;
+}
+.lp .escena {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 330px;
+  margin-top: 4px;
+  z-index: 1;
+}
+/* El lienzo ABSOLUTO: en flujo con height:100% el porcentaje cae al tamaño intrínseco del
+   canvas —el que le acaba de fijar el renderer— y el hero se estira solo fuera de pantalla. */
+.lp .escena canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── 02 el problema ── */
+.lp .dolores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 52px;
+}
+.lp .dolor {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 28px 26px;
+}
+.lp .dolor q {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 24px;
+  line-height: 1.28;
+  font-style: italic;
+  display: block;
+  quotes: "«" "»";
+}
+.lp .dolor p {
+  margin-top: 14px;
+  font-size: 14.5px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+/* El remate necesita AIRE. Pegado a las tarjetas se lee como un pie de foto; separado y
+   más grande, se lee como la conclusión de la sección — que es lo que es. */
+.lp .remate {
+  margin: 96px auto 8px;
+  text-align: center;
+  font-size: clamp(23px, 2.7vw, 35px);
+  line-height: 1.32;
+  max-width: 19em;
+  letter-spacing: -0.015em;
+}
+/* Este remate es más largo que el resto: con 19em se le parten las dos líneas
+   por la mitad y pierde el golpe. */
+.lp .remate.ancho {
+  max-width: 27em;
+}
+.lp .remate.corto {
+  margin-top: 70px;
+}
+.lp .remate b {
+  font-weight: 400;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  color: var(--green-deep);
+}
+
+/* ── 04 cómo funciona ─────────────────────────────────────────────────────
+   Rediseño «gerencial»: el bloque vendía explicando y ahora vende mostrando.
+   El texto de cada paso baja de ~40 palabras a una sola frase; el peso se pasa
+   a la tarjeta, que ahora es el argumento y no la ilustración. Las tres
+   tarjetas cierran con la misma estructura — «De X a Y» — para que la fila se
+   lea como una escalera de transformación y no como tres funciones sueltas. */
+.lp .pasos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 60px;
+  align-items: stretch;
+}
+.lp .paso {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lp .paso .lp-n {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lp .paso .lp-n::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+.lp .paso h3 {
+  font-size: 20px;
+  line-height: 1.24;
+  letter-spacing: -0.02em;
+}
+/* Una sola frase por paso. Si crece de dos líneas, el bloque volvió a ser denso. */
+.lp .paso .p {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--mut);
+  margin-bottom: 20px;
+  max-width: 30em;
+}
+/* `margin-top:auto` alinea las tres tarjetas por ABAJO aunque los textos midan
+   distinto. La sombra suave — no el borde — es lo que las levanta del fondo. */
+.lp .paso .art {
+  margin-top: auto;
+  background: #fff;
+  border: 1px solid rgba(29, 29, 31, 0.06);
+  border-radius: 20px;
+  padding: 20px 20px 0;
+  min-height: 272px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow:
+    0 24px 44px -34px rgba(29, 29, 31, 0.5),
+    0 2px 4px -2px rgba(29, 29, 31, 0.05);
+}
+/* El cuerpo de la tarjeta se centra verticalmente. Sin esto, la tarjeta con menos
+   contenido queda con todo arriba y un hueco muerto antes de la promesa. */
+.lp .paso .cuerpo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+/* El remate de cada tarjeta: la promesa. Va pegado al borde inferior, separado
+   por una línea, para que se lea como conclusión y no como otro dato más. */
+.lp .gana {
+  border-top: 1px solid var(--line);
+  margin-inline: -20px;
+  padding: 13px 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--mut);
+}
+.lp .gana em {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 16.5px;
+  color: var(--green-deep);
+  letter-spacing: -0.01em;
+}
+
+/* ── 01 · las vías de entrada ──
+   Cuatro celdas del mismo peso, a propósito: ninguna vía es «la buena». El
+   mensaje visual es «dame la información como quieras», no «conectá tu banco».
+   Antes eran cuatro filas de dos líneas — la tarjeta más densa de las tres.
+   Ahora son cuatro fichas de una línea y un solo ejemplo que muestra la magia. */
+.lp .canales {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.lp .canal {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--soft);
+  border-radius: 12px;
+  padding: 9px 11px;
+}
+.lp .canal .lp-ic {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  line-height: 1;
+}
+.lp .canal .ic-v {
+  color: var(--green);
+  font-weight: 700;
+  font-size: 14px;
+}
+.lp .canal b {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+}
+.lp .ejemplo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.lp .ejemplo .dice {
+  color: var(--ink);
+}
+.lp .ejemplo .hace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green-deep);
+  font-weight: 500;
+}
+.lp .ejemplo .hace::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--green);
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 3px rgba(55, 132, 81, 0.14);
+}
+
+/* ── 02 · los hilos que se juntan ── */
+.lp .hilos {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.lp .hilos .nodos rect {
+  fill: #fff;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.lp .hilos .nodos text {
+  font:
+    600 10.5px Sora,
+    sans-serif;
+  fill: var(--ink);
+}
+
+/* ── 03 · la jugada del mes ──
+   Jerarquía explícita: una recomendación principal con peso visual y dos
+   señales secundarias. Antes eran tres filas idénticas — una lista de
+   problemas. Ahora es una decisión con contexto, que es lo que se vende. */
+.lp .jugada {
+  background: linear-gradient(180deg, rgba(55, 132, 81, 0.09), rgba(55, 132, 81, 0.045));
+  border: 1px solid rgba(55, 132, 81, 0.16);
+  border-radius: 14px;
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lp .jugada b {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+}
+.lp .jugada span {
+  font-size: 12.5px;
+  color: var(--mut);
+  line-height: 1.4;
+}
+.lp .jugada .tasa {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  color: var(--green-deep);
+}
+.lp .atencion .cuerpo {
+  gap: 11px;
+}
+.lp .titulillo {
+  font-family: "Space Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+}
+.lp .atencion .fila {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.lp .atencion .fila i {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.lp .atencion .lp-media {
+  background: #b07a2e;
+}
+.lp .atencion .opor {
+  background: var(--green);
+}
+
+.lp .correo .de {
+  font-size: 12px;
+  color: #8e8e93;
+}
+.lp .correo .asunto {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+}
+.lp .correo .cuerpo {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--mut);
+}
+.lp .prop {
+  background: #fff;
+  border: 1px solid var(--green);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lp .prop .lp-t {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+}
+.lp .prop .lp-m {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.lp .prop .c {
+  font-size: 12.5px;
+  color: var(--mut);
+}
+.lp .prop .btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.lp .prop .btns span {
+  font-family: Sora, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.lp .prop .btns .si {
+  background: var(--green);
+  color: #fff;
+}
+.lp .prop .btns .lp-no {
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.lp .sobre .cab {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--mut);
+}
+.lp .barra {
+  height: 7px;
+  border-radius: 4px;
+  background: #e6e6ea;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.lp .barra i {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+
+/* ── 03 el asesor ─────────────────────────────────────────────────────────
+   Este es el bloque que justifica la mensualidad: acá se deja de vender que
+   CARTERA+ ordena información y se vende que My Agent C+ conoce la realidad
+   financiera de ESA persona y razona dentro de ella. Por eso el argumento no
+   es «una IA a la que le podés preguntar» — eso lo hace cualquier chatbot —
+   sino números + hábitos + memoria + objetivos.
+
+   El chat ya no vive dentro de una tarjeta: las burbujas van al aire sobre el
+   fondo de la sección. Encerrarlo en una caja lo hacía leer como una captura
+   de pantalla; suelto se lee como una conversación que está pasando. */
+.lp .dos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: 52px;
+  align-items: center;
+}
+/* Toda la columna de argumento tiene que caber junto al chat en UNA pantalla.
+   Por eso este bloque baja un escalón la escala tipográfica: el titular, la
+   bajada y las capacidades van más apretados que en el resto de la página. */
+.lp .asesor {
+  padding: 72px 0;
+}
+.lp .asesor h2 {
+  font-size: clamp(30px, 3.4vw, 46px);
+  line-height: 1.06;
+}
+.lp .asesor .lead {
+  font-size: 17px;
+  line-height: 1.5;
+  margin-top: 14px !important;
+}
+.lp .overline.largo {
+  letter-spacing: 0.14em;
+  font-size: 11.5px;
+}
+.lp .overline.largo em {
+  font-style: normal;
+  color: var(--mut);
+  font-weight: 400;
+}
+.lp .overline .cw {
+  letter-spacing: 0.1em;
+}
+
+/* La frase bisagra: es la promesa del bloque en dos líneas, así que va con
+   peso de titular chico y no de párrafo. */
+.lp .subraya {
+  margin-top: 18px;
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+}
+.lp .subraya em {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 22px;
+  color: var(--green-deep);
+}
+
+/* Las cuatro capacidades. No son features: son cuatro formas de conocer a
+   alguien. Aparecen escalonadas al entrar para que se lean una por una. */
+.lp .caps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.lp .cap {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 11px;
+  align-items: start;
+}
+.lp .cap .lp-ico {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  background: var(--green-soft);
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+}
+.lp .cap .lp-ico svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+  stroke: var(--green-deep);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lp .cap b {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 14.5px;
+  letter-spacing: -0.015em;
+}
+.lp .cap span {
+  display: block;
+  font-size: 13.8px;
+  line-height: 1.42;
+  color: var(--mut);
+  margin-top: 1px;
+}
+/* La confianza se dice en positivo. «La IA nunca inventa un número» pone al
+   lector a pensar en que podría inventarlo; esto dice lo mismo al derecho. */
+.lp .control {
+  margin-top: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #8e8e93;
+}
+.lp .control b {
+  font-weight: 600;
+  color: var(--mut);
+}
+
+/* ── el chat, enmarcado en vidrio ─────────────────────────────────────────
+   Suelto sobre blanco las burbujas quedaban a la deriva. La vitrina las
+   enmarca sin encajonarlas: es un panel translúcido con desenfoque real, no
+   un rectángulo gris. Para que el vidrio se lea COMO vidrio necesita algo
+   detrás que refractar — de ahí el halo: dos manchas muy suaves de color que
+   se ven difuminadas a través del panel. Sin el halo, sobre fondo blanco, el
+   `backdrop-filter` no tiene nada que hacer y el efecto no existe. */
+.lp .conver {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.lp .halo {
+  position: absolute;
+  inset: -9% -7%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 40px;
+}
+.lp .halo span {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(58px);
+}
+.lp .halo span:nth-child(1) {
+  width: 62%;
+  height: 52%;
+  left: -6%;
+  top: 4%;
+  background: radial-gradient(closest-side, rgba(55, 132, 81, 0.36), transparent);
+}
+.lp .halo span:nth-child(2) {
+  width: 58%;
+  height: 48%;
+  right: -4%;
+  bottom: 2%;
+  background: radial-gradient(closest-side, rgba(43, 125, 106, 0.26), transparent);
+}
+.lp .halo span:nth-child(3) {
+  width: 44%;
+  height: 38%;
+  left: 32%;
+  top: 38%;
+  background: radial-gradient(closest-side, rgba(176, 122, 46, 0.13), transparent);
+}
+/* El borde claro arriba y la sombra profunda abajo son lo que da el volumen:
+   el panel parece una lámina con canto, no un recuadro pintado. */
+.lp .vitrina {
+  position: relative;
+  z-index: 1;
+  border-radius: 28px;
+  padding: 20px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: linear-gradient(158deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.44));
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  backdrop-filter: blur(26px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 0 0 1px rgba(29, 29, 31, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(29, 29, 31, 0.04),
+    0 44px 88px -54px rgba(29, 29, 31, 0.6),
+    0 10px 28px -22px rgba(29, 29, 31, 0.3);
+}
+/* Filo de luz en el canto superior: el detalle que separa «translúcido» de «vidrio». */
+.lp .vitrina::before {
+  content: "";
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+  pointer-events: none;
+}
+.lp .burb {
+  font-size: 15px;
+  line-height: 1.55;
+}
+.lp .yo {
+  align-self: flex-end;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 20px 20px 6px 20px;
+  padding: 12px 17px;
+  max-width: 80%;
+}
+.lp .fila-ia {
+  align-self: flex-start;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 94%;
+}
+.lp .lp-ava {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(55, 132, 81, 0.3);
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+}
+.lp .lp-ava svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.lp .ia {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(29, 29, 31, 0.055);
+  border-radius: 20px 20px 20px 6px;
+  padding: 15px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  box-shadow:
+    0 16px 30px -26px rgba(29, 29, 31, 0.45),
+    0 1px 3px -1px rgba(29, 29, 31, 0.05);
+}
+/* Los tres caminos: numerados y del mismo peso. El asesor no esconde las
+   alternativas — muestra el mapa y después recomienda. */
+.lp .ops {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 1px;
+}
+/* `>` obligatorio: con `.ops div` la grilla también le caía al div interno y el
+   título y la explicación se montaban uno encima del otro. */
+.lp .ops > div {
+  display: grid;
+  grid-template-columns: 19px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.lp .ops i {
+  width: 19px;
+  height: 19px;
+  border-radius: 6px;
+  background: var(--soft);
+  font-style: normal;
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  color: var(--mut);
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+}
+.lp .ops > div > div {
+  min-width: 0;
+}
+.lp .ops b {
+  display: block;
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+.lp .ops span {
+  display: block;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--mut);
+  margin-top: 1px;
+}
+/* El reparto propuesto: el momento en que la conversación deja de explicar y se
+   convierte en una decisión concreta. Por eso tiene su propio bloque.
+   Se llama `.reparto` y no `.lp-plan` porque `.lp-plan` ya es la tarjeta de precios,
+   que se define más abajo y le ganaba el fondo blanco. */
+.lp .reparto {
+  background: rgba(55, 132, 81, 0.07);
+  border: 1px solid rgba(55, 132, 81, 0.16);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp .reparto div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.lp .reparto em {
+  font-family: "Space Mono", monospace;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--green-deep);
+  flex: 0 0 auto;
+}
+.lp .reparto span {
+  font-size: 13.5px;
+  color: var(--mut);
+  line-height: 1.4;
+}
+
+/* Alto FIJO en el hilo: la conversación crece dentro de una caja que no cambia
+   de tamaño, así la página no da saltos mientras corre (CLS 0). Con
+   `justify-content:flex-end` los mensajes se apilan desde abajo y los viejos
+   se salen por arriba; la máscara los desvanece en vez de cortarlos en seco. */
+.lp .hilo {
+  height: 512px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 14px;
+  overflow: hidden;
+  padding-top: 8px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 64px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 64px);
+}
+.lp .hilo > * {
+  animation: entra 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  flex: 0 0 auto;
+}
+@keyframes entra {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* los tres puntitos mientras el asesor piensa */
+.lp .puntos {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(29, 29, 31, 0.055);
+  border-radius: 20px 20px 20px 6px;
+  padding: 15px 18px;
+  display: flex;
+  gap: 5px;
+  box-shadow: 0 20px 38px -30px rgba(29, 29, 31, 0.55);
+}
+.lp .puntos i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b9b9bf;
+  display: block;
+  animation: latir 1.25s ease-in-out infinite;
+}
+.lp .puntos i:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.lp .puntos i:nth-child(3) {
+  animation-delay: 0.32s;
+}
+@keyframes latir {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+/* El redactor es lo que hace que se lea como una conversación de verdad y no
+   como una captura: se ve a alguien escribiendo antes de que salga la burbuja.
+   Sin la tarjeta alrededor, flota como una barra suelta. */
+.lp .redactor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Alto FIJO y una sola línea: si el campo creciera al escribir un mensaje largo,
+   la columna entera cambiaría de alto y la página daría un saltito. Un campo real
+   tampoco crece: el texto se le va por la izquierda — eso hace `.tira`. */
+.lp .campo {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  padding: 0 20px;
+  font-size: 14.5px;
+  line-height: 1.35;
+  color: var(--ink);
+  height: 50px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 10px 20px -18px rgba(29, 29, 31, 0.4);
+}
+.lp .tira {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  will-change: transform;
+}
+.lp .campo .ph {
+  color: #a1a1a8;
+}
+.lp .cursor {
+  display: inline-block;
+  width: 1.5px;
+  height: 1.05em;
+  background: var(--green);
+  margin-left: 2px;
+  vertical-align: -2px;
+  animation: parpadeo 1s steps(1) infinite;
+}
+@keyframes parpadeo {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+.lp .enviar {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: #dcdce1;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: default;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+.lp .enviar.lp-listo {
+  background: var(--green);
+}
+.lp .enviar.va {
+  transform: scale(0.86);
+}
+.lp .enviar svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+/* ── 05 el camino ─────────────────────────────────────────────────────────
+   No son cuatro funcionalidades ni cuatro movimientos sueltos: es UN camino.
+   El bloque anterior terminó diciendo «entiendo dónde estás y te ayudo a
+   decidir qué sigue»; la pregunta que queda en el aire es «¿y hacia dónde me
+   vas a llevar?». Esto la contesta: control → base → crecimiento → libertad.
+
+   Por eso el riel va ARRIBA de las tarjetas y arranca en HOY: sin él, cuatro
+   tarjetas en fila se leen como una lista de features; con él se leen como
+   etapas de un recorrido que ya empezó. */
+.lp .riel {
+  position: relative;
+  margin: 52px 0 30px;
+  padding-top: 26px;
+}
+.lp .riel .hoy {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+}
+/* La línea NO llega a los extremos: nace bajo el primer punto y muere en el
+   último, si no parece un borde de sección en vez de un recorrido. */
+.lp .riel .via {
+  position: absolute;
+  left: 12.5%;
+  right: 12.5%;
+  top: 31px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), #cfd6cf 55%, var(--green));
+}
+.lp .riel .paradas {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  text-align: center;
+}
+.lp .riel .parada {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 11px;
+}
+.lp .riel .parada i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #cbd5cd;
+  box-shadow: 0 0 0 4px #fff;
+}
+/* El punto se va llenando de color a lo largo del riel: la meta se ve distinta
+   desde antes de llegar a la tarjeta negra. */
+.lp .riel .parada:nth-child(1) i {
+  border-color: #c6d2c8;
+}
+.lp .riel .parada:nth-child(2) i {
+  border-color: #9dbda8;
+}
+.lp .riel .parada:nth-child(3) i {
+  border-color: var(--green);
+}
+.lp .riel .parada:nth-child(4) i {
+  background: var(--green);
+  border-color: var(--green);
+}
+.lp .riel .parada span {
+  font-family: "Space Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+.lp .riel .parada:nth-child(4) span {
+  color: var(--green-deep);
+}
+
+.lp .escalera {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+/* Progresión visual: la tarjeta se va cargando de peso hacia la derecha, así la
+   negra no aparece de la nada — se ve venir. */
+.lp .peld {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  box-shadow: 0 18px 36px -32px rgba(29, 29, 31, 0.4);
+}
+.lp .peld:nth-child(2) {
+  box-shadow: 0 22px 42px -32px rgba(29, 29, 31, 0.46);
+}
+.lp .peld:nth-child(3) {
+  box-shadow: 0 26px 48px -32px rgba(29, 29, 31, 0.52);
+}
+.lp .peld .lp-n {
+  font-family: "Space Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--green);
+  text-transform: uppercase;
+}
+.lp .peld h3 {
+  font-size: 18px;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+}
+/* La primera frase es la promesa del escalón; la segunda, cómo se cumple. */
+.lp .peld .clave {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 14.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.lp .peld .cuerpo {
+  font-size: 14px;
+  color: var(--mut);
+  line-height: 1.5;
+}
+/* El «de → a» es el corazón del bloque: es lo único que dice qué CAMBIA en la
+   persona. Va en serif itálica para que se lea como conclusión, no como dato. */
+.lp .peld .salto {
+  margin-top: 6px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--mut);
+}
+.lp .peld .salto em {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 16.5px;
+  color: var(--green-deep);
+}
+.lp .peld .medida {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.lp .peld .medida b {
+  font-family: "Space Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+  font-weight: 400;
+}
+.lp .peld .medida span {
+  font-family: "Space Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+/* La cuarta es el destino, no un paso más. Pero el peso NO se lo da el relleno:
+   se lo da la luz. Rellenarla —de negro o de verde— la sacaba de la fila; el
+   negro ni siquiera está en la paleta, y el verde saturado se comía la lectura
+   del texto. La tarjeta se queda igual que las otras y lo que cambia es lo que
+   la rodea: un halo verde muy difuso, un aro finísimo y la etiqueta. Sutil, no
+   tecnológico. */
+.lp .peld.fin {
+  border-color: rgba(55, 132, 81, 0.36);
+  box-shadow:
+    0 0 0 5px rgba(55, 132, 81, 0.085),
+    0 30px 56px -34px rgba(55, 132, 81, 0.6);
+}
+/* El halo va DETRÁS del fondo blanco de la tarjeta (z-index -1), así se ve solo
+   asomando por los bordes: es luz alrededor, no un fondo de color. */
+.lp .peld.fin::after {
+  content: "";
+  position: absolute;
+  inset: -28px;
+  z-index: -1;
+  border-radius: 44px;
+  background: radial-gradient(60% 54% at 50% 48%, rgba(55, 132, 81, 0.38), transparent 74%);
+  filter: blur(22px);
+  pointer-events: none;
+}
+.lp .peld.fin .destino {
+  position: absolute;
+  top: -11px;
+  left: 22px;
+  background: var(--green);
+  color: #fff;
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: 0 8px 16px -10px rgba(55, 132, 81, 0.8);
+}
+/* Lo único que se tiñe adentro es el indicador: el dato del destino en verde. */
+.lp .peld.fin .medida span {
+  color: var(--green-deep);
+}
+/* El único indicador que es un TRIPLE y no cabe en una línea. En vez de
+   achicarlo hasta que no se lea, se deja en dos con interlínea propia: es la
+   tarjeta del destino, un renglón más ahí no descuadra la fila (todas las
+   tarjetas se estiran a la misma altura).
+   PENDIENTE: si la app expone un Rich Life Score real, va un número acá —
+   «37% del camino» vendería más que los tres nombres. */
+.lp .peld.fin .medida span {
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/* ── 06 el escenario ─────────────────────────────────────────────────────
+   HONESTIDAD PRIMERO: esto NO es un testimonio. Es un escenario calculado con
+   los motores de CARTERA+ sobre un perfil financiero definido. Por eso el
+   bloque ya no se llama «la prueba» ni menciona «cuenta demo»: se presenta
+   como lo que es — una proyección — y lleva su nota al pie. Cuando existan
+   usuarios con 6 o 12 meses de historial real, este bloque evoluciona a
+   «historias reales» y ESE cambio sí es oro para conversión.
+
+   La estructura es narrativa, no una fila de tres cifras: punto de partida →
+   qué se movió y en qué orden → dónde se llega. Sin el paso del medio, los
+   números de diciembre parecen magia. */
+.lp .escena-año {
+  margin-top: 52px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── enero: la foto del arranque ── */
+.lp .momento {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.lp .momento b {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  font-weight: 400;
+}
+.lp .momento i {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  font-style: normal;
+}
+.lp .momento .sello {
+  font-family: "Space Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+}
+
+.lp .parte {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 30px 32px;
+}
+.lp .parte .titular {
+  font-size: 20px;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  max-width: 26em;
+}
+.lp .tercias {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 24px;
+}
+.lp .tercia b {
+  display: block;
+  font-family: "Space Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+  font-weight: 400;
+}
+.lp .tercia .lp-v {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(26px, 2.6vw, 36px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-top: 6px;
+}
+.lp .tercia .lp-v.rojo {
+  color: #b04a46;
+}
+.lp .tercia small {
+  display: block;
+  font-size: 12.5px;
+  color: var(--mut);
+  margin-top: 3px;
+}
+.lp .parte .moraleja {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-size: 17px;
+  line-height: 1.5;
+  max-width: 38em;
+}
+.lp .parte .moraleja em {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 21px;
+  color: var(--green-deep);
+}
+
+/* ── el camino: doce meses, animados ──────────────────────────────────────
+   Es el eslabón sin el cual diciembre parece magia, y además es donde la
+   página tiene que DEMOSTRAR movimiento: se está vendiendo progreso, así que
+   la interfaz no puede quedarse quieta.
+
+   La animación arranca sola cuando el bloque entra en pantalla y dura ~6 s.
+   No va atada al scroll a propósito: con scroll rápido se la salta y en móvil
+   da tirones; autoplay al entrar siempre se ve bien. Con
+   `prefers-reduced-motion` se pinta diciembre de una y no se anima nada. */
+.lp .pasaje {
+  padding: 30px 0;
+  position: relative;
+}
+.lp .linea {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 24px 26px 22px;
+}
+
+/* la lectura viva: los números que van cambiando mes a mes */
+.lp .lectura {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.lp .lectura .mes {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.lp .lectura .mes b {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  min-width: 4.6em;
+}
+.lp .lectura .mes span {
+  font-family: "Space Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+}
+.lp .vivos {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+}
+.lp .vivos > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 8.6em;
+}
+.lp .vivos b {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+  font-weight: 400;
+}
+/* Tabular: sin esto los dígitos bailan de ancho mientras el número corre. */
+.lp .vivos span {
+  font-family: "Space Mono", monospace;
+  font-size: 15px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.lp .vivos span.lp-neg {
+  color: #b04a46;
+}
+.lp .vivos span.lp-ok {
+  color: var(--green-deep);
+}
+
+.lp .grafo {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-top: 16px;
+  overflow: visible;
+}
+.lp .grafo .eje {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.lp .grafo .cero {
+  stroke: #d8d8de;
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.lp .grafo .curva {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lp .grafo .rotulo {
+  font:
+    400 9px "Space Mono",
+    monospace;
+  fill: #b4b4b9;
+  letter-spacing: 0.08em;
+}
+.lp .grafo .rotulo.chico {
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.lp .grafo .rotulo.act {
+  fill: var(--ink);
+}
+.lp .grafo .aguja {
+  stroke: rgba(55, 132, 81, 0.4);
+  stroke-width: 1;
+}
+.lp .grafo .punto {
+  fill: var(--green);
+  stroke: #fff;
+  stroke-width: 2.5;
+}
+
+/* los cuatro movimientos, que se encienden al pasar la aguja */
+.lp .hitos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.lp .hito {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0.34;
+  transition:
+    opacity 0.55s ease,
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(4px);
+}
+.lp .hito.lp-on {
+  opacity: 1;
+  transform: none;
+}
+.lp .hito i {
+  font-family: "Space Mono", monospace;
+  font-style: normal;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.lp .hito i::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.lp .hito b {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 14.5px;
+  letter-spacing: -0.01em;
+}
+.lp .hito span {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--mut);
+}
+.lp .pasaje .nota {
+  text-align: center;
+  font-size: 14.5px;
+  color: var(--mut);
+  line-height: 1.5;
+  max-width: 40em;
+  margin: 20px auto 0;
+}
+
+/* ── diciembre: el resultado, con el salto en grande ── */
+.lp .parte.llega {
+  position: relative;
+  border-color: rgba(55, 132, 81, 0.3);
+  box-shadow:
+    0 0 0 5px rgba(55, 132, 81, 0.075),
+    0 30px 56px -34px rgba(55, 132, 81, 0.5);
+}
+.lp .parte.llega::after {
+  content: "";
+  position: absolute;
+  inset: -26px;
+  z-index: -1;
+  border-radius: 42px;
+  background: radial-gradient(60% 54% at 50% 50%, rgba(55, 132, 81, 0.3), transparent 74%);
+  filter: blur(22px);
+  pointer-events: none;
+}
+.lp .saltos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 26px;
+  margin-top: 24px;
+}
+.lp .salto-c {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp .salto-c b {
+  font-family: "Space Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+  font-weight: 400;
+}
+.lp .salto-c .par {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(24px, 2.4vw, 33px);
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: #9a9aa0;
+}
+.lp .salto-c .par u {
+  text-decoration: none;
+  color: var(--ink);
+}
+.lp .salto-c .par s {
+  text-decoration: none;
+  color: #c7c7cc;
+  margin: 0 0.18em;
+}
+/* El DELTA es el número que vende: no el antes ni el después, sino la distancia. */
+.lp .salto-c .lp-delta {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: var(--green-deep);
+}
+.lp .salto-c small {
+  font-size: 12.5px;
+  color: var(--mut);
+  line-height: 1.45;
+}
+
+.lp .parte.llega .cierre-esc {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.lp .parte.llega .cierre-esc p {
+  font-size: 19px;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+  max-width: 30em;
+}
+.lp .parte.llega .cierre-esc em {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 23px;
+  color: var(--green-deep);
+}
+.lp .parte.llega .cierre-esc .abre {
+  margin-top: 12px;
+  font-size: 14.5px;
+  color: var(--mut);
+  max-width: 46em;
+}
+/* La nota al pie no mata la magia: es lo que permite hacer la demostración
+   fuerte sin convertir una simulación en un testimonio que todavía no existe. */
+.lp .letra-chica {
+  margin-top: 26px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #9a9aa0;
+  max-width: 52em;
+}
+
+/* ── 07 por qué CARTERA+ ──────────────────────────────────────────────────
+   Este bloque ya no explica funciones: CIERRA el argumento de venta. El
+   visitante vio el problema, cómo se entienden sus finanzas, el asesor, el
+   camino y el impacto. Queda una sola pregunta: «¿por qué debería confiarle
+   mis finanzas a CARTERA+?».
+
+   Los cuatro argumentos anteriores eran TRES DEFENSIVOS y uno comercial (no
+   pedimos clave / la IA no calcula / nada se ejecuta sin vos / hecho para
+   Costa Rica). Para un bloque «por qué elegirnos» hacen falta cuatro razones
+   para ELEGIR, no cuatro razones para no tener miedo. La seguridad no se
+   elimina: baja a una franja de sellos, que es donde pesa lo justo. */
+.lp .pilares {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 34px 48px;
+  margin-top: 48px;
+}
+.lp .pilar {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-top: 20px;
+  border-top: 2px solid var(--ink);
+}
+.lp .pilar .lp-n {
+  font-family: "Space Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.lp .pilar h3 {
+  font-size: 19px;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+  max-width: 22em;
+}
+.lp .pilar p {
+  font-size: 15px;
+  color: var(--mut);
+  line-height: 1.55;
+  max-width: 34em;
+}
+/* El remate de cada pilar es lo que se recuerda: va en serif itálica verde,
+   el mismo recurso con el que cierran las tarjetas del resto de la página. */
+.lp .pilar .cierra {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 19px;
+  color: var(--green-deep);
+  letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+/* El logotipo dentro de una línea en serif itálica pesa más que el resto: se
+   baja un punto para que no se coma la frase. */
+.lp .pilar .cierra .cw {
+  font-size: 0.84em;
+  vertical-align: 0.02em;
+}
+
+/* La franja de sellos: la seguridad dicha en una línea, sin gastar en ella
+   dos de los cuatro argumentos comerciales. */
+.lp .sellos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 0;
+  margin-top: 52px;
+  padding: 20px 24px;
+  background: var(--soft);
+  border-radius: 16px;
+}
+.lp .sellos span {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--mut);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.lp .sellos span + span {
+  border-left: 1px solid var(--line);
+}
+.lp .sellos span::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  flex: 0 0 auto;
+}
+
+/* El cierre: el sentimiento justo antes del precio. */
+.lp .remate.cierre-porque {
+  margin-top: 88px;
+}
+.lp .bajo-remate {
+  text-align: center;
+  font-size: 16px;
+  color: var(--mut);
+  margin-top: 16px;
+  max-width: 34em;
+  margin-inline: auto;
+  line-height: 1.5;
+}
+.lp .acto {
+  text-align: center;
+  margin-top: 30px;
+}
+.lp .acto .fine {
+  margin-top: 14px;
+}
+
+/* ── 08 planes ────────────────────────────────────────────────────────────
+   Momento de monetización: acá no se vuelve a explicar la aplicación desde
+   cero. La persona mira las tres tarjetas y tiene que pensar «este es el nivel
+   que necesito».
+
+   Por eso los planes NO se diferencian por funcionalidades sueltas sino por el
+   NIVEL DE INTELIGENCIA Y ACOMPAÑAMIENTO — que es la parte valiosa. De ahí el
+   bloque de My Agent C+ dentro de cada tarjeta, con su medidor de tres tramos:
+   en tres segundos se entiende por qué $17 → $34 → $47 sin leer quince viñetas.
+
+   Y ojo con el posicionamiento: Esencial+ deja ENTRAR, Pro+ es la experiencia
+   que se quiere vender masivamente (donde CARTERA+ se vuelve de verdad «tu
+   asesor de bolsillo») y Max+ vende continuidad, profundidad y memoria total.
+   Si Esencial+ se vuelve demasiado bueno, Pro+ queda como «lo mismo con más
+   IA» y los $34 se comparan contra otra app de presupuesto en vez de contra
+   tener acompañamiento financiero todos los días. */
+.lp .planes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 52px;
+  align-items: stretch;
+}
+.lp .lp-plan {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 30px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lp .lp-plan.hot {
+  border: 2px solid var(--green);
+  box-shadow: 0 34px 74px -50px rgba(55, 132, 81, 0.6);
+}
+.lp .lp-plan .badge {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--green);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 15px;
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lp .lp-plan .nom {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+.lp .lp-plan .nom i {
+  font-style: normal;
+  color: var(--green);
+}
+.lp .lp-plan .promesa {
+  font-size: 14.5px;
+  color: var(--mut);
+  line-height: 1.45;
+  margin-top: -8px;
+}
+.lp .lp-plan .precio {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.lp .lp-plan .precio .lp-n {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.lp .lp-plan .precio .lp-m {
+  font-size: 14px;
+  color: var(--mut);
+}
+/* El upsell natural: una vez que alguien está mirando Pro+, Max+ cuesta 13
+   dólares más. Decirlo en voz baja hace la mitad del trabajo. */
+.lp .lp-plan .delta13 {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--green-deep);
+  margin-top: -8px;
+}
+
+/* ── el bloque que de verdad diferencia los planes ── */
+.lp .lp-agente-nivel {
+  background: var(--soft);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.lp .lp-plan.hot .lp-agente-nivel {
+  background: rgba(55, 132, 81, 0.08);
+}
+.lp .lp-agente-nivel .et {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+}
+.lp .lp-agente-nivel .et .cw {
+  font-size: 1.15em;
+  letter-spacing: 0.06em;
+}
+.lp .lp-agente-nivel .lv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.lp .lp-agente-nivel .lv b {
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+/* Medidor de tres tramos: la progresión se ve antes de leerla. */
+.lp .lp-medidor3 {
+  display: flex;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+.lp .lp-medidor3 i {
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+  background: #dcdce1;
+  display: block;
+}
+.lp .lp-medidor3 i.lp-on {
+  background: var(--green);
+}
+.lp .lp-agente-nivel small {
+  font-size: 12px;
+  color: var(--mut);
+  line-height: 1.4;
+}
+
+.lp .lp-plan ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 14px;
+  color: var(--mut);
+}
+.lp .lp-plan li {
+  position: relative;
+  padding-left: 24px;
+  line-height: 1.45;
+}
+.lp .lp-plan li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 10px;
+  height: 5.5px;
+  border-left: 2px solid var(--green);
+  border-bottom: 2px solid var(--green);
+  transform: rotate(-45deg);
+}
+.lp .lp-plan li strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+/* La frase antes del botón: lo que se recuerda de cada plan. */
+.lp .lp-plan .remata {
+  margin-top: auto;
+  padding-top: 16px;
+  line-height: 1.4;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 16.5px;
+  color: var(--green-deep);
+}
+.lp .lp-plan .lp-btn {
+  margin-top: 14px;
+}
+
+/* El cierre del pricing: contesta la última objeción — «no tengo mis finanzas
+   en orden como para empezar». */
+.lp .remate.cierre-precio {
+  margin-top: 80px;
+}
+.lp .acto-precio {
+  text-align: center;
+  margin-top: 26px;
+}
+.lp .acto-precio p {
+  font-size: 16px;
+  color: var(--mut);
+  max-width: 34em;
+  margin: 0 auto 22px;
+  line-height: 1.5;
+}
+
+/* ── 09 el cierre ─────────────────────────────────────────────────────────
+   Acá NO se vende nada más. Ya se vendió: si la persona llegó hasta abajo, ya
+   pasó por cuatro CTA y por el precio. Otro botón convertiría el final en un
+   banner comercial; este bloque tiene que dejar una idea en la cabeza cuando
+   se cierre la pestaña, y eso es marca, no conversión.
+
+   Por eso: sin tarjetas, sin cifras, sin botón. Todo se desacelera — mucho
+   aire, la palabra que rota más lenta que la del hero, y la firma al final.
+
+   La simetría con el arranque es deliberada. El hero abre con «Tu dinero, con
+   dirección» y la página entera existe para demostrar de dónde sale esa
+   dirección; el cierre vuelve al mismo lugar, pero ahora la palabra significa
+   algo. Y el titular gira del pasado al futuro: hasta este punto CARTERA+
+   analiza lo que ya pasó — la última línea mira lo que sigue. Esa es la tesis
+   del producto en una frase. */
+.lp .cierre {
+  text-align: center;
+  padding: 130px 0 120px;
+}
+.lp .cierre h2 {
+  max-width: 18em;
+  margin-inline: auto;
+}
+/* Alto fijo en la segunda línea: rota entre frases de distinto largo y sin esto
+   la página se movería en cada cambio. */
+.lp .linea2 {
+  display: block;
+  min-height: 1.06em;
+}
+/* Fundido y NO animación de ancho, a diferencia del hero: acá el cambio tiene
+   que sentirse calmo. Durante el cruce el texto está en opacidad 0, así que el
+   recentrado no se ve. */
+.lp .gira {
+  display: inline-block;
+  transition:
+    opacity 0.42s ease,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.lp .gira.va {
+  opacity: 0;
+  transform: translateY(-0.14em);
+}
+.lp .cierre .lead {
+  max-width: 38em;
+  margin: 26px auto 0;
+}
+/* El aire antes de la firma es parte del mensaje: el final tiene que respirar. */
+.lp .firma {
+  margin-top: 104px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+.lp .firma .trilogia {
+  font-size: clamp(19px, 2vw, 25px);
+  line-height: 1.5;
+  letter-spacing: -0.015em;
+}
+.lp .firma .trilogia em {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  color: var(--green-deep);
+  font-size: 1.12em;
+}
+.lp .firma .marca {
+  margin-top: 26px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--mut);
+}
+.lp .firma .marca .cw {
+  font-size: 19px;
+}
+.lp .firma .marca .sep {
+  color: #c7c7cc;
+}
+.lp .pie {
+  border-top: 1px solid var(--line);
+  padding: 28px 0;
+  font-size: 13.5px;
+  color: #8e8e93;
+}
+.lp .pie .in {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* ── CTA fijo de móvil ── */
+.lp .cta-fijo {
+  display: none;
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 60;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+.lp .cta-fijo .lp-btn {
+  width: 100%;
+}
+
+@media (max-width: 1023px) {
+  .lp section {
+    padding: 80px 0;
+  }
+  .lp .dos {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+  }
+  .lp .escalera {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* El riel sigue siendo un resumen del camino aunque las tarjetas bajen a dos
+     columnas: se achica, no se parte. */
+  .lp .riel .parada span {
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+  }
+  .lp .riel {
+    margin-bottom: 26px;
+  }
+  .lp .planes {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 520px;
+  }
+  .lp .pilares {
+    gap: 30px 34px;
+  }
+  .lp .sellos span {
+    padding: 0 14px;
+    font-size: 9.5px;
+  }
+  /* Cuatro movimientos en 4 columnas a 1000 px quedan de tres palabras por línea. */
+  .lp .hitos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 24px;
+  }
+}
+@media (max-width: 767px) {
+  .lp .lp-nav a:not(.lp-btn) {
+    display: none;
+  }
+  .lp .lp-nav .btn-green {
+    display: none;
+  }
+  .lp section {
+    padding: 64px 0;
+  }
+  .lp .hero {
+    padding-top: 36px;
+  }
+  .lp .escena {
+    min-height: 340px;
+  }
+  .lp .dolores,
+  .lp .pasos,
+  .lp .escalera,
+  .lp .pilares {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* La franja de sellos en columna: en fila, a 390 px, cada sello queda de una
+     palabra por línea y se lee como una lista rota. */
+  .lp .sellos {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 20px;
+  }
+  .lp .sellos span {
+    padding: 0;
+    border-left: 0 !important;
+  }
+  .lp .remate.cierre-porque,
+  .lp .remate.cierre-precio {
+    margin-top: 60px;
+  }
+  .lp .lp-plan {
+    padding: 26px 22px;
+  }
+  /* En una sola columna el riel horizontal ya no le corresponde a nada: la
+     secuencia la llevan los 01–04 de las tarjetas. */
+  .lp .riel {
+    display: none;
+  }
+  .lp .escalera {
+    margin-top: 44px;
+  }
+  /* La respuesta con los tres caminos mide solita más de 360 px: con el alto de
+     antes la máscara se comía media burbuja en móvil. */
+  /* En móvil la columna ocupa todo el ancho: el halo con inset negativo se
+     salía de la pantalla y metía desborde horizontal. */
+  .lp .halo {
+    inset: -3% 0;
+  }
+  .lp .vitrina {
+    border-radius: 22px;
+    padding: 16px 14px 14px;
+  }
+  .lp .hilo {
+    height: 470px;
+  }
+  .lp .subraya {
+    font-size: 18px;
+  }
+  .lp .overline.largo {
+    letter-spacing: 0.11em;
+    font-size: 11px;
+  }
+  /* La etiqueta de la propuesta parte en dos con el tracking grande: en móvil se aprieta. */
+  .lp .propuesta .overline {
+    letter-spacing: 0.1em;
+    font-size: 10px;
+  }
+  /* El escenario baja a una columna: el pasaje pierde la línea vertical (no
+     tiene cuatro columnas que unir) y las tercias se apilan. */
+  .lp .tercias,
+  .lp .saltos {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 26px;
+  }
+  .lp .hitos {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .lp .linea {
+    padding: 18px 16px 16px;
+  }
+  /* Los tres números tienen que quedar en UNA fila: en dos, la lectura deja de
+     leerse como un tablero y se convierte en una lista. */
+  .lp .lectura {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .lp .lectura .mes b {
+    font-size: 26px;
+    min-width: 0;
+  }
+  .lp .vivos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .lp .vivos > div {
+    min-width: 0;
+  }
+  .lp .vivos b {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+  }
+  .lp .vivos span {
+    font-size: 12.5px;
+    letter-spacing: -0.02em;
+  }
+  .lp .grafo {
+    overflow: hidden;
+  }
+  .lp .parte {
+    padding: 24px 22px;
+  }
+  .lp .cierre {
+    padding: 76px 0;
+  }
+  .lp .cta-fijo {
+    display: block;
+  }
+  .lp .pie {
+    padding-bottom: 96px;
+  }
+  .lp .pie .in {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp,
+  .lp * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .lp .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

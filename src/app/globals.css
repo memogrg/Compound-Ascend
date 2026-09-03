@@ -7073,3 +7073,31 @@ select.ac-rc-field {
   opacity: 0.55;
   cursor: default;
 }
+
+/* La línea del plan elegido en el registro: contexto, no decoración —
+   confirma que no se perdió lo que la persona eligió en la landing. */
+.auth-plan {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* El remate del alta: un solo botón, sin volver a elegir plan. */
+.card.elegido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-color: var(--accent);
+}
+.card.elegido .ov {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}

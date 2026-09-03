@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getUser } from "@/lib/auth/session";
-import { Landing } from "@/components/marketing/landing";
+import { Landing } from "@/components/marketing/v3/landing";
 
 /**
  * Raíz pública: los visitantes ven la landing CARTERA+;

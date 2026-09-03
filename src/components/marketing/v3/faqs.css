@@ -1,0 +1,567 @@
+/* ═══ CARTERA+ · preguntas frecuentes ══════════════════════════════════════
+   Mismos tokens, misma tipografía y mismo logotipo que la landing: esto no es
+   una página de soporte de otro sitio, es la misma marca contestando en serio.
+
+   Por qué existe como página y no como bloque: en la landing, seis preguntas
+   eran un trámite antes del precio. Acá caben las sesenta y pico que la gente
+   se hace de verdad — configuración, monedas, deudas, inversiones, patrimonio,
+   privacidad — y el buscador las vuelve navegables. Una landing no aguanta ese
+   volumen sin dejar de vender; una página de FAQ vive de él.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.lp {
+  --ink: #1d1d1f;
+  --mut: #6e6e73;
+  --soft: #f5f5f7;
+  --line: #e8e8ed;
+  --green: #378451;
+  --green-deep: #2c6e43;
+}
+.lp,
+.lp * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.lp {
+  background: #fff;
+  color: var(--ink);
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+.lp a {
+  color: inherit;
+  text-decoration: none;
+}
+.lp .wrap {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+/* ── el logotipo, con las mismas reglas de la landing ── */
+.lp .cm {
+  width: 1.12em;
+  height: 1.12em;
+  display: inline-block;
+  vertical-align: -0.21em;
+  flex: 0 0 auto;
+}
+.lp .cw {
+  white-space: nowrap;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.lp .cw .cm {
+  margin-right: 0.24em;
+}
+.lp .cw i {
+  font-style: normal;
+  color: var(--green);
+}
+.lp .cw-inv,
+.lp .cw-inv i {
+  color: #fff;
+}
+
+/* ── barra ── */
+.lp .hdr {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: saturate(190%) blur(24px);
+  backdrop-filter: saturate(190%) blur(24px);
+  border-bottom: 1px solid rgba(29, 29, 31, 0.07);
+}
+.lp .hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+}
+.lp .lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+.lp .lp-brand .mark {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.lp .lp-brand .wm {
+  display: inline;
+}
+.lp .lp-brand .p {
+  color: var(--green);
+}
+.lp .lp-nav {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  font-size: 14.5px;
+  color: var(--mut);
+}
+.lp .lp-nav a:hover {
+  color: var(--ink);
+}
+.lp .lp-nav a.act {
+  color: var(--ink);
+}
+.lp .lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34em;
+  border-radius: 980px;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition:
+    background 0.18s ease,
+    transform 0.16s ease;
+}
+.lp .lp-btn:active {
+  transform: scale(0.98);
+}
+.lp .btn-green {
+  background: var(--green);
+  color: #fff;
+  height: 38px;
+  padding: 0 20px;
+  font-size: 14.5px;
+}
+.lp .btn-green:hover {
+  background: var(--green-deep);
+}
+.lp .btn-lg {
+  height: 54px;
+  padding: 0 34px;
+  font-size: 17px;
+  box-shadow: 0 14px 30px -18px rgba(55, 132, 81, 0.9);
+}
+.lp .lp-btn-ghost {
+  border: 1px solid var(--line);
+  height: 38px;
+  padding: 0 18px;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.lp .lp-btn-ghost:hover {
+  border-color: #c9c9cf;
+}
+
+/* ── cabecera de la página ── */
+.lp .overline {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--mut);
+}
+.lp .tope {
+  padding-block: 70px 34px;
+  text-align: center;
+}
+.lp h1 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(36px, 4.6vw, 60px);
+  line-height: 1.04;
+  letter-spacing: -0.022em;
+  margin-top: 14px;
+}
+.lp h1 em {
+  font-style: italic;
+  color: var(--green-deep);
+}
+.lp .tope .lead {
+  font-size: 18px;
+  color: var(--mut);
+  max-width: 40em;
+  margin: 16px auto 0;
+  line-height: 1.55;
+}
+
+/* ── buscador ──
+   Con sesenta preguntas, el índice por sí solo no alcanza: la gente llega con
+   una palabra en la cabeza («dólares», «avalancha», «cancelar»). El filtro
+   corre en el cliente sobre el texto ya renderizado — sin índice, sin red. */
+.lp .buscador {
+  position: relative;
+  max-width: 34em;
+  margin: 26px auto 0;
+}
+.lp .buscador input {
+  width: 100%;
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0 52px 0 22px;
+  font-family: Manrope, sans-serif;
+  font-size: 16px;
+  color: var(--ink);
+  box-shadow: 0 14px 28px -26px rgba(29, 29, 31, 0.5);
+  outline: none;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.lp .buscador input:focus {
+  border-color: rgba(55, 132, 81, 0.5);
+  box-shadow:
+    0 0 0 4px rgba(55, 132, 81, 0.08),
+    0 14px 28px -26px rgba(29, 29, 31, 0.5);
+}
+.lp .buscador input::placeholder {
+  color: #a1a1a8;
+}
+.lp .buscador svg {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  stroke: #a1a1a8;
+  fill: none;
+  stroke-width: 2;
+  pointer-events: none;
+}
+.lp .conteo {
+  text-align: center;
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+  margin-top: 14px;
+  min-height: 1.2em;
+}
+
+/* ── el cuerpo: índice pegajoso + preguntas ── */
+.lp .cuerpo {
+  display: grid;
+  grid-template-columns: minmax(0, 230px) minmax(0, 1fr);
+  gap: 56px;
+  padding-block: 20px 90px;
+  align-items: start;
+}
+.lp .indice {
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lp .indice p {
+  font-family: "Space Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a3a3a8;
+  margin-bottom: 10px;
+}
+.lp .indice a {
+  font-size: 14.5px;
+  color: var(--mut);
+  padding: 7px 12px;
+  border-radius: 9px;
+  line-height: 1.35;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+.lp .indice a:hover {
+  background: var(--soft);
+  color: var(--ink);
+}
+.lp .indice a.act {
+  background: rgba(55, 132, 81, 0.09);
+  color: var(--green-deep);
+  font-weight: 600;
+}
+
+.lp .grupo {
+  scroll-margin-top: 88px;
+}
+.lp .grupo + .grupo {
+  margin-top: 52px;
+}
+.lp .grupo h2 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.lp .grupo .lp-sub {
+  font-size: 14.5px;
+  color: var(--mut);
+  margin-top: 6px;
+}
+.lp .lista {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── cada pregunta ── */
+.lp .qa {
+  border-bottom: 1px solid var(--line);
+}
+.lp .qa summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 19px 44px 19px 0;
+  position: relative;
+  font-family: Sora, sans-serif;
+  font-weight: 600;
+  font-size: 16.5px;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+}
+.lp .qa summary::-webkit-details-marker {
+  display: none;
+}
+.lp .qa summary:hover {
+  color: var(--green-deep);
+}
+/* La cruz gira a menos: el estado abierto se lee sin leer. */
+.lp .qa summary::after,
+.lp .qa summary::before {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  background: #b4b4b9;
+  transition:
+    transform 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s ease;
+}
+.lp .qa summary::before {
+  width: 13px;
+  height: 1.6px;
+  margin-top: -0.8px;
+}
+.lp .qa summary::after {
+  width: 1.6px;
+  height: 13px;
+  margin-top: -6.5px;
+  margin-right: 5.7px;
+}
+.lp .qa[open] summary::after {
+  transform: rotate(90deg);
+  opacity: 0;
+}
+.lp .qa[open] summary::before,
+.lp .qa[open] summary:hover::before {
+  background: var(--green);
+}
+.lp .qa .lp-r {
+  padding: 0 44px 22px 0;
+  font-size: 15.5px;
+  color: var(--mut);
+  line-height: 1.65;
+  animation: abre 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes abre {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* `p + p` no cubre el párrafo que sigue a una lista: sin esto quedan pegados. */
+.lp .qa .lp-r p + p,
+.lp .qa .lp-r ul + p {
+  margin-top: 11px;
+}
+.lp .qa .lp-r strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.lp .qa .lp-r ul {
+  margin: 11px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.lp .qa .lp-r li {
+  position: relative;
+  padding-left: 22px;
+  line-height: 1.5;
+}
+.lp .qa .lp-r li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 9px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.lp .qa .lp-r .mono {
+  font-family: "Space Mono", monospace;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.lp .qa.oculta {
+  display: none;
+}
+.lp .grupo.oculta {
+  display: none;
+}
+
+.lp .nada {
+  display: none;
+  text-align: center;
+  padding: 56px 0;
+  color: var(--mut);
+}
+.lp .nada.lp-on {
+  display: block;
+}
+.lp .nada b {
+  display: block;
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+/* ── cierre ── */
+.lp .cierre {
+  background: var(--soft);
+  padding: 76px 0;
+  text-align: center;
+}
+.lp .cierre h2 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(28px, 3.4vw, 44px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.lp .cierre h2 em {
+  font-style: italic;
+  color: var(--green-deep);
+}
+.lp .cierre p {
+  color: var(--mut);
+  margin: 16px auto 28px;
+  max-width: 32em;
+}
+.lp .fine {
+  font-size: 13px;
+  color: #8e8e93;
+  margin-top: 14px;
+}
+.lp .pie {
+  border-top: 1px solid var(--line);
+  padding: 26px 0;
+  font-size: 13.5px;
+  color: var(--mut);
+}
+.lp .pie .in {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .lp .cuerpo {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  /* En una columna el índice pegajoso taparía media pantalla: pasa a una fila
+     de fichas que se desliza, arriba de las preguntas. */
+  /* Sangra hasta el canto de la pantalla: una fila que se desliza tiene que
+     verse cortada por el borde, no por un margen — si no, parece rota. */
+  .lp .indice {
+    position: static;
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 24px 18px;
+    margin: 0 -24px 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 22px,
+      #000 calc(100% - 22px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 22px,
+      #000 calc(100% - 22px),
+      transparent 100%
+    );
+  }
+  .lp .indice::-webkit-scrollbar {
+    display: none;
+  }
+  .lp .indice p {
+    display: none;
+  }
+  .lp .indice a {
+    flex: 0 0 auto;
+    background: var(--soft);
+    font-size: 13.5px;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 767px) {
+  .lp .lp-nav a:not(.lp-btn) {
+    display: none;
+  }
+  .lp .lp-nav .lp-btn-ghost {
+    display: none;
+  }
+  .lp .tope {
+    padding-block: 46px 26px;
+  }
+  .lp h1 {
+    font-size: 33px;
+  }
+  .lp .grupo h2 {
+    font-size: 26px;
+  }
+  .lp .qa summary {
+    font-size: 16px;
+  }
+  .lp .pie .in {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp,
+  .lp * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
