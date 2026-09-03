@@ -93,7 +93,7 @@ export function Landing() {
             <div className="aur a3"></div>
           </div>
           <div className="wrap in">
-            <p className="overline">
+            <p className="lp-rotulo">
               <i></i>Tu asesor financiero, siempre con vos
             </p>
             <h1>
@@ -135,7 +135,7 @@ export function Landing() {
         <section className="soft">
           <div className="wrap">
             <div className="sec-head center reveal">
-              <p className="overline">El problema</p>
+              <p className="lp-rotulo">El problema</p>
               <h2>
                 Sabés cuánto ganás.
                 <br />
@@ -199,7 +199,7 @@ export function Landing() {
         <section className="asesor">
           <div className="wrap dos">
             <div className="reveal">
-              <p className="overline agente largo">
+              <p className="lp-rotulo agente largo">
                 <span className="cw">
                   My Agent C<i>+</i>
                 </span>{" "}
@@ -364,7 +364,7 @@ export function Landing() {
         <section className="soft" id="como">
           <div className="wrap">
             <div className="sec-head center reveal">
-              <p className="overline">Cómo funciona</p>
+              <p className="lp-rotulo">Cómo funciona</p>
               <h2>
                 Primero entiende dónde estás.
                 <br />
@@ -548,7 +548,7 @@ export function Landing() {
         <section>
           <div className="wrap">
             <div className="sec-head center reveal">
-              <p className="overline">Tu camino financiero</p>
+              <p className="lp-rotulo">Tu camino financiero</p>
               <h2>
                 No importa dónde estés hoy.
                 <br />
@@ -695,7 +695,7 @@ export function Landing() {
         <section className="soft">
           <div className="wrap">
             <div className="sec-head center reveal">
-              <p className="overline">Un año. Un plan. Una dirección.</p>
+              <p className="lp-rotulo">Un año. Un plan. Una dirección.</p>
               <h2>
                 Mirá lo que puede cambiar
                 <br />
@@ -913,7 +913,7 @@ export function Landing() {
         <section>
           <div className="wrap">
             <div className="sec-head center reveal">
-              <p className="overline">
+              <p className="lp-rotulo">
                 Por qué{" "}
                 <span className="cw">
                   CARTERA<i>+</i>
@@ -1053,7 +1053,7 @@ export function Landing() {
         <section className="soft" id="planes">
           <div className="wrap">
             <div className="sec-head center reveal">
-              <p className="overline">Planes</p>
+              <p className="lp-rotulo">Planes</p>
               <h2>
                 Elegí cuánto querés que
                 <br />
@@ -1267,7 +1267,7 @@ export function Landing() {
            ═══════════════════════════════════════════════════════════════════════ */}
         <section className="cierre">
           <div className="wrap reveal">
-            <p className="overline">
+            <p className="lp-rotulo">
               Por eso existe{" "}
               <span className="cw">
                 CARTERA<i>+</i>

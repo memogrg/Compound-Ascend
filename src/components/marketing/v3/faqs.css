@@ -161,7 +161,7 @@
 }
 
 /* ── cabecera de la página ── */
-.lp .overline {
+.lp .lp-rotulo {
   font-family: "Space Mono", monospace;
   font-size: 11px;
   letter-spacing: 0.2em;

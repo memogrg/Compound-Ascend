@@ -249,14 +249,26 @@
   font-size: 19px;
   letter-spacing: -0.02em;
 }
-.lp .overline {
+/* ⚠️ SE LLAMA `lp-rotulo` Y NO `overline` A PROPÓSITO — NO LO RENOMBRES.
+   Tailwind (importado en globals.css) trae una utilidad llamada exactamente `.overline`
+   que pinta `text-decoration-line: overline`. Como esta hoja NUNCA declaraba
+   `text-decoration`, la utilidad global llenaba el hueco y dibujaba una rayita encima de
+   cada rótulo de sección: siete rayas horizontales repartidas por toda la página que
+   nadie había puesto ahí.
+
+   Es la misma trampa que ya nos mordió al portar el prototipo: prefijar con `.lp` protege
+   lo que la hoja DECLARA, no lo que deja en su valor por defecto. Y acá ni siquiera
+   bastaba con revisar globals.css, porque la regla no está escrita en ningún archivo del
+   repo — la genera Tailwind. Verificado creando un <p class="overline"> vacío fuera de
+   `.lp`: sale con la línea igual. La única defensa real es no usar nombres de utilidad. */
+.lp .lp-rotulo {
   font-family: "Space Mono", monospace;
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--mut);
 }
-.lp .overline > i {
+.lp .lp-rotulo > i {
   display: inline-block;
   vertical-align: middle;
   width: 7px;
@@ -267,12 +279,12 @@
 }
 /* El cintillo del agente es el nombre del producto dentro del producto: se le da
    un punto más de cuerpo y el + en verde, para que no se pierda como una etiqueta más. */
-.lp .overline.agente {
+.lp .lp-rotulo.agente {
   font-size: 12.5px;
   letter-spacing: 0.19em;
   color: var(--ink);
 }
-.lp .overline.agente b {
+.lp .lp-rotulo.agente b {
   font-weight: 400;
   color: var(--green);
 }
@@ -934,16 +946,16 @@
   line-height: 1.5;
   margin-top: 14px !important;
 }
-.lp .overline.largo {
+.lp .lp-rotulo.largo {
   letter-spacing: 0.14em;
   font-size: 11.5px;
 }
-.lp .overline.largo em {
+.lp .lp-rotulo.largo em {
   font-style: normal;
   color: var(--mut);
   font-weight: 400;
 }
-.lp .overline .cw {
+.lp .lp-rotulo .cw {
   letter-spacing: 0.1em;
 }
 
@@ -2553,12 +2565,12 @@
   .lp .subraya {
     font-size: 18px;
   }
-  .lp .overline.largo {
+  .lp .lp-rotulo.largo {
     letter-spacing: 0.11em;
     font-size: 11px;
   }
   /* La etiqueta de la propuesta parte en dos con el tracking grande: en móvil se aprieta. */
-  .lp .propuesta .overline {
+  .lp .propuesta .lp-rotulo {
     letter-spacing: 0.1em;
     font-size: 10px;
   }

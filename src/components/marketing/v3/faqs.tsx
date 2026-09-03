@@ -82,7 +82,7 @@ export function Faqs() {
 
       <main>
         <div className="wrap tope">
-          <p className="overline">Preguntas frecuentes</p>
+          <p className="lp-rotulo">Preguntas frecuentes</p>
           <h1>
             Todo lo que querés saber
             <br />
