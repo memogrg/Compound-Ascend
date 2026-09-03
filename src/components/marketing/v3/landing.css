@@ -1985,12 +1985,17 @@
   gap: 34px 48px;
   margin-top: 48px;
 }
+/* El filete de arriba era `2px solid var(--ink)` — negro puro y grueso. Cuatro de esos,
+   uno por pilar, leían como rayas de cuaderno atravesando la sección: la línea pesaba más
+   que el texto que estaba separando. Un filete divide; no compite. Ahora es de 1px y del
+   verde de la marca a media opacidad: sigue marcando dónde empieza cada pilar, pero deja
+   de ser lo primero que ve el ojo. */
 .lp .pilar {
   display: flex;
   flex-direction: column;
   gap: 9px;
   padding-top: 20px;
-  border-top: 2px solid var(--ink);
+  border-top: 1px solid color-mix(in srgb, var(--green) 45%, transparent);
 }
 .lp .pilar .lp-n {
   font-family: "Space Mono", monospace;
