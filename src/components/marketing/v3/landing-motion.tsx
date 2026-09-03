@@ -148,7 +148,21 @@ export function LandingMotion() {
 
         let i = 0,
           aLaVista = true,
-          andando = false;
+          andando = false,
+          temporizador = 0;
+
+        /* UN SOLO HILO DE ROTACIÓN. `andando` se levanta al PROGRAMAR, no al ejecutar.
+           Antes `arrancar()` dejaba un paso agendado a 2,2 s sin tocar la bandera, así que
+           el observador de visibilidad —que solo miraba `!andando`— creía que no había
+           nada corriendo y arrancaba un SEGUNDO ciclo: dos rotaciones a la vez sobre el
+           mismo titular. Con el relevo por innerHTML no se notaba (los dos hilos se
+           pisaban el mismo nodo); con el cruce de capas se veía apilarse una capa por
+           vuelta. El `clearTimeout` garantiza que nunca queden dos pasos agendados. */
+        function programar(ms: number) {
+          andando = true;
+          clearTimeout(temporizador);
+          temporizador = window.setTimeout(paso, ms);
+        }
 
         function ancho(html) {
           medidor.innerHTML = html;
@@ -167,26 +181,43 @@ export function LandingMotion() {
           andando = true;
           const sig = (i + 1) % FRASES.length;
 
-          rot.classList.remove("entra");
-          rot.classList.add("sale");
+          /* Las dos palabras se CRUZAN. Antes esto era un relevo: se desvanecía la
+             saliente, se esperaba 360 ms y recién ahí entraba la nueva desde opacidad
+             cero — o sea el renglón quedaba vacío como un tercio de segundo en cada
+             vuelta, y el titular del hero se leía a medias. Ahora la saliente se despega
+             a una capa absoluta encima y las dos animaciones corren a la vez. */
+          /* Cinturón: si alguna capa vieja sobrevivió, se va acá. Sin esto un fallo de
+             temporizador convierte una fuga perdida en una capa permanente. */
+          rot.querySelectorAll(".pal.fuga").forEach(function (n) {
+            n.remove();
+          });
+          const saliente = rot.querySelector(".pal");
+          if (saliente) {
+            saliente.classList.add("fuga");
+            // Se retira sola al terminar: si se quedara, cada vuelta apilaría una capa más.
+            setTimeout(function () {
+              saliente.remove();
+            }, 460);
+          }
           fijarAncho(FRASES[sig]); // el ancho glisa mientras la palabra se va
 
-          setTimeout(function () {
-            rot.innerHTML = '<span class="pal">' + FRASES[sig] + "</span>";
-            rot.classList.remove("sale");
-            // reflow para que la animación de entrada vuelva a correr
-            void rot.offsetWidth;
-            rot.classList.add("entra");
-            i = sig;
-            // la frase de marca se queda más tiempo: es el remate del ciclo
-            setTimeout(paso, i === ULTIMA ? 3400 : 1900);
-          }, 360);
+          const entrante = document.createElement("span");
+          entrante.className = "pal";
+          entrante.innerHTML = FRASES[sig]; // texto propio del archivo, no entra nada del usuario
+          rot.appendChild(entrante);
+          // reflow para que la animación de entrada vuelva a correr
+          rot.classList.remove("entra");
+          void rot.offsetWidth;
+          rot.classList.add("entra");
+          i = sig;
+          // la frase de marca se queda más tiempo: es el remate del ciclo
+          programar(i === ULTIMA ? 3400 : 1900);
         }
 
         // el ancho de arranque, ya con las fuentes cargadas
         function arrancar() {
           fijarAncho(FRASES[i]);
-          if (!andando) setTimeout(paso, 2200);
+          if (!andando) programar(2200);
         }
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(arrancar);
         else arrancar();
@@ -195,13 +226,13 @@ export function LandingMotion() {
         new ObservadorVigilado(
           function (e) {
             aLaVista = e[0].isIntersecting;
-            if (aLaVista && !document.hidden && !andando) paso();
+            if (aLaVista && !document.hidden && !andando) programar(0);
           },
           { threshold: 0 },
         ).observe(rot);
 
         document.addEventListener("visibilitychange", function () {
-          if (!document.hidden && aLaVista && !andando) paso();
+          if (!document.hidden && aLaVista && !andando) programar(0);
         });
 
         // el ancho depende del tamaño de letra, que es fluido

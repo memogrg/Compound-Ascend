@@ -45,33 +45,18 @@ export function montarTelefono(op) {
     T = 0.36,
     R = 0.54,
     BEV = 0.085;
-  /* El teléfono YA NO DA LA VUELTA. Oscila alrededor de un tres cuartos suave y la pantalla
-   nunca deja de verse: el rango vive entre −29° y +9°, así que el frente siempre mira a la
-   cámara y el canto izquierdo se asoma lo justo para que el aparato se lea como un volumen
-   y no como una foto pegada.
+  /* UN SOLO MOVIMIENTO. El teléfono queda fijo en un tres cuartos suave y lo único que se
+   mueve es la flotación vertical. Antes había CINCO movimientos a la vez —giro en Y, cabeceo
+   en X, flote, paralaje del puntero y deriva de la cámara— y el resultado era un aparato
+   inquieto del que costaba leer la pantalla, que es justo lo que la pieza tiene que mostrar.
 
-   Son dos senos de períodos que no encajan (13 s y 8,3 s) en vez de una lista de hitos: el
-   movimiento no se repite a ojo, no tiene arranques ni frenadas visibles, y no hay un
-   instante en que el aparato «llegue» a ningún lado. Un objeto sostenido en la mano se
-   mueve así; una animación con hitos se nota. */
-  const CENTRO = -10,
-    AMP_1 = 15,
-    AMP_2 = 7,
-    PER_1 = 13,
-    PER_2 = 8.3;
+   El ángulo fijo (−12°) deja el frente mirando a la cámara: la pantalla NUNCA se oculta. Se
+   conserva algo de ángulo, en vez de un frontal plano, para que el aparato se lea como un
+   volumen y no como una calcomanía. */
+  const ANGULO_FIJO = -12,
+    CABECEO_FIJO = 4.5;
   const FLOTE_SEG = 6.5,
-    ANGULO_QUIETO = -18;
-  function anguloEn(t) {
-    return (
-      CENTRO +
-      AMP_1 * Math.sin((t * Math.PI * 2) / PER_1) +
-      AMP_2 * Math.sin((t * Math.PI * 2) / PER_2 + 1.1)
-    );
-  }
-  /* El cabeceo también respira, muy poco: sin esto el vaivén se lee como un giro de tocadiscos. */
-  function cabeceoEn(t) {
-    return 4.5 + 2.2 * Math.sin((t * Math.PI * 2) / 10.5 + 0.6);
-  }
+    FLOTE_AMP = 0.09;
 
   let renderer;
   try {
@@ -1090,25 +1075,9 @@ export function montarTelefono(op) {
   resize();
   window.addEventListener("resize", resize);
 
-  const pt = { x: 0, y: 0, tx: 0, ty: 0 };
-  window.addEventListener(
-    "pointermove",
-    function (e) {
-      const r = stage.getBoundingClientRect();
-      pt.tx = ((e.clientX - r.left) / r.width - 0.5) * 2;
-      pt.ty = ((e.clientY - r.top) / r.height - 0.5) * 2;
-    },
-    { passive: true },
-  );
-  window.addEventListener(
-    "deviceorientation",
-    function (e) {
-      if (e.gamma == null) return;
-      pt.tx = Math.max(-1, Math.min(1, e.gamma / 26));
-      pt.ty = Math.max(-1, Math.min(1, ((e.beta || 40) - 40) / 26));
-    },
-    { passive: true },
-  );
+  /* El paralaje de puntero y de giroscopio se retiró junto con el resto de los movimientos:
+   inclinar el teléfono real movía el de la pantalla, que es otra forma de girarlo. Con los
+   escuchas fuera, la página tampoco despierta al hilo principal en cada movimiento del ratón. */
 
   let running = true,
     panel = 0,
@@ -1176,13 +1145,12 @@ export function montarTelefono(op) {
       }
     }
 
-    const ang = reduced ? ANGULO_QUIETO : anguloEn(t);
-    pt.x += (pt.tx - pt.x) * 0.045;
-    pt.y += (pt.ty - pt.y) * 0.045;
-    rig.rotation.y = THREE.MathUtils.degToRad(ang) + pt.x * 0.16;
-    rig.rotation.x = THREE.MathUtils.degToRad(reduced ? 4.5 : cabeceoEn(t)) - pt.y * 0.09;
+    /* La orientación no depende del tiempo ni del puntero: es una pose. El único término
+     animado de toda la escena es `position.y`. */
+    rig.rotation.y = THREE.MathUtils.degToRad(ANGULO_FIJO);
+    rig.rotation.x = THREE.MathUtils.degToRad(CABECEO_FIJO);
     rig.rotation.z = THREE.MathUtils.degToRad(-1.5);
-    rig.position.y = reduced ? 0 : Math.sin((t / FLOTE_SEG) * Math.PI * 2) * 0.09;
+    rig.position.y = reduced ? 0 : Math.sin((t / FLOTE_SEG) * Math.PI * 2) * FLOTE_AMP;
 
     /* Con la vuelta entera el ángulo barría 360°; ahora vive en unos 38°, así que los mismos
      multiplicadores dejaban el cristal apagado. Se suben para que el reflejo siga BARRIENDO
@@ -1201,11 +1169,7 @@ export function montarTelefono(op) {
       sombraMesh.material.opacity = 0.78 + 0.22 * frente;
     }
 
-    if (!reduced) {
-      camera.position.x = Math.sin(t * 0.27) * 0.16 + Math.sin(t * 0.61) * 0.07;
-      camera.position.y = 0.15 + Math.cos(t * 0.34) * 0.12 + Math.sin(t * 0.83) * 0.05;
-      camera.lookAt(0, 0.05, 0);
-    }
+    /* La cámara ya no deriva: con el aparato quieto, moverla equivalía a girarlo. */
 
     panelT += dt;
     if (panelT > 7) {
