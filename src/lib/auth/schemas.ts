@@ -30,6 +30,17 @@ export const signUpSchema = z
     path: ["confirm"],
   });
 
+/**
+ * Alta desde la web (/empezar): SOLO correo y contraseña. Nombre y confirmación
+ * se piden adentro, después de pagar. Baymard: cada campo antes del pago es
+ * abandono; la confirmación de contraseña sobra si el campo se puede mostrar.
+ */
+export const empezarSchema = z.object({
+  email: emailSchema,
+  password: passwordSchema,
+  plan: z.enum(["esencial", "pro", "max"], { message: "Elegí un plan" }),
+});
+
 export const requestResetSchema = z.object({ email: emailSchema });
 
 export const updatePasswordSchema = z
