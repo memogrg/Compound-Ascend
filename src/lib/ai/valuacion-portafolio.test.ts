@@ -27,47 +27,70 @@ const pos = (p: Partial<PosicionValuada> & { name: string; fuente: PosicionValua
 };
 
 /**
- * La cartera que motivó todo esto, en chico: la cripto muy abajo, un plan valuado a mano muy
- * arriba, y el titular saliendo POSITIVO porque se sumaban las dos cosas.
+ * La cartera que motivó todo esto, con los números reales de la cuenta: la cripto en −44%, los ETF
+ * en +29% y casi la mitad valuada a mano. Los dos promedios que había que dejar de dar son el que
+ * funde mercado con manual (+$1.013 sobre una cartera en baja) y el que funde cripto con ETF
+ * (−4,1%, que no describe a ninguno de los dos).
  */
+const CRIPTO_INV = 127_091;
+const CRIPTO_VAL = 71_183; // −44%
+const ETF_INV = 210_222; // BTC spot + IBIT
+const ETF_VAL = 252_442; // +20%
+
 const CARTERA_REAL: PosicionValuada[] = [
-  pos({ name: "cripto", fuente: "mercado", invested: 337_313, value: 323_625 }),
+  pos({ name: "cripto", fuente: "cripto", invested: CRIPTO_INV, value: CRIPTO_VAL }),
+  pos({ name: "IBIT", fuente: "mercado", invested: ETF_INV, value: ETF_VAL }),
   pos({ name: "S&P 500 PLAN", fuente: "manual", invested: 66_000, value: 91_981 }),
   pos({ name: "CTA FUTURA C", fuente: "manual", invested: 60_585, value: 46_021 }),
   pos({ name: "certificados", fuente: "manual", invested: 189_762, value: 189_762 }),
 ];
 
 describe("resumirValuacion · el reparto por fuente", () => {
-  it("separa mercado, manual y sin precio, y cuenta cada grupo", () => {
+  it("separa cripto, mercado tradicional, manual y sin precio, y cuenta cada grupo", () => {
     const v = resumirValuacion([
-      pos({ name: "a", fuente: "mercado" }),
+      pos({ name: "a", fuente: "cripto" }),
       pos({ name: "b", fuente: "mercado" }),
-      pos({ name: "c", fuente: "manual" }),
-      pos({ name: "d", fuente: "sin_precio" }),
+      pos({ name: "c", fuente: "mercado" }),
+      pos({ name: "d", fuente: "manual" }),
+      pos({ name: "e", fuente: "sin_precio" }),
     ]);
+    expect(v.cripto.posiciones).toBe(1);
     expect(v.mercado.posiciones).toBe(2);
     expect(v.manual.posiciones).toBe(1);
     expect(v.sinPrecio.posiciones).toBe(1);
     expect(v.mezcla).toBe(true);
   });
 
-  it("el resultado de mercado NO incluye lo valuado a mano", () => {
+  it("cripto y ETF salen como cortes SEPARADOS, cada uno con su propio rendimiento", () => {
     const v = resumirValuacion(CARTERA_REAL);
-    // Solo la cripto: −13.688, no el +11.417 de las manuales.
-    expect(v.mercado.plPrimario).toBe(-13_688);
-    expect(v.mercado.pctPrimario).toBeCloseTo(-13_688 / 337_313, 6);
-    expect(v.manual.plPrimario).toBe(91_981 + 46_021 + 189_762 - (66_000 + 60_585 + 189_762));
+    // La cripto, muy abajo.
+    expect(v.cripto.plPrimario).toBe(CRIPTO_VAL - CRIPTO_INV);
+    expect(v.cripto.pctPrimario).toBeCloseTo(-0.44, 2);
+    // Los ETF, arriba. Ninguno de los dos contamina al otro.
+    expect(v.mercado.plPrimario).toBe(ETF_VAL - ETF_INV);
+    expect(v.mercado.pctPrimario).toBeGreaterThan(0.15);
+    // Y el promedio ponderado que ya NO se publica no coincide con ninguno de los dos.
+    const promedio = (CRIPTO_VAL + ETF_VAL - CRIPTO_INV - ETF_INV) / (CRIPTO_INV + ETF_INV);
+    expect(promedio).toBeGreaterThan(v.cripto.pctPrimario!);
+    expect(promedio).toBeLessThan(v.mercado.pctPrimario!);
   });
 
-  it("el bug original: fundir los grupos tapa la pérdida de mercado con una marca escrita a mano", () => {
+  it("ningún grupo incluye lo valuado a mano", () => {
     const v = resumirValuacion(CARTERA_REAL);
-    const fundido = (v.mercado.plPrimario ?? 0) + (v.manual.plPrimario ?? 0);
-    // Lo que de verdad hizo el mercado.
-    expect(v.mercado.plPrimario).toBe(-13_688);
-    // Lo que se reportaba: la marca manual (+11.417) se come el 83% de la caída, y con la cripto
-    // un poco más arriba —como el 1/9 a las 16:32— el titular cruzaba a POSITIVO.
-    expect(fundido).toBeGreaterThan(v.mercado.plPrimario!);
-    expect(Math.abs(fundido)).toBeLessThan(Math.abs(v.mercado.plPrimario!) / 5);
+    expect(v.manual.plPrimario).toBe(91_981 + 46_021 + 189_762 - (66_000 + 60_585 + 189_762));
+    expect(v.cripto.plPrimario).not.toBe(v.manual.plPrimario);
+    expect(v.mercado.plPrimario).not.toBe(v.manual.plPrimario);
+  });
+
+  it("el bug original: fundir los grupos tapa la caída de la cripto", () => {
+    const v = resumirValuacion(CARTERA_REAL);
+    const fundido =
+      (v.cripto.plPrimario ?? 0) + (v.mercado.plPrimario ?? 0) + (v.manual.plPrimario ?? 0);
+    // La cripto pierde 55.908 y el titular fundido queda en −2.271: el 96% de la caída
+    // desaparece detrás de los ETF y de las marcas manuales. Con la cripto un poco más arriba
+    // —como el 1/9 a las 16:32— ese mismo titular cruzaba a POSITIVO.
+    expect(v.cripto.plPrimario).toBe(-55_908);
+    expect(Math.abs(fundido)).toBeLessThan(Math.abs(v.cripto.plPrimario!) / 20);
   });
 
   it("sin_precio NUNCA publica resultado: es null, no 0", () => {
@@ -190,21 +213,25 @@ describe("frasesValuacion · lo que se le dice al usuario", () => {
   const texto = (p: PosicionValuada[], voz?: "vos" | "tu") =>
     frasesValuacion(resumirValuacion(p), { fmt, voz }).join(" · ");
 
-  it("con la cartera real: el resultado que se afirma es SOLO el de mercado", () => {
+  it("con la cartera real: tres cortes, cada uno con su propio resultado", () => {
     const t = texto(CARTERA_REAL);
-    expect(t).toContain("−13688 USD"); // el de mercado, con su signo
+    expect(t).toContain("−55908 USD"); // la cripto, sola
+    expect(t).toContain("+42220 USD"); // los ETF, solos
     expect(t).toContain("valuadas por vos, no por el mercado");
-    // El titular fundido (+11.417 − 13.688 = −2.271) no aparece como "resultado".
-    expect(t).not.toContain("+11417");
+    // Ni el fundido total (−2.271) ni el promedio de lo cotizado (−13.688) se publican.
+    expect(t).not.toContain("−2271");
+    expect(t).not.toContain("−13688");
   });
 
-  it("mercado y manual NUNCA quedan en la misma frase", () => {
+  it("cripto, mercado y manual NUNCA quedan en la misma frase", () => {
     const fs = frasesValuacion(resumirValuacion(CARTERA_REAL), { fmt });
-    const conMercado = fs.filter((f) => f.includes("cotizadas"));
+    const conCripto = fs.filter((f) => f.startsWith("Tu cripto"));
+    const conMercado = fs.filter((f) => f.startsWith("Tus acciones y ETF"));
     const conManual = fs.filter((f) => f.includes("por el mercado"));
+    expect(conCripto).toHaveLength(1);
     expect(conMercado).toHaveLength(1);
     expect(conManual).toHaveLength(1);
-    expect(conMercado[0]).not.toBe(conManual[0]);
+    expect(new Set([conCripto[0], conMercado[0], conManual[0]]).size).toBe(3);
   });
 
   it("con posiciones sin precio: lo dice SIEMPRE y aclara qué muestra por ellas", () => {
@@ -286,13 +313,15 @@ describe("frasesValuacion · lo que se le dice al usuario", () => {
     expect(tu).not.toContain("actualizás");
   });
 
-  it("una cartera 100% de mercado se lee como siempre, sin ruido extra", () => {
+  it("una cartera de un solo corte se lee en una sola frase, sin ruido extra", () => {
     const fs = frasesValuacion(
       resumirValuacion([pos({ name: "a", fuente: "mercado", invested: 900, value: 1_000 })]),
       { fmt },
     );
     expect(fs).toHaveLength(1);
-    expect(fs[0]).toContain("cotizadas valen");
+    expect(fs[0]).toContain("Tus acciones y ETF");
+    // Sin cripto no se menciona un corte vacío.
+    expect(fs[0]).not.toContain("cripto");
   });
 });
 

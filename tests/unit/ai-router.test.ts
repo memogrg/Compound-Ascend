@@ -238,7 +238,7 @@ describe("terminología · 'listá mis metas' enumera; 'cuáles son mis sobres' 
  */
 function valuacionDe(
   pos: {
-    fuente: "mercado" | "manual" | "sin_precio";
+    fuente: "cripto" | "mercado" | "manual" | "sin_precio";
     invested: number;
     value: number;
     moneda: string;
@@ -440,7 +440,29 @@ describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", ()
     const r = answerFromContext("resumen_inversiones", {}, tc, ctxCaido);
     expect(r?.reply).toMatch(/No puedo valuar tu portafolio ahora mismo/);
     expect(r?.reply).toMatch(/Lo que invertiste es/);
-    expect(r?.reply).not.toMatch(/cotizadas valen/);
+    // Ningún corte con precio se publica cuando la mayoría está a ciegas.
+    expect(r?.reply).not.toMatch(/Tu cripto|Tus acciones y ETF/);
+  });
+
+  it("resumen_inversiones da cripto y acciones/ETF como cortes SEPARADOS", () => {
+    // Los números reales de la cuenta: la cripto en −44% y los ETF en +20%. El promedio
+    // ponderado de los dos (−4,1%) no describe a ninguno, y por eso ya no se publica.
+    const ctxCortes = {
+      ...CTX,
+      investmentInvested: [{ monto: 337_313, moneda: "USD" }],
+      investmentValue: [{ monto: 323_625, moneda: "USD" }],
+      investmentPL: [{ monto: -13_688, moneda: "USD" }],
+      valuacion: valuacionDe([
+        { fuente: "cripto", invested: 127_091, value: 71_183, moneda: "USD" },
+        { fuente: "mercado", invested: 210_222, value: 252_442, moneda: "USD" },
+      ]),
+    } as FinancialContext;
+    const r = answerFromContext("resumen_inversiones", {}, tc, ctxCortes)!;
+    expect(r.reply).toMatch(/Tu cripto .*−\$55\.908 \(−44,0%\)/);
+    expect(r.reply).toMatch(/Tus acciones y ETF .*\+\$42\.220 \(\+20,1%\)/);
+    // El promedio fundido de los dos no aparece por ningún lado.
+    expect(r.reply).not.toContain("−$13.688");
+    expect(r.reply).not.toContain("4,1%");
   });
 
   it("sin desglose por fuente el lane ESCALA: no vuelve al texto que afirmaba de más", () => {
