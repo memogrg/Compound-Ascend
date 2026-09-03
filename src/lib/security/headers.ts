@@ -11,6 +11,27 @@ type Header = { key: string; value: string };
 
 const isProd = process.env.APP_ENV === "production";
 
+/**
+ * El host al que Sentry manda los errores del navegador, sacado del propio DSN.
+ *
+ * Se DERIVA en vez de escribirse a mano porque un host pegado acá se
+ * desincroniza el día que cambie el proyecto de Sentry, y el síntoma sería
+ * exactamente el que estamos arreglando: los reportes se bloquean en silencio
+ * —la CSP no rompe la página, solo descarta la petición— y uno se entera
+ * cuando necesita un error que nunca llegó.
+ *
+ * Sin DSN devuelve null y la CSP queda como estaba: Sentry ya es inerte ahí.
+ */
+function sentryIngestHost(): string | null {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!dsn) return null;
+  try {
+    return new URL(dsn).origin;
+  } catch {
+    return null;
+  }
+}
+
 function contentSecurityPolicy(): string {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   // En dev permitimos 'unsafe-eval' para el HMR de Next; en prod no.
@@ -21,6 +42,7 @@ function contentSecurityPolicy(): string {
     supabaseUrl,
     supabaseUrl.replace("https://", "wss://"), // realtime
     "https://challenges.cloudflare.com", // turnstile
+    sentryIngestHost(), // reportes de error del navegador
   ]
     .filter(Boolean)
     .join(" ");
