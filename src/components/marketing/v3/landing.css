@@ -430,6 +430,7 @@
    cambia la palabra. Con la transición, el centro se desliza. */
 .lp .rot {
   display: inline-block;
+  position: relative;
   white-space: nowrap;
   transition: width 0.52s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -440,12 +441,33 @@
     transform 0.34s cubic-bezier(0.4, 0, 1, 1),
     filter 0.34s ease;
 }
-.lp .rot.sale .pal {
-  opacity: 0;
-  transform: translateY(-0.26em);
-  filter: blur(4px);
+/* CRUCE, no relevo. Antes la palabra saliente llegaba a `opacity: 0` y la entrante
+   aparecía 360 ms después empezando TAMBIÉN en 0: durante ~350 ms de cada ciclo —cada
+   1,9 s— el segundo renglón del titular quedaba vacío y el hero mostraba media frase.
+   Ahora la saliente se despega a una capa absoluta y se desvanece ENCIMA de la entrante,
+   así que las dos se solapan y siempre hay algo escrito. Va centrada con `left: 50%`
+   para no descolgarse mientras el ancho de `.rot` todavía está glisando. */
+.lp .rot .pal.fuga {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  pointer-events: none;
+  animation: fuga 0.42s cubic-bezier(0.4, 0, 1, 1) both;
 }
-.lp .rot.entra .pal {
+@keyframes fuga {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -0.26em);
+    filter: blur(4px);
+  }
+}
+/* `:not(.fuga)` es lo que impide que la animación de entrada pise a la que se está yendo. */
+.lp .rot.entra .pal:not(.fuga) {
   animation: llega 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes llega {
@@ -2087,6 +2109,23 @@
 .lp .acto {
   text-align: center;
   margin-top: 30px;
+}
+
+/* SALIDA A MITAD DE CAMINO. Medido antes de tocar nada: entre el botón del hero y el de
+   planes había 9,8 pantallas de scroll en escritorio y 14,7 en móvil SIN una sola forma
+   de entrar. Quien se convencía en la mitad de la página tenía que seguir bajando diez
+   pantallas para encontrar dónde darle, y esa es una fuga que no se ve en ninguna métrica
+   de la página: se ve en los que no llegan.
+
+   Van deliberadamente en fantasma y no en verde. Son una puerta abierta para el que ya
+   decidió, no un empujón para el que todavía está leyendo — con tres botones verdes más,
+   la página pasaría de argumentar a insistir. */
+.lp .paso-cta {
+  margin-top: 34px;
+  text-align: center;
+}
+.lp .paso-cta .fine {
+  margin-top: 12px;
 }
 .lp .acto .fine {
   margin-top: 14px;

@@ -337,6 +337,13 @@ export function Landing() {
             <p className="fine reveal" style={{ textAlign: "center", marginTop: "18px" }}>
               Disponible 24/7 · Con tu contexto · Con tus objetivos · Con tus números
             </p>
+
+            <div className="paso-cta reveal">
+              <a className="lp-btn lp-btn-ghost" href="/signup">
+                Probalo con tus propios números
+              </a>
+              <p className="fine">14 días · No se cobra hasta el día 15</p>
+            </div>
           </div>
         </section>
 
@@ -660,6 +667,13 @@ export function Landing() {
               <br />
               Empieza cuando <b>sabés qué hacer con el que tenés hoy.</b>
             </p>
+
+            <div className="paso-cta reveal">
+              <a className="lp-btn lp-btn-ghost" href="/signup">
+                Empezar mi camino
+              </a>
+              <p className="fine">14 días · No se cobra hasta el día 15</p>
+            </div>
           </div>
         </section>
 
@@ -870,6 +884,13 @@ export function Landing() {
               a partir de un perfil financiero. Los resultados individuales dependen de ingresos,
               gastos, decisiones, rendimientos y otras circunstancias personales.
             </p>
+
+            <div className="paso-cta reveal">
+              <a className="lp-btn lp-btn-ghost" href="/signup">
+                Ver qué pasa con mis números
+              </a>
+              <p className="fine">14 días · No se cobra hasta el día 15</p>
+            </div>
           </div>
         </section>
 
