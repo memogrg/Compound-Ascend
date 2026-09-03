@@ -21,9 +21,18 @@
 
 import { subtotales, type Monto } from "@/lib/ai/money";
 
-/** De dónde viene el valor de una posición. */
+/**
+ * De dónde viene el valor de una posición.
+ *
+ * Cripto y mercado tradicional van SEPARADOS aunque los dos tengan precio de feed: promediarlos da
+ * un número que no describe a ninguno de los dos. En la cartera que motivó esto, la cripto estaba
+ * en −44% y los ETF en +29%, y el promedio ponderado salía −4,1% — un número que no le sirve a
+ * nadie para decidir nada.
+ */
 export type FuenteValor =
-  /** Precio de mercado vigente. */
+  /** Cripto con precio de feed. */
+  | "cripto"
+  /** Acciones y ETF con precio de feed: el mercado tradicional. */
   | "mercado"
   /** Valor escrito por el usuario (no cotizada a propósito: certificado, préstamo, inmueble). */
   | "manual"
@@ -65,6 +74,9 @@ export interface GrupoValuacion {
 }
 
 export interface ValuacionPortafolio {
+  /** Cripto con precio de feed. */
+  cripto: GrupoValuacion;
+  /** Acciones y ETF con precio de feed. */
   mercado: GrupoValuacion;
   manual: GrupoValuacion;
   sinPrecio: GrupoValuacion;
@@ -74,12 +86,16 @@ export interface ValuacionPortafolio {
   mayoriaSinPrecio: boolean;
   /** Manuales con valor = costo y mucho tiempo sin tocarse: nadie las está valuando. */
   manualesSinActualizar: { name: string; meses: number | null }[];
-  /** ¿Hay a la vez posiciones de mercado y valuadas a mano? (el caso que obliga a separar) */
+  /** ¿Hay a la vez posiciones con precio de feed y valuadas a mano? (el caso que obliga a separar) */
   mezcla: boolean;
 }
 
-/** A partir de cuántos meses una valuación manual pegada al costo deja de ser creíble. */
-export const MESES_MANUAL_VIEJO = 6;
+/**
+ * A partir de cuántos meses una valuación manual pegada al costo deja de ser creíble. Tres y no
+ * seis: un certificado o un préstamo personal cambian de valor dentro de un trimestre, y a los seis
+ * meses la pregunta llega tarde.
+ */
+export const MESES_MANUAL_VIEJO = 3;
 
 const GRUPO_VACIO: GrupoValuacion = {
   posiciones: 0,
@@ -110,8 +126,9 @@ function armarGrupo(pos: PosicionValuada[], conResultado: boolean): GrupoValuaci
   };
 }
 
-/** Reparte las posiciones por fuente y arma los tres grupos. */
+/** Reparte las posiciones por fuente y arma los cuatro grupos. */
 export function resumirValuacion(posiciones: PosicionValuada[]): ValuacionPortafolio {
+  const cripto = posiciones.filter((p) => p.fuente === "cripto");
   const mercado = posiciones.filter((p) => p.fuente === "mercado");
   const manual = posiciones.filter((p) => p.fuente === "manual");
   const sinPrecio = posiciones.filter((p) => p.fuente === "sin_precio");
@@ -120,6 +137,7 @@ export function resumirValuacion(posiciones: PosicionValuada[]): ValuacionPortaf
   const invertidoSinPrecio = sinPrecio.reduce((s, p) => s + p.invertidoPrimario, 0);
 
   return {
+    cripto: armarGrupo(cripto, true),
     mercado: armarGrupo(mercado, true),
     manual: armarGrupo(manual, true),
     // El grupo sin precio NUNCA publica resultado: su valor es el costo, por placeholder.
@@ -129,7 +147,7 @@ export function resumirValuacion(posiciones: PosicionValuada[]): ValuacionPortaf
     manualesSinActualizar: manual
       .filter((p) => p.valorIgualCosto && (p.mesesSinTocar ?? 0) >= MESES_MANUAL_VIEJO)
       .map((p) => ({ name: p.name, meses: p.mesesSinTocar ?? null })),
-    mezcla: mercado.length > 0 && manual.length > 0,
+    mezcla: (mercado.length > 0 || cripto.length > 0) && manual.length > 0,
   };
 }
 
@@ -204,6 +222,7 @@ export function frasesValuacion(v: ValuacionPortafolio, opts: FrasesOpts): strin
   // (1) Sin mayoría valuable: no hay titular de valor que dar.
   if (v.mayoriaSinPrecio) {
     const invertidoTodo = subtotales([
+      ...v.cripto.invertido,
       ...v.mercado.invertido,
       ...v.manual.invertido,
       ...v.sinPrecio.invertido,
@@ -221,13 +240,21 @@ export function frasesValuacion(v: ValuacionPortafolio, opts: FrasesOpts): strin
     return out;
   }
 
-  // (2) El grupo con precio de mercado: el único que puede afirmar un resultado.
-  if (v.mercado.posiciones > 0) {
-    const pct = v.mercado.pctPrimario;
-    const resultado = v.mercado.pl ? firmado(v.mercado.pl, fmt) : null;
+  // (2) Los grupos con precio de feed, CADA UNO POR SEPARADO. Cripto y mercado tradicional se
+  // mueven distinto: promediarlos esconde a los dos. Con la cripto en −44% y los ETF en +29%, el
+  // promedio ponderado daba −4,1%, que no describe a ninguno.
+  // La etiqueta lleva su artículo: "Tu cripto vale" / "Tus acciones y ETF valen".
+  const conFeed: [GrupoValuacion, string, string][] = [
+    [v.cripto, "Tu cripto", "vale"],
+    [v.mercado, "Tus acciones y ETF", "valen"],
+  ];
+  for (const [g, etiqueta, verbo] of conFeed) {
+    if (g.posiciones === 0) continue;
+    const pct = g.pctPrimario;
+    const resultado = g.pl ? firmado(g.pl, fmt) : null;
     out.push(
-      `Tus ${v.mercado.posiciones} posiciones cotizadas valen ${subs(v.mercado.valor, fmt)}` +
-        ` sobre ${subs(v.mercado.invertido, fmt)} invertidos` +
+      `${etiqueta} (${g.posiciones} ${g.posiciones === 1 ? "posición" : "posiciones"}) ${verbo} ${subs(g.valor, fmt)}` +
+        ` sobre ${subs(g.invertido, fmt)} invertidos` +
         (resultado ? `: ${resultado}${pct != null ? ` (${pctTexto(pct)})` : ""}` : ""),
     );
   }
@@ -268,7 +295,13 @@ export function etiquetaContexto(v: ValuacionPortafolio): string | null {
   const partes: string[] = [];
   if (v.mezcla) {
     partes.push(
-      `de ese total, ${v.mercado.posiciones} posiciones tienen precio de mercado y ${v.manual.posiciones} están valuadas a mano por el usuario (no confirmadas por el mercado) — NO presentes su suma como un resultado de mercado`,
+      `de ese total, ${v.cripto.posiciones + v.mercado.posiciones} posiciones tienen precio de mercado y ${v.manual.posiciones} están valuadas a mano por el usuario (no confirmadas por el mercado) — NO presentes su suma como un resultado de mercado`,
+    );
+  }
+  // Cripto y tradicional van por separado SIEMPRE, incluso cuando el modelo escribe libre.
+  if (v.cripto.posiciones > 0 && v.mercado.posiciones > 0) {
+    partes.push(
+      `la cripto (${v.cripto.posiciones} posiciones, ${v.cripto.pctPrimario != null ? (v.cripto.pctPrimario * 100).toFixed(1) + "%" : "s/d"}) y las acciones/ETF (${v.mercado.posiciones} posiciones, ${v.mercado.pctPrimario != null ? (v.mercado.pctPrimario * 100).toFixed(1) + "%" : "s/d"}) se mueven distinto — dalas SEPARADAS, nunca un rendimiento promedio de las dos`,
     );
   }
   if (v.haySinPrecio) {
