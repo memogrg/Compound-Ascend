@@ -1,0 +1,524 @@
+/* ═══ CARTERA+ · /empezar ═════════════════════════════════════════════════
+   Paso 1 de 3 del flujo de adquisición. Mismos tokens, misma marca y misma
+   serif que la landing y las FAQs: la hoja es autónoma (como faqs.css) para que
+   la página se vea igual entre en la ruta que entre, sin depender de que
+   landing.css esté cargada.
+
+   Sin vidrio ni relieve a propósito. Aquí se escribe una contraseña y se elige
+   cuánto pagar: la confianza la dan el contraste, un solo acento verde y una
+   línea de tiempo que dice exactamente qué pasa con la tarjeta y cuándo.
+
+   Todo prefijado con `.lp` y con clases `emp-*`. Lección repetida tres veces:
+   una hoja solo defiende lo que DECLARA —Tailwind rellena lo demás—, así que
+   `text-decoration`, `font-style` y `flex-direction` van escritos.
+   ══════════════════════════════════════════════════════════════════════════ */
+.lp {
+  --ink: #1d1d1f;
+  --mut: #6e6e73;
+  --soft: #f5f5f7;
+  --line: #e8e8ed;
+  --green: #378451;
+  --green-deep: #2c6e43;
+  --green-soft: rgba(55, 132, 81, 0.1);
+}
+.lp,
+.lp * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+.lp {
+  background: #fff;
+  color: var(--ink);
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+  min-height: 100dvh;
+}
+.lp a {
+  color: inherit;
+  text-decoration: none;
+}
+.lp .wrap {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+/* ── cabecera: fija, sin vidrio (no hay hero que atravesar) ── */
+.lp .hdr {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--line);
+}
+.lp .hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+}
+.lp .lp-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.lp .lp-brand .mark {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.lp .lp-brand .wm {
+  display: inline;
+}
+.lp .lp-brand .p {
+  color: var(--green);
+}
+.lp .lp-nav {
+  display: flex;
+  align-items: center;
+  font-size: 14.5px;
+  color: var(--mut);
+}
+.lp .emp-ya b {
+  font-weight: 600;
+  color: var(--ink);
+}
+.lp .emp-ya:hover b {
+  color: var(--green-deep);
+}
+
+/* ── botones (copia de la landing) ── */
+.lp .lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34em;
+  border: 0;
+  border-radius: 980px;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    transform 0.16s ease,
+    box-shadow 0.18s ease;
+}
+.lp .lp-btn:active {
+  transform: scale(0.98);
+}
+.lp .btn-green {
+  background: var(--green);
+  color: #fff;
+  height: 38px;
+  padding: 0 20px;
+  font-size: 14.5px;
+}
+.lp .btn-green:hover {
+  background: var(--green-deep);
+}
+.lp .btn-green:disabled {
+  background: #9cc3aa;
+  cursor: progress;
+}
+.lp .btn-lg {
+  height: 54px;
+  padding: 0 34px;
+  font-size: 17px;
+  box-shadow: 0 14px 30px -18px rgba(55, 132, 81, 0.9);
+}
+.lp .lp-btn-ghost {
+  background: #fff;
+  border: 1px solid var(--line);
+  height: 38px;
+  padding: 0 18px;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.lp .lp-btn-ghost:hover {
+  border-color: #c9c9cf;
+}
+
+/* ── tipografía ── */
+.lp h1 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+  font-size: clamp(38px, 4.8vw, 62px);
+  line-height: 1.02;
+  letter-spacing: -0.024em;
+  text-wrap: balance;
+  max-width: 22ch;
+}
+.lp h1 em {
+  font-style: italic;
+  color: var(--green-deep);
+}
+.lp .lead {
+  font-size: clamp(16px, 1.3vw, 19px);
+  color: var(--mut);
+  line-height: 1.55;
+  max-width: 56ch;
+  margin-top: 14px;
+}
+/* Se llama `lp-rotulo`, no `overline`: Tailwind trae una utilidad con ese nombre. */
+.lp .lp-rotulo {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--mut);
+}
+.lp .fine {
+  font-size: 13px;
+  color: #8e8e93;
+}
+
+/* ── cuerpo de la página ── */
+.lp .emp-main {
+  padding-block: 44px 72px;
+}
+/* Indicador de tres pasos. Dice dónde está la persona y cuánto falta; el
+   estudio de Blinkist (+23 % de pruebas, −55 % de quejas) es exactamente esto:
+   mostrar la línea de tiempo antes de pedir la tarjeta. */
+.lp .emp-pasos {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  list-style: none;
+  margin-bottom: 34px;
+  font-family: "Space Mono", monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a1a1a6;
+}
+.lp .emp-pasos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.lp .emp-pasos li i {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  font-style: normal;
+  font-size: 11px;
+  color: inherit;
+}
+.lp .emp-pasos li.activo {
+  color: var(--ink);
+}
+.lp .emp-pasos li.activo i {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+/* ── el formulario: dos columnas ── */
+.lp .emp-form {
+  margin-top: 40px;
+}
+.lp .emp-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 56px;
+  align-items: start;
+}
+.lp .emp-cuenta {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 440px;
+}
+.lp .emp-aviso {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff4e5;
+  border: 1px solid #f5d9ad;
+  color: #7a4b00;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.lp .emp-google {
+  display: block;
+}
+.lp .emp-google-btn {
+  width: 100%;
+  height: 48px;
+  font-size: 15px;
+  gap: 10px;
+}
+.lp .emp-o {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: #8e8e93;
+}
+.lp .emp-o::before,
+.lp .emp-o::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.lp .emp-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lp .emp-campo > span {
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.lp .emp-campo input,
+.lp .emp-fijo {
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.lp .emp-campo input::placeholder {
+  color: #b0b0b5;
+}
+.lp .emp-campo input:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 4px var(--green-soft);
+}
+.lp .emp-campo input[aria-invalid="true"] {
+  border-color: #d0463c;
+}
+.lp .emp-fijo {
+  display: flex;
+  align-items: center;
+  background: var(--soft);
+  color: var(--mut);
+}
+.lp .emp-err {
+  font-style: normal;
+  font-size: 13px;
+  color: #b3261e;
+}
+.lp .emp-enviar {
+  width: 100%;
+  margin-top: 6px;
+}
+.lp .emp-fine {
+  text-align: center;
+}
+.lp .emp-otra {
+  margin-top: 18px;
+}
+.lp .emp-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ── la tarjeta lateral: plan + línea de tiempo ── */
+.lp .emp-lado {
+  padding: 26px 26px 28px;
+  border-radius: 22px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+.lp .emp-rotulo-2 {
+  margin-top: 26px;
+}
+.lp .emp-planes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+/* Radios como tarjetas: el input queda accesible (teclado, lector) pero se
+   dibuja la etiqueta entera. Sin JS: el estado vive en :checked. */
+.lp .emp-plan {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+.lp .emp-plan input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.lp .emp-plan-cuerpo {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "nombre precio"
+    "promesa precio";
+  column-gap: 14px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 13px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.lp .emp-plan:hover .emp-plan-cuerpo {
+  border-color: #c9c9cf;
+}
+.lp .emp-plan input:checked + .emp-plan-cuerpo {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+.lp .emp-plan input:focus-visible + .emp-plan-cuerpo {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.lp .emp-plan-nombre {
+  grid-area: nombre;
+  font-family: Sora, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 15.5px;
+  letter-spacing: -0.02em;
+}
+.lp .emp-plan-precio {
+  grid-area: precio;
+  font-family: "Space Mono", monospace;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.lp .emp-plan-precio small {
+  font-size: 11px;
+  color: var(--mut);
+  margin-left: 1px;
+}
+.lp .emp-plan-promesa {
+  grid-area: promesa;
+  font-size: 13.5px;
+  color: var(--mut);
+  line-height: 1.35;
+}
+
+/* Línea de tiempo: hoy $0 · día 7 aviso · día 14 primer cobro. */
+.lp .emp-linea {
+  list-style: none;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.lp .emp-linea li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 118px 1fr;
+  gap: 12px;
+  padding: 9px 0 9px 18px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--mut);
+}
+.lp .emp-linea li::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 16px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.lp .emp-linea li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 25px;
+  bottom: -9px;
+  width: 1px;
+  background: #cfd8d2;
+}
+.lp .emp-linea li b {
+  font-family: "Space Mono", monospace;
+  font-weight: 400;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink);
+  padding-top: 2px;
+}
+.lp .emp-linea li strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+/* El precio del primer cobro sigue al plan marcado, sin JavaScript. */
+.lp .emp-precio-esencial,
+.lp .emp-precio-pro,
+.lp .emp-precio-max {
+  display: none;
+}
+.lp .emp-form:has(input[name="plan"][value="esencial"]:checked) .emp-precio-esencial,
+.lp .emp-form:has(input[name="plan"][value="pro"]:checked) .emp-precio-pro,
+.lp .emp-form:has(input[name="plan"][value="max"]:checked) .emp-precio-max {
+  display: inline;
+}
+
+.lp .emp-pie {
+  margin-top: 56px;
+}
+.lp .emp-pie a:hover {
+  color: var(--ink);
+}
+
+/* ── móvil: una columna, el plan primero (es lo que se vino a elegir) ── */
+@media (max-width: 860px) {
+  .lp .emp-main {
+    padding-block: 28px 56px;
+  }
+  .lp .emp-cols {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .lp .emp-lado {
+    order: -1;
+    padding: 20px 18px 22px;
+  }
+  .lp .emp-cuenta {
+    max-width: none;
+  }
+  .lp .emp-linea li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .lp .emp-ya {
+    font-size: 13.5px;
+  }
+}
