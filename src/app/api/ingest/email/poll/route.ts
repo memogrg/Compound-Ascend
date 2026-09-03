@@ -27,6 +27,7 @@ import {
 } from "@/lib/ingestion/email/imap-poller";
 import { createImapClient, isEmailIngestConfigured } from "@/lib/ingestion/email/imap-client";
 import { lookupOwnerByForwarder } from "@/lib/ingestion/email/forwarder-lookup";
+import { lookupOwnerByIngestAddress } from "@/lib/ingestion/email/address-lookup";
 
 export const runtime = "nodejs";
 
@@ -45,6 +46,8 @@ function buildDeps(
   markSeenUid: (uid: number) => Promise<void>,
 ): EmailIngestDeps {
   return {
+    lookupByAddress: (candidates: string[]) => lookupOwnerByIngestAddress(supabase, candidates),
+
     lookupOwner: (candidates: string[]) => lookupOwnerByForwarder(supabase, candidates),
 
     async isProcessed(eventId: string): Promise<boolean> {
@@ -142,12 +145,24 @@ async function handle(req: Request) {
       if (new URL(req.url).searchParams.get("debug")) {
         const samples = [];
         for (const m of messages.slice(0, 10)) {
-          const owner = await deps.lookupOwner(m.recipients);
+          // Se prueban los cuatro niveles por separado para ver CUÁL resolvería:
+          // es exactamente lo que hay que mirar al certificar un proveedor nuevo.
+          const porSobre = await deps.lookupByAddress(m.envelopeTo);
+          const porDireccion = await deps.lookupByAddress(m.recipients);
+          const porDestinatario = await deps.lookupOwner(m.recipients);
+          const porRemitente = m.senderCandidates.length
+            ? await deps.lookupOwner(m.senderCandidates)
+            : null;
           samples.push({
             from: m.from,
             subject: m.subject,
+            envelopeTo: m.envelopeTo,
             recipients: m.recipients,
-            matched: Boolean(owner),
+            fromAutenticado: m.senderCandidates.length > 0,
+            porSobre: porSobre.status,
+            porDireccion: porDireccion.status,
+            porDestinatario: porDestinatario.status,
+            porRemitente: porRemitente?.status ?? null,
           });
         }
         return NextResponse.json(

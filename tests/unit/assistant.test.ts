@@ -49,9 +49,11 @@ describe("parseAction", () => {
 
 describe("límites de tokens", () => {
   it("bloquea al superar el límite del plan", () => {
-    expect(isWithinLimit("free", PLAN_TOKEN_LIMITS.free - 1)).toBe(true);
-    expect(isWithinLimit("free", PLAN_TOKEN_LIMITS.free)).toBe(false);
-    expect(isWithinLimit("premium", PLAN_TOKEN_LIMITS.free + 1)).toBe(true);
+    expect(isWithinLimit("esencial", PLAN_TOKEN_LIMITS.esencial - 1)).toBe(true);
+    expect(isWithinLimit("esencial", PLAN_TOKEN_LIMITS.esencial)).toBe(false);
+    expect(isWithinLimit("pro", PLAN_TOKEN_LIMITS.esencial + 1)).toBe(true);
+    // Sin suscripción el límite es cero: nada pasa, ni el primer mensaje.
+    expect(isWithinLimit("ninguno", 0)).toBe(false);
   });
 });
 

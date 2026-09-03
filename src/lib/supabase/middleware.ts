@@ -14,9 +14,33 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 // debe interceptarlo hacia /login (rompería el flujo de auth del móvil). Ninguna ruta
 // web existente empieza con "/m/" ni es exactamente "/m" (p. ej. "/mi-perfil…" no
 // coincide), así que este prefijo no afecta a la web.
-const PUBLIC_PREFIXES = ["/login", "/signup", "/reset-password", "/auth", "/invitacion", "/m"];
+// `/faqs` es pública: quien todavía no se registró tiene que poder leerla
+// entera antes de decidir. Sin esto el middleware la manda a /login y la página
+// que existe para resolver dudas se vuelve inalcanzable justo para quien las tiene.
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/signup",
+  "/reset-password",
+  "/auth",
+  "/invitacion",
+  "/faqs",
+  "/m",
+];
 /** Rutas de autenticación: si ya hay sesión, redirigir al panel. */
 const AUTH_PAGES = ["/login", "/signup", "/reset-password"];
+
+/**
+ * Lo único que puede tocar una cuenta SIN suscripción activa.
+ *
+ * `/configuracion` está adentro a propósito: ahí vive «Descargar mis datos» y el
+ * borrado de cuenta. Encerrar a alguien sin dejarlo llevarse su información
+ * sería usar sus propios datos como rehén.
+ */
+const RUTAS_SIN_PLAN = ["/suscripcion", "/configuracion"];
+
+function SIN_PLAN_PERMITIDO(pathname: string): boolean {
+  return RUTAS_SIN_PLAN.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 function isPublic(pathname: string): boolean {
   // Las rutas /api gestionan su propia autenticación y responden JSON; el
@@ -102,6 +126,23 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     redirect.pathname = "/dashboard";
     redirect.search = "";
     return NextResponse.redirect(redirect);
+  }
+
+  // ── El muro de suscripción ────────────────────────────────────────────────
+  // Una cuenta sin plan activo —canceló, o quedó huérfana porque el titular del
+  // hogar bajó de plan— entra igual, pero solo a /suscripcion y a las páginas
+  // donde puede llevarse sus datos. La cuenta y la información siguen siendo
+  // suyas; lo que se corta es el uso de la app.
+  if (user && !isPublic(pathname) && !SIN_PLAN_PERMITIDO(pathname)) {
+    const { data } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
+    // Sin fila de perfil todavía (recién registrado) no se bloquea: el alta la
+    // termina el propio flujo de registro.
+    if (data && data.plan === "ninguno") {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/suscripcion";
+      redirect.search = "";
+      return NextResponse.redirect(redirect);
+    }
   }
 
   captureReferral(request, response);

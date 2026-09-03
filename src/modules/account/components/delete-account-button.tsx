@@ -14,22 +14,10 @@ import {
   exportHouseholdDataAction,
   deleteAccountAction,
 } from "@/modules/account/api/actions";
+import { downloadBase64Xlsx } from "./download-xlsx";
 
 type Step = "idle" | "confirm" | "otp";
 type Variant = "web" | "mobile";
-
-function downloadBase64(filename: string, base64: string): void {
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const blob = new Blob([bytes], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export function DeleteAccountButton({
   isOwnerWithMembers = false,
@@ -96,7 +84,7 @@ export function DeleteAccountButton({
       setError(r.message ?? "No pudimos generar el export.");
       return;
     }
-    downloadBase64(r.filename, r.base64);
+    downloadBase64Xlsx(r.filename, r.base64);
     setExported(true);
   };
 

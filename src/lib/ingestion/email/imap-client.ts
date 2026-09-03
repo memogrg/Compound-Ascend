@@ -10,7 +10,9 @@ import { simpleParser } from "mailparser";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import {
+  extractEnvelopeCandidates,
   extractRecipientCandidates,
+  fromIsAuthenticated,
   type ImapClient,
   type RawImapMessage,
 } from "@/lib/ingestion/email/imap-poller";
@@ -95,13 +97,21 @@ export async function createImapClient(): Promise<ImapClient> {
         const to = (msg.envelope?.to ?? [])
           .map((a) => a.address?.toLowerCase())
           .filter((a): a is string => Boolean(a));
-        const fromHeaders = msg.source ? extractRecipientCandidates(headerBlock(msg.source)) : [];
+        const headers = msg.source ? headerBlock(msg.source) : "";
+        const fromHeaders = headers ? extractRecipientCandidates(headers) : [];
         const recipients = [...new Set([...to, ...fromHeaders])]; // dedup, ya en minúsculas
+        const from = msg.envelope?.from?.[0]?.address ?? null;
         out.push({
           uid: msg.uid,
           messageId: msg.envelope?.messageId ?? null,
-          from: msg.envelope?.from?.[0]?.address ?? null,
+          from,
           recipients,
+          // Lo que estampó el receptor al entregar: con el catch-all del
+          // subdominio, aquí viaja la dirección de ingesta única de la cuenta.
+          envelopeTo: headers ? extractEnvelopeCandidates(headers) : [],
+          // ¿Nuestro buzón validó DKIM/SPF para ese From? Sin esto, el remitente
+          // es una afirmación del que manda y no puede valer como identidad.
+          fromAuthenticated: Boolean(from) && fromIsAuthenticated(headers, from!),
           subject: msg.envelope?.subject ?? null,
           text: msg.source ? await extractBodyText(msg.source) : "",
           // envelope.date (cabecera Date del correo) como instante ISO. Fallback de occurred_on

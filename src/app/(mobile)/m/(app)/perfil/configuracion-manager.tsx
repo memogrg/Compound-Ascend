@@ -36,6 +36,7 @@ import type { HouseholdMembersView } from "@/modules/personal-profile";
 import { testEmailAction, type EmailTestResult } from "@/modules/account/api/actions";
 import { updatePasswordAction } from "@/lib/auth/actions";
 import { INGEST_TARGET } from "@/modules/account/constants";
+import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
 import type { NotificationChannel, NotificationPrefs } from "@/lib/notifications/preferences";
 import type { IngestEmailRow } from "@/modules/account/services/ingest-email-service";
 
@@ -51,6 +52,7 @@ import { MSectionHeader, MContentCard, MDataRow, MChip } from "../../components/
 import { AppLockToggle } from "../../components/app-lock-toggle";
 import { isNativeApp, checkBiometryAvailable, verifyIdentity } from "../../lib/app-lock";
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
+import { ExportDataButton } from "@/modules/account/components/export-data-button";
 
 type SheetId = "currency" | "timezone" | "theme" | "household" | "password" | null;
 
@@ -87,6 +89,7 @@ export function ConfiguracionManager({
   timezone,
   notifications,
   ingestEmails,
+  ingestAddress,
   household,
   emailConfigured,
 }: {
@@ -94,6 +97,7 @@ export function ConfiguracionManager({
   timezone: string | null;
   notifications: NotificationPrefs;
   ingestEmails: IngestEmailRow[];
+  ingestAddress: string | null;
   household: HouseholdMembersView | null;
   emailConfigured: boolean;
 }) {
@@ -197,10 +201,20 @@ export function ConfiguracionManager({
       {/* Correos del banco (ingesta) — formulario/lista propios (form-kit): se conservan. */}
       <MSectionHeader title="Correos del banco" />
       <MContentCard style={{ marginBottom: 14 }}>
-        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
-          Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y
-          registra aquí el correo desde el que reenvías.
-        </p>
+        {ingestAddress ? (
+          <>
+            <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
+              Reenviá los avisos de tu banco a tu dirección de ingesta. Con eso basta: no hay que
+              registrar nada más.
+            </p>
+            <IngestAddressCard address={ingestAddress} />
+          </>
+        ) : (
+          <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
+            Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y
+            registra aquí el correo desde el que reenvías.
+          </p>
+        )}
         <IngestSection emails={ingestEmails} />
       </MContentCard>
 
@@ -232,6 +246,13 @@ export function ConfiguracionManager({
         <EmailTestRow />
       </MContentCard>
       <AppLockToggle />
+
+      {/* Portabilidad — ARRIBA de la zona de peligro y fuera de ella: bajarse una
+          copia de los propios datos no puede exigir pasar por el flujo de borrado. */}
+      <MSectionHeader title="Tus datos" />
+      <MContentCard style={{ marginBottom: 14 }}>
+        <ExportDataButton variant="mobile" />
+      </MContentCard>
 
       {/* Zona de peligro — separada y en tono de peligro; su ConfirmDialog de 2 pasos intacto. */}
       <MSectionHeader title="Zona de peligro" />

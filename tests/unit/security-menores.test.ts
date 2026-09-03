@@ -1,6 +1,6 @@
 /**
  * Regresión del pack de seguridad menor (auditoría TOP #10):
- *  - Webhook de pagos con rate-limit: la firma sigue siendo la defensa real;
+ *  - Webhook de Stripe con rate-limit: la firma sigue siendo la defensa real;
  *    esto corta el costo de CPU de intentos masivos.
  *  - /api/assistant/chat emite headers CORS también en la respuesta de éxito
  *    (antes solo validaba origen sin reflejar los headers).
@@ -25,11 +25,18 @@ vi.mock("@/lib/rate-limit", () => ({
 
 vi.mock("@/lib/env", () => ({
   getServerEnv: () => ({
-    PAYMENT_WEBHOOK_SECRET: "whsec",
+    STRIPE_SECRET_KEY: "sk_test_x",
+    STRIPE_WEBHOOK_SECRET: "whsec",
     ALLOWED_ORIGINS: "https://app.ejemplo.com",
   }),
 }));
 vi.mock("@/lib/logger", () => ({ logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+
+// El webhook de Stripe lee las claves de process.env (no de getServerEnv): sin
+// esto la ruta corta antes por "no configurado" y no se probaría la firma, que
+// es justo la defensa que importa.
+process.env.STRIPE_SECRET_KEY = "sk_test_x";
+process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
 vi.mock("@/lib/security/webhook", () => ({ verifySignature: vi.fn(() => false) }));
 vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: vi.fn() }));
 
@@ -49,7 +56,7 @@ vi.mock("@/lib/auth/session", () => ({
 }));
 vi.mock("@/server/observability/alerts", () => ({ alert: vi.fn() }));
 
-import { POST as paymentWebhook } from "@/app/api/webhooks/payment/route";
+import { POST as stripeWebhook } from "@/app/api/webhooks/stripe/route";
 import { POST as chat } from "@/app/api/assistant/chat/route";
 
 beforeEach(() => {
@@ -58,20 +65,20 @@ beforeEach(() => {
 });
 
 describe("webhooks con rate-limit", () => {
-  it("payment: 429 al exceder el límite, ANTES de tocar la firma", async () => {
+  it("stripe: 429 al exceder el límite, ANTES de tocar la firma", async () => {
     rateLimitOk = false;
-    const res = await paymentWebhook(
-      new Request("http://localhost/api/webhooks/payment", { method: "POST", body: "{}" }),
+    const res = await stripeWebhook(
+      new Request("http://localhost/api/webhooks/stripe", { method: "POST", body: "{}" }),
     );
     expect(res.status).toBe(429);
   });
 
-  it("payment: dentro del límite la firma sigue mandando (403 firma inválida)", async () => {
-    const res = await paymentWebhook(
-      new Request("http://localhost/api/webhooks/payment", { method: "POST", body: "{}" }),
+  it("stripe: sin firma no pasa, aunque el rate-limit deje pasar", async () => {
+    const res = await stripeWebhook(
+      new Request("http://localhost/api/webhooks/stripe", { method: "POST", body: "{}" }),
     );
     expect(res.status).toBe(403);
-    expect(rateLimitMock).toHaveBeenCalledWith("webhook:pay:9.9.9.9", expect.anything());
+    expect(rateLimitMock).toHaveBeenCalledWith("webhook:stripe:9.9.9.9", expect.anything());
   });
 });
 

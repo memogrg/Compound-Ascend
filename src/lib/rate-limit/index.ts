@@ -115,6 +115,13 @@ export const RATE_LIMITS = {
   aiChat: { limit: 20, windowMs: 60_000 },
   receiptScan: { limit: 10, windowMs: 60_000 },
   marketData: { limit: 60, windowMs: 60_000 },
+  // Ingesta por correo. El codigo de verificacion viaja a una direccion que el
+  // usuario aun no ha probado que es suya: sin techo, la app se vuelve un
+  // bombardeador de correo ajeno con nuestra marca. Y 6 digitos se adivinan a
+  // fuerza bruta si se deja intentar sin limite.
+  ingestEmailAddress: { limit: 3, windowMs: 60 * 60_000 },
+  ingestEmailUser: { limit: 10, windowMs: 24 * 60 * 60_000 },
+  ingestEmailConfirm: { limit: 8, windowMs: 15 * 60_000 },
   // Webhooks firmados: la firma es la defensa real; esto solo corta el costo
   // de CPU de intentos masivos de firma invalida.
   webhook: { limit: 30, windowMs: 60_000 },

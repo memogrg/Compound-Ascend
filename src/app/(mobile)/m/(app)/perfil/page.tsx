@@ -6,6 +6,7 @@ import { PLAN_LABEL } from "@/lib/plan";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { isEmailConfigured } from "@/lib/email/send";
 import { listHouseholdMembers, type HouseholdMembersView } from "@/modules/personal-profile";
+import { getOrCreateIngestAddress } from "@/modules/account/services/ingest-address-service";
 import {
   listMyIngestEmails,
   type IngestEmailRow,
@@ -48,12 +49,18 @@ export default async function MobilePerfil() {
 
   // Datos extra para la gestión (best-effort: si algo falla, degradamos sin romper).
   let ingestEmails: IngestEmailRow[] = [];
+  let ingestAddress: string | null = null;
   let household: HouseholdMembersView | null = null;
   if (isSupabaseConfigured()) {
     try {
       ingestEmails = await listMyIngestEmails();
     } catch {
       ingestEmails = [];
+    }
+    try {
+      ingestAddress = await getOrCreateIngestAddress();
+    } catch {
+      ingestAddress = null;
     }
     try {
       household = await listHouseholdMembers();
@@ -180,6 +187,7 @@ export default async function MobilePerfil() {
           timezone={savedTz}
           notifications={acc.notifications}
           ingestEmails={ingestEmails}
+          ingestAddress={ingestAddress}
           household={household}
           emailConfigured={emailConfigured}
         />

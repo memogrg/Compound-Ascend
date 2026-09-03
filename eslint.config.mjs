@@ -51,6 +51,27 @@ const eslintConfig = [
     files: ["tests/**/*.ts", "tests/**/*.tsx"],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
+  // La landing y las FAQ son JavaScript de animación PORTADO de un prototipo:
+  // una escena de three.js y el movimiento de la página, escritos en estilo
+  // antiguo (`var`, DOM directo, sin tipos) y ya verificados corriendo.
+  //
+  // Se declara acá y no con comentarios sueltos en cada archivo porque así la
+  // excepción es visible y tiene alcance: vale para esta carpeta y para nada
+  // más. Reescribirlos en estilo moderno a mano sería tocar cientos de líneas
+  // que funcionan, sin lógica de negocio detrás, para ganar nada: si algo se
+  // rompe ahí, se ve en pantalla al instante.
+  //
+  // Lo que NO se apaga: el resto del port —marcado y páginas— pasa por el
+  // compilador y por lint como cualquier otro archivo.
+  {
+    files: ["src/components/marketing/v3/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/ban-ts-comment": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-var": "off",
+    },
+  },
 ];
 
 export default eslintConfig;

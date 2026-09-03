@@ -1,5 +1,5 @@
 -- ============================================================
--- 20260902000001 · Retiro de WhatsApp de CARTERA+
+-- 20260903000001 · Retiro de WhatsApp de CARTERA+
 --
 -- WhatsApp deja de existir como canal (registro, consulta y notificación pasan a
 -- la app móvil y la web). Esta migración limpia el rastro de WhatsApp en la BD:
@@ -19,7 +19,7 @@
 --
 -- notification_log.channel es text libre y tiene 0 filas de WhatsApp → no requiere
 -- cambio. Aplicación MANUAL por SQL Editor; luego
---   supabase migration repair --status applied 20260902000001
+--   supabase migration repair --status applied 20260903000001
 -- ============================================================
 
 -- ------------------------------------------------------------

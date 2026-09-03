@@ -11,7 +11,7 @@
  * `never`). Con `type` el tipado del cliente funciona correctamente.
  */
 
-export type Plan = "free" | "premium";
+export type Plan = "ninguno" | "esencial" | "pro" | "max";
 export type HouseholdType = "solo" | "pareja" | "familia" | "socios";
 export type HouseholdRole = "owner" | "adult" | "member" | "viewer";
 export type MemberStatus = "active" | "invited" | "removed";
@@ -48,6 +48,20 @@ export type ProfileRow = Timestamps & {
    * (migración 20260826000001). Público por diseño — se comparte en un QR.
    */
   referral_code: string;
+
+  // ── Suscripción (migración 20260902120000) ──────────────────────────────
+  // Todas las escribe SOLO el servidor: el trigger `protect_profile_plan`
+  // bloquea al rol `authenticated` en `plan` y en cada una de estas.
+  /** Plan al que se baja cuando venza el período pagado. null = sin cambio. */
+  plan_pending: Plan | null;
+  /** Momento en que `plan_pending` reemplaza a `plan`. Lo lee el cron. */
+  plan_effective_at: string | null;
+  /** Fin del período ya pagado, según Stripe. */
+  period_end: string | null;
+  /** Fin de los 14 días de prueba: ahí cae el primer cobro. */
+  trial_ends_at: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
 };
 
 /**
@@ -1092,7 +1106,20 @@ export type EmailIngestLinkRow = Audited & {
   verified: boolean; // solo se procesan remitentes verificados (migración 0031)
   verify_code_hash: string | null; // sha256 del código de verificación; null tras verificar
   verify_expires_at: string | null; // vigencia del código
+  verified_at: string | null; // cuándo se probó la propiedad (migración 20260902000001)
   created_at: string;
+};
+
+/** Dirección de ingesta única por cuenta (migración 20260902000002). El
+ *  destinatario ES la identidad: se resuelve por X-Gm-Original-To. Escritura
+ *  solo desde el servidor (sin grant para anon/authenticated). */
+export type IngestAddressRow = Audited & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  address: string; // u<token>@<dominio de ingesta>
+  created_at: string;
+  revoked_at: string | null; // rotación: deja de resolver y nunca se reasigna
 };
 
 export type IngestProposalStatus = "pending" | "confirmed" | "discarded";
@@ -1282,6 +1309,7 @@ export interface Database {
       >;
       // Ingesta por correo (migración 0027). El poller usa service-role.
       email_ingest_links: UserTable<EmailIngestLinkRow>;
+      ingest_addresses: UserTable<IngestAddressRow>;
       ingest_proposals: UserTable<IngestProposalRow>;
       account_cards: UserTable<AccountCardRow>;
       // Caché de sugerencias de sobre por (usuario, comercio) (migración 0032).

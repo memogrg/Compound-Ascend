@@ -107,19 +107,25 @@ export type MapHoldingsOptions = {
   ahora?: number;
 };
 
+/** Los tipos que el feed cotiza como cripto (mismo criterio que CRYPTO_TYPES del motor). */
+const TIPOS_CRIPTO = new Set(["cripto"]);
+
 /**
  * De dónde viene el valor de una posición.
  *  - `sin_precio`: el motor la marcó `priceUnavailable` → su valor es el costo, como placeholder.
  *  - `manual`: el usuario escribió el valor (certificado, préstamo, inmueble, plan).
- *  - `mercado`: precio del feed.
- * El orden importa: `priceUnavailable` manda sobre todo lo demás.
+ *  - `cripto` / `mercado`: precio del feed, separados porque no se mueven igual.
+ * El orden importa: `priceUnavailable` manda sobre todo lo demás, y un valor escrito a mano manda
+ * sobre el tipo de activo (si el usuario lo valuó él, la fuente es él).
  */
 export function fuenteDelValor(h: {
+  assetType: string;
   priceUnavailable: boolean;
   currentValueManual?: number | null;
 }): FuenteValor {
   if (h.priceUnavailable) return "sin_precio";
-  return h.currentValueManual != null ? "manual" : "mercado";
+  if (h.currentValueManual != null) return "manual";
+  return TIPOS_CRIPTO.has(h.assetType) ? "cripto" : "mercado";
 }
 
 /**

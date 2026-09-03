@@ -12,7 +12,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isSupabaseConfigured } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
-import { PLAN_TOKEN_LIMITS, isWithinLimit } from "@/lib/ai/limits";
+import { PLAN_TOKEN_LIMITS, isWithinLimit, type PlanConLimite } from "@/lib/ai/limits";
 
 export { PLAN_TOKEN_LIMITS, isWithinLimit };
 
@@ -39,14 +39,14 @@ export async function assertTokenBudget(userId: string): Promise<void> {
         .eq("period", currentPeriod())
         .maybeSingle(),
     ]);
-    const plan = (profile?.plan ?? "free") as "free" | "premium";
+    const plan = (profile?.plan ?? "ninguno") as PlanConLimite;
     const used = Number(usage?.tokens_used ?? 0);
     if (!isWithinLimit(plan, used)) {
       throw new AppError(
         "RATE_LIMITED",
-        plan === "free"
-          ? "Alcanzaste el límite de IA de tu plan gratuito este mes. Mejora a Premium para seguir conversando."
-          : "Alcanzaste el límite de IA de este mes.",
+        plan === "ninguno"
+          ? "Tu cuenta no tiene una suscripción activa. Elegí un plan para volver a conversar con My Agent C+."
+          : "Alcanzaste el uso de My Agent C+ de este mes en tu plan. Podés subir de plan para tener más.",
       );
     }
   } catch (err) {

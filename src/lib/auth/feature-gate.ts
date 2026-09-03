@@ -16,12 +16,12 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import { can, type Feature, type Plan } from "@/lib/plan";
 
-/** Plan del usuario autenticado (server-side). Default seguro: 'free'. */
+/** Plan del usuario autenticado (server-side). Default seguro: 'ninguno'. */
 export async function getUserPlan(): Promise<Plan> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
-  return (data?.plan ?? "free") as Plan;
+  return (data?.plan ?? "ninguno") as Plan;
 }
 
 /**
@@ -31,6 +31,6 @@ export async function getUserPlan(): Promise<Plan> {
 export async function assertFeature(feature: Feature): Promise<void> {
   const plan = await getUserPlan();
   if (!can(plan, feature)) {
-    throw new AppError("FORBIDDEN", "Esta función es parte del plan Premium.");
+    throw new AppError("FORBIDDEN", "Esta función no está incluida en tu plan.");
   }
 }

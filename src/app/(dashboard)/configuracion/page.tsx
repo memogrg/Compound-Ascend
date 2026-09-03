@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getAccountInfo, getAccountDeletionInfo } from "@/modules/account/services/account-service";
 import { DeleteAccountButton } from "@/modules/account/components/delete-account-button";
+import { ExportDataButton } from "@/modules/account/components/export-data-button";
 import { ReferralCard } from "@/components/referrals/referral-card";
 import { MemoryPanel } from "@/components/memory/memory-panel";
 import { listMyMemoryAction, type MemoryItem } from "@/modules/assistant";
@@ -12,6 +13,8 @@ import { TimezoneSelector } from "@/modules/account/components/timezone-selector
 import { NotificationPrefs } from "@/modules/account/components/notification-prefs";
 import { EmailTester } from "@/modules/account/components/email-tester";
 import { IngestEmails } from "@/modules/account/components/ingest-emails";
+import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
+import { getOrCreateIngestAddress } from "@/modules/account/services/ingest-address-service";
 import { INGEST_TARGET, INGEST_HELP } from "@/modules/account/constants";
 import {
   listMyIngestEmails,
@@ -27,7 +30,7 @@ import {
 } from "@/modules/personal-profile";
 import { isEmailConfigured } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/auth/session";
-import { PLAN_LABEL, isPremium } from "@/lib/plan";
+import { PLAN_LABEL, isPaidPlan } from "@/lib/plan";
 
 /** Fila de la hoja de configuración: encabezado (título + descripción) | cuerpo. */
 function SetRow({
@@ -63,11 +66,19 @@ export default async function Page() {
 
   // Correos del banco (onboarding de ingesta). Best-effort: si falla, lista vacía.
   let ingestEmails: IngestEmailRow[] = [];
+  // Dirección única de la cuenta: se crea sola la primera vez que se abre esta
+  // pantalla. null si el dominio de ingesta no está configurado todavía.
+  let ingestAddress: string | null = null;
   if (isSupabaseConfigured()) {
     try {
       ingestEmails = await listMyIngestEmails();
     } catch {
       ingestEmails = [];
+    }
+    try {
+      ingestAddress = await getOrCreateIngestAddress();
+    } catch {
+      ingestAddress = null;
     }
   }
 
@@ -142,7 +153,7 @@ export default async function Page() {
       </SetRow>
 
       <SetRow title="Tu plan" desc="Tu suscripción y consumo de IA del mes.">
-        <span className={`plan-chip${isPremium(acc.plan) ? " prem" : ""}`}>
+        <span className={`plan-chip${isPaidPlan(acc.plan) ? " prem" : ""}`}>
           {PLAN_LABEL[acc.plan]}
         </span>
         <div className="usage-lb">
@@ -211,13 +222,21 @@ export default async function Page() {
           </>
         }
         desc={
-          <>
-            Configurá en tu correo un reenvío de los avisos de tu banco a{" "}
-            <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el que
-            reenviás.
-          </>
+          ingestAddress ? (
+            <>
+              Configurá en tu correo un reenvío de los avisos de tu banco a tu dirección de ingesta.
+              Con eso basta: no hay que registrar nada más.
+            </>
+          ) : (
+            <>
+              Configurá en tu correo un reenvío de los avisos de tu banco a{" "}
+              <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el
+              que reenviás.
+            </>
+          )
         }
       >
+        {ingestAddress ? <IngestAddressCard address={ingestAddress} /> : null}
         <IngestEmails initial={ingestEmails} />
       </SetRow>
 
@@ -235,11 +254,18 @@ export default async function Page() {
         </p>
       </SetRow>
 
-      {!isPremium(acc.plan) ? (
+      {acc.plan !== "max" ? (
         <div style={{ marginTop: 12 }}>
-          <UpgradePrompt />
+          <UpgradePrompt plan={acc.plan} />
         </div>
       ) : null}
+
+      <SetRow
+        title="Tus datos"
+        desc="Descargá una copia completa de tu información cuando querás. Es tuya y te la llevás."
+      >
+        <ExportDataButton />
+      </SetRow>
 
       <SetRow
         title="Zona de peligro"
