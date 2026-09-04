@@ -27,7 +27,7 @@
  * Y ante duda, no se adivina: si los candidatos apuntan a DOS cuentas distintas,
  * el correo se deja sin procesar (`ambiguos`) en vez de caer en una al azar.
  */
-import type { RawMovement } from "@/lib/ingestion/types";
+import type { RawMovement, NotificationMeta } from "@/lib/ingestion/types";
 import { todayISOInTz } from "@/lib/time/user-time-core";
 import { buildNotice, type IngestNotice } from "@/lib/ingestion/email/notices";
 
@@ -322,7 +322,7 @@ async function resolverDueno(message: ImapMessage, deps: EmailIngestDeps): Promi
  */
 export async function processInboundEmails(
   messages: ImapMessage[],
-  parse: (text: string) => RawMovement[],
+  parse: (text: string, meta?: NotificationMeta) => RawMovement[],
   deps: EmailIngestDeps,
 ): Promise<IngestSummary> {
   const summary: IngestSummary = {
@@ -364,7 +364,7 @@ export async function processInboundEmails(
     }
 
     // c) Parseo.
-    const movements = parse(message.text);
+    const movements = parse(message.text, { from: message.from, subject: message.subject });
     if (movements.length > 0) {
       // Fecha faltante: si el parser no extrajo fecha (occurredOn ""), la propuesta moría en el
       // insert (occurred_on es NOT NULL). Fallback central a la fecha de recepción del correo en
