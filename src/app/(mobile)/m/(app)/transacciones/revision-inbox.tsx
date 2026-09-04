@@ -25,7 +25,17 @@ import { MContentCard, MSectionHeader, MChip, MEmptyState } from "../../componen
 import type { LinkableEntities } from "@/modules/financial-base/services/linkable-entities-service";
 import type { Transaction } from "@/modules/financial-base/types";
 
-import { BottomSheet, ConfirmDialog, useToast } from "../../components/form-kit";
+import {
+  BottomSheet,
+  ConfirmDialog,
+  useToast,
+  TextField,
+  MoneyField,
+  DateField,
+  SheetSelect,
+  CUR_OPTS,
+} from "../../components/form-kit";
+import type { ProposalOverrides } from "@/modules/financial-base/api/v2-actions";
 
 /**
  * Bandeja "Por ordenar" de /m/transacciones — paridad con la web:
@@ -132,6 +142,47 @@ export function RevisionInbox({
   const [done, setDone] = useState<Set<string>>(new Set());
   const [discard, setDiscard] = useState<PendingProposalView | null>(null);
   const [classify, setClassify] = useState<Transaction | null>(null);
+  // Edición antes de confirmar: la promesa es «un toque, y si hay que corregir,
+  // ahí mismo». El borrador vive en la hoja; confirmar sin abrirla sigue siendo
+  // un solo toque.
+  const [edit, setEdit] = useState<PendingProposalView | null>(null);
+  const [draft, setDraft] = useState<{
+    amount: number | undefined;
+    currency: string;
+    occurredOn: string;
+    merchant: string;
+    note: string;
+    categoryId: string;
+  } | null>(null);
+
+  function abrirEdicion(p: PendingProposalView) {
+    setEdit(p);
+    setDraft({
+      amount: p.amount,
+      currency: p.currency,
+      occurredOn: p.occurredOn,
+      merchant: p.merchant ?? "",
+      note: "",
+      categoryId: "",
+    });
+  }
+
+  /** Solo lo que cambió viaja como override. */
+  function overridesDe(p: PendingProposalView): ProposalOverrides {
+    if (!draft) return {};
+    const ov: ProposalOverrides = {};
+    if (draft.amount !== undefined && draft.amount > 0 && draft.amount !== p.amount) {
+      ov.amount = draft.amount;
+    }
+    if (draft.currency && draft.currency !== p.currency) ov.currency = draft.currency;
+    if (draft.occurredOn && draft.occurredOn !== p.occurredOn) ov.occurredOn = draft.occurredOn;
+    if (draft.merchant.trim() && draft.merchant.trim() !== (p.merchant ?? "")) {
+      ov.merchant = draft.merchant.trim();
+    }
+    if (draft.note.trim()) ov.note = draft.note.trim();
+    if (draft.categoryId) ov.categoryId = draft.categoryId;
+    return ov;
+  }
   const [link, setLink] = useState<UnlinkedCandidate | null>(null);
 
   const visibleProposals = proposals.filter((p) => !done.has(p.id));
@@ -220,6 +271,15 @@ export function RevisionInbox({
                   }
                 >
                   Confirmar
+                </button>
+                <button
+                  type="button"
+                  className="m-btn m-btn-secondary"
+                  style={SM_BTN}
+                  disabled={pending}
+                  onClick={() => abrirEdicion(p)}
+                >
+                  Editar
                 </button>
                 <button
                   type="button"
@@ -394,6 +454,91 @@ export function RevisionInbox({
           if (p) run(() => discardIngestProposalAction(p.id), "Propuesta descartada", p.id);
         }}
       />
+
+      {/* Corregir antes de confirmar: monto, moneda, fecha, comercio, nota y sobre. */}
+      <BottomSheet
+        open={edit !== null}
+        title="Revisar antes de confirmar"
+        onClose={() => {
+          setEdit(null);
+          setDraft(null);
+        }}
+      >
+        {edit && draft && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <div className="muted" style={{ fontSize: 13 }}>
+              Lo que dijo el banco: {edit.merchant || "Movimiento"} ·{" "}
+              {formatMoney(edit.amount, edit.currency)} · {shortDate(edit.occurredOn)}
+              {edit.cardLabel ? ` · ${edit.cardLabel}` : ""}
+            </div>
+            <MoneyField
+              name="amount"
+              label="Monto"
+              value={draft.amount}
+              onChange={(v) => setDraft({ ...draft, amount: v })}
+              currency={draft.currency}
+            />
+            <SheetSelect
+              name="currency"
+              label="Moneda"
+              value={draft.currency}
+              onChange={(v) => setDraft({ ...draft, currency: v })}
+              options={CUR_OPTS}
+              sheetTitle="Moneda"
+            />
+            <DateField
+              name="occurredOn"
+              label="Fecha"
+              value={draft.occurredOn}
+              onChange={(v) => setDraft({ ...draft, occurredOn: v })}
+            />
+            <TextField
+              name="merchant"
+              label="Comercio"
+              value={draft.merchant}
+              onChange={(v) => setDraft({ ...draft, merchant: v })}
+              maxLength={160}
+            />
+            <TextField
+              name="note"
+              label="Nota"
+              value={draft.note}
+              onChange={(v) => setDraft({ ...draft, note: v })}
+              placeholder="Opcional"
+              maxLength={280}
+            />
+            <SheetSelect
+              name="categoryId"
+              label="Sobre"
+              value={draft.categoryId || undefined}
+              onChange={(v) => setDraft({ ...draft, categoryId: v })}
+              options={categories
+                .filter((c) => categoryMatchesKind(c.categoryType, edit.kind))
+                .map((c) => ({ value: c.id, label: c.name }))}
+              placeholder="Elegí un sobre (opcional)"
+              sheetTitle="Sobre"
+            />
+            <button
+              type="button"
+              className="m-btn m-btn-primary m-btn-block"
+              disabled={pending}
+              onClick={() => {
+                const p = edit;
+                const ov = overridesDe(p);
+                setEdit(null);
+                setDraft(null);
+                run(
+                  () => confirmIngestProposalAction(p.id, Object.keys(ov).length ? ov : undefined),
+                  "Movimiento confirmado",
+                  p.id,
+                );
+              }}
+            >
+              Confirmar con estos datos
+            </button>
+          </div>
+        )}
+      </BottomSheet>
 
       {/* Asignar sobre (categoría) */}
       <BottomSheet open={classify !== null} title="Asignar sobre" onClose={() => setClassify(null)}>

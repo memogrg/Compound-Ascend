@@ -480,20 +480,65 @@ export async function addTransactionAction(
 const PROPOSAL_COLS = "id, kind, amount, currency, occurred_on, merchant, card_last4, confidence";
 
 /**
+ * Correcciones que el usuario puede hacer ANTES de confirmar una propuesta, en la
+ * misma fila, sin salir de la bandeja: el banco a veces trae el comercio críptico
+ * («OPENAI *CHATGPT SU»), la fecha de posteo en vez de la de compra, o el usuario
+ * quiere dejarla en su sobre y su cuenta de una vez. Todo opcional: sin overrides
+ * es el mismo «un clic» de siempre.
+ */
+const proposalUuidOrNull = z.preprocess(
+  (v) => (v === "" || v === undefined ? null : v),
+  z.string().uuid().nullable(),
+);
+const proposalOverridesSchema = z.object({
+  amount: z.number().positive().optional(),
+  currency: z.string().trim().length(3).toUpperCase().optional(),
+  occurredOn: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  merchant: z.string().trim().min(1).max(160).optional(),
+  note: z.string().trim().max(280).optional(),
+  categoryId: proposalUuidOrNull.optional(),
+  accountId: proposalUuidOrNull.optional(),
+});
+export type ProposalOverrides = z.infer<typeof proposalOverridesSchema>;
+
+/**
  * Confirma una propuesta de ingesta (bandeja "Por revisar"): crea la transacción
  * real por el mismo camino que addTransactionAction y marca la propuesta confirmed.
  * Claim atómico (update ... where status='pending') para evitar doble confirmación;
  * si la creación de la transacción falla, revierte el claim para poder reintentar.
+ *
+ * `overrides` aplica las correcciones del usuario: se guardan también en la
+ * propuesta (para que el registro refleje lo que él confirmó, no lo que el
+ * banco dijo) y viajan a la transacción con el sobre y la cuenta elegidos.
  */
-export async function confirmIngestProposalAction(id: string): Promise<ActionResult> {
+export async function confirmIngestProposalAction(
+  id: string,
+  overrides?: ProposalOverrides,
+): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await requireUser();
+    const parsedOv = overrides ? proposalOverridesSchema.safeParse(overrides) : null;
+    if (parsedOv && !parsedOv.success) {
+      return { ok: false, message: "Revisá los datos corregidos." };
+    }
+    const ov = parsedOv?.data ?? {};
     const supabase = await createSupabaseServerClient();
     // Reclama la propuesta: solo una confirmación gana (RLS la acota al dueño).
+    // Las correcciones se escriben en el mismo update: la propuesta queda como
+    // el usuario la confirmó.
     const { data: claimed } = await supabase
       .from("ingest_proposals")
-      .update({ status: "confirmed" })
+      .update({
+        status: "confirmed",
+        ...(ov.amount !== undefined ? { amount: ov.amount } : {}),
+        ...(ov.currency ? { currency: ov.currency } : {}),
+        ...(ov.occurredOn ? { occurred_on: ov.occurredOn } : {}),
+        ...(ov.merchant ? { merchant: ov.merchant } : {}),
+      })
       .eq("id", id)
       .eq("status", "pending")
       .select(PROPOSAL_COLS)
@@ -505,7 +550,13 @@ export async function confirmIngestProposalAction(id: string): Promise<ActionRes
       .select("last4, label, holder_name");
     const view = mapProposalRow(claimed, cardRows ?? []);
 
-    const res = await addTransactionAction(proposalToTxnInput(view));
+    const base = proposalToTxnInput(view);
+    const res = await addTransactionAction({
+      ...base,
+      ...(ov.note ? { description: ov.note } : {}),
+      ...(ov.categoryId !== undefined ? { categoryId: ov.categoryId } : {}),
+      ...(ov.accountId !== undefined ? { accountId: ov.accountId } : {}),
+    });
     if (!res.ok) {
       // Revierte el claim: la transacción no se creó, la propuesta vuelve a pending.
       await supabase.from("ingest_proposals").update({ status: "pending" }).eq("id", id);
