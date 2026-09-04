@@ -56,6 +56,10 @@ const ACTIONS: Record<InsightKind, InsightAction> = {
   ritual_patrimonio: { label: "revisar el marco patrimonial", route: "/mi-rich-life" },
   perfil_revision: { label: "revisar el perfil financiero", route: "/mi-perfil-financiero" },
   alerta_precio: { label: "revisar la alerta en el portafolio", route: "/patrimonio" },
+  frecuencia_ingreso_revisar: {
+    label: "revisar la frecuencia de esa fuente de ingreso",
+    route: "/ingresos",
+  },
   // Ritmo del mes. Los tres caen en /gastos o /transacciones a propósito: el ritual se
   // cumple donde están los sobres, no en una pantalla nueva de "rituales".
   ventana_presupuesto: { label: "repartir el presupuesto de los sobres", route: "/gastos" },

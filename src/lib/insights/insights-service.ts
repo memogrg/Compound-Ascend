@@ -69,6 +69,20 @@ const keyOf = (kind: string, relatedId: string | null | undefined): string =>
 const RITUAL_KIND = "ritual_patrimonio";
 
 /**
+ * Kinds que `syncInsights` NO resuelve automáticamente.
+ *
+ * La reconciliación normal cierra todo activo que la pasada no vuelva a emitir
+ * — así es como un insight se auto-resuelve cuando su causa desaparece. Pero un
+ * aviso que NINGÚN detector emite (porque es un hecho puntual, no una condición
+ * medible) moriría en la primera pasada. Estos dos se gestionan aparte:
+ *   · el ritual patrimonial, que tiene su propia función de escritura;
+ *   · el aviso de frecuencia de ingreso, sembrado una sola vez para las cuentas
+ *     cuyas fuentes se normalizaron a "mensual". Vive hasta que la persona lo
+ *     descarta (el descarte sí persiste).
+ */
+const KINDS_SIN_RECONCILIAR = new Set<string>([RITUAL_KIND, "frecuencia_ingreso_revisar"]);
+
+/**
  * Orquestador on-demand: si la última corrida está vieja, recalcula los insights
  * a partir de los datos de control y los sincroniza. Best-effort: nunca rompe.
  */
@@ -700,8 +714,9 @@ export async function syncInsights(detected: DetectedInsight[], ctx?: AuthContex
     .eq("status", "activo");
   const present = new Set(detected.map((d) => keyOf(d.kind, d.relatedId)));
   const toResolve = (actives ?? [])
-    // El ritual patrimonial se gestiona aparte; no lo resuelve esta pasada.
-    .filter((a) => a.kind !== RITUAL_KIND && !present.has(keyOf(a.kind, a.related_id)))
+    // El ritual patrimonial y los avisos únicos se gestionan aparte; no los
+    // resuelve esta pasada (ver KINDS_SIN_RECONCILIAR).
+    .filter((a) => !KINDS_SIN_RECONCILIAR.has(a.kind) && !present.has(keyOf(a.kind, a.related_id)))
     .map((a) => a.id);
   if (toResolve.length > 0) {
     await supabase.from("user_insights").update({ status: "resuelto" }).in("id", toResolve);
