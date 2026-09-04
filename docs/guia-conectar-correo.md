@@ -109,7 +109,9 @@ solo; si querés cargar los últimos días, reenvialos a mano.
 ## Paso 5 · Confirmá tu primer movimiento
 
 Nada entra a tus números sin que vos lo aprobés. Lo vas a encontrar en la sección **Por revisar**, dentro de
-Transacciones, tanto en la app del celular como en la web. Confirmás o descartás con un toque.
+Transacciones, tanto en la app del celular como en la web. Confirmás con un toque; si el banco puso mal el
+comercio o la fecha, o querés dejarlo en su sobre de una vez, tocá **Editar** y lo corregís ahí mismo antes
+de confirmar.
 
 La primera vez te vamos a preguntar de cuál tarjeta es. A partir de ahí la reconocemos sola por los últimos
 4 dígitos y le ponemos la etiqueta que vos le pusiste ("Visa mía", "Adicional de Caro").

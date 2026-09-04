@@ -238,10 +238,22 @@ function parseFallback(text: string): RawMovement | null {
   });
 }
 
+// Una transacción RECHAZADA trae comercio, monto y referencia igual que una
+// aprobada: sin este guard se proponía como gasto real. Se busca la palabra en
+// el texto sin acentos (deburr) y en minúsculas.
+const DECLINED_RE =
+  /\b(rechazad[ao]|declinad[ao]|denegad[ao]|no aprobad[ao]|no fue aprobad[ao]|no se pudo procesar|transaccion fallida)\b/;
+
+/** ¿El aviso describe una transacción que NO ocurrió? */
+export function isDeclinedNotification(text: string): boolean {
+  return DECLINED_RE.test(deburr(text).toLowerCase());
+}
+
 export const bacNotificationSource: IngestionSource<string> = {
   kind: "bank_notification",
   parse(text: string): RawMovement[] {
     if (!text) return [];
+    if (isDeclinedNotification(text)) return [];
     const m =
       parseCardPurchase(text) ??
       parseSinpeReceived(text) ??

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { bacNotificationSource } from "@/lib/ingestion/sources/bac-notification";
+import {
+  bacNotificationSource,
+  isDeclinedNotification,
+} from "@/lib/ingestion/sources/bac-notification";
 import { parseNotification } from "@/lib/ingestion/sources";
 
 const parse = (t: string) => bacNotificationSource.parse(t);
@@ -137,5 +140,23 @@ describe("BAC · no-notificación y registro", () => {
     const movs = parseNotification(CARD_CRC);
     expect(movs).toHaveLength(1);
     expect(movs[0]!.amount).toBe(11490);
+  });
+});
+
+describe("BAC · transacciones rechazadas", () => {
+  it("un aviso de compra RECHAZADA no se propone como gasto (trae comercio y monto igual que una aprobada)", () => {
+    const texto = `Hola GUILLERMO, BAC Credomatic le informa.
+Su transacción fue RECHAZADA. A continuación le detallamos:
+Comercio: AUTO MERCADO SANTA ANA  Ciudad y país: SAN JOSE, Costa Rica
+Fecha: Jun 11, 2026, 20:31  MASTER ***2062  Autorización: 425613
+Referencia: 35689751  Tipo de Transacción: COMPRA  Monto: CRC 11,490.00`;
+    expect(isDeclinedNotification(texto)).toBe(true);
+    expect(bacNotificationSource.parse(texto)).toEqual([]);
+  });
+
+  it("«declinada» y «denegada» también cuentan, con o sin acento", () => {
+    expect(isDeclinedNotification("Transacción declinada por fondos insuficientes")).toBe(true);
+    expect(isDeclinedNotification("Compra denegada")).toBe(true);
+    expect(isDeclinedNotification("Compra aprobada en AUTOMERCADO")).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import {
 import { BaseHeader } from "@/modules/financial-base/components/v2/base-header";
 import { TransaccionesSection } from "@/modules/financial-base/components/v2/sections";
 import { PorRevisarCard } from "@/modules/financial-base/components/v2/por-revisar-card";
+import { selectableCategoryLeaves } from "@/modules/financial-base/engine/classify";
 
 /** Transacciones — ruta propia. Lee del mismo modelo V2 (transactions). */
 export default async function Page({
@@ -39,7 +40,11 @@ export default async function Page({
         sub="Todos tus movimientos del periodo."
         period={view.period}
       />
-      <PorRevisarCard proposals={proposals} />
+      <PorRevisarCard
+        proposals={proposals}
+        categories={selectableCategoryLeaves(view.categories)}
+        accounts={view.accounts}
+      />
       <TransaccionesSection view={view} />
     </div>
   );

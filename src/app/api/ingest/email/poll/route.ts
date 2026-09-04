@@ -105,6 +105,24 @@ function buildDeps(
       return { inserted, duplicated };
     },
 
+    async saveNotice(notice, owner): Promise<void> {
+      const { error } = await supabase.from("ingest_notices").insert({
+        user_id: owner.userId,
+        household_id: owner.householdId,
+        kind: notice.kind,
+        from_address: notice.fromAddress,
+        subject: notice.subject,
+        snippet: notice.snippet,
+        confirm_url: notice.confirmUrl,
+        confirm_code: notice.confirmCode,
+        message_id: notice.messageId,
+      });
+      // 23505 = ya estaba (mismo correo): idempotente, no es error.
+      if (error && error.code !== "23505") {
+        logger.warn("email-ingest: fallo al guardar aviso", { message: error.message });
+      }
+    },
+
     async markSeen(message: ImapMessage): Promise<void> {
       try {
         await markSeenUid(message.uid);
@@ -138,13 +156,17 @@ async function handle(req: Request) {
       const supabase = createServiceRoleClient();
       const deps = buildDeps(supabase, (uid) => client.markSeen(uid));
 
-      // Modo diagnóstico: ?debug=1 devuelve, por correo (hasta 10), el remitente,
-      // asunto y candidatos de destinatario + si matchean un forwarder conocido.
-      // NO procesa ni marca leído: sirve para ver qué cabecera trae la dirección
-      // sobre correos reales sin consumirlos.
-      if (new URL(req.url).searchParams.get("debug")) {
+      // Modo diagnóstico: ?debug=1 devuelve, por correo, el remitente, asunto y
+      // candidatos de destinatario + en qué nivel resolvería al dueño. NO procesa
+      // ni marca leído: sirve para ver qué cabecera trae la dirección sobre
+      // correos reales sin consumirlos. Los MÁS RECIENTES primero (el correo de
+      // prueba que alguien acaba de mandar es el que se quiere ver), hasta `n`
+      // (10 por defecto, máximo 50).
+      const params = new URL(req.url).searchParams;
+      if (params.get("debug")) {
+        const n = Math.min(50, Math.max(1, Number(params.get("n")) || 10));
         const samples = [];
-        for (const m of messages.slice(0, 10)) {
+        for (const m of [...messages].reverse().slice(0, n)) {
           // Se prueban los cuatro niveles por separado para ver CUÁL resolvería:
           // es exactamente lo que hay que mirar al certificar un proveedor nuevo.
           const porSobre = await deps.lookupByAddress(m.envelopeTo);
@@ -156,6 +178,7 @@ async function handle(req: Request) {
           samples.push({
             from: m.from,
             subject: m.subject,
+            receivedAt: m.receivedAt,
             envelopeTo: m.envelopeTo,
             recipients: m.recipients,
             fromAutenticado: m.senderCandidates.length > 0,
