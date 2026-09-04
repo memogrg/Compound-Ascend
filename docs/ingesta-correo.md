@@ -475,3 +475,123 @@ prefijo `uf-` **cancela** el reenvío; nunca ofrecer ese.
 
 Caso especial: los usuarios del propio `aitechumbrella.com` no reciben confirmación —Google la omite
 cuando el destino es un subdominio del mismo dominio— así que su reenvío queda activo de una.
+
+---
+
+## 10. Estado de cierre (4 de septiembre de 2026)
+
+Revisión completa del carril contra el objetivo del producto: *que el usuario conecte cualquier correo,
+que todos los avisos de sus bancos entren solos, y que él solo confirme —y corrija ahí mismo si hace falta—
+sin volver a teclear un gasto*. Lo que está, lo que se cerró en esta entrega y lo que sigue faltando.
+
+### 10.1 Lo que ya funciona en producción
+
+| Pieza | Estado | Evidencia |
+|---|---|---|
+| Dirección de ingesta única por cuenta | ✅ Viva | `u2g5zmfs5w2@in.aitechumbrella.com` creada al abrir Configuración; segunda cuenta con la suya |
+| Subdominio `in.aitechumbrella.com` en Workspace + MX + catch-all con `X-Gm-Original-To` + filtro de sobre por destinatario | ✅ Configurado | Capturas del 4 sep; regla `ingesta-catchall` habilitada; `dig MX` responde `1 smtp.google.com` |
+| `INGEST_ADDRESS_DOMAIN` en Vercel | ✅ | Todos los entornos; despliegue posterior READY |
+| Poller cada 15 min por GitHub Actions | ✅ Corre | Última corrida: `{"ok":true,"ignorados":104,…}` — vivo, autenticado, sin errores |
+| Aislamiento entre cuentas (los 3 P0) | ✅ Cerrado y desplegado | PR #717 |
+| Parser de avisos de **BAC**: compra con tarjeta (CRC/USD), SINPE recibido/debitado por IBAN, fallback con confianza baja | ✅ | `sources/bac-notification.ts` |
+| Confirmación / descarte en «Por revisar» (web y móvil) → transacción real con `origin='imported', source='email'` | ✅ | `confirmIngestProposalAction` |
+| Categorización automática al confirmar (reglas → historial del hogar → caché de sugerencias) | ✅ | `buildTransactionRow` → `resolveAutoCategory` |
+
+### 10.2 Lo que cerró esta entrega (rama `feat/ingesta-cierre`)
+
+- **La confirmación de reenvío de Gmail ya no se pierde.** Se captura, se le muestra al usuario en
+  Configuración con el botón «Confirmar el reenvío» y el código. Sin esto, todo usuario de Gmail se
+  quedaba a mitad del paso 3 sin saber por qué. (No se puede auto-confirmar: el enlace abre una pantalla
+  con botón.)
+- **Los correos de bancos sin parser dejan rastro** (`ingest_notices`, con recorte del texto) y el usuario
+  ve «tu reenvío funciona: recibimos N avisos que todavía no sabemos leer». Es, además, **la única forma
+  de conseguir muestras reales de BNCR, BCR y los demás** para escribir sus parsers.
+- **Corregir antes de confirmar**, en la misma fila (web) o en una hoja (móvil): monto, moneda, fecha,
+  comercio, nota, sobre y cuenta. Confirmar sin tocar nada sigue siendo un clic. Un movimiento con sobre
+  elegido ya no cae al segundo paso de «Por clasificar».
+- **Una compra RECHAZADA de BAC ya no se propone como gasto.**
+- **Los 104 correos ajenos** que el buzón re-bajaba completos cada 15 minutos se archivan a los 3 días.
+- **Modo diagnóstico desde GitHub Actions** (`debug=true`), con los correos más recientes primero: certificar
+  un proveedor nuevo es un clic, sin repartir la clave del cron.
+- `.env.example` documenta por fin las variables de la ingesta.
+
+### 10.3 Lo que todavía falta, por orden de impacto
+
+1. **Parsers de los otros bancos.** Hoy solo BAC. No se pueden escribir a ciegas: hacen falta correos
+   reales. `ingest_notices` los va a ir juntando desde el primer usuario de BNCR/BCR/Popular que conecte.
+   Con 3–5 muestras por banco, cada parser es un día de trabajo. Prioridad por cuota de mercado: **BNCR,
+   BCR, Popular, Davivienda/Scotiabank, Promerica**.
+2. **SINPE Móvil.** El parser de BAC cubre SINPE por IBAN; el aviso de SINPE Móvil (por teléfono) no tiene
+   plantilla verificada. Mismo camino: muestras → parser. Y ojo: BAC avisa el SINPE Móvil recibido por
+   **SMS**, no por correo, así que por este carril solo entra lo que el banco decida mandar por correo.
+3. **Etiquetas de tarjeta.** El backend sabe el `last4` (`account_cards`) pero no hay pantalla para
+   ponerle nombre («Visa mía», «Adicional de Caro»). Hasta entonces la fila no muestra de cuál tarjeta es.
+4. **Retiros de cajero, transferencias entre cuentas propias, reversos, pago de tarjeta.** Sin plantilla.
+   Una transferencia entre cuentas propias hoy se propondría como gasto y como ingreso.
+5. **Reenvío «como adjunto».** Si el usuario reenvía el aviso como archivo adjunto (`.eml`), el cuerpo
+   llega vacío y se descarta sin aviso.
+6. **Observabilidad.** El resumen de cada corrida vive solo en el log de Actions. Falta persistirlo y
+   alertar si `ignorados`/`ambiguos` crecen o si el buzón deja de autenticar.
+7. **Límite del buzón único** (86.400/día, y al pasarse rebota). No es problema hoy; es el detonante para
+   pasar a un webhook (SendGrid/Mailgun) cuando haya cientos de usuarios activos.
+
+---
+
+## 11. Cómo se llega a «sin clics» — lo que hacen las demás apps y qué aplica en Costa Rica
+
+Investigado el 4 de septiembre de 2026 con fuentes oficiales. La pregunta de fondo: *¿cómo sabe la app cuánto
+gana y cuánto gasta el usuario sin que él lo escriba?* Hay seis mecanismos en el mundo. En Costa Rica, en
+2026, tres sirven, dos sirven a medias y uno no existe.
+
+| Mecanismo | Qué captura | Fricción | Costo | Costa Rica hoy | Android / iOS |
+|---|---|---|---|---|---|
+| **Agregación bancaria** (Belvo, Prometeo, Fintoc, Plaid…) | Todo: tarjeta, SINPE, salario, cajero | 3 toques, luego cero | Belvo desde **US$1.000/mes** | **No existe.** Ningún agregador cubre un banco tico; 0 bancos con API pública; la regulación está «en planificación» (BCCR/SUGEF) y la Ley Marco Fintech no trae datos abiertos | — |
+| **Correo** (lo que ya tenemos) | Lo que el banco mande por correo: compras con tarjeta en BAC/BCR, SINPE por IBAN… | 3–6 clics una vez | ≈ $0 | **La mejor opción hoy.** Monedly (competidor tico, US$9,99/mes) corre exactamente esto | ✔ / ✔ |
+| **Escuchar las notificaciones push del teléfono** (Android `NotificationListenerService`) | Lo que la app del banco notifique: compras, SINPE recibido/enviado, en tiempo real | 2–3 toques una vez | Solo ingeniería (~2–3 semanas) | **El salto más grande hacia «cero clics»** para la mayoría Android de CR. Google lo permite con consentimiento explícito y divulgación; parsear en el teléfono y subir solo campos | ✔ / **✘ imposible en iOS** |
+| **Leer SMS** (Android) | BAC avisa SINPE Móvil por SMS; BN Alertas es solo SMS (y solo Kolbi) | 2 toques + revisión de Google Play | Ingeniería + riesgo de rechazo | A medias: Play lo permite para «gestión de presupuesto por SMS» pero la revisión es discrecional y ha habido bajas | ✔ con riesgo / ✘ |
+| **Importar estado de cuenta** (CSV/XLS/PDF) | Todo, una vez al mes | 3–4 toques al mes | OCR centavos por página | BAC exporta CSV/XLS/QIF/MT940; BCR Excel/PDF; Popular solo PDF al correo. Como «compartir con CARTERA+» desde la app del banco es un toque | ✔ / ✔ |
+| **Inferir lo recurrente** (salario, alquiler, suscripciones) | Ingresos y gastos fijos, por patrón | 1 toque: «¿ya te llegó el salario?» | Solo ingeniería | Universal. Es lo que hacen Monarch, Rocket Money y Copilot | ✔ / ✔ |
+
+Lo que **no** sirve, para no perder tiempo: Apple Wallet y Google Wallet no exponen transacciones a
+terceros (FinanceKit es solo Apple Card en EE. UU./Reino Unido); las APIs de «card-linked offers» (Fidel,
+Visa/Mastercard) solo dan compras en comercios inscritos y no están en CR; el scraping con credenciales del
+usuario viola el contrato de banca electrónica de todos los bancos ticos y se rompe con cada OTP.
+
+Y en iOS, el único camino en tiempo real son los **Atajos** (automatización «Transacción» al pagar con Apple
+Pay, y «Mensaje» al recibir un SMS con «SINPE»): funciona, pero el usuario tiene que instalarlos y son
+frágiles. Se ofrecen como opción avanzada, no como base.
+
+### 11.1 La pila recomendada para Costa Rica, en orden de retorno
+
+**Ahora (este trimestre).** (1) El correo como columna vertebral: ya está; sumar **Microsoft OAuth**, que
+es el único «un clic» gratis y sin auditoría, y dejar Gmail OAuth para cuando la cuota de usuarios de Gmail
+justifique la CASA anual. (2) **Inferencia de recurrentes** con tarjeta de confirmación de un toque:
+«¿Ya recibiste tu salario de ₡X?» — llena justo los huecos que el correo deja (salario, alquiler, cuotas).
+(3) Un **asistente por banco para activar alertas**: en BAC, las de transferencias y cajero; en BN, las
+alertas SMS; en BCR, las compras por correo. Sube la tasa de acierto de todos los demás canales gratis.
+
+**Siguiente trimestre.** (4) **Escucha de notificaciones en Android** con un plugin propio de Capacitor
+(el único publicado está archivado y no funciona), parseo en el dispositivo, pantalla de consentimiento
+explícita, activación por banco. Captura SINPE y tarjeta al instante sin depender de SMS ni correo.
+(5) **Importar estado de cuenta** como destino de «Compartir» desde la app del banco: BAC CSV/XLS primero.
+Es la red de seguridad mensual que garantiza completitud.
+
+**Después.** (6) Atajos de iOS como opción avanzada. (7) Permiso de SMS en Android solo si la escucha de
+notificaciones no cubre a los usuarios de BN. (8) Agregación bancaria: no existe; reevaluar cuando
+Prometeo o Belvo anuncien CR o el BCCR publique una hoja de ruta.
+
+### 11.2 Los cinco tropiezos que hay que evitar
+
+1. **Prometer «conectá tu banco» en 2026.** No hay agregador para CR. Lo que sí se puede prometer:
+   «conectá tu correo y tus avisos entran solos».
+2. **Subir notificaciones crudas al servidor.** Hace indefendible el formulario de seguridad de datos de
+   Google Play. Parsear en el teléfono; subir solo `{banco, monto, moneda, comercio, fecha, tipo}`.
+3. **Apoyarse en SMS.** BN Alertas es solo SMS y solo Kolbi; BAC no deja activar avisos de compra por
+   SMS desde Banca en Línea; el permiso de Play es discrecional. Es un refuerzo para BN, nunca la base.
+4. **Plantillas de banco sin telemetría.** Los correos y las notificaciones cambian de redacción sin aviso.
+   Sin métrica de acierto por banco y plantillas actualizables sin desplegar, se pierden semanas de datos
+   antes de que alguien lo note. El paso de «confirmar con un toque» es justamente lo que hace que el
+   usuario avise cuando algo se leyó mal: no quitarlo.
+5. **Leer el cambio de SINPE de junio de 2026 al revés.** El BCCR empuja de SMS a canales autenticados
+   (₡100.000 vs ₡500.000 diarios): el SINPE va a llegar cada vez más como **push de la app del banco** y
+   menos como SMS. Eso favorece la escucha de notificaciones y el correo, y erosiona el SMS.
