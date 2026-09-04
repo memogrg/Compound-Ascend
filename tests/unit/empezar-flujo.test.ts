@@ -31,6 +31,11 @@ vi.mock("@/lib/billing/stripe", () => ({
   aIso: (n: number | null | undefined) => (n ? new Date(n * 1000).toISOString() : null),
 }));
 
+const enviarBienvenida = vi.fn(async (_i: unknown) => ({ enviado: true }));
+vi.mock("@/modules/account/services/correo-bienvenida", () => ({
+  enviarBienvenidaUnaVez: (i: unknown) => enviarBienvenida(i),
+}));
+
 const aplicarPlan = vi.fn();
 vi.mock("@/modules/account/services/subscription-service", () => ({
   aplicarPlan: (...a: unknown[]) => aplicarPlan(...a),
@@ -63,6 +68,7 @@ beforeEach(() => {
   sessionsRetrieve.mockReset();
   subsRetrieve.mockReset();
   aplicarPlan.mockReset();
+  enviarBienvenida.mockClear();
 });
 
 describe("empezarSchema", () => {
@@ -159,6 +165,8 @@ function subDe(plan: string, status = "trialing") {
 describe("cumplirCheckout", () => {
   it("aplica el plan cuando la sesión es del usuario y está pagada", async () => {
     sessionsRetrieve.mockResolvedValue({
+      id: "cs_1",
+      customer_details: { email: "vos@correo.com" },
       metadata: { userId: "u1" },
       payment_status: "paid",
       subscription: subDe("pro"),
@@ -166,6 +174,9 @@ describe("cumplirCheckout", () => {
     const r = await cumplirCheckout("cs_1", "u1");
     expect(r).toEqual({ ok: true, plan: "pro" });
     expect(aplicarPlan).toHaveBeenCalledWith("u1", "pro", expect.anything());
+    expect(enviarBienvenida).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "cs_1", email: "vos@correo.com" }),
+    );
   });
 
   it("rechaza un session_id de otro usuario sin tocar nada", async () => {

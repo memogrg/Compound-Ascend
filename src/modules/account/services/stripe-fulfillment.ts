@@ -34,6 +34,7 @@ import { logger } from "@/lib/logger";
 import { getStripe, planDeSuscripcion, suscripcionDaAcceso, aIso } from "@/lib/billing/stripe";
 import { aplicarPlan } from "@/modules/account/services/subscription-service";
 import { isDowngrade, type Plan } from "@/lib/plan";
+import { enviarBienvenidaUnaVez } from "@/modules/account/services/correo-bienvenida";
 
 /** Del cliente de Stripe a nuestro usuario. Primero la metadata, después la tabla. */
 async function usuarioDe(sub: Stripe.Subscription): Promise<string | null> {
@@ -153,6 +154,11 @@ export async function cumplirCheckout(
   if (!sub) return { ok: false, motivo: "checkout sin suscripción" };
 
   await manejarSuscripcion(sub);
+  await enviarBienvenidaUnaVez({
+    sessionId: sesion.id,
+    email: sesion.customer_details?.email ?? sesion.customer_email,
+    sub,
+  });
   const plan = planDeSuscripcion(sub);
   return plan ? { ok: true, plan } : { ok: false, motivo: "precio sin plan reconocible" };
 }

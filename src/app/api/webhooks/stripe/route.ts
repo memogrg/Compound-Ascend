@@ -19,6 +19,7 @@ import { toSafeResponse, AppError } from "@/lib/errors";
 import { alreadyProcessed } from "@/lib/security/idempotency";
 import { getStripe } from "@/lib/billing/stripe";
 import { manejarSuscripcion } from "@/modules/account/services/stripe-fulfillment";
+import { enviarBienvenidaUnaVez } from "@/modules/account/services/correo-bienvenida";
 
 export const runtime = "nodejs";
 
@@ -63,7 +64,17 @@ export async function POST(req: Request) {
         const sesion = evento.data.object as Stripe.Checkout.Session;
         const subId =
           typeof sesion.subscription === "string" ? sesion.subscription : sesion.subscription?.id;
-        if (subId) await manejarSuscripcion(await stripe.subscriptions.retrieve(subId));
+        if (subId) {
+          const sub = await stripe.subscriptions.retrieve(subId);
+          await manejarSuscripcion(sub);
+          // El correo de bienvenida: monto, fecha del primer cobro y cómo
+          // cancelar. Idempotente con /bienvenida, que también lo intenta.
+          await enviarBienvenidaUnaVez({
+            sessionId: sesion.id,
+            email: sesion.customer_details?.email ?? sesion.customer_email,
+            sub,
+          });
+        }
         break;
       }
 
