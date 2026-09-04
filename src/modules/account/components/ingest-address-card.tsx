@@ -8,7 +8,7 @@
  * El botón de copiar existe porque la dirección NO se teclea a mano: un carácter
  * mal copiado manda los avisos del banco a un buzón que no existe, en silencio.
  */
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 export function IngestAddressCard({ address }: { address: string }) {
   const [copiado, setCopiado] = useState(false);
@@ -57,6 +57,128 @@ export function IngestAddressCard({ address }: { address: string }) {
         Es tuya y solo tuya: cualquier aviso del banco que reenvíes acá entra a tu cuenta, sin que
         tengas que verificar nada. No la compartas.
       </p>
+      <IngestSetupGuide address={address} />
     </div>
+  );
+}
+
+const STEP_STYLE: CSSProperties = { fontSize: 13, lineHeight: 1.55, margin: "6px 0 0 18px" };
+const NOTE_STYLE: CSSProperties = { fontSize: 12.5, lineHeight: 1.5, margin: "8px 0 0" };
+
+/**
+ * Guía "para todos", clic por clic, con la dirección del usuario ya puesta en
+ * cada paso. Vive junto a la dirección porque es el momento en que la necesita;
+ * la versión larga está en docs/guia-conectar-correo.md.
+ */
+function IngestSetupGuide({ address }: { address: string }) {
+  return (
+    <details style={{ marginTop: 12 }}>
+      <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 13.5 }}>
+        Cómo configurarlo, paso a paso (5–10 minutos, una sola vez)
+      </summary>
+
+      <p style={NOTE_STYLE}>
+        <strong>Paso 0 · Que el banco te avise por correo.</strong> Buscá en tu bandeja un correo
+        del banco de una compra reciente. Si no hay, entrá a la app o banca en línea de tu banco →{" "}
+        <strong>Alertas</strong> o <strong>Notificaciones</strong> → marcá{" "}
+        <strong>correo electrónico</strong> para todo (compras, retiros, transferencias, SINPE) y
+        poné el monto mínimo en cero.
+      </p>
+
+      <details style={{ marginTop: 10 }}>
+        <summary style={{ cursor: "pointer", fontSize: 13 }}>Gmail (en la computadora)</summary>
+        <ol style={STEP_STYLE}>
+          <li>
+            Engranaje ⚙ → <strong>Ver toda la configuración</strong> → pestaña{" "}
+            <strong>Reenvío y correo POP/IMAP</strong>.
+          </li>
+          <li>
+            <strong>Agregar una dirección de reenvío</strong> → pegá <code>{address}</code> →
+            Siguiente → Continuar → Aceptar.
+          </li>
+          <li>
+            Gmail manda una confirmación a esa dirección. <strong>Nos llega a nosotros:</strong> en
+            unos minutos aparece acá arriba el botón «Confirmar el reenvío». Tocalo y después
+            recargá Gmail.
+          </li>
+          <li>
+            Abrí un correo del banco → ⋮ → <strong>Filtrar mensajes como estos</strong> →{" "}
+            <strong>Crear filtro</strong>.
+          </li>
+          <li>
+            Marcá <strong>Reenviarlo a</strong> (elegí tu dirección) y{" "}
+            <strong>No enviarlo nunca a Spam</strong> → <strong>Crear filtro</strong>. Repetí por
+            cada banco.
+          </li>
+        </ol>
+        <p className="muted" style={NOTE_STYLE}>
+          Google no deja hacer esto desde la app del celular. Si no ves la pestaña «Reenvío» y el
+          correo es de tu empresa, el administrador lo tiene apagado: usá el reenvío manual.
+        </p>
+      </details>
+
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontSize: 13 }}>
+          Outlook / Hotmail / Microsoft 365
+        </summary>
+        <ol style={STEP_STYLE}>
+          <li>
+            Engranaje ⚙ → <strong>Correo</strong> → <strong>Reglas</strong> →{" "}
+            <strong>Agregar nueva regla</strong>.
+          </li>
+          <li>
+            Condición <strong>De</strong> → el correo desde el que te escribe tu banco (copialo de
+            un aviso que ya tengas).
+          </li>
+          <li>
+            Acción <strong>Redirigir a</strong> (no «Reenviar a») → pegá <code>{address}</code> →
+            Guardar.
+          </li>
+        </ol>
+        <p className="muted" style={NOTE_STYLE}>
+          Si te rebota con «5.7.520 external forwarding», tu empresa bloquea el reenvío externo: usá
+          el reenvío manual mientras el administrador lo habilita.
+        </p>
+      </details>
+
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontSize: 13 }}>iCloud (correo de Apple)</summary>
+        <ol style={STEP_STYLE}>
+          <li>
+            En icloud.com/mail: engranaje ⚙ → <strong>Ajustes</strong> → <strong>Reglas</strong> →{" "}
+            <strong>Añadir regla</strong>.
+          </li>
+          <li>
+            Si un mensaje <strong>es de</strong> tu banco → <strong>Reenviar a</strong>{" "}
+            <code>{address}</code>. No marqués «Eliminar después de reenviar».
+          </li>
+        </ol>
+      </details>
+
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontSize: 13 }}>Yahoo</summary>
+        <p style={NOTE_STYLE}>
+          El reenvío automático solo existe en Yahoo Mail Plus (de pago): Ajustes → Más ajustes →
+          Buzones → Reenvío → pegá <code>{address}</code>. Sin Plus, usá el reenvío manual.
+        </p>
+      </details>
+
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontSize: 13 }}>
+          Reenvío manual (cualquier correo, desde el celular)
+        </summary>
+        <p style={NOTE_STYLE}>
+          Abrí el aviso del banco → <strong>Reenviar</strong> → pegá <code>{address}</code> →
+          enviar. Da igual desde cuál correo lo mandés. Sirve también para cargar avisos viejos: el
+          reenvío automático solo aplica a correos nuevos.
+        </p>
+      </details>
+
+      <p style={NOTE_STYLE}>
+        <strong>Probalo:</strong> reenviá a mano un aviso que ya tengas. Revisamos el buzón cada 15
+        minutos; el movimiento aparece en <strong>Transacciones → Por revisar</strong>, donde lo
+        confirmás con un toque o lo editás antes.
+      </p>
+    </details>
   );
 }

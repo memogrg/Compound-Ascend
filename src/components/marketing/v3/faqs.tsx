@@ -304,30 +304,110 @@ export function Faqs() {
                   <summary>¿Cómo funciona la lectura automática del correo?</summary>
                   <div className="lp-r">
                     <p>
-                      La app te da una dirección propia. Configurás en tu correo una regla que
-                      reenvíe ahí los avisos de compra de tu banco, y cada aviso que llega se
-                      convierte en un movimiento propuesto.
+                      En Configuración la app te da <strong>tu dirección de ingesta</strong>: una
+                      dirección de correo tuya y solo tuya. Hacés que tu correo reenvíe ahí los
+                      avisos del banco (un filtro por remitente, cinco minutos, una sola vez) y cada
+                      aviso que llega se convierte en un movimiento con comercio, monto, fecha y
+                      tarjeta.
                     </p>
                     <p>
-                      <strong>Se propone, no se registra solo.</strong> Vos confirmás — o editás, o
-                      descartás — antes de que entre a tus números.
+                      <strong>Se propone, no se registra solo.</strong> Te espera en «Por revisar»:
+                      confirmás con un toque, o editás ahí mismo monto, moneda, fecha, comercio,
+                      sobre, cuenta y nota antes de confirmar. Un aviso reenviado dos veces no se
+                      duplica, y una compra rechazada no se propone.
+                    </p>
+                    <p>
+                      La guía paso a paso, clic por clic, está en{" "}
+                      <strong>Configuración → Correos del banco</strong>.
                     </p>
                   </div>
                 </details>
 
                 <details className="qa">
-                  <summary>¿Y si mi banco no está entre los que se leen automáticamente?</summary>
+                  <summary>¿Con qué correos funciona?</summary>
                   <div className="lp-r">
                     <p>
-                      Hoy la lectura automática cubre los avisos de <strong>BAC</strong>. Con
-                      cualquier otro banco seguís teniendo las otras tres vías: foto del recibo,
-                      importación del estado de cuenta en CSV, o registro por chat en cinco
-                      segundos.
+                      Con todos: Gmail, Outlook y Hotmail, iCloud, Yahoo y los de empresa. En Gmail,
+                      Outlook e iCloud el reenvío automático es gratis. Yahoo cobra el reenvío
+                      automático, pero podés reenviar los avisos a mano desde el celular con un
+                      toque y funciona igual.
                     </p>
                     <p>
-                      Los parsers de <strong>BNCR y BCR</strong> están en camino. Que tu banco no
-                      esté todavía no te deja fuera de nada: cambia cuánto tenés que escribir, no lo
-                      que la app puede hacer con tus números.
+                      Para Gmail hace falta una computadora <em>solo para configurarlo</em>: Google
+                      no deja crear reenvíos desde la app del celular.
+                    </p>
+                  </div>
+                </details>
+
+                <details className="qa">
+                  <summary>¿Con qué bancos funciona?</summary>
+                  <div className="lp-r">
+                    <p>
+                      Con los avisos de <strong>BAC</strong> la lectura es completa: comercio,
+                      monto, moneda, fecha, tarjeta, SINPE recibido y enviado. Para{" "}
+                      <strong>
+                        BN, BCR, Popular, Scotiabank, Promerica, Davivienda, Lafise, Coopenae,
+                        Coopeservidores
+                      </strong>{" "}
+                      y los demás bancos y cooperativas del país hacemos una lectura general (monto,
+                      si es gasto o ingreso, comercio, fecha) que vos revisás antes de confirmar, y
+                      que se vuelve exacta a medida que llegan avisos reales de cada banco.
+                    </p>
+                    <p>
+                      Si un aviso no lo entendemos, no se pierde: se guarda, te lo decimos en
+                      Configuración y aparece solo cuando lo sepamos leer. Y con cualquier banco
+                      seguís teniendo las otras vías: foto del recibo, CSV o chat.
+                    </p>
+                  </div>
+                </details>
+
+                <details className="qa">
+                  <summary>Mi banco no me manda correos, solo SMS. ¿Qué hago?</summary>
+                  <div className="lp-r">
+                    <p>
+                      Encendé los avisos por correo desde la app o la banca en línea de tu banco:
+                      buscá <strong>Alertas</strong> o <strong>Notificaciones</strong>, marcá{" "}
+                      <strong>correo electrónico</strong> y poné el monto mínimo en cero. Todos los
+                      bancos de Costa Rica lo tienen; casi siempre viene apagado. Si no lo
+                      encontrás, una llamada al banco lo activa en dos minutos.
+                    </p>
+                  </div>
+                </details>
+
+                <details className="qa">
+                  <summary>
+                    Gmail me pidió confirmar la dirección de reenvío. ¿Dónde está el código?
+                  </summary>
+                  <div className="lp-r">
+                    <p>
+                      Google manda esa confirmación a tu dirección de ingesta, así que nos llega a
+                      nosotros. Entrá a <strong>Configuración → Correos del banco</strong>: ahí te
+                      espera el botón <strong>«Confirmar el reenvío»</strong>. Un clic y listo.
+                      Hasta que no confirmés, Gmail no reenvía nada.
+                    </p>
+                  </div>
+                </details>
+
+                <details className="qa">
+                  <summary>Configuré todo y no llega nada. ¿Qué reviso?</summary>
+                  <div className="lp-r">
+                    <p>En este orden:</p>
+                    <ul>
+                      <li>
+                        Que el aviso del banco te haya llegado a vos (si no, activá las alertas).
+                      </li>
+                      <li>
+                        Que la dirección de ingesta esté copiada exacta, carácter por carácter.
+                      </li>
+                      <li>
+                        En Gmail: que hayás confirmado el reenvío y marcado «No enviarlo nunca a
+                        Spam». Gmail no reenvía lo que cae en spam.
+                      </li>
+                      <li>Que hayan pasado 15 minutos: es cada cuánto revisamos el buzón.</li>
+                    </ul>
+                    <p>
+                      Si en Configuración dice «recibimos N avisos que todavía no sabemos leer», tu
+                      reenvío funciona; el pendiente es nuestro.
                     </p>
                   </div>
                 </details>

@@ -1,62 +1,85 @@
-# Conectar tu correo — bloque para la landing y las FAQs
+# Conectar tu correo — copy para la landing y las FAQs
 
-Copy listo para pegar en `/faqs` y en la sección «Cómo funciona» de la landing. Voseo, sin tecnicismos,
-sin prometer lo que no existe (no hay conexión directa con bancos en Costa Rica). La guía paso a paso
-completa vive en `docs/guia-conectar-correo.md` y en la app.
+Texto listo para la landing y para `/faqs` (`src/components/marketing/v3/faqs.tsx`, sección «Registrar
+movimientos» y «Privacidad»). Voseo, sin tecnicismos, sin prometer lo que no existe: **no hay conexión
+directa con bancos en Costa Rica**, el carril es el correo. La guía paso a paso vive en
+`docs/guia-conectar-correo.md` y en el artefacto «Conectar tu correo del banco».
 
 ---
 
 ## Para la landing (dos frases)
 
-**Tus gastos se registran solos.** Tu banco ya te avisa por correo cada vez que pasás la tarjeta. Conectá
-ese correo a CARTERA+ una sola vez, y cada aviso se convierte en un movimiento listo para confirmar con un
-toque. Sin teclear nada.
+**Tus gastos se registran solos.** Tu banco ya te avisa por correo cada vez que pasás la tarjeta.
+Conectá ese correo a CARTERA+ una sola vez, y cada aviso se convierte en un movimiento listo para
+confirmar con un toque. Sin teclear nada, y sin darle a nadie la clave del banco.
 
 ---
 
-## FAQs
+## FAQs — en el orden en que la gente las hace
 
 **¿Cómo registra CARTERA+ mis gastos sin que yo los escriba?**
-Tu banco te manda un correo por cada compra, transferencia o SINPE. Vos configurás en tu correo un reenvío
-de esos avisos a tu dirección de ingesta de CARTERA+ —es una dirección tuya y solo tuya— y nosotros leemos
-el comercio, el monto, la fecha y la tarjeta. El movimiento te espera en «Por revisar»: confirmás con un
-toque, o corregís lo que haga falta ahí mismo.
+Tu banco te manda un correo por cada compra, transferencia o SINPE. Vos hacés que tu correo reenvíe
+esos avisos a **tu dirección de ingesta** de CARTERA+ (una dirección de correo tuya y solo tuya, que
+copiás desde Configuración), y nosotros leemos el comercio, el monto, la fecha y la tarjeta. El
+movimiento te espera en «Por revisar»: confirmás con un toque, o corregís lo que haga falta ahí mismo.
+
+**¿Tengo que darles la clave del banco?**
+No, y no es una política: no existe el campo. La app nunca entra a tu banco. Solo lee los avisos que el
+banco _ya te manda a vos_.
 
 **¿Con qué correos funciona?**
-Con todos: Gmail, Outlook y Hotmail, iCloud, Yahoo y los de empresa. En Gmail, Outlook e iCloud el reenvío
-es automático y gratis. Yahoo cobra el reenvío automático, pero podés reenviar los avisos a mano desde el
-celular y funciona igual.
+Con todos: Gmail, Outlook y Hotmail, iCloud, Yahoo y los de empresa. En Gmail, Outlook e iCloud el
+reenvío automático es gratis. Yahoo cobra el reenvío automático, pero podés reenviar los avisos a mano
+desde el celular con un toque y funciona igual.
 
 **¿Cuánto tarda configurarlo?**
-Unos seis minutos, una sola vez. Para Gmail hace falta una computadora, porque Google no deja configurar
-reenvíos desde la app del celular.
+Entre 5 y 10 minutos, una sola vez. Para Gmail hace falta una computadora, porque Google no deja
+configurar reenvíos desde la app del celular. La guía paso a paso te lleva clic por clic.
 
 **¿Con qué bancos funciona?**
-Hoy leemos los avisos de BAC. Estamos agregando BNCR, BCR, Popular, Davivienda, Promerica y los demás.
-Si tu banco todavía no está, tu reenvío igual sirve: guardamos los avisos y en cuanto tu banco esté listo,
-aparecen solos en «Por revisar».
+Con los avisos de **BAC** la lectura es completa: comercio, monto, moneda, fecha, tarjeta, SINPE
+recibido y enviado. Para **BN, BCR, Popular, Scotiabank, Promerica, Davivienda, Lafise, Coopenae,
+Coopeservidores** y los demás bancos y cooperativas del país hacemos una lectura general (monto, si es
+gasto o ingreso, comercio, fecha) que vos revisás antes de confirmar, y que se vuelve exacta a medida
+que llegan avisos reales de cada banco. Si un aviso no lo entendemos, no se pierde: se guarda, te lo
+decimos en Configuración y aparece solo cuando lo sepamos leer.
+
+**Mi banco no me manda correos, solo SMS. ¿Qué hago?**
+Encendé los avisos por correo desde la app o la banca en línea de tu banco: buscá **Alertas** o
+**Notificaciones**, marcá **correo electrónico** y poné el monto mínimo en cero. Todos los bancos de
+Costa Rica lo tienen; casi siempre viene apagado. Si no lo encontrás, una llamada al banco lo activa.
+
+**Gmail me pidió confirmar la dirección de reenvío. ¿Dónde está el código?**
+Google manda esa confirmación a tu dirección de ingesta, así que nos llega a nosotros. Entrá a
+Configuración → Correos del banco: ahí te espera el botón **«Confirmar el reenvío»**. Un clic y listo.
+Hasta que no confirmés, Gmail no reenvía nada.
+
+**Configuré todo y no llega nada.**
+Revisá en este orden: (1) que el aviso del banco te haya llegado a vos; (2) que la dirección de ingesta
+esté copiada exacta; (3) en Gmail, que hayás confirmado el reenvío y marcado «No enviarlo nunca a
+Spam» (Gmail no reenvía spam); (4) que hayan pasado 15 minutos, que es cada cuánto revisamos el buzón.
+Si en Configuración dice «recibimos N avisos que todavía no sabemos leer», tu reenvío funciona.
 
 **¿Van a leer todo mi correo?**
-No. Solo nos llega lo que vos reenviás. Por eso recomendamos un filtro por remitente del banco en vez del
-reenvío total: así ni siquiera pasa por nosotros nada que no sea un aviso de movimiento.
+No. Solo nos llega lo que vos reenviás. Por eso recomendamos un filtro **por remitente del banco** en
+vez del reenvío total: así ni siquiera pasa por nosotros nada que no sea un aviso de movimiento.
 
 **¿Cómo saben que un movimiento es mío y no de otro usuario?**
-Porque tu dirección de ingesta es única e irrepetible. Lo que llega a ella entra a tu cuenta —o a la de tu
-familia, si compartís una— y a ninguna otra. Un correo que no llegue a una dirección conocida no se procesa.
+Porque tu dirección de ingesta es única e irrepetible. Lo que llega a ella entra a tu cuenta —o a la de
+tu familia, si compartís una— y a ninguna otra. Un correo que no llegue a una dirección conocida se
+ignora.
 
 **¿Se registra algo sin que yo lo apruebe?**
 No. Todo llega como propuesta y espera tu confirmación. Vos decidís qué entra a tus números.
 
 **¿Y si el banco puso mal el nombre del comercio, o la fecha?**
 Lo corregís antes de confirmar, en la misma fila: monto, moneda, fecha, comercio, nota, sobre y cuenta.
-No hay que ir a buscar el movimiento después.
 
 **¿Y si reenvío el mismo aviso dos veces?**
 No se duplica. Reconocemos el movimiento por su referencia y lo contamos una sola vez.
 
-**Gmail me pidió confirmar la dirección de reenvío. ¿Dónde está el código?**
-Google manda esa confirmación a tu dirección de ingesta, así que la recibimos nosotros. Entrá a
-Configuración → Correos del banco: ahí te espera el botón «Confirmar el reenvío». Un clic y listo.
+**¿Una compra rechazada se registra?**
+No. Si el aviso dice que la transacción fue rechazada o declinada, no se propone nada.
 
 **¿Por qué no me conecto directo al banco, como en otras apps?**
 Porque en Costa Rica todavía no existe esa conexión: ningún banco tico ofrece una API abierta y la
@@ -64,8 +87,9 @@ regulación está en planificación. Las apps que la ofrecen operan en México, 
 es hoy la forma más segura y completa de traer tus movimientos sin darle tu contraseña del banco a nadie.
 
 **¿Puedo apagarlo?**
-Cuando quieras. Borrá el reenvío o el filtro en tu proveedor de correo. Lo que ya registraste se queda con vos.
+Cuando quieras. Borrá el reenvío o el filtro en tu proveedor de correo. Lo que ya registraste se queda
+con vos.
 
 **¿Y las compras en efectivo, o lo que el banco no avisa por correo?**
-Para eso está el escáner de recibos y el registro rápido. Y estamos trabajando para que la app también lea
-las notificaciones de tu banco en el celular, para que ni eso haya que teclear.
+Para eso está la foto del recibo y el registro por chat. Y estamos trabajando para que la app del
+celular lea también las notificaciones del banco, para que ni eso haya que teclear.
