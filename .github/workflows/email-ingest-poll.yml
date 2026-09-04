@@ -3,7 +3,12 @@ name: Email ingest poll
 on:
   schedule:
     - cron: "*/15 * * * *"
-  workflow_dispatch: {} # permitir corrida manual desde la pestaña Actions
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: "Solo diagnosticar: lista hasta 10 correos sin leer con sus candidatos, SIN procesarlos"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -16,8 +21,14 @@ jobs:
   poll:
     runs-on: ubuntu-latest
     steps:
+      # En modo debug el endpoint no consume nada: devuelve, por correo, el remitente,
+      # el asunto, las direcciones vistas en cabeceras y en qué nivel resolvería al
+      # dueño. Es la herramienta para certificar un proveedor de correo nuevo sin
+      # tener que pedirle la clave del cron a nadie.
       - name: Trigger email ingest poll
         run: |
+          DEBUG=""
+          if [ "${{ github.event.inputs.debug }}" = "true" ]; then DEBUG="?debug=1"; fi
           curl --fail-with-body -sS -X POST \
-            "https://carteraplus.vercel.app/api/ingest/email/poll" \
+            "https://carteraplus.vercel.app/api/ingest/email/poll${DEBUG}" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"
