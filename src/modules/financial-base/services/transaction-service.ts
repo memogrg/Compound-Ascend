@@ -24,6 +24,7 @@ import {
 } from "@/modules/financial-base/services/base-service";
 import { getCategoryNameMap } from "@/modules/financial-base/services/categories-service";
 import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engine/period";
+import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import type { RealTxnLine } from "@/modules/financial-base/engine/expense-jars";
 import type {
   Transaction,
@@ -921,7 +922,7 @@ export async function getRealHistory(period: Period, monthsBack = 6): Promise<Hi
       .lte("occurred_on", period.to),
     supabase
       .from("budget_items")
-      .select("type,amount,currency,period_month,period_year")
+      .select("type,amount,currency,frequency,period_month,period_year")
       .in("user_id", memberIds)
       .in("period_year", [...years]),
   ]);
@@ -939,7 +940,13 @@ export async function getRealHistory(period: Period, monthsBack = 6): Promise<Hi
   for (const r of budgetRes.data ?? []) {
     const b = buckets.get(`${r.period_year}-${r.period_month}`);
     if (!b) continue;
-    const value = convertCurrency(Number(r.amount), r.currency, currency, rates);
+    // Mismo criterio que getBudgetTotals: el ingreso se mensualiza desde su
+    // monto POR PAGO; el gasto ya es el presupuesto del mes.
+    const nativo =
+      r.type === "income"
+        ? monthlyPlanned(Number(r.amount), r.frequency as Frequency)
+        : Number(r.amount);
+    const value = convertCurrency(nativo, r.currency, currency, rates);
     if (r.type === "income") b.bIncome += value;
     else b.bExpense += value;
   }

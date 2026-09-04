@@ -18,16 +18,24 @@ function Field({
   name,
   label,
   children,
+  hint,
+  note,
 }: {
   name: string;
   label: string;
   children: React.ReactNode;
+  /** Aclaración discreta bajo el campo (qué se espera exactamente). */
+  hint?: string | null;
+  /** Nota destacada bajo el campo (p. ej. el equivalente mensual en vivo). */
+  note?: string | null;
 }) {
   const error = useFormError(name);
   return (
     <div className="m-qfield">
       <div className="m-qlabel">{label}</div>
       {children}
+      {note ? <div className="m-field-note">{note}</div> : null}
+      {hint ? <div className="m-field-hint">{hint}</div> : null}
       {error ? <div className="m-field-err">{error}</div> : null}
     </div>
   );
@@ -79,6 +87,8 @@ export function MoneyField({
   onChange,
   currency,
   placeholder = "0",
+  hint,
+  note,
 }: {
   name: string;
   label: string;
@@ -86,9 +96,11 @@ export function MoneyField({
   onChange: (v: number | undefined) => void;
   currency: string;
   placeholder?: string;
+  hint?: string | null;
+  note?: string | null;
 }) {
   return (
-    <Field name={name} label={label}>
+    <Field name={name} label={label} hint={hint} note={note}>
       <div className="m-money">
         <span className="m-money-sym">{currencySymbol(currency)}</span>
         <input
@@ -126,6 +138,36 @@ export function DateField({
       <input
         className="m-inp"
         type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </Field>
+  );
+}
+
+/**
+ * Mes nativo (YYYY-MM). Es el ancla de tiempo de las frecuencias multi-mes: se
+ * pregunta el MES del próximo pago, no el día — el día no cambia en qué meses
+ * cae la fuente y pedirlo sería fricción sin información.
+ */
+export function MonthField({
+  name,
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  name: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint?: string | null;
+}) {
+  return (
+    <Field name={name} label={label} hint={hint}>
+      <input
+        className="m-inp"
+        type="month"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />

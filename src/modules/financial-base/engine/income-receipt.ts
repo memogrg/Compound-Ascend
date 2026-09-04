@@ -5,20 +5,30 @@
  * llegue al 100 % de lo proyectado o lo supere (lo real puede exceder al plan; el
  * 100 % es plan, no tope). Por eso la sugerencia nunca es 0: al 100 %+ propone el
  * monto pleno de la fuente, para registrar un extra de un toque.
+ *
+ * El monto de la fuente es SIEMPRE lo que se recibe POR PAGO (ver `monthlyize`),
+ * así que la sugerencia se deriva de ahí sin fracciones inventadas. La vieja
+ * RECURRENT_FRACTION (quincenal → ×0.5) asumía lo contrario — que el monto era
+ * mensual — y sugería la mitad de la quincena; se eliminó.
  */
-
-/** Fracción sugerida en fuentes recurrentes sub-mensuales (igual que la web). */
-export const RECURRENT_FRACTION: Record<string, number> = { semanal: 0.25, quincenal: 0.5 };
+import { esSubMensual, type Frequency } from "./monthlyize";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Monto sugerido: fracción recurrente, o el restante del mes; nunca 0 (a 100 %+ el monto pleno). */
+/**
+ * Monto sugerido para el próximo "Recibido".
+ *
+ * - Sub-mensual (diario/semanal/quincenal): cada clic es UN pago, así que se
+ *   sugiere el pago PLENO. Una quincena de ₡800.000 sugiere ₡800.000, y dos
+ *   clics en el mes suman los ₡1.600.000 planificados.
+ * - Mensual y multi-mes: el pago llega una sola vez en su mes, así que se
+ *   sugiere lo que falta de ese pago; nunca 0 (a 100 %+, el monto pleno).
+ */
 export function suggestedReceipt(
   source: { amount: number; frequency: string; recurringItemId?: string | null },
   received: number,
 ): number {
-  const frac = source.recurringItemId ? RECURRENT_FRACTION[source.frequency] : undefined;
-  if (frac) return round2(source.amount * frac);
+  if (esSubMensual(source.frequency as Frequency)) return round2(source.amount);
   const remaining = round2(source.amount - received);
   return remaining > 0 ? remaining : source.amount;
 }
