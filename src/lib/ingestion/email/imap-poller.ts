@@ -29,6 +29,7 @@
  */
 import type { RawMovement } from "@/lib/ingestion/types";
 import { todayISOInTz } from "@/lib/time/user-time-core";
+import { buildNotice, type IngestNotice } from "@/lib/ingestion/email/notices";
 
 /** Zona por defecto cuando el correo no trae fecha parseable y el dueño no tiene tz guardada.
  *  Los bancos que reenvían aquí son de Costa Rica → su fecha local es la sensata. */
@@ -247,17 +248,32 @@ export interface EmailIngestDeps {
   ): Promise<{ inserted: number; duplicated: number }>;
   /** Marca el correo como leído en el buzón (best-effort). */
   markSeen(message: ImapMessage): Promise<void>;
+  /** Guarda un aviso para el dueño: confirmación de reenvío de Gmail o correo
+   *  de banco sin parser. Antes esos correos se consumían sin dejar rastro. */
+  saveNotice(notice: IngestNotice, owner: EmailOwner): Promise<void>;
 }
 
 /** Resumen de una corrida del poller. */
 export interface IngestSummary {
   procesados: number; // dueño resuelto y correo consumido (parseado + marcado)
   propuestos: number; // propuestas insertadas en ingest_proposals
-  ignorados: number; // ningún candidato está en la allowlist
+  ignorados: number; // ningún candidato está en la allowlist (se deja sin leer, por si acaso)
   duplicados: number; // correo ya procesado (por id) o propuesta repetida (cuenta, ref)
   ambiguos: number; // candidatos de DOS cuentas distintas: no se procesa, se alerta
-  sinParsear: number; // dueño conocido pero ningún parser supo leer el correo
+  sinParsear: number; // dueño conocido pero ningún parser supo leer el correo (queda aviso)
+  archivados: number; // ignorados viejos: se marcan leídos para no re-bajarlos cada 15 min
+  confirmacionesGmail: number; // confirmaciones de reenvío de Gmail capturadas para mostrar en la app
 }
+
+/**
+ * Un correo sin dueño se deja sin leer por si su reenviador se registra después.
+ * Pero no para siempre: cada corrida vuelve a bajar el source completo de TODO lo
+ * no leído, y un buzón con cientos de correos ajenos (spam, avisos de servicios)
+ * convierte el poll en una descarga de megas cada 15 minutos. Pasados estos días,
+ * un correo que nadie reclamó se marca leído (NO procesado: si alguien lo
+ * reclama, basta con marcarlo no leído en el buzón para que se reintente).
+ */
+export const IGNORED_TTL_DAYS = 3;
 
 /**
  * Fecha una propuesta cuyo parser NO extrajo fecha del correo (occurredOn ""): usa la fecha de
@@ -316,7 +332,10 @@ export async function processInboundEmails(
     duplicados: 0,
     ambiguos: 0,
     sinParsear: 0,
+    archivados: 0,
+    confirmacionesGmail: 0,
   };
+  const corte = Date.now() - IGNORED_TTL_DAYS * 24 * 60 * 60 * 1000;
 
   for (const message of messages) {
     // a) Identificación. Sin dueño claro no se toca el correo: se deja sin leer
@@ -327,7 +346,13 @@ export async function processInboundEmails(
       continue;
     }
     if (lookup.status === "none") {
-      summary.ignorados += 1;
+      const viejo = message.receivedAt ? new Date(message.receivedAt).getTime() < corte : false;
+      if (viejo) {
+        await deps.markSeen(message);
+        summary.archivados += 1;
+      } else {
+        summary.ignorados += 1;
+      }
       continue;
     }
     const owner = lookup.owner;
@@ -355,9 +380,14 @@ export async function processInboundEmails(
       summary.propuestos += inserted;
       summary.duplicados += duplicated;
     } else {
-      // El dueño reenvió algo que ningún parser reconoce: hoy es un banco sin
-      // plantilla. Se cuenta para que deje de ser una pérdida invisible.
-      summary.sinParsear += 1;
+      // Sin movimiento. O es la confirmación de reenvío de Gmail (hay que
+      // mostrársela al usuario para que la complete) o es un banco que todavía
+      // no sabemos leer (se guarda el recorte: es la cola de parsers). En ambos
+      // casos queda aviso; antes esto se consumía sin dejar rastro.
+      const notice = buildNotice(message);
+      await deps.saveNotice(notice, owner);
+      if (notice.kind === "gmail_forwarding") summary.confirmacionesGmail += 1;
+      else summary.sinParsear += 1;
     }
 
     // e) Cerrar el correo: procesado + leído.

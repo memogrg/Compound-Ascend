@@ -10,6 +10,7 @@ import {
   updateNotificationChannel,
 } from "@/modules/account/services/account-service";
 import { TZ_COOKIE } from "@/lib/time/user-time";
+import { resolveIngestNotice } from "@/modules/account/services/ingest-notices-service";
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from "@/lib/notifications/preferences";
 import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base";
 import { SUPPORTED_CURRENCIES } from "@/lib/fx";
@@ -313,6 +314,23 @@ export async function confirmIngestEmailAction(
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos confirmar el correo." };
+  }
+}
+
+export async function resolveIngestNoticeAction(id: string): Promise<AccountActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
+  try {
+    const res = await resolveIngestNotice(id);
+    if (res.ok) {
+      revalidatePath("/configuracion");
+      revalidatePath("/m/perfil");
+    }
+    return res;
+  } catch (err) {
+    logger.error("resolveIngestNotice fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos actualizar el aviso." };
   }
 }
 

@@ -15,6 +15,12 @@ import { EmailTester } from "@/modules/account/components/email-tester";
 import { IngestEmails } from "@/modules/account/components/ingest-emails";
 import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
 import { getOrCreateIngestAddress } from "@/modules/account/services/ingest-address-service";
+import { IngestNotices } from "@/modules/account/components/ingest-notices";
+import {
+  listMyIngestNotices,
+  EMPTY_NOTICES,
+  type IngestNoticesView,
+} from "@/modules/account/services/ingest-notices-service";
 import { INGEST_TARGET, INGEST_HELP } from "@/modules/account/constants";
 import {
   listMyIngestEmails,
@@ -69,6 +75,7 @@ export default async function Page() {
   // Dirección única de la cuenta: se crea sola la primera vez que se abre esta
   // pantalla. null si el dominio de ingesta no está configurado todavía.
   let ingestAddress: string | null = null;
+  let ingestNotices: IngestNoticesView = EMPTY_NOTICES;
   if (isSupabaseConfigured()) {
     try {
       ingestEmails = await listMyIngestEmails();
@@ -79,6 +86,11 @@ export default async function Page() {
       ingestAddress = await getOrCreateIngestAddress();
     } catch {
       ingestAddress = null;
+    }
+    try {
+      ingestNotices = await listMyIngestNotices();
+    } catch {
+      ingestNotices = EMPTY_NOTICES;
     }
   }
 
@@ -237,6 +249,7 @@ export default async function Page() {
         }
       >
         {ingestAddress ? <IngestAddressCard address={ingestAddress} /> : null}
+        <IngestNotices view={ingestNotices} />
         <IngestEmails initial={ingestEmails} />
       </SetRow>
 

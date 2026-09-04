@@ -13,6 +13,7 @@ import {
   type RawImapMessage,
 } from "@/lib/ingestion/email/imap-poller";
 import { parseNotification } from "@/lib/ingestion/sources";
+import { buildNotice, isGmailForwardingConfirmation } from "@/lib/ingestion/email/notices";
 import type { RawMovement } from "@/lib/ingestion/types";
 
 // Muestra real de notificación de compra con tarjeta de BAC (la usa el parser).
@@ -48,6 +49,7 @@ function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<str
   const seenRefs = new Set<string>(); // claves (cuenta, external_ref) ya insertadas
   const deps: EmailIngestDeps = {
     lookupByAddress: async () => ({ status: "none" }) as const,
+    saveNotice: async () => {},
     lookupOwner: async (candidates) => {
       for (const c of candidates) {
         const owner = allowlist[c];
@@ -257,6 +259,8 @@ describe("email ingestion · processInboundEmails", () => {
       duplicados: 0,
       ambiguos: 0,
       sinParsear: 0,
+      archivados: 0,
+      confirmacionesGmail: 0,
     });
     expect(proposals).toHaveLength(1);
   });
@@ -274,6 +278,8 @@ describe("email ingestion · processInboundEmails", () => {
       duplicados: 1,
       ambiguos: 0,
       sinParsear: 0,
+      archivados: 0,
+      confirmacionesGmail: 0,
     });
     expect(proposals).toHaveLength(1); // la compra entró una sola vez
   });
@@ -288,6 +294,8 @@ describe("email ingestion · processInboundEmails", () => {
       duplicados: 0,
       ambiguos: 0,
       sinParsear: 0,
+      archivados: 0,
+      confirmacionesGmail: 0,
     });
     expect(proposals).toHaveLength(1);
     expect(proposals[0]!.movements).toBe(1);
@@ -309,6 +317,8 @@ describe("email ingestion · processInboundEmails", () => {
       duplicados: 0,
       ambiguos: 0,
       sinParsear: 0,
+      archivados: 0,
+      confirmacionesGmail: 0,
     });
     expect(proposals).toHaveLength(0);
     expect(markedSeen).toEqual([]);
@@ -325,12 +335,16 @@ describe("email ingestion · processInboundEmails", () => {
       duplicados: 1,
       ambiguos: 0,
       sinParsear: 0,
+      archivados: 0,
+      confirmacionesGmail: 0,
     });
     expect(proposals).toHaveLength(0);
   });
 
-  it("correo conocido sin notificación -> procesado sin propuesta", async () => {
+  it("correo conocido sin notificación -> procesado sin propuesta, y deja AVISO (unparsed)", async () => {
     const { deps, proposals, markedSeen, processed } = fakeDeps({ [FORWARDER]: owner });
+    const avisos: { kind: string; subject: string }[] = [];
+    deps.saveNotice = async (n) => void avisos.push({ kind: n.kind, subject: n.subject });
     const summary = await processInboundEmails(
       [msg({ id: "<m3@x>", text: "Hola, ¿almorzamos el viernes?", uid: 3 })],
       parseNotification,
@@ -345,7 +359,10 @@ describe("email ingestion · processInboundEmails", () => {
       duplicados: 0,
       ambiguos: 0,
       sinParsear: 1,
+      archivados: 0,
+      confirmacionesGmail: 0,
     });
+    expect(avisos).toEqual([{ kind: "unparsed", subject: "Compra" }]);
     expect(proposals).toHaveLength(0);
     expect(markedSeen).toEqual([3]); // se marca leído igual
     expect(processed.has("<m3@x>")).toBe(true);
@@ -374,6 +391,7 @@ describe("email ingestion · fecha faltante (fallback a la fecha de recepción)"
     const capturado: RawMovement[] = [];
     const deps: EmailIngestDeps = {
       lookupByAddress: async () => ({ status: "none" }) as const,
+      saveNotice: async () => {},
       lookupOwner: async () => ({ status: "found", owner }) as const,
       isProcessed: async () => false,
       markProcessed: async () => {},
@@ -464,6 +482,7 @@ describe("email ingestion · aislamiento entre cuentas", () => {
     const processed = new Set<string>();
     const deps: EmailIngestDeps = {
       lookupByAddress: async () => ({ status: "none" }) as const,
+      saveNotice: async () => {},
       lookupOwner: async () => lookup,
       isProcessed: async (id) => processed.has(id),
       markProcessed: async (id) => {
@@ -572,6 +591,7 @@ describe("email ingestion · dirección de ingesta única", () => {
     const usados: string[] = [];
     const proposals: RawMovement[] = [];
     const deps: EmailIngestDeps = {
+      saveNotice: async () => {},
       lookupByAddress: async (c) => {
         usados.push(`dir:${c.join(",")}`);
         return c.length ? porDireccion : { status: "none" };
@@ -636,5 +656,130 @@ describe("email ingestion · dirección de ingesta única", () => {
     expect(summary.propuestos).toBe(1);
     expect(proposals).toHaveLength(1);
     expect(usados.some((u) => u.startsWith("fwd:"))).toBe(true);
+  });
+});
+
+describe("email ingestion · ignorados viejos se archivan", () => {
+  const sinDueno: EmailIngestDeps = {
+    lookupByAddress: async () => ({ status: "none" }) as const,
+    saveNotice: async () => {},
+    lookupOwner: async () => ({ status: "none" }) as const,
+    isProcessed: async () => false,
+    markProcessed: async () => {},
+    saveProposals: async () => ({ inserted: 0, duplicated: 0 }),
+    markSeen: async () => {},
+  };
+  const base: ImapMessage = {
+    id: "<x@y>",
+    from: "security@facebookmail.com",
+    recipients: [FLAT_INBOX],
+    envelopeTo: [FLAT_INBOX],
+    senderCandidates: [],
+    subject: "Spam",
+    text: "cuerpo",
+    uid: 5,
+    receivedAt: null,
+  };
+
+  it("un correo sin dueño de hace 10 días se marca leído (archivado), no se reintenta cada 15 min", async () => {
+    const seen: number[] = [];
+    const deps = { ...sinDueno, markSeen: async (m: ImapMessage) => void seen.push(m.uid) };
+    const hace10d = new Date(Date.now() - 10 * 86_400_000).toISOString();
+    const s = await processInboundEmails(
+      [{ ...base, receivedAt: hace10d }],
+      parseNotification,
+      deps,
+    );
+    expect(s.archivados).toBe(1);
+    expect(s.ignorados).toBe(0);
+    expect(seen).toEqual([5]);
+  });
+
+  it("un correo sin dueño de hoy se deja sin leer (ignorado) por si su reenviador se registra", async () => {
+    const seen: number[] = [];
+    const deps = { ...sinDueno, markSeen: async (m: ImapMessage) => void seen.push(m.uid) };
+    const s = await processInboundEmails(
+      [{ ...base, receivedAt: new Date().toISOString() }],
+      parseNotification,
+      deps,
+    );
+    expect(s.ignorados).toBe(1);
+    expect(s.archivados).toBe(0);
+    expect(seen).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Confirmación de reenvío de Gmail: se captura y se le muestra al usuario.
+// ---------------------------------------------------------------------------
+describe("email ingestion · confirmación de reenvío de Gmail", () => {
+  const GMAIL_CONF: ImapMessage = {
+    id: "<conf@google>",
+    from: "forwarding-noreply@google.com",
+    recipients: [FLAT_INBOX],
+    envelopeTo: ["u2g5zmfs5w2@in.aitechumbrella.com"],
+    senderCandidates: [],
+    subject: "(#123456789) Gmail Forwarding Confirmation - Receive Mail from memogrg@gmail.com",
+    text: [
+      "memogrg@gmail.com has requested to automatically forward mail to your email address.",
+      "Confirmation code: 123456789",
+      "To allow, click: https://mail-settings.google.com/mail/vf-AbC_123-xyz%2Fq",
+      "To cancel, click: https://mail-settings.google.com/mail/uf-AbC_123-xyz",
+    ].join("\n"),
+    uid: 88,
+    receivedAt: null,
+  };
+
+  it("se reconoce por remitente y por asunto", () => {
+    expect(isGmailForwardingConfirmation(GMAIL_CONF)).toBe(true);
+    expect(isGmailForwardingConfirmation({ from: BANK_FROM, subject: "Compra" })).toBe(false);
+    expect(
+      isGmailForwardingConfirmation({
+        from: "x@y.com",
+        subject: "Confirmación de reenvío de Gmail",
+      }),
+    ).toBe(true);
+  });
+
+  it("extrae el enlace vf- (nunca el uf- que cancela) y el código", () => {
+    const n = buildNotice(GMAIL_CONF);
+    expect(n.kind).toBe("gmail_forwarding");
+    expect(n.confirmUrl).toBe("https://mail-settings.google.com/mail/vf-AbC_123-xyz%2Fq");
+    expect(n.confirmUrl).not.toContain("uf-");
+    expect(n.confirmCode).toBe("123456789");
+  });
+
+  it("en el poller cuenta como confirmación, no como sinParsear, y queda aviso para el dueño", async () => {
+    const owner: EmailOwner = { userId: "uA", householdId: null, timezone: null };
+    const avisos: { kind: string; url: string | null }[] = [];
+    const deps: EmailIngestDeps = {
+      lookupByAddress: async (c) =>
+        c.length ? ({ status: "found", owner } as const) : ({ status: "none" } as const),
+      lookupOwner: async () => ({ status: "none" }) as const,
+      isProcessed: async () => false,
+      markProcessed: async () => {},
+      saveProposals: async () => ({ inserted: 0, duplicated: 0 }),
+      markSeen: async () => {},
+      saveNotice: async (n) => void avisos.push({ kind: n.kind, url: n.confirmUrl }),
+    };
+    const s = await processInboundEmails([GMAIL_CONF], parseNotification, deps);
+    expect(s.confirmacionesGmail).toBe(1);
+    expect(s.sinParsear).toBe(0);
+    expect(s.procesados).toBe(1);
+    expect(avisos[0]!.kind).toBe("gmail_forwarding");
+    expect(avisos[0]!.url).toContain("vf-");
+  });
+
+  it("un correo de banco sin parser deja aviso unparsed con recorte del texto", () => {
+    const n = buildNotice({
+      ...GMAIL_CONF,
+      id: "<bncr@x>",
+      from: "notificaciones@bncr.fi.cr",
+      subject: "Notificación de transacción",
+      text: "Estimado cliente, se realizó una compra por CRC 5.000,00 en AUTOMERCADO",
+    });
+    expect(n.kind).toBe("unparsed");
+    expect(n.snippet).toContain("AUTOMERCADO");
+    expect(n.confirmUrl).toBeNull();
   });
 });

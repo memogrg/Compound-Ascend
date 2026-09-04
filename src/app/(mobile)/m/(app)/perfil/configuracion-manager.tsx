@@ -37,6 +37,8 @@ import { testEmailAction, type EmailTestResult } from "@/modules/account/api/act
 import { updatePasswordAction } from "@/lib/auth/actions";
 import { INGEST_TARGET } from "@/modules/account/constants";
 import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
+import { IngestNotices } from "@/modules/account/components/ingest-notices";
+import type { IngestNoticesView } from "@/modules/account/services/ingest-notices-service";
 import type { NotificationChannel, NotificationPrefs } from "@/lib/notifications/preferences";
 import type { IngestEmailRow } from "@/modules/account/services/ingest-email-service";
 
@@ -90,6 +92,7 @@ export function ConfiguracionManager({
   notifications,
   ingestEmails,
   ingestAddress,
+  ingestNotices,
   household,
   emailConfigured,
 }: {
@@ -98,6 +101,7 @@ export function ConfiguracionManager({
   notifications: NotificationPrefs;
   ingestEmails: IngestEmailRow[];
   ingestAddress: string | null;
+  ingestNotices: IngestNoticesView;
   household: HouseholdMembersView | null;
   emailConfigured: boolean;
 }) {
@@ -208,6 +212,7 @@ export function ConfiguracionManager({
               registrar nada más.
             </p>
             <IngestAddressCard address={ingestAddress} />
+            <IngestNotices view={ingestNotices} />
           </>
         ) : (
           <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>

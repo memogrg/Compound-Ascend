@@ -1122,6 +1122,24 @@ export type IngestAddressRow = Audited & {
   revoked_at: string | null; // rotación: deja de resolver y nunca se reasigna
 };
 
+/** Avisos de la ingesta por correo (migración 20260904000001): la confirmación
+ *  de reenvío de Gmail para mostrar en la app, y los correos de banco sin parser
+ *  (cola de trabajo). Escritura solo desde el servidor. */
+export type IngestNoticeRow = Audited & {
+  id: string;
+  user_id: string;
+  household_id: string | null;
+  kind: "gmail_forwarding" | "unparsed";
+  from_address: string | null;
+  subject: string | null;
+  snippet: string | null;
+  confirm_url: string | null;
+  confirm_code: string | null;
+  message_id: string | null;
+  created_at: string;
+  resolved_at: string | null;
+};
+
 export type IngestProposalStatus = "pending" | "confirmed" | "discarded";
 
 /** Cola de propuestas de ingesta por confirmar (migración 0027). */
@@ -1310,6 +1328,7 @@ export interface Database {
       // Ingesta por correo (migración 0027). El poller usa service-role.
       email_ingest_links: UserTable<EmailIngestLinkRow>;
       ingest_addresses: UserTable<IngestAddressRow>;
+      ingest_notices: UserTable<IngestNoticeRow>;
       ingest_proposals: UserTable<IngestProposalRow>;
       account_cards: UserTable<AccountCardRow>;
       // Caché de sugerencias de sobre por (usuario, comercio) (migración 0032).
