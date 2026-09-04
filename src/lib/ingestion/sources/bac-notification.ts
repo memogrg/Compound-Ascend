@@ -7,7 +7,12 @@
  * Plantillas: compra con tarjeta y SINPE (recibido/debitado). Fallback de baja
  * confianza como última red. Si no parece de BAC, devuelve [].
  */
-import type { IngestionSource, RawMovement } from "@/lib/ingestion/types";
+import type { IngestionSource, NotificationMeta, RawMovement } from "@/lib/ingestion/types";
+import { isDeclinedNotification } from "@/lib/ingestion/sources/common";
+import { partyFromSubject } from "@/lib/ingestion/sources/cr-generic-notification";
+
+// Guard de rechazo compartido (common.ts); se re-exporta para no romper importadores.
+export { isDeclinedNotification };
 
 const MONTHS: Record<string, string> = {
   jan: "01",
@@ -41,6 +46,13 @@ function parseSpanishMonthDate(text: string): string | null {
 /** "2/6/2026" (D/M/YYYY de Costa Rica) → "2026-06-02". null si no calza. */
 function parseDMY(s: string): string | null {
   const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  return `${m[3]}-${m[2]!.padStart(2, "0")}-${m[1]!.padStart(2, "0")}`;
+}
+
+/** "… 03-09-2026 - 08:04" (asunto de BAC, DD-MM-YYYY) → "2026-09-03". null si no calza. */
+function parseSubjectDate(subject: string | null | undefined): string | null {
+  const m = subject?.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
   if (!m) return null;
   return `${m[3]}-${m[2]!.padStart(2, "0")}-${m[1]!.padStart(2, "0")}`;
 }
@@ -124,7 +136,7 @@ function withDivisaRule(m: RawMovement, concept: string): RawMovement {
 }
 
 /** PLANTILLA 1 — Compra con tarjeta → gasto. */
-function parseCardPurchase(text: string): RawMovement | null {
+function parseCardPurchase(text: string, meta?: NotificationMeta): RawMovement | null {
   const isCard =
     /Comercio\s*:/i.test(text) &&
     (/Tipo de Transacci[oó]n\s*:/i.test(text) || /le detallamos la transacci[oó]n/i.test(text));
@@ -134,8 +146,12 @@ function parseCardPurchase(text: string): RawMovement | null {
   const money = montoField.match(/(CRC|USD)\s*([\d.,]+)/i);
   if (!money) return null;
 
-  const merchant = cleanMerchant(fieldAfterLabel(text, "Comercio:"));
-  const date = parseSpanishMonthDate(fieldAfterLabel(text, "Fecha:") ?? "");
+  // El asunto ("Notificación de transacción CINEPOLIS WEB 03-09-2026 - 08:04") trae
+  // comercio y fecha: sirve de respaldo cuando el cuerpo llega pobre o en HTML raro.
+  const merchant =
+    cleanMerchant(fieldAfterLabel(text, "Comercio:")) ?? partyFromSubject(meta?.subject);
+  const date =
+    parseSpanishMonthDate(fieldAfterLabel(text, "Fecha:") ?? "") ?? parseSubjectDate(meta?.subject);
   const ref =
     leadingDigits(fieldAfterLabel(text, "Referencia:")) ??
     leadingDigits(fieldAfterLabel(text, "Autorización:")) ??
@@ -214,8 +230,8 @@ function parseSinpeDebited(text: string): RawMovement | null {
 }
 
 /** Fallback: parece BAC pero no calza plantilla; hay monto+moneda → baja confianza. */
-function parseFallback(text: string): RawMovement | null {
-  if (!/BAC/i.test(text)) return null;
+function parseFallback(text: string, meta?: NotificationMeta): RawMovement | null {
+  if (!/BAC/i.test(text) && !/baccredomatic/i.test(meta?.from ?? "")) return null;
   const crcUsd = text.match(/(CRC|USD)\s*([\d.,]+)/i);
   const word = text.match(/([\d.,]+)\s*(D[oó]lares|Colones)/i);
   if (!crcUsd && !word) return null;
@@ -223,42 +239,33 @@ function parseFallback(text: string): RawMovement | null {
   const amount = crcUsd ? parseAmount(crcUsd[2]!) : parseAmount(word![1]!);
   const currency = crcUsd ? crcUsd[1]!.toUpperCase() : mapCurrencyWord(word![2]!);
 
+  const merchant = partyFromSubject(meta?.subject);
   return base({
     kind: "gasto",
     amount,
     currency,
-    // Sin fecha parseable (la fuente no la trae): "" → el poller la feche con receivedAt en la zona
-    // del usuario (fecharConReceivedAt), como los otros parsers. NO UTC-today, que reintroduciría
-    // #90 al esquivar ese fallback central. La propuesta se revisa antes de aplicarse.
-    occurredOn: "",
-    description: "Movimiento BAC (revisá los datos)",
-    confidence: 0.5,
+    // Sin fecha parseable en el cuerpo se intenta el asunto; si tampoco, "" → el poller la fecha
+    // con receivedAt en la zona del usuario (fecharConReceivedAt), como los otros parsers. NO
+    // UTC-today, que reintroduciría #90. La propuesta se revisa antes de aplicarse.
+    occurredOn: parseSubjectDate(meta?.subject) ?? "",
+    merchant,
+    description: merchant ?? "Movimiento BAC (revisá los datos)",
+    confidence: merchant ? 0.6 : 0.5,
     cardLast4: cardLast4(text),
     rawText: text,
   });
 }
 
-// Una transacción RECHAZADA trae comercio, monto y referencia igual que una
-// aprobada: sin este guard se proponía como gasto real. Se busca la palabra en
-// el texto sin acentos (deburr) y en minúsculas.
-const DECLINED_RE =
-  /\b(rechazad[ao]|declinad[ao]|denegad[ao]|no aprobad[ao]|no fue aprobad[ao]|no se pudo procesar|transaccion fallida)\b/;
-
-/** ¿El aviso describe una transacción que NO ocurrió? */
-export function isDeclinedNotification(text: string): boolean {
-  return DECLINED_RE.test(deburr(text).toLowerCase());
-}
-
 export const bacNotificationSource: IngestionSource<string> = {
   kind: "bank_notification",
-  parse(text: string): RawMovement[] {
+  parse(text: string, meta?: NotificationMeta): RawMovement[] {
     if (!text) return [];
     if (isDeclinedNotification(text)) return [];
     const m =
-      parseCardPurchase(text) ??
+      parseCardPurchase(text, meta) ??
       parseSinpeReceived(text) ??
       parseSinpeDebited(text) ??
-      parseFallback(text);
+      parseFallback(text, meta);
     // Solo proponemos si pudimos extraer un monto > 0.
     return m && m.amount > 0 ? [m] : [];
   },

@@ -24,10 +24,16 @@ export interface RawMovement {
   rawText: string | null; // texto crudo para auditoría/depuración
 }
 
+/** Contexto opcional del mensaje que trae el input: remitente y asunto (correo). */
+export interface NotificationMeta {
+  from?: string | null;
+  subject?: string | null;
+}
+
 /** Una fuente de ingesta produce RawMovement[] a partir de su input propio. */
 export interface IngestionSource<TInput> {
   readonly kind: IngestionSourceKind;
-  parse(input: TInput): RawMovement[];
+  parse(input: TInput, meta?: NotificationMeta): RawMovement[];
 }
 
 /**

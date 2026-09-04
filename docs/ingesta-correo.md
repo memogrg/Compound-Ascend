@@ -180,15 +180,16 @@ en dos niveles: primero destinatarios (auto-forward), y solo si ahí no hay nada
 
 ### P1-4 · Pérdida silenciosa: el banco que no sabemos leer
 
-Si el dueño se resuelve pero `parseNotification` no devuelve nada — hoy **solo existe el parser de BAC**
-(`sources/index.ts`) —, el correo se marca `processed` + leído y desaparece. El usuario configuró todo bien,
-ve que el correo salió de su bandeja, y en la app no pasa nada. Nunca sabrá por qué.
+Si el dueño se resuelve pero `parseNotification` no devuelve nada, el correo se marcaba `processed` +
+leído y desaparecía. El usuario configuró todo bien, ve que el correo salió de su bandeja, y en la app no
+pasaba nada. Nunca sabría por qué.
 
-**PARCIAL** — ya se cuenta en el resumen del poller (`sinParsear`), así que deja de ser invisible. Falta
-la parte que le sirve al usuario. **Fix (P1):** cuando hay dueño y cero movimientos, guardar el correo en una tabla `ingest_unparsed`
-(dueño, remitente, asunto, cuerpo recortado) y (a) avisarle al usuario "recibimos un aviso de tu banco pero
-todavía no sabemos leerlo, ya estamos en eso", (b) usar esa tabla como cola de trabajo para escribir los
-parsers de BNCR, BCR y los demás del piloto de 13 bancos.
+**CERRADO** — (a) el correo con dueño y cero movimientos queda en `ingest_notices` (remitente, asunto,
+recorte) y Configuración le dice al usuario «tu reenvío funciona; recibimos N avisos que todavía no
+sabemos leer» (PR #737); (b) el parser genérico de Costa Rica (`sources/cr-generic-notification.ts`)
+propone con confianza ≤ 0.85 los avisos de BNCR, BCR, Popular y el resto de bancos y cooperativas
+identificables, así que «no sabemos leerlo» queda reservado a lo que ni siquiera trae banco o monto
+(rama `feat/plantillas-bancos`). `ingest_notices` sigue siendo la cola para afinar plantillas exactas.
 
 ### Otros hallazgos operativos
 
@@ -493,7 +494,8 @@ sin volver a teclear un gasto*. Lo que está, lo que se cerró en esta entrega y
 | `INGEST_ADDRESS_DOMAIN` en Vercel | ✅ | Todos los entornos; despliegue posterior READY |
 | Poller cada 15 min por GitHub Actions | ✅ Corre | Última corrida: `{"ok":true,"ignorados":104,…}` — vivo, autenticado, sin errores |
 | Aislamiento entre cuentas (los 3 P0) | ✅ Cerrado y desplegado | PR #717 |
-| Parser de avisos de **BAC**: compra con tarjeta (CRC/USD), SINPE recibido/debitado por IBAN, fallback con confianza baja | ✅ | `sources/bac-notification.ts` |
+| Parser de avisos de **BAC**: compra con tarjeta (CRC/USD), SINPE recibido/debitado por IBAN, fallback con confianza baja; comercio y fecha de respaldo desde el asunto | ✅ | `sources/bac-notification.ts` |
+| Parser **genérico de Costa Rica** (BNCR, BCR, Popular, Scotiabank, Promerica, Davivienda, Lafise, Cathay, BCT, Improsa, Coopenae, Coopeservidores, Coopealianza, Coopeande, Mucap, Grupo Mutual, Caja de ANDE, Prival): identifica el banco por dominio del remitente o marca, y saca monto/moneda, tipo (compra, SINPE Móvil, retiro en cajero, reverso, pago de tarjeta, entre cuentas propias), comercio/contraparte, fecha, referencia y último-4 con anclas comunes. Confianza ≤ 0.85: siempre pasa por «Por revisar». Rama `feat/plantillas-bancos` | ✅ | `sources/cr-generic-notification.ts`, `sources/common.ts` |
 | Confirmación / descarte en «Por revisar» (web y móvil) → transacción real con `origin='imported', source='email'` | ✅ | `confirmIngestProposalAction` |
 | Categorización automática al confirmar (reglas → historial del hogar → caché de sugerencias) | ✅ | `buildTransactionRow` → `resolveAutoCategory` |
 
@@ -517,17 +519,21 @@ sin volver a teclear un gasto*. Lo que está, lo que se cerró en esta entrega y
 
 ### 10.3 Lo que todavía falta, por orden de impacto
 
-1. **Parsers de los otros bancos.** Hoy solo BAC. No se pueden escribir a ciegas: hacen falta correos
-   reales. `ingest_notices` los va a ir juntando desde el primer usuario de BNCR/BCR/Popular que conecte.
-   Con 3–5 muestras por banco, cada parser es un día de trabajo. Prioridad por cuota de mercado: **BNCR,
-   BCR, Popular, Davivienda/Scotiabank, Promerica**.
-2. **SINPE Móvil.** El parser de BAC cubre SINPE por IBAN; el aviso de SINPE Móvil (por teléfono) no tiene
-   plantilla verificada. Mismo camino: muestras → parser. Y ojo: BAC avisa el SINPE Móvil recibido por
-   **SMS**, no por correo, así que por este carril solo entra lo que el banco decida mandar por correo.
+1. **Afinar las plantillas por banco con correos reales.** La genérica (`cr-generic-notification.ts`)
+   ya propone movimientos de BNCR, BCR, Popular y los demás con anclas comunes, pero está calibrada
+   con muestras **sintéticas**: la redacción exacta de cada banco no está verificada. Regla de
+   operación: cada aviso que la genérica no entienda queda en `ingest_notices`; con 3–5 muestras reales
+   por banco se escribe su plantilla exacta (un archivo + una línea en `sources/index.ts`, ANTES de la
+   genérica) y sube la confianza a ≥ 0.9. Prioridad por cuota de mercado: **BNCR, BCR, Popular,
+   Davivienda/Scotiabank, Promerica**.
+2. **SINPE Móvil por SMS.** Varios bancos (BAC entre ellos) avisan el SINPE Móvil recibido por **SMS**,
+   no por correo, así que por este carril solo entra lo que el banco decida mandar por correo. El
+   camino para el resto es el oyente de notificaciones en Android (§11).
 3. **Etiquetas de tarjeta.** El backend sabe el `last4` (`account_cards`) pero no hay pantalla para
    ponerle nombre («Visa mía», «Adicional de Caro»). Hasta entonces la fila no muestra de cuál tarjeta es.
-4. **Retiros de cajero, transferencias entre cuentas propias, reversos, pago de tarjeta.** Sin plantilla.
-   Una transferencia entre cuentas propias hoy se propondría como gasto y como ingreso.
+4. **Transferencias entre cuentas propias.** La genérica las marca `[Entre cuentas propias]` con
+   confianza 0.5 para que el usuario decida; lo correcto a futuro es proponerlas como traslado (no como
+   gasto ni ingreso) cuando el modelo de transacciones lo soporte.
 5. **Reenvío «como adjunto».** Si el usuario reenvía el aviso como archivo adjunto (`.eml`), el cuerpo
    llega vacío y se descarta sin aviso.
 6. **Observabilidad.** El resumen de cada corrida vive solo en el log de Actions. Falta persistirlo y
