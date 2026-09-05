@@ -20,6 +20,8 @@ import {
   confirmIngestProposalAction,
   discardIngestProposalAction,
   mergeIngestProposalAction,
+  confirmIngestProposalsBatchAction,
+  discardIngestProposalsBatchAction,
   type ProposalOverrides,
 } from "@/modules/financial-base/api/v2-actions";
 import {
@@ -93,8 +95,48 @@ export function PorRevisarCard({
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
 
-  const visible = proposals.filter((p) => !hidden.has(p.id));
-  if (visible.length === 0) return null;
+  // Lote: filtro por fecha + selección múltiple. Para cargar un mes de historial
+  // de un toque en vez de sesenta clics.
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [sel, setSel] = useState<Set<string>>(() => new Set());
+
+  const visibleTodas = proposals.filter((p) => !hidden.has(p.id));
+  const visible = visibleTodas.filter(
+    (p) => (!desde || p.occurredOn >= desde) && (!hasta || p.occurredOn <= hasta),
+  );
+  if (visibleTodas.length === 0) return null;
+  const seleccionadas = visible.filter((p) => sel.has(p.id));
+  // «Todos» no incluye los posibles duplicados: esos se deciden uno por uno.
+  const seleccionables = visible.filter((p) => !p.possibleDuplicate || ignorarDup.has(p.id));
+  const todosMarcados = seleccionables.length > 0 && seleccionables.every((p) => sel.has(p.id));
+
+  const lote = (
+    action: (ids: string[]) => Promise<{ ok: boolean; hechas: number; fallidas: number }>,
+    verbo: string,
+  ) => {
+    const ids = seleccionadas.map((p) => p.id);
+    if (ids.length === 0) return;
+    setBusy("__lote__");
+    startTransition(async () => {
+      const r = await action(ids);
+      setBusy(null);
+      if (r.hechas > 0) {
+        setHidden((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id) => next.add(id));
+          return next;
+        });
+        setSel(new Set());
+        toast(
+          `${r.hechas} ${r.hechas === 1 ? "movimiento" : "movimientos"} ${verbo}${r.fallidas ? ` · ${r.fallidas} no se pudieron` : ""}`,
+        );
+        router.refresh();
+      } else {
+        toast("No se pudo procesar la selección", "error");
+      }
+    });
+  };
 
   const run = (
     id: string,
@@ -198,6 +240,104 @@ export function PorRevisarCard({
 
       {open ? (
         <div style={{ padding: "0 18px 12px", borderTop: "1px solid var(--line)" }}>
+          {/* Barra de lote: fechas + seleccionar todos + registrar/descartar la selección. */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+              padding: "10px 0",
+              borderBottom: "1px solid var(--line)",
+              fontSize: 12,
+            }}
+          >
+            <label
+              className="muted"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <input
+                type="checkbox"
+                aria-label="Seleccionar todos los visibles"
+                checked={todosMarcados}
+                disabled={pending || seleccionables.length === 0}
+                onChange={(e) =>
+                  setSel(e.target.checked ? new Set(seleccionables.map((p) => p.id)) : new Set())
+                }
+              />
+              Todos
+            </label>
+            <label
+              className="muted"
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              Del
+              <input
+                type="date"
+                className="inp"
+                style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                value={desde}
+                onChange={(e) => setDesde(e.target.value)}
+              />
+            </label>
+            <label
+              className="muted"
+              style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              al
+              <input
+                type="date"
+                className="inp"
+                style={{ fontSize: 11, padding: "3px 6px", width: "auto" }}
+                value={hasta}
+                onChange={(e) => setHasta(e.target.value)}
+              />
+            </label>
+            {desde || hasta ? (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ fontSize: 11, padding: "3px 8px" }}
+                onClick={() => {
+                  setDesde("");
+                  setHasta("");
+                }}
+              >
+                Quitar fechas
+              </button>
+            ) : null}
+            <span className="muted" style={{ marginLeft: "auto" }}>
+              {visible.length} de {visibleTodas.length}
+              {seleccionadas.length ? ` · ${seleccionadas.length} seleccionados` : ""}
+            </span>
+            {seleccionadas.length > 0 ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ fontSize: 11, padding: "4px 10px" }}
+                  disabled={pending}
+                  onClick={() => lote(confirmIngestProposalsBatchAction, "registrados")}
+                >
+                  {pending && busy === "__lote__" ? "…" : `Registrar ${seleccionadas.length}`}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: 11, padding: "4px 10px" }}
+                  disabled={pending}
+                  onClick={() => lote(discardIngestProposalsBatchAction, "descartados")}
+                >
+                  Descartar {seleccionadas.length}
+                </button>
+              </>
+            ) : null}
+          </div>
+          {visible.length === 0 ? (
+            <p className="muted" style={{ fontSize: 12.5, margin: "10px 0 0" }}>
+              Nada entre esas fechas. Quitá el filtro para ver el resto.
+            </p>
+          ) : null}
           {visible.map((p) => {
             const rowBusy = pending && busy === p.id;
             const sobres = categories.filter((c) => categoryMatchesKind(c.categoryType, p.kind));
@@ -215,6 +355,20 @@ export function PorRevisarCard({
                   opacity: rowBusy ? 0.5 : 1,
                 }}
               >
+                <input
+                  type="checkbox"
+                  aria-label={`Seleccionar ${p.merchant ?? "movimiento"}`}
+                  checked={sel.has(p.id)}
+                  disabled={rowBusy}
+                  onChange={(e) =>
+                    setSel((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(p.id);
+                      else next.delete(p.id);
+                      return next;
+                    })
+                  }
+                />
                 <span className="tnum" style={{ fontWeight: 600, flex: "none" }}>
                   {formatMoney(p.amount, p.currency)}
                 </span>

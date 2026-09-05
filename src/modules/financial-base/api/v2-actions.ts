@@ -625,6 +625,42 @@ export async function mergeIngestProposalAction(
   }
 }
 
+export type BatchResult = { ok: boolean; hechas: number; fallidas: number; message?: string };
+
+const idsSchema = z.array(z.string().uuid()).min(1).max(200);
+
+/**
+ * Lote: confirma varias propuestas de una (cargar el historial de un mes de un
+ * toque). Cada una pasa por el mismo claim + alta que la confirmación individual;
+ * una que falle no frena a las demás.
+ */
+export async function confirmIngestProposalsBatchAction(ids: string[]): Promise<BatchResult> {
+  const parsed = idsSchema.safeParse(ids);
+  if (!parsed.success) return { ok: false, hechas: 0, fallidas: 0, message: "Selección inválida." };
+  let hechas = 0;
+  let fallidas = 0;
+  for (const id of parsed.data) {
+    const r = await confirmIngestProposalAction(id);
+    if (r.ok) hechas += 1;
+    else fallidas += 1;
+  }
+  return { ok: hechas > 0 || fallidas === 0, hechas, fallidas };
+}
+
+/** Lote: descarta varias propuestas de una. */
+export async function discardIngestProposalsBatchAction(ids: string[]): Promise<BatchResult> {
+  const parsed = idsSchema.safeParse(ids);
+  if (!parsed.success) return { ok: false, hechas: 0, fallidas: 0, message: "Selección inválida." };
+  let hechas = 0;
+  let fallidas = 0;
+  for (const id of parsed.data) {
+    const r = await discardIngestProposalAction(id);
+    if (r.ok) hechas += 1;
+    else fallidas += 1;
+  }
+  return { ok: hechas > 0 || fallidas === 0, hechas, fallidas };
+}
+
 /** Descarta una propuesta de ingesta (no crea transacción). Claim atómico. */
 export async function discardIngestProposalAction(id: string): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };

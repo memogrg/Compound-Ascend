@@ -8,6 +8,8 @@ import {
   confirmIngestProposalAction,
   discardIngestProposalAction,
   mergeIngestProposalAction,
+  confirmIngestProposalsBatchAction,
+  discardIngestProposalsBatchAction,
   assignCategoryAction,
   linkTransactionAction,
   markReviewedAction,
@@ -187,13 +189,50 @@ export function RevisionInbox({
   }
   const [link, setLink] = useState<UnlinkedCandidate | null>(null);
 
-  const visibleProposals = proposals.filter((p) => !done.has(p.id));
+  // Lote: filtro por fecha + selección múltiple (cargar un mes de historial de un toque).
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [sel, setSel] = useState<Set<string>>(() => new Set());
+  const todasProposals = proposals.filter((p) => !done.has(p.id));
+  const visibleProposals = todasProposals.filter(
+    (p) => (!desde || p.occurredOn >= desde) && (!hasta || p.occurredOn <= hasta),
+  );
+  const seleccionadas = visibleProposals.filter((p) => sel.has(p.id));
+  const seleccionables = visibleProposals.filter(
+    (p) => !p.possibleDuplicate || ignorarDup.has(p.id),
+  );
+  const todosMarcados = seleccionables.length > 0 && seleccionables.every((p) => sel.has(p.id));
+  function lote(
+    fn: (ids: string[]) => Promise<{ ok: boolean; hechas: number; fallidas: number }>,
+    verbo: string,
+  ) {
+    const ids = seleccionadas.map((p) => p.id);
+    if (ids.length === 0) return;
+    startTransition(async () => {
+      const r = await fn(ids);
+      if (r.hechas > 0) {
+        setDone((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id) => next.add(id));
+          return next;
+        });
+        setSel(new Set());
+        toast.show(
+          `${r.hechas} ${verbo}${r.fallidas ? ` · ${r.fallidas} no se pudieron` : ""}`,
+          "success",
+        );
+        router.refresh();
+      } else {
+        toast.show("No pudimos procesar la selección.", "error");
+      }
+    });
+  }
   const visibleUncat = uncategorized.filter((t) => !done.has(t.id));
   const visibleCandidates = candidates.filter((c) => !done.has(c.transaction.id)).slice(0, 6);
   // Solo las accionables (lo cumplido no requiere atención).
   const visibleAlerts = alerts.filter((a) => a.status !== "cumplido");
 
-  const totalPendiente = visibleProposals.length + visibleUncat.length + visibleCandidates.length;
+  const totalPendiente = todasProposals.length + visibleUncat.length + visibleCandidates.length;
 
   /** Ejecuta una acción, oculta la fila si sale bien y refresca. Toast en español. */
   function run(fn: () => Promise<ActionResult>, okMsg: string, hideId?: string) {
@@ -235,15 +274,80 @@ export function RevisionInbox({
       />
 
       {/* ── Por revisar: propuestas de ingesta ─────────────────────────── */}
-      {visibleProposals.length > 0 && (
+      {todasProposals.length > 0 && (
         <Block
           title="Por revisar"
-          n={visibleProposals.length}
+          n={todasProposals.length}
           hint="Propuestas detectadas en tus correos del banco."
         >
+          {/* Lote: fechas + todos + registrar/descartar la selección. */}
+          <div style={{ display: "grid", gap: 8, margin: "8px 0 4px" }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <DateField name="desde" label="Del" value={desde} onChange={setDesde} />
+              <DateField name="hasta" label="Al" value={hasta} onChange={setHasta} />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <label
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={todosMarcados}
+                  disabled={pending || seleccionables.length === 0}
+                  onChange={(e) =>
+                    setSel(e.target.checked ? new Set(seleccionables.map((p) => p.id)) : new Set())
+                  }
+                />
+                Todos ({visibleProposals.length})
+              </label>
+              {seleccionadas.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    className="m-btn m-btn-primary"
+                    style={SM_BTN}
+                    disabled={pending}
+                    onClick={() => lote(confirmIngestProposalsBatchAction, "registrados")}
+                  >
+                    Registrar {seleccionadas.length}
+                  </button>
+                  <button
+                    type="button"
+                    className="m-btn m-btn-secondary"
+                    style={SM_BTN}
+                    disabled={pending}
+                    onClick={() => lote(discardIngestProposalsBatchAction, "descartados")}
+                  >
+                    Descartar {seleccionadas.length}
+                  </button>
+                </>
+              ) : null}
+            </div>
+            {visibleProposals.length === 0 ? (
+              <div className="muted" style={{ fontSize: 12 }}>
+                Nada entre esas fechas. Borrá el filtro para ver el resto.
+              </div>
+            ) : null}
+          </div>
           {visibleProposals.map((p) => (
             <div key={p.id} style={ROW}>
-              <div style={TTL}>{p.merchant || "Movimiento"}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  aria-label={`Seleccionar ${p.merchant ?? "movimiento"}`}
+                  checked={sel.has(p.id)}
+                  disabled={pending}
+                  onChange={(e) =>
+                    setSel((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(p.id);
+                      else next.delete(p.id);
+                      return next;
+                    })
+                  }
+                />
+                <div style={{ ...TTL, flex: 1 }}>{p.merchant || "Movimiento"}</div>
+              </div>
               <div style={META}>
                 <span
                   className="muted"
