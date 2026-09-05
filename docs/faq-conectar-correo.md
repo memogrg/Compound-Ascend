@@ -58,7 +58,7 @@ Hasta que no confirmés, Gmail no reenvía nada.
 **Configuré todo y no llega nada.**
 Revisá en este orden: (1) que el aviso del banco te haya llegado a vos; (2) que la dirección de ingesta
 esté copiada exacta; (3) en Gmail, que hayás confirmado el reenvío y marcado «No enviarlo nunca a
-Spam» (Gmail no reenvía spam); (4) que hayan pasado 15 minutos, que es cada cuánto revisamos el buzón.
+Spam» (Gmail no reenvía spam); (4) tocá «Buscar avisos ahora» en Configuración → Correos del banco (o esperá: el buzón se revisa solo cada 5 minutos).
 Si en Configuración dice «recibimos N avisos que todavía no sabemos leer», tu reenvío funciona.
 
 **¿Van a leer todo mi correo?**

@@ -401,7 +401,10 @@ export function Faqs() {
                         En Gmail: que hayás confirmado el reenvío y marcado «No enviarlo nunca a
                         Spam». Gmail no reenvía lo que cae en spam.
                       </li>
-                      <li>Que hayan pasado 15 minutos: es cada cuánto revisamos el buzón.</li>
+                      <li>
+                        Tocá «Buscar avisos ahora» en Configuración → Correos del banco (o esperá:
+                        el buzón se revisa solo cada 5 minutos).
+                      </li>
                     </ul>
                     <p>
                       Si en Configuración dice «recibimos N avisos que todavía no sabemos leer», tu

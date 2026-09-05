@@ -122,6 +122,10 @@ export const RATE_LIMITS = {
   ingestEmailAddress: { limit: 3, windowMs: 60 * 60_000 },
   ingestEmailUser: { limit: 10, windowMs: 24 * 60 * 60_000 },
   ingestEmailConfirm: { limit: 8, windowMs: 15 * 60_000 },
+  // «Buscar avisos ahora»: abre el buzón IMAP compartido. Por usuario y global,
+  // porque una corrida procesa el buzón entero (sirve a todos a la vez).
+  ingestPollUser: { limit: 6, windowMs: 10 * 60_000 },
+  ingestPollGlobal: { limit: 1, windowMs: 20_000 },
   // Webhooks firmados: la firma es la defensa real; esto solo corta el costo
   // de CPU de intentos masivos de firma invalida.
   webhook: { limit: 30, windowMs: 60_000 },
