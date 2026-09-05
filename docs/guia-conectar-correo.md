@@ -72,7 +72,7 @@ ingesta**, la que copiaste en el Paso 1.
 
 **Parte 2: confirmar desde CARTERA+ (1 minuto)**
 
-7. Volvé a CARTERA+ → **Configuración → Correos del banco**. En menos de 15 minutos aparece una tarjeta
+7. Volvé a CARTERA+ → **Configuración → Correos del banco**. Tocá **Buscar avisos ahora** y aparece una tarjeta
    que dice **«Gmail necesita que confirmés el reenvío»** con un botón **Confirmar el reenvío**.
 8. Tocá el botón. Se abre una página de Google: tocá **Confirmar**.
 9. Volvé a la pestaña de Gmail y **recargá la página** (F5).
@@ -143,7 +143,7 @@ aplica a correos nuevos.
 ## Paso 3 · Probalo
 
 1. Reenviá **a mano** (opción E) un aviso del banco que ya tengas en la bandeja.
-2. Esperá hasta 15 minutos (revisamos el buzón cada 15).
+2. En **Configuración → Correos del banco** tocá **Buscar avisos ahora** (o esperá: el buzón se revisa solo cada 5 minutos).
 3. Abrí CARTERA+ → **Transacciones → Por revisar**. Ahí debería estar el movimiento.
 
 Si en Configuración → Correos del banco aparece «recibimos N avisos que todavía no sabemos leer», tu
@@ -185,7 +185,7 @@ Un aviso reenviado dos veces **no se duplica**: lo reconocemos por su referencia
    (Paso 2, parte 3).
 5. **¿Es correo de la empresa?** Google Workspace y Microsoft 365 pueden tener el reenvío bloqueado por
    el administrador. Mientras tanto, reenvío manual.
-6. **¿Pasaron 15 minutos?** Revisamos el buzón cada 15 minutos; no es instantáneo.
+6. **¿Tocaste «Buscar avisos ahora»?** Si no, el buzón se revisa solo cada 5 minutos; no es instantáneo.
 
 Si nada de eso lo explica, escribinos contándonos el banco y la hora a la que reenviaste, y lo revisamos.
 

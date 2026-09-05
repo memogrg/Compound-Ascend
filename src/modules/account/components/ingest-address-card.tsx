@@ -8,7 +8,10 @@
  * El botón de copiar existe porque la dirección NO se teclea a mano: un carácter
  * mal copiado manda los avisos del banco a un buzón que no existe, en silencio.
  */
-import { useState, type CSSProperties } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/toast";
+import { pollIngestNowAction } from "@/modules/account/api/actions";
 
 export function IngestAddressCard({ address }: { address: string }) {
   const [copiado, setCopiado] = useState(false);
@@ -57,7 +60,39 @@ export function IngestAddressCard({ address }: { address: string }) {
         Es tuya y solo tuya: cualquier aviso del banco que reenvíes acá entra a tu cuenta, sin que
         tengas que verificar nada. No la compartas.
       </p>
+      <PollNowRow />
       <IngestSetupGuide address={address} />
+    </div>
+  );
+}
+
+/**
+ * «Buscar avisos ahora». El buzón se revisa solo cada 5 minutos; cuando la
+ * persona acaba de reenviar algo (o de agregar la dirección en Gmail y espera el
+ * botón de confirmar) no tiene por qué mirar el reloj.
+ */
+function PollNowRow() {
+  const router = useRouter();
+  const toast = useToast();
+  const [pending, start] = useTransition();
+  const [ultimo, setUltimo] = useState<string | null>(null);
+
+  const buscar = () =>
+    start(async () => {
+      const r = await pollIngestNowAction();
+      setUltimo(r.message);
+      if (r.ok) router.refresh();
+      else toast(r.message, "error");
+    });
+
+  return (
+    <div className="row" style={{ gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+      <button type="button" className="btn" onClick={buscar} disabled={pending}>
+        {pending ? "Revisando el buzón…" : "Buscar avisos ahora"}
+      </button>
+      <span className="muted" style={{ fontSize: 12.5, lineHeight: 1.4 }}>
+        {ultimo ?? "Revisamos el buzón solo cada 5 minutos. ¿Recién reenviaste algo? Tocá acá."}
+      </span>
     </div>
   );
 }
@@ -175,9 +210,10 @@ function IngestSetupGuide({ address }: { address: string }) {
       </details>
 
       <p style={NOTE_STYLE}>
-        <strong>Probalo:</strong> reenviá a mano un aviso que ya tengas. Revisamos el buzón cada 15
-        minutos; el movimiento aparece en <strong>Transacciones → Por revisar</strong>, donde lo
-        confirmás con un toque o lo editás antes.
+        <strong>Probalo:</strong> reenviá a mano un aviso que ya tengas. Tocá «Buscar avisos ahora»
+        (o esperá: el buzón se revisa solo cada 5 minutos); el movimiento aparece en{" "}
+        <strong>Transacciones → Por revisar</strong>, donde lo confirmás con un toque o lo editás
+        antes.
       </p>
     </details>
   );

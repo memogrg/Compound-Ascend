@@ -11,6 +11,7 @@ import {
 } from "@/modules/account/services/account-service";
 import { TZ_COOKIE } from "@/lib/time/user-time";
 import { resolveIngestNotice } from "@/modules/account/services/ingest-notices-service";
+import { pollIngestNow, type PollNowResult } from "@/modules/account/services/ingest-poll-service";
 import { NOTIFICATION_CHANNELS, type NotificationChannel } from "@/lib/notifications/preferences";
 import { DISPLAY_CURRENCY_COOKIE } from "@/modules/financial-base";
 import { SUPPORTED_CURRENCIES } from "@/lib/fx";
@@ -331,6 +332,30 @@ export async function resolveIngestNoticeAction(id: string): Promise<AccountActi
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos actualizar el aviso." };
+  }
+}
+
+export async function pollIngestNowAction(): Promise<PollNowResult> {
+  if (!isSupabaseConfigured()) {
+    return { ok: false, encontrado: false, message: "Conecta Supabase." };
+  }
+  try {
+    const res = await pollIngestNow();
+    if (res.ok) {
+      for (const p of ["/configuracion", "/m/perfil", "/transacciones", "/m/transacciones"]) {
+        revalidatePath(p);
+      }
+    }
+    return res;
+  } catch (err) {
+    logger.error("pollIngestNow fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return {
+      ok: false,
+      encontrado: false,
+      message: "No pudimos revisar el buzón. Probá de nuevo.",
+    };
   }
 }
 
