@@ -96,3 +96,12 @@ export type { BaseIndicators, IncomeSource, ExpenseItem, ExpenseNature } from ".
 export type { Transaction, TxnKind, Period } from "./types";
 /** Fija el presupuesto de un sobre del periodo (lo usa el tab de Gastos y el asesor). */
 export { setEnvelopeBudgetAction } from "./api/v2-actions";
+
+// Conciliador de ingesta (nivel B): unir propuestas con movimientos de otras puertas.
+export {
+  autoMergePendingProposal,
+  mergeProposalIntoTransaction,
+  attachDuplicateHints,
+  type AutoMerged,
+  type DuplicateHint,
+} from "@/modules/financial-base/services/reconcile-service";

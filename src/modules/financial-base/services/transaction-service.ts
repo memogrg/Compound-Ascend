@@ -315,6 +315,10 @@ export async function buildTransactionRow(
     // Off-budget: default true (cuenta en presupuesto); false solo para gastos
     // que ya se contaron en otro lado (p.ej. consumo de un frasco de ahorro).
     counts_in_budget: input.countsInBudget ?? true,
+    // Conciliador (migración 20260905000002): referencia del banco si vino de la ingesta.
+    external_ref: input.externalRef ?? null,
+    card_last4: input.cardLast4 ?? null,
+    bank_code: input.bankCode ?? null,
   };
   return { row, linkedKind, linkedId, currency };
 }

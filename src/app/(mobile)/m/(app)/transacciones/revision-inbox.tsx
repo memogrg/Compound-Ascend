@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/format";
 import {
   confirmIngestProposalAction,
   discardIngestProposalAction,
+  mergeIngestProposalAction,
   assignCategoryAction,
   linkTransactionAction,
   markReviewedAction,
@@ -140,6 +141,7 @@ export function RevisionInbox({
 
   // Ocultado optimista: la fila desaparece al resolverse, sin esperar al refresh.
   const [done, setDone] = useState<Set<string>>(new Set());
+  const [ignorarDup, setIgnorarDup] = useState<Set<string>>(() => new Set());
   const [discard, setDiscard] = useState<PendingProposalView | null>(null);
   const [classify, setClassify] = useState<Transaction | null>(null);
   // Edición antes de confirmar: la promesa es «un toque, y si hay que corregir,
@@ -260,6 +262,53 @@ export function RevisionInbox({
                   {formatMoney(p.amount, p.currency)}
                 </span>
               </div>
+              {p.possibleDuplicate && !ignorarDup.has(p.id) ? (
+                <div
+                  role="note"
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.45,
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    background: "var(--warn-soft, rgba(190,140,40,.12))",
+                    margin: "6px 0",
+                  }}
+                >
+                  Parece el mismo que{" "}
+                  <strong>
+                    {p.possibleDuplicate.description} ·{" "}
+                    {formatMoney(p.possibleDuplicate.amount, p.possibleDuplicate.currency)} ·{" "}
+                    {shortDate(p.possibleDuplicate.occurredOn)}
+                  </strong>{" "}
+                  que ya registraste.
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="m-btn m-btn-primary"
+                      style={SM_BTN}
+                      disabled={pending}
+                      onClick={() =>
+                        run(
+                          () => mergeIngestProposalAction(p.id, p.possibleDuplicate!.transactionId),
+                          "Unido: un solo movimiento",
+                          p.id,
+                        )
+                      }
+                    >
+                      Sí, es el mismo
+                    </button>
+                    <button
+                      type="button"
+                      className="m-btn m-btn-secondary"
+                      style={SM_BTN}
+                      disabled={pending}
+                      onClick={() => setIgnorarDup((prev) => new Set(prev).add(p.id))}
+                    >
+                      No, es otro
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div style={ACTIONS}>
                 <button
                   type="button"

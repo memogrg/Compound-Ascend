@@ -163,6 +163,14 @@ export function QuickAddModal({
       // al EDITAR, `editTransactionAction` no lo devuelve — y no se inventa.
       const restante = sobreRemainingText((res as { sobre?: SobreRemaining }).sobre, formatMoney);
       if (restante) toast(restante, "info");
+      // Conciliador: el aviso del banco que esperaba en «Por revisar» se unió a este movimiento.
+      const unido = (res as { unido?: { merchant: string | null } }).unido;
+      if (unido) {
+        toast(
+          `Lo unimos con el aviso del banco${unido.merchant ? ` (${unido.merchant})` : ""}: no queda dos veces.`,
+          "info",
+        );
+      }
       if (!mismoMes(date, hoy)) {
         toast(`Quedó en ${mesLegible(date)}, no en tu mes actual.`, "info");
       }

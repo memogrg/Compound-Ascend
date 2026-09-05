@@ -11,7 +11,11 @@ import "server-only";
  * pipeline central (integración household de main), no este servicio.
  */
 import { createTransaction as createBaseTransaction } from "@/modules/financial-base";
-import { propagateLinkedTransaction, deleteLinkedTransaction } from "@/modules/financial-base";
+import {
+  propagateLinkedTransaction,
+  deleteLinkedTransaction,
+  autoMergePendingProposal,
+} from "@/modules/financial-base";
 import type { TransactionInput } from "@/modules/assistant/schemas";
 
 export async function createTransaction(input: TransactionInput): Promise<void> {
@@ -32,6 +36,17 @@ export async function createTransaction(input: TransactionInput): Promise<void> 
     origin: input.source === "receipt" ? "scanned" : "ai_assisted",
     linkedKind: input.linkedKind ?? "none",
     linkedId: input.linkedId ?? null,
+  });
+
+  // Conciliador: si el aviso del banco de este mismo movimiento ya estaba esperando en
+  // «Por revisar» (recibo escaneado hoy, correo que llegó antes), se une solo. Best-effort.
+  await autoMergePendingProposal({
+    id: created.id,
+    kind: input.kind,
+    amount: input.amount,
+    currency: created.currency,
+    occurredOn: input.occurredOn,
+    merchant: input.description,
   });
 
   // Propagación (vínculo propuesto por la IA o aplicado por regla).
