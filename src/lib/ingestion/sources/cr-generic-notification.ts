@@ -43,7 +43,7 @@ type Aviso =
 
 const RE_REVERSO = /\b(revers(?:o|i[oó]n)|anulaci[oó]n|devoluci[oó]n|reintegro|reembolso)\b/i;
 const RE_PROPIAS =
-  /\b(cuentas? propias?|entre (?:sus )?cuentas|transferencia propia|mismo titular)\b/i;
+  /\b(cuentas? propias?|entre sus cuentas|transferencia propia|mismo titular|tarjeta de cr[eé]dito propia)\b/i;
 const RE_PAGO_TARJETA =
   /\b(pago (?:de |a )?(?:su |la )?tarjeta|abono a (?:su |la )?tarjeta|pago tarjeta)\b/i;
 const RE_CAJERO = /\b(retiro (?:en |de )?(?:cajero|efectivo|atm)|cajero autom[aá]tico|ATM)\b/i;

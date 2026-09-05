@@ -14,14 +14,14 @@
 
 ## 1. Estado real hoy (medido, no supuesto)
 
-| Métrica (prod) | Valor |
-|---|---|
-| Reenviadores registrados (`email_ingest_links`) | 2 |
-| Reenviadores **verificados** | **0** |
+| Métrica (prod)                                                                  | Valor                               |
+| ------------------------------------------------------------------------------- | ----------------------------------- |
+| Reenviadores registrados (`email_ingest_links`)                                 | 2                                   |
+| Reenviadores **verificados**                                                    | **0**                               |
 | Correos procesados históricamente (`processed_events`, provider `email_ingest`) | 167 (último: 1 sep 2026, 02:02 UTC) |
-| Propuestas en cola (`ingest_proposals`) | 0 |
-| Transacciones con `source='email'` | 0 |
-| Tarjetas etiquetadas (`account_cards`) | 0 |
+| Propuestas en cola (`ingest_proposals`)                                         | 0                                   |
+| Transacciones con `source='email'`                                              | 0                                   |
+| Tarjetas etiquetadas (`account_cards`)                                          | 0                                   |
 
 **Lectura:** el carril está **apagado de hecho**. `lookupOwnerByForwarder` filtra por `verified = true`
 (`src/lib/ingestion/email/forwarder-lookup.ts`), y no hay ninguna fila verificada: todo correo que llegue
@@ -86,7 +86,7 @@ Lo que **sí** está bien resuelto y conviene no tocar:
 > el código nuevo esté en prod, el alta de correos **falla** (el código viejo escribe con el cliente de
 > sesión, que ya no tiene grant). Como no hay ningún reenviador verificado, no rompe nada en uso.
 
-El miedo de fondo — *"que un usuario conecte su correo y los gastos le lleguen a todos"* — **no ocurre**:
+El miedo de fondo — _"que un usuario conecte su correo y los gastos le lleguen a todos"_ — **no ocurre**:
 la propuesta se inserta con el `user_id`/`household_id` del dueño resuelto y la RLS impide que otro la lea.
 El riesgo real es el opuesto y más silencioso: **que el correo de un usuario se le asigne al usuario equivocado**.
 Hay cuatro caminos para eso, y tres son P0.
@@ -118,7 +118,7 @@ Consecuencias, en orden de gravedad:
    contra la fila del atacante y **sus gastos aparecen en la cuenta del atacante**. Es exactamente el
    escenario que no puede pasar.
 2. **Bloqueo (squatting).** `uq_email_ingest_links_forwarder` es único: la víctima ya no puede registrar su
-   propio correo y recibe *"Ese correo no está disponible"* sin entender por qué.
+   propio correo y recibe _"Ese correo no está disponible"_ sin entender por qué.
 
 **CERRADO** — migración `20260902000001_email_ingest_hardening.sql`, aplicada en prod. El fix fue sacar
 la escritura de manos del cliente:
@@ -172,7 +172,7 @@ con cuentas separadas en copia del mismo aviso, o un reenvío manual con copia a
 devuelve la que quiera y **el movimiento cae en una cuenta al azar**. No hay error, no hay log: se ve como
 si hubiera funcionado.
 
-**CERRADO** — `lookupOwnerByForwarder` trae *todos* los match y devuelve `OwnerLookup`:
+**CERRADO** — `lookupOwnerByForwarder` trae _todos_ los match y devuelve `OwnerLookup`:
 `found` | `none` | `ambiguous`. Con dos cuentas distintas el correo **no se procesa**, no se marca leído
 y se cuenta en `ambiguos` para alertar; dos correos del mismo hogar no son ambigüedad. La resolución es
 en dos niveles: primero destinatarios (auto-forward), y solo si ahí no hay nada, el remitente autenticado
@@ -193,16 +193,16 @@ identificables, así que «no sabemos leerlo» queda reservado a lo que ni siqui
 
 ### Otros hallazgos operativos
 
-| # | Hallazgo | Severidad | Fix |
-|---|---|---|---|
-| 5 | El poller lee **solo INBOX**. Un correo reenviado falla SPF y DMARC por diseño → Gmail lo puede mandar a Spam y se pierde sin rastro | P1 | Filtro "no enviar nunca a Spam" en el buzón de ingesta **y** leer también `[Gmail]/Spam` |
-| 6 | Gmail exige verificar la dirección destino y **manda el enlace a nuestro buzón compartido**. Hoy alguien tiene que abrirlo a mano por cada usuario nuevo | P1 | Ver §4: dirección única por usuario, o un auto-confirmador en el poller |
-| 7 | ~~Sin límite de envío en `requestIngestEmailVerification`~~ | — | **CERRADO** con P0-1 |
-| 8 | ~~`verify_expires_at` = 15 min~~ · falta el botón "reenviar código" | P2 | TTL ya subido a 30 min; falta el botón |
-| 8b | `anon`/`authenticated` tienen **TRUNCATE** sobre las tablas de usuario (herencia del `grant all` de los default privileges). TRUNCATE **ignora la RLS**. Hoy no es explotable porque PostgREST no lo expone | P2 | Revocar TRUNCATE a los roles del cliente en todas las tablas |
-| 9 | Los `ignorados` se acumulan sin leer en el buzón para siempre | P2 | Purga a los 30 días + métrica |
-| 10 | El resumen del poller no va a ninguna parte (solo el JSON de la respuesta) | P2 | Registrar cada corrida y alertar si `ignorados > 0` sostenido o si no hay corrida en 1 h |
-| 11 | Prod **sin backups** (gap P1-7 de la auditoría) | P1 | Fuera de este carril, pero aplica a estos datos |
+| #   | Hallazgo                                                                                                                                                                                                    | Severidad | Fix                                                                                      |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------- |
+| 5   | El poller lee **solo INBOX**. Un correo reenviado falla SPF y DMARC por diseño → Gmail lo puede mandar a Spam y se pierde sin rastro                                                                        | P1        | Filtro "no enviar nunca a Spam" en el buzón de ingesta **y** leer también `[Gmail]/Spam` |
+| 6   | Gmail exige verificar la dirección destino y **manda el enlace a nuestro buzón compartido**. Hoy alguien tiene que abrirlo a mano por cada usuario nuevo                                                    | P1        | Ver §4: dirección única por usuario, o un auto-confirmador en el poller                  |
+| 7   | ~~Sin límite de envío en `requestIngestEmailVerification`~~                                                                                                                                                 | —         | **CERRADO** con P0-1                                                                     |
+| 8   | ~~`verify_expires_at` = 15 min~~ · falta el botón "reenviar código"                                                                                                                                         | P2        | TTL ya subido a 30 min; falta el botón                                                   |
+| 8b  | `anon`/`authenticated` tienen **TRUNCATE** sobre las tablas de usuario (herencia del `grant all` de los default privileges). TRUNCATE **ignora la RLS**. Hoy no es explotable porque PostgREST no lo expone | P2        | Revocar TRUNCATE a los roles del cliente en todas las tablas                             |
+| 9   | Los `ignorados` se acumulan sin leer en el buzón para siempre                                                                                                                                               | P2        | Purga a los 30 días + métrica                                                            |
+| 10  | El resumen del poller no va a ninguna parte (solo el JSON de la respuesta)                                                                                                                                  | P2        | Registrar cada corrida y alertar si `ignorados > 0` sostenido o si no hay corrida en 1 h |
+| 11  | Prod **sin backups** (gap P1-7 de la auditoría)                                                                                                                                                             | P1        | Fuera de este carril, pero aplica a estos datos                                          |
 
 ---
 
@@ -224,7 +224,7 @@ El destinatario **es** la identidad. Se cae solo:
 
 - **P0-2 (spoofing) desaparece:** el atacante tendría que adivinar el token del destinatario.
 - **P0-3 (ambigüedad) desaparece:** un correo tiene una dirección de ingesta, no varias.
-- **Hallazgo 6 desaparece:** el código/enlace de verificación de Gmail llega a la dirección de *ese* usuario;
+- **Hallazgo 6 desaparece:** el código/enlace de verificación de Gmail llega a la dirección de _ese_ usuario;
   el poller lo reconoce, lo asocia sin ambigüedad y se lo muestra en la app (o abre el enlace solo).
 - **Privacidad:** si el usuario se equivoca de filtro y reenvía correo personal, entra por su propio buzón lógico.
 
@@ -242,15 +242,15 @@ La dirección plana actual se queda como camino de reenvío manual heredado, con
 
 ## 5. Matriz por proveedor (verificado contra documentación oficial, sep 2026)
 
-| Proveedor | Reenvío automático | ¿Verifica el destino? | Costo | Trampa principal |
-|---|---|---|---|---|
-| **Gmail personal** | Configuración → Reenvío y correo POP/IMAP; filtro por remitente para reenviar solo el banco | **Sí**, enlace/código a la dirección destino. El filtro solo lista direcciones ya verificadas | Gratis | **Nunca reenvía lo que cae en Spam** → hay que crear antes el filtro "No enviarlo nunca a Spam". Y **no se configura desde el celular**: la doc de Google empieza cada paso con "En tu computadora" |
-| **Google Workspace** | Igual que Gmail | Sí | — | El admin puede apagarlo: la sección de Reenvío **desaparece sin mensaje de error** |
-| **Outlook.com / Hotmail** | Configuración → Correo → Reenvío; o Reglas → **Redirigir a** | **No verifica nada** | Gratis | Usar **"Redirigir a"**, no "Reenviar a" (el reenvío llega "de parte del usuario" y se pierde el remitente del banco). Sin verificación, un typo manda los avisos del banco a un tercero y nadie se entera |
-| **Microsoft 365 / Exchange** | Igual que Outlook web | No | — | **Bloqueado por defecto desde 2021** en todo tenant nuevo. Rebota con `5.7.520 Access denied, Your organization does not allow external forwarding` → lo tiene que habilitar el admin |
-| **Yahoo Mail** | Configuración → Buzones → Auto-forwarding | Sí, botón *Verify* | **Requiere Yahoo Mail Plus (de pago)** | Además "no disponible en todos los locales" — falta confirmar Costa Rica con una cuenta real |
-| **iCloud** | icloud.com/mail → Configuración → Reenvío de correo | No | Gratis | **No marcar "Eliminar mensajes después de reenviarlos"**: el usuario pierde su propia copia. Solo desde icloud.com, no desde la app Mail |
-| **Cualquiera** | Reenvío **manual** del aviso | — | Gratis | Camino de rescate universal. Depende del `From` → exige el endurecimiento P0-2 |
+| Proveedor                    | Reenvío automático                                                                          | ¿Verifica el destino?                                                                         | Costo                                  | Trampa principal                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gmail personal**           | Configuración → Reenvío y correo POP/IMAP; filtro por remitente para reenviar solo el banco | **Sí**, enlace/código a la dirección destino. El filtro solo lista direcciones ya verificadas | Gratis                                 | **Nunca reenvía lo que cae en Spam** → hay que crear antes el filtro "No enviarlo nunca a Spam". Y **no se configura desde el celular**: la doc de Google empieza cada paso con "En tu computadora"       |
+| **Google Workspace**         | Igual que Gmail                                                                             | Sí                                                                                            | —                                      | El admin puede apagarlo: la sección de Reenvío **desaparece sin mensaje de error**                                                                                                                        |
+| **Outlook.com / Hotmail**    | Configuración → Correo → Reenvío; o Reglas → **Redirigir a**                                | **No verifica nada**                                                                          | Gratis                                 | Usar **"Redirigir a"**, no "Reenviar a" (el reenvío llega "de parte del usuario" y se pierde el remitente del banco). Sin verificación, un typo manda los avisos del banco a un tercero y nadie se entera |
+| **Microsoft 365 / Exchange** | Igual que Outlook web                                                                       | No                                                                                            | —                                      | **Bloqueado por defecto desde 2021** en todo tenant nuevo. Rebota con `5.7.520 Access denied, Your organization does not allow external forwarding` → lo tiene que habilitar el admin                     |
+| **Yahoo Mail**               | Configuración → Buzones → Auto-forwarding                                                   | Sí, botón _Verify_                                                                            | **Requiere Yahoo Mail Plus (de pago)** | Además "no disponible en todos los locales" — falta confirmar Costa Rica con una cuenta real                                                                                                              |
+| **iCloud**                   | icloud.com/mail → Configuración → Reenvío de correo                                         | No                                                                                            | Gratis                                 | **No marcar "Eliminar mensajes después de reenviarlos"**: el usuario pierde su propia copia. Solo desde icloud.com, no desde la app Mail                                                                  |
+| **Cualquiera**               | Reenvío **manual** del aviso                                                                | —                                                                                             | Gratis                                 | Camino de rescate universal. Depende del `From` → exige el endurecimiento P0-2                                                                                                                            |
 
 Nota de mercado: RACSA cerró su correo de consumo; ICE/kölbi y los cables no documentan reenvío para
 usuarios finales. Con Gmail, Outlook, iCloud y Yahoo se cubre prácticamente todo el mercado tico.
@@ -277,13 +277,13 @@ Para cada proveedor (Gmail, Outlook, iCloud, Yahoo) y en los dos modos (automát
 3. Confirmar que la dirección del usuario aparece y que `matched: true`.
 4. Anotar en esta tabla qué cabecera la trajo, para saber de qué dependemos:
 
-| Proveedor | Modo | Cabecera que trajo la dirección | ¿Match? | Fecha |
-|---|---|---|---|---|
-| Gmail | auto | | | |
-| Gmail | manual | | | |
-| Outlook.com | redirect | | | |
-| iCloud | auto | | | |
-| Yahoo | auto | | | |
+| Proveedor   | Modo     | Cabecera que trajo la dirección | ¿Match? | Fecha |
+| ----------- | -------- | ------------------------------- | ------- | ----- |
+| Gmail       | auto     |                                 |         |       |
+| Gmail       | manual   |                                 |         |       |
+| Outlook.com | redirect |                                 |         |       |
+| iCloud      | auto     |                                 |         |       |
+| Yahoo       | auto     |                                 |         |       |
 
 ### 6.2 Prueba de aislamiento (obligatoria antes de abrir el registro)
 
@@ -337,16 +337,16 @@ al usuario, no esperar a que se dé cuenta.
 
 ## 7. Orden sugerido de trabajo (un delta a la vez)
 
-| # | Delta | Estado |
-|---|---|---|
-| 1 | **P0-1 / P0-2 / P0-3**: revoke + escritura solo desde el servidor + rate limit + DKIM + sin adivinar | **HECHO** (rama `fix/ingesta-correo-aislamiento`; el revoke ya en prod) |
-| 2 | Desplegar y reactivar el carril: verificar un reenviador real y probar punta a punta | Siguiente. Sin esto no hay nada que medir |
-| 3 | Dirección de ingesta única por usuario (§4), sobre Cloudflare Email Routing | Siguiente. Borra la inferencia por cabeceras de raíz |
-| 4 | OAuth de Microsoft (Graph `Mail.Read`) | El único "un clic" de verdad que es gratis y sin auditoría |
-| 5 | `ingest_unparsed` + aviso al usuario | Convierte la pérdida silenciosa en cola de trabajo de parsers |
-| 6 | Spam del buzón + alertas del cron | Evita la pérdida invisible |
-| 7 | Gmail OAuth (piloto ≤100 usuarios con cliente desechable → después CASA o proveedor) | Decisión con costo; ver §8 |
-| 8 | Parsers BNCR y BCR | Recién ahí el producto sirve fuera de BAC |
+| #   | Delta                                                                                                | Estado                                                                  |
+| --- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1   | **P0-1 / P0-2 / P0-3**: revoke + escritura solo desde el servidor + rate limit + DKIM + sin adivinar | **HECHO** (rama `fix/ingesta-correo-aislamiento`; el revoke ya en prod) |
+| 2   | Desplegar y reactivar el carril: verificar un reenviador real y probar punta a punta                 | Siguiente. Sin esto no hay nada que medir                               |
+| 3   | Dirección de ingesta única por usuario (§4), sobre Cloudflare Email Routing                          | Siguiente. Borra la inferencia por cabeceras de raíz                    |
+| 4   | OAuth de Microsoft (Graph `Mail.Read`)                                                               | El único "un clic" de verdad que es gratis y sin auditoría              |
+| 5   | `ingest_unparsed` + aviso al usuario                                                                 | Convierte la pérdida silenciosa en cola de trabajo de parsers           |
+| 6   | Spam del buzón + alertas del cron                                                                    | Evita la pérdida invisible                                              |
+| 7   | Gmail OAuth (piloto ≤100 usuarios con cliente desechable → después CASA o proveedor)                 | Decisión con costo; ver §8                                              |
+| 8   | Parsers BNCR y BCR                                                                                   | Recién ahí el producto sirve fuera de BAC                               |
 
 ---
 
@@ -355,14 +355,14 @@ al usuario, no esperar a que se dé cuenta.
 El reenvío nunca va a ser un clic: es configuración en casa ajena. Lo que sí puede serlo es **conectar la
 bandeja**. El terreno, por proveedor:
 
-| Proveedor | Camino a un clic | Costo | Plazo |
-|---|---|---|---|
-| **Outlook / Hotmail / M365** | Microsoft Graph `Mail.Read` delegado. Funciona en cuentas personales **sin consentimiento de administrador**; la verificación de publicador es **gratis y de minutos**. No existe auditoría pagada | **$0** | ~1 semana |
-| **Gmail (piloto)** | `gmail.readonly` con el cliente OAuth en producción **sin verificar**: tope de **100 usuarios de por vida y por cliente** (no se resetea), con pantalla de "app no verificada" | $0 | ~1 semana |
-| **Gmail (escala)** | El mismo scope es **restringido**: verificación + **auditoría de seguridad CASA anual**. Precio no publicado por Google; los evaluadores rondan **$540–$1.800/año** | Costo fijo anual | **6–12 semanas** |
-| **Gmail (comprado)** | Un proveedor con cliente Google pre-verificado (Nylas y similares) evita verificación y CASA | ~$49/mes + ~$2/cuenta/mes | ~1 semana |
-| **Yahoo (plan gratis)** | **La palanca que buscábamos:** el reenvío automático es de pago, pero **IMAP con contraseña de aplicación es gratis** y no está paywalleado. `imap.mail.yahoo.com:993` | **$0** | ~1 semana |
-| **iCloud** | Contraseña específica de app + IMAP (`imap.mail.me.com:993`). Gratis, máx. 25 activas | **$0** | ~1 semana |
+| Proveedor                    | Camino a un clic                                                                                                                                                                                   | Costo                     | Plazo            |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ---------------- |
+| **Outlook / Hotmail / M365** | Microsoft Graph `Mail.Read` delegado. Funciona en cuentas personales **sin consentimiento de administrador**; la verificación de publicador es **gratis y de minutos**. No existe auditoría pagada | **$0**                    | ~1 semana        |
+| **Gmail (piloto)**           | `gmail.readonly` con el cliente OAuth en producción **sin verificar**: tope de **100 usuarios de por vida y por cliente** (no se resetea), con pantalla de "app no verificada"                     | $0                        | ~1 semana        |
+| **Gmail (escala)**           | El mismo scope es **restringido**: verificación + **auditoría de seguridad CASA anual**. Precio no publicado por Google; los evaluadores rondan **$540–$1.800/año**                                | Costo fijo anual          | **6–12 semanas** |
+| **Gmail (comprado)**         | Un proveedor con cliente Google pre-verificado (Nylas y similares) evita verificación y CASA                                                                                                       | ~$49/mes + ~$2/cuenta/mes | ~1 semana        |
+| **Yahoo (plan gratis)**      | **La palanca que buscábamos:** el reenvío automático es de pago, pero **IMAP con contraseña de aplicación es gratis** y no está paywalleado. `imap.mail.yahoo.com:993`                             | **$0**                    | ~1 semana        |
+| **iCloud**                   | Contraseña específica de app + IMAP (`imap.mail.me.com:993`). Gratis, máx. 25 activas                                                                                                              | **$0**                    | ~1 semana        |
 
 Tres cosas que hay que tener en la cabeza antes de tocar OAuth de Google:
 
@@ -377,7 +377,7 @@ Tres cosas que hay que tener en la cabeza antes de tocar OAuth de Google:
    desechable, no con el que se vaya a verificar después.
 
 **Y la palanca de las contraseñas de aplicación tiene un precio que no es dinero:** custodiar una
-credencial del correo del usuario. Si se toma ese camino (Yahoo e iCloud, donde es la *única* opción),
+credencial del correo del usuario. Si se toma ese camino (Yahoo e iCloud, donde es la _única_ opción),
 va cifrada con llave de KMS —nunca al alcance del código de aplicación con la service-role— y con el
 flujo de re-autenticación construido **antes** de lanzarlo: la contraseña se revoca sola cuando el
 usuario cambia su clave principal, y si no hay aviso, el usuario solo ve que "dejó de funcionar".
@@ -410,9 +410,9 @@ gratis y sin tocar el apex.
 
 DNS Settings → **Custom Records** → añadir:
 
-| Alojamiento (Host) | Tipo | Prioridad | Datos |
-|---|---|---|---|
-| `in` | MX | 10 | `smtp.google.com` |
+| Alojamiento (Host) | Tipo | Prioridad | Datos             |
+| ------------------ | ---- | --------- | ----------------- |
+| `in`               | MX   | 10        | `smtp.google.com` |
 
 Ruta: **account.squarespace.com/domains** → el dominio → **DNS** → **Registros personalizados** →
 **Agregar registro**. En «Alojamiento» va solo `in`, no el dominio completo.
@@ -421,11 +421,11 @@ Ruta: **account.squarespace.com/domains** → el dominio → **DNS** → **Regis
 
 ### 9.3 Regla de enrutamiento (el catch-all)
 
-Consola → **Apps → Google Workspace → Gmail → Enrutamiento** (*Routing* — NO «Enrutamiento
+Consola → **Apps → Google Workspace → Gmail → Enrutamiento** (_Routing_ — NO «Enrutamiento
 predeterminado» ni «Hosts», que son pantallas distintas) → **Configurar** / **Agregar otra regla**:
 
 - Nombre: `ingesta-catchall`.
-- **Selecciona cuándo se aplica esta acción** (*Select when this action is applied*): solo
+- **Selecciona cuándo se aplica esta acción** (_Select when this action is applied_): solo
   **Mensajes entrantes**.
 - **Filtro de sobre** → **Solo afectar a destinatarios específicos del sobre** →
   **Coincidencia de patrones** → `(?i)^.*@in\.aitechumbrella\.com$`
@@ -434,12 +434,12 @@ predeterminado» ni «Hosts», que son pantallas distintas) → **Configurar** /
 - Acción **Modificar mensaje** → **Cambiar destinatario del sobre** → **Reemplazar la dirección de
   correo electrónico completa del destinatario** → `communications@aitechumbrella.com`.
 - ⚠️ Dentro de **Modificar mensaje**, marcar **«Agregar encabezado X-Gm-Original-To»**
-  (*Add X-Gm-Original-To header*; si no aparece arriba, está en la lista **Avanzado**).
+  (_Add X-Gm-Original-To header_; si no aparece arriba, está en la lista **Avanzado**).
   **Es el paso que sostiene todo el diseño.** Sin él, el destinatario original se pierde al reescribir
   el sobre y la dirección única queda irrecuperable: en un auto-forward el `To:` trae la dirección del
   propio usuario, no la nuestra.
-- Tipos de cuenta: **Todas las cuentas inactivas y no reconocidas** (desmarcar *Cuenta de usuario* y
-  *Cuenta de grupo*).
+- Tipos de cuenta: **Todas las cuentas inactivas y no reconocidas** (desmarcar _Cuenta de usuario_ y
+  _Cuenta de grupo_).
 - Hasta 24 h en propagar, normalmente minutos.
 
 ### 9.4 Variable en Vercel
@@ -468,7 +468,7 @@ Cuando el usuario configure el reenvío, Google manda a **su** dirección de ing
 `forwarding-noreply@google.com`, asunto `Gmail Forwarding Confirmation (#NNNNNNNN)…`, con un código y
 un enlace `https://mail-settings.google.com/mail/vf-<token>`.
 
-**No se puede auto-confirmar desde el servidor:** el enlace abre una pantalla con un botón *Confirm*,
+**No se puede auto-confirmar desde el servidor:** el enlace abre una pantalla con un botón _Confirm_,
 no es un GET idempotente, y no hay endpoint documentado. Lo que sí se puede —y es el siguiente
 delta— es **detectar ese correo, resolver al usuario por `X-Gm-Original-To` y mostrarle el enlace
 dentro de la app**: «Confirmá el reenvío», un clic, sin salir a buscar nada. Ojo: el enlace gemelo con
@@ -481,23 +481,24 @@ cuando el destino es un subdominio del mismo dominio— así que su reenvío que
 
 ## 10. Estado de cierre (4 de septiembre de 2026)
 
-Revisión completa del carril contra el objetivo del producto: *que el usuario conecte cualquier correo,
+Revisión completa del carril contra el objetivo del producto: _que el usuario conecte cualquier correo,
 que todos los avisos de sus bancos entren solos, y que él solo confirme —y corrija ahí mismo si hace falta—
-sin volver a teclear un gasto*. Lo que está, lo que se cerró en esta entrega y lo que sigue faltando.
+sin volver a teclear un gasto_. Lo que está, lo que se cerró en esta entrega y lo que sigue faltando.
 
 ### 10.1 Lo que ya funciona en producción
 
-| Pieza | Estado | Evidencia |
-|---|---|---|
-| Dirección de ingesta única por cuenta | ✅ Viva | `u2g5zmfs5w2@in.aitechumbrella.com` creada al abrir Configuración; segunda cuenta con la suya |
-| Subdominio `in.aitechumbrella.com` en Workspace + MX + catch-all con `X-Gm-Original-To` + filtro de sobre por destinatario | ✅ Configurado | Capturas del 4 sep; regla `ingesta-catchall` habilitada; `dig MX` responde `1 smtp.google.com` |
-| `INGEST_ADDRESS_DOMAIN` en Vercel | ✅ | Todos los entornos; despliegue posterior READY |
-| Poller cada 15 min por GitHub Actions | ✅ Corre | Última corrida: `{"ok":true,"ignorados":104,…}` — vivo, autenticado, sin errores |
-| Aislamiento entre cuentas (los 3 P0) | ✅ Cerrado y desplegado | PR #717 |
-| Parser de avisos de **BAC**: compra con tarjeta (CRC/USD), SINPE recibido/debitado por IBAN, fallback con confianza baja; comercio y fecha de respaldo desde el asunto | ✅ | `sources/bac-notification.ts` |
-| Parser **genérico de Costa Rica** (BNCR, BCR, Popular, Scotiabank, Promerica, Davivienda, Lafise, Cathay, BCT, Improsa, Coopenae, Coopeservidores, Coopealianza, Coopeande, Mucap, Grupo Mutual, Caja de ANDE, Prival): identifica el banco por dominio del remitente o marca, y saca monto/moneda, tipo (compra, SINPE Móvil, retiro en cajero, reverso, pago de tarjeta, entre cuentas propias), comercio/contraparte, fecha, referencia y último-4 con anclas comunes. Confianza ≤ 0.85: siempre pasa por «Por revisar». Rama `feat/plantillas-bancos` | ✅ | `sources/cr-generic-notification.ts`, `sources/common.ts` |
-| Confirmación / descarte en «Por revisar» (web y móvil) → transacción real con `origin='imported', source='email'` | ✅ | `confirmIngestProposalAction` |
-| Categorización automática al confirmar (reglas → historial del hogar → caché de sugerencias) | ✅ | `buildTransactionRow` → `resolveAutoCategory` |
+| Pieza                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Estado                  | Evidencia                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Dirección de ingesta única por cuenta                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ✅ Viva                 | `u2g5zmfs5w2@in.aitechumbrella.com` creada al abrir Configuración; segunda cuenta con la suya                  |
+| Subdominio `in.aitechumbrella.com` en Workspace + MX + catch-all con `X-Gm-Original-To` + filtro de sobre por destinatario                                                                                                                                                                                                                                                                                                                                                                                                          | ✅ Configurado          | Capturas del 4 sep; regla `ingesta-catchall` habilitada; `dig MX` responde `1 smtp.google.com`                 |
+| `INGEST_ADDRESS_DOMAIN` en Vercel                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | ✅                      | Todos los entornos; despliegue posterior READY                                                                 |
+| Poller cada 15 min por GitHub Actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ✅ Corre                | Última corrida: `{"ok":true,"ignorados":104,…}` — vivo, autenticado, sin errores                               |
+| Aislamiento entre cuentas (los 3 P0)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | ✅ Cerrado y desplegado | PR #717                                                                                                        |
+| Parser de avisos de **BAC**: compra con tarjeta (CRC/USD), SINPE recibido/debitado por IBAN, fallback con confianza baja; comercio y fecha de respaldo desde el asunto                                                                                                                                                                                                                                                                                                                                                              | ✅                      | `sources/bac-notification.ts`                                                                                  |
+| Plantillas **exactas** calibradas con correos reales (sep 2026): **BCR** (compra en tabla + «Transferencia entre cuentas BCR» a terceros/propia por nombre), **BN** (comprobante de Compra, monto `CRC 27939,00`, ref alfanumérica), **Davivienda/DAVIbank** (prosa `Alertas@davibank.cr`), **Promerica** (compra con etiquetas sin dos puntos y `CRC: 16,915.00`; pago de tarjeta propia). BAC SINPE con la redacción «acreditando la cuenta … un monto de …». Confianza 0.95                                                      | ✅                      | `sources/bcr-notification.ts`, `bn-notification.ts`, `davivienda-notification.ts`, `promerica-notification.ts` |
+| Parser **genérico de Costa Rica** (BNCR, BCR, Popular, Scotiabank, Promerica, Davivienda, Lafise, Cathay, BCT, Improsa, Coopenae, Coopeservidores, Coopealianza, Coopeande, Mucap, Grupo Mutual, Caja de ANDE, Prival): identifica el banco por dominio del remitente o marca, y saca monto/moneda, tipo (compra, SINPE Móvil, retiro en cajero, reverso, pago de tarjeta, entre cuentas propias), comercio/contraparte, fecha, referencia y último-4 con anclas comunes. Confianza ≤ 0.85: siempre pasa por «Por revisar». PR #738 | ✅                      | `sources/cr-generic-notification.ts`, `sources/common.ts`                                                      |
+| Confirmación / descarte en «Por revisar» (web y móvil) → transacción real con `origin='imported', source='email'`                                                                                                                                                                                                                                                                                                                                                                                                                   | ✅                      | `confirmIngestProposalAction`                                                                                  |
+| Categorización automática al confirmar (reglas → historial del hogar → caché de sugerencias)                                                                                                                                                                                                                                                                                                                                                                                                                                        | ✅                      | `buildTransactionRow` → `resolveAutoCategory`                                                                  |
 
 ### 10.2 Lo que cerró esta entrega (rama `feat/ingesta-cierre`)
 
@@ -519,13 +520,12 @@ sin volver a teclear un gasto*. Lo que está, lo que se cerró en esta entrega y
 
 ### 10.3 Lo que todavía falta, por orden de impacto
 
-1. **Afinar las plantillas por banco con correos reales.** La genérica (`cr-generic-notification.ts`)
-   ya propone movimientos de BNCR, BCR, Popular y los demás con anclas comunes, pero está calibrada
-   con muestras **sintéticas**: la redacción exacta de cada banco no está verificada. Regla de
-   operación: cada aviso que la genérica no entienda queda en `ingest_notices`; con 3–5 muestras reales
-   por banco se escribe su plantilla exacta (un archivo + una línea en `sources/index.ts`, ANTES de la
-   genérica) y sube la confianza a ≥ 0.9. Prioridad por cuota de mercado: **BNCR, BCR, Popular,
-   Davivienda/Scotiabank, Promerica**.
+1. **Plantillas exactas que faltan.** Ya hay plantilla real para BAC, BCR, BN, Davivienda y Promerica
+   (compras con tarjeta; SINPE solo BAC; transferencias solo BCR). Sin muestra real todavía: **Popular,
+   Scotiabank, Lafise, Coopenae, Coopeservidores** y el SINPE/transferencia/retiro de BN, BCR, Davivienda
+   y Promerica — los cubre la genérica (≤ 0.85) y `ingest_notices` junta lo que no entienda. Regla: cada
+   plantilla nueva = un archivo + una línea en `sources/index.ts` ANTES de la genérica, con test de la
+   muestra real.
 2. **SINPE Móvil por SMS.** Varios bancos (BAC entre ellos) avisan el SINPE Móvil recibido por **SMS**,
    no por correo, así que por este carril solo entra lo que el banco decida mandar por correo. El
    camino para el resto es el oyente de notificaciones en Android (§11).
@@ -545,18 +545,18 @@ sin volver a teclear un gasto*. Lo que está, lo que se cerró en esta entrega y
 
 ## 11. Cómo se llega a «sin clics» — lo que hacen las demás apps y qué aplica en Costa Rica
 
-Investigado el 4 de septiembre de 2026 con fuentes oficiales. La pregunta de fondo: *¿cómo sabe la app cuánto
-gana y cuánto gasta el usuario sin que él lo escriba?* Hay seis mecanismos en el mundo. En Costa Rica, en
+Investigado el 4 de septiembre de 2026 con fuentes oficiales. La pregunta de fondo: _¿cómo sabe la app cuánto
+gana y cuánto gasta el usuario sin que él lo escriba?_ Hay seis mecanismos en el mundo. En Costa Rica, en
 2026, tres sirven, dos sirven a medias y uno no existe.
 
-| Mecanismo | Qué captura | Fricción | Costo | Costa Rica hoy | Android / iOS |
-|---|---|---|---|---|---|
-| **Agregación bancaria** (Belvo, Prometeo, Fintoc, Plaid…) | Todo: tarjeta, SINPE, salario, cajero | 3 toques, luego cero | Belvo desde **US$1.000/mes** | **No existe.** Ningún agregador cubre un banco tico; 0 bancos con API pública; la regulación está «en planificación» (BCCR/SUGEF) y la Ley Marco Fintech no trae datos abiertos | — |
-| **Correo** (lo que ya tenemos) | Lo que el banco mande por correo: compras con tarjeta en BAC/BCR, SINPE por IBAN… | 3–6 clics una vez | ≈ $0 | **La mejor opción hoy.** Monedly (competidor tico, US$9,99/mes) corre exactamente esto | ✔ / ✔ |
-| **Escuchar las notificaciones push del teléfono** (Android `NotificationListenerService`) | Lo que la app del banco notifique: compras, SINPE recibido/enviado, en tiempo real | 2–3 toques una vez | Solo ingeniería (~2–3 semanas) | **El salto más grande hacia «cero clics»** para la mayoría Android de CR. Google lo permite con consentimiento explícito y divulgación; parsear en el teléfono y subir solo campos | ✔ / **✘ imposible en iOS** |
-| **Leer SMS** (Android) | BAC avisa SINPE Móvil por SMS; BN Alertas es solo SMS (y solo Kolbi) | 2 toques + revisión de Google Play | Ingeniería + riesgo de rechazo | A medias: Play lo permite para «gestión de presupuesto por SMS» pero la revisión es discrecional y ha habido bajas | ✔ con riesgo / ✘ |
-| **Importar estado de cuenta** (CSV/XLS/PDF) | Todo, una vez al mes | 3–4 toques al mes | OCR centavos por página | BAC exporta CSV/XLS/QIF/MT940; BCR Excel/PDF; Popular solo PDF al correo. Como «compartir con CARTERA+» desde la app del banco es un toque | ✔ / ✔ |
-| **Inferir lo recurrente** (salario, alquiler, suscripciones) | Ingresos y gastos fijos, por patrón | 1 toque: «¿ya te llegó el salario?» | Solo ingeniería | Universal. Es lo que hacen Monarch, Rocket Money y Copilot | ✔ / ✔ |
+| Mecanismo                                                                                 | Qué captura                                                                        | Fricción                            | Costo                          | Costa Rica hoy                                                                                                                                                                     | Android / iOS              |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| **Agregación bancaria** (Belvo, Prometeo, Fintoc, Plaid…)                                 | Todo: tarjeta, SINPE, salario, cajero                                              | 3 toques, luego cero                | Belvo desde **US$1.000/mes**   | **No existe.** Ningún agregador cubre un banco tico; 0 bancos con API pública; la regulación está «en planificación» (BCCR/SUGEF) y la Ley Marco Fintech no trae datos abiertos    | —                          |
+| **Correo** (lo que ya tenemos)                                                            | Lo que el banco mande por correo: compras con tarjeta en BAC/BCR, SINPE por IBAN…  | 3–6 clics una vez                   | ≈ $0                           | **La mejor opción hoy.** Monedly (competidor tico, US$9,99/mes) corre exactamente esto                                                                                             | ✔ / ✔                      |
+| **Escuchar las notificaciones push del teléfono** (Android `NotificationListenerService`) | Lo que la app del banco notifique: compras, SINPE recibido/enviado, en tiempo real | 2–3 toques una vez                  | Solo ingeniería (~2–3 semanas) | **El salto más grande hacia «cero clics»** para la mayoría Android de CR. Google lo permite con consentimiento explícito y divulgación; parsear en el teléfono y subir solo campos | ✔ / **✘ imposible en iOS** |
+| **Leer SMS** (Android)                                                                    | BAC avisa SINPE Móvil por SMS; BN Alertas es solo SMS (y solo Kolbi)               | 2 toques + revisión de Google Play  | Ingeniería + riesgo de rechazo | A medias: Play lo permite para «gestión de presupuesto por SMS» pero la revisión es discrecional y ha habido bajas                                                                 | ✔ con riesgo / ✘           |
+| **Importar estado de cuenta** (CSV/XLS/PDF)                                               | Todo, una vez al mes                                                               | 3–4 toques al mes                   | OCR centavos por página        | BAC exporta CSV/XLS/QIF/MT940; BCR Excel/PDF; Popular solo PDF al correo. Como «compartir con CARTERA+» desde la app del banco es un toque                                         | ✔ / ✔                      |
+| **Inferir lo recurrente** (salario, alquiler, suscripciones)                              | Ingresos y gastos fijos, por patrón                                                | 1 toque: «¿ya te llegó el salario?» | Solo ingeniería                | Universal. Es lo que hacen Monarch, Rocket Money y Copilot                                                                                                                         | ✔ / ✔                      |
 
 Lo que **no** sirve, para no perder tiempo: Apple Wallet y Google Wallet no exponen transacciones a
 terceros (FinanceKit es solo Apple Card en EE. UU./Reino Unido); las APIs de «card-linked offers» (Fidel,

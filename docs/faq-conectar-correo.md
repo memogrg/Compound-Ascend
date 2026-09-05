@@ -37,12 +37,13 @@ Entre 5 y 10 minutos, una sola vez. Para Gmail hace falta una computadora, porqu
 configurar reenvíos desde la app del celular. La guía paso a paso te lleva clic por clic.
 
 **¿Con qué bancos funciona?**
-Con los avisos de **BAC** la lectura es completa: comercio, monto, moneda, fecha, tarjeta, SINPE
-recibido y enviado. Para **BN, BCR, Popular, Scotiabank, Promerica, Davivienda, Lafise, Coopenae,
-Coopeservidores** y los demás bancos y cooperativas del país hacemos una lectura general (monto, si es
-gasto o ingreso, comercio, fecha) que vos revisás antes de confirmar, y que se vuelve exacta a medida
-que llegan avisos reales de cada banco. Si un aviso no lo entendemos, no se pierde: se guarda, te lo
-decimos en Configuración y aparece solo cuando lo sepamos leer.
+Con **BAC, BCR, Banco Nacional, Davivienda y Promerica** la lectura de compras con tarjeta es completa:
+comercio, monto, moneda, fecha, tarjeta (y SINPE en BAC, transferencias en BCR, pago de tarjeta en
+Promerica). Para **Popular, Scotiabank, Lafise, Coopenae, Coopeservidores** y los demás bancos y
+cooperativas del país hacemos una lectura general (monto, si es gasto o ingreso, comercio, fecha) que
+vos revisás antes de confirmar, y que se vuelve exacta con el primer aviso real de cada banco. Si un
+aviso no lo entendemos, no se pierde: se guarda, te lo decimos en Configuración y aparece solo cuando lo
+sepamos leer.
 
 **Mi banco no me manda correos, solo SMS. ¿Qué hago?**
 Encendé los avisos por correo desde la app o la banca en línea de tu banco: buscá **Alertas** o

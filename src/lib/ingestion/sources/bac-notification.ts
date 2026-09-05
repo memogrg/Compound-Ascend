@@ -177,13 +177,20 @@ function parseCardPurchase(text: string, meta?: NotificationMeta): RawMovement |
 
 /** PLANTILLA 2 — SINPE recibido → ingreso. */
 function parseSinpeReceived(text: string): RawMovement | null {
-  const flat = deburr(text);
+  // Dos redacciones reales del mismo aviso: "… por un monto de X Colones por concepto Y, la cual se
+  // aplicó …" y "… acreditando la cuenta IBAN … un monto de X Colones, por concepto de Y." (sin "por"
+  // y con el concepto cerrado por punto). Se trabaja sobre el texto aplanado.
+  const flat = deburr(text).replace(/\s+/g, " ");
   if (!/recibio una transferencia/i.test(flat)) return null;
 
-  const money = flat.match(/por un monto de\s*([\d.,]+)\s*(Dolares|Colones)/i);
+  const money = flat.match(/(?:por\s+)?un monto de\s*([\d.,]+)\s*(Dolares|Colones)/i);
   if (!money) return null;
 
-  const concept = text.match(/por concepto\s+(?:de\s+)?(.+?)\s*,\s*la cual/i)?.[1]?.trim() ?? "";
+  const concept =
+    text
+      .replace(/\s+/g, " ")
+      .match(/por concepto\s+(?:de\s+)?(.+?)\s*(?:,\s*la cual|\.\s*(?:Muchas gracias|$)|\.$)/i)?.[1]
+      ?.trim() ?? "";
   const date = parseDMY(flat.match(/el dia\s*(\d{1,2}\/\d{1,2}\/\d{4})/i)?.[1] ?? "");
   const ref = flat.match(/numero de referencia\s*(\d+)/i)?.[1] ?? null;
 

@@ -29,7 +29,8 @@ export function flatten(s: string): string {
  * Devuelve null si no hay dígitos.
  */
 export function parseAmountLoose(raw: string): number | null {
-  const s = raw.replace(/[\s ]/g, "");
+  // Sin espacios y sin separadores colgando ("12,444.00," → "12,444.00").
+  const s = raw.replace(/[\s ]/g, "").replace(/^[.,]+|[.,]+$/g, "");
   if (!/\d/.test(s)) return null;
   const m = s.match(/^(.*?)([.,])(\d{1,2})$/);
   let intPart: string;
@@ -59,7 +60,7 @@ const NUMBER_TOKEN = "\\d{1,3}(?:[.,\\s]\\d{3})*(?:[.,]\\d{1,2})?|\\d+(?:[.,]\\d
  */
 export function findMoney(text: string): { amount: number; currency: string } | null {
   const flat = flatten(text);
-  const before = new RegExp(`(${CURRENCY_TOKEN})\\s*(${NUMBER_TOKEN})(?![\\d])`, "i");
+  const before = new RegExp(`(${CURRENCY_TOKEN})\\s*:?\\s*(${NUMBER_TOKEN})(?![\\d])`, "i");
   const after = new RegExp(`(${NUMBER_TOKEN})\\s*(${CURRENCY_TOKEN})(?![A-Za-z])`, "i");
   const a = flat.match(before);
   const b = flat.match(after);
@@ -296,8 +297,8 @@ export const CR_BANKS: CrBank[] = [
   {
     code: "DAVIVIENDA",
     name: "Davivienda",
-    domains: ["davivienda.cr", "davivienda.com"],
-    brands: /davivienda/i,
+    domains: ["davivienda.cr", "davivienda.com", "davibank.cr"],
+    brands: /davivienda|davibank/i,
   },
   { code: "LAFISE", name: "Lafise", domains: ["lafise.com", "lafise.fi.cr"], brands: /lafise/i },
   { code: "CATHAY", name: "Banco Cathay", domains: ["bancocathay.com"], brands: /cathay/i },
