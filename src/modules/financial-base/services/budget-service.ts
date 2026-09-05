@@ -655,6 +655,12 @@ export async function getBudgetTotals(period: Period, ctx?: AuthContext): Promis
     // GASTO: la línea del sobre YA es el presupuesto de ese mes por construcción
     // (el editor manual y `syncDerivedBudget` escriben mensual), así que se suma
     // cruda — mensualizarla la contaría dos veces.
+    //
+    // Las líneas de ingreso DERIVADAS (renta/dividendos) también traen el monto ya
+    // mensualizado, pero no hay doble conteo: `syncDerivedBudget` las escribe con
+    // frequency "mensual" fija (derived-budget-service), y ahí monthlyPlanned es
+    // la identidad. Si algún día una derivada naciera con otra frecuencia, este
+    // sería el punto que la contaría de más.
     const nativo =
       it.type === "income" ? monthlyPlanned(it.amount, it.frequency as Frequency) : it.amount;
     const value = convertCurrency(nativo, it.currency, currency, rates);
