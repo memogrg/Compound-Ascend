@@ -343,15 +343,13 @@ export function Faqs() {
                   <summary>¿Con qué bancos funciona?</summary>
                   <div className="lp-r">
                     <p>
-                      Con los avisos de <strong>BAC</strong> la lectura es completa: comercio,
-                      monto, moneda, fecha, tarjeta, SINPE recibido y enviado. Para{" "}
-                      <strong>
-                        BN, BCR, Popular, Scotiabank, Promerica, Davivienda, Lafise, Coopenae,
-                        Coopeservidores
-                      </strong>{" "}
-                      y los demás bancos y cooperativas del país hacemos una lectura general (monto,
+                      Con <strong>BAC, BCR, Banco Nacional, Davivienda y Promerica</strong> la
+                      lectura de compras con tarjeta es completa: comercio, monto, moneda, fecha y
+                      tarjeta (y SINPE en BAC, transferencias en BCR, pago de tarjeta en Promerica).
+                      Para <strong>Popular, Scotiabank, Lafise, Coopenae, Coopeservidores</strong> y
+                      los demás bancos y cooperativas del país hacemos una lectura general (monto,
                       si es gasto o ingreso, comercio, fecha) que vos revisás antes de confirmar, y
-                      que se vuelve exacta a medida que llegan avisos reales de cada banco.
+                      que se vuelve exacta con el primer aviso real de cada banco.
                     </p>
                     <p>
                       Si un aviso no lo entendemos, no se pierde: se guarda, te lo decimos en
