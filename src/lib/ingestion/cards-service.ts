@@ -3,7 +3,7 @@ import "server-only";
 /**
  * Servicio de tarjetas por cuenta + etiquetado por último-4.
  *
- * La propiedad correo→cuenta vive en email_ingest_links. El último-4 NO es llave
+ * La propiedad correo→cuenta vive en ingest_addresses. El último-4 NO es llave
  * de propiedad ni único global: es solo una ETIQUETA dentro de la cuenta (hogar si
  * existe, si no el usuario) — único por (cuenta, last4) en account_cards.
  *

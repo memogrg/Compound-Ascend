@@ -29,11 +29,6 @@ import {
   verifyEmailConnection,
   sendEmail,
 } from "@/lib/email/send";
-import {
-  requestIngestEmailVerification,
-  confirmIngestEmail,
-  removeIngestEmail,
-} from "@/modules/account/services/ingest-email-service";
 import { logger } from "@/lib/logger";
 import { errorDetail } from "@/lib/errors";
 
@@ -287,37 +282,6 @@ export async function deleteAccountAction(input: {
 
 // ---------- Ingesta por correo: onboarding self-serve ----------
 
-export async function requestIngestEmailAction(email: string): Promise<AccountActionResult> {
-  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
-  try {
-    const res = await requestIngestEmailVerification(email);
-    if (res.ok) revalidatePath("/configuracion");
-    return res;
-  } catch (err) {
-    logger.error("requestIngestEmail fallido", {
-      message: err instanceof Error ? err.message : "?",
-    });
-    return { ok: false, message: "No pudimos enviar el código." };
-  }
-}
-
-export async function confirmIngestEmailAction(
-  email: string,
-  code: string,
-): Promise<AccountActionResult> {
-  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
-  try {
-    const res = await confirmIngestEmail(email, code);
-    if (res.ok) revalidatePath("/configuracion");
-    return res;
-  } catch (err) {
-    logger.error("confirmIngestEmail fallido", {
-      message: err instanceof Error ? err.message : "?",
-    });
-    return { ok: false, message: "No pudimos confirmar el correo." };
-  }
-}
-
 export async function resolveIngestNoticeAction(id: string): Promise<AccountActionResult> {
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
   try {
@@ -356,19 +320,5 @@ export async function pollIngestNowAction(): Promise<PollNowResult> {
       encontrado: false,
       message: "No pudimos revisar el buzón. Probá de nuevo.",
     };
-  }
-}
-
-export async function removeIngestEmailAction(id: string): Promise<AccountActionResult> {
-  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase." };
-  try {
-    const res = await removeIngestEmail(id);
-    if (res.ok) revalidatePath("/configuracion");
-    return res;
-  } catch (err) {
-    logger.error("removeIngestEmail fallido", {
-      message: err instanceof Error ? err.message : "?",
-    });
-    return { ok: false, message: "No pudimos eliminar el correo." };
   }
 }

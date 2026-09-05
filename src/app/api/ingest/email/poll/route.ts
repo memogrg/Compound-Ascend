@@ -56,14 +56,10 @@ async function handle(req: Request) {
         const n = Math.min(50, Math.max(1, Number(params.get("n")) || 10));
         const samples = [];
         for (const m of [...messages].reverse().slice(0, n)) {
-          // Se prueban los cuatro niveles por separado para ver CUÁL resolvería:
+          // Se prueban los dos niveles por separado para ver CUÁL resolvería:
           // es exactamente lo que hay que mirar al certificar un proveedor nuevo.
           const porSobre = await deps.lookupByAddress(m.envelopeTo);
           const porDireccion = await deps.lookupByAddress(m.recipients);
-          const porDestinatario = await deps.lookupOwner(m.recipients);
-          const porRemitente = m.senderCandidates.length
-            ? await deps.lookupOwner(m.senderCandidates)
-            : null;
           samples.push({
             from: m.from,
             subject: m.subject,
@@ -73,8 +69,6 @@ async function handle(req: Request) {
             fromAutenticado: m.senderCandidates.length > 0,
             porSobre: porSobre.status,
             porDireccion: porDireccion.status,
-            porDestinatario: porDestinatario.status,
-            porRemitente: porRemitente?.status ?? null,
           });
         }
         return NextResponse.json(

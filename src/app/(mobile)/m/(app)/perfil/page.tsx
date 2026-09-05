@@ -12,10 +12,6 @@ import {
   EMPTY_NOTICES,
   type IngestNoticesView,
 } from "@/modules/account/services/ingest-notices-service";
-import {
-  listMyIngestEmails,
-  type IngestEmailRow,
-} from "@/modules/account/services/ingest-email-service";
 import { MSectionHeader, MContentCard, MDataRow, MProgress } from "../../components/content-kit";
 import { ConfiguracionManager } from "./configuracion-manager";
 import { BuildIdentity } from "./build-identity";
@@ -53,16 +49,10 @@ export default async function MobilePerfil() {
   }
 
   // Datos extra para la gestión (best-effort: si algo falla, degradamos sin romper).
-  let ingestEmails: IngestEmailRow[] = [];
   let ingestAddress: string | null = null;
   let ingestNotices: IngestNoticesView = EMPTY_NOTICES;
   let household: HouseholdMembersView | null = null;
   if (isSupabaseConfigured()) {
-    try {
-      ingestEmails = await listMyIngestEmails();
-    } catch {
-      ingestEmails = [];
-    }
     try {
       ingestAddress = await getOrCreateIngestAddress();
     } catch {
@@ -197,7 +187,6 @@ export default async function MobilePerfil() {
           currency={acc.currency}
           timezone={savedTz}
           notifications={acc.notifications}
-          ingestEmails={ingestEmails}
           ingestAddress={ingestAddress}
           ingestNotices={ingestNotices}
           household={household}

@@ -16,12 +16,31 @@ import { join } from "node:path";
 // Tablas que el hogar comparte (su borrado es una acción sobre datos comunes).
 // NO incluye las PERSONALES (transaction_rules, perfiles, user_settings…).
 const SHARED = new Set([
-  "accounts", "assets", "budget_items", "debt_payments", "debts", "dividends",
-  "expense_items", "goal_contributions", "income_sources", "insurance_policies",
-  "investment_holdings", "investment_transactions", "investments", "liabilities",
-  "rental_payments", "savings_goals", "transaction_templates", "transactions",
-  "watchlist_symbols", "holding_contributions", "holding_valuations", "account_cards",
-  "email_ingest_links", "ingest_proposals", "expense_categories", "goal_period_resets",
+  "accounts",
+  "assets",
+  "budget_items",
+  "debt_payments",
+  "debts",
+  "dividends",
+  "expense_items",
+  "goal_contributions",
+  "income_sources",
+  "insurance_policies",
+  "investment_holdings",
+  "investment_transactions",
+  "investments",
+  "liabilities",
+  "rental_payments",
+  "savings_goals",
+  "transaction_templates",
+  "transactions",
+  "watchlist_symbols",
+  "holding_contributions",
+  "holding_valuations",
+  "account_cards",
+  "ingest_proposals",
+  "expense_categories",
+  "goal_period_resets",
 ]);
 
 // Funciones EXCLUIDAS del log, con su razón (revisable):
@@ -30,9 +49,18 @@ const SHARED = new Set([
 //  · delete-en-create/rollback: no son borrados de usuario.
 //  · recurring_items en cascada: secundario del income_source (primario ya logueado).
 const EXCLUDED = new Set([
-  "syncDerivedBudget", "sweepOrphanedDerived", "recordTransactionDelta", "relinkRentalReceipts",
-  "clearAllFinancialData", "seedDemoTemplate", "completeProfile", "saveDraft",
-  "createDividend", "createHolding", "registerPassiveIncomeWithStub", "updateIncomeSource",
+  "syncDerivedBudget",
+  "sweepOrphanedDerived",
+  "recordTransactionDelta",
+  "relinkRentalReceipts",
+  "clearAllFinancialData",
+  "seedDemoTemplate",
+  "completeProfile",
+  "saveDraft",
+  "createDividend",
+  "createHolding",
+  "registerPassiveIncomeWithStub",
+  "updateIncomeSource",
   "deleteIncomeSourcesByHolding",
   // Reverso interno del orquestador: al borrar una transacción vinculada revierte
   // su ledger (p.ej. borra el debt_payment). El primario (la transacción) ya lo
@@ -85,6 +113,9 @@ describe("cobertura del log de borrados (E3)", () => {
         }
       }
     }
-    expect(offenders, `Borrados sin log (agregá logHouseholdDeletion o excluí con razón):\n${offenders.join("\n")}`).toEqual([]);
+    expect(
+      offenders,
+      `Borrados sin log (agregá logHouseholdDeletion o excluí con razón):\n${offenders.join("\n")}`,
+    ).toEqual([]);
   });
 });

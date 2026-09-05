@@ -119,9 +119,6 @@ export const RATE_LIMITS = {
   // usuario aun no ha probado que es suya: sin techo, la app se vuelve un
   // bombardeador de correo ajeno con nuestra marca. Y 6 digitos se adivinan a
   // fuerza bruta si se deja intentar sin limite.
-  ingestEmailAddress: { limit: 3, windowMs: 60 * 60_000 },
-  ingestEmailUser: { limit: 10, windowMs: 24 * 60 * 60_000 },
-  ingestEmailConfirm: { limit: 8, windowMs: 15 * 60_000 },
   // «Buscar avisos ahora»: abre el buzón IMAP compartido. Por usuario y global,
   // porque una corrida procesa el buzón entero (sirve a todos a la vez).
   ingestPollUser: { limit: 6, windowMs: 10 * 60_000 },

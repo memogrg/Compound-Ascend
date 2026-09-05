@@ -25,7 +25,8 @@ Referencia: 35689751  Tipo de Transacción: COMPRA  Monto: CRC 11,490.00`;
 
 const BANK_FROM = "notificacion@notificacionesbaccr.com"; // con auto-forward, el From es del banco
 const FLAT_INBOX = "communications@aitechumbrella.com"; // dirección plana del buzón
-const FORWARDER = "memogrg@gmail.com"; // destinatario original (forwarder conocido)
+const FORWARDER = "memogrg@gmail.com"; // remitente humano de un reenvío manual
+const MY_ADDR = "u2g5zmfs5w2@in.aitechumbrella.com"; // dirección de ingesta de la cuenta
 
 /** Cliente IMAP falso: devuelve los correos dados, registra los marcados leídos. */
 function fakeClient(raw: RawImapMessage[]): ImapClient & { seen: number[] } {
@@ -40,23 +41,22 @@ function fakeClient(raw: RawImapMessage[]): ImapClient & { seen: number[] } {
   };
 }
 
-/** Deps en memoria: allowlist por forwarder, dedup por id, propuestas acumuladas.
+/** Deps en memoria: dirección de ingesta → dueño, dedup por id, propuestas acumuladas.
  *  saveProposals simula el único (cuenta, external_ref): la misma compra en 2
  *  correos se inserta una vez; la repetición cuenta como duplicado. */
-function fakeDeps(allowlist: Record<string, EmailOwner>, processed = new Set<string>()) {
+function fakeDeps(addresses: Record<string, EmailOwner>, processed = new Set<string>()) {
   const proposals: { movements: number; owner: EmailOwner }[] = [];
   const markedSeen: number[] = [];
   const seenRefs = new Set<string>(); // claves (cuenta, external_ref) ya insertadas
   const deps: EmailIngestDeps = {
-    lookupByAddress: async () => ({ status: "none" }) as const,
-    saveNotice: async () => {},
-    lookupOwner: async (candidates) => {
+    lookupByAddress: async (candidates) => {
       for (const c of candidates) {
-        const owner = allowlist[c];
+        const owner = addresses[c];
         if (owner) return { status: "found", owner } as const;
       }
       return { status: "none" } as const;
     },
+    saveNotice: async () => {},
     isProcessed: async (id) => processed.has(id),
     markProcessed: async (id) => {
       processed.add(id);
@@ -224,7 +224,7 @@ describe("email ingestion · processInboundEmails", () => {
   const msg = (over: Partial<ImapMessage>): ImapMessage => ({
     id: "<m1@bac>",
     from: BANK_FROM,
-    recipients: [FLAT_INBOX, FORWARDER], // el forwarder viaja entre los candidatos
+    recipients: [FLAT_INBOX, MY_ADDR], // la dirección de ingesta viaja entre los destinatarios
     subject: "Compra",
     text: BAC_CARD,
     uid: 1,
@@ -234,39 +234,8 @@ describe("email ingestion · processInboundEmails", () => {
     ...over,
   });
 
-  it("reenvío manual (From = forwarder, To solo el buzón) -> 1 propuesta", async () => {
-    const { deps, proposals } = fakeDeps({ [FORWARDER]: owner });
-    // Pasa por fetchUnseen para que el From se sume a los candidatos (ruta real).
-    const client = fakeClient([
-      {
-        uid: 22,
-        messageId: "<manual2@gmail>",
-        fromAuthenticated: true,
-        envelopeTo: [],
-        from: FORWARDER,
-        recipients: [FLAT_INBOX],
-        subject: "Fwd: Compra BAC",
-        text: BAC_CARD,
-        receivedAt: null,
-      },
-    ]);
-    const messages = await fetchUnseen(client);
-    const summary = await processInboundEmails(messages, parseNotification, deps);
-    expect(summary).toEqual({
-      procesados: 1,
-      propuestos: 1,
-      ignorados: 0,
-      duplicados: 0,
-      ambiguos: 0,
-      sinParsear: 0,
-      archivados: 0,
-      confirmacionesGmail: 0,
-    });
-    expect(proposals).toHaveLength(1);
-  });
-
   it("misma compra (cuenta, referencia) en 2 correos -> 1 propuesta + 1 duplicado", async () => {
-    const { deps, proposals } = fakeDeps({ [FORWARDER]: owner });
+    const { deps, proposals } = fakeDeps({ [MY_ADDR]: owner });
     // Dos correos distintos (Message-ID distinto, así no choca el dedup por id) con
     // la MISMA notificación BAC → misma (cuenta, external_ref).
     const messages = [msg({ id: "<copia-A@bac>", uid: 1 }), msg({ id: "<copia-B@bac>", uid: 2 })];
@@ -284,8 +253,8 @@ describe("email ingestion · processInboundEmails", () => {
     expect(proposals).toHaveLength(1); // la compra entró una sola vez
   });
 
-  it("forwarder conocido entre los candidatos + notificación BAC -> 1 propuesta", async () => {
-    const { deps, proposals, markedSeen, processed } = fakeDeps({ [FORWARDER]: owner });
+  it("dirección de ingesta entre los destinatarios + notificación BAC -> 1 propuesta", async () => {
+    const { deps, proposals, markedSeen, processed } = fakeDeps({ [MY_ADDR]: owner });
     const summary = await processInboundEmails([msg({})], parseNotification, deps);
     expect(summary).toEqual({
       procesados: 1,
@@ -303,8 +272,8 @@ describe("email ingestion · processInboundEmails", () => {
     expect(processed.has("<m1@bac>")).toBe(true);
   });
 
-  it("forwarder desconocido -> ignorado (no propone, no marca procesado)", async () => {
-    const { deps, proposals, markedSeen, processed } = fakeDeps({ [FORWARDER]: owner });
+  it("sin dirección de ingesta conocida -> ignorado (no propone, no marca procesado)", async () => {
+    const { deps, proposals, markedSeen, processed } = fakeDeps({ [MY_ADDR]: owner });
     const summary = await processInboundEmails(
       [msg({ recipients: [FLAT_INBOX, "otro@gmail.com"], id: "<m2@bac>" })],
       parseNotification,
@@ -326,7 +295,7 @@ describe("email ingestion · processInboundEmails", () => {
   });
 
   it("id ya procesado -> duplicado (dedup por messageId)", async () => {
-    const { deps, proposals } = fakeDeps({ [FORWARDER]: owner }, new Set(["<m1@bac>"]));
+    const { deps, proposals } = fakeDeps({ [MY_ADDR]: owner }, new Set(["<m1@bac>"]));
     const summary = await processInboundEmails([msg({})], parseNotification, deps);
     expect(summary).toEqual({
       procesados: 0,
@@ -342,7 +311,7 @@ describe("email ingestion · processInboundEmails", () => {
   });
 
   it("correo conocido sin notificación -> procesado sin propuesta, y deja AVISO (unparsed)", async () => {
-    const { deps, proposals, markedSeen, processed } = fakeDeps({ [FORWARDER]: owner });
+    const { deps, proposals, markedSeen, processed } = fakeDeps({ [MY_ADDR]: owner });
     const avisos: { kind: string; subject: string }[] = [];
     deps.saveNotice = async (n) => void avisos.push({ kind: n.kind, subject: n.subject });
     const summary = await processInboundEmails(
@@ -390,9 +359,8 @@ describe("email ingestion · fecha faltante (fallback a la fecha de recepción)"
   function capturingDeps(owner: EmailOwner) {
     const capturado: RawMovement[] = [];
     const deps: EmailIngestDeps = {
-      lookupByAddress: async () => ({ status: "none" }) as const,
+      lookupByAddress: async () => ({ status: "found", owner }) as const,
       saveNotice: async () => {},
-      lookupOwner: async () => ({ status: "found", owner }) as const,
       isProcessed: async () => false,
       markProcessed: async () => {},
       saveProposals: async (movements) => {
@@ -475,15 +443,14 @@ describe("email ingestion · fecha faltante (fallback a la fecha de recepción)"
 describe("email ingestion · aislamiento entre cuentas", () => {
   const ownerA: EmailOwner = { userId: "uA", householdId: null, timezone: null };
 
-  /** Deps cuyo lookupOwner responde lo que se le indique (found/none/ambiguous). */
+  /** Deps cuyo lookupByAddress responde lo que se le indique (found/none/ambiguous). */
   function depsCon(lookup: OwnerLookup) {
     const proposals: RawMovement[] = [];
     const markedSeen: number[] = [];
     const processed = new Set<string>();
     const deps: EmailIngestDeps = {
-      lookupByAddress: async () => ({ status: "none" }) as const,
+      lookupByAddress: async () => lookup,
       saveNotice: async () => {},
-      lookupOwner: async () => lookup,
       isProcessed: async (id) => processed.has(id),
       markProcessed: async (id) => {
         processed.add(id);
@@ -586,8 +553,8 @@ describe("email ingestion · dirección de ingesta única", () => {
     expect(extractEnvelopeCandidates(h)).not.toContain("memogrg@gmail.com");
   });
 
-  /** Deps con los dos niveles separados, para probar la prioridad. */
-  function depsNiveles(porDireccion: OwnerLookup, porForwarder: OwnerLookup) {
+  /** Deps que registran qué candidatos consultó el poller, para probar la prioridad. */
+  function depsNiveles(porDireccion: OwnerLookup) {
     const usados: string[] = [];
     const proposals: RawMovement[] = [];
     const deps: EmailIngestDeps = {
@@ -595,10 +562,6 @@ describe("email ingestion · dirección de ingesta única", () => {
       lookupByAddress: async (c) => {
         usados.push(`dir:${c.join(",")}`);
         return c.length ? porDireccion : { status: "none" };
-      },
-      lookupOwner: async (c) => {
-        usados.push(`fwd:${c.join(",")}`);
-        return c.length ? porForwarder : { status: "none" };
       },
       isProcessed: async () => false,
       markProcessed: async () => {},
@@ -624,38 +587,22 @@ describe("email ingestion · dirección de ingesta única", () => {
     ...over,
   });
 
-  it("la dirección del sobre resuelve SIN reenviador verificado (cero configuración)", async () => {
-    // El forwarder es desconocido a propósito: con dirección única no hace falta.
-    const { deps, proposals, usados } = depsNiveles({ status: "found", owner }, { status: "none" });
+  it("la dirección del sobre resuelve por sí sola (cero configuración)", async () => {
+    const { deps, proposals, usados } = depsNiveles({ status: "found", owner });
     const summary = await processInboundEmails([conSobre()], parseNotification, deps);
     expect(summary.propuestos).toBe(1);
     expect(proposals).toHaveLength(1);
-    // Resolvió en el primer nivel: ni siquiera consultó la allowlist heredada.
+    // Resolvió en el primer nivel: no consultó los destinatarios.
     expect(usados).toEqual([`dir:${DIR}`]);
   });
 
   it("dos direcciones de ingesta de cuentas distintas -> ambiguo, y NO degrada al nivel de abajo", async () => {
-    const { deps, proposals, usados } = depsNiveles(
-      { status: "ambiguous", cuentas: 2 },
-      { status: "found", owner }, // si degradara, este resolvería y sería un error
-    );
+    const { deps, proposals, usados } = depsNiveles({ status: "ambiguous", cuentas: 2 });
     const summary = await processInboundEmails([conSobre()], parseNotification, deps);
     expect(summary.ambiguos).toBe(1);
     expect(summary.procesados).toBe(0);
     expect(proposals).toHaveLength(0);
     expect(usados).toEqual([`dir:${DIR}`]);
-  });
-
-  it("sin dirección de ingesta cae al carril heredado del reenviador verificado", async () => {
-    const { deps, proposals, usados } = depsNiveles({ status: "none" }, { status: "found", owner });
-    const summary = await processInboundEmails(
-      [conSobre({ envelopeTo: [], recipients: [FLAT_INBOX, FORWARDER] })],
-      parseNotification,
-      deps,
-    );
-    expect(summary.propuestos).toBe(1);
-    expect(proposals).toHaveLength(1);
-    expect(usados.some((u) => u.startsWith("fwd:"))).toBe(true);
   });
 });
 
@@ -663,7 +610,6 @@ describe("email ingestion · ignorados viejos se archivan", () => {
   const sinDueno: EmailIngestDeps = {
     lookupByAddress: async () => ({ status: "none" }) as const,
     saveNotice: async () => {},
-    lookupOwner: async () => ({ status: "none" }) as const,
     isProcessed: async () => false,
     markProcessed: async () => {},
     saveProposals: async () => ({ inserted: 0, duplicated: 0 }),
@@ -695,7 +641,7 @@ describe("email ingestion · ignorados viejos se archivan", () => {
     expect(seen).toEqual([5]);
   });
 
-  it("un correo sin dueño de hoy se deja sin leer (ignorado) por si su reenviador se registra", async () => {
+  it("un correo sin dueño de hoy se deja sin leer (ignorado) por si aparece su dueño", async () => {
     const seen: number[] = [];
     const deps = { ...sinDueno, markSeen: async (m: ImapMessage) => void seen.push(m.uid) };
     const s = await processInboundEmails(
@@ -755,7 +701,6 @@ describe("email ingestion · confirmación de reenvío de Gmail", () => {
     const deps: EmailIngestDeps = {
       lookupByAddress: async (c) =>
         c.length ? ({ status: "found", owner } as const) : ({ status: "none" } as const),
-      lookupOwner: async () => ({ status: "none" }) as const,
       isProcessed: async () => false,
       markProcessed: async () => {},
       saveProposals: async () => ({ inserted: 0, duplicated: 0 }),
