@@ -47,6 +47,14 @@ export type InsightKind =
   // Ritmo de gasto: el sobre va más rápido que el calendario. Preventivo — cuando SÍ se pasa
   // habla `sobre_sobregirado`, que es el que merece severidad 'accionar'.
   | "ritmo_sobre"
+  /**
+   * Aviso ÚNICO (no lo emite ningún detector): la frecuencia de una fuente de
+   * ingreso quedó normalizada a "mensual" al unificar la semántica del monto
+   * (el monto pasó a ser SIEMPRE lo que se recibe por pago). Se siembra a mano
+   * para las cuentas afectadas y sobrevive a la reconciliación — ver
+   * KINDS_SIN_RECONCILIAR en insights-service.
+   */
+  | "frecuencia_ingreso_revisar"
   // Sobre con presupuesto asignado y casi sin uso en los últimos meses. Severidad 'info': ni
   // siquiera es un riesgo — es plata inmovilizada, y a veces a propósito.
   | "sobre_ocioso"

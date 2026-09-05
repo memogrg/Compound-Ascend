@@ -25,7 +25,8 @@ import { monthPeriod, previousMonthPeriod } from "@/modules/financial-base/engin
 import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine/budget-rollup";
 import { acumularNativo } from "@/modules/financial-base/engine/sobre-moneda";
 import type { BudgetItem, BudgetType, IncomeType, Period } from "@/modules/financial-base/types";
-import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
+import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
+import { caeEnElPeriodo, requiereAncla } from "@/modules/financial-base/engine/income-schedule";
 import type {
   BudgetItemInput,
   IncomeSourceInput,
@@ -78,7 +79,25 @@ export async function listBudgetItems(period: Period, ctx?: AuthContext): Promis
     .eq("period_month", period.month)
     .eq("period_year", period.year)
     .order("amount", { ascending: false });
-  return (data ?? []).map(rowToBudgetItem);
+  const items = (data ?? []).map(rowToBudgetItem);
+
+  // Hidrata el ancla de tiempo desde las plantillas recurrentes. Va en un
+  // segundo fetch (y no en un join) para no cambiar la forma de la fila: el
+  // ancla la necesita el FORMULARIO al editar, no el agregado.
+  const templateIds = [
+    ...new Set(items.map((i) => i.recurringItemId).filter((v): v is string => Boolean(v))),
+  ];
+  if (templateIds.length === 0) return items;
+
+  const { data: templates } = await supabase
+    .from("recurring_items")
+    .select("id,next_date")
+    .in("id", templateIds);
+  const anclaPorId = new Map((templates ?? []).map((t) => [t.id, t.next_date ?? null]));
+  for (const it of items) {
+    if (it.recurringItemId) it.nextDate = anclaPorId.get(it.recurringItemId) ?? null;
+  }
+  return items;
 }
 
 export async function createBudgetItem(input: BudgetItemInput, ctx?: AuthContext): Promise<void> {
@@ -251,11 +270,21 @@ function periodFromDate(occurredOn: string): Period {
   return monthPeriod(y!, m!);
 }
 
+/**
+ * Normaliza el ancla antes de escribirla: sólo se guarda en las frecuencias
+ * multi-mes. Guardarla en una mensual sería ruido — y peor, si algún día se
+ * lee sin mirar la frecuencia, adelantaría el primer pago de una fuente que
+ * en realidad cae todos los meses.
+ */
+function anclaDe(frequency: string, nextDate: string | null | undefined): string | null {
+  return requiereAncla(frequency as Frequency) ? (nextDate ?? null) : null;
+}
+
 /** Crea la plantilla recurrente (inactiva) y devuelve su id. */
 async function createRecurringTemplate(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   userId: string,
-  input: Pick<IncomeSourceInput, "name" | "amount" | "currency" | "frequency">,
+  input: Pick<IncomeSourceInput, "name" | "amount" | "currency" | "frequency" | "nextDate">,
 ): Promise<string> {
   const household_id = await getActiveHouseholdId(supabase, userId);
   const { data, error } = await supabase
@@ -270,7 +299,9 @@ async function createRecurringTemplate(
       amount: input.amount,
       currency: input.currency,
       frequency: input.frequency,
-      next_date: null,
+      // Ancla de tiempo (ver income-schedule): sólo las frecuencias multi-mes la
+      // necesitan; en las demás queda null y la fuente cae todos los meses.
+      next_date: anclaDe(input.frequency, input.nextDate),
       active: false, // copy-on-demand: no auto-sync.
     })
     .select("id")
@@ -338,6 +369,7 @@ export async function updateIncomeSource(id: string, input: IncomeSourceInput): 
         amount: input.amount,
         currency: input.currency,
         frequency: input.frequency,
+        next_date: anclaDe(input.frequency, input.nextDate),
       })
       .eq("id", recurringItemId)
       .eq("user_id", user.id);
@@ -500,34 +532,83 @@ export async function receivePartialIncome(
 }
 
 /**
- * Copia al periodo dado SOLO las fuentes de ingreso RECURRENTES del mes anterior
- * (las que enlazan una plantilla recurring_items). Idempotente: no duplica una
- * plantilla ya presente este mes. Devuelve cuántas copió. (Fase 2)
+ * Materializa en `period` las fuentes de ingreso RECURRENTES a las que les toca
+ * pago ese mes. Idempotente: no duplica una plantilla ya presente. Devuelve
+ * cuántas agendó. (Fase 2 · agenda por ancla)
+ *
+ * Antes copiaba las líneas del MES ANTERIOR, y eso no puede sostener una
+ * frecuencia multi-mes: un bimestral anclado en enero no tiene línea en febrero,
+ * así que en marzo no habría de dónde copiarlo y la fuente desaparecía para
+ * siempre. La fuente de verdad es la PLANTILLA (`recurring_items`) más su ancla;
+ * el mes anterior es sólo un accidente de la historia.
+ *
+ * El `income_type` y la categoría se recuperan de la última línea que existió de
+ * esa plantilla (la plantilla no los guarda), cayendo a "activo" si no hay.
  */
 export async function copyPreviousMonthIncome(period: Period): Promise<number> {
-  const prev = previousMonthPeriod(period);
-  const [prevItems, curItems] = await Promise.all([listBudgetItems(prev), listBudgetItems(period)]);
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  const memberIds = await householdMemberIds(supabase, user.id);
+
+  const [{ data: templates }, curItems] = await Promise.all([
+    supabase
+      .from("recurring_items")
+      .select("id,name,amount,currency,frequency,next_date")
+      .in("user_id", memberIds)
+      .eq("kind", "ingreso"),
+    listBudgetItems(period),
+  ]);
+
   const present = new Set(
     curItems.filter((i) => i.type === "income" && i.recurringItemId).map((i) => i.recurringItemId),
   );
-  const toCopy = prevItems.filter(
-    (i) => i.type === "income" && i.recurringItemId && !present.has(i.recurringItemId),
+  const pendientes = (templates ?? []).filter(
+    (t) => !present.has(t.id) && caeEnElPeriodo(t.frequency as Frequency, t.next_date, period),
   );
-  for (const it of toCopy) {
+  if (pendientes.length === 0) return 0;
+
+  // Última línea conocida de cada plantilla → tipo y subcategoría a conservar.
+  const { data: previas } = await supabase
+    .from("budget_items")
+    .select("recurring_item_id,income_type,category_id,period_year,period_month")
+    .in("user_id", memberIds)
+    .eq("type", "income")
+    .in(
+      "recurring_item_id",
+      pendientes.map((t) => t.id),
+    )
+    .order("period_year", { ascending: false })
+    .order("period_month", { ascending: false });
+
+  const ultimaPorPlantilla = new Map<
+    string,
+    { income_type: string | null; category_id: string | null }
+  >();
+  for (const r of previas ?? []) {
+    if (r.recurring_item_id && !ultimaPorPlantilla.has(r.recurring_item_id)) {
+      ultimaPorPlantilla.set(r.recurring_item_id, {
+        income_type: r.income_type,
+        category_id: r.category_id,
+      });
+    }
+  }
+
+  for (const t of pendientes) {
+    const previa = ultimaPorPlantilla.get(t.id);
     await createBudgetItem({
       type: "income",
-      categoryId: null,
-      name: it.name,
-      amount: it.amount,
-      currency: it.currency,
-      frequency: it.frequency,
+      categoryId: previa?.category_id ?? null,
+      name: t.name,
+      amount: Number(t.amount),
+      currency: t.currency,
+      frequency: t.frequency as Frequency,
       periodMonth: period.month,
       periodYear: period.year,
-      incomeType: it.incomeType,
-      recurringItemId: it.recurringItemId,
+      incomeType: (previa?.income_type ?? "activo") as IncomeType,
+      recurringItemId: t.id,
     });
   }
-  return toCopy.length;
+  return pendientes.length;
 }
 
 export type KeyedTotals = Record<string, { label: string; value: number }>;
@@ -568,7 +649,21 @@ export async function getBudgetTotals(period: Period, ctx?: AuthContext): Promis
   const nativeByKey: NativeKeyedTotals = {};
 
   for (const it of items) {
-    const value = convertCurrency(it.amount, it.currency, currency, rates);
+    // INGRESO: el monto de la fuente es lo que llega POR PAGO, así que el aporte
+    // al mes pasa por `monthlyPlanned` (una quincena de 800k son 1.6M en el mes;
+    // un bimestral aporta su pago pleno en el mes en que su línea existe).
+    // GASTO: la línea del sobre YA es el presupuesto de ese mes por construcción
+    // (el editor manual y `syncDerivedBudget` escriben mensual), así que se suma
+    // cruda — mensualizarla la contaría dos veces.
+    //
+    // Las líneas de ingreso DERIVADAS (renta/dividendos) también traen el monto ya
+    // mensualizado, pero no hay doble conteo: `syncDerivedBudget` las escribe con
+    // frequency "mensual" fija (derived-budget-service), y ahí monthlyPlanned es
+    // la identidad. Si algún día una derivada naciera con otra frecuencia, este
+    // sería el punto que la contaría de más.
+    const nativo =
+      it.type === "income" ? monthlyPlanned(it.amount, it.frequency as Frequency) : it.amount;
+    const value = convertCurrency(nativo, it.currency, currency, rates);
     if (it.type === "income") {
       budgetIncome += value;
       const key = it.name.trim().toLowerCase() || it.id;

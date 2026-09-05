@@ -24,6 +24,9 @@ import {
   registerIncomeSourceAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
+// Motores puros: import directo del archivo, nunca del barrel (server-only).
+import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
+import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 
 const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
@@ -32,20 +35,9 @@ const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
   extraordinario: "Extraordinario",
 };
 
-// Fracción sugerida por clic en fuentes recurrentes sub-mensuales (ej. salario
-// bisemanal → la mitad). En el resto, se sugiere el restante.
-const RECURRENT_FRACTION: Record<string, number> = {
-  semanal: 0.25,
-  bisemanal: 0.5,
-  quincenal: 0.5,
-};
-
-function suggestedAmount(it: BudgetItem, received: number): number {
-  const frac = it.recurringItemId ? RECURRENT_FRACTION[it.frequency] : undefined;
-  if (frac) return Math.round(it.amount * frac * 100) / 100;
-  const remaining = Math.round((it.amount - received) * 100) / 100;
-  return remaining > 0 ? remaining : it.amount;
-}
+// La sugerencia de "Recibido" vive en el motor puro (income-receipt): acá había
+// una copia local con una fracción propia — y una clave "bisemanal" que ni
+// siquiera existe en el enum Frequency. Una sola definición, la del motor.
 
 export function IncomeSources({
   items,
@@ -82,6 +74,7 @@ export function IncomeSources({
           incomeType: it.incomeType ?? "activo",
           recurrent: Boolean(it.recurringItemId),
           frequency: it.frequency,
+          nextDate: it.nextDate ?? null,
           categoryId: it.categoryId ?? null,
         }),
       "Fuente duplicada",
@@ -154,14 +147,17 @@ function SourceRow({
   const [receiving, setReceiving] = useState(false);
   const [value, setValue] = useState("");
 
-  const budget = it.amount;
+  // Lo PLANIFICADO del mes, no el monto por pago: una quincena de 800k se
+  // compara contra los 1.6M que se esperan en el mes (dos pagos), si no la
+  // barra marcaría 100 % con la primera quincena.
+  const budget = monthlyPlanned(it.amount, it.frequency as Frequency);
   const pct = budget > 0 ? received / budget : received > 0 ? 1 : 0;
   const fullyReceived = budget > 0 && received >= budget;
   const over = budget > 0 && received > budget;
   const incomeType = it.incomeType ?? "activo";
 
   const openReceive = () => {
-    setValue(String(suggestedAmount(it, received)));
+    setValue(String(suggestedReceipt(it, received)));
     setReceiving(true);
   };
 

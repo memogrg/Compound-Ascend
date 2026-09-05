@@ -15,7 +15,11 @@ import {
   householdWriteScope,
 } from "@/lib/household/active";
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
-import { monthlyize, type Frequency } from "@/modules/financial-base/engine/monthlyize";
+import {
+  monthlyize,
+  monthlyPlanned,
+  type Frequency,
+} from "@/modules/financial-base/engine/monthlyize";
 import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import { convertCurrency, SUPPORTED_CURRENCIES } from "@/lib/fx";
@@ -277,7 +281,7 @@ async function computeV2Totals(
   const [bi, tx] = await Promise.all([
     supabase
       .from("budget_items")
-      .select("type,amount,currency")
+      .select("type,amount,currency,frequency")
       .in("user_id", memberIds)
       .eq("period_month", p.month)
       .eq("period_year", p.year),
@@ -296,7 +300,14 @@ async function computeV2Totals(
   // Misma pasada que ya recorre presupuesto y transacciones: sin query ni loop extra.
   const monedas = new Set<string>();
   for (const r of bi.data ?? []) {
-    const v = convertCurrency(Number(r.amount), r.currency, displayCurrency, rates);
+    // Mismo criterio que getBudgetTotals: el monto de una fuente de ingreso es lo
+    // que llega POR PAGO, así que su aporte al mes pasa por `monthlyPlanned`. El
+    // gasto no: la línea del sobre ya es el presupuesto de ese mes.
+    const nativo =
+      r.type === "income"
+        ? monthlyPlanned(Number(r.amount), r.frequency as Frequency)
+        : Number(r.amount);
+    const v = convertCurrency(nativo, r.currency, displayCurrency, rates);
     if (r.currency) monedas.add(r.currency);
     if (r.type === "income") budgetIncome += v;
     else budgetExpense += v;

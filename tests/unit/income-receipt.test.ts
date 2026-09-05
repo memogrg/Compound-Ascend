@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { suggestedReceipt, RECURRENT_FRACTION } from "@/modules/financial-base/engine/income-receipt";
+import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
 
 const source = (
   over: Partial<{ amount: number; frequency: string; recurringItemId: string | null }> = {},
@@ -26,10 +26,31 @@ describe("suggestedReceipt", () => {
     expect(s).toBe(1000);
   });
 
-  it("recurrente sub-mensual: sugiere la fracción de la frecuencia", () => {
-    expect(suggestedReceipt(source({ frequency: "quincenal", recurringItemId: "r1" }), 0)).toBe(500);
-    expect(suggestedReceipt(source({ frequency: "semanal", recurringItemId: "r1" }), 0)).toBe(250);
-    expect(RECURRENT_FRACTION.quincenal).toBe(0.5);
+  // SEMÁNTICA ÚNICA: el monto de la fuente es lo que llega POR PAGO. Cada clic de
+  // "Recibido" en una fuente sub-mensual es UN pago, así que se sugiere el pago
+  // PLENO — no una fracción. Antes RECURRENT_FRACTION lo partía por la mitad
+  // (asumía que el monto era mensual) y sugería media quincena.
+  it("sub-mensual: sugiere el pago PLENO, no una fracción", () => {
+    expect(suggestedReceipt(source({ frequency: "quincenal", recurringItemId: "r1" }), 0)).toBe(
+      1000,
+    );
+    expect(suggestedReceipt(source({ frequency: "semanal", recurringItemId: "r1" }), 0)).toBe(1000);
+  });
+
+  it("sub-mensual: el segundo pago del mes también sugiere el pago pleno", () => {
+    // Ya se recibió una quincena; la siguiente vale lo mismo.
+    expect(suggestedReceipt(source({ frequency: "quincenal", recurringItemId: "r1" }), 1000)).toBe(
+      1000,
+    );
+  });
+
+  it("multi-mes: el pago llega una vez, así que sugiere lo que falta de ese pago", () => {
+    expect(suggestedReceipt(source({ frequency: "bimensual", recurringItemId: "r1" }), 0)).toBe(
+      1000,
+    );
+    expect(suggestedReceipt(source({ frequency: "bimensual", recurringItemId: "r1" }), 400)).toBe(
+      600,
+    );
   });
 
   it("redondea a 2 decimales", () => {
