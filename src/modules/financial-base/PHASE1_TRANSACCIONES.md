@@ -5,7 +5,6 @@ autocompletado determinista, favoritos de 1 clic, gestión de categorías y UI
 premium con tooltips. **Sin motor de IA** (solo arquitectura preparada: `transactions.ai_meta`).
 
 ## Datos (migración aditiva, idempotente, NO destructiva)
-
 - `supabase/migrations/20260605000004_transactions_revamp.sql` — extiende
   `expense_categories` (`category_type`, `icon`, `color`, `is_active`,
   `is_favorite`, `merged_into_id`), crea 8 grupos de Nivel 1 (`g_*`), re-parenta
@@ -18,7 +17,6 @@ premium con tooltips. **Sin motor de IA** (solo arquitectura preparada: `transac
   `TransactionRow.ai_meta`, nuevo `TransactionTemplateRow` + tabla registrada.
 
 ## Backend (services + schemas + actions)
-
 - `services/categories-service.ts` — `listCategories()` retrocompatible (plana,
   incluye inactivas); `listCategoryTree('expense'|'income')` (grupos →
   descendientes aplanados, guard anti-ciclos); `getCategoryPath`; CRUD +
@@ -35,7 +33,6 @@ premium con tooltips. **Sin motor de IA** (solo arquitectura preparada: `transac
   auto-categorización por reglas de `createTransaction`).
 
 ## Frontend (components/v2, premium, responsive)
-
 - `transaction-composer.tsx` — UNA pantalla: tipo segmentado (Gasto/Ingreso/
   Transferencia), monto grande con `inputMode="decimal"`, comercio con píldora de
   sugerencia accionable, selector jerárquico (chips de grupo con punto de color →
@@ -51,7 +48,6 @@ premium con tooltips. **Sin motor de IA** (solo arquitectura preparada: `transac
   `.cmp-fav-chip` (glassmorphism), tooltips `.tip[data-tip]`.
 
 ## Verificación
-
 - `tsc --noEmit`, lint, test (94) y build en verde.
 - Migración aplicada a prod y **re-ejecutada sin error** (idempotente). Las 8
   raíces de sistema son los `g_*`; 0 `transactions.category_id` huérfanos.
