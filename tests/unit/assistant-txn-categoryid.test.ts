@@ -15,6 +15,8 @@ vi.mock("@/modules/financial-base", () => ({
   },
   propagateLinkedTransaction: vi.fn(),
   deleteLinkedTransaction: vi.fn(),
+  // Conciliador: el wrapper intenta unir una propuesta pendiente tras crear (best-effort).
+  autoMergePendingProposal: vi.fn().mockResolvedValue(null),
 }));
 
 import { createTransaction } from "@/modules/assistant/services/transaction-service";

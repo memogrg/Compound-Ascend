@@ -19,6 +19,7 @@ import { formatMoney } from "@/lib/format";
 import {
   confirmIngestProposalAction,
   discardIngestProposalAction,
+  mergeIngestProposalAction,
   type ProposalOverrides,
 } from "@/modules/financial-base/api/v2-actions";
 import {
@@ -86,6 +87,7 @@ export function PorRevisarCard({
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [ignorarDup, setIgnorarDup] = useState<Set<string>>(() => new Set());
   // Sobre elegido por fila (sin desplegar la edición) y borrador de edición abierto.
   const [sobre, setSobre] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<string | null>(null);
@@ -295,6 +297,62 @@ export function PorRevisarCard({
                     Descartar
                   </button>
                 </span>
+
+                {/* Conciliador: ya hay un movimiento que parece este (recibo, manual,
+                    importado). Unir = una sola transacción con dos fuentes; no crea nada. */}
+                {p.possibleDuplicate && !ignorarDup.has(p.id) ? (
+                  <div
+                    role="note"
+                    style={{
+                      flexBasis: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      flexWrap: "wrap",
+                      fontSize: 12,
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      background: "var(--warn-soft, rgba(190,140,40,.12))",
+                    }}
+                  >
+                    <span>
+                      Parece el mismo que{" "}
+                      <strong>
+                        {p.possibleDuplicate.description} ·{" "}
+                        {formatMoney(p.possibleDuplicate.amount, p.possibleDuplicate.currency)} ·{" "}
+                        {p.possibleDuplicate.occurredOn}
+                      </strong>{" "}
+                      que ya registraste.
+                    </span>
+                    <span style={{ display: "inline-flex", gap: 6, marginLeft: "auto" }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ fontSize: 11, padding: "4px 10px" }}
+                        disabled={rowBusy}
+                        onClick={() =>
+                          run(
+                            p.id,
+                            (id) =>
+                              mergeIngestProposalAction(id, p.possibleDuplicate!.transactionId),
+                            "Unido: un solo movimiento con la referencia del banco",
+                          )
+                        }
+                      >
+                        Sí, es el mismo
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ fontSize: 11, padding: "4px 10px" }}
+                        disabled={rowBusy}
+                        onClick={() => setIgnorarDup((prev) => new Set(prev).add(p.id))}
+                      >
+                        No, es otro
+                      </button>
+                    </span>
+                  </div>
+                ) : null}
 
                 {/* Edición en línea: corregir lo que el banco trajo mal, sin salir de acá. */}
                 {editing === p.id && draft ? (

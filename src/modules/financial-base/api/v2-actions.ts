@@ -100,6 +100,11 @@ import {
   proposalToTxnInput,
 } from "@/modules/financial-base/services/ingest-proposals-view";
 import { logger } from "@/lib/logger";
+import {
+  autoMergePendingProposal,
+  mergeProposalIntoTransaction,
+  type AutoMerged,
+} from "@/modules/financial-base/services/reconcile-service";
 import { AppError } from "@/lib/errors";
 // `import type` y no runtime: en un fichero "use server" solo pueden EXPORTARSE funciones
 // async, pero importar tipos es libre y desaparece al compilar.
@@ -430,7 +435,7 @@ export async function registerPassiveIncomeWithStubAction(raw: unknown): Promise
  */
 export async function addTransactionAction(
   raw: unknown,
-): Promise<ActionResult & { sobre?: SobreRemaining }> {
+): Promise<ActionResult & { sobre?: SobreRemaining; unido?: AutoMerged }> {
   const parsed = txnInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
@@ -466,7 +471,23 @@ export async function addTransactionAction(
           () => null,
         )) ?? undefined;
     }
-    return { ok: true, sobre };
+    // Conciliador (camino inverso): si esto ya había llegado por correo y estaba
+    // esperando en «Por revisar», se une solo en vez de quedar dos veces. Solo
+    // para gasto/ingreso que NO vienen de la propia ingesta.
+    let unido: AutoMerged | undefined;
+    if (parsed.data.source !== "email" && parsed.data.kind !== "ajuste") {
+      unido =
+        (await autoMergePendingProposal({
+          id: created.id,
+          kind: parsed.data.kind,
+          amount: parsed.data.amount,
+          currency: created.currency,
+          occurredOn: parsed.data.occurredOn,
+          merchant: parsed.data.merchantOrSource ?? parsed.data.description ?? null,
+        })) ?? undefined;
+      if (unido) revalidatePath("/transacciones");
+    }
+    return { ok: true, sobre, unido };
   } catch (err) {
     logger.error("addTransaction fallido", { message: err instanceof Error ? err.message : "?" });
     const msg =
@@ -477,7 +498,8 @@ export async function addTransactionAction(
   }
 }
 
-const PROPOSAL_COLS = "id, kind, amount, currency, occurred_on, merchant, card_last4, confidence";
+const PROPOSAL_COLS =
+  "id, kind, amount, currency, occurred_on, merchant, card_last4, confidence, bank_code, external_ref";
 
 /**
  * Correcciones que el usuario puede hacer ANTES de confirmar una propuesta, en la
@@ -570,6 +592,36 @@ export async function confirmIngestProposalAction(
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos confirmar el movimiento." };
+  }
+}
+
+/**
+ * Conciliador · «Sí, es el mismo»: une la propuesta al movimiento que ya existía
+ * (recibo, manual, importado). No crea nada: el movimiento gana la referencia del
+ * banco y la propuesta queda `merged`.
+ */
+export async function mergeIngestProposalAction(
+  proposalId: string,
+  transactionId: string,
+): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  const ids = z.object({ p: z.string().uuid(), t: z.string().uuid() }).safeParse({
+    p: proposalId,
+    t: transactionId,
+  });
+  if (!ids.success) return { ok: false, message: "Datos inválidos." };
+  try {
+    const res = await mergeProposalIntoTransaction(ids.data.p, ids.data.t);
+    if (res.ok) {
+      revalidatePath("/transacciones");
+      revalidatePath("/m/transacciones");
+    }
+    return res;
+  } catch (err) {
+    logger.error("mergeIngestProposal fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos unir el movimiento." };
   }
 }
 

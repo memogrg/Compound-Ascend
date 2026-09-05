@@ -373,6 +373,14 @@ export function TransactionComposer({
       // ellas (`addTransactionAction`) trae `sobre`; una transferencia nunca lo tiene.
       const restante = sobreRemainingText((res as { sobre?: SobreRemaining }).sobre, formatMoney);
       if (restante) toast(restante, "info");
+      // Conciliador: el aviso del banco que esperaba en «Por revisar» se unió a este movimiento.
+      const unido = (res as { unido?: { merchant: string | null } }).unido;
+      if (unido) {
+        toast(
+          `Lo unimos con el aviso del banco${unido.merchant ? ` (${unido.merchant})` : ""}: no queda dos veces.`,
+          "info",
+        );
+      }
       // Aprendizaje: si categorizaste un comercio y no había sugerencia exacta,
       // ofrece regla (con vínculo incluido: la próxima vez se auto-vincula).
       const m = merchant.trim();

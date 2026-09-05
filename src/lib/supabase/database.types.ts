@@ -388,6 +388,10 @@ export type TransactionRow = Timestamps &
     // Gasto off-budget (migración 20260717000001): false = no cuenta en el gasto
     // del mes / free cashflow / actuals (p.ej. consumo de un frasco de ahorro).
     counts_in_budget: boolean;
+    // Conciliador de ingesta (migración 20260905000002): lo que trae el aviso del banco.
+    external_ref: string | null;
+    card_last4: string | null;
+    bank_code: string | null;
   };
 
 // ---------- Base Financiera V2 (presupuesto, cuentas, reglas) ----------
@@ -1126,7 +1130,7 @@ export type IngestNoticeRow = Audited & {
   resolved_at: string | null;
 };
 
-export type IngestProposalStatus = "pending" | "confirmed" | "discarded";
+export type IngestProposalStatus = "pending" | "confirmed" | "discarded" | "merged";
 
 /** Cola de propuestas de ingesta por confirmar (migración 0027). */
 export type IngestProposalRow = Audited & {
@@ -1147,6 +1151,8 @@ export type IngestProposalRow = Audited & {
   card_last4: string | null;
   raw_text: string | null;
   created_at: string;
+  /** Conciliador (migración 20260905000002): movimiento con el que se unió (status 'merged'). */
+  merged_into: string | null;
 };
 
 /** Tarjeta por cuenta: el último-4 es etiqueta DENTRO de la cuenta (migración 0029). */

@@ -9,6 +9,10 @@ import "server-only";
  */
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resolveCardLabel } from "@/lib/ingestion/cards-service";
+import {
+  attachDuplicateHints,
+  type DuplicateHint,
+} from "@/modules/financial-base/services/reconcile-service";
 
 /** Propuesta lista para la UI (forma plana, etiqueta de tarjeta resuelta). */
 export interface PendingProposalView {
@@ -21,9 +25,14 @@ export interface PendingProposalView {
   cardLast4: string | null;
   cardLabel: string | null;
   confidence: number;
+  bankCode: string | null;
+  externalRef: string | null;
+  /** Movimiento ya registrado por otra puerta que parece el mismo (conciliador). */
+  possibleDuplicate?: DuplicateHint | null;
 }
 
-const COLS = "id, kind, amount, currency, occurred_on, merchant, card_last4, confidence";
+const COLS =
+  "id, kind, amount, currency, occurred_on, merchant, card_last4, confidence, bank_code, external_ref";
 
 type ProposalRow = {
   id: string;
@@ -34,6 +43,8 @@ type ProposalRow = {
   merchant: string | null;
   card_last4: string | null;
   confidence: number;
+  bank_code?: string | null;
+  external_ref?: string | null;
 };
 
 type CardRow = { last4: string; label: string; holder_name: string | null };
@@ -55,6 +66,8 @@ export function mapProposalRow(row: ProposalRow, cards: CardRow[]): PendingPropo
     cardLast4: row.card_last4,
     cardLabel: resolveCardLabel(cardList, row.card_last4),
     confidence: row.confidence,
+    bankCode: row.bank_code ?? null,
+    externalRef: row.external_ref ?? null,
   };
 }
 
@@ -71,7 +84,10 @@ export async function listMyPendingProposals(): Promise<PendingProposalView[]> {
     .from("account_cards")
     .select("last4, label, holder_name");
   const cards = (cardRows ?? []) as CardRow[];
-  return (data as ProposalRow[]).map((r) => mapProposalRow(r, cards));
+  const views = (data as ProposalRow[]).map((r) => mapProposalRow(r, cards));
+  // Conciliador: marca las que parecen un movimiento ya registrado por otra puerta.
+  const hints = await attachDuplicateHints(views);
+  return views.map((v) => ({ ...v, possibleDuplicate: hints.get(v.id) ?? null }));
 }
 
 /**
@@ -92,5 +108,8 @@ export function proposalToTxnInput(p: PendingProposalView) {
     source: "email" as const,
     status: "confirmed" as const,
     confidence: p.confidence,
+    ...(p.externalRef ? { externalRef: p.externalRef } : {}),
+    ...(p.cardLast4 ? { cardLast4: p.cardLast4 } : {}),
+    ...(p.bankCode ? { bankCode: p.bankCode } : {}),
   };
 }

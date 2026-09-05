@@ -43,7 +43,16 @@ describe("ingest-proposals-view · proposalToTxnInput", () => {
     cardLast4: "2062",
     cardLabel: "Mastercard personal",
     confidence: 0.95,
+    bankCode: "BAC",
+    externalRef: "617800725966",
   };
+
+  it("lleva la referencia del banco, el último-4 y el banco al movimiento (conciliador)", () => {
+    const t = proposalToTxnInput(base);
+    expect(t.externalRef).toBe("617800725966");
+    expect(t.cardLast4).toBe("2062");
+    expect(t.bankCode).toBe("BAC");
+  });
 
   it("mapea a payload de transacción con descripción 'comercio · tarjeta'", () => {
     const t = proposalToTxnInput(base);

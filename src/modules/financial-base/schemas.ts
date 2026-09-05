@@ -133,6 +133,14 @@ export const txnInputSchema = z
     // (p.ej. consumo de un frasco de ahorro, que ya se contó al aportar). Opt-in
     // como el resto de los campos aditivos; si se omite, el insert usa true.
     countsInBudget: z.boolean().optional(),
+    // Lo que trae el aviso del banco cuando el movimiento entra por la ingesta
+    // por correo (o se une a ella): referencia, último-4 y banco. Opt-in.
+    externalRef: z.string().max(80).optional(),
+    cardLast4: z
+      .string()
+      .regex(/^\d{4}$/)
+      .optional(),
+    bankCode: z.string().max(24).optional(),
   })
   .refine((d) => !d.linkedKind || d.linkedKind === "none" || !!d.linkedId, {
     message: "Un vínculo necesita la entidad (linkedId).",
