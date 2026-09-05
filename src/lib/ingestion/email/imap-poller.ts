@@ -208,7 +208,7 @@ export async function fetchUnseen(client: ImapClient): Promise<ImapMessage[]> {
 // Orquestación (pura sobre dependencias inyectadas)
 // ------------------------------------------------------------
 
-/** Dueño resuelto de un correo (vía allowlist email_ingest_links). */
+/** Dueño resuelto de un correo (vía ingest_addresses). */
 export interface EmailOwner {
   userId: string;
   householdId: string | null;
@@ -232,10 +232,6 @@ export interface EmailIngestDeps {
   /** Resuelve el dueño por DIRECCIÓN DE INGESTA única (nivel 0). Sin verificación
    *  de por medio: la dirección es el secreto que la app le dio a esa cuenta. */
   lookupByAddress(candidates: string[]): Promise<OwnerLookup>;
-  /** Resuelve el dueño por reenviador verificado (carril heredado). Devuelve
-   *  `ambiguous` si los candidatos apuntan a más de una cuenta: el poller
-   *  entonces no procesa, no adivina. */
-  lookupOwner(candidates: string[]): Promise<OwnerLookup>;
   /** ¿Este correo (por id) ya se procesó? (processed_events). */
   isProcessed(eventId: string): Promise<boolean>;
   /** Registra el correo como procesado (processed_events). */
@@ -293,15 +289,15 @@ function fecharConReceivedAt(receivedAt: string | null, tz: string | null): stri
  *
  *   0. dirección de ingesta en la cabecera del receptor  (identidad, no indicio)
  *   1. dirección de ingesta vista en cualquier otra cabecera
- *   2. reenviador verificado entre los destinatarios     (carril heredado)
- *   3. reenviador verificado en el From autenticado      (reenvío manual)
+ *
+ * La ÚNICA identidad es la dirección de ingesta de la cuenta. El carril heredado
+ * (reenviador verificado por código, por destinatario o por From autenticado) se
+ * retiró: un correo que no llegue a una dirección de ingesta conocida se ignora.
  */
 async function resolverDueno(message: ImapMessage, deps: EmailIngestDeps): Promise<OwnerLookup> {
   const niveles: Array<() => Promise<OwnerLookup>> = [
     () => deps.lookupByAddress(message.envelopeTo),
     () => deps.lookupByAddress(message.recipients),
-    () => deps.lookupOwner(message.recipients),
-    () => deps.lookupOwner(message.senderCandidates),
   ];
   for (const nivel of niveles) {
     const out = await nivel();

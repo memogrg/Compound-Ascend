@@ -12,7 +12,6 @@ import { CurrencySelector } from "@/modules/account/components/currency-selector
 import { TimezoneSelector } from "@/modules/account/components/timezone-selector";
 import { NotificationPrefs } from "@/modules/account/components/notification-prefs";
 import { EmailTester } from "@/modules/account/components/email-tester";
-import { IngestEmails } from "@/modules/account/components/ingest-emails";
 import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
 import { getOrCreateIngestAddress } from "@/modules/account/services/ingest-address-service";
 import { IngestNotices } from "@/modules/account/components/ingest-notices";
@@ -21,11 +20,7 @@ import {
   EMPTY_NOTICES,
   type IngestNoticesView,
 } from "@/modules/account/services/ingest-notices-service";
-import { INGEST_TARGET, INGEST_HELP } from "@/modules/account/constants";
-import {
-  listMyIngestEmails,
-  type IngestEmailRow,
-} from "@/modules/account/services/ingest-email-service";
+import { INGEST_HELP } from "@/modules/account/constants";
 import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Icon } from "@/components/ui/icon";
@@ -70,18 +65,11 @@ export default async function Page() {
   const usagePct =
     acc.tokenLimit > 0 ? Math.min(100, Math.round((acc.tokensUsed / acc.tokenLimit) * 100)) : 0;
 
-  // Correos del banco (onboarding de ingesta). Best-effort: si falla, lista vacía.
-  let ingestEmails: IngestEmailRow[] = [];
   // Dirección única de la cuenta: se crea sola la primera vez que se abre esta
   // pantalla. null si el dominio de ingesta no está configurado todavía.
   let ingestAddress: string | null = null;
   let ingestNotices: IngestNoticesView = EMPTY_NOTICES;
   if (isSupabaseConfigured()) {
-    try {
-      ingestEmails = await listMyIngestEmails();
-    } catch {
-      ingestEmails = [];
-    }
     try {
       ingestAddress = await getOrCreateIngestAddress();
     } catch {
@@ -240,17 +228,12 @@ export default async function Page() {
               Con eso basta: no hay que registrar nada más.
             </>
           ) : (
-            <>
-              Configurá en tu correo un reenvío de los avisos de tu banco a{" "}
-              <strong className="tnum">{INGEST_TARGET}</strong>, y registrá acá el correo desde el
-              que reenviás.
-            </>
+            <>La lectura de correo todavía no está encendida en este entorno.</>
           )
         }
       >
         {ingestAddress ? <IngestAddressCard address={ingestAddress} /> : null}
         <IngestNotices view={ingestNotices} />
-        <IngestEmails initial={ingestEmails} />
       </SetRow>
 
       <SetRow

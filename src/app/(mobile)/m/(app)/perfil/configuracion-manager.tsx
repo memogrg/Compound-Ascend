@@ -8,7 +8,7 @@
  *  - Moneda principal → updateCurrencyAction
  *  - Notificaciones → updateNotificationPrefAction (optimista, revierte si falla)
  *  - Hogar (ver/invitar/revocar/quitar miembros, cupo por plan) → household actions
- *  - Correos del banco → requestIngestEmailAction / confirmIngestEmailAction / removeIngestEmailAction
+ *  - Correos del banco → dirección única (IngestAddressCard) + avisosAction
  *  - Borrar todos los datos → clearAllDataAction (confirmación de 2 pasos)
  */
 import { useState, useTransition } from "react";
@@ -22,9 +22,6 @@ import {
   updateCurrencyAction,
   saveUserTimezone,
   updateNotificationPrefAction,
-  requestIngestEmailAction,
-  confirmIngestEmailAction,
-  removeIngestEmailAction,
   clearAllDataAction,
 } from "@/modules/account/api/actions";
 import {
@@ -35,12 +32,10 @@ import {
 import type { HouseholdMembersView } from "@/modules/personal-profile";
 import { testEmailAction, type EmailTestResult } from "@/modules/account/api/actions";
 import { updatePasswordAction } from "@/lib/auth/actions";
-import { INGEST_TARGET } from "@/modules/account/constants";
 import { IngestAddressCard } from "@/modules/account/components/ingest-address-card";
 import { IngestNotices } from "@/modules/account/components/ingest-notices";
 import type { IngestNoticesView } from "@/modules/account/services/ingest-notices-service";
 import type { NotificationChannel, NotificationPrefs } from "@/lib/notifications/preferences";
-import type { IngestEmailRow } from "@/modules/account/services/ingest-email-service";
 
 import {
   BottomSheet,
@@ -90,7 +85,6 @@ export function ConfiguracionManager({
   currency,
   timezone,
   notifications,
-  ingestEmails,
   ingestAddress,
   ingestNotices,
   household,
@@ -99,7 +93,6 @@ export function ConfiguracionManager({
   currency: string;
   timezone: string | null;
   notifications: NotificationPrefs;
-  ingestEmails: IngestEmailRow[];
   ingestAddress: string | null;
   ingestNotices: IngestNoticesView;
   household: HouseholdMembersView | null;
@@ -202,7 +195,7 @@ export function ConfiguracionManager({
         />
       </MContentCard>
 
-      {/* Correos del banco (ingesta) — formulario/lista propios (form-kit): se conservan. */}
+      {/* Correos del banco (ingesta): la dirección única es la única forma. */}
       <MSectionHeader title="Correos del banco" />
       <MContentCard style={{ marginBottom: 14 }}>
         {ingestAddress ? (
@@ -216,11 +209,9 @@ export function ConfiguracionManager({
           </>
         ) : (
           <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px" }}>
-            Reenvía los avisos de tu banco a <strong className="mono">{INGEST_TARGET}</strong> y
-            registra aquí el correo desde el que reenvías.
+            La lectura de correo todavía no está encendida en este entorno.
           </p>
         )}
-        <IngestSection emails={ingestEmails} />
       </MContentCard>
 
       {/* Seguridad — contraseña (fila del kit) + probar correo (.srow con botón y resultado) +
@@ -843,162 +834,6 @@ function HouseholdSheet({
         }}
         onCancel={() => setConfirmRemove(null)}
       />
-    </div>
-  );
-}
-
-/** Correos del banco: lista + alta (email → código → confirmar). Espeja ingest-emails.tsx. */
-function IngestSection({ emails }: { emails: IngestEmailRow[] }) {
-  const router = useRouter();
-  const toast = useToast();
-  const [pending, start] = useTransition();
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [verifying, setVerifying] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const sendCode = () =>
-    start(async () => {
-      const r = await requestIngestEmailAction(email.trim());
-      if (r.ok) {
-        setVerifying(email.trim());
-        setCode("");
-        toast.show(`Te enviamos un código a ${email.trim()}.`, "success");
-      } else {
-        toast.show(r.message ?? "No pudimos enviar el código.", "error");
-      }
-    });
-
-  const confirm = () =>
-    start(async () => {
-      if (!verifying) return;
-      const r = await confirmIngestEmailAction(verifying, code.trim());
-      if (r.ok) {
-        toast.show("Correo verificado.", "success");
-        setVerifying(null);
-        setEmail("");
-        setCode("");
-        router.refresh();
-      } else {
-        toast.show(r.message ?? "No pudimos verificar el correo.", "error");
-      }
-    });
-
-  const remove = (id: string) =>
-    start(async () => {
-      setBusyId(id);
-      const r = await removeIngestEmailAction(id);
-      setBusyId(null);
-      if (r.ok) {
-        toast.show("Correo eliminado.", "success");
-        router.refresh();
-      } else {
-        toast.show(r.message ?? "No pudimos eliminar el correo.", "error");
-      }
-    });
-
-  return (
-    <div style={{ display: "grid", gap: 10 }}>
-      {emails.length > 0 ? (
-        <div style={{ display: "grid", gap: 8 }}>
-          {emails.map((e) => (
-            <div key={e.id} className="between" style={{ gap: 10 }}>
-              <span
-                style={{
-                  minWidth: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  fontSize: 13,
-                }}
-              >
-                {e.forwarderEmail}
-              </span>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flex: "none" }}>
-                <span
-                  className={`badge ${e.verified ? "pos" : "neutral"}`}
-                  style={{ fontSize: 10.5 }}
-                >
-                  {e.verified ? "Verificado" : "Pendiente"}
-                </span>
-                <button
-                  type="button"
-                  className="linkbtn"
-                  style={{
-                    background: "none",
-                    border: 0,
-                    color: "var(--danger)",
-                    cursor: "pointer",
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                  }}
-                  disabled={pending && busyId === e.id}
-                  onClick={() => remove(e.id)}
-                >
-                  Quitar
-                </button>
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {verifying ? (
-        <>
-          <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-            Ingresa el código de 6 dígitos que enviamos a <strong>{verifying}</strong>:
-          </div>
-          <input
-            className="m-inp mono"
-            inputMode="numeric"
-            maxLength={6}
-            placeholder="000000"
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            style={{ letterSpacing: "0.3em", textAlign: "center" }}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              className="m-btn m-btn-secondary"
-              style={{ flex: "none", padding: "0 16px" }}
-              onClick={() => setVerifying(null)}
-              disabled={pending}
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              className="m-btn m-btn-block m-btn-primary"
-              onClick={confirm}
-              disabled={pending || code.trim().length !== 6}
-            >
-              {pending ? "Verificando…" : "Confirmar"}
-            </button>
-          </div>
-        </>
-      ) : (
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            className="m-inp"
-            type="email"
-            inputMode="email"
-            placeholder="correo-que-reenvia@correo.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button
-            type="button"
-            className="m-btn m-btn-secondary"
-            style={{ flex: "none", padding: "0 16px" }}
-            onClick={sendCode}
-            disabled={pending || email.trim().length < 5}
-          >
-            {pending ? "Enviando…" : "Enviar código"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

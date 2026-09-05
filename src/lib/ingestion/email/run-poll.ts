@@ -18,7 +18,6 @@ import {
   type IngestSummary,
 } from "@/lib/ingestion/email/imap-poller";
 import { createImapClient, isEmailIngestConfigured } from "@/lib/ingestion/email/imap-client";
-import { lookupOwnerByForwarder } from "@/lib/ingestion/email/forwarder-lookup";
 import { lookupOwnerByIngestAddress } from "@/lib/ingestion/email/address-lookup";
 
 const PROVIDER = "email_ingest";
@@ -30,8 +29,6 @@ export function buildDeps(
 ): EmailIngestDeps {
   return {
     lookupByAddress: (candidates: string[]) => lookupOwnerByIngestAddress(supabase, candidates),
-
-    lookupOwner: (candidates: string[]) => lookupOwnerByForwarder(supabase, candidates),
 
     async isProcessed(eventId: string): Promise<boolean> {
       const { data } = await supabase

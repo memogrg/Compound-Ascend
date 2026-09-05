@@ -1096,20 +1096,6 @@ export type InvestmentReportRow = {
   created_at: string;
 };
 
-/** Ingesta por correo: allowlist alias de destinatario -> usuario (migración 0027). */
-export type EmailIngestLinkRow = Audited & {
-  id: string;
-  user_id: string;
-  household_id: string | null;
-  ingest_alias: string | null; // legado: alias plus-addressing (ya no se usa para match)
-  forwarder_email: string | null; // llave de match: destinatario original (correo del usuario)
-  verified: boolean; // solo se procesan remitentes verificados (migración 0031)
-  verify_code_hash: string | null; // sha256 del código de verificación; null tras verificar
-  verify_expires_at: string | null; // vigencia del código
-  verified_at: string | null; // cuándo se probó la propiedad (migración 20260902000001)
-  created_at: string;
-};
-
 /** Dirección de ingesta única por cuenta (migración 20260902000002). El
  *  destinatario ES la identidad: se resuelve por X-Gm-Original-To. Escritura
  *  solo desde el servidor (sin grant para anon/authenticated). */
@@ -1326,7 +1312,6 @@ export interface Database {
         Partial<ProcessedEventRow>
       >;
       // Ingesta por correo (migración 0027). El poller usa service-role.
-      email_ingest_links: UserTable<EmailIngestLinkRow>;
       ingest_addresses: UserTable<IngestAddressRow>;
       ingest_notices: UserTable<IngestNoticeRow>;
       ingest_proposals: UserTable<IngestProposalRow>;
