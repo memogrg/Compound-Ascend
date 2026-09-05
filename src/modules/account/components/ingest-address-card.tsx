@@ -209,6 +209,23 @@ function IngestSetupGuide({ address }: { address: string }) {
         </p>
       </details>
 
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: "pointer", fontSize: 13 }}>
+          Cargar avisos viejos (el historial de un mes, de una vez)
+        </summary>
+        <p style={NOTE_STYLE}>
+          El reenvío automático solo aplica a correos nuevos. Para traer lo anterior, en Gmail (en
+          la computadora) buscá los avisos de tu banco con una fecha, por ejemplo{" "}
+          <code>from:notificacionbac@baccredomatic.cr after:2026/08/01</code>, marcá la casilla de
+          «seleccionar todos», tocá los tres puntos ⋮ →{" "}
+          <strong>Reenviar como archivo adjunto</strong>, poné <code>{address}</code> y enviá. Un
+          solo correo con todos los avisos adentro: los leemos uno por uno. Después, en{" "}
+          <strong>Transacciones → Por revisar</strong>, filtrá por fecha, marcá «Todos» y tocá{" "}
+          <strong>Registrar</strong>. Lo que ya tenías registrado a mano o por recibo aparece
+          marcado como posible duplicado para que decidás.
+        </p>
+      </details>
+
       <p style={NOTE_STYLE}>
         <strong>Probalo:</strong> reenviá a mano un aviso que ya tengas. Tocá «Buscar avisos ahora»
         (o esperá: el buzón se revisa solo cada 5 minutos); el movimiento aparece en{" "}

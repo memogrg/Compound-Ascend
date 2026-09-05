@@ -6,7 +6,7 @@ import "server-only";
  * `ImapClient` y se prueba con un fake. Sin sesión de usuario: lo dispara el cron.
  */
 import { ImapFlow } from "imapflow";
-import { simpleParser } from "mailparser";
+import { decodeMail } from "@/lib/ingestion/email/mime";
 import { getServerEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import {
@@ -23,18 +23,6 @@ export function isEmailIngestConfigured(): boolean {
   return Boolean(env.GMAIL_IMAP_USER && env.GMAIL_IMAP_APP_PASSWORD);
 }
 
-/**
- * Cuerpo DECODIFICADO de un correo MIME, vía mailparser: resuelve
- * quoted-printable/base64/multipart. Prefiere text/plain; si no hay, deriva del
- * HTML. Esto arregla las notificaciones de BAC que llegaban en quoted-printable.
- */
-async function extractBodyText(source: Buffer): Promise<string> {
-  const parsed = await simpleParser(source);
-  const plain = (parsed.text ?? "").trim();
-  if (plain) return plain;
-  return parsed.html ? stripHtml(parsed.html) : "";
-}
-
 /** Devuelve el bloque de cabeceras de un RFC822 (todo antes del primer renglón
  *  en blanco). Las cabeceras de reenvío (Delivered-To, X-Forwarded-For/To) viven
  *  aquí, no en el envelope de IMAP. */
@@ -42,18 +30,6 @@ function headerBlock(source: Buffer): string {
   const raw = source.toString("utf8");
   const sep = raw.search(/\r?\n\r?\n/);
   return sep >= 0 ? raw.slice(0, sep) : raw;
-}
-
-/** Quita etiquetas HTML y colapsa espacios (fallback cuando no hay text/plain). */
-function stripHtml(html: string): string {
-  return html
-    .replace(/<\s*(br|\/p|\/div|\/tr|\/li)\s*>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
 }
 
 /**
@@ -101,22 +77,51 @@ export async function createImapClient(): Promise<ImapClient> {
         const fromHeaders = headers ? extractRecipientCandidates(headers) : [];
         const recipients = [...new Set([...to, ...fromHeaders])]; // dedup, ya en minúsculas
         const from = msg.envelope?.from?.[0]?.address ?? null;
+        // Lo que estampó el receptor al entregar: con el catch-all del
+        // subdominio, aquí viaja la dirección de ingesta única de la cuenta.
+        const envelopeTo = headers ? extractEnvelopeCandidates(headers) : [];
+        // ¿Nuestro buzón validó DKIM/SPF para ese From? Sin esto, el remitente
+        // es una afirmación del que manda y no puede valer como identidad.
+        const fromAuthenticated = Boolean(from) && fromIsAuthenticated(headers, from!);
+        const decoded = msg.source ? await decodeMail(msg.source) : null;
+        const receivedAt = msg.envelope?.date
+          ? new Date(msg.envelope.date).toISOString()
+          : (decoded?.date ?? null);
+
+        // «Reenviar como archivo adjunto»: cada .eml adentro es un aviso del banco
+        // con vida propia (su Message-ID, su fecha, su cuerpo). El dueño es el del
+        // correo exterior (llegó a la dirección de ingesta), por eso heredan
+        // recipients/envelopeTo. Comparten el uid: markSeen es idempotente.
+        if (decoded && decoded.attached.length > 0) {
+          decoded.attached.forEach((inner, i) => {
+            out.push({
+              uid: msg.uid,
+              messageId: inner.messageId ?? `${msg.envelope?.messageId ?? `uid:${msg.uid}`}#${i}`,
+              from: inner.from ?? from,
+              recipients,
+              envelopeTo,
+              fromAuthenticated: false, // el interior no lo autenticó nadie
+              subject: inner.subject,
+              text: inner.text,
+              // La fecha del aviso original, no la del reenvío: es la que fecha el gasto.
+              receivedAt: inner.date ?? receivedAt,
+            });
+          });
+          continue;
+        }
+
         out.push({
           uid: msg.uid,
           messageId: msg.envelope?.messageId ?? null,
           from,
           recipients,
-          // Lo que estampó el receptor al entregar: con el catch-all del
-          // subdominio, aquí viaja la dirección de ingesta única de la cuenta.
-          envelopeTo: headers ? extractEnvelopeCandidates(headers) : [],
-          // ¿Nuestro buzón validó DKIM/SPF para ese From? Sin esto, el remitente
-          // es una afirmación del que manda y no puede valer como identidad.
-          fromAuthenticated: Boolean(from) && fromIsAuthenticated(headers, from!),
+          envelopeTo,
+          fromAuthenticated,
           subject: msg.envelope?.subject ?? null,
-          text: msg.source ? await extractBodyText(msg.source) : "",
+          text: decoded?.text ?? "",
           // envelope.date (cabecera Date del correo) como instante ISO. Fallback de occurred_on
           // cuando el cuerpo no trae fecha parseable (imapflow lo entrega como Date).
-          receivedAt: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
+          receivedAt,
         });
       }
       return out;
