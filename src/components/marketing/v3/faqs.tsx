@@ -414,6 +414,43 @@ export function Faqs() {
                 </details>
 
                 <details className="qa">
+                  <summary>Ya lo había registrado a mano o por recibo. ¿Se duplica?</summary>
+                  <div className="lp-r">
+                    <p>
+                      No. Si el aviso del banco se parece a un movimiento que ya tenés (mismo monto
+                      y moneda, misma fecha o un día de diferencia, comercio parecido), «Por
+                      revisar» te lo dice antes de confirmar y te ofrece{" "}
+                      <strong>«Sí, es el mismo»</strong>: se unen en un solo movimiento, que gana la
+                      referencia del banco y la tarjeta. Si es otro gasto igual (dos cafés el mismo
+                      día), tocás «No, es otro».
+                    </p>
+                    <p>
+                      Y al revés: si registrás algo a mano, por recibo o por chat y el aviso del
+                      banco ya estaba esperando, se une solo y te lo avisa.
+                    </p>
+                  </div>
+                </details>
+
+                <details className="qa">
+                  <summary>¿Cómo cargo los movimientos de antes (el historial)?</summary>
+                  <div className="lp-r">
+                    <p>
+                      El reenvío automático solo aplica a correos nuevos. Para traer un mes de una
+                      vez: en Gmail buscá los avisos del banco con una fecha (por ejemplo{" "}
+                      <code>from:notificacionbac@baccredomatic.cr after:2026/08/01</code>),
+                      seleccioná todos, ⋮ → <strong>Reenviar como archivo adjunto</strong>, a tu
+                      dirección de ingesta. Es un solo correo con todos los avisos adentro; los
+                      leemos uno por uno (hasta 200 por correo).
+                    </p>
+                    <p>
+                      Después tocá «Buscar avisos ahora» en Configuración y, en «Por revisar»,
+                      filtrá por fecha, marcá «Todos» y <strong>Registrar</strong>. Lo que ya tenías
+                      registrado aparece marcado como posible duplicado para que lo decidás.
+                    </p>
+                  </div>
+                </details>
+
+                <details className="qa">
                   <summary>¿Se puede corregir un movimiento mal clasificado?</summary>
                   <div className="lp-r">
                     <p>

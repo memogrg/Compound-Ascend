@@ -76,6 +76,22 @@ No. Todo llega como propuesta y espera tu confirmación. Vos decidís qué entra
 **¿Y si el banco puso mal el nombre del comercio, o la fecha?**
 Lo corregís antes de confirmar, en la misma fila: monto, moneda, fecha, comercio, nota, sobre y cuenta.
 
+**Ya lo había registrado a mano (o por recibo, o por chat). ¿Se duplica?**
+No. Si el aviso del banco se parece a un movimiento que ya tenés (mismo monto, moneda, fecha o un
+día de diferencia y comercio parecido), Por revisar te lo dice antes de confirmar y te ofrece
+**«Sí, es el mismo»**: se unen en un solo movimiento, que gana la referencia del banco y la tarjeta.
+Si registrás algo a mano y el aviso ya estaba esperando, se une solo y te lo avisa.
+
+**¿Cómo cargo los movimientos de antes (el historial)?**
+El reenvío automático solo aplica a correos nuevos. En Gmail buscá los avisos del banco con una
+fecha (`from:notificacionbac@baccredomatic.cr after:2026/08/01`), seleccioná todos, ⋮ → **Reenviar
+como archivo adjunto**, a tu dirección de ingesta. Es un solo correo con todos los avisos adentro; los
+leemos uno por uno. Después, en Por revisar, filtrá por fecha, marcá «Todos» y **Registrar**. Un lote
+admite hasta 200 avisos por correo.
+
+**¿Hay más de una forma de conectar el correo?**
+No: una sola, la dirección de ingesta. No hay códigos ni correos que registrar.
+
 **¿Y si reenvío el mismo aviso dos veces?**
 No se duplica. Reconocemos el movimiento por su referencia y lo contamos una sola vez.
 

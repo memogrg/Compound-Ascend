@@ -162,6 +162,37 @@ En **Por revisar** cada aviso llega como propuesta:
 
 Un aviso reenviado dos veces **no se duplica**: lo reconocemos por su referencia.
 
+**¿Y si ya lo habías registrado a mano, por recibo o por chat?** Tampoco se duplica. Si el aviso del
+banco se parece a un movimiento que ya tenés (mismo monto, misma moneda, misma fecha o un día de
+diferencia, comercio parecido), la fila lo dice antes de confirmar: «Parece el mismo que Subway ·
+₡5.150 · 4 sep que ya registraste». Tocás **Sí, es el mismo** y se unen: queda **un solo**
+movimiento, ahora con la referencia del banco y la tarjeta. Si es otro gasto igual (dos cafés el
+mismo día), tocás **No, es otro**. Y al revés también: si registrás algo a mano y el aviso del banco
+ya estaba esperando en Por revisar, se une solo y te lo avisa.
+
+---
+
+## Paso 5 · Cargá tu historial (los avisos de antes de hoy)
+
+El reenvío automático **solo aplica a correos nuevos**: lo que ya estaba en tu bandeja no se reenvía
+solo. Para traer un mes (o tres) de una sola vez:
+
+1. En Gmail, en la computadora, buscá los avisos de tu banco con una fecha de inicio, por ejemplo:
+   `from:notificacionbac@baccredomatic.cr after:2026/08/01` (para BCR `from:bancobcr.com`, para BN
+   `from:bncr.fi.cr`, para Davivienda `from:davibank.cr`).
+2. Marcá la casilla de arriba a la izquierda (**seleccionar todos**). Si Gmail te ofrece «Seleccionar
+   las N conversaciones que coinciden», tocalo.
+3. Tres puntos **⋮** (arriba, junto a los íconos) → **Reenviar como archivo adjunto**.
+4. En «Para» pegá tu dirección de ingesta → **Enviar**. Es un solo correo con todos los avisos
+   adentro.
+5. En CARTERA+, **Configuración → Correos del banco → Buscar avisos ahora**.
+6. En **Transacciones → Por revisar**: filtrá **del / al** por fecha, marcá **Todos** y tocá
+   **Registrar N**. Lo que ya tenías registrado aparece marcado como posible duplicado para que lo
+   decidás uno por uno; lo que no querés, **Descartar**.
+
+En Outlook y Apple Mail existe la misma opción («Reenviar como datos adjuntos»). Un lote tiene un
+tope de 200 avisos por correo: si tenés más, mandalos en dos.
+
 ---
 
 ## Qué se lee de cada banco (hoy)
@@ -210,6 +241,10 @@ trabajando para que la app del celular lea también las notificaciones del banco
 
 **¿Puedo apagarlo?**
 Cuando quieras: borrá el filtro o la regla en tu correo. Lo que ya registraste se queda con vos.
+
+**¿Hay más de una forma de conectar el correo?**
+No: una sola, la dirección de ingesta. No hay códigos que pedir ni correos que registrar. Todo lo
+que llegue a tu dirección es tuyo.
 
 **¿Puedo cambiar mi dirección de ingesta?**
 Sí. Si creés que se filtró, escribinos y te damos una nueva: la vieja deja de funcionar en el acto y no
