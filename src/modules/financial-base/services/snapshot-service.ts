@@ -15,6 +15,7 @@ import { convertCurrency } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
 import type { Database } from "@/lib/supabase/database.types";
 import type { Period } from "@/modules/financial-base/types";
+import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
@@ -95,7 +96,7 @@ async function snapshotUserAdmin(
   const [bi, tx] = await Promise.all([
     admin
       .from("budget_items")
-      .select("type,amount,currency")
+      .select("type,amount,currency,frequency")
       .eq("user_id", userId)
       .eq("period_month", period.month)
       .eq("period_year", period.year),
@@ -114,7 +115,13 @@ async function snapshotUserAdmin(
     rIncome = 0,
     rExpense = 0;
   for (const r of bi.data ?? []) {
-    const v = convertCurrency(Number(r.amount), r.currency, currency, rates);
+    // Mismo criterio que getBudgetTotals: el ingreso se mensualiza desde su
+    // monto POR PAGO; el gasto ya es el presupuesto del mes.
+    const nativo =
+      r.type === "income"
+        ? monthlyPlanned(Number(r.amount), r.frequency as Frequency)
+        : Number(r.amount);
+    const v = convertCurrency(nativo, r.currency, currency, rates);
     if (r.type === "income") bIncome += v;
     else bExpense += v;
   }

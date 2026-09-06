@@ -12,6 +12,7 @@ import {
   TextField,
   MoneyField,
   DateField,
+  MonthField,
   Segmented,
   SheetSelect,
   Toggle,
@@ -20,6 +21,17 @@ import {
   type ActionResult,
   type Opt,
 } from "../../components/form-kit";
+
+import { formatMoney } from "@/lib/format";
+// Motores puros: import directo del archivo, nunca del barrel (server-only).
+import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
+import {
+  etiquetaMonto,
+  ayudaMonto,
+  equivalenteMensual,
+  nombreMes,
+} from "@/modules/financial-base/engine/frequency-copy";
+import { requiereAncla, proximosPeriodos } from "@/modules/financial-base/engine/income-schedule";
 
 /**
  * Formulario de una FUENTE de ingreso V2 (mismo modelo que la web /ingresos:
@@ -42,6 +54,8 @@ export type IncomeSourceValues = {
   incomeType: string;
   recurrent: boolean;
   frequency: string;
+  /** Ancla de tiempo (YYYY-MM-DD) de las frecuencias multi-mes. */
+  nextDate: string | null;
   categoryId: string | null;
 };
 
@@ -107,6 +121,9 @@ export function IncomeSourceForm({
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? NO_SUBCATEGORY);
   const [recurrent, setRecurrent] = useState(initial?.recurrent ?? false);
   const [frequency, setFrequency] = useState(initial?.frequency ?? "mensual");
+  // Ancla de las frecuencias multi-mes: el <input type="month"> trabaja en
+  // YYYY-MM y se persiste como YYYY-MM-01.
+  const [anclaMes, setAnclaMes] = useState((initial?.nextDate ?? "").slice(0, 7));
 
   // Sub-flujo de ingreso pasivo con activo (renta/dividendos → crea stub de inversión).
   const [fromAsset, setFromAsset] = useState(false);
@@ -124,6 +141,23 @@ export function IncomeSourceForm({
   // Subcategoría OBLIGATORIA: ya no hay opción "Sin subcategoría" (nada a "Por clasificar").
   const subOpts: Opt[] = leavesForType(incomeTree, incomeType);
 
+  // La frecuencia EFECTIVA: una fuente no recurrente es siempre del mes.
+  const freqEfectiva = (recurrent ? frequency : "mensual") as Frequency;
+  const pideAncla = recurrent && requiereAncla(freqEfectiva);
+  const preview = equivalenteMensual(amount ?? 0, freqEfectiva, (n) => formatMoney(n, cur));
+  const agenda =
+    pideAncla && anclaMes
+      ? proximosPeriodos(
+          freqEfectiva,
+          `${anclaMes}-01`,
+          (() => {
+            const [y, m] = anclaMes.split("-").map(Number);
+            return { year: y ?? 2026, month: m ?? 1 };
+          })(),
+          4,
+        )
+      : [];
+
   const values: IncomeSourceValues = {
     name,
     amount,
@@ -131,7 +165,8 @@ export function IncomeSourceForm({
     occurredOn: date,
     incomeType,
     recurrent,
-    frequency: recurrent ? frequency : "mensual",
+    frequency: freqEfectiva,
+    nextDate: pideAncla && anclaMes ? `${anclaMes}-01` : null,
     categoryId: categoryId === NO_SUBCATEGORY ? null : categoryId,
   };
 
@@ -181,9 +216,12 @@ export function IncomeSourceForm({
       submitLabel={submitLabel}
       successMessage={successMessage}
       onSuccess={onSuccess}
-      validate={() =>
-        missingSub ? { categoryId: "Seleccioná una subcategoría para guardar" } : null
-      }
+      validate={(): Record<string, string> | null => {
+        if (missingSub) return { categoryId: "Seleccioná una subcategoría para guardar" };
+        if (pideAncla && !anclaMes)
+          return { nextDate: "Indica en qué mes cae el próximo pago de esta fuente." };
+        return null;
+      }}
     >
       <TextField
         name="name"
@@ -194,7 +232,18 @@ export function IncomeSourceForm({
         maxLength={120}
         autoFocus
       />
-      <MoneyField name="amount" label="Monto" value={amount} onChange={setAmount} currency={cur} />
+      {/* La etiqueta se ancla a la frecuencia ("Monto por quincena") y debajo se
+          ve en vivo el equivalente mensual: así no hay forma de confundir el
+          monto por pago con el total del mes. */}
+      <MoneyField
+        name="amount"
+        label={recurrent ? etiquetaMonto(freqEfectiva) : "Monto"}
+        value={amount}
+        onChange={setAmount}
+        currency={cur}
+        note={preview}
+        hint={recurrent ? ayudaMonto(freqEfectiva) : null}
+      />
       <SheetSelect
         name="currency"
         label="Moneda"
@@ -236,6 +285,22 @@ export function IncomeSourceForm({
           onChange={setFrequency}
           options={FREQ_OPTS}
           sheetTitle="Frecuencia"
+        />
+      ) : null}
+
+      {/* Ancla de tiempo: sin ella, una fuente cada 2 meses no sabe si cae en
+          enero/marzo/mayo o en febrero/abril/junio y se agenda todos los meses. */}
+      {pideAncla ? (
+        <MonthField
+          name="nextDate"
+          label="¿Cuándo cae el próximo pago?"
+          value={anclaMes}
+          onChange={setAnclaMes}
+          hint={
+            agenda.length > 0
+              ? `Se agendará en ${agenda.map((p) => nombreMes(p.month)).join(", ")}…`
+              : "Elige el mes del próximo pago."
+          }
         />
       ) : null}
 

@@ -12,6 +12,7 @@ import {
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
+import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import { formatMoney } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
@@ -77,6 +78,7 @@ function toValues(it: BudgetItem): IncomeSourceValues {
     incomeType: it.incomeType ?? "activo",
     recurrent: Boolean(it.recurringItemId),
     frequency: it.frequency,
+    nextDate: it.nextDate ?? null,
     categoryId: it.categoryId,
   };
 }
@@ -158,7 +160,10 @@ export function IncomeManager({
         <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {sources.map((it) => {
             const rec = received[it.id] ?? 0;
-            const budget = it.amount;
+            // Lo PLANIFICADO del mes, no el monto por pago: una quincena de 800k
+            // se compara contra los 1.6M del mes (dos pagos), si no la barra
+            // marcaría 100 % con la primera quincena.
+            const budget = monthlyPlanned(it.amount, it.frequency as Frequency);
             const pct = budget > 0 ? rec / budget : rec > 0 ? 1 : 0;
             const over = budget > 0 && rec > budget;
             const incomeType = it.incomeType ?? "activo";
@@ -398,7 +403,10 @@ export function ReceiveForm({
   const [amount, setAmount] = useState<number | undefined>(suggestedReceipt(source, received));
   const todayISO = useCaptureToday();
   const [date, setDate] = useState(todayISO());
-  const remaining = round2(source.amount - received);
+  // El planificado del mes puede ser varios pagos (quincenal → dos), así que el
+  // restante se mide contra el mes, no contra un pago.
+  const planificado = monthlyPlanned(source.amount, source.frequency as Frequency);
+  const remaining = round2(planificado - received);
   const values = { budgetItemId: source.id, amount, date };
   return (
     <FormShell
@@ -418,8 +426,8 @@ export function ReceiveForm({
       <DateField name="date" label="Fecha" value={date} onChange={setDate} />
       <div className="muted" style={{ fontSize: 12, lineHeight: 1.5, marginTop: -2 }}>
         {remaining > 0
-          ? `Restante del mes: ${formatMoney(remaining, source.currency)} de ${formatMoney(source.amount, source.currency)}.`
-          : `Ya recibiste lo planificado (${formatMoney(source.amount, source.currency)}); puedes registrar un extra.`}
+          ? `Restante del mes: ${formatMoney(remaining, source.currency)} de ${formatMoney(planificado, source.currency)}.`
+          : `Ya recibiste lo planificado (${formatMoney(planificado, source.currency)}); puedes registrar un extra.`}
       </div>
     </FormShell>
   );

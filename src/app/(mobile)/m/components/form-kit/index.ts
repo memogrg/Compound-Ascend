@@ -13,6 +13,7 @@ export {
   TextField,
   MoneyField,
   DateField,
+  MonthField,
   Segmented,
   SheetSelect,
   Toggle,

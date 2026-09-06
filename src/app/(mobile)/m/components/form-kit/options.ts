@@ -13,7 +13,9 @@ export const FREQ_OPTS: Opt[] = [
   { value: "semanal", label: "Semanal" },
   { value: "quincenal", label: "Quincenal" },
   { value: "mensual", label: "Mensual" },
-  { value: "bimensual", label: "Bimensual" },
+  // "Bimensual" en español se lee también como dos-veces-al-mes: esa ambigüedad
+  // era parte del bug de ingresos, así que la opción se nombra sin lugar a dudas.
+  { value: "bimensual", label: "Cada 2 meses (bimestral)" },
   { value: "trimestral", label: "Trimestral" },
   { value: "cuatrimestral", label: "Cuatrimestral" },
   { value: "semestral", label: "Semestral" },

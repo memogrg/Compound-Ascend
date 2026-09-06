@@ -11,7 +11,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useRouter } from "next/navigation";
-import { CURRENCY_SYMBOL } from "@/lib/format";
+import { CURRENCY_SYMBOL, formatMoney } from "@/lib/format";
+// Motores puros: se importan del archivo, NO del barrel del módulo (el barrel
+// arrastra `server-only` y rompe el build del client component).
+import type { Frequency } from "@/modules/financial-base/engine/monthlyize";
+import {
+  etiquetaMonto,
+  ayudaMonto,
+  equivalenteMensual,
+  nombreMes,
+} from "@/modules/financial-base/engine/frequency-copy";
+import { requiereAncla, proximosPeriodos } from "@/modules/financial-base/engine/income-schedule";
 import { Modal } from "@/components/ui/modal";
 import { Icon } from "@/components/ui/icon";
 import { useToast } from "@/components/ui/toast";
@@ -46,7 +56,9 @@ const FREQUENCIES: { value: string; label: string }[] = [
   { value: "semanal", label: "Semanal" },
   { value: "quincenal", label: "Quincenal" },
   { value: "mensual", label: "Mensual" },
-  { value: "bimensual", label: "Cada 2 meses" },
+  // "Bimensual" en español se lee también como dos-veces-al-mes: esa ambigüedad
+  // era parte del bug, así que la opción se nombra sin lugar a dudas.
+  { value: "bimensual", label: "Cada 2 meses (bimestral)" },
   { value: "trimestral", label: "Trimestral" },
   { value: "semestral", label: "Semestral" },
   { value: "anual", label: "Anual" },
@@ -82,6 +94,9 @@ export function RegisterIncomeModal({
   const [categoryId, setCategoryId] = useState<string>(item?.categoryId ?? "");
   const [recurrent, setRecurrent] = useState(Boolean(item?.recurringItemId));
   const [frequency, setFrequency] = useState<string>(item?.frequency ?? "mensual");
+  // Ancla de tiempo de las frecuencias multi-mes (mes en que cae el pago). El
+  // <input type="month"> trabaja en YYYY-MM; se persiste como YYYY-MM-01.
+  const [anclaMes, setAnclaMes] = useState<string>((item?.nextDate ?? "").slice(0, 7));
   // Subcategorías creadas en esta sesión (se ven al instante; router.refresh las persiste).
   const [extraLeaves, setExtraLeaves] = useState<Leaf[]>([]);
   const [creating, setCreating] = useState(false);
@@ -126,14 +141,35 @@ export function RegisterIncomeModal({
     setRenaming(false);
   };
 
+  // La frecuencia EFECTIVA: una fuente no recurrente es siempre del mes.
+  const freqEfectiva = (recurrent ? frequency : "mensual") as Frequency;
+  const pideAncla = recurrent && requiereAncla(freqEfectiva);
+  const montoNum = Number(amount);
+  const preview = equivalenteMensual(montoNum, freqEfectiva, (n) => formatMoney(n, curr));
+  const ayuda = recurrent ? ayudaMonto(freqEfectiva) : null;
+  // Vista previa de la agenda: los meses en que realmente caerá el pago.
+  const agenda =
+    pideAncla && anclaMes
+      ? proximosPeriodos(
+          freqEfectiva,
+          `${anclaMes}-01`,
+          (() => {
+            const [y, m] = anclaMes.split("-").map(Number);
+            return { year: y ?? 2026, month: m ?? 1 };
+          })(),
+          4,
+        )
+      : [];
+
   const incomePayload = () => ({
     name: name.trim(),
-    amount: Number(amount),
+    amount: montoNum,
     currency: curr,
     occurredOn: date,
     incomeType,
     recurrent,
-    frequency: recurrent ? frequency : "mensual",
+    frequency: freqEfectiva,
+    nextDate: pideAncla && anclaMes ? `${anclaMes}-01` : null,
     categoryId: categoryId || null,
   });
 
@@ -201,6 +237,8 @@ export function RegisterIncomeModal({
     const amt = Number(amount);
     if (!name.trim()) return setError("Ponle un nombre a la fuente.");
     if (!Number.isFinite(amt) || amt < 0) return setError("Ingresa un monto válido.");
+    if (pideAncla && !anclaMes)
+      return setError("Indicá en qué mes cae el próximo pago de esta fuente.");
     // Falta la subcategoría → no se guarda; el warning se ve a nivel de campo (no banner mudo).
     if (missingSub) {
       setSubAttempted(true);
@@ -333,7 +371,11 @@ export function RegisterIncomeModal({
               </select>
             </div>
             <div className="fld">
-              <label className="fld-label">Monto</label>
+              {/* La etiqueta se ancla a la frecuencia: "Monto por quincena" no
+                  deja lugar a que el usuario escriba el total del mes. */}
+              <label className="fld-label">
+                {recurrent ? etiquetaMonto(freqEfectiva) : "Monto"}
+              </label>
               <div className="inp-money">
                 <span className="pre">{CURRENCY_SYMBOL[curr] ?? ""}</span>
                 <input
@@ -347,6 +389,16 @@ export function RegisterIncomeModal({
                   required
                 />
               </div>
+              {/* Vista previa en vivo del equivalente mensual: el usuario ve cómo
+                  se está interpretando lo que escribió y lo corrige al instante. */}
+              {preview ? (
+                <div style={{ fontSize: 12.5, marginTop: 6, color: "var(--info)" }}>{preview}</div>
+              ) : null}
+              {ayuda ? (
+                <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+                  {ayuda}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -575,6 +627,26 @@ export function RegisterIncomeModal({
                   </option>
                 ))}
               </select>
+            </div>
+          ) : null}
+
+          {/* Ancla de tiempo: sin ella, una fuente cada-2-meses no sabe si cae en
+              enero/marzo/mayo o en febrero/abril/junio y se agenda todos los meses. */}
+          {pideAncla ? (
+            <div className="fld">
+              <label className="fld-label">¿Cuándo cae el próximo pago?</label>
+              <input
+                className="inp"
+                type="month"
+                value={anclaMes}
+                onChange={(e) => setAnclaMes(e.target.value)}
+                required
+              />
+              {agenda.length > 0 ? (
+                <div className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+                  Se agendará en {agenda.map((p) => nombreMes(p.month)).join(", ")}…
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

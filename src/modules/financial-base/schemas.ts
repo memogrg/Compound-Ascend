@@ -91,6 +91,18 @@ export const incomeSourceInputSchema = z.object({
   incomeType: z.enum(["activo", "pasivo", "extraordinario"]),
   recurrent: z.boolean().default(false),
   frequency: frequency.default("mensual"),
+  /**
+   * Ancla de tiempo (YYYY-MM-DD) de las frecuencias multi-mes: cuándo cae el
+   * próximo pago. Sin ella, un bimestral no sabe si toca enero/marzo/mayo o
+   * febrero/abril/junio y se agenda todos los meses. Se persiste en
+   * `recurring_items.next_date`; en frecuencias de un pago al mes o más, se ignora.
+   */
+  nextDate: z
+    .preprocess(
+      (v) => (v === "" || v === undefined ? null : v),
+      z.string().min(8).max(10).nullable(),
+    )
+    .optional(),
   // Subcategoría elegida (hoja del grupo del tipo); opcional.
   categoryId: uuidOrNull.optional(),
 });

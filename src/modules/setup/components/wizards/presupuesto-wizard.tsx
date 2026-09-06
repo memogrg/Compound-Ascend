@@ -189,7 +189,11 @@ function IngresosStep({ snapshot }: { snapshot: SetupSnapshot }) {
             maxLength={120}
           />
         </Field>
-        <Field label="¿Cuánto?">
+        {/* El wizard fija frequency="mensual", así que acá no hay frecuencia que
+            elegir — pero la etiqueta lo dice igual: un "¿Cuánto?" pelado es la
+            misma ambigüedad que hacía que se cargaran quincenas como si fueran
+            meses. */}
+        <Field label="¿Cuánto por mes?">
           <MoneyInput value={amount} onChange={setAmount} currency={currency} />
         </Field>
         <Field label="Tipo">

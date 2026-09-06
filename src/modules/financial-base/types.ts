@@ -122,6 +122,13 @@ export type BudgetItem = {
   // Ingresos (Fase 1): tipo de fuente + plantilla recurrente copy-on-demand.
   incomeType?: IncomeType;
   recurringItemId?: string | null;
+  /**
+   * Ancla de tiempo de la plantilla recurrente (`recurring_items.next_date`,
+   * YYYY-MM-DD): en qué mes cae el pago. Sólo tiene sentido en frecuencias
+   * multi-mes (bimensual…anual); en el resto es null. Se hidrata en
+   * `listBudgetItems` con un segundo fetch a las plantillas del periodo.
+   */
+  nextDate?: string | null;
   // Ingresos (Fase 3): inversión vinculada (stub de renta/dividendos).
   holdingId?: string | null;
 };
