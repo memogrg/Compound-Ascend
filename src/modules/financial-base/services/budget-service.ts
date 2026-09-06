@@ -536,6 +536,13 @@ export async function receivePartialIncome(
  * pago ese mes. Idempotente: no duplica una plantilla ya presente. Devuelve
  * cuántas agendó. (Fase 2 · agenda por ancla)
  *
+ * DOS PUERTAS, una función: el page load de la Base/dashboard y el cron diario
+ * de `ventana`. Si la única puerta fuera la pantalla, quien no la abre —pero le
+ * habla al chat o recibe notificaciones— seguiría viendo el mes a medias, y de
+ * ese presupuesto salen los INDICADORES (score de salud, DTI, contexto del
+ * asesor). Por eso es ctx-inyectable (`resolveAuth`): sin ctx corre con la
+ * sesión por cookies; con ctx, el cron le pasa service-role + userId.
+ *
  * Antes copiaba las líneas del MES ANTERIOR, y eso no puede sostener una
  * frecuencia multi-mes: un bimestral anclado en enero no tiene línea en febrero,
  * así que en marzo no habría de dónde copiarlo y la fuente desaparecía para
@@ -545,10 +552,9 @@ export async function receivePartialIncome(
  * El `income_type` y la categoría se recuperan de la última línea que existió de
  * esa plantilla (la plantilla no los guarda), cayendo a "activo" si no hay.
  */
-export async function copyPreviousMonthIncome(period: Period): Promise<number> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const memberIds = await householdMemberIds(supabase, user.id);
+export async function ensureRecurringIncome(period: Period, ctx?: AuthContext): Promise<number> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
 
   const [{ data: templates }, curItems] = await Promise.all([
     supabase
@@ -556,7 +562,7 @@ export async function copyPreviousMonthIncome(period: Period): Promise<number> {
       .select("id,name,amount,currency,frequency,next_date")
       .in("user_id", memberIds)
       .eq("kind", "ingreso"),
-    listBudgetItems(period),
+    listBudgetItems(period, ctx),
   ]);
 
   const present = new Set(
@@ -595,18 +601,21 @@ export async function copyPreviousMonthIncome(period: Period): Promise<number> {
 
   for (const t of pendientes) {
     const previa = ultimaPorPlantilla.get(t.id);
-    await createBudgetItem({
-      type: "income",
-      categoryId: previa?.category_id ?? null,
-      name: t.name,
-      amount: Number(t.amount),
-      currency: t.currency,
-      frequency: t.frequency as Frequency,
-      periodMonth: period.month,
-      periodYear: period.year,
-      incomeType: (previa?.income_type ?? "activo") as IncomeType,
-      recurringItemId: t.id,
-    });
+    await createBudgetItem(
+      {
+        type: "income",
+        categoryId: previa?.category_id ?? null,
+        name: t.name,
+        amount: Number(t.amount),
+        currency: t.currency,
+        frequency: t.frequency as Frequency,
+        periodMonth: period.month,
+        periodYear: period.year,
+        incomeType: (previa?.income_type ?? "activo") as IncomeType,
+        recurringItemId: t.id,
+      },
+      ctx,
+    );
   }
   return pendientes.length;
 }

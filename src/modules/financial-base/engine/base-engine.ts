@@ -95,4 +95,38 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Naturaleza de una línea de gasto del presupuesto, en orden de autoridad.
+ *
+ * 1. `source_kind` de las líneas DERIVADAS. Un aporte a meta es ahorro y un
+ *    pago de deuda es financiero por lo que SON, no por dónde se archivaron —
+ *    y de hecho `syncDerivedBudget` las escribe con `category_id` null, así que
+ *    la categoría no tiene nada que decir sobre ellas. Sin esto, los aportes a
+ *    metas caían todos en "misceláneo" y la tasa de ahorro daba 0 % con el
+ *    usuario ahorrando cada mes.
+ * 2. `default_nature` de la categoría de la línea.
+ * 3. `default_nature` del GRUPO padre. Una hoja propia (o un fork del hogar)
+ *    nace sin naturaleza; hereda la de su grupo, que es donde el usuario la
+ *    puso. Sin esto, personalizar una categoría la sacaba del cálculo.
+ * 4. Misceláneo, que es lo que de verdad no sabemos clasificar.
+ */
+export function naturalezaDeLinea(args: {
+  sourceKind?: string | null;
+  categoryNature?: string | null;
+  parentNature?: string | null;
+}): ExpenseNature {
+  const porOrigen: Record<string, ExpenseNature> = {
+    goal: "ahorro",
+    debt: "financiero",
+    policy: "proteccion",
+  };
+  const derivada = args.sourceKind ? porOrigen[args.sourceKind] : undefined;
+  if (derivada) return derivada;
+
+  const candidata = args.categoryNature ?? args.parentNature ?? null;
+  return (
+    candidata && (NATURES as string[]).includes(candidata) ? candidata : "miscelaneo"
+  ) as ExpenseNature;
+}
+
 export { INCOME_TYPES, NATURES };

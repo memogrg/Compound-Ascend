@@ -62,7 +62,7 @@ import {
   updateIncomeSource,
   deleteIncomeSource,
   receivePartialIncome,
-  copyPreviousMonthIncome,
+  ensureRecurringIncome,
   registerPassiveIncomeWithStub,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
@@ -375,21 +375,21 @@ export async function receivePartialIncomeAction(raw: unknown): Promise<ActionRe
 }
 
 /** Copia al mes actual SOLO las fuentes de ingreso recurrentes del mes anterior. */
-export async function copyPreviousMonthIncomeAction(
+export async function ensureRecurringIncomeAction(
   raw: unknown,
 ): Promise<ActionResult & { copied?: number }> {
   const parsed = copyMonthSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    const copied = await copyPreviousMonthIncome(
+    const copied = await ensureRecurringIncome(
       monthPeriod(parsed.data.periodYear, parsed.data.periodMonth),
     );
     revalidate();
     revalidatePath("/ingresos");
     return { ok: true, copied };
   } catch (err) {
-    logger.error("copyPreviousMonthIncome fallido", {
+    logger.error("ensureRecurringIncome fallido", {
       message: err instanceof Error ? err.message : "?",
     });
     return { ok: false, message: "No pudimos copiar los ingresos del mes anterior." };

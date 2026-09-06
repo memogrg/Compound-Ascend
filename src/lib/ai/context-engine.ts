@@ -114,6 +114,14 @@ export async function buildFinancialContext(
       incomeMonthly: base.indicators.incomeMonthly,
       expenseMonthly: base.indicators.expenseMonthly,
       freeCashflow: base.indicators.freeCashflow,
+      // De QUÉ mes son esas cifras. Si el mes en curso todavía no tiene
+      // presupuesto de gasto, los indicadores son del mes cerrado anterior: el
+      // asesor tiene que DECIRLO, no afirmarlas como si fueran de este mes.
+      // Acceso opcional a propósito: este bloque vive dentro de un try/catch que
+      // se traga el error, así que un campo faltante no rompería "sólo la
+      // etiqueta" — se llevaría puesto TODO el contexto de la base (moneda
+      // incluida) sin dejar rastro. Ya pasó en los tests.
+      indicadoresEtiqueta: base.indicadoresDe?.etiqueta ?? undefined,
     };
     // Gasto más pesado por naturaleza (ya en la moneda de visualización) + tasa de ahorro.
     const natureEntries = Object.entries(base.indicators.expenseByNature).filter(([, v]) => v > 0);

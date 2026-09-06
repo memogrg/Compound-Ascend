@@ -101,18 +101,36 @@ describe("buildSystemPrompt · perfil conductual", () => {
 
   it("sin fondo de emergencia + bajo presión activa la regla de seguridad (§18)", () => {
     // hasEmergencyFund 'no' + urgency alta → debe disparar.
-    const byUrgency = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "no", urgency: "alta" });
-    expect(byUrgency).toContain("construir el fondo de emergencia antes que cualquier inversión de riesgo");
+    const byUrgency = buildSystemPrompt({
+      currency: "CRC",
+      hasEmergencyFund: "no",
+      urgency: "alta",
+    });
+    expect(byUrgency).toContain(
+      "construir el fondo de emergencia antes que cualquier inversión de riesgo",
+    );
     // Sin estado real de fondos → cae al auto-reporte del onboarding.
     expect(byUrgency).toContain("Fondo de emergencia (auto-reporte del onboarding): no.");
 
     // hasEmergencyFund 'no_se' + lifeStage de deuda → también dispara (sin urgencia).
-    const byStage = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "no_se", lifeStage: "salir deudas" });
-    expect(byStage).toContain("construir el fondo de emergencia antes que cualquier inversión de riesgo");
+    const byStage = buildSystemPrompt({
+      currency: "CRC",
+      hasEmergencyFund: "no_se",
+      lifeStage: "salir deudas",
+    });
+    expect(byStage).toContain(
+      "construir el fondo de emergencia antes que cualquier inversión de riesgo",
+    );
 
     // Con fondo de emergencia ('si') NO debe disparar la regla aunque haya urgencia.
-    const withFund = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "si", urgency: "critica" });
-    expect(withFund).not.toContain("construir el fondo de emergencia antes que cualquier inversión de riesgo");
+    const withFund = buildSystemPrompt({
+      currency: "CRC",
+      hasEmergencyFund: "si",
+      urgency: "critica",
+    });
+    expect(withFund).not.toContain(
+      "construir el fondo de emergencia antes que cualquier inversión de riesgo",
+    );
   });
 
   it("arquetipo en el ctx produce su etiqueta (Bloque A) y su guía + foco (Bloque B)", () => {
@@ -146,7 +164,10 @@ describe("buildSystemPrompt · perfil conductual", () => {
   });
 
   it("dominantValue produce su hecho en el Bloque A; sin él no rompe", () => {
-    const conValor = buildSystemPrompt({ currency: "CRC", dominantValue: "seguridad para mi familia" });
+    const conValor = buildSystemPrompt({
+      currency: "CRC",
+      dominantValue: "seguridad para mi familia",
+    });
     expect(conValor).toContain("Lo que más quiere de su dinero: seguridad para mi familia.");
 
     const sinValor = buildSystemPrompt({ currency: "CRC" });
@@ -244,7 +265,9 @@ describe("buildSystemPrompt · perfil conductual", () => {
     expect(prompt).toContain("Número de Seguridad: 300000000 CRC");
     expect(prompt).toContain("Número de Independencia: 772538304 CRC");
     // Sin numeroDeLibertad → invita a definirlo, no inventa la cifra.
-    expect(prompt).toContain("Número de Libertad: el usuario AÚN NO definió su estilo de vida deseado");
+    expect(prompt).toContain(
+      "Número de Libertad: el usuario AÚN NO definió su estilo de vida deseado",
+    );
     expect(prompt).toContain("Años de Libertad: tu patrimonio invertible cubre 6 años");
     // (ii) Las nuevas instrucciones de uso de métricas y estilo directo.
     expect(prompt).toContain("Usa SIEMPRE las métricas que ya vienen en tu contexto");
@@ -270,8 +293,12 @@ describe("buildSystemPrompt · perfil conductual", () => {
       richLifePhrase: "Tiempo con mi familia",
     });
     expect(prompt).toContain("Perfil de riesgo: moderado.");
-    expect(prompt).toContain("Lo que más le cuesta (por prioridad): primaria: ahorrar · secundaria: invertir.");
-    expect(prompt).toContain("Sus prioridades (por prioridad): primaria: seguridad · secundaria: familia.");
+    expect(prompt).toContain(
+      "Lo que más le cuesta (por prioridad): primaria: ahorrar · secundaria: invertir.",
+    );
+    expect(prompt).toContain(
+      "Sus prioridades (por prioridad): primaria: seguridad · secundaria: familia.",
+    );
     expect(prompt).toContain('Su vida rica en una frase: "Tiempo con mi familia".');
   });
 
@@ -575,7 +602,22 @@ describe("buildSystemPrompt · inversiones por posición + conversación", () =>
     const prompt = buildSystemPrompt({
       currency: "CRC",
       holdings: [
-        { symbol: "XYZ", name: "XYZ", assetType: "cripto", quantity: 3, invested: 1000, value: 1000, price: null, pl: 0, plPct: 0, currency: "USD", monedaFila: "USD", valorPrimario: 500_000, priceUnavailable: true, fuente: "sin_precio" as const },
+        {
+          symbol: "XYZ",
+          name: "XYZ",
+          assetType: "cripto",
+          quantity: 3,
+          invested: 1000,
+          value: 1000,
+          price: null,
+          pl: 0,
+          plPct: 0,
+          currency: "USD",
+          monedaFila: "USD",
+          valorPrimario: 500_000,
+          priceUnavailable: true,
+          fuente: "sin_precio" as const,
+        },
       ],
     });
     expect(prompt).toContain("precio actual no disponible");
@@ -628,8 +670,22 @@ describe("buildSystemPrompt · fondos de defensa (estado REAL supersede el auto-
       defenseFunds: {
         currency: "CRC",
         activeFund: "peace",
-        emergency: { registrado: true, actual: 800_000, objetivo: 1_000_000, progresoPct: 80, aporteRecomendado: 50_000, cubierto: false },
-        paz: { registrado: false, actual: 0, objetivo: 3_000_000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+        emergency: {
+          registrado: true,
+          actual: 800_000,
+          objetivo: 1_000_000,
+          progresoPct: 80,
+          aporteRecomendado: 50_000,
+          cubierto: false,
+        },
+        paz: {
+          registrado: false,
+          actual: 0,
+          objetivo: 3_000_000,
+          progresoPct: 0,
+          aporteRecomendado: 0,
+          cubierto: false,
+        },
         ...over,
       },
     }) as FinancialContext;
@@ -655,7 +711,10 @@ describe("buildSystemPrompt · fondos de defensa (estado REAL supersede el auto-
   });
 
   it("sin estado real → cae al auto-reporte del onboarding", () => {
-    const prompt = buildSystemPrompt({ currency: "CRC", hasEmergencyFund: "no" } as FinancialContext);
+    const prompt = buildSystemPrompt({
+      currency: "CRC",
+      hasEmergencyFund: "no",
+    } as FinancialContext);
     expect(prompt).toMatch(/auto-reporte del onboarding/i);
   });
 });
@@ -731,7 +790,10 @@ describe("buildSystemPrompt · deudas con su moneda", () => {
   });
 
   it("con tipo de cambio, el total convertido aparece marcado como conversión", () => {
-    const prompt = buildSystemPrompt({ ...dosMonedas, debtTotalConvertido: { monto: 4_000_000, moneda: "CRC" } });
+    const prompt = buildSystemPrompt({
+      ...dosMonedas,
+      debtTotalConvertido: { monto: 4_000_000, moneda: "CRC" },
+    });
     expect(prompt).toMatch(/equivale a 4000000 CRC convertido/);
   });
 
@@ -766,7 +828,12 @@ describe("buildSystemPrompt · deudas con su moneda", () => {
 
 // ── Agregados convertidos: decir que lo son, sin ruido cuando no lo son (delta 2C) ──
 describe("buildSystemPrompt · agregados convertidos", () => {
-  const base = { currency: "CRC" as const, incomeMonthly: 1_200_000, expenseMonthly: 800_000, freeCashflow: 400_000 };
+  const base = {
+    currency: "CRC" as const,
+    incomeMonthly: 1_200_000,
+    expenseMonthly: 800_000,
+    freeCashflow: 400_000,
+  };
 
   it("baseConvertido true → ingreso/gasto/flujo se declaran convertidos", () => {
     const prompt = buildSystemPrompt({ ...base, baseConvertido: true });
@@ -795,8 +862,22 @@ describe("buildSystemPrompt · agregados convertidos", () => {
       convertido: true,
       monedaOrigen: "CRC",
       activeFund: "emergency" as const,
-      emergency: { registrado: true, actual: 1_000, objetivo: 3_000, progresoPct: 33, aporteRecomendado: 200, cubierto: false },
-      paz: { registrado: false, actual: 0, objetivo: 6_000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+      emergency: {
+        registrado: true,
+        actual: 1_000,
+        objetivo: 3_000,
+        progresoPct: 33,
+        aporteRecomendado: 200,
+        cubierto: false,
+      },
+      paz: {
+        registrado: false,
+        actual: 0,
+        objetivo: 6_000,
+        progresoPct: 0,
+        aporteRecomendado: 0,
+        cubierto: false,
+      },
     };
     const prompt = buildSystemPrompt({ currency: "USD", defenseFunds: df });
     expect(prompt).toContain("Esos montos de defensa están CONVERTIDOS de CRC a USD.");
@@ -807,8 +888,22 @@ describe("buildSystemPrompt · agregados convertidos", () => {
       currency: "CRC",
       convertido: false,
       activeFund: "emergency" as const,
-      emergency: { registrado: true, actual: 500_000, objetivo: 1_500_000, progresoPct: 33, aporteRecomendado: 100_000, cubierto: false },
-      paz: { registrado: false, actual: 0, objetivo: 3_000_000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+      emergency: {
+        registrado: true,
+        actual: 500_000,
+        objetivo: 1_500_000,
+        progresoPct: 33,
+        aporteRecomendado: 100_000,
+        cubierto: false,
+      },
+      paz: {
+        registrado: false,
+        actual: 0,
+        objetivo: 3_000_000,
+        progresoPct: 0,
+        aporteRecomendado: 0,
+        cubierto: false,
+      },
     };
     const prompt = buildSystemPrompt({ currency: "CRC", defenseFunds: df });
     expect(prompt).not.toMatch(/CONVERTIDOS/);
@@ -917,5 +1012,39 @@ describe("buildSystemPrompt · tono de amigo que es asesor experto", () => {
 
   it("no se mete en una consulta ajena ni sirve de excusa para ofrecer algo", () => {
     expect(prompt).toMatch(/Nunca lo metas a la fuerza en una consulta ajena/i);
+  });
+});
+
+/**
+ * La etiqueta del mes tiene que llegar al ASESOR, no sólo al badge de la UI.
+ * Si el chat responde sobre score/DTI/tasa de ahorro durante la ventana, debe
+ * decir de qué mes habla — nunca afirmar las cifras del mes cerrado como si
+ * fueran las del mes en curso.
+ */
+describe("buildSystemPrompt · de qué mes son los indicadores", () => {
+  const conEtiqueta: FinancialContext = {
+    currency: "USD",
+    incomeMonthly: 20_534,
+    expenseMonthly: 6_855,
+    freeCashflow: 13_679,
+    indicadoresEtiqueta: "según agosto — septiembre aún sin presupuesto",
+  };
+
+  it("la advertencia aparece y nombra los dos meses", () => {
+    const prompt = buildSystemPrompt(conEtiqueta);
+    expect(prompt).toContain("según agosto — septiembre aún sin presupuesto");
+    expect(prompt).toMatch(/NUNCA las presentes como las del mes en curso/i);
+  });
+
+  it("va ANTES de las cifras que califica", () => {
+    // Leída después, el modelo ya afirmó los números como del mes en curso.
+    const prompt = buildSystemPrompt(conEtiqueta);
+    expect(prompt.indexOf("OJO con el mes")).toBeLessThan(prompt.indexOf("Ingreso mensual:"));
+  });
+
+  it("sin etiqueta no se agrega ruido", () => {
+    const prompt = buildSystemPrompt({ ...conEtiqueta, indicadoresEtiqueta: undefined });
+    expect(prompt).not.toContain("OJO con el mes");
+    expect(prompt).toContain("Ingreso mensual:");
   });
 });

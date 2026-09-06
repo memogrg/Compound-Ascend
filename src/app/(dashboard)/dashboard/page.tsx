@@ -10,11 +10,19 @@ import { isDemoData } from "@/modules/account/services/account-service";
 import { DemoBanner } from "@/components/shared/demo-banner";
 import { Observations, type Observation } from "@/modules/dashboard/components/observations";
 import { ensureMonthlyContributions } from "@/modules/wealth/services/contribution-service";
+import { ensureRecurringIncome } from "@/modules/financial-base/services/budget-service";
+import { userCurrentPeriod } from "@/lib/time/user-time";
 import { SurplusDecision, getSurplusDecision } from "@/modules/wealth";
 import { SetupHub, getSetupProgress } from "@/modules/setup";
 
 /** Datos del panel en streaming: el shell pinta de inmediato con skeletons. */
 async function DashboardContent() {
+  // Agenda de cobros ANTES de leer: el panel muestra indicadores (salud, flujo)
+  // que salen del presupuesto del mes, y un mes recién abierto sin sus fuentes
+  // recurrentes los deja a medias. Mismo patrón best-effort que
+  // ensureMonthlyContributions más abajo; idempotente y sólo del mes en curso.
+  await ensureRecurringIncome(await userCurrentPeriod()).catch(() => {});
+
   const data = await getDashboardData();
 
   if (!data.health.hasData) {

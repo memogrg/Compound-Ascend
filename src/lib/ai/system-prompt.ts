@@ -33,6 +33,12 @@ export type FinancialContext = {
    */
   householdShared?: boolean;
   incomeMonthly?: number;
+  /**
+   * De qué mes hablan ingreso/gasto/flujo/ahorro cuando NO son del mes en curso
+   * (p. ej. "según agosto — septiembre aún sin presupuesto"). Ver
+   * financial-base/engine/periodo-indicadores.
+   */
+  indicadoresEtiqueta?: string;
   /** Cuántas fuentes de ingreso activas tiene (1 = dependencia de una sola fuente). Best-effort. */
   incomeSourceCount?: number;
   expenseMonthly?: number;
@@ -345,6 +351,14 @@ export function buildSystemPrompt(ctx: FinancialContext): string {
   // Los agregados de la base se convierten a UNA moneda a propósito (son ollas: partirlas por
   // moneda no ayuda). Lo que faltaba era DECIR que son conversiones — pero solo cuando lo son.
   const convertidoNota = ctx.baseConvertido ? ` (convertido a ${ctx.currency})` : "";
+  // La advertencia va ANTES de las cifras que califica: leída después, el modelo
+  // ya afirmó los números como del mes en curso.
+  if (ctx.indicadoresEtiqueta)
+    facts.push(
+      `OJO con el mes: el ingreso, el gasto, el flujo libre y la tasa de ahorro de abajo son ` +
+        `${ctx.indicadoresEtiqueta}. Si hablás de cualquiera de esas cifras —o del score de salud— ` +
+        `decí de qué mes son; NUNCA las presentes como las del mes en curso.`,
+    );
   if (ctx.incomeMonthly !== undefined)
     facts.push(`Ingreso mensual: ${ctx.incomeMonthly} ${ctx.currency}${convertidoNota}.`);
   if (ctx.incomeSourceCount !== undefined)

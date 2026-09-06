@@ -202,6 +202,21 @@ export async function runVentanaCron(): Promise<CronOutcome> {
       const { year, month } = periodoDe(hoy);
       const period = monthPeriod(year, month);
 
+      // Agenda de cobros (puerta 2 de 2 — la otra es el page load). Va ACÁ ARRIBA,
+      // antes de las compuertas de envío: no depende de que la ventana esté abierta
+      // ni de que se pueda mandar el correo. Si la única puerta fuera la pantalla,
+      // quien no abre la Base —pero le habla al chat o recibe notificaciones—
+      // seguiría con el mes a medias, y de ese presupuesto salen los indicadores.
+      // Misma función que el page load, con service-role inyectado. Best-effort:
+      // que falle no debe tumbar el recordatorio de este usuario ni el del resto.
+      try {
+        const { ensureRecurringIncome } =
+          await import("@/modules/financial-base/services/budget-service");
+        await ensureRecurringIncome(period, { db: admin, userId: u.userId });
+      } catch {
+        // sigue con el nudge igual.
+      }
+
       // ¿La ventana sigue abierta para su hogar?
       const householdId = await householdOf(admin, u.userId);
       let q = admin

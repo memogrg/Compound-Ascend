@@ -8,7 +8,7 @@ import {
   updateIncomeSourceAction,
   deleteIncomeSourceAction,
   receivePartialIncomeAction,
-  copyPreviousMonthIncomeAction,
+  ensureRecurringIncomeAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
@@ -113,7 +113,7 @@ export function IncomeManager({
 
   const confirmCopy = () => {
     startCopy(async () => {
-      const res = await copyPreviousMonthIncomeAction({ periodMonth, periodYear });
+      const res = await ensureRecurringIncomeAction({ periodMonth, periodYear });
       setCopyOpen(false);
       if (res.ok) {
         const n = res.copied ?? 0;
