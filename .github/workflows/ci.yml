@@ -166,21 +166,43 @@ jobs:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
 
-      # Datos mínimos para el smoke: un ingreso (para que health.hasData sea
-      # true y /dashboard pinte el HERO en vez del EmptyState) y un holding
-      # (para que /patrimonio liste una posición). Vía psql como superusuario:
-      # ni service_role ni authenticated tienen grant de INSERT en el stack
-      # local. Idempotente (no-op si el usuario ya tiene esos datos).
-      - name: Seed datos E2E (ingreso + holding vía SQL superuser)
+      # Datos mínimos para el smoke: presupuesto del MES EN CURSO (para que
+      # health.hasData sea true y /dashboard pinte el HERO en vez del
+      # EmptyState) y un holding (para que /patrimonio liste una posición).
+      #
+      # Va a budget_items y NO a income_sources: los indicadores se calculan
+      # desde el presupuesto vivo, no desde las tablas del Módulo 2 original
+      # —que ninguna pantalla escribe ya—. Sembrar income_sources dejaba al
+      # usuario E2E sin datos visibles y el smoke caía en el EmptyState.
+      #
+      # El gasto MANUAL es tan necesario como el ingreso: sin él el mes se
+      # considera "sin presupuesto" y los indicadores caen al mes cerrado
+      # anterior (que en una cuenta recién sembrada no existe), ver
+      # engine/periodo-indicadores.
+      #
+      # Sin created_by/last_edited_by: son columnas de auditoría nullables que
+      # agrega una migración dinámica (household_backfillable_tables) y el smoke
+      # no las necesita — nombrarlas ataría este seed a esa lista.
+      #
+      # Vía psql como superusuario: ni service_role ni authenticated tienen
+      # grant de INSERT en el stack local. Idempotente.
+      - name: Seed datos E2E (presupuesto + holding vía SQL superuser)
         env:
           E2E_EMAIL: ${{ vars.E2E_EMAIL || 'e2e@ci.local' }}
         run: >
           psql "$DB_URL" -v ON_ERROR_STOP=1
-          -c "insert into public.income_sources (user_id, name, income_type, amount, currency, frequency, is_fixed, owner_scope, include_in_budget, amount_monthly_base)
-          select u.id, 'Salario E2E', 'activo', 1000000, 'CRC', 'mensual', true, 'usuario', true, 1000000
+          -c "insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, income_type, source_kind)
+          select u.id, 'income', 'Salario E2E', 1000000, 'CRC', 'mensual',
+          extract(year from now())::int, extract(month from now())::int, 'activo', 'manual'
           from auth.users u
           where u.email = '$E2E_EMAIL'
-          and not exists (select 1 from public.income_sources i where i.user_id = u.id);
+          and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'income');
+          insert into public.budget_items (user_id, type, name, amount, currency, frequency, period_year, period_month, source_kind)
+          select u.id, 'expense', 'Vivienda E2E', 400000, 'CRC', 'mensual',
+          extract(year from now())::int, extract(month from now())::int, 'manual'
+          from auth.users u
+          where u.email = '$E2E_EMAIL'
+          and not exists (select 1 from public.budget_items b where b.user_id = u.id and b.type = 'expense');
           insert into public.investment_holdings (user_id, symbol, asset_type, quantity, average_cost, cost_basis, currency, label)
           select u.id, 'VOO', 'etf', 10, 400, 4000, 'USD', 'VOO'
           from auth.users u
