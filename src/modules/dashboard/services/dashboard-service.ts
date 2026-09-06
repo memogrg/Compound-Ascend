@@ -192,6 +192,11 @@ function demoExpense(name: string, nature: ExpenseItem["nature"], m: number): Ex
   };
 }
 
+function demoPeriodo(): { year: number; month: number } {
+  const d = new Date();
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
 function buildDemoSummary(): BaseSummary {
   const incomes: IncomeSource[] = [
     demoIncome("Salario", "activo", 850_000),
@@ -212,5 +217,7 @@ function buildDemoSummary(): BaseSummary {
     incomes,
     expenses,
     monedasVistas: ["CRC"],
+    // La demo trae mes completo por construcción: sin etiqueta que poner.
+    indicadoresDe: { periodo: demoPeriodo(), estado: "actual", etiqueta: null },
   };
 }

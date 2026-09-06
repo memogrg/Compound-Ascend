@@ -25,9 +25,14 @@ import {
   computeBaseIndicators,
   naturalezaDeLinea,
 } from "@/modules/financial-base/engine/base-engine";
-import { userCurrentPeriod } from "@/lib/time/user-time";
+import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
 import { convertCurrency, SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
+import {
+  decidirPeriodoIndicadores,
+  mesAnterior,
+  type DecisionIndicadores,
+} from "@/modules/financial-base/engine/periodo-indicadores";
 import type {
   IncomeSource,
   ExpenseItem,
@@ -220,6 +225,12 @@ export type BaseSummary = {
    * presentar el agregado como una cifra nativa.
    */
   monedasVistas: string[];
+  /**
+   * De QUÉ mes hablan `indicators`, y con qué etiqueta. Viaja con el dato para
+   * que ninguna superficie —UI o asesor— pueda afirmar las cifras del mes
+   * anterior como si fueran las de este. Ver `engine/periodo-indicadores`.
+   */
+  indicadoresDe: DecisionIndicadores;
 };
 
 /**
@@ -247,11 +258,11 @@ export type BaseSummary = {
  * está en el presupuesto por definición. Se emite siempre true.
  */
 async function baseItemsDelPeriodo(
+  p: { year: number; month: number },
   ctx?: AuthContext,
 ): Promise<{ incomes: IncomeSource[]; expenses: ExpenseItem[] }> {
   const { db: supabase, userId } = await resolveAuth(ctx);
   const memberIds = await householdMemberIds(supabase, userId);
-  const p = await userCurrentPeriod(ctx);
 
   const [bi, cats] = await Promise.all([
     supabase
@@ -363,10 +374,60 @@ async function provisionNoMensual(
   return Math.round(total * 100) / 100;
 }
 
+/**
+ * ¿De qué mes hablan los indicadores? Ver `engine/periodo-indicadores`.
+ *
+ * Las dos señales que necesita el motor salen de acá: si el mes en curso tiene
+ * al menos un sobre MANUAL con monto, y si la ventana de ajuste sigue abierta.
+ */
+async function decidirPeriodo(
+  actual: { year: number; month: number },
+  ctx?: AuthContext,
+): Promise<DecisionIndicadores> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
+
+  // Sólo las MANUALES cuentan como "el usuario ya configuró el mes": las
+  // derivadas se regeneran solas y harían que la condición fuese siempre cierta.
+  const { count } = await supabase
+    .from("budget_items")
+    .select("id", { count: "exact", head: true })
+    .in("user_id", memberIds)
+    .eq("type", "expense")
+    .eq("period_year", actual.year)
+    .eq("period_month", actual.month)
+    .eq("source_kind", "manual")
+    .gt("amount", 0);
+
+  const hoy = await userToday(ctx);
+  const dia = Number(hoy.slice(8, 10));
+  const { estadoVentana } = await import("@/lib/rhythm/engine");
+  // `closed_at` es un cierre explícito del hogar; acá alcanza con el día, porque
+  // cerrar la ventana a mano sólo puede ADELANTAR la salida del fallback.
+  const ventana = estadoVentana({ dia, closedAt: null });
+
+  const previo = mesAnterior(actual);
+  const { count: previoCount } = await supabase
+    .from("budget_items")
+    .select("id", { count: "exact", head: true })
+    .in("user_id", memberIds)
+    .eq("period_year", previo.year)
+    .eq("period_month", previo.month);
+
+  return decidirPeriodoIndicadores({
+    actual,
+    tienePresupuestoDeGasto: (count ?? 0) > 0,
+    ventanaAbierta: ventana.abierta,
+    hayMesCerrado: (previoCount ?? 0) > 0,
+  });
+}
+
 /** Carga ítems y calcula los indicadores de la base financiera. */
 async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
+  const actual = await userCurrentPeriod(ctx);
+  const decision = await decidirPeriodo(actual, ctx);
   const [{ incomes, expenses }, primary, rates] = await Promise.all([
-    baseItemsDelPeriodo(ctx),
+    baseItemsDelPeriodo(decision.periodo, ctx),
     getDisplayCurrency(ctx),
     getFxRates(),
   ]);
@@ -392,6 +453,7 @@ async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
     incomes,
     expenses,
     monedasVistas: [...monedas].sort(),
+    indicadoresDe: decision,
   };
 
   // `annualCoverage` no se puede derivar de las líneas del presupuesto (nacen

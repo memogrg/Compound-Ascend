@@ -69,7 +69,7 @@ export function DashboardView({
 
       {/* ③ Salud financiera + Composición de gastos (reusados) */}
       <section className="dash-split">
-        <HealthCard health={health} />
+        <HealthCard health={health} etiqueta={summary.indicadoresDe.etiqueta} />
         <CompositionCard
           donutData={donutData}
           expenseMonthly={ind.expenseMonthly}
@@ -184,12 +184,20 @@ function PillarCard({ pillar: p }: { pillar: PillarVM }) {
   );
 }
 
-function HealthCard({ health }: { health: HealthScore }) {
+function HealthCard({ health, etiqueta }: { health: HealthScore; etiqueta?: string | null }) {
   return (
     <div className="card card-pad">
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div className="label">Salud financiera</div>
-        <span className="chip live">En vivo</span>
+        {/* "En vivo" sería una mentira cuando el score es del mes cerrado: el
+            chip dice de qué mes habla el número que está debajo. */}
+        {etiqueta ? (
+          <span className="chip" title={etiqueta} style={{ textTransform: "none" }}>
+            {etiqueta}
+          </span>
+        ) : (
+          <span className="chip live">En vivo</span>
+        )}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 14 }}>
         <div className="ring-wrap">

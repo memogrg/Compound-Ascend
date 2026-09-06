@@ -48,6 +48,11 @@ vi.mock("@/modules/financial-base/services/base-service", () => ({
       incomes: [],
       expenses: [],
       monedasVistas,
+      indicadoresDe: {
+        periodo: { year: 2026, month: 9 },
+        estado: "actual" as const,
+        etiqueta: null,
+      },
     };
   },
   getPrimaryCurrency: async () => primary,
@@ -78,7 +83,13 @@ vi.mock("@/modules/rich-life/services/rich-life-service", () => ({ getRichLifeSu
 vi.mock("@/modules/wealth/services/portfolio-service", () => ({ getPortfolioReport: skip }));
 vi.mock("@/modules/financial-base/services/snapshot-service", () => ({ getSnapshotHistory: skip }));
 vi.mock("@/modules/wealth/services/snapshot-service", () => ({ getSnapshotHistory: skip }));
-const FONDO = { current: 500_000, target: 1_500_000, progressPct: 0.33, recommendedMonthly: 100_000, covered: false };
+const FONDO = {
+  current: 500_000,
+  target: 1_500_000,
+  progressPct: 0.33,
+  recommendedMonthly: 100_000,
+  covered: false,
+};
 vi.mock("@/modules/wealth", () => ({
   getPatrimonioReport: skip,
   getMacroInsights: skip,

@@ -11,7 +11,10 @@ import { formatMoney } from "@/lib/format";
 import { getBaseSummary } from "@/modules/financial-base/services/base-service";
 import { getLiquidityBalance } from "@/modules/financial-base/services/liquidity-service";
 import { filterConfiguredSobreTree } from "@/modules/financial-base/engine/classify";
-import { getBudgetTotals } from "@/modules/financial-base/services/budget-service";
+import {
+  getBudgetTotals,
+  ensureRecurringIncome,
+} from "@/modules/financial-base/services/budget-service";
 import { getMonthFlow } from "@/modules/financial-base/services/month-flow-service";
 import {
   getRealTotals,
@@ -49,7 +52,19 @@ import type { V2View } from "@/modules/financial-base/components/v2/sections";
 
 export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promise<V2View | null> {
   if (!isSupabaseConfigured()) return null;
-  const period = parseMonthParam(periodRaw, await userCurrentPeriod());
+  const actual = await userCurrentPeriod();
+  const period = parseMonthParam(periodRaw, actual);
+
+  // Agenda de cobros (puerta 1 de 2 — la otra es el cron de `ventana`): materializa
+  // las fuentes recurrentes a las que les toca pago ESTE mes, antes de leer nada.
+  // Sin esto el mes recién abierto se lee a medias y de ese presupuesto salen los
+  // INDICADORES (score de salud, DTI, contexto del asesor), no sólo el titular.
+  //
+  // Sólo el mes EN CURSO: navegar a un mes viejo no debe crear filas hacia atrás.
+  // Best-effort e idempotente; si falla, la vista se arma igual con lo que haya.
+  if (period.year === actual.year && period.month === actual.month) {
+    await ensureRecurringIncome(period).catch(() => {});
+  }
 
   // Rango del histórico/cuadros (solo lo pasa el tab de Ingresos). Sin rango se
   // conserva la ventana de 6 meses que usan Mi Base, Gastos y Transacciones.
@@ -165,6 +180,12 @@ export async function loadBaseView(periodRaw?: string, rangeRaw?: string): Promi
   });
   const readingInput = {
     totals,
+    // Préstamo DELIBERADO entre meses: `base.indicators` puede describir el mes
+    // cerrado anterior mientras este no tenga presupuesto de gasto (ver
+    // engine/periodo-indicadores). Se usa igual porque la presión sólo elige el
+    // TONO del próximo paso —no es una cifra— y ya viene filtrada por el flujo
+    // libre de ESTE mes. Calcularla del mes a medias diría "baja" por ausencia
+    // de gasto, que es peor estimación que la del mes completo anterior.
     financialPressure: base.indicators.financialPressure,
     expenseComposition: composition(real.expenseByKey),
     incomeComposition: composition(real.incomeByKey),
