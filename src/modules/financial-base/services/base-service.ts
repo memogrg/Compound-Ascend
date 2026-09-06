@@ -18,9 +18,13 @@ import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import {
   monthlyize,
   monthlyPlanned,
+  mesesEntrePagos,
   type Frequency,
 } from "@/modules/financial-base/engine/monthlyize";
-import { computeBaseIndicators } from "@/modules/financial-base/engine/base-engine";
+import {
+  computeBaseIndicators,
+  naturalezaDeLinea,
+} from "@/modules/financial-base/engine/base-engine";
 import { userCurrentPeriod } from "@/lib/time/user-time";
 import { convertCurrency, SUPPORTED_CURRENCIES } from "@/lib/fx";
 import { getFxRates } from "@/lib/market-data/fx-rates";
@@ -218,11 +222,151 @@ export type BaseSummary = {
   monedasVistas: string[];
 };
 
+/**
+ * Ítems que alimentan los INDICADORES, construidos desde el presupuesto VIVO
+ * del mes (`budget_items`) — que es lo que el usuario realmente edita.
+ *
+ * Antes salían de `income_sources` / `expense_items`, las tablas del Módulo 2
+ * original. Ninguna pantalla las escribe ya (`createIncomeAction` y sus pares
+ * quedaron sin un solo llamador cuando el tab de Ingresos pasó a budget_items),
+ * así que para una cuenta real esas tablas están vacías o traen una fila
+ * fósil. El efecto no era un número raro sino un diagnóstico entero inventado:
+ * con gasto 0, la tasa de ahorro da 100 %, el peso de esenciales 0 % y el score
+ * de salud sale 100 "SÓLIDA" — y de ahí comen el DTI de deudas, los pilares del
+ * dashboard, los detectores de insights y el contexto del asesor. Es la misma
+ * raíz que #638 parchó por el lado de Patrimonio ("un denominador, no cuatro
+ * bugs"); esto la corta en el origen.
+ *
+ * Mapeo:
+ *  · ingreso  → `monthlyPlanned` sobre el monto por pago (semántica única) y
+ *               `income_type` como tipo.
+ *  · gasto    → el monto de la línea YA es el presupuesto del mes; la
+ *               naturaleza sale de `expense_categories.default_nature`.
+ *
+ * `includeInBudget` deja de existir como concepto: una línea de presupuesto
+ * está en el presupuesto por definición. Se emite siempre true.
+ */
+async function baseItemsDelPeriodo(
+  ctx?: AuthContext,
+): Promise<{ incomes: IncomeSource[]; expenses: ExpenseItem[] }> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
+  const p = await userCurrentPeriod(ctx);
+
+  const [bi, cats] = await Promise.all([
+    supabase
+      .from("budget_items")
+      .select("id,type,name,amount,currency,frequency,income_type,category_id,source_kind")
+      .in("user_id", memberIds)
+      .eq("period_month", p.month)
+      .eq("period_year", p.year),
+    supabase.from("expense_categories").select("id,default_nature,parent_id"),
+  ]);
+
+  const catsById = new Map((cats.data ?? []).map((c) => [c.id, c]));
+
+  const incomes: IncomeSource[] = [];
+  const expenses: ExpenseItem[] = [];
+  for (const r of bi.data ?? []) {
+    const amount = Number(r.amount);
+    const frequency = r.frequency as Frequency;
+    if (r.type === "income") {
+      incomes.push({
+        id: r.id,
+        name: r.name,
+        incomeType: (r.income_type ?? "activo") as IncomeType,
+        category: null,
+        amount,
+        currency: r.currency,
+        frequency,
+        isFixed: true,
+        certainty: null,
+        ownerScope: "usuario" as OwnerScope,
+        includeInBudget: true,
+        amountMonthly: monthlyPlanned(amount, frequency),
+      });
+    } else {
+      const cat = r.category_id ? catsById.get(r.category_id) : null;
+      const padre = cat?.parent_id ? catsById.get(cat.parent_id) : null;
+      expenses.push({
+        id: r.id,
+        name: r.name,
+        categoryId: r.category_id,
+        nature: naturalezaDeLinea({
+          sourceKind: r.source_kind,
+          categoryNature: cat?.default_nature ?? null,
+          parentNature: padre?.default_nature ?? null,
+        }),
+        amount,
+        currency: r.currency,
+        frequency,
+        isFixed: true,
+        obligation: null,
+        reducible: null,
+        ownerScope: "usuario" as OwnerScope,
+        // La línea del sobre ya ES el presupuesto de ese mes (ver getBudgetTotals).
+        amountMonthly: amount,
+      });
+    }
+  }
+  return { incomes, expenses };
+}
+
+/**
+ * Provisión mensual para gastos que NO llegan todos los meses (`annualCoverage`).
+ *
+ * Salía de recorrer los ítems de gasto y quedarse con los de frecuencia
+ * no-mensual. Con los indicadores leyendo el presupuesto vivo eso da 0 siempre:
+ * una línea de `budget_items` ES el presupuesto de un mes, así que nace
+ * "mensual" por construcción y la cadencia real se pierde. Dejarlo en 0 no era
+ * neutral — apagaba en silencio el aviso del dashboard y el subtítulo del pilar.
+ *
+ * La cadencia sí vive en las ENTIDADES, que son las mismas de las que
+ * `syncDerivedBudget` deriva sus líneas: pólizas (`premium_frequency`) y
+ * plantillas recurrentes de gasto. Se mensualiza cada compromiso no-mensual y se
+ * suma — que es exactamente lo que hay que apartar cada mes para que la prima
+ * semestral o el marchamo anual no lleguen de sorpresa.
+ */
+async function provisionNoMensual(
+  primary: string,
+  rates: Record<string, number>,
+  ctx?: AuthContext,
+): Promise<number> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
+
+  const [pol, rec] = await Promise.all([
+    supabase
+      .from("insurance_policies")
+      .select("premium,premium_frequency,currency")
+      .in("user_id", memberIds),
+    supabase
+      .from("recurring_items")
+      .select("amount,frequency,currency")
+      .in("user_id", memberIds)
+      .eq("kind", "gasto")
+      .eq("active", true),
+  ]);
+
+  let total = 0;
+  const sumar = (amount: number, frequency: string | null, currency: string | null) => {
+    const f = (frequency ?? "mensual") as Frequency;
+    // Sólo los multi-mes necesitan provisión: lo mensual y lo sub-mensual ya
+    // caen dentro del mes y están en el presupuesto.
+    if (mesesEntrePagos(f) <= 1) return;
+    total += convertCurrency(monthlyize(amount, f), currency ?? primary, primary, rates);
+  };
+
+  for (const p of pol.data ?? []) sumar(Number(p.premium ?? 0), p.premium_frequency, p.currency);
+  for (const r of rec.data ?? []) sumar(Number(r.amount ?? 0), r.frequency, r.currency);
+
+  return Math.round(total * 100) / 100;
+}
+
 /** Carga ítems y calcula los indicadores de la base financiera. */
 async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
-  const [incomes, expenses, primary, rates] = await Promise.all([
-    listIncomes(ctx),
-    listExpenses(ctx),
+  const [{ incomes, expenses }, primary, rates] = await Promise.all([
+    baseItemsDelPeriodo(ctx),
     getDisplayCurrency(ctx),
     getFxRates(),
   ]);
@@ -249,6 +393,16 @@ async function _getBaseSummary(ctx?: AuthContext): Promise<BaseSummary> {
     expenses,
     monedasVistas: [...monedas].sort(),
   };
+
+  // `annualCoverage` no se puede derivar de las líneas del presupuesto (nacen
+  // mensuales); se reconstruye desde las entidades que sí llevan la cadencia.
+  // Best-effort: si falla, queda el 0 del motor y el resto de los indicadores
+  // no se ve afectado.
+  try {
+    summary.indicators.annualCoverage = await provisionNoMensual(primary, rates, ctx);
+  } catch {
+    // sin pólizas/recurrentes accesibles: se queda en 0.
+  }
 
   // V2 (best-effort, no bloquea ni rompe a los 5 consumidores si falla).
   try {
