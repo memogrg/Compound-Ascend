@@ -35,8 +35,6 @@ export function buildFamiliaMetasEducacion(seed: number): PersonaSpec {
       goalTarget: rng.amount(700_000, 950_000, 50_000),
       hasInvestment: false,
       investmentValue: 0,
-      incomeSourceName: "Salario familiar",
-      expenseItemName: "Gastos del hogar",
       incomeBudgetName: "Salario mensual",
       expenseBudgetName: "Gastos familiares",
       debtName: "Préstamo personal",

@@ -36,8 +36,6 @@ export function buildIngresosIrregulares(seed: number): PersonaSpec {
       goalTarget: rng.amount(120_000, 200_000, 20_000),
       hasInvestment: false,
       investmentValue: 0,
-      incomeSourceName: "Honorarios",
-      expenseItemName: "Renta",
       incomeBudgetName: "Ingreso freelance",
       expenseBudgetName: "Gastos del hogar",
       debtName: "Tarjeta de crédito",

@@ -10,10 +10,6 @@ import { createPrng } from "../prng";
 
 export interface PersonaSetup {
   openingBalance: number;
-  incomeSourceName: string;
-  incomeSourceMonthly: number;
-  expenseItemName: string;
-  expenseItemMonthly: number;
   incomeBudgetName: string;
   incomeBudgetAmount: number;
   expenseBudgetName: string;
@@ -76,10 +72,6 @@ export function buildControlExcelente(seed: number): PersonaSpec {
     seed,
     setup: {
       openingBalance,
-      incomeSourceName: "Salario",
-      incomeSourceMonthly,
-      expenseItemName: "Renta",
-      expenseItemMonthly,
       incomeBudgetName: "Salario mensual",
       incomeBudgetAmount: incomeSourceMonthly,
       expenseBudgetName: "Gastos del hogar",

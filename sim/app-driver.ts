@@ -12,7 +12,6 @@
 import type { AuthContext } from "@/lib/auth/auth-context";
 import type { Period } from "@/modules/financial-base/types";
 import { setOpeningBalance } from "@/modules/financial-base/services/liquidity-service";
-import { createIncome, createExpense } from "@/modules/financial-base/services/base-service";
 import { createBudgetItem, receivePartialIncome } from "@/modules/financial-base/services/budget-service";
 import { createTransaction } from "@/modules/financial-base/services/transaction-service";
 import {
@@ -43,38 +42,11 @@ export class AppDriver {
     this.log.record("setup", "saldo inicial (apertura)", this.day, { amount, currency: this.currency });
   }
 
-  async addIncomeSource(name: string, amountMonthly: number): Promise<void> {
-    await createIncome(
-      {
-        name,
-        incomeType: "activo",
-        amount: amountMonthly,
-        currency: this.currency,
-        frequency: "mensual",
-        isFixed: true,
-        ownerScope: "usuario",
-        includeInBudget: true,
-      },
-      this.ctx,
-    );
-    this.log.record("setup", `fuente de ingreso "${name}"`, this.day, { amountMonthly });
-  }
-
-  async addExpenseItem(name: string, amountMonthly: number): Promise<void> {
-    await createExpense(
-      {
-        name,
-        nature: "esencial",
-        amount: amountMonthly,
-        currency: this.currency,
-        frequency: "mensual",
-        isFixed: true,
-        ownerScope: "usuario",
-      },
-      this.ctx,
-    );
-    this.log.record("setup", `ítem de gasto "${name}"`, this.day, { amountMonthly });
-  }
+  // `addIncomeSource` / `addExpenseItem` sembraban income_sources / expense_items.
+  // Se retiraron: los indicadores leen el presupuesto vivo, así que esas escrituras
+  // no alimentaban ninguna lectura — el simulador ya sembraba EN PARALELO la línea
+  // de presupuesto con el mismo monto (addIncomeBudgetLine / addExpenseBudgetLine),
+  // que es la que la app realmente mira.
 
   /** Creates an income budget line and reads its id back (the write returns void). */
   async addIncomeBudgetLine(name: string, amount: number, period: Period): Promise<string> {

@@ -42,8 +42,6 @@ export interface FinancialSetup {
   hasInvestment: boolean;
   investmentValue: number;
   // Labels for the seeded entities.
-  incomeSourceName: string;
-  expenseItemName: string;
   incomeBudgetName: string;
   expenseBudgetName: string;
   debtName: string;

@@ -9,8 +9,6 @@ import {
   txnInputSchema,
   budgetItemInputSchema,
   categoryInputSchema,
-  incomeInputSchema,
-  expenseInputSchema,
   incomeSourceInputSchema,
 } from "@/modules/financial-base/schemas";
 
@@ -297,20 +295,6 @@ describe("validación de fechas no futuras", () => {
  * placeholder) — 0 es legítimo ahí; se guardan con un test de no-regresión.
  */
 describe("schemas · amount > 0 en movimientos (ingreso/gasto), 0 legítimo en presupuesto/fuente", () => {
-  const income = {
-    name: "Salario",
-    incomeType: "activo" as const,
-    amount: 100,
-    currency: "CRC",
-    frequency: "mensual" as const,
-  };
-  const expense = {
-    name: "Súper",
-    nature: "esencial" as const,
-    amount: 100,
-    currency: "CRC",
-    frequency: "mensual" as const,
-  };
   const budgetItem = {
     type: "expense" as const,
     name: "Comida",
@@ -326,18 +310,6 @@ describe("schemas · amount > 0 en movimientos (ingreso/gasto), 0 legítimo en p
     occurredOn: "2026-08-01",
     incomeType: "pasivo" as const,
   };
-
-  it("ingreso: rechaza amount 0 y negativo, acepta > 0", () => {
-    expectFailAt(incomeInputSchema, { ...income, amount: 0 }, ["amount"]);
-    expectFailAt(incomeInputSchema, { ...income, amount: -5 }, ["amount"]);
-    expect(incomeInputSchema.safeParse({ ...income, amount: 100 }).success).toBe(true);
-  });
-
-  it("gasto: rechaza amount 0 y negativo, acepta > 0", () => {
-    expectFailAt(expenseInputSchema, { ...expense, amount: 0 }, ["amount"]);
-    expectFailAt(expenseInputSchema, { ...expense, amount: -5 }, ["amount"]);
-    expect(expenseInputSchema.safeParse({ ...expense, amount: 100 }).success).toBe(true);
-  });
 
   it("no-regresión: presupuesto de sobre SIGUE aceptando 0 (= quitar presupuesto)", () => {
     expect(budgetItemInputSchema.safeParse({ ...budgetItem, amount: 0 }).success).toBe(true);

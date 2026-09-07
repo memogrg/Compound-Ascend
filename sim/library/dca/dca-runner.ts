@@ -80,7 +80,6 @@ export async function runDcaPersona(opts: { nowStamp: number; months?: number })
       driver.day = 0;
       const period = await userCurrentPeriod(ctx);
       await driver.openingBalance(persona.openingBalance);
-      await driver.addIncomeSource(persona.incomeSourceName, persona.monthlyIncome);
       const incomeLineId = await driver.addIncomeBudgetLine(
         persona.incomeBudgetName,
         persona.monthlyIncome,

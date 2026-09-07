@@ -2,19 +2,13 @@ import "server-only";
 import { cache } from "react";
 
 /**
- * Servicio de datos del Módulo 2 (respeta RLS). El monto mensualizado se calcula
- * en el servidor con el motor `monthlyize` y se persiste en `amount_monthly_base`.
+ * Servicio de datos del Módulo 2 (respeta RLS). Arma los INDICADORES de la base
+ * a partir del presupuesto vivo del periodo (`budget_items`), decide de qué mes
+ * hablan (ver engine/periodo-indicadores) y expone las monedas de trabajo.
  */
 import { cookies } from "next/headers";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/auth/session";
 import { resolveAuth, type AuthContext } from "@/lib/auth/auth-context";
-import {
-  getActiveHouseholdId,
-  householdMemberIds,
-  householdWriteScope,
-} from "@/lib/household/active";
-import { logHouseholdDeletion } from "@/lib/household/activity-log";
+import { householdMemberIds } from "@/lib/household/active";
 import {
   monthlyize,
   monthlyPlanned,
@@ -38,173 +32,20 @@ import type {
   ExpenseItem,
   BaseIndicators,
   IncomeType,
-  ExpenseNature,
   OwnerScope,
 } from "@/modules/financial-base/types";
-import type { IncomeInput, ExpenseInput } from "@/modules/financial-base/schemas";
-import type { IncomeSourceRow, ExpenseItemRow } from "@/lib/supabase/database.types";
 
-function rowToIncome(r: IncomeSourceRow): IncomeSource {
-  return {
-    id: r.id,
-    name: r.name,
-    incomeType: r.income_type as IncomeType,
-    category: r.category,
-    amount: Number(r.amount),
-    currency: r.currency,
-    frequency: r.frequency as Frequency,
-    isFixed: r.is_fixed,
-    certainty: r.certainty as IncomeSource["certainty"],
-    ownerScope: r.owner_scope as OwnerScope,
-    includeInBudget: r.include_in_budget,
-    amountMonthly: Number(r.amount_monthly_base),
-  };
-}
-
-function rowToExpense(r: ExpenseItemRow): ExpenseItem {
-  return {
-    id: r.id,
-    name: r.name,
-    categoryId: r.category_id,
-    nature: (r.nature ?? "miscelaneo") as ExpenseNature,
-    amount: Number(r.amount),
-    currency: r.currency,
-    frequency: r.frequency as Frequency,
-    isFixed: r.is_fixed,
-    obligation: r.obligation as ExpenseItem["obligation"],
-    reducible: r.reducible as ExpenseItem["reducible"],
-    ownerScope: r.owner_scope as OwnerScope,
-    amountMonthly: Number(r.amount_monthly_base),
-  };
-}
-
-export async function listIncomes(ctx?: AuthContext): Promise<IncomeSource[]> {
-  const { db, userId } = await resolveAuth(ctx);
-  const memberIds = await householdMemberIds(db, userId);
-  const { data } = await db
-    .from("income_sources")
-    .select("*")
-    .in("user_id", memberIds)
-    .order("created_at", { ascending: false });
-  return (data ?? []).map(rowToIncome);
-}
-
-export async function listExpenses(ctx?: AuthContext): Promise<ExpenseItem[]> {
-  const { db, userId } = await resolveAuth(ctx);
-  const memberIds = await householdMemberIds(db, userId);
-  const { data } = await db
-    .from("expense_items")
-    .select("*")
-    .in("user_id", memberIds)
-    .order("created_at", { ascending: false });
-  return (data ?? []).map(rowToExpense);
-}
-
-export async function createIncome(input: IncomeInput, ctx?: AuthContext): Promise<void> {
-  const { db: supabase, userId } = await resolveAuth(ctx);
-  const household_id = await getActiveHouseholdId(supabase, userId);
-  await supabase.from("income_sources").insert({
-    user_id: userId,
-    household_id,
-    created_by: userId,
-    last_edited_by: userId,
-    name: input.name,
-    income_type: input.incomeType,
-    category: input.category ?? null,
-    amount: input.amount,
-    currency: input.currency,
-    frequency: input.frequency,
-    is_fixed: input.isFixed,
-    certainty: input.certainty ?? null,
-    owner_scope: input.ownerScope,
-    include_in_budget: input.includeInBudget,
-    amount_monthly_base: monthlyize(input.amount, input.frequency),
-  });
-}
-
-export async function createExpense(input: ExpenseInput, ctx?: AuthContext): Promise<void> {
-  const { db: supabase, userId } = await resolveAuth(ctx);
-  const household_id = await getActiveHouseholdId(supabase, userId);
-  await supabase.from("expense_items").insert({
-    user_id: userId,
-    household_id,
-    created_by: userId,
-    last_edited_by: userId,
-    name: input.name,
-    nature: input.nature,
-    amount: input.amount,
-    currency: input.currency,
-    frequency: input.frequency,
-    is_fixed: input.isFixed,
-    obligation: input.obligation ?? null,
-    reducible: input.reducible ?? null,
-    owner_scope: input.ownerScope,
-    amount_monthly_base: monthlyize(input.amount, input.frequency),
-  });
-}
-
-export async function updateIncome(id: string, input: IncomeInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
-  await supabase
-    .from("income_sources")
-    .update({
-      last_edited_by: user.id,
-      name: input.name,
-      income_type: input.incomeType,
-      category: input.category ?? null,
-      amount: input.amount,
-      currency: input.currency,
-      frequency: input.frequency,
-      is_fixed: input.isFixed,
-      certainty: input.certainty ?? null,
-      owner_scope: input.ownerScope,
-      include_in_budget: input.includeInBudget,
-      amount_monthly_base: monthlyize(input.amount, input.frequency),
-    })
-    .eq("id", id)
-    .in("user_id", scope);
-}
-
-export async function updateExpense(id: string, input: ExpenseInput): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
-  await supabase
-    .from("expense_items")
-    .update({
-      last_edited_by: user.id,
-      name: input.name,
-      nature: input.nature,
-      amount: input.amount,
-      currency: input.currency,
-      frequency: input.frequency,
-      is_fixed: input.isFixed,
-      obligation: input.obligation ?? null,
-      reducible: input.reducible ?? null,
-      owner_scope: input.ownerScope,
-      amount_monthly_base: monthlyize(input.amount, input.frequency),
-    })
-    .eq("id", id)
-    .in("user_id", scope);
-}
-
-export async function deleteIncome(id: string): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
-  await supabase.from("income_sources").delete().eq("id", id).in("user_id", scope);
-  await logHouseholdDeletion(supabase, { userId: user.id, table: "income_sources", rowId: id });
-}
-
-export async function deleteExpense(id: string): Promise<void> {
-  const user = await requireUser();
-  const supabase = await createSupabaseServerClient();
-  const scope = await householdWriteScope(supabase, user.id);
-  await supabase.from("expense_items").delete().eq("id", id).in("user_id", scope);
-  await logHouseholdDeletion(supabase, { userId: user.id, table: "expense_items", rowId: id });
-}
+/**
+ * El CRUD de `income_sources` / `expense_items` vivía acá (listIncomes,
+ * createIncome, updateExpense…). Se retiró con su UI (BaseDashboard/BaseActions,
+ * y las server actions de api/actions.ts): los indicadores pasaron a leer el
+ * presupuesto vivo de `budget_items` y esas tablas dejaron de tener pantalla
+ * que las escribiera.
+ *
+ * Las TABLAS siguen existiendo a propósito: guardan filas históricas y
+ * `dividend-service` / `rental-service` todavía borran por `income_id` al
+ * revertir una renta o un dividendo. Lo que se fue es el código sin llamadores.
+ */
 
 export type BaseSummary = {
   indicators: BaseIndicators;
