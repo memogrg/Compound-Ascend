@@ -58,7 +58,10 @@ export function anticipar(
  */
 export function cancelar(estado: PendientesBarra, id: string): PendientesBarra {
   if (!estado[id]) return estado;
-  const { [id]: _fuera, ...resto } = estado;
+  // Copia sin la clave. Se arma explícito en vez de desestructurar-y-descartar
+  // porque la variable de descarte cuenta como no usada para el lint del repo.
+  const resto: PendientesBarra = {};
+  for (const [k, v] of Object.entries(estado)) if (k !== id) resto[k] = v;
   return resto;
 }
 
