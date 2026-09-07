@@ -22,7 +22,9 @@ const getEnvelopesSummary = vi.fn();
 const formatEnvelopesReply = vi.fn();
 const suggestSobreForChatFast = vi.fn();
 const getSobreRemaining = vi.fn();
-const listSobresForKind = vi.fn(async (..._a: unknown[]) => [] as { id: string; sobre: string; frasco: string | null }[]);
+const listSobresForKind = vi.fn(
+  async (..._a: unknown[]) => [] as { id: string; sobre: string; frasco: string | null }[],
+);
 vi.mock("@/modules/financial-base", () => ({
   getLiquidityBalance: () => getLiquidityBalance(),
   listTransactions: (...a: unknown[]) => listTransactions(...a),
@@ -48,7 +50,19 @@ vi.mock("@/modules/wealth", () => ({
 // FX del carril multi-posición (import dinámico): tasas fijas para no pegarle a la red.
 vi.mock("@/lib/market-data/fx-rates", () => ({ getFxRates: async () => ({ USD: 1, CRC: 530 }) }));
 
-import { matchIntent, answerFromContext, tryRouteQuery, resolveMatchedIntent, affordReply, extractAmount, extractAffordDesc, extractMarketSymbol, buildMarketReply, freshnessNote, normalizeSlang } from "@/lib/ai/router";
+import {
+  matchIntent,
+  answerFromContext,
+  tryRouteQuery,
+  resolveMatchedIntent,
+  affordReply,
+  extractAmount,
+  extractAffordDesc,
+  extractMarketSymbol,
+  buildMarketReply,
+  freshnessNote,
+  normalizeSlang,
+} from "@/lib/ai/router";
 import type { ToolContext, FinancialContext } from "@/lib/ai/orchestrator";
 
 // FinancialContext con las cifras R2 que YA trae el context-engine (0 fetch).
@@ -76,7 +90,19 @@ const tc: ToolContext = {
 const ask = (content: string) => [{ role: "user", content }];
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  // RESET, no clear: `vi.clearAllMocks()` borra el historial de llamadas pero
+  // CONSERVA las implementaciones, y en este archivo eso filtra estado entre los
+  // 101 tests. El caso real: "saldo_sobre matchea por NOMBRE" deja
+  // `listSobresForKind` devolviendo la lista de sobres reales; el test de
+  // "saldo_sobre → restante del sobre nombrado" que corra DESPUÉS matchea por
+  // nombre contra esa lista filtrada y nunca llama al clasificador, así que su
+  // aserción sobre `suggestSobreForChatFast` falla con "0 llamadas".
+  //
+  // En orden de declaración el que filtra corre después y no se nota — por eso
+  // sólo aparecía como un fallo suelto e irreproducible. Con
+  // `--sequence.shuffle` fallaba en 7 de cada 10 semillas; con reset, 12 de 12
+  // en verde.
+  vi.resetAllMocks();
 });
 
 describe("matchIntent · patrones (0 tokens)", () => {
@@ -84,7 +110,9 @@ describe("matchIntent · patrones (0 tokens)", () => {
     expect(matchIntent("¿Cuál es mi número de libertad?")?.intent).toBe("numero_libertad");
     // Los TRES números son intents distintos y NO se mezclan.
     expect(matchIntent("¿cuál es mi número de seguridad?")?.intent).toBe("numero_seguridad");
-    expect(matchIntent("¿cuál es mi número de independencia?")?.intent).toBe("numero_independencia");
+    expect(matchIntent("¿cuál es mi número de independencia?")?.intent).toBe(
+      "numero_independencia",
+    );
     // Nota: "cuáles son mis metas" ahora es listar_sobres (Mejora 3); el PROGRESO es `metas`.
     expect(matchIntent("mostrame el progreso de mi ahorro")?.intent).toBe("metas");
     expect(matchIntent("cuánto llevo ahorrado en mis metas")?.intent).toBe("metas");
@@ -92,14 +120,20 @@ describe("matchIntent · patrones (0 tokens)", () => {
   });
 
   it("una PROYECCIÓN genérica se escala al razonamiento (null), pero NO la de independencia", () => {
-    expect(matchIntent("si invierto $300 en el Nasdaq durante 5 años, ¿cuánto tendría?")).toBeNull();
+    expect(
+      matchIntent("si invierto $300 en el Nasdaq durante 5 años, ¿cuánto tendría?"),
+    ).toBeNull();
     expect(matchIntent("¿me conviene pagar la deuda o invertir?")).toBeNull();
   });
 
   it("plan de independencia → intent determinista (no cae al LLM); 'libertad financiera' = vida actual", () => {
     expect(matchIntent("¿cómo llego a mi independencia?")?.intent).toBe("plan_independencia");
-    expect(matchIntent("cuánto debo invertir al mes para llegar a mi independencia")?.intent).toBe("plan_independencia");
-    expect(matchIntent("¿cómo alcanzo mi libertad financiera más rápido?")?.intent).toBe("plan_independencia");
+    expect(matchIntent("cuánto debo invertir al mes para llegar a mi independencia")?.intent).toBe(
+      "plan_independencia",
+    );
+    expect(matchIntent("¿cómo alcanzo mi libertad financiera más rápido?")?.intent).toBe(
+      "plan_independencia",
+    );
     // "cuál es mi número de libertad" sigue siendo la CONSULTA de dato (no el plan).
     expect(matchIntent("¿Cuál es mi número de libertad?")?.intent).toBe("numero_libertad");
   });
@@ -139,7 +173,9 @@ describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () =>
   });
 
   it("sin securityNumber/independenceNumber → null (escala, no adivina)", () => {
-    expect(answerFromContext("numero_seguridad", {}, { ...tc, securityNumber: undefined })).toBeNull();
+    expect(
+      answerFromContext("numero_seguridad", {}, { ...tc, securityNumber: undefined }),
+    ).toBeNull();
     expect(
       answerFromContext("numero_independencia", {}, { ...tc, independenceNumber: undefined }),
     ).toBeNull();
@@ -163,7 +199,12 @@ describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () =>
 
   it("plan_independencia proyecta hacia el número de INDEPENDENCIA sin pedir vida deseada", () => {
     const ctxPlan = { ...CTX, freeCashflow: 1_000, compromisoMensual: 2_333 } as FinancialContext;
-    const r = answerFromContext("plan_independencia", {}, { ...tc, independenceNumber: 350_000, investableWealth: 120_000 }, ctxPlan);
+    const r = answerFromContext(
+      "plan_independencia",
+      {},
+      { ...tc, independenceNumber: 350_000, investableWealth: 120_000 },
+      ctxPlan,
+    );
     expect(r?.reply).toContain("350.000"); // el número de independencia como meta
     expect(r?.reply).toMatch(/patrimonio invertible/i);
     expect(r?.reply).toMatch(/al 8%/);
@@ -172,7 +213,12 @@ describe("answerFromContext · la cifra SALE del motor (nunca inventada)", () =>
   });
 
   it("plan_independencia sin aporte conocido → da el número y pide el aporte (no se traba)", () => {
-    const r = answerFromContext("plan_independencia", {}, { ...tc, independenceNumber: 350_000 }, CTX);
+    const r = answerFromContext(
+      "plan_independencia",
+      {},
+      { ...tc, independenceNumber: 350_000 },
+      CTX,
+    );
     expect(r?.reply).toContain("350.000");
     expect(r?.reply).toMatch(/cuánto podés aportar/i);
   });
@@ -183,9 +229,27 @@ describe("metas_a_aportar · SOLO metas de ahorro recurrentes con su aporte (no 
   const tcMetas: ToolContext = {
     ...tc,
     goals: [
-      { nombre: "Fondo de emergencia", objetivo: 12_000, actual: 3_000, aporte_mensual: 200, recurrence: "mensual" },
-      { nombre: "Seguro anual", objetivo: 1_200, actual: 300, aporte_mensual: 100, recurrence: "anual" },
-      { nombre: "Carro", objetivo: 8_000, actual: 1_000, aporte_mensual: 300, recurrence: "ninguna" },
+      {
+        nombre: "Fondo de emergencia",
+        objetivo: 12_000,
+        actual: 3_000,
+        aporte_mensual: 200,
+        recurrence: "mensual",
+      },
+      {
+        nombre: "Seguro anual",
+        objetivo: 1_200,
+        actual: 300,
+        aporte_mensual: 100,
+        recurrence: "anual",
+      },
+      {
+        nombre: "Carro",
+        objetivo: 8_000,
+        actual: 1_000,
+        aporte_mensual: 300,
+        recurrence: "ninguna",
+      },
     ],
   };
 
@@ -213,7 +277,15 @@ describe("metas_a_aportar · SOLO metas de ahorro recurrentes con su aporte (no 
   it("sin metas recurrentes → mensaje honesto que las separa de los sobres de gasto", () => {
     const sinRec: ToolContext = {
       ...tc,
-      goals: [{ nombre: "Carro", objetivo: 8_000, actual: 1_000, aporte_mensual: 300, recurrence: "ninguna" }],
+      goals: [
+        {
+          nombre: "Carro",
+          objetivo: 8_000,
+          actual: 1_000,
+          aporte_mensual: 300,
+          recurrence: "ninguna",
+        },
+      ],
     };
     const r = answerFromContext("metas_a_aportar", {}, sinRec);
     expect(r?.reply).toMatch(/recurrentes/i);
@@ -277,18 +349,34 @@ describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", ()
   });
 
   it("DEFENSA: fondo emergencia/paz, colchón y 'si me botan' → defensa_fondo con su foco", () => {
-    expect(matchIntent("¿tengo fondo de emergencia?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "emergencia" } });
-    expect(matchIntent("¿cuánto llevo en el fondo de paz?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "paz" } });
-    expect(matchIntent("¿cuántos meses de colchón tengo?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "colchon" } });
-    expect(matchIntent("si me botan del trabajo, ¿cuánto aguanto?")).toMatchObject({ intent: "defensa_fondo", params: { focus: "colchon" } });
+    expect(matchIntent("¿tengo fondo de emergencia?")).toMatchObject({
+      intent: "defensa_fondo",
+      params: { focus: "emergencia" },
+    });
+    expect(matchIntent("¿cuánto llevo en el fondo de paz?")).toMatchObject({
+      intent: "defensa_fondo",
+      params: { focus: "paz" },
+    });
+    expect(matchIntent("¿cuántos meses de colchón tengo?")).toMatchObject({
+      intent: "defensa_fondo",
+      params: { focus: "colchon" },
+    });
+    expect(matchIntent("si me botan del trabajo, ¿cuánto aguanto?")).toMatchObject({
+      intent: "defensa_fondo",
+      params: { focus: "colchon" },
+    });
     expect(matchIntent("¿ya estoy blindado?")?.intent).toBe("defensa_fondo");
   });
 
   it("INVERSIONES resumen vs símbolo puntual", () => {
     expect(matchIntent("¿cuánto tengo invertido en total?")?.intent).toBe("resumen_inversiones");
     expect(matchIntent("¿cómo va mi portafolio?")?.intent).toBe("resumen_inversiones");
-    expect(matchIntent("¿cuánto he ganado o perdido en inversiones?")?.intent).toBe("resumen_inversiones");
-    expect(matchIntent("¿cuál es el valor actual de mis inversiones?")?.intent).toBe("resumen_inversiones");
+    expect(matchIntent("¿cuánto he ganado o perdido en inversiones?")?.intent).toBe(
+      "resumen_inversiones",
+    );
+    expect(matchIntent("¿cuál es el valor actual de mis inversiones?")?.intent).toBe(
+      "resumen_inversiones",
+    );
     // un símbolo puntual sigue yendo al carril de mercado, no a resumen.
     expect(matchIntent("¿cuánto vale mi ETH ahorita?")?.intent).toBe("datos_mercado");
     expect(matchIntent("¿cuánto aporto de DCA al mes?")?.intent).toBe("dca_mensual");
@@ -316,8 +404,22 @@ describe("Carriles nuevos · defensa / ahorro / inversiones / metas / slang", ()
     defenseFunds: {
       currency: "CRC",
       activeFund: "emergency",
-      emergency: { registrado: true, actual: 300000, objetivo: 900000, progresoPct: 33, aporteRecomendado: 50000, cubierto: false },
-      paz: { registrado: false, actual: 0, objetivo: 1800000, progresoPct: 0, aporteRecomendado: 0, cubierto: false },
+      emergency: {
+        registrado: true,
+        actual: 300000,
+        objetivo: 900000,
+        progresoPct: 33,
+        aporteRecomendado: 50000,
+        cubierto: false,
+      },
+      paz: {
+        registrado: false,
+        actual: 0,
+        objetivo: 1800000,
+        progresoPct: 0,
+        aporteRecomendado: 0,
+        cubierto: false,
+      },
     },
   } as FinancialContext;
 
@@ -497,8 +599,16 @@ describe("tryRouteQuery · carriles y tokens", () => {
   });
 
   it("consulta fraseada RARO (sin patrón) → clasificador Flash-Lite → routea + cuenta sus tokens", async () => {
-    liteChat.mockResolvedValue({ text: '{"intent":"metas","complejo":false}', tokensIn: 14, tokensOut: 6 });
-    const routed = await tryRouteQuery(ask("che, ¿en qué ando con lo que estoy juntando?"), CTX, tc);
+    liteChat.mockResolvedValue({
+      text: '{"intent":"metas","complejo":false}',
+      tokensIn: 14,
+      tokensOut: 6,
+    });
+    const routed = await tryRouteQuery(
+      ask("che, ¿en qué ando con lo que estoy juntando?"),
+      CTX,
+      tc,
+    );
     expect(liteChat).toHaveBeenCalledTimes(1);
     expect(routed?.lane).toBe("lite");
     expect(routed?.tokensIn).toBe(14); // solo la clasificación se paga; la respuesta es plantilla
@@ -506,7 +616,11 @@ describe("tryRouteQuery · carriles y tokens", () => {
   });
 
   it("PROYECCIÓN → el clasificador la marca compleja → null (escala al razonamiento)", async () => {
-    liteChat.mockResolvedValue({ text: '{"intent":"otro","complejo":true}', tokensIn: 12, tokensOut: 4 });
+    liteChat.mockResolvedValue({
+      text: '{"intent":"otro","complejo":true}',
+      tokensIn: 12,
+      tokensOut: 4,
+    });
     const routed = await tryRouteQuery(
       ask("proyectá cuánto tendría invirtiendo $300 al mes 10 años"),
       CTX,
@@ -551,7 +665,9 @@ describe("R2 · matchIntent (patrones)", () => {
     expect(multi?.intent).toBe("saldo_sobre");
     expect(multi?.params.names).toEqual(["transporte", "restaurantes"]);
     // "el sobre de mercado este mes" → nombre limpio.
-    expect(matchIntent("¿cuánto me queda en el sobre de mercado este mes?")?.params.names).toEqual(["mercado"]);
+    expect(matchIntent("¿cuánto me queda en el sobre de mercado este mes?")?.params.names).toEqual([
+      "mercado",
+    ]);
   });
 
   it("saldo_liquidez SOLO ante términos explícitos (no secuestra 'me queda de {sobre}')", () => {
@@ -583,13 +699,21 @@ describe("R2 · answerFromContext (cifra del FinancialContext, 0 fetch)", () => 
   });
 
   it("flujo_libre usa ctx.freeCashflow (no el saldo de liquidez)", () => {
-    const r = answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: 1_500 } as FinancialContext);
+    const r = answerFromContext("flujo_libre", {}, tc, {
+      ...CTX,
+      freeCashflow: 1_500,
+    } as FinancialContext);
     expect(r?.reply).toContain("1.500");
     expect(r?.reply).toMatch(/libre este mes/i);
   });
 
   it("flujo_libre sin dato → null (escala, no adivina ₡0)", () => {
-    expect(answerFromContext("flujo_libre", {}, tc, { ...CTX, freeCashflow: undefined } as FinancialContext)).toBeNull();
+    expect(
+      answerFromContext("flujo_libre", {}, tc, {
+        ...CTX,
+        freeCashflow: undefined,
+      } as FinancialContext),
+    ).toBeNull();
   });
 
   it("gasto_categoria usa ctx.topExpenseCategory (nombre + monto + %)", () => {
@@ -612,7 +736,10 @@ describe("R2 · answerFromContext (cifra del FinancialContext, 0 fetch)", () => 
   });
 
   it("gasto_categoria usa el SOBRE de mayor gasto (topGastoSobre), plantilla determinista", () => {
-    const ctxSobre = { ...CTX, topGastoSobre: { name: "Supermercados", monthly: 340_525 } } as FinancialContext;
+    const ctxSobre = {
+      ...CTX,
+      topGastoSobre: { name: "Supermercados", monthly: 340_525 },
+    } as FinancialContext;
     const r = answerFromContext("gasto_categoria", {}, tc, ctxSobre);
     expect(r?.reply).toMatch(/sobre de mayor gasto es Supermercados/i);
     expect(r?.reply).toContain("340.525");
@@ -644,8 +771,18 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
   });
 
   it("saldo_sobre → restante del sobre nombrado (getSobreRemaining), NO liquidez", async () => {
-    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-super", categoryPath: "Necesidades › Super" });
-    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Super", currency: "CRC", budget: 320000, spent: 120000, remaining: 200000, hasBudget: true });
+    suggestSobreForChatFast.mockResolvedValue({
+      categoryId: "c-super",
+      categoryPath: "Necesidades › Super",
+    });
+    getSobreRemaining.mockResolvedValue({
+      path: "Necesidades › Super",
+      currency: "CRC",
+      budget: 320000,
+      spent: 120000,
+      remaining: 200000,
+      hasBudget: true,
+    });
     const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
     expect(routed?.lane).toBe("template");
     expect(routed?.tokensIn).toBe(0);
@@ -664,10 +801,28 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
     );
     getSobreRemaining.mockImplementation((id: string) =>
       id === "c-tra"
-        ? Promise.resolve({ path: "Transporte", currency: "CRC", budget: 140000, spent: 40000, remaining: 100000, hasBudget: true })
-        : Promise.resolve({ path: "Restaurantes", currency: "CRC", budget: 120000, spent: 90000, remaining: 30000, hasBudget: true }),
+        ? Promise.resolve({
+            path: "Transporte",
+            currency: "CRC",
+            budget: 140000,
+            spent: 40000,
+            remaining: 100000,
+            hasBudget: true,
+          })
+        : Promise.resolve({
+            path: "Restaurantes",
+            currency: "CRC",
+            budget: 120000,
+            spent: 90000,
+            remaining: 30000,
+            hasBudget: true,
+          }),
     );
-    const routed = await tryRouteQuery(ask("¿cuánto me queda en transporte, restaurantes?"), CTX, tc);
+    const routed = await tryRouteQuery(
+      ask("¿cuánto me queda en transporte, restaurantes?"),
+      CTX,
+      tc,
+    );
     expect(routed?.response.reply).toMatch(/Transporte/);
     expect(routed?.response.reply).toMatch(/Restaurantes/);
     expect(routed?.response.reply).toContain("100.000");
@@ -679,7 +834,14 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
       { id: "c-mer", sobre: "Mercado", frasco: "Necesidades" },
       { id: "c-tra", sobre: "Transporte", frasco: "Necesidades" },
     ]);
-    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Mercado", currency: "CRC", budget: 320000, spent: 120000, remaining: 200000, hasBudget: true });
+    getSobreRemaining.mockResolvedValue({
+      path: "Necesidades › Mercado",
+      currency: "CRC",
+      budget: 320000,
+      spent: 120000,
+      remaining: 200000,
+      hasBudget: true,
+    });
     // "supermercados" matchea "Mercado" (fuzzy: 'mercado' ⊂ 'supermercados').
     const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
     expect(getSobreRemaining).toHaveBeenCalledWith("c-mer", expect.any(String));
@@ -688,15 +850,33 @@ describe("R2 · carril fetch (lectura fresca, solo web)", () => {
   });
 
   it("saldo_sobre multi-parte → escala (null), no responde una sola cosa mal", async () => {
-    const routed = await tryRouteQuery(ask("¿cuánto me queda en transporte? ¿y hay aporte de inversión pendiente?"), CTX, tc);
+    const routed = await tryRouteQuery(
+      ask("¿cuánto me queda en transporte? ¿y hay aporte de inversión pendiente?"),
+      CTX,
+      tc,
+    );
     expect(routed).toBeNull();
     expect(getSobreRemaining).not.toHaveBeenCalled();
   });
 
   it("ultimos_movimientos → lista las transacciones reales del ledger", async () => {
     listTransactions.mockResolvedValue([
-      { occurredOn: "2026-07-20", merchantOrSource: "Super", amount: 42, currency: "USD", kind: "gasto", description: null },
-      { occurredOn: "2026-07-18", merchantOrSource: "Sueldo", amount: 4000, currency: "USD", kind: "ingreso", description: null },
+      {
+        occurredOn: "2026-07-20",
+        merchantOrSource: "Super",
+        amount: 42,
+        currency: "USD",
+        kind: "gasto",
+        description: null,
+      },
+      {
+        occurredOn: "2026-07-18",
+        merchantOrSource: "Sueldo",
+        amount: 4000,
+        currency: "USD",
+        kind: "ingreso",
+        description: null,
+      },
     ]);
     const routed = await tryRouteQuery(ask("mis últimas transacciones"), CTX, tc);
     expect(listTransactions).toHaveBeenCalledTimes(1);
@@ -731,7 +911,9 @@ describe("Mejora 3 · matchIntent (sobres/frascos/metas → listar)", () => {
 describe("Mejora 3 · carril fetch (sobres agrupados por frasco, determinista)", () => {
   it("listar_sobres → arma el resumen y responde con el formato determinista (0 tokens)", async () => {
     getEnvelopesSummary.mockResolvedValue({ currency: "USD", expense: [], goals: [] });
-    formatEnvelopesReply.mockReturnValue("**Tus sobres de gasto mensual:**\n- **Frasco Vivienda:** Supermercados");
+    formatEnvelopesReply.mockReturnValue(
+      "**Tus sobres de gasto mensual:**\n- **Frasco Vivienda:** Supermercados",
+    );
     const routed = await tryRouteQuery(ask("¿cuáles son mis sobres?"), CTX, tc);
     expect(getEnvelopesSummary).toHaveBeenCalledTimes(1);
     expect(formatEnvelopesReply).toHaveBeenCalledTimes(1);
@@ -765,9 +947,22 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
   });
 
   it("afford con display USD: '¿me da para un gustito de ₡8.000?' convierte ₡8.000 (~$15), no lo trata como $8.000", async () => {
-    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-rest", categoryPath: "Alimentación › Restaurantes" });
-    getSobreRemaining.mockResolvedValue({ path: "Alimentación › Restaurantes", currency: "USD", budget: 300, spent: 168, remaining: 132, hasBudget: true });
-    const routed = await tryRouteQuery(ask("¿me da para un gustito de ₡8.000?"), CTX, { ...tc, currency: "USD" });
+    suggestSobreForChatFast.mockResolvedValue({
+      categoryId: "c-rest",
+      categoryPath: "Alimentación › Restaurantes",
+    });
+    getSobreRemaining.mockResolvedValue({
+      path: "Alimentación › Restaurantes",
+      currency: "USD",
+      budget: 300,
+      spent: 168,
+      remaining: 132,
+      hasBudget: true,
+    });
+    const routed = await tryRouteQuery(ask("¿me da para un gustito de ₡8.000?"), CTX, {
+      ...tc,
+      currency: "USD",
+    });
     const reply = routed?.response.reply ?? "";
     // ₡8.000 / 530 ≈ $15 → entra en los $132; NUNCA "$8.000 se pasa".
     expect(reply).toMatch(/\$15\b/);
@@ -777,7 +972,9 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
 
   it("extractAffordDesc deja el ítem sin el monto ni el artículo", () => {
     expect(extractAffordDesc("¿puedo darme un gusto de ₡8.000?")?.toLowerCase()).toBe("gusto");
-    expect(extractAffordDesc("me alcanza para unas zapatillas")?.toLowerCase()).toContain("zapatillas");
+    expect(extractAffordDesc("me alcanza para unas zapatillas")?.toLowerCase()).toContain(
+      "zapatillas",
+    );
   });
 
   it("ORDEN NATURAL: las 4 fraseos de «helado» rutean a puedo_gastar con desc=helado", () => {
@@ -796,39 +993,81 @@ describe("puedo_gastar · ¿me puedo comprar X?", () => {
   it("guard: NO rutea afford si no hay ítem de compra (falso positivo)", () => {
     // "me alcanza el tiempo/la plata para llegar" no es una compra → NO puedo_gastar.
     expect(matchIntent("¿me alcanza el tiempo para llegar?")?.intent).not.toBe("puedo_gastar");
-    expect(matchIntent("no me alcanza la plata para llegar a fin de mes")?.intent).not.toBe("puedo_gastar");
+    expect(matchIntent("no me alcanza la plata para llegar a fin de mes")?.intent).not.toBe(
+      "puedo_gastar",
+    );
   });
 
   it("affordReply: la cifra sale del motor (no inventada) en cada rama", () => {
     // Con presupuesto y saldo: informa el disponible; con monto, cuánto queda.
-    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 30000, remaining: 20000, hasBudget: true }, null, money)).toBe(
-      "En Ocio › Restaurantes te quedan ¢20000 este mes.",
-    );
-    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 30000, remaining: 20000, hasBudget: true }, 8000, money)).toContain(
-      "te quedarían ¢12000",
-    );
+    expect(
+      affordReply(
+        "Ocio › Restaurantes",
+        { budget: 50000, spent: 30000, remaining: 20000, hasBudget: true },
+        null,
+        money,
+      ),
+    ).toBe("En Ocio › Restaurantes te quedan ¢20000 este mes.");
+    expect(
+      affordReply(
+        "Ocio › Restaurantes",
+        { budget: 50000, spent: 30000, remaining: 20000, hasBudget: true },
+        8000,
+        money,
+      ),
+    ).toContain("te quedarían ¢12000");
     // Agotado (≤0): recordatorio sin regaño.
-    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 55000, remaining: -5000, hasBudget: true }, null, money)).toBe(
+    expect(
+      affordReply(
+        "Ocio › Restaurantes",
+        { budget: 50000, spent: 55000, remaining: -5000, hasBudget: true },
+        null,
+        money,
+      ),
+    ).toBe(
       "Ya usaste tu presupuesto de Ocio › Restaurantes (¢55000 de ¢50000). Si te lo das, te estarías pasando.",
     );
     // Sin presupuesto asignado: guía a asignarlo.
-    expect(affordReply("Ocio › Restaurantes", { budget: 0, spent: 0, remaining: 0, hasBudget: false }, null, money)).toContain(
-      "No tenés presupuesto en Ocio › Restaurantes",
-    );
+    expect(
+      affordReply(
+        "Ocio › Restaurantes",
+        { budget: 0, spent: 0, remaining: 0, hasBudget: false },
+        null,
+        money,
+      ),
+    ).toContain("No tenés presupuesto en Ocio › Restaurantes");
     // Monto que se pasa: aviso claro.
-    expect(affordReply("Ocio › Restaurantes", { budget: 50000, spent: 45000, remaining: 5000, hasBudget: true }, 8000, money)).toContain(
-      "se pasa por ¢3000",
-    );
+    expect(
+      affordReply(
+        "Ocio › Restaurantes",
+        { budget: 50000, spent: 45000, remaining: 5000, hasBudget: true },
+        8000,
+        money,
+      ),
+    ).toContain("se pasa por ¢3000");
   });
 
   it("carril BLINDADO: usa el mapeo determinista-primero y responde con el remaining del MOTOR", async () => {
-    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-rest", categoryPath: "Ocio › Restaurantes" });
-    getSobreRemaining.mockResolvedValue({ path: "Ocio › Restaurantes", currency: "USD", budget: 50000, spent: 30000, remaining: 20000, hasBudget: true });
+    suggestSobreForChatFast.mockResolvedValue({
+      categoryId: "c-rest",
+      categoryPath: "Ocio › Restaurantes",
+    });
+    getSobreRemaining.mockResolvedValue({
+      path: "Ocio › Restaurantes",
+      currency: "USD",
+      budget: 50000,
+      spent: 30000,
+      remaining: 20000,
+      hasBudget: true,
+    });
     const routed = await tryRouteQuery(ask("quiero un helado, me alcanza?"), CTX, tc);
     expect(routed?.lane).toBe("template");
     expect(routed?.response.reply).toContain("te quedan");
     expect(routed?.response.reply).toContain("20.000"); // = rem.remaining formateado (motor), no inventado
-    expect(suggestSobreForChatFast).toHaveBeenCalledWith(expect.stringContaining("helado"), "gasto");
+    expect(suggestSobreForChatFast).toHaveBeenCalledWith(
+      expect.stringContaining("helado"),
+      "gasto",
+    );
   });
 
   it("sin sobre claro → respuesta determinista pidiendo precisión (NO escala al LLM → nunca IA-503)", async () => {
@@ -860,7 +1099,11 @@ describe("carril de ACCIÓN · el router PROPONE crear (0 tokens de LLM), no dic
   });
 
   it('"creá una meta de ahorro de 500000 para viaje" → propone create_goal', async () => {
-    const routed = await tryRouteQuery(ask("creá una meta de ahorro de 500000 para viaje"), CTX, tc);
+    const routed = await tryRouteQuery(
+      ask("creá una meta de ahorro de 500000 para viaje"),
+      CTX,
+      tc,
+    );
     expect(routed?.lane).toBe("template");
     expect(routed?.response.action?.type).toBe("create_goal");
     expect(liteChat).not.toHaveBeenCalled();
@@ -879,7 +1122,19 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     ...CTX,
     currency: "USD",
     holdings: [
-      { symbol: "KMNO", name: "Kamino", assetType: "cripto", quantity: 100, invested: 500000, value: 560000, price: 5600, pl: 60000, plPct: 0.12, currency: "USD", priceUnavailable: false },
+      {
+        symbol: "KMNO",
+        name: "Kamino",
+        assetType: "cripto",
+        quantity: 100,
+        invested: 500000,
+        value: 560000,
+        price: 5600,
+        pl: 60000,
+        plPct: 0.12,
+        currency: "USD",
+        priceUnavailable: false,
+      },
     ],
   } as FinancialContext;
 
@@ -898,8 +1153,18 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
   });
 
   it("invoca datos_de_mercado, trae ATH real y calcula con lo invertido del contexto + caveat", async () => {
-    getMarketHighlights.mockResolvedValue({ price: 5600, currency: "USD", high: 8000, highDate: "2024-03-14", highKind: "ath" });
-    const routed = await tryRouteQuery(ask("si vendo KMNO en el ATH, ¿cuánto gano?"), ctxWithKmno, tc);
+    getMarketHighlights.mockResolvedValue({
+      price: 5600,
+      currency: "USD",
+      high: 8000,
+      highDate: "2024-03-14",
+      highKind: "ath",
+    });
+    const routed = await tryRouteQuery(
+      ask("si vendo KMNO en el ATH, ¿cuánto gano?"),
+      ctxWithKmno,
+      tc,
+    );
     expect(routed?.lane).toBe("template"); // determinista, no razonamiento
     expect(getMarketHighlights).toHaveBeenCalledWith("KMNO", "crypto");
     // Ganancia al ATH = 100×8000 − 500000 = 300000; caveat de techo no cronometrable.
@@ -917,11 +1182,32 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
       ...CTX,
       currency: "CRC",
       holdings: [
-        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 0.1, invested: 2_650_000, value: 3_180_000, price: 31_800_000, pl: 530_000, plPct: 0.2, currency: "USD", priceUnavailable: false },
+        {
+          symbol: "BTC",
+          name: "Bitcoin",
+          assetType: "cripto",
+          quantity: 0.1,
+          invested: 2_650_000,
+          value: 3_180_000,
+          price: 31_800_000,
+          pl: 530_000,
+          plPct: 0.2,
+          currency: "USD",
+          priceUnavailable: false,
+        },
       ],
     } as FinancialContext;
-    getMarketHighlights.mockResolvedValue({ price: 60000, currency: "USD", high: 126000, highDate: "2025-10-06", highKind: "ath" });
-    const routed = await tryRouteQuery(ask("si vendo mi BTC hoy, ¿cuánto saco?"), ctxCRC, { ...tc, currency: "CRC" });
+    getMarketHighlights.mockResolvedValue({
+      price: 60000,
+      currency: "USD",
+      high: 126000,
+      highDate: "2025-10-06",
+      highKind: "ath",
+    });
+    const routed = await tryRouteQuery(ask("si vendo mi BTC hoy, ¿cuánto saco?"), ctxCRC, {
+      ...tc,
+      currency: "CRC",
+    });
     const reply = routed?.response.reply ?? "";
     // invertido convertido: ₡2.650.000 / 530 = $5.000. Valor 0,1×60000 = $6.000. Ganancia $1.000.
     expect(reply).toContain("5.000");
@@ -940,7 +1226,16 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
 
   it("símbolo que no trae dato → motivo REAL (reintentá), no 'no tengo acceso'", () => {
     const reply = buildMarketReply(
-      { symbol: "XYZ", precio_actual: null, maximo: null, maximo_tipo: null, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: null, ganancia_al_maximo: null },
+      {
+        symbol: "XYZ",
+        precio_actual: null,
+        maximo: null,
+        maximo_tipo: null,
+        valor_actual: null,
+        ganancia_al_precio_actual: null,
+        valor_al_maximo: null,
+        ganancia_al_maximo: null,
+      },
       "USD",
       true,
       false,
@@ -954,17 +1249,61 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
       ...CTX,
       currency: "USD",
       holdings: [
-        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 40000, value: 64000, price: 64000, pl: 24000, plPct: 0.6, currency: "USD", priceUnavailable: false },
-        { symbol: "JUP", name: "Jupiter", assetType: "cripto", quantity: 1000, invested: 500, value: 500, price: 0.5, pl: 0, plPct: 0, currency: "USD", priceUnavailable: false },
-        { symbol: "ETH", name: "Ethereum", assetType: "cripto", quantity: 2, invested: 3000, value: 6000, price: 3000, pl: 3000, plPct: 1, currency: "USD", priceUnavailable: false },
+        {
+          symbol: "BTC",
+          name: "Bitcoin",
+          assetType: "cripto",
+          quantity: 1,
+          invested: 40000,
+          value: 64000,
+          price: 64000,
+          pl: 24000,
+          plPct: 0.6,
+          currency: "USD",
+          priceUnavailable: false,
+        },
+        {
+          symbol: "JUP",
+          name: "Jupiter",
+          assetType: "cripto",
+          quantity: 1000,
+          invested: 500,
+          value: 500,
+          price: 0.5,
+          pl: 0,
+          plPct: 0,
+          currency: "USD",
+          priceUnavailable: false,
+        },
+        {
+          symbol: "ETH",
+          name: "Ethereum",
+          assetType: "cripto",
+          quantity: 2,
+          invested: 3000,
+          value: 6000,
+          price: 3000,
+          pl: 3000,
+          plPct: 1,
+          currency: "USD",
+          priceUnavailable: false,
+        },
       ],
     } as FinancialContext;
     const highs: Record<string, number> = { BTC: 126000, JUP: 2, ETH: 4800 };
     getMarketHighlights.mockImplementation(async (symbol: string) => ({
-      price: 1, currency: "USD", high: highs[symbol] ?? null, highDate: "2024-01-31", highKind: "ath",
+      price: 1,
+      currency: "USD",
+      high: highs[symbol] ?? null,
+      highDate: "2024-01-31",
+      highKind: "ath",
     }));
 
-    const routed = await tryRouteQuery(ask("cuánto genero si vendo todos los altcoins a 90% de su ATH"), ctxAlt, tc);
+    const routed = await tryRouteQuery(
+      ask("cuánto genero si vendo todos los altcoins a 90% de su ATH"),
+      ctxAlt,
+      tc,
+    );
     expect(routed?.lane).toBe("template");
     expect(routed?.tokensIn).toBe(0);
     expect(liteChat).not.toHaveBeenCalled(); // NO pasó por el LLM
@@ -986,12 +1325,40 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
       ...CTX,
       currency: "USD",
       holdings: [
-        { symbol: "JUP", name: "Jupiter", assetType: "cripto", quantity: 1000, invested: 500, value: 500, price: 0.5, pl: 0, plPct: 0, currency: "USD", priceUnavailable: false },
-        { symbol: "ZZZ", name: "Zzz", assetType: "cripto", quantity: 10, invested: 100, value: 100, price: 5, pl: 0, plPct: 0, currency: "USD", priceUnavailable: false },
+        {
+          symbol: "JUP",
+          name: "Jupiter",
+          assetType: "cripto",
+          quantity: 1000,
+          invested: 500,
+          value: 500,
+          price: 0.5,
+          pl: 0,
+          plPct: 0,
+          currency: "USD",
+          priceUnavailable: false,
+        },
+        {
+          symbol: "ZZZ",
+          name: "Zzz",
+          assetType: "cripto",
+          quantity: 10,
+          invested: 100,
+          value: 100,
+          price: 5,
+          pl: 0,
+          plPct: 0,
+          currency: "USD",
+          priceUnavailable: false,
+        },
       ],
     } as FinancialContext;
     getMarketHighlights.mockImplementation(async (symbol: string) => ({
-      price: 1, currency: "USD", high: symbol === "JUP" ? 2 : null, highDate: "2024-01-31", highKind: "ath",
+      price: 1,
+      currency: "USD",
+      high: symbol === "JUP" ? 2 : null,
+      highDate: "2024-01-31",
+      highKind: "ath",
     }));
 
     const routed = await tryRouteQuery(ask("vender todos mis altcoins al 90% del ATH"), ctxAlt, tc);
@@ -1003,7 +1370,16 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
 
   it("acción/ETF: el máximo se presenta como 52 semanas, no como ATH", () => {
     const reply = buildMarketReply(
-      { symbol: "VOO", precio_actual: 500, maximo: 560, maximo_tipo: "52_semanas", valor_actual: 15000, ganancia_al_precio_actual: 5000, valor_al_maximo: 16800, ganancia_al_maximo: 6800 },
+      {
+        symbol: "VOO",
+        precio_actual: 500,
+        maximo: 560,
+        maximo_tipo: "52_semanas",
+        valor_actual: 15000,
+        ganancia_al_precio_actual: 5000,
+        valor_al_maximo: 16800,
+        ganancia_al_maximo: 6800,
+      },
       "USD",
       true,
       true,
@@ -1016,7 +1392,18 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     // 0,15 BTC, ATH $126.080 → valor al ATH 0,15×126.080. Sin invertido (undefined) no debe aparecer
     // "invertiste" ni "ganancia" (el bug era CRC-como-$ con ganancia absurda −$2,7M).
     const reply = buildMarketReply(
-      { symbol: "BTC", precio_actual: 126080, maximo: 126080, maximo_tipo: "ath", cantidad: 0.15, invertido: null, valor_actual: 18912, ganancia_al_precio_actual: null, valor_al_maximo: 18912, ganancia_al_maximo: null },
+      {
+        symbol: "BTC",
+        precio_actual: 126080,
+        maximo: 126080,
+        maximo_tipo: "ath",
+        cantidad: 0.15,
+        invertido: null,
+        valor_actual: 18912,
+        ganancia_al_precio_actual: null,
+        valor_al_maximo: 18912,
+        ganancia_al_maximo: null,
+      },
       "USD",
       true,
       true,
@@ -1030,7 +1417,16 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
   it("cripto sub-$1: el ATH/precio NO se muestra como '$0' (bug del formatMoney fiat 0 dec)", () => {
     // KMNO ~ $0,2478: con formatMoney(USD) salía "$0" y parecía "sin dato".
     const reply = buildMarketReply(
-      { symbol: "KMNO", precio_actual: 0.24, maximo: 0.2478, maximo_tipo: "ath", valor_actual: 2400, ganancia_al_precio_actual: 400, valor_al_maximo: 2478, ganancia_al_maximo: 478 },
+      {
+        symbol: "KMNO",
+        precio_actual: 0.24,
+        maximo: 0.2478,
+        maximo_tipo: "ath",
+        valor_actual: 2400,
+        ganancia_al_precio_actual: 400,
+        valor_al_maximo: 2478,
+        ganancia_al_maximo: 478,
+      },
       "USD",
       true,
       true,
@@ -1044,13 +1440,42 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
     const ctxSinJup = {
       ...CTX,
       currency: "USD",
-      holdings: [{ symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 40000, value: 64000, price: 64000, pl: 24000, plPct: 0.6, currency: "USD", priceUnavailable: false }],
+      holdings: [
+        {
+          symbol: "BTC",
+          name: "Bitcoin",
+          assetType: "cripto",
+          quantity: 1,
+          invested: 40000,
+          value: 64000,
+          price: 64000,
+          pl: 24000,
+          plPct: 0.6,
+          currency: "USD",
+          priceUnavailable: false,
+        },
+      ],
     } as FinancialContext;
     // Precio $0 (basura) + ATH real $2. La posición completa: 1.250 JUP, invertido $500.
-    getMarketHighlights.mockResolvedValue({ price: 0, currency: "USD", high: 2, highDate: "2024-01-31", highKind: "ath" });
-    getPositionForSymbol.mockResolvedValue({ quantity: 1250, invested: 500, currency: "USD", assetType: "cripto" });
+    getMarketHighlights.mockResolvedValue({
+      price: 0,
+      currency: "USD",
+      high: 2,
+      highDate: "2024-01-31",
+      highKind: "ath",
+    });
+    getPositionForSymbol.mockResolvedValue({
+      quantity: 1250,
+      invested: 500,
+      currency: "USD",
+      assetType: "cripto",
+    });
 
-    const routed = await tryRouteQuery(ask("si vendo todo mi JUP al ATH, ¿cuánto gano?"), ctxSinJup, tc);
+    const routed = await tryRouteQuery(
+      ask("si vendo todo mi JUP al ATH, ¿cuánto gano?"),
+      ctxSinJup,
+      tc,
+    );
     const reply = routed?.response.reply ?? "";
 
     expect(getPositionForSymbol).toHaveBeenCalledWith("JUP"); // buscó la posición COMPLETA
@@ -1068,7 +1493,19 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
   it("precio ≤0 no imprime '$0' ni bloquea el escenario al ATH (buildMarketReply puro)", () => {
     // precio_actual null (ya saneado aguas arriba desde 0), ATH presente, con posición.
     const reply = buildMarketReply(
-      { symbol: "JUP", precio_actual: null, maximo: 2, maximo_tipo: "ath", maximo_fecha: "2024-01-31", cantidad: 1250, invertido: 500, valor_actual: null, ganancia_al_precio_actual: null, valor_al_maximo: 2500, ganancia_al_maximo: 2000 },
+      {
+        symbol: "JUP",
+        precio_actual: null,
+        maximo: 2,
+        maximo_tipo: "ath",
+        maximo_fecha: "2024-01-31",
+        cantidad: 1250,
+        invertido: 500,
+        valor_actual: null,
+        ganancia_al_precio_actual: null,
+        valor_al_maximo: 2500,
+        ganancia_al_maximo: 2000,
+      },
       "USD",
       true,
       true,
@@ -1093,7 +1530,16 @@ describe("datos_mercado · carril determinista de precio/ATH (no depende del LLM
 
   it("buildMarketReply anexa la nota de frescura cuando el precio es guardado, no en vivo", () => {
     const reply = buildMarketReply(
-      { symbol: "KMNO", precio_actual: 0.018, maximo: 0.2478, maximo_tipo: "ath", valor_actual: 180, ganancia_al_precio_actual: 80, valor_al_maximo: 2478, ganancia_al_maximo: 2378 },
+      {
+        symbol: "KMNO",
+        precio_actual: 0.018,
+        maximo: 0.2478,
+        maximo_tipo: "ath",
+        valor_actual: 180,
+        ganancia_al_precio_actual: 80,
+        valor_al_maximo: 2478,
+        ganancia_al_maximo: 2378,
+      },
       "USD",
       true,
       true,
@@ -1128,14 +1574,30 @@ describe("informe_inversion · carril deep", () => {
     // Un "análisis" sin portafolio no es un informe de portafolio.
     expect(matchIntent("hacé un análisis de BTC")?.intent).not.toBe("informe_inversion");
     // Escenario de venta: sigue siendo mercado, no informe.
-    expect(matchIntent("si vendo todas mis inversiones al ATH, ¿cuánto gano?")?.intent).toBe("datos_mercado");
+    expect(matchIntent("si vendo todas mis inversiones al ATH, ¿cuánto gano?")?.intent).toBe(
+      "datos_mercado",
+    );
   });
 
   it("resuelve por PLANTILLA con lane 'deep' y cero tokens", async () => {
     const ctx = {
       currency: "USD",
       holdings: [
-        { symbol: "BTC", name: "Bitcoin", assetType: "cripto", quantity: 1, invested: 20_000, value: 30_000, price: 30_000, pl: 10_000, plPct: 0.5, currency: "USD", monedaFila: "USD", valorPrimario: 30_000, priceUnavailable: false },
+        {
+          symbol: "BTC",
+          name: "Bitcoin",
+          assetType: "cripto",
+          quantity: 1,
+          invested: 20_000,
+          value: 30_000,
+          price: 30_000,
+          pl: 10_000,
+          plPct: 0.5,
+          currency: "USD",
+          monedaFila: "USD",
+          valorPrimario: 30_000,
+          priceUnavailable: false,
+        },
       ],
       investmentValue: [{ monto: 30_000, moneda: "USD" }],
       investmentInvested: [{ monto: 20_000, moneda: "USD" }],
@@ -1163,9 +1625,33 @@ describe("informe_inversion · carril deep", () => {
 describe("carriles con moneda nativa · blindaje", () => {
   it("ultimos_movimientos: cada transacción con SU moneda, CRC y USD en la misma respuesta", async () => {
     listTransactions.mockResolvedValue([
-      { id: "t1", occurredOn: "2026-07-20", merchantOrSource: "Automercado", description: null, kind: "gasto", amount: 45_000, currency: "CRC" },
-      { id: "t2", occurredOn: "2026-07-19", merchantOrSource: "Netflix", description: null, kind: "gasto", amount: 12, currency: "USD" },
-      { id: "t3", occurredOn: "2026-07-18", merchantOrSource: "Salario", description: null, kind: "ingreso", amount: 1_200_000, currency: "CRC" },
+      {
+        id: "t1",
+        occurredOn: "2026-07-20",
+        merchantOrSource: "Automercado",
+        description: null,
+        kind: "gasto",
+        amount: 45_000,
+        currency: "CRC",
+      },
+      {
+        id: "t2",
+        occurredOn: "2026-07-19",
+        merchantOrSource: "Netflix",
+        description: null,
+        kind: "gasto",
+        amount: 12,
+        currency: "USD",
+      },
+      {
+        id: "t3",
+        occurredOn: "2026-07-18",
+        merchantOrSource: "Salario",
+        description: null,
+        kind: "ingreso",
+        amount: 1_200_000,
+        currency: "CRC",
+      },
     ]);
     const routed = await tryRouteQuery(ask("mostrame mis últimos movimientos"), CTX, tc);
     const reply = routed?.response.reply ?? "";
@@ -1179,8 +1665,18 @@ describe("carriles con moneda nativa · blindaje", () => {
 
   it("saldo_sobre usa la moneda del SOBRE, no la de display del toolContext", async () => {
     // tc.currency es USD en este archivo; el sobre viene en CRC → manda el sobre.
-    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-super", categoryPath: "Necesidades › Super" });
-    getSobreRemaining.mockResolvedValue({ path: "Necesidades › Super", currency: "CRC", budget: 320_000, spent: 120_000, remaining: 200_000, hasBudget: true });
+    suggestSobreForChatFast.mockResolvedValue({
+      categoryId: "c-super",
+      categoryPath: "Necesidades › Super",
+    });
+    getSobreRemaining.mockResolvedValue({
+      path: "Necesidades › Super",
+      currency: "CRC",
+      budget: 320_000,
+      spent: 120_000,
+      remaining: 200_000,
+      hasBudget: true,
+    });
     const routed = await tryRouteQuery(ask("¿cuánto me queda de supermercados?"), CTX, tc);
     const reply = routed?.response.reply ?? "";
 
@@ -1189,8 +1685,18 @@ describe("carriles con moneda nativa · blindaje", () => {
   });
 
   it("puedo_gastar compara contra el restante en la moneda del sobre", async () => {
-    suggestSobreForChatFast.mockResolvedValue({ categoryId: "c-res", categoryPath: "Estilo › Restaurantes" });
-    getSobreRemaining.mockResolvedValue({ path: "Estilo › Restaurantes", currency: "CRC", budget: 120_000, spent: 90_000, remaining: 30_000, hasBudget: true });
+    suggestSobreForChatFast.mockResolvedValue({
+      categoryId: "c-res",
+      categoryPath: "Estilo › Restaurantes",
+    });
+    getSobreRemaining.mockResolvedValue({
+      path: "Estilo › Restaurantes",
+      currency: "CRC",
+      budget: 120_000,
+      spent: 90_000,
+      remaining: 30_000,
+      hasBudget: true,
+    });
     const routed = await tryRouteQuery(ask("¿me puedo comprar un almuerzo de ₡8.000?"), CTX, tc);
     const reply = routed?.response.reply ?? "";
 
