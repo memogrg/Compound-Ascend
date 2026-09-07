@@ -704,6 +704,15 @@ export type InvestmentHoldingRow = Timestamps &
     payout_frequency: string | null;
     payout_withholding_pct: number;
     payout_next_date: string | null;
+    // Notas estructuradas (migración 20260907000002).
+    note_issuer: string | null;
+    note_underlying: string | null;
+    note_capital_protection_pct: number | null;
+    note_barrier_pct: number | null;
+    note_autocall: boolean;
+    note_autocall_date: string | null;
+    note_participation_pct: number | null;
+    note_isin: string | null;
     // Inmueble de renta: costos operativos para ROI (migración 20260628000002).
     purchase_price: number | null;
     closing_costs: number | null;

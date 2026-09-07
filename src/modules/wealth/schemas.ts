@@ -72,6 +72,7 @@ const ASSET_TYPE_ENUM = [
   "commodity",
   "arte",
   "nft",
+  "nota_estructurada",
   "otro",
 ] as const;
 

@@ -108,6 +108,7 @@ export function categoryFromAssetType(assetType: AssetType): InvestmentCategory 
     commodity: "alternativo",
     arte: "alternativo",
     nft: "cripto",
+    nota_estructurada: "nota_estructurada",
     otro: "alternativo",
   };
   return map[assetType] ?? "alternativo";

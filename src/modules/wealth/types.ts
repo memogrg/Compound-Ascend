@@ -13,6 +13,7 @@ export type AssetType =
   | "commodity"
   | "arte"
   | "nft"
+  | "nota_estructurada"
   | "otro";
 
 /** Taxonomía de inversiones (PLAN §2.1): 2 naturalezas × 20 categorías.
@@ -40,6 +41,7 @@ export const INVESTMENT_CATEGORIES = [
   "compra_negocio",
   "cripto",
   "alternativo",
+  "nota_estructurada",
   "plan_inversion",
 ] as const;
 
@@ -238,6 +240,15 @@ export type Holding = {
   payoutFrequency?: string | null;
   payoutWithholdingPct?: number;
   payoutNextDate?: string | null;
+  // ── Nota estructurada ──
+  noteIssuer?: string | null;
+  noteUnderlying?: string | null;
+  noteCapitalProtectionPct?: number | null;
+  noteBarrierPct?: number | null;
+  noteAutocall?: boolean;
+  noteAutocallDate?: string | null;
+  noteParticipationPct?: number | null;
+  noteIsin?: string | null;
   /** Aporte mensual del recurrente, separado del total invertido (migración 20260623000001). */
   monthlyContribution?: number | null;
 };

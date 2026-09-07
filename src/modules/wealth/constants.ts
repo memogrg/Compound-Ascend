@@ -155,6 +155,15 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
     defaultAssetType: "cripto",
     quoted: true,
   },
+  nota_estructurada: {
+    nature: "growth",
+    label: "Notas estructuradas",
+    icon: "invest",
+    // NO cotiza: su valor lo pone el usuario (o el estado de cuenta del emisor),
+    // así que hereda el aviso de "valuada por vos" que ya existe.
+    defaultAssetType: "nota_estructurada",
+    quoted: false,
+  },
   alternativo: {
     nature: "growth",
     label: "Activos alternativos",
