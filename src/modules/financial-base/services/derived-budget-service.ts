@@ -25,6 +25,9 @@ import {
   type ExistingDerived,
 } from "@/modules/financial-base/engine/derived-budget";
 import { getSystemCategoryId } from "@/modules/financial-base/services/linked-transaction-service";
+// Motor compartido: vive en `lib/finance` justamente para que financial-base
+// pueda usarlo sin importar de wealth (la dirección es wealth → financial-base).
+import { calcularRendimiento, esFrecuenciaPago } from "@/lib/finance/rendimiento-periodico";
 import type { Period } from "@/modules/financial-base/types";
 
 const POLICY_LABEL: Record<string, string> = {
@@ -133,34 +136,98 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     });
   }
 
-  // Dividendos: promedio mensual de lo recibido en 12 meses, por posición.
+  // ── Dividendos ──────────────────────────────────────────────────────────
+  // Dos fuentes, y la CONFIG manda sobre el historial:
+  //
+  //  · Si el holding tiene dividendos configurados (`pays_dividends`), la
+  //    proyección sale de esa config, con el monto NETO de retención. Es lo que
+  //    el usuario declaró que va a cobrar, y está disponible desde el primer día
+  //    — sin esperar 12 meses de historial.
+  //  · Si no, se conserva el comportamiento previo: promedio de lo REALMENTE
+  //    recibido en 12 meses. Es el único dato que hay para una posición que paga
+  //    dividendos sin haberlos configurado.
+  //
+  // Una sola línea por holding en cualquiera de los dos casos: el diff de
+  // `diffDerived` la inserta, la actualiza al editar y la borra si el holding
+  // deja de pagar. No hace falta ciclo de vida propio.
   const divByHolding = new Map<string, { total: number; currency: string }>();
   for (const dv of divs.data ?? []) {
     const acc = divByHolding.get(dv.holding_id) ?? { total: 0, currency: dv.currency };
     acc.total += Number(dv.amount);
     divByHolding.set(dv.holding_id, acc);
   }
-  if (divByHolding.size > 0) {
-    const ids = [...divByHolding.keys()];
-    const { data: holdings } = await supabase
-      .from("investment_holdings")
-      .select("id,label,symbol")
-      .eq("user_id", user.id)
-      .in("id", ids);
-    const nameById = new Map((holdings ?? []).map((h) => [h.id, h.label ?? h.symbol]));
-    for (const [holdingId, acc] of divByHolding) {
-      const monthly = Math.round((acc.total / 12) * 100) / 100;
-      if (monthly <= 0) continue;
-      desired.push({
-        type: "income",
-        name: `Dividendos — ${nameById.get(holdingId) ?? "posición"}`,
-        amount: monthly,
-        currency: acc.currency,
-        categoryId: null,
-        sourceKind: "dividend",
-        sourceId: holdingId,
-      });
+
+  // Dos consultas y no un `.or(...)` con ids interpolados: ese `.or` rompe la
+  // inferencia del cliente tipado (devuelve GenericStringError) y obligaría a
+  // castear la fila entera, justo donde se leen siete columnas nuevas.
+  // El literal va INLINE en cada select, no en una const: el cliente tipado sólo
+  // infiere la forma de la fila desde un string literal — con una variable
+  // devuelve GenericStringError y habría que castear la fila entera, justo donde
+  // se leen siete columnas nuevas.
+  //
+  // Y son dos consultas, no un `.or(...)` con ids interpolados, por lo mismo.
+  const idsConHistorial = [...divByHolding.keys()];
+  const configurados = await supabase
+    .from("investment_holdings")
+    .select(
+      "id,label,symbol,currency,quantity,average_cost,current_value_manual,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct",
+    )
+    .eq("user_id", user.id)
+    .eq("pays_dividends", true);
+  const conHistorial =
+    idsConHistorial.length > 0
+      ? await supabase
+          .from("investment_holdings")
+          .select(
+            "id,label,symbol,currency,quantity,average_cost,current_value_manual,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct",
+          )
+          .eq("user_id", user.id)
+          .in("id", idsConHistorial)
+      : { data: null };
+  // Unión por id: un holding configurado que ADEMÁS tiene historial aparece en
+  // las dos y no puede generar dos líneas.
+  const divHoldings = new Map<string, NonNullable<typeof configurados.data>[number]>();
+  for (const h of configurados.data ?? []) divHoldings.set(h.id, h);
+  for (const h of conHistorial.data ?? []) if (!divHoldings.has(h.id)) divHoldings.set(h.id, h);
+
+  for (const h of divHoldings.values()) {
+    const nombre = h.label ?? h.symbol ?? "posición";
+    let monthly = 0;
+    let currency = h.currency;
+
+    if (h.pays_dividends && esFrecuenciaPago(h.dividend_frequency)) {
+      // Base del yield: el valor manual si lo hay, si no lo invertido. El valor
+      // de MERCADO no se usa acá a propósito — esto corre en cada carga y no
+      // puede depender de una llamada de precios que puede fallar o tardar.
+      const invertido = Number(h.quantity ?? 0) * Number(h.average_cost ?? 0);
+      const base = Number(h.current_value_manual ?? 0) || invertido;
+      monthly = calcularRendimiento(
+        {
+          modo: (h.dividend_mode as "yield" | "manual") ?? "yield",
+          yieldPct: h.dividend_yield_pct,
+          montoPorPago: h.dividend_amount,
+          frecuencia: h.dividend_frequency,
+          retencionPct: h.dividend_withholding_pct,
+        },
+        base,
+      ).netoMensual;
+    } else {
+      const acc = divByHolding.get(h.id);
+      if (!acc) continue;
+      monthly = Math.round((acc.total / 12) * 100) / 100;
+      currency = acc.currency;
     }
+
+    if (monthly <= 0) continue;
+    desired.push({
+      type: "income",
+      name: `Dividendos — ${nombre}`,
+      amount: monthly,
+      currency,
+      categoryId: null,
+      sourceKind: "dividend",
+      sourceId: h.id,
+    });
   }
 
   // Renta de inversiones de flujo de caja (Airbnb/alquiler/CDP/bono/negocio…):

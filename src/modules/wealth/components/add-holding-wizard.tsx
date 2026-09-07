@@ -15,6 +15,14 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import { formatMoney, currencySymbol, captureCurrencyDefault } from "@/lib/format";
+// Motor compartido (`lib/finance`): el MISMO cálculo que usa la proyección de
+// ingreso pasivo, para que la vista previa no diga un número y el flujo otro.
+import {
+  calcularRendimiento,
+  esFrecuenciaPago,
+  textoRendimiento,
+  FRECUENCIAS_PAGO,
+} from "@/lib/finance/rendimiento-periodico";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
@@ -39,6 +47,13 @@ import {
 import type { AssetType, Holding, InvestmentCategory } from "@/modules/wealth/types";
 
 // ── Constantes UI ──────────────────────────────────────────────────
+
+/** Etiquetas de la frecuencia de pago. El VALOR es 'bimensual' (la grafía de
+ *  monthlyize); la etiqueta desambigua, igual que en los ingresos (#740). */
+const FRECUENCIAS_DIVIDENDO: { value: string; label: string }[] = FRECUENCIAS_PAGO.map((f) => ({
+  value: f,
+  label: f === "bimensual" ? "Cada 2 meses (bimestral)" : f.charAt(0).toUpperCase() + f.slice(1),
+}));
 
 const REGIONS: { value: string; label: string }[] = [
   { value: "us", label: "US" },
@@ -260,6 +275,26 @@ export function AddHoldingModal({
     captureCurrencyDefault(undefined, prefill?.currency, captureCurrency),
   );
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
+  // ── Dividendos (acciones/ETF) ──
+  const [pagaDividendos, setPagaDividendos] = useState(prefill?.paysDividends ?? false);
+  const [dividendoModo, setDividendoModo] = useState<"yield" | "manual">(
+    (prefill?.dividendMode as "yield" | "manual") ?? "yield",
+  );
+  const [dividendoYieldPct, setDividendoYieldPct] = useState(
+    prefill?.dividendYieldPct != null ? String(prefill.dividendYieldPct) : "",
+  );
+  const [dividendoMonto, setDividendoMonto] = useState(
+    prefill?.dividendAmount != null ? String(prefill.dividendAmount) : "",
+  );
+  const [dividendoFrecuencia, setDividendoFrecuencia] = useState(
+    prefill?.dividendFrequency ?? "trimestral",
+  );
+  const [dividendoRetencionPct, setDividendoRetencionPct] = useState(
+    prefill?.dividendWithholdingPct ? String(prefill.dividendWithholdingPct) : "",
+  );
+  const [dividendoProximaFecha, setDividendoProximaFecha] = useState(
+    prefill?.dividendNextDate ?? "",
+  );
   // Aporte mensual: separado del total invertido; persiste en monthly_contribution.
   const [aporteMensual, setAporteMensual] = useState(
     prefill?.monthlyContribution != null ? String(prefill.monthlyContribution) : "",
@@ -428,6 +463,13 @@ export function AddHoldingModal({
       region,
       aportoCadaMes,
       aporteMensual,
+      pagaDividendos,
+      dividendoModo,
+      dividendoYieldPct,
+      dividendoMonto,
+      dividendoFrecuencia,
+      dividendoRetencionPct,
+      dividendoProximaFecha,
       registerExpense,
     };
   }
@@ -482,6 +524,20 @@ export function AddHoldingModal({
             onInvested={setInvested}
             onCurrency={setCur}
             aportoCadaMes={aportoCadaMes}
+            pagaDividendos={pagaDividendos}
+            onPagaDividendos={setPagaDividendos}
+            dividendoModo={dividendoModo}
+            onDividendoModo={setDividendoModo}
+            dividendoYieldPct={dividendoYieldPct}
+            onDividendoYieldPct={setDividendoYieldPct}
+            dividendoMonto={dividendoMonto}
+            onDividendoMonto={setDividendoMonto}
+            dividendoFrecuencia={dividendoFrecuencia}
+            onDividendoFrecuencia={setDividendoFrecuencia}
+            dividendoRetencionPct={dividendoRetencionPct}
+            onDividendoRetencionPct={setDividendoRetencionPct}
+            dividendoProximaFecha={dividendoProximaFecha}
+            onDividendoProximaFecha={setDividendoProximaFecha}
             onAportoCadaMes={setAportoCadaMes}
             aporteMensual={aporteMensual}
             onAporteMensual={setAporteMensual}
@@ -666,6 +722,20 @@ function Step2Fields(props: {
   onCurrency: (v: string) => void;
   aportoCadaMes: boolean;
   onAportoCadaMes: (v: boolean) => void;
+  pagaDividendos: boolean;
+  onPagaDividendos: (v: boolean) => void;
+  dividendoModo: "yield" | "manual";
+  onDividendoModo: (v: "yield" | "manual") => void;
+  dividendoYieldPct: string;
+  onDividendoYieldPct: (v: string) => void;
+  dividendoMonto: string;
+  onDividendoMonto: (v: string) => void;
+  dividendoFrecuencia: string;
+  onDividendoFrecuencia: (v: string) => void;
+  dividendoRetencionPct: string;
+  onDividendoRetencionPct: (v: string) => void;
+  dividendoProximaFecha: string;
+  onDividendoProximaFecha: (v: string) => void;
   aporteMensual: string;
   onAporteMensual: (v: string) => void;
   symbol: string;
@@ -709,6 +779,31 @@ function Step2Fields(props: {
   isEdit: boolean;
 }) {
   const { profile, cur } = props;
+  // El tipo de activo sale de la categoría (CATEGORY_META), no de una prop
+  // nueva: la categoría ya es la fuente única de esa relación.
+  const tipoActivo = props.category ? CATEGORY_META[props.category].defaultAssetType : null;
+
+  // Vista previa del dividendo. El cálculo viene del motor compartido
+  // (`lib/finance`) — el MISMO que usa la proyección de ingreso pasivo, así que
+  // lo que el usuario ve acá es exactamente lo que va a entrar en su flujo.
+  // Base: el valor manual si lo cargó, si no lo invertido.
+  const vistaPreviaDividendo = (() => {
+    if (!props.pagaDividendos || !esFrecuenciaPago(props.dividendoFrecuencia)) return null;
+    const base = parseFloat(props.currentValue) || parseFloat(props.invested) || 0;
+    const retencion = parseFloat(props.dividendoRetencionPct) || 0;
+    const r = calcularRendimiento(
+      {
+        modo: props.dividendoModo,
+        yieldPct: parseFloat(props.dividendoYieldPct) || 0,
+        montoPorPago: parseFloat(props.dividendoMonto) || 0,
+        frecuencia: props.dividendoFrecuencia,
+        retencionPct: retencion,
+      },
+      base,
+    );
+    return textoRendimiento(r, retencion, (n) => formatMoney(n, cur));
+  })();
+
   return (
     <div>
       {/* Nombre */}
@@ -1110,6 +1205,145 @@ function Step2Fields(props: {
             />
           </div>
         </div>
+      ) : null}
+
+      {/* Dividendos · solo acciones y ETF (los que reparten). El cálculo y la
+          vista previa salen del motor compartido, así que web y móvil dicen lo
+          mismo y la proyección de ingreso pasivo usa exactamente este número. */}
+      {tipoActivo === "accion" || tipoActivo === "etf" ? (
+        <>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 6,
+              fontSize: 12.5,
+              color: "var(--ink-2)",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={props.pagaDividendos}
+              onChange={(e) => props.onPagaDividendos(e.target.checked)}
+            />
+            ¿Paga dividendos?
+            <HelpTip text="Si esta posición reparte dividendos, configuralos acá: el ingreso entra solo en tu flujo del mes y en la cobertura de ingreso pasivo, sin que registres cada pago." />
+          </label>
+
+          {props.pagaDividendos ? (
+            <div className="fld" style={{ marginTop: 6, display: "grid", gap: 10 }}>
+              <div className="seg" role="radiogroup" aria-label="Modo de dividendo">
+                {(
+                  [
+                    ["yield", "% anual"],
+                    ["manual", "Monto por pago"],
+                  ] as const
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={props.dividendoModo === m}
+                    className={props.dividendoModo === m ? "seg-btn on" : "seg-btn"}
+                    onClick={() => props.onDividendoModo(m)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="fld-2">
+                {props.dividendoModo === "yield" ? (
+                  <div className="fld">
+                    <label className="fld-label">
+                      % anual{" "}
+                      <HelpTip text="Rendimiento anual por dividendos sobre el valor de la posición. Lo ves en tu bróker como 'dividend yield'." />
+                    </label>
+                    <div className="inp-money">
+                      <span className="pre">%</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={props.dividendoYieldPct}
+                        onChange={(e) => props.onDividendoYieldPct(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="fld">
+                    <label className="fld-label">Monto bruto por pago</label>
+                    <div className="inp-money">
+                      <span className="pre">{currencySymbol(cur)}</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={props.dividendoMonto}
+                        onChange={(e) => props.onDividendoMonto(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="fld">
+                  <label className="fld-label">Frecuencia</label>
+                  <select
+                    className="sel"
+                    value={props.dividendoFrecuencia}
+                    onChange={(e) => props.onDividendoFrecuencia(e.target.value)}
+                  >
+                    {FRECUENCIAS_DIVIDENDO.map((f) => (
+                      <option key={f.value} value={f.value}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="fld-2">
+                <div className="fld">
+                  <label className="fld-label">
+                    Retención de impuestos{" "}
+                    <HelpTip text="Muchos brókers retienen impuesto en origen sobre dividendos (por ejemplo 30% en acciones de EE. UU. para no residentes, o menos si hay tratado). Poné el % que ves en tu estado de cuenta." />
+                  </label>
+                  <div className="inp-money">
+                    <span className="pre">%</span>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="100"
+                      value={props.dividendoRetencionPct}
+                      onChange={(e) => props.onDividendoRetencionPct(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                <div className="fld">
+                  <label className="fld-label">
+                    Próximo pago{" "}
+                    <HelpTip text="Fecha del próximo dividendo. Fija el calendario: de ahí salen los siguientes según la frecuencia." />
+                  </label>
+                  <input
+                    className="inp"
+                    type="date"
+                    value={props.dividendoProximaFecha}
+                    onChange={(e) => props.onDividendoProximaFecha(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {vistaPreviaDividendo ? (
+                <div style={{ fontSize: 12.5, color: "var(--info)" }}>{vistaPreviaDividendo}</div>
+              ) : null}
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       {/* Común final · región */}
