@@ -27,6 +27,7 @@ import {
 import { CATEGORY_META, CASHFLOW_CATEGORIES, GROWTH_CATEGORIES } from "@/modules/wealth/constants";
 import { computeRentalRoi } from "@/modules/wealth/engine/rental-roi";
 import {
+  DIVIDENDO_VACIO,
   buildHoldingPayload,
   categoryFromAssetType,
   profileForCategory,
@@ -265,6 +266,7 @@ export function HoldingWizardSheet({
       region,
       aportoCadaMes,
       aporteMensual: numStr(aporteMensual),
+      ...DIVIDENDO_VACIO,
       registerExpense,
     };
   }

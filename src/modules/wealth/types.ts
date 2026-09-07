@@ -229,6 +229,15 @@ export type Holding = {
   region?: string | null;
   /** Si el aporte mensual es real (recurrente). */
   isRecurring?: boolean;
+  // Dividendos configurados (acciones/ETF). `dividendFrequency` guarda
+  // 'bimensual', la grafía de monthlyize.
+  paysDividends?: boolean;
+  dividendMode?: "yield" | "manual" | null;
+  dividendYieldPct?: number | null;
+  dividendAmount?: number | null;
+  dividendFrequency?: string | null;
+  dividendWithholdingPct?: number;
+  dividendNextDate?: string | null;
   /** Aporte mensual del recurrente, separado del total invertido (migración 20260623000001). */
   monthlyContribution?: number | null;
 };
