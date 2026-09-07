@@ -5,9 +5,9 @@
  * portfolio_snapshots + inversiones vs-mes. Reads use ctx.db (harness plumbing) or
  * getHomeCardsData (the app read).
  *
- * #6 CHARACTERIZES a known bug (issue #655): the auto-DCA writes holding_contributions
- * but NOT investment_transactions, so recurring contributions are invisible in the
- * purchase history (UI + AI). Asserted as current behavior, flagged as discrepancy.
+ * #6 asserts the DCA purchase history (issue #655): every automatic contribution leaves
+ * its own `compra` in investment_transactions, on top of the initial purchase — that is
+ * what makes recurring contributions visible in "mis compras" (UI + AI).
  */
 import type { AuthContext } from "@/lib/auth/auth-context";
 import { getHomeCardsData } from "@/modules/dashboard/services/home-cards-service";
@@ -140,29 +140,46 @@ export async function validateInversionesVsMes(ctx: AuthContext, log: EventLog):
 }
 
 /**
- * #6 — DISCREPANCIA CONOCIDA (issue #655). El auto-DCA escribe holding_contributions
- * pero NO investment_transactions; solo la compra INICIAL (createHolding) queda en
- * investment_transactions. Se asserta el comportamiento ACTUAL: si alguien arregla el
- * bug (el auto-DCA registra la compra), investment_transactions sube a 1+aportes y este
- * check FALLA → señal para actualizarlo y cerrar el issue. No es "correcto", es
- * caracterización.
+ * #6 — HISTORIAL DE COMPRAS COMPLETO (issue #655, arreglado en 494e56d2).
+ *
+ * Este check nació caracterizando el bug: el auto-DCA escribía holding_contributions
+ * pero NO investment_transactions, así que los aportes recurrentes eran invisibles en
+ * "mis compras" (UI web y móvil) y para la IA — sólo se veía la compra inicial. El
+ * check afirmaba ese comportamiento y decía que fallaría cuando alguien lo arreglara.
+ *
+ * Ya está arreglado, así que ahora afirma lo CORRECTO: una compra por cada aporte
+ * automático, MÁS la inicial de `createHolding`. Si esto vuelve a dar 1, el auto-DCA
+ * dejó de registrar su compra y el historial volvió a mentir.
+ *
+ * El promedio del holding NO entra acá a propósito: `investment_transactions` es
+ * historial puro y no toca `average_cost` (lo cubre el validador del merge).
  */
-export async function validateInvestmentTxnDiscrepancy(
+export async function validateInvestmentTxnHistorial(
   ctx: AuthContext,
   holdingId: string,
   dcaCount: number,
   log: EventLog,
 ): Promise<void> {
   const [{ data: itx }, { data: hc }] = await Promise.all([
-    ctx.db.from("investment_transactions").select("id").eq("user_id", ctx.userId).eq("holding_id", holdingId),
-    ctx.db.from("holding_contributions").select("id").eq("user_id", ctx.userId).eq("holding_id", holdingId),
+    ctx.db
+      .from("investment_transactions")
+      .select("id,tx_type")
+      .eq("user_id", ctx.userId)
+      .eq("holding_id", holdingId),
+    ctx.db
+      .from("holding_contributions")
+      .select("id")
+      .eq("user_id", ctx.userId)
+      .eq("holding_id", holdingId),
   ]);
-  const itxCount = (itx ?? []).length;
+  const compras = (itx ?? []).filter((t) => t.tx_type === "compra").length;
   const hcCount = (hc ?? []).length;
+  // 1 = la compra inicial de createHolding; dcaCount = un aporte automático por mes.
+  const esperado = 1 + dcaCount;
   push(
     log,
-    "dca · DISCREPANCIA CONOCIDA #655: el auto-DCA NO escribe investment_transactions (solo la compra inicial)",
-    itxCount === 1 && hcCount === dcaCount,
-    `investment_transactions=${itxCount} (esperado 1=inicial) · holding_contributions=${hcCount} (=${dcaCount} aportes auto invisibles en el historial)`,
+    "dca · #655: cada aporte automático deja su compra en investment_transactions",
+    compras === esperado && hcCount === dcaCount,
+    `compras=${compras} (esperado ${esperado} = 1 inicial + ${dcaCount} aportes) · holding_contributions=${hcCount}`,
   );
 }
