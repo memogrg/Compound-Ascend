@@ -45,6 +45,14 @@ export const DIVIDENDO_VACIO = {
   dividendoFrecuencia: "trimestral",
   dividendoRetencionPct: "",
   dividendoProximaFecha: "",
+  notaEmisor: "",
+  notaSubyacente: "",
+  notaProteccion: "",
+  notaBarrera: "",
+  notaAutocall: false,
+  notaAutocallFecha: "",
+  notaParticipacion: "",
+  notaIsin: "",
 };
 
 export type HoldingFormValues = {
@@ -82,6 +90,15 @@ export type HoldingFormValues = {
   dividendoFrecuencia: string;
   dividendoRetencionPct: string;
   dividendoProximaFecha: string;
+  // ── Nota estructurada ──
+  notaEmisor: string;
+  notaSubyacente: string;
+  notaProteccion: string;
+  notaBarrera: string;
+  notaAutocall: boolean;
+  notaAutocallFecha: string;
+  notaParticipacion: string;
+  notaIsin: string;
   aporteMensual: string;
   registerExpense: boolean;
 };
@@ -182,6 +199,7 @@ export function buildHoldingPayload(v: HoldingFormValues): HoldingInput {
     isRecurring: v.aportoCadaMes,
     monthlyContribution: v.aportoCadaMes ? parseFloat(v.aporteMensual) || undefined : undefined,
     ...dividendoPayload(v),
+    ...notaPayloadForm(v),
     registerExpense: v.registerExpense,
     // Fecha capturada tz-aware por el form (useCaptureToday → captureToday(tz)); NUNCA el reloj
     // UTC del server, que a la noche en zonas negativas (p.ej. UTC-6) ya es "mañana" → fecharía la
@@ -255,5 +273,29 @@ function dividendoPayload(v: HoldingFormValues) {
       : "trimestral") as HoldingInput["payoutFrequency"],
     payoutWithholdingPct: num(v.dividendoRetencionPct) ?? 0,
     payoutNextDate: v.dividendoProximaFecha || undefined,
+  };
+}
+
+/**
+ * Términos de la nota → entrada del holding. Sólo viajan si el activo ES una
+ * nota; el servicio limpia las columnas en cualquier otro tipo, así que mandar
+ * basura acá no ensuciaría la BD, pero tampoco tiene sentido.
+ */
+function notaPayloadForm(v: HoldingFormValues) {
+  const meta = CATEGORY_META[v.category];
+  if (meta.defaultAssetType !== "nota_estructurada") return {};
+  const num = (s: string) => {
+    const n = parseFloat(s);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
+  return {
+    noteIssuer: v.notaEmisor.trim() || undefined,
+    noteUnderlying: v.notaSubyacente.trim() || undefined,
+    noteCapitalProtectionPct: num(v.notaProteccion),
+    noteBarrierPct: num(v.notaBarrera),
+    noteAutocall: v.notaAutocall,
+    noteAutocallDate: v.notaAutocall ? v.notaAutocallFecha || undefined : undefined,
+    noteParticipationPct: num(v.notaParticipacion),
+    noteIsin: v.notaIsin.trim() || undefined,
   };
 }

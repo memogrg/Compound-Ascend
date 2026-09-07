@@ -19,6 +19,11 @@
  */
 import { calcularRendimiento, esFrecuenciaPago } from "@/lib/finance/rendimiento-periodico";
 import type { DetectedInsight } from "@/lib/insights/types";
+// `constants` es la única ruta que el lint permite importar entre módulos, y es
+// justamente donde vive la etiqueta del pago por tipo de activo: acá NO se
+// decide si se dice "dividendo" o "cupón".
+import { etiquetaPayout } from "@/modules/wealth/constants";
+import type { AssetType } from "@/modules/wealth/types";
 
 export type HoldingConDividendo = {
   id: string;
@@ -34,8 +39,10 @@ export type HoldingConDividendo = {
   payoutWithholdingPct: number | null;
   /** Ancla del próximo pago (YYYY-MM-DD). */
   payoutNextDate: string | null;
-  /** Fecha del último dividendo YA registrado para esta posición, si hay. */
+  /** Fecha del último pago YA registrado para esta posición, si hay. */
   ultimoPagoRegistrado?: string | null;
+  /** Define cómo se llama el pago: dividendo, cupón, interés… */
+  assetType?: AssetType | null;
 };
 
 /**
@@ -75,10 +82,12 @@ export function detectDividendosPorCobrar(
         ? ` (${redondear(r.brutoPorPago)} brutos menos ${redondear(r.retenidoPorPago)} de impuestos)`
         : "";
 
+    const etiqueta = etiquetaPayout(h.assetType).singular;
+
     out.push({
       kind: "dividendo_por_cobrar",
       severity: "accionar",
-      title: `¿Te llegó el dividendo de ${h.label}?`,
+      title: `¿Te llegó el ${etiqueta} de ${h.label}?`,
       body:
         `Según lo que configuraste, tocaba cobrar el ${formatoCorto(vence)}: ` +
         `≈ ${redondear(r.netoPorPago)} ${h.currency} netos${retuvo}. ` +

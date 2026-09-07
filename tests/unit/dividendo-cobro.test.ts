@@ -24,6 +24,7 @@ const base = (over: Partial<HoldingConDividendo> = {}): HoldingConDividendo => (
   payoutWithholdingPct: 30,
   payoutNextDate: "2026-09-01",
   ultimoPagoRegistrado: null,
+  assetType: "accion",
   ...over,
 });
 
@@ -121,5 +122,35 @@ describe("varias posiciones", () => {
       HOY,
     );
     expect(out.map((i) => i.relatedId)).toEqual(["a"]);
+  });
+});
+
+describe("cómo se LLAMA el pago según el tipo de activo", () => {
+  // Bloqueante: una nota que pregunta "¿te llegó el dividendo?" suena a que el
+  // producto no entiende lo que el usuario compró. La etiqueta sale de
+  // `etiquetaPayout` (wealth/constants), no de un if en el detector.
+  const titulo = (assetType: HoldingConDividendo["assetType"]) =>
+    detectDividendosPorCobrar([base({ assetType })], HOY)[0]!.title;
+
+  it("acción y ETF → dividendo", () => {
+    expect(titulo("accion")).toContain("el dividendo de");
+    expect(titulo("etf")).toContain("el dividendo de");
+  });
+
+  it("nota estructurada y bono → cupón", () => {
+    expect(titulo("nota_estructurada")).toContain("el cupón de");
+    expect(titulo("bono")).toContain("el cupón de");
+  });
+
+  it("certificado → interés", () => {
+    expect(titulo("certificado")).toContain("el interés de");
+  });
+
+  it("un tipo sin etiqueta propia cae a 'pago', no a 'dividendo'", () => {
+    expect(titulo("commodity")).toContain("el pago de");
+  });
+
+  it("sin tipo tampoco inventa 'dividendo'", () => {
+    expect(titulo(null)).toContain("el pago de");
   });
 });

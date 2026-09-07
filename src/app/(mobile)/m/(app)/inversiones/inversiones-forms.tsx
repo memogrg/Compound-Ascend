@@ -20,6 +20,7 @@ import {
   textoRendimiento,
   FRECUENCIAS_PAGO,
 } from "@/lib/finance/rendimiento-periodico";
+import { lecturaDeRiesgo } from "@/modules/wealth/engine/nota-estructurada";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import {
@@ -134,6 +135,21 @@ export function HoldingWizardSheet({
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
   // ── Dividendos (acciones/ETF) ──
   const [pagaDividendos, setPagaDividendos] = useState(prefill?.payoutEnabled ?? false);
+  // ── Nota estructurada ──
+  const [notaEmisor, setNotaEmisor] = useState(prefill?.noteIssuer ?? "");
+  const [notaSubyacente, setNotaSubyacente] = useState(prefill?.noteUnderlying ?? "");
+  const [notaProteccion, setNotaProteccion] = useState<number | undefined>(
+    prefill?.noteCapitalProtectionPct ?? undefined,
+  );
+  const [notaBarrera, setNotaBarrera] = useState<number | undefined>(
+    prefill?.noteBarrierPct ?? undefined,
+  );
+  const [notaAutocall, setNotaAutocall] = useState(prefill?.noteAutocall ?? false);
+  const [notaAutocallFecha, setNotaAutocallFecha] = useState(prefill?.noteAutocallDate ?? "");
+  const [notaParticipacion, setNotaParticipacion] = useState<number | undefined>(
+    prefill?.noteParticipationPct ?? undefined,
+  );
+  const [notaIsin, setNotaIsin] = useState(prefill?.noteIsin ?? "");
   const [dividendoModo, setDividendoModo] = useState<"yield" | "manual">(
     (prefill?.payoutMode as "yield" | "manual") ?? "yield",
   );
@@ -297,6 +313,14 @@ export function HoldingWizardSheet({
       region,
       aportoCadaMes,
       aporteMensual: numStr(aporteMensual),
+      notaEmisor,
+      notaSubyacente,
+      notaProteccion: notaProteccion == null ? "" : String(notaProteccion),
+      notaBarrera: notaBarrera == null ? "" : String(notaBarrera),
+      notaAutocall,
+      notaAutocallFecha,
+      notaParticipacion: notaParticipacion == null ? "" : String(notaParticipacion),
+      notaIsin,
       pagaDividendos,
       dividendoModo,
       dividendoYieldPct: dividendoYieldPct == null ? "" : String(dividendoYieldPct),
@@ -357,6 +381,22 @@ export function HoldingWizardSheet({
             onInvested={setInvested}
             onCurrency={setCur}
             aportoCadaMes={aportoCadaMes}
+            notaEmisor={notaEmisor}
+            onNotaEmisor={setNotaEmisor}
+            notaSubyacente={notaSubyacente}
+            onNotaSubyacente={setNotaSubyacente}
+            notaProteccion={notaProteccion}
+            onNotaProteccion={setNotaProteccion}
+            notaBarrera={notaBarrera}
+            onNotaBarrera={setNotaBarrera}
+            notaAutocall={notaAutocall}
+            onNotaAutocall={setNotaAutocall}
+            notaAutocallFecha={notaAutocallFecha}
+            onNotaAutocallFecha={setNotaAutocallFecha}
+            notaParticipacion={notaParticipacion}
+            onNotaParticipacion={setNotaParticipacion}
+            notaIsin={notaIsin}
+            onNotaIsin={setNotaIsin}
             pagaDividendos={pagaDividendos}
             onPagaDividendos={setPagaDividendos}
             dividendoModo={dividendoModo}
@@ -515,6 +555,22 @@ type Step2Props = {
   onInvested: (v: number | undefined) => void;
   onCurrency: (v: string) => void;
   aportoCadaMes: boolean;
+  notaEmisor: string;
+  onNotaEmisor: (v: string) => void;
+  notaSubyacente: string;
+  onNotaSubyacente: (v: string) => void;
+  notaProteccion: number | undefined;
+  onNotaProteccion: (v: number | undefined) => void;
+  notaBarrera: number | undefined;
+  onNotaBarrera: (v: number | undefined) => void;
+  notaAutocall: boolean;
+  onNotaAutocall: (v: boolean) => void;
+  notaAutocallFecha: string;
+  onNotaAutocallFecha: (v: string) => void;
+  notaParticipacion: number | undefined;
+  onNotaParticipacion: (v: number | undefined) => void;
+  notaIsin: string;
+  onNotaIsin: (v: string) => void;
   pagaDividendos: boolean;
   onPagaDividendos: (v: boolean) => void;
   dividendoModo: "yield" | "manual";
@@ -574,6 +630,17 @@ function Step2Fields(p: Step2Props) {
   const { profile, cur } = p;
   // El tipo de activo sale de la categoría (CATEGORY_META), igual que en la web.
   const tipoActivo = p.category ? CATEGORY_META[p.category].defaultAssetType : null;
+
+  // Lectura de riesgo de la nota, con el mismo motor que la web.
+  const lecturaNota = lecturaDeRiesgo({
+    emisor: p.notaEmisor || null,
+    subyacente: p.notaSubyacente || null,
+    proteccionPct: p.notaProteccion ?? null,
+    barreraPct: p.notaBarrera ?? null,
+    autocall: p.notaAutocall,
+    autocallDate: p.notaAutocallFecha || null,
+    participacionPct: p.notaParticipacion ?? null,
+  });
 
   // Vista previa del dividendo con el MISMO motor que la web y que la proyección
   // de ingreso pasivo: un solo cálculo, tres superficies.
@@ -819,6 +886,80 @@ function Step2Fields(p: Step2Props) {
           onChange={p.onAporteMensual}
           currency={cur}
         />
+      ) : null}
+
+      {/* Nota estructurada · términos propios. Mismo motor de lectura de riesgo
+          que la web: una sola verdad sobre qué significan estos términos. */}
+      {tipoActivo === "nota_estructurada" ? (
+        <>
+          <TextInput
+            name="notaEmisor"
+            label="Emisor"
+            value={p.notaEmisor}
+            onChange={p.onNotaEmisor}
+            placeholder="JP Morgan, BAC… (la protección vale lo que vale quien la promete)"
+          />
+          <TextInput
+            name="notaSubyacente"
+            label="Subyacente"
+            value={p.notaSubyacente}
+            onChange={p.onNotaSubyacente}
+            placeholder="S&P 500, canasta…"
+          />
+          <MoneyField
+            name="notaProteccion"
+            label="Capital protegido"
+            value={p.notaProteccion}
+            onChange={p.onNotaProteccion}
+            currency="%"
+            hint="Qué % te devuelven al vencimiento. 100% = garantizado, si no hay barrera."
+          />
+          <MoneyField
+            name="notaBarrera"
+            label="Barrera (opcional)"
+            value={p.notaBarrera}
+            onChange={p.onNotaBarrera}
+            currency="%"
+            hint="Si el subyacente cae por debajo de este % del inicial, la protección deja de aplicar."
+          />
+          <MoneyField
+            name="notaParticipacion"
+            label="Participación (opcional)"
+            value={p.notaParticipacion}
+            onChange={p.onNotaParticipacion}
+            currency="%"
+            hint="Qué % de la subida te corresponde. Puede superar 100%."
+          />
+          <TextInput
+            name="notaIsin"
+            label="ISIN / código (opcional)"
+            value={p.notaIsin}
+            onChange={p.onNotaIsin}
+            placeholder="XS1234567890"
+          />
+          <Toggle
+            name="notaAutocall"
+            label="Tiene autocall"
+            value={p.notaAutocall}
+            onChange={p.onNotaAutocall}
+            hint="El emisor puede cancelarla antes; el plazo real puede ser menor."
+          />
+          {p.notaAutocall ? (
+            <DateField
+              name="notaAutocallFecha"
+              label="Fecha de observación"
+              value={p.notaAutocallFecha}
+              onChange={p.onNotaAutocallFecha}
+            />
+          ) : null}
+          {lecturaNota.puntos.length > 0 ? (
+            <div className="m-card-note">
+              {lecturaNota.puntos.map((t) => (
+                <div key={t}>· {t}</div>
+              ))}
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       {/* Dividendos · solo acciones y ETF. Mismo motor que la web: la vista previa

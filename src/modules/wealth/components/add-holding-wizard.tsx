@@ -23,6 +23,7 @@ import {
   textoRendimiento,
   FRECUENCIAS_PAGO,
 } from "@/lib/finance/rendimiento-periodico";
+import { lecturaDeRiesgo } from "@/modules/wealth/engine/nota-estructurada";
 import { CURRENCIES } from "@/modules/personal-profile/constants";
 import { useCaptureCurrency } from "@/components/layout/currency-context";
 import { useDeepLinkModal } from "@/lib/hooks/use-deep-link-modal";
@@ -277,6 +278,21 @@ export function AddHoldingModal({
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
   // ── Dividendos (acciones/ETF) ──
   const [pagaDividendos, setPagaDividendos] = useState(prefill?.payoutEnabled ?? false);
+  // ── Nota estructurada ──
+  const [notaEmisor, setNotaEmisor] = useState(prefill?.noteIssuer ?? "");
+  const [notaSubyacente, setNotaSubyacente] = useState(prefill?.noteUnderlying ?? "");
+  const [notaProteccion, setNotaProteccion] = useState(
+    prefill?.noteCapitalProtectionPct != null ? String(prefill.noteCapitalProtectionPct) : "",
+  );
+  const [notaBarrera, setNotaBarrera] = useState(
+    prefill?.noteBarrierPct != null ? String(prefill.noteBarrierPct) : "",
+  );
+  const [notaAutocall, setNotaAutocall] = useState(prefill?.noteAutocall ?? false);
+  const [notaAutocallFecha, setNotaAutocallFecha] = useState(prefill?.noteAutocallDate ?? "");
+  const [notaParticipacion, setNotaParticipacion] = useState(
+    prefill?.noteParticipationPct != null ? String(prefill.noteParticipationPct) : "",
+  );
+  const [notaIsin, setNotaIsin] = useState(prefill?.noteIsin ?? "");
   const [dividendoModo, setDividendoModo] = useState<"yield" | "manual">(
     (prefill?.payoutMode as "yield" | "manual") ?? "yield",
   );
@@ -461,6 +477,14 @@ export function AddHoldingModal({
       region,
       aportoCadaMes,
       aporteMensual,
+      notaEmisor,
+      notaSubyacente,
+      notaProteccion,
+      notaBarrera,
+      notaAutocall,
+      notaAutocallFecha,
+      notaParticipacion,
+      notaIsin,
       pagaDividendos,
       dividendoModo,
       dividendoYieldPct,
@@ -522,6 +546,22 @@ export function AddHoldingModal({
             onInvested={setInvested}
             onCurrency={setCur}
             aportoCadaMes={aportoCadaMes}
+            notaEmisor={notaEmisor}
+            onNotaEmisor={setNotaEmisor}
+            notaSubyacente={notaSubyacente}
+            onNotaSubyacente={setNotaSubyacente}
+            notaProteccion={notaProteccion}
+            onNotaProteccion={setNotaProteccion}
+            notaBarrera={notaBarrera}
+            onNotaBarrera={setNotaBarrera}
+            notaAutocall={notaAutocall}
+            onNotaAutocall={setNotaAutocall}
+            notaAutocallFecha={notaAutocallFecha}
+            onNotaAutocallFecha={setNotaAutocallFecha}
+            notaParticipacion={notaParticipacion}
+            onNotaParticipacion={setNotaParticipacion}
+            notaIsin={notaIsin}
+            onNotaIsin={setNotaIsin}
             pagaDividendos={pagaDividendos}
             onPagaDividendos={setPagaDividendos}
             dividendoModo={dividendoModo}
@@ -720,6 +760,22 @@ function Step2Fields(props: {
   onCurrency: (v: string) => void;
   aportoCadaMes: boolean;
   onAportoCadaMes: (v: boolean) => void;
+  notaEmisor: string;
+  onNotaEmisor: (v: string) => void;
+  notaSubyacente: string;
+  onNotaSubyacente: (v: string) => void;
+  notaProteccion: string;
+  onNotaProteccion: (v: string) => void;
+  notaBarrera: string;
+  onNotaBarrera: (v: string) => void;
+  notaAutocall: boolean;
+  onNotaAutocall: (v: boolean) => void;
+  notaAutocallFecha: string;
+  onNotaAutocallFecha: (v: string) => void;
+  notaParticipacion: string;
+  onNotaParticipacion: (v: string) => void;
+  notaIsin: string;
+  onNotaIsin: (v: string) => void;
   pagaDividendos: boolean;
   onPagaDividendos: (v: boolean) => void;
   dividendoModo: "yield" | "manual";
@@ -801,6 +857,18 @@ function Step2Fields(props: {
     );
     return textoRendimiento(r, retencion, (n) => formatMoney(n, cur));
   })();
+
+  // Lectura de riesgo en vivo: mientras se cargan los términos, la persona ya ve
+  // qué significan. Mismo motor que el detalle.
+  const lecturaNota = lecturaDeRiesgo({
+    emisor: props.notaEmisor || null,
+    subyacente: props.notaSubyacente || null,
+    proteccionPct: props.notaProteccion === "" ? null : parseFloat(props.notaProteccion),
+    barreraPct: props.notaBarrera === "" ? null : parseFloat(props.notaBarrera),
+    autocall: props.notaAutocall,
+    autocallDate: props.notaAutocallFecha || null,
+    participacionPct: props.notaParticipacion === "" ? null : parseFloat(props.notaParticipacion),
+  });
 
   return (
     <div>
@@ -1202,6 +1270,155 @@ function Step2Fields(props: {
               placeholder="0"
             />
           </div>
+        </div>
+      ) : null}
+
+      {/* Nota estructurada · términos propios. La lectura de riesgo que sale de
+          acá se pinta en el detalle; el motor es `nota-estructurada`. */}
+      {tipoActivo === "nota_estructurada" ? (
+        <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">
+                Emisor{" "}
+                <HelpTip text="El banco o entidad que emite la nota. Importa más de lo que parece: la protección vale lo que vale quien la promete." />
+              </label>
+              <input
+                className="inp"
+                value={props.notaEmisor}
+                onChange={(e) => props.onNotaEmisor(e.target.value)}
+                placeholder="JP Morgan, BAC…"
+              />
+            </div>
+            <div className="fld">
+              <label className="fld-label">
+                Subyacente{" "}
+                <HelpTip text="El índice, acción o canasta de la que depende el rendimiento de la nota." />
+              </label>
+              <input
+                className="inp"
+                value={props.notaSubyacente}
+                onChange={(e) => props.onNotaSubyacente(e.target.value)}
+                placeholder="S&P 500, canasta…"
+              />
+            </div>
+          </div>
+
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">
+                Capital protegido{" "}
+                <HelpTip text="Qué % del capital te devuelven al vencimiento según los términos. 100% = capital garantizado (si no hay barrera)." />
+              </label>
+              <div className="inp-money">
+                <span className="pre">%</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max="100"
+                  value={props.notaProteccion}
+                  onChange={(e) => props.onNotaProteccion(e.target.value)}
+                  placeholder="100"
+                />
+              </div>
+            </div>
+            <div className="fld">
+              <label className="fld-label">
+                Barrera (opcional){" "}
+                <HelpTip text="Si el subyacente cae por debajo de este % de su nivel inicial, la protección deja de aplicar y tu capital queda expuesto." />
+              </label>
+              <div className="inp-money">
+                <span className="pre">%</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  max="100"
+                  value={props.notaBarrera}
+                  onChange={(e) => props.onNotaBarrera(e.target.value)}
+                  placeholder="70"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="fld-2">
+            <div className="fld">
+              <label className="fld-label">
+                Participación (opcional){" "}
+                <HelpTip text="Qué % de la subida del subyacente te corresponde. Puede ser mayor a 100%." />
+              </label>
+              <div className="inp-money">
+                <span className="pre">%</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={props.notaParticipacion}
+                  onChange={(e) => props.onNotaParticipacion(e.target.value)}
+                  placeholder="100"
+                />
+              </div>
+            </div>
+            <div className="fld">
+              <label className="fld-label">ISIN / código (opcional)</label>
+              <input
+                className="inp"
+                value={props.notaIsin}
+                onChange={(e) => props.onNotaIsin(e.target.value)}
+                placeholder="XS1234567890"
+              />
+            </div>
+          </div>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12.5,
+              color: "var(--ink-2)",
+              cursor: "pointer",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={props.notaAutocall}
+              onChange={(e) => props.onNotaAutocall(e.target.checked)}
+            />
+            Tiene autocall
+            <HelpTip text="El emisor puede cancelarla anticipadamente si se cumple una condición en la fecha de observación. El plazo real puede ser menor al vencimiento." />
+          </label>
+          {props.notaAutocall ? (
+            <div className="fld">
+              <label className="fld-label">Fecha de observación</label>
+              <input
+                className="inp"
+                type="date"
+                value={props.notaAutocallFecha}
+                onChange={(e) => props.onNotaAutocallFecha(e.target.value)}
+              />
+            </div>
+          ) : null}
+
+          {lecturaNota.puntos.length > 0 ? (
+            <div
+              style={{
+                fontSize: 12.5,
+                lineHeight: 1.5,
+                padding: "10px 12px",
+                borderRadius: 8,
+                background: "var(--surface-2)",
+                display: "grid",
+                gap: 4,
+              }}
+            >
+              {lecturaNota.puntos.map((p) => (
+                <div key={p}>· {p}</div>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

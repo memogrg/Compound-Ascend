@@ -247,7 +247,7 @@ export async function listDividendosPorCobrar(
   const { data: holdings } = await supabase
     .from("investment_holdings")
     .select(
-      "id,label,symbol,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct,payout_next_date",
+      "id,label,symbol,asset_type,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct,payout_next_date",
     )
     .in("user_id", memberIds)
     .eq("payout_enabled", true);
@@ -286,6 +286,7 @@ export async function listDividendosPorCobrar(
         h.payout_withholding_pct == null ? null : Number(h.payout_withholding_pct),
       payoutNextDate: h.payout_next_date,
       ultimoPagoRegistrado: ultimoPorHolding.get(h.id) ?? null,
+      assetType: h.asset_type as import("@/modules/wealth/types").AssetType,
     };
   });
 }

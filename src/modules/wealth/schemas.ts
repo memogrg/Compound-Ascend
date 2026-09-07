@@ -131,6 +131,15 @@ export const holdingInputSchema = z.object({
   // negativo o mayor al bruto.
   payoutWithholdingPct: z.number().min(0).max(100).optional(),
   payoutNextDate: z.string().optional(),
+  // ── Nota estructurada ──
+  noteIssuer: z.string().trim().max(120).optional(),
+  noteUnderlying: z.string().trim().max(120).optional(),
+  noteCapitalProtectionPct: z.number().min(0).max(100).optional(),
+  noteBarrierPct: z.number().min(0).max(100).optional(),
+  noteAutocall: z.boolean().optional(),
+  noteAutocallDate: z.string().optional(),
+  noteParticipationPct: z.number().nonnegative().optional(),
+  noteIsin: z.string().trim().max(20).optional(),
   // Aporte mensual del recurrente (separado del total invertido).
   monthlyContribution: z.number().nonnegative().optional(),
   // Fase 4.1: registrar la compra/aporte como gasto vinculado en Base
