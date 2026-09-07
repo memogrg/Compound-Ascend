@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -9,6 +9,7 @@ import {
   deleteIncomeSourceAction,
   receivePartialIncomeAction,
   ensureRecurringIncomeAction,
+  removeOutOfPhaseIncomeLineAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
@@ -108,8 +109,26 @@ export function IncomeManager({
   // El "+" contextual: elección (registrar ingreso / crear fuente) → picker → reusa el flujo.
   const [plusOpen, setPlusOpen] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [fueraDeFase, setFueraDeFase] = useState<BudgetItem | null>(null);
+  const [fasePending, setFasePending] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyPending, startCopy] = useTransition();
+  const [, startRecibido] = useTransition();
+
+  /**
+   * BARRA AL INSTANTE, igual que en la web. `received` viene del servidor y acá
+   * el problema era doble: sin update optimista la barra esperaba el round-trip,
+   * y encima ninguna action revalidaba las rutas `/m/...`, así que el dato del
+   * servidor llegaba viejo y hacía falta recargar a mano. Lo segundo se arregló
+   * en `revalidarIngresos`; esto resuelve lo primero.
+   */
+  const [recibido, sumarRecibido] = useOptimistic(
+    received,
+    (estado: Record<string, number>, nuevo: { id: string; amount: number }) => ({
+      ...estado,
+      [nuevo.id]: (estado[nuevo.id] ?? 0) + nuevo.amount,
+    }),
+  );
 
   const confirmCopy = () => {
     startCopy(async () => {
@@ -159,7 +178,7 @@ export function IncomeManager({
         // lateral lo pone la regla puente .m-swipe-content .m-drow.
         <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {sources.map((it) => {
-            const rec = received[it.id] ?? 0;
+            const rec = recibido[it.id] ?? 0;
             // Lo PLANIFICADO del mes, no el monto por pago: una quincena de 800k
             // se compara contra los 1.6M del mes (dos pagos), si no la barra
             // marcaría 100 % con la primera quincena.
@@ -292,7 +311,13 @@ export function IncomeManager({
           <IncomeSourceForm
             incomeTree={incomeTree}
             initial={toValues(editing)}
-            action={(v: IncomeSourceValues) => updateIncomeSourceAction(editing.id, v)}
+            action={async (v: IncomeSourceValues) => {
+              const res = await updateIncomeSourceAction(editing.id, v);
+              // La línea de este mes pudo quedar fuera de fase al cambiar
+              // frecuencia/ancla. No se borra sola: se pregunta.
+              if (res.ok && res.fueraDeFase) setFueraDeFase(editing);
+              return res;
+            }}
             submitLabel="Guardar cambios"
             successMessage="Fuente actualizada"
             onSuccess={() => setEditing(null)}
@@ -309,11 +334,43 @@ export function IncomeManager({
         {receiving ? (
           <ReceiveForm
             source={receiving}
-            received={received[receiving.id] ?? 0}
+            received={recibido[receiving.id] ?? 0}
+            onOptimista={(amount) =>
+              // Dentro de una transición: fuera de ella React descarta el optimista.
+              startRecibido(() => sumarRecibido({ id: receiving.id, amount }))
+            }
             onSuccess={() => setReceiving(null)}
           />
         ) : null}
       </BottomSheet>
+
+      {/* La línea del mes dejó de caer en fase al cambiar frecuencia/ancla.
+          Se pregunta: borrarla en silencio escondería un "recibido" ya anotado. */}
+      <ConfirmDialog
+        open={!!fueraDeFase}
+        title="Esta fuente ya no cae en este mes"
+        message={
+          fueraDeFase
+            ? `Con la nueva frecuencia, "${fueraDeFase.name}" no tiene pago este mes. Puedes quitar la línea del mes; la fuente se mantiene y vuelve cuando le toque.`
+            : undefined
+        }
+        confirmLabel="Quitar del mes"
+        cancelLabel="Dejarla"
+        variant="warning"
+        pending={fasePending}
+        onConfirm={async () => {
+          if (!fueraDeFase) return;
+          setFasePending(true);
+          const res = await removeOutOfPhaseIncomeLineAction(fueraDeFase.id);
+          setFasePending(false);
+          setFueraDeFase(null);
+          if (res.ok) {
+            toast.show("Línea del mes quitada", "success");
+            router.refresh();
+          } else toast.show(res.message ?? "No se pudo quitar.", "error");
+        }}
+        onCancel={() => setFueraDeFase(null)}
+      />
 
       {/* Copiar mes anterior (crea filas → confirmación breve) */}
       <ConfirmDialog
@@ -395,10 +452,13 @@ export function ReceiveForm({
   source,
   received,
   onSuccess,
+  onOptimista,
 }: {
   source: BudgetItem;
   received: number;
   onSuccess: () => void;
+  /** Pinta el monto en la barra ANTES de que vuelva el servidor. */
+  onOptimista?: (amount: number) => void;
 }) {
   const [amount, setAmount] = useState<number | undefined>(suggestedReceipt(source, received));
   const todayISO = useCaptureToday();
@@ -410,7 +470,12 @@ export function ReceiveForm({
   const values = { budgetItemId: source.id, amount, date };
   return (
     <FormShell
-      action={receivePartialIncomeAction}
+      action={async (v: typeof values) => {
+        // El optimista se aplica al ENVIAR, no al volver: es justamente el hueco
+        // que hacía falta tapar (la barra quieta durante todo el round-trip).
+        if (amount && amount > 0) onOptimista?.(amount);
+        return receivePartialIncomeAction(v);
+      }}
       values={values}
       submitLabel="Registrar recibido"
       successMessage="Recibido registrado"

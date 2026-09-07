@@ -215,6 +215,12 @@ export function IncomeSourceForm({
       values={values}
       submitLabel={submitLabel}
       successMessage={successMessage}
+      // Cuando el alta NO crea línea de este mes (multi-mes anclada a futuro) hay
+      // que decirlo: sin aviso el alta parece fallida y la fuente se crea dos veces.
+      successDetail={(res) => {
+        const mes = (res as { agendadoPara?: string }).agendadoPara;
+        return mes ? `Primer pago agendado para ${mes}` : null;
+      }}
       onSuccess={onSuccess}
       validate={(): Record<string, string> | null => {
         if (missingSub) return { categoryId: "Seleccioná una subcategoría para guardar" };

@@ -63,9 +63,11 @@ import {
   deleteIncomeSource,
   receivePartialIncome,
   ensureRecurringIncome,
+  removeOutOfPhaseIncomeLine,
   registerPassiveIncomeWithStub,
 } from "@/modules/financial-base/services/budget-service";
 import { monthPeriod } from "@/modules/financial-base/engine/period";
+import { nombreMes } from "@/modules/financial-base/engine/frequency-copy";
 import { getSobreRemaining } from "@/modules/financial-base/services/sobre-remaining";
 import type { SobreRemaining } from "@/modules/financial-base/engine/sobre-remaining-copy";
 import { userCurrentPeriod, userToday } from "@/lib/time/user-time";
@@ -125,6 +127,21 @@ function fieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
 function revalidate() {
   revalidatePath("/mi-base-financiera");
   revalidatePath("/dashboard");
+}
+
+/**
+ * Rutas que pintan fuentes de ingreso, WEB Y MÓVIL. El móvil vive en su propio
+ * árbol de rutas (`/m/...`) y quedaba fuera de toda revalidación: sólo
+ * `/m/transacciones` estaba cubierta en todo este archivo. Efecto: al marcar
+ * "Recibido" en el móvil el servidor seguía sirviendo el dato viejo y hacía
+ * falta recargar a mano.
+ */
+function revalidarIngresos() {
+  revalidate();
+  revalidatePath("/ingresos");
+  revalidatePath("/m/ingresos");
+  revalidatePath("/m/mi-base-financiera");
+  revalidatePath("/m");
 }
 
 // ---------- Presupuesto ----------
@@ -300,14 +317,39 @@ export async function copyPreviousMonthBudgetAction(
 }
 
 // ---------- Fuentes de ingreso (tab Ingresos · Fase 1) ----------
-export async function registerIncomeSourceAction(raw: unknown): Promise<ActionResult> {
+/**
+ * Quita la línea del mes que quedó fuera de fase tras editar frecuencia/ancla.
+ * Conserva la plantilla: la fuente sigue viva y volverá en el mes que le toque.
+ */
+export async function removeOutOfPhaseIncomeLineAction(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
+  try {
+    await removeOutOfPhaseIncomeLine(id);
+    revalidarIngresos();
+    return { ok: true };
+  } catch (err) {
+    logger.error("removeOutOfPhaseIncomeLine fallido", {
+      message: err instanceof Error ? err.message : "?",
+    });
+    return { ok: false, message: "No pudimos quitar la línea de este mes." };
+  }
+}
+
+export async function registerIncomeSourceAction(
+  raw: unknown,
+): Promise<ActionResult & { agendadoPara?: string }> {
   const parsed = incomeSourceInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    await registerIncomeSource(parsed.data);
-    revalidate();
-    revalidatePath("/ingresos");
+    const alta = await registerIncomeSource(parsed.data);
+    revalidarIngresos();
+    // Cuando el alta NO crea línea de este mes (multi-mes anclada a futuro), la
+    // UI tiene que decirlo: sin aviso parece que falló y la fuente se crea otra vez.
+    if (alta.agendadoPara) {
+      const { year, month } = alta.agendadoPara;
+      return { ok: true, agendadoPara: `${nombreMes(month)} ${year}` };
+    }
     return { ok: true };
   } catch (err) {
     logger.error("registerIncomeSource fallido", {
@@ -317,15 +359,19 @@ export async function registerIncomeSourceAction(raw: unknown): Promise<ActionRe
   }
 }
 
-export async function updateIncomeSourceAction(id: string, raw: unknown): Promise<ActionResult> {
+export async function updateIncomeSourceAction(
+  id: string,
+  raw: unknown,
+): Promise<ActionResult & { fueraDeFase?: boolean }> {
   const parsed = incomeSourceInputSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, fieldErrors: fieldErrors(parsed.error.issues) };
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
-    await updateIncomeSource(id, parsed.data);
-    revalidate();
-    revalidatePath("/ingresos");
-    return { ok: true };
+    const { fueraDeFase } = await updateIncomeSource(id, parsed.data);
+    revalidarIngresos();
+    // La línea de este mes puede haber quedado fuera de fase tras cambiar la
+    // frecuencia o el ancla. No se borra sola: la UI pregunta.
+    return fueraDeFase ? { ok: true, fueraDeFase: true } : { ok: true };
   } catch (err) {
     logger.error("updateIncomeSource fallido", {
       message: err instanceof Error ? err.message : "?",
@@ -338,8 +384,7 @@ export async function deleteIncomeSourceAction(id: string): Promise<ActionResult
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     await deleteIncomeSource(id);
-    revalidate();
-    revalidatePath("/ingresos");
+    revalidarIngresos();
     return { ok: true };
   } catch {
     return { ok: false };
@@ -359,8 +404,7 @@ export async function receivePartialIncomeAction(raw: unknown): Promise<ActionRe
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await receivePartialIncome(parsed.data);
-    revalidate();
-    revalidatePath("/ingresos");
+    revalidarIngresos();
     return { ok: true };
   } catch (err) {
     logger.error("receivePartialIncome fallido", {
@@ -406,8 +450,7 @@ export async function registerPassiveIncomeWithStubAction(raw: unknown): Promise
   if (!isSupabaseConfigured()) return { ok: false, message: "Conecta Supabase para guardar." };
   try {
     await registerPassiveIncomeWithStub(parsed.data);
-    revalidate();
-    revalidatePath("/ingresos");
+    revalidarIngresos();
     revalidatePath("/patrimonio");
     return { ok: true };
   } catch (err) {
