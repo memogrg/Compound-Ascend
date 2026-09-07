@@ -11,7 +11,7 @@
  * El recibido por fuente llega ya agregado (real.incomeReceivedBySource), sumado
  * de las transacciones de ingreso confirmadas con income_source_id = la fuente.
  */
-import { useOptimistic, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/modal";
@@ -29,6 +29,7 @@ import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 // Motores puros: import directo del archivo, nunca del barrel (server-only).
 import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
 import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
+import { useBarraAnticipada } from "@/lib/ui/use-barra-anticipada";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 
 const INCOME_TYPE_LABEL: Record<IncomeType, string> = {
@@ -58,20 +59,17 @@ export function IncomeSources({
   const [, startTransition] = useTransition();
 
   /**
-   * BARRA AL INSTANTE. `received` viene del servidor, así que hasta esta pasada
-   * la barra no se movía hasta que volviera el round-trip completo (action →
-   * revalidatePath → refetch del RSC) — y en la práctica parecía que hacía falta
-   * refrescar a mano. `useOptimistic` pinta el nuevo total apenas se confirma y
-   * lo descarta solo cuando llega el dato del servidor: si la escritura falla,
-   * la barra vuelve sola a la verdad, sin lógica de rollback nuestra.
+   * BARRA AL INSTANTE, sin rebote. Antes esto era `useOptimistic`, y se llenaba
+   * y se vaciaba sola: React suelta el optimista al terminar la transición, y
+   * `router.refresh()` no es esperable, así que la transición cerraba ANTES de
+   * que llegaran las props frescas. La escritura andaba bien —el movimiento
+   * quedaba guardado— pero la barra mostraba el monto y lo quitaba sin
+   * explicación, que en plata es inaceptable.
+   *
+   * El anticipo ahora se sostiene hasta que el servidor REFLEJE el monto
+   * (comparando valores, no esperando un tiempo) o hasta que la escritura falle.
    */
-  const [recibido, sumarRecibido] = useOptimistic(
-    received,
-    (estado: Record<string, number>, nuevo: { id: string; amount: number }) => ({
-      ...estado,
-      [nuevo.id]: (estado[nuevo.id] ?? 0) + nuevo.amount,
-    }),
-  );
+  const barra = useBarraAnticipada(received);
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string }>, msg: string) =>
     startTransition(async () => {
@@ -120,12 +118,10 @@ export function IncomeSources({
             <SourceRow
               key={it.id}
               it={it}
-              received={recibido[it.id] ?? 0}
+              received={barra.valor(it.id)}
               onReceive={(amount) =>
-                // El optimista va DENTRO de la misma transición que la escritura:
-                // fuera de ella React lo descartaría en el acto.
                 startTransition(async () => {
-                  sumarRecibido({ id: it.id, amount });
+                  barra.anticipar(it.id, amount);
                   const res = await receivePartialIncomeAction({
                     budgetItemId: it.id,
                     amount,
@@ -134,7 +130,12 @@ export function IncomeSources({
                   if (res.ok) {
                     toast("Recibido registrado");
                     router.refresh();
-                  } else toast(res.message ?? "No se pudo completar", "error");
+                  } else {
+                    // La escritura falló: se suelta el anticipo Y se dice por qué.
+                    // La barra nunca baja en silencio.
+                    barra.cancelar(it.id);
+                    toast(res.message ?? "No pudimos registrar lo recibido", "error");
+                  }
                 })
               }
               onEdit={() => setEditing(it)}

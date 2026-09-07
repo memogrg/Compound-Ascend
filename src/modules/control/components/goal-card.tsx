@@ -15,7 +15,7 @@
  * se deja que llegue el dato real. Ver también `debts-view`, donde el saldo NO
  * se puede anticipar (el servidor lo recalcula amortizando).
  */
-import { useOptimistic, useTransition } from "react";
+import { useMemo } from "react";
 import { DeleteButton } from "./delete-button";
 import { PagoVinculadoButton } from "./pago-vinculado-button";
 import { GoalWithdrawButton } from "./goal-withdraw-button";
@@ -26,6 +26,7 @@ import { formatMoney } from "@/lib/format";
 // Del ENGINE directo, no del barrel: `@/modules/control` reexporta servicios con
 // `server-only` y este es un client component.
 import { aporteOptimista } from "@/modules/control/engine/aporte-optimista";
+import { useBarraAnticipada } from "@/lib/ui/use-barra-anticipada";
 import type { ControlSummary } from "@/modules/control/services/control-service";
 import type { GoalAction, SavingsGoal } from "@/modules/control/types";
 
@@ -62,16 +63,22 @@ export function GoalCard({
   d: ControlSummary["diagnosis"];
   currency: string;
 }) {
-  const [, startTransition] = useTransition();
-  // Delta optimista sobre el acumulado. Se descarta solo cuando el server
-  // component vuelve con el `g.currentAmount` real.
-  const [aportado, aportar] = useOptimistic(0, (previo: number, monto: number) => previo + monto);
+  /**
+   * BARRA AL INSTANTE, sin rebote. Antes era `useOptimistic` y acá el rebote era
+   * inmediato: `PagoVinculadoButton` llama `onDone()` y recién DESPUÉS
+   * `router.refresh()`, así que la transición de este callback envolvía sólo el
+   * update optimista y cerraba en el acto — el aporte se pintaba y se borraba
+   * antes de que llegara ninguna prop. El anticipo ahora se sostiene hasta que
+   * el servidor refleje el monto (comparando valores, no esperando un tiempo).
+   */
+  const servidor = useMemo(() => ({ [g.id]: g.currentAmount }), [g.id, g.currentAmount]);
+  const barra = useBarraAnticipada(servidor);
 
   const rec = d.goalRecs.find((r) => r.goalId === g.id);
   const a = rec ? ACTION[rec.action] : ACTION.mantener;
   // Un sobre acumula sin meta: no hay barra ni % de progreso.
   const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
-  const acumulado = g.currentAmount + aportado;
+  const acumulado = barra.valor(g.id);
   const progress = g.targetAmount > 0 ? Math.min(100, (acumulado / g.targetAmount) * 100) : 0;
 
   return (
@@ -131,7 +138,7 @@ export function GoalCard({
             // El guardia de "sólo si el número es exacto" vive en el motor, con
             // test: en otra moneda el servidor convierte y no se anticipa nada.
             const delta = aporteOptimista({ aplicado, monedaEntidad: g.currency });
-            if (delta > 0) startTransition(() => aportar(delta));
+            if (delta > 0) barra.anticipar(g.id, delta);
           }}
         />
         <GoalSpendButton goal={g} />

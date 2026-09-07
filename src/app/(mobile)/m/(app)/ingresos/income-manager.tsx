@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -14,6 +14,7 @@ import {
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 import { suggestedReceipt } from "@/modules/financial-base/engine/income-receipt";
 import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
+import { useBarraAnticipada } from "@/lib/ui/use-barra-anticipada";
 import type { CategoryNode } from "@/modules/financial-base/services/categories-service";
 import { formatMoney } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
@@ -113,22 +114,14 @@ export function IncomeManager({
   const [fasePending, setFasePending] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
   const [copyPending, startCopy] = useTransition();
-  const [, startRecibido] = useTransition();
-
   /**
-   * BARRA AL INSTANTE, igual que en la web. `received` viene del servidor y acá
-   * el problema era doble: sin update optimista la barra esperaba el round-trip,
-   * y encima ninguna action revalidaba las rutas `/m/...`, así que el dato del
-   * servidor llegaba viejo y hacía falta recargar a mano. Lo segundo se arregló
-   * en `revalidarIngresos`; esto resuelve lo primero.
+   * BARRA AL INSTANTE, sin rebote. Antes era `useOptimistic` y se llenaba y se
+   * vaciaba sola: React suelta el optimista al cerrar la transición y
+   * `router.refresh()` no es esperable, así que cerraba antes de que llegaran
+   * las props frescas. El anticipo ahora se sostiene hasta que el servidor
+   * REFLEJE el monto (comparando valores, no esperando un tiempo).
    */
-  const [recibido, sumarRecibido] = useOptimistic(
-    received,
-    (estado: Record<string, number>, nuevo: { id: string; amount: number }) => ({
-      ...estado,
-      [nuevo.id]: (estado[nuevo.id] ?? 0) + nuevo.amount,
-    }),
-  );
+  const barra = useBarraAnticipada(received);
 
   const confirmCopy = () => {
     startCopy(async () => {
@@ -178,7 +171,7 @@ export function IncomeManager({
         // lateral lo pone la regla puente .m-swipe-content .m-drow.
         <MContentCard style={{ padding: 0, overflow: "hidden" }}>
           {sources.map((it) => {
-            const rec = recibido[it.id] ?? 0;
+            const rec = barra.valor(it.id);
             // Lo PLANIFICADO del mes, no el monto por pago: una quincena de 800k
             // se compara contra los 1.6M del mes (dos pagos), si no la barra
             // marcaría 100 % con la primera quincena.
@@ -334,11 +327,9 @@ export function IncomeManager({
         {receiving ? (
           <ReceiveForm
             source={receiving}
-            received={recibido[receiving.id] ?? 0}
-            onOptimista={(amount) =>
-              // Dentro de una transición: fuera de ella React descarta el optimista.
-              startRecibido(() => sumarRecibido({ id: receiving.id, amount }))
-            }
+            received={barra.valor(receiving.id)}
+            onAnticipar={(amount) => barra.anticipar(receiving.id, amount)}
+            onFallo={() => barra.cancelar(receiving.id)}
             onSuccess={() => setReceiving(null)}
           />
         ) : null}
@@ -452,13 +443,16 @@ export function ReceiveForm({
   source,
   received,
   onSuccess,
-  onOptimista,
+  onAnticipar,
+  onFallo,
 }: {
   source: BudgetItem;
   received: number;
   onSuccess: () => void;
   /** Pinta el monto en la barra ANTES de que vuelva el servidor. */
-  onOptimista?: (amount: number) => void;
+  onAnticipar?: (amount: number) => void;
+  /** Suelta el anticipo: la escritura falló. */
+  onFallo?: () => void;
 }) {
   const [amount, setAmount] = useState<number | undefined>(suggestedReceipt(source, received));
   const todayISO = useCaptureToday();
@@ -471,10 +465,12 @@ export function ReceiveForm({
   return (
     <FormShell
       action={async (v: typeof values) => {
-        // El optimista se aplica al ENVIAR, no al volver: es justamente el hueco
-        // que hacía falta tapar (la barra quieta durante todo el round-trip).
-        if (amount && amount > 0) onOptimista?.(amount);
-        return receivePartialIncomeAction(v);
+        // Se anticipa al ENVIAR (el hueco era la barra quieta todo el round-trip)
+        // y se SUELTA si la escritura falla: nunca un número que baja sin razón.
+        if (amount && amount > 0) onAnticipar?.(amount);
+        const res = await receivePartialIncomeAction(v);
+        if (!res.ok) onFallo?.();
+        return res;
       }}
       values={values}
       submitLabel="Registrar recibido"
