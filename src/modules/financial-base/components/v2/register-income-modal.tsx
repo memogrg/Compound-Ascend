@@ -73,10 +73,13 @@ export function RegisterIncomeModal({
   incomeTree,
   item,
   onClose,
+  onFueraDeFase,
 }: {
   incomeTree: CategoryNode[];
   item?: BudgetItem;
   onClose: () => void;
+  /** La línea de este mes quedó fuera de fase tras editar frecuencia/ancla. */
+  onFueraDeFase?: (item: BudgetItem) => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -190,13 +193,24 @@ export function RegisterIncomeModal({
     el?.querySelector<HTMLElement>("button")?.focus();
   }, [showSubWarn]);
 
-  const finish = (res: { ok: boolean; message?: string }, okMsg: string) => {
+  const finish = (
+    res: { ok: boolean; message?: string; agendadoPara?: string; fueraDeFase?: boolean },
+    okMsg: string,
+  ) => {
     setPending(false);
-    if (res.ok) {
-      toast(okMsg);
-      onClose();
-      router.refresh();
-    } else setError(res.message ?? "No pudimos guardar.");
+    if (!res.ok) return setError(res.message ?? "No pudimos guardar.");
+
+    // El alta puede NO haber creado línea de este mes (multi-mes anclada a
+    // futuro). Decirlo evita que parezca un fallo y que la fuente se cree dos veces.
+    toast(
+      res.agendadoPara ? `Fuente creada — primer pago agendado para ${res.agendadoPara}` : okMsg,
+    );
+    onClose();
+    router.refresh();
+
+    // Editar la frecuencia o el ancla pudo dejar la línea de este mes fuera de
+    // fase. No se borra sola: se pregunta.
+    if (res.fueraDeFase && item) onFueraDeFase?.(item);
   };
 
   const onCreateSub = async () => {

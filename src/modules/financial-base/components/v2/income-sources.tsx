@@ -11,9 +11,10 @@
  * El recibido por fuente llega ya agregado (real.incomeReceivedBySource), sumado
  * de las transacciones de ingreso confirmadas con income_source_id = la fuente.
  */
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { useCaptureToday } from "@/components/tz/timezone-context";
 import { CURRENCY_SYMBOL, formatMoney, formatPercent } from "@/lib/format";
@@ -22,6 +23,7 @@ import {
   receivePartialIncomeAction,
   deleteIncomeSourceAction,
   registerIncomeSourceAction,
+  removeOutOfPhaseIncomeLineAction,
 } from "@/modules/financial-base/api/v2-actions";
 import type { BudgetItem, IncomeType } from "@/modules/financial-base/types";
 // Motores puros: import directo del archivo, nunca del barrel (server-only).
@@ -52,7 +54,24 @@ export function IncomeSources({
   const toast = useToast();
   const today = useCaptureToday();
   const [editing, setEditing] = useState<BudgetItem | null>(null);
+  const [fueraDeFase, setFueraDeFase] = useState<BudgetItem | null>(null);
   const [, startTransition] = useTransition();
+
+  /**
+   * BARRA AL INSTANTE. `received` viene del servidor, así que hasta esta pasada
+   * la barra no se movía hasta que volviera el round-trip completo (action →
+   * revalidatePath → refetch del RSC) — y en la práctica parecía que hacía falta
+   * refrescar a mano. `useOptimistic` pinta el nuevo total apenas se confirma y
+   * lo descarta solo cuando llega el dato del servidor: si la escritura falla,
+   * la barra vuelve sola a la verdad, sin lógica de rollback nuestra.
+   */
+  const [recibido, sumarRecibido] = useOptimistic(
+    received,
+    (estado: Record<string, number>, nuevo: { id: string; amount: number }) => ({
+      ...estado,
+      [nuevo.id]: (estado[nuevo.id] ?? 0) + nuevo.amount,
+    }),
+  );
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string }>, msg: string) =>
     startTransition(async () => {
@@ -101,12 +120,22 @@ export function IncomeSources({
             <SourceRow
               key={it.id}
               it={it}
-              received={received[it.id] ?? 0}
+              received={recibido[it.id] ?? 0}
               onReceive={(amount) =>
-                run(
-                  () => receivePartialIncomeAction({ budgetItemId: it.id, amount, date: today() }),
-                  "Recibido registrado",
-                )
+                // El optimista va DENTRO de la misma transición que la escritura:
+                // fuera de ella React lo descartaría en el acto.
+                startTransition(async () => {
+                  sumarRecibido({ id: it.id, amount });
+                  const res = await receivePartialIncomeAction({
+                    budgetItemId: it.id,
+                    amount,
+                    date: today(),
+                  });
+                  if (res.ok) {
+                    toast("Recibido registrado");
+                    router.refresh();
+                  } else toast(res.message ?? "No se pudo completar", "error");
+                })
               }
               onEdit={() => setEditing(it)}
               onDuplicate={() => duplicate(it)}
@@ -121,7 +150,35 @@ export function IncomeSources({
           incomeTree={incomeTree}
           item={editing}
           onClose={() => setEditing(null)}
+          onFueraDeFase={setFueraDeFase}
         />
+      ) : null}
+
+      {/* La línea de este mes dejó de caer en fase al cambiar frecuencia/ancla.
+          Se pregunta: borrarla en silencio escondería un "recibido" ya anotado. */}
+      {fueraDeFase ? (
+        <Modal
+          title="Esta fuente ya no cae en este mes"
+          sub={`Con la nueva frecuencia, “${fueraDeFase.name}” no tiene pago este mes. Podés quitar la línea del mes; la fuente se mantiene y vuelve cuando le toque.`}
+          onClose={() => setFueraDeFase(null)}
+        >
+          <div className="modal-foot">
+            <button type="button" className="btn btn-ghost" onClick={() => setFueraDeFase(null)}>
+              Dejarla
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                const id = fueraDeFase.id;
+                setFueraDeFase(null);
+                run(() => removeOutOfPhaseIncomeLineAction(id), "Línea del mes quitada");
+              }}
+            >
+              Quitar del mes
+            </button>
+          </div>
+        </Modal>
       ) : null}
     </div>
   );

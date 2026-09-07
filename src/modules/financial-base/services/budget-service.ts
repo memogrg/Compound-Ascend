@@ -26,7 +26,11 @@ import { rollupByGroup, type GroupRollup } from "@/modules/financial-base/engine
 import { acumularNativo } from "@/modules/financial-base/engine/sobre-moneda";
 import type { BudgetItem, BudgetType, IncomeType, Period } from "@/modules/financial-base/types";
 import { monthlyPlanned, type Frequency } from "@/modules/financial-base/engine/monthlyize";
-import { caeEnElPeriodo, requiereAncla } from "@/modules/financial-base/engine/income-schedule";
+import {
+  caeEnElPeriodo,
+  requiereAncla,
+  proximosPeriodos,
+} from "@/modules/financial-base/engine/income-schedule";
 import type {
   BudgetItemInput,
   IncomeSourceInput,
@@ -310,16 +314,49 @@ async function createRecurringTemplate(
   return data!.id;
 }
 
+/** Resultado del alta: si hubo línea de este mes, y para cuándo quedó agendada si no. */
+export type AltaFuenteIngreso = {
+  /** Id de la línea del periodo. `null` cuando a la fuente no le toca este mes. */
+  budgetItemId: string | null;
+  /** Periodo del PRIMER pago; sólo viaja cuando no se creó línea. */
+  agendadoPara: { year: number; month: number } | null;
+};
+
+/**
+ * Da de alta una fuente de ingreso.
+ *
+ * EL ANCLA MANDA. Antes la línea de `budget_items` se insertaba SIEMPRE en el
+ * periodo de `occurredOn`, sin mirar la agenda: una fuente cada-2-meses anclada
+ * en octubre aparecía en septiembre. El ancla quedaba bien guardada en la
+ * plantilla, pero el alta ya había escrito el mes equivocado.
+ *
+ * Ahora, en las frecuencias multi-mes, la línea del mes se crea sólo si le toca;
+ * si no, se crea SOLO la plantilla y `ensureRecurringIncome` materializa la línea
+ * cuando llegue su mes. El resultado dice cuál de los dos caminos se tomó para
+ * que la UI pueda avisarlo — sin ese aviso el alta parece fallida y la persona
+ * la crea otra vez.
+ */
 export async function registerIncomeSource(
   input: IncomeSourceInput,
   holdingId?: string | null,
-): Promise<string> {
+): Promise<AltaFuenteIngreso> {
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
   const period = periodFromDate(input.occurredOn);
+  const frequency = (input.recurrent ? input.frequency : "mensual") as Frequency;
+  const ancla = input.recurrent ? anclaDe(input.frequency, input.nextDate) : null;
   const recurringItemId = input.recurrent
     ? await createRecurringTemplate(supabase, user.id, input)
     : null;
+
+  // La compuerta se aplica SÓLO a las multi-mes: son las únicas con ancla. Sin
+  // este filtro, una frecuencia sin agenda ('unico') no crearía línea nunca —
+  // ni acá ni en ensureRecurringIncome — y la fuente desaparecería en silencio.
+  if (input.recurrent && requiereAncla(frequency) && !caeEnElPeriodo(frequency, ancla, period)) {
+    const [primero] = proximosPeriodos(frequency, ancla, period, 1);
+    return { budgetItemId: null, agendadoPara: primero ?? null };
+  }
+
   const household_id = await getActiveHouseholdId(supabase, user.id);
   const { data, error } = await supabase
     .from("budget_items")
@@ -333,7 +370,7 @@ export async function registerIncomeSource(
       name: input.name,
       amount: input.amount,
       currency: input.currency,
-      frequency: input.recurrent ? input.frequency : "mensual",
+      frequency,
       period_month: period.month,
       period_year: period.year,
       income_type: input.incomeType,
@@ -343,10 +380,13 @@ export async function registerIncomeSource(
     .select("id")
     .single();
   if (error) throw new Error(error.message);
-  return data!.id;
+  return { budgetItemId: data!.id, agendadoPara: null };
 }
 
-export async function updateIncomeSource(id: string, input: IncomeSourceInput): Promise<void> {
+export async function updateIncomeSource(
+  id: string,
+  input: IncomeSourceInput,
+): Promise<{ fueraDeFase: boolean }> {
   await assertManualItem(id);
   const user = await requireUser();
   const supabase = await createSupabaseServerClient();
@@ -386,19 +426,43 @@ export async function updateIncomeSource(id: string, input: IncomeSourceInput): 
   }
 
   const period = periodFromDate(input.occurredOn);
+  const frequency = (input.recurrent ? input.frequency : "mensual") as Frequency;
   await updateBudgetItem(id, {
     type: "income",
     categoryId: input.categoryId ?? null,
     name: input.name,
     amount: input.amount,
     currency: input.currency,
-    frequency: input.recurrent ? input.frequency : "mensual",
+    frequency,
     periodMonth: period.month,
     periodYear: period.year,
     incomeType: input.incomeType,
     recurringItemId,
     holdingId,
   });
+
+  // Cambiar la frecuencia o el ancla puede dejar la línea de este mes fuera de
+  // fase (p. ej. pasarla a bimestral anclada en octubre estando en septiembre).
+  // NO se borra en silencio: se avisa y la persona decide — borrar una línea que
+  // ya tiene "recibido" registrado le haría perder el movimiento de vista.
+  const ancla = input.recurrent ? anclaDe(input.frequency, input.nextDate) : null;
+  const fueraDeFase =
+    input.recurrent && requiereAncla(frequency) && !caeEnElPeriodo(frequency, ancla, period);
+  return { fueraDeFase };
+}
+
+/**
+ * Quita SOLO la línea del mes, conservando la plantilla recurrente. Es la salida
+ * del aviso de "fuera de fase": la fuente sigue existiendo y volverá a
+ * materializarse en el mes que le toque; lo que se retira es la línea del mes
+ * en que ya no cae. Distinto de `deleteIncomeSource`, que borra las dos cosas.
+ */
+export async function removeOutOfPhaseIncomeLine(id: string): Promise<void> {
+  await assertManualItem(id);
+  const user = await requireUser();
+  const supabase = await createSupabaseServerClient();
+  await supabase.from("budget_items").delete().eq("id", id).eq("user_id", user.id);
+  await logHouseholdDeletion(supabase, { userId: user.id, table: "budget_items", rowId: id });
 }
 
 export async function deleteIncomeSource(id: string): Promise<void> {
