@@ -41,6 +41,14 @@ describe("wrappers de tiempo bajo reloj virtual", () => {
   });
 
   it("sin reloj activo: el comportamiento actual no cambia (día real en UTC)", async () => {
-    expect(await userToday()).toBe(new Date().toISOString().slice(0, 10));
+    // Las dos lecturas del reloj están separadas por un await, así que una corrida
+    // que cruce la medianoche UTC las vería en días distintos y el test fallaría
+    // por calendario, no por un bug. La ventana es de milisegundos y se abre una
+    // vez al día, que es justo la forma de un flake irreproducible: se acota
+    // aceptando cualquiera de los dos días que abarcó la medición.
+    const antes = new Date().toISOString().slice(0, 10);
+    const hoy = await userToday();
+    const despues = new Date().toISOString().slice(0, 10);
+    expect([antes, despues]).toContain(hoy);
   });
 });
