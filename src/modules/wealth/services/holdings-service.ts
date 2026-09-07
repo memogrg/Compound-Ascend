@@ -58,13 +58,21 @@ export function rowToHolding(r: {
   region?: string | null;
   is_recurring?: boolean | null;
   monthly_contribution?: number | null;
-  pays_dividends?: boolean | null;
-  dividend_mode?: string | null;
-  dividend_yield_pct?: number | null;
-  dividend_amount?: number | null;
-  dividend_frequency?: string | null;
-  dividend_withholding_pct?: number | null;
-  dividend_next_date?: string | null;
+  payout_enabled?: boolean | null;
+  payout_mode?: string | null;
+  payout_rate_pct?: number | null;
+  payout_amount?: number | null;
+  payout_frequency?: string | null;
+  payout_withholding_pct?: number | null;
+  payout_next_date?: string | null;
+  note_issuer?: string | null;
+  note_underlying?: string | null;
+  note_capital_protection_pct?: number | null;
+  note_barrier_pct?: number | null;
+  note_autocall?: boolean | null;
+  note_autocall_date?: string | null;
+  note_participation_pct?: number | null;
+  note_isin?: string | null;
   purchase_price?: number | null;
   closing_costs?: number | null;
   vacancy_pct?: number | null;
@@ -106,13 +114,23 @@ export function rowToHolding(r: {
     region: r.region ?? null,
     isRecurring: r.is_recurring ?? false,
     monthlyContribution: r.monthly_contribution == null ? null : Number(r.monthly_contribution),
-    paysDividends: r.pays_dividends ?? false,
-    dividendMode: (r.dividend_mode ?? null) as "yield" | "manual" | null,
-    dividendYieldPct: r.dividend_yield_pct == null ? null : Number(r.dividend_yield_pct),
-    dividendAmount: r.dividend_amount == null ? null : Number(r.dividend_amount),
-    dividendFrequency: r.dividend_frequency ?? null,
-    dividendWithholdingPct: Number(r.dividend_withholding_pct ?? 0),
-    dividendNextDate: r.dividend_next_date ?? null,
+    payoutEnabled: r.payout_enabled ?? false,
+    payoutMode: (r.payout_mode ?? null) as "yield" | "manual" | null,
+    payoutRatePct: r.payout_rate_pct == null ? null : Number(r.payout_rate_pct),
+    payoutAmount: r.payout_amount == null ? null : Number(r.payout_amount),
+    payoutFrequency: r.payout_frequency ?? null,
+    payoutWithholdingPct: Number(r.payout_withholding_pct ?? 0),
+    payoutNextDate: r.payout_next_date ?? null,
+    noteIssuer: r.note_issuer ?? null,
+    noteUnderlying: r.note_underlying ?? null,
+    noteCapitalProtectionPct:
+      r.note_capital_protection_pct == null ? null : Number(r.note_capital_protection_pct),
+    noteBarrierPct: r.note_barrier_pct == null ? null : Number(r.note_barrier_pct),
+    noteAutocall: r.note_autocall ?? false,
+    noteAutocallDate: r.note_autocall_date ?? null,
+    noteParticipationPct:
+      r.note_participation_pct == null ? null : Number(r.note_participation_pct),
+    noteIsin: r.note_isin ?? null,
     purchasePrice: r.purchase_price == null ? null : Number(r.purchase_price),
     closingCosts: r.closing_costs == null ? null : Number(r.closing_costs),
     vacancyPct: r.vacancy_pct == null ? null : Number(r.vacancy_pct),
@@ -127,7 +145,7 @@ export function rowToHolding(r: {
 }
 
 export const HOLDING_COLS =
-  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,updated_at,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date,term_years,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct,dividend_next_date";
+  "id,investment_id,symbol,asset_type,quantity,average_cost,purchase_date,broker,currency,label,updated_at,current_value_manual,rental_income,rental_frequency,rental_subtype,needs_detail,nature,category,income_month,region,is_recurring,monthly_contribution,purchase_price,closing_costs,vacancy_pct,mgmt_pct,maintenance_monthly,hoa_monthly,property_tax_annual,insurance_annual,services_monthly,debt_id,annual_rate_pct,maturity_date,term_years,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct,payout_next_date,note_issuer,note_underlying,note_capital_protection_pct,note_barrier_pct,note_autocall,note_autocall_date,note_participation_pct,note_isin";
 
 const QUOTED_TYPES = new Set(["etf", "accion", "cripto"]);
 
@@ -298,39 +316,72 @@ function taxonomyColumns(input: HoldingInput) {
     // Solo el recurrente lleva aporte mensual; el resto lo deja en NULL.
     monthly_contribution: input.isRecurring ? (input.monthlyContribution ?? null) : null,
     ...dividendPayload(input),
+    ...notaPayload(input),
   };
 }
 
 /**
- * Config de dividendos → columnas. Todo cuelga de `pays_dividends`: al apagarlo
+ * Términos de la nota estructurada. Sólo se guardan si el activo ES una nota:
+ * dejarlos en otro tipo llenaría columnas que ninguna pantalla lee y que la
+ * lectura de riesgo tomaría por buenas si algún día ese holding cambia de tipo.
+ */
+function notaPayload(input: HoldingInput) {
+  if (input.assetType !== "nota_estructurada") {
+    return {
+      note_issuer: null,
+      note_underlying: null,
+      note_capital_protection_pct: null,
+      note_barrier_pct: null,
+      note_autocall: false,
+      note_autocall_date: null,
+      note_participation_pct: null,
+      note_isin: null,
+    };
+  }
+  return {
+    note_issuer: input.noteIssuer ?? null,
+    note_underlying: input.noteUnderlying ?? null,
+    note_capital_protection_pct: input.noteCapitalProtectionPct ?? null,
+    note_barrier_pct: input.noteBarrierPct ?? null,
+    note_autocall: input.noteAutocall ?? false,
+    // Sin autocall no hay fecha de observación: guardarla dejaría una alerta
+    // creándose por una condición que la nota no tiene.
+    note_autocall_date: input.noteAutocall ? input.noteAutocallDate || null : null,
+    note_participation_pct: input.noteParticipationPct ?? null,
+    note_isin: input.noteIsin ?? null,
+  };
+}
+
+/**
+ * Config de dividendos → columnas. Todo cuelga de `payout_enabled`: al apagarlo
  * se LIMPIA el resto en vez de dejarlo colgando, porque de esas columnas sale la
  * proyección de ingreso pasivo — una config huérfana seguiría proyectando plata
  * que el usuario ya dijo que no recibe.
  *
- * Y sólo se guarda el campo del modo elegido: dejar `dividend_amount` poblado
+ * Y sólo se guarda el campo del modo elegido: dejar `payout_amount` poblado
  * con modo 'yield' invita a que alguien lo lea sin mirar el modo.
  */
 function dividendPayload(input: HoldingInput) {
-  if (!input.paysDividends) {
+  if (!input.payoutEnabled) {
     return {
-      pays_dividends: false,
-      dividend_mode: null,
-      dividend_yield_pct: null,
-      dividend_amount: null,
-      dividend_frequency: null,
-      dividend_withholding_pct: 0,
-      dividend_next_date: null,
+      payout_enabled: false,
+      payout_mode: null,
+      payout_rate_pct: null,
+      payout_amount: null,
+      payout_frequency: null,
+      payout_withholding_pct: 0,
+      payout_next_date: null,
     };
   }
-  const modo = input.dividendMode ?? "yield";
+  const modo = input.payoutMode ?? "yield";
   return {
-    pays_dividends: true,
-    dividend_mode: modo,
-    dividend_yield_pct: modo === "yield" ? (input.dividendYieldPct ?? null) : null,
-    dividend_amount: modo === "manual" ? (input.dividendAmount ?? null) : null,
-    dividend_frequency: input.dividendFrequency ?? "trimestral",
-    dividend_withholding_pct: input.dividendWithholdingPct ?? 0,
-    dividend_next_date: input.dividendNextDate || null,
+    payout_enabled: true,
+    payout_mode: modo,
+    payout_rate_pct: modo === "yield" ? (input.payoutRatePct ?? null) : null,
+    payout_amount: modo === "manual" ? (input.payoutAmount ?? null) : null,
+    payout_frequency: input.payoutFrequency ?? "trimestral",
+    payout_withholding_pct: input.payoutWithholdingPct ?? 0,
+    payout_next_date: input.payoutNextDate || null,
   };
 }
 
@@ -498,6 +549,18 @@ export async function createHolding(input: HoldingInput, ctx?: AuthContext): Pro
   if (error) throw new Error(error.message);
 
   if (canMerge && created) await recordPurchaseTx(supabase, userId, created.id, input);
+
+  // Nota estructurada: vencimiento y observación de autocall generan alertas por
+  // fecha en el riel que ya existe (price_alerts kind='vesting'), con su cron y
+  // su gestor. Best-effort e idempotente.
+  const idNota = created?.id ?? existing?.id ?? null;
+  if (input.assetType === "nota_estructurada" && idNota) {
+    const { syncNoteDateAlerts } = await import("@/modules/wealth/services/price-alerts-service");
+    await syncNoteDateAlerts(idNota, {
+      maturityDate: input.maturityDate,
+      autocallDate: input.noteAutocall ? input.noteAutocallDate : null,
+    });
+  }
 
   // Compra nueva: el holding existe primero (la transacción lo referencia);
   // si el gasto vinculado falla, se compensa borrando el holding recién creado.
@@ -717,6 +780,17 @@ export async function updateHolding(id: string, input: HoldingInput): Promise<vo
     if (txnId) await deleteLinkedTransaction(txnId);
     throw new Error(error.message);
   }
+
+  // Re-sincroniza las alertas por fecha: si el usuario movió el vencimiento o
+  // apagó el autocall, `syncNoteDateAlerts` borra las que ya no corresponden.
+  // Se llama SIEMPRE (no sólo para notas): si un holding dejó de serlo, hay que
+  // retirarle las alertas que tenía.
+  const { syncNoteDateAlerts } = await import("@/modules/wealth/services/price-alerts-service");
+  await syncNoteDateAlerts(id, {
+    maturityDate: input.assetType === "nota_estructurada" ? input.maturityDate : null,
+    autocallDate:
+      input.assetType === "nota_estructurada" && input.noteAutocall ? input.noteAutocallDate : null,
+  });
 }
 
 /**

@@ -695,15 +695,24 @@ export type InvestmentHoldingRow = Timestamps &
     // Aporte mensual separado del total invertido (migración 20260623000001).
     monthly_contribution: number | null;
     // Dividendos configurados a nivel del holding (migración 20260907000001).
-    // `dividend_frequency` usa la grafía 'bimensual' (la de monthlyize), NO
+    // `payout_frequency` usa la grafía 'bimensual' (la de monthlyize), NO
     // 'bimestral': dos grafías romperían el lookup del mensualizado en silencio.
-    pays_dividends: boolean;
-    dividend_mode: string | null;
-    dividend_yield_pct: number | null;
-    dividend_amount: number | null;
-    dividend_frequency: string | null;
-    dividend_withholding_pct: number;
-    dividend_next_date: string | null;
+    payout_enabled: boolean;
+    payout_mode: string | null;
+    payout_rate_pct: number | null;
+    payout_amount: number | null;
+    payout_frequency: string | null;
+    payout_withholding_pct: number;
+    payout_next_date: string | null;
+    // Notas estructuradas (migración 20260907000002).
+    note_issuer: string | null;
+    note_underlying: string | null;
+    note_capital_protection_pct: number | null;
+    note_barrier_pct: number | null;
+    note_autocall: boolean;
+    note_autocall_date: string | null;
+    note_participation_pct: number | null;
+    note_isin: string | null;
     // Inmueble de renta: costos operativos para ROI (migración 20260628000002).
     purchase_price: number | null;
     closing_costs: number | null;

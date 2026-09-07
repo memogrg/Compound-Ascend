@@ -328,3 +328,68 @@ export async function markInvestmentAlertTriggered(
     .update({ triggered_at: triggeredAtIso, active: oneShot ? false : true })
     .eq("id", id);
 }
+
+/**
+ * Sincroniza las alertas por FECHA de una nota estructurada: vencimiento y
+ * observación de autocall.
+ *
+ * Van por `kind='vesting'` —el riel que ya existe, con su cron, su gestor y su
+ * notificación— en vez de un mecanismo nuevo. El usuario las ve, las edita y las
+ * borra en el gestor de alertas como cualquier otra.
+ *
+ * IDEMPOTENTE POR FECHA: la identidad de una alerta de nota es
+ * (holding, kind='vesting', trigger_date). Se borran las vesting de ese holding
+ * cuyas fechas ya no correspondan —el usuario movió el vencimiento— y se crean
+ * las que falten. Sin ese barrido, cambiar una fecha dejaría avisando la vieja.
+ *
+ * Best-effort: guardar la nota no puede fallar porque no se pudo crear un aviso.
+ */
+export async function syncNoteDateAlerts(
+  holdingId: string,
+  fechas: { maturityDate?: string | null; autocallDate?: string | null },
+): Promise<void> {
+  try {
+    const user = await requireUser();
+    const supabase = await createSupabaseServerClient();
+    const household_id = await getActiveHouseholdId(supabase, user.id);
+
+    const deseadas = [fechas.maturityDate, fechas.autocallDate].filter(
+      (f): f is string => typeof f === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f),
+    );
+
+    const { data: existentes } = await supabase
+      .from("price_alerts")
+      .select("id,trigger_date")
+      .eq("user_id", user.id)
+      .eq("holding_id", holdingId)
+      .eq("kind", "vesting");
+
+    // Sobrantes: fechas que ya no están en la nota.
+    const sobran = (existentes ?? [])
+      .filter((a) => !a.trigger_date || !deseadas.includes(a.trigger_date))
+      .map((a) => a.id);
+    if (sobran.length > 0) {
+      await supabase.from("price_alerts").delete().in("id", sobran).eq("user_id", user.id);
+    }
+
+    const yaEstan = new Set(
+      (existentes ?? []).map((a) => a.trigger_date).filter((d): d is string => Boolean(d)),
+    );
+    const faltan = deseadas.filter((f) => !yaEstan.has(f));
+    if (faltan.length === 0) return;
+
+    await supabase.from("price_alerts").insert(
+      faltan.map((trigger_date) => ({
+        user_id: user.id,
+        household_id,
+        holding_id: holdingId,
+        kind: "vesting",
+        trigger_date,
+        active: true,
+        one_shot: true,
+      })),
+    );
+  } catch {
+    // no bloquea el guardado de la nota.
+  }
+}

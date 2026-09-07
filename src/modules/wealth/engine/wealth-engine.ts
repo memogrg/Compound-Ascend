@@ -235,6 +235,7 @@ const ASSET_LABEL: Record<AssetType, string> = {
   commodity: "Commodities",
   arte: "Arte",
   nft: "NFTs",
+  nota_estructurada: "Notas estructuradas",
   otro: "Otros",
 };
 

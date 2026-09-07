@@ -155,6 +155,15 @@ export const CATEGORY_META: Record<InvestmentCategory, CategoryMeta> = {
     defaultAssetType: "cripto",
     quoted: true,
   },
+  nota_estructurada: {
+    nature: "growth",
+    label: "Notas estructuradas",
+    icon: "invest",
+    // NO cotiza: su valor lo pone el usuario (o el estado de cuenta del emisor),
+    // así que hereda el aviso de "valuada por vos" que ya existe.
+    defaultAssetType: "nota_estructurada",
+    quoted: false,
+  },
   alternativo: {
     nature: "growth",
     label: "Activos alternativos",
@@ -186,3 +195,31 @@ export const CASHFLOW_CATEGORIES: InvestmentCategory[] = categoriesOfNature("cas
 
 /** Slugs de naturaleza 'growth' (crecimiento patrimonial), en orden de declaración. */
 export const GROWTH_CATEGORIES: InvestmentCategory[] = categoriesOfNature("growth");
+
+/**
+ * Cómo se LLAMA el rendimiento periódico de cada tipo de activo.
+ *
+ * Una acción paga dividendos; una nota estructurada y un bono pagan cupón. Las
+ * columnas son las mismas (`payout_*`) porque el cálculo es el mismo, pero el
+ * nombre NO puede serlo: una nota que pregunta "¿te llegó el dividendo?" suena
+ * a que el producto no entiende lo que el usuario compró.
+ *
+ * Vive acá, en `constants`, a propósito: es la única ruta que el lint permite
+ * importar entre módulos, así que el detector de insights, el wizard y el
+ * detalle leen la MISMA etiqueta en vez de repetir un `if` cada uno.
+ */
+const PAYOUT_LABEL: Partial<Record<AssetType, { singular: string; plural: string }>> = {
+  accion: { singular: "dividendo", plural: "dividendos" },
+  etf: { singular: "dividendo", plural: "dividendos" },
+  nota_estructurada: { singular: "cupón", plural: "cupones" },
+  bono: { singular: "cupón", plural: "cupones" },
+  certificado: { singular: "interés", plural: "intereses" },
+};
+
+/** Nombre del pago periódico de ese activo. Genérico si el tipo no lo define. */
+export function etiquetaPayout(assetType: AssetType | null | undefined): {
+  singular: string;
+  plural: string;
+} {
+  return (assetType ? PAYOUT_LABEL[assetType] : undefined) ?? { singular: "pago", plural: "pagos" };
+}
