@@ -1,45 +1,17 @@
 import { Icon } from "@/components/ui/icon";
-import { DeleteButton } from "./delete-button";
+import { GoalCard } from "./goal-card";
 // Fase 4.1 (interconexión): botón Retirar — aditivo, coordinar con el owner
 // de esta pantalla. El componente es autocontenido (goal-withdraw-button).
-import { PagoVinculadoButton } from "./pago-vinculado-button";
-import { GoalWithdrawButton } from "./goal-withdraw-button";
-import { GoalSpendButton } from "./goal-spend-button";
-import { GoalDetailButton } from "./goal-detail-button";
-import { EditControlButton, AddControlButton } from "./control-actions";
+import { AddControlButton } from "./control-actions";
 import { formatMoney } from "@/lib/format";
 import { groupByJar, type CategoryNode } from "@/modules/financial-base";
 import type { ControlSummary } from "@/modules/control/services/control-service";
-import type { GoalAction, SavingsGoal, Semaforo } from "@/modules/control/types";
+import type { Semaforo } from "@/modules/control/types";
 
 const SEMAFORO: Record<Semaforo, { label: string; color: string }> = {
   verde: { label: "Saludable", color: "var(--pos)" },
   amarillo: { label: "Requiere ajustes", color: "var(--warn)" },
   rojo: { label: "Acción urgente", color: "var(--neg)" },
-};
-
-const RECURRENCE_LABEL: Record<string, string> = {
-  mensual: "Mensual",
-  trimestral: "Trimestral",
-  semestral: "Semestral",
-  anual: "Anual",
-};
-
-function fmtResetDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("es-CR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-const ACTION: Record<GoalAction, { label: string; color: string; bg: string }> = {
-  mantener: { label: "Mantener", color: "var(--pos)", bg: "var(--pos-soft)" },
-  acelerar: { label: "Acelerar", color: "var(--info)", bg: "var(--info-soft)" },
-  reducir: { label: "Reducir", color: "var(--warn)", bg: "var(--warn-soft)" },
-  pausar: { label: "Pausar", color: "var(--neg)", bg: "var(--neg-soft)" },
-  convertir: { label: "Convertir a inversión", color: "var(--c-invest)", bg: "var(--info-soft)" },
-  replantear: { label: "Replantear", color: "var(--warn)", bg: "var(--warn-soft)" },
 };
 
 export function ControlDashboard({
@@ -310,79 +282,6 @@ export function ControlDashboard({
 }
 
 /** Tarjeta de un objetivo (idéntica a antes); extraída para agrupar por frasco. */
-function GoalCard({
-  g,
-  d,
-  currency,
-}: {
-  g: SavingsGoal;
-  d: ControlSummary["diagnosis"];
-  currency: string;
-}) {
-  const rec = d.goalRecs.find((r) => r.goalId === g.id);
-  const a = rec ? ACTION[rec.action] : ACTION.mantener;
-  // Un sobre acumula sin meta: no hay barra ni % de progreso.
-  const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
-  const progress = g.targetAmount > 0 ? Math.min(100, (g.currentAmount / g.targetAmount) * 100) : 0;
-  return (
-    <div className="goal">
-      <div className="gt">
-        <span className="gn">{g.name}</span>
-        <span className="chip" style={{ background: a.bg, color: a.color, fontWeight: 700 }}>
-          {a.label}
-        </span>
-      </div>
-      {isSobre ? null : (
-        <div className="bar">
-          <div className="fl" style={{ width: `${progress}%` }} />
-        </div>
-      )}
-      <div className="gs">
-        <span className="gnum">{formatMoney(g.currentAmount, g.currency)}</span>
-        {isSobre ? (
-          <span className="muted"> · acumulado (sobre)</span>
-        ) : (
-          <> / {formatMoney(g.targetAmount, g.currency)}</>
-        )}
-        {rec?.reason ? <> · {rec.reason}</> : null}
-      </div>
-      {g.recurrence && g.recurrence !== "ninguna" ? (
-        <div
-          className="gs tip tip-wrap"
-          data-tip="Frasco recurrente: al llegar la fecha, la meta se restaura al monto del período y lo no gastado se arrastra."
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "help" }}
-        >
-          <span
-            className="chip"
-            style={{ background: "var(--info-soft)", color: "var(--info)", fontWeight: 700 }}
-          >
-            {RECURRENCE_LABEL[g.recurrence] ?? "Recurrente"}
-          </span>
-          {g.nextResetOn ? (
-            <span className="muted">Próximo reinicio: {fmtResetDate(g.nextResetOn)}</span>
-          ) : null}
-        </div>
-      ) : null}
-      {/* Referencia "dónde está el dinero" (stored_in), discreta y solo si tiene valor. */}
-      {g.storedIn ? (
-        <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-          {g.storedIn}
-        </div>
-      ) : null}
-      <div className="acts">
-        <GoalDetailButton goal={g} />
-        {/* Aportar va PRIMERO y como acción primaria: es lo que se hace todos los meses;
-            gastar y retirar son excepciones. */}
-        <PagoVinculadoButton kind="meta" id={g.id} name={g.name} />
-        <GoalSpendButton goal={g} />
-        <GoalWithdrawButton goal={g} />
-        <EditControlButton kind="goal" item={g} currency={currency} />
-        <DeleteButton id={g.id} kind="goal" />
-      </div>
-    </div>
-  );
-}
-
 function Empty({ text, action }: { text: string; action?: React.ReactNode }) {
   return (
     <div
