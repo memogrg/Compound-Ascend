@@ -56,6 +56,10 @@ const ACTIONS: Record<InsightKind, InsightAction> = {
   ritual_patrimonio: { label: "revisar el marco patrimonial", route: "/mi-rich-life" },
   perfil_revision: { label: "revisar el perfil financiero", route: "/mi-perfil-financiero" },
   alerta_precio: { label: "revisar la alerta en el portafolio", route: "/patrimonio" },
+  dividendo_por_cobrar: {
+    label: "registrar el dividendo que cobraste",
+    route: "/patrimonio",
+  },
   frecuencia_ingreso_revisar: {
     label: "revisar la frecuencia de esa fuente de ingreso",
     route: "/ingresos",

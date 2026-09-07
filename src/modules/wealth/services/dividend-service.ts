@@ -28,6 +28,14 @@ import {
 import { logHouseholdDeletion } from "@/lib/household/activity-log";
 import type { DividendInput } from "@/modules/wealth/schemas";
 import type { Dividend } from "@/modules/wealth/types";
+import { esFrecuenciaPago, proximaFechaPago } from "@/lib/finance/rendimiento-periodico";
+
+/** Día siguiente en ISO, sin zona horaria de por medio (fecha pura). */
+function sumarUnDia(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 function rowToDividend(r: {
   id: string;
@@ -114,6 +122,40 @@ export async function createDividend(input: DividendInput): Promise<void> {
     .single();
   if (divErr) throw new Error(divErr.message);
 
+  // 1b) Avanza el ANCLA del próximo pago si esta posición tiene dividendos
+  //     configurados. Es lo que cierra el ciclo del recordatorio: sin esto, el
+  //     aviso "¿te llegó el dividendo?" quedaría pegado en la fecha vieja aunque
+  //     el usuario ya lo hubiera registrado. Best-effort: registrar el cobro no
+  //     puede fallar porque no se pudo mover una fecha.
+  try {
+    const { data: cfg } = await supabase
+      .from("investment_holdings")
+      .select("pays_dividends,dividend_frequency,dividend_next_date")
+      .eq("id", input.holdingId)
+      .in("user_id", scope)
+      .maybeSingle();
+    if (cfg?.pays_dividends && esFrecuenciaPago(cfg.dividend_frequency)) {
+      // Desde el DÍA SIGUIENTE al pago registrado: si se calculara desde la
+      // misma fecha, `proximaFechaPago` devolvería esa misma fecha (es >= hoy)
+      // y el ancla no avanzaría.
+      const desde = sumarUnDia(input.paymentDate);
+      const siguiente = proximaFechaPago(
+        cfg.dividend_next_date ?? input.paymentDate,
+        cfg.dividend_frequency,
+        desde,
+      );
+      if (siguiente) {
+        await supabase
+          .from("investment_holdings")
+          .update({ dividend_next_date: siguiente })
+          .eq("id", input.holdingId)
+          .in("user_id", scope);
+      }
+    }
+  } catch {
+    // no bloquea el registro del cobro.
+  }
+
   // 2) Materializa la línea derivada de dividendos del periodo (promedio 12m,
   //    source_kind='dividend') y obtén su id para la barra "Recibido".
   const [py, pm] = input.paymentDate.split("-").map(Number);
@@ -186,4 +228,64 @@ export async function deleteDividend(id: string): Promise<void> {
     // deleteLinkedTransaction registra por su cuenta el borrado de la transacción.
     await deleteLinkedTransaction(row.transaction_id);
   }
+}
+
+/**
+ * Posiciones con dividendos configurados, con lo necesario para el recordatorio
+ * de cobro: la config, la base del yield y la fecha del último pago YA
+ * registrado (para no avisar de algo ya cobrado).
+ *
+ * Devuelve la forma que consume `detectDividendosPorCobrar`; el cálculo del
+ * monto vive en el motor, no acá.
+ */
+export async function listDividendosPorCobrar(
+  ctx?: AuthContext,
+): Promise<import("@/lib/insights/dividendo-cobro").HoldingConDividendo[]> {
+  const { db: supabase, userId } = await resolveAuth(ctx);
+  const memberIds = await householdMemberIds(supabase, userId);
+
+  const { data: holdings } = await supabase
+    .from("investment_holdings")
+    .select(
+      "id,label,symbol,currency,quantity,average_cost,current_value_manual,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct,dividend_next_date",
+    )
+    .in("user_id", memberIds)
+    .eq("pays_dividends", true);
+  if (!holdings || holdings.length === 0) return [];
+
+  // Último pago registrado por posición, en UNA consulta: N+1 acá costaría una
+  // query por holding en cada refresh de insights.
+  const { data: pagos } = await supabase
+    .from("dividends")
+    .select("holding_id,payment_date")
+    .in("user_id", memberIds)
+    .in(
+      "holding_id",
+      holdings.map((h) => h.id),
+    )
+    .order("payment_date", { ascending: false });
+  const ultimoPorHolding = new Map<string, string>();
+  for (const p of pagos ?? []) {
+    if (!ultimoPorHolding.has(p.holding_id)) ultimoPorHolding.set(p.holding_id, p.payment_date);
+  }
+
+  return holdings.map((h) => {
+    const invertido = Number(h.quantity ?? 0) * Number(h.average_cost ?? 0);
+    return {
+      id: h.id,
+      label: h.label ?? h.symbol ?? "tu posición",
+      currency: h.currency,
+      // Misma base que la proyección: el valor manual manda, si no lo invertido.
+      base: Number(h.current_value_manual ?? 0) || invertido,
+      paysDividends: h.pays_dividends ?? false,
+      dividendMode: h.dividend_mode,
+      dividendYieldPct: h.dividend_yield_pct == null ? null : Number(h.dividend_yield_pct),
+      dividendAmount: h.dividend_amount == null ? null : Number(h.dividend_amount),
+      dividendFrequency: h.dividend_frequency,
+      dividendWithholdingPct:
+        h.dividend_withholding_pct == null ? null : Number(h.dividend_withholding_pct),
+      dividendNextDate: h.dividend_next_date,
+      ultimoPagoRegistrado: ultimoPorHolding.get(h.id) ?? null,
+    };
+  });
 }

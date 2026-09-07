@@ -105,6 +105,19 @@ export async function refreshInsights(ctx?: AuthContext): Promise<void> {
       // best-effort: si falla, no bloquea el resto de los insights.
     }
     try {
+      // Dividendos configurados cuya fecha de pago ya llegó. La fecha se compara
+      // en la zona del USUARIO: el aviso tiene que aparecer el día que para él
+      // es el día de pago, no en UTC.
+      const { listDividendosPorCobrar } =
+        await import("@/modules/wealth/services/dividend-service");
+      const { userToday } = await import("@/lib/time/user-time");
+      const { detectDividendosPorCobrar } = await import("@/lib/insights/dividendo-cobro");
+      const porCobrar = await listDividendosPorCobrar(ctx);
+      detected.push(...detectDividendosPorCobrar(porCobrar, await userToday(ctx)));
+    } catch {
+      // best-effort.
+    }
+    try {
       // Recordatorio del fondo de paz (F2). best-effort.
       const { getDefenseFundsReport, monthsCovered } = await import("@/modules/wealth");
       const { detectPeaceFundGap } = await import("@/lib/insights/detectors");

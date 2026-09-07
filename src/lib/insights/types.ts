@@ -55,6 +55,9 @@ export type InsightKind =
    * KINDS_SIN_RECONCILIAR en insights-service.
    */
   | "frecuencia_ingreso_revisar"
+  /** Tocaba cobrar un dividendo configurado y todavía no se registró. Se
+   *  auto-resuelve al registrarlo (el detector deja de emitirlo). */
+  | "dividendo_por_cobrar"
   // Sobre con presupuesto asignado y casi sin uso en los últimos meses. Severidad 'info': ni
   // siquiera es un riesgo — es plata inmovilizada, y a veces a propósito.
   | "sobre_ocioso"
