@@ -25,7 +25,18 @@ import {
   getPlanPaidUntilAction,
   type LinkableDebt,
 } from "@/modules/wealth/api/actions";
+import { HelpTip } from "@/components/shared/help-tip";
 import { EditHoldingButton } from "@/modules/wealth/components/add-holding-wizard";
+import { etiquetaPayout } from "@/modules/wealth/constants";
+import { lecturaDeRiesgo } from "@/modules/wealth/engine/nota-estructurada";
+// Motor compartido con el detalle móvil: los términos, la lectura de riesgo y
+// el cupón configurado se arman una sola vez.
+import {
+  esNota,
+  filasDeNota,
+  terminosDeNota,
+  payoutConfigurado,
+} from "@/modules/wealth/engine/detalle-instrumento";
 import { AlertManager } from "@/modules/wealth/components/alert-manager";
 import { monthlyValuations } from "@/modules/wealth/engine/portfolio-engine";
 import type { PlanPeriod } from "@/modules/wealth/engine/premiums";
@@ -145,6 +156,17 @@ export function HoldingDetailModal({
     currentPrice !== null
       ? holding.quantity * currentPrice
       : (holding.currentValueManual ?? costBasis);
+  // Lo que firmó: términos, lectura de riesgo y rendimiento configurado.
+  const esNotaEstructurada = esNota(holding);
+  const lectura = esNotaEstructurada ? lecturaDeRiesgo(terminosDeNota(holding)) : null;
+  const filasNota = esNotaEstructurada ? filasDeNota(holding) : [];
+  const payout = payoutConfigurado(holding, today());
+  // Un instrumento con cupón NO es una propiedad en renta. La nota entraba por
+  // `isRental` (que es "todo lo no cotizado") y terminaba mostrando la sección
+  // de RENTA de un inmueble, sin ningún lugar donde ver sus cupones.
+  const muestraPagos = !isRental || esNotaEstructurada;
+  const muestraRenta = isRental && !isPlan && !esNotaEstructurada;
+  const etiquetaPagos = etiquetaPayout(holding.assetType);
   const profitLoss = currentValue - costBasis;
   const returnPct = costBasis > 0 ? profitLoss / costBasis : 0;
   const positive = profitLoss >= 0;
@@ -325,6 +347,99 @@ export function HoldingDetailModal({
             value={`${holding.quantity.toFixed(holding.quantity < 1 ? 6 : 4)} uds.`}
           />
         </div>
+
+        {/* Lo que firmaste · términos de la nota + lectura de riesgo.
+            Va ARRIBA del gráfico a propósito: meses después de comprarla, la
+            pregunta no es cuánto rindió sino qué condiciones tiene. */}
+        {esNotaEstructurada && (filasNota.length > 0 || (lectura?.puntos.length ?? 0) > 0) ? (
+          <div style={{ padding: "14px 22px 0" }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>
+              Lo que firmaste
+            </div>
+
+            {filasNota.length > 0 ? (
+              <div style={{ display: "grid", gap: 1, marginBottom: 10 }}>
+                {filasNota.map((f) => (
+                  <div
+                    key={f.etiqueta}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "7px 10px",
+                      background: "var(--surface-2)",
+                      borderRadius: "var(--r-md)",
+                      fontSize: 12.5,
+                    }}
+                  >
+                    <span style={{ color: "var(--muted)", display: "flex", gap: 4 }}>
+                      {f.etiqueta}
+                      {f.ayuda ? <HelpTip text={f.ayuda} /> : null}
+                    </span>
+                    <span style={{ fontWeight: 500, color: "var(--ink)", textAlign: "right" }}>
+                      {f.valor}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {lectura && lectura.puntos.length > 0 ? (
+              <div
+                style={{
+                  fontSize: 12.5,
+                  lineHeight: 1.5,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "var(--surface-2)",
+                  borderLeft: `3px solid ${ACENTO_NIVEL[lectura.nivel]}`,
+                  display: "grid",
+                  gap: 4,
+                }}
+              >
+                {lectura.puntos.map((punto) => (
+                  <div key={punto}>· {punto}</div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Rendimiento CONFIGURADO (cupón/dividendo/interés). Distinto del
+            historial de abajo: esto es lo que va a cobrar, no lo ya cobrado.
+            Sin esta tarjeta, una nota con cupón configurado se leía "sin
+            dividendos registrados aún", que dice lo contrario de lo que pasa. */}
+        {payout ? (
+          <div style={{ padding: "14px 22px 0" }}>
+            <div
+              style={{
+                padding: "11px 13px",
+                borderRadius: "var(--r-md)",
+                background: "var(--pos-soft, var(--surface-2))",
+                display: "grid",
+                gap: 3,
+              }}
+            >
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                {capitalizar(payout.singular)} configurado
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--pos)" }}>
+                {formatMoney(payout.rendimiento.netoPorPago, currency)}{" "}
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--muted)" }}>
+                  neto · {payout.frecuencia}
+                </span>
+              </div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                {formatMoney(payout.rendimiento.netoAnual, currency)} al año
+                {payout.retencionPct > 0
+                  ? ` · ya descontado ${formatPercent(payout.retencionPct / 100, 1)} de retención`
+                  : ""}
+                {payout.proximoCobro ? ` · próximo: ${fechaCorta(payout.proximoCobro)}` : ""}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Chart */}
         <div style={{ padding: "14px 22px 0" }}>
@@ -667,8 +782,9 @@ export function HoldingDetailModal({
           </div>
         )}
 
-        {/* Dividendos: solo activos cotizados (no se mezcla con renta) */}
-        {!isRental && (
+        {/* Historial de pagos cobrados (no se mezcla con renta). El título sale
+            del tipo de activo: una nota cobra cupones, no dividendos. */}
+        {muestraPagos && (
           <div
             style={{ padding: "14px 22px 0", borderTop: "1px solid var(--line)", marginTop: 14 }}
           >
@@ -682,7 +798,7 @@ export function HoldingDetailModal({
             >
               <div>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink)" }}>
-                  Dividendos
+                  {capitalizar(etiquetaPagos.plural)} cobrados
                 </div>
                 {totalDividends > 0 && (
                   <div className="muted" style={{ fontSize: 12 }}>
@@ -696,7 +812,7 @@ export function HoldingDetailModal({
               currentValue={currentValue}
               onAdded={() => {
                 void listDividendsAction(holding.id).then(setDividends);
-                toast("Dividendo registrado");
+                toast(`${capitalizar(etiquetaPagos.singular)} registrado`);
                 router.refresh();
               }}
             />
@@ -736,13 +852,13 @@ export function HoldingDetailModal({
               </div>
             ) : (
               <div className="muted" style={{ fontSize: 12.5, marginTop: 6, paddingBottom: 8 }}>
-                Sin dividendos registrados aún.
+                Sin {etiquetaPagos.plural} registrados aún.
               </div>
             )}
           </div>
         )}
 
-        {isRental && !isPlan && (
+        {muestraRenta && (
           <RentalSection
             holding={holding}
             currency={currency}
@@ -1114,7 +1230,7 @@ function DividendForm({
         disabled={pending || effectiveAmount <= 0}
         onClick={handleSubmit}
       >
-        {pending ? "Guardando…" : "Registrar dividendo"}
+        {pending ? "Guardando…" : `Registrar ${etiquetaPayout(holding.assetType).singular}`}
       </button>
     </div>
   );
@@ -1320,4 +1436,21 @@ function RentalSection({
       )}
     </div>
   );
+}
+
+/** Color del borde de la lectura de riesgo, por nivel de exposición del capital. */
+const ACENTO_NIVEL: Record<string, string> = {
+  protegido: "var(--pos)",
+  condicionado: "var(--warn)",
+  expuesto: "var(--neg)",
+  desconocido: "var(--line)",
+};
+
+function capitalizar(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function fechaCorta(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
 }
