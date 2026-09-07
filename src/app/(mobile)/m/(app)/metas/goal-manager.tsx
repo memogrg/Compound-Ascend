@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -31,6 +31,7 @@ import type {
 } from "@/modules/control/services/goal-detail-service";
 import { formatMoney } from "@/lib/format";
 import { useCaptureToday } from "@/components/tz/timezone-context";
+import { useBarraAnticipada } from "@/lib/ui/use-barra-anticipada";
 
 import {
   Fab,
@@ -123,22 +124,22 @@ export function GoalManager({
   const [editing, setEditing] = useState<SavingsGoal | null>(null);
   const [deleting, setDeleting] = useState<SavingsGoal | null>(null);
   const [contributing, setContributing] = useState<SavingsGoal | null>(null);
-  const [, startAporte] = useTransition();
-
   /**
-   * BARRA AL INSTANTE (#751). El acumulado viene del servidor, así que tras
-   * aportar la barra se quedaba quieta todo el round-trip y parecía que el
-   * aporte no había entrado. Acá el optimista es EXACTO: el formulario siempre
-   * aporta en la moneda de la meta (`currency: goal.currency`), sin conversión
-   * ni split que adivinar. Se descarta solo cuando llega el dato real.
+   * BARRA AL INSTANTE, sin rebote (#751, corregido). El optimista es EXACTO en
+   * metas: el formulario siempre aporta en la moneda de la meta, sin conversión
+   * ni split que adivinar.
+   *
+   * Lo que estaba mal era el SOSTÉN: con `useOptimistic` el valor se suelta al
+   * cerrar la transición, y `router.refresh()` no es esperable, así que cerraba
+   * antes de que llegaran las props frescas — el aporte se pintaba y se borraba
+   * solo. Ahora el anticipo se sostiene hasta que el servidor REFLEJE el monto
+   * (comparando valores, no esperando un tiempo).
    */
-  const [aportes, sumarAporte] = useOptimistic(
-    {} as Record<string, number>,
-    (estado, nuevo: { id: string; amount: number }) => ({
-      ...estado,
-      [nuevo.id]: (estado[nuevo.id] ?? 0) + nuevo.amount,
-    }),
+  const servidorMetas = useMemo(
+    () => Object.fromEntries(goals.map((g) => [g.id, g.currentAmount])),
+    [goals],
   );
+  const barra = useBarraAnticipada(servidorMetas);
   // El "+" contextual: elección (aportar / crear) → picker de meta → reusa el aporte.
   const [plusOpen, setPlusOpen] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -183,7 +184,7 @@ export function GoalManager({
             <MContentCard style={{ padding: 0, overflow: "hidden" }}>
               {section.items.map((g) => {
                 const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
-                const acumulado = g.currentAmount + (aportes[g.id] ?? 0);
+                const acumulado = barra.valor(g.id);
                 const pct = g.targetAmount > 0 ? Math.min(1, acumulado / g.targetAmount) : 0;
                 const tone = STATUS_TONE[g.status] ?? "neutral";
                 const missing = Math.max(0, g.targetAmount - acumulado);
@@ -349,10 +350,8 @@ export function GoalManager({
         {contributing ? (
           <ContributionForm
             goal={contributing}
-            onOptimista={(amount) =>
-              // Dentro de una transición: fuera de ella React lo descarta al instante.
-              startAporte(() => sumarAporte({ id: contributing.id, amount }))
-            }
+            onAnticipar={(amount) => barra.anticipar(contributing.id, amount)}
+            onFallo={() => barra.cancelar(contributing.id)}
             onSuccess={() => setContributing(null)}
           />
         ) : null}
@@ -458,14 +457,17 @@ export function GoalPickerSheet({
 export function ContributionForm({
   goal,
   onSuccess,
-  onOptimista,
+  onAnticipar,
+  onFallo,
 }: {
   /** Forma mínima a propósito: el frasco de Ahorro del tab de Gastos tiene un `JarItem`, no una
    *  `SavingsGoal` entera, y el resto del contexto lo carga este mismo formulario. */
   goal: { id: string; name: string; currency: string };
   onSuccess: () => void;
   /** Pinta el aporte en la barra ANTES de que vuelva el servidor. */
-  onOptimista?: (amount: number) => void;
+  onAnticipar?: (amount: number) => void;
+  /** Suelta el anticipo: la escritura falló. */
+  onFallo?: () => void;
 }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const todayISO = useCaptureToday();
@@ -489,10 +491,12 @@ export function ContributionForm({
   return (
     <FormShell
       action={async (v: typeof values) => {
-        // Al ENVIAR, no al volver: el hueco era justamente la barra quieta
-        // durante todo el round-trip.
-        if (amount && amount > 0) onOptimista?.(amount);
-        return addGoalContributionAction(v);
+        // Se anticipa al ENVIAR y se SUELTA si la escritura falla: la barra
+        // nunca muestra un monto y después lo quita sin razón visible.
+        if (amount && amount > 0) onAnticipar?.(amount);
+        const res = await addGoalContributionAction(v);
+        if (!res.ok) onFallo?.();
+        return res;
       }}
       values={values}
       submitLabel="Registrar aporte"
