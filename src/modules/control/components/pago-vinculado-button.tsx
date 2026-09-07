@@ -77,7 +77,15 @@ export function PagoVinculadoButton({
   id: string;
   name: string;
   tone?: "primary" | "compact";
-  onDone?: () => void;
+  /**
+   * Se llama al confirmar, con LO QUE SE APLICÓ. La lista de arriba lo usa para
+   * mover su barra al instante (update optimista) sin esperar el round-trip.
+   *
+   * Viaja la moneda porque el modal deja cambiarla: si no coincide con la de la
+   * entidad, el servidor convierte y el llamador NO puede sumar el monto tal
+   * cual — ahí le toca esperar el dato real en vez de pintar un número inventado.
+   */
+  onDone?: (aplicado: { amount: number; currency: string }) => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -153,7 +161,7 @@ export function PagoVinculadoButton({
     if (res.ok) {
       toast(copy.ok);
       cerrar();
-      onDone?.();
+      onDone?.({ amount: monto, currency });
       router.refresh();
     } else {
       setError(res.message ?? "No pudimos registrar el movimiento.");

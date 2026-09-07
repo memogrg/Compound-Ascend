@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -123,6 +123,22 @@ export function GoalManager({
   const [editing, setEditing] = useState<SavingsGoal | null>(null);
   const [deleting, setDeleting] = useState<SavingsGoal | null>(null);
   const [contributing, setContributing] = useState<SavingsGoal | null>(null);
+  const [, startAporte] = useTransition();
+
+  /**
+   * BARRA AL INSTANTE (#751). El acumulado viene del servidor, así que tras
+   * aportar la barra se quedaba quieta todo el round-trip y parecía que el
+   * aporte no había entrado. Acá el optimista es EXACTO: el formulario siempre
+   * aporta en la moneda de la meta (`currency: goal.currency`), sin conversión
+   * ni split que adivinar. Se descarta solo cuando llega el dato real.
+   */
+  const [aportes, sumarAporte] = useOptimistic(
+    {} as Record<string, number>,
+    (estado, nuevo: { id: string; amount: number }) => ({
+      ...estado,
+      [nuevo.id]: (estado[nuevo.id] ?? 0) + nuevo.amount,
+    }),
+  );
   // El "+" contextual: elección (aportar / crear) → picker de meta → reusa el aporte.
   const [plusOpen, setPlusOpen] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -167,9 +183,10 @@ export function GoalManager({
             <MContentCard style={{ padding: 0, overflow: "hidden" }}>
               {section.items.map((g) => {
                 const isSobre = g.kind === "sobre" || g.targetAmount <= 0;
-                const pct = g.targetAmount > 0 ? Math.min(1, g.currentAmount / g.targetAmount) : 0;
+                const acumulado = g.currentAmount + (aportes[g.id] ?? 0);
+                const pct = g.targetAmount > 0 ? Math.min(1, acumulado / g.targetAmount) : 0;
                 const tone = STATUS_TONE[g.status] ?? "neutral";
-                const missing = Math.max(0, g.targetAmount - g.currentAmount);
+                const missing = Math.max(0, g.targetAmount - acumulado);
                 return (
                   <SwipeRow key={g.id} onEdit={() => setEditing(g)} onDelete={() => setDeleting(g)}>
                     {/* Los cuatro botones NO caben en `trailing`: estrecharía toda la columna de
@@ -186,7 +203,7 @@ export function GoalManager({
                         currency: g.currency,
                         targetDate: g.targetDate,
                       })}${g.storedIn ? ` · ${g.storedIn}` : ""}`}
-                      value={mAmount(g.currentAmount, g.currency, 10)}
+                      value={mAmount(acumulado, g.currency, 10)}
                       valueTone={tone === "danger" ? "danger" : "neutral"}
                       slot={
                         <>
@@ -330,7 +347,14 @@ export function GoalManager({
         title="Registrar aporte"
       >
         {contributing ? (
-          <ContributionForm goal={contributing} onSuccess={() => setContributing(null)} />
+          <ContributionForm
+            goal={contributing}
+            onOptimista={(amount) =>
+              // Dentro de una transición: fuera de ella React lo descarta al instante.
+              startAporte(() => sumarAporte({ id: contributing.id, amount }))
+            }
+            onSuccess={() => setContributing(null)}
+          />
         ) : null}
       </BottomSheet>
 
@@ -434,11 +458,14 @@ export function GoalPickerSheet({
 export function ContributionForm({
   goal,
   onSuccess,
+  onOptimista,
 }: {
   /** Forma mínima a propósito: el frasco de Ahorro del tab de Gastos tiene un `JarItem`, no una
    *  `SavingsGoal` entera, y el resto del contexto lo carga este mismo formulario. */
   goal: { id: string; name: string; currency: string };
   onSuccess: () => void;
+  /** Pinta el aporte en la barra ANTES de que vuelva el servidor. */
+  onOptimista?: (amount: number) => void;
 }) {
   const [amount, setAmount] = useState<number | undefined>(undefined);
   const todayISO = useCaptureToday();
@@ -461,7 +488,12 @@ export function ContributionForm({
   const values = { goalId: goal.id, amount, contributionDate: date, currency: goal.currency };
   return (
     <FormShell
-      action={addGoalContributionAction}
+      action={async (v: typeof values) => {
+        // Al ENVIAR, no al volver: el hueco era justamente la barra quieta
+        // durante todo el round-trip.
+        if (amount && amount > 0) onOptimista?.(amount);
+        return addGoalContributionAction(v);
+      }}
       values={values}
       submitLabel="Registrar aporte"
       successMessage="Aporte registrado"
