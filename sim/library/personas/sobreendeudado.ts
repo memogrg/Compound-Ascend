@@ -35,8 +35,6 @@ export function buildSobreendeudado(seed: number): PersonaSpec {
       goalTarget: 0,
       hasInvestment: false,
       investmentValue: 0,
-      incomeSourceName: "Salario",
-      expenseItemName: "Renta",
       incomeBudgetName: "Salario mensual",
       expenseBudgetName: "Gastos del hogar",
       debtName: "Préstamo de consumo",

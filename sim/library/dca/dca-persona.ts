@@ -21,7 +21,6 @@ export interface DcaPersonaSpec {
   mockPrice: number;
   initialQuantity: number;
   monthlyContribution: number;
-  incomeSourceName: string;
   incomeBudgetName: string;
   holdingLabel: string;
 }
@@ -40,7 +39,6 @@ export function buildInversionistaDca(seed: number): DcaPersonaSpec {
     mockPrice,
     initialQuantity: rng.amount(5, 15, 1),
     monthlyContribution: mockPrice, // 1 unidad/mes → merge exacto
-    incomeSourceName: "Salario",
     incomeBudgetName: "Salario mensual",
     holdingLabel: "ETF global",
   };

@@ -89,8 +89,6 @@ export {
   purchaseExpenseAmount,
   positionIncreaseAmount,
 } from "./engine/linked";
-export { BaseDashboard } from "./components/base-dashboard";
-export { BaseActions } from "./components/base-actions";
 export type { BaseSummary } from "./services/base-service";
 export type { BaseIndicators, IncomeSource, ExpenseItem, ExpenseNature } from "./types";
 export type { Transaction, TxnKind, Period } from "./types";

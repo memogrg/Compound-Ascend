@@ -36,8 +36,6 @@ export function buildIngresoMuyBajo(seed: number): PersonaSpec {
       goalTarget: rng.amount(40_000, 80_000, 10_000),
       hasInvestment: false,
       investmentValue: 0,
-      incomeSourceName: "Salario",
-      expenseItemName: "Alquiler",
       incomeBudgetName: "Salario mensual",
       expenseBudgetName: "Gastos básicos",
       debtName: "Deuda de tarjeta",

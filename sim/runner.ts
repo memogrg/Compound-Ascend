@@ -53,8 +53,6 @@ export async function runVerticalSlice(opts: { seed: number; nowStamp: number })
       driver.day = 0;
       const period = await userCurrentPeriod(ctx);
       await driver.openingBalance(persona.setup.openingBalance);
-      await driver.addIncomeSource(persona.setup.incomeSourceName, persona.setup.incomeSourceMonthly);
-      await driver.addExpenseItem(persona.setup.expenseItemName, persona.setup.expenseItemMonthly);
       const incomeLineId = await driver.addIncomeBudgetLine(
         persona.setup.incomeBudgetName,
         persona.setup.incomeBudgetAmount,

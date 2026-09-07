@@ -36,8 +36,6 @@ export function buildControlExcelente(seed: number): PersonaSpec {
       goalTarget: rng.amount(150_000, 250_000, 50_000),
       hasInvestment: true,
       investmentValue: rng.amount(350_000, 500_000, 50_000),
-      incomeSourceName: "Salario",
-      expenseItemName: "Renta",
       incomeBudgetName: "Salario mensual",
       expenseBudgetName: "Gastos del hogar",
       debtName: "Tarjeta de crédito",

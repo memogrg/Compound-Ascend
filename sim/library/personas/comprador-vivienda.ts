@@ -35,8 +35,6 @@ export function buildCompradorVivienda(seed: number): PersonaSpec {
       goalTarget: rng.amount(1_800_000, 2_400_000, 100_000),
       hasInvestment: false,
       investmentValue: 0,
-      incomeSourceName: "Salario",
-      expenseItemName: "Alquiler",
       incomeBudgetName: "Salario mensual",
       expenseBudgetName: "Gastos del hogar",
       debtName: "",

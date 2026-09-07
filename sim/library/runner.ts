@@ -78,8 +78,6 @@ async function seedPersona(
 ): Promise<SimEntityIds> {
   const s = persona.setup;
   await driver.openingBalance(s.openingBalance);
-  await driver.addIncomeSource(s.incomeSourceName, s.monthlyIncome);
-  await driver.addExpenseItem(s.expenseItemName, s.fixedExpenseMonthly);
   const incomeLineId = await driver.addIncomeBudgetLine(s.incomeBudgetName, s.monthlyIncome, period);
   await driver.addExpenseBudgetLine(s.expenseBudgetName, s.fixedExpenseMonthly, period);
   const debtId = s.hasDebt ? await driver.addDebt(s.debtName, s.debtBalance, s.debtMinPayment) : null;

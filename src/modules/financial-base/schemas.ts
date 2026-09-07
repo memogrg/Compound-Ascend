@@ -15,46 +15,12 @@ const frequency = z.enum([
   "variable",
 ]);
 
-const ownerScope = z.enum(["usuario", "pareja", "familia", "grupo"]);
-
-export const incomeInputSchema = z.object({
-  name: z.string().trim().min(1, "Ponle un nombre").max(120),
-  incomeType: z.enum(["activo", "pasivo", "extraordinario"]),
-  category: z.string().max(60).optional(),
-  amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
-  currency: z.string().length(3),
-  frequency,
-  isFixed: z.boolean().default(true),
-  certainty: z.enum(["seguro", "probable", "incierto"]).optional(),
-  ownerScope: ownerScope.default("usuario"),
-  includeInBudget: z.boolean().default(true),
-});
-
-export const expenseInputSchema = z.object({
-  name: z.string().trim().min(1, "Ponle un nombre").max(120),
-  categoryKey: z.string().max(60).optional(),
-  nature: z.enum([
-    "esencial",
-    "estilo_vida",
-    "financiero",
-    "proteccion",
-    "crecimiento",
-    "ahorro",
-    "inversion",
-    "donacion",
-    "miscelaneo",
-  ]),
-  amount: z.number({ error: "Monto inválido" }).positive("Debe ser mayor a 0"),
-  currency: z.string().length(3),
-  frequency,
-  isFixed: z.boolean().default(true),
-  obligation: z.enum(["obligatorio", "flexible", "deseable"]).optional(),
-  reducible: z.enum(["si", "no", "tal_vez"]).optional(),
-  ownerScope: ownerScope.default("usuario"),
-});
-
-export type IncomeInput = z.infer<typeof incomeInputSchema>;
-export type ExpenseInput = z.infer<typeof expenseInputSchema>;
+/**
+ * `incomeInputSchema` / `expenseInputSchema` (y sus tipos IncomeInput/ExpenseInput)
+ * validaban el CRUD de income_sources / expense_items. Se retiraron con ese CRUD:
+ * los indicadores leen el presupuesto vivo (`budgetItemInputSchema` de abajo) y
+ * aquellas tablas se quedaron sin pantalla que las escribiera.
+ */
 
 // ---------- Base Financiera V2 ----------
 const uuidOrNull = z.preprocess(
