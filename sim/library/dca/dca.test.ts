@@ -1,8 +1,8 @@
 /**
  * F3a-DCA end-to-end: a QUOTED recurring holding auto-contributing each month with a
  * MOCKED price, over a multi-month virtual window. Validates 1 contribution/month +
- * the merge + linked gasto + portfolio_snapshots + inversiones vs-mes, and
- * characterizes the known investment_transactions gap (issue #655). Gated on
+ * the merge + linked gasto + portfolio_snapshots + inversiones vs-mes, and the DCA
+ * purchase history in investment_transactions (issue #655). Gated on
  * SUPABASE_TEST_* (self-skips without a test DB); NOT part of `npm test`. Run with
  * `npm run sim`. `SIM_MONTHS=<n>` sets the window (default 6).
  */

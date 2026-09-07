@@ -29,7 +29,7 @@ import {
   validateDcaLinkedTxns,
   validatePortfolioSnapshots,
   validateInversionesVsMes,
-  validateInvestmentTxnDiscrepancy,
+  validateInvestmentTxnHistorial,
 } from "./dca-validators";
 
 const RUN_CURRENCY = "CRC";
@@ -162,8 +162,8 @@ export async function runDcaPersona(opts: { nowStamp: number; months?: number })
         await validatePortfolioSnapshots(ctx, m + 1, log);
         // #5 vs-mes inversiones — needs a prior month's snapshot (m ≥ 1).
         if (m >= 1) await validateInversionesVsMes(ctx, log);
-        // #6 known-discrepancy characterization (issue #655).
-        await validateInvestmentTxnDiscrepancy(ctx, ids.holdingId, m + 1, log);
+        // #6 historial de compras: una `compra` por aporte + la inicial (issue #655).
+        await validateInvestmentTxnHistorial(ctx, ids.holdingId, m + 1, log);
       });
     }
 
