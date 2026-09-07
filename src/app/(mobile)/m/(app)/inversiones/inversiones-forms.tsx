@@ -133,25 +133,23 @@ export function HoldingWizardSheet({
   const [cur, setCur] = useState(prefill?.currency ?? primaryCurrency);
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
   // ── Dividendos (acciones/ETF) ──
-  const [pagaDividendos, setPagaDividendos] = useState(prefill?.paysDividends ?? false);
+  const [pagaDividendos, setPagaDividendos] = useState(prefill?.payoutEnabled ?? false);
   const [dividendoModo, setDividendoModo] = useState<"yield" | "manual">(
-    (prefill?.dividendMode as "yield" | "manual") ?? "yield",
+    (prefill?.payoutMode as "yield" | "manual") ?? "yield",
   );
   const [dividendoYieldPct, setDividendoYieldPct] = useState<number | undefined>(
-    prefill?.dividendYieldPct ?? undefined,
+    prefill?.payoutRatePct ?? undefined,
   );
   const [dividendoMonto, setDividendoMonto] = useState<number | undefined>(
-    prefill?.dividendAmount ?? undefined,
+    prefill?.payoutAmount ?? undefined,
   );
   const [dividendoFrecuencia, setDividendoFrecuencia] = useState(
-    prefill?.dividendFrequency ?? "trimestral",
+    prefill?.payoutFrequency ?? "trimestral",
   );
   const [dividendoRetencionPct, setDividendoRetencionPct] = useState<number | undefined>(
-    prefill?.dividendWithholdingPct || undefined,
+    prefill?.payoutWithholdingPct || undefined,
   );
-  const [dividendoProximaFecha, setDividendoProximaFecha] = useState(
-    prefill?.dividendNextDate ?? "",
-  );
+  const [dividendoProximaFecha, setDividendoProximaFecha] = useState(prefill?.payoutNextDate ?? "");
   const [aporteMensual, setAporteMensual] = useState<number | undefined>(
     prefill?.monthlyContribution ?? undefined,
   );

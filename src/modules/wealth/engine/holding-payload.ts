@@ -35,7 +35,7 @@ export type RentalCosts = {
 /**
  * Estado inicial del bloque de dividendos. Existe para que un formulario que
  * todavía no lo expone (o un test) no tenga que inventar siete campos: se
- * expanden estos y el payload sale con `paysDividends: false`.
+ * expanden estos y el payload sale con `payoutEnabled: false`.
  */
 export const DIVIDENDO_VACIO = {
   pagaDividendos: false,
@@ -236,23 +236,23 @@ export function buildHoldingPayload(v: HoldingFormValues): HoldingInput {
  * seguiría proyectando ingreso pasivo que el usuario ya dijo que no recibe.
  *
  * Sólo viaja el campo del modo elegido, por la misma razón que en el servicio:
- * un `dividendAmount` poblado con modo 'yield' invita a leerlo sin mirar el modo.
+ * un `payoutAmount` poblado con modo 'yield' invita a leerlo sin mirar el modo.
  */
 function dividendoPayload(v: HoldingFormValues) {
-  if (!v.pagaDividendos) return { paysDividends: false };
+  if (!v.pagaDividendos) return { payoutEnabled: false };
   const num = (s: string) => {
     const n = parseFloat(s);
     return Number.isFinite(n) && n >= 0 ? n : undefined;
   };
   return {
-    paysDividends: true,
-    dividendMode: v.dividendoModo,
-    dividendYieldPct: v.dividendoModo === "yield" ? num(v.dividendoYieldPct) : undefined,
-    dividendAmount: v.dividendoModo === "manual" ? num(v.dividendoMonto) : undefined,
-    dividendFrequency: (esFrecuenciaPago(v.dividendoFrecuencia)
+    payoutEnabled: true,
+    payoutMode: v.dividendoModo,
+    payoutRatePct: v.dividendoModo === "yield" ? num(v.dividendoYieldPct) : undefined,
+    payoutAmount: v.dividendoModo === "manual" ? num(v.dividendoMonto) : undefined,
+    payoutFrequency: (esFrecuenciaPago(v.dividendoFrecuencia)
       ? v.dividendoFrecuencia
-      : "trimestral") as HoldingInput["dividendFrequency"],
-    dividendWithholdingPct: num(v.dividendoRetencionPct) ?? 0,
-    dividendNextDate: v.dividendoProximaFecha || undefined,
+      : "trimestral") as HoldingInput["payoutFrequency"],
+    payoutWithholdingPct: num(v.dividendoRetencionPct) ?? 0,
+    payoutNextDate: v.dividendoProximaFecha || undefined,
   };
 }

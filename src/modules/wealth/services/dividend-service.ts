@@ -130,24 +130,24 @@ export async function createDividend(input: DividendInput): Promise<void> {
   try {
     const { data: cfg } = await supabase
       .from("investment_holdings")
-      .select("pays_dividends,dividend_frequency,dividend_next_date")
+      .select("payout_enabled,payout_frequency,payout_next_date")
       .eq("id", input.holdingId)
       .in("user_id", scope)
       .maybeSingle();
-    if (cfg?.pays_dividends && esFrecuenciaPago(cfg.dividend_frequency)) {
+    if (cfg?.payout_enabled && esFrecuenciaPago(cfg.payout_frequency)) {
       // Desde el DÍA SIGUIENTE al pago registrado: si se calculara desde la
       // misma fecha, `proximaFechaPago` devolvería esa misma fecha (es >= hoy)
       // y el ancla no avanzaría.
       const desde = sumarUnDia(input.paymentDate);
       const siguiente = proximaFechaPago(
-        cfg.dividend_next_date ?? input.paymentDate,
-        cfg.dividend_frequency,
+        cfg.payout_next_date ?? input.paymentDate,
+        cfg.payout_frequency,
         desde,
       );
       if (siguiente) {
         await supabase
           .from("investment_holdings")
-          .update({ dividend_next_date: siguiente })
+          .update({ payout_next_date: siguiente })
           .eq("id", input.holdingId)
           .in("user_id", scope);
       }
@@ -247,10 +247,10 @@ export async function listDividendosPorCobrar(
   const { data: holdings } = await supabase
     .from("investment_holdings")
     .select(
-      "id,label,symbol,currency,quantity,average_cost,current_value_manual,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct,dividend_next_date",
+      "id,label,symbol,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct,payout_next_date",
     )
     .in("user_id", memberIds)
-    .eq("pays_dividends", true);
+    .eq("payout_enabled", true);
   if (!holdings || holdings.length === 0) return [];
 
   // Último pago registrado por posición, en UNA consulta: N+1 acá costaría una
@@ -277,14 +277,14 @@ export async function listDividendosPorCobrar(
       currency: h.currency,
       // Misma base que la proyección: el valor manual manda, si no lo invertido.
       base: Number(h.current_value_manual ?? 0) || invertido,
-      paysDividends: h.pays_dividends ?? false,
-      dividendMode: h.dividend_mode,
-      dividendYieldPct: h.dividend_yield_pct == null ? null : Number(h.dividend_yield_pct),
-      dividendAmount: h.dividend_amount == null ? null : Number(h.dividend_amount),
-      dividendFrequency: h.dividend_frequency,
-      dividendWithholdingPct:
-        h.dividend_withholding_pct == null ? null : Number(h.dividend_withholding_pct),
-      dividendNextDate: h.dividend_next_date,
+      payoutEnabled: h.payout_enabled ?? false,
+      payoutMode: h.payout_mode,
+      payoutRatePct: h.payout_rate_pct == null ? null : Number(h.payout_rate_pct),
+      payoutAmount: h.payout_amount == null ? null : Number(h.payout_amount),
+      payoutFrequency: h.payout_frequency,
+      payoutWithholdingPct:
+        h.payout_withholding_pct == null ? null : Number(h.payout_withholding_pct),
+      payoutNextDate: h.payout_next_date,
       ultimoPagoRegistrado: ultimoPorHolding.get(h.id) ?? null,
     };
   });

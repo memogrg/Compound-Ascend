@@ -26,14 +26,14 @@ export type HoldingConDividendo = {
   currency: string;
   /** Base del yield: valor manual si lo hay, si no lo invertido. */
   base: number;
-  paysDividends: boolean;
-  dividendMode: string | null;
-  dividendYieldPct: number | null;
-  dividendAmount: number | null;
-  dividendFrequency: string | null;
-  dividendWithholdingPct: number | null;
+  payoutEnabled: boolean;
+  payoutMode: string | null;
+  payoutRatePct: number | null;
+  payoutAmount: number | null;
+  payoutFrequency: string | null;
+  payoutWithholdingPct: number | null;
   /** Ancla del próximo pago (YYYY-MM-DD). */
-  dividendNextDate: string | null;
+  payoutNextDate: string | null;
   /** Fecha del último dividendo YA registrado para esta posición, si hay. */
   ultimoPagoRegistrado?: string | null;
 };
@@ -49,8 +49,8 @@ export function detectDividendosPorCobrar(
   const out: DetectedInsight[] = [];
 
   for (const h of holdings) {
-    if (!h.paysDividends || !esFrecuenciaPago(h.dividendFrequency)) continue;
-    const vence = h.dividendNextDate;
+    if (!h.payoutEnabled || !esFrecuenciaPago(h.payoutFrequency)) continue;
+    const vence = h.payoutNextDate;
     if (!vence || vence > hoy) continue; // todavía no toca
 
     // Ya se registró un pago en esa fecha o después: el cobro está hecho y el
@@ -60,11 +60,11 @@ export function detectDividendosPorCobrar(
 
     const r = calcularRendimiento(
       {
-        modo: (h.dividendMode as "yield" | "manual") ?? "yield",
-        yieldPct: h.dividendYieldPct,
-        montoPorPago: h.dividendAmount,
-        frecuencia: h.dividendFrequency,
-        retencionPct: h.dividendWithholdingPct,
+        modo: (h.payoutMode as "yield" | "manual") ?? "yield",
+        yieldPct: h.payoutRatePct,
+        montoPorPago: h.payoutAmount,
+        frecuencia: h.payoutFrequency,
+        retencionPct: h.payoutWithholdingPct,
       },
       h.base,
     );

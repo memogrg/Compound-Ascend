@@ -276,25 +276,23 @@ export function AddHoldingModal({
   );
   const [aportoCadaMes, setAportoCadaMes] = useState(prefill?.isRecurring ?? false);
   // ── Dividendos (acciones/ETF) ──
-  const [pagaDividendos, setPagaDividendos] = useState(prefill?.paysDividends ?? false);
+  const [pagaDividendos, setPagaDividendos] = useState(prefill?.payoutEnabled ?? false);
   const [dividendoModo, setDividendoModo] = useState<"yield" | "manual">(
-    (prefill?.dividendMode as "yield" | "manual") ?? "yield",
+    (prefill?.payoutMode as "yield" | "manual") ?? "yield",
   );
   const [dividendoYieldPct, setDividendoYieldPct] = useState(
-    prefill?.dividendYieldPct != null ? String(prefill.dividendYieldPct) : "",
+    prefill?.payoutRatePct != null ? String(prefill.payoutRatePct) : "",
   );
   const [dividendoMonto, setDividendoMonto] = useState(
-    prefill?.dividendAmount != null ? String(prefill.dividendAmount) : "",
+    prefill?.payoutAmount != null ? String(prefill.payoutAmount) : "",
   );
   const [dividendoFrecuencia, setDividendoFrecuencia] = useState(
-    prefill?.dividendFrequency ?? "trimestral",
+    prefill?.payoutFrequency ?? "trimestral",
   );
   const [dividendoRetencionPct, setDividendoRetencionPct] = useState(
-    prefill?.dividendWithholdingPct ? String(prefill.dividendWithholdingPct) : "",
+    prefill?.payoutWithholdingPct ? String(prefill.payoutWithholdingPct) : "",
   );
-  const [dividendoProximaFecha, setDividendoProximaFecha] = useState(
-    prefill?.dividendNextDate ?? "",
-  );
+  const [dividendoProximaFecha, setDividendoProximaFecha] = useState(prefill?.payoutNextDate ?? "");
   // Aporte mensual: separado del total invertido; persiste en monthly_contribution.
   const [aporteMensual, setAporteMensual] = useState(
     prefill?.monthlyContribution != null ? String(prefill.monthlyContribution) : "",

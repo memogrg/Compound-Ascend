@@ -16,13 +16,13 @@ const base = (over: Partial<HoldingConDividendo> = {}): HoldingConDividendo => (
   label: "VOO",
   currency: "USD",
   base: 10_000,
-  paysDividends: true,
-  dividendMode: "yield",
-  dividendYieldPct: 4,
-  dividendAmount: null,
-  dividendFrequency: "trimestral",
-  dividendWithholdingPct: 30,
-  dividendNextDate: "2026-09-01",
+  payoutEnabled: true,
+  payoutMode: "yield",
+  payoutRatePct: 4,
+  payoutAmount: null,
+  payoutFrequency: "trimestral",
+  payoutWithholdingPct: 30,
+  payoutNextDate: "2026-09-01",
   ultimoPagoRegistrado: null,
   ...over,
 });
@@ -39,20 +39,20 @@ describe("cuándo avisa", () => {
   });
 
   it("la fecha es HOY → avisa (el pago es hoy, no mañana)", () => {
-    expect(detectDividendosPorCobrar([base({ dividendNextDate: HOY })], HOY)).toHaveLength(1);
+    expect(detectDividendosPorCobrar([base({ payoutNextDate: HOY })], HOY)).toHaveLength(1);
   });
 
   it("la fecha es futura → NO avisa", () => {
     // Avisar antes sólo genera un registro con fecha equivocada.
-    expect(detectDividendosPorCobrar([base({ dividendNextDate: "2026-12-01" })], HOY)).toEqual([]);
+    expect(detectDividendosPorCobrar([base({ payoutNextDate: "2026-12-01" })], HOY)).toEqual([]);
   });
 
   it("sin ancla → no hay nada que recordar", () => {
-    expect(detectDividendosPorCobrar([base({ dividendNextDate: null })], HOY)).toEqual([]);
+    expect(detectDividendosPorCobrar([base({ payoutNextDate: null })], HOY)).toEqual([]);
   });
 
   it("la posición no paga dividendos → no avisa", () => {
-    expect(detectDividendosPorCobrar([base({ paysDividends: false })], HOY)).toEqual([]);
+    expect(detectDividendosPorCobrar([base({ payoutEnabled: false })], HOY)).toEqual([]);
   });
 });
 
@@ -86,14 +86,14 @@ describe("el monto del aviso", () => {
   });
 
   it("sin retención no menciona impuestos", () => {
-    const [i] = detectDividendosPorCobrar([base({ dividendWithholdingPct: 0 })], HOY);
+    const [i] = detectDividendosPorCobrar([base({ payoutWithholdingPct: 0 })], HOY);
     expect(i!.metric).toBe(100);
     expect(i!.body).not.toContain("impuestos");
   });
 
   it("modo manual: el monto por pago manda", () => {
     const [i] = detectDividendosPorCobrar(
-      [base({ dividendMode: "manual", dividendAmount: 250, dividendWithholdingPct: 0 })],
+      [base({ payoutMode: "manual", payoutAmount: 250, payoutWithholdingPct: 0 })],
       HOY,
     );
     expect(i!.metric).toBe(250);
@@ -101,12 +101,12 @@ describe("el monto del aviso", () => {
 
   it("sin monto estimable no avisa: no hay nada que prellenar", () => {
     expect(
-      detectDividendosPorCobrar([base({ dividendYieldPct: 0, dividendAmount: null })], HOY),
+      detectDividendosPorCobrar([base({ payoutRatePct: 0, payoutAmount: null })], HOY),
     ).toEqual([]);
   });
 
   it("una frecuencia con grafía desconocida no avisa (en vez de dar cero)", () => {
-    expect(detectDividendosPorCobrar([base({ dividendFrequency: "bimestral" })], HOY)).toEqual([]);
+    expect(detectDividendosPorCobrar([base({ payoutFrequency: "bimestral" })], HOY)).toEqual([]);
   });
 });
 
@@ -115,7 +115,7 @@ describe("varias posiciones", () => {
     const out = detectDividendosPorCobrar(
       [
         base({ id: "a", label: "VOO" }),
-        base({ id: "b", label: "SCHD", dividendNextDate: "2027-01-01" }),
+        base({ id: "b", label: "SCHD", payoutNextDate: "2027-01-01" }),
         base({ id: "c", label: "JEPI", ultimoPagoRegistrado: "2026-09-02" }),
       ],
       HOY,

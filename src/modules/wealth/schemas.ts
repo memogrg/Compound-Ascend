@@ -119,17 +119,17 @@ export const holdingInputSchema = z.object({
   // ── Dividendos configurados (acciones/ETF) ──
   // La frecuencia reusa las de `FRECUENCIAS_PAGO` del motor de rendimiento;
   // 'bimensual' es la grafía que entiende monthlyize.
-  paysDividends: z.boolean().optional(),
-  dividendMode: z.enum(["yield", "manual"]).optional(),
-  dividendYieldPct: z.number().nonnegative().max(100).optional(),
-  dividendAmount: z.number().nonnegative().optional(),
-  dividendFrequency: z
+  payoutEnabled: z.boolean().optional(),
+  payoutMode: z.enum(["yield", "manual"]).optional(),
+  payoutRatePct: z.number().nonnegative().max(100).optional(),
+  payoutAmount: z.number().nonnegative().optional(),
+  payoutFrequency: z
     .enum(["mensual", "bimensual", "trimestral", "cuatrimestral", "semestral", "anual"])
     .optional(),
   // Retención acotada igual que en la BD: fuera de [0,100] daría un neto
   // negativo o mayor al bruto.
-  dividendWithholdingPct: z.number().min(0).max(100).optional(),
-  dividendNextDate: z.string().optional(),
+  payoutWithholdingPct: z.number().min(0).max(100).optional(),
+  payoutNextDate: z.string().optional(),
   // Aporte mensual del recurrente (separado del total invertido).
   monthlyContribution: z.number().nonnegative().optional(),
   // Fase 4.1: registrar la compra/aporte como gasto vinculado en Base

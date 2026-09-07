@@ -139,7 +139,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   // ── Dividendos ──────────────────────────────────────────────────────────
   // Dos fuentes, y la CONFIG manda sobre el historial:
   //
-  //  · Si el holding tiene dividendos configurados (`pays_dividends`), la
+  //  · Si el holding tiene dividendos configurados (`payout_enabled`), la
   //    proyección sale de esa config, con el monto NETO de retención. Es lo que
   //    el usuario declaró que va a cobrar, y está disponible desde el primer día
   //    — sin esperar 12 meses de historial.
@@ -170,16 +170,16 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
   const configurados = await supabase
     .from("investment_holdings")
     .select(
-      "id,label,symbol,currency,quantity,average_cost,current_value_manual,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct",
+      "id,label,symbol,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct",
     )
     .eq("user_id", user.id)
-    .eq("pays_dividends", true);
+    .eq("payout_enabled", true);
   const conHistorial =
     idsConHistorial.length > 0
       ? await supabase
           .from("investment_holdings")
           .select(
-            "id,label,symbol,currency,quantity,average_cost,current_value_manual,pays_dividends,dividend_mode,dividend_yield_pct,dividend_amount,dividend_frequency,dividend_withholding_pct",
+            "id,label,symbol,currency,quantity,average_cost,current_value_manual,payout_enabled,payout_mode,payout_rate_pct,payout_amount,payout_frequency,payout_withholding_pct",
           )
           .eq("user_id", user.id)
           .in("id", idsConHistorial)
@@ -195,7 +195,7 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
     let monthly = 0;
     let currency = h.currency;
 
-    if (h.pays_dividends && esFrecuenciaPago(h.dividend_frequency)) {
+    if (h.payout_enabled && esFrecuenciaPago(h.payout_frequency)) {
       // Base del yield: el valor manual si lo hay, si no lo invertido. El valor
       // de MERCADO no se usa acá a propósito — esto corre en cada carga y no
       // puede depender de una llamada de precios que puede fallar o tardar.
@@ -203,11 +203,11 @@ export async function syncDerivedBudget(period: Period): Promise<void> {
       const base = Number(h.current_value_manual ?? 0) || invertido;
       monthly = calcularRendimiento(
         {
-          modo: (h.dividend_mode as "yield" | "manual") ?? "yield",
-          yieldPct: h.dividend_yield_pct,
-          montoPorPago: h.dividend_amount,
-          frecuencia: h.dividend_frequency,
-          retencionPct: h.dividend_withholding_pct,
+          modo: (h.payout_mode as "yield" | "manual") ?? "yield",
+          yieldPct: h.payout_rate_pct,
+          montoPorPago: h.payout_amount,
+          frecuencia: h.payout_frequency,
+          retencionPct: h.payout_withholding_pct,
         },
         base,
       ).netoMensual;
